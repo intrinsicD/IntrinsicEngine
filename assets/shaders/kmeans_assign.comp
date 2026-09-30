@@ -1,22 +1,21 @@
 #version 460
-// Batched nearest-centroid assignment through the shared device LBVH.
 #extension GL_GOOGLE_include_directive : require
-#include "include/point_lbvh.glsl"
-layout(local_size_x=256) in;
 #include "include/kmeans_state.glsl"
-layout(buffer_reference, scalar) readonly buffer FloatArrayRO { float Values[]; };
-layout(buffer_reference, scalar) buffer FloatArray { float Values[]; };
-layout(buffer_reference, scalar) buffer UIntArray { uint Values[]; };
-
-
-void main()
-{
-    uint i=gl_GlobalInvocationID.x;
-    if(i>=pc.PointCount || pc.StateBDA==uint64_t(0) || pc.NodesBDA==uint64_t(0))return;
-    KMeansStateRef state=KMeansStateRef(pc.StateBDA);
-    vec3 p=vec3(FloatArrayRO(state.PositionXBDA).Values[i],
-                FloatArrayRO(state.PositionYBDA).Values[i],FloatArrayRO(state.PositionZBDA).Values[i]);
-    LbvhNeighbor nearest=lbvhNearest(pc.NodesBDA,pc.ClusterCount,p);
-    UIntArray(state.LabelsBDA).Values[i]=nearest.index;
-    FloatArray(state.SquaredDistancesBDA).Values[i]=nearest.distance;
+layout(local_size_x=64) in;
+// Rows and centroid ranges are both paged; continuation retains the best pair.
+void main(){
+    uint row=pc.first+gl_GlobalInvocationID.x;
+    if(gl_GlobalInvocationID.x>=pc.count)return;
+    UInts labels=UInts(pc.labels);Floats distances=Floats(pc.distances);
+    if(pc.innerFirst==0)UInts(pc.previous).v[row]=labels.v[row];
+    uint best=pc.innerFirst==0?0:labels.v[row];
+    float value=pc.innerFirst==0?distance2(load3(pc.positions,row),load3(pc.centroids,0)):distances.v[row];
+    for(uint j=0;j<pc.innerCount;++j){uint c=pc.innerFirst+j;
+        float d=distance2(load3(pc.positions,row),load3(pc.centroids,c));
+        if(d<value){value=d;best=c;}}
+    labels.v[row]=best;distances.v[row]=value;
+    if(pc.innerFirst+pc.innerCount==pc.clusters){
+        if(best!=UInts(pc.previous).v[row])atomicOr(Stats(pc.stats).changed,1);
+        if(isnan(value)||isinf(value))atomicOr(Stats(pc.stats).invalid,1);
+    }
 }

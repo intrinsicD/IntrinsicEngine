@@ -31,6 +31,7 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.Runtime.ClusteringModule;
+import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
@@ -456,6 +457,7 @@ namespace
         config.Simulation.WorkerThreadCount = 1u;
 
         Runtime::Engine engine{std::move(config)};
+        engine.EmplaceModule<Runtime::SpatialIndexCache>();
         engine.EmplaceModule<Runtime::ClusteringModule>();
         auto driver =
             std::make_unique<ClusteringBenchmarkDriver>(engine, fixture);

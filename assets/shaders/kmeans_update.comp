@@ -1,111 +1,31 @@
 #version 460
 #extension GL_GOOGLE_include_directive : require
-
-// GEOM-056 Slice B — k-means centroid update.
-//
-// One invocation per cluster: scan the current labels, recompute the centroid as
-// the mean of its assigned points, or, when the cluster is empty, reseed it to
-// the farthest point recorded in the per-point squared-distance buffer. The scan
-// is intentionally portable: it avoids optional float atomics and replaces the
-// earlier global atomic-add reduction until the shared segmented-reduction
-// primitive lands.
-//
-// Requires an execution/memory barrier after the assignment pass so Sums,
-// Counts, and the packed argmax are visible here (the runtime recorder inserts
-// ShaderWrite -> ShaderRead between passes).
-
-#extension GL_EXT_scalar_block_layout : require
-#extension GL_EXT_buffer_reference2 : require
-#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
-
-layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
-
 #include "include/kmeans_state.glsl"
-
-layout(buffer_reference, scalar) readonly buffer FloatArrayRO { float Values[]; };
-layout(buffer_reference, scalar) readonly buffer UIntArrayRO { uint Values[]; };
-layout(buffer_reference, scalar) buffer FloatArray { float Values[]; };
-
-void main()
-{
-    const uint cluster = gl_GlobalInvocationID.x;
-    if (cluster >= pc.ClusterCount || pc.StateBDA == uint64_t(0))
-    {
-        return;
+layout(local_size_x=64) in;
+shared dvec3 partial[64];
+shared uint sizes[64];
+// One fixed 64-lane tree per centroid/page. Lane zero combines page sums in
+// dispatch order; no floating atomics or scheduler-dependent accumulation.
+void main(){
+    uint lane=gl_LocalInvocationID.x;
+    uint c=pc.first+gl_WorkGroupID.x;
+    precise dvec3 sum=dvec3(0);uint count=0;
+    for(uint j=lane;j<pc.innerCount;j+=64){uint row=pc.innerFirst+j;
+        if(UInts(pc.labels).v[row]==c){sum+=dvec3(load3(pc.positions,row));++count;}}
+    partial[lane]=sum;sizes[lane]=count;barrier();
+    for(uint stride=32;stride>0;stride>>=1){
+        if(lane<stride){partial[lane]+=partial[lane+stride];sizes[lane]+=sizes[lane+stride];}
+        barrier();
     }
-
-    KMeansStateRef state = KMeansStateRef(pc.StateBDA);
-    FloatArray centroids = FloatArray(state.CentroidsBDA);
-
-    const float oldX = centroids.Values[cluster * 3u + 0u];
-    const float oldY = centroids.Values[cluster * 3u + 1u];
-    const float oldZ = centroids.Values[cluster * 3u + 2u];
-
-    FloatArrayRO px = FloatArrayRO(state.PositionXBDA);
-    FloatArrayRO py = FloatArrayRO(state.PositionYBDA);
-    FloatArrayRO pz = FloatArrayRO(state.PositionZBDA);
-    UIntArrayRO labels = UIntArrayRO(state.LabelsBDA);
-    FloatArrayRO distances = FloatArrayRO(state.SquaredDistancesBDA);
-
-    float sumX = 0.0;
-    float sumY = 0.0;
-    float sumZ = 0.0;
-    uint count = 0u;
-    uint farthest = 0u;
-    float farthestDistance = -1.0;
-
-    for (uint index = 0u; index < pc.PointCount; ++index)
-    {
-        if (labels.Values[index] == cluster)
-        {
-            sumX += px.Values[index];
-            sumY += py.Values[index];
-            sumZ += pz.Values[index];
-            ++count;
-        }
-
-        const float distance = distances.Values[index];
-        if (distance > farthestDistance)
-        {
-            farthestDistance = distance;
-            farthest = index;
-        }
-    }
-
-    float newX;
-    float newY;
-    float newZ;
-    if (count > 0u)
-    {
-        const float inv = 1.0 / float(count);
-        newX = sumX * inv;
-        newY = sumY * inv;
-        newZ = sumZ * inv;
-    }
-    else
-    {
-        if (farthest >= pc.PointCount)
-        {
-            farthest = 0u;
-        }
-        newX = px.Values[farthest];
-        newY = py.Values[farthest];
-        newZ = pz.Values[farthest];
-    }
-
-    centroids.Values[cluster * 3u + 0u] = newX;
-    centroids.Values[cluster * 3u + 1u] = newY;
-    centroids.Values[cluster * 3u + 2u] = newZ;
-
-    const float sdx = newX - oldX;
-    const float sdy = newY - oldY;
-    const float sdz = newZ - oldZ;
-    const float shiftSquared = sdx * sdx + sdy * sdy + sdz * sdz;
-
-    if (state.ReductionBDA != uint64_t(0))
-    {
-        // shiftSquared >= 0, so its float bits are monotonic under atomicMax.
-        atomicMax(KMeansReductionRef(state.ReductionBDA).MaxShiftBits,
-                  floatBitsToUint(shiftSquared));
+    if(lane!=0)return;
+    Doubles sums=Doubles(pc.sums);
+    precise dvec3 total=partial[0];count=sizes[0];
+    if(pc.innerFirst!=0){total+=dvec3(sums.v[c*3],sums.v[c*3+1],sums.v[c*3+2]);count+=UInts(pc.counts).v[c];}
+    sums.v[c*3]=total.x;sums.v[c*3+1]=total.y;sums.v[c*3+2]=total.z;UInts(pc.counts).v[c]=count;
+    if(pc.innerFirst+pc.innerCount==pc.points){
+        precise vec3 next=count>0?vec3(total/double(count)):load3(pc.positions,Stats(pc.stats).maxDistanceIndex);
+        float shift=distance2(load3(pc.centroids,c),next);
+        if(any(isnan(next))||any(isinf(next))||isnan(shift)||isinf(shift))atomicOr(Stats(pc.stats).invalid,1);
+        atomicMax(Stats(pc.stats).maxShift,floatBitsToUint(shift));store3(pc.centroids,c,next);
     }
 }

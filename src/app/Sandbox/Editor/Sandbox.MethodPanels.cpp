@@ -35,6 +35,7 @@ import Extrinsic.Sandbox.Editor.Shell;
 
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
@@ -479,15 +480,18 @@ namespace Extrinsic::Sandbox::Editor
         {
             ProcessingEntityInput Input{};
             std::optional<Runtime::KMeansRunCompleted> LastResult{};
+            Runtime::CommandCorrelationId LastServiceResult{};
+            Runtime::CommandCorrelationId ActiveGpuCorrelation{};
             std::optional<Runtime::RuntimeEngineConfigApplyResult>
                 LastConfigApply{};
             Runtime::KMeansPropertyRefs Properties{};
             std::uint32_t Entity{};
             std::string VisualizationDiagnostic{};
             std::int32_t Backend{0};
-            std::int32_t ClusterCount{8};
+            std::uint32_t ClusterCount{8u};
             std::int32_t MaxIterations{32};
             std::uint32_t Seed{42u};
+            std::uint32_t GpuPreviewInterval{5u};
             bool UseHierarchicalInitialization{true};
             bool Initialized{false};
             bool Dirty{false};
@@ -1728,6 +1732,13 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::End();
         }
 
+        void SetKMeansSubmission(const Runtime::KMeansRunCompleted& result)
+        {
+            KMeans.LastResult=result;
+            if(result.Correlation.IsValid() && result.RequestedBackend==Runtime::ClusteringBackend::VulkanCompute)
+                KMeans.ActiveGpuCorrelation=result.Correlation;
+        }
+
         void DrawKMeansControls(
             const Runtime::EditorDomainWindowModel& model,
             const SandboxEditorContext& context)
@@ -1735,8 +1746,11 @@ namespace Extrinsic::Sandbox::Editor
             const auto& service = PointCloudServiceFrame(context);
             ImGui::SeparatorText("K-Means execution");
 
-            if (service.Results.LastKMeansResult.has_value())
+            if (service.Results.LastKMeansResult && service.Results.LastKMeansResult->Correlation != KMeans.LastServiceResult)
+            {
+                KMeans.LastServiceResult = service.Results.LastKMeansResult->Correlation;
                 KMeans.LastResult = *service.Results.LastKMeansResult;
+            }
             if (!KMeans.Initialized || !KMeans.Dirty)
             {
                 const std::optional<Runtime::ClusteringConfig> active =
@@ -1744,11 +1758,11 @@ namespace Extrinsic::Sandbox::Editor
                 if (active.has_value())
                 {
                     KMeans.Backend = IndexOfOption(kKMeansBackends, active->Backend);
-                    KMeans.ClusterCount = static_cast<std::int32_t>(
-                        active->Parameters.ClusterCount);
+                    KMeans.ClusterCount = active->Parameters.ClusterCount;
                     KMeans.MaxIterations = static_cast<std::int32_t>(
                         active->Parameters.MaxIterations);
                     KMeans.Seed = active->Parameters.Seed;
+                    KMeans.GpuPreviewInterval = active->Parameters.GpuPreviewInterval;
                     KMeans.UseHierarchicalInitialization =
                         active->Parameters.Initialization ==
                         Runtime::KMeansInitialization::Hierarchical;
@@ -1820,12 +1834,8 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::EndCombo();
             }
 
-            bool configChanged = ImGui::DragInt(
-                "Clusters##KMeans",
-                &KMeans.ClusterCount,
-                1.0f,
-                1,
-                1024);
+            bool configChanged = ImGui::InputScalar(
+                "Clusters##KMeans", ImGuiDataType_U32, &KMeans.ClusterCount);
             configChanged |= ImGui::DragInt(
                 "Max iterations##KMeans",
                 &KMeans.MaxIterations,
@@ -1836,12 +1846,14 @@ namespace Extrinsic::Sandbox::Editor
                 "Seed##KMeans",
                 ImGuiDataType_U32,
                 &KMeans.Seed);
-            KMeans.ClusterCount = std::clamp(KMeans.ClusterCount, 1, 1024);
+            KMeans.ClusterCount = std::clamp(KMeans.ClusterCount, 1u, 1024u);
             KMeans.MaxIterations =
                 std::clamp(KMeans.MaxIterations, 1, 4096);
             configChanged |= ImGui::Checkbox(
                 "Hierarchical initialization##KMeans",
                 &KMeans.UseHierarchicalInitialization);
+            configChanged |= ImGui::InputScalar("GPU preview interval##KMeans", ImGuiDataType_U32, &KMeans.GpuPreviewInterval);
+            KMeans.GpuPreviewInterval = std::clamp(KMeans.GpuPreviewInterval, 1u, 1000000u);
             KMeans.Dirty |= configChanged;
 
             const Runtime::ClusteringBackend backend =
@@ -1853,6 +1865,7 @@ namespace Extrinsic::Sandbox::Editor
                     .MaxIterations = static_cast<std::uint32_t>(
                         KMeans.MaxIterations),
                     .Seed = KMeans.Seed,
+                    .GpuPreviewInterval = KMeans.GpuPreviewInterval,
                     .Initialization = KMeans.UseHierarchicalInitialization
                         ? Runtime::KMeansInitialization::Hierarchical
                         : Runtime::KMeansInitialization::Random,
@@ -1885,11 +1898,35 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::EndDisabled();
 
             const bool clusteringAvailable = service.ClusteringAvailable;
-            const Runtime::RunKMeans request = Runtime::MakeConfiguredKMeansRequest(
+            Runtime::RunKMeans request = Runtime::MakeConfiguredKMeansRequest(
                 model.SelectedStableId, KMeans.Properties, clusteringConfig);
+            request.AutoAccept = false;
+            bool pendingGpuRun = false;
+            if (service.Clustering && KMeans.ActiveGpuCorrelation.IsValid())
+            {
+                const auto id = KMeans.ActiveGpuCorrelation;
+                const auto run = service.Clustering->GpuRun(id);
+                pendingGpuRun = run.Running || run.ReadyToAccept || run.Accepting;
+                if (run.Running || run.ReadyToAccept || run.Accepting)
+                {
+                    ImGui::TextWrapped("%s", run.Message.c_str());
+                    ImGui::Text("Iterations: %u  submissions: %u  previews: %u", run.Iterations, run.Submissions, run.Previews);
+                    ImGui::Text("Input: %llu bytes / %llu hits; CPU stages: %llu up / %llu down",
+                        (unsigned long long)run.InputUploadBytes, (unsigned long long)run.InputCacheHits,
+                        (unsigned long long)run.CpuStageUploadBytes, (unsigned long long)run.CpuStageReadbackBytes);
+                    ImGui::BeginDisabled(!run.Running);
+                    if (ImGui::Button("Stop##KMeans")) (void)service.Clustering->GpuRun(id, Runtime::KMeansGpuAction::Stop);
+                    ImGui::EndDisabled(); ImGui::SameLine();
+                    ImGui::BeginDisabled(!run.CanAccept);
+                    if (ImGui::Button("Accept##KMeans")) (void)service.Clustering->GpuRun(id, Runtime::KMeansGpuAction::Accept);
+                    ImGui::EndDisabled(); ImGui::SameLine();
+                    if (ImGui::Button("Discard##KMeans")) (void)service.Clustering->GpuRun(id, Runtime::KMeansGpuAction::Discard);
+                }
+            }
             const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
                 service.Commands,
                 Runtime::PreviewEditorKMeansRun(service.Commands, service.Clustering, request));
+            ImGui::BeginDisabled(pendingGpuRun);
             if (DrawProcessingActionButton("Run K-Means##KMeans", readiness))
             {
                 KMeans.LastConfigApply =
@@ -1900,12 +1937,10 @@ namespace Extrinsic::Sandbox::Editor
                 if (KMeans.LastConfigApply->Succeeded())
                 {
                     KMeans.Dirty = false;
-                    KMeans.LastResult = Runtime::SubmitKMeansRun(
-                        service.Commands,
-                        service.Clustering,
-                        request);
+                    SetKMeansSubmission(Runtime::SubmitKMeansRun(service.Commands, service.Clustering, request));
                 }
             }
+            ImGui::EndDisabled();
             ImGui::SeparatorText("Display output properties");
             DrawProcessingPropertyShowButton(context, model.SelectedStableId, KMeans.Properties.OutputLabels, KMeans.VisualizationDiagnostic);
             DrawProcessingPropertyShowButton(context, model.SelectedStableId, KMeans.Properties.OutputColors, KMeans.VisualizationDiagnostic);
@@ -1966,6 +2001,9 @@ namespace Extrinsic::Sandbox::Editor
                     result.Converged ? "yes" : "no",
                     static_cast<double>(result.Inertia));
             }
+            ImGui::Text("Input: %llu bytes / %llu hits; CPU stages: %llu up / %llu down",
+                (unsigned long long)result.GpuInputUploadBytes, (unsigned long long)result.GpuInputCacheHits,
+                (unsigned long long)result.CpuStageUploadBytes, (unsigned long long)result.CpuStageReadbackBytes);
             if (!result.BackendDiagnostic.empty())
             {
                 ImGui::TextWrapped(
@@ -3886,6 +3924,11 @@ namespace Extrinsic::Sandbox::Editor
     {
         m_Impl->Unregister();
     }
+
+    void MethodPanels::InjectKMeansSubmissionForTest(const Runtime::KMeansRunCompleted& result)
+    { m_Impl->SetKMeansSubmission(result); }
+    Runtime::CommandCorrelationId MethodPanels::KMeansGpuCorrelationForTest() const
+    { return m_Impl->KMeans.ActiveGpuCorrelation; }
 
     void MethodPanels::Register(EditorShell& editorShell)
     {

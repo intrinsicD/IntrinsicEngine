@@ -32,6 +32,7 @@ import Extrinsic.Runtime.RegistrationOperations;
 import Extrinsic.Runtime.PointSamplingOperations;
 import Extrinsic.Runtime.PointCloudServiceOperations;
 import Extrinsic.Runtime.PointCloudConsolidationTypes;
+import Extrinsic.Runtime.ClusteringConfig;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.VisualizationEditingOperations;
@@ -538,6 +539,53 @@ namespace Extrinsic::Runtime
                 return true;
             }};
         }
+        AgentOperationOutcome RunKMeansOperation(const AgentOperationContext& context, std::string_view arguments)
+        {
+            if (!context.Attachment || !context.Attachment->IsAttached()) return Fail(kNoWorkspace);
+            const auto args=ParseObject(arguments);
+            const auto entity=args?UInt(*args,"entity"):std::nullopt;
+            const auto name=args?String(*args,"domain"):std::nullopt;
+            GeometryElementDomain domain=GeometryElementDomain::Unknown;
+            for (unsigned i=1;i<=unsigned(GeometryElementDomain::PointCloudPoint);++i)
+                if(name&&*name==ToString(static_cast<GeometryElementDomain>(i)))domain=static_cast<GeometryElementDomain>(i);
+            if(!entity||domain==GeometryElementDomain::Unknown)return Fail("Expected an entity ID and property domain.");
+            const auto frame=PrepareEditorPointCloudServiceFrame(*context.Attachment);
+            const auto config=GetEditorClusteringConfig(frame.Commands);
+            if(!config||!frame.ClusteringAvailable)return Fail("Clustering is unavailable.");
+            auto refs=config->Properties.value_or(MakeKMeansPropertyRefs(domain));
+            if(const auto positions=String(*args,"positions"))refs.InputPositions.Name=*positions;
+            auto request=MakeConfiguredKMeansRequest(*entity,std::move(refs),*config);
+            request.AutoAccept=true;
+            struct Pending
+            {
+                CommandCorrelationId Correlation{};
+                std::optional<KMeansRunCompleted> Result{};
+                ClusteringService* Service{};
+                KernelEventSubscription Subscription{};
+                void Release(){if(Service&&Subscription.IsValid())Service->Unsubscribe(Subscription);Subscription={};}
+                ~Pending(){Release();}
+            };
+            auto pending=std::make_shared<Pending>();pending->Service=frame.Clustering;
+            pending->Subscription=pending->Service->SubscribeRunCompleted([weak=std::weak_ptr<Pending>(pending)](const KMeansRunCompleted& result){
+                if(auto p=weak.lock();p&&p->Correlation==result.Correlation)p->Result=result;
+            });
+            const auto submitted=SubmitKMeansRun(frame.Commands,frame.Clustering,request);
+            pending->Correlation=submitted.Correlation;
+            if(submitted.Status!=KMeansRunStatus::Queued){pending->Release();return Fail(submitted.Message);}
+            return {.Continuation=[pending](const AgentOperationContext& current,AgentOperationOutcome& out){
+                if(!current.Attachment||!current.Attachment->IsAttached()){pending->Release();out=Fail(kNoWorkspace);return true;}
+                if(!pending->Result)return false;
+                pending->Release();const auto& r=*pending->Result;
+                out={.IsError=!r.Succeeded(),.Text=Dump(Json{
+                    {"status",ToString(r.Status)},{"message",r.Message},{"succeeded",r.Succeeded()},
+                    {"requested_backend",ToString(r.RequestedBackend)},{"actual_backend",ToString(r.ActualBackend)},
+                    {"implementation_id",r.ImplementationId},{"backend_diagnostic",r.BackendDiagnostic},{"fell_back_to_cpu",r.FellBackToCpu},
+                    {"gpu_input_upload_bytes",r.GpuInputUploadBytes},{"gpu_input_cache_hits",r.GpuInputCacheHits},
+                    {"cpu_stage_upload_bytes",r.CpuStageUploadBytes},{"cpu_stage_readback_bytes",r.CpuStageReadbackBytes},
+                    {"gpu_submissions",r.GpuSubmissions},{"gpu_previews",r.GpuPreviews},
+                    {"iterations",r.Iterations},{"converged",r.Converged},{"inertia",r.Inertia}})};return true;
+            }};
+        }
         AgentOperationOutcome RunConsolidation(const AgentOperationContext& context, std::string_view arguments)
         {
             if (!context.Attachment || !context.Attachment->IsAttached()) return Fail(kNoWorkspace);
@@ -720,6 +768,10 @@ namespace Extrinsic::Runtime
             "Order the configured entity's points with the chosen sampling method (sandbox.point_sampling; config_apply "
             "first) and publish rank/selection properties or a new point cloud as one undoable step.",
             none, false, [](const AgentOperationContext& c, std::string_view) { return RunPointSampling(c, false); });
+        add("run_kmeans", "Run K-Means",
+            "Cluster the configured point property (sandbox.clustering); GPU results auto-accept atomically. Reports backend and IO.",
+            Schema(R"({"entity":{"type":"integer","minimum":1},"domain":{"type":"string"},"positions":{"type":"string"}})",
+                R"(["entity","domain"])") , false, RunKMeansOperation);
         add("run_point_cloud_consolidation", "Run point-cloud consolidation",
             "Consolidate the named vec3 point property using sandbox.point_cloud_consolidation; GPU runs auto-accept. Reports backend and IO.",
             Schema(R"({"entity":{"type":"integer","minimum":1},"domain":{"type":"string","enum":["MeshVertex","MeshEdge","MeshHalfedge","MeshFace","GraphNode","GraphHalfedge","GraphEdge","PointCloudPoint"]},"positions":{"type":"string","default":"v:position"}})",

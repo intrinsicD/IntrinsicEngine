@@ -1,4 +1,4 @@
-// One-shot resident scalar previews shared by density, spacing and density weights.
+// Resident scalar previews and typed, undoable publication for point methods.
 module;
 #include <cstdint>
 #include <cstddef>
@@ -6,11 +6,14 @@ module;
 #include <memory>
 #include <string>
 #include <vector>
+#include <span>
+#include <optional>
 export module Extrinsic.Runtime.PointScalarTransaction;
 export import Extrinsic.Runtime.EditorProcessing;
 export import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Graphics.PointScalarAnalysis;
-import Extrinsic.Graphics.GpuPropertyResidency;
+export import Extrinsic.Graphics.GpuPropertyResidency;
+export import Extrinsic.Runtime.GeometryProperty.Types;
 export namespace Extrinsic::Runtime
 {
     struct EditorPointScalarTransaction;
@@ -26,6 +29,28 @@ export namespace Extrinsic::Runtime
         std::size_t LiveCount{};
         Graphics::PointScalarGpuStats Statistics{};
     };
+    // External producers retain their numerical workspace; this transaction owns the
+    // typed ring, float presentation ring, Accept readback and exactly-once delivery.
+    struct EditorPointScalarPublication
+    {
+        std::uint32_t EntityId{}, Count{};
+        GeometryPropertyRef Output{};
+        std::string Label{};
+        std::function<bool()> Current{};
+        std::function<EditorCommandStatus(std::span<const std::byte>)> Publish{};
+    };
+    [[nodiscard]] EditorPointScalarTransactionHandle BeginEditorPointScalarPublication(
+        const EditorProcessingCommands&, EditorPointScalarPublication,
+        EditorPointScalarTransactionSnapshot&,
+        std::function<void(EditorPointScalarTransactionSnapshot)> sink = {});
+    struct EditorPointScalarBack
+    {
+        Graphics::GpuPropertyView Typed{}, Presentation{};
+    };
+    [[nodiscard]] std::optional<EditorPointScalarBack> AcquireEditorPointScalarBack(
+        const EditorPointScalarTransactionHandle&);
+    // Call only after the producer completion, after releasing its back leases.
+    [[nodiscard]] bool PublishEditorPointScalarBack(const EditorPointScalarTransactionHandle&, bool ready);
     [[nodiscard]] EditorPointScalarTransactionSnapshot SnapshotEditorPointScalar(
         const EditorProcessingCommands&,const EditorPointScalarTransactionHandle&);
     // A nonempty Accept sink replaces the Start sink after admission succeeds.

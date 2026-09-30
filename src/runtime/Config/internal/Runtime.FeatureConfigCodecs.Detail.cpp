@@ -1379,6 +1379,7 @@ namespace Extrinsic::Runtime
                 context,
                 *object,
                 {"cluster_count",
+                 "gpu_preview_interval",
                  "max_iterations",
                  "seed",
                  "initialization",
@@ -1388,6 +1389,11 @@ namespace Extrinsic::Runtime
             {
                 config.Parameters.ClusterCount =
                     static_cast<std::uint32_t>(*value);
+                CountParsed(context);
+            }
+            if (const auto value = ReadInteger(context, *object, "gpu_preview_interval", 1, 1000000))
+            {
+                config.Parameters.GpuPreviewInterval = static_cast<std::uint32_t>(*value);
                 CountParsed(context);
             }
             if (const auto value = ReadInteger(
@@ -2708,6 +2714,7 @@ namespace Extrinsic::Runtime
         return ConfigDetail::SerializeConfigJson(json::object({
             {"properties", properties},
             {"cluster_count", config.Parameters.ClusterCount},
+            {"gpu_preview_interval", config.Parameters.GpuPreviewInterval},
             {"max_iterations", config.Parameters.MaxIterations},
             {"seed", config.Parameters.Seed},
             {"initialization",

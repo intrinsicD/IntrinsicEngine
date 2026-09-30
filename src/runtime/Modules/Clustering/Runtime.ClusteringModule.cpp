@@ -22,6 +22,8 @@ module;
 module Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.EditorProcessing;
+import Extrinsic.Runtime.EditorCommon;
+import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.EditorJobProjection;
 
 import Extrinsic.Runtime.Module;
@@ -408,6 +410,8 @@ namespace Extrinsic::Runtime
             result.Completion.ActualBackend = actualBackend;
             result.Completion.FellBackToCpu = clustered.FellBackToCPU;
             result.Completion.BackendDiagnostic = result.Snapshot.BackendDiagnostic;
+            result.Completion.ImplementationId = actualBackend == ClusteringBackend::CpuReference ? "geometry_kmeans_cpu_reference" : "vulkan_resident_paged_lloyd";
+            result.Completion.Centroids = clustered.Centroids;
             if (result.Completion.FellBackToCpu)
             {
                 result.Completion.BackendDiagnostic =
@@ -961,55 +965,26 @@ namespace Extrinsic::Runtime
             return CommandOutcome::Ok();
         }
 
-        void HandleGpuResult(
-            ClusteringGpuResult result,
-            JobService* jobs,
-            WorldRegistry* worlds,
-            KernelEventBus* events,
-            EditorCommandHistory* history,
-            ClusteringModuleStats& stats)
+        void HandleGpuResult(ClusteringGpuResult result, KernelEventBus* events, ClusteringModuleStats& stats)
         {
-            if (result.Succeeded())
+            auto completed = std::move(result.Published);
+            if (completed.Succeeded())
             {
-                stats.GpuCompletions += 1u;
-                KMeansJobResult completed = MakeCompletedResult(
-                    std::move(result.Snapshot),
-                    std::move(*result.Clustered),
-                    ClusteringBackend::VulkanCompute);
-                HandleJobCompletedEvent(
-                    KMeansJobCompleted{.Result = std::move(completed)},
-                    worlds,
-                    events,
-                    history,
-                    stats);
-                return;
+                ++stats.GpuCompletions;
+                ++stats.LabelsCommitted;
+                if (events) events->Publish(ClusterLabelsChanged{
+                    .Correlation=completed.Correlation,.World=completed.World,
+                    .Labels=completed.Properties.OutputLabels,.Colors=completed.Properties.OutputColors,
+                    .StableEntityId=completed.StableEntityId,.LabelCount=completed.LabelCount});
             }
-
-            stats.GpuFallbacks += 1u;
-            result.Snapshot.BackendDiagnostic = result.Diagnostic.empty()
-                ? "K-Means Vulkan execution failed; the CPU reference completed the request."
-                : result.Diagnostic +
-                      " The CPU reference completed the request.";
-            if (jobs == nullptr)
-            {
-                KMeansRunCompleted failed = MakeCompletion(
-                    result.Snapshot.Command,
-                    result.Snapshot.World,
-                    result.Snapshot.Correlation,
-                    KMeansRunStatus::GeometryProcessingFailed,
-                    Core::ErrorCode::InvalidState,
-                    "K-Means Vulkan execution failed and JobService is unavailable for CPU fallback.");
-                PublishCompletion(events, std::move(failed));
-                return;
-            }
-            (void)SubmitCpuSnapshot(
-                *jobs, events, std::move(result.Snapshot), stats);
+            PublishCompletion(events, std::move(completed));
         }
 
         [[nodiscard]] CommandOutcome HandleRunKMeansCommand(
             CommandContext& context,
             const RunKMeans& command,
             ClusteringGpuState* gpuState,
+            SpatialIndexCache* spatialIndices, RHI::IDevice* device, EditorCommandHistory* history,
             ClusteringModuleStats& stats)
         {
             stats.CommandsHandled += 1u;
@@ -1051,18 +1026,54 @@ namespace Extrinsic::Runtime
 
             if (command.Backend == ClusteringBackend::VulkanCompute)
             {
+                EditorProcessingContext processing{};
+                processing.Scene = &context.ActiveWorld; processing.World = world;
+                processing.CommandHistory = history; processing.SpatialIndices = spatialIndices; processing.Device = device;
+                processing.AttachmentActive = [worlds=context.Worlds,world,scene=processing.Scene,attached=command.AttachmentActive] {
+                    return worlds && worlds->ActiveWorld()==world && worlds->Get(world)==scene && (!attached || attached());
+                };
+                processing.JobCommands.Submit = [jobs=context.Jobs](JobDesc desc, EditorJobIdentity) {return jobs->Submit(std::move(desc));};
+                const auto captured = std::make_shared<KMeansSnapshot>();
+                const auto entity = SelectionController::ToEntityHandle(command.StableEntityId);
+                const auto availability = BuildGeometryAvailability(processing.Scene->Raw(), entity);
+                std::vector<GeometryProcessingDetail::PointPropertyWatch> watches;
+                const auto watch = [&](const GeometryPropertyRef& ref) {
+                    watches.push_back(GeometryProcessingDetail::ObserveGeometryProperty(availability, ref.Domain, ref.Name));
+                };
+                watch(command.Properties.InputPositions); watch(command.Properties.OutputLabels); watch(command.Properties.OutputColors);
+                if (command.Properties.OutputScalarLabels) watch(*command.Properties.OutputScalarLabels);
+                const auto deletion = GeometryProcessingDetail::ResolvePointDeletionSource(command.Properties.InputPositions.Domain);
+                watches.push_back(GeometryProcessingDetail::ObserveGeometryProperty(availability, deletion.Domain, deletion.Name));
+                // O(1) revision watches between pages; exact before/after validation is
+                // retained by CommitKMeansOutputs at the publication boundary.
+                const auto current = [processing, entity, watches=std::move(watches)] {
+                    return processing.AttachmentActive() && GeometryProcessingDetail::GeometryPropertiesCurrent(processing, entity, watches);
+                };
                 const ClusteringGpuSubmission submission = gpuState != nullptr
-                    ? gpuState->Start(*snapshot)
+                    ? gpuState->Start(*snapshot, processing, current,
+                        [captured,processing](const GK::KMeansResult& clustered) {
+                            const auto status=CommitKMeansOutputs(processing.Scene,processing.World,processing.CommandHistory,*captured,clustered);
+                            return status==EditorCommandHistoryStatus::Applied?EditorCommandStatus::Applied:
+                                status==EditorCommandHistoryStatus::StaleEntity?EditorCommandStatus::StaleEntity:EditorCommandStatus::GeometryProcessingFailed;
+                        })
                     : ClusteringGpuSubmission{
                           .Diagnostic =
                               "Clustering Vulkan state is unavailable.",
                       };
                 if (submission.Accepted)
                 {
+                    *captured=std::move(*snapshot);
                     stats.GpuRequestsAccepted += 1u;
                     return CommandOutcome::Ok();
                 }
 
+                if (submission.Refused)
+                {
+                    auto refused=MakeCompletion(command,world,context.Correlation,KMeansRunStatus::GeometryProcessingFailed,
+                        Core::ErrorCode::InvalidState,submission.Diagnostic);
+                    PublishCompletion(context.Events,std::move(refused));
+                    return CommandOutcome::Fail(submission.Diagnostic);
+                }
                 stats.GpuFallbacks += 1u;
                 snapshot->BackendDiagnostic = submission.Diagnostic.empty()
                     ? "K-Means Vulkan compute execution is unavailable; the CPU reference completed the request."
@@ -1093,6 +1104,9 @@ namespace Extrinsic::Runtime
         m_Jobs = &setup.Jobs();
         m_Worlds = &setup.Worlds();
         m_Service.Bind(&setup.Commands(), m_Events, &m_Stats);
+        m_Service.m_GpuRun = [this](CommandCorrelationId id, KMeansGpuAction action) {
+            return m_GpuState ? m_GpuState->GpuRun(id,action) : KMeansGpuObservation{};
+        };
 
         if (Core::Result provided =
                 setup.Services().Provide<ClusteringService>(
@@ -1130,12 +1144,7 @@ namespace Extrinsic::Runtime
                                    m_GpuState->ConsumeCompleted())
                         {
                             HandleGpuResult(
-                                std::move(*result),
-                                m_Jobs,
-                                m_Worlds,
-                                m_Events,
-                                m_History,
-                                m_Stats);
+                                std::move(*result), m_Events, m_Stats);
                         }
                     },
                     .HasInFlightWork = [this]() -> bool
@@ -1160,7 +1169,7 @@ namespace Extrinsic::Runtime
                 return HandleRunKMeansCommand(
                     context,
                     command,
-                    m_GpuState.get(),
+                    m_GpuState.get(), m_SpatialIndices, m_Device, m_History,
                     m_Stats);
             });
 
@@ -1193,11 +1202,13 @@ namespace Extrinsic::Runtime
     {
         m_History =
             setup.Services().Find<EditorCommandHistory>();
+        m_SpatialIndices = setup.Services().Find<SpatialIndexCache>();
         return Core::Ok();
     }
 
     void ClusteringModule::OnShutdown(RuntimeModuleShutdownContext& context)
     {
+        m_Service.m_GpuRun = {};
         if (m_Jobs != nullptr && m_Device != nullptr &&
             m_GpuParticipant.IsValid())
         {

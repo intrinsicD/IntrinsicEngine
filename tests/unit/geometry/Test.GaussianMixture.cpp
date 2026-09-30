@@ -362,7 +362,10 @@ TEST(GaussianMixture, RecoversSeparatedComponentsAndMonotonicLikelihood)
         2.0, 0.12);
     EXPECT_NEAR(result.Mixture.Weights[order[0]], 0.5, 0.05);
     EXPECT_NEAR(result.Mixture.Weights[order[1]], 0.5, 0.05);
-    EXPECT_GT(
+    // The k-means initializer (double centroid sums) can already sit on EM's fixed point
+    // for these well-separated clusters, so EM must not decrease the likelihood; it need
+    // not strictly increase it.
+    EXPECT_GE(
         result.Diagnostics.FinalLogLikelihood,
         result.Diagnostics.InitialLogLikelihood);
     ASSERT_FALSE(

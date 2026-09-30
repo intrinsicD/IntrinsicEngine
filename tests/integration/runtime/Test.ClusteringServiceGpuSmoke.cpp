@@ -13,6 +13,10 @@
 #include <glm/glm.hpp>
 
 #include "RuntimeTestModule.hpp"
+#include "Modules/Clustering/Runtime.KMeansPaging.TestSupport.hpp"
+#include <cstring>
+#include <format>
+#include <chrono>
 
 import Extrinsic.Backends.Vulkan;
 import Extrinsic.Core.Config.Engine;
@@ -21,6 +25,10 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.Runtime.ClusteringModule;
+import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.GpuPropertyBinding;
+import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
@@ -62,12 +70,12 @@ namespace
         property.Vector().assign(positions.begin(), positions.end());
     }
 
-    [[nodiscard]] GK::KMeansParams MakeCpuParameters()
+    [[nodiscard]] GK::KMeansParams MakeCpuParameters(const Runtime::KMeansParameters& parameters)
     {
         GK::KMeansParams params{};
-        params.ClusterCount = kParameters.ClusterCount;
-        params.MaxIterations = kParameters.MaxIterations;
-        params.Seed = kParameters.Seed;
+        params.ClusterCount = parameters.ClusterCount;
+        params.MaxIterations = parameters.MaxIterations;
+        params.Seed = parameters.Seed;
         params.Init = GK::Initialization::Hierarchical;
         params.Compute = GK::Backend::CPU;
         return params;
@@ -92,6 +100,10 @@ namespace
         : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
+        std::vector<glm::vec3> Points{kPoints.begin(),kPoints.end()};
+        Runtime::KMeansParameters Parameters{kParameters};
+        bool Deleted{};
+        std::chrono::steady_clock::time_point Started{std::chrono::steady_clock::now()};
         void Resolve() override
         {
             auto& engine = Kernel();
@@ -106,7 +118,9 @@ namespace
             auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
             Entity = scene.Create();
             auto& vertices = scene.Raw().emplace<GS::Vertices>(Entity);
-            SetPositions(vertices, kPoints);
+            SetPositions(vertices, Points);
+            if(Deleted)vertices.Properties.GetOrAdd<bool>("v:deleted",false)[1]=true;
+            (void)vertices.Properties.GetOrAdd<std::uint32_t>("p:kmeans_label",9u);
             StableEntityId =
                 Runtime::SelectionController::ToStableEntityId(Entity);
 
@@ -130,12 +144,48 @@ namespace
                     .StableEntityId = StableEntityId,
                     .Properties = Runtime::MakeKMeansPropertyRefs(
                         Runtime::GeometryElementDomain::PointCloudPoint),
-                    .Parameters = kParameters,
+                    .Parameters = Parameters,
                     .Backend = Runtime::ClusteringBackend::VulkanCompute,
+                    .AutoAccept = Repeated,
                 });
                 Submitted = true;
             }
 
+            if (Submitted && !Repeated && Service->GpuRun(Correlation).ReadyToAccept && !Preview)
+            {
+                auto* cache=engine.Services().Find<Runtime::SpatialIndexCache>();
+                auto& residency=*cache->PropertyResidency();
+                const auto refs=Runtime::MakeKMeansPropertyRefs(Runtime::GeometryElementDomain::PointCloudPoint);
+                auto& scene=*engine.Worlds().Get(engine.ActiveWorld());
+                const auto observed=Runtime::ObserveGpuPropertyFront(residency,scene,engine.ActiveWorld(),Entity,refs.OutputLabels);
+                if(observed){
+                    PreviewObserved=true;
+                    const auto front=residency.Front(Runtime::MakeGpuPropertyKey(engine.ActiveWorld(),Entity,
+                        Runtime::GpuPropertyPresentationRef(refs.OutputLabels)));
+                    const auto typed=residency.Front(Runtime::MakeGpuPropertyKey(engine.ActiveWorld(),Entity,refs.OutputLabels));
+                    if(typed)TypedPreview=cache->QueueGpuCompute(typed->Bytes,[typed](auto& cmd,const auto&){
+                        cmd.BufferBarrier(typed->Buffer,Extrinsic::RHI::MemoryAccess::ShaderWrite,Extrinsic::RHI::MemoryAccess::TransferRead);
+                        return typed->Buffer;
+                    },Runtime::SpatialGpuLatency::Immediate);
+                    if(front)Preview=cache->QueueGpuCompute(front->Bytes,[front](auto& cmd,const auto&){
+                        cmd.BufferBarrier(front->Buffer,Extrinsic::RHI::MemoryAccess::ShaderWrite,
+                            Extrinsic::RHI::MemoryAccess::TransferRead);return front->Buffer;
+                    },Runtime::SpatialGpuLatency::Immediate);
+                }
+            }
+            if(Preview && Preview->State==Runtime::SpatialQueryState::Ready && TypedPreview && TypedPreview->State==Runtime::SpatialQueryState::Ready && !DiscardSent && Service->GpuRun(Correlation).ReadyToAccept){
+                PreviewLabels.resize(Preview->Data.size()/4);std::memcpy(PreviewLabels.data(),Preview->Data.data(),Preview->Data.size());
+                TypedLabels.resize(TypedPreview->Data.size()/4);std::memcpy(TypedLabels.data(),TypedPreview->Data.data(),TypedPreview->Data.size());
+                (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Discard);DiscardSent=true;
+            }
+            if(Completion && !Repeated){
+                auto& properties=engine.Worlds().Get(engine.ActiveWorld())->Raw().get<GS::Vertices>(Entity).Properties;
+                const auto labels=std::as_const(properties).Get<std::uint32_t>("p:kmeans_label");
+                DiscardRestored=Completion->Status==Runtime::KMeansRunStatus::Cancelled && labels &&
+                    std::ranges::all_of(labels.Vector(),[](auto value){return value==9u;}) && !properties.Exists("p:kmeans_color");
+                FirstUploadBytes=Completion->GpuInputUploadBytes;FirstCentroids=Completion->Centroids;
+                Completion.reset();Repeated=true;Submitted=false;return;
+            }
             if (Completion.has_value())
             {
                 CaptureCommittedProperties();
@@ -144,7 +194,7 @@ namespace
                 return;
             }
 
-            if (Frames > 600u)
+            if (std::chrono::steady_clock::now()-Started > std::chrono::seconds(45))
             {
                 TimedOut = true;
                 engine.RequestExit();
@@ -187,10 +237,18 @@ namespace
         bool Submitted{false};
         bool TimedOut{false};
         bool ColorsCommitted{false};
+        bool Repeated{}, PreviewObserved{}, DiscardSent{}, DiscardRestored{};
+        std::uint64_t FirstUploadBytes{};
+        std::shared_ptr<Runtime::SpatialGpuResult> Preview{},TypedPreview{};
+        std::vector<std::uint32_t> TypedLabels{};
+        std::vector<glm::vec3> FirstCentroids{};
+        std::vector<float> PreviewLabels{};
     };
 }
 
-TEST(ClusteringServiceGpuSmoke,
+class ClusteringServiceGpuSmoke : public ::testing::TestWithParam<int> {};
+
+TEST_P(ClusteringServiceGpuSmoke,
      VulkanExecutionMatchesCpuReferenceAndCommitsCanonicalProperties)
 {
     if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
@@ -208,18 +266,35 @@ TEST(ClusteringServiceGpuSmoke,
     config.Render.EnableVSync = false;
     config.ReferenceScene.Enabled = false;
 
+    struct RestorePaging { Runtime::KMeansPagingLimits Before{Runtime::KMeansPagingForTesting};
+        ~RestorePaging(){Runtime::KMeansPagingForTesting=Before;} } restore;
+    Runtime::KMeansPagingForTesting={.PagePairs=2,.SubmissionPairs=8};
     auto app = std::make_unique<ClusteringServiceGpuApp>();
+    if(GetParam()==1){
+        app->Parameters.ClusterCount=3;
+        // Repeated seeds tie across centroid pages; index 1 also beats index 0.
+        app->Points={{0,0,0},{0,0,0},{0,0,0},{4,0,0},{4,0,0},{4,0,0}};
+    }
+    if(GetParam()==2){
+        app->Parameters.ClusterCount=8;app->Deleted=true;app->Points.clear();
+        std::uint32_t random=17;
+        for(unsigned i=0;i<2049;++i){
+            glm::vec3 point{float(i%8)*10,0,0};
+            for(int axis=0;axis<3;++axis){random=random*1664525u+1013904223u;point[axis]+=float(random>>8)/float(1u<<24);}
+            app->Points.push_back(point);
+        }
+        Runtime::KMeansPagingForTesting={.PagePairs=256,.SubmissionPairs=1u<<18};
+    }
     ClusteringServiceGpuApp* appPtr = app.get();
+    auto livePoints=appPtr->Points;if(appPtr->Deleted)livePoints.erase(livePoints.begin()+1);
     Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();
     engine.EmplaceModule<Runtime::ClusteringModule>();
     engine.Initialize();
 
-    const auto operationalInputs =
-        Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(
-            &engine.GetDevice());
-    if (!operationalInputs.LogicalDeviceReady ||
-        !operationalInputs.SwapchainReady ||
-        !operationalInputs.CommandSyncReady)
+    // IsOperational() stays false until the first clean frame; gate on bootstrap readiness.
+    const auto ready = Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(&engine.GetDevice());
+    if (!ready.LogicalDeviceReady || !ready.SwapchainReady || !ready.CommandSyncReady)
     {
         engine.Shutdown();
         GTEST_SKIP()
@@ -242,10 +317,16 @@ TEST(ClusteringServiceGpuSmoke,
               Runtime::ClusteringBackend::VulkanCompute);
     EXPECT_FALSE(appPtr->Completion->FellBackToCpu)
         << appPtr->Completion->BackendDiagnostic;
-    EXPECT_NE(appPtr->Completion->BackendDiagnostic.find("LBVH centroid assignment"), std::string::npos);
-    EXPECT_EQ(appPtr->Completion->LabelCount, kPoints.size());
+    EXPECT_EQ(appPtr->Completion->ImplementationId,"vulkan_resident_paged_lloyd");
+    EXPECT_TRUE(appPtr->PreviewObserved);EXPECT_TRUE(appPtr->DiscardRestored);
+    EXPECT_EQ(appPtr->FirstCentroids,appPtr->Completion->Centroids);
+    EXPECT_EQ(appPtr->FirstUploadBytes,appPtr->Points.size()*(appPtr->Deleted?16u:12u));
+    EXPECT_EQ(appPtr->Completion->GpuInputUploadBytes,0u);
+    EXPECT_GT(appPtr->Completion->GpuInputCacheHits,0u);
+    EXPECT_GT(appPtr->Completion->GpuSubmissions,6u);
+    EXPECT_EQ(appPtr->Completion->LabelCount, livePoints.size());
     EXPECT_EQ(appPtr->Completion->ClusterCount,
-              kParameters.ClusterCount);
+              appPtr->Parameters.ClusterCount);
     EXPECT_TRUE(appPtr->ColorsCommitted);
     ASSERT_TRUE(appPtr->LabelsChanged.has_value());
     EXPECT_EQ(appPtr->LabelsChanged->Correlation, appPtr->Correlation);
@@ -253,16 +334,35 @@ TEST(ClusteringServiceGpuSmoke,
     EXPECT_EQ(appPtr->LabelsChanged->Colors.Name, "p:kmeans_color");
 
     const std::optional<GK::KMeansResult> cpu = GK::Cluster(
-        std::span<const glm::vec3>{kPoints.data(), kPoints.size()},
-        MakeCpuParameters());
+        std::span<const glm::vec3>{livePoints},
+        MakeCpuParameters(appPtr->Parameters));
     ASSERT_TRUE(cpu.has_value());
+    ASSERT_EQ(appPtr->Labels.size(),appPtr->Points.size());
+    ASSERT_EQ(appPtr->TypedLabels.size(),appPtr->Points.size());
+    ASSERT_EQ(appPtr->PreviewLabels.size(),appPtr->Points.size());
+    if(appPtr->Deleted){
+        EXPECT_EQ(appPtr->Labels[1],9u);EXPECT_EQ(appPtr->TypedLabels[1],9u);EXPECT_EQ(appPtr->PreviewLabels[1],9.f);
+        appPtr->Labels.erase(appPtr->Labels.begin()+1);appPtr->TypedLabels.erase(appPtr->TypedLabels.begin()+1);
+        appPtr->PreviewLabels.erase(appPtr->PreviewLabels.begin()+1);
+    }
     ASSERT_EQ(appPtr->Labels.size(), cpu->Labels.size());
-    EXPECT_EQ(CountLabelMismatches(appPtr->Labels, cpu->Labels), 0u);
-    EXPECT_LT(std::abs(appPtr->Completion->Inertia - cpu->Inertia), 1.0e-4f);
+    EXPECT_EQ(appPtr->TypedLabels,cpu->Labels);
+    const auto mismatches=CountLabelMismatches(appPtr->Labels,cpu->Labels);
+    RecordProperty("label_mismatch_count",std::format("{:.17g}",double(mismatches)));EXPECT_EQ(mismatches,0u);
+    ASSERT_EQ(appPtr->Completion->Centroids.size(),cpu->Centroids.size());
+    float delta=0;
+    for(std::size_t i=0;i<cpu->Centroids.size();++i)for(int axis=0;axis<3;++axis)
+        delta=std::max(delta,std::abs(appPtr->Completion->Centroids[i][axis]-cpu->Centroids[i][axis]));
+    RecordProperty("centroid_linf_delta",std::format("{:.17g}",delta));EXPECT_LE(delta,1e-5f);
+    EXPECT_EQ(appPtr->Completion->Iterations,cpu->Iterations);
+    EXPECT_EQ(appPtr->Completion->Converged,cpu->Converged);
+    ASSERT_EQ(appPtr->PreviewLabels.size(),cpu->Labels.size());
+    for(std::size_t i=0;i<cpu->Labels.size();++i)EXPECT_EQ(appPtr->PreviewLabels[i],float(cpu->Labels[i]));
+    EXPECT_LE(std::abs(appPtr->Completion->Inertia - cpu->Inertia), 1.0e-4f*std::max(1.f,cpu->Inertia));
     EXPECT_EQ(appPtr->Completion->MaxDistanceIndex,
               cpu->MaxDistanceIndex);
 
-    EXPECT_EQ(appPtr->Stats.GpuRequestsAccepted, 1u);
+    EXPECT_EQ(appPtr->Stats.GpuRequestsAccepted, 2u);
     EXPECT_EQ(appPtr->Stats.GpuFallbacks, 0u);
     EXPECT_EQ(appPtr->Stats.GpuCompletions, 1u);
     EXPECT_EQ(appPtr->Stats.LabelsCommitted, 1u);
@@ -270,3 +370,5 @@ TEST(ClusteringServiceGpuSmoke,
 
     engine.Shutdown();
 }
+
+INSTANTIATE_TEST_SUITE_P(ResidentPages,ClusteringServiceGpuSmoke,::testing::Values(0,1,2));

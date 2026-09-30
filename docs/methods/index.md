@@ -1,6 +1,6 @@
 # Methods Documentation
 
-- [Point LBVH](../../methods/geometry/point_lbvh/README.md): nearest/radius queries, entity caching, and Vulkan k-means assignment.
+- [Point LBVH](../../methods/geometry/point_lbvh/README.md): nearest/radius queries and entity caching.
 
 This index is the canonical entry point for method/paper implementation documentation.
 
@@ -9,6 +9,8 @@ This index is the canonical entry point for method/paper implementation document
 - [Point sampling backend contract](point-sampling.md): resident FPS inputs, completion-only chunks, terminal publication and parity verification.
 
 - [Locally optimal projection](locally-optimal-projection.md): resident LOP inputs, completion paging and positions-run previews.
+
+- [K-means](kmeans.md): resident inputs, bounded Lloyd pages, typed label previews and atomic Accept.
 
 ## Start here
 

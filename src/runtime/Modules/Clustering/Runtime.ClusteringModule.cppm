@@ -23,7 +23,7 @@ import Extrinsic.Runtime.WorldHandle;
 extern "C++"
 {
     namespace Extrinsic::RHI { class IDevice; }
-    namespace Extrinsic::Runtime { class WorldRegistry; }
+    namespace Extrinsic::Runtime { class WorldRegistry; class SpatialIndexCache; }
 }
 
 namespace Extrinsic::Runtime
@@ -55,6 +55,7 @@ namespace Extrinsic::Runtime
         WorldRegistry* m_Worlds{};
         EditorCommandHistory* m_History{};
         RHI::IDevice* m_Device{};
+        SpatialIndexCache* m_SpatialIndices{};
         std::unique_ptr<ClusteringGpuState> m_GpuState{};
         GpuQueueParticipantHandle m_GpuParticipant{};
         ClusteringModuleStats m_Stats{};

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -914,4 +915,15 @@ TEST(PointCloud_GaussianNoise, SinglePointNonZeroScaleFailsClosed)
     const auto result = Geometry::PointCloud::ApplyGaussianNoise(cloud, {.StdDevFraction = 0.1F, .Seed = 1});
     EXPECT_EQ(result.Status, Geometry::PointCloud::GaussianNoiseStatus::DegenerateScale);
     EXPECT_EQ(result.DisplacedCount, 0u);
+}
+
+TEST(PointCloud_KMeans, CentroidAccumulationPreservesSmallTermsBetweenLargeCoordinates)
+{
+    const std::array<glm::vec3,3> points{{{1e8f,0,0},{1,0,0},{-1e8f,0,0}}};
+    Geometry::KMeans::KMeansParams params;
+    params.ClusterCount=1;params.MaxIterations=1;
+    const auto result=Geometry::KMeans::Cluster(points,params);
+    ASSERT_TRUE(result);ASSERT_EQ(result->Centroids.size(),1u);
+    EXPECT_FLOAT_EQ(result->Centroids[0].x,1.f/3.f);
+    EXPECT_EQ(result->Labels,(std::vector<std::uint32_t>{0,0,0}));
 }

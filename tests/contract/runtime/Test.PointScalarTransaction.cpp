@@ -28,6 +28,7 @@ import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.WorldRegistry;
+#include "Editor/internal/Runtime.EditorPointInputReadiness.hpp"
 namespace R=Extrinsic::Runtime;
 namespace G=Extrinsic::Graphics;
 namespace
@@ -193,4 +194,25 @@ TEST_P(PointScalarTransaction, ReplacedRingRefusesAcceptAndDiscardPreservesRepla
     EXPECT_EQ(Residency.RingGeneration(Key()),generation);
     EXPECT_TRUE(R::SnapshotEditorPointScalar(Commands(),replacement).CanAccept);
     R::DiscardEditorPointScalar(Commands(),replacement);
+}
+
+TEST_P(PointScalarTransaction, DestroyedWorldIsCheckedBeforeSceneAccess)
+{
+    R::WorldRegistry worlds;R::CommandBus bus;
+    Context.World=worlds.CreateWorld("scalar source");Context.Scene=worlds.Get(Context.World);
+    Context.PointInputReadiness=R::MakeEditorPointInputReadiness(worlds,&bus,&Jobs.Jobs());
+    Entity=Intrinsic::Tests::MakePointDomainSource(*Context.Scene,R::GeometryElementDomain::PointCloudPoint);
+    auto& rows=Intrinsic::Tests::PointDomainProperties(*Context.Scene,Entity,R::GeometryElementDomain::PointCloudPoint);
+    (void)rows.GetOrAdd<glm::vec3>("v:position",glm::vec3{0});
+    Density.StableEntityId=Spacing.StableEntityId=Weight.StableEntityId=R::SelectionController::ToStableEntityId(Entity);
+    const std::vector<float> values(rows.Size(),3);
+    auto run=GetParam()==0?R::MakeEditorKernelDensityTransactionForTest(Commands(),Density,values,Residency):
+        GetParam()==1?R::MakeEditorPointSpacingTransactionForTest(Commands(),Spacing,values,Residency):
+        R::MakeEditorDensityWeightTransactionForTest(Commands(),Weight,values,Residency);
+    ASSERT_TRUE(run);
+    worlds.Clear(); // Captured context deliberately retains the dead Scene address.
+    ASSERT_EQ(worlds.Get(Context.World),nullptr);
+    EXPECT_FALSE(R::SnapshotEditorPointScalar(Commands(),run).CanAccept);
+    EXPECT_EQ(R::AcceptEditorPointScalar(Commands(),run).Status,R::EditorCommandStatus::StaleEntity);
+    R::DiscardEditorPointScalar(Commands(),run);
 }

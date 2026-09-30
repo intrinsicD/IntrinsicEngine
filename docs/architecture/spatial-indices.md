@@ -82,18 +82,23 @@ separately indexed world-space positions.
 | --- | --- |
 | Least structured input | Float3 span or strided GPU view; no topology requirement |
 | Compatible entity sources | All canonical point-valued element domains, through shared property resolution |
-| Runtime owner | `SpatialIndexCache` service/module for stable geometry; `ClusteringGpuState` for moving centroids |
+| Runtime owner | `SpatialIndexCache` service/module for stable geometry; `ClusteringGpuState` for resident paged k-means |
 | Config/agent | Existing `sandbox.clustering` validated backend/parameter/property config selects CPU reference or Vulkan compute |
-| UI | Existing K-Means method panels use that config and `ClusteringService`; Vulkan assignment uses LBVH |
+| UI | Existing K-Means method panels use that config and `ClusteringService`; Vulkan assignment uses paged brute-force distance scans |
 | Publication | Cache queries return original source slots; k-means retains its existing atomic named-property publication and stale-source checks |
 | End-to-end tests | `Test.SpatialIndexCache.cpp`, `Test.PointLBVHGpuSmoke.cpp`, `Test.ClusteringServiceGpuSmoke.cpp` |
 
-K-means uses a private `Graphics::PointLbvhWorkspace`: its centroids move each
-iteration, so it rebuilds the hierarchy before each assignment while reusing
-allocations. This uses the same build and traversal shaders as entity queries.
-Existing requested/actual/fallback reporting remains; successful Vulkan
-completion diagnostics identify LBVH assignment. CPU fallback is explicit
-when Vulkan is unavailable or its supported input bounds are exceeded.
+K-means uses resident positions and a private paged brute-force Lloyd workspace.
+Assignment scans centroid pages; Update and Reduce use fixed 64-lane double
+reduction trees, with ordered page combines and pair/serial-depth submission
+budgets. It does not construct a centroid LBVH. See [k-means](../methods/kmeans.md)
+for budgets and parity tolerances. The existing cluster range is [1, 1024]; no
+LBVH point/bounds cap applies. CPU fallback is reported when the operational
+float64 device/cache is unavailable, label storage is not UInt32, or workspace/
+seed preparation fails. Busy residency/output ownership, unrepresentable rows,
+and failed-recording retention refuse admission; device execution failures and
+stale inputs fail the run without a silent CPU retry. Requested/actual/fallback
+reporting identifies the selected path.
 
 ## Construction and limits
 

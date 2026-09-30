@@ -12,8 +12,17 @@
 #include <vector>
 
 #include <glm/glm.hpp>
+#include <entt/entity/registry.hpp>
 
 #include "RuntimeTestModule.hpp"
+#include "MockRHI.hpp"
+#include "SandboxEditorJobHarness.hpp"
+#include "Modules/Clustering/Runtime.KMeansPaging.TestSupport.hpp"
+#include <array>
+#include <bit>
+#include <cstring>
+#include <span>
+#include <utility>
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
@@ -24,6 +33,16 @@ import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.ClusteringModule;
+import Extrinsic.Runtime.PointFieldOperations;
+import Extrinsic.Runtime.PointScalarTransaction;
+import Extrinsic.Runtime.ClusteringConfig;
+import Extrinsic.Runtime.AgentOperations;
+import Extrinsic.Runtime.EditorWorkspaceAttachment;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.Module;
+import Extrinsic.Runtime.GpuPropertyBinding;
+import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
@@ -35,6 +54,7 @@ import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.WorldHandle;
+import Extrinsic.Runtime.WorldRegistry;
 import Geometry.Properties;
 
 namespace CoreConfig = Extrinsic::Core::Config;
@@ -1346,4 +1366,382 @@ TEST(ClusteringModule, ScalarOutputKindsAndPointDomainsRoundTripCanonically)
         EXPECT_EQ(decoded->Properties->OutputLabels, config.Properties->OutputLabels);
         EXPECT_EQ(decoded->Properties->OutputScalarLabels, config.Properties->OutputScalarLabels);
     }
+}
+
+namespace
+{
+    class ClusteringModuleResident : public ::testing::Test
+    {
+    protected:
+        Extrinsic::Tests::MockDevice Device;
+        Extrinsic::Tests::EditorJobHarness Jobs;
+        std::unique_ptr<Extrinsic::Graphics::IRenderer> Renderer{Extrinsic::Graphics::CreateRenderer()};
+        Runtime::WorldRegistry Worlds;
+        Runtime::CommandBus Commands;
+        Runtime::KernelEventBus Events;
+        Runtime::ServiceRegistry Services;
+        Runtime::SpatialIndexCache Cache;
+        Runtime::ClusteringModule Module;
+        Runtime::EditorCommandHistory History;
+        Runtime::WorldHandle World;
+        ECS::EntityHandle Entity;
+        Runtime::ClusteringService* Service{};
+        Runtime::RunKMeans Request;
+        Runtime::CommandCorrelationId Correlation;
+        Runtime::KernelEventSubscription Subscription;
+        std::vector<Runtime::KMeansRunCompleted> Results;
+        std::vector<std::function<void()>> Completions;
+        std::optional<Extrinsic::RHI::ReadbackSink> Held;
+        bool Hold{}, Attached{true}, Converged{};
+        std::uint32_t MaximumDispatches{};
+        Runtime::KMeansPagingLimits SavedLimits{Runtime::KMeansPagingForTesting};
+        auto& Scene(){return *Worlds.Get(World);}
+        auto& Properties(){return Scene().Raw().get<GS::Vertices>(Entity).Properties;}
+        void SetUp()override
+        {
+            World=Worlds.CreateWorld("resident-kmeans");Entity=Scene().Create();
+            auto& vertices=Scene().Raw().emplace<GS::Vertices>(Entity);
+            SetPositions(vertices,std::vector<glm::vec3>(12,glm::vec3(1,2,3)));
+            Device.TransferQueue.AcceptBufferUploads=true;Device.ShaderFloat64=true;Renderer->Initialize(Device);
+            Services.BeginRegistration();
+            ASSERT_TRUE(Services.Provide<Extrinsic::RHI::IDevice>(Device,"test"));
+            ASSERT_TRUE(Services.Provide<Extrinsic::Graphics::IRenderer>(*Renderer,"test"));
+            ASSERT_TRUE(Services.Provide<Runtime::EditorCommandHistory>(History,"test"));
+            Runtime::EngineSetup setup{Commands,Events,Jobs.Jobs(),Worlds,Services,[](Runtime::FramePhase,Runtime::RuntimeFrameHook){}};
+            ASSERT_TRUE(Cache.OnRegister(setup));ASSERT_TRUE(Module.OnRegister(setup));
+            Services.BeginResolution();ASSERT_TRUE(Cache.OnResolve(setup));ASSERT_TRUE(Module.OnResolve(setup));Services.Lock();
+            Service=Services.Find<Runtime::ClusteringService>();ASSERT_NE(Service,nullptr);
+            Subscription=Service->SubscribeRunCompleted([this](const auto& r){Results.push_back(r);});
+            Request.StableEntityId=Runtime::SelectionController::ToStableEntityId(Entity);
+            Request.Properties=Runtime::MakeKMeansPropertyRefs(Runtime::GeometryElementDomain::PointCloudPoint);
+            Request.Parameters.ClusterCount=3;Request.Parameters.MaxIterations=4;Request.Parameters.GpuPreviewInterval=2;
+            Request.Backend=Runtime::ClusteringBackend::VulkanCompute;Request.AutoAccept=false;
+            Request.AttachmentActive=[this]{return Attached;};
+            Device.ComputeReadback=[this](auto record,auto bytes,auto sink){
+                const auto before=Device.CommandContext.DispatchCalls;
+                const auto firstPush=Device.CommandContext.PushConstantPayloads.size();
+                EXPECT_TRUE(record(Device.CommandContext).IsValid());
+                std::uint64_t pairs=0;
+                std::uint32_t serialDepth=0;
+                for(std::size_t i=firstPush;i<Device.CommandContext.PushConstantPayloads.size();++i){
+                    const auto& payload=Device.CommandContext.PushConstantPayloads[i];
+                    EXPECT_EQ(payload.size(),128u);
+                    if(payload.size()!=128u)continue;
+                    std::uint32_t rows{},columns{},phase{};
+                    std::memcpy(&phase,payload.data()+104,4);
+                    std::memcpy(&rows,payload.data()+112,4);std::memcpy(&columns,payload.data()+120,4);
+                    const auto pagePairs=std::uint64_t(rows)*columns;
+                    EXPECT_LE(pagePairs,Runtime::KMeansPagingForTesting.PagePairs);pairs+=pagePairs;
+                    serialDepth+=phase==1?columns+1:phase==2?(columns+63)/64+7:phase==3?(rows+63)/64+7:1;
+                }
+                EXPECT_LE(pairs,Runtime::KMeansPagingForTesting.SubmissionPairs);
+                EXPECT_LE(serialDepth,Runtime::KMeansSubmissionSerialDepth);
+                MaximumDispatches=std::max(MaximumDispatches,std::uint32_t(Device.CommandContext.DispatchCalls-before));
+                if(Hold){Held=std::move(sink);return Extrinsic::RHI::ReadbackToken{2};}
+                std::vector<std::byte> data(bytes);
+                if(bytes==32){
+                    std::array<std::uint32_t,6> diagnostics{};
+                    diagnostics[2]=std::bit_cast<std::uint32_t>(1.0f);diagnostics[4]=!Converged;
+                    std::memcpy(data.data(),diagnostics.data(),24);
+                }
+                Completions.push_back([sink=std::move(sink),data=std::move(data)]()mutable{sink.Deliver(data);});
+                return Extrinsic::RHI::ReadbackToken{2};
+            };
+            Device.TransferQueue.BufferDownload=[this](auto,auto bytes,auto,auto sink){
+                Completions.push_back([sink=std::move(sink),bytes]()mutable{std::vector<std::byte> data(bytes);sink.Deliver(data);});
+                return Extrinsic::RHI::ReadbackToken{3};
+            };
+        }
+        void Tick()
+        {
+            auto completions=std::exchange(Completions,{});for(auto& complete:completions)complete();
+            Commands.Drain(Scene(),{.Events=&Events,.Jobs=&Jobs.Jobs(),.Worlds=&Worlds});
+            (void)Jobs.Jobs().DrainCompletions(Events);(void)Events.Pump();
+            Jobs.Jobs().RecordGpuQueueFrameCommands(Device.CommandContext);++Device.GlobalFrameNumber;
+            (void)Jobs.Jobs().DrainGpuQueueCompletedTransfers();
+        }
+        template<class P>bool Until(P predicate)
+        {
+            const auto end=std::chrono::steady_clock::now()+std::chrono::seconds(5);
+            while(!predicate()&&std::chrono::steady_clock::now()<end){Tick();std::this_thread::yield();}
+            return predicate();
+        }
+        auto Observation(){return Service->GpuRun(Correlation);}
+        void Start(){Correlation=Service->RunKMeans(Request);}
+    public:
+        void DiscardDuringPublication(entt::registry&, entt::entity)
+        { (void)Service->GpuRun(Correlation, Runtime::KMeansGpuAction::Discard); }
+    protected:
+        void TearDown()override
+        {
+            if(Held){Held->Deliver({});Held.reset();}
+            if(Service){(void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Discard);Service->Unsubscribe(Subscription);}
+            for(int i=0;i<5;++i)Tick();
+            Jobs.Jobs().CancelAndDrain();(void)Jobs.Jobs().ShutdownGpuQueueParticipants([this]{Device.WaitIdle();});
+            Runtime::RuntimeModuleShutdownContext shutdown{Commands,Events,Jobs.Jobs(),Worlds,Services};
+            Module.OnShutdown(shutdown);Cache.OnShutdown(shutdown);Services.Reset();Renderer->Shutdown();
+            Runtime::KMeansPagingForTesting=SavedLimits;
+        }
+    };
+}
+TEST_F(ClusteringModuleResident, ResidentInputWaitsForCompletionAndRepeatRunUploadsZero)
+{
+    Hold=true;Start();ASSERT_TRUE(Until([&]{return Held.has_value();}));
+    EXPECT_EQ(Observation().InputUploadBytes,12u*12u);
+    const auto submissions=Observation().Submissions;for(int i=0;i<5;++i)Tick();
+    EXPECT_EQ(Observation().Submissions,submissions);
+    Hold=false;Held->Deliver({});Held.reset();
+    ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+    EXPECT_EQ(Observation().Iterations,4u);EXPECT_EQ(Observation().Previews,2u);
+    EXPECT_EQ(Observation().CpuStageUploadBytes,3u*12u);
+    EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
+    (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Discard);
+    ASSERT_TRUE(Until([&]{return Results.size()==1;}));
+    EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
+    Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+    EXPECT_EQ(Observation().InputUploadBytes,0u);EXPECT_GT(Observation().InputCacheHits,0u);
+}
+TEST_F(ClusteringModuleResident, MultiPageSubmissionsAndConvergence)
+{
+    Runtime::KMeansPagingForTesting={.PagePairs=3,.SubmissionPairs=12};
+    Converged=true;Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+    EXPECT_GT(MaximumDispatches,1u);EXPECT_GT(Observation().Submissions,5u);
+    EXPECT_EQ(Observation().Iterations,1u);EXPECT_EQ(Observation().Previews,1u);
+}
+TEST_F(ClusteringModuleResident, StaleAcceptRefusedAndDetachDiscards)
+{
+    Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+    Properties().Get<glm::vec3>("v:position")[0].x=9;
+    EXPECT_FALSE(Observation().CanAccept);EXPECT_FALSE(Observation().Message.empty());
+    (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Accept);EXPECT_TRUE(Results.empty());
+    Attached=false;ASSERT_TRUE(Until([&]{return Results.size()==1;}));
+    EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
+}
+TEST_F(ClusteringModuleResident, StopAcceptIsExactlyOnceAndUndoable)
+{
+    Request.Properties.OutputScalarLabels=Runtime::GeometryPropertyRef{
+        .Domain=Runtime::GeometryElementDomain::PointCloudPoint,.Name="scalar_labels",.ValueKind=Geometry::PropertyValueKind::Double};
+    Start();ASSERT_TRUE(Until([&]{return Observation().Submissions>0;}));
+    (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Stop);
+    ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));EXPECT_EQ(Observation().Iterations,1u);
+    (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Accept);
+    ASSERT_TRUE(Until([&]{return Results.size()==1;}));EXPECT_TRUE(Results[0].Succeeded())<<Results[0].Message;
+    EXPECT_TRUE(Properties().Exists("p:kmeans_label"));EXPECT_TRUE(Properties().Exists("p:kmeans_color"));
+    EXPECT_TRUE(Properties().Exists("scalar_labels"));
+    (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Accept);
+    for(int i=0;i<5;++i)Tick();EXPECT_EQ(Results.size(),1u);
+    ASSERT_TRUE(History.Undo().Succeeded());EXPECT_FALSE(Properties().Exists("p:kmeans_label"));EXPECT_FALSE(Properties().Exists("p:kmeans_color"));
+    EXPECT_FALSE(Properties().Exists("scalar_labels"));
+}
+TEST_F(ClusteringModuleResident, BatchAutoAccept)
+{
+    Request.AutoAccept=true;Start();ASSERT_TRUE(Until([&]{return Results.size()==1;}));
+    EXPECT_TRUE(Results[0].Succeeded())<<Results[0].Message;EXPECT_GT(Results[0].CpuStageReadbackBytes,0u);
+    EXPECT_EQ(Results[0].ImplementationId,"vulkan_resident_paged_lloyd");
+}
+TEST_F(ClusteringModuleResident, PreviewCopiesOnlyAtCadenceAndPublishesAfterCompletion)
+{
+    const auto key=Runtime::MakeGpuPropertyKey(World,Entity,Request.Properties.OutputLabels);
+    auto* residency=Cache.PropertyResidency();ASSERT_NE(residency,nullptr);
+    const auto submit=Device.ComputeReadback;
+    bool heldOnce=false;
+    std::uint64_t copiedBack{};
+    Device.ComputeReadback=[&](auto record,auto bytes,auto sink){
+        const bool boundary=!heldOnce&&bytes==0&&Observation().Iterations==2;
+        Hold=boundary;heldOnce|=boundary;
+        const auto token=submit([&](auto& cmd){
+            const auto count=Device.CommandContext.CopyBufferRecords.size();
+            const auto result=record(cmd);
+            if(boundary){
+                EXPECT_EQ(Device.CommandContext.CopyBufferRecords.size(),count);
+                // Phase 4 scatters every live label; all-live previews need no copy.
+                const auto& push=Device.CommandContext.PushConstantPayloads.back();
+                std::memcpy(&copiedBack,push.data()+80,8);
+                EXPECT_FALSE(residency->Front(key));
+            }
+            return result;
+        },bytes,std::move(sink));
+        Hold=false;return token;
+    };
+    Start();ASSERT_TRUE(Until([&]{return Held.has_value();}));ASSERT_NE(copiedBack,0u);
+    EXPECT_EQ(Observation().Previews,0u);for(int i=0;i<5;++i)Tick();EXPECT_FALSE(residency->Front(key));
+    Held->Deliver({});Held.reset();
+    ASSERT_TRUE(Until([&]{return Observation().Previews==1;}));
+    ASSERT_TRUE(residency->Front(key));EXPECT_EQ(residency->Front(key)->Address,copiedBack);
+    ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+    EXPECT_EQ(Device.CommandContext.CopyBufferRecords.size(),0u);
+}
+TEST_F(ClusteringModuleResident, ReentrantDiscardDuringAcceptKeepsOneAppliedCompletion)
+{
+    Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+    Scene().Raw().on_construct<Dirty::DirtyVertexAttributes>().connect<&ClusteringModuleResident::DiscardDuringPublication>(*this);
+    (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Accept);
+    ASSERT_TRUE(Until([&]{return Results.size()==1;}));
+    Scene().Raw().on_construct<Dirty::DirtyVertexAttributes>().disconnect<&ClusteringModuleResident::DiscardDuringPublication>(*this);
+    EXPECT_TRUE(Results[0].Succeeded())<<Results[0].Message;
+    for(int i=0;i<10;++i)Tick();EXPECT_EQ(Results.size(),1u);
+    EXPECT_TRUE(Properties().Exists("p:kmeans_label"));ASSERT_TRUE(History.Undo().Succeeded());
+}
+TEST_F(ClusteringModuleResident, DiscardPendingAcceptDeliversOnce)
+{
+    Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+    Hold=true;(void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Accept);
+    ASSERT_TRUE(Until([&]{return Held.has_value();}));
+    (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Discard);
+    ASSERT_TRUE(Until([&]{return Results.size()==1;}));
+    Hold=false;std::vector<std::byte> bytes(12*4);Held->Deliver(bytes);Held.reset();
+    for(int i=0;i<10;++i)Tick();EXPECT_EQ(Results.size(),1u);EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
+}
+TEST(ClusteringModule, AgentRunAutoAcceptsAndReportsBackendAndIo)
+{
+    auto config=NullWindowHeadlessConfig();
+    Runtime::ClusteringConfig clustering;
+    clustering.Backend=Runtime::ClusteringBackend::VulkanCompute;
+    Runtime::SetClusteringConfig(config,clustering);
+    Intrinsic::Tests::RuntimeTestKernel engine{std::move(config)};
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.EmplaceModule<Runtime::ClusteringModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    CoreConfig::EngineConfigSectionRegistry sections;
+    ASSERT_TRUE(sections.Register(Runtime::MakeClusteringConfigSectionRegistration()));
+    engine.EmplaceModule<Runtime::EngineConfigControl>(std::move(sections));engine.Initialize();
+    auto* scene=engine.Worlds().Get(engine.ActiveWorld());ASSERT_NE(scene,nullptr);
+    const auto entity=scene->Create();auto& vertices=scene->Raw().emplace<GS::Vertices>(entity);
+    SetPositions(vertices,{{0,0,0},{1,0,0},{3,0,0}});
+    Runtime::EditorWorkspaceAttachment attachment;attachment.Attach(engine.Worlds(),engine.Services());
+    ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment));
+    Runtime::AgentOperationRegistry registry;Runtime::RegisterEditorAgentOperations(registry);
+    const Runtime::AgentOperationContext context{.Attachment=&attachment};
+    auto outcome=Runtime::InvokeAgentOperation(registry,"run_kmeans",context,
+        "{\"entity\":"+std::to_string(Runtime::SelectionController::ToStableEntityId(entity))+",\"domain\":\"PointCloudPoint\"}",false);
+    ASSERT_TRUE(outcome.Continuation)<<outcome.Text;
+    Runtime::AgentOperationOutcome completed;bool done=false;
+    const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(5);
+    while(!done&&std::chrono::steady_clock::now()<deadline){
+        engine.Commands().Drain(*scene,{&engine.Events(),&engine.Jobs(),&engine.Worlds()});
+        (void)engine.Jobs().DrainCompletions(engine.Events());(void)engine.Events().Pump();
+        done=outcome.Continuation(context,completed);std::this_thread::yield();
+    }
+    EXPECT_TRUE(done);EXPECT_FALSE(completed.IsError)<<completed.Text;
+    for(const auto key:{"gpu_input_upload_bytes","gpu_input_cache_hits","cpu_stage_upload_bytes","cpu_stage_readback_bytes","implementation_id"})
+        EXPECT_NE(completed.Text.find(key),std::string::npos);
+    EXPECT_TRUE(vertices.Properties.Exists("p:kmeans_label"));
+    outcome.Continuation={};attachment.Detach();engine.Shutdown();
+}
+TEST_F(ClusteringModuleResident, BusyAdmissionHasOneRefusedCompletionAndPreservesPendingRun)
+{
+    Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+    const auto second=Service->RunKMeans(Request);
+    ASSERT_TRUE(Until([&]{return Results.size()==1;}));
+    EXPECT_EQ(Results[0].Correlation,second);EXPECT_FALSE(Results[0].Succeeded());
+    EXPECT_TRUE(Observation().CanAccept);
+    for(int i=0;i<5;++i)Tick();EXPECT_EQ(Results.size(),1u);
+}
+TEST_F(ClusteringModuleResident, DeletedSlotsUseDeclaredMapAndPreservePriorLabels)
+{
+    Properties().GetOrAdd<bool>("v:deleted",false)[1]=true;
+    (void)Properties().GetOrAdd<std::uint32_t>("p:kmeans_label",9u);
+    Request.AutoAccept=true;Start();ASSERT_TRUE(Until([&]{return Results.size()==1;}));
+    ASSERT_TRUE(Results[0].Succeeded())<<Results[0].Message;
+    EXPECT_EQ(Results[0].LabelCount,11u);
+    EXPECT_EQ(Results[0].CpuStageUploadBytes,3u*12u+11u*4u);
+    EXPECT_EQ(std::as_const(Properties()).Get<std::uint32_t>("p:kmeans_label")[1],9u);
+    ASSERT_TRUE(History.Undo().Succeeded());
+    for(auto label:std::as_const(Properties()).Get<std::uint32_t>("p:kmeans_label").Vector())EXPECT_EQ(label,9u);
+}
+
+TEST_F(ClusteringModuleResident, FailedRecordedPageRequiresIdleAtShutdown)
+{
+    Device.ComputeReadback=[&](auto record,auto,auto){
+        EXPECT_TRUE(record(Device.CommandContext).IsValid());
+        return Extrinsic::RHI::ReadbackToken{};
+    };
+    Start();ASSERT_TRUE(Until([&]{return Results.size()==1;}));
+    EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::GeometryProcessingFailed);
+    EXPECT_EQ(Service->Stats().GpuCompletions,0u);
+    unsigned waits=0;
+    (void)Jobs.Jobs().ShutdownGpuQueueParticipants([&]{++waits;Device.WaitIdle();});
+    EXPECT_EQ(waits,1u);
+}
+TEST_F(ClusteringModuleResident, AutoAcceptRefusalCompletesStaleAndAllowsNextRun)
+{
+    bool arm=false;unsigned checks=0;
+    Request.AutoAccept=true;
+    Request.AttachmentActive=[&]{
+        if(arm&&++checks==3)Properties().Get<glm::vec3>("v:position")[0].x=9;
+        return true;
+    };
+    const auto submit=Device.ComputeReadback;
+    Device.ComputeReadback=[&](auto record,auto bytes,auto sink){
+        const auto token=submit(std::move(record),bytes,std::move(sink));
+        if(bytes==3*12)Completions.push_back([&]{arm=true;});
+        return token;
+    };
+    Start();ASSERT_TRUE(Until([&]{return Results.size()==1;}));
+    EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::StaleSource);
+    EXPECT_EQ(Service->Stats().GpuCompletions,0u);
+    arm=false;Request.AttachmentActive={};Start();
+    ASSERT_TRUE(Until([&]{return Results.size()==2;}));EXPECT_TRUE(Results[1].Succeeded());
+    EXPECT_EQ(Service->Stats().GpuCompletions,1u);
+}
+TEST_F(ClusteringModuleResident, StaleDuringAcceptReadbackReportsStaleSource)
+{
+    Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+    (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Accept);
+    Properties().Get<glm::vec3>("v:position")[0].x=7;
+    ASSERT_TRUE(Until([&]{return Results.size()==1;}));
+    EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::StaleSource);
+}
+TEST_F(ClusteringModuleResident, AdmissionReservesTypedAndPresentationAgainstScalarOwners)
+{
+    Start();Tick();
+    auto* residency=Cache.PropertyResidency();ASSERT_NE(residency,nullptr);
+    const auto typed=Runtime::MakeGpuPropertyKey(World,Entity,Request.Properties.OutputLabels);
+    const auto presentation=Runtime::MakeGpuPropertyKey(World,Entity,Runtime::GpuPropertyPresentationRef(Request.Properties.OutputLabels));
+    ASSERT_TRUE(residency->HasRing(typed));ASSERT_TRUE(residency->HasRing(presentation));
+    const auto generation=residency->RingGeneration(presentation);
+    Runtime::EditorProcessingContext context;
+    context.Scene=&Scene();context.World=World;context.Device=&Device;context.SpatialIndices=&Cache;
+    Jobs.Attach(context);
+    Runtime::KernelDensityConfig scalar;
+    scalar.StableEntityId=Request.StableEntityId;scalar.Positions=Request.Properties.InputPositions;
+    scalar.Density=Runtime::GpuPropertyPresentationRef(Request.Properties.OutputLabels);
+    const auto commands=Runtime::BindEditorProcessingCommands(context);
+    auto competing=Runtime::MakeEditorKernelDensityTransactionForTest(commands,scalar,std::vector<float>(12,3),*residency);
+    EXPECT_FALSE(competing);EXPECT_EQ(residency->RingGeneration(presentation),generation);
+    (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Discard);
+    ASSERT_TRUE(Until([&]{return Results.size()==1;}));
+    competing=Runtime::MakeEditorKernelDensityTransactionForTest(commands,scalar,std::vector<float>(12,3),*residency);
+    ASSERT_TRUE(competing);
+    Start();ASSERT_TRUE(Until([&]{return Results.size()==2;}));EXPECT_FALSE(Results[1].Succeeded());
+    EXPECT_TRUE(Runtime::SnapshotEditorPointScalar(commands,competing).CanAccept);
+    Runtime::DiscardEditorPointScalar(commands,competing);
+}
+TEST_F(ClusteringModuleResident, TerminalPreviewRetriesAreBounded)
+{
+    Request.Parameters.GpuPreviewInterval=1;
+    Start();
+    std::vector<Extrinsic::Graphics::GpuPropertyView> leases;
+    std::uint64_t publication=0;
+    ASSERT_TRUE(Until([&]{
+        const auto key=Runtime::MakeGpuPropertyKey(World,Entity,Request.Properties.OutputLabels);
+        if(auto front=Cache.PropertyResidency()->Front(key);front&&front->Publication!=publication){
+            publication=front->Publication;leases.push_back(*front);
+        }
+        return Results.size()==1;
+    }));
+    EXPECT_EQ(leases.size(),3u);
+    EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::GeometryProcessingFailed);
+    EXPECT_NE(Results[0].Message.find("600 retries"),std::string::npos);
+}
+
+TEST_F(ClusteringModuleResident, MillionRowsRespectPairAndSerialBudgets)
+{
+    SetPositions(Scene().Raw().get<GS::Vertices>(Entity),std::vector<glm::vec3>(1u<<20,glm::vec3(1,2,3)));
+    Request.Parameters.ClusterCount=8;Request.Parameters.MaxIterations=1;
+    Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+    // Fixture checks every recorded submission's pair and lane-depth totals.
+    // Reduce/Update each require > 2^14 depth for 256 pages (256 * 71).
+    EXPECT_GE(Observation().Submissions,9u);
+    EXPECT_LE(MaximumDispatches,Runtime::KMeansSubmissionSerialDepth);
 }

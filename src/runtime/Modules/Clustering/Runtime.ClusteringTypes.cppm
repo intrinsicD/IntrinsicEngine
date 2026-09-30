@@ -5,6 +5,8 @@ module;
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
+#include <glm/vec3.hpp>
 #include <entt/entity/fwd.hpp>
 export module Extrinsic.Runtime.ClusteringTypes;
 import Extrinsic.Core.Error;
@@ -35,6 +37,7 @@ export namespace Extrinsic::Runtime
         std::uint32_t ClusterCount{8u};
         std::uint32_t MaxIterations{32u};
         std::uint32_t Seed{42u};
+        std::uint32_t GpuPreviewInterval{5u};
         KMeansInitialization Initialization{
             KMeansInitialization::Hierarchical};
     };
@@ -82,12 +85,22 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::string_view ToString(
         KMeansRunStatus status) noexcept;
 
+    enum class KMeansGpuAction : std::uint8_t { Observe, Stop, Accept, Discard };
+    struct KMeansGpuObservation
+    {
+        bool Running{}, ReadyToAccept{}, Accepting{}, CanAccept{};
+        std::string Message{};
+        std::uint32_t Iterations{}, Submissions{}, Previews{};
+        std::uint64_t InputUploadBytes{}, InputCacheHits{}, CpuStageUploadBytes{}, CpuStageReadbackBytes{};
+    };
     struct RunKMeans
     {
         std::uint32_t StableEntityId{0u};
         KMeansPropertyRefs Properties{};
         KMeansParameters Parameters{};
         ClusteringBackend Backend{ClusteringBackend::CpuReference};
+        bool AutoAccept{true};
+        std::function<bool()> AttachmentActive{};
     };
 
     struct KMeansRunCompleted
@@ -108,6 +121,10 @@ export namespace Extrinsic::Runtime
         ClusteringBackend ActualBackend{ClusteringBackend::None};
         bool FellBackToCpu{false};
         std::string BackendDiagnostic{};
+        std::string ImplementationId{};
+        std::uint64_t GpuInputUploadBytes{}, GpuInputCacheHits{}, CpuStageUploadBytes{}, CpuStageReadbackBytes{};
+        std::uint32_t GpuSubmissions{}, GpuPreviews{};
+        std::vector<glm::vec3> Centroids{};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
 
@@ -169,6 +186,7 @@ export namespace Extrinsic::Runtime
         void Unsubscribe(KernelEventSubscription subscription);
 
         [[nodiscard]] ClusteringModuleStats Stats() const noexcept;
+        [[nodiscard]] KMeansGpuObservation GpuRun(CommandCorrelationId, KMeansGpuAction = KMeansGpuAction::Observe);
 
     private:
         friend class ClusteringModule;
@@ -177,6 +195,7 @@ export namespace Extrinsic::Runtime
                   KernelEventBus* events,
                   const ClusteringModuleStats* stats) noexcept;
 
+        std::function<KMeansGpuObservation(CommandCorrelationId, KMeansGpuAction)> m_GpuRun{};
         CommandBus* m_Commands{};
         KernelEventBus* m_Events{};
         const ClusteringModuleStats* m_Stats{};

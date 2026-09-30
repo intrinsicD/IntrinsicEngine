@@ -11,8 +11,9 @@ spans. The normal workflow can obtain those neighborhoods from framed Vulkan
 queries; PCA/orientation remain on the CPU. Its KD-tree default and neighborhood
 policy remain unchanged.
 
-Entity consumers use `Extrinsic.Runtime.SpatialIndexCache`; Vulkan k-means uses
-the same kernels with a private centroid workspace. See the
+Entity LBVH consumers use `Extrinsic.Runtime.SpatialIndexCache`. Vulkan k-means
+uses its property residency with a separate paged brute-force Lloyd workspace;
+it does not build or query a centroid LBVH. See the
 [ownership and API contract](../../../docs/architecture/spatial-indices.md),
 [formulation](paper.md), and [manifest](method.yaml).
 

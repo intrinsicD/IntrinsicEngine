@@ -543,3 +543,23 @@ Cardinality changes and separate named outputs retain terminal publication rathe
 than borrowing the same-cardinality positions transaction. Their inputs are also
 resident and their producer is paged. See the [LOP backend contract](../methods/locally-optimal-projection.md)
 for IO accounting, numerical scope and the Vulkan proof surface.
+
+### Resident k-means labels
+
+K-means resolves stride-12 canonical positions through the residency and gathers
+live rows on the device. Seed centroids and any deleted-row map are declared
+CPU-stage uploads. Pair-bounded assignment/update pages use the existing spatial
+compute queue with immediate completions; only small convergence diagnostics
+cross back during iteration.
+
+The typed UInt32 label ring has a float presentation ring under the same property
+name. Both publish after their producer completion, at the validated configured
+interval and at termination. `Runtime.PointScalarTransaction` also accepts
+externally produced typed fronts: it owns stale-aware Accept/readback, revision
+binding, Discard, and exactly-once completion. The clustering callback reuses its
+existing atomic label/color/optional-scalar history entry. Stop exposes the last
+completed iteration; detach discards; batch and agent requests auto-accept.
+
+GPU preview: yes (label colormap); commit via scalar transaction. See
+[k-means](../methods/kmeans.md) for paging bounds, backend identity, IO accounting,
+and the pending measured parity delta.

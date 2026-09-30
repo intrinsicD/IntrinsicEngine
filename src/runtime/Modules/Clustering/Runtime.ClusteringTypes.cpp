@@ -73,6 +73,9 @@ namespace Extrinsic::Runtime
 
     }
 
+    KMeansGpuObservation ClusteringService::GpuRun(CommandCorrelationId id, KMeansGpuAction action)
+    { return m_GpuRun ? m_GpuRun(id, action) : KMeansGpuObservation{}; }
+
     bool IsValidKMeansPropertyBindings(const KMeansPropertyRefs& properties) noexcept
     {
         const auto writable = [](const GeometryPropertyRef& ref) {
@@ -109,7 +112,8 @@ namespace Extrinsic::Runtime
             return reject(KMeansRunStatus::MissingScene, Core::ErrorCode::InvalidState,
                 "Active world is unavailable for K-Means.");
         if (!IsValidKMeansPropertyBindings(command.Properties) ||
-            command.Parameters.ClusterCount == 0u || command.Parameters.MaxIterations == 0u ||
+            command.Parameters.ClusterCount == 0u || command.Parameters.ClusterCount > 1024u || command.Parameters.MaxIterations == 0u ||
+            command.Parameters.GpuPreviewInterval == 0u || command.Parameters.GpuPreviewInterval > 1000000u ||
             command.Backend == ClusteringBackend::None)
             return reject(KMeansRunStatus::InvalidProcessingParameters, Core::ErrorCode::InvalidArgument,
                 "K-Means requires one supported input/output property domain, vec3 positions, scalar label storage, vec4 colors, distinct property names, a concrete backend, and positive cluster and iteration counts.");

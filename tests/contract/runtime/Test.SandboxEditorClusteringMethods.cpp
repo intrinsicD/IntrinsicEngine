@@ -3566,3 +3566,34 @@ TEST(SandboxEditorUi, ProgressivePoissonRejectsUnrepresentableOutputsWithoutPart
         EXPECT_EQ(registry.Raw().get<GS::Vertices>(cloud).Properties.Get<glm::vec3>(PN::kPosition).Vector(), before);
     }
 }
+
+TEST(SandboxEditorUi, KMeansPreviewIntervalRoundTripsAndRejectsInvalidIntervals)
+{
+    Runtime::ClusteringConfig value;
+    value.Parameters.GpuPreviewInterval=7;
+    value.Parameters.ClusterCount=1024;
+    Core::Config::EngineConfig engine;
+    Runtime::SetClusteringConfig(engine,value);
+    const auto restored=Runtime::GetClusteringConfig(engine);
+    ASSERT_TRUE(restored);EXPECT_EQ(restored->Parameters.GpuPreviewInterval,7u);
+    EXPECT_EQ(restored->Parameters.ClusterCount,1024u);
+    EXPECT_TRUE(Runtime::ValidateClusteringConfigSection(Runtime::SerializeClusteringConfig(value),{},"test").Usable());
+    for(auto interval:{0u,1000001u}){
+        value.Parameters.GpuPreviewInterval=interval;
+        const auto invalid=Runtime::ValidateClusteringConfigSection(Runtime::SerializeClusteringConfig(value),{},"test");
+        EXPECT_EQ(invalid.State,Core::Config::EngineConfigState::FallbackApplied);
+    }
+}
+
+TEST(SandboxEditorUi, KMeansClusterCountRetainsOneTo1024Contract)
+{
+    for(const auto count:{0u,1u,1024u,1025u,0xffffffffu}){
+        Runtime::ClusteringConfig config;config.Parameters.ClusterCount=count;
+        EXPECT_EQ(Runtime::ValidateClusteringConfigSection(Runtime::SerializeClusteringConfig(config),{},"test").State,
+            count>=1&&count<=1024?Core::Config::EngineConfigState::Valid:Core::Config::EngineConfigState::FallbackApplied);
+        ECS::Scene::Registry scene;
+        const auto entity=MakePointCloudEntity(scene,"count",{{0,0,0},{1,0,0}});
+        const auto request=Runtime::MakeConfiguredKMeansRequest(Runtime::SelectionController::ToStableEntityId(entity),config);
+        EXPECT_EQ(!Runtime::ValidateKMeansRequest(&scene.Raw(),request),count>=1&&count<=1024);
+    }
+}

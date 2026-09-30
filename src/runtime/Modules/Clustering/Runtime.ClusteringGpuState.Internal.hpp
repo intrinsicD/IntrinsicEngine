@@ -25,26 +25,16 @@ namespace Extrinsic::Runtime
         std::string BackendDiagnostic{};
     };
 
-    enum class ClusteringGpuResultStatus : std::uint8_t
-    {
-        Completed,
-        Failed,
-    };
-
     struct ClusteringGpuSubmission
     {
         bool Accepted{false};
+        bool Refused{false};
         std::string Diagnostic{};
     };
 
     struct ClusteringGpuResult
     {
-        ClusteringGpuResultStatus Status{ClusteringGpuResultStatus::Failed};
-        KMeansSnapshot Snapshot{};
-        std::optional<Geometry::KMeans::KMeansResult> Clustered{};
-        std::string Diagnostic{};
-
-        [[nodiscard]] bool Succeeded() const noexcept;
+        KMeansRunCompleted Published{};
     };
 
     class ClusteringGpuState
@@ -58,9 +48,12 @@ namespace Extrinsic::Runtime
         ClusteringGpuState(const ClusteringGpuState&) = delete;
         ClusteringGpuState& operator=(const ClusteringGpuState&) = delete;
 
-        // Moves `snapshot` only when accepted so the caller can run the CPU
-        // reference as an honest fallback on rejection.
-        [[nodiscard]] ClusteringGpuSubmission Start(KMeansSnapshot& snapshot);
+        // Reads the snapshot during admission; the caller retains the publication
+        // before-state on acceptance or can run the CPU fallback on rejection.
+        [[nodiscard]] ClusteringGpuSubmission Start(KMeansSnapshot& snapshot,
+            const EditorProcessingContext&, std::function<bool()> current,
+            std::function<EditorCommandStatus(const Geometry::KMeans::KMeansResult&)> publish);
+        [[nodiscard]] KMeansGpuObservation GpuRun(CommandCorrelationId, KMeansGpuAction);
         void RecordFrameCommands(RHI::ICommandContext& commandContext);
         void DrainCompletedTransfers();
         [[nodiscard]] std::optional<ClusteringGpuResult> ConsumeCompleted();

@@ -1,57 +1,34 @@
 #version 460
 #extension GL_GOOGLE_include_directive : require
-
-// GEOM-056 Slice B — k-means per-iteration reset.
-//
-// Zeroes the per-cluster accumulators (SumX/Y/Z, Counts) and, on the first
-// invocation, the shared reduction slots (inertia, packed farthest-point
-// argmax, changed-label counter, max centroid shift, converged flag). One
-// invocation per cluster; dispatched with ceil(ClusterCount / GroupSize).
-//
-// All storage is reached through Buffer Device Addresses carried in a scalar
-// push constant, matching Extrinsic.Runtime.KMeansGpuBackend and the promoted
-// clustered-light / progressive-Poisson compute convention. No descriptor-set
-// storage bindings.
-
-#extension GL_EXT_scalar_block_layout : require
-#extension GL_EXT_buffer_reference2 : require
-#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
-
-layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
-
 #include "include/kmeans_state.glsl"
-
-layout(buffer_reference, scalar) buffer FloatArray { float Values[]; };
-layout(buffer_reference, scalar) buffer UIntArray { uint Values[]; };
-
-void main()
-{
-    if (pc.StateBDA == uint64_t(0))
-    {
+layout(local_size_x=64) in;
+shared double inertia[64];
+shared float farthest[64];
+shared uint indices[64];
+void main(){
+    uint lane=gl_LocalInvocationID.x;
+    uint row=pc.first+gl_GlobalInvocationID.x;
+    if(pc.phase==3){
+        precise double sum=0;float best=-1;uint index=0;
+        for(uint j=lane;j<pc.count;j+=64){uint i=pc.first+j;float d=Floats(pc.distances).v[i];
+            sum+=double(d);if(d>best){best=d;index=i;}}
+        inertia[lane]=sum;farthest[lane]=best;indices[lane]=index;barrier();
+        for(uint stride=32;stride>0;stride>>=1){
+            if(lane<stride){
+                inertia[lane]+=inertia[lane+stride];
+                float other=farthest[lane+stride];uint oi=indices[lane+stride];
+                if(other>farthest[lane]||(other==farthest[lane]&&oi<indices[lane])){
+                    farthest[lane]=other;indices[lane]=oi;}}
+            barrier();
+        }
+        if(lane==0){Stats s=Stats(pc.stats);
+            if(pc.first==0){s.inertiaSum=0;s.maxDistance=-1;s.maxDistanceIndex=0;}
+            s.inertiaSum+=inertia[0];s.inertia=float(s.inertiaSum);
+            if(farthest[0]>s.maxDistance){s.maxDistance=farthest[0];s.maxDistanceIndex=indices[0];}}
         return;
     }
-    KMeansStateRef state = KMeansStateRef(pc.StateBDA);
-
-    const uint cluster = gl_GlobalInvocationID.x;
-
-    // The first invocation clears the shared reduction record once per pass.
-    if (cluster == 0u && state.ReductionBDA != uint64_t(0))
-    {
-        KMeansReductionRef reduction = KMeansReductionRef(state.ReductionBDA);
-        reduction.PackedMaxDistIndex = uint64_t(0);
-        reduction.InertiaSum = 0.0;
-        reduction.ChangedCount = 0u;
-        reduction.MaxShiftBits = 0u;
-        reduction.Converged = 0u;
-    }
-
-    if (cluster >= pc.ClusterCount)
-    {
-        return;
-    }
-
-    if (state.SumXBDA != uint64_t(0)) { FloatArray(state.SumXBDA).Values[cluster] = 0.0; }
-    if (state.SumYBDA != uint64_t(0)) { FloatArray(state.SumYBDA).Values[cluster] = 0.0; }
-    if (state.SumZBDA != uint64_t(0)) { FloatArray(state.SumZBDA).Values[cluster] = 0.0; }
-    if (state.CountsBDA != uint64_t(0)) { UIntArray(state.CountsBDA).Values[cluster] = 0u; }
+    if(gl_GlobalInvocationID.x>=pc.count)return;
+    if(pc.phase==0){store3(pc.positions,row,load3(pc.inputBDA,slot(row)));UInts(pc.labels).v[row]=0;return;}
+    if(pc.phase==5){Floats(pc.presentation).v[row]=float(UInts(pc.outputBDA).v[row]);return;}
+    if(pc.phase==4)UInts(pc.outputBDA).v[slot(row)]=UInts(pc.labels).v[row];
 }

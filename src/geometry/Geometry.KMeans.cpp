@@ -246,7 +246,7 @@ namespace Geometry::KMeans
         if (result.Centroids.size() != k)
             return std::nullopt;
 
-        std::vector<glm::vec3> sums(k, glm::vec3(0.0f));
+        std::vector<glm::dvec3> sums(k, glm::dvec3(0.0));
         std::vector<uint32_t> counts(k, 0u);
         std::vector<uint32_t> nextLabels(points.size(), 0u);
 
@@ -255,7 +255,7 @@ namespace Geometry::KMeans
 
         for (uint32_t iter = 0; iter < params.MaxIterations; ++iter)
         {
-            std::fill(sums.begin(), sums.end(), glm::vec3(0.0f));
+            std::fill(sums.begin(), sums.end(), glm::dvec3(0.0));
             std::fill(counts.begin(), counts.end(), 0u);
             static_cast<void>(RebuildCentroidTree(result.Centroids, cpuScratch));
 
@@ -273,7 +273,7 @@ namespace Geometry::KMeans
                 const auto [bestCluster, bestDistance] = *assignment;
                 nextLabels[i] = bestCluster;
                 result.SquaredDistances[i] = bestDistance;
-                sums[bestCluster] += points[i];
+                sums[bestCluster] += glm::dvec3(points[i]);
                 ++counts[bestCluster];
                 inertia += bestDistance;
 
@@ -293,7 +293,7 @@ namespace Geometry::KMeans
                 glm::vec3 nextCentroid = result.Centroids[c];
                 if (counts[c] > 0)
                 {
-                    nextCentroid = sums[c] / static_cast<float>(counts[c]);
+                    nextCentroid = glm::vec3(sums[c] / static_cast<double>(counts[c]));
                 }
                 else
                 {

@@ -51,11 +51,6 @@ Operational or parity verdict is recorded for the changed path.
 
 The other rows remain under this task's split-out provision:
 
-- **k-means:** replace private SoA input uploads with resident inputs and
-  device conversion; page the execution plan across completions; add typed
-  integer label and float presentation rings; extend/reuse scalar publication
-  for labels and wire Stop, Accept/Discard, observation and auto-accept; add
-  contract and Vulkan parity/IO/preview tests.
 - **Keypoints:** retain residency-backed index views through completion; page
   spacing, covariance and suppression work instead of recording every page
   in one submission; write score/mask rings and extend/reuse the scalar
@@ -101,3 +96,19 @@ DISPLAY=:7 ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu|vulkan' 
   uploads 0 input bytes. Focused CPU 111/111; layering strict clean. Reviewed by Codex
   (read-only) and Claude Opus 5.5; the paging P1 and all P2s were fixed. Remaining:
   k-means and keypoints.
+
+- 2026-10-01 (slice 3: k-means). Lloyd iterations read the canonical resident positions and
+  run brute-force assignment plus parallel, fixed-shape double reductions (update/reduce), paged
+  at <= 2^18 pairs per page, <= 2^24 per submission and <= 2^14 serial lane depth, with
+  immediate completions and host convergence matching `Geometry.KMeans` (whose centroid sums
+  are now double). A uint label ring plus a float presentation ring preview the colormap every
+  `gpu_preview_interval`; Accept/Discard go through the extended `PointScalarTransaction`
+  (typed publication reserves both rings at admission). The cluster range stays [1, 1024].
+  Gates: `ClusteringServiceGpuSmoke` (3 cases incl. centroid-page ties, 2,049 points/k=8, deleted
+  slot) 0 label mismatches, centroid Linf 0; RUNTIME292/297/298 scalar smokes pass; CPU
+  RuntimeContract 1518/1518, SandboxEditorIntegration 143/143, Geometry 1606/1606; layering clean.
+  The old smoke's `IsOperational()` gate always skipped at cold start and now gates on
+  bootstrap readiness; the GMM likelihood assertion is non-strict because the double-sum
+  initializer can already be EM's fixed point. Reviewed by Codex and Claude Opus 5.5 (serial
+  reduction P1, retired-resource shutdown P1 and all P2s fixed). Not yet measured: 1M-point
+  timing. Remaining: keypoints.

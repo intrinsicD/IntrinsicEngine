@@ -32,6 +32,7 @@ import Extrinsic.Runtime.PointSetOperations;
 import Extrinsic.Runtime.PointConstructionOperations;
 import Extrinsic.Runtime.PointCloudServiceOperations;
 import Extrinsic.Runtime.ClusteringModule;
+import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Config.Window;
@@ -3758,4 +3759,42 @@ TEST(SandboxProcessingPanels, ScalarTransactionTerminalResultsPersistAndDetachDi
         h.Panels.Unregister();EXPECT_EQ(R::SnapshotEditorPointScalar(commands,pending).Phase,Phase::Discarded);
         EXPECT_EQ(rows.Exists(method==0?density.Density.Name:method==1?spacing.Radii.Name:weights.Weights.Name),applied);
     }
+}
+
+TEST(SandboxProcessingPanels, KMeansDismissAndUnrelatedCompletionRetainGpuCorrelation)
+{
+    PanelHarness h(Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry(),true);
+    const auto entity=h.Scene().Create();
+    PopulateSamples(h.Scene().Raw(),entity,R::GeometryElementDomain::PointCloudPoint);
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(h.Scene(),entity));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("pointcloud.processing.kmeans",true));
+    const R::CommandCorrelationId active{101},other{102};
+    unsigned frame=0;bool dismissed=false,replaced=false;
+    std::optional<R::KMeansRunCompleted> last;
+    const auto observer=h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+        .Id="test.kmeans_correlation",.MenuPath={"View"},.Title="K-Means correlation observer",.OpenByDefault=true,
+        .Draw=[&](bool&,const Editor::SandboxEditorContext& context){last=context.PointCloudService->Results.LastKMeansResult;}});
+    h.Driver->OnFrame=[&](R::Engine& engine){
+        ++frame;auto* window=ImGui::FindWindowByName("PointCloud / Processing / K-Means");
+        if(!window){if(frame>100){ADD_FAILURE();engine.RequestExit();}return;}
+        ImGui::SetWindowSize(window,{850,1500});ImGui::SetWindowPos(window,{0,0});
+        if(frame==3){
+            R::KMeansRunCompleted queued{.Correlation=active,.Status=R::KMeansRunStatus::Queued,
+                .RequestedBackend=R::ClusteringBackend::VulkanCompute};
+            h.Methods.InjectKMeansSubmissionForTest(queued);engine.Events().Publish(queued);
+        }
+        if(frame==6)ImGui::ActivateItemByID(window->GetID("Dismiss##KMeans"));
+        if(frame==9){
+            EXPECT_FALSE(last);dismissed=!last;
+            EXPECT_EQ(h.Methods.KMeansGpuCorrelationForTest(),active);
+            engine.Events().Publish(R::KMeansRunCompleted{.Correlation=other,.Status=R::KMeansRunStatus::GeometryProcessingFailed});
+        }
+        if(frame==12){
+            ASSERT_TRUE(last);EXPECT_EQ(last->Correlation,other);replaced=last->Correlation==other;
+            EXPECT_EQ(h.Methods.KMeansGpuCorrelationForTest(),active);
+            engine.RequestExit();
+        }
+    };
+    h.Engine->Run();EXPECT_TRUE(dismissed);EXPECT_TRUE(replaced);
+    EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
 }

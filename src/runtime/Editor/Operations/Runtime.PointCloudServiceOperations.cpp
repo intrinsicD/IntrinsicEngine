@@ -71,7 +71,9 @@ namespace Extrinsic::Runtime
             rejected->World = context.World;
             return std::move(*rejected);
         }
-        result.Correlation = clustering->RunKMeans(command);
+        auto request = command;
+        request.AttachmentActive = context.AttachmentActive;
+        result.Correlation = clustering->RunKMeans(std::move(request));
         result.Status = KMeansRunStatus::Queued;
         result.Message = "K-Means runtime job queued.";
         return result;

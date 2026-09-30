@@ -326,12 +326,14 @@ The geometry entry point always runs the deterministic CPU reference.
 `Extrinsic.Runtime.ClusteringService::RunKMeans` is the sole integration
 operation: it snapshots typed geometry properties, routes CPU work through
 world-scoped `JobService`, or accepts Vulkan work into one private clustering
-GPU participant. The non-exported backend partition reuses persistent `(n,k)`
-buffers, records the reset/assign/update loop, and drains labels, distances,
-and centroids as one copied `Graphics.GpuTransfer` batch after producer
-retirement. Both paths rejoin one stale/cancellation/writeback gate, publish the
-same typed completion, and commit label/color properties before visualization
-refresh. No Sandbox facade DTO, backend module, direct benchmark import, or
+GPU participant. Its private workspace gathers resident stride-12 positions and
+records pair-bounded assignment/update pages through `SpatialIndexCache` immediate
+completions. Small diagnostics preserve CPU-reference convergence semantics.
+Integer labels and a float colormap presentation publish at preview boundaries;
+Accept uses `PointScalarTransaction` and the existing atomic label/color history
+entry. Stop, stale checks and Discard share that lifecycle; batch/agent requests
+auto-accept. See [k-means](../methods/kmeans.md) for budgets, IO and the unmeasured
+parity delta of the residency path. No Sandbox facade DTO, backend module, direct benchmark import, or
 second queue bypasses the service. GEOM-056/RUNTIME-196 prove this operation
 with an opt-in `gpu;vulkan` service parity smoke and the stable
 `IntrinsicKMeansGpuBenchmarkSmoke`, which reports end-to-end

@@ -3,6 +3,8 @@ module;
 #include <memory>
 #include "Sandbox.EditorFwd.hpp"
 export module Extrinsic.Sandbox.Editor.MethodPanels;
+import Extrinsic.Runtime.ClusteringModule;
+import Extrinsic.Runtime.CommandBus;
 export namespace Extrinsic::Sandbox::Editor
 {
     class MethodPanels final
@@ -18,6 +20,8 @@ export namespace Extrinsic::Sandbox::Editor
 
         void Register(EditorShell& editorShell);
         void Unregister();
+        void InjectKMeansSubmissionForTest(const Runtime::KMeansRunCompleted&);
+        [[nodiscard]] Runtime::CommandCorrelationId KMeansGpuCorrelationForTest() const;
 
     private:
         struct Impl;
