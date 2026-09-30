@@ -16,6 +16,7 @@ module;
 module Extrinsic.Runtime.RenderExtraction:Internal;
 
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Component.ProceduralGeometryRef;
@@ -309,6 +310,8 @@ namespace Extrinsic::Runtime
 
         std::unordered_map<std::uint32_t, RenderableSidecar> m_Renderables{};
         std::unordered_set<std::uint32_t> m_LiveRenderableKeys{};
+        WorldHandle m_World{DefaultWorldHandle}; // the world ExtractAndSubmit is reading
+        GpuPropertyObserver m_GpuPropertyObserver{};
         std::vector<Graphics::TransformSyncRecord> m_Transforms{};
         std::vector<Graphics::VisualizationSyncRecord> m_Visualizations{};
         std::vector<Graphics::LightSnapshot> m_Lights{};

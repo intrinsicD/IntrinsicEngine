@@ -44,6 +44,11 @@ export namespace Extrinsic::Graphics
         // from that previous solution; the first ChainStride solves use RightHandSides.
         std::span<const double> RhsDiagonal, RhsConstant;
         std::uint32_t ChainStride{0};
+        // Chained solves whose first ChainStride seeds live on the device (ADR 0030): the caller
+        // records them into the solution block (SolutionsAddress) after RecordUpload and before
+        // the first RecordNext, which then forms b = RhsDiagonal * seed + RhsConstant for those
+        // solves too. RightHandSides and InitialGuesses are empty.
+        bool SeedsOnDevice{false};
         std::uint32_t MaxIterations{1000};
         double Tolerance{1e-8};
     };
@@ -62,6 +67,10 @@ export namespace Extrinsic::Graphics
         // Validates and copies the problem; false on malformed CSR, shapes, parameters, or a device
         // without operational state or shader double support.
         [[nodiscard]] bool Begin(const SparseCgProblem& problem);
+        // Creates and uploads the device buffers (the operator, right-hand sides, seeds) once;
+        // RecordNext does this itself, so callers only need it to record into the solution
+        // block before the first chunk. False on failure.
+        [[nodiscard]] bool RecordUpload(RHI::ICommandContext& commands);
         // Records the next bounded chunk (uploading the operator on the first call) and returns the
         // buffer holding every report and solution, ready for transfer reads; invalid on failure.
         // Read back ReportReadbackBytes per chunk.
@@ -75,6 +84,14 @@ export namespace Extrinsic::Graphics
         [[nodiscard]] RHI::BufferHandle RecordFinal(RHI::ICommandContext& commands);
         [[nodiscard]] bool Finished() const noexcept;
         [[nodiscard]] std::uint32_t Chunks() const noexcept;
+        // The result buffer and the address of its solutions block (solution k at
+        // SolutionsAddress() + k * rows * 8), valid once the first chunk was recorded; a
+        // consumer stores a solution into a resident property from here (ADR 0030 previews).
+        [[nodiscard]] RHI::BufferHandle ResultBuffer() const noexcept;
+        [[nodiscard]] std::uint64_t SolutionsAddress() const;
+        // Solves the recorded commands complete (each solve k < CompletedSolves() has its
+        // Finalize recorded, or the device reported it done).
+        [[nodiscard]] std::uint32_t CompletedSolves() const noexcept;
     private:
         struct Impl;
         std::unique_ptr<Impl> m_Impl;

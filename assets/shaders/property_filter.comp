@@ -10,15 +10,25 @@
 layout(local_size_x = 64) in;
 
 layout(buffer_reference, scalar) buffer Doubles { double v[]; };
+layout(buffer_reference, scalar) buffer Floats { float v[]; };
 layout(buffer_reference, scalar) buffer Uints { uint v[]; };
 
+// Load and Store move rows between a resident property (its own scalar type, tightly packed
+// channels over every property row; ADR 0030) and the double working layout: working element
+// (i, c) sits at i * rowStride + c * channelStride, property element (slots[i], c) at
+// slots[i] * channels + c (slots 0: row i). Store also writes an optional float view and,
+// for rows flagged in `fixedRows` (the restore mask), writes the input property's own value
+// (`degree` aliases the typed input address, `randomWalk` its scalar type) so the stored rows
+// equal what the CPU publication restores for fixed and isolated rows.
 const uint ModeApply = 0, ModeBilateralWeights = 1, ModeBilateralDegree = 2,
-           ModeScale = 3, ModeAxpy = 4, ModeDivide = 5, ModeCopy = 6;
+           ModeScale = 3, ModeAxpy = 4, ModeDivide = 5, ModeCopy = 6, ModeLoad = 7, ModeStore = 8;
+const uint ScalarFloat32 = 0, ScalarFloat64 = 1;
 
 layout(push_constant, scalar) uniform Push {
     uint64_t src, dst, edges, weights, baseWeights, offsets, incidences, degree, fixedRows;
+    uint64_t slots, presentation;
     uint rows, channels, edgeCount, mode;
-    uint randomWalk, reserved;
+    uint randomWalk, scalarType, rowStride, channelStride;
     double scalar;
 } pc;
 
@@ -68,6 +78,28 @@ void main()
         return;
     }
     if (id >= pc.rows) return;
+    if (pc.mode == ModeLoad || pc.mode == ModeStore)
+    {
+        const uint row = pc.slots != 0ul ? Uints(pc.slots).v[id] : id;
+        for (uint c = 0; c < C; ++c)
+        {
+            const uint working = id * pc.rowStride + c * pc.channelStride, property = row * C + c;
+            if (pc.mode == ModeLoad)
+                dst.v[working] = pc.scalarType == ScalarFloat64 ? Doubles(pc.src).v[property]
+                                                               : double(Floats(pc.src).v[property]);
+            else
+            {
+                const bool restore = pc.degree != 0ul && Uints(pc.fixedRows).v[id] != 0;
+                const double value = restore
+                    ? (pc.randomWalk == ScalarFloat64 ? Doubles(pc.degree).v[property] : double(Floats(pc.degree).v[property]))
+                    : src.v[working];
+                if (pc.scalarType == ScalarFloat64) Doubles(pc.dst).v[property] = value;
+                else Floats(pc.dst).v[property] = float(value);
+                if (pc.presentation != 0ul) Floats(pc.presentation).v[property] = float(value);
+            }
+        }
+        return;
+    }
     if (pc.mode == ModeBilateralDegree)
     {
         precise double sum = 1.0lf;

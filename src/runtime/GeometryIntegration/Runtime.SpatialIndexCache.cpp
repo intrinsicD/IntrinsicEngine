@@ -20,6 +20,7 @@ import Extrinsic.Graphics.PointLBVH;
 import Extrinsic.Graphics.GpuPropertyResidency;
 import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.RHI.Descriptors;
@@ -308,6 +309,7 @@ namespace Extrinsic::Runtime
         }
         std::uint64_t Next{1};
         SpatialIndexCacheStats Stats{};
+        RenderExtractionCache* Extraction{}; // observes rings through our residency while registered
         Graphics::GpuPropertyResidency* EnsureResidency()
         {
             if (!Residency && Device) Residency = std::make_unique<Graphics::GpuPropertyResidency>(*Device, ResidencyConfig);
@@ -497,10 +499,27 @@ namespace Extrinsic::Runtime
             m_Impl->ResidencyConfig.IdleEvictSeconds = double(render.GpuPropertyIdleEvictSeconds);
             m_Impl->ResidencyConfig.BudgetBytes = std::uint64_t(render.GpuPropertyBudgetMegabytes) << 20u;
         }
+        // The renderer observes method output rings through extraction (ADR 0030 decision 5).
+        if (auto* extraction = setup.Services().Find<RenderExtractionCache>(); extraction && m_Impl->Device)
+        {
+            m_Impl->Extraction = extraction;
+            extraction->SetGpuPropertyObserver(
+                [this](const WorldHandle world, const entt::entity entity, const GeometryPropertyRef& ref)
+                    -> std::optional<RenderExtractionCache::GpuPropertyFront> {
+                    auto& s = *m_Impl;
+                    auto* scene = s.Worlds ? s.Worlds->Get(world) : nullptr;
+                    if (!scene || !s.Residency || s.Residency->Stats().Rings == 0u) return std::nullopt;
+                    const auto front = ObserveGpuPropertyFront(*s.Residency, *scene, world, entity, ref);
+                    if (!front) return std::nullopt;
+                    return RenderExtractionCache::GpuPropertyFront{.Address = front->Address, .Count = front->Count, .Stamp = front->Stamp};
+                });
+        }
         return Core::Ok();
     }
     void SpatialIndexCache::OnShutdown(RuntimeModuleShutdownContext& context)
     {
+        if (m_Impl->Extraction) m_Impl->Extraction->SetGpuPropertyObserver({});
+        m_Impl->Extraction = nullptr;
         if (m_Impl->Jobs && m_Impl->Participant.IsValid())
             m_Impl->Jobs->UnregisterGpuQueueParticipant(m_Impl->Participant, [this]() { m_Impl->Device->WaitIdle(); });
         m_Impl->ShutdownBatches();

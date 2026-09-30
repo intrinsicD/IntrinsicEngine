@@ -3,10 +3,12 @@ module;
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <span>
 #include <vector>
+#include <entt/entity/fwd.hpp>
 
 export module Extrinsic.Runtime.RenderExtraction;
 
@@ -225,6 +227,8 @@ export namespace Extrinsic::Runtime
         // Typed visualization recipe encoding counters. Every value comes
         // from closed recipe data and pure encoding, never object dispatch.
         std::uint32_t VisualizationRecipeScalarConfigsObserved{0};
+        // Appearance scalars bound straight to a GPU method's ring front (ADR 0030).
+        std::uint32_t VisualizationRecipeScalarGpuFrontsObserved{0};
         std::uint32_t VisualizationRecipeEncodeCount{0};
         std::uint32_t VisualizationRecipePacketAppendCount{0};
         std::uint32_t VisualizationRecipeMissingSourceCount{0};
@@ -490,6 +494,22 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] std::optional<VisualizationRecipe> GetVisualizationRecipe(
             std::uint32_t stableEntityId) const noexcept;
         [[nodiscard]] std::uint64_t GetVisualizationRecipeRevision() const noexcept;
+
+        // ADR 0030 decision 5: the renderer observes a GPU method's result. When the
+        // appearance selects a scalar property and the observer returns a device buffer
+        // for it, the scalar recipe binds that buffer through `BufferBDA` instead of
+        // uploading the CPU property; the observer records the frame's use. Surface lanes
+        // with a seam-split vertex remap keep the CPU upload (the front follows property
+        // rows, not split GPU vertices). Set by the residency owner; empty disables.
+        struct GpuPropertyFront
+        {
+            std::uint64_t Address{};
+            std::uint32_t Count{};
+            std::uint64_t Stamp{};
+        };
+        using GpuPropertyObserver = std::function<std::optional<GpuPropertyFront>(
+            WorldHandle world, entt::entity entity, const GeometryPropertyRef& property)>;
+        void SetGpuPropertyObserver(GpuPropertyObserver observer);
 
     private:
         struct State;

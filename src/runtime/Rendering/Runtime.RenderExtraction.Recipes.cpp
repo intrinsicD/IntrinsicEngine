@@ -248,6 +248,11 @@ namespace Extrinsic::Runtime
         m_VisualizationState.Batch.Append(std::move(encoded.Batch));
     }
 
+    void RenderExtractionCache::SetGpuPropertyObserver(GpuPropertyObserver observer)
+    {
+        m_State->m_GpuPropertyObserver = std::move(observer);
+    }
+
     void RenderExtractionCache::SetVisualizationRecipe(
         const std::uint32_t stableEntityId,
         VisualizationRecipe recipe)

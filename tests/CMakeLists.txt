@@ -1305,6 +1305,7 @@ if(TARGET ExtrinsicRuntime)
         Test.PrimitiveSelection.cpp
         Test.SpatialIndexCache.cpp
         Test.GpuPropertyBinding.cpp
+        Test.PropertySmoothingTransaction.cpp
         Test.RegistrationDomains.cpp
         Test.CoherentPointDriftOperations.cpp
         Test.PointSamplingOperations.cpp
@@ -1829,6 +1830,7 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
                 integration/graphics/Test.PointSamplingGpuSmoke.cpp
                 integration/graphics/Test.LowLatencyComputeSmoke.cpp
                 integration/graphics/Test.GpuPropertyResidencySmoke.cpp
+                integration/graphics/Test.PropertySmoothingTransactionGpuSmoke.cpp
         DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
     )
     # METHOD-056: the Vulkan CPD scaling profile shares the METHOD-049 fixtures.
@@ -2933,6 +2935,7 @@ if(_intrinsic_registered_test_targets)
         "  set_tests_properties(GEOM081VulkanPropertySmoothing.ExplicitFiltersMatchTheCpuReferenceOnEveryDomainAndKind GEOM081VulkanPropertySmoothing.StaleInputRejectsPublication PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(RUNTIME269VulkanSparseSolve.MatchesTheCpuConjugateGradientOnConsumerSystemsAndFailures PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(GEOM089VulkanImplicitSmoothing.ConjugateGradientStepsMatchTheCpuReference PROPERTIES TIMEOUT 120)\n"
+        "  set_tests_properties(RUNTIME292ScalarSmoothingTransaction.PreviewBindsTheFrontAndAcceptPublishesOnce RUNTIME292ScalarSmoothingTransaction.DiscardAndStopKeepTheCpuProperty PROPERTIES TIMEOUT 180)\n"
         "  set_tests_properties(PointConstructionGpuSmoke.QueriesMatchReferenceAcrossDomainsAndGeneratedGeometryRenders PointConstructionGpuSmoke.StaleCancelledAndPartialSubmissionCreateNoEntity PROPERTIES TIMEOUT 180)\n"
         "  set_tests_properties(PointLBVHGpuSmoke.FramedRegistrationReusesTargetAcrossRunsAndMatchesCpuSolve PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(PointLBVHGpuSmoke.NormalNeighborhoodsPublishAcrossDomainsAndRejectIncompleteSupport PROPERTIES TIMEOUT 120)\n"

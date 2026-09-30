@@ -40,6 +40,10 @@ Graphics is organized into explicit sublayers:
   C++ linkage declaration. Their implementation units import `RHI.Device`; a
   manager constructor declaration does not expose device submission dependencies.
 - PointLBVH, PointKeypoints, PropertyFilter and SparseConjugateGradient likewise borrow `IDevice` and `ICommandContext`.
+  PropertyFilter and SparseConjugateGradient also read and write resident
+  property slots by buffer handle and address (`PropertyFilterResidentIo`,
+  `SolutionsAddress`), keeping `Graphics.GpuPropertyResidency` out of their
+  interfaces (ADR 0030 decision 9; the runtime job binds the slots).
   ComputeParallelPrimitives and GpuTransfer borrow `IDevice`, retaining the
   CommandContext import for its `MemoryAccess` value type. Visualization property
   residency and overlay uploads, ImGuiOverlaySystem and ImGuiUploadHelper borrow

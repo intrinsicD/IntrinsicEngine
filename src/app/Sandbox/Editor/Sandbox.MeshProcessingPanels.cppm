@@ -6,7 +6,7 @@ module;
 #include "Sandbox.EditorFwd.hpp"
 
 export module Extrinsic.Sandbox.Editor.MeshProcessingPanels;
-
+import Extrinsic.Runtime.MeshFieldOperations;
 
 export namespace Extrinsic::Sandbox::Editor
 {
@@ -23,6 +23,10 @@ export namespace Extrinsic::Sandbox::Editor
 
         void Register(EditorShell& editorShell);
         void Unregister();
+        // Test seam: the Smooth Property window drives this GPU transaction (Accept / Discard /
+        // Stop) as if it had started it, so the panel's transaction state is exercised without
+        // a device.
+        void InjectPropertySmoothingTransactionForTest(Runtime::EditorPropertySmoothingTransactionHandle transaction);
 
     private:
         struct Impl;

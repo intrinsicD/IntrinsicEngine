@@ -1287,6 +1287,7 @@ namespace Extrinsic::Runtime
     {
         RuntimeRenderExtractionStats stats{};
         stats.World = world;
+        m_World = world;
         auto& registry = scene.Raw();
         m_LiveRenderableKeys.clear();
 
@@ -2066,16 +2067,28 @@ namespace Extrinsic::Runtime
                     if (alreadyAppended)
                         continue;
 
-                    if (const auto scalar = BuildScalarVisualizationRecipe(
+                    if (auto scalar = BuildScalarVisualizationRecipe(
                             *availabilityThisFrame,
                             configs[i],
                             scalarKeyFor(configs[i], canonicalMeshLane));
                         scalar.has_value())
                     {
                         ++stats.VisualizationRecipeScalarConfigsObserved;
-                        if (alreadyEncoded(m_VisualizationState.Batch.Scalars,
-                                           std::get<ScalarVisualizationRecipe>(scalar->Data)))
+                        auto& scalarRecipe = std::get<ScalarVisualizationRecipe>(scalar->Data);
+                        if (alreadyEncoded(m_VisualizationState.Batch.Scalars, scalarRecipe))
                             continue;
+                        // A GPU method's ring front replaces the CPU upload while it exists;
+                        // a seam-split surface keeps the remapped CPU payload.
+                        const bool splitSurface = i == 0u && meshBoundThisFrame &&
+                                                  !sidecar->MeshSourceVertexForGpuVertex.empty();
+                        if (m_GpuPropertyObserver && !splitSurface)
+                            if (const auto front = m_GpuPropertyObserver(m_World, entity, scalarRecipe.Source))
+                            {
+                                scalarRecipe.BufferBDA = front->Address;
+                                scalarRecipe.DirtyStamp = front->Stamp;
+                                scalarRecipe.ExternalElementCount = front->Count;
+                                ++stats.VisualizationRecipeScalarGpuFrontsObserved;
+                            }
                         AppendVisualizationRecipe(
                             *availabilityThisFrame,
                             *scalar,

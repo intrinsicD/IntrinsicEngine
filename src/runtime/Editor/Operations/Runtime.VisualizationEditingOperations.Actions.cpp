@@ -1727,8 +1727,12 @@ ApplyEditorRenderHintCommand(
                                 return EditorCommandStatus::UnsupportedGeometryDomain;
                             resolved.Source.Domain = ToGeometryElementDomain(*domain);
                         }
-                        // Displaying a published result does not depend on processing readiness.
-                        if (!EncodeVisualizationRecipe(availability, {.Data = resolved}).Succeeded())
+                        // Displaying a published result does not depend on processing readiness;
+                        // a scalar that is only resident on the device (a GPU result awaiting
+                        // Accept) is shown from its ring front.
+                        const bool pendingResident = std::is_same_v<T, ScalarVisualizationRecipe> &&
+                            context.PendingResidentScalar && context.PendingResidentScalar(entity, resolved.Source);
+                        if (!pendingResident && !EncodeVisualizationRecipe(availability, {.Data = resolved}).Succeeded())
                             return EditorCommandStatus::InvalidVisualizationProperty;
 
                         EditorVisualizationConfigCommand config{
@@ -1772,6 +1776,9 @@ ApplyEditorRenderHintCommand(
                             config.IsolineValues = existing->Scalar.Isolines.Values;
                             config.IsolineValueCount = existing->Scalar.Isolines.ValueCount;
                         }
+                        // A baked texture is built from CPU values, which a pending result lacks.
+                        if (pendingResident)
+                            config.UseBakedTexture = false;
                         if constexpr (std::is_same_v<T, ColorVisualizationRecipe>)
                             config.Interpretation = resolved.Interpretation;
                         if constexpr (std::is_same_v<T, ScalarVisualizationRecipe>)

@@ -31,6 +31,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `GRAPHICS-126` — Bandwidth-priced frame-recipe trace model (tasks/backlog/rendering/GRAPHICS-126-bandwidth-priced-frame-recipe-trace-model.md)
 - blocked by `GRAPHICS-137`: `GRAPHICS-136` — Rename `Pipeline*` to `GraphicsState*` at the RHI boundary (tasks/backlog/rendering/GRAPHICS-136-rename-pipeline-to-graphics-state-rhi-boundary.md)
 - unblocked: `GRAPHICS-137` — Shader-object realization spike (ADR-0028 killing experiment) (tasks/backlog/rendering/GRAPHICS-137-shader-object-realization-spike.md)
+- unblocked: `GRAPHICS-157` — Completion-based retirement of freed and replaced bindless slots (tasks/backlog/rendering/GRAPHICS-157-bindless-slot-completion-retirement.md)
 
 ## Theme C — Physics readiness
 
@@ -135,7 +136,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `GEOM-108` — Small Framework24 parity helpers (tasks/backlog/geometry/GEOM-108-framework24-small-parity-helpers.md)
 - unblocked: `GRAPHICS-151` — Sorted segment heads and fixed-order segment reduction (tasks/backlog/rendering/GRAPHICS-151-sorted-segment-heads-and-reduction.md)
 - unblocked: `GRAPHICS-152` — Device round trips that do not lose small inputs to frame pacing (tasks/backlog/rendering/GRAPHICS-152-small-input-device-round-trip-pacing.md)
-- blocked by `RUNTIME-292`: `GRAPHICS-156` — Renderer observes positions from the residency (tasks/backlog/rendering/GRAPHICS-156-gpu-position-previews.md)
+- unblocked: `GRAPHICS-156` — Renderer observes positions from the residency (tasks/backlog/rendering/GRAPHICS-156-gpu-position-previews.md)
 - blocked by `METHOD-014`: `HARDEN-084` — Localized CPU/GPU parity signatures (tasks/backlog/methods/HARDEN-084-localized-cpu-gpu-parity-signatures.md)
 - unblocked: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
 - unblocked: `METHOD-003A` — Spatial-query CPU-reference integration intake (tasks/backlog/methods/METHOD-003A-spatial-query-reference-integration-intake.md)
@@ -177,7 +178,6 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `RUNTIME-211` — K-Means property-domain integration (tasks/backlog/runtime/RUNTIME-211-kmeans-property-domain-integration.md)
 - unblocked: `RUNTIME-212` — Progressive Poisson property-domain publication (tasks/backlog/runtime/RUNTIME-212-progressive-poisson-property-domain-publication.md)
 - unblocked: `RUNTIME-275` — Gaussian noise editor operation (tasks/backlog/runtime/RUNTIME-275-gaussian-noise-editor-operation.md)
-- unblocked: `RUNTIME-292` — First end-to-end GPU property transaction: scalar smoothing with Accept (tasks/backlog/runtime/RUNTIME-292-first-gpu-property-transaction-scalar-smoothing.md)
 - blocked by `GRAPHICS-156`: `RUNTIME-293` — Accept GPU-authored positions without a re-upload (tasks/backlog/runtime/RUNTIME-293-gpu-positions-commit.md)
 - blocked by `RUNTIME-293`: `RUNTIME-294` — Migrate every GPU method to the property residency (tasks/backlog/runtime/RUNTIME-294-migrate-gpu-methods-to-property-residency.md)
 - blocked by `RUNTIME-293`: `RUNTIME-295` — Extraction fills render blocks from the residency (tasks/backlog/runtime/RUNTIME-295-extraction-fills-render-blocks-from-residency.md)

@@ -1943,6 +1943,10 @@ namespace Extrinsic::Graphics
             if (began)
             {
                 m_CurrentFrame = outFrame;
+                // Bindless descriptor writes queued since the last frame (colormap LUTs,
+                // texture leases) become visible to every pass of this frame; the heap is an
+                // update-after-bind set, and the ImGui pass flushes again for its font atlas.
+                m_Device->GetBindlessHeap().FlushPending();
                 const std::uint32_t framesInFlight = m_Device->GetFramesInFlight() == 0u
                     ? 1u
                     : m_Device->GetFramesInFlight();

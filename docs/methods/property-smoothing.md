@@ -157,8 +157,8 @@ face-center construction and guarded editor history.
 | Runtime owner | `Runtime.MeshFieldOperations.Smoothing.cpp`; uses canonical resolution, point/deletion capture, face-center construction, DEC and editor history. |
 | Config/agent | `sandbox.property_smoothing`, registered in the sandbox config tree; serialization and preview/apply use the same validator as execution admission. Fit fields: `smoothness_penalty`, `data_penalty`, `fidelity`, `fit_weight`, `noise_level`, `penalty_delta`, `bound`, `bound_radius`, `bound_radii` (null unless bound; required on the input domain for per-row bounds), `fit_solver`, `max_fit_iterations` (1–100000), `fit_tolerance`, `bound_norm`, `smoothness_order`, `second_order_weight`; Euclidean bounds and second order require `fit_solver` ADMM. `backend` (0 CPU, 1 Vulkan) is limited to the explicit filters and conjugate-gradient implicit smoothing. |
 | UI | View → Smooth Property, also reachable from Mesh/Graph/PointCloud → Processing. Input property, output name/storage, positions, filter, Laplacian, weights, backend (explicit filters) and parameters are configurable, with requested/actual backend feedback; **Variational fit** adds penalties, fixed weight or noise level, the tolerance bound with its radius property and shape (vector inputs), smoothness order with second-order weight, and the solver; choosing a ball or second order selects ADMM. Edits are reconciled by `ReconcilePropertySmoothingConfig`: the edited choice wins and options it invalidates fall back (a new input retargets the output to `<input>_smoothed` with the input's storage unless overwriting, and drops mesh-only weights, pinning and lumped mass off mesh vertices; a new method drops lumped mass and Vulkan where they do not apply; the reweighted solver restores first order, box bounds and a positive delta). Fit-only solver combinations are validated only for the variational fit, and the panel shows the specific reason when the button is disabled. |
-| Publication | Same domain and cardinality; only the named output changes. Existing deleted output slots remain bitwise untouched; new deleted output slots are zero. In-place writes, including positions, use guarded undo/redo. |
-| Verification | `Test.PropertySmoothing.cpp` (including direct-vs-CG implicit parity), `Test.VariationalFit.cpp` (implicit-step equivalence, closed-form TV, outlier rejection, perturbation optimality for every penalty/bound pair and both solvers, ADMM-to-reference parity with one factorization, exact undamped TV, discrepancy target, Euclidean bounds, second-order affine reproduction, staircasing and a dense quadratic oracle), `Test.PropertySmoothingOperations.cpp`, the real ImGui actions in `Test.SandboxProcessingPanels.cpp`, and the Vulkan parity/stale suites `GEOM081VulkanPropertySmoothing` and `GEOM089VulkanImplicitSmoothing` in `Test.PropertySmoothingGpuSmoke.cpp`. The bound-radius property is a publication guard. |
+| Publication | Same domain and cardinality; only the named output changes. Existing deleted output slots remain bitwise untouched; new deleted output slots are zero. In-place writes, including positions, use guarded undo/redo. GPU preview: yes (the ring front of the output is the colormap scalar while the appearance shows it); commit via Accept (`AcceptEditorPropertySmoothing`, one readback, then the same undoable publication; batch and agent commands accept automatically). |
+| Verification | `Test.PropertySmoothing.cpp` (including direct-vs-CG implicit parity), `Test.VariationalFit.cpp` (implicit-step equivalence, closed-form TV, outlier rejection, perturbation optimality for every penalty/bound pair and both solvers, ADMM-to-reference parity with one factorization, exact undamped TV, discrepancy target, Euclidean bounds, second-order affine reproduction, staircasing and a dense quadratic oracle), `Test.PropertySmoothingOperations.cpp`, the real ImGui actions in `Test.SandboxProcessingPanels.cpp`, the Vulkan parity/stale suites `GEOM081VulkanPropertySmoothing` and `GEOM089VulkanImplicitSmoothing` in `Test.PropertySmoothingGpuSmoke.cpp`, the transaction contract tests `Test.PropertySmoothingTransaction.cpp` (Accept binds the revision, Discard, cancel, stale, undo, "Applied" only after publication), the panel test `PropertySmoothingAcceptsOrDiscardsAPendingGpuResult` and the `RUNTIME292ScalarSmoothingTransaction` smokes (`Test.PropertySmoothingTransactionGpuSmoke.cpp`: the colormap binds the ring front before Accept, CPU == readback == CPU reference after Accept, a second run on the same revision uploads zero input bytes, Discard and Stop). The bound-radius property is a publication guard. |
 
 The default output type follows the chosen input in the UI. Scalar output
 storage can also be float or double. Conversion rejects nonfinite results or
@@ -190,6 +190,29 @@ tested device. Bilateral weights use a Cody-Waite plus degree-13 Taylor `exp`,
 since GLSL has no double-precision `exp`. The parity bound frozen per case is
 `max |gpu - cpu| <= 1e-12 * max(1, max |input|)`.
 
+The Vulkan run is a GPU property transaction (ADR 0030, RUNTIME-292; see
+[property coherence](../architecture/property-coherence.md#gpu-property-transactions-observation-and-accept)):
+the kernels gather the input from the property's canonical residency slot
+(uploaded once per CPU revision) and scatter the result into the output
+property's ring in its own scalar type, with a float presentation ring beside a
+double output. The renderer binds the ring front as the colormap scalar while
+the appearance shows the output, so the preview is visible before anything
+reaches the CPU. Interactively (`StartEditorPropertySmoothing`, the panel's
+Smooth Property button with the Vulkan backend) the finished or stopped run
+waits for **Accept** (one readback in the property's precision, the undoable
+publication, then the front becomes the canonical slot of the new revision so
+the next run uploads nothing) or **Discard** (nothing published, ring
+released). Stop ends a chunked implicit solve after its current chunk and
+offers its latest preview. A result whose inputs changed while it waits is
+stale: Accept is refused with the reason and only Discard remains.
+`ApplyEditorPropertySmoothingCommand` (batch, agent) accepts automatically.
+Implicit smoothing seeds its chained solves from the canonical slot on the
+device; the CPU stage that remains (ADR 0030 decision 8) is the assembly of the
+right-hand-side diagonal (mass) and the fixed-row coupling
+`dt * sum_j w_ij x_j` over pinned neighbours, which depend on the captured
+input and are uploaded per run (`2 * rows * channels` doubles); the result
+message reports those bytes ("CPU-assembled coupling uploaded"). The CSR
+operator, weights and the graph are CPU-built inputs of every backend.
 Publication, stale-input detection and undo/redo are shared with the CPU path;
 a changed input, topology or output while the job is pending publishes nothing.
 A run is refused above 2^24 rows, 2^26 edges, 256 MiB of values or 2^20

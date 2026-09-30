@@ -376,6 +376,9 @@ namespace Extrinsic::Sandbox::Editor
         // Vulkan smoothing completes on a later frame; the shared mailbox outlives the panel.
         std::shared_ptr<std::optional<Runtime::EditorPropertySmoothingResult>> SmoothingCompletion{
             std::make_shared<std::optional<Runtime::EditorPropertySmoothingResult>>()};
+        // The interactive Vulkan run (ADR 0030): its preview shows in the viewport until the
+        // user accepts or discards it.
+        Runtime::EditorPropertySmoothingTransactionHandle SmoothingTransaction{};
         std::uint32_t SmoothingEntity{};
         ProcessingDraftState<Runtime::HarmonicFieldConfig, Runtime::EditorHarmonicFieldResult> Harmonic{};
         std::uint32_t HarmonicEntity{};
@@ -434,6 +437,7 @@ namespace Extrinsic::Sandbox::Editor
         void DrawSegmentationWindow(bool&, const SandboxEditorContext&);
         void DrawGradientWindow(bool&, const SandboxEditorContext&);
         void DrawSmoothingWindow(bool&, const SandboxEditorContext&);
+        void DrawSmoothingTransaction(const SandboxEditorContext&);
         void DrawHarmonicFieldWindow(bool&, const SandboxEditorContext&);
         void DrawEigenbasisWindow(bool&, const SandboxEditorContext&);
         void DrawGeodesicsWindow(bool&, const SandboxEditorContext&);
@@ -3181,6 +3185,11 @@ namespace Extrinsic::Sandbox::Editor
         m_Impl->Register(editorShell);
     }
 
+    void MeshProcessingPanels::InjectPropertySmoothingTransactionForTest(Runtime::EditorPropertySmoothingTransactionHandle transaction)
+    {
+        m_Impl->SmoothingTransaction = std::move(transaction);
+    }
+
     void MeshProcessingPanels::Unregister()
     {
         m_Impl->Unregister();
@@ -3312,13 +3321,38 @@ namespace Extrinsic::Sandbox::Editor
             Smoothing.LastResult.reset();
             Smoothing.ConfigDiagnostic = apply(config).Succeeded() ? "" : "Smoothing configuration was rejected.";
         }
-        const auto readiness = Runtime::PreviewEditorPropertySmoothingCommand(context.MeshFields.Commands, model.SelectedStableId, config);
+        auto readiness = Runtime::PreviewEditorPropertySmoothingCommand(context.MeshFields.Commands, model.SelectedStableId, config);
+        // A pending GPU result blocks the next run until it is accepted or discarded.
+        using Phase = Runtime::EditorPropertySmoothingPhase;
+        const auto transaction = Runtime::SnapshotEditorPropertySmoothing(context.MeshFields.Commands, SmoothingTransaction);
+        const bool transactionPending = SmoothingTransaction && (transaction.Phase == Phase::Running ||
+            transaction.Phase == Phase::ReadyToAccept || transaction.Phase == Phase::Accepting);
+        if (transactionPending && readiness.Enabled)
+            readiness = {.Enabled = false, .DisabledReason = "Accept or discard the pending GPU result first."};
         if (DrawProcessingActionButton("Smooth property", readiness))
-            ApplyProcessingExecution(Smoothing, config, apply,
-                [&] { return Runtime::ApplyEditorPropertySmoothingCommand(context.MeshFields.Commands, model.SelectedStableId, config,
-                          [completion = SmoothingCompletion](Runtime::EditorPropertySmoothingResult result) { *completion = std::move(result); }); },
-                std::function<void(Runtime::EditorPropertySmoothingResult)>{}, "Smoothing configuration was rejected.");
+        {
+            if (config.Backend == Runtime::PropertySmoothingBackend::Vulkan)
+            {
+                // Interactive Vulkan runs preview on the device and publish on Accept.
+                Smoothing.ConfigDiagnostic = apply(config).Succeeded() ? "" : "Smoothing configuration was rejected.";
+                if (Smoothing.ConfigDiagnostic.empty())
+                {
+                    // A finished transaction is retired before the new one takes its place.
+                    SmoothingTransaction.reset();
+                    Runtime::EditorPropertySmoothingResult failure;
+                    SmoothingTransaction = Runtime::StartEditorPropertySmoothing(context.MeshFields.Commands, model.SelectedStableId, config, failure);
+                    Smoothing.LastResult = SmoothingTransaction
+                        ? Runtime::SnapshotEditorPropertySmoothing(context.MeshFields.Commands, SmoothingTransaction).Result : failure;
+                }
+            }
+            else
+                ApplyProcessingExecution(Smoothing, config, apply,
+                    [&] { return Runtime::ApplyEditorPropertySmoothingCommand(context.MeshFields.Commands, model.SelectedStableId, config,
+                              [completion = SmoothingCompletion](Runtime::EditorPropertySmoothingResult result) { *completion = std::move(result); }); },
+                    std::function<void(Runtime::EditorPropertySmoothingResult)>{}, "Smoothing configuration was rejected.");
+        }
         if (!readiness.Enabled && !readiness.DisabledReason.empty()) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
+        if (SmoothingTransaction) DrawSmoothingTransaction(context);
         DrawProcessingPropertyShowButton(context, model.SelectedStableId, config.Output, Smoothing.VisualizationDiagnostic);
         ImGui::TextDisabled(fit ? "CPU reference; penalties use the Euclidean norm over vector channels, bounds apply per channel."
                                 : "Vectors are filtered componentwise without normalization.");
@@ -3331,6 +3365,48 @@ namespace Extrinsic::Sandbox::Editor
         if (!Smoothing.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Smoothing.ConfigDiagnostic.c_str());
         if (!Smoothing.VisualizationDiagnostic.empty()) ImGui::TextWrapped("%s", Smoothing.VisualizationDiagnostic.c_str());
         ImGui::End();
+    }
+
+    // Stop / Accept / Discard of the interactive Vulkan run (ADR 0030 decisions 6-7). The
+    // preview stays in the viewport until the user decides; "Applied" appears only after the
+    // CPU publication succeeded.
+    void MeshProcessingPanels::Impl::DrawSmoothingTransaction(const SandboxEditorContext& context)
+    {
+        using Phase = Runtime::EditorPropertySmoothingPhase;
+        const auto& commands = context.MeshFields.Commands;
+        // A fresh snapshot: the handle may have been replaced by a start this frame.
+        const auto transaction = Runtime::SnapshotEditorPropertySmoothing(commands, SmoothingTransaction);
+        ImGui::SeparatorText("GPU result");
+        ImGui::TextDisabled("State: %s%s", Runtime::ToString(transaction.Phase),
+                            transaction.Phase == Phase::ReadyToAccept && transaction.Stale ? " (stale)" : "");
+        ImGui::BeginDisabled(transaction.Phase != Phase::Running);
+        if (ImGui::Button("Stop##Smoothing")) Runtime::StopEditorPropertySmoothing(SmoothingTransaction);
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!transaction.CanAccept);
+        if (ImGui::Button("Accept##Smoothing") && transaction.CanAccept)
+            Smoothing.LastResult = Runtime::AcceptEditorPropertySmoothing(commands, SmoothingTransaction,
+                [completion = SmoothingCompletion](Runtime::EditorPropertySmoothingResult result) { *completion = std::move(result); });
+        ImGui::EndDisabled();
+        if (!transaction.CanAccept && !transaction.AcceptDisabledReason.empty())
+            DrawDisabledReasonTooltip(transaction.AcceptDisabledReason);
+        ImGui::SameLine();
+        ImGui::BeginDisabled(transaction.Phase == Phase::Applied || transaction.Phase == Phase::Discarded || transaction.Phase == Phase::Failed);
+        if (ImGui::Button("Discard##Smoothing"))
+        {
+            Runtime::DiscardEditorPropertySmoothing(commands, SmoothingTransaction);
+            Smoothing.LastResult = Runtime::SnapshotEditorPropertySmoothing(commands, SmoothingTransaction).Result;
+        }
+        ImGui::EndDisabled();
+        if (!transaction.AcceptDisabledReason.empty()) ImGui::TextWrapped("%s", transaction.AcceptDisabledReason.c_str());
+        else if (transaction.Phase == Phase::ReadyToAccept)
+            ImGui::TextWrapped("The viewport shows the device result; Accept publishes it (undoable), Discard keeps the CPU property.");
+        if (transaction.Phase == Phase::Applied || transaction.Phase == Phase::Discarded || transaction.Phase == Phase::Failed)
+        {
+            // Terminal: the result line below reports it; the next run may start.
+            if (!*SmoothingCompletion) Smoothing.LastResult = transaction.Result;
+            SmoothingTransaction.reset();
+        }
     }
 
     void MeshProcessingPanels::Impl::DrawEigenbasisWindow(bool& open, const SandboxEditorContext& context)

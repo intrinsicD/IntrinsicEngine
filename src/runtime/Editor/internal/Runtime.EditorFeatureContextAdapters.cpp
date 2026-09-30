@@ -64,6 +64,7 @@ import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -1298,6 +1299,15 @@ MakeEditorVisualizationEditingContext(const EditorFeatureBindings &bindings) {
       .OperationalGpuAvailable =
           bindings.Device != nullptr && bindings.Device->IsOperational(),
       .VisualizationCommandsAvailable = bindings.VisualizationCommandsAvailable,
+      .PendingResidentScalar =
+          [cache = bindings.SpatialIndices, world = bindings.World](
+              const ECS::EntityHandle entity, const GeometryPropertyRef &ref) {
+            const auto *residency =
+                cache != nullptr ? std::as_const(*cache).PropertyResidency() : nullptr;
+            return residency != nullptr &&
+                   residency->HasRing(MakeGpuPropertyKey(
+                       world, entity, GpuPropertyPresentationRef(ref)));
+          },
   };
 }
 

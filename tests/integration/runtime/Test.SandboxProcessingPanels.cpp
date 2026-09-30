@@ -3351,3 +3351,93 @@ TEST(SandboxProcessingPanels, CoherentPointDriftPanelStepsRunsAndApplies)
     // This harness composes no document history; undo/redo of the publication is covered by
     // Test.CoherentPointDriftOperations.cpp.
 }
+
+// RUNTIME-292: the Smooth Property window drives a GPU property transaction (ADR 0030): once a
+// Vulkan run waits for the user, Accept and Discard appear; Accept is disabled while the inputs
+// changed under the result (stale), Discard always works, and Accept publishes the front through
+// the undoable transaction. The transaction is injected through the panel's test seam because the
+// null device cannot run the kernels; its state machine is the runtime's real one.
+TEST(SandboxProcessingPanels, PropertySmoothingAcceptsOrDiscardsAPendingGpuResult)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    scene.Raw().emplace_or_replace<Extrinsic::ECS::Components::Transform::Component>(entity);
+    auto& vertices = scene.Raw().emplace<GS::Vertices>(entity).Properties;
+    vertices.Resize(16);
+    auto positions = vertices.GetOrAdd<glm::vec3>("v:position");
+    auto signal = vertices.GetOrAdd<float>("signal", 0.f);
+    for (std::size_t i = 0; i < 16; ++i) { positions[i] = {float(i % 4), float(i / 4), 0.f}; signal[i] = float(i); }
+    R::PropertySmoothingConfig smoothing;
+    smoothing.Input = {R::GeometryElementDomain::PointCloudPoint, "signal", Geometry::PropertyValueKind::Float};
+    smoothing.Output = {R::GeometryElementDomain::PointCloudPoint, "smooth", Geometry::PropertyValueKind::Float};
+    smoothing.Positions = {R::GeometryElementDomain::PointCloudPoint, "v:position", Geometry::PropertyValueKind::Vec3};
+    smoothing.Neighbors = 4;
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto section = R::MakePropertySmoothingConfigSectionRegistration().DefaultSection;
+    section.PayloadJson = R::SerializePropertySmoothingConfig(smoothing);
+    Config::UpsertEngineConfigSection(config.AppSections, section);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("mesh.processing.property_smoothing", true));
+    // The transaction's own context: the scene, an undo history and the engine's job service.
+    R::EditorCommandHistory history;
+    R::EditorProcessingContext context;
+    context.Scene = &scene;
+    context.CommandHistory = &history;
+    context.JobCommands.Submit = [&](R::JobDesc desc, const auto&) { return h.Engine->Jobs().Submit(std::move(desc)); };
+    const auto commands = R::BindEditorProcessingCommands(context);
+    const auto id = R::SelectionController::ToStableEntityId(entity);
+    const std::vector<double> front(16, 42.0);
+    R::EditorPropertySmoothingTransactionHandle stale, fresh;
+    int frames = 0;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        ++frames;
+        auto* window = ImGui::FindWindowByName("Smooth Property");
+        if (window) { ImGui::SetWindowSize(window, {750, 1200}); ImGui::SetWindowPos(window, {0, 0}); ImGui::FocusWindow(window); }
+        if (!window) { if (frames > 60) { ADD_FAILURE() << "no Smooth Property window"; engine.RequestExit(); } return; }
+        switch (frames)
+        {
+        case 10:
+            stale = R::MakeEditorPropertySmoothingTransactionForTest(commands, id, smoothing, front);
+            ASSERT_TRUE(stale);
+            h.Panels.InjectPropertySmoothingTransactionForTest(stale);
+            vertices.Get<float>("signal")[0] += 1.f; // the input changes under the waiting result
+            break;
+        case 13:
+            EXPECT_TRUE(R::SnapshotEditorPropertySmoothing(commands, stale).Stale);
+            ImGui::ActivateItemByID(window->GetID("Accept##Smoothing"));
+            break;
+        case 16:
+            EXPECT_EQ(R::SnapshotEditorPropertySmoothing(commands, stale).Phase, R::EditorPropertySmoothingPhase::ReadyToAccept)
+                << "a stale result cannot be accepted from the panel";
+            EXPECT_FALSE(std::as_const(vertices).Exists("smooth"));
+            ImGui::ActivateItemByID(window->GetID("Discard##Smoothing"));
+            break;
+        case 19:
+            EXPECT_EQ(R::SnapshotEditorPropertySmoothing(commands, stale).Phase, R::EditorPropertySmoothingPhase::Discarded);
+            EXPECT_FALSE(std::as_const(vertices).Exists("smooth"));
+            fresh = R::MakeEditorPropertySmoothingTransactionForTest(commands, id, smoothing, front);
+            ASSERT_TRUE(fresh);
+            EXPECT_TRUE(R::SnapshotEditorPropertySmoothing(commands, fresh).CanAccept);
+            h.Panels.InjectPropertySmoothingTransactionForTest(fresh);
+            break;
+        case 22:
+            ImGui::ActivateItemByID(window->GetID("Accept##Smoothing"));
+            break;
+        default:
+            if (frames > 22 && R::SnapshotEditorPropertySmoothing(commands, fresh).Phase == R::EditorPropertySmoothingPhase::Applied)
+            {
+                const auto smooth = std::as_const(vertices).Get<float>("smooth");
+                ASSERT_TRUE(smooth);
+                EXPECT_FLOAT_EQ(smooth[3], 42.f);
+                EXPECT_TRUE(history.Undo().Succeeded()) << "Accept published through the undoable transaction";
+                EXPECT_FALSE(std::as_const(vertices).Exists("smooth"));
+                engine.RequestExit();
+            }
+            if (frames > 300) { ADD_FAILURE() << "the panel never accepted the result"; engine.RequestExit(); }
+            break;
+        }
+    };
+    h.Engine->Run();
+}

@@ -61,20 +61,83 @@ The stable boundary is:
 ```text
 CPU method: const CPU input -> CPU kernel -> canonical CPU output/revision
 GPU method: CPU revision -> canonical residency slot (once per revision, shared)
-                          -> GPU-only iterations -> terminal readback -> CPU output/revision
+                          -> GPU-only iterations -> ring front (observed by the renderer)
+                          -> Accept: one readback -> CPU output/revision -> front becomes canonical
 Rendering:  CPU revision delta -> copied upload plan -> staging/copy -> GPU draw
+            (or the ring front bound directly while a transaction shows it)
 ```
 
 `SpatialIndexCache` owns the residency (created on first GPU use, configured
 from the render config, ticked from its maintenance hook). Current users of
 canonical slots: its GPU index in property space over every row (GRAPHICS-154);
 an index keeps its slot leased while it is current, so that slot is not evicted
-under it. Transformed or compacted indices keep a private upload. Renderer
-observation of in-flight results, Accept to the CPU and routing render uploads
-through the residency follow ADR 0030 (RUNTIME-292, GRAPHICS-156,
-RUNTIME-293..295). Where a method still runs a CPU stage per iteration, the
-traffic that stage needs is reported by the method until its port lands
-(RUNTIME-294).
+under it. Transformed or compacted indices keep a private upload. Where a
+method still runs a CPU stage per iteration, the traffic that stage needs is
+reported by the method until its port lands (RUNTIME-294).
+
+### GPU property transactions (observation and Accept)
+
+A GPU method that writes a property runs as a **transaction** (ADR 0030
+decisions 5-7; first consumer: Vulkan property smoothing, RUNTIME-292). Its
+per-run state lives in the method's job state, not in a service:
+
+- **Input and output.** The kernel reads its input from the canonical slot
+  (`ResolveGpuPropertyInput`; one upload per CPU revision, so a second run on
+  an unchanged revision uploads zero input bytes) and writes the output
+  property's ring (`AcquireGpuPropertyOutput`, depth 3 for renderer-bound
+  scalars). Conversion between the property's own scalar type and the kernel's
+  working layout happens on the device (`property_filter.comp` Load/Store); a
+  double scalar additionally publishes a float **presentation ring** keyed by
+  the same name with `ValueKind Float` (`GpuPropertyPresentationRef`), because
+  the colormap shader reads floats. The implicit solver's seeds are gathered
+  from the canonical slot too (`SeedsOnDevice`); only its CPU-assembled
+  right-hand-side diagonal and fixed-row coupling are uploaded per run (ADR
+  0030 decision 8, reported in the result message).
+- **Byte identity.** The ring front that Accept binds must equal the CPU
+  revision it publishes: the store first copies the output property's
+  canonical slot (rows outside the sampled live rows keep their published
+  bytes; a new output's read as 0, as the CPU publication writes them) and
+  writes the input's own value for fixed and isolated rows (the CPU restores
+  those from the input). Values convert to the property's scalar type on the
+  device exactly as the CPU casts them.
+- **Observation.** Extraction asks the residency owner
+  (`RenderExtractionCache::SetGpuPropertyObserver`, set by `SpatialIndexCache`)
+  for every appearance-selected scalar; while a ring front covers the property's
+  rows, the scalar recipe binds it through `BufferBDA` instead of uploading the
+  CPU property, and the residency records the frame's use (`MarkObserved`).
+  Surface lanes with a seam-split vertex remap keep the CPU upload (the front
+  follows property rows, not split GPU vertices). An output that does not
+  exist on the CPU yet (a new output name) is encoded from the front's element
+  count with the appearance's manual range, or 0..1 when the range is invalid
+  or auto (auto-range needs CPU values); an existing output keeps its CPU
+  auto-range. The editor's display request ("Show <output>",
+  `ApplyEditorVisualizationRecipeCommand`) accepts such a pending resident
+  scalar through `EditorVisualizationEditingContext::PendingResidentScalar`
+  (bound to the residency's ring check); once the ring is discarded the
+  request is refused as for any missing property and the appearance that still
+  names it encodes as a missing source (the lane falls back). Vector
+  properties are not colormap scalars and are not observed.
+- **Ready to accept.** A finished or stopped run keeps its front observed and
+  the CPU unchanged. Stop takes a chunked solve's latest published preview (an
+  explicit filter is one submission and completes as usual).
+- **Accept** reads the front back once in the property's precision (the
+  readback token is a slot completion; the front stays leased until the bytes
+  landed), runs the existing undoable publication and, only when it succeeded,
+  binds the front as the canonical slot of the new CPU revision
+  (`BindRevision`). "Applied" is reported only after that publication; batch
+  and agent commands (`ApplyEditorPropertySmoothingCommand`) accept
+  automatically.
+- **Discard, cancel, stale.** Discard or cancel publishes nothing and releases
+  the ring (freed after its completions; a readback in flight keeps its lease
+  until the bytes landed); observation returns to the CPU property. If the
+  inputs or the output change while a result waits (also an in-place output,
+  which the publication guards by value rather than by revision), Accept is
+  refused with the reason and only Discard remains. Undo moves the CPU
+  revision on, so the next GPU use uploads once. A refused slot defers the run
+  (bounded) and never falls back to the CPU silently.
+
+Position observation and Accept for positions, and routing render uploads
+through the residency, follow (GRAPHICS-156, RUNTIME-293, RUNTIME-295).
 
 ## Property revisions
 

@@ -1846,6 +1846,18 @@ Concretely:
   are an LRU cache with an idle timeout and a byte budget (`Tick`, injected
   clock, counters in `Stats()`). Render buffers are never a source; see
   [property coherence](../../../docs/architecture/property-coherence.md).
+  `Graphics.PropertyFilter` reads and writes resident slots directly
+  (`PropertyFilterResidentIo`: Load gathers the property's own scalar type
+  into the double working layout, Store copies the output's base bytes,
+  scatters the result back, restores fixed/isolated rows from the input and
+  writes an optional float presentation view; `RecordStore` / `RecordLoad`
+  also serve the conjugate-gradient solutions and seeds, whose
+  `SeedsOnDevice` problem takes them from the residency), so a smoothing run
+  moves no property values through the CPU.
+- The renderer flushes the bindless heap's queued descriptor writes once per
+  frame in `BeginFrame` (the ImGui pass flushes again for its font atlas), so
+  colormap LUTs and texture leases registered since the last frame are
+  sampled by every pass, with or without a UI overlay.
 - `Graphics.GpuTransfer` is the recommended facade for algorithm/user
   buffer-transfer helpers introduced by
   [ADR-0023](../../../docs/adr/0023-cpu-gpu-transfer-foundation.md). It composes

@@ -886,6 +886,7 @@ namespace Extrinsic::Runtime
                            a.BufferBDA == b.BufferBDA &&
                            a.BufferSourceKey == b.BufferSourceKey &&
                            a.DirtyStamp == b.DirtyStamp &&
+                           a.ExternalElementCount == b.ExternalElementCount &&
                            a.AutoRange == b.AutoRange &&
                            a.RangeMin == b.RangeMin &&
                            a.RangeMax == b.RangeMax &&
@@ -1051,6 +1052,31 @@ namespace Extrinsic::Runtime
                 }
                 else if constexpr (std::is_same_v<Recipe, ScalarVisualizationRecipe>)
                 {
+                    const std::optional<Graphics::VisualizationAttributeDomain> externalDomain =
+                        ToVisualizationDomain(authored.Source.Domain);
+                    if (authored.BufferBDA != 0u && authored.ExternalElementCount != 0u && externalDomain.has_value() &&
+                        !ResolveGeometryProperty(availability, authored.Source, std::nullopt, /*requireFiniteValues=*/false).Resolved())
+                    {
+                        // A device-resident scalar without a CPU property: bound as is, with the
+                        // manual range (auto-range has no CPU values to scan) or 0..1.
+                        const bool manual = !authored.AutoRange && ValidRange(authored.RangeMin, authored.RangeMax);
+                        if (!manual) ++result.Diagnostics.InvalidRangeCount;
+                        else ++result.Diagnostics.ManualRangeCount;
+                        const std::string sourceKey = authored.OutputName.empty() ? authored.Source.Name : authored.OutputName;
+                        result.Batch.Scalars.push_back(Graphics::ScalarAttributePacket{
+                            .Name = sourceKey,
+                            .SourceBufferKey = authored.BufferSourceKey.empty() ? sourceKey : authored.BufferSourceKey,
+                            .Domain = *externalDomain,
+                            .ElementCount = authored.ExternalElementCount,
+                            .RangeMin = manual ? authored.RangeMin : 0.0f,
+                            .RangeMax = manual ? authored.RangeMax : 1.0f,
+                            .Colormap = authored.Colormap,
+                            .ScalarBufferBDA = authored.BufferBDA,
+                        });
+                        ++result.Diagnostics.PacketAppendCount;
+                        result.Status = VisualizationRecipeStatus::Encoded;
+                        return;
+                    }
                     (void)appendPropertyRecipe(
                         authored.Source,
                         VisualizationEncodingOptions{

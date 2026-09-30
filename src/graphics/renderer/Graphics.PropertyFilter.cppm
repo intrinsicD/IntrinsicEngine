@@ -1,6 +1,9 @@
 // Device-owned double-precision kernels for the explicit graph property filters (averaging,
 // Taubin, bilateral, spectral heat). Inputs are plain arrays prepared by the caller from the
-// CPU reference plan, so this layer stays free of geometry and ECS types.
+// CPU reference plan, so this layer stays free of geometry and ECS types. A run may read its
+// values from, and write its result into, resident property buffers (ADR 0030): the kernel
+// converts the property's own scalar type to its double working layout at the start and back
+// at the end, so no CPU copy crosses the boundary.
 module;
 #include <array>
 #include <cstdint>
@@ -38,6 +41,36 @@ export namespace Extrinsic::Graphics
         std::span<const std::uint32_t> Fixed; // nonzero: the row keeps its value
     };
 
+    // A resident property buffer as a kernel endpoint: the property's own scalar type (float
+    // or double), `Channels` tightly packed per row, over every property row.
+    struct PropertyFilterResidentView
+    {
+        RHI::BufferHandle Buffer{};
+        std::uint64_t Address{};
+        bool Double{};
+        [[nodiscard]] bool Valid() const noexcept { return Buffer.IsValid() && Address != 0u; }
+    };
+    // Resident endpoints of a run. `Slots` maps working row i to its property row (empty:
+    // row i); `Rows` is the working row count when `Slots` is empty. `Input` replaces the
+    // uploaded values (they are gathered on the device). `Output` receives the result: it is
+    // first filled from `Base` (the output property's current bytes, so rows outside `Slots`
+    // keep their published values) or zeroed over `OutputBytes` without a base, then rows
+    // flagged in `RestoreMask` (one per working row) take the input's own value instead of
+    // the kernel's, matching the CPU publication's fixed and isolated rows. `Presentation` is
+    // an optional float copy of the output (a double property's colormap view).
+    struct PropertyFilterResidentIo
+    {
+        PropertyFilterResidentView Input{};
+        PropertyFilterResidentView Output{};
+        std::uint64_t OutputBytes{};
+        PropertyFilterResidentView Base{};
+        PropertyFilterResidentView Presentation{};
+        std::uint64_t PresentationBytes{};
+        std::span<const std::uint32_t> Slots{};
+        std::span<const std::uint32_t> RestoreMask{};
+        std::uint32_t Rows{};
+    };
+
     class PropertyFilterWorkspace
     {
     public:
@@ -49,9 +82,23 @@ export namespace Extrinsic::Graphics
         // Uploads the inputs, records every iteration on the device and returns the buffer holding
         // the filtered rows x channels doubles, ready for transfer reads; invalid on refusal
         // (non-operational device, no shader double support, bad shape or dispatch budget).
-        // The caller keeps the workspace alive until the readback completes.
+        // With `resident`, the values come from its input (input.Values may be empty, or equal
+        // in shape) and the result is also stored into its output. The caller keeps the
+        // workspace alive until the readback completes.
         [[nodiscard]] RHI::BufferHandle Record(RHI::ICommandContext& commands,
-            const PropertyFilterGpuInput& input, const PropertyFilterGpuParams& params);
+            const PropertyFilterGpuInput& input, const PropertyFilterGpuParams& params,
+            const PropertyFilterResidentIo* resident = nullptr);
+        // Stores rows x `channels` doubles held elsewhere on the device (element (i, c) at
+        // `source` + (i * rowStride + c * channelStride) * 8) into the resident output and
+        // presentation, e.g. a conjugate-gradient solution block. False on refusal.
+        [[nodiscard]] bool RecordStore(RHI::ICommandContext& commands, const PropertyFilterResidentIo& resident,
+            std::uint32_t channels, RHI::BufferHandle source, std::uint64_t sourceAddress,
+            std::uint32_t rowStride, std::uint32_t channelStride);
+        // Gathers the resident input into rows x `channels` doubles held elsewhere on the device
+        // (the same element layout), e.g. a solver's seed block. False on refusal.
+        [[nodiscard]] bool RecordLoad(RHI::ICommandContext& commands, const PropertyFilterResidentIo& resident,
+            std::uint32_t channels, RHI::BufferHandle target, std::uint64_t targetAddress,
+            std::uint32_t rowStride, std::uint32_t channelStride);
     private:
         struct Impl;
         std::unique_ptr<Impl> m_Impl;

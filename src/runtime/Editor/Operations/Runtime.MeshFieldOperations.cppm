@@ -5,10 +5,12 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 export module Extrinsic.Runtime.MeshFieldOperations;
 export import Extrinsic.Runtime.EditorProcessing;
 export import Extrinsic.Runtime.EditorCommon;
@@ -24,6 +26,7 @@ export import Geometry.Segmentation.Diagnostics;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
+import Extrinsic.Graphics.GpuPropertyResidency;
 
 export namespace Extrinsic::Runtime
 {
@@ -175,11 +178,69 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::optional<PropertySmoothingConfig> GetEditorPropertySmoothingConfig(const EditorProcessingCommands&);
     [[nodiscard]] ActionReadiness PreviewEditorPropertySmoothingCommand(
         const EditorProcessingCommands&, std::uint32_t stableEntityId, const PropertySmoothingConfig&);
-    // CPU runs publish synchronously. Vulkan returns Pending and delivers the published (or stale
-    // or failed) result to onComplete once the framed readback completes.
+    // CPU runs publish synchronously. Vulkan returns Pending, runs as a GPU property
+    // transaction that accepts automatically when the device finishes (batch and agent
+    // callers), and delivers the published (or stale or failed) result to onComplete.
     [[nodiscard]] EditorPropertySmoothingResult ApplyEditorPropertySmoothingCommand(
         const EditorProcessingCommands&, std::uint32_t stableEntityId, const PropertySmoothingConfig&,
         std::function<void(EditorPropertySmoothingResult)> onComplete = {});
+
+    // Interactive Vulkan smoothing as a GPU property transaction (ADR 0030 decisions 5-7).
+    // The run reads its input from the property's canonical residency slot and writes the
+    // output property's ring; the renderer shows the ring front while the appearance selects
+    // that scalar. When the run finishes or is stopped it waits for the user: Accept reads the
+    // front back once, publishes it through the undoable smoothing transaction and binds the
+    // front as the canonical slot of the new CPU revision (the next run uploads nothing);
+    // Discard publishes nothing and releases the ring. A result whose inputs changed while it
+    // waits is stale: Accept is refused with the reason and only Discard remains.
+    enum class EditorPropertySmoothingPhase : std::uint8_t
+    {
+        Running,        // the device is computing (or a chunked solve is between chunks)
+        ReadyToAccept,  // the front holds the result (or a stopped run's latest preview)
+        Accepting,      // the front is being read back and published
+        Applied,        // the CPU publication succeeded; the front is canonical
+        Discarded,      // discarded, cancelled or stopped before any preview
+        Failed,         // the device or the publication failed; nothing changed
+    };
+    [[nodiscard]] const char* ToString(EditorPropertySmoothingPhase phase) noexcept;
+    struct EditorPropertySmoothingTransactionSnapshot
+    {
+        EditorPropertySmoothingPhase Phase{EditorPropertySmoothingPhase::Running};
+        bool Stale{};                        // the inputs changed while the result waits
+        bool CanAccept{};                    // ReadyToAccept, current and a front exists
+        std::string AcceptDisabledReason{};  // why not, when a result waits but cannot be accepted
+        std::uint32_t Previews{};            // fronts published so far
+        bool DeviceWorkQueued{};             // a submission of this run has been queued to the device
+        EditorPropertySmoothingResult Result{}; // Pending until Applied, Failed or Discarded
+    };
+    // The run's job state; the handle keeps it alive across frames.
+    struct EditorPropertySmoothingTransaction;
+    using EditorPropertySmoothingTransactionHandle = std::shared_ptr<EditorPropertySmoothingTransaction>;
+    // Validates and captures like the command, then queues the device run. Null with `failure`
+    // filled when the request is rejected (including while a result for the same output awaits
+    // Accept or Discard). Vulkan backend only.
+    [[nodiscard]] EditorPropertySmoothingTransactionHandle StartEditorPropertySmoothing(
+        const EditorProcessingCommands&, std::uint32_t stableEntityId, const PropertySmoothingConfig&,
+        EditorPropertySmoothingResult& failure);
+    // Stops a running chunked solve after its current chunk (its latest preview becomes the
+    // result); an explicit filter, recorded as one submission, completes as usual.
+    void StopEditorPropertySmoothing(const EditorPropertySmoothingTransactionHandle&);
+    [[nodiscard]] EditorPropertySmoothingTransactionSnapshot SnapshotEditorPropertySmoothing(
+        const EditorProcessingCommands&, const EditorPropertySmoothingTransactionHandle&);
+    // Pending when the readback was queued (onComplete then receives the published result);
+    // otherwise the refusal (stale, wrong phase, no front).
+    [[nodiscard]] EditorPropertySmoothingResult AcceptEditorPropertySmoothing(
+        const EditorProcessingCommands&, const EditorPropertySmoothingTransactionHandle&,
+        std::function<void(EditorPropertySmoothingResult)> onComplete = {});
+    // Cancels a running or accepting run, publishes nothing and releases the ring.
+    void DiscardEditorPropertySmoothing(const EditorProcessingCommands&, const EditorPropertySmoothingTransactionHandle&);
+    // Test seam (null or mock device): a transaction over the entity's captured inputs that
+    // already waits for Accept with `frontValues` (rows x channels in sample order) as the
+    // device result. With `residency`, the output property's ring holds a published front there
+    // so Accept binds it. Accept publishes from `frontValues` without a device readback.
+    [[nodiscard]] EditorPropertySmoothingTransactionHandle MakeEditorPropertySmoothingTransactionForTest(
+        const EditorProcessingCommands&, std::uint32_t stableEntityId, const PropertySmoothingConfig&,
+        std::vector<double> frontValues, Graphics::GpuPropertyResidency* residency = nullptr);
 
     // Smallest eigenpairs of a modal operator with unit or lumped-area mass, published as one
     // property per mode (GEOM-024 solver; UI-056 viewer; METHOD-051 operators): the sample-graph

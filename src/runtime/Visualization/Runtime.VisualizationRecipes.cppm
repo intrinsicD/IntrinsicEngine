@@ -78,6 +78,10 @@ export namespace Extrinsic::Runtime
         // revision. This authored value remains for external GPU-address
         // sources that do not publish through Geometry::PropertySet.
         std::uint64_t DirtyStamp{0u};
+        // An external `BufferBDA` whose property does not exist on the CPU yet (a GPU
+        // method's output before Accept, ADR 0030) encodes from this element count with
+        // the manual range, or 0..1 when the range is invalid; `AutoRange` needs CPU values.
+        std::uint32_t ExternalElementCount{0u};
         bool AutoRange{true};
         float RangeMin{0.0f};
         float RangeMax{1.0f};

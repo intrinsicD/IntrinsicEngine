@@ -360,6 +360,7 @@ namespace Extrinsic::Tests
 
         // ---- Knobs ---------------------------------------------------------
         bool Operational            = true;
+        bool ShaderFloat64          = false;
         // FailNext flags clear when the corresponding allocation fails.
         bool FailNextBufferCreate   = false;
         bool FailNextTextureCreate  = false;
@@ -434,6 +435,7 @@ namespace Extrinsic::Tests
 
         // ---- IDevice -------------------------------------------------------
         [[nodiscard]] bool IsOperational() const noexcept override { return Operational; }
+        [[nodiscard]] bool SupportsShaderFloat64() const noexcept override { return ShaderFloat64; }
 
         void NoteRecipeGraphValidation(bool clean) noexcept override;
 

@@ -51,7 +51,7 @@ namespace Extrinsic::Graphics
         Push Base{};
         // Progress: the solve being recorded, whether it started, and its recorded iterations.
         std::uint32_t Solve{}, Iteration{}, ChunkCount{};
-        bool Started{}, Uploaded{}, Failed{};
+        bool Started{}, Uploaded{}, Failed{}, SeedsOnDevice{};
 
         explicit Impl(RHI::IDevice& device) : Device(device) {}
         ~Impl()
@@ -83,7 +83,7 @@ namespace Extrinsic::Graphics
             const std::size_t n = Rows;
             // Reports start zeroed; each solve's slot of the solutions starts at its initial guess.
             std::vector<std::byte> output(ReadbackBytes(Rows, Solves), std::byte{0});
-            std::memcpy(output.data() + ReportBytes(), Guesses.data(), Guesses.size() * sizeof(double));
+            if (!Guesses.empty()) std::memcpy(output.data() + ReportBytes(), Guesses.data(), Guesses.size() * sizeof(double));
             std::vector<double> rhs(std::size_t(Solves) * n, 0.0);
             std::copy(Rhs.begin(), Rhs.end(), rhs.begin());
             const auto offsets = Create(Offsets.data(), Offsets.size() * 4, "SparseCG.RowOffsets");
@@ -133,9 +133,11 @@ namespace Extrinsic::Graphics
         const std::uint64_t n = m.Rows;
         const bool chained = p.ChainStride > 0;
         const std::uint64_t seeds = chained ? p.ChainStride : p.Solves;
+        const bool deviceSeeds = p.SeedsOnDevice && chained;
+        const std::uint64_t seedCount = deviceSeeds ? 0u : seeds * n;
         if (n == 0 || n > (1u << 24) || p.Solves == 0 || m.RowOffsets.size() != n + 1 ||
             m.RowOffsets[0] != 0 || m.RowOffsets[n] != m.Columns.size() || m.Columns.size() != m.Values.size() ||
-            m.Values.size() > (1u << 26) || p.RightHandSides.size() != seeds * n || p.InitialGuesses.size() != seeds * n ||
+            m.Values.size() > (1u << 26) || p.RightHandSides.size() != seedCount || p.InitialGuesses.size() != seedCount ||
             (chained && (p.Solves % p.ChainStride != 0 || p.RhsDiagonal.size() != p.ChainStride * n ||
                          p.RhsConstant.size() != p.ChainStride * n)) ||
             p.MaxIterations == 0 || !std::isfinite(p.Tolerance) || p.Tolerance <= 0 ||
@@ -158,8 +160,22 @@ namespace Extrinsic::Graphics
         s.Guesses.assign(p.InitialGuesses.begin(), p.InitialGuesses.end());
         s.RhsDiagonal.assign(p.RhsDiagonal.begin(), p.RhsDiagonal.end());
         s.RhsConstant.assign(p.RhsConstant.begin(), p.RhsConstant.end());
+        s.SeedsOnDevice = deviceSeeds;
         s.Solve = s.Iteration = s.ChunkCount = 0;
         s.Started = s.Uploaded = s.Failed = false;
+        return true;
+    }
+
+    bool SparseConjugateGradientWorkspace::RecordUpload(RHI::ICommandContext& commands)
+    {
+        auto& s = *m_Impl;
+        if (s.Failed || s.Rows == 0 || !s.Device.IsOperational()) return false;
+        if (s.Uploaded) return true;
+        if (!s.Upload()) return false;
+        s.Uploaded = true;
+        for (auto buffer : s.Buffers)
+            commands.BufferBarrier(buffer, RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderRead,
+                                   RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite);
         return true;
     }
 
@@ -169,15 +185,7 @@ namespace Extrinsic::Graphics
         if (s.Failed || s.Rows == 0 || Finished() || !s.Device.IsOperational()) return {};
         std::uint32_t budget = ChunkDispatches;
         const std::uint64_t n = s.Rows;
-        std::vector<RHI::BufferHandle> touched;
-        if (!s.Uploaded)
-        {
-            if (!s.Upload()) return {};
-            s.Uploaded = true;
-            for (auto buffer : s.Buffers)
-                commands.BufferBarrier(buffer, RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderRead,
-                                       RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite);
-        }
+        if (!RecordUpload(commands)) return {};
         commands.BindPipeline(s.Pipeline);
         Push push = s.Base;
         const auto dispatch = [&](std::uint32_t mode, bool single = false) {
@@ -198,11 +206,14 @@ namespace Extrinsic::Graphics
             push.B = s.Address(s.RhsBuffer) + std::uint64_t(s.Solve) * n * sizeof(double);
             if (!s.Started)
             {
-                if (s.ChainStride && s.Solve >= s.ChainStride)
+                if (s.ChainStride && (s.Solve >= s.ChainStride || s.SeedsOnDevice))
                 {
-                    // Form the chained right-hand side and warm start from the previous solution.
+                    // Form the chained right-hand side and warm start from the previous solution
+                    // (a device-seeded first solve reads its own seed).
                     const std::uint32_t lane = s.Solve % s.ChainStride;
-                    push.Previous = result + s.ReportBytes() + std::uint64_t(s.Solve - s.ChainStride) * n * sizeof(double);
+                    push.Previous = s.Solve >= s.ChainStride
+                        ? result + s.ReportBytes() + std::uint64_t(s.Solve - s.ChainStride) * n * sizeof(double)
+                        : push.X;
                     push.RhsDiagonal = s.Address(s.DiagonalBuffer) + std::uint64_t(lane) * n * sizeof(double);
                     push.RhsConstant = s.Address(s.ConstantBuffer) + std::uint64_t(lane) * n * sizeof(double);
                     dispatch(ChainRhs);
@@ -245,5 +256,11 @@ namespace Extrinsic::Graphics
     }
 
     bool SparseConjugateGradientWorkspace::Finished() const noexcept { return m_Impl->Solve >= m_Impl->Solves; }
+    RHI::BufferHandle SparseConjugateGradientWorkspace::ResultBuffer() const noexcept { return m_Impl->Uploaded ? m_Impl->Result : RHI::BufferHandle{}; }
+    std::uint64_t SparseConjugateGradientWorkspace::SolutionsAddress() const
+    {
+        return m_Impl->Uploaded ? m_Impl->Address(m_Impl->Result) + m_Impl->ReportBytes() : 0u;
+    }
+    std::uint32_t SparseConjugateGradientWorkspace::CompletedSolves() const noexcept { return m_Impl->Solve; }
     std::uint32_t SparseConjugateGradientWorkspace::Chunks() const noexcept { return m_Impl->ChunkCount; }
 }

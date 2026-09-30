@@ -19,6 +19,7 @@ export module Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Error;
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
@@ -663,6 +664,10 @@ export namespace Extrinsic::Runtime
             std::function<void()> InvalidateWorkspaceSnapshotCache{};
             bool OperationalGpuAvailable{false};
             bool VisualizationCommandsAvailable{false};
+            // A scalar that exists only as a GPU method's ring front for the entity (ADR
+            // 0030, a result awaiting Accept): a display request for it is accepted; render
+            // extraction binds the front until the property is published or discarded.
+            std::function<bool(ECS::EntityHandle, const GeometryPropertyRef&)> PendingResidentScalar{};
         };
     }
 

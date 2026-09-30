@@ -1050,6 +1050,10 @@ to visualization. Forward feature-context construction remains shared.
 The shared Smooth Property window is registered under View and redirected from
 Mesh, Graph and PointCloud processing menus. `Runtime.MeshFieldOperations` owns
 validated `sandbox.property_smoothing` configuration, typed domain capture and
-guarded publication; `Geometry.Smoothing` owns the filters. See the
+guarded publication; `Geometry.Smoothing` owns the filters. With the Vulkan
+backend the window starts a GPU property transaction (ADR 0030): the viewport
+shows the device result as the colormap scalar and the window offers Stop,
+Accept (the undoable publication) and Discard; a stale result disables Accept
+with the reason, and the next run waits for that decision. See the
 [property smoothing contract](../methods/property-smoothing.md) for input/output
 bindings, Laplacian semantics, derived sample positions and limits.
