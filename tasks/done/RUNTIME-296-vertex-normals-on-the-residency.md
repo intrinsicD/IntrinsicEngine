@@ -36,8 +36,8 @@ contracts: [geometry.property-coherence, geometry.element-domain-sources, method
 | End-to-end tests | `NormalTransaction.*` contract tests, the panel test, gpu;vulkan `RUNTIME296VertexNormalsResidency.*` (parity vs the CPU reference, zero-upload second run, Accept + undo). |
 
 ## Completion — 2026-09-30
-Commits on `claude/cpd-nystrom` (see RETIREMENT-LOG): slice 1 `e8364ccf2`, slice 2 in the
-retiring commit. Both mesh normal methods run on the GPU property residency with backend
+Commit: `e8364ccf2` (slice 1) and `a61a906fe` (slice 2) on `claude/cpd-nystrom` (see RETIREMENT-LOG). The
+slice 2 commit retired the task. Both mesh normal methods run on the GPU property residency with backend
 `vulkan`:
 - `mesh_face_weighted`: fp64 face pass plus a deterministic per-vertex gather over a
   vertex->face CSR in the reference's order (uniform, area, max; the angle weightings stay on
