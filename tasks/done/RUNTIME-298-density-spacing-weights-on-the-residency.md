@@ -33,7 +33,7 @@ contracts: [geometry.property-coherence, geometry.element-domain-sources, method
 | End-to-end tests | Contract tests on the mock device; one gpu;vulkan parity + IO smoke covering the three methods. |
 
 ## Completion — 2026-09-30
-Commit: see RETIREMENT-LOG (`claude/cpd-nystrom`). Kernel density, point spacing and density
+Commit: `a4857450c` on `claude/cpd-nystrom`. Kernel density, point spacing and density
 weights run on the GPU property residency (`vulkan_lbvh`):
 - One LBVH neighbor kernel (`point_scalar_analysis.comp`), scalar rings observed by the
   colormap, and the shared `Runtime.PointScalarTransaction` (Accept -> publication ->
