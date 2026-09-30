@@ -104,6 +104,14 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         GeometryScalarPropertySnapshot BeforeValues{};
         std::vector<float> AfterValues{};
     };
+    // A method writing the positions themselves (RUNTIME-293): the position watch is in
+    // `Inputs` like any input; `BeforeValues` holds every row (deleted included), which is
+    // what the publication restores on undo and what a ring front covers.
+    struct PointPositionCapture : PointInputCapture
+    {
+        GeometryPropertyRef Positions{};
+        std::vector<glm::vec3> BeforeValues{};
+    };
 
     // Metadata-only vec3 candidates; callers retain method-specific admission.
     [[nodiscard]] GeometryPropertyCatalogSnapshot BuildPointInputCandidateCatalog(
@@ -142,5 +150,24 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
     [[nodiscard]] EditorCommandHistoryStatus PublishPointScalarField(
         const EditorProcessingContext&, entt::entity, const PointScalarCapture&,
         std::string label);
+
+    // Positions analogue (RUNTIME-293, ADR 0030 decision 6): the capture copies every row's
+    // value before the method runs. `after` holds every row (an accepted ring front, or the
+    // capture's values with the method's rows replaced). The publication is one undoable
+    // history entry guarded by the other inputs' watches and the positions' own revision.
+    // `commitOnce`, when given, runs inside the first (accepting) publication after the rows
+    // were written, with the published watch; it returns true when the render block already
+    // holds the bytes and the revision is acknowledged, in which case no dirty tag is set.
+    // Undo, redo and a refused commit mark the positions dirty for the ordinary upload.
+    // Compiled in `Runtime.GeometryProcessingOperations.GpuPositions.cpp`.
+    [[nodiscard]] bool CapturePointPositionField(
+        const GeometryEntityAvailability&, GeometryPropertyRef& positions, PointPositionCapture&,
+        std::string& diagnostic);
+    [[nodiscard]] bool PointPositionFieldCurrent(
+        const EditorProcessingContext&, entt::entity, const PointPositionCapture&);
+    [[nodiscard]] EditorCommandHistoryStatus PublishPointPositionField(
+        const EditorProcessingContext&, entt::entity, const PointPositionCapture&,
+        std::vector<glm::vec3> after, std::string label,
+        std::function<bool(const PointPropertyWatch& published)> commitOnce = {});
 }
 }

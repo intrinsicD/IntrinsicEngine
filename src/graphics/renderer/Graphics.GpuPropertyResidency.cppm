@@ -77,6 +77,10 @@ export namespace Extrinsic::Graphics
         std::uint64_t Address{};
         std::uint64_t Bytes{};
         std::uint64_t Revision{};
+        // The residency-wide publication that made a ring slot the front (0 for a slot
+        // uploaded from the CPU). Ring slots are reused without changing their buffer, so
+        // this, not the buffer, identifies a front's bytes.
+        std::uint64_t Publication{};
         GpuPropertyLayout Layout{};
         RHI::TransferToken Upload{};
         std::shared_ptr<const void> Lease{};
@@ -123,6 +127,7 @@ export namespace Extrinsic::Graphics
         // `layout`; a ring keeps its depth and layout until Discard/BindRevision). Empty when
         // the ring is exhausted: every slot is front, leased or has pending completions.
         // That is counted as a dropped preview; the ring never blocks and never overwrites.
+        // A refused allocation leaves no ring behind when this call would have created it.
         [[nodiscard]] std::optional<GpuPropertyView> AcquireBack(
             const GpuPropertyKey& key, const GpuPropertyLayout& layout, std::uint32_t depth);
         // The last acquired back becomes the front (the previous front is reusable once its
@@ -130,11 +135,19 @@ export namespace Extrinsic::Graphics
         bool Publish(const GpuPropertyKey& key);
         // Releases the ring; its buffers are freed once their completions and leases are gone.
         void Discard(const GpuPropertyKey& key);
+        // The key's current ring identity (residency-wide, assigned when the ring is created;
+        // 0 without a ring). A run that acquired a ring discards only that ring: a later ring
+        // on the same key belongs to a later run.
+        [[nodiscard]] std::uint64_t RingGeneration(const GpuPropertyKey& key) const;
+        // Discard only when the key's ring is `generation`; false (nothing released) otherwise.
+        bool Discard(const GpuPropertyKey& key, std::uint64_t generation);
         // The ring's front while one exists, otherwise the canonical slot. No side effects.
         [[nodiscard]] std::optional<GpuPropertyView> Front(const GpuPropertyKey& key) const;
         // After Accept: the ring's front becomes the canonical slot for `revision` (the ring
-        // and the old canonical slot are released). False without a front.
-        bool BindRevision(const GpuPropertyKey& key, std::uint64_t revision);
+        // and the old canonical slot are released). False without a front, or when
+        // `publication` is nonzero and the front is a later publication than the one Accept
+        // read back (the caller then discards the ring: the CPU holds the accepted bytes).
+        bool BindRevision(const GpuPropertyKey& key, std::uint64_t revision, std::uint64_t publication = 0u);
         [[nodiscard]] bool HasRing(const GpuPropertyKey& key) const;
 
         // ---- completions and use -------------------------------------------------------

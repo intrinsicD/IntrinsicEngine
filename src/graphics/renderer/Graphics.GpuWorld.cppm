@@ -221,6 +221,31 @@ export namespace Extrinsic::Graphics
             InvalidInput, // row count or gather map does not fit the block
         };
 
+        // ADR 0030 decision 6 (RUNTIME-293): the accepted positions of a 1:1 block. The CPU
+        // published `PositionBytes` (float3 rows at stride 12, one per GPU vertex: the bytes of
+        // the ring front that became the canonical slot); the shadow of the position range is
+        // patched to them, the other channels are untouched, and the fingerprint and content
+        // revision are refreshed without an upload. `Source` names the front so a block that
+        // does not hold it yet (the preview was never copied, or a newer front was published
+        // after the last copy) gets one copy front -> block at the next culling head instead of
+        // a CPU upload; when a block already holds the front, nothing is recorded.
+        struct GeometryPositionCommitDesc
+        {
+            std::span<const std::byte> PositionBytes{};
+            RHI::BufferHandle Source{};
+            std::uint64_t SourceOffsetBytes = 0;
+            std::uint32_t SourceRowCount = 0;
+            std::uint64_t Stamp = 0;
+        };
+
+        enum class GeometryPositionCommitStatus : std::uint8_t
+        {
+            Committed,     // the block holds the bytes; the preview ended
+            CopyPending,   // one copy of `Source` into the block at the next culling head
+            InvalidHandle,
+            InvalidInput,  // bytes do not fit the block, the block is seam-split, or no source to copy
+        };
+
         GpuWorld();
         ~GpuWorld();
 
@@ -251,6 +276,11 @@ export namespace Extrinsic::Graphics
             GpuGeometryHandle geometry,
             const GeometryPositionPreviewDesc& desc);
         void ClearGeometryPositionPreview(GpuGeometryHandle geometry);
+        // Accept of GPU-authored positions (see `GeometryPositionCommitDesc`). A later position
+        // upload supersedes a pending copy.
+        [[nodiscard]] GeometryPositionCommitStatus CommitGeometryPositions(
+            GpuGeometryHandle geometry,
+            const GeometryPositionCommitDesc& desc);
 
         void SetInstanceGeometry(GpuInstanceHandle instance, GpuGeometryHandle geometry);
         [[nodiscard]] GpuGeometryHandle GetInstanceGeometry(GpuInstanceHandle instance) const noexcept;

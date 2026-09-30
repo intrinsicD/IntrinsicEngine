@@ -1324,6 +1324,47 @@ namespace Extrinsic::Runtime
         return it != m_State->m_Renderables.end() && it->second.PositionPreview;
     }
 
+    RenderExtractionCache::PositionCommitStatus RenderExtractionCache::CommitAcceptedPositions(
+        const AcceptedPositions& accepted)
+    {
+        State& state = *m_State;
+        const auto it = state.m_Renderables.find(accepted.StableEntityId);
+        if (it == state.m_Renderables.end() || state.m_GeometryResidencyWorld == nullptr)
+            return PositionCommitStatus::NotOneToOne;
+        State::RenderableSidecar& sidecar = it->second;
+        // A mesh surface may be seam-split and its lanes share one position revision, so a
+        // mesh commits through the ordinary revision-delta upload (RUNTIME-295 routes it
+        // through the residency). Point clouds and graphs hold one 1:1 block each.
+        const bool pointCloud = sidecar.PointCloudGeometry.IsValid();
+        const bool graph = sidecar.GraphGeometry.IsValid();
+        if (sidecar.MeshGeometry.IsValid() || pointCloud == graph)
+            return PositionCommitStatus::NotOneToOne;
+        RenderExtractionGeometrySourceRevisions& revisions =
+            pointCloud ? sidecar.PointCloudSourceRevisions : sidecar.GraphSourceRevisions;
+        if (revisions.PositionCount != accepted.RowCount ||
+            accepted.PositionBytes.size_bytes() != std::uint64_t(accepted.RowCount) * sizeof(glm::vec3))
+            return PositionCommitStatus::Rejected;
+        const auto status = state.m_GeometryResidencyWorld->CommitGeometryPositions(
+            pointCloud ? sidecar.PointCloudGeometry : sidecar.GraphGeometry,
+            Graphics::GpuWorld::GeometryPositionCommitDesc{
+                .PositionBytes = accepted.PositionBytes,
+                .Source = accepted.Front.Buffer,
+                .SourceOffsetBytes = 0u,
+                .SourceRowCount = accepted.Front.Count,
+                .Stamp = accepted.Front.Stamp,
+            });
+        using Status = Graphics::GpuWorld::GeometryPositionCommitStatus;
+        if (status != Status::Committed && status != Status::CopyPending)
+            return PositionCommitStatus::Rejected;
+        // The revision is acknowledged as if this extraction had uploaded it, and the
+        // preview is over without a restore: the block holds the accepted bytes.
+        revisions.Position = accepted.Revision;
+        sidecar.PositionPreview = false;
+        ++state.m_PositionCommits;
+        return status == Status::Committed ? PositionCommitStatus::Acknowledged
+                                           : PositionCommitStatus::AcknowledgedCopyPending;
+    }
+
     std::optional<RenderExtractionCache::GpuRenderableAvailabilityView>
     RenderExtractionCache::FindGpuRenderableAvailability(
         const std::uint32_t stableEntityId) const noexcept

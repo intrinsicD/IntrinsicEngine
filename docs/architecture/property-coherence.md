@@ -185,13 +185,81 @@ While an entity shows uncommitted positions:
   pipeline cannot be created), the replay writes the shadow after all, so the
   block never holds undefined bytes.
 
-When the front disappears (Discard, cancel, or Accept binding the ring), the
-frame's extraction forces a position channel upload from the current CPU
-positions (`DirtyVertexPositions`; `PositionPreviewRestores`), which makes the
-shadow authoritative again. The block is never restored from the old shadow,
-so a CPU edit made during the preview shows after Discard. Accept for
-positions (RUNTIME-293) and routing render uploads through the residency
-(RUNTIME-295) follow.
+When the front disappears without an acknowledged Accept (Discard, cancel, a
+mesh Accept), the frame's extraction forces a position channel upload from the
+current CPU positions (`DirtyVertexPositions`; `PositionPreviewRestores`),
+which makes the shadow authoritative again. The block is never restored from
+the old shadow, so a CPU edit made during the preview shows after Discard.
+Routing render uploads through the residency (RUNTIME-295) follows.
+
+### Accept of positions (RUNTIME-293)
+
+A GPU method that writes `v:position` begins a **run** before its first write
+(`BeginEditorGpuPositionRun` in `Runtime.GeometryProcessingOperations`: the
+capture of every row's value, the live rows and the positions' revision, kept
+in the method's job state; the internal shape is `PointPositionCapture` /
+`PublishPointPositionField`, the positions analogue of
+`PublishPointScalarField`). Begin creates the positions' ring and hands its
+first write slot to the method (`EditorGpuPositionRunFirstBack`); the run owns
+that ring (`GpuPropertyResidency::RingGeneration`) and a second run cannot
+begin while a ring waits for Accept or Discard. Accept (`AcceptEditorGpuPositionRun`; batch and
+agent commands accept at once) does, in order:
+
+1. one readback of the front in float3 (`GpuFrontReadback`, shared with the
+   scalar transaction: immediate where the device can, otherwise with the
+   frame; the front stays leased until the bytes landed);
+2. the undoable publication of **every row** (deleted rows included, so the
+   CPU rows are byte-identical to the front) as one history entry guarded by
+   the other inputs' watches and the positions' own revision; non-finite rows
+   are refused and nothing is published; a front equal to the CPU rows is
+   `NoChange`;
+3. inside that first publication, for a **1:1 domain** (point cloud, graph):
+   `SpatialIndexCache::CommitGpuPositions` (the runtime commit seam of ADR 0030
+   decision 1) hands the rows to `RenderExtractionCache::CommitAcceptedPositions`,
+   which patches the block's shadow
+   for the position channel only (`GpuWorld::CommitGeometryPositions`: the
+   other channels are byte-identical, the fingerprint and content revision are
+   refreshed, nothing is uploaded), the sidecar acknowledges the new revision
+   and the preview ends without a restore, so the next extraction neither
+   uploads nor restores (`PositionCommitsAcknowledged`). Fronts are identified
+   by their residency-wide **publication** (`GpuPropertyView::Publication`, the
+   observation stamp): a ring slot is reused with the same buffer, so only the
+   publication says which bytes a copy holds. When the block's last copy read
+   the accepted publication and no newer front or rewrite followed, the commit
+   is complete at once; a block that never copied it, or copied an older front,
+   gets one copy front -> block at the next culling head instead of a CPU
+   upload (`CopyPending`; the slot is held one frame for it, and a CPU
+   position upload landing first supersedes the copy). No dirty tag is set.
+   A **mesh**, an entity without a resident 1:1 block, or a block that refuses
+   the bytes is not acknowledged: the positions are marked dirty and the
+   ordinary revision-delta upload applies (RUNTIME-295 routes it through the
+   residency);
+4. `BindRevision(key, revision, publication)`: the publication Accept read
+   back becomes the canonical slot of the new revision, so the next GPU use of
+   `v:position` (a method input or `SpatialIndexCache`) uploads zero bytes. The
+   accepted front stays leased through the commit; a front published after the
+   readback is neither committed to the block nor bound: the ring is discarded
+   and the next GPU use uploads the revision once.
+
+"Applied" is reported only after the CPU publication. Undo and redo restore
+the rows through the ordinary path (`DirtyVertexPositions`; one upload each)
+and move the CPU revision on, so the next GPU use uploads once. A run whose
+positions changed since it began is stale: Accept is refused (before, or at
+publication) and the caller discards the run. Discard is run-level
+(`DiscardEditorGpuPositionRun`): it abandons the run, so a readback still in
+flight publishes nothing, and releases only the ring the run acquired
+(`Discard(key, generation)`); a terminal run discards nothing, so a later run's
+ring on the same property is never touched. The residency's own `Discard` is
+not the contract. Authored culling bounds move with the rows in the same
+history entry: the **local** bounds of the live rows (deleted rows excluded)
+are the history state, and the world bounds are derived from the entity's
+world matrix at every mutation (Accept, undo, redo), so a transform edit in
+between is never replayed from history. Rows that admit no finite bounds (an
+overflowing extent) are refused before anything is written; an entity with
+neither authored component keeps the extraction default (authored local bounds
+alone are recomputed too, never left for propagation to turn into stale world
+bounds). Dependent normals keep their CPU
+state; a method that owns them republishes them itself.
 
 ## Property revisions
 

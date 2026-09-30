@@ -46,6 +46,11 @@ export namespace Extrinsic::Runtime
         std::uint32_t Count{};
         std::uint64_t Stamp{}; // changes with the observed slot
     };
+    // The observation stamp of a front: its residency-wide publication. A ring slot is
+    // reused without changing its buffer, so only the publication identifies the bytes a
+    // front holds; every Publish changes it. Accept of positions (RUNTIME-293) names the
+    // accepted front to GpuWorld by the same stamp.
+    [[nodiscard]] std::uint64_t GpuPropertyObservationStamp(const Graphics::GpuPropertyView& front) noexcept;
     // The ring front of the entity's property when a method is writing it and the front covers
     // every property row (ADR 0030 decision 5); marks it observed this frame. A scalar ref
     // observes the float (presentation) ring the colormap binds; a Vec3 ref (positions)

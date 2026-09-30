@@ -336,6 +336,9 @@ namespace Extrinsic::Runtime
         PointCloudPackBuffer m_PointCloudPack{};
         std::uint32_t m_PointCloudFreeRetires{0};
         std::uint32_t m_PrevPointCloudFreeRetires{0};
+        // RUNTIME-293: accepted position revisions acknowledged between extractions.
+        std::uint32_t m_PositionCommits{0};
+        std::uint32_t m_PrevPositionCommits{0};
 
         MeshPrimitiveViewBuffer m_MeshPrimitiveViewPack{};
         std::uint32_t m_MeshPrimitiveViewFreeRetires{0};

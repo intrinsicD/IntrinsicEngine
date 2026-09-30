@@ -41,7 +41,11 @@ namespace Extrinsic::Graphics
             std::uint32_t Depth{};
             std::vector<Slot> Slots{};
             int Front{-1}, Back{-1};
+            std::uint64_t FrontPublication{};
+            std::uint64_t Generation{};
         };
+        std::uint64_t NextPublication{1u};
+        std::uint64_t NextRingGeneration{1u};
         RHI::IDevice& Device;
         GpuPropertyResidencyConfig Config;
         std::vector<Canonical> Canonicals{};
@@ -200,9 +204,10 @@ namespace Extrinsic::Graphics
         const auto layout = Impl::Normalized(requested);
         if (!s.Device.IsOperational() || !layout.Valid() || depth < 1u || depth > 3u) return std::nullopt;
         auto* ring = s.FindRing(key);
+        const bool created = ring == nullptr;
         if (!ring)
         {
-            s.Rings.push_back({.Key = key, .Layout = layout, .Depth = depth});
+            s.Rings.push_back({.Key = key, .Layout = layout, .Depth = depth, .Generation = s.NextRingGeneration++});
             ring = &s.Rings.back();
         }
         else if (ring->Layout != layout)
@@ -224,7 +229,13 @@ namespace Extrinsic::Graphics
         if (pick < 0 && ring->Slots.size() < ring->Depth)
         {
             auto slot = s.Allocate(layout, "GpuPropertyResidency.Ring");
-            if (!slot) return std::nullopt;
+            if (!slot)
+            {
+                // A ring created by this call has no slot: it must not stay behind (a
+                // slot-less ring would refuse every later run on the key).
+                if (created) s.Rings.pop_back();
+                return std::nullopt;
+            }
             ring->Slots.push_back(std::move(*slot));
             pick = int(ring->Slots.size()) - 1;
         }
@@ -243,6 +254,7 @@ namespace Extrinsic::Graphics
         auto* ring = m_Impl->FindRing(key);
         if (!ring || ring->Back < 0) return false;
         ring->Front = std::exchange(ring->Back, -1);
+        ring->FrontPublication = m_Impl->NextPublication++;
         ++m_Impl->Stats.Publishes;
         return true;
     }
@@ -257,6 +269,19 @@ namespace Extrinsic::Graphics
         });
     }
 
+    std::uint64_t GpuPropertyResidency::RingGeneration(const GpuPropertyKey& key) const
+    {
+        const auto* ring = m_Impl->FindRing(key);
+        return ring ? ring->Generation : 0u;
+    }
+
+    bool GpuPropertyResidency::Discard(const GpuPropertyKey& key, const std::uint64_t generation)
+    {
+        if (generation == 0u || RingGeneration(key) != generation) return false;
+        Discard(key);
+        return true;
+    }
+
     std::optional<GpuPropertyView> GpuPropertyResidency::Front(const GpuPropertyKey& key) const
     {
         auto& s = *m_Impl;
@@ -264,6 +289,7 @@ namespace Extrinsic::Graphics
         {
             auto view = ring->Slots[std::size_t(ring->Front)].View;
             view.Lease = ring->Slots[std::size_t(ring->Front)].Lease;
+            view.Publication = ring->FrontPublication;
             return view;
         }
         if (auto* canonical = s.FindCanonical(key))
@@ -275,12 +301,15 @@ namespace Extrinsic::Graphics
         return std::nullopt;
     }
 
-    bool GpuPropertyResidency::BindRevision(const GpuPropertyKey& key, const std::uint64_t revision)
+    bool GpuPropertyResidency::BindRevision(const GpuPropertyKey& key, const std::uint64_t revision,
+                                            const std::uint64_t publication)
     {
         auto& s = *m_Impl;
         auto* ring = s.FindRing(key);
         if (!ring || ring->Front < 0) return false;
+        if (publication != 0u && ring->FrontPublication != publication) return false;
         Impl::Slot front = std::move(ring->Slots[std::size_t(ring->Front)]);
+        front.View.Publication = ring->FrontPublication;
         ring->Slots.erase(ring->Slots.begin() + ring->Front);
         ring->Front = -1;
         s.DiscardRing(*ring);

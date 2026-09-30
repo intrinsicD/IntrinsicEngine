@@ -1952,6 +1952,18 @@ Concretely:
   are refused (`InvalidInput`); a freed block drops its preview, and Clear
   validates the handle generation so a stale handle never clears the slot's
   reuser.
+- `GpuWorld::CommitGeometryPositions(...)` (`RUNTIME-293`, ADR 0030 decision 6)
+  is Accept for a 1:1 block (stamps are the residency's publication numbers, so a
+  reused ring buffer never passes as an older copy): the shadow's position range takes the accepted
+  float3 rows (the other channels are untouched; the position fingerprint and
+  content revision are refreshed) and nothing is uploaded. A block whose last
+  copy read the accepted front (no newer front or rewrite since) is
+  `Committed` and its preview ends; otherwise the front is copied once at the next culling head
+  (`CopyPending`, then the preview ends and the shadow is authoritative), and
+  a position channel upload landing first supersedes that copy. Seam-split
+  blocks, bytes that do not fit and a missing source are refused
+  (`InvalidInput`); without an operational device the patched shadow is the
+  truth for the next rebuild.
 - `GpuWorld::TryGetGeometryResidencyView(...)` exposes generation-checked
   CPU metadata for the exact live managed allocation without expanding the
   shader-facing `RHI::GpuGeometryRecord`. The view carries that current record,

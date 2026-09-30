@@ -3,8 +3,10 @@
 // culling is bypassed, picks stay at the entity level); when it disappears the blocks are
 // restored from the current CPU positions by a forced channel upload, so a CPU edit made
 // during the preview shows after Discard. Null device: the block bytes are the CPU shadow.
+#include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -229,4 +231,110 @@ TEST(PositionPreviewExtraction, MeshesObserveTheMeshVertexPositionsAndHandTheSea
     ASSERT_TRUE(sidecar.has_value());
     EXPECT_TRUE(sidecar->HasMeshResidency);
     EXPECT_TRUE(sidecar->HasMeshVertexView);
+}
+
+// RUNTIME-293 (ADR 0030 decision 6): after Accept, extraction acknowledges the new
+// `v:position` revision of a point cloud without a position upload (the block keeps the
+// copied front; the shadow is patched for the position channel only) and without a
+// restore; a mesh is not acknowledged and commits through the revision-delta upload.
+namespace
+{
+    [[nodiscard]] Extrinsic::Runtime::RenderExtractionCache::AcceptedPositions Accepted(
+        const std::uint32_t id, const std::vector<glm::vec3>& rows, const Geometry::PropertyRevision revision,
+        const Extrinsic::Runtime::RenderExtractionCache::GpuPropertyFront& front)
+    {
+        return {.StableEntityId = id, .PositionBytes = std::as_bytes(std::span<const glm::vec3>{rows}),
+                .RowCount = std::uint32_t(rows.size()), .Revision = revision, .Front = front};
+    }
+    // Simulates the publication: the CPU rows become `rows`; the new revision is observed.
+    [[nodiscard]] Geometry::PropertyRevision PublishRows(Registry& scene, const EntityHandle entity,
+                                                         const std::vector<glm::vec3>& rows)
+    {
+        auto& props = scene.Raw().get<gs::Vertices>(entity).Properties;
+        props.Get<glm::vec3>(std::string{pn::kPosition}).Vector() = rows;
+        return *props.FindPropertyRevision(std::string{pn::kPosition});
+    }
+}
+
+TEST(PositionPreviewExtraction, AcceptAcknowledgesTheRevisionOfAPointCloudWithoutAPositionUpload)
+{
+    using Status = RenderExtractionCache::PositionCommitStatus;
+    Fixture f;
+    const std::vector<glm::vec3> original{{0.f, 0.f, 0.f}, {1.f, 0.f, 0.f}, {0.f, 1.f, 0.f}};
+    const EntityHandle entity = MakePointCloudRenderable(f.Scene(), original);
+    const auto id = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
+    auto stats = f.Extract();
+    ASSERT_EQ(stats.PointCloudGeometryUploads, 1u);
+    const auto geometry = f.Extraction.FindRenderableSidecarForTest(id)->PointCloudGeometry;
+    const auto uploaded = f.View(geometry);
+    ASSERT_NE(uploaded.TexcoordFingerprint, 0u) << "the point-cloud block carries a texcoord channel";
+
+    // The method's front shows; then the user accepts it.
+    f.Front = Fixture::FrontFor(3u, 11u);
+    stats = f.Extract();
+    ASSERT_EQ(stats.PositionPreviewsObserved, 1u);
+    const std::vector<glm::vec3> accepted{{0.f, 0.f, 0.5f}, {2.f, 0.f, 0.5f}, {0.f, 2.f, 0.5f}};
+    const auto revision = PublishRows(f.Scene(), entity, accepted);
+    ASSERT_EQ(f.Extraction.CommitAcceptedPositions(Accepted(id, accepted, revision, *f.Front)), Status::Acknowledged);
+    f.Front.reset(); // BindRevision: the ring is gone
+    EXPECT_FALSE(f.Extraction.ShowsUncommittedPositions(id)) << "the preview is over at once";
+
+    // The next extraction neither restores nor uploads: the revision is acknowledged.
+    stats = f.Extract();
+    EXPECT_EQ(stats.PositionCommitsAcknowledged, 1u);
+    EXPECT_EQ(stats.PositionPreviewRestores, 0u);
+    EXPECT_EQ(stats.PointCloudGeometryPartialUploads, 0u);
+    EXPECT_EQ(stats.PointCloudGeometryReuploads, 0u);
+    EXPECT_EQ(stats.PointCloudGeometryReuseHits, 1u);
+    EXPECT_FALSE(f.Scene().Raw().any_of<Extrinsic::ECS::Components::DirtyTags::DirtyVertexPositions>(entity));
+    const auto view = f.View(geometry);
+    EXPECT_EQ(view.PositionFingerprint, Fingerprint(accepted)) << "the shadow holds the accepted rows";
+    EXPECT_EQ(view.TexcoordFingerprint, uploaded.TexcoordFingerprint) << "other channels are byte-identical";
+    EXPECT_EQ(view.TexcoordByteCount, uploaded.TexcoordByteCount);
+    EXPECT_FALSE(view.PositionShadowStale);
+    EXPECT_NE(view.ContentRevision, uploaded.ContentRevision);
+    stats = f.Extract();
+    EXPECT_EQ(stats.PositionCommitsAcknowledged, 0u);
+    EXPECT_EQ(stats.PointCloudGeometryPartialUploads, 0u);
+
+    // Undo (an ordinary CPU write) uploads once through the revision delta.
+    (void)PublishRows(f.Scene(), entity, original);
+    stats = f.Extract();
+    EXPECT_EQ(stats.PointCloudGeometryPartialUploads, 1u);
+    EXPECT_EQ(f.View(geometry).PositionFingerprint, Fingerprint(original));
+}
+
+TEST(PositionPreviewExtraction, AcceptIsNotAcknowledgedForAMeshWhichUsesTheDeltaUpload)
+{
+    using Status = RenderExtractionCache::PositionCommitStatus;
+    Fixture f;
+    namespace E = Extrinsic::ECS::Components;
+    namespace G = Extrinsic::Graphics::Components;
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0, 0, 0}), b = mesh.AddVertex({1, 0, 0}), c = mesh.AddVertex({0, 1, 0});
+    ASSERT_TRUE(mesh.AddTriangle(a, b, c));
+    auto& scene = f.Scene();
+    const EntityHandle entity = scene.Create();
+    scene.Raw().emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
+    scene.Raw().emplace<G::RenderSurface>(entity);
+    gs::PopulateFromMesh(scene.Raw(), entity, mesh);
+    const auto id = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
+    auto stats = f.Extract();
+    ASSERT_EQ(stats.MeshGeometryUploads, 1u);
+    f.Front = Fixture::FrontFor(3u, 5u);
+    stats = f.Extract();
+    ASSERT_EQ(stats.PositionPreviewsObserved, 1u);
+    const std::vector<glm::vec3> accepted{{0.f, 0.f, 1.f}, {1.f, 0.f, 1.f}, {0.f, 1.f, 1.f}};
+    const auto revision = PublishRows(scene, entity, accepted);
+    EXPECT_EQ(f.Extraction.CommitAcceptedPositions(Accepted(id, accepted, revision, *f.Front)), Status::NotOneToOne);
+    f.Front.reset();
+    stats = f.Extract();
+    EXPECT_EQ(stats.PositionCommitsAcknowledged, 0u);
+    EXPECT_EQ(stats.PositionPreviewRestores, 1u);
+    EXPECT_EQ(stats.MeshGeometryPartialUploads, 1u) << "the mesh commits through the ordinary upload";
+    EXPECT_EQ(f.View(f.Extraction.FindRenderableSidecarForTest(id)->MeshGeometry).PositionFingerprint,
+              Fingerprint(accepted));
+
+    // An unknown entity or a row count that does not fit is refused, not reinterpreted.
+    EXPECT_EQ(f.Extraction.CommitAcceptedPositions(Accepted(id + 1000u, accepted, revision, {})), Status::NotOneToOne);
 }

@@ -150,6 +150,9 @@ namespace Extrinsic::Graphics
             std::uint64_t CopiedStamp = 0;
             std::uint64_t CopiedGatherStamp = 0;
             bool Recopy = true;
+            // RUNTIME-293: the front was accepted; the next copy ends the preview and leaves
+            // the (already patched) shadow authoritative.
+            bool CommitOnCopy = false;
         };
 
         struct PositionGatherPush
@@ -1073,6 +1076,14 @@ namespace Extrinsic::Graphics
                 preview.CopiedStamp = preview.Stamp;
                 preview.CopiedGatherStamp = preview.GatherStamp;
                 preview.Recopy = false;
+                if (preview.CommitOnCopy)
+                {
+                    // The accepted front is in the block now, and the shadow already holds
+                    // its bytes (CommitGeometryPositions): the preview is over.
+                    allocation.PositionShadowStale = false;
+                    it = PositionPreviews.erase(it);
+                    continue;
+                }
                 allocation.PositionShadowStale = true;
                 ++it;
             }
@@ -1791,12 +1802,16 @@ namespace Extrinsic::Graphics
         if (channels.Position)
         {
             // The CPU bytes are authoritative again; an observed front, if any, is
-            // copied over them at the next culling head.
+            // copied over them at the next culling head. A pending commit copy is
+            // superseded: the CPU moved on (e.g. undo right after Accept).
             allocation.PositionShadowStale = false;
             if (auto found = m_Impl->PositionPreviews.find(geometry.Index);
                 found != m_Impl->PositionPreviews.end())
             {
-                found->second.Recopy = true;
+                if (found->second.CommitOnCopy)
+                    m_Impl->PositionPreviews.erase(found);
+                else
+                    found->second.Recopy = true;
             }
         }
         allocation.ContentRevision =
@@ -1852,6 +1867,7 @@ namespace Extrinsic::Graphics
         preview.SourceOffsetBytes = desc.SourceOffsetBytes;
         preview.SourceRowCount = desc.SourceRowCount;
         preview.Stamp = desc.Stamp;
+        preview.CommitOnCopy = false; // a new method's front replaces a pending commit copy
         if (!gather)
         {
             preview.GatherStamp = 0u;
@@ -1893,6 +1909,85 @@ namespace Extrinsic::Graphics
             return;
         }
         m_Impl->PositionPreviews.erase(geometry.Index);
+    }
+
+    GpuWorld::GeometryPositionCommitStatus GpuWorld::CommitGeometryPositions(
+        const GpuGeometryHandle geometry,
+        const GeometryPositionCommitDesc& desc)
+    {
+        if (!m_Impl->GeometrySlots.ResolveForUse(geometry) ||
+            geometry.Index >= m_Impl->GeometryAllocations.size())
+        {
+            return GeometryPositionCommitStatus::InvalidHandle;
+        }
+        auto& allocation = m_Impl->GeometryAllocations[geometry.Index];
+        if (!allocation.Live || allocation.Generation != geometry.Generation)
+        {
+            return GeometryPositionCommitStatus::InvalidHandle;
+        }
+        const auto preview = m_Impl->PositionPreviews.find(geometry.Index);
+        const bool gather =
+            preview != m_Impl->PositionPreviews.end() && preview->second.GatherCount != 0u;
+        if (gather || allocation.PositionByteCount == 0u ||
+            allocation.PositionByteCount !=
+                std::uint64_t(allocation.VertexCount) * kPositionElementBytes ||
+            desc.PositionBytes.size_bytes() != allocation.PositionByteCount)
+        {
+            return GeometryPositionCommitStatus::InvalidInput;
+        }
+        // The block holds the front when its last copy read this very publication and no
+        // newer front or block rewrite followed. The stamp is the residency's publication
+        // number, not the buffer: a ring slot is reused with the same buffer, so only a
+        // copied stamp equal to the preview's and the accepted one is the same bytes.
+        const bool holdsFront =
+            preview != m_Impl->PositionPreviews.end() &&
+            !preview->second.Recopy &&
+            preview->second.Source == desc.Source &&
+            preview->second.SourceOffsetBytes == desc.SourceOffsetBytes &&
+            preview->second.CopiedStamp == desc.Stamp &&
+            preview->second.CopiedStamp == preview->second.Stamp;
+        const bool operational = m_Impl->Device != nullptr && m_Impl->Device->IsOperational();
+        if (!holdsFront && operational &&
+            (!desc.Source.IsValid() || desc.SourceRowCount != allocation.VertexCount))
+        {
+            return GeometryPositionCommitStatus::InvalidInput;
+        }
+
+        // The shadow's position range becomes the accepted bytes; nothing else moves.
+        std::memcpy(allocation.VertexBytes.data() +
+                        static_cast<std::ptrdiff_t>(allocation.PositionByteOffset),
+                    desc.PositionBytes.data(),
+                    static_cast<std::size_t>(allocation.PositionByteCount));
+        RefreshUpdatedResidencyFingerprints(allocation, GeometryChannelUpdateMask{.Position = true});
+        allocation.ContentRevision = m_Impl->IssueGeometryContentRevision();
+        if (holdsFront || !operational)
+        {
+            // Without a device there is no block to copy into: the shadow is the truth and
+            // a later rebuild replays it.
+            allocation.PositionShadowStale = false;
+            if (preview != m_Impl->PositionPreviews.end())
+            {
+                m_Impl->PositionPreviews.erase(preview);
+            }
+            return GeometryPositionCommitStatus::Committed;
+        }
+        // One copy of the accepted front at the next culling head; until then the block
+        // shows older bytes the shadow does not describe (a replay skips the range and
+        // the copy fills it).
+        auto& pending = m_Impl->PositionPreviews[geometry.Index];
+        pending.Source = desc.Source;
+        pending.SourceOffsetBytes = desc.SourceOffsetBytes;
+        pending.SourceRowCount = desc.SourceRowCount;
+        pending.Stamp = desc.Stamp;
+        pending.GatherStamp = 0u;
+        pending.GatherCount = 0u;
+        pending.GatherMap.clear();
+        pending.GatherLease = {};
+        pending.GatherUploadedStamp = 0u;
+        pending.Recopy = true;
+        pending.CommitOnCopy = true;
+        allocation.PositionShadowStale = true;
+        return GeometryPositionCommitStatus::CopyPending;
     }
 
     void GpuWorld::FreeGeometry(GpuGeometryHandle geometry)

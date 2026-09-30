@@ -54,6 +54,7 @@ import Geometry.Properties;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuFront.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.hpp"
 #include "Editor/Operations/Runtime.MeshFieldOperations.PropertyGraph.hpp"
 
@@ -542,12 +543,14 @@ namespace Extrinsic::Runtime
         // Accept reads it back.
         Graphics::GpuPropertyResidency* Residency{};
         Graphics::GpuPropertyKey Key{}, PresentationKey{};
+        // The rings this run acquired (residency ring generations): the only ones it discards.
+        std::uint64_t Ring{}, PresentationRing{};
         bool Presentation{};
         std::uint32_t Count{}; // property rows
         // Input: the canonical slot the kernels gather from; Base: the output property's
         // canonical slot when it exists (rows outside the samples keep its bytes); Back /
-        // PresentationBack: the ring write slots; FrontLease: the front during Accept.
-        std::optional<Graphics::GpuPropertyView> Input{}, Base{}, Back{}, PresentationBack{}, FrontLease{};
+        // PresentationBack: the ring write slots.
+        std::optional<Graphics::GpuPropertyView> Input{}, Base{}, Back{}, PresentationBack{};
         std::vector<std::uint32_t> RestoreMask{}; // fixed or isolated working rows keep the input value
         GP::PointPropertyWatch OutputWatch{};
         std::uint64_t CpuStageBytes{}; // implicit: the CPU-assembled coupling uploaded per run (ADR 0030, 8)
@@ -555,10 +558,9 @@ namespace Extrinsic::Runtime
         std::uint32_t Deferrals{}, Previews{};
         EditorPropertySmoothingPhase Phase{EditorPropertySmoothingPhase::Running};
         bool AutoAccept{}, StopRequested{}, Stopped{};
-        // Accept: the front's bytes in the property's precision, or the test seam's values.
-        std::vector<std::byte> Readback{};
-        bool ReadbackDone{}, ReadbackFailed{};
-        std::shared_ptr<SpatialGpuResult> AcceptGpu{};
+        // Accept: the front's readback in the property's precision (it leases the front
+        // until the bytes landed), or the test seam's values.
+        std::shared_ptr<GP::GpuFrontReadback> Readback{};
         std::optional<std::vector<double>> TestFront{};
     };
 
@@ -589,13 +591,14 @@ namespace Extrinsic::Runtime
             w->Base.reset();
             w->Back.reset();
             w->PresentationBack.reset();
-            w->FrontLease.reset();
+            if (w->Readback) w->Readback->Lease.reset();
             if (!w->Residency) return;
-            w->Residency->Discard(w->Key);
-            if (w->Presentation) w->Residency->Discard(w->PresentationKey);
+            (void)w->Residency->Discard(w->Key, w->Ring);
+            if (w->Presentation) (void)w->Residency->Discard(w->PresentationKey, w->PresentationRing);
         }
         void Finish(const Work& w, const EditorPropertySmoothingPhase phase, const EditorCommandStatus status, std::string message)
         {
+            if (w->Readback) w->Readback->Abandoned = true; // a framed readback still queued records nothing
             ReleaseRings(w);
             w->Phase = phase;
             auto result = w->Result;
@@ -649,11 +652,13 @@ namespace Extrinsic::Runtime
             if (!w->Back)
             {
                 w->Back = AcquireGpuPropertyOutput(r, ctx.World, entity, c.Output, w->Count, kRingDepth);
+                if (w->Back) w->Ring = r.RingGeneration(w->Key);
                 if (!w->Back) return false;
             }
             if (w->Presentation && !w->PresentationBack)
             {
                 w->PresentationBack = AcquireGpuPropertyOutput(r, ctx.World, entity, GpuPropertyPresentationRef(c.Output), w->Count, kRingDepth);
+                if (w->PresentationBack) w->PresentationRing = r.RingGeneration(w->PresentationKey);
                 if (!w->PresentationBack) return false;
             }
             return true;
@@ -832,8 +837,10 @@ namespace Extrinsic::Runtime
         {
             const auto& ctx = w->Context;
             const auto& p = w->Publication;
-            w->FrontLease.reset();
-            if (w->ReadbackFailed)
+            // The publication the readback leased: BindRevision binds exactly that one.
+            const std::uint64_t accepted = w->Readback && w->Readback->Lease ? w->Readback->Lease->Publication : 0u;
+            if (w->Readback) w->Readback->Lease.reset();
+            if (w->Readback && w->Readback->Failed)
             {
                 Finish(w, EditorPropertySmoothingPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
                        "Vulkan property smoothing readback failed; previous output retained.");
@@ -846,7 +853,7 @@ namespace Extrinsic::Runtime
             {
                 const bool wide = p.Config.Output.ValueKind == K::Double;
                 const std::size_t elementBytes = wide ? sizeof(double) : sizeof(float);
-                if (w->Readback.size() != std::size_t(w->Count) * channels * elementBytes)
+                if (!w->Readback || w->Readback->Bytes.size() != std::size_t(w->Count) * channels * elementBytes)
                 {
                     Finish(w, EditorPropertySmoothingPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
                            "Vulkan property smoothing readback has the wrong size; previous output retained.");
@@ -855,7 +862,7 @@ namespace Extrinsic::Runtime
                 for (std::size_t i = 0; i < p.Slots.size(); ++i)
                     for (std::size_t c = 0; c < channels; ++c)
                     {
-                        const std::byte* at = w->Readback.data() + (std::size_t(p.Slots[i]) * channels + c) * elementBytes;
+                        const std::byte* at = w->Readback->Bytes.data() + (std::size_t(p.Slots[i]) * channels + c) * elementBytes;
                         if (wide) std::memcpy(&gpuValues[i * channels + c], at, sizeof(double));
                         else { float value{}; std::memcpy(&value, at, sizeof(float)); gpuValues[i * channels + c] = value; }
                     }
@@ -880,8 +887,9 @@ namespace Extrinsic::Runtime
             {
                 const auto watch = GP::ObserveGeometryProperty(BuildGeometryAvailability(ctx.Scene->Raw(), p.Entity),
                                                                p.Config.Output.Domain, p.Config.Output.Name);
-                if (!watch.Revision || !w->Residency->BindRevision(w->Key, *watch.Revision)) w->Residency->Discard(w->Key);
-                if (w->Presentation) w->Residency->Discard(w->PresentationKey);
+                if (!watch.Revision || !w->Residency->BindRevision(w->Key, *watch.Revision, accepted))
+                    (void)w->Residency->Discard(w->Key, w->Ring);
+                if (w->Presentation) (void)w->Residency->Discard(w->PresentationKey, w->PresentationRing);
             }
             w->Phase = EditorPropertySmoothingPhase::Applied;
             Deliver(w, std::move(result));
@@ -901,45 +909,17 @@ namespace Extrinsic::Runtime
                 return refuse(EditorCommandStatus::StaleEntity, "The inputs changed since the run; discard the result and run again.");
             const auto& ctx = w->Context;
             if (onComplete) w->Sink = GuardEditorProcessingResult(ctx, std::move(onComplete));
-            w->ReadbackDone = w->ReadbackFailed = false;
-            w->AcceptGpu.reset();
-            if (w->TestFront) w->ReadbackDone = true;
-            else
+            w->Readback.reset();
+            if (!w->TestFront)
             {
-                const auto front = w->Residency && w->Residency->HasRing(w->Key) ? w->Residency->Front(w->Key) : std::nullopt;
-                if (!front || !ctx.Device || !ctx.SpatialIndices)
+                // One readback in the property's precision (shared with the positions Accept).
+                w->Readback = std::make_shared<GP::GpuFrontReadback>();
+                if (!w->Residency || !GP::BeginGpuFrontReadback(ctx, *w->Residency, w->Key, w->Readback))
                 {
+                    w->Readback.reset();
                     Finish(w, EditorPropertySmoothingPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
                            "The GPU result is no longer resident; previous output retained.");
                     return w->Result;
-                }
-                w->FrontLease = front;
-                const auto bytes = front->Bytes;
-                w->Readback.assign(std::size_t(bytes), std::byte{0});
-                // The recorder and the sink hold the front's lease, so the slot is neither
-                // rewritten nor freed until the bytes landed, whatever happens to the
-                // transaction meanwhile; the recorder also registers the frame it records in.
-                const auto record = [w, buffer = front->Buffer, lease = front->Lease](RHI::ICommandContext& commands) -> RHI::BufferHandle {
-                    if (w->Abandoned) return {};
-                    if (w->Residency && w->Context.Device) w->Residency->NoteUse(buffer, w->Context.Device->GetGlobalFrameNumber());
-                    commands.BufferBarrier(buffer, RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite | RHI::MemoryAccess::TransferRead,
-                                           RHI::MemoryAccess::TransferRead);
-                    return buffer;
-                };
-                // One readback in the property's precision: at once where the device can
-                // (GRAPHICS-150), otherwise with the frame.
-                const auto token = ctx.Device->SubmitComputeReadback(record, bytes,
-                    RHI::ReadbackSink::Invoke([w, lease = front->Lease](std::span<const std::byte> data) {
-                        if (data.size() == w->Readback.size()) std::memcpy(w->Readback.data(), data.data(), data.size());
-                        else w->ReadbackFailed = true;
-                        w->ReadbackDone = true;
-                    }));
-                if (token.IsValid()) w->Residency->AddCompletion(front->Buffer, token, bytes);
-                else
-                {
-                    w->AcceptGpu = ctx.SpatialIndices->QueueGpuCompute(std::size_t(bytes),
-                        [record](RHI::ICommandContext& commands, const SpatialGpuIndexView&) { return record(commands); });
-                    w->Residency->AddCompletion(front->Buffer, RHI::ReadbackToken{}, bytes); // counted; the captured lease covers it
                 }
             }
             w->Phase = EditorPropertySmoothingPhase::Accepting;
@@ -947,20 +927,7 @@ namespace Extrinsic::Runtime
             JobDesc accept{
                 .DebugName = "Vulkan property smoothing accept", .Scope = ctx.World, .Kind = RuntimeTaskKinds::GeometryProcess,
                 .Work = [](const JobCancellation&) { return JobResultEnvelope::Make(true); },
-                .IsReadyToApply = [w] {
-                    if (!Current(w)) return true;
-                    if (w->AcceptGpu && !w->ReadbackDone)
-                    {
-                        if (w->AcceptGpu->State == SpatialQueryState::Ready)
-                        {
-                            if (w->AcceptGpu->Data.size() == w->Readback.size()) w->Readback = w->AcceptGpu->Data;
-                            else w->ReadbackFailed = true;
-                            w->ReadbackDone = true;
-                        }
-                        else if (w->AcceptGpu->State == SpatialQueryState::Failed) w->ReadbackFailed = w->ReadbackDone = true;
-                    }
-                    return w->ReadbackDone;
-                },
+                .IsReadyToApply = [w] { return !Current(w) || !w->Readback || GP::PollGpuFrontReadback(*w->Readback); },
                 .ValidateBeforeApply = [w] { return Current(w) ? JobApplyValidation::Current : JobApplyValidation::StaleGeneration; },
                 .PublishCompletion = [w](KernelEventBus&, const JobResultEnvelope&) {
                     CompleteAccept(w);
@@ -1238,9 +1205,11 @@ namespace Extrinsic::Runtime
             if (const auto back = AcquireGpuPropertyOutput(*residency, context.World, prepared->Entity, c.Output, w->Count, PS::kRingDepth);
                 back && residency->Publish(w->Key))
                 ++w->Previews;
+            w->Ring = residency->RingGeneration(w->Key);
             if (w->Presentation)
                 if (AcquireGpuPropertyOutput(*residency, context.World, prepared->Entity, GpuPropertyPresentationRef(c.Output), w->Count, PS::kRingDepth))
                     (void)residency->Publish(w->PresentationKey);
+            if (w->Presentation) w->PresentationRing = residency->RingGeneration(w->PresentationKey);
         }
         else ++w->Previews;
         w->TestFront = std::move(frontValues);

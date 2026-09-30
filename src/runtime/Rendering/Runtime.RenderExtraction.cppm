@@ -237,6 +237,10 @@ export namespace Extrinsic::Runtime
         std::uint32_t PositionPreviewsObserved{0};
         std::uint32_t PositionPreviewBlocksRejected{0};
         std::uint32_t PositionPreviewRestores{0};
+        // RUNTIME-293: accepted position revisions acknowledged since the last extraction
+        // without a position upload (the block kept the copied front; see
+        // `CommitAcceptedPositions`).
+        std::uint32_t PositionCommitsAcknowledged{0};
         std::uint32_t VisualizationRecipeEncodeCount{0};
         std::uint32_t VisualizationRecipePacketAppendCount{0};
         std::uint32_t VisualizationRecipeMissingSourceCount{0};
@@ -542,6 +546,34 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] bool ObservesUncommittedPositions(ECS::Scene::Registry& scene,
                                                         WorldHandle world,
                                                         std::uint32_t stableEntityId) const;
+
+        // RUNTIME-293 (ADR 0030 decision 6): the entity's `v:position` was published from an
+        // accepted ring front (`Revision` is the published property revision, `PositionBytes`
+        // its float3 rows in property order, `Front` the slot that now is the canonical slot).
+        // For a 1:1 domain (point cloud, graph) the GpuWorld block's shadow is patched to the
+        // bytes, the sidecar acknowledges the revision and the preview ends, so the next
+        // extraction uploads nothing for the positions (`PositionCommitsAcknowledged`); the
+        // caller sets no dirty tag. `AcknowledgedCopyPending`: a block did not hold the front
+        // yet and copies it once at the next culling head (the caller keeps the front's slot
+        // alive for that frame). Meshes, entities without a resident 1:1 block and blocks that
+        // refuse the bytes are not acknowledged: the caller marks the positions dirty and the
+        // ordinary revision-delta upload applies.
+        struct AcceptedPositions
+        {
+            std::uint32_t StableEntityId{};
+            std::span<const std::byte> PositionBytes{};
+            std::uint32_t RowCount{};
+            std::uint64_t Revision{};
+            GpuPropertyFront Front{};
+        };
+        enum class PositionCommitStatus : std::uint8_t
+        {
+            Acknowledged,
+            AcknowledgedCopyPending,
+            NotOneToOne,
+            Rejected,
+        };
+        [[nodiscard]] PositionCommitStatus CommitAcceptedPositions(const AcceptedPositions& accepted);
 
     private:
         struct State;

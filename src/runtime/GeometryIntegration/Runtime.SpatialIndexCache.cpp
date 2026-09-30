@@ -823,6 +823,23 @@ namespace Extrinsic::Runtime
     {
         return m_Impl->EnsureResidency();
     }
+    SpatialIndexCache::GpuPositionCommitStatus SpatialIndexCache::CommitGpuPositions(const GpuPositionCommit& c)
+    {
+        if (!m_Impl->Extraction) return GpuPositionCommitStatus::NotAcknowledged;
+        using Status = RenderExtractionCache::PositionCommitStatus;
+        switch (m_Impl->Extraction->CommitAcceptedPositions(
+            {.StableEntityId = c.StableEntityId, .PositionBytes = c.PositionBytes, .RowCount = c.RowCount,
+             .Revision = c.Revision,
+             .Front = {.Buffer = c.Front, .Address = c.FrontAddress, .Bytes = c.FrontBytes, .Count = c.FrontCount,
+                       .Stamp = c.FrontStamp}}))
+        {
+        case Status::Acknowledged: return GpuPositionCommitStatus::Acknowledged;
+        case Status::AcknowledgedCopyPending: return GpuPositionCommitStatus::AcknowledgedCopyPending;
+        case Status::NotOneToOne:
+        case Status::Rejected: break;
+        }
+        return GpuPositionCommitStatus::NotAcknowledged;
+    }
     const Graphics::GpuPropertyResidency* SpatialIndexCache::PropertyResidency() const noexcept
     {
         return m_Impl->Residency.get();

@@ -5,6 +5,7 @@
 // and that upload makes the CPU bytes authoritative again.
 #include <algorithm>
 #include <array>
+#include <cstring>
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -12,12 +13,14 @@
 
 #include <gtest/gtest.h>
 
+import Extrinsic.Graphics.GpuPropertyResidency;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.SceneHandles;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Types;
 
+#include "GeometryResidencyFingerprint.hpp"
 #include "MockRHI.hpp"
 
 namespace
@@ -483,4 +486,235 @@ TEST(GpuWorldPositionPreviewContract, AFailedGatherPipelineAfterARebuildReplaysT
     f.World.SubmitPendingUploadBarriers(f.Commands);
     EXPECT_EQ(f.Commands.DispatchRecords.size(), 2u);
     EXPECT_TRUE(f.View(geometry).PositionShadowStale);
+}
+
+// RUNTIME-293 (ADR 0030 decision 6): Accept of GPU-authored positions patches only the
+// position range of the shadow, keeps the copied front in the block (no upload), and ends
+// the preview; a block that does not hold the front copies it once at the next culling head;
+// a CPU position upload supersedes that pending copy.
+namespace
+{
+    constexpr std::array<PackedVertex, 3> kShiftedVerts{{
+        {0.5f, -0.5f, 0.0f, 0.0f, 0.0f},
+        {1.5f, -0.5f, 0.0f, 1.0f, 0.0f},
+        {1.0f, 0.5f, 0.0f, 0.5f, 1.0f},
+    }};
+
+    [[nodiscard]] std::vector<std::byte> ShiftedPositionBytes()
+    {
+        std::vector<std::byte> bytes(kPositionBytes);
+        for (std::size_t i = 0; i < kShiftedVerts.size(); ++i)
+        {
+            const float p[3]{kShiftedVerts[i].Px, kShiftedVerts[i].Py, kShiftedVerts[i].Pz};
+            std::memcpy(bytes.data() + i * sizeof(p), p, sizeof(p));
+        }
+        return bytes;
+    }
+
+    [[nodiscard]] std::uint64_t ShiftedFingerprint()
+    {
+        return Extrinsic::Tests::GeometryFloat32Fingerprint(
+            {kShiftedVerts[0].Px, kShiftedVerts[0].Py, kShiftedVerts[0].Pz, kShiftedVerts[1].Px, kShiftedVerts[1].Py,
+             kShiftedVerts[1].Pz, kShiftedVerts[2].Px, kShiftedVerts[2].Py, kShiftedVerts[2].Pz});
+    }
+
+    [[nodiscard]] Graphics::GpuWorld::GeometryPositionCommitDesc Commit(const Fixture& f,
+                                                                       const std::span<const std::byte> bytes,
+                                                                       const std::uint64_t stamp)
+    {
+        return Graphics::GpuWorld::GeometryPositionCommitDesc{
+            .PositionBytes = bytes,
+            .Source = f.Front,
+            .SourceOffsetBytes = 0u,
+            .SourceRowCount = static_cast<std::uint32_t>(kTriangleVerts.size()),
+            .Stamp = stamp,
+        };
+    }
+    using CommitStatus = Graphics::GpuWorld::GeometryPositionCommitStatus;
+}
+
+TEST(GpuWorldPositionCommitContract, CommitOfACopiedFrontPatchesOnlyThePositionShadowWithoutAnUpload)
+{
+    Fixture f;
+    const auto geometry = f.World.UploadGeometry(TriangleUpload());
+    ASSERT_TRUE(geometry.IsValid());
+    ASSERT_EQ(f.World.SetGeometryPositionPreview(geometry, f.Preview(1u)), Status::Accepted);
+    f.World.SubmitPendingUploadBarriers(f.Commands);
+    ASSERT_EQ(f.Commands.CopyBufferRecords.size(), 1u);
+    const auto before = f.View(geometry);
+    ASSERT_TRUE(before.PositionShadowStale);
+    const std::size_t writesBefore = f.Device.BufferWrites.size();
+
+    const auto bytes = ShiftedPositionBytes();
+    ASSERT_EQ(f.World.CommitGeometryPositions(geometry, Commit(f, bytes, 1u)), CommitStatus::Committed);
+    const auto after = f.View(geometry);
+    EXPECT_FALSE(after.PositionShadowStale);
+    EXPECT_EQ(after.PositionFingerprint, ShiftedFingerprint());
+    EXPECT_EQ(after.TexcoordFingerprint, before.TexcoordFingerprint) << "other channels are untouched";
+    EXPECT_EQ(after.TexcoordByteCount, before.TexcoordByteCount);
+    EXPECT_NE(after.ContentRevision, before.ContentRevision);
+    EXPECT_EQ(f.Device.BufferWrites.size(), writesBefore) << "nothing is uploaded";
+
+    // The preview is over: no further copy, and a later position upload behaves as usual.
+    f.World.SubmitPendingUploadBarriers(f.Commands);
+    EXPECT_EQ(f.Commands.CopyBufferRecords.size(), 1u);
+    EXPECT_EQ(f.Device.BufferWrites.size(), writesBefore);
+    // The patched shadow is what a rebuild replays.
+    const std::size_t rebuildFrom = f.Device.BufferWrites.size();
+    ASSERT_TRUE(f.World.RebuildGpuResources(f.Device, f.Buffers));
+    EXPECT_EQ(f.VertexWritesOverlapping(f.BlockPositionOffset(geometry), before.PositionByteCount, rebuildFrom), 1u);
+    bool replayedShifted = false;
+    for (std::size_t i = rebuildFrom; i < f.Device.BufferWrites.size(); ++i)
+    {
+        const auto& write = f.Device.BufferWrites[i];
+        if (write.Handle != f.World.GetManagedVertexBuffer() || write.Data.size() < bytes.size()) continue;
+        replayedShifted |= std::equal(bytes.begin(), bytes.end(), write.Data.begin());
+    }
+    EXPECT_TRUE(replayedShifted);
+}
+
+TEST(GpuWorldPositionCommitContract, CommitWithoutACopiedFrontCopiesItOnceThenEndsThePreview)
+{
+    Fixture f;
+    const auto geometry = f.World.UploadGeometry(TriangleUpload());
+    const auto bytes = ShiftedPositionBytes();
+    const std::size_t writesBefore = f.Device.BufferWrites.size();
+    // Never previewed (an automatic Accept before any extraction): the block is stale until
+    // the copy lands.
+    ASSERT_EQ(f.World.CommitGeometryPositions(geometry, Commit(f, bytes, 7u)), CommitStatus::CopyPending);
+    EXPECT_TRUE(f.View(geometry).PositionShadowStale);
+    EXPECT_EQ(f.View(geometry).PositionFingerprint, ShiftedFingerprint());
+    f.World.SubmitPendingUploadBarriers(f.Commands);
+    ASSERT_EQ(f.Commands.CopyBufferRecords.size(), 1u);
+    EXPECT_EQ(f.Commands.CopyBufferRecords.back().Src, f.Front);
+    EXPECT_EQ(f.Commands.CopyBufferRecords.back().DstOffset, f.BlockPositionOffset(geometry));
+    EXPECT_FALSE(f.View(geometry).PositionShadowStale) << "the shadow describes the copied block";
+    f.World.SubmitPendingUploadBarriers(f.Commands);
+    EXPECT_EQ(f.Commands.CopyBufferRecords.size(), 1u) << "one copy, then the preview is over";
+    EXPECT_EQ(f.VertexWritesOverlapping(f.BlockPositionOffset(geometry), kPositionBytes, writesBefore), 0u)
+        << "no CPU upload of the positions";
+
+    // A newer front published after the last copy is not what the block holds either.
+    ASSERT_EQ(f.World.SetGeometryPositionPreview(geometry, f.Preview(8u)), Status::Accepted);
+    f.World.SubmitPendingUploadBarriers(f.Commands);
+    ASSERT_EQ(f.Commands.CopyBufferRecords.size(), 2u);
+    ASSERT_EQ(f.World.CommitGeometryPositions(geometry, Commit(f, bytes, 9u)), CommitStatus::CopyPending);
+    f.World.SubmitPendingUploadBarriers(f.Commands);
+    EXPECT_EQ(f.Commands.CopyBufferRecords.size(), 3u);
+    EXPECT_FALSE(f.View(geometry).PositionShadowStale);
+}
+
+TEST(GpuWorldPositionCommitContract, ACpuPositionUploadSupersedesAPendingCommitCopy)
+{
+    Fixture f;
+    const auto geometry = f.World.UploadGeometry(TriangleUpload());
+    const auto bytes = ShiftedPositionBytes();
+    ASSERT_EQ(f.World.CommitGeometryPositions(geometry, Commit(f, bytes, 3u)), CommitStatus::CopyPending);
+    // Undo right after Accept: the CPU rows upload and the old front must not land over them.
+    ASSERT_TRUE(f.World.UpdateGeometryChannels(
+        geometry, TriangleUpload(), Graphics::GpuWorld::GeometryChannelUpdateMask{.Position = true}).Succeeded());
+    EXPECT_FALSE(f.View(geometry).PositionShadowStale);
+    f.World.SubmitPendingUploadBarriers(f.Commands);
+    EXPECT_TRUE(f.Commands.CopyBufferRecords.empty());
+}
+
+TEST(GpuWorldPositionCommitContract, CommitRefusesBytesThatDoNotFitAndSeamSplitBlocks)
+{
+    Fixture f;
+    const auto geometry = f.World.UploadGeometry(TriangleUpload());
+    const auto bytes = ShiftedPositionBytes();
+    EXPECT_EQ(f.World.CommitGeometryPositions(geometry, Commit(f, std::span<const std::byte>{bytes}.first(12u), 1u)),
+              CommitStatus::InvalidInput);
+    EXPECT_EQ(f.World.CommitGeometryPositions(Graphics::GpuGeometryHandle{}, Commit(f, bytes, 1u)),
+              CommitStatus::InvalidHandle);
+    // A block that neither holds the front nor names a source to copy from cannot commit.
+    auto noSource = Commit(f, bytes, 1u);
+    noSource.Source = {};
+    EXPECT_EQ(f.World.CommitGeometryPositions(geometry, noSource), CommitStatus::InvalidInput);
+    // A seam-split block (gather preview) commits through the ordinary upload.
+    constexpr std::array<PackedVertex, 4> kSplit{{
+        {-0.5f, -0.5f, 0.0f, 0.0f, 0.0f},
+        {0.5f, -0.5f, 0.0f, 1.0f, 0.0f},
+        {0.0f, 0.5f, 0.0f, 0.5f, 1.0f},
+        {-0.5f, -0.5f, 0.0f, 1.0f, 1.0f},
+    }};
+    constexpr std::array<std::uint32_t, 6> kSplitIndices{{0u, 1u, 2u, 3u, 1u, 2u}};
+    Graphics::GpuWorld::GeometryUploadDesc split{};
+    split.PackedVertexBytes = std::as_bytes(std::span<const PackedVertex>{kSplit});
+    split.SurfaceIndices = std::span<const std::uint32_t>{kSplitIndices};
+    split.VertexCount = 4u;
+    const auto seam = f.World.UploadGeometry(split);
+    ASSERT_TRUE(seam.IsValid());
+    constexpr std::array<std::uint32_t, 4> kMap{{0u, 1u, 2u, 0u}};
+    ASSERT_EQ(f.World.SetGeometryPositionPreview(seam, f.Preview(1u, kMap, 1u)), Status::Accepted);
+    std::vector<std::byte> fourRows(4u * 12u);
+    EXPECT_EQ(f.World.CommitGeometryPositions(seam, Commit(f, fourRows, 1u)), CommitStatus::InvalidInput);
+}
+
+// RUNTIME-293 review (P1): a ring slot is recycled with the same buffer. When extraction
+// missed the intermediate publications, the block holds the first copy of slot A while the
+// accepted front is A republished with new bytes: the publication stamp tells them apart, so
+// Accept copies again instead of keeping the old bytes. Stamps come from the residency.
+TEST(GpuWorldPositionCommitContract, ARecycledSlotRepublishedAfterTheLastCopyIsCopiedAgainNotKept)
+{
+    Fixture f;
+    f.Device.FramesInFlight = 2u;
+    Graphics::GpuPropertyResidency residency(f.Device);
+    const Graphics::GpuPropertyKey key{.Scope = 1u, .Owner = 293u, .Domain = 2u, .ValueKind = 3u, .Name = "v:position"};
+    const Graphics::GpuPropertyLayout layout{.Scalar = Graphics::GpuScalarType::Float32, .Channels = 3u, .Stride = 0u,
+                                             .Count = static_cast<std::uint32_t>(kTriangleVerts.size())};
+    const auto geometry = f.World.UploadGeometry(TriangleUpload());
+    const auto bytes = ShiftedPositionBytes();
+    const auto previewOf = [&](const Graphics::GpuPropertyView& front) {
+        return Graphics::GpuWorld::GeometryPositionPreviewDesc{
+            .Source = front.Buffer, .SourceOffsetBytes = 0u,
+            .SourceRowCount = static_cast<std::uint32_t>(kTriangleVerts.size()), .Stamp = front.Publication};
+    };
+    const auto commitOf = [&](const Graphics::GpuPropertyView& front) {
+        return Graphics::GpuWorld::GeometryPositionCommitDesc{
+            .PositionBytes = bytes, .Source = front.Buffer, .SourceOffsetBytes = 0u,
+            .SourceRowCount = static_cast<std::uint32_t>(kTriangleVerts.size()), .Stamp = front.Publication};
+    };
+
+    // Publication 1 in slot A is shown and copied.
+    ASSERT_TRUE(residency.AcquireBack(key, layout, 2u));
+    ASSERT_TRUE(residency.Publish(key));
+    auto first = *residency.Front(key);
+    first.Lease.reset(); // the renderer observes, it does not lease
+    residency.MarkObserved(key);
+    ASSERT_EQ(f.World.SetGeometryPositionPreview(geometry, previewOf(first)), Status::Accepted);
+    f.World.SubmitPendingUploadBarriers(f.Commands);
+    ASSERT_EQ(f.Commands.CopyBufferRecords.size(), 1u);
+
+    // Extraction misses the next frames: B is published, then A is recycled and republished.
+    ASSERT_TRUE(residency.AcquireBack(key, layout, 2u));
+    ASSERT_TRUE(residency.Publish(key));
+    f.Device.GlobalFrameNumber = 3u;
+    const auto recycled = residency.AcquireBack(key, layout, 2u);
+    ASSERT_TRUE(recycled.has_value());
+    ASSERT_EQ(recycled->Buffer, first.Buffer) << "the scenario needs slot A back";
+    ASSERT_TRUE(residency.Publish(key));
+    const auto third = *residency.Front(key);
+    ASSERT_EQ(third.Buffer, first.Buffer);
+    ASSERT_NE(third.Publication, first.Publication);
+
+    // Accept of the third publication: the block holds the first one's bytes.
+    ASSERT_EQ(f.World.CommitGeometryPositions(geometry, commitOf(third)), CommitStatus::CopyPending);
+    f.World.SubmitPendingUploadBarriers(f.Commands);
+    ASSERT_EQ(f.Commands.CopyBufferRecords.size(), 2u) << "the republished slot is copied again";
+    EXPECT_EQ(f.Commands.CopyBufferRecords.back().Src, first.Buffer);
+    EXPECT_FALSE(f.View(geometry).PositionShadowStale);
+    EXPECT_EQ(f.View(geometry).PositionFingerprint, ShiftedFingerprint());
+
+    // Control: accepting the very publication the block copied keeps it without a copy.
+    ASSERT_TRUE(residency.AcquireBack(key, layout, 2u));
+    ASSERT_TRUE(residency.Publish(key));
+    const auto fourth = *residency.Front(key);
+    ASSERT_EQ(f.World.SetGeometryPositionPreview(geometry, previewOf(fourth)), Status::Accepted);
+    f.World.SubmitPendingUploadBarriers(f.Commands);
+    ASSERT_EQ(f.Commands.CopyBufferRecords.size(), 3u);
+    ASSERT_EQ(f.World.CommitGeometryPositions(geometry, commitOf(fourth)), CommitStatus::Committed);
+    f.World.SubmitPendingUploadBarriers(f.Commands);
+    EXPECT_EQ(f.Commands.CopyBufferRecords.size(), 3u);
+    residency.Discard(key);
 }

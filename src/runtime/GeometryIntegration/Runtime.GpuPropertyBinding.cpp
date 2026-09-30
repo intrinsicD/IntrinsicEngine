@@ -123,8 +123,12 @@ namespace Extrinsic::Runtime
         if (!properties || properties->Size() != front->Layout.Count) return std::nullopt;
         residency.MarkObserved(key);
         return GpuPropertyObservation{.Buffer = front->Buffer, .Address = front->Address, .Bytes = front->Bytes,
-                                      .Count = front->Layout.Count,
-                                      .Stamp = (std::uint64_t(front->Buffer.Generation) << 32u) | front->Buffer.Index};
+                                      .Count = front->Layout.Count, .Stamp = GpuPropertyObservationStamp(*front)};
+    }
+
+    std::uint64_t GpuPropertyObservationStamp(const Graphics::GpuPropertyView& front) noexcept
+    {
+        return front.Publication;
     }
 
     std::optional<Graphics::GpuPropertyView> AcquireGpuPropertyOutput(

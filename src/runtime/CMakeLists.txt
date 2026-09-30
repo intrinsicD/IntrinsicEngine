@@ -153,6 +153,7 @@ target_sources(${target_name}
         Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Density.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp
+        Editor/Operations/Runtime.GeometryProcessingOperations.GpuPositions.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Bilateral.cpp

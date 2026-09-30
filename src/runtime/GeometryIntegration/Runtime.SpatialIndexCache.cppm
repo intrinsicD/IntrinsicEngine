@@ -168,6 +168,27 @@ export namespace Extrinsic::Runtime
         // Created on first use; null without a device (const: null until the first use).
         [[nodiscard]] Graphics::GpuPropertyResidency* PropertyResidency() noexcept;
         [[nodiscard]] const Graphics::GpuPropertyResidency* PropertyResidency() const noexcept;
+        // Accept of GPU-authored positions (RUNTIME-293, ADR 0030 decision 6): the published
+        // rows and revision of an entity's `v:position` and the ring front that becomes its
+        // canonical slot, handed to the render extraction this residency's observer is
+        // registered on (`RenderExtractionCache::CommitAcceptedPositions`). For a 1:1 block
+        // the shadow is patched and the revision acknowledged, so nothing is uploaded again;
+        // `AcknowledgedCopyPending` when the block copies the front once at the next culling
+        // head. `NotAcknowledged` without an extraction, for meshes, or when the block refuses
+        // the bytes: the caller marks the positions dirty for the ordinary upload.
+        struct GpuPositionCommit
+        {
+            std::uint32_t StableEntityId{};
+            std::span<const std::byte> PositionBytes{};
+            std::uint32_t RowCount{};
+            std::uint64_t Revision{};
+            RHI::BufferHandle Front{};
+            std::uint64_t FrontAddress{}, FrontBytes{};
+            std::uint32_t FrontCount{};
+            std::uint64_t FrontStamp{};
+        };
+        enum class GpuPositionCommitStatus : std::uint8_t { Acknowledged, AcknowledgedCopyPending, NotAcknowledged };
+        [[nodiscard]] GpuPositionCommitStatus CommitGpuPositions(const GpuPositionCommit& commit);
 
       private:
         [[nodiscard]] std::shared_ptr<SpatialNearestBatch> QueueGpuBatch(

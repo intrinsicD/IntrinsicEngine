@@ -2387,6 +2387,12 @@ namespace Extrinsic::Runtime
             m_PointCloudFreeRetires - m_PrevPointCloudFreeRetires;
         m_PrevPointCloudFreeRetires = m_PointCloudFreeRetires;
 
+        // Accepted position revisions are acknowledged from the editor between
+        // extractions (RUNTIME-293); publish them as a per-frame delta likewise.
+        stats.PositionCommitsAcknowledged =
+            m_PositionCommits - m_PrevPositionCommits;
+        m_PrevPositionCommits = m_PositionCommits;
+
         // Edge and vertex view frees share one diagnostic counter because both
         // use the mesh-primitive-view namespace in the common coordinator.
         stats.MeshPrimitiveViewFreeRetires =

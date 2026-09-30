@@ -524,3 +524,95 @@ TEST(GpuPropertyResidency, PruneReleasesRejectedKeysIncludingTheirRingsOnceCompl
     EXPECT_EQ(device.DestroyBufferCount, 4) << "Clear frees everything, held or not";
     EXPECT_EQ(residency.Stats().ResidentBytes, 0u);
 }
+
+// RUNTIME-293 review: a ring slot is reused with the same buffer, so a front's bytes are
+// identified by the residency-wide publication, not the buffer; BindRevision binds only the
+// publication Accept read back.
+TEST(GpuPropertyResidency, ARepublishedSlotCarriesANewPublicationAndBindRevisionBindsOnlyThatOne)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.FramesInFlight = 2u;
+    GpuPropertyResidency residency(device);
+    const auto layout = Float3(4);
+    const auto a = residency.AcquireBack(Key(21), layout, 2u)->Buffer;
+    ASSERT_TRUE(residency.Publish(Key(21)));
+    auto first = residency.Front(Key(21));
+    ASSERT_TRUE(first.has_value());
+    first->Lease.reset(); // an observation, not a lease: the slot may be recycled
+    EXPECT_EQ(first->Buffer, a);
+    EXPECT_NE(first->Publication, 0u);
+    residency.MarkObserved(Key(21)); // the renderer copied this publication in frame 0
+
+    ASSERT_TRUE(residency.AcquireBack(Key(21), layout, 2u));
+    ASSERT_TRUE(residency.Publish(Key(21)));
+    auto second = residency.Front(Key(21));
+    second->Lease.reset();
+    EXPECT_NE(second->Buffer, a);
+    EXPECT_NE(second->Publication, first->Publication);
+
+    // Slot A is recycled once its frame use completed and republished with new bytes.
+    device.GlobalFrameNumber = 3u;
+    const auto recycled = residency.AcquireBack(Key(21), layout, 2u);
+    ASSERT_TRUE(recycled.has_value());
+    EXPECT_EQ(recycled->Buffer, a);
+    ASSERT_TRUE(residency.Publish(Key(21)));
+    const auto third = residency.Front(Key(21));
+    EXPECT_EQ(third->Buffer, a) << "same buffer as the first publication";
+    EXPECT_NE(third->Publication, first->Publication) << "a new publication: the observation stamp changes";
+    EXPECT_GT(third->Publication, second->Publication);
+
+    // Accept read the first publication back: it is no longer the front, so it is not bound.
+    EXPECT_FALSE(residency.BindRevision(Key(21), 7u, first->Publication));
+    EXPECT_TRUE(residency.HasRing(Key(21)));
+    EXPECT_TRUE(residency.BindRevision(Key(21), 7u, third->Publication));
+    EXPECT_FALSE(residency.HasRing(Key(21)));
+    const auto canonical = residency.Front(Key(21));
+    ASSERT_TRUE(canonical.has_value());
+    EXPECT_EQ(canonical->Buffer, a);
+    EXPECT_EQ(canonical->Revision, 7u);
+    EXPECT_EQ(canonical->Publication, third->Publication);
+}
+
+// Re-review P2: a ring has an identity; a discard naming another ring's generation releases
+// nothing, so a run only ever discards the ring it acquired.
+TEST(GpuPropertyResidency, DiscardByGenerationReleasesOnlyThatRing)
+{
+    Extrinsic::Tests::MockDevice device;
+    GpuPropertyResidency residency(device);
+    EXPECT_EQ(residency.RingGeneration(Key(31)), 0u);
+    ASSERT_TRUE(residency.AcquireBack(Key(31), Float3(3), 2u));
+    const auto first = residency.RingGeneration(Key(31));
+    ASSERT_NE(first, 0u);
+    residency.Discard(Key(31));
+    ASSERT_TRUE(residency.AcquireBack(Key(31), Float3(3), 2u));
+    const auto second = residency.RingGeneration(Key(31));
+    EXPECT_NE(second, first);
+    EXPECT_FALSE(residency.Discard(Key(31), first)) << "the first ring is gone; its generation names nothing";
+    EXPECT_FALSE(residency.Discard(Key(31), 0u));
+    EXPECT_TRUE(residency.HasRing(Key(31)));
+    EXPECT_TRUE(residency.Discard(Key(31), second));
+    EXPECT_FALSE(residency.HasRing(Key(31)));
+}
+
+// Third check P2: a refused slot allocation must not leave a slot-less ring behind, or every
+// later run on the key would be refused as "a result waits".
+TEST(GpuPropertyResidency, ARefusedRingAllocationLeavesNoRingBehind)
+{
+    Extrinsic::Tests::MockDevice device;
+    GpuPropertyResidency residency(device);
+    device.FailNextBufferCreate = true;
+    EXPECT_FALSE(residency.AcquireBack(Key(41), Float3(3), 2u));
+    EXPECT_FALSE(residency.HasRing(Key(41)));
+    EXPECT_EQ(residency.RingGeneration(Key(41)), 0u);
+    EXPECT_EQ(residency.Stats().Rings, 0u);
+    // The next acquisition creates the ring as if nothing happened.
+    ASSERT_TRUE(residency.AcquireBack(Key(41), Float3(3), 2u));
+    EXPECT_TRUE(residency.HasRing(Key(41)));
+    // A refused second slot on an existing ring keeps that ring and its first slot.
+    ASSERT_TRUE(residency.Publish(Key(41)));
+    device.FailNextBufferCreate = true;
+    EXPECT_FALSE(residency.AcquireBack(Key(41), Float3(3), 2u));
+    EXPECT_TRUE(residency.HasRing(Key(41)));
+    EXPECT_TRUE(residency.Front(Key(41)).has_value());
+    residency.Discard(Key(41));
+}
