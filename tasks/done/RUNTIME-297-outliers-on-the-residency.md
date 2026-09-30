@@ -33,7 +33,7 @@ contracts: [geometry.property-coherence, geometry.element-domain-sources, method
 | End-to-end tests | Contract tests on the mock device; one gpu;vulkan parity + IO smoke. |
 
 ## Completion — 2026-09-30
-Commit: see RETIREMENT-LOG (`claude/cpd-nystrom`). Statistical, radius and LDR outliers run
+Commit: `e1b77ba19` on `claude/cpd-nystrom`. Statistical, radius and LDR outliers run
 on the GPU property residency with backend `vulkan_lbvh`:
 - Positions come from the canonical slot through the LBVH. The shared `lbvhQuery` traversal
   (`point_lbvh.glsl`) is used by both `lbvh_query.comp` and `outlier_analysis.comp`.
