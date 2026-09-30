@@ -1753,6 +1753,7 @@ namespace Extrinsic::Runtime
                  "convergence_tolerance",
                  "target_point_count",
                  "seed",
+                 "gpu_preview_interval",
                  "gpu_query_batch_size",
                  "gpu_radius_capacity",
                  "wlop_anisotropic",
@@ -1871,6 +1872,8 @@ namespace Extrinsic::Runtime
                 config.Seed = static_cast<std::uint32_t>(*value);
                 CountParsed(context);
             }
+            if (const auto value = ReadInteger(context, *object, "gpu_preview_interval", 1, 1000000))
+            { config.GpuPreviewInterval = static_cast<std::uint32_t>(*value); CountParsed(context); }
             if (const auto value = ReadInteger(context, *object, "gpu_query_batch_size", 1, 16384))
             { config.GpuQueryBatchSize = static_cast<std::uint32_t>(*value); CountParsed(context); }
             if (const auto value = ReadInteger(context, *object, "gpu_radius_capacity", 1, 1024))
@@ -2904,6 +2907,7 @@ namespace Extrinsic::Runtime
         const PointCloudConsolidationConfig& config)
     {
         json doc = json::object({
+            {"gpu_preview_interval", config.GpuPreviewInterval},
             {"gpu_query_batch_size", config.GpuQueryBatchSize},
             {"gpu_radius_capacity", config.GpuRadiusCapacity},
             {"backend", std::string{ToConfigString(config.Backend)}},

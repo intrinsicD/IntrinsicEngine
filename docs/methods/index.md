@@ -8,6 +8,8 @@ This index is the canonical entry point for method/paper implementation document
 
 - [Point sampling backend contract](point-sampling.md): resident FPS inputs, completion-only chunks, terminal publication and parity verification.
 
+- [Locally optimal projection](locally-optimal-projection.md): resident LOP inputs, completion paging and positions-run previews.
+
 ## Start here
 
 - [Method template](method-template.md)

@@ -293,6 +293,7 @@ namespace Extrinsic::Runtime
             Stop.store(true);
             if (Worker.joinable()) Worker.join();
             Listener.Close();
+            if (Protocol) Protocol->DropPending();
             Attachment.Detach();
             std::scoped_lock lock{Mutex};
             Status.Listening = false;

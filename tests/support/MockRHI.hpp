@@ -92,6 +92,12 @@ namespace Extrinsic::Tests
             return !token.IsValid() || ReadbacksComplete;
         }
 
+        std::function<RHI::ReadbackToken(RHI::BufferHandle, std::uint64_t, std::uint64_t, RHI::ReadbackSink)> BufferDownload{};
+        [[nodiscard]] RHI::ReadbackToken DownloadBuffer(RHI::BufferHandle buffer, std::uint64_t bytes,
+                                                       std::uint64_t offset, RHI::ReadbackSink sink) override
+        {
+            return BufferDownload ? BufferDownload(buffer, bytes, offset, std::move(sink)) : RHI::ReadbackToken{};
+        }
         void CollectCompleted() override {}
 
     private:

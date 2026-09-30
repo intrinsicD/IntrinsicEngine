@@ -129,6 +129,7 @@ namespace Extrinsic::Sandbox::Editor
                 .StableEntityId = stableEntityId,
                 .Properties = properties,
                 .Config = config,
+                .AutoAccept = false,
             },
         };
     }
@@ -182,6 +183,12 @@ namespace Extrinsic::Sandbox::Editor
             .ActualBackend = std::string{
                 Runtime::StableToken(result.ActualBackend)},
             .FellBackToCpu = result.FellBackToCpu,
+            .GpuInputUploadBytes = result.GpuInputUploadBytes,
+            .GpuInputCacheHits = result.GpuInputCacheHits,
+            .CpuStageUploadBytes = result.CpuStageUploadBytes,
+            .CpuStageReadbackBytes = result.CpuStageReadbackBytes,
+            .GpuSubmissions = result.GpuSubmissions,
+            .GpuPreviews = result.GpuPreviews,
             .BackendDiagnostic = result.BackendDiagnostic,
             .SupportRadiusAnalysisStatus =
                 result.SupportRadiusAnalysisStatus,
@@ -1043,6 +1050,9 @@ namespace Extrinsic::Sandbox::Editor
             switch (config.Strategy)
             {
             case Strategy::Lop:
+                changed |= ImGui::InputScalar("Preview every k iterations##PointCloudConsolidation",
+                    ImGuiDataType_U32, &config.GpuPreviewInterval);
+                config.GpuPreviewInterval = std::max(1u, config.GpuPreviewInterval);
                 ImGui::TextDisabled(
                     "LOP uses unit density weights and the shared parameters.");
                 break;
@@ -1106,6 +1116,10 @@ namespace Extrinsic::Sandbox::Editor
             const SandboxPointCloudConsolidationResultSummary summary =
                 BuildSandboxPointCloudConsolidationResultSummary(*result);
             ImGui::Text("Status: %s", summary.Status.c_str());
+            ImGui::Text("GPU input: %llu bytes, %llu cache hits; CPU stages: %llu upload / %llu readback bytes",
+                (unsigned long long)result->GpuInputUploadBytes, (unsigned long long)result->GpuInputCacheHits,
+                (unsigned long long)result->CpuStageUploadBytes, (unsigned long long)result->CpuStageReadbackBytes);
+            ImGui::Text("GPU submissions: %u, previews: %u", result->GpuSubmissions, result->GpuPreviews);
             ImGui::Text(
                 "Strategy: %s  implementation: %s",
                 summary.StrategyToken.c_str(),
@@ -1523,7 +1537,10 @@ namespace Extrinsic::Sandbox::Editor
                     }
                 }
                 if (service.Results
-                        .LastPointCloudConsolidationResult.has_value())
+                        .LastPointCloudConsolidationResult.has_value() &&
+                    (!PointCloudConsolidation.LastResult ||
+                     PointCloudConsolidation.LastResult->Status != Runtime::PointCloudConsolidationRunStatus::Queued ||
+                     PointCloudConsolidation.LastResult->Correlation == service.Results.LastPointCloudConsolidationResult->Correlation))
                 {
                     PointCloudConsolidation.LastResult =
                         *service.Results
@@ -1590,6 +1607,28 @@ namespace Extrinsic::Sandbox::Editor
                 }
                 ImGui::EndDisabled();
 
+                Runtime::PointCloudConsolidationGpuObservation gpu{};
+                if (service.PointCloudConsolidation && PointCloudConsolidation.LastResult)
+                    gpu = service.PointCloudConsolidation->GpuRun(PointCloudConsolidation.LastResult->Correlation);
+                if (gpu.Running || gpu.ReadyToAccept || gpu.Accepting)
+                {
+                    availability.Available = false;
+                    availability.Message = "Accept or Discard the pending GPU run before starting another.";
+                    ImGui::TextWrapped("%s", gpu.Message.c_str());
+                    ImGui::Text("Iterations: %u, submissions: %u, previews: %u; input: %llu bytes / %llu hits",
+                        gpu.Iterations, gpu.Submissions, gpu.Previews,
+                        (unsigned long long)gpu.InputUploadBytes, (unsigned long long)gpu.InputCacheHits);
+                    ImGui::BeginDisabled(!gpu.Running);
+                    if (ImGui::Button("Stop##PointCloudConsolidation"))
+                        (void)service.PointCloudConsolidation->GpuRun(gpu.Correlation, Runtime::PointCloudConsolidationGpuAction::Stop);
+                    ImGui::EndDisabled();
+                    ImGui::SameLine();
+                    if (DrawProcessingActionButton("Accept##PointCloudConsolidation", {gpu.CanAccept, gpu.Message}))
+                        (void)service.PointCloudConsolidation->GpuRun(gpu.Correlation, Runtime::PointCloudConsolidationGpuAction::Accept);
+                    ImGui::SameLine();
+                    if (ImGui::Button("Discard##PointCloudConsolidation"))
+                        (void)service.PointCloudConsolidation->GpuRun(gpu.Correlation, Runtime::PointCloudConsolidationGpuAction::Discard);
+                }
                 const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
                     service.Commands, {availability.Available, availability.Message});
                 if (DrawProcessingActionButton(

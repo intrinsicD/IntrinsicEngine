@@ -30,7 +30,7 @@ void main()
     ivec3 coordinate;
     uint cell;
     if (!LopCellForPoint(
-            LopVec4ArrayRO(positionsBDA).Values[index].xyz,
+            LopLoadPosition(positionsBDA, index),
             coordinate,
             cell))
     {

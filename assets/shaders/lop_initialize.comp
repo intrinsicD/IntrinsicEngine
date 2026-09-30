@@ -8,14 +8,18 @@ void main()
 {
     if (pc.StateBDA == uint64_t(0)) return;
     LopGpuStateRef state = LopGpuStateRef(pc.StateBDA);
-    const uint index = gl_GlobalInvocationID.x;
+    if (pc.PageCount != 0u && gl_GlobalInvocationID.x >= pc.PageCount) return;
+    const uint index = pc.Reserved0 + gl_GlobalInvocationID.x;
     if (index >= pc.TargetCount) return;
     LopGpuDiagnosticsRef diagnostics =
         LopGpuDiagnosticsRef(state.DiagnosticsBDA);
     if (diagnostics.Active == 0u) return;
 
     const vec3 query =
-        LopVec4ArrayRO(state.ProjectedBBDA).Values[index].xyz;
+        pc.Strategy == LOP_GPU_STRATEGY_LOP
+        ? LopLoadPosition(state.SourcePositionsBDA, state.SeedRowsBDA == uint64_t(0)
+            ? index : LopUIntArrayRO(state.SeedRowsBDA).Values[index])
+        : LopLoadPosition(state.ProjectedBBDA, index);
     ivec3 center;
     uint ignoredCell;
     if (!LopCellForPoint(query, center, ignoredCell))
@@ -28,6 +32,7 @@ void main()
     float weightSum = 0.0;
     uint contributions = 0u;
     const float h2 = pc.SupportRadius * pc.SupportRadius;
+    uint visited = 0u;
     for (int z = -1; z <= 1; ++z)
     for (int y = -1; y <= 1; ++y)
     for (int x = -1; x <= 1; ++x)
@@ -41,11 +46,16 @@ void main()
             LopUIntArrayRO(state.SourceCountsBDA).Values[cell];
         for (uint local = 0u; local < count; ++local)
         {
+            if (pc.Reserved1 != 0u && visited++ >= pc.Reserved1)
+            {
+                LopFail(state, LOP_GPU_ERROR_NEIGHBOR_LIMIT);
+                return;
+            }
             const uint neighbor =
                 LopUIntArrayRO(state.SourceIndicesBDA).Values[begin + local];
             if (neighbor >= pc.SourceCount) continue;
             const vec3 source =
-                LopVec4ArrayRO(state.SourcePositionsBDA).Values[neighbor].xyz;
+                LopLoadPosition(state.SourcePositionsBDA, neighbor);
             const vec3 delta = query - source;
             const float distanceSquared = dot(delta, delta);
             if (!(distanceSquared < h2)) continue;
@@ -74,8 +84,7 @@ void main()
         LopFail(state, LOP_GPU_ERROR_NON_FINITE);
         return;
     }
-    LopVec4Array(state.ProjectedABDA).Values[index] =
-        vec4(initialized, 1.0);
+    LopStorePosition(state.ProjectedABDA, index, initialized);
     LopSaturatingAtomicAdd(
         diagnostics, LOP_GPU_COUNTER_ATTRACTION, contributions);
     if (index == 0u) diagnostics.SourceGridBuilt = 1u;

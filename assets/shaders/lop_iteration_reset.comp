@@ -10,6 +10,7 @@ void main()
     LopGpuStateRef state = LopGpuStateRef(pc.StateBDA);
     LopGpuDiagnosticsRef diagnostics =
         LopGpuDiagnosticsRef(state.DiagnosticsBDA);
+    if (pc.Strategy == LOP_GPU_STRATEGY_LOP) diagnostics.Reserved0 = 0u;
     if (diagnostics.Active != 0u)
         diagnostics.MaxDisplacementBits = 0u;
 }

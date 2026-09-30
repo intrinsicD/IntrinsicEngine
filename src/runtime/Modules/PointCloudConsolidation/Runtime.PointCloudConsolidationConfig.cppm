@@ -72,6 +72,7 @@ export namespace Extrinsic::Runtime
         // seeded legacy subsample driven by `Seed`.
         PointSamplingConfig InitialSampling{.Method = PointSamplingMethod::Random};
 
+        std::uint32_t GpuPreviewInterval{5u};
         std::uint32_t GpuQueryBatchSize{4096u};
         std::uint32_t GpuRadiusCapacity{256u};
 

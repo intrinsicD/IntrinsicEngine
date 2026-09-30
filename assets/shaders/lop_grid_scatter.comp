@@ -37,7 +37,7 @@ void main()
     ivec3 coordinate;
     uint cell;
     if (!LopCellForPoint(
-            LopVec4ArrayRO(positionsBDA).Values[index].xyz,
+            LopLoadPosition(positionsBDA, index),
             coordinate,
             cell))
     {
@@ -54,4 +54,22 @@ void main()
         return;
     }
     LopUIntArray(indicesBDA).Values[destination] = index;
+    // Counts are complete before scatter. One invocation per occupied query cell
+    // measures the actual stencil, including both loops of the project shader.
+    if (pc.Strategy == LOP_GPU_STRATEGY_LOP && local == 0u)
+    {
+        uint candidates = 0u;
+        for (int z = -1; z <= 1; ++z)
+        for (int y = -1; y <= 1; ++y)
+        for (int x = -1; x <= 1; ++x)
+        {
+            const ivec3 neighbor = coordinate + ivec3(x, y, z);
+            if (!LopValidNeighborCell(neighbor)) continue;
+            const uint cellIndex = LopLinearCell(neighbor);
+            candidates += LopUIntArrayRO(state.SourceCountsBDA).Values[cellIndex];
+            if (!source)
+                candidates += LopUIntArrayRO(state.ProjectedCountsBDA).Values[cellIndex];
+        }
+        atomicMax(LopGpuDiagnosticsRef(state.DiagnosticsBDA).Reserved0, candidates);
+    }
 }

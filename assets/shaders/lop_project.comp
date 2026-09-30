@@ -8,17 +8,18 @@ void main()
 {
     if (pc.StateBDA == uint64_t(0)) return;
     LopGpuStateRef state = LopGpuStateRef(pc.StateBDA);
-    const uint index = gl_GlobalInvocationID.x;
+    if (pc.PageCount != 0u && gl_GlobalInvocationID.x >= pc.PageCount) return;
+    const uint index = pc.Reserved0 + gl_GlobalInvocationID.x;
     if (index >= pc.TargetCount) return;
     LopGpuDiagnosticsRef diagnostics =
         LopGpuDiagnosticsRef(state.DiagnosticsBDA);
     const uint64_t currentBDA =
         LopCurrentProjectedBDA(state, pc.Iteration);
     const uint64_t nextBDA = LopNextProjectedBDA(state, pc.Iteration);
-    const vec3 query = LopVec4ArrayRO(currentBDA).Values[index].xyz;
+    const vec3 query = LopLoadPosition(currentBDA, index);
     if (diagnostics.Active == 0u)
     {
-        LopVec4Array(nextBDA).Values[index] = vec4(query, 1.0);
+        LopStorePosition(nextBDA, index, query);
         return;
     }
 
@@ -39,6 +40,7 @@ void main()
     const float h2 = pc.SupportRadius * pc.SupportRadius;
     const float distanceFloor = max(pc.SupportRadius * 0.01, 1.17549435e-38);
 
+    uint visited = 0u;
     for (int z = -1; z <= 1; ++z)
     for (int y = -1; y <= 1; ++y)
     for (int x = -1; x <= 1; ++x)
@@ -53,11 +55,15 @@ void main()
             LopUIntArrayRO(state.SourceCountsBDA).Values[cell];
         for (uint local = 0u; local < sourceCount; ++local)
         {
+            if (pc.Reserved1 != 0u && visited++ >= pc.Reserved1)
+            {
+                LopFail(state, LOP_GPU_ERROR_NEIGHBOR_LIMIT);
+                return;
+            }
             const uint neighbor = LopUIntArrayRO(
                 state.SourceIndicesBDA).Values[sourceBegin + local];
             if (neighbor >= pc.SourceCount) continue;
-            const vec3 source = LopVec4ArrayRO(
-                state.SourcePositionsBDA).Values[neighbor].xyz;
+            const vec3 source = LopLoadPosition(state.SourcePositionsBDA, neighbor);
             const vec3 delta = query - source;
             const float distanceSquared = dot(delta, delta);
             if (!(distanceSquared < h2)) continue;
@@ -82,11 +88,16 @@ void main()
             LopUIntArrayRO(state.ProjectedCountsBDA).Values[cell];
         for (uint local = 0u; local < projectedCount; ++local)
         {
+            if (pc.Reserved1 != 0u && visited++ >= pc.Reserved1)
+            {
+                LopFail(state, LOP_GPU_ERROR_NEIGHBOR_LIMIT);
+                return;
+            }
             const uint neighbor = LopUIntArrayRO(
                 state.ProjectedIndicesBDA).Values[projectedBegin + local];
             if (neighbor >= pc.TargetCount || neighbor == index) continue;
             const vec3 neighborPoint =
-                LopVec4ArrayRO(currentBDA).Values[neighbor].xyz;
+                LopLoadPosition(currentBDA, neighbor);
             const vec3 delta = query - neighborPoint;
             const float distanceSquared = dot(delta, delta);
             if (!(distanceSquared < h2)) continue;
@@ -123,7 +134,7 @@ void main()
     }
 
     const float displacement = length(updated - query);
-    LopVec4Array(nextBDA).Values[index] = vec4(updated, 1.0);
+    LopStorePosition(nextBDA, index, updated);
     LopFloatArray(state.DisplacementsBDA).Values[index] = displacement;
     atomicMax(diagnostics.MaxDisplacementBits,
               floatBitsToUint(displacement));

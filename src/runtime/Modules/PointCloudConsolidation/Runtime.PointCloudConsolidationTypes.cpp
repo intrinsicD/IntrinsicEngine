@@ -173,6 +173,12 @@ namespace Extrinsic::Runtime
             : PointCloudConsolidationModuleStats{};
     }
 
+    PointCloudConsolidationGpuObservation PointCloudConsolidationService::GpuRun(
+        CommandCorrelationId correlation, PointCloudConsolidationGpuAction action)
+    {
+        return m_GpuRun ? m_GpuRun(correlation, action) : PointCloudConsolidationGpuObservation{};
+    }
+
     void PointCloudConsolidationService::Bind(
         CommandBus* commands,
         KernelEventBus* events,

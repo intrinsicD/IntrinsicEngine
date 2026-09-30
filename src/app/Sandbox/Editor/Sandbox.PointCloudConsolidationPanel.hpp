@@ -68,6 +68,8 @@ namespace Extrinsic::Sandbox::Editor
         std::string RequestedBackend{};
         std::string ActualBackend{};
         bool FellBackToCpu{false};
+        std::uint64_t GpuInputUploadBytes{}, GpuInputCacheHits{}, CpuStageUploadBytes{}, CpuStageReadbackBytes{};
+        std::uint32_t GpuSubmissions{}, GpuPreviews{};
         std::string BackendDiagnostic{};
         std::string SupportRadiusAnalysisStatus{};
         std::string SupportRadiusSource{};

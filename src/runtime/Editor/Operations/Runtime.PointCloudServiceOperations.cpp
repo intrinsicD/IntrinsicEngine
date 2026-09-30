@@ -96,6 +96,7 @@ namespace Extrinsic::Runtime
         if (!IsEditorPointCloudConsolidationAvailable(commands, consolidation))
             return result;
 
+        request.AttachmentActive = context.AttachmentActive;
         result.Correlation = consolidation->Run(std::move(request));
         if (!result.Correlation.IsValid())
         {

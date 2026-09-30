@@ -24,6 +24,7 @@ TEST(PointCloudConsolidationConfig, RoundTripsAndFallsBackPerField)
         .ConvergenceTolerance = 1.0e-3,
         .TargetPointCount = 31u,
         .Seed = 91u,
+        .GpuPreviewInterval = 3u,
         .WlopAnisotropic = true,
         .NormalSource = Runtime::PointCloudConsolidationNormalSource::
             RequireAuthored,
@@ -41,6 +42,7 @@ TEST(PointCloudConsolidationConfig, RoundTripsAndFallsBackPerField)
     const auto decoded =
         Runtime::GetPointCloudConsolidationConfig(document);
     ASSERT_TRUE(decoded.has_value());
+    EXPECT_EQ(decoded->GpuPreviewInterval, 3u);
     EXPECT_EQ(decoded->Backend, configured.Backend);
     EXPECT_EQ(decoded->Strategy, configured.Strategy);
     EXPECT_EQ(decoded->SupportRadiusMode, configured.SupportRadiusMode);
@@ -58,7 +60,7 @@ TEST(PointCloudConsolidationConfig, RoundTripsAndFallsBackPerField)
 
     const CoreConfig::EngineConfigSectionValidationResult validation =
         Runtime::ValidatePointCloudConsolidationConfigSection(
-            R"({"backend":"unknown","strategy":"clop","support_radius_mode":"unknown","support_radius":0,"max_support_neighbors":0,"max_predicted_contributions":0,"max_iterations":7,"normal_refinement_rounds":9,"ear_edge_sensitivity":6,"unknown_field":true})",
+            R"({"gpu_preview_interval":0,"backend":"unknown","strategy":"clop","support_radius_mode":"unknown","support_radius":0,"max_support_neighbors":0,"max_predicted_contributions":0,"max_iterations":7,"normal_refinement_rounds":9,"ear_edge_sensitivity":6,"unknown_field":true})",
             Runtime::SerializePointCloudConsolidationConfig(configured),
             "app.sections.sandbox.point_cloud_consolidation.payload");
     EXPECT_EQ(validation.State, CoreConfig::EngineConfigState::FallbackApplied);
@@ -79,6 +81,7 @@ TEST(PointCloudConsolidationConfig, RoundTripsAndFallsBackPerField)
     const auto fallback =
         Runtime::GetPointCloudConsolidationConfig(canonical);
     ASSERT_TRUE(fallback.has_value());
+    EXPECT_EQ(fallback->GpuPreviewInterval, 3u);
     EXPECT_EQ(fallback->Backend, configured.Backend);
     EXPECT_EQ(fallback->Strategy,
               Runtime::PointCloudConsolidationStrategy::Clop);

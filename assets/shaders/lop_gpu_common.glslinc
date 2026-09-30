@@ -26,6 +26,14 @@ layout(buffer_reference, scalar) buffer LopVec4Array
 {
     vec4 Values[];
 };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer LopVec3ArrayRO
+{
+    vec3 Values[];
+};
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LopVec3Array
+{
+    vec3 Values[];
+};
 layout(buffer_reference, scalar) readonly buffer LopFloatArrayRO
 {
     float Values[];
@@ -80,6 +88,7 @@ layout(buffer_reference, scalar) readonly buffer LopGpuStateRef
     uint64_t ProjectedCursorsBDA;
     uint64_t ProjectedIndicesBDA;
     uint64_t DiagnosticsBDA;
+    uint64_t SeedRowsBDA;
 };
 
 layout(push_constant, scalar) uniform LopGpuPush
@@ -103,7 +112,23 @@ layout(push_constant, scalar) uniform LopGpuPush
     float SupportRadius;
     float RepulsionWeight;
     float ConvergenceTolerance;
+    uint PageCount;
+    uint Reserved1;
 } pc;
+
+// LOP uses canonical float3 rows; the other strategies retain their packed workspace.
+vec3 LopLoadPosition(uint64_t address, uint row)
+{
+    if (pc.Strategy == LOP_GPU_STRATEGY_LOP)
+        return LopVec3ArrayRO(address).Values[row];
+    return LopVec4ArrayRO(address).Values[row].xyz;
+}
+void LopStorePosition(uint64_t address, uint row, vec3 value)
+{
+    if (pc.Strategy == LOP_GPU_STRATEGY_LOP)
+        LopVec3Array(address).Values[row] = value;
+    else LopVec4Array(address).Values[row] = vec4(value, 1.0);
+}
 
 bool LopFinite(const vec3 value)
 {

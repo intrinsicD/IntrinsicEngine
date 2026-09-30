@@ -39,7 +39,7 @@ void main()
         return;
     }
 
-    const vec3 query = LopVec4ArrayRO(positionsBDA).Values[index].xyz;
+    const vec3 query = LopLoadPosition(positionsBDA, index);
     ivec3 center;
     uint ignoredCell;
     if (!LopCellForPoint(query, center, ignoredCell))
@@ -66,7 +66,7 @@ void main()
                 LopUIntArrayRO(indicesBDA).Values[begin + local];
             if (neighbor >= pointCount || neighbor == index) continue;
             const vec3 delta = query -
-                LopVec4ArrayRO(positionsBDA).Values[neighbor].xyz;
+                LopLoadPosition(positionsBDA, neighbor);
             const float distanceSquared = dot(delta, delta);
             if (!(distanceSquared < h2)) continue;
             density += LopTheta(distanceSquared);

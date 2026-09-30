@@ -85,6 +85,8 @@ export namespace Extrinsic::Runtime
         std::uint32_t StableEntityId{0u};
         PointCloudConsolidationPropertyRefs Properties{};
         PointCloudConsolidationConfig Config{};
+        bool AutoAccept{true};
+        std::function<bool()> AttachmentActive{};
     };
 
     struct PointCloudConsolidationResult
@@ -103,6 +105,8 @@ export namespace Extrinsic::Runtime
         bool FellBackToCpu{false};
         bool ReusedSpatialIndex{false};
         std::uint32_t GpuQueryBatches{}, SpatialWorkspaceBuilds{};
+        std::uint64_t GpuInputUploadBytes{}, GpuInputCacheHits{}, CpuStageUploadBytes{}, CpuStageReadbackBytes{};
+        std::uint32_t GpuSubmissions{}, GpuPreviews{};
         std::string BackendDiagnostic{};
         std::string ImplementationId{"cpu_reference"};
         std::string StrategyToken{"wlop"};
@@ -141,6 +145,16 @@ export namespace Extrinsic::Runtime
         {
             return Status == PointCloudConsolidationRunStatus::Applied;
         }
+    };
+
+    enum class PointCloudConsolidationGpuAction : std::uint8_t { Observe, Stop, Accept, Discard };
+    struct PointCloudConsolidationGpuObservation
+    {
+        CommandCorrelationId Correlation{};
+        bool Running{}, ReadyToAccept{}, Accepting{}, CanAccept{};
+        std::string Message{};
+        std::uint32_t Iterations{}, Submissions{}, Previews{};
+        std::uint64_t InputUploadBytes{}, InputCacheHits{}, CpuStageUploadBytes{}, CpuStageReadbackBytes{};
     };
 
     struct PointCloudConsolidationModuleStats
@@ -183,6 +197,8 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] KernelEventSubscription SubscribeCompleted(
             std::function<void(const PointCloudConsolidationResult&)> listener);
         void Unsubscribe(KernelEventSubscription subscription);
+        [[nodiscard]] PointCloudConsolidationGpuObservation GpuRun(
+            CommandCorrelationId correlation, PointCloudConsolidationGpuAction action = PointCloudConsolidationGpuAction::Observe);
         [[nodiscard]] PointCloudConsolidationModuleStats Stats() const noexcept;
 
     private:
@@ -195,6 +211,7 @@ export namespace Extrinsic::Runtime
             std::function<PointCloudConsolidationAvailability(
                 WorldHandle, const PointCloudConsolidationRequest&)> prepare = {}) noexcept;
 
+        std::function<PointCloudConsolidationGpuObservation(CommandCorrelationId, PointCloudConsolidationGpuAction)> m_GpuRun{};
         std::function<PointCloudConsolidationAvailability(
             WorldHandle, const PointCloudConsolidationRequest&)> m_PrepareAvailability{};
         CommandBus* m_Commands{};

@@ -19,7 +19,7 @@ contracts: [geometry.property-coherence, geometry.element-domain-sources, method
 - k-means: a labels ring (integer, with a float presentation ring for the colormap); Accept through the scalar transaction.
 - FPS: positions -> double on the device from the canonical slot; a completion-only submit replaces the interim double copy; order / mask published through the existing publication (no preview).
 - Keypoints: index views from the residency; score / mask rings; Accept through the scalar transaction.
-- ADR 0030 decisions 8-9: the kernels record from `GpuPropertyView` inputs into ring outputs, never from CPU spans; `RequestedBackend` / `ActualBackend`, fallback reasons and the residency IO counters stay uniform. The CPU reference stays canonical; the GPU backend reports its identity and parity delta.
+- ADR 0030 decisions 8-9: the kernels record from `GpuPropertyView` inputs into ring outputs, never from CPU spans; `RequestedBackend` / `ActualBackend`, fallback reasons and the residency IO counters stay uniform. The CPU reference stays canonical; the GPU backend reports its identity, and Vulkan tests record its parity delta.
 
 ## Engine integration
 
@@ -28,7 +28,7 @@ contracts: [geometry.property-coherence, geometry.element-domain-sources, method
 | Least-structured input | Unchanged per method: a count-matched vec3 position property on any point domain. |
 | Compatible entity sources | Mesh vertices, graph nodes, point clouds. |
 | RuntimeModule | Existing modules: `PointCloudConsolidation` (LOP), clustering (k-means), `PointSamplingOperations` (FPS), `PointAnalysisOperations` (keypoints). |
-| Config/agent | Unchanged backend enums; IO counters in the results and agent output. |
+| Config/agent | Unchanged backend enums; LOP `gpu_preview_interval` in the validated config; IO counters in results and `run_point_cloud_consolidation` agent output. |
 | UI | Each panel: Accept / Discard, observation state, IO counters. |
 | Publication | Same cardinality per method. GPU preview: LOP yes (positions), k-means yes (label colormap), keypoints yes (score), FPS no; commit via the positions run API (LOP) or the scalar transaction (labels, scores, masks); FPS via its existing publication. |
 | End-to-end tests | Contract tests on the mock device per method; one gpu;vulkan parity + IO smoke per method. |
@@ -51,11 +51,6 @@ Operational or parity verdict is recorded for the changed path.
 
 The other rows remain under this task's split-out provision:
 
-- **LOP:** replace packed private input uploads with stride-12 resident views;
-  page the producer's iteration loop across completions; write/publish the
-  positions run ring every configured preview interval; connect Stop,
-  Accept/Discard and batch auto-accept to the existing positions API; add
-  method contract tests and the preview/discard/parity/IO Vulkan smoke.
 - **k-means:** replace private SoA input uploads with resident inputs and
   device conversion; page the execution plan across completions; add typed
   integer label and float presentation rings; extend/reuse scalar publication
@@ -75,8 +70,10 @@ was introduced. FPS has no preview or output-ring `BindRevision` by design.
 
 ## Verification
 ```bash
-ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
-DISPLAY=:7 ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu|vulkan' --timeout 900
+# Focused CPU gate (AGENTS.md §7): build the owning test executables, run the touched suites.
+ctest --test-dir build/ci --output-on-failure --timeout 60 -R '^(<touched suites>)\.'
+# Per-method Vulkan parity/IO smoke on the opt-in display host.
+DISPLAY=:7 ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu|vulkan' --timeout 900 -R '<method smoke suite>'
 ```
 - 2026-09-30 (slice 1 committed: FPS). FPS reads canonical resident positions/weights,
   gathers and converts on the device, runs bounded completion-only intermediate submissions
@@ -88,3 +85,19 @@ DISPLAY=:7 ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu|vulkan' 
   Reviewed by Claude Opus 5.5: no P1/P2. Gates: CPU 5410/5410; GPU suite green except the
   environmental `VulkanShutdownLsanContract` (RUNTIME290 FPS smoke passes). Remaining in
   this task: LOP, k-means and keypoints (see the items above).
+
+- 2026-09-30 (slice 2: LOP). Stride-12 kernels read the canonical resident positions;
+  pages are sized from the measured 27-cell candidate maximum (2^18 pairs per page,
+  2^24 per submission, immediate completions) so an iteration needs a few submissions and
+  degenerate clouds stay bounded; the host reads the finalize diagnostics and stops on
+  convergence like the CPU reference. The positions run ring previews every
+  `gpu_preview_interval` (default 5) iterations; Stop, stale-aware Accept, Discard and
+  batch/agent auto-accept use the RUNTIME-293 positions run API. Named-output/downsampling
+  keeps its terminal publication; WLOP/CLOP/EAR are unchanged (RUNTIME-303/304).
+  Gates: all 9 `PointCloudConsolidationGpuParity` Vulkan tests pass on the RTX 3050
+  (Xephyr). LOP vs CPU reference: resident Linf 6.1e-6 / RMS 1.7e-6; multi-page uniform
+  Linf 4.3e-7, identical points 0; frozen fixture Linf 3.1e-4 / RMS 3.2e-5 with identical
+  iteration counts (atomic grid-scatter order; tolerance Linf 2e-3 / RMS 5e-4). Repeat run
+  uploads 0 input bytes. Focused CPU 111/111; layering strict clean. Reviewed by Codex
+  (read-only) and Claude Opus 5.5; the paging P1 and all P2s were fixed. Remaining:
+  k-means and keypoints.

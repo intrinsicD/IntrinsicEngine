@@ -1,3 +1,4 @@
+#include "Modules/PointCloudConsolidation/Runtime.LopPaging.TestSupport.hpp"
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -17,9 +18,20 @@
 #include <glm/glm.hpp>
 
 #include "RuntimeTestModule.hpp"
+#include "MockRHI.hpp"
+#include "SandboxEditorJobHarness.hpp"
+#include <cstring>
 
 import Extrinsic.Runtime.Module;
+import Extrinsic.Runtime.AgentOperations;
+import Extrinsic.Runtime.EditorWorkspaceAttachment;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.ServiceRegistry;
+import Extrinsic.Graphics.Renderer;
+import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Tasks;
 import Extrinsic.ECS.Component.DirtyTags;
@@ -37,6 +49,7 @@ import Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldRegistry;
+import Extrinsic.Runtime.WorldHandle;
 import Geometry.PointCloud.Consolidation;
 import Geometry.Properties;
 
@@ -1940,4 +1953,639 @@ TEST_F(ConsolidationReadiness, ReplacingActivePreviewDiscardsOnlySupersededCheck
     Drain();
     EXPECT_TRUE(Prepare().Available);
     EXPECT_EQ(Service->Stats().ReadinessPropertyScans, 2u);
+}
+
+namespace
+{
+    class ResidentLop : public ::testing::Test
+    {
+    protected:
+        Extrinsic::Tests::MockDevice Device;
+        Extrinsic::Tests::EditorJobHarness Jobs;
+        std::unique_ptr<Extrinsic::Graphics::IRenderer> Renderer{Extrinsic::Graphics::CreateRenderer()};
+        Runtime::WorldRegistry Worlds;
+        Runtime::CommandBus Commands;
+        Runtime::KernelEventBus Events;
+        Runtime::ServiceRegistry Services;
+        Runtime::SpatialIndexCache Cache;
+        Runtime::PointCloudConsolidationModule Module;
+        Runtime::EditorCommandHistory History;
+        Runtime::WorldHandle World;
+        ECS::EntityHandle Entity;
+        Runtime::PointCloudConsolidationService* Service{};
+        Runtime::PointCloudConsolidationRequest Request;
+        std::vector<Runtime::PointCloudConsolidationResult> Results;
+        std::vector<glm::vec3> Before, Accepted;
+        std::optional<Extrinsic::RHI::ReadbackSink> DiagnosticSink;
+        Runtime::CommandCorrelationId Correlation;
+        bool HoldCompletion{}, EarlyConvergence{};
+        std::vector<std::function<void()>> ComputeCompletions;
+        void Defer(Extrinsic::RHI::ReadbackSink sink, std::span<const std::byte> bytes)
+        {
+            ComputeCompletions.push_back([sink = std::move(sink), data = std::vector<std::byte>(bytes.begin(), bytes.end())]() mutable { sink.Deliver(data); });
+        }
+        std::optional<Extrinsic::RHI::ReadbackSink> PendingCompletion;
+        Runtime::KernelEventSubscription Subscription;
+        auto& Scene() { return *Worlds.Get(World); }
+        auto& Properties() { return Scene().Raw().get<GS::Vertices>(Entity).Properties; }
+        void SetUp() override
+        {
+            World = Worlds.CreateWorld("resident-lop");
+            Entity = Scene().Create();
+            Before = NoisyPlane();
+            auto& vertices = Scene().Raw().emplace<GS::Vertices>(Entity);
+            vertices.Properties.Resize(Before.size());
+            vertices.Properties.GetOrAdd<glm::vec3>("v:position").Vector() = Before;
+            Accepted = Before;
+            for (auto& p : Accepted) p.z += 0.01f;
+            Device.TransferQueue.AcceptBufferUploads = true;
+            Renderer->Initialize(Device);
+            Services.BeginRegistration();
+            ASSERT_TRUE(Services.Provide<Extrinsic::RHI::IDevice>(Device, "test"));
+            ASSERT_TRUE(Services.Provide<Extrinsic::Graphics::IRenderer>(*Renderer, "test"));
+            ASSERT_TRUE(Services.Provide<Runtime::EditorCommandHistory>(History, "test"));
+            Runtime::EngineSetup setup{Commands, Events, Jobs.Jobs(), Worlds, Services, [](Runtime::FramePhase, Runtime::RuntimeFrameHook) {}};
+            ASSERT_TRUE(Cache.OnRegister(setup));
+            ASSERT_TRUE(Module.OnRegister(setup));
+            Services.BeginResolution();
+            ASSERT_TRUE(Cache.OnResolve(setup));
+            ASSERT_TRUE(Module.OnResolve(setup));
+            Services.Lock();
+            Service = Services.Find<Runtime::PointCloudConsolidationService>();
+            ASSERT_NE(Service, nullptr);
+            Subscription = Service->SubscribeCompleted([this](const auto& result) { Results.push_back(result); });
+            Request.StableEntityId = Runtime::SelectionController::ToStableEntityId(Entity);
+            Request.Config = SameCardinalityConfig();
+            Request.Config.Strategy = Runtime::PointCloudConsolidationStrategy::Lop;
+            Request.Config.Backend = Runtime::PointCloudConsolidationBackend::VulkanCompute;
+            Request.Config.MaxIterations = 4u;
+            Request.Config.GpuPreviewInterval = 2u;
+            Request.Config.ConvergenceTolerance = 0.0;
+            Request.AutoAccept = false;
+            Request.Properties.InputNormals.reset();
+            Request.Properties.OutputNormals.reset();
+            Device.TransferQueue.BufferDownload = [this](auto, auto bytes, auto, auto sink) {
+                EXPECT_EQ(bytes, 64u);
+                DiagnosticSink = std::move(sink);
+                return Extrinsic::RHI::ReadbackToken{1u};
+            };
+            Device.TransferQueue.BufferUploads.clear();
+            Device.BufferWrites.clear();
+            Device.ComputeReadback = [this](auto record, auto bytes, auto sink) {
+                EXPECT_TRUE(record(Device.CommandContext).IsValid());
+                if (HoldCompletion)
+                {
+                    PendingCompletion = std::move(sink);
+                    return Extrinsic::RHI::ReadbackToken{2u};
+                }
+                if (bytes == 0u) Defer(std::move(sink), {});
+                else if (bytes == 64u)
+                {
+                    const auto pipeline = std::find(Device.CreatedPipelineHandles.begin(),
+                        Device.CreatedPipelineHandles.end(), Device.CommandContext.LastBoundPipeline);
+                    EXPECT_NE(pipeline, Device.CreatedPipelineHandles.end());
+                    const auto& path = Device.CreatedPipelineDescs[pipeline - Device.CreatedPipelineHandles.begin()].ComputeShaderPath;
+                    if (path.find("lop_final_reduce") != std::string::npos)
+                        DiagnosticSink = std::move(sink);
+                    else
+                    {
+                        std::array<std::uint32_t, 16> data{};
+                        data[3] = 1u;
+                        data[11] = 2u * Before.size();
+                        if (path.find("lop_iteration_finalize") != std::string::npos)
+                        {
+                            data[1] = Service->GpuRun(Correlation).Iterations + 1u;
+                            data[9] = 1u;
+                            data[10] = data[1];
+                            data[2] = EarlyConvergence;
+                            if (EarlyConvergence || data[1] == Request.Config.MaxIterations)
+                            {
+                                data[3] = 0u;
+                                data[0] = EarlyConvergence ? 0u : 6u;
+                            }
+                        }
+                        Defer(std::move(sink), std::as_bytes(std::span(data)));
+                    }
+                }
+                else
+                {
+                    EXPECT_EQ(bytes, Accepted.size() * sizeof(glm::vec3));
+                    Defer(std::move(sink), std::as_bytes(std::span(Accepted)));
+                }
+                return Extrinsic::RHI::ReadbackToken{2u};
+            };
+        }
+        void TearDown() override
+        {
+            if (Service)
+            {
+                (void)Service->GpuRun(Correlation, Runtime::PointCloudConsolidationGpuAction::Discard);
+                Service->Unsubscribe(Subscription);
+            }
+            Jobs.Jobs().CancelAndDrain();
+            (void)Jobs.Jobs().ShutdownGpuQueueParticipants([this] { Device.WaitIdle(); });
+            Runtime::RuntimeModuleShutdownContext shutdown{Commands, Events, Jobs.Jobs(), Worlds, Services};
+            Module.OnShutdown(shutdown);
+            Cache.OnShutdown(shutdown);
+            Services.Reset();
+            Renderer->Shutdown();
+        }
+        void Tick(bool advanceFrame = true)
+        {
+            auto completions = std::exchange(ComputeCompletions, {});
+            for (auto& complete : completions) complete();
+            Commands.Drain(Scene(), {.Events = &Events, .Jobs = &Jobs.Jobs(), .Worlds = &Worlds});
+            (void)Jobs.Jobs().DrainCompletions(Events);
+            (void)Events.Pump();
+            Jobs.Jobs().RecordGpuQueueFrameCommands(Device.CommandContext);
+            if (advanceFrame) ++Device.GlobalFrameNumber;
+            (void)Jobs.Jobs().DrainGpuQueueCompletedTransfers();
+        }
+        template<class Predicate> bool Until(Predicate predicate)
+        {
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+            while (!predicate() && std::chrono::steady_clock::now() < deadline)
+            { Tick(); std::this_thread::yield(); }
+            return predicate();
+        }
+        auto Observation() { return Service->GpuRun(Correlation); }
+        void Start() { Correlation = Service->Run(Request); }
+        void CompleteDiagnostics()
+        {
+            ASSERT_TRUE(DiagnosticSink);
+            std::array<std::uint32_t, 16> bytes{};
+            bytes[0] = EarlyConvergence ? 0u : 6u;
+            bytes[2] = EarlyConvergence;
+            bytes[1] = Observation().Iterations;
+            bytes[9] = 1u;
+            bytes[10] = bytes[1];
+            DiagnosticSink->Deliver(std::as_bytes(std::span(bytes)));
+            DiagnosticSink.reset();
+        }
+    };
+}
+
+TEST_F(ResidentLop, ResidentInputCompletionPagesPreviewCadenceAndDiscardReuse)
+{
+    HoldCompletion = true;
+    Start();
+    ASSERT_TRUE(Until([&] { return Observation().Submissions > 0u; }));
+    EXPECT_EQ(Observation().InputUploadBytes, Before.size() * 12u);
+    const auto submissions = Observation().Submissions;
+    for (unsigned i = 0; i < 8u; ++i) Tick(false);
+    EXPECT_EQ(Observation().Submissions, submissions) << "No completion means no next page";
+    ASSERT_TRUE(PendingCompletion);
+    std::array<std::uint32_t, 16> grid{};
+    grid[3] = 1u;
+    grid[11] = 2u * Before.size();
+    HoldCompletion = false;
+    PendingCompletion->Deliver(std::as_bytes(std::span(grid)));
+    PendingCompletion.reset();
+    ASSERT_TRUE(Until([&] { return DiagnosticSink.has_value(); }));
+    EXPECT_EQ(Observation().Previews, 2u);
+    EXPECT_EQ(std::count_if(Device.TransferQueue.BufferUploads.begin(), Device.TransferQueue.BufferUploads.end(),
+        [&](const auto& upload) { return upload.Data.size() == Before.size() * 12u; }), 1);
+    EXPECT_EQ(std::count_if(Device.TransferQueue.BufferUploads.begin(), Device.TransferQueue.BufferUploads.end(),
+        [&](const auto& upload) { return upload.Data.size() == Before.size() * 16u; }), 0)
+        << "LOP must not upload privately packed positions";
+    EXPECT_GT(Observation().Submissions, Request.Config.MaxIterations);
+    EXPECT_EQ(std::as_const(Properties()).Get<glm::vec3>("v:position").Vector(), Before);
+    CompleteDiagnostics();
+    ASSERT_TRUE(Until([&] { return Observation().ReadyToAccept; }));
+    EXPECT_TRUE(Observation().CanAccept);
+    EXPECT_TRUE(Results.empty());
+    (void)Service->GpuRun(Correlation, Runtime::PointCloudConsolidationGpuAction::Discard);
+    ASSERT_TRUE(Until([&] { return Results.size() == 1u; }));
+    EXPECT_EQ(Results.back().Status, Runtime::PointCloudConsolidationRunStatus::Cancelled);
+    Start();
+    ASSERT_TRUE(Until([&] { return Observation().Submissions > 0u; }));
+    EXPECT_EQ(Observation().InputUploadBytes, 0u);
+    EXPECT_EQ(Observation().InputCacheHits, 1u);
+}
+
+TEST_F(ResidentLop, PreviewCopiesOnlyAtIntervalAndTerminalBoundaries)
+{
+    Request.Config.MaxIterations = 10u;
+    Request.Config.GpuPreviewInterval = 5u;
+    Start();
+    ASSERT_TRUE(Until([&] { return DiagnosticSink.has_value(); }));
+    EXPECT_EQ(Observation().Previews, 2u);
+    // The first two copies seed the private ping-pong buffers. Every remaining
+    // position copy must target a preview slot, exactly at iterations 5 and 10.
+    const auto& copies = Device.CommandContext.CopyBufferRecords;
+    ASSERT_EQ(copies.size(), 4u);
+    EXPECT_EQ(copies[0].Src, copies[1].Src);
+    for (std::size_t i = 2u; i < copies.size(); ++i)
+    {
+        EXPECT_TRUE(copies[i].Src == copies[0].Dst || copies[i].Src == copies[1].Dst);
+        EXPECT_NE(copies[i].Dst, copies[0].Dst);
+        EXPECT_NE(copies[i].Dst, copies[1].Dst);
+    }
+}
+
+TEST_F(ResidentLop, BoundaryPublishesCopiedBackOnlyAfterCompletion)
+{
+    auto* residency = Cache.PropertyResidency();
+    ASSERT_NE(residency, nullptr);
+    const auto key = Runtime::MakeGpuPropertyKey(World, Entity, Request.Properties.OutputPositions);
+    Extrinsic::RHI::BufferHandle copiedBack{}, copiedSource{}, input{};
+    const auto submit = Device.ComputeReadback;
+    Device.ComputeReadback = [&](auto record, auto bytes, auto sink) {
+        const bool boundary = bytes == 0u && Observation().Previews == 0u &&
+            Observation().Iterations == Request.Config.GpuPreviewInterval;
+        HoldCompletion = boundary;
+        const auto token = submit([&](auto& commands) {
+            const auto before = Device.CommandContext.CopyBufferRecords.size();
+            const auto output = record(commands);
+            if (boundary)
+            {
+                const auto& copies = Device.CommandContext.CopyBufferRecords;
+                EXPECT_EQ(copies.size(), before + 1u) << "Boundary must copy into the back before Publish";
+                if (copies.size() == before + 1u && before >= 2u)
+                {
+                    input = copies[0].Src;
+                    copiedBack = copies.back().Dst;
+                    copiedSource = copies.back().Src;
+                    // Upload seeds B, then A; iteration 2 completes in A.
+                    EXPECT_EQ(copiedSource, copies[1].Dst);
+                    EXPECT_NE(copiedBack, input);
+                    EXPECT_NE(copiedBack, copies[0].Dst);
+                    EXPECT_NE(copiedBack, copies[1].Dst);
+                }
+            }
+            return output;
+        }, bytes, std::move(sink));
+        HoldCompletion = false;
+        return token;
+    };
+    Start();
+    ASSERT_TRUE(Until([&] { return PendingCompletion.has_value(); }));
+    ASSERT_TRUE(copiedBack.IsValid());
+    ASSERT_TRUE(residency->Front(key));
+    EXPECT_EQ(Observation().Iterations, Request.Config.GpuPreviewInterval);
+    EXPECT_EQ(Observation().Previews, 0u);
+    EXPECT_EQ(residency->Front(key)->Buffer, input)
+        << "Iteration count and a ring alone do not prove preview publication";
+    for (unsigned i = 0; i < 4u; ++i) Tick();
+    EXPECT_EQ(Observation().Previews, 0u);
+    EXPECT_EQ(residency->Front(key)->Buffer, input);
+    PendingCompletion->Deliver({});
+    PendingCompletion.reset();
+    ASSERT_TRUE(Until([&] { return Observation().Previews == 1u; }));
+    ASSERT_TRUE(residency->Front(key));
+    EXPECT_EQ(residency->Front(key)->Buffer, copiedBack);
+    EXPECT_NE(residency->Front(key)->Publication, 0u);
+    EXPECT_EQ(Observation().Iterations, Request.Config.GpuPreviewInterval);
+}
+
+TEST_F(ResidentLop, BatchesPagesWithinCandidateBudgetAndCoversReductionTail)
+{
+    struct RestoreLimits
+    {
+        Runtime::LopPagingLimits Saved{Runtime::LopPagingForTesting};
+        ~RestoreLimits() { Runtime::LopPagingForTesting = Saved; }
+    } restore;
+    Runtime::LopPagingForTesting = {.PagePairs = 150u, .SubmissionPairs = 512u, .ReduceRows = 7u};
+    Request.Config.MaxIterations = 2u;
+    std::vector<std::uint32_t> initialized, projected, reduced;
+    bool batched = false;
+    const auto submit = Device.ComputeReadback;
+    Device.ComputeReadback = [&](auto record, auto bytes, auto sink) {
+        return submit([&](auto& commands) {
+            const auto begin = Device.CommandContext.PushConstantPayloads.size();
+            const auto output = record(commands);
+            const auto pipeline = std::find(Device.CreatedPipelineHandles.begin(),
+                Device.CreatedPipelineHandles.end(), Device.CommandContext.LastBoundPipeline);
+            const auto& path = Device.CreatedPipelineDescs[pipeline - Device.CreatedPipelineHandles.begin()].ComputeShaderPath;
+            const bool initialize = path.find("lop_initialize") != std::string::npos;
+            const bool project = path.find("lop_project") != std::string::npos;
+            const bool reduce = path.find("lop_final_reduce") != std::string::npos;
+            if (initialize || project || reduce)
+            {
+                std::uint32_t rows = 0u;
+                const auto& pushes = Device.CommandContext.PushConstantPayloads;
+                if (!reduce && pushes.size() - begin > 1u) batched = true;
+                for (auto i = begin; i < pushes.size(); ++i)
+                {
+                    EXPECT_EQ(pushes[i].size(), 88u);
+                    std::uint32_t first{}, count{};
+                    std::memcpy(&first, pushes[i].data() + 52u, sizeof(first));
+                    std::memcpy(&count, pushes[i].data() + 80u, sizeof(count));
+                    EXPECT_LE(count, reduce ? 7u : 3u);
+                    auto& covered = initialize ? initialized : project ? projected : reduced;
+                    for (auto row = first; row < first + count; ++row) covered.push_back(row);
+                    rows += count;
+                }
+                if (!reduce) EXPECT_LE(rows * 50u, 512u);
+            }
+            return output;
+        }, bytes, std::move(sink));
+    };
+    Start();
+    ASSERT_TRUE(Until([&] { return DiagnosticSink.has_value(); }));
+    EXPECT_TRUE(batched);
+    ASSERT_EQ(initialized.size(), Before.size());
+    ASSERT_EQ(projected.size(), Before.size() * 2u);
+    ASSERT_EQ(reduced.size(), Before.size());
+    for (std::uint32_t i = 0u; i < Before.size(); ++i)
+    {
+        EXPECT_EQ(initialized[i], i);
+        EXPECT_EQ(projected[i], i);
+        EXPECT_EQ(projected[i + Before.size()], i);
+        EXPECT_EQ(reduced[i], i);
+    }
+    CompleteDiagnostics();
+    ASSERT_TRUE(Until([&] { return Observation().CanAccept; }));
+}
+
+TEST_F(ResidentLop, TwoIterationFixtureRequiresValidNormalRefinementBudget)
+{
+    Request.Config.SupportRadius = 0.5;
+    Request.Config.TargetPointCount = 0u;
+    Request.Config.Seed = 42u;
+    Request.Config.MaxIterations = 2u;
+    Request.Config.NormalRefinementRounds = 3u;
+    Start();
+    ASSERT_TRUE(Until([&] { return Results.size() == 1u; }));
+    EXPECT_FALSE(Results.back().Succeeded());
+    EXPECT_NE(Results.back().Message.find("outside the validated runtime control surface"), std::string::npos);
+    EXPECT_EQ(Observation().Submissions, 0u);
+
+    Request.Config.NormalRefinementRounds = 1u;
+    Start();
+    ASSERT_TRUE(Until([&] { return DiagnosticSink.has_value(); }));
+    CompleteDiagnostics();
+    ASSERT_TRUE(Until([&] { return Observation().CanAccept; }));
+    EXPECT_EQ(Observation().Iterations, 2u);
+}
+
+TEST_F(ResidentLop, SynchronousAcceptRejectionCompletesExactlyOnce)
+{
+    Start();
+    ASSERT_TRUE(Until([&] { return DiagnosticSink.has_value(); }));
+    CompleteDiagnostics();
+    ASSERT_TRUE(Until([&] { return Observation().CanAccept; }));
+    // Removing the front preserves CPU currency but makes Accept call its
+    // rejection sink synchronously, then read the retained run result.
+    auto* residency = Cache.PropertyResidency();
+    ASSERT_NE(residency, nullptr);
+    residency->Discard(Runtime::MakeGpuPropertyKey(World, Entity, Request.Properties.OutputPositions));
+    (void)Service->GpuRun(Correlation, Runtime::PointCloudConsolidationGpuAction::Accept);
+    ASSERT_TRUE(Until([&] { return Results.size() == 1u; }));
+    EXPECT_EQ(Results.back().Status, Runtime::PointCloudConsolidationRunStatus::GeometryProcessingFailed);
+    EXPECT_EQ(std::as_const(Properties()).Get<glm::vec3>("v:position").Vector(), Before);
+    for (unsigned i = 0u; i < 10u; ++i) Tick();
+    EXPECT_EQ(Results.size(), 1u);
+}
+
+TEST_F(ResidentLop, AcceptPublishesExactlyOnceAndStaleOnlyAllowsDiscard)
+{
+    Start();
+    ASSERT_TRUE(Until([&] { return DiagnosticSink.has_value(); }));
+    CompleteDiagnostics();
+    ASSERT_TRUE(Until([&] { return Observation().CanAccept; }));
+    (void)Service->GpuRun(Correlation, Runtime::PointCloudConsolidationGpuAction::Accept);
+    ASSERT_TRUE(Until([&] { return Results.size() == 1u; }));
+    EXPECT_TRUE(Results.back().Succeeded()) << Results.back().Message;
+    EXPECT_EQ(std::as_const(Properties()).Get<glm::vec3>("v:position").Vector(), Accepted);
+    for (unsigned i = 0; i < 10u; ++i) Tick();
+    EXPECT_EQ(Results.size(), 1u);
+    Start();
+    ASSERT_TRUE(Until([&] { return DiagnosticSink.has_value(); }));
+    EXPECT_EQ(Observation().InputUploadBytes, 0u) << "Accept bound the canonical revision";
+    CompleteDiagnostics();
+    ASSERT_TRUE(Until([&] { return Observation().ReadyToAccept; }));
+    Properties().Get<glm::vec3>("v:position")[0].x += 0.25f;
+    EXPECT_FALSE(Observation().CanAccept);
+    EXPECT_FALSE(Observation().Message.empty());
+    (void)Service->GpuRun(Correlation, Runtime::PointCloudConsolidationGpuAction::Accept);
+    EXPECT_EQ(Results.size(), 1u);
+}
+
+TEST_F(ResidentLop, BatchAutoAcceptAndDetachDiscard)
+{
+    Request.AutoAccept = true;
+    Start();
+    ASSERT_TRUE(Until([&] { return DiagnosticSink.has_value(); }));
+    CompleteDiagnostics();
+    ASSERT_TRUE(Until([&] { return Results.size() == 1u; }));
+    EXPECT_TRUE(Results.back().Succeeded());
+    bool attached = true;
+    Request.AttachmentActive = [&] { return attached; };
+    Start();
+    ASSERT_TRUE(Until([&] { return Observation().Submissions > 0u; }));
+    attached = false;
+    ASSERT_TRUE(Until([&] { return Results.size() == 2u; }));
+    EXPECT_EQ(Results.back().Status, Runtime::PointCloudConsolidationRunStatus::Cancelled);
+}
+
+TEST_F(ResidentLop, StopPublishesATerminalFrontBetweenPreviewIntervals)
+{
+    Request.Config.MaxIterations = 9u;
+    Request.Config.GpuPreviewInterval = 4u;
+    Start();
+    ASSERT_TRUE(Until([&] { return Observation().Iterations >= 1u; }));
+    (void)Service->GpuRun(Correlation, Runtime::PointCloudConsolidationGpuAction::Stop);
+    ASSERT_TRUE(Until([&] { return DiagnosticSink.has_value(); }));
+    EXPECT_LT(Observation().Iterations, Request.Config.MaxIterations);
+    EXPECT_GE(Observation().Previews, 1u);
+    CompleteDiagnostics();
+    ASSERT_TRUE(Until([&] { return Observation().CanAccept; }));
+    EXPECT_EQ(std::as_const(Properties()).Get<glm::vec3>("v:position").Vector(), Before);
+    (void)Service->GpuRun(Correlation, Runtime::PointCloudConsolidationGpuAction::Accept);
+    ASSERT_TRUE(Until([&] { return Results.size() == 1u; }));
+    EXPECT_EQ(Results.back().GeometryStatus, Geometry::PointCloud::Consolidation::Status::NotConverged);
+    EXPECT_NE(Results.back().Error, Extrinsic::Core::ErrorCode::Success);
+    EXPECT_FALSE(Results.back().Converged);
+}
+
+TEST_F(ResidentLop, ConvergencePublishesTerminalFrontBeforePreviewInterval)
+{
+    EarlyConvergence = true;
+    Start();
+    ASSERT_TRUE(Until([&] { return DiagnosticSink.has_value(); }));
+    EXPECT_EQ(Observation().Iterations, 1u);
+    EXPECT_EQ(Observation().Previews, 1u);
+    CompleteDiagnostics();
+    ASSERT_TRUE(Until([&] { return Observation().CanAccept; }));
+    (void)Service->GpuRun(Correlation, Runtime::PointCloudConsolidationGpuAction::Accept);
+    ASSERT_TRUE(Until([&] { return Results.size() == 1u; }));
+    EXPECT_TRUE(Results.back().Converged);
+    EXPECT_EQ(Results.back().Iterations, 1u);
+}
+
+TEST_F(ResidentLop, PendingAcceptDiscardCompletesExactlyOnce)
+{
+    Start();
+    ASSERT_TRUE(Until([&] { return DiagnosticSink.has_value(); }));
+    CompleteDiagnostics();
+    ASSERT_TRUE(Until([&] { return Observation().CanAccept; }));
+    HoldCompletion = true;
+    (void)Service->GpuRun(Correlation, Runtime::PointCloudConsolidationGpuAction::Accept);
+    ASSERT_TRUE(Until([&] { return PendingCompletion.has_value(); }));
+    ASSERT_TRUE(Observation().Accepting);
+    (void)Service->GpuRun(Correlation, Runtime::PointCloudConsolidationGpuAction::Discard);
+    ASSERT_TRUE(Until([&] { return Results.size() == 1u; }));
+    EXPECT_EQ(Results.back().Status, Runtime::PointCloudConsolidationRunStatus::Cancelled);
+    PendingCompletion->Deliver(std::as_bytes(std::span(Accepted)));
+    PendingCompletion.reset();
+    for (unsigned i = 0; i < 10u; ++i) Tick();
+    EXPECT_EQ(Results.size(), 1u);
+    EXPECT_EQ(std::as_const(Properties()).Get<glm::vec3>("v:position").Vector(), Before);
+}
+
+TEST_F(ResidentLop, PendingAcceptStaleCompletesExactlyOnce)
+{
+    Start();
+    ASSERT_TRUE(Until([&] { return DiagnosticSink.has_value(); }));
+    CompleteDiagnostics();
+    ASSERT_TRUE(Until([&] { return Observation().CanAccept; }));
+    HoldCompletion = true;
+    (void)Service->GpuRun(Correlation, Runtime::PointCloudConsolidationGpuAction::Accept);
+    ASSERT_TRUE(Until([&] { return PendingCompletion.has_value(); }));
+    Properties().Get<glm::vec3>("v:position")[0].x += 0.25f;
+    const auto edited = std::as_const(Properties()).Get<glm::vec3>("v:position").Vector();
+    ASSERT_TRUE(Until([&] { return Results.size() == 1u; }));
+    EXPECT_EQ(Results.back().Status, Runtime::PointCloudConsolidationRunStatus::StaleSource);
+    PendingCompletion->Deliver(std::as_bytes(std::span(Accepted)));
+    PendingCompletion.reset();
+    for (unsigned i = 0; i < 10u; ++i) Tick();
+    EXPECT_EQ(Results.size(), 1u);
+    EXPECT_EQ(std::as_const(Properties()).Get<glm::vec3>("v:position").Vector(), edited);
+}
+
+TEST_F(ResidentLop, BusyStartIsRefusedWithoutCpuFallback)
+{
+    Start();
+    ASSERT_TRUE(Until([&] { return Observation().Submissions > 0u; }));
+    const auto refused = Service->Run(Request);
+    ASSERT_TRUE(Until([&] { return !Results.empty(); }));
+    EXPECT_EQ(Results.front().Correlation, refused);
+    EXPECT_FALSE(Results.front().Succeeded());
+    EXPECT_FALSE(Results.front().FellBackToCpu);
+    EXPECT_EQ(Service->Stats().GpuFallbacks, 0u);
+    EXPECT_FALSE(Results.front().BackendDiagnostic.empty());
+}
+
+TEST_F(ResidentLop, RejectedAcceptSubmissionDeliversOneFailure)
+{
+    Start();
+    ASSERT_TRUE(Until([&] { return DiagnosticSink.has_value(); }));
+    CompleteDiagnostics();
+    ASSERT_TRUE(Until([&] { return Observation().CanAccept; }));
+    Jobs.Jobs().CancelAndDrain();
+    (void)Service->GpuRun(Correlation, Runtime::PointCloudConsolidationGpuAction::Accept);
+    ASSERT_TRUE(Until([&] { return !Results.empty(); }));
+    EXPECT_EQ(Results.size(), 1u);
+    EXPECT_FALSE(Results.back().Succeeded());
+    EXPECT_EQ(std::as_const(Properties()).Get<glm::vec3>("v:position").Vector(), Before);
+}
+
+TEST_F(ResidentLop, StaleBatchFinishesWithoutPublishingOrWaitingForAccept)
+{
+    Request.AutoAccept = true;
+    Start();
+    ASSERT_TRUE(Until([&] { return DiagnosticSink.has_value(); }));
+    Properties().Get<glm::vec3>("v:position")[0].x += 0.5f;
+    const auto edited = std::as_const(Properties()).Get<glm::vec3>("v:position").Vector();
+    CompleteDiagnostics();
+    ASSERT_TRUE(Until([&] { return Results.size() == 1u; }));
+    EXPECT_EQ(Results.back().Status, Runtime::PointCloudConsolidationRunStatus::StaleSource);
+    EXPECT_EQ(std::as_const(Properties()).Get<glm::vec3>("v:position").Vector(), edited);
+}
+
+TEST_F(ResidentLop, SwitchingWorldsDiscardsABatchRun)
+{
+    Request.AutoAccept = true;
+    Start();
+    ASSERT_TRUE(Until([&] { return Observation().Submissions > 0u; }));
+    const auto other = Worlds.CreateWorld("other");
+    ASSERT_TRUE(Worlds.RequestSetActiveWorld(other));
+    (void)Worlds.ApplyMaintenance(Events, Jobs.Jobs());
+    ASSERT_TRUE(Until([&] { return Results.size() == 1u; }));
+    EXPECT_EQ(Results.back().Status, Runtime::PointCloudConsolidationRunStatus::Cancelled);
+    EXPECT_EQ(std::as_const(Properties()).Get<glm::vec3>("v:position").Vector(), Before);
+}
+
+TEST_F(ResidentLop, DiscardingQueuedPagesAllowsANewGpuRun)
+{
+    Start();
+    ASSERT_TRUE(Until([&] { return Observation().Submissions >= 2u; }));
+    (void)Service->GpuRun(Correlation, Runtime::PointCloudConsolidationGpuAction::Discard);
+    ASSERT_TRUE(Until([&] { return Results.size() == 1u; }));
+    EXPECT_EQ(Results.back().Status, Runtime::PointCloudConsolidationRunStatus::Cancelled);
+    Start();
+    ASSERT_TRUE(Until([&] { return Observation().Submissions > 0u; }));
+    EXPECT_EQ(Observation().InputUploadBytes, 0u);
+    EXPECT_EQ(Service->Stats().GpuFallbacks, 0u);
+}
+
+TEST(PointCloudConsolidationModule, AgentCompletionListenerReleasedOnDetachCancellationAndCompletion)
+{
+    auto config = HeadlessConfig();
+    Runtime::SetPointCloudConsolidationConfig(config, SameCardinalityConfig());
+    Intrinsic::Tests::RuntimeTestKernel engine{std::move(config)};
+    engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    CoreConfig::EngineConfigSectionRegistry sections;
+    ASSERT_TRUE(sections.Register(Runtime::MakePointCloudConsolidationConfigSectionRegistration()));
+    engine.EmplaceModule<Runtime::EngineConfigControl>(std::move(sections));
+    engine.Initialize();
+    auto* scene = engine.Worlds().Get(engine.ActiveWorld());
+    ASSERT_NE(scene, nullptr);
+    const auto entity = AddPointCloud(*scene, NoisyPlane());
+    Runtime::AgentOperationRegistry registry;
+    Runtime::RegisterEditorAgentOperations(registry);
+    Runtime::EditorWorkspaceAttachment attachment;
+    const Runtime::AgentOperationContext context{.Attachment = &attachment};
+    const auto listenerCalls = [&] {
+        const auto before = engine.Events().Stats().ListenerInvocations;
+        engine.Events().Publish(Runtime::PointCloudConsolidationResult{});
+        (void)engine.Events().Pump();
+        return engine.Events().Stats().ListenerInvocations - before;
+    };
+    const auto detachedListeners = listenerCalls();
+    for (const auto mode : {"detach", "cancel", "complete"})
+    {
+        SCOPED_TRACE(mode);
+        attachment.Attach(engine.Worlds(), engine.Services());
+        ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment));
+        const auto attachedListeners = listenerCalls();
+        auto outcome = Runtime::InvokeAgentOperation(registry, "run_point_cloud_consolidation", context,
+            "{\"entity\":" + std::to_string(Runtime::SelectionController::ToStableEntityId(entity)) +
+            ",\"domain\":\"PointCloudPoint\"}", false);
+        ASSERT_TRUE(outcome.Continuation) << outcome.Text;
+        EXPECT_EQ(listenerCalls(), attachedListeners + 1u);
+        Runtime::AgentOperationOutcome completed;
+        if (std::string_view(mode) == "detach")
+        {
+            attachment.Detach();
+            EXPECT_TRUE(outcome.Continuation(context, completed));
+            EXPECT_TRUE(completed.IsError);
+            EXPECT_EQ(listenerCalls(), detachedListeners);
+        }
+        else if (std::string_view(mode) == "cancel")
+        {
+            outcome.Continuation = {};
+            EXPECT_EQ(listenerCalls(), attachedListeners);
+        }
+        else
+        {
+            bool done = false;
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+            while (!done && std::chrono::steady_clock::now() < deadline)
+            {
+                engine.Commands().Drain(*scene, {&engine.Events(), &engine.Jobs(), &engine.Worlds()});
+                (void)engine.Jobs().DrainCompletions(engine.Events());
+                (void)engine.Events().Pump();
+                done = outcome.Continuation(context, completed);
+                std::this_thread::yield();
+            }
+            EXPECT_TRUE(done);
+            EXPECT_EQ(listenerCalls(), attachedListeners);
+        }
+        outcome.Continuation = {};
+        attachment.Detach();
+    }
+    engine.Shutdown();
 }

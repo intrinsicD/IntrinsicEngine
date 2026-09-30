@@ -523,3 +523,23 @@ deletion, transform and output revisions guard publication. Cancellation and
 admission refusal leave CPU properties unchanged. FPS has no output Accept ring
 or `BindRevision`: its canonical inputs are unchanged by rank/mask publication.
 See the [sampling backend contract](../methods/point-sampling.md) for verification.
+
+### Resident LOP consolidation
+
+LOP resolves canonical float3 inputs and pages initialization/projection through
+immediate `SpatialIndexCache` submissions, with 64-byte grid-bound and per-iteration
+diagnostics. The existing consolidation GPU
+participant owns its method cursor; no second transfer queue or scheduler is added.
+For same-cardinality in-place positions, `BeginEditorGpuPositionRun` owns the ring.
+Only configured preview boundaries and the terminal iteration copy into its back
+slot; completion publishes the front. Intermediate slot
+pressure drops previews, while terminal publication waits for a slot.
+
+Stop retains the completed iteration. Accept uses `AcceptEditorGpuPositionRun`;
+Discard and attachment loss use `DiscardEditorGpuPositionRun`. CPU edits make
+Accept stale, with a visible reason. Batch/agent requests auto-accept. Canonical
+revision binding lets the next run reuse the accepted input without another upload.
+Cardinality changes and separate named outputs retain terminal publication rather
+than borrowing the same-cardinality positions transaction. Their inputs are also
+resident and their producer is paged. See the [LOP backend contract](../methods/locally-optimal-projection.md)
+for IO accounting, numerical scope and the Vulkan proof surface.

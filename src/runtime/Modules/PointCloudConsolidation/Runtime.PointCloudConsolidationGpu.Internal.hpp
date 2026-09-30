@@ -1,7 +1,6 @@
+// Private consolidation snapshots and GPU producer state shared by the module
+// implementation units; include after their runtime, geometry, ECS and RHI imports.
 #pragma once
-
-// Include-only implementation detail for PointCloudConsolidationModule. Include
-// after the module's runtime, geometry, ECS GeometrySources, and RHI imports.
 
 namespace Extrinsic::Runtime
 {
@@ -34,6 +33,7 @@ namespace Extrinsic::Runtime
         Geometry::PointCloud::Consolidation::Params Params{};
         std::optional<Geometry::SupportRadius::Analysis> RadiusAnalysis{};
         std::vector<glm::vec3> GpuInitialPositions{};
+        std::vector<std::uint32_t> GpuSeedRows{};
         bool ForceCpu{false};
         std::shared_ptr<const Geometry::PointLBVH::Index> SourceIndex{};
         bool ReusedSpatialIndex{false};
@@ -65,6 +65,7 @@ namespace Extrinsic::Runtime
     struct PointCloudConsolidationGpuSubmission
     {
         bool Accepted{false};
+        bool Refused{false};
         std::string Diagnostic{};
     };
 
@@ -76,6 +77,8 @@ namespace Extrinsic::Runtime
         std::optional<Geometry::PointCloud::Consolidation::Result>
             Consolidated{};
         std::string Diagnostic{};
+        std::optional<PointCloudConsolidationResult> Published{};
+        PointCloudConsolidationResult Metrics{};
 
         [[nodiscard]] inline bool HasGpuResult() const noexcept
         {
@@ -102,7 +105,10 @@ namespace Extrinsic::Runtime
         // Moves the snapshot only when accepted so the caller can submit an
         // honest CPU-reference fallback after a planning/device rejection.
         [[nodiscard]] PointCloudConsolidationGpuSubmission Start(
-            PointCloudConsolidationSnapshot& snapshot);
+            PointCloudConsolidationSnapshot& snapshot, const EditorProcessingContext& context,
+            const PointCloudConsolidationResult& prepared);
+        [[nodiscard]] PointCloudConsolidationGpuObservation GpuRun(
+            CommandCorrelationId correlation, PointCloudConsolidationGpuAction action);
         void RecordFrameCommands(RHI::ICommandContext& commandContext);
         void DrainCompletedTransfers();
         [[nodiscard]] std::optional<PointCloudConsolidationGpuResult>

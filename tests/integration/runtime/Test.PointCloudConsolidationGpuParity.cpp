@@ -6,18 +6,22 @@
 #include <chrono>
 #include <cstdlib>
 #include <fstream>
+#include <format>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <limits>
 #include <optional>
 #include <span>
 #include <string>
 #include <vector>
+#include <utility>
 
 #include <glm/glm.hpp>
 
 #include "RuntimeTestModule.hpp"
+#include "../../../src/runtime/Modules/PointCloudConsolidation/Runtime.LopPaging.TestSupport.hpp"
 
 import Extrinsic.Backends.Vulkan;
 import Extrinsic.ECS.Component.DirtyTags;
@@ -32,6 +36,10 @@ import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.GpuPropertyBinding;
+import Extrinsic.RHI.Device;
+import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.JobService;
@@ -308,7 +316,7 @@ namespace
                 Stats = Service->Stats();
                 engine.RequestExit();
             }
-            else if (Frames > 2'000u)
+            else if (Frames > 2'000u || std::chrono::steady_clock::now() - Started > std::chrono::seconds(50))
             {
                 TimedOut = true;
                 engine.RequestExit();
@@ -321,6 +329,7 @@ namespace
                 Service->Unsubscribe(CompletionSubscription);
         }
 
+        std::chrono::steady_clock::time_point Started{std::chrono::steady_clock::now()};
         std::array<ParityFixture, 2u> Fixtures{};
         Runtime::PointCloudConsolidationService* Service{};
         ECS::Scene::Registry* Scene{};
@@ -543,6 +552,7 @@ TEST(PointCloudConsolidationGpuParity,
         fixtures);
     PointCloudConsolidationGpuParityApp* appPtr = app.get();
     Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();
     engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
     engine.Initialize();
 
@@ -603,6 +613,15 @@ TEST(PointCloudConsolidationGpuParity,
             appPtr->Outputs[run], references[fixtureIndex].Positions);
         EXPECT_LE(parity.Rms, kRmsTolerance);
         EXPECT_LE(parity.Linf, kLinfTolerance);
+        if (fixtures[fixtureIndex].Config.Strategy == Runtime::PointCloudConsolidationStrategy::Lop)
+        {
+            RecordProperty("lop_parity_linf", std::format("{:.17g}", parity.Linf));
+            RecordProperty("lop_parity_rms", std::format("{:.17g}", parity.Rms));
+            RecordProperty("lop_gpu_iterations", result.Iterations);
+            RecordProperty("lop_cpu_iterations", references[fixtureIndex].Diagnostics.Iterations);
+            RecordProperty("lop_gpu_max_displacement", std::format("{:.17g}", result.MaxDisplacement));
+            RecordProperty("lop_cpu_max_displacement", std::format("{:.17g}", references[fixtureIndex].Diagnostics.MaxDisplacement));
+        }
     }
 
     for (std::size_t fixtureIndex = 0u;
@@ -1099,4 +1118,289 @@ TEST(PointCloudConsolidationGpuParity, VulkanLbvhClopAcrossDomainsAndFailures)
 TEST(PointCloudConsolidationGpuParity, VulkanLbvhEarAcrossDomainsInsertionAndFailures)
 {
     RunProjectionLbvhCase(Runtime::PointCloudConsolidationStrategy::Ear,false,"ear");
+}
+
+namespace
+{
+    class ResidentLopPreviewApp final : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        std::vector<glm::vec3> Input = MakePlane(12u, 12u, 1.0);
+        Runtime::PointCloudConsolidationConfig Config = MakeConfig(Runtime::PointCloudConsolidationStrategy::Lop, 0.35, 0u, 42u);
+        std::vector<Runtime::PointCloudConsolidationResult> Results;
+        std::vector<glm::vec3> Output;
+        bool TimedOut{}, PreviewObserved{}, DiscardRestored{};
+        std::uint32_t PreviewIteration{};
+        using RowsReadback = std::shared_ptr<std::optional<std::vector<glm::vec3>>>;
+        RowsReadback PreviewRows{std::make_shared<std::optional<std::vector<glm::vec3>>>()};
+        RowsReadback RestoredRows{std::make_shared<std::optional<std::vector<glm::vec3>>>()};
+        std::uint64_t RepeatUploadBytes{UINT64_MAX}, RepeatCacheHits{};
+        std::uint32_t Previews{};
+    private:
+        Runtime::PointCloudConsolidationService* Service{};
+        Runtime::RenderExtractionCache* Extraction{};
+        Runtime::SpatialIndexCache* Cache{};
+        ECS::Scene::Registry* Scene{};
+        ECS::EntityHandle Entity{};
+        Runtime::CommandCorrelationId Correlation{};
+        Runtime::KernelEventSubscription Subscription{};
+        unsigned Phase{}, Frames{};
+        bool PreviewReadbackQueued{}, RestoreReadbackQueued{};
+        std::chrono::steady_clock::time_point Started{std::chrono::steady_clock::now()};
+        auto Id() const { return Runtime::SelectionController::ToStableEntityId(Entity); }
+        auto Rows() const { return std::as_const(Scene->Raw().get<GS::Vertices>(Entity).Properties).Get<glm::vec3>("v:position").Vector(); }
+        void ReadRows(Extrinsic::RHI::BufferHandle buffer, std::uint64_t offset,
+                      RowsReadback rows, std::shared_ptr<const void> lease = {})
+        {
+            const auto count = Input.size();
+            const auto token = Kernel().GetDevice().GetTransferQueue().DownloadBuffer(
+                buffer, count * sizeof(glm::vec3), offset,
+                Extrinsic::RHI::ReadbackSink::Invoke([rows, count, lease = std::move(lease)](auto bytes) {
+                    EXPECT_EQ(bytes.size(), count * sizeof(glm::vec3));
+                    if (bytes.size() != count * sizeof(glm::vec3)) return;
+                    rows->emplace(count);
+                    std::memcpy(rows->value().data(), bytes.data(), bytes.size());
+                }));
+            EXPECT_TRUE(token.IsValid());
+        }
+        void Start()
+        {
+            Correlation = Service->Run({.StableEntityId = Id(),
+                .Properties = Runtime::MakePointCloudConsolidationPropertyRefs(Runtime::GeometryElementDomain::PointCloudPoint, "v:position"),
+                .Config = Config, .AutoAccept = false});
+        }
+        void Resolve() override
+        {
+            Service = Kernel().Services().Find<Runtime::PointCloudConsolidationService>();
+            Extraction = Kernel().Services().Find<Runtime::RenderExtractionCache>();
+            Cache = Kernel().Services().Find<Runtime::SpatialIndexCache>();
+            ASSERT_NE(Cache, nullptr);
+            Scene = Kernel().Worlds().Get(Kernel().ActiveWorld());
+            ASSERT_NE(Service, nullptr);
+            ASSERT_NE(Extraction, nullptr);
+            ASSERT_NE(Scene, nullptr);
+            Entity = Scene->Create();
+            SetPositions(Scene->Raw().emplace<GS::Vertices>(Entity), Input);
+            Scene->Raw().emplace<Extrinsic::ECS::Components::Transform::WorldMatrix>(Entity);
+            Scene->Raw().emplace<Graphics::Components::RenderPoints>(Entity).SizeSource = 5.0f;
+            Config.MaxIterations = 4u;
+            Config.GpuPreviewInterval = 2u;
+            Config.ConvergenceTolerance = 0.0;
+            Subscription = Service->SubscribeCompleted([this](const auto& r) {
+                if (r.Correlation == Correlation) Results.push_back(r);
+            });
+        }
+        void Frame(double, double) override
+        {
+            if (++Frames > 4000u || std::chrono::steady_clock::now() - Started > std::chrono::seconds(120)) { TimedOut = true; Kernel().RequestExit(); return; }
+            if (!Service || !Extraction || !Scene || !Kernel().GetDevice().IsOperational()) return;
+            if (Phase == 0u) { Start(); Phase = 1u; }
+            const auto observation = Service->GpuRun(Correlation);
+            // Finalize advances Iterations before the copy's completion publishes
+            // the back. Until then Front() can still return the resident input.
+            if (Phase == 1u && !PreviewReadbackQueued &&
+                observation.Previews > 0u &&
+                observation.Iterations == Config.GpuPreviewInterval &&
+                observation.Iterations < Config.MaxIterations && Extraction->ShowsUncommittedPositions(Id()))
+            {
+                auto* residency = Cache->PropertyResidency();
+                ASSERT_NE(residency, nullptr);
+                const auto ref = Runtime::MakePointCloudConsolidationPropertyRefs(
+                    Runtime::GeometryElementDomain::PointCloudPoint, "v:position").OutputPositions;
+                const auto observed = Runtime::ObserveGpuPropertyFront(*residency, *Scene, Kernel().ActiveWorld(), Entity, ref);
+                ASSERT_TRUE(observed);
+                const auto front = residency->Front(Runtime::MakeGpuPropertyKey(Kernel().ActiveWorld(), Entity, ref));
+                ASSERT_TRUE(front);
+                ASSERT_EQ(front->Buffer, observed->Buffer);
+                ASSERT_EQ(Runtime::GpuPropertyObservationStamp(*front), observed->Stamp);
+                ASSERT_NE(front->Publication, 0u);
+                ASSERT_EQ(observed->Count, Input.size());
+                PreviewIteration = observation.Iterations;
+                EXPECT_EQ(Rows(), Input) << "Preview cannot mutate the CPU property";
+                ReadRows(observed->Buffer, 0u, PreviewRows, front->Lease);
+                PreviewReadbackQueued = true;
+            }
+            if (Phase == 1u && observation.ReadyToAccept && PreviewRows->has_value())
+            {
+                PreviewObserved = true;
+                EXPECT_EQ(Rows(), Input);
+                EXPECT_TRUE(Results.empty()) << "Only terminal publication delivers the full result";
+                Previews = observation.Previews;
+                (void)Service->GpuRun(Correlation, Runtime::PointCloudConsolidationGpuAction::Discard);
+                Phase = 2u;
+            }
+            if (Phase == 2u && Results.size() == 1u && !Extraction->ShowsUncommittedPositions(Id()))
+            {
+                EXPECT_EQ(Rows(), Input);
+                if (!RestoreReadbackQueued)
+                {
+                    const auto sidecar = Extraction->FindRenderableSidecarForTest(Id());
+                    ASSERT_TRUE(sidecar);
+                    auto& gpu = Kernel().GetRenderer().GetGpuWorld();
+                    Graphics::GpuGeometryResidencyView block{};
+                    ASSERT_TRUE(gpu.TryGetGeometryResidencyView(sidecar->PointCloudGeometry, block));
+                    ASSERT_FALSE(block.PositionShadowStale);
+                    ASSERT_EQ(block.PositionByteCount, Input.size() * sizeof(glm::vec3));
+                    ASSERT_EQ(block.PositionStrideBytes, sizeof(glm::vec3));
+                    const auto buffer = gpu.GetManagedVertexBuffer();
+                    const auto base = Kernel().GetDevice().GetBufferDeviceAddress(buffer);
+                    ASSERT_GE(block.Record.VertexBufferBDA, base);
+                    ReadRows(buffer, block.Record.VertexBufferBDA - base, RestoredRows);
+                    RestoreReadbackQueued = true;
+                }
+                if (RestoredRows->has_value())
+                {
+                    EXPECT_EQ(RestoredRows->value(), Input) << "Discard must restore the renderer's position bytes";
+                    DiscardRestored = true;
+                    Start();
+                    Phase = 3u;
+                }
+            }
+            if (Phase == 3u && observation.ReadyToAccept && observation.Correlation == Correlation)
+            {
+                RepeatUploadBytes = observation.InputUploadBytes;
+                RepeatCacheHits = observation.InputCacheHits;
+                EXPECT_TRUE(observation.CanAccept) << observation.Message;
+                (void)Service->GpuRun(Correlation, Runtime::PointCloudConsolidationGpuAction::Accept);
+                Phase = 4u;
+            }
+            if (Phase == 4u && Results.size() == 2u)
+            {
+                Output = Rows();
+                Kernel().RequestExit();
+            }
+        }
+        void Shutdown() override { if (Service) Service->Unsubscribe(Subscription); }
+    };
+}
+
+TEST(PointCloudConsolidationGpuParity, ResidentLopPreviewDiscardAcceptParityAndRepeatInputIo)
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize()) GTEST_SKIP() << "Requires the opt-in Vulkan display.";
+    auto config = Runtime::CreateReferenceEngineConfig();
+    config.Window.Width = config.Window.Height = 64;
+    config.Window.Resizable = false;
+    config.Render.EnableValidation = true;
+    config.Render.EnableVSync = false;
+    config.ReferenceScene.Enabled = false;
+    auto app = std::make_unique<ResidentLopPreviewApp>();
+    auto* view = app.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.Initialize();
+    const auto ready = Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(&engine.GetDevice());
+    if (!ready.LogicalDeviceReady || !ready.SwapchainReady || !ready.CommandSyncReady)
+    { engine.Shutdown(); GTEST_SKIP() << "Vulkan device/swapchain/command readiness unavailable."; }
+    const auto validation = Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot();
+    engine.Run();
+    EXPECT_FALSE(view->TimedOut);
+    EXPECT_TRUE(view->PreviewObserved);
+    EXPECT_TRUE(view->DiscardRestored);
+    ASSERT_TRUE(view->PreviewRows->has_value());
+    ASSERT_TRUE(view->RestoredRows->has_value());
+    EXPECT_EQ(view->PreviewIteration, view->Config.GpuPreviewInterval);
+    EXPECT_LT(view->PreviewIteration, view->Config.MaxIterations);
+    auto previewParams = MakeCpuParams(view->Config);
+    previewParams.MaxIterations = view->PreviewIteration;
+    const auto intermediate = Consolidation::Consolidate(view->Input, previewParams);
+    ASSERT_EQ(intermediate.Positions.size(), view->PreviewRows->value().size());
+    const auto previewParity = MeasurePositionError(view->PreviewRows->value(), intermediate.Positions);
+    EXPECT_LE(previewParity.Rms, kRmsTolerance);
+    EXPECT_LE(previewParity.Linf, kLinfTolerance);
+    EXPECT_GT(MeasurePositionError(view->PreviewRows->value(), view->Input).Linf, 1.0e-6);
+    EXPECT_EQ(view->RestoredRows->value(), view->Input);
+    EXPECT_GT(view->Previews, 0u);
+    EXPECT_LE(view->Previews, 2u) << "Only interval boundaries and the terminal front publish";
+    EXPECT_EQ(view->RepeatUploadBytes, 0u);
+    EXPECT_GE(view->RepeatCacheHits, 1u);
+    ASSERT_EQ(view->Results.size(), 2u);
+    EXPECT_EQ(view->Results[0].Status, Runtime::PointCloudConsolidationRunStatus::Cancelled);
+    ASSERT_TRUE(view->Results[1].Succeeded()) << view->Results[1].Message;
+    EXPECT_EQ(view->Results[1].ActualBackend, Runtime::PointCloudConsolidationBackend::VulkanCompute);
+    EXPECT_GT(view->Results[1].GpuSubmissions, view->Config.MaxIterations);
+    EXPECT_EQ(view->Results[1].CpuStageReadbackBytes,
+        64u * (2u + 2u * view->Results[1].Iterations));
+    const auto reference = Consolidation::Consolidate(view->Input, MakeCpuParams(view->Config));
+    ASSERT_EQ(view->Output.size(), reference.Positions.size());
+    const auto parity = MeasurePositionError(view->Output, reference.Positions);
+    EXPECT_LE(parity.Rms, kRmsTolerance);
+    EXPECT_LE(parity.Linf, kLinfTolerance);
+    RecordProperty("lop_parity_linf", std::format("{:.17g}", parity.Linf));
+    RecordProperty("lop_parity_rms", std::format("{:.17g}", parity.Rms));
+    engine.Shutdown();
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot().VulkanValidationErrorCount,
+              validation.VulkanValidationErrorCount);
+}
+
+TEST(PointCloudConsolidationGpuParity, ResidentLopMultipleProjectionAndReducePagesMatchCpu)
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
+        GTEST_SKIP() << "Requires the opt-in Vulkan display.";
+    struct RestoreLimits
+    {
+        Runtime::LopPagingLimits Saved{Runtime::LopPagingForTesting};
+        ~RestoreLimits() { Runtime::LopPagingForTesting = Saved; }
+    } restore;
+    Runtime::LopPagingForTesting = {.PagePairs = 512u, .SubmissionPairs = 4096u, .ReduceRows = 32u};
+    auto lop = MakeConfig(Runtime::PointCloudConsolidationStrategy::Lop, 0.5, 0u, 42u);
+    lop.MaxIterations = 2u;
+    // The shared runtime validator bounds refinement rounds even for LOP.
+    lop.NormalRefinementRounds = 1u;
+    const std::array<ParityFixture, 2u> fixtures{{
+        {.Name = "uniform", .Input = MakePlane(16u, 16u, 1.0), .Config = lop},
+        {.Name = "identical", .Input = std::vector<glm::vec3>(256u, glm::vec3(0.0f)), .Config = lop},
+    }};
+    std::array<Consolidation::Result, 2u> references;
+    for (std::size_t i = 0; i < fixtures.size(); ++i)
+        references[i] = Consolidation::Consolidate(fixtures[i].Input, MakeCpuParams(lop));
+    ASSERT_TRUE(references[1].Diagnostics.Converged);
+    ASSERT_EQ(references[1].Diagnostics.Iterations, 1u);
+    auto config = Runtime::CreateReferenceEngineConfig();
+    config.Window.Width = config.Window.Height = 64;
+    config.Window.Resizable = false;
+    config.Render.EnableValidation = true;
+    config.Render.EnableVSync = false;
+    config.ReferenceScene.Enabled = false;
+    auto app = std::make_unique<PointCloudConsolidationGpuParityApp>(fixtures);
+    auto* view = app.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
+    engine.Initialize();
+    const auto ready = Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(&engine.GetDevice());
+    if (!ready.LogicalDeviceReady || !ready.SwapchainReady || !ready.CommandSyncReady)
+    { engine.Shutdown(); GTEST_SKIP() << "Vulkan readiness unavailable."; }
+    const auto validation = Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot();
+    engine.Run();
+    EXPECT_FALSE(view->TimedOut);
+    ASSERT_EQ(view->CompletedRuns, 4u);
+    for (std::size_t run = 0; run < 4u; ++run)
+    {
+        SCOPED_TRACE(fixtures[run / 2u].Name);
+        ASSERT_TRUE(view->Results[run]);
+        const auto& result = *view->Results[run];
+        ASSERT_TRUE(result.Succeeded()) << result.Message;
+        EXPECT_FALSE(result.FellBackToCpu);
+        EXPECT_EQ(result.ActualBackend, Runtime::PointCloudConsolidationBackend::VulkanCompute);
+        const auto& reference = references[run / 2u];
+        EXPECT_EQ(result.Iterations, reference.Diagnostics.Iterations);
+        EXPECT_EQ(result.Converged, reference.Diagnostics.Converged);
+        EXPECT_EQ(result.GeometryStatus, reference.State);
+        ASSERT_EQ(view->Outputs[run].size(), reference.Positions.size());
+        const auto error = MeasurePositionError(view->Outputs[run], reference.Positions);
+        EXPECT_LE(error.Rms, kRmsTolerance);
+        EXPECT_LE(error.Linf, kLinfTolerance);
+        RecordProperty("lop_parity_linf_" + fixtures[run / 2u].Name, std::format("{:.17g}", error.Linf));
+        RecordProperty("lop_parity_rms_" + fixtures[run / 2u].Name, std::format("{:.17g}", error.Rms));
+        // The identical cloud has 256 initialization and 512 projection candidates
+        // per row: 16 + 32 submissions, with multiple dispatches in each, plus 8
+        // reduce pages. Its convergence after one iteration must retain all pages.
+        if (run / 2u == 1u) EXPECT_GE(result.GpuSubmissions, 16u + 32u + 8u);
+        EXPECT_EQ(result.CpuStageReadbackBytes, 64u * (2u + 2u * result.Iterations));
+    }
+    engine.Shutdown();
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot().VulkanValidationErrorCount,
+        validation.VulkanValidationErrorCount);
 }

@@ -453,6 +453,12 @@ TEST(SandboxPointCloudConsolidationPanel,
         .ActualBackend =
             Runtime::PointCloudConsolidationBackend::CpuReference,
         .FellBackToCpu = true,
+        .GpuInputUploadBytes = 480u,
+        .GpuInputCacheHits = 2u,
+        .CpuStageUploadBytes = 64u,
+        .CpuStageReadbackBytes = 64u,
+        .GpuSubmissions = 9u,
+        .GpuPreviews = 2u,
         .BackendDiagnostic = "Vulkan unavailable; CPU completed.",
         .ImplementationId = "cpu_reference",
         .StrategyToken = "ear",
@@ -493,6 +499,12 @@ TEST(SandboxPointCloudConsolidationPanel,
     EXPECT_EQ(summary.RequestedBackend, "gpu_vulkan_compute");
     EXPECT_EQ(summary.ActualBackend, "cpu_reference");
     EXPECT_TRUE(summary.FellBackToCpu);
+    EXPECT_EQ(summary.GpuInputUploadBytes, 480u);
+    EXPECT_EQ(summary.GpuInputCacheHits, 2u);
+    EXPECT_EQ(summary.CpuStageUploadBytes, 64u);
+    EXPECT_EQ(summary.CpuStageReadbackBytes, 64u);
+    EXPECT_EQ(summary.GpuSubmissions, 9u);
+    EXPECT_EQ(summary.GpuPreviews, 2u);
     EXPECT_EQ(summary.BackendDiagnostic,
               "Vulkan unavailable; CPU completed.");
     EXPECT_EQ(summary.SupportRadiusAnalysisStatus, "success");
