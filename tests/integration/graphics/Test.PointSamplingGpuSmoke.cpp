@@ -6,6 +6,10 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
+#include <cstring>
+#include <cmath>
+#include <sstream>
+#include <iomanip>
 #include <memory>
 #include <optional>
 #include <random>
@@ -14,6 +18,7 @@
 #include <vector>
 #include <entt/entity/entity.hpp>
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <gtest/gtest.h>
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.RHI.Device;
@@ -77,11 +82,21 @@ namespace
             std::uniform_real_distribution<double> weight(0.5, 2.0);
             for (auto& w : Weights) w = weight(random);
             Entity = Context.Scene->Create();
-            Context.Scene->Raw().emplace<T::Component>(Entity);
+            auto& transform = Context.Scene->Raw().emplace<T::Component>(Entity);
+            transform.Position = {3.25f, -0.5f, 2.0f};
+            transform.Scale = {0.75f, -1.25f, 1.5f};
+            transform.Rotation = glm::angleAxis(0.37f, glm::normalize(glm::vec3(1, 2, 3)));
             auto& vertices = Context.Scene->Raw().emplace<GS::Vertices>(Entity).Properties;
             const auto points = Cloud(6000, 50, 9u);
             vertices.Resize(points.size());
             vertices.GetOrAdd<glm::vec3>("v:position").Vector() = points;
+            auto deleted = vertices.GetOrAdd<bool>("v:deleted", false);
+            auto weights = vertices.GetOrAdd<float>("v:importance", 1.0f);
+            for (std::size_t i = 0; i < points.size(); ++i)
+            {
+                if (i % 11 == 0) deleted[i] = true;
+                weights[i] = 0.5f + float(i % 17) / 16.0f;
+            }
         }
 
         std::vector<float> Rank(const std::string& name) const
@@ -104,7 +119,17 @@ namespace
                 const PS::Params params{.FirstIndex = 5u, .Weights = Weights};
                 Reason = Runtime::PointSamplingGpuUnsupportedReason(params, Direct.size(), 3000u, &Kernel().GetDevice());
                 if (!Reason.empty()) { Kernel().RequestExit(); return; }
-                Run = std::make_unique<Runtime::PointSamplingGpuRun>(Kernel().GetDevice(), Direct, params, 3000u);
+                auto& residency = *Context.SpatialIndices->PropertyResidency();
+                const auto positions = residency.AcquireInput({.Name = "direct_positions"}, 1u,
+                    {.Scalar = Extrinsic::Graphics::GpuScalarType::Float32, .Channels = 3, .Count = std::uint32_t(Direct.size())},
+                    [this](auto out) { std::memcpy(out.data(), Direct.data(), out.size()); });
+                const auto weights = residency.AcquireInput({.Name = "direct_weights"}, 1u,
+                    {.Scalar = Extrinsic::Graphics::GpuScalarType::Float64, .Count = std::uint32_t(Weights.size())},
+                    [this](auto out) { std::memcpy(out.data(), Weights.data(), out.size()); });
+                if (!positions || !weights) { Reason = "Resident input acquisition failed"; Kernel().RequestExit(); return; }
+                Run = std::make_unique<Runtime::PointSamplingGpuRun>(Kernel().GetDevice(),
+                    Extrinsic::Graphics::FarthestPointGpuInput{.Positions = *positions, .Weights = *weights, .FirstIndex = 5u, .Count = 3000u},
+                    Direct, params);
                 Gpu = Run->QueueNext(*Context.SpatialIndices);
                 Phase = 1;
                 return;
@@ -118,6 +143,7 @@ namespace
                     return;
                 }
                 if (Gpu->State != Runtime::SpatialQueryState::Ready) return;
+                if (!Run->Current().Order.size() && Prefixes.empty()) EXPECT_TRUE(Gpu->Data.empty());
                 const bool finished = Run->Observe(*Gpu);
                 Prefixes.push_back(Run->Current().Order);
                 if (!finished) { Gpu = Run->QueueNext(*Context.SpatialIndices); return; }
@@ -136,11 +162,19 @@ namespace
                     .Backend = vulkan ? Runtime::PointSamplingBackend::Vulkan : Runtime::PointSamplingBackend::Cpu,
                     .RankName = vulkan ? "v:vulkan_rank" : "v:cpu_rank",
                     .SelectedName = vulkan ? "v:vulkan_selected" : "v:cpu_selected"};
+                config.WeightsName = "v:importance";
                 Waiting = true;
                 const auto pending = Runtime::ApplyEditorPointSamplingCommand(
                     Runtime::BindEditorProcessingCommands(Context), config,
                     [this, vulkan](Runtime::EditorPointSamplingResult result) {
-                        if (vulkan) VulkanRanks.push_back(Rank("v:vulkan_rank"));
+                        if (vulkan)
+                        {
+                            VulkanRanks.push_back(Rank("v:vulkan_rank"));
+                            const auto& rows = std::as_const(Context.Scene->Raw().get<GS::Vertices>(Entity).Properties);
+                            EXPECT_EQ(rows.Get<bool>("v:vulkan_selected").Vector(), rows.Get<bool>("v:cpu_selected").Vector());
+                            if (Phase >= 4) { EXPECT_EQ(result.GpuInputUploadBytes, 0u); EXPECT_GT(result.GpuInputCacheHits, 0u); }
+                            EXPECT_EQ(result.CpuStageReadbackBytes, 0u);
+                        }
                         (vulkan ? EditorVulkan : EditorCpu) = std::move(result);
                         Waiting = false;
                         ++Phase;
@@ -205,6 +239,12 @@ TEST(RUNTIME290VulkanPointSampling, FarthestPointMatchesTheCpuAcrossChunksAndThr
     ASSERT_TRUE(reference.Succeeded());
     EXPECT_EQ(final, reference.Order);
     EXPECT_EQ(run->Clearance, reference.Clearance);
+    double maxDelta = 0;
+    for (std::size_t i = 1; i < reference.Clearance.size(); ++i)
+        maxDelta = std::max(maxDelta, std::abs(run->Clearance[i] - reference.Clearance[i]));
+    std::ostringstream measured;
+    measured << std::setprecision(17) << maxDelta;
+    RecordProperty("max_clearance_delta", measured.str());
     EXPECT_TRUE(run->Verified) << run->VerifyDiagnostic;
 
     // Editor: the Vulkan backend equals the CPU backend, three times.

@@ -6,6 +6,8 @@ This index is the canonical entry point for method/paper implementation document
 
 > **Pathfinder method.** [`METHOD-002 — Signed Heat Method reference backend`](../../tasks/archive/METHOD-002-signed-heat-method-reference-backend.md) is the first method driven end-to-end through the methods pipeline (paper intake → CPU reference → correctness tests → benchmark harness → docs). See retired [`METHODS-001`](../../tasks/archive/METHODS-001-signed-heat-pathfinder.md) for the rationale and dependency chain. Treat the resulting [`methods/geometry/signed_heat/`](../../methods/geometry/signed_heat/) package as the canonical pattern when authoring future method packages.
 
+- [Point sampling backend contract](point-sampling.md): resident FPS inputs, completion-only chunks, terminal publication and parity verification.
+
 ## Start here
 
 - [Method template](method-template.md)

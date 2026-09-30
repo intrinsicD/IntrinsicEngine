@@ -3,6 +3,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <cstddef>
 #include <cstring>
 #include <expected>
@@ -436,6 +437,15 @@ namespace Extrinsic::Tests
         // ---- IDevice -------------------------------------------------------
         [[nodiscard]] bool IsOperational() const noexcept override { return Operational; }
         [[nodiscard]] bool SupportsShaderFloat64() const noexcept override { return ShaderFloat64; }
+        std::function<RHI::ReadbackToken(std::function<RHI::BufferHandle(RHI::ICommandContext&)>,
+                                        std::uint64_t, RHI::ReadbackSink)> ComputeReadback{};
+        [[nodiscard]] RHI::ReadbackToken SubmitComputeReadback(
+            std::function<RHI::BufferHandle(RHI::ICommandContext&)> record, std::uint64_t bytes,
+            RHI::ReadbackSink sink) override
+        {
+            return ComputeReadback ? ComputeReadback(std::move(record), bytes, std::move(sink)) : RHI::ReadbackToken{};
+        }
+
 
         void NoteRecipeGraphValidation(bool clean) noexcept override;
 

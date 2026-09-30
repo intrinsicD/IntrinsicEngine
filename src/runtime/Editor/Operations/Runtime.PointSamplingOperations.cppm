@@ -30,6 +30,7 @@ export namespace Extrinsic::Runtime
         std::string RequestedBackend{"cpu_reference"};
         std::string Backend{"cpu_reference"};
         std::string BackendDiagnostic{};
+        std::uint64_t GpuInputUploadBytes{}, GpuInputCacheHits{}, CpuStageReadbackBytes{};
         std::string Message{};
         [[nodiscard]] bool Succeeded() const noexcept { return Status == EditorCommandStatus::Applied; }
     };

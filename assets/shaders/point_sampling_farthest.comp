@@ -27,7 +27,9 @@ layout(push_constant, scalar) uniform Push {
     uint64_t partials;   // one Candidate per group
     uint64_t results;    // clearance doubles (count), then order uints (count)
     uint count, groups, capacity, round;
-    uint mode, reserved;
+    uint mode, first;
+    uint64_t sourcePoints, sourceWeights, rows, model;
+    uint weightBytes, reserved;
 } pc;
 
 shared double sharedKey[256];
@@ -52,12 +54,54 @@ void Reduce(uint local)
     barrier();
 }
 
+// Integer loads preserve float subnormals on devices whose float arithmetic flushes them.
+double LoadFloat(uint64_t address, uint index)
+{
+    uint bits = Uints(address).v[index];
+    if ((bits & 0x7f800000u) == 0u)
+        return ((bits & 0x80000000u) == 0u ? 1.0lf : -1.0lf) * double(bits & 0x7fffffu) * 1.4012984643248171e-45lf;
+    return double(uintBitsToFloat(bits));
+}
+double RoundFloat(double value)
+{
+    if (abs(value) < 1.1754943508222875e-38lf)
+        return roundEven(value / 1.4012984643248171e-45lf) * 1.4012984643248171e-45lf;
+    return double(float(value));
+}
+
 void main()
 {
     const uint local = gl_LocalInvocationID.x;
     const uint i = gl_GlobalInvocationID.x;
     Uints selected = Uints(pc.selected);
     Doubles clear = Doubles(pc.clearance);
+    if (pc.mode == 3u)
+    {
+        if (i >= pc.count) return;
+        uint row = pc.rows == 0ul ? i : Uints(pc.rows).v[i];
+        dvec3 p = dvec3(LoadFloat(pc.sourcePoints, 3u * row), LoadFloat(pc.sourcePoints, 3u * row + 1u),
+                        LoadFloat(pc.sourcePoints, 3u * row + 2u));
+        Doubles model = Doubles(pc.model);
+        for (uint axis = 0u; axis < 3u; ++axis)
+        {
+            // Match GLM's (column0*x + column1*y) + (column2*z + column3).
+            precise double xy = model.v[axis] * p.x + model.v[4u + axis] * p.y;
+            precise double zw = model.v[8u + axis] * p.z + model.v[12u + axis];
+            precise double world = xy + zw;
+            Doubles(pc.points).v[3u * i + axis] = RoundFloat(world);
+        }
+        if (pc.weights != 0ul)
+            Doubles(pc.weights).v[i] = pc.weightBytes == 8u ? Doubles(pc.sourceWeights).v[row] : LoadFloat(pc.sourceWeights, row);
+        clear.v[i] = packDouble2x32(uvec2(0u, 0x7ff00000u));
+        selected.v[i] = i == pc.first ? 1u : 0u;
+        if (i == 0u)
+        {
+            selected.v[pc.count] = pc.first;
+            Doubles(pc.results).v[0] = packDouble2x32(uvec2(0u, 0x7ff00000u));
+            Uints(pc.results + uint64_t(pc.capacity) * 8ul).v[0] = pc.first;
+        }
+        return;
+    }
     if (pc.mode == ModeUpdate)
     {
         if (i >= pc.count || selected.v[i] != 0u) return;

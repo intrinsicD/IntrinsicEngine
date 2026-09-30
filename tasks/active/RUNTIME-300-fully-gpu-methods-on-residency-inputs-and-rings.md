@@ -40,8 +40,51 @@ contracts: [geometry.property-coherence, geometry.element-domain-sources, method
 - [ ] `method.engine-integration` publication row states "GPU preview: yes/no; commit via X" and the method docs record the backend identity and parity delta.
 - [ ] Each of the four methods moves data only at start (resident input) and end (Accept readback or the terminal publication).
 
+## Current implementation slice and remaining work
+
+The FPS slice changes canonical position/weight input acquisition, device-side
+live-row gathering/world conversion, completion-only intermediate submissions,
+terminal publication guards, and panel/agent IO reporting. Its existing
+`PointLBVHGpuTestObjs` smoke now checks repeat-run residency and reports the
+measured clearance delta when executed. GPU execution is still required; no
+Operational or parity verdict is recorded for the changed path.
+
+The other rows remain under this task's split-out provision:
+
+- **LOP:** replace packed private input uploads with stride-12 resident views;
+  page the producer's iteration loop across completions; write/publish the
+  positions run ring every configured preview interval; connect Stop,
+  Accept/Discard and batch auto-accept to the existing positions API; add
+  method contract tests and the preview/discard/parity/IO Vulkan smoke.
+- **k-means:** replace private SoA input uploads with resident inputs and
+  device conversion; page the execution plan across completions; add typed
+  integer label and float presentation rings; extend/reuse scalar publication
+  for labels and wire Stop, Accept/Discard, observation and auto-accept; add
+  contract and Vulkan parity/IO/preview tests.
+- **Keypoints:** retain residency-backed index views through completion; page
+  spacing, covariance and suppression work instead of recording every page
+  in one submission; write score/mask rings and extend/reuse the scalar
+  transaction for atomic publication; wire panel/agent lifecycle and IO
+  reporting; add contract and Vulkan parity/IO/preview tests.
+
+Reuse review: FPS keeps `Runtime.PointSamplingOperations`' existing atomic
+rank/mask history entry and `Runtime.EditorFramedGpuJob`'s lifecycle. The
+completion-only path extends `SpatialIndexCache` and Vulkan's existing timeline
+callback queue. No parallel scheduler, transaction service or transfer queue
+was introduced. FPS has no preview or output-ring `BindRevision` by design.
+
 ## Verification
 ```bash
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 DISPLAY=:7 ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu|vulkan' --timeout 900
 ```
+- 2026-09-30 (slice 1 committed: FPS). FPS reads canonical resident positions/weights,
+  gathers and converts on the device, runs bounded completion-only intermediate submissions
+  and publishes through the existing undoable terminal publication. Review follow-ups:
+  - the transfer timeline signal uses ALL_COMMANDS, so completion-only compute is covered;
+  - an all-live input uploads no row map;
+  - the panel test waits for the published normals.
+
+  Reviewed by Claude Opus 5.5: no P1/P2. Gates: CPU 5410/5410; GPU suite green except the
+  environmental `VulkanShutdownLsanContract` (RUNTIME290 FPS smoke passes). Remaining in
+  this task: LOP, k-means and keypoints (see the items above).

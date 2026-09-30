@@ -26,6 +26,7 @@ import Extrinsic.Runtime.RegistrationOperations;
 import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.MeshTopologyOperations;
 import Extrinsic.Runtime.PointFieldOperations;
+import Extrinsic.Core.Tasks;
 import Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.Runtime.PointSetOperations;
 import Extrinsic.Runtime.PointConstructionOperations;
@@ -391,7 +392,12 @@ TEST(SandboxProcessingPanels, ShowButtonsApplyAppearancePropertiesOnMeshGraphAnd
             if (action == 0 && step == 2)
                 ImGui::ActivateItemByID(window->GetID("Estimate normals"));
             if (step == 3)
+            {
+                // Point-set normals run asynchronously: hold this step until they are
+                // published, so Show never races the completion under parallel CTest load.
+                if (action == 0 && !std::as_const(properties).Exists("v:normal")) return;
                 ImGui::SetScrollY(window, window->ScrollMax.y);
+            }
             if (step == 5)
             {
                 if (action == 1 || action == 2)

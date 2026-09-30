@@ -518,6 +518,8 @@ namespace Extrinsic::Runtime
                                  {"message", r.Message}, {"method", r.Method}, {"input_points", r.InputCount},
                                  {"samples", r.SampleCount}, {"output_entity", r.OutputEntityId},
                                  {"milliseconds", r.Milliseconds}, {"distance_pairs", r.DistancePairs},
+                                 {"gpu_input_upload_bytes", r.GpuInputUploadBytes}, {"gpu_input_cache_hits", r.GpuInputCacheHits},
+                                 {"cpu_stage_readback_bytes", r.CpuStageReadbackBytes},
                                  {"requested_backend", r.RequestedBackend}, {"backend", r.Backend},
                                  {"backend_diagnostic", r.BackendDiagnostic}});
             };

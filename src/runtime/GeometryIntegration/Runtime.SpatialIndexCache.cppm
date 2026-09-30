@@ -139,6 +139,7 @@ export namespace Extrinsic::Runtime
         // Record against the retained, current index on the device-owner thread.
         // Recorder owns its buffers (including a TransferSrc result of readbackBytes)
         // through captured leases. The cache retains it until the final readback is safe.
+        // Zero bytes requests completion only, with no CPU transfer.
         [[nodiscard]] std::shared_ptr<SpatialGpuResult> QueueGpuCompute(
             SpatialIndexHandle handle, std::size_t readbackBytes,
             std::function<RHI::BufferHandle(RHI::ICommandContext&,

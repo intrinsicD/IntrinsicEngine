@@ -1402,7 +1402,7 @@ RHI::ReadbackToken VulkanDevice::SubmitComputeReadback(
     std::function<RHI::BufferHandle(RHI::ICommandContext&)> record, const std::uint64_t readbackBytes,
     RHI::ReadbackSink sink)
 {
-    if (!record || readbackBytes == 0u || !HasLiveOperationalPrerequisites() || !m_TransferQueue ||
+    if (!record || !HasLiveOperationalPrerequisites() || !m_TransferQueue ||
         !m_TransferQueue->IsValid() || !m_BindlessHeap || !m_BindlessHeap->IsValid())
         return {};
     // GRAPHICS-150: a transfer-pool command buffer on the graphics queue, so the work is ordered

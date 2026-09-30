@@ -283,9 +283,11 @@ namespace Extrinsic::RHI
         // TransferSrc) and submits at once; the transfer queue's CollectCompleted delivers the
         // bytes to `sink` as soon as the GPU finished, with no frames-in-flight wait. The work
         // is ordered after every frame already submitted. Device-owner thread only; buffers the
-        // recorder uses must stay alive, and unwritten, until the sink ran. An invalid token
+        // recorder uses must stay alive, and unwritten, until the sink ran. Zero bytes requests
+        // completion only: no copy or staging allocation; the sink receives an empty span.
+        // The recorder must still return a valid buffer to indicate successful recording. An invalid token
         // (the default: unsupported, or the recorder returned no buffer) means nothing was
-        // submitted; the caller then records into the frame instead.
+        // submitted. A stateful recorder may fall back to a frame only if it was not invoked.
         [[nodiscard]] virtual ReadbackToken SubmitComputeReadback(
             std::function<BufferHandle(ICommandContext&)> /*record*/, std::uint64_t /*readbackBytes*/,
             ReadbackSink /*sink*/)

@@ -192,7 +192,7 @@ namespace Extrinsic::Runtime
                     work->Result->State = SpatialQueryState::Failed;
                     return;
                 }
-                std::memcpy(work->Result->Data.data(), data.data(), data.size());
+                if (!data.empty()) std::memcpy(work->Result->Data.data(), data.data(), data.size());
                 work->Result->State = SpatialQueryState::Ready;
             });
         }
@@ -202,7 +202,9 @@ namespace Extrinsic::Runtime
         bool SubmitImmediate(const std::shared_ptr<Computation>& work)
         {
             if (work->Target && !(work->Target->Gpu && work->Target->Gpu->View().NodesBDA)) return false;
-            const auto record = [this, work](RHI::ICommandContext& commands) {
+            bool recorded = false;
+            const auto record = [this, work, &recorded](RHI::ICommandContext& commands) {
+                recorded = true;
                 if (!work->Target) return work->Record(commands, {});
                 const auto& e = *work->Target;
                 return work->Record(commands, {e.Gpu->View().NodesBDA, Device->GetBufferDeviceAddress(e.Points),
@@ -210,7 +212,16 @@ namespace Extrinsic::Runtime
                                                std::uint32_t(e.Snapshot->Slots.size())});
             };
             if (!Device->SubmitComputeReadback(record, work->Result->Data.size(), ComputationSink(work)).IsValid())
+            {
+                // A recorder can advance a chunk cursor. Replaying it after submission refusal
+                // would skip work that never reached the device. Only unsupported calls fall back.
+                if (recorded)
+                {
+                    work->Result->State = SpatialQueryState::Failed;
+                    work->Result->Diagnostic = "GPU compute submission refused after recording.";
+                }
                 return false;
+            }
             work->DownloadQueued = true;
             work->SubmittedFrame = Device->GetGlobalFrameNumber();
             work->Result->State = SpatialQueryState::Submitted;
@@ -239,8 +250,14 @@ namespace Extrinsic::Runtime
             for (auto& work : Computations)
             {
                 if (work->Result->State != SpatialQueryState::Submitted || work->DownloadQueued ||
-                    Device->GetGlobalFrameNumber() < work->SubmittedFrame + Device->GetFramesInFlight()) continue;
+                    Device->GetGlobalFrameNumber() < work->SubmittedFrame + Device->GetFramesInFlight() +
+                        (work->Result->Data.empty() ? 1u : 0u)) continue;
                 work->DownloadQueued = true;
+                if (work->Result->Data.empty())
+                {
+                    work->Result->State = SpatialQueryState::Ready;
+                    continue;
+                }
                 const auto ticket = Device->GetTransferQueue().DownloadBuffer(
                     work->Output, work->Result->Data.size(), 0, ComputationSink(work));
                 if (!ticket.IsValid())
@@ -758,7 +775,7 @@ namespace Extrinsic::Runtime
         const auto* entry = s.Find(handle);
         if (!entry || !GpuQueriesAvailable() || entry->Snapshot->Slots.empty() ||
             entry->Snapshot->Slots.size() > (1u << 20) || !record ||
-            readbackBytes == 0 || readbackBytes > (1u << 28))
+            readbackBytes > (1u << 28))
         {
             work->Result->State = SpatialQueryState::Failed;
             work->Result->Diagnostic = "GPU computation requires a current index, framed device and bounded result.";
@@ -777,7 +794,7 @@ namespace Extrinsic::Runtime
         const SpatialGpuLatency latency)
     {
         auto work = std::make_shared<Impl::Computation>();
-        if (!GpuQueriesAvailable() || !record || readbackBytes == 0 || readbackBytes > (1u << 28))
+        if (!GpuQueriesAvailable() || !record || readbackBytes > (1u << 28))
         {
             work->Result->State = SpatialQueryState::Failed;
             work->Result->Diagnostic = "GPU computation requires a framed device and bounded result.";

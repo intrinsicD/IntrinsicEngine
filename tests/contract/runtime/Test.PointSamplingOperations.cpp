@@ -1,5 +1,7 @@
 // RUNTIME-274: standalone point sampling through the editor command.
 #include <algorithm>
+#include <cstring>
+#include <optional>
 #include <cmath>
 #include <random>
 #include <string>
@@ -8,7 +10,14 @@
 #include <entt/entity/registry.hpp>
 #include <gtest/gtest.h>
 #include "SandboxEditorJobHarness.hpp"
+#include "MockRHI.hpp"
 import Extrinsic.Runtime.PointSamplingGpu;
+import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.CommandBus;
+import Extrinsic.Runtime.KernelEvents;
+import Extrinsic.Runtime.Module;
+import Extrinsic.Runtime.ServiceRegistry;
+import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.Runtime.PointSamplingOperations;
 import Extrinsic.Runtime.RegistrationOperations;
 import Extrinsic.Runtime.WorldRegistry;
@@ -179,4 +188,239 @@ TEST(PointSamplingOperations, VulkanBackendWithoutADeviceRunsOnTheCpuAndSaysWhy)
               std::string::npos);
     EXPECT_NE(R::PointSamplingGpuUnsupportedReason({}, 300u, 40u, nullptr).find("No operational Vulkan device"),
               std::string::npos);
+}
+
+namespace
+{
+    class ResidentPointSampling : public ::testing::Test
+    {
+    protected:
+        Scene S;
+        Extrinsic::Tests::MockDevice Device;
+        Extrinsic::Tests::EditorJobHarness Jobs;
+        R::SpatialIndexCache Cache;
+        R::CommandBus Commands;
+        R::KernelEventBus Events;
+        R::ServiceRegistry Services;
+        std::optional<R::JobDesc> Queued;
+        entt::entity Entity{};
+        R::PointSamplingOperationConfig Config;
+        unsigned Calls{};
+        R::EditorPointSamplingResult Last;
+        void SetUp() override
+        {
+            Entity = MakeCloud(S, 12);
+            Config = {.SourceStableEntityId = Id(Entity), .Count = 4, .Backend = R::PointSamplingBackend::Vulkan};
+            Device.ShaderFloat64 = true;
+            Device.TransferQueue.AcceptBufferUploads = true;
+            S.Context.Device = &Device;
+            S.Context.SpatialIndices = &Cache;
+            S.Context.JobCommands.Submit = [this](R::JobDesc desc, R::EditorJobIdentity) {
+                Queued = std::move(desc); return R::JobToken{1, 1};
+            };
+            Services.BeginRegistration();
+            ASSERT_TRUE(Services.Provide<Extrinsic::RHI::IDevice>(Device, "test").has_value());
+            R::EngineSetup setup{Commands, Events, Jobs.Jobs(), S.Worlds, Services, [](R::FramePhase, R::RuntimeFrameHook) {}};
+            ASSERT_TRUE(Cache.OnRegister(setup).has_value());
+        }
+        void TearDown() override
+        {
+            Queued.reset();
+            Jobs.Jobs().CancelAndDrain();
+            R::RuntimeModuleShutdownContext shutdown{Commands, Events, Jobs.Jobs(), S.Worlds, Services};
+            Cache.OnShutdown(shutdown);
+        }
+        auto Start()
+        {
+            return R::ApplyEditorPointSamplingCommand(S.Commands(), Config,
+                [this](auto result) { ++Calls; Last = std::move(result); });
+        }
+        auto& Rows() { return S.Registry.Raw().get<GS::Vertices>(Entity).Properties; }
+    };
+}
+
+TEST_F(ResidentPointSampling, SecondAdmissionReusesCanonicalInputAndDiscardKeepsCpuUnchanged)
+{
+    auto first = Start();
+    ASSERT_EQ(first.Status, R::EditorCommandStatus::Pending) << first.Message;
+    EXPECT_EQ(first.GpuInputUploadBytes, 12u * 12u);
+    ASSERT_TRUE(Queued);
+    Queued->FinalizeUnpublishedOnMainThread();
+    Queued->FinalizeUnpublishedOnMainThread();
+    EXPECT_EQ(Calls, 1u);
+    EXPECT_FALSE(Rows().Exists(Config.RankName));
+    EXPECT_FALSE(Rows().Exists(Config.SelectedName));
+    auto second = Start();
+    ASSERT_EQ(second.Status, R::EditorCommandStatus::Pending) << second.Message;
+    EXPECT_EQ(second.GpuInputUploadBytes, 0u);
+    EXPECT_EQ(second.GpuInputCacheHits, 1u);
+    EXPECT_EQ(second.CpuStageReadbackBytes, 0u);
+    Queued->FinalizeUnpublishedOnMainThread();
+    EXPECT_EQ(Calls, 2u);
+}
+
+TEST_F(ResidentPointSampling, InputOutputAndTransformEditsInvalidateQueuedPublication)
+{
+    for (unsigned edit = 0; edit < 4; ++edit)
+    {
+        ASSERT_EQ(Start().Status, R::EditorCommandStatus::Pending);
+        ASSERT_EQ(Queued->ValidateBeforeApply(), R::JobApplyValidation::Current);
+        if (edit == 0) Rows().Get<glm::vec3>("v:position")[0].x += 1;
+        if (edit == 1) Rows().GetOrAdd<float>(Config.RankName)[0] = 2;
+        if (edit == 2) Rows().GetOrAdd<bool>(Config.SelectedName)[0] = true;
+        if (edit == 3) S.Registry.Raw().get<T::Component>(Entity).Position.x += 1;
+        EXPECT_EQ(Queued->ValidateBeforeApply(), R::JobApplyValidation::StaleGeneration);
+        Queued->FinalizeUnpublishedOnMainThread();
+        EXPECT_EQ(Last.Status, R::EditorCommandStatus::StaleEntity);
+    }
+    EXPECT_EQ(Calls, 4u);
+}
+
+TEST_F(ResidentPointSampling, RefusedUploadAndRejectedJobNotifyExactlyOnceWithoutCpuPublication)
+{
+    Device.TransferQueue.AcceptBufferUploads = false;
+    const auto refused = Start();
+    EXPECT_EQ(refused.Status, R::EditorCommandStatus::GeometryProcessingFailed);
+    EXPECT_EQ(Calls, 1u);
+    EXPECT_FALSE(Queued);
+    EXPECT_FALSE(Rows().Exists(Config.RankName));
+    Device.TransferQueue.AcceptBufferUploads = true;
+    S.Context.JobCommands.Submit = [](R::JobDesc, R::EditorJobIdentity) { return R::JobToken{}; };
+    EXPECT_EQ(Start().Status, R::EditorCommandStatus::GeometryProcessingFailed);
+    EXPECT_EQ(Calls, 2u);
+    EXPECT_FALSE(Rows().Exists(Config.RankName));
+}
+
+TEST_F(ResidentPointSampling, CompletionOnlyFrameWaitsPastFenceReuseWithoutReadback)
+{
+    auto result = Cache.QueueGpuCompute(0u, [](auto&, const auto&) { return Extrinsic::RHI::BufferHandle{1, 1}; });
+    ASSERT_TRUE(result);
+    Jobs.Jobs().RecordGpuQueueFrameCommands(Device.CommandContext);
+    EXPECT_EQ(result->State, R::SpatialQueryState::Submitted);
+    Device.GlobalFrameNumber = Device.FramesInFlight;
+    (void)Jobs.Jobs().DrainGpuQueueCompletedTransfers();
+    EXPECT_EQ(result->State, R::SpatialQueryState::Submitted);
+    ++Device.GlobalFrameNumber;
+    (void)Jobs.Jobs().DrainGpuQueueCompletedTransfers();
+    EXPECT_EQ(result->State, R::SpatialQueryState::Ready);
+    EXPECT_TRUE(result->Data.empty());
+}
+
+TEST_F(ResidentPointSampling, WorkspaceReadsResidentPropertiesAndUploadsOnlyMetadata)
+{
+    namespace G = Extrinsic::Graphics;
+    auto& residency = *Cache.PropertyResidency();
+    const auto view = R::ResolveGpuPropertyInput(residency, S.Registry, S.World, Entity,
+        {.Domain = D::PointCloudPoint, .Name = "v:position", .ValueKind = Geometry::PropertyValueKind::Vec3});
+    ASSERT_TRUE(view);
+    const std::vector<std::uint32_t> rows{2, 4, 8};
+    G::FarthestPointSamplingWorkspace workspace(Device);
+    ASSERT_TRUE(workspace.Begin({.Positions = *view, .Rows = rows, .Count = 2}));
+    Device.BufferWrites.clear();
+    ASSERT_TRUE(workspace.RecordNext(Device.CommandContext).IsValid());
+    // The only host writes are the live-row map and the world matrix; values are device inputs.
+    ASSERT_EQ(Device.BufferWrites.size(), 2u);
+    EXPECT_EQ(workspace.Produced(), 2u);
+    EXPECT_TRUE(workspace.Finished());
+    auto wrong = *view;
+    wrong.Layout.Channels = 4;
+    EXPECT_FALSE(workspace.Begin({.Positions = wrong, .Count = 2}));
+    const std::vector<std::uint32_t> invalidRows{12};
+    EXPECT_FALSE(workspace.Begin({.Positions = *view, .Rows = invalidRows, .Count = 1}));
+}
+
+TEST_F(ResidentPointSampling, TerminalGpuOrderPublishesAtomicallyAndUndoRestoresBothFields)
+{
+    std::optional<Extrinsic::RHI::ReadbackSink> sink;
+    Device.ComputeReadback = [&](auto record, std::uint64_t bytes, auto completion) {
+        EXPECT_EQ(bytes, Config.Count * 12u);
+        EXPECT_TRUE(record(Device.CommandContext).IsValid());
+        sink = std::move(completion);
+        return Extrinsic::RHI::ReadbackToken{1};
+    };
+    const auto& rows = std::as_const(Rows());
+    const auto points = rows.Get<glm::vec3>("v:position");
+    const auto reference = Geometry::PointSampling::Order(std::span<const glm::vec3>(points.Vector()), {}, Config.Count);
+    ASSERT_TRUE(reference.Succeeded());
+    ASSERT_EQ(Start().Status, R::EditorCommandStatus::Pending);
+    EXPECT_FALSE(Queued->IsReadyToApply());
+    ASSERT_TRUE(sink);
+    EXPECT_FALSE(Rows().Exists(Config.RankName));
+    std::vector<std::byte> bytes(Config.Count * 12u);
+    std::memcpy(bytes.data(), reference.Clearance.data(), Config.Count * sizeof(double));
+    std::memcpy(bytes.data() + Config.Count * sizeof(double), reference.Order.data(), Config.Count * sizeof(std::uint32_t));
+    sink->Deliver(bytes);
+    ASSERT_TRUE(Queued->IsReadyToApply());
+    ASSERT_EQ(Queued->ValidateBeforeApply(), R::JobApplyValidation::Current);
+    ASSERT_TRUE(Queued->PublishCompletion(Events, R::JobResultEnvelope::Make(true)));
+    EXPECT_EQ(Calls, 1u);
+    EXPECT_EQ(Last.Backend, "gpu_vulkan_compute");
+    for (std::size_t i = 0; i < reference.Order.size(); ++i)
+    {
+        EXPECT_EQ(rows.Get<float>(Config.RankName)[reference.Order[i]], float(i));
+        EXPECT_TRUE(rows.Get<bool>(Config.SelectedName)[reference.Order[i]]);
+    }
+    ASSERT_TRUE(S.History.Undo().Succeeded());
+    EXPECT_FALSE(rows.Exists(Config.RankName));
+    EXPECT_FALSE(rows.Exists(Config.SelectedName));
+    ASSERT_TRUE(S.History.Redo().Succeeded());
+    EXPECT_TRUE(rows.Exists(Config.RankName));
+    Queued->FinalizeUnpublishedOnMainThread();
+    EXPECT_EQ(Calls, 1u);
+}
+
+TEST_F(ResidentPointSampling, RefusedRecordedSubmissionIsNotReplayedOrPublished)
+{
+    unsigned records = 0;
+    Device.ComputeReadback = [&](auto record, std::uint64_t, auto) {
+        ++records;
+        EXPECT_TRUE(record(Device.CommandContext).IsValid());
+        return Extrinsic::RHI::ReadbackToken{};
+    };
+    ASSERT_EQ(Start().Status, R::EditorCommandStatus::Pending);
+    ASSERT_TRUE(Queued->IsReadyToApply());
+    Jobs.Jobs().RecordGpuQueueFrameCommands(Device.CommandContext);
+    EXPECT_EQ(records, 1u);
+    EXPECT_FALSE(Queued->PublishCompletion(Events, R::JobResultEnvelope::Make(true)));
+    EXPECT_EQ(Last.Status, R::EditorCommandStatus::GeometryProcessingFailed);
+    EXPECT_FALSE(Rows().Exists(Config.RankName));
+    Queued->FinalizeUnpublishedOnMainThread();
+    EXPECT_EQ(Calls, 1u);
+}
+
+TEST_F(ResidentPointSampling, WeightAndDeletionChangesRefusePublication)
+{
+    Config.WeightsName = "v:importance";
+    (void)Rows().GetOrAdd<float>(Config.WeightsName, 1.0f);
+    for (unsigned edit = 0; edit < 2; ++edit)
+    {
+        ASSERT_EQ(Start().Status, R::EditorCommandStatus::Pending);
+        if (edit == 0) Rows().Get<float>(Config.WeightsName)[0] = 2.0f;
+        else Rows().GetOrAdd<bool>("v:deleted", false)[0] = true;
+        EXPECT_EQ(Queued->ValidateBeforeApply(), R::JobApplyValidation::StaleGeneration);
+        Queued->FinalizeUnpublishedOnMainThread();
+        EXPECT_FALSE(Rows().Exists(Config.RankName));
+    }
+    EXPECT_EQ(Calls, 2u);
+}
+
+TEST_F(ResidentPointSampling, WorkspacePagesRoundsWithinTheSubmissionBudget)
+{
+    namespace G = Extrinsic::Graphics;
+    const auto count = G::FarthestPointSamplingWorkspace::MaxPoints;
+    const auto buffer = Device.CreateBuffer({.SizeBytes = std::uint64_t(count) * 12u,
+        .Usage = Extrinsic::RHI::BufferUsage::Storage});
+    const G::GpuPropertyView input{.Buffer = buffer, .Address = Device.GetBufferDeviceAddress(buffer),
+        .Bytes = std::uint64_t(count) * 12u, .Layout = {.Channels = 3, .Count = count}};
+    G::FarthestPointSamplingWorkspace workspace(Device);
+    ASSERT_TRUE(workspace.Begin({.Positions = input, .Count = count}));
+    EXPECT_FALSE(workspace.NextChunkFinishes());
+    ASSERT_TRUE(workspace.RecordNext(Device.CommandContext).IsValid());
+    const auto first = workspace.Produced();
+    EXPECT_LE(std::uint64_t(first - 1u) * count, G::FarthestPointSamplingWorkspace::MaxPairsPerSubmission);
+    EXPECT_FALSE(workspace.Finished());
+    ASSERT_TRUE(workspace.RecordNext(Device.CommandContext).IsValid());
+    EXPECT_LE(std::uint64_t(workspace.Produced() - first) * count, G::FarthestPointSamplingWorkspace::MaxPairsPerSubmission);
+    EXPECT_GT(workspace.Produced(), first);
+    for (const auto& dispatch : Device.CommandContext.DispatchRecords) EXPECT_LE(dispatch.X, 65535u);
 }

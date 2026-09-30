@@ -499,3 +499,27 @@ messages report upload bytes, input hits and diagnostic/Accept readback bytes.
 The panel uses this same lifecycle; batch/agent commands accept automatically.
 See [normal estimation](normal-estimation.md#resident-pca-vulkan_lbvh) for admission,
 numerical limits and pending GPU parity evidence.
+
+### Resident farthest-point sampling
+
+`Runtime.PointSamplingOperations` resolves canonical position and optional weight
+slots through `ResolveGpuPropertyInput`. `Graphics.FarthestPointSampling` retains
+those views through completion and gathers live rows on the device. It applies
+the captured world matrix, rounds to the public float position representation,
+and converts to double working coordinates, preserving the CPU sampling contract.
+Only row-map and transform metadata are written privately at start. Results and
+agent/panel diagnostics report residency input uploads, cache hits and CPU-stage
+readback bytes (zero for FPS); metadata is not a property-value upload.
+
+Rounds remain bounded by the workspace's point-pair budget. Intermediate chunks
+use zero-byte `QueueGpuCompute` submissions; Vulkan uses the existing transfer
+queue timeline and callback with no staging allocation or copy. The framed
+fallback waits past frame-fence reuse before reporting completion. A submission
+refused after its recorder ran fails instead of replaying an advanced cursor.
+
+GPU preview: no; commit via the existing atomic rank/selection publication on
+completion (or the existing generated-point-cloud publication). Input, weight,
+deletion, transform and output revisions guard publication. Cancellation and
+admission refusal leave CPU properties unchanged. FPS has no output Accept ring
+or `BindRevision`: its canonical inputs are unchanged by rank/mask publication.
+See the [sampling backend contract](../methods/point-sampling.md) for verification.

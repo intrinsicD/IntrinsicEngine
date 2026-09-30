@@ -49,8 +49,8 @@ namespace Extrinsic::Runtime
         bool Began{false};
     };
 
-    PointSamplingGpuRun::PointSamplingGpuRun(RHI::IDevice& device, const std::span<const glm::vec3> points,
-                                             const PS::Params& params, const std::size_t count)
+    PointSamplingGpuRun::PointSamplingGpuRun(RHI::IDevice& device, const Graphics::FarthestPointGpuInput& input,
+                                             const std::span<const glm::vec3> points, const PS::Params& params)
         : m_Impl(std::make_unique<Impl>())
     {
         auto& s = *m_Impl;
@@ -65,9 +65,8 @@ namespace Extrinsic::Runtime
         s.Weights.assign(params.Weights.begin(), params.Weights.end());
         s.Params = params;
         s.Params.Weights = s.Weights;
-        s.Count = std::min(count, points.size());
-        s.Began = s.Workspace->Begin({.X = s.X, .Y = s.Y, .Z = s.Z, .Weights = s.Weights,
-                                      .FirstIndex = params.FirstIndex, .Count = std::uint32_t(s.Count)});
+        s.Count = input.Count;
+        s.Began = points.size() > 0u && s.Workspace->Begin(input);
     }
 
     PointSamplingGpuRun::~PointSamplingGpuRun() = default;
@@ -76,10 +75,9 @@ namespace Extrinsic::Runtime
     {
         auto& s = *m_Impl;
         if (!s.Began) return nullptr;
-        // Only the chunk that finishes reads the order back; earlier chunks read one double
-        // (GRAPHICS-153: CPU<->GPU traffic at the start and the end only).
+        // Earlier chunks wait for completion without moving any intermediate values to the CPU.
         const std::size_t bytes = s.Workspace->NextChunkFinishes()
-            ? Graphics::FarthestPointSamplingWorkspace::ReadbackBytes(std::uint32_t(s.Count)) : sizeof(double);
+            ? Graphics::FarthestPointSamplingWorkspace::ReadbackBytes(std::uint32_t(s.Count)) : 0u;
         return cache.QueueGpuCompute(bytes,
             [workspace = s.Workspace](RHI::ICommandContext& commands, const SpatialGpuIndexView&) {
                 return workspace->RecordNext(commands);
@@ -93,7 +91,7 @@ namespace Extrinsic::Runtime
         if (produced > s.Count) return true;
         // An intermediate chunk carries no samples; the order arrives with the last one.
         if (chunk.Data.size() != Graphics::FarthestPointSamplingWorkspace::ReadbackBytes(std::uint32_t(s.Count)))
-            return chunk.Data.size() != sizeof(double) || s.Workspace->Finished();
+            return !chunk.Data.empty() || s.Workspace->Finished();
         // Entries already published never change; only the new tail is appended.
         std::vector<double> clearance(produced);
         std::vector<std::uint32_t> order(produced);

@@ -3,8 +3,6 @@ module;
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
-#include <limits>
 #include <memory>
 #include <span>
 #include <vector>
@@ -21,23 +19,27 @@ namespace Extrinsic::Graphics
     namespace
     {
         constexpr std::uint32_t kGroup = 256u;
-        enum Mode : std::uint32_t { Update = 0u, Partial = 1u, Final = 2u };
+        enum Mode : std::uint32_t { Update = 0u, Partial = 1u, Final = 2u, Initialize = 3u };
         struct Push
         {
             std::uint64_t Points{}, Weights{}, Clearance{}, Selected{}, Partials{}, Results{};
             std::uint32_t Count{}, Groups{}, Capacity{}, Round{};
-            std::uint32_t Mode{}, Reserved{};
+            std::uint32_t Mode{}, First{};
+            std::uint64_t SourcePoints{}, SourceWeights{}, Rows{}, Model{};
+            std::uint32_t WeightBytes{}, Reserved{};
         };
-        static_assert(sizeof(Push) == 72);
+        static_assert(sizeof(Push) == 112);
     }
 
     struct FarthestPointSamplingWorkspace::Impl
     {
         RHI::IDevice& Device;
         RHI::PipelineHandle Pipeline{};
-        // Points, weights, clearance, selected (+ last sample), group winners, results.
-        std::array<RHI::BufferHandle, 6> Buffers{};
-        std::vector<double> Points{}, Weights{};
+        // Working points/weights, clearance, selection, winners, results, row map and transform.
+        std::array<RHI::BufferHandle, 8> Buffers{};
+        GpuPropertyView Positions{}, Weights{};
+        std::vector<std::uint32_t> Rows{};
+        std::array<double, 16> Model{};
         // Rounds one chunk records for `remaining` samples: the pairs stay under the budget.
         [[nodiscard]] std::uint32_t Rounds(std::uint32_t remaining) const noexcept
         {
@@ -45,7 +47,7 @@ namespace Extrinsic::Graphics
                 : std::uint32_t(std::clamp<std::uint64_t>(MaxPairsPerSubmission / N, 1u, remaining));
         }
         std::uint32_t N{0u}, Count{0u}, First{0u}, Produced{0u};
-        bool Uploaded{false};
+        bool Initialized{false};
         explicit Impl(RHI::IDevice& device) : Device(device) {}
         ~Impl() { Release(); }
         void Release()
@@ -65,23 +67,17 @@ namespace Extrinsic::Graphics
             if (data != nullptr && bytes > 0u) Device.WriteBuffer(Buffers[index], data, bytes);
             return true;
         }
-        bool Upload()
+        bool Allocate()
         {
             const std::uint32_t groups = (N + kGroup - 1u) / kGroup;
-            std::vector<double> clearance(N, std::numeric_limits<double>::infinity());
-            std::vector<std::uint32_t> selected(std::size_t(N) + 1u, 0u);
-            selected[First] = 1u;
-            selected[N] = First;
-            std::vector<std::byte> results(ReadbackBytes(Count));
-            const double first = std::numeric_limits<double>::infinity();
-            std::memcpy(results.data(), &first, sizeof(first));
-            std::memcpy(results.data() + std::size_t(Count) * sizeof(double), &First, sizeof(First));
-            return Create(0, Points.size() * sizeof(double), Points.data(), "FarthestPoint.Points") &&
-                   (Weights.empty() || Create(1, Weights.size() * sizeof(double), Weights.data(), "FarthestPoint.Weights")) &&
-                   Create(2, clearance.size() * sizeof(double), clearance.data(), "FarthestPoint.Clearance") &&
-                   Create(3, selected.size() * sizeof(std::uint32_t), selected.data(), "FarthestPoint.Selected") &&
+            return Create(0, std::size_t(N) * 3u * sizeof(double), nullptr, "FarthestPoint.Points") &&
+                   (!Weights.Valid() || Create(1, std::size_t(N) * sizeof(double), nullptr, "FarthestPoint.Weights")) &&
+                   Create(2, std::size_t(N) * sizeof(double), nullptr, "FarthestPoint.Clearance") &&
+                   Create(3, (std::size_t(N) + 1u) * sizeof(std::uint32_t), nullptr, "FarthestPoint.Selected") &&
                    Create(4, std::size_t(groups) * 16u, nullptr, "FarthestPoint.GroupWinners") &&
-                   Create(5, results.size(), results.data(), "FarthestPoint.Results");
+                   Create(5, ReadbackBytes(Count), nullptr, "FarthestPoint.Results") &&
+                   (Rows.empty() || Create(6, Rows.size() * sizeof(std::uint32_t), Rows.data(), "FarthestPoint.Rows")) &&
+                   Create(7, sizeof(Model), Model.data(), "FarthestPoint.Model");
         }
     };
 
@@ -97,25 +93,28 @@ namespace Extrinsic::Graphics
     bool FarthestPointSamplingWorkspace::Begin(const FarthestPointGpuInput& input)
     {
         auto& s = *m_Impl;
-        const std::size_t n = input.X.size();
-        if (n == 0u || n > MaxPoints || input.Y.size() != n || input.Z.size() != n ||
-            (!input.Weights.empty() && input.Weights.size() != n) || input.FirstIndex >= n ||
-            input.Count == 0u || input.Count > n)
+        const auto& positions = input.Positions;
+        const auto& weights = input.Weights;
+        const std::size_t n = input.Rows.empty() ? positions.Layout.Count : input.Rows.size();
+        if (!positions.Valid() || !positions.Address || positions.Layout.Scalar != GpuScalarType::Float32 ||
+            positions.Bytes < positions.Layout.Bytes() || positions.Layout.Channels != 3u || positions.Layout.ElementBytes() != 12u || positions.Layout.RowMap != 0u ||
+            n == 0u || n > MaxPoints || input.FirstIndex >= n || input.Count == 0u || input.Count > n ||
+            std::ranges::any_of(input.Rows, [&](auto row) { return row >= positions.Layout.Count; }))
             return false;
+        if (weights.Valid() && (weights.Bytes < weights.Layout.Bytes() || !weights.Address || weights.Layout.Count != positions.Layout.Count ||
+            weights.Layout.Channels != 1u || weights.Layout.RowMap != 0u ||
+            (weights.Layout.Scalar != GpuScalarType::Float32 && weights.Layout.Scalar != GpuScalarType::Float64) ||
+            weights.Layout.ElementBytes() != GpuScalarBytes(weights.Layout.Scalar))) return false;
         s.Release();
         s.N = std::uint32_t(n);
         s.Count = input.Count;
         s.First = input.FirstIndex;
         s.Produced = 0u;
-        s.Uploaded = false;
-        s.Points.resize(3u * n);
-        for (std::size_t i = 0; i < n; ++i)
-        {
-            s.Points[3u * i] = input.X[i];
-            s.Points[3u * i + 1u] = input.Y[i];
-            s.Points[3u * i + 2u] = input.Z[i];
-        }
-        s.Weights.assign(input.Weights.begin(), input.Weights.end());
+        s.Initialized = false;
+        s.Positions = positions;
+        s.Weights = weights;
+        s.Rows.assign(input.Rows.begin(), input.Rows.end());
+        s.Model = input.Model;
         return true;
     }
 
@@ -127,10 +126,11 @@ namespace Extrinsic::Graphics
             s.Pipeline = CreateComputePipeline(s.Device, "shaders/point_sampling_farthest.comp.spv", sizeof(Push),
                                                "FarthestPointSampling");
         if (!s.Pipeline.IsValid()) return {};
-        if (!s.Uploaded)
+        const bool initialize = !s.Initialized;
+        if (initialize)
         {
-            if (!s.Upload()) return {};
-            s.Uploaded = true;
+            if (!s.Allocate()) return {};
+            s.Initialized = true;
             s.Produced = 1u;
         }
         const auto address = [&](std::size_t index) {
@@ -138,11 +138,17 @@ namespace Extrinsic::Graphics
         };
         const std::uint32_t groups = (s.N + kGroup - 1u) / kGroup;
         Push push{.Points = address(0), .Weights = address(1), .Clearance = address(2), .Selected = address(3),
-                  .Partials = address(4), .Results = address(5), .Count = s.N, .Groups = groups, .Capacity = s.Count};
+                  .Partials = address(4), .Results = address(5), .Count = s.N, .Groups = groups, .Capacity = s.Count,
+                  .First = s.First, .SourcePoints = s.Positions.Address, .SourceWeights = s.Weights.Address,
+                  .Rows = address(6), .Model = address(7),
+                  .WeightBytes = s.Weights.Valid() ? GpuScalarBytes(s.Weights.Layout.Scalar) : 0u};
         for (const auto buffer : s.Buffers)
             if (buffer.IsValid())
                 commands.BufferBarrier(buffer, RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderRead,
                                        RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite);
+        for (const auto& view : {s.Positions, s.Weights})
+            if (view.Valid()) commands.BufferBarrier(view.Buffer, RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderWrite,
+                                                     RHI::MemoryAccess::ShaderRead);
         commands.BindPipeline(s.Pipeline);
         const auto dispatch = [&](std::uint32_t mode, std::uint32_t groupCount) {
             push.Mode = mode;
@@ -152,6 +158,13 @@ namespace Extrinsic::Graphics
                 commands.BufferBarrier(s.Buffers[index], RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite,
                                        RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite);
         };
+        if (initialize)
+        {
+            dispatch(Initialize, groups);
+            for (const auto index : {0u, 1u})
+                if (s.Buffers[index].IsValid()) commands.BufferBarrier(s.Buffers[index],
+                    RHI::MemoryAccess::ShaderWrite, RHI::MemoryAccess::ShaderRead);
+        }
         // Each round is three bounded dispatches over the points; a chunk keeps its pairs under
         // the submission budget, so no single submission runs long enough for a watchdog.
         const std::uint32_t rounds = s.Rounds(s.Count - s.Produced);
@@ -174,12 +187,12 @@ namespace Extrinsic::Graphics
     {
         const auto& s = *m_Impl;
         if (s.N == 0u) return true;
-        const std::uint32_t produced = s.Uploaded ? s.Produced : 1u; // the first sample comes with the upload
+        const std::uint32_t produced = s.Initialized ? s.Produced : 1u; // initialization writes the first sample
         return produced + s.Rounds(s.Count - produced) >= s.Count;
     }
 
     bool FarthestPointSamplingWorkspace::Finished() const noexcept
     {
-        return m_Impl->N != 0u && m_Impl->Uploaded && m_Impl->Produced >= m_Impl->Count;
+        return m_Impl->N != 0u && m_Impl->Initialized && m_Impl->Produced >= m_Impl->Count;
     }
 }

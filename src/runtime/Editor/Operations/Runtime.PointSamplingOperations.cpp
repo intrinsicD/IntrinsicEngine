@@ -1,5 +1,6 @@
 module;
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -37,6 +38,7 @@ import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PointSamplingGpu;
+import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.Graph;
@@ -132,6 +134,9 @@ namespace Extrinsic::Runtime
             if (out == nullptr) return std::nullopt;
             out->Entity = *entity;
             out->Input = std::move(input);
+            // Outputs are also watched from admission, so an edit during compute is never overwritten.
+            for (const auto& name : {config.RankName, config.SelectedName})
+                out->Input.Inputs.push_back(GPD::ObserveGeometryProperty(available, config.Positions.Domain, name));
             // A deferred run publishes only while the weights it read are unchanged, too.
             if (weights) out->Input.Inputs.push_back(GPD::ObserveGeometryProperty(available, config.Positions.Domain,
                                                                                   config.WeightsName));
@@ -279,7 +284,30 @@ namespace Extrinsic::Runtime
             }
 
             // Vulkan: bounded framed chunks, the prefix checked against the CPU before publishing.
-            auto run = std::make_shared<PointSamplingGpuRun>(*context.Device, captured->World, params, count);
+            auto* residency = context.SpatialIndices->PropertyResidency();
+            if (!residency) return finish(Failure(EditorCommandStatus::GeometryProcessingFailed, "GPU property residency unavailable."));
+            const auto before = residency->Stats();
+            const auto positions = ResolveGpuPropertyInput(*residency, *context.Scene, context.World, captured->Entity, config.Positions);
+            std::optional<Graphics::GpuPropertyView> weights;
+            if (!config.WeightsName.empty())
+                weights = ResolveGpuPropertyInput(*residency, *context.Scene, context.World, captured->Entity,
+                    {.Domain = config.Positions.Domain, .Name = config.WeightsName, .ValueKind = Geometry::PropertyValueKind::Float});
+            result.GpuInputUploadBytes = residency->Stats().UploadBytes - before.UploadBytes;
+            result.GpuInputCacheHits = residency->Stats().Hits - before.Hits;
+            if (!positions || (!config.WeightsName.empty() && !weights))
+            {
+                result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                result.Message = "Resident sampling input acquisition refused; nothing was changed.";
+                return finish(result);
+            }
+            Graphics::FarthestPointGpuInput input{.Positions = *positions, .Weights = weights.value_or(Graphics::GpuPropertyView{}),
+                .Rows = captured->Input.Slots, .FirstIndex = params.FirstIndex, .Count = std::uint32_t(count)};
+            // Every row live: the shader's identity path needs no row map upload.
+            if (captured->Input.Slots.size() == positions->Layout.Count) input.Rows = {};
+            const auto model = ModelMatrix(captured->Transform ? &*captured->Transform : nullptr);
+            for (std::size_t column = 0; column < 4; ++column)
+                for (std::size_t row = 0; row < 4; ++row) input.Model[4 * column + row] = model[column][row];
+            auto run = std::make_shared<PointSamplingGpuRun>(*context.Device, input, captured->World, params);
             auto sink = GuardEditorProcessingResult(context, std::move(onComplete));
             auto delivered = std::make_shared<bool>(false);
             const auto started = std::chrono::steady_clock::now();
@@ -310,9 +338,14 @@ namespace Extrinsic::Runtime
                     std::string why;
                     PS::Result order;
                     if (gpu == nullptr || gpu->State != SpatialQueryState::Ready)
-                        why = gpu && !gpu->Diagnostic.empty() ? gpu->Diagnostic
-                                                              : "The Vulkan sampler did not return a result; sampling ran on the CPU.";
-                    else if (run->Current().Order.size() != count)
+                    {
+                        final.Status = EditorCommandStatus::GeometryProcessingFailed;
+                        final.Message = gpu && !gpu->Diagnostic.empty() ? gpu->Diagnostic : "GPU sampling submission refused.";
+                        *delivered = true;
+                        if (sink) sink(final);
+                        return false;
+                    }
+                    if (run->Current().Order.size() != count)
                         why = "The Vulkan sampler returned an incomplete order; sampling ran on the CPU.";
                     else if (!run->VerifyPrefix(why)) {}
                     if (why.empty())
@@ -346,6 +379,7 @@ namespace Extrinsic::Runtime
             {
                 pending.Status = EditorCommandStatus::GeometryProcessingFailed;
                 pending.Message = "The job lane rejected the Vulkan point sampling job.";
+                if (!*delivered) { *delivered = true; if (sink) sink(pending); }
             }
             return pending;
         }

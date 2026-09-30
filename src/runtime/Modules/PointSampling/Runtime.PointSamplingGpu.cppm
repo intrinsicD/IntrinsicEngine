@@ -1,9 +1,5 @@
-// Vulkan execution seam of Geometry.PointSampling (RUNTIME-290). Geometry stays CPU-only; this
-// module decides whether a request can run on the device, drives it in bounded chunks
-// through SpatialIndexCache::QueueGpuCompute (main thread, immediate submits), reads the order
-// back once, with the last chunk, and checks it against the CPU reference before the
-// result may report `gpu_vulkan_compute`. Methods with a device kernel: exact (weighted)
-// farthest point (Graphics.FarthestPointSampling); METHOD-014/055/060-062 plug in here.
+// Drives resident farthest-point sampling in bounded GPU submissions and checks the terminal
+// order against the CPU reference before runtime publishes it.
 module;
 #include <cstddef>
 #include <memory>
@@ -14,6 +10,7 @@ module;
 export module Extrinsic.Runtime.PointSamplingGpu;
 
 export import Geometry.PointSampling;
+export import Extrinsic.Graphics.FarthestPointSampling;
 export import Extrinsic.Runtime.SpatialIndexCache;
 
 extern "C++"
@@ -39,9 +36,9 @@ export namespace Extrinsic::Runtime
     class PointSamplingGpuRun
     {
     public:
-        // Copies the points and weights; the request must be supported (see above).
-        PointSamplingGpuRun(RHI::IDevice& device, std::span<const glm::vec3> points,
-                            const Geometry::PointSampling::Params& params, std::size_t count);
+        // Device input is canonical residency. CPU points/weights are retained only for the parity check.
+        PointSamplingGpuRun(RHI::IDevice& device, const Graphics::FarthestPointGpuInput& input,
+                            std::span<const glm::vec3> referencePoints, const Geometry::PointSampling::Params& params);
         ~PointSamplingGpuRun();
         PointSamplingGpuRun(const PointSamplingGpuRun&) = delete;
         PointSamplingGpuRun& operator=(const PointSamplingGpuRun&) = delete;

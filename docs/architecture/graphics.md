@@ -302,3 +302,11 @@ The phased path from the current 2025-era foundation (explicit RHI, render graph
 
 - Frame graph details: [frame-graph.md](frame-graph.md).
 - Historical migration docs: `legacy-rendering-architecture-migration.md`, `gpu-driven-modular-rendering-pipeline-plan.md`.
+
+## Completion-only method submissions
+
+`IDevice::SubmitComputeReadback` accepts zero bytes for a completion callback
+without readback storage or a copy. The recorder still returns a valid buffer
+as its success signal. Vulkan uses its existing timeline and callback retirement;
+`SpatialIndexCache` provides the frame-fence fallback. Resident FPS uses this
+between bounded chunks; see [property coherence](property-coherence.md#resident-farthest-point-sampling).

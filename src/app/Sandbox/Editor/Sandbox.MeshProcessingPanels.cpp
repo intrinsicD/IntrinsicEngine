@@ -4355,6 +4355,9 @@ namespace Extrinsic::Sandbox::Editor
             const auto& r = **state.LastResult;
             ImGui::Text("%s   %u of %u points   %.2f ms   backend: %s", r.Method.c_str(), r.SampleCount, r.InputCount,
                         r.Milliseconds, r.Backend.c_str());
+            ImGui::Text("GPU input: %llu bytes uploaded, %llu cache hits; CPU stage: %llu bytes",
+                        (unsigned long long)r.GpuInputUploadBytes, (unsigned long long)r.GpuInputCacheHits,
+                        (unsigned long long)r.CpuStageReadbackBytes);
             if (!r.BackendDiagnostic.empty()) ImGui::TextWrapped("%s", r.BackendDiagnostic.c_str());
             if (!r.Message.empty()) ImGui::TextWrapped("%s", r.Message.c_str());
         }

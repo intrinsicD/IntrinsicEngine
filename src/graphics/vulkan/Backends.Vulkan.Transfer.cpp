@@ -217,7 +217,9 @@ uint64_t VulkanTransferQueue::SubmitTimelineLocked(
     sigInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
     sigInfo.semaphore = m_Timeline;
     sigInfo.value = ticket;
-    sigInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
+    // All commands: a completion-only compute submission records no transfer, so a
+    // transfer-stage signal would not cover its dispatches.
+    sigInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
 
     VkSubmitInfo2 submit{};
     submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
@@ -439,7 +441,7 @@ void VulkanTransferQueue::DrainCompletedReadbacks(uint64_t completedValue)
                                                                  std::memory_order_acquire))
         {
         }
-        m_DownloadsCompleted.fetch_add(1u, std::memory_order_relaxed);
+        if (!readback.Bytes.empty()) m_DownloadsCompleted.fetch_add(1u, std::memory_order_relaxed);
     }
 }
 
@@ -907,6 +909,9 @@ RHI::ReadbackToken VulkanTransferQueue::DownloadBuffer(RHI::BufferHandle src,
 RHI::ReadbackToken VulkanTransferQueue::SubmitRecordedDownload(VkCommandBuffer cmd, RHI::BufferHandle src,
                                                                uint64_t size, RHI::ReadbackSink sink)
 {
+    // Completion-only compute shares the timeline/sink lifecycle, without a staging slot.
+    if (src.IsValid() && size == 0u && sink.IsValidForSize(0u))
+        return SubmitReadback(cmd, std::numeric_limits<size_t>::max(), 0u, std::move(sink));
     const auto source = src.IsValid() ? PrepareDownload(src, size, 0u, sink) : std::nullopt;
     if (!source)
     {
