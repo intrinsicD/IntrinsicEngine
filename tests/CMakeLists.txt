@@ -1307,6 +1307,7 @@ if(TARGET ExtrinsicRuntime)
         Test.SpatialIndexCache.cpp
         Test.GpuPropertyBinding.cpp
         Test.PropertySmoothingTransaction.cpp
+        Test.NormalTransaction.cpp
         Test.GpuPositionsAccept.cpp
         Test.RegistrationDomains.cpp
         Test.CoherentPointDriftOperations.cpp
@@ -1835,6 +1836,7 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
                 integration/graphics/Test.PropertySmoothingTransactionGpuSmoke.cpp
                 integration/graphics/Test.GpuPositionPreviewSmoke.cpp
                 integration/graphics/Test.GpuPositionsAcceptSmoke.cpp
+                integration/graphics/Test.VertexNormalsTransactionGpuSmoke.cpp
         DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
     )
     # METHOD-056: the Vulkan CPD scaling profile shares the METHOD-049 fixtures.
@@ -2150,6 +2152,7 @@ set(_graphics_contract_cpu_test_files
     Test.RenderPrepPipeline.cpp
     Test.RenderSubsystemRegistry.cpp
     Test.GpuPropertyResidency.cpp
+    Test.VertexNormalsWorkspace.cpp
     Test.RendererFrameLifecycle.cpp
     Test.RenderWorldContract.cpp
     Test.RenderGraphParallelRecording.cpp

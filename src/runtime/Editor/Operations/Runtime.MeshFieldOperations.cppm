@@ -193,19 +193,9 @@ export namespace Extrinsic::Runtime
     // front as the canonical slot of the new CPU revision (the next run uploads nothing);
     // Discard publishes nothing and releases the ring. A result whose inputs changed while it
     // waits is stale: Accept is refused with the reason and only Discard remains.
-    enum class EditorPropertySmoothingPhase : std::uint8_t
-    {
-        Running,        // the device is computing (or a chunked solve is between chunks)
-        ReadyToAccept,  // the front holds the result (or a stopped run's latest preview)
-        Accepting,      // the front is being read back and published
-        Applied,        // the CPU publication succeeded; the front is canonical
-        Discarded,      // discarded, cancelled or stopped before any preview
-        Failed,         // the device or the publication failed; nothing changed
-    };
-    [[nodiscard]] const char* ToString(EditorPropertySmoothingPhase phase) noexcept;
     struct EditorPropertySmoothingTransactionSnapshot
     {
-        EditorPropertySmoothingPhase Phase{EditorPropertySmoothingPhase::Running};
+        EditorGpuTransactionPhase Phase{EditorGpuTransactionPhase::Running};
         bool Stale{};                        // the inputs changed while the result waits
         bool CanAccept{};                    // ReadyToAccept, current and a front exists
         std::string AcceptDisabledReason{};  // why not, when a result waits but cannot be accepted

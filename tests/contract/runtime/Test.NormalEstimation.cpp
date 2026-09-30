@@ -635,7 +635,7 @@ TEST(NormalEstimationConfig, RoundTripAndSharedPreviewApplyRun)
         R::BindEditorProcessingCommands(fallback), changedConfig).Succeeded());
     EXPECT_EQ(applies, 2);
     EXPECT_EQ(R::GetNormalEstimationConfig(state.ActiveConfig)->KNeighbors, changedConfig.KNeighbors);
-    for (auto payload : {R"({"method":"automatic"})", R"({"backend":"vulkan"})", R"({"k_neighbors":0})",
+    for (auto payload : {R"({"method":"automatic"})", R"({"backend":"cuda"})", R"({"k_neighbors":0})",
                          R"({"minimum_neighbors":-1})", R"({"orientation":2})", R"({"weighting":5})",
                          R"({"use_radius":true,"radius":0})", R"({"radius":1e100})", R"({"unknown":1})",
                          R"({"fallback_normal":[1,2]})"})

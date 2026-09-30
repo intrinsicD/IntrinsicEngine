@@ -60,6 +60,19 @@ export namespace Extrinsic::Runtime
         InvalidProcessingParameters,
         GeometryProcessingFailed,
     };
+    // Phase of a GPU property transaction (ADR 0030 decisions 5-7): a method previews on the
+    // device and publishes on Accept. Shared by every method that runs one (property
+    // smoothing, vertex normals, ...).
+    enum class EditorGpuTransactionPhase : std::uint8_t
+    {
+        Running,        // the device is computing (or a chunked solve is between chunks)
+        ReadyToAccept,  // the front holds the result (or a stopped run's latest preview)
+        Accepting,      // the front is being read back and published
+        Applied,        // the CPU publication succeeded; the front is canonical
+        Discarded,      // discarded, cancelled or stopped before any preview
+        Failed,         // the device or the publication failed; nothing changed
+    };
+    [[nodiscard]] const char* ToString(EditorGpuTransactionPhase phase) noexcept;
     enum class EditorDomainWindowKind : std::uint8_t
     {
         Mesh,

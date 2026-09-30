@@ -7,6 +7,7 @@ module;
 
 export module Extrinsic.Sandbox.Editor.MeshProcessingPanels;
 import Extrinsic.Runtime.MeshFieldOperations;
+import Extrinsic.Runtime.NormalOperations;
 
 export namespace Extrinsic::Sandbox::Editor
 {
@@ -27,6 +28,8 @@ export namespace Extrinsic::Sandbox::Editor
         // Stop) as if it had started it, so the panel's transaction state is exercised without
         // a device.
         void InjectPropertySmoothingTransactionForTest(Runtime::EditorPropertySmoothingTransactionHandle transaction);
+        // The same seam for the Normal Estimation window's Vulkan run (Accept / Discard).
+        void InjectNormalTransactionForTest(Runtime::EditorNormalTransactionHandle transaction);
 
     private:
         struct Impl;

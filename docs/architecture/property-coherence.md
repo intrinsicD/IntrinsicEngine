@@ -261,6 +261,29 @@ alone are recomputed too, never left for propagation to turn into stale world
 bounds). Dependent normals keep their CPU
 state; a method that owns them republishes them itself.
 
+### Vertex normals (RUNTIME-296)
+
+The first method row of RUNTIME-294 ported to the residency (ADR 0030 decisions 8-9). The
+Vulkan `mesh_face_weighted` run reads the canonical `v:position` slot and writes the
+output's float3 ring through the same transaction shape as the scalar run
+(`EditorNormalTransaction`, phases `EditorGpuTransactionPhase` shared by every GPU
+transaction). Two things are new:
+
+- **Derived resident data.** The face rings and vertex->face incidences the kernels gather
+  over are a `uint32` bundle under a derived key (`#vertex_normal_topology`, domain
+  MeshFace, ValueKind UInt32) whose revision is a hash of the topology and deletion watches
+  (every captured input but the positions). It is a canonical slot like any other: uploaded
+  once per topology revision, an LRU cache entry, pruned with its entity, and counted by the
+  residency's IO counters; a resident bundle describes its layout from the source counts, so
+  a hit reconstructs nothing on the CPU. Method results report the bundle's bytes and reuse
+  next to the positions' upload bytes.
+- **No observation.** Vec3 normal rings are neither colormap scalars nor positions, so the
+  observer does not bind them and the render block keeps the CPU normals until Accept
+  ("GPU preview: no; commit via the normals transaction"). Accept publishes every row
+  through the existing undoable normals entry, then `BindRevision` makes the front the
+  canonical slot of the new revision; the accepted output then serves the next run's base
+  copy without an upload.
+
 ## Property revisions
 
 Every property storage and its owning registry carry a process-monotonic,

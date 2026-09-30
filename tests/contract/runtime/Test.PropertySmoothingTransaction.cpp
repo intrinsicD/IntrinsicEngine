@@ -110,7 +110,7 @@ TEST(PropertySmoothingTransaction, AcceptPublishesUndoablyThenBindsTheFrontAsThe
     const auto run = h.Ready(7.0);
     ASSERT_TRUE(run);
     auto snapshot = R::SnapshotEditorPropertySmoothing(h.Commands(), run);
-    EXPECT_EQ(snapshot.Phase, R::EditorPropertySmoothingPhase::ReadyToAccept);
+    EXPECT_EQ(snapshot.Phase, R::EditorGpuTransactionPhase::ReadyToAccept);
     EXPECT_TRUE(snapshot.CanAccept) << snapshot.AcceptDisabledReason;
     EXPECT_EQ(snapshot.Result.Status, R::EditorCommandStatus::Pending);
     EXPECT_TRUE(h.Residency.HasRing(h.Key())) << "the seam publishes a front on the output ring";
@@ -120,13 +120,13 @@ TEST(PropertySmoothingTransaction, AcceptPublishesUndoablyThenBindsTheFrontAsThe
     const auto accepted = R::AcceptEditorPropertySmoothing(h.Commands(), run, [&](R::EditorPropertySmoothingResult r) { delivered = r; });
     ASSERT_EQ(accepted.Status, R::EditorCommandStatus::Pending) << accepted.Message;
     snapshot = R::SnapshotEditorPropertySmoothing(h.Commands(), run);
-    EXPECT_EQ(snapshot.Phase, R::EditorPropertySmoothingPhase::Accepting);
+    EXPECT_EQ(snapshot.Phase, R::EditorGpuTransactionPhase::Accepting);
     EXPECT_EQ(snapshot.Result.Status, R::EditorCommandStatus::Pending) << "\"Applied\" only after the CPU publication";
     EXPECT_FALSE(delivered);
 
     ASSERT_TRUE(h.Jobs.DrainUntilTerminal());
     snapshot = R::SnapshotEditorPropertySmoothing(h.Commands(), run);
-    EXPECT_EQ(snapshot.Phase, R::EditorPropertySmoothingPhase::Applied);
+    EXPECT_EQ(snapshot.Phase, R::EditorGpuTransactionPhase::Applied);
     ASSERT_TRUE(delivered);
     EXPECT_EQ(delivered->Status, R::EditorCommandStatus::Applied) << delivered->Message;
     EXPECT_EQ(delivered->BackendId, "vulkan_compute");
@@ -175,7 +175,7 @@ TEST(PropertySmoothingTransaction, DiscardPublishesNothingAndReleasesTheRing)
     ASSERT_TRUE(h.Residency.HasRing(h.Key()));
     R::DiscardEditorPropertySmoothing(h.Commands(), run);
     const auto snapshot = R::SnapshotEditorPropertySmoothing(h.Commands(), run);
-    EXPECT_EQ(snapshot.Phase, R::EditorPropertySmoothingPhase::Discarded);
+    EXPECT_EQ(snapshot.Phase, R::EditorGpuTransactionPhase::Discarded);
     EXPECT_FALSE(snapshot.CanAccept);
     EXPECT_FALSE(h.Residency.HasRing(h.Key())) << "observation returns to the canonical slot";
     EXPECT_FALSE(h.Residency.Front(h.Key())) << "no canonical slot was ever bound";
@@ -194,17 +194,17 @@ TEST(PropertySmoothingTransaction, StaleWhilePendingDisablesAcceptUntilDiscard)
     // The input changes while the result waits.
     h.Props().Get<double>("temperature")[0] += 1.0;
     const auto stale = R::SnapshotEditorPropertySmoothing(h.Commands(), run);
-    EXPECT_EQ(stale.Phase, R::EditorPropertySmoothingPhase::ReadyToAccept);
+    EXPECT_EQ(stale.Phase, R::EditorGpuTransactionPhase::ReadyToAccept);
     EXPECT_TRUE(stale.Stale);
     EXPECT_FALSE(stale.CanAccept);
     EXPECT_NE(stale.AcceptDisabledReason.find("changed"), std::string::npos) << stale.AcceptDisabledReason;
     const auto refused = R::AcceptEditorPropertySmoothing(h.Commands(), run);
     EXPECT_EQ(refused.Status, R::EditorCommandStatus::StaleEntity) << refused.Message;
-    EXPECT_EQ(R::SnapshotEditorPropertySmoothing(h.Commands(), run).Phase, R::EditorPropertySmoothingPhase::ReadyToAccept)
+    EXPECT_EQ(R::SnapshotEditorPropertySmoothing(h.Commands(), run).Phase, R::EditorGpuTransactionPhase::ReadyToAccept)
         << "a refused Accept leaves the result waiting";
     EXPECT_FALSE(h.Props().Exists("smooth"));
     R::DiscardEditorPropertySmoothing(h.Commands(), run);
-    EXPECT_EQ(R::SnapshotEditorPropertySmoothing(h.Commands(), run).Phase, R::EditorPropertySmoothingPhase::Discarded);
+    EXPECT_EQ(R::SnapshotEditorPropertySmoothing(h.Commands(), run).Phase, R::EditorGpuTransactionPhase::Discarded);
     EXPECT_FALSE(h.Residency.HasRing(h.Key()));
 }
 
@@ -218,9 +218,9 @@ TEST(PropertySmoothingTransaction, CancelWhileAcceptingPublishesNothing)
               R::EditorCommandStatus::Pending);
     // Discard before the publication drain: the job finalizes unpublished.
     R::DiscardEditorPropertySmoothing(h.Commands(), run);
-    EXPECT_EQ(R::SnapshotEditorPropertySmoothing(h.Commands(), run).Phase, R::EditorPropertySmoothingPhase::Discarded);
+    EXPECT_EQ(R::SnapshotEditorPropertySmoothing(h.Commands(), run).Phase, R::EditorGpuTransactionPhase::Discarded);
     ASSERT_TRUE(h.Jobs.DrainUntilTerminal());
-    EXPECT_EQ(R::SnapshotEditorPropertySmoothing(h.Commands(), run).Phase, R::EditorPropertySmoothingPhase::Discarded);
+    EXPECT_EQ(R::SnapshotEditorPropertySmoothing(h.Commands(), run).Phase, R::EditorGpuTransactionPhase::Discarded);
     EXPECT_FALSE(h.Props().Exists("smooth"));
     ASSERT_TRUE(delivered);
     EXPECT_EQ(delivered->Status, R::EditorCommandStatus::StaleEntity) << delivered->Message;
@@ -241,7 +241,7 @@ TEST(PropertySmoothingTransaction, StaleAtPublicationIsRejectedAndReleasesTheRin
     ASSERT_TRUE(h.Jobs.DrainUntilTerminal());
     ASSERT_TRUE(delivered);
     EXPECT_EQ(delivered->Status, R::EditorCommandStatus::StaleEntity) << delivered->Message;
-    EXPECT_NE(R::SnapshotEditorPropertySmoothing(h.Commands(), run).Phase, R::EditorPropertySmoothingPhase::Applied);
+    EXPECT_NE(R::SnapshotEditorPropertySmoothing(h.Commands(), run).Phase, R::EditorGpuTransactionPhase::Applied);
     EXPECT_FALSE(h.Props().Exists("smooth"));
     EXPECT_FALSE(h.Residency.HasRing(h.Key()));
     EXPECT_FALSE(h.Residency.Front(h.Key()));
@@ -342,10 +342,10 @@ TEST(PropertySmoothingTransaction, ASecondRunOnTheSameOutputWaitsForTheDecision)
     EXPECT_FALSE(h.Cache.PropertyResidency()->HasRing(key));
     const auto next = R::StartEditorPropertySmoothing(h.Cmd(), h.Id(), h.Config, failure);
     ASSERT_TRUE(next) << failure.Message;
-    EXPECT_EQ(R::SnapshotEditorPropertySmoothing(h.Cmd(), next).Phase, R::EditorPropertySmoothingPhase::Running);
+    EXPECT_EQ(R::SnapshotEditorPropertySmoothing(h.Cmd(), next).Phase, R::EditorGpuTransactionPhase::Running);
     R::DiscardEditorPropertySmoothing(h.Cmd(), next);
     EXPECT_TRUE(h.Jobs.DrainUntilTerminal());
-    EXPECT_EQ(R::SnapshotEditorPropertySmoothing(h.Cmd(), next).Phase, R::EditorPropertySmoothingPhase::Discarded);
+    EXPECT_EQ(R::SnapshotEditorPropertySmoothing(h.Cmd(), next).Phase, R::EditorGpuTransactionPhase::Discarded);
 }
 
 TEST(PropertySmoothingTransaction, FloatOutputsAcceptInTheirOwnPrecision)

@@ -21,6 +21,9 @@ appearance and displays the output as a constant color per original face.
 | `mesh_face_weighted` | Named vertex positions, polygon face rings and halfedge topology | Incident polygon normals with uniform, area, angle, area-angle or Max weighting |
 | `graph_neighborhood` | Named vertex/node positions and canonical edge endpoints | Existing adjacency-based local normal kernel; mesh adjacency is accepted without creating a graph entity |
 
+`mesh_face_weighted` also runs on the GPU property residency (backend `vulkan`, see
+[Vulkan vertex normals](#vulkan-vertex-normals-on-the-gpu-property-residency)).
+
 Point-set PCA accepts mesh vertex, edge, halfedge and face properties; graph
 node, edge and halfedge properties; and point-cloud properties. Slot semantics
 do not prescribe property names: `f:centroid` is a valid Position binding when
@@ -99,6 +102,58 @@ active output adds no callback. An expired attachment rejects scene reads, queue
 publication and history replay before dereferencing borrowed services. Prepared
 frames copy retained results; their completion and dismissal callbacks use the
 session attachment epoch.
+
+## Vulkan vertex normals on the GPU property residency
+
+`mesh_face_weighted` with backend `vulkan` (RUNTIME-296, ADR 0030 decisions 8-9) runs the
+whole method on the device as a GPU property transaction
+([property coherence](property-coherence.md#vertex-normals-runtime-296)); every other
+backend value is the CPU reference for this method, and the other methods refuse `vulkan`
+(PCA keeps `vulkan_lbvh`).
+
+- **Inputs.** The positions come from their canonical residency slot
+  (`ResolveGpuPropertyInput`: uploaded once per CPU revision, shared with every GPU user).
+  The face rings and the vertex->face incidences are one `uint32` bundle
+  (`Graphics.VertexNormals`: face offsets, corner vertices in the reference's ring order,
+  vertex offsets, `(face, corner)` incidences in ascending face order, live rows), packed
+  from the reference's corner table
+  (`Geometry.HalfedgeMesh.Vertices.Normals::GatherFaceCornerTable`, the same walk and skip
+  rules as `Recompute`) and resident under a derived key
+  (`#vertex_normal_topology`, revision = a hash of the topology and deletion watches). A
+  second run on the same topology revision uploads no bundle; a topology or deletion edit
+  uploads it once. Its bytes and reuse are reported (`GpuTopologyBytes`,
+  `GpuTopologyReused`), as are the positions' upload bytes (`GpuInputUploadBytes`, 0 when
+  the revision is resident).
+- **Kernels** (`vertex_normals.comp`, double precision, `precise`): a face pass forms the
+  fan area vector from the first corner and the unit normal; a vertex pass gathers the
+  incident faces in the reference's face order and normalizes, so the sums round as the CPU
+  reference rounds them. No float atomics; the deterministic gather replaces the scatter.
+  Uniform, area and max weighting run on the device; the angle weightings need a
+  double-precision `acos` the device does not have and are refused (CPU only). Deleted
+  faces, rings touching deleted vertices or edges, non-finite corners and area vectors under
+  the epsilon are skipped as on the CPU; a deleted vertex keeps its published bytes because
+  the ring starts as a copy of the output's canonical slot (zeros for a new output).
+- **Transaction.** The output ring is not observed by the renderer (vec3 rings are not
+  colormap scalars or positions), so there is no viewport preview: the render block keeps the
+  CPU normals until Accept. Accept reads the front back once, runs the existing undoable
+  "Estimate normals" publication and binds the front as the canonical slot of the new revision;
+  Discard releases the ring; a stale result (positions, topology, deletion masks or the
+  output changed) can only be discarded. Batch and agent commands
+  (`ApplyEditorNormalEstimationCommand`) accept automatically. The result reports
+  `ActualBackend = vulkan_mesh_face_weighted`, the device's valid / fallback / processed-face
+  counts and the IO counters; the panel shows Accept / Discard and the IO line.
+- **Parity.** [`Test.VertexNormalsTransactionGpuSmoke.cpp`](../../tests/integration/graphics/Test.VertexNormalsTransactionGpuSmoke.cpp)
+  compares the accepted rows with the CPU reference on a noisy quad/triangle grid with a
+  deleted face and a deleted vertex (area and max weighting): the bound is 2e-6 per
+  component, i.e. a few float ulps of a unit vector (the kernels repeat the reference's double
+  arithmetic; only the float rounding of the normalized result and a last-bit difference of
+  the device's `sqrt` / division can differ). The reported maximum delta is recorded as a test
+  property. Contract tests
+  ([`Test.NormalTransaction.cpp`](../../tests/contract/runtime/Test.NormalTransaction.cpp))
+  cover Accept / Discard / stale / cancel, the deleted-row bytes and the bundle's residency
+  per topology revision on a mock device; the panel test drives Accept / Discard.
+- **Not yet on the device:** `mesh_face_normals` (Newell area vectors on the face domain)
+  stays CPU (RUNTIME-296, second slice); PCA normals follow in RUNTIME-299.
 
 ## Spatial ownership and numerical limits
 

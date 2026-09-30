@@ -399,6 +399,11 @@ namespace Extrinsic::Sandbox::Editor
         CoherentPointDriftState CoherentPointDrift{};
         PointSamplingState PointSampling{};
         NormalsState Normals{};
+        // The interactive Vulkan vertex-normals run (RUNTIME-296, ADR 0030): the device result
+        // waits for Accept or Discard; its completion lands on a later frame.
+        Runtime::EditorNormalTransactionHandle NormalTransaction{};
+        std::shared_ptr<std::optional<Runtime::EditorNormalEstimationResult>> NormalCompletion{
+            std::make_shared<std::optional<Runtime::EditorNormalEstimationResult>>()};
         OutliersState Outliers{};
         KeypointsState Keypoints{};
         DescriptorsState Descriptors{};
@@ -448,6 +453,7 @@ namespace Extrinsic::Sandbox::Editor
         void DrawSubdivideWindow(bool&, const SandboxEditorContext&);
         void DrawSimplifyWindow(bool&, const SandboxEditorContext&);
         void DrawNormalsWindow(bool&, const SandboxEditorContext&);
+        void DrawNormalTransaction(const SandboxEditorContext&);
         void DrawOutliersWindow(bool&, const SandboxEditorContext&);
         void DrawKeypointsWindow(bool&, const SandboxEditorContext&);
         void DrawDescriptorsWindow(bool&, const SandboxEditorContext&);
@@ -606,6 +612,12 @@ namespace Extrinsic::Sandbox::Editor
         }
         Handles.clear();
         Shell = nullptr;
+        // A pending GPU result must not outlive the panel: its ring would block every later
+        // run on that output. Discard is a no-op for terminal transactions.
+        if (SmoothingTransaction) Runtime::DiscardEditorPropertySmoothing({}, SmoothingTransaction);
+        SmoothingTransaction.reset();
+        if (NormalTransaction) Runtime::DiscardEditorNormalEstimation({}, NormalTransaction);
+        NormalTransaction.reset();
         ResetModelCache();
         Denoise.LastResult.reset();
         Denoise.Input = {};
@@ -1792,6 +1804,7 @@ namespace Extrinsic::Sandbox::Editor
     {
         if (context.Normals.Results.LastNormalEstimationResult)
             Normals.LastResult = context.Normals.Results.LastNormalEstimationResult;
+        if (*NormalCompletion) { Normals.LastResult = std::move(**NormalCompletion); NormalCompletion->reset(); }
         ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
         if (!ImGui::Begin("Normal Estimation", &open))
         {
@@ -1844,6 +1857,10 @@ namespace Extrinsic::Sandbox::Editor
                 if (ImGui::Selectable(Runtime::ToString(method), config.Method == method))
                 {
                     config = candidate;
+                    // The residency backend belongs to the mesh method alone.
+                    if (method != Runtime::NormalEstimationMethod::MeshFaceWeighted &&
+                        config.Backend == Runtime::NormalEstimationBackend::Vulkan)
+                        config.Backend = Runtime::NormalEstimationBackend::CpuKDTree;
                     changed = true;
                 }
                 ImGui::EndDisabled();
@@ -1894,6 +1911,16 @@ namespace Extrinsic::Sandbox::Editor
                 config.Weighting = decltype(config.Weighting)(weighting);
                 changed = true;
             }
+            // Every non-Vulkan value is the CPU reference for this method.
+            int backend = config.Backend == Runtime::NormalEstimationBackend::Vulkan ? 1 : 0;
+            if (ImGui::Combo("Backend##Normals", &backend, "CPU reference\0Vulkan (GPU property residency, double precision)\0"))
+            {
+                config.Backend = backend == 1 ? Runtime::NormalEstimationBackend::Vulkan : Runtime::NormalEstimationBackend::CpuKDTree;
+                changed = true;
+            }
+            if (config.Backend == Runtime::NormalEstimationBackend::Vulkan)
+                ImGui::TextWrapped("The kernels read the resident positions and a per-topology bundle; the result waits "
+                                   "for Accept (undoable) or Discard. Uniform, area and max weighting; no viewport preview.");
         }
         else if (config.Method == Runtime::NormalEstimationMethod::MeshFaceNormals)
         {
@@ -1915,12 +1942,42 @@ namespace Extrinsic::Sandbox::Editor
                                           &config.CollinearEigenvalueRatioEpsilon, 0, 0, "%.8g");
             ImGui::TreePop();
         }
-        DrawProcessingExecution(context.Normals.Commands, Normals, changed,
-            [&](const auto& request) { return Runtime::PreviewEditorNormalEstimationCommand(context.Normals.Commands, request); },
-            [&](const auto& request) { return Runtime::ApplyEditorNormalEstimationConfig(context.Normals.Commands, request); },
-            [&] { return Runtime::ApplyEditorConfiguredNormalEstimation(context.Normals.Commands, context.Normals.ResultSinks.NormalEstimation); },
-            context.Normals.ResultSinks.NormalEstimation, "Estimate normals",
-            "Controls were rejected by normal config validation.", "Normal config was rejected.");
+        // A pending GPU result blocks the next run until it is accepted or discarded.
+        using Phase = Runtime::EditorGpuTransactionPhase;
+        const auto transaction = Runtime::SnapshotEditorNormalEstimation(context.Normals.Commands, NormalTransaction);
+        const bool transactionPending = NormalTransaction && (transaction.Phase == Phase::Running ||
+            transaction.Phase == Phase::ReadyToAccept || transaction.Phase == Phase::Accepting);
+        if (changed)
+            Normals.ConfigDiagnostic = Runtime::ApplyEditorNormalEstimationConfig(context.Normals.Commands, config).Succeeded()
+                ? "" : "Controls were rejected by normal config validation.";
+        if (!Normals.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Normals.ConfigDiagnostic.c_str());
+        auto readiness = Runtime::ResolveEditorProcessingActionReadiness(context.Normals.Commands,
+            Runtime::PreviewEditorNormalEstimationCommand(context.Normals.Commands, config));
+        if (transactionPending && readiness.Enabled)
+            readiness = {.Enabled = false, .DisabledReason = "Accept or discard the pending GPU result first."};
+        if (!readiness.Enabled) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
+        if (DrawProcessingActionButton("Estimate normals", readiness))
+        {
+            if (config.Backend == Runtime::NormalEstimationBackend::Vulkan)
+            {
+                // Interactive Vulkan runs compute on the device and publish on Accept.
+                Normals.ConfigDiagnostic = Runtime::ApplyEditorNormalEstimationConfig(context.Normals.Commands, config).Succeeded()
+                    ? "" : "Normal config was rejected.";
+                if (Normals.ConfigDiagnostic.empty())
+                {
+                    NormalTransaction.reset(); // a finished transaction is retired before the new one
+                    Runtime::EditorNormalEstimationResult failure;
+                    NormalTransaction = Runtime::StartEditorNormalEstimationTransaction(context.Normals.Commands, config, failure);
+                    Normals.LastResult = NormalTransaction
+                        ? Runtime::SnapshotEditorNormalEstimation(context.Normals.Commands, NormalTransaction).Result : failure;
+                }
+            }
+            else
+                ApplyProcessingExecution(Normals, config,
+                    [&](const auto& request) { return Runtime::ApplyEditorNormalEstimationConfig(context.Normals.Commands, request); },
+                    [&] { return Runtime::ApplyEditorConfiguredNormalEstimation(context.Normals.Commands, context.Normals.ResultSinks.NormalEstimation); },
+                    context.Normals.ResultSinks.NormalEstimation, "Normal config was rejected.");
+        }
         const auto outputProperty = config.Output;
         ImGui::SameLine();
         if (config.Method == Runtime::NormalEstimationMethod::MeshFaceNormals)
@@ -1951,13 +2008,15 @@ namespace Extrinsic::Sandbox::Editor
         }
         if (!Normals.VisualizationDiagnostic.empty())
             ImGui::Text("Normal display: %s", Normals.VisualizationDiagnostic.c_str());
+        if (NormalTransaction) DrawNormalTransaction(context);
         if (Normals.LastResult)
         {
             const auto &result = *Normals.LastResult;
             ImGui::Separator();
             ImGui::Text("Status: %s", Runtime::DebugNameForEditorCommandStatus(result.Status));
             ImGui::Text("Method: %s", Runtime::ToString(result.Method));
-            if (result.Method == Runtime::NormalEstimationMethod::PointSetPCA)
+            if (result.Method == Runtime::NormalEstimationMethod::PointSetPCA ||
+                result.Method == Runtime::NormalEstimationMethod::MeshFaceWeighted)
                 ImGui::Text("Requested: %s", Runtime::ToString(result.RequestedBackend));
             if (!result.ActualBackend.empty())
                 ImGui::Text("Ran: %s", result.ActualBackend.c_str());
@@ -3190,6 +3249,53 @@ namespace Extrinsic::Sandbox::Editor
         m_Impl->SmoothingTransaction = std::move(transaction);
     }
 
+    void MeshProcessingPanels::InjectNormalTransactionForTest(Runtime::EditorNormalTransactionHandle transaction)
+    {
+        m_Impl->NormalTransaction = std::move(transaction);
+    }
+
+    // Accept / Discard of the interactive Vulkan vertex-normals run (ADR 0030 decisions 6-7).
+    // The viewport keeps the CPU normals until Accept; "Applied" appears only after the CPU
+    // publication succeeded.
+    void MeshProcessingPanels::Impl::DrawNormalTransaction(const SandboxEditorContext& context)
+    {
+        using Phase = Runtime::EditorGpuTransactionPhase;
+        const auto& commands = context.Normals.Commands;
+        const auto transaction = Runtime::SnapshotEditorNormalEstimation(commands, NormalTransaction);
+        ImGui::SeparatorText("GPU result");
+        ImGui::TextDisabled("State: %s%s", Runtime::ToString(transaction.Phase),
+                            transaction.Phase == Phase::ReadyToAccept && transaction.Stale ? " (stale)" : "");
+        ImGui::BeginDisabled(!transaction.CanAccept);
+        if (ImGui::Button("Accept##Normals") && transaction.CanAccept)
+            Normals.LastResult = Runtime::AcceptEditorNormalEstimation(commands, NormalTransaction,
+                [completion = NormalCompletion](Runtime::EditorNormalEstimationResult result) { *completion = std::move(result); });
+        ImGui::EndDisabled();
+        if (!transaction.CanAccept && !transaction.AcceptDisabledReason.empty())
+            DrawDisabledReasonTooltip(transaction.AcceptDisabledReason);
+        ImGui::SameLine();
+        ImGui::BeginDisabled(transaction.Phase == Phase::Applied || transaction.Phase == Phase::Discarded || transaction.Phase == Phase::Failed);
+        if (ImGui::Button("Discard##Normals"))
+        {
+            Runtime::DiscardEditorNormalEstimation(commands, NormalTransaction);
+            Normals.LastResult = Runtime::SnapshotEditorNormalEstimation(commands, NormalTransaction).Result;
+        }
+        ImGui::EndDisabled();
+        if (!transaction.AcceptDisabledReason.empty()) ImGui::TextWrapped("%s", transaction.AcceptDisabledReason.c_str());
+        else if (transaction.Phase == Phase::ReadyToAccept)
+            ImGui::TextWrapped("The device result is resident (no viewport preview); Accept publishes it (undoable), Discard keeps the CPU normals.");
+        if (transaction.Result.GpuTopologyBytes || transaction.Result.GpuInputUploadBytes)
+            ImGui::TextDisabled("Residency IO: positions upload %llu bytes; topology bundle %llu bytes (%s)",
+                                static_cast<unsigned long long>(transaction.Result.GpuInputUploadBytes),
+                                static_cast<unsigned long long>(transaction.Result.GpuTopologyBytes),
+                                transaction.Result.GpuTopologyReused ? "resident" : "uploaded");
+        if (transaction.Phase == Phase::Applied || transaction.Phase == Phase::Discarded || transaction.Phase == Phase::Failed)
+        {
+            // Terminal: the result line reports it; the next run may start.
+            if (!*NormalCompletion) Normals.LastResult = transaction.Result;
+            NormalTransaction.reset();
+        }
+    }
+
     void MeshProcessingPanels::Unregister()
     {
         m_Impl->Unregister();
@@ -3323,7 +3429,7 @@ namespace Extrinsic::Sandbox::Editor
         }
         auto readiness = Runtime::PreviewEditorPropertySmoothingCommand(context.MeshFields.Commands, model.SelectedStableId, config);
         // A pending GPU result blocks the next run until it is accepted or discarded.
-        using Phase = Runtime::EditorPropertySmoothingPhase;
+        using Phase = Runtime::EditorGpuTransactionPhase;
         const auto transaction = Runtime::SnapshotEditorPropertySmoothing(context.MeshFields.Commands, SmoothingTransaction);
         const bool transactionPending = SmoothingTransaction && (transaction.Phase == Phase::Running ||
             transaction.Phase == Phase::ReadyToAccept || transaction.Phase == Phase::Accepting);
@@ -3372,7 +3478,7 @@ namespace Extrinsic::Sandbox::Editor
     // CPU publication succeeded.
     void MeshProcessingPanels::Impl::DrawSmoothingTransaction(const SandboxEditorContext& context)
     {
-        using Phase = Runtime::EditorPropertySmoothingPhase;
+        using Phase = Runtime::EditorGpuTransactionPhase;
         const auto& commands = context.MeshFields.Commands;
         // A fresh snapshot: the handle may have been replaced by a start this frame.
         const auto transaction = Runtime::SnapshotEditorPropertySmoothing(commands, SmoothingTransaction);

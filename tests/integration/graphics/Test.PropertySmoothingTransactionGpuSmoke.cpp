@@ -79,7 +79,7 @@ namespace
     namespace S = Geometry::Smoothing;
     using Domain = Runtime::GeometryElementDomain;
     using K = Geometry::PropertyValueKind;
-    using Phase = Runtime::EditorPropertySmoothingPhase;
+    using Phase = Runtime::EditorGpuTransactionPhase;
 
     struct Shutdown
     {

@@ -556,7 +556,7 @@ namespace Extrinsic::Runtime
         std::uint64_t CpuStageBytes{}; // implicit: the CPU-assembled coupling uploaded per run (ADR 0030, 8)
         bool StoreRecorded{}; // the queued submission writes Back
         std::uint32_t Deferrals{}, Previews{};
-        EditorPropertySmoothingPhase Phase{EditorPropertySmoothingPhase::Running};
+        EditorGpuTransactionPhase Phase{EditorGpuTransactionPhase::Running};
         bool AutoAccept{}, StopRequested{}, Stopped{};
         // Accept: the front's readback in the property's precision (it leases the front
         // until the bytes landed), or the test seam's values.
@@ -596,7 +596,7 @@ namespace Extrinsic::Runtime
             (void)w->Residency->Discard(w->Key, w->Ring);
             if (w->Presentation) (void)w->Residency->Discard(w->PresentationKey, w->PresentationRing);
         }
-        void Finish(const Work& w, const EditorPropertySmoothingPhase phase, const EditorCommandStatus status, std::string message)
+        void Finish(const Work& w, const EditorGpuTransactionPhase phase, const EditorCommandStatus status, std::string message)
         {
             if (w->Readback) w->Readback->Abandoned = true; // a framed readback still queued records nothing
             ReleaseRings(w);
@@ -792,7 +792,7 @@ namespace Extrinsic::Runtime
             w->Input.reset();
             if (!w->Gpu || w->Gpu->State != SpatialQueryState::Ready)
             {
-                Finish(w, EditorPropertySmoothingPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
+                Finish(w, EditorGpuTransactionPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
                        w->Gpu && !w->Gpu->Diagnostic.empty() ? w->Gpu->Diagnostic
                        : "Vulkan property smoothing did not return a result; previous output retained.");
                 return;
@@ -813,7 +813,7 @@ namespace Extrinsic::Runtime
                 }
                 if (!converged)
                 {
-                    Finish(w, EditorPropertySmoothingPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
+                    Finish(w, EditorGpuTransactionPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
                            "Implicit solver failed to converge on Vulkan; no property was changed.");
                     return;
                 }
@@ -822,12 +822,12 @@ namespace Extrinsic::Runtime
             else if (!w->Implicit) w->Result.OperatorApplications = Graphics::PropertyFilterWorkspace::DispatchCount(w->Params);
             if (w->Previews == 0u)
             {
-                Finish(w, EditorPropertySmoothingPhase::Discarded, EditorCommandStatus::StaleEntity,
+                Finish(w, EditorGpuTransactionPhase::Discarded, EditorCommandStatus::StaleEntity,
                        w->Stopped ? "Vulkan property smoothing stopped before a preview; previous output retained."
                                   : "Vulkan property smoothing published no preview; previous output retained.");
                 return;
             }
-            w->Phase = EditorPropertySmoothingPhase::ReadyToAccept;
+            w->Phase = EditorGpuTransactionPhase::ReadyToAccept;
             w->Result.Status = EditorCommandStatus::Pending;
             w->Result.Message = w->Stopped ? "Stopped; the latest preview waits for Accept or Discard."
                                            : "The GPU result waits for Accept or Discard.";
@@ -842,7 +842,7 @@ namespace Extrinsic::Runtime
             if (w->Readback) w->Readback->Lease.reset();
             if (w->Readback && w->Readback->Failed)
             {
-                Finish(w, EditorPropertySmoothingPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
+                Finish(w, EditorGpuTransactionPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
                        "Vulkan property smoothing readback failed; previous output retained.");
                 return;
             }
@@ -855,7 +855,7 @@ namespace Extrinsic::Runtime
                 const std::size_t elementBytes = wide ? sizeof(double) : sizeof(float);
                 if (!w->Readback || w->Readback->Bytes.size() != std::size_t(w->Count) * channels * elementBytes)
                 {
-                    Finish(w, EditorPropertySmoothingPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
+                    Finish(w, EditorGpuTransactionPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
                            "Vulkan property smoothing readback has the wrong size; previous output retained.");
                     return;
                 }
@@ -877,7 +877,7 @@ namespace Extrinsic::Runtime
             if (!filtered.Success || !result.Succeeded())
             {
                 ReleaseRings(w);
-                w->Phase = EditorPropertySmoothingPhase::Failed;
+                w->Phase = EditorGpuTransactionPhase::Failed;
                 if (!filtered.Success) result.Status = EditorCommandStatus::GeometryProcessingFailed;
                 Deliver(w, std::move(result));
                 return;
@@ -891,7 +891,7 @@ namespace Extrinsic::Runtime
                     (void)w->Residency->Discard(w->Key, w->Ring);
                 if (w->Presentation) (void)w->Residency->Discard(w->PresentationKey, w->PresentationRing);
             }
-            w->Phase = EditorPropertySmoothingPhase::Applied;
+            w->Phase = EditorGpuTransactionPhase::Applied;
             Deliver(w, std::move(result));
         }
         // Queues the front's readback and the job that publishes it.
@@ -903,7 +903,7 @@ namespace Extrinsic::Runtime
                 result.Message = std::move(message);
                 return result;
             };
-            if (w->Phase != EditorPropertySmoothingPhase::ReadyToAccept)
+            if (w->Phase != EditorGpuTransactionPhase::ReadyToAccept)
                 return refuse(EditorCommandStatus::InvalidProcessingParameters, "No GPU result waits for Accept.");
             if (!Current(w))
                 return refuse(EditorCommandStatus::StaleEntity, "The inputs changed since the run; discard the result and run again.");
@@ -917,12 +917,12 @@ namespace Extrinsic::Runtime
                 if (!w->Residency || !GP::BeginGpuFrontReadback(ctx, *w->Residency, w->Key, w->Readback))
                 {
                     w->Readback.reset();
-                    Finish(w, EditorPropertySmoothingPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
+                    Finish(w, EditorGpuTransactionPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
                            "The GPU result is no longer resident; previous output retained.");
                     return w->Result;
                 }
             }
-            w->Phase = EditorPropertySmoothingPhase::Accepting;
+            w->Phase = EditorGpuTransactionPhase::Accepting;
             // The publication runs from a completion drain like every other editor result.
             JobDesc accept{
                 .DebugName = "Vulkan property smoothing accept", .Scope = ctx.World, .Kind = RuntimeTaskKinds::GeometryProcess,
@@ -931,17 +931,17 @@ namespace Extrinsic::Runtime
                 .ValidateBeforeApply = [w] { return Current(w) ? JobApplyValidation::Current : JobApplyValidation::StaleGeneration; },
                 .PublishCompletion = [w](KernelEventBus&, const JobResultEnvelope&) {
                     CompleteAccept(w);
-                    return w->Phase == EditorPropertySmoothingPhase::Applied;
+                    return w->Phase == EditorGpuTransactionPhase::Applied;
                 },
                 .FinalizeUnpublishedOnMainThread = [w] {
                     w->Abandoned = true;
                     if (w->Delivered) return;
-                    Finish(w, EditorPropertySmoothingPhase::Discarded, EditorCommandStatus::StaleEntity,
+                    Finish(w, EditorGpuTransactionPhase::Discarded, EditorCommandStatus::StaleEntity,
                            "Vulkan property smoothing cancelled or stale; previous output retained.");
                 }};
             if (!ctx.JobCommands.Submit(std::move(accept), w->Identity).IsValid())
             {
-                Finish(w, EditorPropertySmoothingPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
+                Finish(w, EditorGpuTransactionPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
                        "Vulkan property smoothing accept submission rejected.");
                 return w->Result;
             }
@@ -1041,22 +1041,22 @@ namespace Extrinsic::Runtime
                 .ValidateBeforeApply = [w] { return Current(w) ? JobApplyValidation::Current : JobApplyValidation::StaleGeneration; },
                 .PublishCompletion = [w](KernelEventBus&, const JobResultEnvelope&) {
                     CompleteRun(w);
-                    if (w->Phase == EditorPropertySmoothingPhase::ReadyToAccept && w->AutoAccept)
+                    if (w->Phase == EditorGpuTransactionPhase::ReadyToAccept && w->AutoAccept)
                     {
                         // A refused automatic Accept (e.g. stale) ends the transaction: nothing
                         // waits for a user here.
                         const auto accepted = BeginAccept(w, {});
                         if (accepted.Status != EditorCommandStatus::Pending)
-                            Finish(w, accepted.Status == EditorCommandStatus::StaleEntity ? EditorPropertySmoothingPhase::Discarded
-                                                                                          : EditorPropertySmoothingPhase::Failed,
+                            Finish(w, accepted.Status == EditorCommandStatus::StaleEntity ? EditorGpuTransactionPhase::Discarded
+                                                                                          : EditorGpuTransactionPhase::Failed,
                                    accepted.Status, accepted.Message);
                     }
-                    return w->Phase != EditorPropertySmoothingPhase::Failed;
+                    return w->Phase != EditorGpuTransactionPhase::Failed;
                 },
                 .FinalizeUnpublishedOnMainThread = [w] {
                     w->Abandoned = true;
                     if (w->Delivered) return;
-                    Finish(w, EditorPropertySmoothingPhase::Discarded, EditorCommandStatus::StaleEntity,
+                    Finish(w, EditorGpuTransactionPhase::Discarded, EditorCommandStatus::StaleEntity,
                            "Vulkan property smoothing cancelled or stale; previous output retained.");
                 }};
             if (!context.JobCommands.Submit(std::move(gpu), w->Identity).IsValid())
@@ -1069,20 +1069,6 @@ namespace Extrinsic::Runtime
             result = w->Result;
             return w;
         }
-    }
-
-    const char* ToString(const EditorPropertySmoothingPhase phase) noexcept
-    {
-        switch (phase)
-        {
-        case EditorPropertySmoothingPhase::Running: return "running";
-        case EditorPropertySmoothingPhase::ReadyToAccept: return "ready_to_accept";
-        case EditorPropertySmoothingPhase::Accepting: return "accepting";
-        case EditorPropertySmoothingPhase::Applied: return "applied";
-        case EditorPropertySmoothingPhase::Discarded: return "discarded";
-        case EditorPropertySmoothingPhase::Failed: return "failed";
-        }
-        return "unknown";
     }
 
     EditorPropertySmoothingTransactionHandle StartEditorPropertySmoothing(const EditorProcessingCommands& commands, const std::uint32_t id,
@@ -1119,7 +1105,7 @@ namespace Extrinsic::Runtime
         snapshot.Previews = run->Previews;
         snapshot.DeviceWorkQueued = run->Gpu != nullptr;
         snapshot.Result = run->Result;
-        if (run->Phase == EditorPropertySmoothingPhase::ReadyToAccept)
+        if (run->Phase == EditorGpuTransactionPhase::ReadyToAccept)
         {
             snapshot.Stale = !PropertySmoothingDetail::Current(run);
             const bool resident = run->TestFront.has_value() || (run->Residency && run->Residency->HasRing(run->Key));
@@ -1150,20 +1136,20 @@ namespace Extrinsic::Runtime
         namespace PS = PropertySmoothingDetail;
         switch (run->Phase)
         {
-        case EditorPropertySmoothingPhase::Applied:
-        case EditorPropertySmoothingPhase::Discarded:
-        case EditorPropertySmoothingPhase::Failed:
+        case EditorGpuTransactionPhase::Applied:
+        case EditorGpuTransactionPhase::Discarded:
+        case EditorGpuTransactionPhase::Failed:
             return;
-        case EditorPropertySmoothingPhase::Running:
-        case EditorPropertySmoothingPhase::Accepting:
+        case EditorGpuTransactionPhase::Running:
+        case EditorGpuTransactionPhase::Accepting:
             // The job finalizes as cancelled on its next drain; the rings go now (freed after
             // their completions), so observation returns to the canonical slot at once.
             run->Abandoned = true;
-            PS::Finish(run, EditorPropertySmoothingPhase::Discarded, EditorCommandStatus::StaleEntity,
+            PS::Finish(run, EditorGpuTransactionPhase::Discarded, EditorCommandStatus::StaleEntity,
                        "Vulkan property smoothing discarded; previous output retained.");
             return;
-        case EditorPropertySmoothingPhase::ReadyToAccept:
-            PS::Finish(run, EditorPropertySmoothingPhase::Discarded, EditorCommandStatus::StaleEntity,
+        case EditorGpuTransactionPhase::ReadyToAccept:
+            PS::Finish(run, EditorGpuTransactionPhase::Discarded, EditorCommandStatus::StaleEntity,
                        "Vulkan property smoothing discarded; previous output retained.");
             return;
         }
@@ -1217,7 +1203,7 @@ namespace Extrinsic::Runtime
         w->Result.Status = EditorCommandStatus::Pending;
         w->Result.Message = "The GPU result waits for Accept or Discard.";
         w->Result.BackendId = "vulkan_compute";
-        w->Phase = EditorPropertySmoothingPhase::ReadyToAccept;
+        w->Phase = EditorGpuTransactionPhase::ReadyToAccept;
         return w;
     }
 

@@ -1,0 +1,181 @@
+#version 460
+// Mesh vertex normals from weighted incident-face contributions (RUNTIME-296, ADR 0030),
+// mirroring Geometry.HalfedgeMesh.Vertices.Normals::Recompute in double precision with its
+// summation order, so a normal rounds as the CPU reference rounds it.
+//
+// ModeFaces: one thread per face reads its corner ring (a CSR over the canonical float3
+// positions), forms the fan area vector from the first corner and stores the area vector and
+// unit normal (six doubles); a face the reference skips (empty ring, a non-finite corner, a
+// non-finite or shorter-than-epsilon area vector) stores zeros. ModeVertices: one thread per
+// live row gathers its incident faces in ascending face order (the reference's face loop),
+// skips zero faces and contributions the reference drops, and writes the normalized sum or
+// the fallback into the float3 ring. `precise` keeps every product and sum uncontracted, as
+// the x86-64 reference compiles them.
+#extension GL_ARB_gpu_shader_fp64 : require
+#extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+layout(local_size_x = 64) in;
+
+layout(buffer_reference, scalar) readonly buffer Floats { float v[]; };
+layout(buffer_reference, scalar) writeonly buffer OutFloats { float v[]; };
+layout(buffer_reference, scalar) readonly buffer Uints { uint v[]; };
+layout(buffer_reference, scalar) buffer Doubles { double v[]; };
+layout(buffer_reference, scalar) buffer Stats { uint v[]; };
+
+const uint ModeFaces = 0, ModeVertices = 1;
+const uint WeightUniformFace = 0, WeightAreaWeighted = 1, WeightMaxWeighted = 2;
+
+// `first` + `count` name the chunk of faces or live rows this dispatch covers (a dispatch
+// stays within the guaranteed 65535 workgroups); the caller issues one dispatch per chunk.
+layout(push_constant, scalar) uniform Push {
+    uint64_t positions, faceOffsets, corners, vertexOffsets, incidence, liveRows, areas, result, stats;
+    uint mode, count, weighting, first;
+    double epsilon;
+    float fallbackX, fallbackY, fallbackZ, pad1;
+} pc;
+
+bool Finite(double x) { return !isnan(x) && !isinf(x); }
+bool Finite(dvec3 v) { return Finite(v.x) && Finite(v.y) && Finite(v.z); }
+bool FiniteF(vec3 v) { return !isnan(v.x) && !isinf(v.x) && !isnan(v.y) && !isinf(v.y) && !isnan(v.z) && !isinf(v.z); }
+
+// glm::dot: (x*x + y*y) + z*z, uncontracted.
+double DotLengthSq(dvec3 a)
+{
+    precise double d = a.x * a.x + a.y * a.y;
+    d = d + a.z * a.z;
+    return d;
+}
+// glm::cross component order.
+dvec3 Cross(dvec3 a, dvec3 b)
+{
+    precise dvec3 c;
+    c.x = a.y * b.z - b.y * a.z;
+    c.y = a.z * b.x - b.z * a.x;
+    c.z = a.x * b.y - b.x * a.y;
+    return c;
+}
+
+vec3 PositionF(uint vertex)
+{
+    Floats p = Floats(pc.positions);
+    return vec3(p.v[3u * vertex], p.v[3u * vertex + 1u], p.v[3u * vertex + 2u]);
+}
+
+void FacePass(uint face)
+{
+    Uints offsets = Uints(pc.faceOffsets);
+    Uints corners = Uints(pc.corners);
+    Doubles areas = Doubles(pc.areas);
+    const uint first = offsets.v[face], last = offsets.v[face + 1u];
+    const uint n = last - first;
+    precise dvec3 area = dvec3(0.0lf);
+    bool ok = n >= 3u;
+    if (ok)
+    {
+        const vec3 rootF = PositionF(corners.v[first]);
+        ok = FiniteF(rootF);
+        const dvec3 root = dvec3(rootF);
+        vec3 previousF = PositionF(corners.v[first + 1u]);
+        ok = ok && FiniteF(previousF);
+        dvec3 previous = dvec3(previousF) - root;
+        for (uint i = 1u; ok && i + 1u < n; ++i)
+        {
+            const vec3 nextF = PositionF(corners.v[first + i + 1u]);
+            ok = FiniteF(nextF);
+            const dvec3 next = dvec3(nextF) - root;
+            area += Cross(previous, next);
+            previous = next;
+        }
+    }
+    const double length = sqrt(DotLengthSq(area));
+    if (!ok || !Finite(area) || !Finite(length) || length <= pc.epsilon)
+    {
+        for (uint k = 0u; k < 6u; ++k) areas.v[6u * face + k] = 0.0lf;
+        return;
+    }
+    const dvec3 unit = area / length;
+    areas.v[6u * face] = area.x;
+    areas.v[6u * face + 1u] = area.y;
+    areas.v[6u * face + 2u] = area.z;
+    areas.v[6u * face + 3u] = unit.x;
+    areas.v[6u * face + 4u] = unit.y;
+    areas.v[6u * face + 5u] = unit.z;
+    atomicAdd(Stats(pc.stats).v[0], 1u);
+}
+
+// MaxCornerWeight of the reference for corner `index` of the face ring [first, first + n).
+double MaxCornerWeight(uint first, uint n, uint index)
+{
+    Uints corners = Uints(pc.corners);
+    const uint previousIndex = (index + n - 1u) % n;
+    const uint nextIndex = (index + 1u) % n;
+    const dvec3 at = dvec3(PositionF(corners.v[first + index]));
+    const dvec3 toPrev = dvec3(PositionF(corners.v[first + previousIndex])) - at;
+    const dvec3 toNext = dvec3(PositionF(corners.v[first + nextIndex])) - at;
+    const double prevLenSq = DotLengthSq(toPrev);
+    const double nextLenSq = DotLengthSq(toNext);
+    const double epsilonSq = pc.epsilon * pc.epsilon;
+    if (!Finite(prevLenSq) || !Finite(nextLenSq) || prevLenSq <= epsilonSq || nextLenSq <= epsilonSq) return 0.0lf;
+    const double crossLen = sqrt(DotLengthSq(Cross(toPrev, toNext)));
+    const double denominator = prevLenSq * nextLenSq;
+    const double weight = crossLen / denominator;
+    if (!Finite(weight) || weight <= pc.epsilon) return 0.0lf;
+    return weight;
+}
+
+void VertexPass(uint row)
+{
+    const uint vertex = Uints(pc.liveRows).v[row];
+    if (!FiniteF(PositionF(vertex))) return; // the reference treats the row as deleted
+    Uints vertexOffsets = Uints(pc.vertexOffsets);
+    Uints incidence = Uints(pc.incidence);
+    Uints faceOffsets = Uints(pc.faceOffsets);
+    Doubles areas = Doubles(pc.areas);
+    precise dvec3 accumulated = dvec3(0.0lf);
+    const double epsilonSq = pc.epsilon * pc.epsilon;
+    for (uint k = vertexOffsets.v[vertex]; k < vertexOffsets.v[vertex + 1u]; ++k)
+    {
+        const uint face = incidence.v[2u * k], corner = incidence.v[2u * k + 1u];
+        const dvec3 area = dvec3(areas.v[6u * face], areas.v[6u * face + 1u], areas.v[6u * face + 2u]);
+        if (area.x == 0.0lf && area.y == 0.0lf && area.z == 0.0lf) continue; // a face the reference skipped
+        const dvec3 unit = dvec3(areas.v[6u * face + 3u], areas.v[6u * face + 4u], areas.v[6u * face + 5u]);
+        dvec3 contribution;
+        if (pc.weighting == WeightAreaWeighted) contribution = area;
+        else if (pc.weighting == WeightMaxWeighted)
+        {
+            const uint first = faceOffsets.v[face], n = faceOffsets.v[face + 1u] - first;
+            contribution = unit * MaxCornerWeight(first, n, corner);
+        }
+        else contribution = unit;
+        if (!Finite(contribution) || DotLengthSq(contribution) <= epsilonSq) continue;
+        accumulated += contribution;
+    }
+    const double length = sqrt(DotLengthSq(accumulated));
+    OutFloats result = OutFloats(pc.result);
+    if (Finite(accumulated) && Finite(length) && length > pc.epsilon)
+    {
+        const dvec3 normal = accumulated / length;
+        result.v[3u * vertex] = float(normal.x);
+        result.v[3u * vertex + 1u] = float(normal.y);
+        result.v[3u * vertex + 2u] = float(normal.z);
+        atomicAdd(Stats(pc.stats).v[1], 1u);
+    }
+    else
+    {
+        result.v[3u * vertex] = pc.fallbackX;
+        result.v[3u * vertex + 1u] = pc.fallbackY;
+        result.v[3u * vertex + 2u] = pc.fallbackZ;
+        atomicAdd(Stats(pc.stats).v[2], 1u);
+    }
+}
+
+void main()
+{
+    const uint local = gl_GlobalInvocationID.x;
+    if (local >= pc.count) return;
+    const uint id = pc.first + local;
+    if (pc.mode == ModeFaces) FacePass(id);
+    else VertexPass(id);
+}

@@ -29,7 +29,7 @@ namespace Extrinsic::Runtime
             for (unsigned i = 0; i < 4; ++i)
                 if (d.at("method") == ToString(NormalEstimationMethod(i)))
                     c.Method = NormalEstimationMethod(i);
-            for (unsigned i = 0; i < 3; ++i)
+            for (unsigned i = 0; i < 4; ++i)
                 if (d.at("backend") == ToString(NormalEstimationBackend(i)))
                     c.Backend = NormalEstimationBackend(i);
             ConfigDetail::DecodePointPropertyRef(d.at("positions"), c.Positions);
@@ -83,6 +83,8 @@ namespace Extrinsic::Runtime
             return "cpu_lbvh";
         case NormalEstimationBackend::VulkanLBVH:
             return "vulkan_lbvh";
+        case NormalEstimationBackend::Vulkan:
+            return "vulkan";
         }
         return "invalid";
     }
@@ -124,8 +126,9 @@ namespace Extrinsic::Runtime
         if (d["method"] != "point_set_pca" && d["method"] != "mesh_face_weighted" &&
             d["method"] != "graph_neighborhood" && d["method"] != "mesh_face_normals")
             return RejectConfigSection(subject, "Unknown normal method.");
-        if (d["backend"] != "cpu_kdtree" && d["backend"] != "cpu_lbvh" && d["backend"] != "vulkan_lbvh")
-            return RejectConfigSection(subject, "Normal backend must be cpu_kdtree, cpu_lbvh or vulkan_lbvh.");
+        if (d["backend"] != "cpu_kdtree" && d["backend"] != "cpu_lbvh" && d["backend"] != "vulkan_lbvh" &&
+            d["backend"] != "vulkan")
+            return RejectConfigSection(subject, "Normal backend must be cpu_kdtree, cpu_lbvh, vulkan_lbvh or vulkan.");
         if (d["gpu_query_batch_size"] == 0 || d["gpu_query_batch_size"] > 16384)
             return RejectConfigSection(subject, "GPU query batch size must be in 1..16384.");
         if (!d["use_radius"].is_boolean() || !d["orient_toward_fallback"].is_boolean())

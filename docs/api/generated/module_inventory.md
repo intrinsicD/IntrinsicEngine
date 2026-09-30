@@ -15,7 +15,7 @@ Root scanned: `src`
 | `geometry` | 132 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
-| `graphics/renderer` | 77 |
+| `graphics/renderer` | 78 |
 | `graphics/rhi` | 18 |
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
@@ -305,6 +305,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.TransformSyncSystem` | `src/graphics/renderer/Graphics.TransformSyncSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.TransientDebugUploadHelper` | `src/graphics/renderer/Graphics.TransientDebugUploadHelper.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.UvView` | `src/graphics/renderer/Graphics.UvView.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.VertexNormals` | `src/graphics/renderer/Graphics.VertexNormals.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.VisualizationOverlayUploadHelper` | `src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.VisualizationPackets` | `src/graphics/renderer/Graphics.VisualizationPackets.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.VisualizationPropertyBufferResidency` | `src/graphics/renderer/Graphics.VisualizationPropertyBufferResidency.cppm` | `graphics/renderer` |
@@ -477,4 +478,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **450**
+Total modules: **451**

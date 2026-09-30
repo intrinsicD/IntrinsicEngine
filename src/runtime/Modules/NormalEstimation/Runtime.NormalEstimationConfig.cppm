@@ -22,11 +22,15 @@ export namespace Extrinsic::Runtime
         GraphNeighborhood,
         MeshFaceNormals
     };
+    // PCA: CpuKDTree, CpuLBVH (cached) or VulkanLBVH (device neighborhoods, CPU fit).
+    // MeshFaceWeighted: Vulkan runs the kernels on the GPU property residency as a transaction
+    // (RUNTIME-296); every other value is the CPU reference. The remaining methods are CPU.
     enum class NormalEstimationBackend : std::uint8_t
     {
         CpuKDTree,
         CpuLBVH,
-        VulkanLBVH
+        VulkanLBVH,
+        Vulkan
     };
     extern "C++" [[nodiscard]] const char *ToString(NormalEstimationMethod method) noexcept;
     extern "C++" [[nodiscard]] const char *ToString(NormalEstimationBackend backend) noexcept;

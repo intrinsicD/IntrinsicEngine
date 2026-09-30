@@ -3409,13 +3409,13 @@ TEST(SandboxProcessingPanels, PropertySmoothingAcceptsOrDiscardsAPendingGpuResul
             ImGui::ActivateItemByID(window->GetID("Accept##Smoothing"));
             break;
         case 16:
-            EXPECT_EQ(R::SnapshotEditorPropertySmoothing(commands, stale).Phase, R::EditorPropertySmoothingPhase::ReadyToAccept)
+            EXPECT_EQ(R::SnapshotEditorPropertySmoothing(commands, stale).Phase, R::EditorGpuTransactionPhase::ReadyToAccept)
                 << "a stale result cannot be accepted from the panel";
             EXPECT_FALSE(std::as_const(vertices).Exists("smooth"));
             ImGui::ActivateItemByID(window->GetID("Discard##Smoothing"));
             break;
         case 19:
-            EXPECT_EQ(R::SnapshotEditorPropertySmoothing(commands, stale).Phase, R::EditorPropertySmoothingPhase::Discarded);
+            EXPECT_EQ(R::SnapshotEditorPropertySmoothing(commands, stale).Phase, R::EditorGpuTransactionPhase::Discarded);
             EXPECT_FALSE(std::as_const(vertices).Exists("smooth"));
             fresh = R::MakeEditorPropertySmoothingTransactionForTest(commands, id, smoothing, front);
             ASSERT_TRUE(fresh);
@@ -3426,7 +3426,7 @@ TEST(SandboxProcessingPanels, PropertySmoothingAcceptsOrDiscardsAPendingGpuResul
             ImGui::ActivateItemByID(window->GetID("Accept##Smoothing"));
             break;
         default:
-            if (frames > 22 && R::SnapshotEditorPropertySmoothing(commands, fresh).Phase == R::EditorPropertySmoothingPhase::Applied)
+            if (frames > 22 && R::SnapshotEditorPropertySmoothing(commands, fresh).Phase == R::EditorGpuTransactionPhase::Applied)
             {
                 const auto smooth = std::as_const(vertices).Get<float>("smooth");
                 ASSERT_TRUE(smooth);
@@ -3440,4 +3440,140 @@ TEST(SandboxProcessingPanels, PropertySmoothingAcceptsOrDiscardsAPendingGpuResul
         }
     };
     h.Engine->Run();
+}
+
+// RUNTIME-296: the Normal Estimation window drives the Vulkan vertex-normals transaction like
+// the smoothing window drives its scalar one: a stale result cannot be accepted, only
+// discarded; a current one is accepted through the undoable publication.
+TEST(SandboxProcessingPanels, NormalEstimationAcceptsOrDiscardsAPendingGpuResult)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    scene.Raw().emplace_or_replace<Extrinsic::ECS::Components::Transform::Component>(entity);
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0.f, 0.f, 0.f}), b = mesh.AddVertex({1.f, 0.f, 0.f}),
+               c = mesh.AddVertex({0.f, 1.f, 0.f}), d = mesh.AddVertex({1.f, 1.f, 0.2f});
+    (void)mesh.AddTriangle(a, b, c);
+    (void)mesh.AddTriangle(c, b, d);
+    GS::PopulateFromMesh(scene.Raw(), entity, mesh);
+    auto& vertices = scene.Raw().get<GS::Vertices>(entity).Properties;
+    R::NormalEstimationConfig normals;
+    normals.StableEntityId = R::SelectionController::ToStableEntityId(entity);
+    normals.Method = R::NormalEstimationMethod::MeshFaceWeighted;
+    normals.Backend = R::NormalEstimationBackend::Vulkan;
+    normals.Positions = {R::GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3};
+    normals.Output = {R::GeometryElementDomain::MeshVertex, "v:normal", Geometry::PropertyValueKind::Vec3};
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto section = R::MakeNormalEstimationConfigSectionRegistration().DefaultSection;
+    section.PayloadJson = R::SerializeNormalEstimationConfig(normals);
+    Config::UpsertEngineConfigSection(config.AppSections, section);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.normal_estimation", true));
+    R::EditorCommandHistory history;
+    R::EditorProcessingContext context;
+    context.Scene = &scene;
+    context.CommandHistory = &history;
+    context.JobCommands.Submit = [&](R::JobDesc desc, const auto&) { return h.Engine->Jobs().Submit(std::move(desc)); };
+    const auto commands = R::BindEditorProcessingCommands(context);
+    const std::vector<glm::vec3> front(vertices.Size(), glm::vec3{0.f, 0.f, 1.f});
+    R::EditorNormalTransactionHandle stale, fresh;
+    int frames = 0;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        ++frames;
+        auto* window = ImGui::FindWindowByName("Normal Estimation");
+        if (window) { ImGui::SetWindowSize(window, {750, 1200}); ImGui::SetWindowPos(window, {0, 0}); ImGui::FocusWindow(window); }
+        if (!window) { if (frames > 60) { ADD_FAILURE() << "no Normal Estimation window"; engine.RequestExit(); } return; }
+        switch (frames)
+        {
+        case 10:
+            stale = R::MakeEditorNormalTransactionForTest(commands, normals, front);
+            ASSERT_TRUE(stale);
+            h.Panels.InjectNormalTransactionForTest(stale);
+            vertices.Get<glm::vec3>("v:position")[0].z += 1.f; // the positions change under the waiting result
+            break;
+        case 13:
+            EXPECT_TRUE(R::SnapshotEditorNormalEstimation(commands, stale).Stale);
+            ImGui::ActivateItemByID(window->GetID("Accept##Normals"));
+            break;
+        case 16:
+            EXPECT_EQ(R::SnapshotEditorNormalEstimation(commands, stale).Phase, R::EditorGpuTransactionPhase::ReadyToAccept)
+                << "a stale result cannot be accepted from the panel";
+            EXPECT_FALSE(std::as_const(vertices).Exists("v:normal"));
+            ImGui::ActivateItemByID(window->GetID("Discard##Normals"));
+            break;
+        case 19:
+            EXPECT_EQ(R::SnapshotEditorNormalEstimation(commands, stale).Phase, R::EditorGpuTransactionPhase::Discarded);
+            EXPECT_FALSE(std::as_const(vertices).Exists("v:normal"));
+            fresh = R::MakeEditorNormalTransactionForTest(commands, normals, front);
+            ASSERT_TRUE(fresh);
+            EXPECT_TRUE(R::SnapshotEditorNormalEstimation(commands, fresh).CanAccept);
+            h.Panels.InjectNormalTransactionForTest(fresh);
+            break;
+        case 22:
+            ImGui::ActivateItemByID(window->GetID("Accept##Normals"));
+            break;
+        default:
+            if (frames > 22 && R::SnapshotEditorNormalEstimation(commands, fresh).Phase == R::EditorGpuTransactionPhase::Applied)
+            {
+                const auto published = std::as_const(vertices).Get<glm::vec3>("v:normal");
+                ASSERT_TRUE(published);
+                EXPECT_EQ(published[3], glm::vec3(0.f, 0.f, 1.f));
+                EXPECT_TRUE(history.Undo().Succeeded()) << "Accept published through the undoable transaction";
+                EXPECT_FALSE(std::as_const(vertices).Exists("v:normal"));
+                engine.RequestExit();
+            }
+            if (frames > 300) { ADD_FAILURE() << "the panel never accepted the result"; engine.RequestExit(); }
+            break;
+        }
+    };
+    h.Engine->Run();
+}
+
+// Detaching the panels discards a GPU result that still waits for Accept or Discard (its ring
+// would otherwise block every later run on that output); terminal transactions are untouched.
+TEST(SandboxProcessingPanels, DetachDiscardsPendingGpuResults)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    scene.Raw().emplace_or_replace<Extrinsic::ECS::Components::Transform::Component>(entity);
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0.f, 0.f, 0.f}), b = mesh.AddVertex({1.f, 0.f, 0.f}), c = mesh.AddVertex({0.f, 1.f, 0.f});
+    (void)mesh.AddTriangle(a, b, c);
+    GS::PopulateFromMesh(scene.Raw(), entity, mesh);
+    auto& vertices = scene.Raw().get<GS::Vertices>(entity).Properties;
+    auto signal = vertices.GetOrAdd<float>("signal", 0.f);
+    for (std::size_t i = 0; i < vertices.Size(); ++i) signal[i] = float(i);
+    R::EditorCommandHistory history;
+    R::EditorProcessingContext context;
+    context.Scene = &scene;
+    context.CommandHistory = &history;
+    const auto commands = R::BindEditorProcessingCommands(context);
+    const auto id = R::SelectionController::ToStableEntityId(entity);
+    R::NormalEstimationConfig normals;
+    normals.StableEntityId = id;
+    normals.Method = R::NormalEstimationMethod::MeshFaceWeighted;
+    normals.Backend = R::NormalEstimationBackend::Vulkan;
+    normals.Positions = {R::GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3};
+    normals.Output = {R::GeometryElementDomain::MeshVertex, "v:normal", Geometry::PropertyValueKind::Vec3};
+    R::PropertySmoothingConfig smoothing;
+    smoothing.Input = {R::GeometryElementDomain::MeshVertex, "signal", Geometry::PropertyValueKind::Float};
+    smoothing.Output = {R::GeometryElementDomain::MeshVertex, "smooth", Geometry::PropertyValueKind::Float};
+    smoothing.Positions = {R::GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3};
+    smoothing.Neighbors = 2;
+    const auto normalRun = R::MakeEditorNormalTransactionForTest(commands, normals, std::vector<glm::vec3>(vertices.Size(), glm::vec3{0.f, 0.f, 1.f}));
+    const auto smoothingRun = R::MakeEditorPropertySmoothingTransactionForTest(commands, id, smoothing, std::vector<double>(vertices.Size(), 1.0));
+    ASSERT_TRUE(normalRun);
+    ASSERT_TRUE(smoothingRun);
+    h.Panels.InjectNormalTransactionForTest(normalRun);
+    h.Panels.InjectPropertySmoothingTransactionForTest(smoothingRun);
+    EXPECT_EQ(R::SnapshotEditorNormalEstimation(commands, normalRun).Phase, R::EditorGpuTransactionPhase::ReadyToAccept);
+    EXPECT_EQ(R::SnapshotEditorPropertySmoothing(commands, smoothingRun).Phase, R::EditorGpuTransactionPhase::ReadyToAccept);
+    h.Panels.Unregister();
+    EXPECT_EQ(R::SnapshotEditorNormalEstimation(commands, normalRun).Phase, R::EditorGpuTransactionPhase::Discarded);
+    EXPECT_EQ(R::SnapshotEditorPropertySmoothing(commands, smoothingRun).Phase, R::EditorGpuTransactionPhase::Discarded);
+    EXPECT_FALSE(std::as_const(vertices).Exists("v:normal"));
+    EXPECT_FALSE(std::as_const(vertices).Exists("smooth"));
 }

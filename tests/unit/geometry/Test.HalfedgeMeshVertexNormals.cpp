@@ -3,6 +3,8 @@
 #include <cmath>
 #include <limits>
 #include <numbers>
+#include <cstdint>
+#include <vector>
 
 #include <glm/glm.hpp>
 
@@ -211,4 +213,35 @@ TEST(HalfedgeMeshVertexNormals, ExistingPropertyWithWrongTypeFailsClosed)
     EXPECT_EQ(result.Status, VertexNormals::RecomputeStatus::PropertyTypeConflict);
     EXPECT_FALSE(result.Normals.IsValid());
     EXPECT_TRUE(mesh.VertexProperties().Get<float>("v:test_normal").IsValid());
+}
+
+// A corner's position is checked right after its topology (per corner, in ring order): a face
+// whose first corner is non-finite counts as non-finite even when a later corner is deleted,
+// and the corner table skips that face the same way.
+TEST(HalfedgeMeshVertexNormals, ANonFiniteCornerBeforeAnInvalidCornerCountsAsNonFinite)
+{
+    auto mesh = MakeAsymmetricTwoTriangleFan();
+    // Face 0 = (v0, v1, v2) is walked in that order: v1 (non-finite) comes before v2 (deleted).
+    mesh.Position(Geometry::VertexHandle{1u}).y = std::numeric_limits<float>::quiet_NaN();
+    mesh.VertexProperties().GetOrAdd<bool>("v:deleted", false).Vector()[2] = true;
+
+    VertexNormals::Params params;
+    params.OutputProperty = "v:test_normal";
+    const auto result = VertexNormals::Recompute(mesh, params);
+    ASSERT_EQ(result.Status, VertexNormals::RecomputeStatus::Success);
+    EXPECT_EQ(result.NonFiniteFaceCount, 1u) << "the non-finite corner is met before the deleted one";
+    EXPECT_EQ(result.InvalidTopologyFaceCount, 1u) << "face 1 touches the deleted vertex first";
+    EXPECT_EQ(result.ProcessedFaceCount, 0u);
+
+    // The corner table applies the topology rules only (positions are the kernel's rule): both
+    // faces touch the deleted vertex, so both rings are empty.
+    const auto table = VertexNormals::GatherFaceCornerTable(mesh);
+    EXPECT_EQ((std::vector<std::uint32_t>{0u, 0u, 0u}), table.FaceOffsets);
+    EXPECT_EQ(table.InvalidTopologyFaceCount, 2u);
+    EXPECT_TRUE(table.Corners.empty());
+    // Without the deletion the table walks both rings in the reference's order.
+    mesh.VertexProperties().GetOrAdd<bool>("v:deleted", false).Vector()[2] = false;
+    const auto walked = VertexNormals::GatherFaceCornerTable(mesh);
+    EXPECT_EQ((std::vector<std::uint32_t>{0u, 3u, 6u}), walked.FaceOffsets) << "the non-finite corner is not a topology rule";
+    EXPECT_EQ((std::vector<std::uint32_t>{0u, 1u, 2u, 0u, 2u, 3u}), walked.Corners) << "the reference's walk order";
 }

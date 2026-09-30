@@ -64,13 +64,19 @@ namespace Geometry::HalfedgeMesh::VertexNormals
             result.FallbackNormalWasRepaired = true;
         }
 
-        [[nodiscard]] bool GatherFaceCorners(const Mesh& mesh,
-                                             FaceHandle face,
-                                             const Params& params,
-                                             Result& result,
-                                             std::vector<FaceCorner>& corners)
+        // The ring walk shared by the reference and the corner table. `onCorner(vertex)` runs
+        // for each corner right after its topology checks (the reference checks the corner's
+        // position there, so a non-finite corner is counted before a later invalid corner);
+        // false from it ends the walk after the callee counted the reason.
+        template <typename OnCorner>
+        [[nodiscard]] bool WalkFaceCorners(const Mesh& mesh,
+                                           FaceHandle face,
+                                           const bool skipDeleted,
+                                           Result& result,
+                                           std::size_t& cornerCount,
+                                           OnCorner&& onCorner)
         {
-            corners.clear();
+            cornerCount = 0;
 
             if (!face.IsValid() || !mesh.IsValid(face))
             {
@@ -97,7 +103,7 @@ namespace Geometry::HalfedgeMesh::VertexNormals
                     return false;
                 }
 
-                if (params.SkipDeleted && mesh.IsDeleted(current))
+                if (skipDeleted && mesh.IsDeleted(current))
                 {
                     ++result.InvalidTopologyFaceCount;
                     return false;
@@ -116,23 +122,17 @@ namespace Geometry::HalfedgeMesh::VertexNormals
                     return false;
                 }
 
-                if (params.SkipDeleted && mesh.IsDeleted(vertex))
+                if (skipDeleted && mesh.IsDeleted(vertex))
                 {
                     ++result.InvalidTopologyFaceCount;
                     return false;
                 }
 
-                const glm::vec3 position = mesh.Position(vertex);
-                if (!IsFinite(position))
+                if (!onCorner(vertex))
                 {
-                    ++result.NonFiniteFaceCount;
                     return false;
                 }
-
-                corners.push_back(FaceCorner{
-                    .Vertex = vertex,
-                    .Position = glm::dvec3(position),
-                });
+                ++cornerCount;
 
                 current = mesh.NextHalfedge(current);
                 ++steps;
@@ -144,13 +144,37 @@ namespace Geometry::HalfedgeMesh::VertexNormals
                 return false;
             }
 
-            if (corners.size() < 3u)
+            if (cornerCount < 3u)
             {
                 ++result.DegenerateFaceCount;
                 return false;
             }
 
             return true;
+        }
+
+        [[nodiscard]] bool GatherFaceCorners(const Mesh& mesh,
+                                             FaceHandle face,
+                                             const Params& params,
+                                             Result& result,
+                                             std::vector<FaceCorner>& corners)
+        {
+            corners.clear();
+            std::size_t count = 0;
+            return WalkFaceCorners(mesh, face, params.SkipDeleted, result, count, [&](const VertexHandle vertex) {
+                const glm::vec3 position = mesh.Position(vertex);
+                if (!IsFinite(position))
+                {
+                    ++result.NonFiniteFaceCount;
+                    return false;
+                }
+
+                corners.push_back(FaceCorner{
+                    .Vertex = vertex,
+                    .Position = glm::dvec3(position),
+                });
+                return true;
+            });
         }
 
         [[nodiscard]] glm::dvec3 ComputeAreaVector(const std::vector<FaceCorner>& corners) noexcept
@@ -414,5 +438,42 @@ namespace Geometry::HalfedgeMesh::VertexNormals
         }
 
         return result;
+    }
+    FaceCornerTable GatherFaceCornerTable(const Mesh& mesh, const bool skipDeleted)
+    {
+        FaceCornerTable table{};
+        Result counters{};
+        table.FaceOffsets.reserve(mesh.FacesSize() + 1u);
+        table.FaceOffsets.push_back(0u);
+        for (std::size_t faceIndex = 0; faceIndex < mesh.FacesSize(); ++faceIndex)
+        {
+            const FaceHandle face{static_cast<PropertyIndex>(faceIndex)};
+            const std::size_t begin = table.Corners.size();
+            std::size_t count = 0;
+            if (skipDeleted && mesh.IsDeleted(face))
+            {
+                ++table.SkippedDeletedFaceCount;
+            }
+            else if (!WalkFaceCorners(mesh, face, skipDeleted, counters, count, [&](const VertexHandle vertex) {
+                         table.Corners.push_back(static_cast<std::uint32_t>(vertex.Index));
+                         return true;
+                     }))
+            {
+                table.Corners.resize(begin); // a skipped face has an empty range
+            }
+            table.FaceOffsets.push_back(static_cast<std::uint32_t>(table.Corners.size()));
+        }
+        table.InvalidTopologyFaceCount = counters.InvalidTopologyFaceCount;
+        table.DegenerateFaceCount = counters.DegenerateFaceCount;
+        return table;
+    }
+
+    glm::vec3 ResolveFallbackNormal(const Params& params, bool& repaired) noexcept
+    {
+        Result result{};
+        glm::vec3 fallback{0.0f};
+        NormalizeFallback(params, result, fallback);
+        repaired = result.FallbackNormalWasRepaired;
+        return fallback;
     }
 } // namespace Geometry::HalfedgeMesh::VertexNormals

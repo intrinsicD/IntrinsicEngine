@@ -4,6 +4,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
+#include <vector>
 
 #include <glm/glm.hpp>
 
@@ -60,4 +61,23 @@ export namespace Geometry::HalfedgeMesh::VertexNormals
 
     [[nodiscard]] Result Recompute(Mesh& mesh,
                                    const Params& params = {});
+
+    // The face rings Recompute walks, in its corner order, as CSR: face f's corner vertices
+    // are Corners[FaceOffsets[f] .. FaceOffsets[f + 1]). A face Recompute skips for its
+    // topology (deleted, a deleted halfedge or vertex on the ring, a broken ring, under three
+    // corners) has an empty range. Corner positions are not inspected here; a backend that
+    // gathers from this table applies the reference's position rules itself.
+    struct FaceCornerTable
+    {
+        std::vector<std::uint32_t> FaceOffsets{};
+        std::vector<std::uint32_t> Corners{};
+        std::size_t SkippedDeletedFaceCount{0};
+        std::size_t InvalidTopologyFaceCount{0};
+        std::size_t DegenerateFaceCount{0};
+    };
+    [[nodiscard]] FaceCornerTable GatherFaceCornerTable(const Mesh& mesh, bool skipDeleted = true);
+
+    // The fallback normal Recompute writes: `params.FallbackNormal` normalized in float, or
+    // +Y (`repaired`) when it is not finite or shorter than the epsilon.
+    [[nodiscard]] glm::vec3 ResolveFallbackNormal(const Params& params, bool& repaired) noexcept;
 } // namespace Geometry::HalfedgeMesh::VertexNormals

@@ -79,4 +79,15 @@ DebugNameForEditorDomainWindowKind(const EditorDomainWindowKind kind) noexcept {
   }
   return "Unknown";
 }
+const char* ToString(const EditorGpuTransactionPhase phase) noexcept {
+  switch (phase) {
+  case EditorGpuTransactionPhase::Running: return "running";
+  case EditorGpuTransactionPhase::ReadyToAccept: return "ready_to_accept";
+  case EditorGpuTransactionPhase::Accepting: return "accepting";
+  case EditorGpuTransactionPhase::Applied: return "applied";
+  case EditorGpuTransactionPhase::Discarded: return "discarded";
+  case EditorGpuTransactionPhase::Failed: return "failed";
+  }
+  return "unknown";
+}
 } // namespace Extrinsic::Runtime

@@ -39,11 +39,14 @@ Graphics is organized into explicit sublayers:
 - The four RHI resource-manager interfaces borrow `IDevice` through its existing
   C++ linkage declaration. Their implementation units import `RHI.Device`; a
   manager constructor declaration does not expose device submission dependencies.
-- PointLBVH, PointKeypoints, PropertyFilter and SparseConjugateGradient likewise borrow `IDevice` and `ICommandContext`.
-  PropertyFilter and SparseConjugateGradient also read and write resident
-  property slots by buffer handle and address (`PropertyFilterResidentIo`,
-  `SolutionsAddress`), keeping `Graphics.GpuPropertyResidency` out of their
-  interfaces (ADR 0030 decision 9; the runtime job binds the slots).
+- PointLBVH, PointKeypoints, PropertyFilter, SparseConjugateGradient and VertexNormals likewise borrow `IDevice` and `ICommandContext`.
+  PropertyFilter, SparseConjugateGradient and VertexNormals also read and write
+  resident property slots by buffer handle and address (`PropertyFilterResidentIo`,
+  `SolutionsAddress`, `VertexNormalsResidentIo`), keeping `Graphics.GpuPropertyResidency`
+  out of their interfaces (ADR 0030 decision 9; the runtime job binds the slots).
+  VertexNormals additionally defines the packed topology bundle
+  (`PackVertexNormalsTopology` / `UnpackVertexNormalsTopologyLayout`) the runtime keeps
+  resident per topology revision (RUNTIME-296).
   ComputeParallelPrimitives and GpuTransfer borrow `IDevice`, retaining the
   CommandContext import for its `MemoryAccess` value type. Visualization property
   residency and overlay uploads, ImGuiOverlaySystem and ImGuiUploadHelper borrow

@@ -1,0 +1,45 @@
+---
+id: RUNTIME-297
+theme: I
+depends_on: [RUNTIME-292, GRAPHICS-154]
+maturity_target: Operational
+template: micro
+workflow_schema: 1
+workflow_profile: micro
+evidence: not_applicable
+evidence_skip_reason: slice of RUNTIME-294 planned from ADR 0030 decisions 8-9 (2026-09-30); implementation owes the contract tests and the gpu;vulkan parity + IO smoke listed below.
+contract_schema: 1
+contracts: [geometry.property-coherence, geometry.element-domain-sources, method.engine-integration]
+---
+# RUNTIME-297 — Outlier analysis on the GPU property residency
+
+## Goal
+- RUNTIME-294 row "Outliers (statistical, radius, LDR, remove)".
+- Input: positions from the canonical residency slot through the LBVH (`SpatialIndexCache`, GRAPHICS-154).
+- Output: the score as a float ring (observed by the colormap like any scalar) and the mask as a typed ring with a float presentation ring; Accept through the scalar transaction (`PublishPointScalarField`). Removal changes the cardinality and publishes atomically through the existing removal command (no ring).
+- CPU stage today: reductions on downloaded neighborhoods. Port: per-point kNN / radius-count kernels, a fixed-order mean / std reduction (deterministic), stream compaction for removal.
+- ADR 0030 decisions 8-9: the kernels record from `GpuPropertyView` inputs into ring outputs, never from CPU spans; `RequestedBackend` / `ActualBackend`, fallback reasons and the residency IO counters stay uniform. The CPU reference stays canonical; the GPU backend reports its identity and parity delta.
+
+## Engine integration
+
+| Field | Disposition |
+| --- | --- |
+| Least-structured input | Unchanged: a count-matched vec3 position property on any point domain. |
+| Compatible entity sources | Mesh vertices, graph nodes, point clouds. |
+| RuntimeModule | `Extrinsic.Runtime.PointAnalysisOperations` (existing outlier operations). |
+| Config/agent | Unchanged backend enum; IO counters in the result and agent output. |
+| UI | Outlier panel: Accept / Discard for a GPU result, the observation state and the IO counters. |
+| Publication | Score and mask on the input domain, same cardinality. GPU preview: yes for the score (colormap scalar); no for the mask and removal; commit via the scalar transaction, removal via the existing atomic removal publication. |
+| End-to-end tests | Contract tests on the mock device; one gpu;vulkan parity + IO smoke. |
+
+## Acceptance criteria
+- [ ] gpu;vulkan parity smoke: the accepted rows equal the CPU reference within a stated, justified tolerance.
+- [ ] IO counters: a second run on the same input revision uploads zero input bytes (the residency reports uploads, hits and any declared CPU-stage bytes in the result and the agent output).
+- [ ] Panel Accept / Discard (Accept disabled with its reason when stale); batch and agent commands accept automatically.
+- [ ] `method.engine-integration` publication row states "GPU preview: yes/no; commit via X" and the method docs record the backend identity and parity delta.
+
+## Verification
+```bash
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+DISPLAY=:7 ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu|vulkan' --timeout 900
+```
