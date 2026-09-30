@@ -3,7 +3,7 @@ module;
 #include <memory>
 #include "Sandbox.EditorFwd.hpp"
 export module Extrinsic.Sandbox.Editor.MethodPanels;
-import Extrinsic.Runtime.ClusteringModule;
+import Extrinsic.Runtime.ClusteringTypes;
 import Extrinsic.Runtime.CommandBus;
 export namespace Extrinsic::Sandbox::Editor
 {
