@@ -111,16 +111,19 @@ namespace Extrinsic::Runtime
         Graphics::GpuPropertyResidency& residency, ECS::Scene::Registry& scene, const WorldHandle world,
         const entt::entity entity, const GeometryPropertyRef& ref)
     {
-        const auto key = MakeGpuPropertyKey(world, entity, GpuPropertyPresentationRef(ref));
+        const bool positions = ref.ValueKind == Geometry::PropertyValueKind::Vec3;
+        const auto key = MakeGpuPropertyKey(world, entity, positions ? ref : GpuPropertyPresentationRef(ref));
         if (!residency.HasRing(key) || !scene.IsValid(entity)) return std::nullopt;
         const auto front = residency.Front(key);
-        if (!front || front->Layout.Scalar != Graphics::GpuScalarType::Float32 || front->Layout.Channels != 1u ||
+        const std::uint32_t channels = positions ? 3u : 1u;
+        if (!front || front->Layout.Scalar != Graphics::GpuScalarType::Float32 || front->Layout.Channels != channels ||
             front->Layout.Stride != 0u)
             return std::nullopt;
         const auto* properties = ResolveGeometryPropertySet(BuildGeometryAvailability(scene.Raw(), entity), ref.Domain);
         if (!properties || properties->Size() != front->Layout.Count) return std::nullopt;
         residency.MarkObserved(key);
-        return GpuPropertyObservation{.Address = front->Address, .Count = front->Layout.Count,
+        return GpuPropertyObservation{.Buffer = front->Buffer, .Address = front->Address, .Bytes = front->Bytes,
+                                      .Count = front->Layout.Count,
                                       .Stamp = (std::uint64_t(front->Buffer.Generation) << 32u) | front->Buffer.Index};
     }
 

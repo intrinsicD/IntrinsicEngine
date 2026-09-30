@@ -3,6 +3,7 @@ module;
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <span>
@@ -28,8 +29,12 @@ import Extrinsic.Runtime.StableEntityLookup;
 
 namespace Extrinsic::Runtime
 {
+    // Highlights of the selected primitives from the CPU `v:position`. Entities for which
+    // `suppress` returns true (GRAPHICS-156: their blocks show uncommitted GPU positions the
+    // CPU does not describe) contribute no highlight until the preview ends.
     export RuntimeSceneInteractionRenderSnapshot BuildPrimitiveSelectionRenderSnapshot(
-        const ECS::Scene::Registry& scene, const SelectionController& selection, WorldHandle world);
+        const ECS::Scene::Registry& scene, const SelectionController& selection, WorldHandle world,
+        const std::function<bool(std::uint32_t stableEntityId)>& suppress = {});
 
     // Optional app-composed owner for every active-world interaction record.
     // The object has app-global lifetime; its mutable cohort binds to exactly

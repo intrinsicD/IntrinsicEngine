@@ -190,6 +190,16 @@ TEST(PrimitiveSelection, HighlightSnapshotAndMethodUseDoNotOverwriteProperties)
     EXPECT_DOUBLE_EQ(result.Diagnostics.Distances[0], 0);
     EXPECT_DOUBLE_EQ(result.Diagnostics.Distances[2], 0);
     EXPECT_EQ(h.Read().Indices, selected.Indices);
+    // GRAPHICS-156: an entity showing uncommitted GPU positions contributes no highlight
+    // (the CPU positions the highlight would use are not what is on screen).
+    const auto suppressed = R::BuildPrimitiveSelectionRenderSnapshot(
+        h.Scene, h.Selection, R::DefaultWorldHandle, [&](const std::uint32_t id) { return id == h.Id; });
+    EXPECT_TRUE(suppressed.DebugPoints.empty());
+    EXPECT_TRUE(suppressed.DebugLines.empty());
+    const auto other = R::BuildPrimitiveSelectionRenderSnapshot(
+        h.Scene, h.Selection, R::DefaultWorldHandle, [&](const std::uint32_t id) { return id != h.Id; });
+    EXPECT_EQ(other.DebugPoints.size(), 2);
+    EXPECT_EQ(other.DebugLines.size(), 3);
     h.Selection.GetConfig().Interaction.Highlight = false;
     EXPECT_TRUE(
         R::BuildPrimitiveSelectionRenderSnapshot(h.Scene, h.Selection, R::DefaultWorldHandle)

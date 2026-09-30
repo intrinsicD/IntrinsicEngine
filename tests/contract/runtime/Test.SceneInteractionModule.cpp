@@ -1,6 +1,8 @@
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -8,6 +10,7 @@
 
 #include <gtest/gtest.h>
 
+#include <entt/entity/entity.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -17,6 +20,7 @@ import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
 import Extrinsic.ECS.Component.Transform;
+import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Components.GeometrySources;
@@ -26,7 +30,9 @@ import Geometry.Properties;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.CameraSnapshots;
+import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.RenderFrameInput;
+import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.SelectionSystem;
 import Extrinsic.Platform.Backend.Null;
@@ -36,6 +42,7 @@ import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.FramePacingDiagnostics;
+import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.KernelEvents;
@@ -45,6 +52,8 @@ import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
+import Extrinsic.Runtime.StableEntityLookup;
+import Extrinsic.RHI.Handles;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
 
@@ -1593,6 +1602,240 @@ TEST(SceneInteractionModule, PrimitiveClicksReachSharedSelectionAndRejectChanged
     EXPECT_TRUE(selection.ReadPrimitives(scene, id, Runtime::GeometryElementDomain::MeshVertex).Indices.empty());
     harness.InvokeFrameHook(0, capture, pacing);
     EXPECT_TRUE(selection.PrimitiveSnapshots(scene).empty());
+}
+
+// GRAPHICS-156 (ADR 0030 decision 5): while an entity shows uncommitted GPU positions (a
+// position ring front observed by extraction), a primitive pick resolves to the entity only;
+// once the front is gone refinement resumes on the CPU geometry.
+TEST(SceneInteractionModule, PrimitiveRefinementIsOffWhileUncommittedPositionsAreShown)
+{
+    DirectHarness harness;
+    harness.InitializeRendererForHooks();
+    ASSERT_TRUE(harness.Start().has_value());
+    auto& selection = *harness.Services.Find<Runtime::SelectionController>();
+    auto& scene = *harness.Worlds.Get(harness.InitialWorld);
+    namespace GS = ECS::Components::GeometrySources;
+    namespace G = Extrinsic::Graphics::Components;
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0, 0, 0}), b = mesh.AddVertex({1, 0, 0}), c = mesh.AddVertex({0, 1, 0});
+    ASSERT_TRUE(mesh.AddTriangle(a, b, c));
+    const auto entity = MakeSelectable(scene);
+    scene.Raw().emplace<ECSC::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
+    scene.Raw().emplace<G::RenderSurface>(entity);
+    GS::PopulateFromMesh(scene.Raw(), entity, mesh);
+    const auto id = Runtime::SelectionController::ToStableEntityId(entity);
+    const auto renderId = Runtime::StableEntityLookup::ToRenderId(entity);
+
+    // A fake residency: `v:position` has a ring front while `front` is set.
+    std::optional<Runtime::RenderExtractionCache::GpuPropertyFront> front{
+        Runtime::RenderExtractionCache::GpuPropertyFront{.Buffer = Extrinsic::RHI::BufferHandle{9u, 1u},
+                                                         .Address = 0x9000u, .Bytes = 36u, .Count = 3u, .Stamp = 1u}};
+    harness.Extraction.SetGpuPropertyObserver(
+        [&front](Runtime::WorldHandle, entt::entity, const Runtime::GeometryPropertyRef& ref)
+            -> std::optional<Runtime::RenderExtractionCache::GpuPropertyFront> {
+            return ref.ValueKind == Geometry::PropertyValueKind::Vec3 ? front : std::nullopt;
+        });
+    // Production order per frame: the BeforeExtraction hook issues the pick, extraction
+    // then builds the frame that renders it, and the Maintenance hook consumes readbacks
+    // after a later frame's extraction. The pick below is issued on the very first
+    // preview frame: no extraction has seen the front yet.
+    Runtime::EditorInputCaptureSnapshot capture{};
+    Runtime::RuntimeFramePacingDiagnostics pacing{};
+    harness.SelectionSettings.Target = Runtime::SelectionTarget::Vertex;
+    auto& window = harness.InputWindow();
+    auto extract = [&]() { (void)harness.Extraction.ExtractAndSubmit(scene, *harness.Renderer); };
+    auto issue = [&]() {
+        window.QueueMouseButton(0, false);
+        window.PollEvents();
+        window.QueueCursor(12, 12);
+        window.QueueMouseButton(0, true);
+        window.PollEvents();
+        Graphics::RenderFrameInput input{};
+        harness.InvokeViewportHook(0, input, capture);
+        harness.InvokeFrameHook(0, capture, pacing);
+        EXPECT_TRUE(input.HasPendingPick);
+        (void)harness.Renderer->GetSelectionSystem().ConsumePick();
+        extract();
+        return input.Pick.Sequence;
+    };
+    auto complete = [&](std::uint64_t sequence, std::uint32_t vertex) {
+        harness.Renderer->GetSelectionSystem().PublishPickResult({
+            .EncodedId = Graphics::EncodeSelectionId(Graphics::SelectionPrimitiveDomain::Point, vertex),
+            .StableEntityId = id, .Hit = true, .Sequence = sequence});
+        harness.InvokeFrameHook(1, capture, pacing);
+    };
+
+    // Uncommitted positions: the vertex hint is not refined against the CPU geometry, so
+    // the vertex pick edits nothing; an entity pick still selects the entity.
+    EXPECT_FALSE(harness.Extraction.ShowsUncommittedPositions(renderId)) << "no extraction yet";
+    EXPECT_TRUE(harness.Extraction.ObservesUncommittedPositions(scene, harness.Worlds.ActiveWorld(), renderId));
+    complete(issue(), 2);
+    ASSERT_TRUE(harness.Extraction.ShowsUncommittedPositions(renderId));
+    EXPECT_TRUE(selection.ReadPrimitives(scene, id, Runtime::GeometryElementDomain::MeshVertex).Indices.empty());
+    EXPECT_FALSE(selection.IsSelected(entity));
+    EXPECT_FALSE(harness.Interaction.LastRefinedPrimitive().has_value());
+    EXPECT_EQ(harness.Interaction.LastRefinedPrimitiveGeneration(), 1u);
+    harness.SelectionSettings.Target = Runtime::SelectionTarget::Entity;
+    complete(issue(), 2);
+    EXPECT_TRUE(selection.IsSelected(entity));
+    EXPECT_TRUE(selection.ReadPrimitives(scene, id, Runtime::GeometryElementDomain::MeshVertex).Indices.empty());
+    EXPECT_FALSE(harness.Interaction.LastRefinedPrimitive().has_value());
+    EXPECT_EQ(harness.Interaction.LastRefinedPrimitiveGeneration(), 2u);
+
+    // The front is gone (Discard) on the frame that issues the next vertex pick: it
+    // resolves the vertex again although the last extraction still showed the preview.
+    front.reset();
+    ASSERT_TRUE(harness.Extraction.ShowsUncommittedPositions(renderId));
+    harness.SelectionSettings.Target = Runtime::SelectionTarget::Vertex;
+    complete(issue(), 2);
+    ASSERT_FALSE(harness.Extraction.ShowsUncommittedPositions(renderId));
+    EXPECT_EQ(selection.ReadPrimitives(scene, id, Runtime::GeometryElementDomain::MeshVertex).Indices,
+              (std::vector<std::uint32_t>{2}));
+    ASSERT_TRUE(harness.Interaction.LastRefinedPrimitive().has_value());
+    harness.Extraction.SetGpuPropertyObserver({});
+    harness.Extraction.Shutdown(*harness.Renderer);
+}
+
+// GRAPHICS-156: a primitive pick's pixels were rendered from one preview state; when that
+// state changes before the readback (Discard before the readback landed, or a preview that
+// started meanwhile) the CPU geometry does not describe the pick, so the pick is discarded
+// instead of refined against the restored (or superseded) positions.
+TEST(SceneInteractionModule, APreviewTransitionBetweenPickAndReadbackDiscardsThePrimitivePick)
+{
+    DirectHarness harness;
+    harness.InitializeRendererForHooks();
+    ASSERT_TRUE(harness.Start().has_value());
+    auto& selection = *harness.Services.Find<Runtime::SelectionController>();
+    auto& scene = *harness.Worlds.Get(harness.InitialWorld);
+    namespace GS = ECS::Components::GeometrySources;
+    namespace G = Extrinsic::Graphics::Components;
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0, 0, 0}), b = mesh.AddVertex({1, 0, 0}), c = mesh.AddVertex({0, 1, 0});
+    ASSERT_TRUE(mesh.AddTriangle(a, b, c));
+    const auto entity = MakeSelectable(scene);
+    scene.Raw().emplace<ECSC::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
+    scene.Raw().emplace<G::RenderSurface>(entity);
+    GS::PopulateFromMesh(scene.Raw(), entity, mesh);
+    const auto id = Runtime::SelectionController::ToStableEntityId(entity);
+    std::optional<Runtime::RenderExtractionCache::GpuPropertyFront> front{
+        Runtime::RenderExtractionCache::GpuPropertyFront{.Buffer = Extrinsic::RHI::BufferHandle{9u, 1u},
+                                                         .Address = 0x9000u, .Bytes = 36u, .Count = 3u, .Stamp = 1u}};
+    harness.Extraction.SetGpuPropertyObserver(
+        [&front](Runtime::WorldHandle, entt::entity, const Runtime::GeometryPropertyRef& ref)
+            -> std::optional<Runtime::RenderExtractionCache::GpuPropertyFront> {
+            return ref.ValueKind == Geometry::PropertyValueKind::Vec3 ? front : std::nullopt;
+        });
+    // Production order: the BeforeExtraction hook issues the pick, then the frame's
+    // extraction runs; readbacks are consumed by the Maintenance hook of a later frame.
+    auto extract = [&]() { (void)harness.Extraction.ExtractAndSubmit(scene, *harness.Renderer); };
+    Runtime::EditorInputCaptureSnapshot capture{};
+    Runtime::RuntimeFramePacingDiagnostics pacing{};
+    harness.SelectionSettings.Target = Runtime::SelectionTarget::Vertex;
+    auto& window = harness.InputWindow();
+    auto issue = [&]() {
+        window.QueueMouseButton(0, false);
+        window.PollEvents();
+        window.QueueCursor(12, 12);
+        window.QueueMouseButton(0, true);
+        window.PollEvents();
+        Graphics::RenderFrameInput input{};
+        harness.InvokeViewportHook(0, input, capture);
+        harness.InvokeFrameHook(0, capture, pacing);
+        EXPECT_TRUE(input.HasPendingPick);
+        (void)harness.Renderer->GetSelectionSystem().ConsumePick();
+        extract();
+        return input.Pick.Sequence;
+    };
+    auto complete = [&](std::uint64_t sequence, std::uint32_t vertex) {
+        harness.Renderer->GetSelectionSystem().PublishPickResult({
+            .EncodedId = Graphics::EncodeSelectionId(Graphics::SelectionPrimitiveDomain::Point, vertex),
+            .StableEntityId = id, .Hit = true, .Sequence = sequence});
+        harness.InvokeFrameHook(1, capture, pacing);
+    };
+
+    // Picked on the first preview frame (no extraction has seen the front yet), Discard
+    // on a later frame before the readback: discarded, not refined against the restored
+    // CPU positions.
+    const auto duringPreview = issue();
+    ASSERT_TRUE(harness.Extraction.ShowsUncommittedPositions(Runtime::StableEntityLookup::ToRenderId(entity)));
+    front.reset();
+    extract();
+    ASSERT_FALSE(harness.Extraction.ShowsUncommittedPositions(Runtime::StableEntityLookup::ToRenderId(entity)));
+    complete(duringPreview, 2);
+    EXPECT_EQ(selection.InFlightPickCount(), 0u);
+    EXPECT_TRUE(selection.ReadPrimitives(scene, id, Runtime::GeometryElementDomain::MeshVertex).Indices.empty());
+    EXPECT_FALSE(selection.IsSelected(entity));
+    EXPECT_FALSE(harness.Interaction.LastRefinedPrimitive().has_value());
+    EXPECT_EQ(harness.Interaction.LastRefinedPrimitiveGeneration(), 0u);
+
+    // Picked without a preview, a preview starts on a later frame before the readback:
+    // discarded too.
+    const auto beforePreview = issue();
+    front = Runtime::RenderExtractionCache::GpuPropertyFront{.Buffer = Extrinsic::RHI::BufferHandle{9u, 1u},
+                                                             .Address = 0x9000u, .Bytes = 36u, .Count = 3u, .Stamp = 2u};
+    extract();
+    complete(beforePreview, 2);
+    EXPECT_EQ(selection.InFlightPickCount(), 0u);
+    EXPECT_TRUE(selection.ReadPrimitives(scene, id, Runtime::GeometryElementDomain::MeshVertex).Indices.empty());
+    EXPECT_EQ(harness.Interaction.LastRefinedPrimitiveGeneration(), 0u);
+
+    // Steady state without a preview: the same pick refines.
+    front.reset();
+    complete(issue(), 2);
+    EXPECT_EQ(selection.ReadPrimitives(scene, id, Runtime::GeometryElementDomain::MeshVertex).Indices,
+              (std::vector<std::uint32_t>{2}));
+    harness.Extraction.SetGpuPropertyObserver({});
+    harness.Extraction.Shutdown(*harness.Renderer);
+}
+
+// GRAPHICS-156: selected-primitive highlights are built from the CPU positions, so while
+// an entity shows uncommitted GPU positions the module submits none for it.
+TEST(SceneInteractionModule, PrimitiveHighlightsAreSuppressedWhileUncommittedPositionsAreShown)
+{
+    DirectHarness harness;
+    harness.InitializeRendererForHooks();
+    ASSERT_TRUE(harness.Start().has_value());
+    auto& selection = *harness.Services.Find<Runtime::SelectionController>();
+    auto& scene = *harness.Worlds.Get(harness.InitialWorld);
+    namespace GS = ECS::Components::GeometrySources;
+    namespace G = Extrinsic::Graphics::Components;
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0, 0, 0}), b = mesh.AddVertex({1, 0, 0}), c = mesh.AddVertex({0, 1, 0});
+    ASSERT_TRUE(mesh.AddTriangle(a, b, c));
+    const auto entity = MakeSelectable(scene);
+    scene.Raw().emplace<ECSC::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
+    scene.Raw().emplace<G::RenderSurface>(entity);
+    GS::PopulateFromMesh(scene.Raw(), entity, mesh);
+    const auto id = Runtime::SelectionController::ToStableEntityId(entity);
+    const std::array<std::uint32_t, 2> vertices{0u, 2u};
+    ASSERT_TRUE(selection.EditPrimitives(scene, id, Runtime::GeometryElementDomain::MeshVertex,
+                                         Runtime::PrimitiveSelectionEdit::Replace, vertices).Usable());
+    std::optional<Runtime::RenderExtractionCache::GpuPropertyFront> front{};
+    harness.Extraction.SetGpuPropertyObserver(
+        [&front](Runtime::WorldHandle, entt::entity, const Runtime::GeometryPropertyRef& ref)
+            -> std::optional<Runtime::RenderExtractionCache::GpuPropertyFront> {
+            return ref.ValueKind == Geometry::PropertyValueKind::Vec3 ? front : std::nullopt;
+        });
+    Runtime::EditorInputCaptureSnapshot capture{};
+    Runtime::RuntimeFramePacingDiagnostics pacing{};
+    // Production order: the BeforeExtraction hook submits the interaction snapshot, then
+    // the frame's extraction hands it to the renderer. The first preview frame (and the
+    // first frame after Discard) must already be right, before any extraction saw the
+    // change.
+    auto highlightPoints = [&]() {
+        harness.InvokeFrameHook(0, capture, pacing);
+        (void)harness.Extraction.ExtractAndSubmit(scene, *harness.Renderer, nullptr, 0u, harness.Worlds.ActiveWorld());
+        return harness.Renderer->ExtractRenderWorld(Graphics::RenderFrameInput{}).DebugPrimitives.Points.size();
+    };
+    EXPECT_EQ(highlightPoints(), 2u) << "control: the two selected vertices are highlighted";
+    front = Runtime::RenderExtractionCache::GpuPropertyFront{.Buffer = Extrinsic::RHI::BufferHandle{9u, 1u},
+                                                             .Address = 0x9000u, .Bytes = 36u, .Count = 3u, .Stamp = 1u};
+    EXPECT_EQ(highlightPoints(), 0u) << "no highlight on the first frame that shows uncommitted positions";
+    EXPECT_EQ(highlightPoints(), 0u);
+    front.reset();
+    EXPECT_EQ(highlightPoints(), 2u) << "the highlight returns on the first frame after Discard";
+    harness.Extraction.SetGpuPropertyObserver({});
+    harness.Extraction.Shutdown(*harness.Renderer);
 }
 
 // METHOD-047: with an editor pane beside the scene, a click is picked only

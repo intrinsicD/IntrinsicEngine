@@ -511,7 +511,9 @@ namespace Extrinsic::Runtime
                     if (!scene || !s.Residency || s.Residency->Stats().Rings == 0u) return std::nullopt;
                     const auto front = ObserveGpuPropertyFront(*s.Residency, *scene, world, entity, ref);
                     if (!front) return std::nullopt;
-                    return RenderExtractionCache::GpuPropertyFront{.Address = front->Address, .Count = front->Count, .Stamp = front->Stamp};
+                    return RenderExtractionCache::GpuPropertyFront{.Buffer = front->Buffer, .Address = front->Address,
+                                                                   .Bytes = front->Bytes, .Count = front->Count,
+                                                                   .Stamp = front->Stamp};
                 });
         }
         return Core::Ok();

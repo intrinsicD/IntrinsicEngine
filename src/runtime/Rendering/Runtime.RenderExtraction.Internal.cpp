@@ -175,6 +175,8 @@ namespace Extrinsic::Runtime
             Graphics::GpuInstanceHandle MeshVertexViewInstance{};
             Graphics::GpuGeometryHandle MeshVertexViewGeometry{};
             RenderExtractionGeometrySourceRevisions MeshVertexViewSourceRevisions{};
+            // GRAPHICS-156: the blocks show a position ring front (ADR 0030 decision 5).
+            bool PositionPreview{false};
         };
 
         enum class MeshPrimitiveViewKind : std::uint8_t

@@ -1,0 +1,32 @@
+#version 460
+// GRAPHICS-156 (ADR 0030 decision 5): gathers an observed position ring front (float3 per
+// property row, stride 12) into a seam-split GpuWorld position block. `map[i]` is the source
+// row of GPU vertex i (the extraction's MeshSourceVertexForGpuVertex); a row outside the
+// front leaves that vertex untouched. Point clouds and graphs are 1:1 and use a plain copy.
+#extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+layout(local_size_x = 64) in;
+
+layout(buffer_reference, scalar) readonly buffer Source { float v[]; };
+layout(buffer_reference, scalar) writeonly buffer Destination { float v[]; };
+layout(buffer_reference, scalar) readonly buffer Map { uint v[]; };
+
+layout(push_constant, scalar) uniform Push {
+    uint64_t src, dst, map;
+    uint count, sourceRows;
+} pc;
+
+void main()
+{
+    const uint i = gl_GlobalInvocationID.x;
+    if (i >= pc.count) return;
+    const uint row = Map(pc.map).v[i];
+    if (row >= pc.sourceRows) return;
+    Destination dst = Destination(pc.dst);
+    Source src = Source(pc.src);
+    dst.v[3u * i] = src.v[3u * row];
+    dst.v[3u * i + 1u] = src.v[3u * row + 1u];
+    dst.v[3u * i + 2u] = src.v[3u * row + 2u];
+}

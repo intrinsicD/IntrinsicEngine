@@ -10,6 +10,7 @@ module;
 export module Extrinsic.Runtime.GpuPropertyBinding;
 export import Extrinsic.Graphics.GpuPropertyResidency;
 export import Extrinsic.Runtime.GeometryProperty.Types;
+import Extrinsic.RHI.Handles;
 import Extrinsic.Runtime.WorldHandle;
 
 extern "C++" { namespace Extrinsic::Runtime { class WorldRegistry; } }
@@ -39,13 +40,17 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] GeometryPropertyRef GpuPropertyPresentationRef(const GeometryPropertyRef& ref);
     struct GpuPropertyObservation
     {
+        RHI::BufferHandle Buffer{};
         std::uint64_t Address{};
+        std::uint64_t Bytes{};
         std::uint32_t Count{};
         std::uint64_t Stamp{}; // changes with the observed slot
     };
-    // The ring front of the entity's scalar property when a method is writing it and the front
-    // covers every property row (ADR 0030 decision 5); marks it observed this frame. Empty
-    // otherwise: the renderer then uploads the CPU property as usual. Render thread only.
+    // The ring front of the entity's property when a method is writing it and the front covers
+    // every property row (ADR 0030 decision 5); marks it observed this frame. A scalar ref
+    // observes the float (presentation) ring the colormap binds; a Vec3 ref (positions)
+    // observes the property's own float3 ring, which GpuWorld copies into the render block.
+    // Empty otherwise: the renderer then uploads the CPU property as usual. Render thread only.
     [[nodiscard]] std::optional<GpuPropertyObservation> ObserveGpuPropertyFront(
         Graphics::GpuPropertyResidency& residency, ECS::Scene::Registry& scene, WorldHandle world, entt::entity entity,
         const GeometryPropertyRef& ref);

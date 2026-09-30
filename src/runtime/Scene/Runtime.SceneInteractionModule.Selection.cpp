@@ -1,5 +1,6 @@
 module;
 #include <cmath>
+#include <functional>
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 module Extrinsic.Runtime.SceneInteractionModule;
@@ -9,7 +10,8 @@ import Extrinsic.Graphics.RenderWorld;
 namespace Extrinsic::Runtime
 {
     RuntimeSceneInteractionRenderSnapshot BuildPrimitiveSelectionRenderSnapshot(
-        const ECS::Scene::Registry& scene, const SelectionController& selection, WorldHandle world)
+        const ECS::Scene::Registry& scene, const SelectionController& selection, WorldHandle world,
+        const std::function<bool(std::uint32_t)>& suppress)
     {
         RuntimeSceneInteractionRenderSnapshot result{.World = world};
         const auto& config = selection.GetConfig().Interaction;
@@ -20,6 +22,8 @@ namespace Extrinsic::Runtime
         constexpr glm::vec4 color{1.f, 0.55f, 0.05f, 1.f};
         for (const auto& selected : selection.PrimitiveSnapshots(scene))
         {
+            if (suppress && suppress(selected.EntityId))
+                continue;
             const auto entity = SelectionController::ToEntityHandle(selected.EntityId);
             const auto source = GS::BuildConstView(scene.Raw(), entity);
             if (!source.VertexSource)

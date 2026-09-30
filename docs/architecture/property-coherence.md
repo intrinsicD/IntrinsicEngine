@@ -136,8 +136,62 @@ per-run state lives in the method's job state, not in a service:
   revision on, so the next GPU use uploads once. A refused slot defers the run
   (bounded) and never falls back to the CPU silently.
 
-Position observation and Accept for positions, and routing render uploads
-through the residency, follow (GRAPHICS-156, RUNTIME-293, RUNTIME-295).
+### Position observation (GRAPHICS-156)
+
+Positions are always shown, so extraction also asks the observer for the
+entity's `v:position` (a Vec3 ref on the provenance domain: mesh vertex,
+graph node, point-cloud point). The float3 ring front is not bound directly:
+its rows live in property order while `GpuWorld` blocks hold packed float3 at
+stride 12 per GPU vertex, so the front is handed to `GpuWorld` as the block's
+**position preview** (`SetGeometryPositionPreview`) and copied at the head of
+the culling pass, where `SubmitPendingUploadBarriers` runs, with a
+compute-write -> transfer-read barrier on the front and the managed vertex
+buffer's transfer-write -> shader-read barrier. Point clouds, graphs and the
+canonical mesh edge/vertex views are 1:1 with the property rows (deleted rows
+included) and copy; a seam-split surface gathers through a device copy of
+`MeshSourceVertexForGpuVertex` uploaded once per remap revision
+(`gpu_world_position_gather.comp`). The copy is recorded only when the front's
+stamp or the remap changed or the block was rewritten (a CPU position upload
+during the preview lands first and is copied over again; compaction and
+rebuild replay set the same flag). The residency records the frame's use of
+the front (`MarkObserved`). A front whose row count does not fit the block is
+refused and counted (`PositionPreviewBlocksRejected`), never reinterpreted.
+
+While an entity shows uncommitted positions:
+
+- its instances submit unbounded culling bounds (`UnboundedPreviewBounds`, a
+  finite radius the frustum test always passes), since the CPU bounds do not
+  describe the preview;
+- primitive pick refinement is off for the entity
+  (`RenderExtractionCache::ShowsUncommittedPositions`, read by
+  `SceneInteractionModule`): a primitive-target pick edits nothing and an
+  entity-target pick selects the entity as usual. The pre-extraction hooks ask
+  `ObservesUncommittedPositions` (the observer, i.e. the state the frame being
+  built will show) rather than the last extraction's flag, so the first
+  preview frame and the first frame after Discard are already right. The
+  preview state is part of the primitive pick stamp taken with the request, so
+  a preview that starts or ends before the readback lands discards that pick
+  rather than refining pixels rendered from one set of positions against
+  another;
+- the selected-primitive highlights (built from the CPU `v:position`) are not
+  submitted for the entity until the preview ends;
+- dependent normals keep their CPU state (only the position range is copied);
+- the block's CPU shadow is **stale** (`PositionShadowStale` on
+  `GpuGeometryResidencyView`): compaction and `RebuildGpuResources` replay
+  every channel but the position range, and the next culling head copies the
+  front into the rewritten block. A rebuild re-uploads the gather maps from
+  their CPU copies first; when no recordable preview remains for a stale
+  block (the preview was cleared, the device refused the map, or the gather
+  pipeline cannot be created), the replay writes the shadow after all, so the
+  block never holds undefined bytes.
+
+When the front disappears (Discard, cancel, or Accept binding the ring), the
+frame's extraction forces a position channel upload from the current CPU
+positions (`DirtyVertexPositions`; `PositionPreviewRestores`), which makes the
+shadow authoritative again. The block is never restored from the old shadow,
+so a CPU edit made during the preview shows after Discard. Accept for
+positions (RUNTIME-293) and routing render uploads through the residency
+(RUNTIME-295) follow.
 
 ## Property revisions
 

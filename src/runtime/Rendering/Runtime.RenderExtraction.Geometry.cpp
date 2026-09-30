@@ -1313,7 +1313,15 @@ namespace Extrinsic::Runtime
             .MaterialHandle = it->second.Material.Lease.GetHandle(),
             .MaterialSlot = it->second.Material.EffectiveSlot,
             .HasMaterialLease = it->second.Material.Lease.IsValid(),
+            .ShowsUncommittedPositions = it->second.PositionPreview,
         };
+    }
+
+    bool RenderExtractionCache::ShowsUncommittedPositions(
+        const std::uint32_t stableEntityId) const noexcept
+    {
+        const auto it = m_State->m_Renderables.find(stableEntityId);
+        return it != m_State->m_Renderables.end() && it->second.PositionPreview;
     }
 
     std::optional<RenderExtractionCache::GpuRenderableAvailabilityView>

@@ -58,11 +58,16 @@ namespace Extrinsic::Runtime
                     .count());
         }
 
-        std::vector<std::uint64_t> PrimitivePickStamp(const ECS::Scene::Registry& scene, std::uint32_t id)
+        // What a primitive pick's pixels were rendered from: topology, positions, the
+        // transform and (GRAPHICS-156) whether the entity showed uncommitted GPU positions.
+        // A stamp that changed between the request and its readback discards the pick.
+        std::vector<std::uint64_t> PrimitivePickStamp(const ECS::Scene::Registry& scene, std::uint32_t id,
+                                                      const bool uncommittedPositions)
         {
             auto stamp = BuildSelectionTopologyStamp(scene, id);
             const auto entity = SelectionController::ToEntityHandle(id);
             if (!id || !scene.IsValid(entity)) return {};
+            stamp.push_back(uncommittedPositions ? 1u : 0u);
             const auto source = ECS::Components::GeometrySources::BuildConstView(scene.Raw(), entity);
             stamp.push_back(source.VertexSource ? source.VertexSource->Properties.FindPropertyRevision("v:position").value_or(0) : 0);
             const auto* world = scene.Raw().try_get<ECS::Components::Transform::WorldMatrix>(entity);
@@ -327,6 +332,16 @@ namespace Extrinsic::Runtime
                     InteractionEpoch = 1u;
             }
 
+            // GRAPHICS-156: whether the frame being built shows a GPU method's position
+            // front for the entity. Asked of the residency observer, not of the last
+            // extraction: the BeforeExtraction hooks run before this frame's extraction
+            // updates the sidecars, and the readback hook runs after it.
+            [[nodiscard]] bool ShowsUncommittedPositions(const std::uint32_t id) const
+            {
+                return Extraction != nullptr && BoundRegistry != nullptr &&
+                       Extraction->ObservesUncommittedPositions(*BoundRegistry, BoundWorld, id);
+            }
+
             void ClearFrameBorrow() noexcept
             {
                 FrameRenderInput = nullptr;
@@ -557,7 +572,7 @@ namespace Extrinsic::Runtime
                             for (const auto entity : BoundRegistry->Raw().view<ECS::Components::GeometrySources::Vertices>())
                             {
                                 const auto id = SelectionController::ToStableEntityId(entity);
-                                stamps.emplace(id, PrimitivePickStamp(*BoundRegistry, id));
+                                stamps.emplace(id, PrimitivePickStamp(*BoundRegistry, id, ShowsUncommittedPositions(id)));
                             }
                         }
                     }
@@ -577,7 +592,9 @@ namespace Extrinsic::Runtime
                         Gizmo.Config().AxisLength);
 
                 Selection.PrunePrimitives(*BoundRegistry);
-                RenderSnapshot = BuildPrimitiveSelectionRenderSnapshot(*BoundRegistry, Selection, BoundWorld);
+                RenderSnapshot = BuildPrimitiveSelectionRenderSnapshot(
+                    *BoundRegistry, Selection, BoundWorld,
+                    [this](const std::uint32_t id) { return ShowsUncommittedPositions(id); });
                 RenderSnapshot.SelectedRenderIds.assign(
                     Selection.SelectedStableIds().begin(),
                     Selection.SelectedStableIds().end());
@@ -653,14 +670,30 @@ namespace Extrinsic::Runtime
                         continue;
                     }
 
-                    const auto refined = RefinePickReadbackResult(
-                        *BoundRegistry, *result, pickContext.Context ? &*pickContext.Context : nullptr);
-                    std::optional<PrimitiveSelectionHit> primitive;
-                    if (refined && IsResolved(refined->Status) && pickContext.Target != SelectionTarget::Entity)
+                    // GRAPHICS-156: while the entity shows uncommitted GPU positions the
+                    // CPU geometry does not describe the picked pixels; the pick stays at
+                    // the entity level (ADR 0030 decision 5). A primitive pick whose entity
+                    // changed between the request and this readback (topology, positions,
+                    // transform, or a preview that started or ended) is discarded before
+                    // any refinement.
+                    const bool primitiveTarget = pickContext.Target != SelectionTarget::Entity;
+                    const bool uncommittedPositions =
+                        ShowsUncommittedPositions(result->StableEntityId);
+                    const auto stamp = pickContext.TopologyStamps.find(result->StableEntityId);
+                    if (primitiveTarget && result->Hit && stamp != pickContext.TopologyStamps.end() &&
+                        stamp->second != PrimitivePickStamp(*BoundRegistry, result->StableEntityId, uncommittedPositions))
                     {
-                        const auto stamp = pickContext.TopologyStamps.find(result->StableEntityId);
-                        if (stamp == pickContext.TopologyStamps.end() ||
-                            stamp->second != PrimitivePickStamp(*BoundRegistry, result->StableEntityId))
+                        (void)Selection.DiscardInFlightPick(result->Sequence);
+                        continue;
+                    }
+                    const auto refined = uncommittedPositions
+                        ? std::nullopt
+                        : RefinePickReadbackResult(
+                              *BoundRegistry, *result, pickContext.Context ? &*pickContext.Context : nullptr);
+                    std::optional<PrimitiveSelectionHit> primitive;
+                    if (refined && IsResolved(refined->Status) && primitiveTarget)
+                    {
+                        if (stamp == pickContext.TopologyStamps.end())
                         {
                             (void)Selection.DiscardInFlightPick(result->Sequence);
                             continue;

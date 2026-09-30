@@ -1934,6 +1934,24 @@ Concretely:
   Pending channel writes are tracked by channel internally, then emitted as the
   managed vertex-buffer upload-to-shader-read barrier during
   `SubmitPendingUploadBarriers(...)`.
+- `GpuWorld::SetGeometryPositionPreview(...)` / `ClearGeometryPositionPreview(...)`
+  (`GRAPHICS-156`, ADR 0030 decision 5) bind a GPU method's float3 position
+  ring front to a live block. `SubmitPendingUploadBarriers(...)` first records
+  every preview whose stamp, remap revision or block changed: a
+  compute-write -> transfer-read barrier on the front, then a `CopyBuffer`
+  into the block's position range (1:1 blocks) or a dispatch of
+  `gpu_world_position_gather.comp` through a device copy of the caller's
+  GPU-vertex -> source-row map uploaded once per remap revision (seam-split
+  blocks), then the managed vertex buffer's shader-read barrier. A copied block
+  has a stale CPU shadow (`GpuGeometryResidencyView::PositionShadowStale`):
+  compaction and `RebuildGpuResources` replay skip its position range and flag
+  the preview for a recopy (a rebuild re-uploads the gather maps from their
+  CPU copies first; a stale block without a recordable preview, i.e. no resident
+  map or no gather pipeline, is replayed in full instead); a position channel upload or full upload restores the
+  shadow's authority. Fronts whose row count or map does not fit the block
+  are refused (`InvalidInput`); a freed block drops its preview, and Clear
+  validates the handle generation so a stale handle never clears the slot's
+  reuser.
 - `GpuWorld::TryGetGeometryResidencyView(...)` exposes generation-checked
   CPU metadata for the exact live managed allocation without expanding the
   shader-facing `RHI::GpuGeometryRecord`. The view carries that current record,

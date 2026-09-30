@@ -196,6 +196,31 @@ export namespace Extrinsic::Graphics
             }
         };
 
+        // ADR 0030 decision 5 (GRAPHICS-156): a GPU method's position ring front that the
+        // renderer shows instead of the block's CPU bytes. The front holds float3 rows at
+        // stride 12 (`SourceRowCount` of them from `SourceOffsetBytes`). A 1:1 block (point
+        // clouds, graphs, canonical mesh views) is copied; a seam-split mesh block gathers
+        // through `GatherMap` (one source row per GPU vertex, uploaded once per
+        // `GatherStamp`). The copy is recorded at the head of the culling pass, only when
+        // `Stamp` or `GatherStamp` changed or the block was rewritten, and marks the block's
+        // CPU shadow stale so compaction and rebuild replay never write old bytes over it.
+        struct GeometryPositionPreviewDesc
+        {
+            RHI::BufferHandle Source{};
+            std::uint64_t SourceOffsetBytes = 0;
+            std::uint32_t SourceRowCount = 0;
+            std::uint64_t Stamp = 0;
+            std::span<const std::uint32_t> GatherMap{};
+            std::uint64_t GatherStamp = 0;
+        };
+
+        enum class GeometryPositionPreviewStatus : std::uint8_t
+        {
+            Accepted,
+            InvalidHandle,
+            InvalidInput, // row count or gather map does not fit the block
+        };
+
         GpuWorld();
         ~GpuWorld();
 
@@ -218,6 +243,14 @@ export namespace Extrinsic::Graphics
             const GeometryUploadDesc& desc,
             GeometryChannelUpdateMask channels);
         void FreeGeometry(GpuGeometryHandle geometry);
+
+        // Shows `desc.Source` in the block until cleared; each call refreshes the front. The
+        // next position upload (`UpdateGeometryChannels` with Position, or a full upload)
+        // restores the shadow's authority; Clear alone leaves the shadow stale until then.
+        [[nodiscard]] GeometryPositionPreviewStatus SetGeometryPositionPreview(
+            GpuGeometryHandle geometry,
+            const GeometryPositionPreviewDesc& desc);
+        void ClearGeometryPositionPreview(GpuGeometryHandle geometry);
 
         void SetInstanceGeometry(GpuInstanceHandle instance, GpuGeometryHandle geometry);
         [[nodiscard]] GpuGeometryHandle GetInstanceGeometry(GpuInstanceHandle instance) const noexcept;
@@ -285,6 +318,9 @@ export namespace Extrinsic::Graphics
         RHI::BufferHandle IndexBuffer{};
 
         std::uint64_t ContentRevision = 0u;
+        // True while the device block holds copied preview positions that the CPU shadow
+        // (and the position fingerprint below) does not describe (ADR 0030 decision 5).
+        bool PositionShadowStale = false;
         // FNV-1a-64 over uint32 words in least-significant-byte-first order;
         // float streams canonicalize -0 to +0. Only absent optional channels
         // use fingerprint zero.

@@ -7,6 +7,7 @@ module;
 #include <cstring>
 #include <memory>
 #include <span>
+#include <unordered_map>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -19,6 +20,7 @@ import Extrinsic.RHI.Device;
 
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
+import Extrinsic.Graphics.ComputeParallelPrimitives;
 import Extrinsic.Graphics.GpuTransfer;
 
 namespace Extrinsic::Graphics
@@ -119,6 +121,9 @@ namespace Extrinsic::Graphics
             std::uint64_t SurfaceIndexFingerprint = 0;
             std::uint64_t TexcoordFingerprint = 0;
             std::uint64_t NormalFingerprint = 0;
+            // The device position range holds copied preview positions that VertexBytes
+            // does not describe (ADR 0030 decision 5); replay skips that range.
+            bool PositionShadowStale = false;
             std::vector<std::byte> VertexBytes;
             std::vector<std::uint32_t> SurfaceIndices;
             std::vector<std::uint32_t> LineIndices;
@@ -128,6 +133,34 @@ namespace Extrinsic::Graphics
                 return SurfaceIndexByteCount + LineIndexByteCount;
             }
         };
+
+        // An observed position front bound to a geometry slot (GRAPHICS-156). `Recopy` forces
+        // the next culling-head copy regardless of the stamps (a rewritten block).
+        struct PositionPreview
+        {
+            RHI::BufferHandle Source{};
+            std::uint64_t SourceOffsetBytes = 0;
+            std::uint32_t SourceRowCount = 0;
+            std::uint64_t Stamp = 0;
+            std::uint64_t GatherStamp = 0;
+            std::uint32_t GatherCount = 0;
+            std::vector<std::uint32_t> GatherMap{}; // CPU copy: re-uploaded after a rebuild
+            RHI::BufferManager::BufferLease GatherLease{};
+            std::uint64_t GatherUploadedStamp = 0;
+            std::uint64_t CopiedStamp = 0;
+            std::uint64_t CopiedGatherStamp = 0;
+            bool Recopy = true;
+        };
+
+        struct PositionGatherPush
+        {
+            std::uint64_t Source = 0;
+            std::uint64_t Destination = 0;
+            std::uint64_t Map = 0;
+            std::uint32_t Count = 0;
+            std::uint32_t SourceRows = 0;
+        };
+        static_assert(sizeof(PositionGatherPush) == 32);
 
         [[nodiscard]] std::span<const std::byte> StoredChannelBytes(
             const ManagedGeometryAllocation& allocation,
@@ -625,6 +658,10 @@ namespace Extrinsic::Graphics
         RHI::BufferHandle MaterialBuffer{};
         std::uint32_t MaterialCapacity = 0;
 
+        // Geometry slot -> its observed position front (GRAPHICS-156). Few entries.
+        std::unordered_map<std::uint32_t, PositionPreview> PositionPreviews{};
+        RHI::PipelineHandle PositionGatherPipeline{};
+
         [[nodiscard]] std::uint64_t IssueGeometryContentRevision() noexcept
         {
             const std::uint64_t revision = NextGeometryContentRevision++;
@@ -720,6 +757,17 @@ namespace Extrinsic::Graphics
 
         void ReleaseGpuResources()
         {
+            if (PositionGatherPipeline.IsValid() && Device != nullptr)
+            {
+                Device->DestroyPipeline(PositionGatherPipeline);
+            }
+            PositionGatherPipeline = {};
+            for (auto& [slot, preview] : PositionPreviews)
+            {
+                preview.GatherLease = {};
+                preview.GatherUploadedStamp = 0u;
+                preview.Recopy = true;
+            }
             InstanceStaticLease = {};
             InstanceDynamicLease = {};
             EntityConfigLease = {};
@@ -876,22 +924,227 @@ namespace Extrinsic::Graphics
             DirtyGeometryRecord[slot] = true;
         }
 
-        void ReplayManagedUpload(const ManagedGeometryAllocation& allocation)
+        // Uploads the preview's CPU gather map into a fresh device-local lease (once per
+        // remap revision; again after a rebuild). False when the device refuses.
+        [[nodiscard]] bool UploadPositionGatherMap(PositionPreview& preview)
         {
-            if (!Device || !Device->IsOperational())
+            preview.GatherLease = {};
+            preview.GatherUploadedStamp = 0u;
+            if (preview.GatherMap.empty() || Device == nullptr || Buffers == nullptr ||
+                !Device->IsOperational())
+            {
+                return false;
+            }
+            RHI::BufferManager::BufferLease lease{};
+            const std::span<const std::uint32_t> map{preview.GatherMap};
+            if (!AllocateBuffer(
+                    lease,
+                    RHI::BufferDesc{
+                        .SizeBytes = map.size_bytes(),
+                        .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
+                        .DebugName = "GpuWorld.PositionGatherMap",
+                    }) ||
+                !QueueBufferUpload(*Device, lease.GetHandle(), map.data(), map.size_bytes(), 0u))
+            {
+                return false;
+            }
+            preview.GatherLease = std::move(lease);
+            preview.GatherUploadedStamp = preview.GatherStamp;
+            return true;
+        }
+
+        [[nodiscard]] bool EnsurePositionGatherPipeline()
+        {
+            if (!PositionGatherPipeline.IsValid() && Device != nullptr)
+            {
+                PositionGatherPipeline = CreateComputePipeline(
+                    *Device,
+                    "shaders/gpu_world_position_gather.comp.spv",
+                    sizeof(PositionGatherPush),
+                    "GpuWorld.PositionGather");
+            }
+            return PositionGatherPipeline.IsValid();
+        }
+
+        // True when the next culling head can record the preview into its block: a 1:1
+        // copy, or a gather whose map is resident for the current remap revision and whose
+        // pipeline exists (created here when missing, e.g. after a rebuild).
+        [[nodiscard]] bool PreviewRecordable(PositionPreview& preview)
+        {
+            return preview.GatherCount == 0u ||
+                   (preview.GatherLease.GetHandle().IsValid() &&
+                    preview.GatherUploadedStamp == preview.GatherStamp &&
+                    EnsurePositionGatherPipeline());
+        }
+
+        // ADR 0030 decision 5: at the head of the culling pass, every observed position
+        // front whose stamp changed (or whose block was rewritten) is copied into its block:
+        // compute-write -> transfer-read on the front, the copy (or the seam gather kernel),
+        // then transfer-write -> shader-read on the managed vertex buffer through the
+        // pending-barrier path below. The block's CPU shadow is stale from then on.
+        void RecordPositionPreviews(RHI::ICommandContext& cmd)
+        {
+            if (PositionPreviews.empty() || !Device || !Device->IsOperational())
             {
                 return;
             }
+            const RHI::BufferHandle vertexBuffer = ManagedVertexLease.GetHandle();
+            if (!vertexBuffer.IsValid())
+            {
+                return;
+            }
+            constexpr auto kFrontWrites =
+                RHI::MemoryAccess::ShaderWrite | RHI::MemoryAccess::TransferWrite;
+            bool destinationPrepared = false;
+            bool gatherBound = false;
+            bool copied = false;
+            bool gathered = false;
+            for (auto it = PositionPreviews.begin(); it != PositionPreviews.end();)
+            {
+                const std::uint32_t slot = it->first;
+                PositionPreview& preview = it->second;
+                if (slot >= GeometryAllocations.size() || !GeometryAllocations[slot].Live)
+                {
+                    it = PositionPreviews.erase(it);
+                    continue;
+                }
+                ManagedGeometryAllocation& allocation = GeometryAllocations[slot];
+                const bool current =
+                    !preview.Recopy &&
+                    preview.CopiedStamp == preview.Stamp &&
+                    preview.CopiedGatherStamp == preview.GatherStamp;
+                if (current || allocation.PositionByteCount == 0u)
+                {
+                    ++it;
+                    continue;
+                }
+                const bool gather = preview.GatherCount != 0u;
+                const RHI::BufferHandle map = preview.GatherLease.GetHandle();
+                if (gather && !PreviewRecordable(preview))
+                {
+                    // The map upload was refused this frame; the block keeps its last
+                    // content until a later frame records the gather.
+                    ++it;
+                    continue;
+                }
+                const std::uint64_t destinationOffset =
+                    allocation.VertexByteOffset + allocation.PositionByteOffset;
+                if (!destinationPrepared)
+                {
+                    cmd.BufferBarrier(vertexBuffer,
+                                      RHI::MemoryAccess::ShaderRead |
+                                          RHI::MemoryAccess::TransferWrite,
+                                      RHI::MemoryAccess::TransferWrite |
+                                          RHI::MemoryAccess::ShaderWrite);
+                    destinationPrepared = true;
+                }
+                if (gather)
+                {
+                    cmd.BufferBarrier(preview.Source, kFrontWrites, RHI::MemoryAccess::ShaderRead);
+                    cmd.BufferBarrier(map, RHI::MemoryAccess::TransferWrite, RHI::MemoryAccess::ShaderRead);
+                    if (!gatherBound)
+                    {
+                        cmd.BindPipeline(PositionGatherPipeline);
+                        gatherBound = true;
+                    }
+                    const PositionGatherPush push{
+                        .Source = Device->GetBufferDeviceAddress(preview.Source) +
+                                  preview.SourceOffsetBytes,
+                        .Destination = Device->GetBufferDeviceAddress(vertexBuffer) +
+                                       destinationOffset,
+                        .Map = Device->GetBufferDeviceAddress(map),
+                        .Count = preview.GatherCount,
+                        .SourceRows = preview.SourceRowCount,
+                    };
+                    cmd.PushConstants(&push, sizeof(push), 0u);
+                    cmd.Dispatch((preview.GatherCount + 63u) / 64u, 1u, 1u);
+                    gathered = true;
+                }
+                else
+                {
+                    cmd.BufferBarrier(preview.Source, kFrontWrites, RHI::MemoryAccess::TransferRead);
+                    cmd.CopyBuffer(preview.Source,
+                                   vertexBuffer,
+                                   preview.SourceOffsetBytes,
+                                   destinationOffset,
+                                   allocation.PositionByteCount);
+                    copied = true;
+                }
+                preview.CopiedStamp = preview.Stamp;
+                preview.CopiedGatherStamp = preview.GatherStamp;
+                preview.Recopy = false;
+                allocation.PositionShadowStale = true;
+                ++it;
+            }
+            if (gathered)
+            {
+                cmd.BufferBarrier(vertexBuffer, RHI::MemoryAccess::ShaderWrite, RHI::MemoryAccess::ShaderRead);
+            }
+            if (copied)
+            {
+                PendingManagedVertexUploadBarrier = true;
+            }
+        }
+
+        void ReplayManagedUpload(const std::uint32_t slot)
+        {
+            if (!Device || !Device->IsOperational() ||
+                slot >= GeometryAllocations.size())
+            {
+                return;
+            }
+            ManagedGeometryAllocation& allocation = GeometryAllocations[slot];
 
             if (!allocation.VertexBytes.empty())
             {
-                (void)QueueBufferUpload(
-                    *Device,
-                    ManagedVertexLease.GetHandle(),
-                    allocation.VertexBytes.data(),
-                    static_cast<std::uint64_t>(allocation.VertexBytes.size()),
-                    allocation.VertexByteOffset);
-                PendingManagedVertexUploadBarrier = true;
+                const std::uint64_t bytes =
+                    static_cast<std::uint64_t>(allocation.VertexBytes.size());
+                // A stale position shadow is not replayed (ADR 0030 decision 5) when the
+                // preview copy will rewrite that range at the next culling head. Without a
+                // recordable preview (cleared, or a gather map the device refused) the
+                // shadow is replayed after all, so the block never holds undefined bytes.
+                const auto preview = PositionPreviews.find(slot);
+                const bool previewRecordable =
+                    preview != PositionPreviews.end() && PreviewRecordable(preview->second);
+                const bool skipPositions =
+                    allocation.PositionShadowStale &&
+                    allocation.PositionByteCount > 0u &&
+                    previewRecordable;
+                if (allocation.PositionShadowStale && !skipPositions)
+                {
+                    allocation.PositionShadowStale = false;
+                }
+                if (preview != PositionPreviews.end())
+                {
+                    preview->second.Recopy = true;
+                }
+                const auto replay = [&](const std::uint64_t begin,
+                                        const std::uint64_t end)
+                {
+                    if (end <= begin)
+                    {
+                        return;
+                    }
+                    (void)QueueBufferUpload(
+                        *Device,
+                        ManagedVertexLease.GetHandle(),
+                        allocation.VertexBytes.data() +
+                            static_cast<std::ptrdiff_t>(begin),
+                        end - begin,
+                        allocation.VertexByteOffset + begin);
+                    PendingManagedVertexUploadBarrier = true;
+                };
+                if (skipPositions)
+                {
+                    replay(0u, allocation.PositionByteOffset);
+                    replay(allocation.PositionByteOffset +
+                               allocation.PositionByteCount,
+                           bytes);
+                }
+                else
+                {
+                    replay(0u, bytes);
+                }
             }
             if (!allocation.SurfaceIndices.empty())
             {
@@ -986,6 +1239,15 @@ namespace Extrinsic::Graphics
         {
             return false;
         }
+        // Seam gathers need their maps back before the replay decides whether a stale
+        // position range may be left to the next culling head.
+        for (auto& [slot, preview] : m_Impl->PositionPreviews)
+        {
+            if (preview.GatherCount != 0u)
+            {
+                (void)m_Impl->UploadPositionGatherMap(preview);
+            }
+        }
 
         for (std::uint32_t slot = 0; slot < m_Impl->GeometryAllocations.size(); ++slot)
         {
@@ -994,7 +1256,7 @@ namespace Extrinsic::Graphics
             {
                 continue;
             }
-            m_Impl->ReplayManagedUpload(allocation);
+            m_Impl->ReplayManagedUpload(slot);
             m_Impl->RewriteGeometryRecord(slot);
         }
 
@@ -1010,6 +1272,7 @@ namespace Extrinsic::Graphics
         }
 
         m_Impl->ReleaseGpuResources();
+        m_Impl->PositionPreviews.clear();
 
         m_Impl->InstanceStaticCpu.clear();
         m_Impl->InstanceDynamicCpu.clear();
@@ -1525,10 +1788,111 @@ namespace Extrinsic::Graphics
                 result.UploadedChannels.Color;
         }
         RefreshUpdatedResidencyFingerprints(allocation, channels);
+        if (channels.Position)
+        {
+            // The CPU bytes are authoritative again; an observed front, if any, is
+            // copied over them at the next culling head.
+            allocation.PositionShadowStale = false;
+            if (auto found = m_Impl->PositionPreviews.find(geometry.Index);
+                found != m_Impl->PositionPreviews.end())
+            {
+                found->second.Recopy = true;
+            }
+        }
         allocation.ContentRevision =
             m_Impl->IssueGeometryContentRevision();
         result.Status = GeometryChannelUpdateStatus::Updated;
         return result;
+    }
+
+    GpuWorld::GeometryPositionPreviewStatus GpuWorld::SetGeometryPositionPreview(
+        const GpuGeometryHandle geometry,
+        const GeometryPositionPreviewDesc& desc)
+    {
+        if (!m_Impl->GeometrySlots.ResolveForUse(geometry) ||
+            geometry.Index >= m_Impl->GeometryAllocations.size())
+        {
+            return GeometryPositionPreviewStatus::InvalidHandle;
+        }
+        auto& allocation = m_Impl->GeometryAllocations[geometry.Index];
+        if (!allocation.Live || allocation.Generation != geometry.Generation)
+        {
+            return GeometryPositionPreviewStatus::InvalidHandle;
+        }
+        const bool gather = !desc.GatherMap.empty();
+        if (!desc.Source.IsValid() || desc.SourceRowCount == 0u ||
+            allocation.PositionByteCount !=
+                std::uint64_t(allocation.VertexCount) * kPositionElementBytes ||
+            (gather ? desc.GatherMap.size() != allocation.VertexCount
+                    : desc.SourceRowCount != allocation.VertexCount))
+        {
+            return GeometryPositionPreviewStatus::InvalidInput;
+        }
+        // Extraction refreshes the preview every frame; the map is validated once per
+        // remap revision and row count (a changed map arrives with a new stamp).
+        const auto existing = m_Impl->PositionPreviews.find(geometry.Index);
+        const bool mapValidated =
+            gather && existing != m_Impl->PositionPreviews.end() &&
+            existing->second.GatherCount == allocation.VertexCount &&
+            existing->second.GatherStamp == desc.GatherStamp &&
+            existing->second.SourceRowCount == desc.SourceRowCount;
+        if (gather && !mapValidated)
+        {
+            for (const std::uint32_t row : desc.GatherMap)
+            {
+                if (row >= desc.SourceRowCount)
+                {
+                    return GeometryPositionPreviewStatus::InvalidInput;
+                }
+            }
+        }
+
+        auto& preview = m_Impl->PositionPreviews[geometry.Index];
+        preview.Source = desc.Source;
+        preview.SourceOffsetBytes = desc.SourceOffsetBytes;
+        preview.SourceRowCount = desc.SourceRowCount;
+        preview.Stamp = desc.Stamp;
+        if (!gather)
+        {
+            preview.GatherStamp = 0u;
+            preview.GatherCount = 0u;
+            preview.GatherMap.clear();
+            preview.GatherLease = {};
+            preview.GatherUploadedStamp = 0u;
+            return GeometryPositionPreviewStatus::Accepted;
+        }
+        if (!mapValidated)
+        {
+            preview.GatherMap.assign(desc.GatherMap.begin(), desc.GatherMap.end());
+        }
+        preview.GatherStamp = desc.GatherStamp;
+        preview.GatherCount = allocation.VertexCount;
+        // The map is uploaded once per remap revision (and again after a rebuild); a
+        // device-local copy the gather kernel reads through its address. A refused upload
+        // is retried on the next call.
+        if (!m_Impl->PreviewRecordable(preview) && m_Impl->Device != nullptr &&
+            m_Impl->Device->IsOperational())
+        {
+            (void)m_Impl->UploadPositionGatherMap(preview);
+        }
+        return GeometryPositionPreviewStatus::Accepted;
+    }
+
+    void GpuWorld::ClearGeometryPositionPreview(const GpuGeometryHandle geometry)
+    {
+        // A stale handle (a freed slot reused by another geometry) must not clear the
+        // reuser's preview: validate the generation like Set and Free do.
+        if (!m_Impl->GeometrySlots.Resolve(geometry) ||
+            geometry.Index >= m_Impl->GeometryAllocations.size())
+        {
+            return;
+        }
+        const auto& allocation = m_Impl->GeometryAllocations[geometry.Index];
+        if (!allocation.Live || allocation.Generation != geometry.Generation)
+        {
+            return;
+        }
+        m_Impl->PositionPreviews.erase(geometry.Index);
     }
 
     void GpuWorld::FreeGeometry(GpuGeometryHandle geometry)
@@ -1558,6 +1922,7 @@ namespace Extrinsic::Graphics
         {
             m_Impl->GeometryAllocations[geometry.Index].Live = false;
         }
+        m_Impl->PositionPreviews.erase(geometry.Index);
         m_Impl->DirtyGeometryRecord[geometry.Index] = true;
         m_Impl->GeometrySlots.Free(geometry, m_Impl->FrameIndex + m_Impl->Desc.DeferredFreeFrames);
     }
@@ -1839,7 +2204,7 @@ namespace Extrinsic::Graphics
             auto& allocation = m_Impl->GeometryAllocations[relocation.Geometry.Index];
             allocation.VertexByteOffset = relocation.NewVertexByteOffset;
             allocation.IndexByteOffset = relocation.NewIndexByteOffset;
-            m_Impl->ReplayManagedUpload(allocation);
+            m_Impl->ReplayManagedUpload(relocation.Geometry.Index);
             m_Impl->RewriteGeometryRecord(relocation.Geometry.Index);
         }
 
@@ -1934,6 +2299,7 @@ namespace Extrinsic::Graphics
 
     void GpuWorld::SubmitPendingUploadBarriers(RHI::ICommandContext& cmd)
     {
+        m_Impl->RecordPositionPreviews(cmd);
         const auto submit = [&cmd](const RHI::BufferHandle buffer,
                                    bool& pending,
                                    const RHI::MemoryAccess after)
@@ -2015,6 +2381,7 @@ namespace Extrinsic::Graphics
         outView.Record = m_Impl->GeometryRecordsCpu[geometry.Index];
         outView.IndexBuffer = GetManagedIndexBuffer();
         outView.ContentRevision = allocation.ContentRevision;
+        outView.PositionShadowStale = allocation.PositionShadowStale;
         outView.PositionFingerprint = allocation.PositionFingerprint;
         outView.SurfaceIndexFingerprint =
             allocation.SurfaceIndexFingerprint;

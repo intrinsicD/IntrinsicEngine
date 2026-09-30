@@ -423,6 +423,55 @@ namespace Extrinsic::Runtime
             return bounds;
         }
 
+        // GRAPHICS-156 (ADR 0030 decision 5): uncommitted GPU positions have no CPU bounds,
+        // so a previewed instance keeps its centre but passes the frustum test for any
+        // camera (the culling shader tests `WorldSphere`; the radius stays finite).
+        [[nodiscard]] RHI::GpuBounds UnboundedPreviewBounds(RHI::GpuBounds bounds) noexcept
+        {
+            constexpr float kRadius = 1.0e18f;
+            bounds.LocalSphere.w = kRadius;
+            bounds.WorldSphere.w = kRadius;
+            bounds.WorldAabbMin = glm::vec4{-kRadius, -kRadius, -kRadius, 0.f};
+            bounds.WorldAabbMax = glm::vec4{kRadius, kRadius, kRadius, 0.f};
+            return bounds;
+        }
+
+        // The element domain that owns `v:position` for a geometry-source provenance.
+        [[nodiscard]] GeometryElementDomain PositionDomainFor(
+            const ECS::Components::GeometrySources::Domain domain) noexcept
+        {
+            using SourceDomain = ECS::Components::GeometrySources::Domain;
+            switch (domain)
+            {
+            case SourceDomain::Mesh: return GeometryElementDomain::MeshVertex;
+            case SourceDomain::Graph: return GeometryElementDomain::GraphNode;
+            case SourceDomain::PointCloud: return GeometryElementDomain::PointCloudPoint;
+            case SourceDomain::None:
+            case SourceDomain::Unknown: break;
+            }
+            return GeometryElementDomain::Unknown;
+        }
+
+        // GRAPHICS-156: the entity's position ring front for the frame being built, from
+        // the residency observer. One definition serves extraction and the pre-extraction
+        // hooks, so a pick request or highlight snapshot sees the state its frame renders.
+        [[nodiscard]] std::optional<RenderExtractionCache::GpuPropertyFront> ObservePositionFront(
+            const RenderExtractionCache::GpuPropertyObserver& observer,
+            const WorldHandle world,
+            const entt::entity entity,
+            const ECS::Components::GeometrySources::Domain provenance)
+        {
+            if (!observer)
+                return std::nullopt;
+            const GeometryPropertyRef positionRef{
+                .Domain = PositionDomainFor(provenance),
+                .Name = "v:position",
+                .ValueKind = Geometry::PropertyValueKind::Vec3};
+            if (positionRef.Domain == GeometryElementDomain::Unknown)
+                return std::nullopt;
+            return observer(world, entity, positionRef);
+        }
+
         struct GeometryDirtyPlan
         {
             bool Dirty = false;
@@ -1499,12 +1548,35 @@ namespace Extrinsic::Runtime
         bool graphLaneReadyThisFrame = false;
         bool presentationRecipesProjected = false;
         std::optional<GeometryEntityAvailability> availabilityThisFrame{};
+        // GRAPHICS-156: the entity's position ring front this frame, if a GPU method is
+        // writing its positions (ADR 0030 decision 5).
+        std::optional<GpuPropertyFront> positionFront{};
         if (sourceEligible)
         {
             namespace GS = ECS::Components::GeometrySources;
+            namespace D = ECS::Components::DirtyTags;
             const GeometryEntityAvailability availability =
                 BuildGeometryAvailability(registry, entity);
             const auto& view = availability.SourceView;
+            positionFront = ObservePositionFront(
+                m_GpuPropertyObserver, m_World, entity, availability.Sources.ProvenanceDomain);
+            if (!positionFront.has_value() && sidecar->PositionPreview)
+            {
+                // The preview ended (Discard, cancel or Accept): the blocks are restored
+                // from the current CPU positions by this frame's forced channel upload,
+                // never from the stale shadow (ADR 0030 decision 7).
+                registry.emplace_or_replace<D::DirtyVertexPositions>(entity);
+                sidecar->PositionPreview = false;
+                ++stats.PositionPreviewRestores;
+                for (const Graphics::GpuGeometryHandle handle :
+                     {sidecar->MeshGeometry, sidecar->MeshEdgeViewGeometry,
+                      sidecar->MeshVertexViewGeometry, sidecar->GraphGeometry,
+                      sidecar->PointCloudGeometry})
+                {
+                    if (handle.IsValid())
+                        renderer.GetGpuWorld().ClearGeometryPositionPreview(handle);
+                }
+            }
             const GeometryRenderLaneAvailability surfaceLane =
                 ResolveRenderLaneAvailability(availability, GeometryRenderLane::Surface);
             const GeometryRenderLaneAvailability edgeLane =
@@ -1570,8 +1642,9 @@ namespace Extrinsic::Runtime
                 // the mesh domain view when their components are present.
                 if (wantsEdges || wantsPoints)
                 {
-                    const RHI::GpuBounds viewBounds =
-                        ExtractBounds(registry, entity, worldMatrix);
+                    const RHI::GpuBounds viewBounds = positionFront.has_value()
+                        ? UnboundedPreviewBounds(ExtractBounds(registry, entity, worldMatrix))
+                        : ExtractBounds(registry, entity, worldMatrix);
                     meshViewsResident = true;
                     const bool edgeSubmitted =
                         ReconcileMeshPrimitiveView(MeshPrimitiveViewKind::Edge,
@@ -1667,6 +1740,42 @@ namespace Extrinsic::Runtime
                     ++stats.PointCloudGeometryFailedPack;
                 }
             }
+        }
+
+        // GRAPHICS-156: hand the observed front to every lane block. The 1:1 lanes
+        // (point clouds, graphs, canonical mesh views) copy it; the seam-split surface
+        // gathers through its vertex remap keyed by the remap revision.
+        sidecar->PositionPreview = positionFront.has_value();
+        if (positionFront.has_value())
+        {
+            ++stats.PositionPreviewsObserved;
+            Graphics::GpuWorld& gpuWorld = renderer.GetGpuWorld();
+            const auto show = [&](const Graphics::GpuGeometryHandle handle,
+                                  const std::span<const std::uint32_t> gather,
+                                  const std::uint64_t gatherStamp)
+            {
+                if (!handle.IsValid())
+                    return;
+                const auto status = gpuWorld.SetGeometryPositionPreview(
+                    handle,
+                    Graphics::GpuWorld::GeometryPositionPreviewDesc{
+                        .Source = positionFront->Buffer,
+                        .SourceOffsetBytes = 0u,
+                        .SourceRowCount = positionFront->Count,
+                        .Stamp = positionFront->Stamp,
+                        .GatherMap = gather,
+                        .GatherStamp = gatherStamp,
+                    });
+                if (status != Graphics::GpuWorld::GeometryPositionPreviewStatus::Accepted)
+                    ++stats.PositionPreviewBlocksRejected;
+            };
+            show(sidecar->MeshGeometry,
+                 std::span<const std::uint32_t>{sidecar->MeshSourceVertexForGpuVertex},
+                 sidecar->MeshSourceVertexForGpuVertex.empty() ? 0u : sidecar->MeshVertexRemapRevision);
+            show(sidecar->MeshEdgeViewGeometry, {}, 0u);
+            show(sidecar->MeshVertexViewGeometry, {}, 0u);
+            show(sidecar->GraphGeometry, {}, 0u);
+            show(sidecar->PointCloudGeometry, {}, 0u);
         }
 
         // Project property-backed presentation after geometry reconciliation
@@ -2177,12 +2286,15 @@ namespace Extrinsic::Runtime
                         nullptr,
                         renderPoints));
             }
+            const RHI::GpuBounds instanceBounds = sidecar->PositionPreview
+                ? UnboundedPreviewBounds(ExtractBounds(registry, entity, worldMatrix))
+                : ExtractBounds(registry, entity, worldMatrix);
             m_Transforms.push_back(Graphics::TransformSyncRecord{
                 .StableId = stableId,
                 .Instance = sidecar->Instance,
                 .Model = worldMatrix,
                 .RenderFlags = renderFlags,
-                .Bounds = ExtractBounds(registry, entity, worldMatrix),
+                .Bounds = instanceBounds,
                 .MaterialSlot = sidecar->Material.EffectiveSlot,
                 .HasMaterialSlot = true,
             });
@@ -2202,12 +2314,31 @@ namespace Extrinsic::Runtime
                                    RHI::GpuRender_Opaque |
                                    RHI::GpuRender_Point |
                                    RHI::GpuRender_Unlit,
-                    .Bounds = ExtractBounds(registry, entity, worldMatrix),
+                    .Bounds = instanceBounds,
                     .MaterialSlot = sidecar->Material.EffectiveSlot,
                     .HasMaterialSlot = true,
                 });
             }
         }
+    }
+
+    bool RenderExtractionCache::ObservesUncommittedPositions(ECS::Scene::Registry& scene,
+                                                             const WorldHandle world,
+                                                             const std::uint32_t stableEntityId) const
+    {
+        const entt::entity entity = StableEntityLookup::ToEntityHandle(stableEntityId);
+        auto& registry = scene.Raw();
+        if (!m_State->m_GpuPropertyObserver || !scene.IsValid(entity))
+            return false;
+        // Only runtime-authored geometry sources preview (the same eligibility as
+        // `ReconcileRenderableEntity`).
+        if (registry.try_get<ECS::Components::ProceduralGeometryRef>(entity) != nullptr ||
+            registry.try_get<ECS::Components::AssetInstance::Source>(entity) != nullptr)
+            return false;
+        const GeometryEntityAvailability availability = BuildGeometryAvailability(registry, entity);
+        return ObservePositionFront(m_State->m_GpuPropertyObserver, world, entity,
+                                    availability.Sources.ProvenanceDomain)
+            .has_value();
     }
 
     void RenderExtractionCache::State::FinalizeAndSubmitSnapshot(

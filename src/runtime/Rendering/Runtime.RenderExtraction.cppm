@@ -20,6 +20,7 @@ import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.Graphics.SceneHandles;
+import Extrinsic.RHI.Handles;
 export import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Runtime.WorldHandle;
@@ -229,6 +230,13 @@ export namespace Extrinsic::Runtime
         std::uint32_t VisualizationRecipeScalarConfigsObserved{0};
         // Appearance scalars bound straight to a GPU method's ring front (ADR 0030).
         std::uint32_t VisualizationRecipeScalarGpuFrontsObserved{0};
+        // GRAPHICS-156: entities whose position ring front is shown this frame (copied
+        // into their GpuWorld blocks at the culling head), blocks the world rejected
+        // (a front that does not fit the block), and entities whose preview ended this
+        // frame and were restored from the CPU positions by a forced channel upload.
+        std::uint32_t PositionPreviewsObserved{0};
+        std::uint32_t PositionPreviewBlocksRejected{0};
+        std::uint32_t PositionPreviewRestores{0};
         std::uint32_t VisualizationRecipeEncodeCount{0};
         std::uint32_t VisualizationRecipePacketAppendCount{0};
         std::uint32_t VisualizationRecipeMissingSourceCount{0};
@@ -448,6 +456,9 @@ export namespace Extrinsic::Runtime
             Graphics::MaterialHandle MaterialHandle{};
             std::uint32_t MaterialSlot = Graphics::kDefaultMaterialSlotIndex;
             bool HasMaterialLease = false;
+            // GRAPHICS-156: the entity's blocks show a position ring front (see
+            // `ShowsUncommittedPositions`).
+            bool ShowsUncommittedPositions = false;
         };
 
         [[nodiscard]] std::optional<RenderableSidecarView> FindRenderableSidecarForTest(
@@ -501,15 +512,36 @@ export namespace Extrinsic::Runtime
         // uploading the CPU property; the observer records the frame's use. Surface lanes
         // with a seam-split vertex remap keep the CPU upload (the front follows property
         // rows, not split GPU vertices). Set by the residency owner; empty disables.
+        //
+        // Positions (GRAPHICS-156): extraction also asks for the entity's `v:position`
+        // (a Vec3 ref). While a front exists it is handed to `GpuWorld` as the block's
+        // position preview (copied, or gathered through the seam remap, at the culling
+        // head), culling is bypassed with unbounded culling bounds, and primitive pick
+        // refinement is off for the entity (`ShowsUncommittedPositions`). When the front
+        // disappears (Discard, cancel, Accept) the block is restored from the current CPU
+        // positions by a forced position channel upload, never from the old shadow.
         struct GpuPropertyFront
         {
+            RHI::BufferHandle Buffer{};
             std::uint64_t Address{};
+            std::uint64_t Bytes{};
             std::uint32_t Count{};
             std::uint64_t Stamp{};
         };
         using GpuPropertyObserver = std::function<std::optional<GpuPropertyFront>(
             WorldHandle world, entt::entity entity, const GeometryPropertyRef& property)>;
         void SetGpuPropertyObserver(GpuPropertyObserver observer);
+        // True while the entity's render blocks show a position ring front (uncommitted
+        // GPU positions) as of the last extraction: picks resolve to the entity only. Keyed
+        // by the stable render id.
+        [[nodiscard]] bool ShowsUncommittedPositions(std::uint32_t stableEntityId) const noexcept;
+        // Whether the frame being built will show uncommitted positions for the entity:
+        // the observer is asked now, exactly as the next `ExtractAndSubmit` will ask it.
+        // Hooks that run before extraction (pick requests, highlight snapshots) use this
+        // so their state matches the frame that renders them.
+        [[nodiscard]] bool ObservesUncommittedPositions(ECS::Scene::Registry& scene,
+                                                        WorldHandle world,
+                                                        std::uint32_t stableEntityId) const;
 
     private:
         struct State;
