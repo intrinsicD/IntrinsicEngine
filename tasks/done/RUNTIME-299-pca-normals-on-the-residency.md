@@ -33,7 +33,7 @@ contracts: [geometry.property-coherence, geometry.element-domain-sources, method
 | End-to-end tests | Contract tests on the mock device; gpu;vulkan parity smoke on every domain against the CPU reference (unoriented); contracts cover explicit MST refusal. |
 
 ## Completion — 2026-09-30
-Commit: see RETIREMENT-LOG (`claude/cpd-nystrom`). Point-set PCA normals run on the GPU
+Commit: `8b03b5b17` on `claude/cpd-nystrom`. Point-set PCA normals run on the GPU
 property residency (`vulkan_lbvh`):
 - Neighbors come from the canonical positions through `lbvhQueryDouble` (double ranking).
 - The covariance is accumulated in double. CPU and GPU share one portable double eigensolver
