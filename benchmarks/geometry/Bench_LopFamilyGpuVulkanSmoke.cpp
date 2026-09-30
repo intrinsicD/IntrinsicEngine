@@ -40,6 +40,7 @@ import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.SpatialIndexCache;
 import Geometry.PointCloud.Consolidation;
 import Geometry.Properties;
 
@@ -588,6 +589,7 @@ namespace
         config.Simulation.WorkerThreadCount = 1u;
 
         Runtime::Engine engine{std::move(config)};
+        engine.EmplaceModule<Runtime::SpatialIndexCache>();
         engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
         auto driver = std::make_unique<LopGpuBenchmarkDriver>(
             engine, fixtures, references);
