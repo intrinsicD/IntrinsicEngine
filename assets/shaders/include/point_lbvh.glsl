@@ -64,3 +64,47 @@ LbvhNeighbor lbvhNearest(uint64_t nodes,uint count,vec3 q)
 {
     return lbvhNearest(nodes,count,q,LBVH_INVALID);
 }
+
+// Shared sorted kNN / inclusive radius traversal. A caller owns its neighbor slice.
+uint lbvhQuery(uint64_t nodes,uint pointCount,vec3 q,uint excluded,
+               float radius,uint kNearestCount,uint capacity,LbvhNeighbors neighbors,uint base)
+{
+    for(uint j=0;j<capacity;++j)neighbors.v[base+j]=LbvhNeighbor(LBVH_INVALID,uintBitsToFloat(0x7f800000u));
+    uint count=0,size=pointCount==0?0:1;uint stack[64];stack[0]=0;
+    LbvhNodes tree=LbvhNodes(nodes);float limit=kNearestCount>0?uintBitsToFloat(0x7f800000u):radius*radius;
+    while(size>0)
+    {
+        LbvhNode node=tree.v[stack[--size]];
+        if(lbvhBoxDistance(node,q)>limit)continue;
+        if(node.object==LBVH_INVALID)
+        {
+            uint nearChild,farChild;float nearDistance,farDistance;
+            lbvhOrderChildren(tree,node,q,nearChild,nearDistance,farChild,farDistance);
+            if(farDistance<=limit)stack[size++]=farChild;
+            if(nearDistance<=limit)stack[size++]=nearChild;
+            continue;
+        }
+        if(node.object==excluded)continue;
+        float distance=lbvhDistance(q,node.lo);if(distance>limit)continue;
+        if(kNearestCount>0)
+        {
+            LbvhNeighbor value=LbvhNeighbor(node.object,distance);
+            // One invocation owns this result slice. Equal-distance candidates remain traversable.
+            for(uint k=0;k<capacity;++k)
+            {
+                LbvhNeighbor old=neighbors.v[base+k];
+                if(value.distance<old.distance || (value.distance==old.distance && value.index<old.index))
+                { neighbors.v[base+k]=value;value=old; }
+            }
+            count=min(count+1,capacity);
+            if(count==capacity)limit=neighbors.v[base+capacity-1].distance;
+            continue;
+        }
+        ++count;
+        LbvhNeighbor value=LbvhNeighbor(node.object,distance);
+        // Keep the lowest source indices, independent of Morton/traversal ordering.
+        for(uint k=0;k<capacity;++k)
+            if(value.index<neighbors.v[base+k].index){LbvhNeighbor old=neighbors.v[base+k];neighbors.v[base+k]=value;value=old;}
+    }
+    return count;
+}

@@ -124,6 +124,7 @@ namespace Extrinsic::Runtime
             std::shared_ptr<SpatialIndexSnapshot> Snapshot{std::make_shared<SpatialIndexSnapshot>()};
             RHI::IDevice* Device{};
             RHI::BufferHandle Points{}, Mapping{};
+            std::optional<Graphics::GpuPropertyView> GatherSource{};
             // GRAPHICS-154: Points borrowed from the property's canonical residency slot (shared
             // with every other GPU user of that revision); the lease keeps it resident.
             std::shared_ptr<const void> ResidentPoints{};
@@ -355,23 +356,24 @@ namespace Extrinsic::Runtime
                         .HostVisible = true,
                         .DebugName = "SpatialIndex.Source"});
                 };
-                // A property-space index over every row reads the property's canonical slot:
-                // its bytes are the property's own, so every GPU user of this revision shares
-                // one upload (GRAPHICS-154). Transformed or compacted indices keep their own.
-                const bool canonical = !e->Transient && e->Space == SpatialIndexSpace::Property &&
-                                       e->Snapshot->Slots.size() == e->Size && !e->Snapshot->Slots.empty();
+                // Compact live rows on the device from the same canonical property slot
+                // used by method kernels. The CPU snapshot supplies only the row mapping.
+                const bool canonical = !e->Transient && e->Space == SpatialIndexSpace::Property && e->Size;
                 if (canonical)
                 {
-                    const auto points = e->Snapshot->Index.Points();
+                    const auto source = Resolve(s.Worlds, e->World, e->Entity, e->Ref);
+                    if (!source) { e->Gpu.reset(); return false; }
                     const auto view = s.EnsureResidency()->AcquireInput(
                         MakeGpuPropertyKey(e->World, e->Entity, e->Ref), e->Revision,
-                        *MakeGpuPropertyLayout(Geometry::PropertyValueKind::Vec3, std::uint32_t(points.size())),
-                        [&](std::span<std::byte> out) { std::memcpy(out.data(), points.data(), out.size()); });
-                    if (view)
+                        *MakeGpuPropertyLayout(Geometry::PropertyValueKind::Vec3, std::uint32_t(e->Size)),
+                        [&](std::span<std::byte> out) { std::memcpy(out.data(), source->Points.Span().data(), out.size()); });
+                    if (!view) { e->Gpu.reset(); return false; }
+                    if (e->Snapshot->Slots.size() == e->Size)
                     {
                         e->Points = view->Buffer;
                         e->ResidentPoints = view->Lease;
                     }
+                    else e->GatherSource = view;
                 }
                 if (!e->Points.IsValid()) e->Points = allocate(e->Snapshot->Slots.size() * 12);
                 e->Mapping = allocate(e->Snapshot->Slots.size() * 4);
@@ -389,7 +391,7 @@ namespace Extrinsic::Runtime
                 }
                 if (!e->Snapshot->Slots.empty())
                 {
-                    if (!e->ResidentPoints)
+                    if (!e->ResidentPoints && !e->GatherSource)
                         s.Device->WriteBuffer(e->Points, e->Snapshot->Index.Points().data(), e->Snapshot->Slots.size() * 12);
                     s.Device->WriteBuffer(e->Mapping, e->Snapshot->Slots.data(), e->Snapshot->Slots.size() * 4);
                 }
@@ -403,6 +405,23 @@ namespace Extrinsic::Runtime
             if (e->ResidentPoints && s.Residency) s.Residency->NoteUse(e->Points, s.Device->GetGlobalFrameNumber());
             if (!e->Gpu->View().NodesBDA || e->GpuStale)
             {
+                if (e->GatherSource)
+                {
+                    const auto& source = *e->GatherSource;
+                    s.Residency->NoteUse(source.Buffer, s.Device->GetGlobalFrameNumber());
+                    commands.BufferBarrier(source.Buffer, RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderWrite,
+                                           RHI::MemoryAccess::TransferRead);
+                    commands.BufferBarrier(e->Points, RHI::MemoryAccess::ShaderRead, RHI::MemoryAccess::TransferWrite);
+                    const auto& slots = e->Snapshot->Slots;
+                    for (std::size_t first = 0; first < slots.size();)
+                    {
+                        std::size_t end = first + 1;
+                        while (end < slots.size() && slots[end] == slots[first] + end - first) ++end;
+                        commands.CopyBuffer(source.Buffer, e->Points, std::uint64_t(slots[first]) * 12,
+                                            first * 12, (end - first) * 12);
+                        first = end;
+                    }
+                }
                 e->GpuStale = false;
                 if (!e->Gpu->RecordBuild(commands,
                                          {.Buffer = e->Points, .Count = std::uint32_t(e->Snapshot->Slots.size())},

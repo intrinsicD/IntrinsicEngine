@@ -7,6 +7,8 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <memory>
+#include <vector>
 #include <optional>
 #include <string>
 export module Extrinsic.Runtime.PointAnalysisOperations;
@@ -19,6 +21,7 @@ export import Extrinsic.Runtime.DescriptorAnalysisConfig;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Geometry.PointCloud.Kernels.Types;
+import Extrinsic.Graphics.GpuPropertyResidency;
 export namespace Extrinsic::Runtime
 {
     struct EditorOutlierAnalysisResult
@@ -31,11 +34,34 @@ export namespace Extrinsic::Runtime
         std::string ActualBackend{}, Message{};
         std::size_t SlotCount{}, LiveCount{}, RejectedCount{}, WrittenCount{};
         float MeanDistance{}, StdDevDistance{}, DistanceThreshold{};
+        std::uint64_t GpuInputUploadBytes{}, GpuInputCacheHits{}, CpuStageReadbackBytes{};
         bool IndexReused{};
         std::size_t GpuQueryBatches{};
         double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};
         [[nodiscard]] bool Succeeded() const noexcept { return Status==EditorCommandStatus::Applied || Status==EditorCommandStatus::NoChange; }
     };
+    struct EditorOutlierTransaction;
+    using EditorOutlierTransactionHandle = std::shared_ptr<EditorOutlierTransaction>;
+    struct EditorOutlierTransactionSnapshot
+    {
+        EditorGpuTransactionPhase Phase{EditorGpuTransactionPhase::Running};
+        bool CanAccept{};
+        std::string AcceptDisabledReason{};
+        EditorOutlierAnalysisResult Result{};
+    };
+    [[nodiscard]] EditorOutlierTransactionHandle StartEditorOutlierAnalysisTransaction(
+        const EditorProcessingCommands&, const OutlierAnalysisConfig&, EditorOutlierAnalysisResult& failure);
+    [[nodiscard]] EditorOutlierTransactionSnapshot SnapshotEditorOutlierAnalysis(
+        const EditorProcessingCommands&, const EditorOutlierTransactionHandle&);
+    [[nodiscard]] EditorOutlierAnalysisResult AcceptEditorOutlierAnalysis(
+        const EditorProcessingCommands&, const EditorOutlierTransactionHandle&,
+        std::function<void(EditorOutlierAnalysisResult)> onComplete = {});
+    void DiscardEditorOutlierAnalysis(const EditorProcessingCommands&, const EditorOutlierTransactionHandle&);
+    // Mock-device seam: captured inputs and an already completed pair of full-row fronts.
+    [[nodiscard]] EditorOutlierTransactionHandle MakeEditorOutlierTransactionForTest(
+        const EditorProcessingCommands&, const OutlierAnalysisConfig&, std::vector<float> scores,
+        std::vector<std::uint32_t> mask, Graphics::GpuPropertyResidency&);
+
     struct EditorKeypointAnalysisResult
     {
         EditorCommandStatus Status{EditorCommandStatus::NoChange};

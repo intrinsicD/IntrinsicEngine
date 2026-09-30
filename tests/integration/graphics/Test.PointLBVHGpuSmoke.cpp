@@ -794,6 +794,7 @@ namespace
             Started=std::chrono::steady_clock::now();
             Context.Scene=Kernel().Worlds().Get(Kernel().ActiveWorld());Context.World=Kernel().ActiveWorld();
             Context.SpatialIndices=Kernel().Services().Find<Runtime::SpatialIndexCache>();
+            Context.Device=&Kernel().GetDevice();
             std::mt19937 random(241);std::uniform_real_distribution<float> dist(-1,1);
             std::vector<glm::vec3> points;
             for(unsigned i=0;i<66;++i){const float x=dist(random),y=dist(random);points.push_back({.1f*x,.1f*y,0});}
@@ -842,8 +843,25 @@ namespace
             }
             if(Submitted)
             {
-                if(Phase==4 && ++CancelFrames==3)
-                    EXPECT_TRUE(Kernel().Jobs().Cancel(FitToken));
+                if(Phase==4 && CancelRun && !CancelFrames)
+                {
+                    const auto snapshot=Runtime::SnapshotEditorOutlierAnalysis(Runtime::BindEditorProcessingCommands(Context),CancelRun);
+                    if(snapshot.Phase==Runtime::EditorGpuTransactionPhase::ReadyToAccept)
+                    {
+                        const auto accepted=Runtime::AcceptEditorOutlierAnalysis(Runtime::BindEditorProcessingCommands(Context),CancelRun,Completion);
+                        AcceptReached=accepted.Status==Runtime::EditorCommandStatus::Pending;
+                        ASSERT_TRUE(AcceptReached)<<accepted.Message;
+                        CancelExecuted=Kernel().Jobs().Cancel(FitToken);
+                        EXPECT_TRUE(CancelExecuted); // GPU finished; cancel the pending atomic Accept.
+                        ++CancelFrames;
+                    }
+                    else if(snapshot.Phase==Runtime::EditorGpuTransactionPhase::Failed ||
+                            snapshot.Phase==Runtime::EditorGpuTransactionPhase::Discarded)
+                    {
+                        ADD_FAILURE()<<"Outlier compute terminated before Accept: "<<snapshot.Result.Message;
+                        Kernel().RequestExit();return;
+                    }
+                }
                 if(Results.size()<ExpectedResults)return;
                 if(Phase>=3)
                 {
@@ -856,6 +874,7 @@ namespace
                         EXPECT_EQ(std::as_const(Props(8)).Get<std::uint32_t>("outliers")[0],0);
                         Done=true;Kernel().RequestExit();return;
                     }
+                    if(Phase==4){EXPECT_TRUE(AcceptReached);EXPECT_TRUE(CancelExecuted);}
                     EXPECT_FALSE(Results.back().Succeeded())<<Results.back().Message;
                     EXPECT_EQ(std::as_const(Props(8)).Get<std::uint32_t>("outliers")[0],77);
                 }
@@ -939,13 +958,17 @@ namespace
                     c.Method=Ratio ? Runtime::OutlierAnalysisMethod::LocalDistanceRatio : Runtime::OutlierAnalysisMethod::Radius;c.KNeighbors=2;c.Radius=1;c.MinimumNeighbors=1027;c.GpuQueryBatchSize=4096;
                 }
                 else Props(8).Get<std::uint32_t>("outliers").Vector().assign(66,77);
-                const auto result=Runtime::ApplyEditorOutlierAnalysisCommand(Runtime::BindEditorProcessingCommands(Context), c, Completion);
+                Runtime::EditorOutlierAnalysisResult result;
+                if(Phase==4)CancelRun=Runtime::StartEditorOutlierAnalysisTransaction(Runtime::BindEditorProcessingCommands(Context),c,result);
+                else result=Runtime::ApplyEditorOutlierAnalysisCommand(Runtime::BindEditorProcessingCommands(Context), c, Completion);
                 if(result.Status!=Runtime::EditorCommandStatus::Pending)Results.push_back(result);
                 if(Phase==3)Props(8).Get<glm::vec3>("samples")[0]+=.1f; // stale before GPU recording
             }
         }
-        void Shutdown() override {Context={};}
+        void Shutdown() override {Runtime::DiscardEditorOutlierAnalysis({},CancelRun);CancelRun.reset();Context={};}
         Runtime::EditorProcessingContext Context{};
+        Runtime::EditorOutlierTransactionHandle CancelRun{};
+        bool AcceptReached{}, CancelExecuted{};
         std::function<void(Runtime::EditorOutlierAnalysisResult)> Completion{};
         Runtime::EditorCommandHistory History{};
         std::vector<entt::entity> Entities;
@@ -968,6 +991,7 @@ TEST(PointLBVHGpuSmoke, OutlierNeighborhoodsPublishAcrossDomainsAndCountDenseSup
     auto app=std::make_unique<OutlierApp>();auto* run=app.get();
     Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));
     engine.EmplaceModule<Runtime::SpatialIndexCache>();engine.Initialize();Shutdown shutdown{engine};
+    if(!engine.GetDevice().SupportsShaderFloat64())GTEST_SKIP()<<"Shader float64 unavailable";
     engine.Run();ASSERT_TRUE(engine.GetDevice().IsOperational());
     ASSERT_FALSE(run->TimedOut)<<"phase="<<run->Phase;ASSERT_TRUE(run->Done);
     EXPECT_LE(run->MaxError,1e-5);ASSERT_EQ(run->PhaseMs.size(),3);
@@ -981,7 +1005,7 @@ TEST(PointLBVHGpuSmoke, OutlierNeighborhoodsPublishAcrossDomainsAndCountDenseSup
                 {"cpu_reference_total_ms",run->CpuMs[1]},{"vulkan_cold_total_ms",run->PhaseMs[0]},
                 {"vulkan_warm_total_ms",run->PhaseMs[1]},{"vulkan_radius_total_ms",run->PhaseMs[2]},
                 {"cpu_radius_total_ms",run->CpuMs[2]},{"warmup_iterations",1},{"measured_iterations",1},
-                {"cpu_classification",true},{"gpu_neighborhood_elapsed_sum_ms",run->NeighborhoodMs},
+                {"cpu_classification",false},{"gpu_neighborhood_elapsed_sum_ms",run->NeighborhoodMs},
                 {"cpu_classification_sum_ms",run->FitMs},{"gpu_query_batch_counts",run->BatchCounts}}},{"status",::testing::Test::HasFailure()?"failed":"passed"}};
         std::ofstream stream(output);ASSERT_TRUE(stream.good());stream<<json.dump(2)<<'\n';ASSERT_TRUE(stream.good());
     }
@@ -995,6 +1019,7 @@ TEST(PointLBVHGpuSmoke, LocalDistanceRatioPublishesAcrossDomains)
     auto app=std::make_unique<OutlierApp>(true);auto* run=app.get();
     Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));
     engine.EmplaceModule<Runtime::SpatialIndexCache>();engine.Initialize();Shutdown shutdown{engine};
+    if(!engine.GetDevice().SupportsShaderFloat64())GTEST_SKIP()<<"Shader float64 unavailable";
     engine.Run();ASSERT_TRUE(engine.GetDevice().IsOperational());
     ASSERT_FALSE(run->TimedOut)<<"phase="<<run->Phase;ASSERT_TRUE(run->Done);
     EXPECT_LE(run->MaxError,1e-5);ASSERT_EQ(run->PhaseMs.size(),3);
@@ -1008,7 +1033,7 @@ TEST(PointLBVHGpuSmoke, LocalDistanceRatioPublishesAcrossDomains)
                 {"cpu_reference_total_ms",run->CpuMs[1]},{"vulkan_cold_total_ms",run->PhaseMs[0]},
                 {"vulkan_warm_total_ms",run->PhaseMs[1]},{"vulkan_k63_total_ms",run->PhaseMs[2]},
                 {"cpu_k63_total_ms",run->CpuMs[2]},{"warmup_iterations",1},{"measured_iterations",1},
-                {"cpu_classification",true},{"gpu_neighborhood_elapsed_sum_ms",run->NeighborhoodMs},
+                {"cpu_classification",false},{"gpu_neighborhood_elapsed_sum_ms",run->NeighborhoodMs},
                 {"cpu_classification_sum_ms",run->FitMs},{"gpu_query_batch_counts",run->BatchCounts}}},{"status",::testing::Test::HasFailure()?"failed":"passed"}};
         std::ofstream stream(output);ASSERT_TRUE(stream.good());stream<<json.dump(2)<<'\n';ASSERT_TRUE(stream.good());
     }

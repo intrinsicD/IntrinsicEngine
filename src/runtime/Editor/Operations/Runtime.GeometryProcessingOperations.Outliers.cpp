@@ -1,5 +1,6 @@
 module;
 #include <functional>
+#include <cstring>
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -37,10 +38,16 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.GpuPropertyBinding;
+import Extrinsic.Graphics.OutlierAnalysis;
+import Extrinsic.RHI.Device;
+import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.CommandContext;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuFront.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -71,7 +78,6 @@ namespace Extrinsic::Runtime
             std::vector<float> AfterScore{};
             std::shared_ptr<const SpatialIndexSnapshot> Index{};
             SpatialIndexHandle GpuIndex{};
-            GeometryProcessingDetail::GpuRowPages Pages{};
             bool Abandoned{};
             EditorOutlierAnalysisResult Result{};
         };
@@ -138,6 +144,21 @@ namespace Extrinsic::Runtime
                     return fail("LBVH requires the spatial cache, at most 2^24 samples and coordinates/radius within 1e18.");
                 if (c.Backend == OutlierAnalysisBackend::VulkanLBVH)
                 {
+                    if (!context.Device || !context.Device->SupportsShaderFloat64())
+                        return fail("Vulkan outlier classification requires shader float64.");
+                    if (c.Score.ValueKind != Geometry::PropertyValueKind::Float || c.Mask.ValueKind != Geometry::PropertyValueKind::UInt32)
+                        return fail("Vulkan outliers require a float score and uint32 mask.");
+                    const auto width = Graphics::OutlierNeighborWidth(std::uint32_t(c.Method), c.KNeighbors,
+                                                                      std::uint32_t(w->LiveCount));
+                    if (w->SlotCount > (1u << 20) || std::uint64_t(w->LiveCount) * width > (1u << 24))
+                        return fail("Vulkan outlier storage exceeds the bounded device workspace.");
+                    // Compute in double so the admission check itself cannot flush the square.
+                    // Radius is the only configured quantity squared by these estimators.
+                    if (c.Method == OutlierAnalysisMethod::Radius &&
+                        double(c.Radius) * double(c.Radius) < double(std::numeric_limits<float>::min()))
+                        return fail("Vulkan radius outliers require radius squared >= FLT_MIN; float32 denorm preservation is not guaranteed.");
+                    if (w->HasSubnormalCoordinates)
+                        return fail("Vulkan outliers do not admit subnormal positions.");
                     if (!context.JobCommands.Available() || !context.SpatialIndices->GpuQueriesAvailable())
                         return fail("Vulkan outlier neighborhoods require the framed spatial cache and job service.");
                     if (w->Result.LiveCount > (1u << 20) ||
@@ -178,19 +199,9 @@ namespace Extrinsic::Runtime
                 else
                 {
                     const auto width = QueryWidth(c, w.Points.size());
-                    if (c.Backend == OutlierAnalysisBackend::CpuLBVH)
-                    {
-                        if (!GeometryProcessingDetail::AppendPointKnnRows(
-                                *w.Index, w.Points, width, w.NeighborIds, r.Message))
-                            return;
-                    }
-                    else
-                        for (auto& id : w.NeighborIds)
-                        {
-                            const auto found = std::lower_bound(w.Slots.begin(), w.Slots.end(), id);
-                            if (found == w.Slots.end() || *found != id) { r.Message="Invalid Vulkan neighbor source row."; return; }
-                            id = std::uint32_t(found - w.Slots.begin());
-                        }
+                    if (!GeometryProcessingDetail::AppendPointKnnRows(
+                            *w.Index, w.Points, width, w.NeighborIds, r.Message))
+                        return;
                     ratio = PC::EstimateOutlierProbabilityFromNeighbors(w.Points, w.NeighborIds, params);
                 }
                 if (!ratio) { r.Message="Local distance ratio failed: invalid neighborhoods or unrepresentable float scores."; return; }
@@ -219,23 +230,9 @@ namespace Extrinsic::Runtime
                 for (std::uint32_t i=0; i<w.Points.size(); ++i)
                 {
                     float sum=0;
-                    if (c.Backend == OutlierAnalysisBackend::CpuLBVH)
-                    {
-                        const auto neighbors = w.Index->Index.KNearest(w.Points[i], std::uint32_t(k), i);
-                        if (neighbors.size()!=k) { r.Message="Incomplete CPU kNN neighborhood."; return; }
-                        for (const auto& n : neighbors) sum += glm::length(w.Points[i]-w.Points[n.Index]);
-                    }
-                    else
-                    {
-                        for (std::size_t j=0; j<k; ++j)
-                        {
-                            const auto id=w.NeighborIds[i*k+j];
-                            const auto found=std::lower_bound(w.Slots.begin(), w.Slots.end(), id);
-                            if (found==w.Slots.end() || *found!=id || id==w.Slots[i])
-                            { r.Message="Invalid Vulkan neighbor source row."; return; }
-                            sum += glm::length(w.Points[i]-w.Points[found-w.Slots.begin()]);
-                        }
-                    }
+                    const auto neighbors = w.Index->Index.KNearest(w.Points[i], std::uint32_t(k), i);
+                    if (neighbors.size()!=k) { r.Message="Incomplete CPU kNN neighborhood."; return; }
+                    for (const auto& n : neighbors) sum += glm::length(w.Points[i]-w.Points[n.Index]);
                     means[i]=sum/float(k);
                 }
                 analysis=PC::ClassifyStatisticalOutliers(means,c.StdDevMultiplier);
@@ -249,39 +246,6 @@ namespace Extrinsic::Runtime
             r.WrittenCount=w.Slots.size(); r.Status=EditorCommandStatus::Applied;
             r.CpuComputeMilliseconds=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
             r.Message="Outlier mask and score computed using "+r.ActualBackend+" neighborhoods and CPU classification.";
-        }
-        // Radius rows keep only counts; kNN rows keep raw source IDs, decoded by Compute.
-        bool AdvanceGpu(const EditorProcessingContext& context, OutlierWork& w)
-        {
-            if (w.Abandoned || !CurrentInput(context,w))
-            {w.Result.Status=EditorCommandStatus::StaleEntity; w.Result.Message="Outlier inputs changed or the job was cancelled."; w.Pages.Batch.reset(); return true;}
-            const auto& c=w.Config;
-            const auto width=QueryWidth(c,w.Points.size());
-            const auto state=GeometryProcessingDetail::AdvanceGpuRowPages(w.Pages,w.Points.size(),c.GpuQueryBatchSize,w.Result.Message,
-                [&](const SpatialNearestBatch& batch, std::string& why)
-                {
-                    for (std::size_t row=0;row<batch.Counts.size();++row)
-                    {
-                        if (c.Method==OutlierAnalysisMethod::Radius) { w.Counts.push_back(batch.Counts[row]); continue; }
-                        if (batch.Counts[row]!=width) { why="Incomplete Vulkan kNN neighborhood."; return false; }
-                        for (std::uint32_t j=0;j<batch.Counts[row];++j)
-                            w.NeighborIds.push_back(batch.Neighbors[row*batch.Capacity+j].Index);
-                    }
-                    return true;
-                },
-                [&](std::size_t first, std::size_t count, std::shared_ptr<SpatialNearestBatch> reuse)
-                {
-                    const auto queries=std::span(w.Points).subspan(first,count);
-                    const auto exclusions=c.Method==OutlierAnalysisMethod::LocalDistanceRatio ?
-                        std::span<const std::uint32_t>{} : std::span<const std::uint32_t>(w.Slots).subspan(first,count);
-                    return c.Method==OutlierAnalysisMethod::Radius
-                        ? context.SpatialIndices->QueueGpuRadius(w.GpuIndex,queries,c.Radius,1,exclusions,std::move(reuse))
-                        : context.SpatialIndices->QueueGpuKNearest(w.GpuIndex,queries,width,exclusions,std::move(reuse));
-                });
-            w.Result.GpuQueryBatches=w.Pages.QueryBatches;
-            if (state==GeometryProcessingDetail::RowsState::Ready) w.Result.GpuNeighborhoodMilliseconds=w.Pages.Milliseconds;
-            if (state==GeometryProcessingDetail::RowsState::Failed) w.Result.Status=EditorCommandStatus::GeometryProcessingFailed;
-            return state!=GeometryProcessingDetail::RowsState::Pending;
         }
         void RestoreStamp(const EditorProcessingContext& context, entt::entity entity,
                           std::optional<AnalysisStamp> stamp, bool rebaseInputs = false,
@@ -389,10 +353,254 @@ namespace Extrinsic::Runtime
                 ? EditorCommandStatus::InvalidProcessingParameters
                 : EditorFeatureDetail::ToEditorCommandStatus(status);
             r.WrittenCount=kept;
-            r.Message=r.Succeeded()?"Marked points removed; all surviving properties retained in source order.":"Removal rejected by history checks.";
+            r.Message=r.Succeeded()?"Marked points removed by the atomic CPU compaction stage; no GPU readback; all surviving properties retained in source order.":"Removal rejected by history checks.";
             return r;
         }
     }
+    struct EditorOutlierTransaction
+    {
+        EditorProcessingContext Context{};
+        std::shared_ptr<OutlierWork> Work{};
+        EditorJobIdentity Identity{};
+        Graphics::GpuPropertyResidency* Residency{};
+        std::array<GeometryPropertyRef,3> Refs{};
+        std::array<Graphics::GpuPropertyKey,3> Keys{};
+        std::array<std::uint64_t,3> Generations{};
+        std::optional<Graphics::GpuPropertyView> Input{};
+        std::array<std::optional<Graphics::GpuPropertyView>,3> Back{};
+        std::array<std::optional<Graphics::GpuPropertyView>,2> Base{};
+        std::array<std::shared_ptr<GeometryProcessingDetail::GpuFrontReadback>,2> Readback{};
+        std::shared_ptr<Graphics::OutlierWorkspace> Workspace{};
+        std::shared_ptr<SpatialGpuResult> Gpu{};
+        EditorGpuTransactionPhase Phase{EditorGpuTransactionPhase::Running};
+        std::uint32_t Deferrals{};
+        bool AutoAccept{}, Abandoned{}, Delivered{}, TestFront{};
+        std::function<void(EditorOutlierAnalysisResult)> Sink{};
+    };
+    namespace OutlierTransactionDetail
+    {
+        namespace GP=GeometryProcessingDetail;
+        using Run=EditorOutlierTransactionHandle;
+        bool Current(const Run& w)
+        {
+            return !w->Abandoned && GP::EditorProcessingContextWorldCurrent(w->Context) && CurrentInput(w->Context,*w->Work);
+        }
+        void Release(const Run& w)
+        {
+            w->Input.reset();
+            for(auto& v:w->Back)v.reset();
+            for(auto& v:w->Base)v.reset();
+            for(auto& r:w->Readback)if(r){r->Abandoned=true;r->Lease.reset();}
+            if(w->Residency)for(std::size_t i=0;i<3;++i)(void)w->Residency->Discard(w->Keys[i],w->Generations[i]);
+        }
+        void Deliver(const Run& w)
+        {
+            if(std::exchange(w->Delivered,true))return;
+            if(w->Sink)w->Sink(w->Work->Result);
+        }
+        void Finish(const Run& w,EditorGpuTransactionPhase phase,EditorCommandStatus status,std::string why)
+        {
+            Release(w);w->Phase=phase;w->Work->Result.Status=status;w->Work->Result.Message=std::move(why);Deliver(w);
+        }
+        void Fail(const Run& w,std::string why)
+        { Finish(w,EditorGpuTransactionPhase::Failed,EditorCommandStatus::GeometryProcessingFailed,std::move(why)); }
+        Run Make(const EditorProcessingContext& context,const std::shared_ptr<OutlierWork>& work,Graphics::GpuPropertyResidency* residency)
+        {
+            auto w=std::make_shared<EditorOutlierTransaction>();w->Context=context;w->Work=work;w->Residency=residency;
+            w->Refs={work->Config.Score,work->Config.Mask,GpuPropertyPresentationRef(work->Config.Mask)};
+            for(std::size_t i=0;i<3;++i)w->Keys[i]=MakeGpuPropertyKey(context.World,work->Entity,w->Refs[i]);
+            w->Identity={.EntityId=work->Config.StableEntityId,.Scope=ToEditorJobScope(work->Config.Mask.Domain),
+                .OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=work->Config.Mask.Name};
+            return w;
+        }
+        bool Acquire(const Run& w)
+        {
+            auto& r=*w->Residency;const auto& ctx=w->Context;auto& work=*w->Work;
+            const auto resolve=[&](const GeometryPropertyRef& ref){
+                const auto before=r.Stats().UploadBytes;
+                auto v=ResolveGpuPropertyInput(r,*ctx.Scene,ctx.World,work.Entity,ref);
+                const auto bytes=r.Stats().UploadBytes-before;work.Result.GpuInputUploadBytes+=bytes;
+                if(v && !bytes)++work.Result.GpuInputCacheHits;
+                return v;
+            };
+            if(!w->Input)w->Input=resolve(work.Config.Positions);
+            if(!w->Input)return false;
+            const std::array watches{work.ScoreWatch,work.MaskWatch};
+            for(std::size_t i=0;i<2;++i)if(watches[i].Revision && !w->Base[i]){
+                w->Base[i]=resolve(w->Refs[i]);if(!w->Base[i])return false;}
+            for(std::size_t i=0;i<3;++i)if(!w->Back[i]){
+                // Another output identity may share this score or mask name. Never acquire
+                // a back in its ring; wait for it to finish or invalidate our captured output.
+                if (!w->Generations[i] && r.HasRing(w->Keys[i])) return false;
+                w->Back[i]=AcquireGpuPropertyOutput(r,ctx.World,work.Entity,w->Refs[i],std::uint32_t(work.SlotCount),3);
+                if(!w->Back[i])return false;
+                w->Generations[i]=r.RingGeneration(w->Keys[i]);}
+            return true;
+        }
+        bool Poll(const Run& w)
+        {
+            if(!Current(w))return true;
+            if(!w->Gpu){
+                if(!Acquire(w)){
+                    if(++w->Deferrals<600)return false;
+                    Fail(w,"The residency refused an input or output slot.");return true;}
+                auto& ctx=w->Context;
+                w->Workspace=std::make_shared<Graphics::OutlierWorkspace>(*ctx.Device);
+                w->Work->Result.GpuQueryBatches=1;
+                w->Gpu=ctx.SpatialIndices->QueueGpuCompute(w->Work->GpuIndex,sizeof(Graphics::OutlierGpuStats),
+                    [w](RHI::ICommandContext& cmd,const SpatialGpuIndexView& index)->RHI::BufferHandle{
+                        if(!Current(w)||!w->Input||!w->Back[0]||!w->Back[1]||!w->Back[2])return {};
+                        const auto frame=w->Context.Device->GetGlobalFrameNumber();
+                        w->Residency->NoteUse(w->Input->Buffer,frame);
+                        for(const auto& v:w->Back)w->Residency->NoteUse(v->Buffer,frame);
+                        for(const auto& v:w->Base)if(v)w->Residency->NoteUse(v->Buffer,frame);
+                        const auto& c=w->Work->Config;
+                        return w->Workspace->Record(cmd,{.Method=std::uint32_t(c.Method),.K=c.KNeighbors,
+                            .MinimumNeighbors=c.MinimumNeighbors,.Radius=c.Radius,.Multiplier=c.StdDevMultiplier,.ScoreThreshold=c.ScoreThreshold},
+                            {.Positions=*w->Input,.Score=*w->Back[0],.Mask=*w->Back[1],.Presentation=*w->Back[2],
+                             .ScoreBase=w->Base[0].value_or(Graphics::GpuPropertyView{}),.MaskBase=w->Base[1].value_or(Graphics::GpuPropertyView{}),
+                             .Nodes=index.NodesBDA,.LiveSlots=index.OriginalSlotsBDA,.LiveCount=index.Count});
+                    },SpatialGpuLatency::Immediate);
+                if(!w->Gpu){Fail(w,"Outlier compute submission refused.");return true;}
+            }
+            return w->Gpu->State==SpatialQueryState::Ready||w->Gpu->State==SpatialQueryState::Failed;
+        }
+        void CompleteAccept(const Run& w)
+        {
+            auto& work=*w->Work;std::array<std::uint64_t,2> publications{};
+            if(!w->TestFront){
+                for(std::size_t i=0;i<2;++i){
+                    const auto& r=w->Readback[i];
+                    if(!r||r->Failed||r->Bytes.size()!=work.SlotCount*4){Fail(w,"Outlier front readback failed.");return;}
+                    publications[i]=r->Lease?r->Lease->Publication:0;
+                }
+                std::memcpy(work.AfterScore.data(),w->Readback[0]->Bytes.data(),work.SlotCount*4);
+                std::memcpy(work.AfterMask.data(),w->Readback[1]->Bytes.data(),work.SlotCount*4);
+            }
+            for(auto& r:w->Readback)if(r)r->Lease.reset();
+            for(const auto row:work.Slots)if(!std::isfinite(work.AfterScore[row])||work.AfterMask[row]>1){Fail(w,"Invalid outlier device result.");return;}
+            work.Result.Status=EditorCommandStatus::Applied;work.Result.WrittenCount=work.Slots.size();
+            work.Result.ActualBackend="vulkan_lbvh";
+            work.Result.Message="Device outlier score and mask accepted; input upload: "+std::to_string(work.Result.GpuInputUploadBytes)+
+                " bytes; residency hits: "+std::to_string(work.Result.GpuInputCacheHits)+"; CPU-stage readback: "+std::to_string(work.Result.CpuStageReadbackBytes)+" bytes.";
+            const auto published=Publish(w->Context,w->Work);
+            if(!published.Succeeded()){Finish(w,EditorGpuTransactionPhase::Failed,published.Status,published.Message);return;}
+            if(w->Residency){
+                const auto a=BuildGeometryAvailability(w->Context.Scene->Raw(),work.Entity);
+                for(std::size_t i=0;i<2;++i){
+                    const auto watch=GP::ObserveGeometryProperty(a,w->Refs[i].Domain,w->Refs[i].Name);
+                    if(!watch.Revision||!w->Residency->BindRevision(w->Keys[i],*watch.Revision,publications[i]))
+                        (void)w->Residency->Discard(w->Keys[i],w->Generations[i]);}
+                (void)w->Residency->Discard(w->Keys[2],w->Generations[2]);
+            }
+            w->Phase=EditorGpuTransactionPhase::Applied;Deliver(w);
+        }
+        EditorOutlierAnalysisResult Accept(const Run& w,std::function<void(EditorOutlierAnalysisResult)> sink)
+        {
+            auto refused=w->Work->Result;
+            if(w->Phase!=EditorGpuTransactionPhase::ReadyToAccept){refused.Status=EditorCommandStatus::InvalidProcessingParameters;refused.Message="No outlier result waits for Accept.";return refused;}
+            if(!Current(w)){refused.Status=EditorCommandStatus::StaleEntity;refused.Message="Outlier input or output changed; discard and run again.";return refused;}
+            if(sink)w->Sink=GuardEditorProcessingResult(w->Context,std::move(sink));
+            if(!w->TestFront)for(std::size_t i=0;i<2;++i){
+                w->Readback[i]=std::make_shared<GP::GpuFrontReadback>();
+                if(!GP::BeginGpuFrontReadback(w->Context,*w->Residency,w->Keys[i],w->Readback[i])){Fail(w,"Outlier front is no longer resident.");return w->Work->Result;}}
+            w->Phase=EditorGpuTransactionPhase::Accepting;
+            JobDesc job{.DebugName="Accept outlier fields",.Scope=w->Context.World,.Kind=RuntimeTaskKinds::GeometryProcess,
+                .Work=[](const JobCancellation&){return JobResultEnvelope::Make(true);},
+                .IsReadyToApply=[w]{if(!Current(w))return true;bool ready=true;for(auto& r:w->Readback)if(r)ready=GP::PollGpuFrontReadback(*r)&&ready;return ready;},
+                .ValidateBeforeApply=[w]{return Current(w)?JobApplyValidation::Current:JobApplyValidation::StaleGeneration;},
+                .PublishCompletion=[w](KernelEventBus&,const JobResultEnvelope&){CompleteAccept(w);return w->Phase==EditorGpuTransactionPhase::Applied;},
+                .FinalizeUnpublishedOnMainThread=[w]{if(!w->Delivered)Finish(w,EditorGpuTransactionPhase::Discarded,EditorCommandStatus::StaleEntity,"Outlier Accept cancelled or stale.");}};
+            if(!w->Context.JobCommands.Submit(std::move(job),w->Identity).IsValid())Fail(w,"Outlier Accept submission refused.");
+            return w->Work->Result;
+        }
+        Run Start(const EditorProcessingContext& ctx,const std::shared_ptr<OutlierWork>& work,EditorOutlierAnalysisResult& result,
+                  std::function<void(EditorOutlierAnalysisResult)> sink,bool automatic)
+        {
+            auto* residency=ctx.SpatialIndices?ctx.SpatialIndices->PropertyResidency():nullptr;
+            if(!residency){result.Status=EditorCommandStatus::InvalidProcessingParameters;result.Message="Outliers need GPU property residency.";return {};}
+            auto w=Make(ctx,work,residency);w->AutoAccept=automatic;w->Sink=GuardEditorProcessingResult(ctx,std::move(sink));
+            for(const auto& key:w->Keys)if(residency->HasRing(key)){
+                result.Status=EditorCommandStatus::InvalidProcessingParameters;result.Message="An outlier output awaits Accept or Discard.";return {};}
+            if(auto active=GP::MeshSupport::FindActiveEditorJob(ctx,w->Identity);active&&IsActiveEditorJobState(active->State)){
+                result.Status=EditorCommandStatus::Pending;result.Message="An outlier job for this output is active.";return {};}
+            std::string why;
+            const auto acquired=GP::AcquirePointIndex(*ctx.SpatialIndices,ctx.World,work->Entity,work->Config.Positions,
+                work->Slots,work->Points,work->GpuIndex,work->Index,work->Result.IndexReused,why);
+            if(acquired!=GP::PointIndexState::Ready){result.Status=EditorCommandStatus::InvalidProcessingParameters;result.Message=why;return {};}
+            work->Result.Status=EditorCommandStatus::Pending;work->Result.ActualBackend="vulkan_lbvh";
+            work->Result.Message="Device outlier analysis queued.";
+            JobDesc job{.DebugName="Device outlier analysis",.Scope=ctx.World,.Kind=RuntimeTaskKinds::GeometryProcess,
+                .Work=[](const JobCancellation&){return JobResultEnvelope::Make(true);},.IsReadyToApply=[w]{return Poll(w);},
+                .ValidateBeforeApply=[w]{return Current(w)?JobApplyValidation::Current:JobApplyValidation::StaleGeneration;},
+                .PublishCompletion=[w](KernelEventBus&,const JobResultEnvelope&){
+                    if(w->Delivered)return false;
+                    if(!w->Gpu||w->Gpu->State!=SpatialQueryState::Ready||w->Gpu->Data.size()!=sizeof(Graphics::OutlierGpuStats)){
+                        Fail(w,w->Gpu?w->Gpu->Diagnostic:"Outlier compute failed.");return false;}
+                    Graphics::OutlierGpuStats stats{};std::memcpy(&stats,w->Gpu->Data.data(),sizeof(stats));
+                    if(stats.Invalid){Fail(w,"Unrepresentable device outlier score.");return false;}
+                    for(std::size_t i=0;i<3;++i){w->Back[i].reset();if(!w->Residency->Publish(w->Keys[i])){Fail(w,"Outlier ring publication failed.");return false;}}
+                    w->Input.reset();for(auto& base:w->Base)base.reset();
+                    auto& r=w->Work->Result;r.RejectedCount=stats.Rejected;r.MeanDistance=stats.Mean;r.StdDevDistance=stats.StdDev;r.DistanceThreshold=stats.Threshold;
+                    r.Message="GPU outlier fields await Accept or Discard.";w->Phase=EditorGpuTransactionPhase::ReadyToAccept;
+                    if(w->AutoAccept){const auto accepted=Accept(w,{});if(accepted.Status!=EditorCommandStatus::Pending)Finish(w,EditorGpuTransactionPhase::Failed,accepted.Status,accepted.Message);}
+                    return !w->Delivered;},
+                .FinalizeUnpublishedOnMainThread=[w]{if(!w->Delivered)Finish(w,EditorGpuTransactionPhase::Discarded,EditorCommandStatus::StaleEntity,"Outlier run cancelled or stale.");}};
+            if(!ctx.JobCommands.Submit(std::move(job),w->Identity).IsValid()){Fail(w,"Outlier compute submission refused.");result=work->Result;return {};}
+            result=work->Result;return w;
+        }
+    }
+    EditorOutlierTransactionHandle StartEditorOutlierAnalysisTransaction(const EditorProcessingCommands& commands,
+        const OutlierAnalysisConfig& config,EditorOutlierAnalysisResult& failure)
+    {
+        failure={.Status=EditorCommandStatus::InvalidProcessingParameters,.Method=config.Method,.RequestedBackend=config.Backend};
+        if(config.Backend!=OutlierAnalysisBackend::VulkanLBVH||config.Operation!=OutlierAnalysisOperation::Analyze){failure.Message="Only Vulkan analysis creates an outlier transaction.";return {};}
+        const auto& ctx=EditorProcessingCommandsAccess::Resolve(commands);std::string why;
+        auto work=Capture(ctx,config,why);if(!work){failure.Message=why;return {};}
+        return OutlierTransactionDetail::Start(ctx,work,failure,{},false);
+    }
+    EditorOutlierTransactionSnapshot SnapshotEditorOutlierAnalysis(const EditorProcessingCommands&,const EditorOutlierTransactionHandle& w)
+    {
+        EditorOutlierTransactionSnapshot s;if(!w)return s;s.Phase=w->Phase;s.Result=w->Work->Result;
+        if(s.Phase==EditorGpuTransactionPhase::ReadyToAccept){
+            s.CanAccept=OutlierTransactionDetail::Current(w);
+            if(!s.CanAccept)s.AcceptDisabledReason="Outlier input or output changed; discard and run again.";
+            else if(!w->TestFront)for(std::size_t i=0;i<2;++i)if(!w->Residency->HasRing(w->Keys[i])){
+                s.CanAccept=false;s.AcceptDisabledReason="The result is no longer resident.";}}
+        return s;
+    }
+    EditorOutlierAnalysisResult AcceptEditorOutlierAnalysis(const EditorProcessingCommands&,const EditorOutlierTransactionHandle& w,
+        std::function<void(EditorOutlierAnalysisResult)> sink)
+    {
+        if(!w)return {.Status=EditorCommandStatus::InvalidProcessingParameters,.Message="No outlier transaction."};
+        return OutlierTransactionDetail::Accept(w,std::move(sink));
+    }
+    void DiscardEditorOutlierAnalysis(const EditorProcessingCommands&,const EditorOutlierTransactionHandle& w)
+    {
+        if(!w||w->Phase==EditorGpuTransactionPhase::Applied||w->Phase==EditorGpuTransactionPhase::Discarded||w->Phase==EditorGpuTransactionPhase::Failed)return;
+        w->Abandoned=true;OutlierTransactionDetail::Finish(w,EditorGpuTransactionPhase::Discarded,EditorCommandStatus::NoChange,"Outlier result discarded; CPU fields retained.");
+    }
+
+    EditorOutlierTransactionHandle MakeEditorOutlierTransactionForTest(const EditorProcessingCommands& commands,
+        const OutlierAnalysisConfig& config,std::vector<float> scores,std::vector<std::uint32_t> mask,
+        Graphics::GpuPropertyResidency& residency)
+    {
+        const auto& ctx=EditorProcessingCommandsAccess::Resolve(commands);
+        auto cpu=config;cpu.Backend=OutlierAnalysisBackend::CpuOctree;
+        std::string why;auto work=Capture(ctx,cpu,why);
+        if(!work||scores.size()!=work->SlotCount||mask.size()!=work->SlotCount)return {};
+        work->Config.Backend=config.Backend;work->Result.RequestedBackend=config.Backend;
+        work->AfterScore=std::move(scores);work->AfterMask=std::move(mask);
+        auto w=OutlierTransactionDetail::Make(ctx,work,&residency);
+        for(std::size_t i=0;i<3;++i){
+            auto back=AcquireGpuPropertyOutput(residency,ctx.World,work->Entity,w->Refs[i],std::uint32_t(work->SlotCount),3);
+            if(!back){OutlierTransactionDetail::Release(w);return {};}
+            w->Generations[i]=residency.RingGeneration(w->Keys[i]);back.reset();
+            if(!residency.Publish(w->Keys[i])){OutlierTransactionDetail::Release(w);return {};}}
+        w->TestFront=true;w->Phase=EditorGpuTransactionPhase::ReadyToAccept;work->Result.Status=EditorCommandStatus::Pending;
+        return w;
+    }
+
     ActionReadiness PreviewEditorOutlierAnalysisCommand(
         const EditorProcessingCommands& commands,const OutlierAnalysisConfig& config)
     {
@@ -419,6 +627,13 @@ namespace Extrinsic::Runtime
         if (!w)
             return report(EditorCommandStatus::InvalidProcessingParameters, std::move(diagnostic));
         if (w->Config.Operation == OutlierAnalysisOperation::RemoveMarked) return RemoveMarked(context, w);
+        if (w->Config.Backend == OutlierAnalysisBackend::VulkanLBVH)
+        {
+            auto result=w->Result;
+            (void)OutlierTransactionDetail::Start(context,w,result,std::move(onComplete),true);
+            return result;
+        }
+
         if (w->Config.Backend != OutlierAnalysisBackend::CpuOctree)
         {
             const auto indexState = GeometryProcessingDetail::AcquirePointIndex(
@@ -484,20 +699,6 @@ namespace Extrinsic::Runtime
                         sink(std::move(pending));
                     }
                 }};
-        if (w->Config.Backend == OutlierAnalysisBackend::VulkanLBVH)
-        {
-            JobDesc gpu{
-                .DebugName = "Outlier neighborhoods (Vulkan)", .Scope = context.World,
-                .Kind = RuntimeTaskKinds::GeometryProcess,
-                .Work = [](const JobCancellation&) { return JobResultEnvelope::Make(true); },
-                .IsReadyToApply = [context, w] { return AdvanceGpu(context, *w); },
-                .PublishCompletion = [w](KernelEventBus&, const JobResultEnvelope&) { return w->Pages.Finished; },
-                .FinalizeUnpublishedOnMainThread = [w] { w->Abandoned = true; }};
-            const auto prerequisite = context.JobCommands.Submit(std::move(gpu), identity);
-            if (!prerequisite.IsValid())
-                return report(EditorCommandStatus::GeometryProcessingFailed, "GPU outlier job submission was rejected.");
-            desc.DependsOn.push_back({prerequisite, "Complete Vulkan outlier neighborhoods before CPU classification"});
-        }
         const auto token = context.JobCommands.Submit(std::move(desc), identity);
         if (!token.IsValid())
         {

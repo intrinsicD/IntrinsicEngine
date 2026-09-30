@@ -19,6 +19,7 @@
 #include <imgui_internal.h>
 
 #include "RuntimeTestModule.hpp"
+#include "MockRHI.hpp"
 
 import Extrinsic.Runtime.NormalOperations;
 import Extrinsic.Runtime.RegistrationOperations;
@@ -38,6 +39,7 @@ import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Components.Selection;
+import Extrinsic.Graphics.GpuPropertyResidency;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.EditorUiModule;
@@ -3576,4 +3578,97 @@ TEST(SandboxProcessingPanels, DetachDiscardsPendingGpuResults)
     EXPECT_EQ(R::SnapshotEditorPropertySmoothing(commands, smoothingRun).Phase, R::EditorGpuTransactionPhase::Discarded);
     EXPECT_FALSE(std::as_const(vertices).Exists("v:normal"));
     EXPECT_FALSE(std::as_const(vertices).Exists("smooth"));
+}
+
+TEST(SandboxProcessingPanels, GpuTransactionsDisplayTerminalFailuresAndStaleResults)
+{
+    using Phase=R::EditorGpuTransactionPhase;
+    for (int method=0; method<3; ++method)
+    for (bool stale : {false,true})
+    {
+        SCOPED_TRACE(method);
+        SCOPED_TRACE(stale);
+        PanelHarness h;
+        Extrinsic::Tests::MockDevice device;
+        Extrinsic::Graphics::GpuPropertyResidency residency{device};
+        device.TransferQueue.AcceptBufferUploads=true;
+        auto& scene=h.Scene(); const auto entity=scene.Create();
+        scene.Raw().emplace<Extrinsic::ECS::Components::Transform::Component>(entity);
+        Geometry::HalfedgeMesh::Mesh mesh;
+        const auto a=mesh.AddVertex({0,0,0}),b=mesh.AddVertex({1,0,0}),c=mesh.AddVertex({0,1,0});
+        (void)mesh.AddTriangle(a,b,c); GS::PopulateFromMesh(scene.Raw(),entity,mesh);
+        auto& rows=scene.Raw().get<GS::Vertices>(entity).Properties;
+        (void)rows.GetOrAdd<float>("signal",1.f);
+        const auto id=R::SelectionController::ToStableEntityId(entity);
+        R::NormalEstimationConfig normals;
+        normals.StableEntityId=id; normals.Method=R::NormalEstimationMethod::MeshFaceWeighted;
+        normals.Backend=R::NormalEstimationBackend::Vulkan;
+        normals.Positions={R::GeometryElementDomain::MeshVertex,"v:position",Geometry::PropertyValueKind::Vec3};
+        normals.Output={R::GeometryElementDomain::MeshVertex,"v:normal",Geometry::PropertyValueKind::Vec3};
+        R::PropertySmoothingConfig smoothing;
+        smoothing.Positions=normals.Positions; smoothing.Neighbors=2;
+        smoothing.Input={R::GeometryElementDomain::MeshVertex,"signal",Geometry::PropertyValueKind::Float};
+        smoothing.Output={R::GeometryElementDomain::MeshVertex,"smooth",Geometry::PropertyValueKind::Float};
+        R::OutlierAnalysisConfig outliers;
+        outliers.StableEntityId=id; outliers.Method=R::OutlierAnalysisMethod::Radius;
+        outliers.Backend=R::OutlierAnalysisBackend::VulkanLBVH; outliers.Positions=normals.Positions;
+        outliers.Score.Domain=outliers.Mask.Domain=R::GeometryElementDomain::MeshVertex;
+        auto config=h.Control().GetEngineConfigControlState().ActiveConfig;
+        R::SetNormalEstimationConfig(config,normals); R::SetOutlierAnalysisConfig(config,outliers);
+        auto section=R::MakePropertySmoothingConfigSectionRegistration().DefaultSection;
+        section.PayloadJson=R::SerializePropertySmoothingConfig(smoothing);
+        Config::UpsertEngineConfigSection(config.AppSections, section);
+        ASSERT_TRUE(h.Apply(config)); ASSERT_TRUE(h.Selection().SetSelectedEntity(scene,entity));
+        const char* ids[]={"view.outlier_analysis","view.normal_estimation","mesh.processing.property_smoothing"};
+        const char* titles[]={"Outlier Analysis","Normal Estimation","Smooth Property"};
+        ASSERT_TRUE(h.Shell.SetEditorWindowOpen(ids[method],true));
+        R::EditorProcessingContext context; context.Scene=&scene;
+        context.JobCommands.Submit=[&](R::JobDesc job,const auto&)->R::JobToken {
+            return stale ? h.Engine->Jobs().Submit(std::move(job)) : R::JobToken{};
+        };
+        const auto commands=R::BindEditorProcessingCommands(context);
+        auto outlierRun=R::MakeEditorOutlierTransactionForTest(commands,outliers,
+            std::vector<float>(rows.Size(),1),std::vector<std::uint32_t>(rows.Size(),0),residency);
+        auto normalRun=R::MakeEditorNormalTransactionForTest(commands,normals,std::vector<glm::vec3>(rows.Size(),{0,0,1}));
+        auto smoothingRun=R::MakeEditorPropertySmoothingTransactionForTest(commands,id,smoothing,std::vector<double>(rows.Size(),1));
+        ASSERT_TRUE(outlierRun); ASSERT_TRUE(normalRun); ASSERT_TRUE(smoothingRun);
+        if(method==0)h.Panels.InjectOutlierTransactionForTest(outlierRun);
+        else if(method==1)h.Panels.InjectNormalTransactionForTest(normalRun);
+        else h.Panels.InjectPropertySmoothingTransactionForTest(smoothingRun);
+        const auto terminal=[&]()->std::pair<Phase,std::string> {
+            if(method==0){const auto s=R::SnapshotEditorOutlierAnalysis(commands,outlierRun);return {s.Phase,s.Result.Message};}
+            if(method==1){const auto s=R::SnapshotEditorNormalEstimation(commands,normalRun);return {s.Phase,s.Result.Message};}
+            const auto s=R::SnapshotEditorPropertySmoothing(commands,smoothingRun);return {s.Phase,s.Result.Message};
+        };
+        int frames=0,terminalFrame=0; bool checked=false;
+        h.Driver->OnFrame=[&](R::Engine& engine) {
+            if(++frames>100){ADD_FAILURE()<<"terminal result was not displayed";engine.RequestExit();return;}
+            auto* window=ImGui::FindWindowByName(titles[method]); if(!window)return;
+            ImGui::SetWindowSize(window,{800,1800}); ImGui::SetWindowPos(window,{0,0});
+            if(frames==5){
+                if(method==0)(void)R::AcceptEditorOutlierAnalysis(commands,outlierRun);
+                else if(method==1)(void)R::AcceptEditorNormalEstimation(commands,normalRun);
+                else (void)R::AcceptEditorPropertySmoothing(commands,smoothingRun);
+                if(stale)rows.Get<glm::vec3>("v:position")[0]={2,3,4};
+            }
+            const auto [phase,message]=terminal();
+            if(phase!=Phase::Failed && phase!=Phase::Discarded)return;
+            EXPECT_EQ(phase,stale?Phase::Discarded:Phase::Failed);
+            if(!terminalFrame){terminalFrame=frames;return;}
+            // Wait beyond the frame which consumes/resets the transaction; the result must persist.
+            if(frames==terminalFrame+3){
+                ImGui::GetCurrentContext()->LogBuffer.clear(); ImGui::LogToBuffer();
+                ImGui::GetCurrentContext()->LogWindow=nullptr;
+            }
+            if(frames==terminalFrame+5){
+                const std::string text{ImGui::GetCurrentContext()->LogBuffer.c_str()}; ImGui::LogFinish();
+                EXPECT_FALSE(message.empty()); EXPECT_NE(text.find(message),std::string::npos)<<text;
+                checked=true;engine.RequestExit();
+            }
+        };
+        h.Engine->Run(); EXPECT_TRUE(checked);
+        R::DiscardEditorOutlierAnalysis({},outlierRun);
+        R::DiscardEditorNormalEstimation({},normalRun);
+        R::DiscardEditorPropertySmoothing({},smoothingRun);
+    }
 }

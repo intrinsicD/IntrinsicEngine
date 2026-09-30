@@ -1307,6 +1307,7 @@ if(TARGET ExtrinsicRuntime)
         Test.SpatialIndexCache.cpp
         Test.GpuPropertyBinding.cpp
         Test.PropertySmoothingTransaction.cpp
+        Test.OutlierTransaction.cpp
         Test.NormalTransaction.cpp
         Test.GpuPositionsAccept.cpp
         Test.RegistrationDomains.cpp
@@ -1836,6 +1837,7 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
                 integration/graphics/Test.PropertySmoothingTransactionGpuSmoke.cpp
                 integration/graphics/Test.GpuPositionPreviewSmoke.cpp
                 integration/graphics/Test.GpuPositionsAcceptSmoke.cpp
+                integration/graphics/Test.OutlierTransactionGpuSmoke.cpp
                 integration/graphics/Test.VertexNormalsTransactionGpuSmoke.cpp
         DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
     )
@@ -2344,7 +2346,7 @@ endif()
 
 if(TARGET SandboxEditorIntegrationTestObjs)
     intrinsic_test_executable(IntrinsicSandboxEditorIntegrationTests
-        OBJECTS SandboxEditorIntegrationTestObjs EditorFeatureTestSupportObjs RuntimeTestModuleSupportObjs
+        OBJECTS SandboxEditorIntegrationTestObjs EditorFeatureTestSupportObjs MockRhiTestSupportObjs RuntimeTestModuleSupportObjs
         LINK_LIBS ExtrinsicSandboxEditor ExtrinsicRuntime
         LABELS integration runtime
     )

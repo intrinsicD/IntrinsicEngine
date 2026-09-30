@@ -21,41 +21,6 @@ void main()
         LbvhNeighbor best=lbvhNearest(pc.nodes,pc.pointCount,q,excluded);neighbors.v[base]=best;
         headers.v[i]=uvec2(best.index==LBVH_INVALID?0:1,0);return;
     }
-    uint count=0,size=pc.pointCount==0?0:1;uint stack[64];stack[0]=0;
-    LbvhNodes tree=LbvhNodes(pc.nodes);float limit=pc.kNearestCount>0?uintBitsToFloat(0x7f800000u):pc.radius*pc.radius;
-    while(size>0)
-    {
-        LbvhNode node=tree.v[stack[--size]];
-        if(lbvhBoxDistance(node,q)>limit)continue;
-        if(node.object==LBVH_INVALID)
-        {
-            uint nearChild,farChild;float nearDistance,farDistance;
-            lbvhOrderChildren(tree,node,q,nearChild,nearDistance,farChild,farDistance);
-            if(farDistance<=limit)stack[size++]=farChild;
-            if(nearDistance<=limit)stack[size++]=nearChild;
-            continue;
-        }
-        if(node.object==excluded)continue;
-        float distance=lbvhDistance(q,node.lo);if(distance>limit)continue;
-        if(pc.kNearestCount>0)
-        {
-            LbvhNeighbor value=LbvhNeighbor(node.object,distance);
-            // One invocation owns this result slice. Equal-distance candidates remain traversable.
-            for(uint k=0;k<pc.capacity;++k)
-            {
-                LbvhNeighbor old=neighbors.v[base+k];
-                if(value.distance<old.distance || (value.distance==old.distance && value.index<old.index))
-                { neighbors.v[base+k]=value;value=old; }
-            }
-            count=min(count+1,pc.capacity);
-            if(count==pc.capacity)limit=neighbors.v[base+pc.capacity-1].distance;
-            continue;
-        }
-        ++count;
-        LbvhNeighbor value=LbvhNeighbor(node.object,distance);
-        // Keep the lowest source indices, independent of Morton/traversal ordering.
-        for(uint k=0;k<pc.capacity;++k)
-            if(value.index<neighbors.v[base+k].index){LbvhNeighbor old=neighbors.v[base+k];neighbors.v[base+k]=value;value=old;}
-    }
+    uint count=lbvhQuery(pc.nodes,pc.pointCount,q,excluded,pc.radius,pc.kNearestCount,pc.capacity,neighbors,base);
     headers.v[i]=uvec2(count,0);
 }

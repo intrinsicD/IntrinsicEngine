@@ -285,6 +285,25 @@ transaction). Two things are new:
   canonical slot of the new revision; the accepted output then serves the next run's base
   copy without an upload.
 
+### Outlier score and mask transactions
+
+Vulkan admission refuses radius analysis when radius squared is below `FLT_MIN`.
+Float32 denormal preservation is not required, so pairwise squared distances below
+`FLT_MIN` may differ on devices that flush denormals; see [outlier analysis](outlier-analysis.md).
+
+Vulkan outlier analysis reads canonical positions through `SpatialIndexCache`;
+indices with deleted rows gather their compact positions on the device. The
+shared LBVH traversal supplies device statistical/radius/LDR scoring. A single
+fixed-order double reduction computes the statistical threshold. The score uses
+a float ring; the uint32 mask has a typed ring and float presentation ring.
+Both stores first retain existing output bytes outside the live rows.
+`EditorOutlierTransaction` uses `GpuFrontReadback` for Accept, the existing atomic
+undoable two-field publisher, and `BindRevision` for both accepted fronts.
+Discard is generation-scoped; stale input, deletion or either output refuses
+Accept. Panel detach discards; batch/agent execution automatically accepts.
+GPU preview: yes for score; commit via the outlier transaction. Cardinality-changing
+removal remains the atomic CPU compaction stage, with no additional device readback.
+
 ## Property revisions
 
 Every property storage and its owning registry carry a process-monotonic,

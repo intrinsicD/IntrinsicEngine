@@ -2,7 +2,7 @@
 
 **View → Outlier Analysis** and the Mesh, Graph, and PointCloud Processing menus
 open one window. Select an entity and a canonical `vec3` property, choose
-Statistical, Radius or Local distance ratio, then **Detect outliers**. Detection publishes two named
+Statistical, Radius or Local distance ratio, then **Detect outliers**. CPU detection publishes two named
 properties on the selected element domain: `outlier_mask` (`uint32`, 1 rejects,
 0 keeps) and `outlier_score` (`float`). **Show mask** and **Show score** use the
 shared label/scalar visualization recipes.
@@ -43,23 +43,46 @@ property. Fewer than two live samples or nonfinite/unrepresentable scores fail.
 | --- | --- | --- |
 | `cpu_octree` (default) | Existing geometry octree reference | CPU |
 | `cpu_lbvh` | Immutable lease from the shared canonical-property spatial cache | CPU |
-| `vulkan_lbvh` | Framed cache kNN or radius queries, bounded batches/readback | CPU |
+| `vulkan_lbvh` | Shared LBVH traversal over canonical resident positions | Device scoring and fixed-order double statistical reduction |
 
-GPU statistical k is 1..64; local-distance-ratio k is at most 63 (64 candidates); GPU input is at most 2^20 live samples. CPU LBVH is
-limited to 2^24. LBVH coordinates/radius must remain within 1e18. GPU batch size
-is 1..16384 (default 4096). Radius requests retain one hit but consume the full
-hit count, including dense neighborhoods exceeding 1024. Counts are exact within
-these input bounds; float publication represents them exactly. GPU distance
-arithmetic and thresholds near floating-point boundaries remain numerically
-sensitive. No speedup or automatic backend selection is claimed.
+Vulkan statistical k is 1..64; local-distance-ratio k is at most 63. Both
+select the reference's candidate set before self removal, including coincident
+peers and ties ordered by source row. The device workspace admits at most 2^20
+source slots and 2^24 candidate entries. CPU LBVH is limited to 2^24 samples.
+LBVH coordinates/radius must remain within 1e18. Vulkan requires shader float64,
+a float score and uint32 mask; unsupported storage, subnormal coordinates,
+radius analysis with radius squared below `FLT_MIN`, or excessive workspace sizes
+are refused explicitly. Radius uses one candidate entry per live point; the other
+methods use their clamped candidate count. No CPU fallback occurs.
+Float32 denormal preservation is not required: pairwise squared distances below
+`FLT_MIN` (separations below approximately 1.1e-19) may differ from the CPU on devices
+that flush denormals, even when the coordinates themselves are normal.
+Radius is the only configured threshold squared in float32. Local distance ratio
+compares its dimensionless score threshold directly; statistical classification
+computes and compares its derived distance threshold in float64.
+The serialized batch-size control remains available to older query consumers;
+resident outlier scoring uses one device submission with chunked dispatches.
 
-The runtime uses `SpatialIndexCache` and existing jobs; no second index service
-or ECS-owned GPU buffers are introduced. GPU queries precede a dependent CPU
-classification job. Publication checks the captured input, deletion and output
-property revisions. Cancellation, stale inputs, unsupported configurations and
-GPU failures retain previous output; an explicit Vulkan request never falls
-back to CPU queries. Results report requested/actual backend, cache reuse,
-query batches and separate neighborhood/CPU elapsed times.
+`EditorOutlierTransaction` reuses `SpatialIndexCache`, GPU property residency,
+shared `GpuFrontReadback`, and the existing atomic two-field undoable publisher.
+Deleted rows are gathered on the device from the canonical position slot for
+index construction. The score, typed mask and float mask presentation occupy
+rings; existing deleted output rows retain their bytes. The panel leaves the
+result pending for **Accept / Discard**; detaching the panel discards it. Batch
+and agent commands accept automatically. Accept reads both typed fronts once,
+publishes them together, then binds their revisions with `BindRevision`.
+Input, deletion and both output watches guard publication. Removal stays on the
+existing atomic **CPU compaction stage** (ADR 0030 decision 8), using the accepted
+mask without any extra GPU readback.
+
+| method.engine-integration field | Disposition |
+| --- | --- |
+| Runtime/config/agent | Existing `PointAnalysisOperations` and `sandbox.outlier_analysis`; requested/actual backend retained. |
+| Publication | GPU preview: yes for score; commit via the outlier transaction's existing atomic undoable two-field publisher, followed by `BindRevision`; removal via the existing CPU removal command. |
+| IO | `GpuInputUploadBytes`, `GpuInputCacheHits`, `CpuStageReadbackBytes`; diagnostic messages also expose these to command/agent callers. Acceptance reads score/mask; no neighborhood download or CPU classification stage. |
+| Parity evidence | `RUNTIME297OutlierResidency.ParityResidentSecondRunAndDiscard` compares all three estimators, masks exactly and scores with absolute tolerance 2e-5 (ordered float distances and device sqrt/division rounding); emits `outlier_method_<n>_max_abs_delta`. Actual measured deltas require running this test on a Vulkan host; compilation alone supplies none. |
+
+No speedup or automatic backend selection is claimed.
 
 ## Removal and history
 
@@ -122,7 +145,8 @@ filtering retain their own execution paths; GEOM-073 tracks those follow-ups.
 
 Tests: [CPU geometry oracle](../../tests/unit/geometry/Test.PointCloudOutlierRemoval.cpp),
 [runtime/config/history](../../tests/contract/runtime/Test.OutlierAnalysis.cpp),
-[GPU query/publication smoke](../../tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp),
+[GPU transaction parity/IO smoke](../../tests/integration/graphics/Test.OutlierTransactionGpuSmoke.cpp),
+[transaction contracts](../../tests/contract/runtime/Test.OutlierTransaction.cpp),
 and [window routing](../../tests/integration/runtime/Test.SandboxEditorPresentation.cpp).
 The bounded [runtime benchmark](../../benchmarks/geometry/manifests/point_lbvh_outlier_runtime_smoke.yaml)
 compares the same input through CPU reference and framed GPU publication; small,

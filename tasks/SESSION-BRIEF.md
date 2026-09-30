@@ -179,7 +179,6 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `RUNTIME-212` — Progressive Poisson property-domain publication (tasks/backlog/runtime/RUNTIME-212-progressive-poisson-property-domain-publication.md)
 - unblocked: `RUNTIME-275` — Gaussian noise editor operation (tasks/backlog/runtime/RUNTIME-275-gaussian-noise-editor-operation.md)
 - unblocked: `RUNTIME-295` — Extraction fills render blocks from the residency (tasks/backlog/runtime/RUNTIME-295-extraction-fills-render-blocks-from-residency.md)
-- unblocked: `RUNTIME-297` — Outlier analysis on the GPU property residency (tasks/backlog/runtime/RUNTIME-297-outliers-on-the-residency.md)
 - unblocked: `RUNTIME-298` — Kernel density, point spacing and density weights on the GPU property residency (tasks/backlog/runtime/RUNTIME-298-density-spacing-weights-on-the-residency.md)
 - unblocked: `RUNTIME-299` — Point-set PCA normals on the GPU property residency (tasks/backlog/runtime/RUNTIME-299-pca-normals-on-the-residency.md)
 - unblocked: `RUNTIME-300` — Fully-GPU methods onto residency inputs and rings (LOP, k-means, FPS, keypoints) (tasks/backlog/runtime/RUNTIME-300-fully-gpu-methods-on-residency-inputs-and-rings.md)

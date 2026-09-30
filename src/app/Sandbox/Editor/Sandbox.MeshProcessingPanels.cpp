@@ -405,6 +405,7 @@ namespace Extrinsic::Sandbox::Editor
         std::shared_ptr<std::optional<Runtime::EditorNormalEstimationResult>> NormalCompletion{
             std::make_shared<std::optional<Runtime::EditorNormalEstimationResult>>()};
         OutliersState Outliers{};
+        Runtime::EditorOutlierTransactionHandle OutlierTransaction{};
         KeypointsState Keypoints{};
         DescriptorsState Descriptors{};
         DensityState Density{};
@@ -642,6 +643,8 @@ namespace Extrinsic::Sandbox::Editor
         Simplify.Input = {};
         Registration = {};
         Normals = {};
+        if (OutlierTransaction) Runtime::DiscardEditorOutlierAnalysis({}, OutlierTransaction);
+        OutlierTransaction.reset();
         Outliers = {};
         Keypoints = {};
         Descriptors = {};
@@ -1980,6 +1983,9 @@ namespace Extrinsic::Sandbox::Editor
                     NormalTransaction = Runtime::StartEditorNormalEstimationTransaction(context.Normals.Commands, config, failure);
                     Normals.LastResult = NormalTransaction
                         ? Runtime::SnapshotEditorNormalEstimation(context.Normals.Commands, NormalTransaction).Result : failure;
+                    // A refused start leaves no handle; the sink keeps its result on screen.
+                    if (!NormalTransaction && context.Normals.ResultSinks.NormalEstimation)
+                        context.Normals.ResultSinks.NormalEstimation(failure);
                 }
             }
             else
@@ -2110,7 +2116,52 @@ namespace Extrinsic::Sandbox::Editor
                 [&] { return Runtime::ApplyEditorConfiguredOutlierAnalysis(context.PointAnalysis.Commands, context.PointAnalysis.ResultSinks.OutlierAnalysis); },
                 context.PointAnalysis.ResultSinks.OutlierAnalysis, "Outlier config was rejected.");
         };
-        if (DrawProcessingActionButton("Detect outliers", readiness)) execute(analyze);
+        const auto transaction = Runtime::SnapshotEditorOutlierAnalysis(context.PointAnalysis.Commands, OutlierTransaction);
+        const bool outlierActive = OutlierTransaction && (transaction.Phase == Runtime::EditorGpuTransactionPhase::Running ||
+            transaction.Phase == Runtime::EditorGpuTransactionPhase::ReadyToAccept || transaction.Phase == Runtime::EditorGpuTransactionPhase::Accepting);
+        if (OutlierTransaction && !outlierActive)
+        {
+            Outliers.LastResult = transaction.Result;
+            if (context.PointAnalysis.ResultSinks.OutlierAnalysis)
+                context.PointAnalysis.ResultSinks.OutlierAnalysis(transaction.Result);
+            OutlierTransaction.reset();
+        }
+        ImGui::BeginDisabled(outlierActive);
+        if (DrawProcessingActionButton("Detect outliers", readiness))
+        {
+            if (analyze.Backend == Runtime::OutlierAnalysisBackend::VulkanLBVH)
+            {
+                Runtime::EditorOutlierAnalysisResult result;
+                OutlierTransaction = Runtime::StartEditorOutlierAnalysisTransaction(context.PointAnalysis.Commands, analyze, result);
+                Outliers.LastResult = result;
+                // A refused start leaves no handle; the sink keeps its result on screen.
+                if (!OutlierTransaction && context.PointAnalysis.ResultSinks.OutlierAnalysis)
+                    context.PointAnalysis.ResultSinks.OutlierAnalysis(result);
+            }
+            else execute(analyze);
+        }
+        ImGui::EndDisabled();
+        if (outlierActive)
+        {
+            ImGui::TextWrapped("%s", transaction.Result.Message.c_str());
+            ImGui::Text("Input upload: %llu bytes; residency hits: %llu",
+                static_cast<unsigned long long>(transaction.Result.GpuInputUploadBytes),
+                static_cast<unsigned long long>(transaction.Result.GpuInputCacheHits));
+            ImGui::BeginDisabled(!transaction.CanAccept);
+            if (ImGui::Button("Accept##Outliers"))
+                Outliers.LastResult = Runtime::AcceptEditorOutlierAnalysis(context.PointAnalysis.Commands, OutlierTransaction,
+                    context.PointAnalysis.ResultSinks.OutlierAnalysis);
+            ImGui::EndDisabled();
+            if (!transaction.AcceptDisabledReason.empty()) ImGui::TextWrapped("%s", transaction.AcceptDisabledReason.c_str());
+            ImGui::SameLine();
+            if (ImGui::Button("Discard##Outliers"))
+            {
+                Runtime::DiscardEditorOutlierAnalysis(context.PointAnalysis.Commands, OutlierTransaction);
+                Outliers.LastResult = Runtime::SnapshotEditorOutlierAnalysis(context.PointAnalysis.Commands, OutlierTransaction).Result;
+            }
+            ImGui::TextWrapped("The score ring is available to the colormap; CPU fields change only on Accept.");
+        }
+
         ImGui::TextWrapped("Detection writes a mask (1 = outlier) and a score. Geometry stays in source order.");
         auto remove = config;
         remove.Operation = Runtime::OutlierAnalysisOperation::RemoveMarked;
@@ -3259,6 +3310,11 @@ namespace Extrinsic::Sandbox::Editor
         m_Impl->SmoothingTransaction = std::move(transaction);
     }
 
+    void MeshProcessingPanels::InjectOutlierTransactionForTest(Runtime::EditorOutlierTransactionHandle transaction)
+    {
+        m_Impl->OutlierTransaction = std::move(transaction);
+    }
+
     void MeshProcessingPanels::InjectNormalTransactionForTest(Runtime::EditorNormalTransactionHandle transaction)
     {
         m_Impl->NormalTransaction = std::move(transaction);
@@ -3301,7 +3357,9 @@ namespace Extrinsic::Sandbox::Editor
         if (transaction.Phase == Phase::Applied || transaction.Phase == Phase::Discarded || transaction.Phase == Phase::Failed)
         {
             // Terminal: the result line reports it; the next run may start.
-            if (!*NormalCompletion) Normals.LastResult = transaction.Result;
+            Normals.LastResult = transaction.Result;
+            if (context.Normals.ResultSinks.NormalEstimation)
+                context.Normals.ResultSinks.NormalEstimation(transaction.Result);
             NormalTransaction.reset();
         }
     }
@@ -3520,7 +3578,7 @@ namespace Extrinsic::Sandbox::Editor
         if (transaction.Phase == Phase::Applied || transaction.Phase == Phase::Discarded || transaction.Phase == Phase::Failed)
         {
             // Terminal: the result line below reports it; the next run may start.
-            if (!*SmoothingCompletion) Smoothing.LastResult = transaction.Result;
+            Smoothing.LastResult = transaction.Result;
             SmoothingTransaction.reset();
         }
     }

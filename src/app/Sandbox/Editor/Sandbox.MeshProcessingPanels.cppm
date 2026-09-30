@@ -8,6 +8,7 @@ module;
 export module Extrinsic.Sandbox.Editor.MeshProcessingPanels;
 import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.NormalOperations;
+import Extrinsic.Runtime.PointAnalysisOperations;
 
 export namespace Extrinsic::Sandbox::Editor
 {
@@ -30,6 +31,7 @@ export namespace Extrinsic::Sandbox::Editor
         void InjectPropertySmoothingTransactionForTest(Runtime::EditorPropertySmoothingTransactionHandle transaction);
         // The same seam for the Normal Estimation window's Vulkan run (Accept / Discard).
         void InjectNormalTransactionForTest(Runtime::EditorNormalTransactionHandle transaction);
+        void InjectOutlierTransactionForTest(Runtime::EditorOutlierTransactionHandle transaction);
 
     private:
         struct Impl;
