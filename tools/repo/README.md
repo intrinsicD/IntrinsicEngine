@@ -55,6 +55,12 @@ graphify explain "Extrinsic.Core.Logging" --graph build/knowledge-graph/graphify
 #     `knowledge-graph` server (query_graph / get_neighbors / shortest_path /
 #     god_nodes / graph_stats). Requires the MCP extra:
 uv tool install graphifyy --with mcp
+# If an MCP client reports `Executable not found in $PATH: graphify-mcp`, the
+# extra is not installed: run the line above (or tools/setup/provision_knowledge_graph.sh,
+# which installs it via uv unless --no-install and always rebuilds the graph).
+# On the manual route, if build/knowledge-graph/graphify-out/graph.json is
+# missing, build it:
+python3 tools/repo/build_knowledge_graph.py
 ```
 
 Shared session setup lives under `tools/setup/`. Agent-specific hooks should

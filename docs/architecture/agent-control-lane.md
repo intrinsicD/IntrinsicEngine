@@ -44,15 +44,19 @@ launch flag: no module, thread or socket.
 - Every operation calls an existing editor query, command or config function:
   workspace snapshots, inspector property catalogs, `SelectEditorEntity`,
   `ApplyEditorFileImportCommand`, document undo/redo, `EngineConfigControl`
-  preview/apply with `RuntimeConfigControlSource::AgentCli`, the mesh-field
-  `Preview*/Apply*` commands, and the panels' Show recipe
+  preview/apply with `RuntimeConfigControlSource::AgentCli`, the mesh-field and
+  registration `Preview*/Apply*` commands, the point-cloud point-sampling, keypoint,
+  k-means and consolidation run commands, and the panels' Show recipe
   (`MakeEditorPropertyVisualizationRecipe`). There is no generic scene or property write.
-- Naming: `scene_*`, `entity_*`, `config_sections`, `config_schema`, `config_get`, `config_preview`,
-  `history`, `jobs`, `log`, `preview_*` (including `preview_registration`) and `view_screenshot` are read-only
-  (`readOnlyHint`); `select_entity`, `import_file`, `show_property`, `config_apply`,
-  `run_mesh_operation`, `run_point_sampling` (the `sandbox.point_sampling` section), `run_registration` (ICP or Coherent Point Drift from their config sections; the
-  reply waits for the job), `undo`, `redo` change state, and `view_capture` writes a PNG
-  inside the allowed roots.
+- Naming. Read-only (`readOnlyHint`): `scene_entities`, `entity_properties`, `config_sections`,
+  `config_schema`, `config_get`, `config_preview`, `history`, `jobs`, `log`,
+  `preview_registration`, `preview_point_sampling`, `preview_mesh_operation` and
+  `view_screenshot`. State-changing: `select_entity`, `import_file`, `show_property`,
+  `config_apply`, `undo`, `redo`, `run_mesh_operation`, `run_registration` (ICP or Coherent
+  Point Drift from their config sections; the reply waits for the job),
+  `run_point_sampling` (the `sandbox.point_sampling` section), `run_keypoint_analysis`,
+  `run_kmeans` and `run_point_cloud_consolidation`. `view_capture` writes a PNG inside the
+  allowed roots.
 - Screenshots complete a few frames after the call: an operation may return an
   `AgentOperationContinuation`, which the server polls each frame and answers with
   the original JSON-RPC id; a reconnecting client drops pending replies. Both tools
@@ -100,12 +104,17 @@ diagnostics ([CORE-011](../../tasks/backlog/architecture/CORE-011-log-entry-curs
 mesh health ([GEOM-110](../../tasks/backlog/geometry/GEOM-110-connected-components-and-topology.md),
 [RUNTIME-286](../../tasks/backlog/runtime/RUNTIME-286-mesh-health-report.md),
 [UI-066](../../tasks/backlog/ui/UI-066-mesh-health-window.md)).
+Planned: lane hardening (minimized sessions, bridge concurrency, protocol conformance,
+progress and cancel) and the remaining operation tools in
+[RUNTIME-312](../../tasks/backlog/runtime/RUNTIME-312-agent-lane-mcp-hardening-and-coverage.md).
 
 ## Limitations
 
-- Mesh-field operations only (smoothing, spectral modes, harmonic field, scalar
-  gradient); curvature, geodesics and the point/graph families still need
-  registrations.
+- Operation tools exist for mesh-field operations (smoothing, spectral modes, harmonic
+  field, scalar gradient), registration (ICP, Coherent Point Drift), point sampling,
+  keypoint analysis, k-means and point-cloud consolidation. The remaining editor commands
+  (curvature, geodesics, remeshing and others) have no tools yet; coverage is owned by
+  [RUNTIME-312](../../tasks/backlog/runtime/RUNTIME-312-agent-lane-mcp-hardening-and-coverage.md).
 - Imports are asynchronous (`Pending`); poll `scene_entities` for the result.
 - Unix-domain sockets only; Windows builds report `Unsupported`.
 - A Sandbox killed by a signal leaves its socket file; the next start replaces it.

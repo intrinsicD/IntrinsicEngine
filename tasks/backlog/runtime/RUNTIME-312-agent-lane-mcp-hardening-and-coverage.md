@@ -123,7 +123,7 @@ the editor operations the Sandbox UI already offers.
 | End-to-end tests | `Test.AgentOperations.cpp` per new tool (readiness, apply, undo), `Test.SandboxAgentServer.cpp` socket round trips (minimized, progress, cancel, long job), `Test.McpBridge.py` for the bridge. |
 
 ## Acceptance criteria
-- [ ] Slice 1: lane doc Naming/Limitations match the registered tools; the knowledge-graph prerequisite and its failure symptom are documented.
+- [x] Slice 1: lane doc Naming/Limitations match the registered tools; the knowledge-graph prerequisite and its failure symptom are documented.
 - [ ] Slice 2: a tool call to a minimized Sandbox completes (non-capture) or fails fast with a typed error (capture); a deferred reply outliving 120 s is still delivered to its connection.
 - [ ] Slice 3: the bridge answers `ping` during a pending call, forwards server notifications, keeps the connection after a per-call timeout, and announces a later-started Sandbox via `tools/list_changed` without a manual call.
 - [ ] Slice 4: unsupported `protocolVersion` gets the server's own version; tool results carry `structuredContent`; annotations match undoability; `view_capture` never overwrites without `overwrite: true`.
