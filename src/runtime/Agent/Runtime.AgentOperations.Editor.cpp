@@ -30,6 +30,7 @@ import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.RegistrationOperations;
 import Extrinsic.Runtime.PointSamplingOperations;
+import Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.Runtime.PointCloudServiceOperations;
 import Extrinsic.Runtime.PointCloudConsolidationTypes;
 import Extrinsic.Runtime.ClusteringConfig;
@@ -539,6 +540,27 @@ namespace Extrinsic::Runtime
                 return true;
             }};
         }
+        AgentOperationOutcome RunKeypoints(const AgentOperationContext& context)
+        {
+            if(!context.Attachment || !context.Attachment->IsAttached())return Fail(kNoWorkspace);
+            const auto commands=PrepareEditorPointAnalysisFrame(*context.Attachment).Commands;
+            auto done=std::make_shared<std::optional<EditorKeypointAnalysisResult>>();
+            const auto json=[](const EditorKeypointAnalysisResult& r) {
+                return Dump(Json{{"status",DebugNameForEditorCommandStatus(r.Status)},{"succeeded",r.Succeeded()},
+                    {"message",r.Message},{"requested_backend",ToString(r.RequestedBackend)},{"actual_backend",r.ActualBackend},
+                    {"implementation_id",r.ImplementationId},
+                    {"gpu_input_upload_bytes",r.GpuInputUploadBytes},{"gpu_input_cache_hits",r.GpuInputCacheHits},
+                    {"cpu_stage_upload_bytes",r.CpuStageUploadBytes},{"cpu_stage_readback_bytes",r.CpuStageReadbackBytes},
+                    {"gpu_submissions",r.GpuQueryBatches},{"keypoints",r.KeypointCount}});
+            };
+            const auto result=ApplyEditorConfiguredKeypointAnalysis(commands,[done](auto r){*done=std::move(r);});
+            if(result.Status!=EditorCommandStatus::Pending)return {.IsError=!result.Succeeded(),.Text=json(result)};
+            return {.Continuation=[done,json](const AgentOperationContext& current,AgentOperationOutcome& out) {
+                if(!current.Attachment || !current.Attachment->IsAttached()){out=Fail(kNoWorkspace);return true;}
+                if(!*done)return false;
+                out={.IsError=!(**done).Succeeded(),.Text=json(**done)};return true;
+            }};
+        }
         AgentOperationOutcome RunKMeansOperation(const AgentOperationContext& context, std::string_view arguments)
         {
             if (!context.Attachment || !context.Attachment->IsAttached()) return Fail(kNoWorkspace);
@@ -768,6 +790,9 @@ namespace Extrinsic::Runtime
             "Order the configured entity's points with the chosen sampling method (sandbox.point_sampling; config_apply "
             "first) and publish rank/selection properties or a new point cloud as one undoable step.",
             none, false, [](const AgentOperationContext& c, std::string_view) { return RunPointSampling(c, false); });
+        add("run_keypoint_analysis", "Run keypoint analysis",
+            "Run sandbox.keypoint_analysis; GPU score and mask auto-accept in one undoable entry. Reports backend and IO.",
+            none, false, [](const AgentOperationContext& c,std::string_view){return RunKeypoints(c);});
         add("run_kmeans", "Run K-Means",
             "Cluster the configured point property (sandbox.clustering); GPU results auto-accept atomically. Reports backend and IO.",
             Schema(R"({"entity":{"type":"integer","minimum":1},"domain":{"type":"string"},"positions":{"type":"string"}})",

@@ -92,6 +92,7 @@ export namespace Extrinsic::Runtime
         SpatialQueryState State{SpatialQueryState::Queued};
         std::vector<std::byte> Data{};
         std::string Diagnostic{};
+        std::uint64_t CpuStageUploadBytes{};
     };
     // This concrete service is also its runtime module; there is no forwarding service layer.
     extern "C++" class SpatialIndexCache final : public IRuntimeModule

@@ -112,4 +112,4 @@ shader arithmetic.
 The preview-boundary and paging assertions require execution on a Vulkan host;
 mock contracts verify recording/publication order but do not execute shaders.
 See [property coherence](../architecture/property-coherence.md) and
-[RUNTIME-300](../../tasks/active/RUNTIME-300-fully-gpu-methods-on-residency-inputs-and-rings.md).
+[RUNTIME-300](../../tasks/done/RUNTIME-300-fully-gpu-methods-on-residency-inputs-and-rings.md).

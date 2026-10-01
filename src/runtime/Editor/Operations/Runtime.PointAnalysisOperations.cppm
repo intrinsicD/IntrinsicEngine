@@ -68,7 +68,8 @@ export namespace Extrinsic::Runtime
         EditorCommandStatus Status{EditorCommandStatus::NoChange};
         KeypointAnalysisBackend RequestedBackend{KeypointAnalysisBackend::CpuKDTree};
         GeometryPropertyRef Mask{}, Score{};
-        std::string ActualBackend{}, Message{};
+        std::string ActualBackend{}, Message{}, ImplementationId{};
+        std::uint64_t GpuInputUploadBytes{}, GpuInputCacheHits{}, CpuStageUploadBytes{}, CpuStageReadbackBytes{};
         std::size_t SlotCount{}, LiveCount{}, KeypointCount{}, WrittenCount{};
         // Resolved spacing and radii in source-property coordinate units.
         float MeanSpacing{}, SalientRadius{}, NonMaxRadius{};
@@ -148,6 +149,9 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::optional<OutlierAnalysisConfig> GetEditorOutlierAnalysisConfig(const EditorProcessingCommands&);
     [[nodiscard]] EditorOutlierAnalysisResult ApplyEditorConfiguredOutlierAnalysis(const EditorProcessingCommands&, std::function<void(EditorOutlierAnalysisResult)> onComplete = {});
 
+    [[nodiscard]] EditorPointScalarTransactionHandle StartEditorKeypointAnalysisTransaction(
+        const EditorProcessingCommands&, const KeypointAnalysisConfig&, EditorKeypointAnalysisResult&,
+        std::function<void(EditorKeypointAnalysisResult)> onComplete = {}, bool automatic = false);
     [[nodiscard]] ActionReadiness PreviewEditorKeypointAnalysisCommand(const EditorProcessingCommands&, const KeypointAnalysisConfig&);
     [[nodiscard]] EditorKeypointAnalysisResult ApplyEditorKeypointAnalysisCommand(const EditorProcessingCommands&, const KeypointAnalysisConfig&, std::function<void(EditorKeypointAnalysisResult)> onComplete = {});
     [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorKeypointAnalysisConfig(const EditorProcessingCommands&, const KeypointAnalysisConfig&, std::string sourceId = {});

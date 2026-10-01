@@ -932,6 +932,12 @@ fallback writes, orientation flips, and spatial-query work.
 
 ### Point-cloud feature descriptors and coarse registration
 
+The [keypoint reference](keypoint-analysis.md) computes nearest-other spacing and
+radius membership with canonical float arithmetic, including float-subnormal squared
+radii; spacing sums and covariance accumulation use double with float eigenvalue
+publication and original-ID ties.
+The device implementation is compared to this reference only in Vulkan tests.
+
 `Geometry.PointCloud.Features` owns the generic, paper-neutral seams that
 initialize robust point-cloud registration and feed later `methods/geometry`
 packages: keypoints → descriptors → correspondences → coarse alignment → ICP.

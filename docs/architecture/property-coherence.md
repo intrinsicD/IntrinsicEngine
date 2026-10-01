@@ -563,3 +563,28 @@ completed iteration; detach discards; batch and agent requests auto-accept.
 GPU preview: yes (label colormap); commit via scalar transaction. See
 [k-means](../methods/kmeans.md) for paging bounds, backend identity, IO accounting,
 and the pending measured parity delta.
+
+### Resident keypoint score and mask
+
+Keypoints read canonical stride-12 position views retained by each completion-gated
+submission. Resumable LBVH traversal bounds rows, node visits and lane serial work;
+the fixed-shape spacing reduction does not serialize the whole cloud on one lane.
+See [keypoint analysis](keypoint-analysis.md) for budgets and numerical contracts.
+
+`PointScalarTransaction` reserves a float score ring and a uint32 companion mask
+ring at admission. The natural preview follows suppression and a completed copy
+of both outputs. Native float/uint32 previews preserve existing deleted rows and
+zero new rows. Alternate typed CPU fields use canonical preview bytes, with deleted
+preview rows zeroed; Accept preserves their original typed deleted rows. Accept reads
+both fronts and calls the existing checked two-field history publisher exactly once.
+Matching typed fronts bind to the new CPU revisions; converted fronts are discarded. The transaction ignores re-entrant
+Discard while the atomic publication is running. Stale input/deletion/output
+refuses Accept; Discard, Stop before completion, and panel detach retain CPU state.
+Batch and `run_keypoint_analysis` auto-accept, including terminal stale completion
+when auto-accept is refused. There is no additional transaction service.
+
+GPU preview: yes (score); commit via PointScalarTransaction.
+Input residency uploads/hits and declared CPU-stage bytes are reported separately;
+repeat requests reuse unchanged canonical positions. Pending recorders retain
+leases even after Discard, and the spatial queue participant stays in flight until
+its outstanding computation completions are drained.

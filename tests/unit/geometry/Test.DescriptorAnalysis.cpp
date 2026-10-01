@@ -95,6 +95,25 @@ TEST(DescriptorAnalysis, RejectsInvalidNormalsScaleAndMalformedNeighborhoods)
     auto moved=points;moved[1].x=10;EXPECT_FALSE(F::ComputeDescriptorsFromNeighbors(moved,normals,{},p,*scale,original));
     auto badScale=*scale;badScale.FeatureRadius=1;EXPECT_FALSE(F::ComputeDescriptorsFromNeighbors(points,normals,{},p,badScale,original));
 }
+TEST(DescriptorAnalysis, SuppliedSupportAcceptsFloatRadiusBoundaryButRejectsOutsideRows)
+{
+    const std::vector<glm::vec3> points{{0,0,0},{.3f,.4f,0},{0,.1f,0},
+        {std::nextafter(.5f,1.f),0,0}};
+    const std::vector<glm::vec3> normals(points.size(),glm::vec3{0,0,1});
+    const F::DescriptorParams p{.FeatureRadius=.5f};
+    const auto reference=F::ComputeDescriptors(points,normals,{},p);ASSERT_TRUE(reference);
+    const auto scale=F::ResolveDescriptorScale(points,p);ASSERT_TRUE(scale);
+    auto rows=Complete(points,p.FeatureRadius);
+    const auto supplied=F::ComputeDescriptorsFromNeighbors(points,normals,{},p,*scale,rows);
+    ASSERT_TRUE(supplied);
+    EXPECT_EQ(supplied->Data,reference->Data);
+    EXPECT_EQ(supplied->SourceIndices,reference->SourceIndices);
+    // Keep IDs sorted but replace an interior neighbor with a point just outside.
+    rows.Indices[rows.Offsets[0]+1]=3;
+    EXPECT_FALSE(F::ComputeDescriptorsFromNeighbors(points,normals,{},p,*scale,rows));
+    auto invalidNormals=normals;invalidNormals[1]={0,0,0};
+    EXPECT_FALSE(F::ComputeDescriptorsFromNeighbors(points,invalidNormals,{},p,*scale,Complete(points,p.FeatureRadius)));
+}
 TEST(DescriptorAnalysis, CloudCompactsDeletedNonfiniteRowsAndRemapsQueries)
 {
     Geometry::PointCloud::Cloud cloud;

@@ -9,7 +9,9 @@ layout(push_constant,scalar) uniform Push {
     uint count, first, queryCount, minimumNeighbors;
     float salientRadius, nonmaxRadius;
     double gamma21, gamma32;
-    uint capacity, mode;
+    uint reserved, mode;
+    uint64_t states, scores, masks;
+    uint visits, resume;
 } pc;
 layout(buffer_reference,scalar) buffer Doubles { double v[]; };
 layout(buffer_reference,scalar) buffer Output {
@@ -22,9 +24,33 @@ shared double sums[64];
 bool failed() { return atomicAdd(Output(pc.result).error,0)!=0; }
 void fail(uint error) { atomicOr(Output(pc.result).error,error); }
 
+// Decode public float bits in double, including denormals on FTZ devices.
+double realFloat(uint bits) {
+    if((bits & 0x7f800000u)==0) return double(bits & 0x007fffffu)*1.4012984643248171e-45lf*((bits & 0x80000000u)==0?1.0lf:-1.0lf);
+    return double(uintBitsToFloat(bits));
+}
+uint floatBits(double value) {
+    return abs(value)<1.1754943508222875e-38lf
+        ? uint(roundEven(abs(value)/1.4012984643248171e-45lf)) | (value<0.0lf?0x80000000u:0u)
+        : floatBitsToUint(float(value));
+}
+double roundedFloat(double value) { return realFloat(floatBits(value)); }
+dvec3 point(uint row) {
+    LbvhIndices bits=LbvhIndices(pc.points+uint64_t(row)*12);
+    return dvec3(realFloat(bits.v[0]),realFloat(bits.v[1]),realFloat(bits.v[2]));
+}
+double distanceSquared(dvec3 a,dvec3 b) {
+    // Match the CPU/KD-tree float subtraction, products and left-associated sum.
+    // Explicit rounding also preserves subnormal intermediates on FTZ devices.
+    precise dvec3 d=a-b;
+    d=dvec3(roundedFloat(d.x),roundedFloat(d.y),roundedFloat(d.z));
+    precise dvec3 squared=d*d;
+    squared=dvec3(roundedFloat(squared.x),roundedFloat(squared.y),roundedFloat(squared.z));
+    return roundedFloat(roundedFloat(squared.x+squared.y)+squared.z);
+}
 // Match the reference's isotropic branch; only eigenvalues are needed here.
 // Jacobi avoids an unavailable GLSL double-precision acos/cos implementation.
-vec3 eigenvalues(dmat3 a)
+dvec3 eigenvalues(dmat3 a)
 {
     precise double mean=(a[0][0]+a[1][1]+a[2][2])/3.0lf;
     precise dvec3 b=dvec3(a[0][0],a[1][1],a[2][2])-mean;
@@ -32,7 +58,7 @@ vec3 eigenvalues(dmat3 a)
         2.0lf*(a[0][1]*a[0][1]+a[0][2]*a[0][2]+a[1][2]*a[1][2]))/6.0lf;
     double scale=1.0lf;
     for(uint c=0;c<3;++c)for(uint r=0;r<3;++r)scale=max(scale,abs(a[c][r]));
-    if(!(p2>2.2204460492503131e-16lf*scale*scale))return vec3(max(mean,0.0lf));
+    if(!(p2>2.2204460492503131e-16lf*scale*scale))return dvec3(max(mean,0.0lf));
     for(uint step=0;step<24;++step)
     {
         uint p=0,q=1;
@@ -55,137 +81,135 @@ vec3 eigenvalues(dmat3 a)
     if(e.x<e.y){double t=e.x;e.x=e.y;e.y=t;}
     if(e.y<e.z){double t=e.y;e.y=e.z;e.z=t;}
     if(e.x<e.y){double t=e.x;e.x=e.y;e.y=t;}
-    return vec3(e);
+    return e;
 }
 
-void score(uint i)
+
+// Scalar layout stride = 384 bytes. Traversal and covariance persist across
+// completions; a dense row never monopolizes a shader invocation.
+struct RowState {
+    uint stack[64]; dvec3 mean; dmat3 covariance; double best;
+    uint size, pass, salient, support, done;
+};
+layout(buffer_reference,scalar) buffer States { RowState v[]; };
+
+void finishScore(uint i, inout RowState r)
 {
-    Output result=Output(pc.result);
-    Doubles scores=Doubles(pc.scratch);
-    scores.v[i]=double(uintBitsToFloat(0x7fc00000u));
-    result.values[i]=uvec2(0);
-    if(failed())return;
-    vec3 center=lbvhPoint(pc.points,12,i);
-    uint original=LbvhIndices(pc.slots).v[i];
-    float salientSquared=result.salientRadius*result.salientRadius;
-    float support=max(result.salientRadius,result.nonmaxRadius);
-    float supportSquared=support*support;
-    precise dvec3 mean=dvec3(center);
-    dmat3 covariance=dmat3(0.0lf);
-    uint salientCount=0;
-    for(uint pass=0;pass<2;++pass)
-    {
-        if(pass==1)
-        {
-            precise dvec3 delta=dvec3(center)-mean;
-            covariance=outerProduct(delta,delta);
-        }
-        float querySquared=pass==0?supportSquared:salientSquared;
-        uint stack[64];uint size=1;stack[0]=0;uint supportCount=0;
-        while(size>0)
-        {
-            LbvhNode node=LbvhNodes(pc.nodes).v[stack[--size]];
-            if(lbvhDistance(center,clamp(center,node.lo,node.hi))>querySquared)continue;
-            if(node.object==LBVH_INVALID)
-            {
-                if(size>62){fail(8);return;}
-                stack[size++]=node.right;stack[size++]=node.left;continue;
-            }
-            if(node.object==original)continue;
-            float distance=lbvhDistance(center,node.lo);
-            if(distance>querySquared)continue;
-            if(pass==0 && ++supportCount>pc.capacity)
-            {atomicMax(result.maximumNeighbors,supportCount);fail(2);return;}
-            if(distance>salientSquared)continue;
-            if(pass==0){mean+=dvec3(node.lo);++salientCount;}
-            else
-            {
-                precise dvec3 delta=dvec3(node.lo)-mean;
-                covariance+=outerProduct(delta,delta);
-            }
-        }
-        if(pass==0)
-        {
-            atomicMax(result.maximumNeighbors,supportCount);
-            if(salientCount<pc.minimumNeighbors)return;
-            mean/=double(salientCount+1);
-        }
-    }
-    covariance/=double(salientCount+1);
-    vec3 e=eigenvalues(covariance);
+    dvec3 e=eigenvalues(r.covariance/double(r.salient+1));
+    e=dvec3(realFloat(floatBits(e.x)),realFloat(floatBits(e.y)),realFloat(floatBits(e.z)));
     if(any(isnan(e)) || any(isinf(e))){fail(4);return;}
-    // Same numerical-zero contract as the CPU keypoint reducer.
     double roundoff=64.0lf*2.2204460492503131e-16lf*double(e.x);
     if(double(e.y)<=roundoff)e.y=0;
     if(double(e.z)<=roundoff)e.z=0;
     if(e.x>0 && e.y>0 && double(e.y)/double(e.x)<=pc.gamma21 && double(e.z)/double(e.y)<=pc.gamma32)
     {
-        scores.v[i]=double(e.z);
-        result.values[i].x=floatBitsToUint(e.z);
+        Doubles(pc.scratch).v[i]=double(e.z);
+        Output(pc.result).values[i].x=floatBits(e.z);
     }
 }
-
-void suppress(uint i)
+void traverse(uint i)
 {
-    if(failed())return;
-    double value=Doubles(pc.scratch).v[i];
-    if(isnan(value))return;
-    vec3 center=lbvhPoint(pc.points,12,i);
+    Output result=Output(pc.result);
     uint original=LbvhIndices(pc.slots).v[i];
-    float radius=Output(pc.result).nonmaxRadius;
-    float radiusSquared=radius*radius;
-    uint stack[64];uint size=1;stack[0]=0;
-    while(size>0)
-    {
-        LbvhNode node=LbvhNodes(pc.nodes).v[stack[--size]];
-        if(lbvhDistance(center,clamp(center,node.lo,node.hi))>radiusSquared)continue;
-        if(node.object==LBVH_INVALID)
-        {
-            if(size>62){fail(8);return;}
-            stack[size++]=node.right;stack[size++]=node.left;continue;
+    dvec3 center=point(original);
+    RowState r=States(pc.states).v[i-pc.first];
+    if(pc.resume==0) {
+        r.size=1;r.stack[0]=0;r.pass=0;r.salient=0;r.support=0;r.done=0;
+        r.mean=dvec3(center);r.covariance=dmat3(0.0lf);r.best=3.402823466e38lf;
+        if(pc.mode==2) {
+            Doubles(pc.scratch).v[i]=double(uintBitsToFloat(0x7fc00000u));
+            result.values[i]=uvec2(0);
         }
-        if(node.object==original || lbvhDistance(center,node.lo)>radiusSquared)continue;
-        double other=Doubles(pc.scratch).v[node.reserved];
-        if(!isnan(other) && (other>value || (other==value && node.object<original)))return;
+        if(pc.mode==3 && isnan(Doubles(pc.scratch).v[i]))r.done=1;
     }
-    Output(pc.result).values[i].y=1;
-    atomicAdd(Output(pc.result).keypointCount,1);
+    if(r.done!=0 || failed())return;
+    double salient=realFloat(floatBitsToUint(result.salientRadius)),nonmax=realFloat(floatBitsToUint(result.nonmaxRadius));
+    double salientSquared=roundedFloat(salient*salient);
+    for(uint visit=0;visit<pc.visits && r.done==0;++visit) {
+        if(r.size==0) {
+            if(pc.mode==0) {
+                Doubles(pc.scratch).v[i]=roundedFloat(sqrt(r.best));
+                r.done=1;
+            } else if(pc.mode==2 && r.pass==0) {
+                atomicMax(result.maximumNeighbors,r.support);
+                if(r.salient<pc.minimumNeighbors){r.done=1;break;}
+                r.mean/=double(r.salient+1);
+                precise dvec3 delta=dvec3(center)-r.mean;
+                r.covariance=outerProduct(delta,delta);
+                r.pass=1;r.size=1;r.stack[0]=0;
+            } else {
+                if(pc.mode==2)finishScore(i,r);
+                else {result.values[i].y=1;atomicAdd(result.keypointCount,1);}
+                r.done=1;
+            }
+            continue;
+        }
+        double limit=pc.mode==0?r.best:pc.mode==3?roundedFloat(nonmax*nonmax):
+            salientSquared;
+        LbvhNode node=LbvhNodes(pc.nodes).v[r.stack[--r.size]];
+        // Float LBVH construction may flush tiny bounds. Widen that band;
+        // leaf membership always uses the canonical float bits decoded in double.
+        dvec3 lo=dvec3(node.lo),hi=dvec3(node.hi);
+        for(uint axis=0;axis<3;++axis) {
+            if(abs(lo[axis])<1.1754943508222875e-38lf)lo[axis]=-1.1754943508222875e-38lf;
+            if(abs(hi[axis])<1.1754943508222875e-38lf)hi[axis]=1.1754943508222875e-38lf;
+        }
+        if(distanceSquared(center,clamp(center,lo,hi))>limit)continue;
+        if(node.object==LBVH_INVALID) {
+            if(r.size>62){fail(8);return;}
+            r.stack[r.size++]=node.right;r.stack[r.size++]=node.left;continue;
+        }
+        if(node.object==original)continue;
+        dvec3 neighbor=point(node.object);
+        double distance=distanceSquared(center,neighbor);
+        if(distance>limit)continue;
+        if(pc.mode==0) {
+            r.best=double(distance);
+            // No tie identity is required for spacing; zero is the absolute minimum.
+            if(distance==0)r.size=0;
+        } else if(pc.mode==2) {
+            if(r.pass==0)++r.support;
+            if(distance>salientSquared)continue;
+            if(r.pass==0){r.mean+=neighbor;++r.salient;}
+            else {precise dvec3 delta=neighbor-r.mean;r.covariance+=outerProduct(delta,delta);}
+        } else {
+            double value=Doubles(pc.scratch).v[i],other=Doubles(pc.scratch).v[node.reserved];
+            if(!isnan(other) && (other>value || (other==value && node.object<original)))r.done=1;
+        }
+    }
+    States(pc.states).v[i-pc.first]=r;
+    if(r.done==0)atomicAdd(result.reserved,1);
 }
-
 void main()
 {
-    if(pc.mode==1)
-    {
+    if(pc.mode==1 || pc.mode==5) {
         uint lane=gl_LocalInvocationIndex;
+        uint begin=pc.mode==5?pc.first+gl_WorkGroupID.x*4096:pc.count;
+        uint end=pc.mode==5?min(begin+4096,pc.first+pc.queryCount):pc.count+(pc.count+4095)/4096;
         precise double sum=0.0lf;
-        for(uint i=lane;i<pc.count;i+=64)sum+=Doubles(pc.scratch).v[i];
+        for(uint i=begin+lane;i<end;i+=64)sum+=Doubles(pc.scratch).v[i];
         sums[lane]=sum;barrier();
         for(uint stride=32;stride>0;stride/=2)
         {if(lane<stride)sums[lane]+=sums[lane+stride];barrier();}
-        if(lane==0)
-        {
+        if(lane==0) {
+            if(pc.mode==5) {Doubles(pc.scratch).v[pc.count+pc.first/4096+gl_WorkGroupID.x]=sums[0];return;}
             Output result=Output(pc.result);
-            float spacing=float(sums[0]/double(pc.count));
-            float salient=pc.salientRadius>0?pc.salientRadius:6.0*spacing;
-            float nonmax=pc.nonmaxRadius>0?pc.nonmaxRadius:4.0*spacing;
-            if(isnan(spacing) || isinf(spacing) || spacing<=0 ||
-                salient<=0 || nonmax<=0 || max(salient,nonmax)>1e18 ||
-                salient*salient==0 || nonmax*nonmax==0){fail(1);return;}
-            result.meanSpacing=spacing;result.salientRadius=salient;result.nonmaxRadius=nonmax;
+            double spacing=realFloat(floatBits(sums[0]/double(pc.count)));
+            double requestedSalient=realFloat(floatBitsToUint(pc.salientRadius)),requestedNonmax=realFloat(floatBitsToUint(pc.nonmaxRadius));
+            double salient=requestedSalient>0?requestedSalient:realFloat(floatBits(6.0lf*spacing));
+            double nonmax=requestedNonmax>0?requestedNonmax:realFloat(floatBits(4.0lf*spacing));
+            if(isnan(spacing)||isinf(spacing)||spacing<=0||salient<=0||nonmax<=0||
+                max(salient,nonmax)>1e18||roundedFloat(salient*salient)==0||roundedFloat(nonmax*nonmax)==0){fail(1);return;}
+            LbvhIndices(pc.result).v[4]=floatBits(spacing);LbvhIndices(pc.result).v[5]=floatBits(salient);LbvhIndices(pc.result).v[6]=floatBits(nonmax);
         }
         return;
     }
     uint local=gl_GlobalInvocationID.x;
     if(local>=pc.queryCount)return;
     uint i=pc.first+local;
-    if(pc.mode==0)
-    {
-        uint original=LbvhIndices(pc.slots).v[i];
-        LbvhNeighbor neighbor=lbvhNearest(pc.nodes,pc.count,lbvhPoint(pc.points,12,i),original);
-        precise float spacing=sqrt(neighbor.distance);
-        Doubles(pc.scratch).v[i]=double(spacing);
-        if(neighbor.index==LBVH_INVALID || isnan(spacing) || isinf(spacing))fail(1);
-    }
-    else if(pc.mode==2)score(i);
-    else suppress(i);
+    if(pc.mode==4) {
+        uint slot=LbvhIndices(pc.slots).v[i];
+        LbvhIndices(pc.scores).v[slot]=Output(pc.result).values[i].x;
+        LbvhIndices(pc.masks).v[slot]=Output(pc.result).values[i].y;
+    } else traverse(i);
 }

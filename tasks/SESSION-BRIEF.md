@@ -18,7 +18,6 @@ picking backlog work; theme priorities and rationale live in
 - `RUNTIME-274` — Point-cloud subsampling editor workflow (tasks/active/RUNTIME-274-point-cloud-subsampling-workflow.md)
 - `RUNTIME-289` — Selectable point sampling wherever points are chosen (tasks/active/RUNTIME-289-selectable-point-sampling-in-consumers.md)
 - `RUNTIME-294` — Migrate every GPU method to the property residency (tasks/active/RUNTIME-294-migrate-gpu-methods-to-property-residency.md)
-- `RUNTIME-300` — Fully-GPU methods onto residency inputs and rings (LOP, k-means, FPS, keypoints) (tasks/active/RUNTIME-300-fully-gpu-methods-on-residency-inputs-and-rings.md)
 - `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/active/UI-037-linear-domain-action-readiness-tooltips.md)
 - `UI-053` — Curvature-extremum engine overlay (tasks/active/UI-053-curvature-extremum-engine-overlay.md)
 

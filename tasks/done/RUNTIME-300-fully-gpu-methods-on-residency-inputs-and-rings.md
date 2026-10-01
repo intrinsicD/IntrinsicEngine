@@ -33,12 +33,32 @@ contracts: [geometry.property-coherence, geometry.element-domain-sources, method
 | Publication | Same cardinality per method. GPU preview: LOP yes (positions), k-means yes (label colormap), keypoints yes (score), FPS no; commit via the positions run API (LOP) or the scalar transaction (labels, scores, masks); FPS via its existing publication. |
 | End-to-end tests | Contract tests on the mock device per method; one gpu;vulkan parity + IO smoke per method. |
 
+## Completion — 2026-10-01
+Commit: `PENDING` on `claude/runtime-300`. All four fully-GPU methods run on the GPU property
+residency: resident canonical inputs, bounded completion-gated paging (pairs per page and per
+submission plus serial depth per thread), output rings, and Accept/Discard through the
+existing owners:
+- FPS (`2dadd2970`): resident positions/weights, terminal publication, no preview.
+- LOP (`932043638`, `066761a83`): position ring preview, positions run API.
+- k-means (`c5357a84d`, `538e42473`): uint label + float presentation rings, typed
+  `PointScalarTransaction` publication.
+- Keypoints (this commit): score/mask rings, `PointScalarTransaction` companion output,
+  checked storage conversion at Accept.
+
+Measured parity versus the CPU references: LOP Linf <= 3.1e-4 (atomic scatter order; tolerance
+2e-3), k-means 0 label mismatches / centroid Linf 0, keypoints score Linf 0 with exact masks,
+FPS as in slice 1. Repeat runs upload zero input bytes. Gates: full CPU 5470/5470;
+IntrinsicPointLBVHGpuTests 51/51 (1 opt-in skip); consolidation, clustering and LOP benchmark
+smokes green; full GPU suite otherwise green except the environmental
+`ExtrinsicSandbox.VulkanShutdownLsanContract`. Reviewed by Codex and Claude Opus 5.5 per
+slice. Not measured: 1M-point timings. Operational.
+
 ## Acceptance criteria
-- [ ] gpu;vulkan parity smoke per method: the accepted rows (LOP positions, k-means labels, keypoint scores / masks) and FPS's published order / mask equal the CPU reference within a stated, justified tolerance.
-- [ ] IO counters: a second run on the same input revision uploads zero input bytes (the residency reports uploads, hits and any declared CPU-stage bytes in the result and the agent output).
-- [ ] Panel Accept / Discard for LOP, k-means and keypoints (Accept disabled with its reason when stale); FPS publishes on completion as today; batch and agent commands accept automatically.
-- [ ] `method.engine-integration` publication row states "GPU preview: yes/no; commit via X" and the method docs record the backend identity and parity delta.
-- [ ] Each of the four methods moves data only at start (resident input) and end (Accept readback or the terminal publication).
+- [x] gpu;vulkan parity smoke per method: the accepted rows (LOP positions, k-means labels, keypoint scores / masks) and FPS's published order / mask equal the CPU reference within a stated, justified tolerance.
+- [x] IO counters: a second run on the same input revision uploads zero input bytes (the residency reports uploads, hits and any declared CPU-stage bytes in the result and the agent output).
+- [x] Panel Accept / Discard for LOP, k-means and keypoints (Accept disabled with its reason when stale); FPS publishes on completion as today; batch and agent commands accept automatically.
+- [x] `method.engine-integration` publication row states "GPU preview: yes/no; commit via X" and the method docs record the backend identity and parity delta.
+- [x] Each of the four methods moves data only at start (resident input) and end (Accept readback or the terminal publication).
 
 ## Current implementation slice and remaining work
 
@@ -112,3 +132,13 @@ DISPLAY=:7 ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu|vulkan' 
   initializer can already be EM's fixed point. Reviewed by Codex and Claude Opus 5.5 (serial
   reduction P1, retired-resource shutdown P1 and all P2s fixed). Not yet measured: 1M-point
   timing. Remaining: keypoints.
+
+- 2026-10-01 (slice 4: keypoints). Resident index/position views retained through completion;
+  spacing, covariance and suppression page at <= 2^24 pairs per submission (16,384 rows x 1,024
+  visits, 6 MiB resume state) with immediate completions; full Vulkan no longer restarts on
+  capacity overflow (the hybrid backend keeps its overflow refusal). Score/mask rings are
+  reserved at admission; Accept converts to the configured storage and publishes through the
+  atomic keypoint publisher via `PointScalarTransaction`'s companion field. Duplicate requests
+  terminate busy. Gates: 11 keypoint Vulkan cases, score Linf 0; full CPU 5470/5470. An
+  intermediate round broke float radius membership (double comparisons) and was reverted to
+  canonical float semantics with CPU regressions. Reviewed by Codex and Claude Opus 5.5.

@@ -31,15 +31,15 @@ own compute and only swaps its input upload and terminal readback for the reside
 | Task | Method | Input | Output / preview | CPU stage today | GPU port effort |
 |---|---|---|---|---|---|
 | done (GRAPHICS-154) | SpatialIndexCache users (index build) | residency (GRAPHICS-154) | index stays GPU-local | none | - |
-| RUNTIME-296 (active) | Vertex normals (face-weighted, face normals) | residency + face indices | normal ring | everything (CPU only today) | small: face-normal kernel, then a per-vertex gather over a vertex->face CSR kept per topology revision (deterministic, no float atomics) |
-| RUNTIME-297 | Outliers (statistical, radius, LDR, remove) | residency via LBVH | score/mask ring | reductions on downloaded neighborhoods | small: per-point kNN/radius-count kernels, fixed-order mean/std reduction, stream compaction for removal |
-| RUNTIME-298 | Kernel density, point spacing, density weights | residency via LBVH | scalar ring | reductions on downloaded neighborhoods | small: one kernel over LBVH neighbors |
-| RUNTIME-299 | Point-set PCA normals | residency via LBVH | normal ring | covariance and orientation | small for unoriented/viewpoint (closed-form 3x3 eigen); MST orientation stays CPU (parallel Boruvka later) |
-| RUNTIME-300 | LOP (fully GPU) | residency, stride-12 kernels | position ring, preview every k iterations | none | - |
-| RUNTIME-300 | k-means | residency, stride-12 kernel | labels ring (colormap preview) | none | - |
-| RUNTIME-300 | FPS | residency -> double on device | order/mask | none | completion-only submit replaces the interim double |
+| done (RUNTIME-296) | Vertex normals (face-weighted, face normals) | residency + face indices | normal ring | everything (CPU only today) | small: face-normal kernel, then a per-vertex gather over a vertex->face CSR kept per topology revision (deterministic, no float atomics) |
+| done (RUNTIME-297) | Outliers (statistical, radius, LDR, remove) | residency via LBVH | score/mask ring | reductions on downloaded neighborhoods | small: per-point kNN/radius-count kernels, fixed-order mean/std reduction, stream compaction for removal |
+| done (RUNTIME-298) | Kernel density, point spacing, density weights | residency via LBVH | scalar ring | reductions on downloaded neighborhoods | small: one kernel over LBVH neighbors |
+| done (RUNTIME-299) | Point-set PCA normals | residency via LBVH | normal ring | covariance and orientation | small for unoriented/viewpoint (closed-form 3x3 eigen); MST orientation stays CPU (parallel Boruvka later) |
+| done (RUNTIME-300) | LOP (fully GPU) | residency, stride-12 kernels | position ring, preview every k iterations | none | - |
+| done (RUNTIME-300) | k-means | residency, stride-12 kernel | labels ring (colormap preview) | none | - |
+| done (RUNTIME-300) | FPS | residency -> double on device | order/mask | none | completion-only submit replaces the interim double |
 | done (RUNTIME-292) | PropertyFilter, implicit CG | residency (RUNTIME-292) | typed ring | CG reports (Observe needs Done) | - |
-| RUNTIME-300 | Keypoints | index views | score/mask ring | none | - |
+| done (RUNTIME-300) | Keypoints | index views | score/mask ring | none | - |
 | RUNTIME-301 | Bilateral | residency | position ring | update per pass | small-medium: kernel per pass, GPU LBVH rebuild |
 | RUNTIME-302 | FPFH | residency + normals | descriptor ring | SPFH/FPFH | medium: two kernels (SPFH per point, weighted FPFH sum) |
 | RUNTIME-303 | WLOP / CLOP | residency | position ring | projection per iteration | medium: neighbor sums per iteration |

@@ -192,19 +192,24 @@ namespace Extrinsic::Sandbox::Editor
             const auto snapshot=Runtime::SnapshotEditorPointScalar(commands,run);
             const auto phase=snapshot.Phase;
             const bool active=phase==Runtime::EditorGpuTransactionPhase::Running||phase==Runtime::EditorGpuTransactionPhase::Accepting||phase==Runtime::EditorGpuTransactionPhase::ReadyToAccept;
+            // External producers deliver their diagnostics through their own completion sink.
+            constexpr bool scalarDiagnostics=requires { Runtime::UpdateEditorPointScalarResult(*state.LastResult,snapshot); };
             if(!active){
-                if(state.LastResult){auto result=*state.LastResult;Runtime::UpdateEditorPointScalarResult(result,snapshot);
-                    PublishCommandResult(state.LastResult,std::move(result),sink);}
+                if constexpr(scalarDiagnostics) {
+                    if(state.LastResult){auto result=*state.LastResult;Runtime::UpdateEditorPointScalarResult(result,snapshot);
+                        PublishCommandResult(state.LastResult,std::move(result),sink);}
+                }
                 run.reset();return false;}
             ImGui::TextWrapped("%s",snapshot.Message.c_str());
-            ImGui::Text("Input upload: %llu bytes; residency hits: %llu; CPU readback: %llu bytes",
-                static_cast<unsigned long long>(snapshot.GpuInputUploadBytes),static_cast<unsigned long long>(snapshot.GpuInputCacheHits),static_cast<unsigned long long>(snapshot.CpuStageReadbackBytes));
+            if constexpr(scalarDiagnostics)
+                ImGui::Text("Input upload: %llu bytes; residency hits: %llu; CPU readback: %llu bytes",
+                    static_cast<unsigned long long>(snapshot.GpuInputUploadBytes),static_cast<unsigned long long>(snapshot.GpuInputCacheHits),static_cast<unsigned long long>(snapshot.CpuStageReadbackBytes));
             if(phase==Runtime::EditorGpuTransactionPhase::ReadyToAccept){
                 ImGui::BeginDisabled(!snapshot.CanAccept);
                 if(ImGui::Button("Accept"))(void)Runtime::AcceptEditorPointScalar(commands,run);
                 ImGui::EndDisabled();
                 if(!snapshot.AcceptRefusalReason.empty())ImGui::TextWrapped("%s",snapshot.AcceptRefusalReason.c_str());}
-            if(ImGui::Button("Discard"))Runtime::DiscardEditorPointScalar(commands,run);
+            if(ImGui::Button(phase==Runtime::EditorGpuTransactionPhase::Running?"Stop":"Discard"))Runtime::DiscardEditorPointScalar(commands,run);
             return true;
         }
 
@@ -430,7 +435,7 @@ namespace Extrinsic::Sandbox::Editor
             std::make_shared<std::optional<Runtime::EditorNormalEstimationResult>>()};
         OutliersState Outliers{};
         Runtime::EditorOutlierTransactionHandle OutlierTransaction{};
-        Runtime::EditorPointScalarTransactionHandle DensityTransaction{}, SpacingTransaction{}, WeightTransaction{};
+        Runtime::EditorPointScalarTransactionHandle DensityTransaction{}, SpacingTransaction{}, WeightTransaction{}, KeypointTransaction{};
         KeypointsState Keypoints{};
         DescriptorsState Descriptors{};
         DensityState Density{};
@@ -672,6 +677,8 @@ namespace Extrinsic::Sandbox::Editor
         OutlierTransaction.reset();
         for(auto* run:{&DensityTransaction,&SpacingTransaction,&WeightTransaction}){Runtime::DiscardEditorPointScalar({},*run);run->reset();}
         Outliers = {};
+        if(KeypointTransaction)Runtime::DiscardEditorPointScalar({},KeypointTransaction);
+        KeypointTransaction.reset();
         Keypoints = {};
         Descriptors = {};
         Density = {};
@@ -2264,24 +2271,34 @@ namespace Extrinsic::Sandbox::Editor
         changed |= ImGui::InputDouble("Eigenvalue ratio 3 / 2",&config.Gamma32);
         changed |= ImGui::InputScalar("Minimum neighbors",ImGuiDataType_U32,&config.MinimumNeighbors);
         ImGui::TextWrapped("Centroid-PCA saliency with radius suppression. Automatic radii use 6 and 4 times mean nearest-neighbor spacing. Equal scores keep the lowest source index.");
-        if(config.Backend==Runtime::KeypointAnalysisBackend::VulkanLBVH || config.Backend==Runtime::KeypointAnalysisBackend::VulkanCompute)
+        if(config.Backend==Runtime::KeypointAnalysisBackend::VulkanLBVH)
         {
             changed |= ImGui::InputScalar("GPU query batch size",ImGuiDataType_U32,&config.GpuQueryBatchSize);
             changed |= ImGui::InputScalar("Complete radius capacity",ImGuiDataType_U32,&config.GpuRadiusCapacity);
-            ImGui::TextWrapped("Radius support must fit the selected capacity (up to 1024). Overflow retains previous outputs.");
-            ImGui::TextWrapped("%s",config.Backend==Runtime::KeypointAnalysisBackend::VulkanCompute?
-                "Spacing, covariance, saliency and suppression run on Vulkan. Requires shader double precision.":
-                "Only neighborhood queries run on Vulkan; scale, covariance and suppression run on CPU.");
+            ImGui::TextWrapped("Neighborhood queries require complete support within capacity; scale, covariance and suppression run on CPU.");
         }
+        else if(config.Backend==Runtime::KeypointAnalysisBackend::VulkanCompute)
+            ImGui::TextWrapped("Spacing, covariance, saliency and suppression run on Vulkan in bounded traversal pages. Requires shader double precision.");
+        const bool keypointActive=DrawPointScalarTransaction(context.PointAnalysis.Commands,
+            KeypointTransaction,Keypoints,context.PointAnalysis.ResultSinks.KeypointAnalysis);
+        ImGui::BeginDisabled(keypointActive);
         DrawProcessingExecution(context.PointAnalysis.Commands, Keypoints, changed,
             [&](const auto& request) { return Runtime::PreviewEditorKeypointAnalysisCommand(context.PointAnalysis.Commands, request); },
             [&](const auto& request) { return Runtime::ApplyEditorKeypointAnalysisConfig(context.PointAnalysis.Commands, request); },
-            [&] { return Runtime::ApplyEditorConfiguredKeypointAnalysis(context.PointAnalysis.Commands, context.PointAnalysis.ResultSinks.KeypointAnalysis); },
+            [&] {
+                if(config.Backend==Runtime::KeypointAnalysisBackend::VulkanCompute) {
+                    Runtime::EditorKeypointAnalysisResult result;
+                    KeypointTransaction=Runtime::StartEditorKeypointAnalysisTransaction(context.PointAnalysis.Commands,config,result,context.PointAnalysis.ResultSinks.KeypointAnalysis);
+                    return result;
+                }
+                return Runtime::ApplyEditorConfiguredKeypointAnalysis(context.PointAnalysis.Commands, context.PointAnalysis.ResultSinks.KeypointAnalysis);
+            },
             context.PointAnalysis.ResultSinks.KeypointAnalysis, "Detect keypoints",
             "Controls were rejected by keypoint config validation.", "Keypoint config was rejected.");
+        ImGui::EndDisabled();
         ImGui::TextWrapped("Detection writes a mask (1 = retained keypoint) and a score. Geometry stays in source order.");
         if(Keypoints.LastResult && Keypoints.LastResult->Status==Runtime::EditorCommandStatus::Pending)
-            ImGui::TextWrapped("Detection is still active. New saliency and mask properties become available when it finishes.");
+            ImGui::TextWrapped("Detection is active. Vulkan previews the completed score; Accept publishes both CPU properties.");
         auto mask=config.Mask,
              score=config.Score;
         if(ImGui::Button("Show mask"))
@@ -2296,6 +2313,9 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::Separator();
             ImGui::Text("Status: %s",Runtime::DebugNameForEditorCommandStatus(result.Status));
             ImGui::Text("Requested: %s; ran: %s",Runtime::ToString(result.RequestedBackend),result.ActualBackend.c_str());
+            ImGui::Text("Implementation: %s",result.ImplementationId.c_str());
+            ImGui::Text("Input upload: %llu; cache hits: %llu; CPU upload/readback: %llu / %llu bytes",
+                (unsigned long long)result.GpuInputUploadBytes,(unsigned long long)result.GpuInputCacheHits,(unsigned long long)result.CpuStageUploadBytes,(unsigned long long)result.CpuStageReadbackBytes);
             ImGui::Text("Live / total: %zu / %zu; keypoints: %zu",result.LiveCount,result.SlotCount,result.KeypointCount);
             ImGui::Text("Spacing: %.5g; salient / suppression radii: %.5g / %.5g",double(result.MeanSpacing),double(result.SalientRadius),double(result.NonMaxRadius));
             ImGui::Text("GPU %s: %zu; largest indexed support: %zu",

@@ -350,7 +350,7 @@ namespace Extrinsic::Runtime
         }
         // Private recording path: the queue participant is the only caller. Records a
         // lazy GPU build then queries into batch-owned buffers; never silently runs CPU.
-        bool RecordBuild(SpatialIndexHandle handle, RHI::ICommandContext& commands)
+        bool RecordBuild(SpatialIndexHandle handle, RHI::ICommandContext& commands, std::uint64_t* hostBytes = nullptr)
         {
             auto& s = *this;
             auto* e = s.Find(handle);
@@ -411,6 +411,7 @@ namespace Extrinsic::Runtime
                     if (!e->ResidentPoints && !e->GatherSource)
                         s.Device->WriteBuffer(e->Points, e->Snapshot->Index.Points().data(), e->Snapshot->Slots.size() * 12);
                     s.Device->WriteBuffer(e->Mapping, e->Snapshot->Slots.data(), e->Snapshot->Slots.size() * 4);
+                    if(hostBytes)*hostBytes+=e->Snapshot->Slots.size()*(4+(!e->ResidentPoints&&!e->GatherSource?12:0));
                 }
             }
             else if (e->GpuStale)
@@ -485,7 +486,7 @@ namespace Extrinsic::Runtime
                         if (work->Result->State != SpatialQueryState::Queued) continue;
                         if (!work->Target)
                             work->Output = work->Record(commands, {});
-                        else if (auto& e = *work->Target; m_Impl->RecordBuild({e.Id}, commands))
+                        else if (auto& e = *work->Target; m_Impl->RecordBuild({e.Id}, commands, &work->Result->CpuStageUploadBytes))
                             work->Output = work->Record(commands,
                                 {e.Gpu->View().NodesBDA,
                                  m_Impl->Device->GetBufferDeviceAddress(e.Points),

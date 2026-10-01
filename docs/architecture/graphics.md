@@ -47,6 +47,10 @@ Graphics is organized into explicit sublayers:
   VertexNormals additionally defines the packed topology bundle
   (`PackVertexNormalsTopology` / `UnpackVertexNormalsTopologyLayout`) the runtime keeps
   resident per topology revision (RUNTIME-296).
+  `PointKeypoints` consumes resident position views and output rings, retaining at most
+  one page of resumable traversal state. Runtime drives completion-gated pages and
+  owns the paired scalar transaction; [keypoint analysis](keypoint-analysis.md)
+  defines the visit/reduction budgets and natural score preview point.
   `PointScalarAnalysis` records density, spacing and compact-weight kernels from
   `GpuPropertyView` inputs into resident float rings over the shared LBVH query.
   Runtime owns their [scalar transaction and publication](property-coherence.md#resident-density-spacing-and-density-weights);

@@ -23,21 +23,23 @@ namespace Extrinsic::Graphics
             std::uint32_t Count{}, First{}, QueryCount{}, MinimumNeighbors{};
             float SalientRadius{}, NonMaxRadius{};
             double Gamma21{}, Gamma32{};
-            std::uint32_t Capacity{}, Mode{};
+            std::uint32_t Reserved{}, Mode{};
+            std::uint64_t States{}, Scores{}, Masks{};
+            std::uint32_t Visits{}, Resume{};
         };
-        static_assert(sizeof(Push) == 88 && offsetof(Push, Gamma21) == 64);
-        static_assert(sizeof(PointKeypointHeader) == 32 && sizeof(PointKeypointValue) == 8);
+        static_assert(sizeof(Push) == 120 && offsetof(Push, Gamma21) == 64);
+        static_assert(sizeof(PointKeypointHeader) == 32);
     }
     struct PointKeypointWorkspace::Impl
     {
         RHI::IDevice& Device;
         RHI::PipelineHandle Pipeline{};
-        RHI::BufferHandle Scratch{}, Output{};
+        RHI::BufferHandle Scratch{}, Output{}, States{};
         std::uint32_t Capacity{};
         explicit Impl(RHI::IDevice& device) : Device(device) {}
         ~Impl()
         {
-            for (auto buffer : {Scratch, Output})
+            for (auto buffer : {Scratch, Output, States})
                 if (buffer.IsValid()) Device.DestroyBuffer(buffer);
             if (Pipeline.IsValid()) Device.DestroyPipeline(Pipeline);
         }
@@ -55,57 +57,67 @@ namespace Extrinsic::Graphics
                     .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc | RHI::BufferUsage::TransferDst,
                     .HostVisible = true, .DebugName = "PointKeypoints.Workspace"});
             };
-            const auto scratch = allocate(std::uint64_t(count) * 8);
-            const auto output = allocate(sizeof(PointKeypointHeader) + std::uint64_t(count) * sizeof(PointKeypointValue));
-            if (!scratch.IsValid() || !output.IsValid())
+            const auto scratch = allocate((std::uint64_t(count) + (count+4095)/4096) * 8);
+            const auto states = allocate(std::uint64_t(std::min(count,16384u)) * 384);
+            const auto output = allocate(sizeof(PointKeypointHeader) + std::uint64_t(count) * 8);
+            if (!scratch.IsValid() || !output.IsValid() || !states.IsValid())
             {
                 if (scratch.IsValid()) Device.DestroyBuffer(scratch);
+                if (states.IsValid()) Device.DestroyBuffer(states);
                 if (output.IsValid()) Device.DestroyBuffer(output);
                 return false;
             }
-            for (auto buffer : {Scratch, Output})
+            for (auto buffer : {Scratch, Output, States})
                 if (buffer.IsValid()) Device.DestroyBuffer(buffer);
-            Scratch = scratch; Output = output; Capacity = count;
+            Scratch = scratch; Output = output; States = states; Capacity = count;
             return true;
         }
     };
     PointKeypointWorkspace::PointKeypointWorkspace(RHI::IDevice& device) : m_Impl(std::make_unique<Impl>(device)) {}
     PointKeypointWorkspace::~PointKeypointWorkspace() = default;
-    RHI::BufferHandle PointKeypointWorkspace::Record(RHI::ICommandContext& commands,
-        std::uint64_t nodes, std::uint64_t points, std::uint64_t slots,
-        std::uint32_t count, const PointKeypointParams& params)
+    RHI::BufferHandle PointKeypointWorkspace::RecordPage(RHI::ICommandContext& commands,
+        std::uint64_t nodes, const GpuPropertyView& positions, std::uint64_t slots,
+        std::uint32_t count, const PointKeypointParams& params, const PointKeypointPage& page,
+        const GpuPropertyView& score, const GpuPropertyView& mask)
     {
         auto& s = *m_Impl;
-        if (!nodes || !points || !slots || count < 2 || count > (1u << 20) ||
-            params.MinimumNeighbors >= count || !params.RadiusCapacity || params.RadiusCapacity > 1024 ||
-            !params.BatchSize || params.BatchSize > 16384 ||
-            !std::isfinite(params.Gamma21) || !std::isfinite(params.Gamma32) ||
-            params.Gamma21 < 0 || params.Gamma21 > 1 || params.Gamma32 < 0 || params.Gamma32 > 1 ||
-            !std::isfinite(params.SalientRadius) || !std::isfinite(params.NonMaxRadius) ||
-            params.SalientRadius < 0 || params.NonMaxRadius < 0 ||
-            params.SalientRadius > 1e18f || params.NonMaxRadius > 1e18f || !s.Reserve(count)) return {};
-        const PointKeypointHeader header{};
-        s.Device.WriteBuffer(s.Output, &header, sizeof(header));
-        Push push{nodes, points, slots, s.Device.GetBufferDeviceAddress(s.Scratch),
-            s.Device.GetBufferDeviceAddress(s.Output), count, 0, count, params.MinimumNeighbors,
-            params.SalientRadius, params.NonMaxRadius, params.Gamma21, params.Gamma32, params.RadiusCapacity};
-        if (!push.Scratch || !push.Output) return {};
-        commands.BufferBarrier(s.Output, RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderRead,
-                               RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite);
-        commands.BindPipeline(s.Pipeline);
-        for (push.Mode = 0; push.Mode != 4; ++push.Mode)
-        {
-            for (push.First = 0; push.First < count; push.First += params.BatchSize)
-            {
-                push.QueryCount = std::min(params.BatchSize, count - push.First);
-                commands.PushConstants(&push, sizeof(push), 0);
-                commands.Dispatch(push.Mode == 1 ? 1 : (push.QueryCount + 63) / 64, 1, 1);
-                if (push.Mode == 1) break;
-            }
-            for (auto buffer : {s.Scratch, s.Output})
-                commands.BufferBarrier(buffer, RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite,
-                    RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite | RHI::MemoryAccess::TransferRead);
+        if (!nodes || !positions.Address || positions.Layout.ElementBytes()!=12 || !slots || count<2 || params.MinimumNeighbors>=count ||
+            !page.Rows || page.First>=count || page.Rows>count-page.First || !page.Visits || page.Visits>1024 ||
+            ((page.Mode==0 || page.Mode==2 || page.Mode==3) &&
+                (page.Rows>16384 || std::uint64_t(page.Rows)*page.Visits>(1u<<24u))) ||
+            !std::isfinite(params.Gamma21) || params.Gamma21<0 || params.Gamma21>1 ||
+            !std::isfinite(params.Gamma32) || params.Gamma32<0 || params.Gamma32>1 ||
+            !std::isfinite(params.SalientRadius) || params.SalientRadius<0 || params.SalientRadius>1e18f ||
+            !std::isfinite(params.NonMaxRadius) || params.NonMaxRadius<0 || params.NonMaxRadius>1e18f ||
+            (page.Mode==4 && (!score.Address || !mask.Address)) ||
+            page.Mode>5 || !s.Reserve(count)) return {};
+        // Only reset the page's unfinished count. All writes occur after the previous
+        // completion; scale/error/count survive across pages and stages.
+        if (page.Mode==0 && page.First==0 && !page.Resume) {
+            const PointKeypointHeader header{};
+            s.Device.WriteBuffer(s.Output,&header,sizeof(header));
+        } else {
+            const std::uint32_t zero{};
+            s.Device.WriteBuffer(s.Output,&zero,sizeof(zero),offsetof(PointKeypointHeader,Reserved));
+            if(page.Mode==2 && page.First==0 && !page.Resume)s.Device.WriteBuffer(s.Output,&zero,sizeof(zero));
         }
+        Push push{nodes,positions.Address,slots,s.Device.GetBufferDeviceAddress(s.Scratch),
+            s.Device.GetBufferDeviceAddress(s.Output),count,page.First,page.Rows,params.MinimumNeighbors,
+            params.SalientRadius,params.NonMaxRadius,params.Gamma21,params.Gamma32,0,page.Mode,
+            s.Device.GetBufferDeviceAddress(s.States),score.Address,mask.Address,page.Visits,page.Resume};
+        if (!push.Scratch || !push.Output || !push.States) return {};
+        for(auto buffer:{s.Output,s.Scratch,s.States})
+            commands.BufferBarrier(buffer,RHI::MemoryAccess::TransferWrite|RHI::MemoryAccess::ShaderWrite,
+                RHI::MemoryAccess::ShaderRead|RHI::MemoryAccess::ShaderWrite);
+        commands.BufferBarrier(positions.Buffer,RHI::MemoryAccess::TransferWrite,RHI::MemoryAccess::ShaderRead);
+        commands.BindPipeline(s.Pipeline);
+        commands.PushConstants(&push,sizeof(push),0);
+        commands.Dispatch(page.Mode==1?1:page.Mode==5?(page.Rows+4095)/4096:(page.Rows+63)/64,1,1);
+        for(auto buffer:{s.Output,s.Scratch,s.States})
+            commands.BufferBarrier(buffer,RHI::MemoryAccess::ShaderWrite,
+                RHI::MemoryAccess::ShaderRead|RHI::MemoryAccess::TransferRead);
+        if(page.Mode==4)for(auto buffer:{score.Buffer,mask.Buffer})
+            commands.BufferBarrier(buffer,RHI::MemoryAccess::ShaderWrite,RHI::MemoryAccess::ShaderRead|RHI::MemoryAccess::TransferRead);
         return s.Output;
     }
 }

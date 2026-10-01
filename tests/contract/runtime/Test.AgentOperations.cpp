@@ -52,6 +52,8 @@ TEST(AgentOperations, EditorOperationsHaveUniqueNamesAndValidSchemas)
     R::AgentOperationRegistry registry;
     R::RegisterEditorAgentOperations(registry);
     EXPECT_GE(registry.Entries().size(), 15u);
+    ASSERT_NE(registry.Find("run_keypoint_analysis"),nullptr);
+    EXPECT_FALSE(registry.Find("run_keypoint_analysis")->ReadOnly);
     for (const auto& spec : registry.Entries())
     {
         SCOPED_TRACE(spec.Name);

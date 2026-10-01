@@ -86,6 +86,27 @@ TEST(KeypointAnalysis, RejectsMalformedSupportAndUnrepresentableInputs)
     bad=p;bad.SalientRadius=std::numeric_limits<float>::max();EXPECT_FALSE(F::AnalyzeKeypoints(AxisSamples,bad));
     EXPECT_FALSE(F::AnalyzeKeypoints(std::vector<glm::vec3>(7),p));
 }
+TEST(KeypointAnalysis, SuppliedSupportPreservesFloatRadiusBoundaryAndSuppressionTies)
+{
+    const std::vector<glm::vec3> points{{0,0,0},{.3f,.4f,0},{-.1f,0,0},
+        {0,-.1f,0},{-.1f,-.1f,0},{.1f,-.1f,0},{std::nextafter(.5f,1.f),0,0}};
+    const auto delta=glm::dvec3(points[1])-glm::dvec3(points[0]);
+    ASSERT_EQ(glm::dot(points[1],points[1]),.25f);
+    ASSERT_GT(glm::dot(delta,delta),.25);
+    for(float salient:{2.f,.5f})
+    {
+        const F::KeypointParams p{.SalientRadius=salient,.NonMaxRadius=.5f,
+            .Gamma21=1,.Gamma32=1,.MinNeighbors=1};
+        const auto reference=F::AnalyzeKeypoints(points,p);ASSERT_TRUE(reference);
+        const auto rows=CompleteRows(points,salient);
+        const auto supplied=F::AnalyzeKeypointsFromNeighbors(points,p,reference->Scale,rows);
+        ASSERT_TRUE(supplied);
+        EXPECT_EQ(supplied->Mask,reference->Mask);
+        EXPECT_EQ(supplied->Saliency,reference->Saliency);
+        EXPECT_EQ(supplied->Mask[0],1u);
+        EXPECT_EQ(supplied->Mask[1],0u);
+    }
+}
 TEST(KeypointAnalysis, CloudSpacingUsesNearestLivePointsAndRemapsOriginalSlots)
 {
     Geometry::PointCloud::Cloud sparse;
@@ -120,4 +141,15 @@ TEST(KeypointAnalysis, CollinearRoundoffCannotCreateSecondEigenvalueCandidates)
         .Gamma21=1,.Gamma32=1,.MinNeighbors=5});
     ASSERT_TRUE(result);EXPECT_TRUE(result->Keypoints.Indices.empty());
     for(auto value:result->Saliency)EXPECT_EQ(value,0);
+}
+
+TEST(KeypointAnalysis, SubnormalFloatRadiusMembershipAndScoresRemainRepresentable)
+{
+    const std::vector<glm::vec3> points{{0,0,0},{1e-20f,0,0},{0,1e-20f,0},{0,0,1e-20f}};
+    const auto result=F::AnalyzeKeypoints(points,{.SalientRadius=2e-20f,.NonMaxRadius=2e-20f,
+        .Gamma21=1,.Gamma32=1,.MinNeighbors=1});
+    ASSERT_TRUE(result);
+    EXPECT_GT(result->Scale.MeanSpacing,0);
+    EXPECT_EQ(std::fpclassify(result->Saliency[0]),FP_SUBNORMAL);
+    EXPECT_EQ(result->Keypoints.Indices,(std::vector<std::uint32_t>{0}));
 }

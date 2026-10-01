@@ -23,6 +23,9 @@
 #include <glm/gtc/quaternion.hpp>
 #include <gtest/gtest.h>
 
+import Extrinsic.Runtime.AgentOperations;
+import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.NormalOperations;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.RegistrationOperations;
@@ -2727,4 +2730,40 @@ TEST_F(EditorPointReadiness, BoundMeshFieldsDiscardSupersededAndDetachedChecks)
     EXPECT_FALSE(preview().Enabled);
     Drain();
     EXPECT_TRUE(preview().Enabled);
+}
+
+namespace
+{
+    class EditorKeypointAgent : public EditorPointReadiness
+    {
+        void SetUp() override
+        {
+            Runtime::RuntimeEngineConfigSectionRegistry sections;
+            ASSERT_TRUE(sections.Register(Runtime::MakeKeypointAnalysisConfigSectionRegistration()));
+            Engine.EmplaceModule<Runtime::EngineConfigControl>(std::move(sections));
+            EditorPointReadiness::SetUp();
+        }
+    };
+}
+TEST_F(EditorKeypointAgent, AgentOperationDuplicateKeypointRequestTerminatesBusy)
+{
+    ASSERT_TRUE(Runtime::ApplyEditorKeypointAnalysisConfig(Commands,Keypoints).Succeeded());
+    Runtime::AgentOperationRegistry registry;
+    Runtime::RegisterEditorAgentOperations(registry);
+    const Runtime::AgentOperationContext context{.Attachment=&Attachment};
+    auto first=Runtime::InvokeAgentOperation(registry,"run_keypoint_analysis",context,"{}",false);
+    ASSERT_TRUE(first.Continuation)<<first.Text;
+    const auto duplicate=Runtime::InvokeAgentOperation(registry,"run_keypoint_analysis",context,"{}",false);
+    EXPECT_TRUE(duplicate.IsError)<<duplicate.Text;
+    EXPECT_FALSE(duplicate.Continuation);
+    EXPECT_NE(duplicate.Text.find("already active"),std::string::npos)<<duplicate.Text;
+    bool completed=false;
+    const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(5);
+    FrameProbe->OnFrame=[&] {
+        Runtime::AgentOperationOutcome result;
+        if(first.Continuation(context,result)) {
+            completed=true;EXPECT_FALSE(result.IsError)<<result.Text;Engine.RequestExit();
+        } else if(std::chrono::steady_clock::now()>deadline)Engine.RequestExit();
+    };
+    Engine.Run();EXPECT_TRUE(completed);
 }

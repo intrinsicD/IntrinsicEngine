@@ -38,6 +38,9 @@ export namespace Extrinsic::Runtime
         std::string Label{};
         std::function<bool()> Current{};
         std::function<EditorCommandStatus(std::span<const std::byte>)> Publish{};
+        // Optional second typed field; the callback publishes both in one history entry.
+        std::optional<GeometryPropertyRef> Companion{};
+        std::function<EditorCommandStatus(std::span<const std::byte>, std::span<const std::byte>)> PublishPair{};
     };
     [[nodiscard]] EditorPointScalarTransactionHandle BeginEditorPointScalarPublication(
         const EditorProcessingCommands&, EditorPointScalarPublication,
@@ -45,7 +48,7 @@ export namespace Extrinsic::Runtime
         std::function<void(EditorPointScalarTransactionSnapshot)> sink = {});
     struct EditorPointScalarBack
     {
-        Graphics::GpuPropertyView Typed{}, Presentation{};
+        Graphics::GpuPropertyView Typed{}, Presentation{}, Companion{};
     };
     [[nodiscard]] std::optional<EditorPointScalarBack> AcquireEditorPointScalarBack(
         const EditorPointScalarTransactionHandle&);
