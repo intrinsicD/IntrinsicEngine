@@ -184,6 +184,10 @@ namespace Extrinsic::Runtime
             double alpha,
             EditorInputCaptureSnapshot& editorCapture,
             RuntimeFramePacingDiagnostics& pacing);
+        // Minimized frame: only runs when a module registered an Idle hook.
+        void RunMinimizedFrameWork(
+            EditorInputCaptureSnapshot& editorCapture,
+            RuntimeFramePacingDiagnostics& pacing);
         void AnnounceRuntimeShutdown();
         void ShutdownRuntimeModules();
         void RefreshActiveWorldScenePointer() noexcept;

@@ -33,11 +33,18 @@ local-only.
 
 The socket thread only frames newline-delimited JSON-RPC and queues messages
 (at most 64 pending; more get a `-32000` busy reply; a message above 8 MiB drops
-the client). The module's `UiBuild` frame hook attaches its own editor workspace
-attachment on first use and handles at most `MaxCallsPerFrame` (default 4)
-messages per frame on the main thread. Responses go back through the socket
-thread; responses for a dropped client are discarded. Nothing exists without the
-launch flag: no module, thread or socket.
+the client). The module registers one drain for the `UiBuild` frame phase and one for
+`FramePhase::Idle`, which the engine runs only on minimized frames (they skip every other
+phase). The drain attaches its own editor workspace attachment on first use and handles at
+most `MaxCallsPerFrame` (default 4) messages per frame on the main thread, so calls are served
+while the window is minimized too. An Idle frame does only the command drain, event pump,
+Idle hooks, job completions, pump and reap: no simulation, extraction or rendering.
+Tools that need a presented frame (`view_screenshot`, `view_capture`) fail fast on a
+minimized frame with the error code `viewport_not_presentable`, also for a capture queued
+before the window was minimized (the capture itself still finishes later). A connection
+may have at most 16 deferred calls; `tools/call` beyond that gets `-32000 too many pending calls`
+before the tool runs. Responses go back through the socket thread; responses for a dropped client
+are discarded. Nothing exists without the launch flag: no module, thread or socket.
 
 ## Protocol
 

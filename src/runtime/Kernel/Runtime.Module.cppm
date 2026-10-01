@@ -49,6 +49,11 @@ namespace Extrinsic::Runtime
         // existing phase values stable while placing execution explicitly in
         // Engine::RunFrame rather than relying on enum order.
         Simulation,
+        // Runs only on minimized frames, which skip every other phase: after the command
+        // drain and event pump, before job completions are published. No simulation,
+        // extraction or rendering happens, so Idle hooks must not touch ImGui or the GPU.
+        // Opt-in; the engine skips the minimized-frame work when no Idle hook is registered.
+        Idle,
     };
     }
 

@@ -1,8 +1,9 @@
 // MCP server of the agent control lane (ARCH-019, RUNTIME-288). Opt-in: the Sandbox
 // creates it only for `--agent-socket`. A background thread owns the owner-only Unix
 // socket and newline-delimited JSON-RPC framing; every request runs on the main thread
-// in the UiBuild frame phase through the AgentOperationRegistry, so tools use the same
-// editor commands, history and config lane as the panels.
+// through the AgentOperationRegistry, in the UiBuild frame phase (or the Idle phase while
+// the window is minimized, where captures fail fast), so tools use the same editor
+// commands, history and config lane as the panels.
 module;
 
 #include <array>
@@ -45,6 +46,8 @@ export namespace Extrinsic::Runtime
         // Replies for deferred tool calls that finished this frame.
         [[nodiscard]] std::vector<std::string> PollPending(const AgentOperationContext& context);
         [[nodiscard]] std::size_t PendingCount() const noexcept { return m_Pending.size(); }
+        // tools/call is refused with -32000 while this many deferred calls are waiting.
+        static constexpr std::size_t kMaxPendingCalls = 16;
         void DropPending() noexcept { m_Pending.clear(); }
         [[nodiscard]] bool Initialized() const noexcept { return m_Initialized; }
         [[nodiscard]] const std::string& ClientName() const noexcept { return m_ClientName; }

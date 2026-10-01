@@ -46,6 +46,12 @@ Three separate regressions here (`BUG-027`, `BUG-037`, `BUG-054`). The invariant
 - On shutdown, keep runtime-owned GPU job resources (e.g. K-Means GPU queue)
   alive until **after** the device-idle wait, then tear down renderer/device.
   Emit an `[INFO]` breadcrumb on the close request.
+- A minimized window skips everything after `Resample()` (simulation, UI,
+  extraction, render, Maintenance). Only modules that registered a
+  `FramePhase::Idle` hook get the narrow minimized-frame path (command drain,
+  pump, Idle hooks, job completions, pump, reap); an Idle hook must not touch
+  ImGui or the GPU, and anything needing a presented frame (captures) must fail
+  fast there instead of waiting.
 
 ### 3. Pre-render transform flush after the fixed-step bundle
 

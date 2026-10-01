@@ -106,6 +106,8 @@ namespace Extrinsic::Runtime
         AgentOperationOutcome StartCapture(const AgentOperationContext& context, ViewCaptureRequest request,
                                            const bool returnImage)
         {
+            if (!context.ViewportPresentable)
+                return Fail("The Sandbox window is minimized; restore it to take screenshots.", "viewport_not_presentable");
             if (context.ViewCapture == nullptr) return Fail("Screenshots are not available in this Sandbox build.");
             if (auto reason = context.ViewCapture->UnavailableReason()) return Fail(std::move(*reason));
             request.KeepPng = returnImage;
@@ -115,7 +117,12 @@ namespace Extrinsic::Runtime
             {
                 if (ctx.ViewCapture == nullptr) { out = Fail("The capture service went away."); return true; }
                 const ViewCaptureStatus status = ctx.ViewCapture->Status(ticket);
-                if (status.State == ViewCaptureState::Queued || status.State == ViewCaptureState::Pending) return false;
+                if (status.State == ViewCaptureState::Queued || status.State == ViewCaptureState::Pending)
+                {
+                    if (ctx.ViewportPresentable) return false;
+                    out = Fail("The Sandbox window was minimized before the capture finished.", "viewport_not_presentable");
+                    return true;
+                }
                 if (status.State != ViewCaptureState::Completed)
                 {
                     out = Fail(status.Diagnostic.empty() ? "The capture was lost." : status.Diagnostic,

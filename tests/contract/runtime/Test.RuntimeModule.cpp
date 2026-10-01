@@ -18,6 +18,7 @@ import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.RenderFrameInput;
+import Extrinsic.Platform.Backend.Null;
 import Extrinsic.Platform.Input;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.CommandBus;
@@ -38,6 +39,7 @@ namespace RHI = Extrinsic::RHI;
 
 static_assert(static_cast<std::uint8_t>(Runtime::FramePhase::Maintenance) == 4u);
 static_assert(static_cast<std::uint8_t>(Runtime::FramePhase::Simulation) == 5u);
+static_assert(static_cast<std::uint8_t>(Runtime::FramePhase::Idle) == 6u);
 
 template <typename T>
 concept HasPhaseMember = requires(T value)
@@ -645,4 +647,75 @@ TEST(RuntimeSceneViewport, MapsWindowCursorToSceneLocalFramebufferPixels)
     EXPECT_FALSE(Runtime::MapWindowCursorToSceneViewport(350.0f, 30.0f, window, framebuffer, scene).Inside);
     EXPECT_FALSE(Runtime::MapWindowCursorToSceneViewport(
         std::numeric_limits<float>::infinity(), 30.0f, window, framebuffer, scene).Inside);
+}
+
+namespace
+{
+    struct IdleProbeState
+    {
+        int UiBuildFrames{0};
+        int UiEndFrames{0};
+        int IdleFrames{0};
+        int IdleFramesAtCommand{-1}; // Idle frames completed when the Idle-enqueued command ran
+        int IdleLimit{3};
+    };
+
+    struct IdleProbeCommand
+    {
+    };
+
+    class IdleProbeModule final : public Runtime::IRuntimeModule
+    {
+    public:
+        IdleProbeModule(IdleProbeState& state, Runtime::Engine& engine)
+            : m_State(state), m_Engine(engine) {}
+        [[nodiscard]] std::string_view Name() const noexcept override { return "Z.IdleProbe"; }
+        [[nodiscard]] Core::Result OnRegister(Runtime::EngineSetup& setup) override
+        {
+            setup.RegisterCommandHandler<IdleProbeCommand>(
+                [this](Runtime::CommandContext&, const IdleProbeCommand&) -> Runtime::CommandOutcome
+                {
+                    m_State.IdleFramesAtCommand = m_State.IdleFrames;
+                    return Runtime::CommandOutcome::Ok();
+                });
+            if (Core::Result hook = setup.RegisterFrameHook(Runtime::FramePhase::UiBuild,
+                    [this](Runtime::RuntimeFrameHookContext&)
+                    {
+                        // The first presented frame minimizes the window; later frames never reach UiBuild.
+                        if (++m_State.UiBuildFrames == 1)
+                            static_cast<Extrinsic::Platform::Backends::Null::NullWindow&>(m_Engine.GetWindow()).QueueResize(0, 0);
+                    });
+                !hook.has_value())
+                return hook;
+            if (Core::Result hook = setup.RegisterFrameHook(Runtime::FramePhase::UiEndCapture,
+                    [this](Runtime::RuntimeFrameHookContext&) { ++m_State.UiEndFrames; });
+                !hook.has_value())
+                return hook;
+            return setup.RegisterFrameHook(Runtime::FramePhase::Idle,
+                [this](Runtime::RuntimeFrameHookContext& context)
+                {
+                    if (m_State.IdleFrames == 0) context.Commands.Enqueue(IdleProbeCommand{});
+                    if (++m_State.IdleFrames >= m_State.IdleLimit) m_Engine.RequestExit();
+                });
+        }
+        void OnShutdown(Runtime::RuntimeModuleShutdownContext&) override {}
+
+    private:
+        IdleProbeState& m_State;
+        Runtime::Engine& m_Engine;
+    };
+}
+
+TEST(RuntimeModule, IdleHooksRunOnMinimizedFramesAndUiHooksDoNot)
+{
+    IdleProbeState state{};
+    Runtime::Engine engine(NullWindowHeadlessConfig());
+    engine.AddModule(std::make_unique<IdleProbeModule>(state, engine));
+    engine.Initialize();
+    engine.Run();
+    engine.Shutdown();
+    EXPECT_EQ(state.UiBuildFrames, 1) << "minimized frames skip UiBuild";
+    EXPECT_EQ(state.UiEndFrames, 1);
+    EXPECT_EQ(state.IdleFrames, 3);
+    EXPECT_EQ(state.IdleFramesAtCommand, 1) << "a command enqueued by an Idle hook is drained by the next minimized frame";
 }

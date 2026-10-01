@@ -56,6 +56,9 @@ export namespace Extrinsic::Runtime
         // Canonical absolute directories file arguments must stay inside.
         std::vector<std::string> AllowedRoots{};
         std::uint64_t FrameIndex{0};
+        // False on minimized frames: no frame is rendered, so captures fail fast with
+        // the error code "viewport_not_presentable" instead of waiting.
+        bool ViewportPresentable{true};
     };
 
     using AgentOperationInvoker =

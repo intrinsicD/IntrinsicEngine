@@ -148,6 +148,7 @@ namespace Extrinsic::Runtime
             if (nameIt == params.end() || !nameIt->is_string()) return Dump(ErrorResponse(id, -32602, "tools/call needs a tool name"));
             const auto name = nameIt->get<std::string>();
             if (m_Registry->Find(name) == nullptr) return Dump(ErrorResponse(id, -32602, "Unknown tool: " + name));
+            if (m_Pending.size() >= kMaxPendingCalls) return Dump(ErrorResponse(id, -32000, "too many pending calls"));
             const auto argsIt = params.find("arguments");
             const std::string arguments = argsIt != params.end() && argsIt->is_object() ? Dump(*argsIt) : "{}";
             auto outcome = InvokeAgentOperation(*m_Registry, name, context, arguments, m_ReadOnly);
@@ -257,7 +258,8 @@ namespace Extrinsic::Runtime
             client.Close();
         }
 
-        void Drain(RuntimeFrameHookContext& frame)
+        // `presentable` is false on minimized (Idle) frames.
+        void Drain(RuntimeFrameHookContext& frame, const bool presentable)
         {
             if (!AttachAttempted)
             {
@@ -272,6 +274,7 @@ namespace Extrinsic::Runtime
                 .ViewCapture = frame.Services.Find<ViewCaptureModule>(),
                 .AllowedRoots = Options.AllowedRoots,
                 .FrameIndex = frame.FrameIndex,
+                .ViewportPresentable = presentable,
             };
             {
                 // Deferred replies belong to the client that asked; a reconnect drops them.
@@ -361,8 +364,13 @@ namespace Extrinsic::Runtime
                             m_Impl->Options.ReadOnly ? " (read-only)" : "");
             m_Impl->Worker = std::thread([impl = m_Impl.get()] { impl->Run(); });
         }
-        return setup.RegisterFrameHook(FramePhase::UiBuild,
-                                       [impl = m_Impl.get()](RuntimeFrameHookContext& frame) { impl->Drain(frame); });
+        // Idle serves calls while the window is minimized and no UiBuild frame runs.
+        if (auto idle = setup.RegisterFrameHook(
+                FramePhase::Idle, [impl = m_Impl.get()](RuntimeFrameHookContext& frame) { impl->Drain(frame, false); });
+            !idle)
+            return idle;
+        return setup.RegisterFrameHook(
+            FramePhase::UiBuild, [impl = m_Impl.get()](RuntimeFrameHookContext& frame) { impl->Drain(frame, true); });
     }
 
     void AgentServerModule::OnShutdown(RuntimeModuleShutdownContext&) { m_Impl->Shutdown(); }

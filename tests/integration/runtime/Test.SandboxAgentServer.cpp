@@ -23,6 +23,7 @@ import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
+import Extrinsic.Platform.Backend.Null;
 import Extrinsic.Platform.LocalSocket;
 import Extrinsic.Runtime.AgentServer;
 import Extrinsic.Runtime.AsyncWorkModule;
@@ -250,6 +251,90 @@ TEST(SandboxAgentServer, ClientRunsSmoothingThroughTheSocketAndUndoesIt)
     EXPECT_EQ(lastApply.Source, R::RuntimeConfigControlSource::AgentCli) << "config_apply records the agent as the source";
     engine.Shutdown();
     EXPECT_FALSE(std::filesystem::exists(socketPath)) << "the socket file is removed on shutdown";
+}
+
+namespace
+{
+    // Idle-phase probe: minimized frames skip the Driver's UiBuild hook, so exit is decided here.
+    class IdleExit final : public R::IRuntimeModule
+    {
+    public:
+        IdleExit(std::atomic_bool& done, R::Engine& engine) : m_Done(done), m_Engine(engine) {}
+        [[nodiscard]] std::string_view Name() const noexcept override { return "Z.IdleExit"; }
+        [[nodiscard]] Extrinsic::Core::Result OnRegister(R::EngineSetup& setup) override
+        {
+            return setup.RegisterFrameHook(R::FramePhase::Idle, [this](R::RuntimeFrameHookContext&) {
+                // The Null window does not sleep while minimized, so bound by time, not frames.
+                if (m_Done.load() || std::chrono::steady_clock::now() > m_Deadline) m_Engine.RequestExit();
+            });
+        }
+        void OnShutdown(R::RuntimeModuleShutdownContext&) override {}
+
+    private:
+        std::atomic_bool& m_Done;
+        R::Engine& m_Engine;
+        std::chrono::steady_clock::time_point m_Deadline{std::chrono::steady_clock::now() + std::chrono::seconds(30)};
+    };
+}
+
+TEST(SandboxAgentServer, MinimizedSandboxStillServesCallsAndCapturesFailFast)
+{
+    const auto socketPath = (std::filesystem::temp_directory_path() /
+                             ("intrinsic-agent-min-" + std::to_string(::getpid()) + ".sock")).string();
+    auto sections = Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry();
+    Config::EngineConfig config{};
+    Config::PopulateEngineConfigSectionDefaults(config, sections);
+    config.Simulation.WorkerThreadCount = 1u;
+    config.ReferenceScene.Enabled = false;
+    config.Camera.Enabled = false;
+    config.Window.Backend = Config::WindowBackend::Null;
+    auto driver = std::make_unique<Driver>();
+    Driver* frames = driver.get();
+    Intrinsic::Tests::RuntimeTestKernel engine{config, std::move(driver)};
+    engine.EmplaceModule<R::EngineConfigControl>(std::move(sections));
+    engine.EmplaceModule<R::SceneInteractionModule>();
+    engine.EmplaceModule<R::SceneDocumentModule>();
+    engine.EmplaceModule<R::AsyncWorkModule>();
+    engine.EmplaceModule<R::ViewCaptureModule>(std::filesystem::temp_directory_path());
+    auto* server = &engine.EmplaceModule<R::AgentServerModule>(
+        R::AgentServerOptions{.SocketPath = socketPath, .AllowedRoots = {std::filesystem::temp_directory_path().string()}});
+    std::atomic_bool done{false};
+    engine.EmplaceModule<IdleExit>(done, engine);
+    engine.Initialize();
+    ASSERT_TRUE(server->Status().Listening) << server->Status().LastError;
+
+    std::vector<std::string> failures;
+    const auto check = [&](bool ok, std::string what) { if (!ok) failures.push_back(std::move(what)); };
+    std::thread client([&] {
+        Client c;
+        for (int attempt = 0; attempt < 50 && P::ConnectLocalSocket(socketPath, c.Connection) != P::LocalSocketStatus::Ok; ++attempt)
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        check(c.Connection.IsOpen(), "connect");
+        // The first frame minimizes the window, so every call below is served by Idle frames.
+        auto init = c.Request("initialize", {{"protocolVersion", "2025-06-18"}, {"capabilities", Json::object()}});
+        check(init["result"]["serverInfo"]["name"] == "intrinsic-sandbox", "initialize: " + init.dump());
+        bool isError = true;
+        auto entities = c.Tool("scene_entities", Json::object(), &isError);
+        check(!isError && entities.contains("entities"), "scene_entities while minimized: " + entities.dump());
+        auto shot = c.Request("tools/call", {{"name", "view_screenshot"}, {"arguments", Json::object()}});
+        check(shot.contains("result") && shot["result"].contains("structuredContent") &&
+              shot["result"]["structuredContent"]["error"]["code"] == "viewport_not_presentable",
+              "capture fails fast while minimized: " + shot.dump());
+        done.store(true);
+    });
+    int uiFrames = 0;
+    frames->OnFrame = [&](R::Engine& kernel) {
+        if (++uiFrames == 1)
+            static_cast<P::Backends::Null::NullWindow&>(kernel.GetWindow()).QueueResize(0, 0);
+        if (uiFrames > 3000) kernel.RequestExit();
+    };
+    engine.Run();
+    client.join();
+    for (const auto& failure : failures) ADD_FAILURE() << failure;
+    EXPECT_TRUE(done.load()) << "client did not finish";
+    EXPECT_EQ(uiFrames, 1) << "the window stayed minimized";
+    EXPECT_EQ(server->Status().CallsHandled, 3u);
+    engine.Shutdown();
 }
 
 TEST(SandboxAgentServer, ConnectionWindowShowsTheClientAndDisconnectsIt)

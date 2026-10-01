@@ -112,6 +112,7 @@ namespace Extrinsic::Runtime
         WorldRegistry m_WorldRegistry{};
         ECS::Scene::Registry* m_Scene{};
         std::vector<FrameHookRecord> m_FrameHooks{};
+        bool m_HasIdleFrameHooks{false}; // set at registration; gates the minimized-frame work
         std::vector<ViewportInputHookRecord> m_ViewportInputHooks{};
         std::uint64_t m_NextHookRegistrationSequence{0u};
         Core::FrameClock m_FrameClock{};
@@ -232,6 +233,7 @@ namespace Extrinsic::Runtime
             });
 
         m_Impl->m_FrameHooks.clear();
+        m_Impl->m_HasIdleFrameHooks = false;
         m_Impl->m_ViewportInputHooks.clear();
         m_Impl->m_NextHookRegistrationSequence = 0u;
 
@@ -278,6 +280,8 @@ namespace Extrinsic::Runtime
                 m_Impl->m_ServiceRegistry,
                 [this, moduleName](FramePhase phase, RuntimeFrameHook hook)
                 {
+                    m_Impl->m_HasIdleFrameHooks =
+                        m_Impl->m_HasIdleFrameHooks || phase == FramePhase::Idle;
                     m_Impl->m_FrameHooks.push_back(
                         Impl::FrameHookRecord{
                             .ModuleName = moduleName,
@@ -694,6 +698,29 @@ namespace Extrinsic::Runtime
             RequestExitFromWindowClose("native-poll");
     }
 
+    void Engine::RunMinimizedFrameWork(
+        EditorInputCaptureSnapshot& editorCapture,
+        RuntimeFramePacingDiagnostics& pacing)
+    {
+        if (!m_Impl->m_Scene)
+            return;
+        // Minimized: no simulation, extraction or render, but modules that opted
+        // into FramePhase::Idle (the agent lane) keep being served. Same order as
+        // the full frame: drain, pump, hooks, completions, pump, reap.
+        m_Impl->m_CommandBus.Drain(*m_Impl->m_Scene,
+                                   CommandDrainServices{
+                                       .Events = &m_Impl->m_KernelEvents,
+                                       .Jobs = &m_Impl->m_JobService,
+                                       .Worlds = &m_Impl->m_WorldRegistry,
+                                   });
+        (void)m_Impl->m_KernelEvents.Pump();
+        RunRuntimeModuleFrameHooks(FramePhase::Idle, 0.0, 0.0, editorCapture, pacing);
+        (void)m_Impl->m_JobService.DrainCompletions(
+            m_Impl->m_KernelEvents, kJobCompletionApplyBudgetPerFrame);
+        (void)m_Impl->m_KernelEvents.Pump();
+        (void)m_Impl->m_JobService.ReapCompleted();
+    }
+
     void Engine::RunFrame()
     {
         RuntimeFrameContext frameContext{};
@@ -744,6 +771,8 @@ namespace Extrinsic::Runtime
         if (!platformContinueFrame)
         {
             m_Impl->m_FrameClock.Resample();
+            if (m_Impl->m_HasIdleFrameHooks)
+                RunMinimizedFrameWork(frameContext.EditorCapture, pacing);
             publishPacingSample();
             return;
         }

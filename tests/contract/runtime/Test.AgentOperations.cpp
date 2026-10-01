@@ -222,6 +222,71 @@ TEST(AgentOperations, CaptureToolsFailClearlyWithoutTheCaptureServiceOrOutsideTh
     EXPECT_NE(fitWithoutPreset["result"]["content"][0]["text"].get<std::string>().find("needs a preset"), std::string::npos);
 }
 
+TEST(AgentOperations, CaptureFailsFastWhenViewportNotPresentable)
+{
+    R::AgentOperationRegistry registry;
+    R::RegisterViewCaptureAgentOperations(registry);
+    R::AgentProtocol protocol{registry, false};
+    const R::AgentOperationContext minimized{.AllowedRoots = {std::filesystem::temp_directory_path().string()},
+                                             .ViewportPresentable = false};
+    for (const char* tool : {"view_screenshot", "view_capture"})
+    {
+        const auto reply = Call(protocol, minimized, {{"jsonrpc", "2.0"}, {"id", 1}, {"method", "tools/call"},
+                                                      {"params", {{"name", tool}}}});
+        EXPECT_TRUE(reply["result"]["isError"].get<bool>()) << tool;
+        EXPECT_EQ(reply["result"]["structuredContent"]["error"]["code"], "viewport_not_presentable") << tool;
+    }
+    EXPECT_EQ(protocol.PendingCount(), 0u) << "the failure is immediate, nothing waits";
+}
+
+TEST(AgentOperations, PendingCapIsEnforced)
+{
+    R::AgentOperationRegistry registry;
+    int invocations = 0;
+    ASSERT_TRUE(registry.Register({.Name = "stuck", .Title = "Stuck", .ReadOnly = true,
+        .Invoke = [&invocations](const R::AgentOperationContext&, std::string_view) {
+            ++invocations;
+            R::AgentOperationOutcome outcome{};
+            outcome.Continuation = [](const R::AgentOperationContext&, R::AgentOperationOutcome&) { return false; };
+            return outcome; }}));
+    R::AgentProtocol protocol{registry, false};
+    const R::AgentOperationContext context{};
+    for (std::size_t i = 0; i < R::AgentProtocol::kMaxPendingCalls; ++i)
+        EXPECT_FALSE(protocol.Handle(Json{{"jsonrpc", "2.0"}, {"id", int(i)}, {"method", "tools/call"},
+                                          {"params", {{"name", "stuck"}}}}.dump(), context).has_value());
+    EXPECT_EQ(protocol.PendingCount(), 16u);
+    const auto refused = Call(protocol, context, {{"jsonrpc", "2.0"}, {"id", 99}, {"method", "tools/call"},
+                                                  {"params", {{"name", "stuck"}}}});
+    EXPECT_EQ(refused["error"]["code"], -32000);
+    EXPECT_EQ(refused["error"]["message"], "too many pending calls");
+    EXPECT_EQ(invocations, 16) << "a refused call never runs the tool";
+    EXPECT_EQ(protocol.PendingCount(), 16u);
+}
+
+TEST(AgentOperations, LateContinuationStillRepliesAfterManyPollRounds)
+{
+    R::AgentOperationRegistry registry;
+    int polls = 0;
+    ASSERT_TRUE(registry.Register({.Name = "late", .Title = "Late", .ReadOnly = true,
+        .Invoke = [&polls](const R::AgentOperationContext&, std::string_view) {
+            R::AgentOperationOutcome outcome{};
+            outcome.Continuation = [&polls](const R::AgentOperationContext&, R::AgentOperationOutcome& out) {
+                if (++polls < 5000) return false;
+                out = R::AgentOperationOutcome{.Text = R"({"late":true})"};
+                return true;
+            };
+            return outcome; }}));
+    R::AgentProtocol protocol{registry, false};
+    const R::AgentOperationContext context{};
+    ASSERT_FALSE(protocol.Handle(Json{{"jsonrpc", "2.0"}, {"id", "slow"}, {"method", "tools/call"},
+                                      {"params", {{"name", "late"}}}}.dump(), context).has_value());
+    for (int round = 0; round < 4999; ++round) ASSERT_TRUE(protocol.PollPending(context).empty());
+    const auto replies = protocol.PollPending(context);
+    ASSERT_EQ(replies.size(), 1u);
+    EXPECT_EQ(Json::parse(replies.front())["id"], "slow");
+    EXPECT_EQ(protocol.PendingCount(), 0u);
+}
+
 TEST(AgentOperations, NegotiatesProtocolVersion)
 {
     int mutations = 0;
