@@ -18,6 +18,7 @@ its dependencies, conditional gates, scope and verification.
 - [CI-019 — Make CI thin and run full confidence once per merge group](CI-019-thin-ci-merge-queue-topology.md)
 - [CI-020 — Cut over verification and retire legacy policy](CI-020-verification-cutover-and-legacy-retirement.md)
 - [PROC-031 — Bind agent workflow to unified verification receipts](PROC-031-agent-verification-receipts.md)
+- [PROC-036 — Add a `.clang-format` and remove the minified-style outliers](PROC-036-clang-format-and-minified-file-cleanup.md)
 
 Completed and superseded work is recorded in the
 [retirement log](../../done/RETIREMENT-LOG.md) and Git history.

@@ -18,7 +18,23 @@ Complete GPU arithmetic for existing statistical/radius outliers, local distance
 
 ## Current state and scope
 
-The shared Vulkan query paths exist; classification, thresholds and statistics are currently computed on CPU.
+The shared Vulkan query paths exist. RUNTIME-297 moved outlier scoring and classification
+onto the residency (`assets/shaders/outlier_analysis.comp`, scalar/outlier transaction), and
+the point-scalar analysis kernel (`point_scalar_analysis.comp`) covers density/spacing
+statistics. What remains is not "move to the GPU" but making those kernels parallel:
+
+- `outlier_analysis.comp`: after the per-row scores, a single invocation computes the mean,
+  variance and threshold and then loops over every point to write the mask, presentation value
+  and rejected count in source-row order. Classification is embarrassingly parallel once the
+  threshold is known.
+- `point_scalar_analysis.comp` (`mode==1`/spacing statistics) has the same one-invocation
+  serial loops over N for mean, min/max, center, diagonal and bandwidth variance.
+- `lop_final_reduce.comp` runs with `local_size_x = 1`.
+- `point_keypoints.comp` already shows the deterministic two-level (workgroup partial then
+  fixed-order combine) alternative to copy.
+
+Observed by the 2026-10-01 audit at `665c693dd`; no timing was taken, so this is a scalability
+hypothesis to measure, not a performance result.
 
 Operator requested this candidate on 2026-09-17 after a source inspection.
 This records authorized backlog planning outside the standing Framework24
@@ -78,6 +94,13 @@ Consult the [consumer inventory](../../../docs/architecture/spatial-index-consum
       architecture notes and module inventory when interfaces change. Bind any
       capability/parity/performance conclusion to ARA evidence; no present
       performance claim follows from filing this task.
+
+- [ ] Replace the single-invocation mean/variance and mask-writing loops with a deterministic
+      two-level reduction (per-workgroup partials in fixed order, then a fixed-order combine) and
+      a parallel classification pass. Summation order changes, so declare the parity delta against
+      the CPU oracle per the method backend policy and keep the reference's strict-threshold,
+      population-variance and tie semantics; do not change the CPU reference. Apply the same
+      pattern to `point_scalar_analysis.comp` statistics and, if it earns it, `lop_final_reduce.comp`.
 
 ## Completion boundary
 

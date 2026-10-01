@@ -92,6 +92,12 @@ Existing owners and evidence:
 
 Target is actual Vulkan execution of the named stages with CPU-reference parity and complete declared integration. Any retained CPU stage must be named in results; shader presence or a GPU query alone does not close the task.
 
+## Notes (2026-10-01 audit, not scope)
+- The Laplacian eigenbasis (`Geometry.Sparse.Eigensolver.cpp`) is shift-invert on `SparseLDLT`,
+  which is not GPU-friendly. A GPU version needs a different algorithm (for example LOBPCG with
+  `sparse_cg.comp` as the inner solve); consider it here only if GEOM-103's CG result justifies
+  GPU solves.
+
 ## Verification
 
 Register the named suites and benchmark output as part of implementation.

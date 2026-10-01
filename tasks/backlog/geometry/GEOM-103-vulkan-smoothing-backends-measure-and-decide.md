@@ -35,6 +35,20 @@ kernel speed. Known handicaps to fix before measuring, or the comparison is unfa
 
 1. All buffers are `HostVisible`, so on a discrete GPU the kernels likely read
    system memory over PCIe; use device-local buffers with staged uploads.
+   The 2026-10-01 audit found the same allocation pattern beyond smoothing (`HostVisible`
+   maps to `VMA_MEMORY_USAGE_CPU_TO_GPU`, `Backends.Vulkan.Device.cpp` ~4417; without ReBAR large
+   buffers can land in system RAM). Hot iterative workspaces allocated `HostVisible = true`:
+   `Graphics.FarthestPointSampling.cpp:70` (points and clearance re-read on each of k
+   iterations), `Graphics.SparseConjugateGradient.cpp:78` (CSR matrix and five vectors per CG
+   iteration), `Graphics.CoherentPointDriftEStep.cpp:62` (the O(N*M) tiled E-step),
+   `Graphics.PropertyFilter.cpp:73`, `Graphics.PointKeypoints.cpp:58`, and the spatial-index
+   source buffer in `Runtime.SpatialIndexCache.cpp:478`. Any "is the GPU faster" verdict taken
+   with these allocations is biased against the GPU; the CPU/GPU comparison for the CG and
+   filter backends here, and for the other methods, must be rerun device-local before a
+   keep/remove decision. Moving the non-smoothing workspaces is a per-method follow-up owed by
+   whichever task owns the method; this task only fixes and measures the smoothing ones.
+   Reuse the device-local + transfer-queue + `GpuTransferReadback` pattern the LOP and Poisson
+   backends already use.
 2. CG records 9 tiny dispatches and 4 barriers per iteration; fuse kernels where
    the CPU-mirroring control flow allows.
 3. Each CG chunk waits several frames for its status readback.
@@ -73,3 +87,9 @@ cmake --build --preset ci-vulkan-release --target IntrinsicPointLBVHGpuTests
 ctest --test-dir build/ci-vulkan-release --output-on-failure -L gpu -L vulkan -R 'GEOM103Vulkan' --no-tests=error --timeout 600
 python3 tools/benchmark/validate_benchmark_results.py --root build/ci-vulkan-release/benchmark-ctest/GEOM-103 --strict
 ```
+
+## Notes (2026-10-01 audit, not scope)
+- A per-face scalar-gradient GPU kernel (CPU: `Geometry.HalfedgeMesh.Utils.cpp` ~965; editor op
+  `Runtime.MeshFieldOperations.Gradient.cpp`) could reuse the vertex-to-face CSR gather from
+  `vertex_normals.comp`. It is cheap on the CPU; this task's "not faster means removed" rule
+  applies to it before any code is written.

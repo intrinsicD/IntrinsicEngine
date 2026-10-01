@@ -50,6 +50,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `GEOM-078` — Intrinsic surface-sample point cloud with contiguous face ranges (tasks/backlog/geometry/GEOM-078-intrinsic-surface-sample-point-cloud.md)
 - unblocked: `GEOM-109` — `Geometry.Properties.Statistics`: statistics, histogram and comparison (tasks/backlog/geometry/GEOM-109-property-statistics-and-comparison.md)
 - unblocked: `GEOM-110` — Connected components and per-component topology/genus (tasks/backlog/geometry/GEOM-110-connected-components-and-topology.md)
+- unblocked: `GEOM-115` — Make 13 halfedge-mesh module names match their file stems (tasks/backlog/geometry/GEOM-115-halfedge-module-names-match-file-stems.md)
 - blocked by `GRAPHICS-105`: `LEGACY-043` — Retire stale multi-descriptor-set shader sources (tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `RUNTIME-276` — Declarative `ConfigFieldSpec` tables, schema generation and conformance test (tasks/backlog/runtime/RUNTIME-276-declarative-config-field-specs.md)
@@ -64,6 +65,8 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `CORE-011`: `RUNTIME-285` — Diagnostics stream (log cursor, device status, operation records) (tasks/backlog/runtime/RUNTIME-285-diagnostics-stream.md)
 - blocked by `GEOM-110`: `RUNTIME-286` — Mesh health report (tasks/backlog/runtime/RUNTIME-286-mesh-health-report.md)
 - unblocked: `RUNTIME-312` — Agent control lane: MCP hardening, conformance and tool coverage (tasks/backlog/runtime/RUNTIME-312-agent-lane-mcp-hardening-and-coverage.md)
+- unblocked: `RUNTIME-313` — One shared setup/completion helper for queued editor jobs (tasks/backlog/runtime/RUNTIME-313-queued-editor-job-setup-and-completion-helper.md)
+- unblocked: `RUNTIME-314` — Reuse existing runtime helpers instead of local copies (tasks/backlog/runtime/RUNTIME-314-reuse-existing-processing-helpers.md)
 - blocked by `RUNTIME-277`: `UI-058` — All-reasons readiness tooltip and offending-control markers (tasks/backlog/ui/UI-058-all-reasons-readiness-tooltips.md)
 - blocked by `RUNTIME-278`: `UI-059` — Property Inspector window (tasks/backlog/ui/UI-059-property-inspector-window.md)
 - blocked by `RUNTIME-279`: `UI-060` — Jobs window (tasks/backlog/ui/UI-060-jobs-window.md)
@@ -74,6 +77,8 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `RUNTIME-286`: `UI-066` — Mesh Health window (tasks/backlog/ui/UI-066-mesh-health-window.md)
 - unblocked: `UI-069` — Shared operation progress read model and panel widget (tasks/backlog/ui/UI-069-shared-operation-progress-widget.md)
 - unblocked: `UI-070` — Camera pose command, view presets and Focus selection (tasks/backlog/ui/UI-070-camera-pose-command-and-controls.md)
+- unblocked: `UI-071` — One Stop/Accept/Discard row and one disabled-reason presentation (tasks/backlog/ui/UI-071-gpu-transaction-controls-and-refusal-presentation.md)
+- unblocked: `UI-072` — Adopt the shared panel helpers (Show buttons, spec-driven widgets) (tasks/backlog/ui/UI-072-adopt-shared-panel-support-helpers.md)
 
 ## Theme G — Active bugs
 
@@ -98,6 +103,7 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `BUILD-006`: `CI-019` — Make CI thin and run full confidence once per merge group (tasks/backlog/process/CI-019-thin-ci-merge-queue-topology.md)
 - blocked by `CI-019`: `CI-020` — Cut over verification and retire legacy policy (tasks/backlog/process/CI-020-verification-cutover-and-legacy-retirement.md)
 - blocked by `CI-013`: `PROC-031` — Bind agent workflow to unified verification receipts (tasks/backlog/process/PROC-031-agent-verification-receipts.md)
+- unblocked: `PROC-036` — Add a `.clang-format` and remove the minified-style outliers (tasks/backlog/process/PROC-036-clang-format-and-minified-file-cleanup.md)
 
 ## Theme I — Research method implementation (paused except explicit P0 dependencies)
 
@@ -140,6 +146,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `GEOM-107` — Wachspress, mean-value and modified-face-normal Laplacian weights (tasks/backlog/geometry/GEOM-107-additional-mesh-laplacian-weights.md)
 - unblocked: `GEOM-108` — Small Framework24 parity helpers (tasks/backlog/geometry/GEOM-108-framework24-small-parity-helpers.md)
 - unblocked: `GEOM-114` — Make the PCA isotropic cutoff relative to covariance scale (tasks/backlog/geometry/GEOM-114-scale-relative-pca-isotropic-cutoff.md)
+- unblocked: `GEOM-116` — Vulkan Tournament point sampling (tasks/backlog/geometry/GEOM-116-vulkan-tournament-point-sampling.md)
 - unblocked: `GRAPHICS-151` — Sorted segment heads and fixed-order segment reduction (tasks/backlog/rendering/GRAPHICS-151-sorted-segment-heads-and-reduction.md)
 - unblocked: `GRAPHICS-152` — Device round trips that do not lose small inputs to frame pacing (tasks/backlog/rendering/GRAPHICS-152-small-input-device-round-trip-pacing.md)
 - blocked by `METHOD-014`: `HARDEN-084` — Localized CPU/GPU parity signatures (tasks/backlog/methods/HARDEN-084-localized-cpu-gpu-parity-signatures.md)
@@ -194,7 +201,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `RUNTIME-308` — Surface construction (Hoppe) on the GPU property residency (tasks/backlog/runtime/RUNTIME-308-construction-on-the-residency.md)
 - unblocked: `RUNTIME-309` — Progressive Poisson sampling on the GPU property residency (tasks/backlog/runtime/RUNTIME-309-progressive-poisson-on-the-residency.md)
 - unblocked: `RUNTIME-310` — Property texture bake on the GPU property residency (tasks/backlog/runtime/RUNTIME-310-texture-bake-on-the-residency.md)
-- unblocked: `RUNTIME-311` — Unify the GPU scalar/outlier transaction lifecycle (one lifecycle generic over N rings) (tasks/backlog/runtime/RUNTIME-311-unify-gpu-scalar-outlier-transaction-lifecycle.md)
+- unblocked: `RUNTIME-311` — Unify the two-phase GPU Run/Accept transaction lifecycle (one lifecycle generic over N rings) (tasks/backlog/runtime/RUNTIME-311-unify-gpu-scalar-outlier-transaction-lifecycle.md)
 - blocked by `RUNTIME-210`: `UI-042` — Signed Heat mesh method panel (tasks/backlog/ui/UI-042-signed-heat-mesh-panel.md)
 - blocked by `RUNTIME-211`: `UI-043` — K-Means property-domain panel (tasks/backlog/ui/UI-043-kmeans-property-domain-panel.md)
 - blocked by `RUNTIME-212`: `UI-044` — Progressive Poisson property-domain panel (tasks/backlog/ui/UI-044-progressive-poisson-property-domain-panel.md)

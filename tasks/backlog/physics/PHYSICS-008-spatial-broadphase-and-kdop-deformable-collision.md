@@ -58,6 +58,11 @@ consumer appears.
    candidates for the XPBD reference through the refitted k-DOP tree, compared
    against an exhaustive candidate oracle.
 
+## Note (2026-10-01 audit)
+- The rigid-body broadphase in `Physics.World.cpp` (~635-647) tests all pairs, O(n^2). This
+  task's optimized-CPU broadphase comes first; a GPU broadphase (LBVH plus radix sort already
+  exist in the renderer) is only considered after that CPU backend and its evidence.
+
 ## Acceptance criteria
 
 - [ ] Slice 1: contacts and candidate order equal the all-pairs result on the PHYSICS-002 fixtures; an added many-body fixture measures the scaling.

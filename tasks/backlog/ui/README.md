@@ -15,6 +15,8 @@ its dependencies, conditional gates, scope and verification.
 - [UI-048 — Editor opens empty, hides file operations under View, and never remembers layout](UI-048-first-run-workspace-and-layout-persistence.md)
 - [UI-049 — Editor panels are sized so that labels clip and results are hidden](UI-049-editor-panel-sizing-and-readability.md)
 - [UI-051 — A mesh does not pass as a graph or a point cloud in the domain windows](UI-051-domain-agnostic-appearance-properties-selection-windows.md)
+- [UI-071 — One Stop/Accept/Discard row and one disabled-reason presentation](UI-071-gpu-transaction-controls-and-refusal-presentation.md)
+- [UI-072 — Adopt the shared panel helpers (Show buttons, spec-driven widgets)](UI-072-adopt-shared-panel-support-helpers.md)
 
 ## Agent lane and inspection windows
 
