@@ -631,8 +631,9 @@ TEST(AgentOperations, AnnotationsReflectUndoability)
     for (const auto& tool : list["result"]["tools"])
     {
         const bool destructive = tool["annotations"]["destructiveHint"].get<bool>();
-        // Destructive: files and engine config, the two effects the undo history does not cover.
-        EXPECT_EQ(destructive, tool["name"] == "view_capture" || tool["name"] == "config_apply") << tool["name"];
+        // Destructive: files, the replaced scene document and engine config, the effects the undo history does not cover.
+        EXPECT_EQ(destructive, tool["name"] == "view_capture" || tool["name"] == "config_apply" || tool["name"] == "save_scene" ||
+                                   tool["name"] == "load_scene") << tool["name"];
         sawCapture |= tool["name"] == "view_capture";
     }
     EXPECT_TRUE(sawCapture);
@@ -810,6 +811,42 @@ TEST(AgentOperations, ConfiguredOperationEntityRulesFollowTheSection)
     const auto aliasMiss = call("run_mesh_operation", R"({"operation":"outlier_analysis"})");
     EXPECT_NE(aliasMiss.Text.find("Unknown operation"), std::string::npos) << aliasMiss.Text;
     EXPECT_EQ(aliasMiss.Text.find("outlier_analysis\"]"), std::string::npos);
+}
+
+// Scene files and imports resolve their path against the allowed roots before anything runs.
+TEST(AgentOperations, SceneFileToolsStayInsideTheRootsAndRefuseToOverwrite)
+{
+    namespace fs = std::filesystem;
+    const auto info = ::testing::UnitTest::GetInstance()->current_test_info();
+    const auto root = fs::weakly_canonical(fs::temp_directory_path() / (std::string("intrinsic-agent-scene-") + info->name()));
+    fs::remove_all(root);
+    fs::create_directories(root);
+    { std::ofstream(root / "taken.scene") << "x"; }
+    R::AgentOperationRegistry registry;
+    R::RegisterEditorAgentOperations(registry);
+    const R::AgentOperationContext context{.AllowedRoots = {root.string()}};
+    const auto call = [&](const char* tool, const Json& arguments) {
+        return R::InvokeAgentOperation(registry, tool, context, arguments.dump(), false); };
+    for (const char* tool : {"import_file", "save_scene", "load_scene"})
+    {
+        const auto outside = call(tool, {{"path", "/etc/passwd"}});
+        EXPECT_TRUE(outside.IsError) << tool;
+        EXPECT_NE(outside.Text.find("allowed agent roots"), std::string::npos) << tool << ": " << outside.Text;
+    }
+    const auto taken = call("save_scene", {{"path", "taken.scene"}});
+    EXPECT_TRUE(taken.IsError);
+    EXPECT_EQ(taken.ErrorCode, "file_exists");
+    // With overwrite the call gets past the file check to the missing workspace.
+    const auto allowed = call("save_scene", {{"path", "taken.scene"}, {"overwrite", true}});
+    EXPECT_TRUE(allowed.IsError);
+    EXPECT_TRUE(allowed.ErrorCode.empty()) << allowed.Text;
+    EXPECT_TRUE(call("save_scene", {{"path", "taken.scene"}, {"overwrite", "yes"}}).IsError);
+    EXPECT_NE(call("load_scene", {{"path", "missing.scene"}}).Text.find("not an existing file"), std::string::npos);
+    EXPECT_NE(call("load_scene", {{"path", "taken.scene"}}).Text.find("workspace is not attached"), std::string::npos);
+    EXPECT_TRUE(registry.Find("save_scene")->Destructive);
+    EXPECT_TRUE(registry.Find("load_scene")->Destructive);
+    EXPECT_FALSE(registry.Find("import_file")->Destructive);
+    fs::remove_all(root);
 }
 
 TEST(AgentOperations, ViewCaptureRefusesToOverwriteUnlessAsked)

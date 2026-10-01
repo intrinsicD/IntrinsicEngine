@@ -31,6 +31,7 @@ import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.RegistrationOperations;
 import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.MeshTopologyOperations;
+import Extrinsic.Runtime.ScalarRidgeOperations;
 import Extrinsic.Runtime.PointFieldOperations;
 import Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.Runtime.PointSetOperations;
@@ -2806,4 +2807,31 @@ TEST_F(EditorKeypointAgent, PendingKeypointCallEndsWhenTheWorkspaceReattaches)
     EXPECT_TRUE(completed)<<"the call must not wait forever";
     EXPECT_TRUE(result.IsError)<<result.Text;
     EXPECT_EQ(result.ErrorCode,"result_unavailable");
+}
+
+// The ranges a command owner declares are enforced by the commands themselves, so the panels and the
+// agent share one rule (the agent's params and the panel sliders read the same tables).
+TEST_F(EditorKeypointAgent, MeshTopologyAndRidgeCommandsRejectValuesOutsideTheirDeclaredRanges)
+{
+    Runtime::EditorMeshSubdivideCommand subdivide{.StableEntityId = Keypoints.StableEntityId, .Iterations = 30u};
+    const auto result = Runtime::ApplyEditorMeshSubdivideCommand(Commands, subdivide);
+    EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters) << result.Message;
+    EXPECT_NE(result.Message.find("1 to 10"), std::string::npos) << result.Message;
+    const auto preview = Runtime::PreviewEditorMeshSubdivideCommand(Commands, subdivide);
+    EXPECT_FALSE(preview.Enabled);
+    Runtime::EditorMeshRemeshCommand remesh{.StableEntityId = Keypoints.StableEntityId, .Iterations = 65u};
+    EXPECT_EQ(Runtime::ApplyEditorMeshRemeshCommand(Commands, remesh).Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    Runtime::EditorMeshDenoiseCommand denoise{.StableEntityId = Keypoints.StableEntityId, .VertexIterations = 5000u};
+    EXPECT_EQ(Runtime::ApplyEditorMeshDenoiseCommand(Commands, denoise).Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    Runtime::EditorMeshSimplifyCommand simplify{.StableEntityId = Keypoints.StableEntityId, .TargetFaces = 10u, .NormalWeight = 5000.0};
+    EXPECT_EQ(Runtime::ApplyEditorMeshSimplifyCommand(Commands, simplify).Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    Runtime::EditorScalarRidgeCommand ridge{.StableEntityId = Keypoints.StableEntityId, .RadiusRatio = 0.5};
+    ridge.Property.Name = "height";
+    const auto ridgePreview = Runtime::PreviewEditorScalarRidgeCommand(Commands, ridge);
+    EXPECT_FALSE(ridgePreview.Enabled);
+    EXPECT_FALSE(ridgePreview.DisabledReason.empty());
+    ridge.RadiusRatio = 0.1;
+    EXPECT_TRUE(Runtime::PreviewEditorScalarRidgeCommand(Commands, ridge).Enabled) << "inside the range the preview is ready";
+    ridge.PublishGraph = false;
+    EXPECT_FALSE(Runtime::PreviewEditorScalarRidgeCommand(Commands, ridge).Enabled) << "no output selected";
 }

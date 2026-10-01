@@ -98,7 +98,8 @@ Nothing exists without the launch flag: no module, thread or socket.
   shapes are still moving, so a schema now would be a promise the tools do not yet keep.
 - Annotations: `readOnlyHint` follows `ReadOnly`. `destructiveHint` (`AgentOperationSpec::Destructive`)
   is true for a mutation the undo history cannot restore and false for everything that records an
-  `Agent: ` history entry: today `view_capture` (writes a file) and `config_apply` (changes engine
+  `Agent: ` history entry: today `view_capture` and `save_scene` (write files), `load_scene`
+  (replaces the scene document) and `config_apply` (changes engine
   configuration, which is not in the history). Mutating tools that edit the scene or its
   properties (`import_file`, `show_property`, `run_*`) are undoable, `undo`/`redo` operate on
   the history itself, and `select_entity` changes selection only, which is editor state, not scene
@@ -124,11 +125,18 @@ Nothing exists without the launch flag: no module, thread or socket.
   `preview_registration`, `preview_point_sampling`, `preview_keypoint_analysis`, `preview_kmeans`,
   `preview_point_cloud_consolidation`, `preview_operation`, `preview_mesh_operation` and
   `view_screenshot`. State-changing: `select_entity`, `import_file`, `show_property`,
-  `config_apply`, `undo`, `redo`, `run_operation`, `run_mesh_operation`, `run_registration` (ICP
+  `config_apply`, `save_scene`, `load_scene`, `undo`, `redo`, `run_operation`,
+  `run_mesh_operation`, `run_registration` (ICP
   or Coherent Point Drift from their config sections; the reply waits for the job),
   `run_point_sampling` (the `sandbox.point_sampling` section), `run_keypoint_analysis`,
   `run_kmeans` and `run_point_cloud_consolidation`. `view_capture` writes a PNG inside the
   allowed roots.
+- Scene files. `save_scene` writes the scene document to a path inside the allowed roots (it
+  refuses an existing file unless `overwrite: true`, error code `file_exists`) and `load_scene`
+  replaces the whole scene document with a file inside them; both resolve the path with
+  `ResolveAgentPath`, answer once the job finished and are `Destructive` (a written file and a
+  replaced document are outside the undo history). `import_file` with `wait: true` answers
+  when the import queue row completed or failed and lists the new entities.
 - Configured operations. `run_operation` / `preview_operation` select a row of one table by
   `operation`: property smoothing, spectral modes, harmonic field, scalar gradient, mesh
   curvature, geodesics, curvature segmentation, normal estimation, kernel density, point
@@ -234,8 +242,8 @@ Planned: lane hardening (the remaining protocol conformance) and the remaining o
 
 - Operation tools exist for the configured operations of the table above, registration (ICP,
   Coherent Point Drift), point sampling, keypoint analysis, k-means and point-cloud
-  consolidation. The remaining editor commands (scene save/load, visibility, camera controller)
+  consolidation. The remaining editor commands (visibility, camera controller)
   are owned by [RUNTIME-312](../../tasks/backlog/runtime/RUNTIME-312-agent-lane-mcp-hardening-and-coverage.md).
-- Imports are asynchronous (`Pending`); poll `scene_entities` for the result.
+- Imports are asynchronous (`Pending`): pass `wait: true`, or poll `scene_entities` for the result.
 - Unix-domain sockets only; Windows builds report `Unsupported`.
 - A Sandbox killed by a signal leaves its socket file; the next start replaces it.

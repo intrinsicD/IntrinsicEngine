@@ -7,6 +7,7 @@ module;
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -22,6 +23,7 @@ module Extrinsic.Runtime.AgentOperations;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Logging;
+import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
@@ -97,20 +99,103 @@ namespace Extrinsic::Runtime
             return Ok({{"selected", *entity}});
         }
 
+        std::vector<std::uint32_t> StableIds(const EditorWorkspaceSnapshotPreparedFrame& prepared)
+        {
+            std::vector<std::uint32_t> ids;
+            for (const auto& row : prepared.Frame.Hierarchy) ids.push_back(row.StableEntityId);
+            return ids;
+        }
+
+        // `wait: true` answers once the import materialized (the queue row reached Complete) or failed.
         AgentOperationOutcome ImportFile(const AgentOperationContext& context, std::string_view arguments)
         {
             const auto args = ParseObject(arguments);
             const auto path = args ? String(*args, "path") : std::nullopt;
             if (!path) return Fail("Pass {\"path\": \"<file inside an allowed root>\"}.");
+            if (args->contains("wait") && !(*args)["wait"].is_boolean()) return Fail("wait must be true or false.");
+            const bool wait = args->value("wait", false);
             const auto resolved = ResolveAgentPath(context, *path);
             if (!resolved) return Fail("Path '" + *path + "' is outside the Sandbox's allowed agent roots.");
-            if (!PrepareSnapshot(context)) return Fail(kNoWorkspace);
+            const auto prepared = PrepareSnapshot(context);
+            if (!prepared) return Fail(kNoWorkspace);
+            const auto before = StableIds(*prepared);
             const auto scene = PrepareEditorSceneEditingFrame(*context.Attachment);
             const auto result = ApplyEditorFileImportCommand(scene.Commands, EditorFileImportCommand{.Path = *resolved});
             const Json out{{"status", DebugNameForEditorCommandStatus(result.Status)}, {"path", *resolved},
                            {"message", result.Message}, {"entities_created", result.PrimitiveEntitiesCreated}};
             // Imports are asynchronous: Pending means queued; the entity appears in scene_entities.
-            return {.IsError = !result.Succeeded() && result.Status != EditorCommandStatus::Pending, .Text = Dump(out)};
+            const bool failed = !result.Succeeded() && result.Status != EditorCommandStatus::Pending;
+            if (!wait || failed || result.Status != EditorCommandStatus::Pending || !result.Operation.IsValid())
+                return {.IsError = failed, .Text = Dump(out)};
+            return {.Continuation = [handle = result.Operation, before, out](const AgentOperationContext& current, AgentOperationOutcome& done) {
+                const auto frame = PrepareSnapshot(current);
+                if (!frame) { done = Fail(kNoWorkspace); return true; }
+                const auto row = std::ranges::find_if(frame->Frame.AssetImportQueue.Rows,
+                                                      [&](const EditorAssetImportQueueRow& r) { return r.Operation == handle; });
+                if (row == frame->Frame.AssetImportQueue.Rows.end()) return false; // not listed yet
+                using Stage = RuntimeAssetImportQueueStage;
+                if (row->Stage != Stage::Complete && row->Stage != Stage::Failed && row->Stage != Stage::Cancelled) return false;
+                Json finished = out;
+                finished["status"] = row->Stage == Stage::Complete ? "Applied" : row->Stage == Stage::Failed ? "Failed" : "Cancelled";
+                finished["message"] = row->DiagnosticText.empty() ? row->StageText : row->DiagnosticText;
+                Json created = Json::array();
+                for (const auto id : StableIds(*frame))
+                    if (std::ranges::find(before, id) == before.end()) created.push_back(id);
+                finished["entities_created"] = created.size();
+                finished["new_entities"] = created;
+                done = {.IsError = row->Stage != Stage::Complete, .Text = Dump(finished)};
+                return true;
+            }};
+        }
+
+        // Save and load answer Pending with the job's token; the projected last scene-file event carries it.
+        AgentOperationOutcome FinishSceneFile(const EditorSceneFileResult& result, const std::string& path)
+        {
+            const auto describe = [path](const EditorSceneFileResult& r) { // by value: the continuation outlives this call
+                return Json{{"status", DebugNameForEditorCommandStatus(r.Status)}, {"succeeded", r.Succeeded()}, {"path", path},
+                            {"message", r.Message}};
+            };
+            if (result.Status != EditorCommandStatus::Pending || !result.Task.IsValid())
+                return {.IsError = !result.Succeeded(), .Text = Dump(describe(result))};
+            return {.Continuation = [token = result.Task, describe](const AgentOperationContext& current, AgentOperationOutcome& out) {
+                if (!PrepareSnapshot(current)) { out = Fail(kNoWorkspace); return true; }
+                const auto last = PrepareEditorSceneEditingFrame(*current.Attachment).LastSceneFileResult;
+                if (!last || last->Task != token) return false;
+                out = {.IsError = !last->Succeeded(), .Text = Dump(describe(*last))};
+                return true;
+            }};
+        }
+
+        AgentOperationOutcome SaveScene(const AgentOperationContext& context, std::string_view arguments)
+        {
+            const auto args = ParseObject(arguments);
+            const auto path = args ? String(*args, "path") : std::nullopt;
+            if (!path) return Fail("Pass {\"path\": \"<scene file inside an allowed root>\", \"overwrite\": <optional boolean>}.");
+            if (args->contains("overwrite") && !(*args)["overwrite"].is_boolean()) return Fail("overwrite must be true or false.");
+            const auto resolved = ResolveAgentPath(context, *path);
+            if (!resolved) return Fail("Path '" + *path + "' is outside the Sandbox's allowed agent roots.");
+            std::error_code status;
+            const auto existing = std::filesystem::symlink_status(*resolved, status); // a dangling symlink occupies the path
+            if (!status && existing.type() != std::filesystem::file_type::not_found && !args->value("overwrite", false))
+                return {.IsError = true, .Text = "'" + *path + "' already exists; pass overwrite: true to replace it.", .ErrorCode = "file_exists"};
+            if (!PrepareSnapshot(context)) return Fail(kNoWorkspace);
+            const auto scene = PrepareEditorSceneEditingFrame(*context.Attachment);
+            return FinishSceneFile(ApplyEditorSceneSaveCommand(scene.Commands, EditorSceneFileCommand{.Path = *resolved}), *resolved);
+        }
+
+        // Loading replaces the whole scene document.
+        AgentOperationOutcome LoadScene(const AgentOperationContext& context, std::string_view arguments)
+        {
+            const auto args = ParseObject(arguments);
+            const auto path = args ? String(*args, "path") : std::nullopt;
+            if (!path) return Fail("Pass {\"path\": \"<scene file inside an allowed root>\"}.");
+            const auto resolved = ResolveAgentPath(context, *path);
+            if (!resolved) return Fail("Path '" + *path + "' is outside the Sandbox's allowed agent roots.");
+            std::error_code status;
+            if (!std::filesystem::is_regular_file(*resolved, status)) return Fail("'" + *path + "' is not an existing file.");
+            if (!PrepareSnapshot(context)) return Fail(kNoWorkspace);
+            const auto scene = PrepareEditorSceneEditingFrame(*context.Attachment);
+            return FinishSceneFile(ApplyEditorSceneLoadCommand(scene.Commands, EditorSceneFileCommand{.Path = *resolved}), *resolved);
         }
 
         AgentOperationOutcome ShowProperty(const AgentOperationContext& context, std::string_view arguments)
@@ -325,8 +410,18 @@ namespace Extrinsic::Runtime
             Schema("{" + kEntityProperty + "}", R"(["entity"])"), false, SelectEntity);
         add("import_file", "Import file",
             "Import a geometry/model file from inside an allowed root into the scene (same path as File > Import).",
-            Schema(R"({"path":{"type":"string","description":"Absolute path, or relative to the first allowed root."}})", R"(["path"])"),
+            Schema(R"({"path":{"type":"string","description":"Absolute path, or relative to the first allowed root."},"wait":{"type":"boolean","default":false,"description":"Answer once the import materialized or failed (reports the new entities) instead of when it is queued."}})", R"(["path"])"),
             false, ImportFile);
+        add("save_scene", "Save scene",
+            "Save the scene document to a file inside an allowed root, like File > Save As. Refuses an existing file unless "
+            "overwrite is true; the write is not part of the undo history. Answers when the save finished.",
+            Schema(R"({"path":{"type":"string","description":"Absolute path, or relative to the first allowed root."},"overwrite":{"type":"boolean","default":false}})", R"(["path"])"),
+            false, SaveScene, true);
+        add("load_scene", "Load scene",
+            "Replace the scene document with a scene file from inside an allowed root, like File > Open: every entity of the "
+            "current scene is dropped (save it first) and the undo history no longer covers it. Answers when loaded.",
+            Schema(R"({"path":{"type":"string","description":"Absolute path, or relative to the first allowed root."}})", R"(["path"])"),
+            false, LoadScene, true);
         add("show_property", "Show property",
             "Color an entity by a property in the viewport, like a panel's Show button: scalars through the colormap, vectors "
             "as component colors (or normal directions).",

@@ -271,7 +271,8 @@ namespace Extrinsic::Runtime
                 if (spec == specs.end())
                 {
                     std::string valid;
-                    for (const auto& s : specs) valid += (valid.empty() ? "" : ", ") + std::string(s.Field->Name);
+                    for (const auto& s : specs)
+                        if (s.Field != nullptr) valid += (valid.empty() ? "" : ", ") + std::string(s.Field->Name);
                     return "Unknown parameter '" + key + "'; valid: " + valid + ".";
                 }
                 if (const auto problem = spec->Set(command, value); !problem.empty()) return "Parameter '" + key + "' " + problem + ".";
@@ -307,6 +308,16 @@ namespace Extrinsic::Runtime
                 if (spec.Field != nullptr) defaults[std::string(spec.Field->Name)] = spec.Default;
             Json schema = Json::parse(ConfigDetail::BuildSectionSchemaJson("", name, "", fields, defaults));
             for (const char* key : {"$schema", "$id", "title", "description"}) schema.erase(key);
+            // Enums are integer codes in the owner's schema; the agent also takes their names.
+            for (auto& [key, property] : schema["properties"].items())
+            {
+                if (!property.contains("x-enum-names")) continue;
+                Json codes{{"type", "integer"}, {"enum", property["enum"]}};
+                Json names{{"type", "string"}, {"enum", property["x-enum-names"]}};
+                property.erase("type");
+                property.erase("enum");
+                property["anyOf"] = Json::array({std::move(codes), std::move(names)});
+            }
             return Dump(schema);
         }
         AgentOperationOutcome InvalidParams(std::string message)
@@ -321,6 +332,7 @@ namespace Extrinsic::Runtime
                                               ParamSpecs<Cmd> specs, Frame frame, Preview preview, Apply apply,
                                               Describe describe, Resolve resolve)
         {
+            std::erase_if(specs, [](const ParamSpec<Cmd>& spec) { return spec.Field == nullptr; }); // a name the owner's table lacks
             ConfiguredOperation op{name, family, OperationEntity::Argument, "",
                 [=](const OperationCall& call) -> AgentOperationOutcome {
                     Cmd command{};

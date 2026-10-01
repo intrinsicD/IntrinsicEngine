@@ -134,6 +134,8 @@ the editor operations the Sandbox UI already offers.
    members and generates the schema with `BuildSectionSchemaJson`. Remaining gap: the member
    mapping and struct defaults are agent-side lists (a `ConfigFieldSpec` has no member binding),
    and enums accept names next to the integer codes of config sections.
+   *Slice 7E done:* `save_scene`/`load_scene` (`ResolveAgentPath`, both `Destructive`; save refuses an
+   existing file unless `overwrite: true`) and `import_file` with `wait`.
 
 8. **Per-run progress source (after UI-069 slice 1).** Each `Run*` captures its run
    key (editor job identity or correlation id) in its outcome; `PollPending` asks

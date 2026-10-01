@@ -2320,7 +2320,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 !InFieldRange(EditorMeshDenoiseFieldSpecs(), "vertex_iterations", command.VertexIterations) ||
                 !InFieldRange(EditorMeshDenoiseFieldSpecs(), "sigma_spatial", command.SigmaSpatial) ||
                 !InFieldRange(EditorMeshDenoiseFieldSpecs(), "sigma_range", command.SigmaRange) ||
-                !IsPositiveFinite(command.DegenerateNormalLengthEpsilon))
+                !InFieldRange(EditorMeshDenoiseFieldSpecs(), "degenerate_normal_length_epsilon", command.DegenerateNormalLengthEpsilon))
             {
                 result.Status =
                     EditorCommandStatus::InvalidProcessingParameters;
@@ -2376,9 +2376,12 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 result.Status =
                     EditorCommandStatus::InvalidProcessingParameters;
                 result.Error = Core::ErrorCode::InvalidArgument;
-                result.Message = "Mesh simplify requires a valid metric, a positive target "
-                                 "face count or maximum error, non-negative weights, and a "
-                                 "feature angle within [0, 180].";
+                result.Message = "Mesh simplify requires a valid metric, a target face count (" +
+                                 DescribeConfigFieldRange(*FindConfigFieldSpec(fields, "target_faces")) +
+                                 ") or a maximum error above 0, weights within " +
+                                 DescribeConfigFieldRange(*FindConfigFieldSpec(fields, "normal_weight")) +
+                                 ", and a feature angle within " +
+                                 DescribeConfigFieldRange(*FindConfigFieldSpec(fields, "feature_angle_threshold_degrees")) + ".";
                 return std::nullopt;
             }
             if (!context.MeshSimplifyKernelAvailable)
@@ -2422,11 +2425,10 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 !InFieldRange(EditorMeshRemeshFieldSpecs(), "iterations", command.Iterations) ||
                 !InFieldRange(EditorMeshRemeshFieldSpecs(), "target_edge_length", command.TargetEdgeLength) ||
                 !InFieldRange(EditorMeshRemeshFieldSpecs(), "reference_projection_k", command.ReferenceProjectionK) ||
-                !IsPositiveFinite(command.Lambda) ||
-                !std::isfinite(command.CurvatureAdaptation) ||
-                command.CurvatureAdaptation < 0.0 ||
-                !std::isfinite(command.MaxReferenceProjectionDistance) ||
-                command.MaxReferenceProjectionDistance < 0.0 ||
+                !InFieldRange(EditorMeshRemeshFieldSpecs(), "lambda", command.Lambda) ||
+                !InFieldRange(EditorMeshRemeshFieldSpecs(), "curvature_adaptation", command.CurvatureAdaptation) ||
+                !InFieldRange(EditorMeshRemeshFieldSpecs(), "max_reference_projection_distance", command.MaxReferenceProjectionDistance) ||
+                !std::isfinite(command.ApproximationError) ||
                 (command.ProjectToSurface && command.ReferenceProjectionK == 0u) ||
                 (command.SizingLaw ==
                      EditorMeshRemeshSizingLaw::ErrorBoundedTaubin &&
@@ -3031,7 +3033,7 @@ ApplyEditorMeshSimplifyCommand(
             Real("target_edge_length", "Target edge length; 0 uses the mean edge length.", 0.0, kUnbounded),
             Real("lambda", "Tangential smoothing weight.", 0.0, kUnbounded, true),
             Real("curvature_adaptation", "Adaptive mode: curvature influence.", 0.0, kUnbounded),
-            Real("approximation_error", "Adaptive mode: allowed approximation error.", 0.0, kUnbounded, true),
+            Real("approximation_error", "Allowed approximation error; must be above 0 for the error-bounded Taubin sizing law.", 0.0, kUnbounded),
             Flag("preserve_boundary", "Keep boundary edges."),
             Flag("project_to_surface", "Project results back onto the input surface."),
             Count("reference_projection_k", "Neighbors used for surface projection.", 0.0, double(kMeshRemeshMaxProjectionNeighbors)),

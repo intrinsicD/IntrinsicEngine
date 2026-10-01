@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cmath>
 #include <filesystem>
+#include <fstream>
 #include <functional>
 #include <map>
 #include <memory>
@@ -28,6 +29,7 @@ import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.Platform.Backend.Null;
 import Extrinsic.Platform.LocalSocket;
 import Extrinsic.Runtime.AgentServer;
+import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.PointCloudConsolidationModule;
@@ -158,6 +160,7 @@ namespace
             Engine->EmplaceModule<R::SceneInteractionModule>();
             Engine->EmplaceModule<R::SceneDocumentModule>();
             Engine->EmplaceModule<R::AsyncWorkModule>();
+            Engine->EmplaceModule<R::AssetWorkflowModule>();
             Engine->EmplaceModule<R::SpatialIndexCache>();
             Engine->EmplaceModule<R::ClusteringModule>();
             Engine->EmplaceModule<R::PointCloudConsolidationModule>();
@@ -961,4 +964,43 @@ TEST(SandboxAgentServer, RunOperationTakesExplicitParamsAndUndoes)
         const auto uv = c.Tool("run_operation", {{"operation", "parameterization"}, {"entity", grid}}, &isError);
         rig.Check(uv.is_object() && uv["operation"] == "parameterization", "parameterization answers: " + uv.dump());
     });
+}
+
+// RUNTIME-312 slice 7E: save_scene / load_scene inside the allowed root and import_file with wait.
+TEST(SandboxAgentServer, SceneSaveLoadAndImportWaitUseTheAllowedRoot)
+{
+    namespace fs = std::filesystem;
+    const fs::path directory = fs::temp_directory_path() / ("intrinsic-agent-scenes-" + std::to_string(::getpid()));
+    fs::remove_all(directory);
+    fs::create_directories(directory);
+    { std::ofstream(directory / "triangle.obj") << "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n"; }
+    AgentRig rig("scenes");
+    ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
+    (void)rig.AddGrid();
+    rig.Run([&](Client& c) {
+        const auto entityCount = [&] { return c.Tool("scene_entities")["entities"].size(); };
+        bool isError = true;
+        const auto before = entityCount();
+        const auto scenePath = (directory / "saved.scene").string();
+        const auto saved = c.Tool("save_scene", {{"path", scenePath}}, &isError);
+        rig.Check(!isError && saved["succeeded"] == true && fs::exists(scenePath), "save_scene: " + saved.dump());
+        const auto again = c.Request("tools/call", {{"name", "save_scene"}, {"arguments", {{"path", scenePath}}}});
+        rig.Check(again["result"]["isError"] == true && again["result"]["structuredContent"]["error"]["code"] == "file_exists",
+                  "an existing scene file needs overwrite: " + again.dump().substr(0, 300));
+        const auto overwritten = c.Tool("save_scene", {{"path", scenePath}, {"overwrite", true}}, &isError);
+        rig.Check(!isError && overwritten["succeeded"] == true, "save_scene overwrite: " + overwritten.dump());
+        // import_file with wait answers when the entity exists.
+        const auto imported = c.Tool("import_file", {{"path", (directory / "triangle.obj").string()}, {"wait", true}}, &isError);
+        rig.Check(!isError && imported["status"] == "Applied" && imported["new_entities"].size() >= 1u, "import_file wait: " + imported.dump());
+        rig.Check(entityCount() > before, "the imported entity is in the scene");
+        const auto missing = c.Tool("import_file", {{"path", (directory / "missing.obj").string()}, {"wait", true}}, &isError);
+        rig.Check(isError, "a missing file fails instead of waiting: " + missing.dump());
+        // load_scene replaces the document: the imported entity is gone again.
+        const auto loaded = c.Tool("load_scene", {{"path", scenePath}}, &isError);
+        rig.Check(!isError && loaded["succeeded"] == true, "load_scene: " + loaded.dump());
+        rig.Check(entityCount() == before, "the loaded scene has the saved entities only: " + std::to_string(entityCount()));
+        const auto outside = c.Tool("load_scene", {{"path", "/etc/hostname"}}, &isError);
+        rig.Check(isError, "paths outside the root are refused: " + outside.dump());
+    });
+    fs::remove_all(directory);
 }
