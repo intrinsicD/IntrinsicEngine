@@ -63,6 +63,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `RUNTIME-284` — History label listing and entity-property checkpoints (tasks/backlog/runtime/RUNTIME-284-history-labels-and-checkpoints.md)
 - blocked by `CORE-011`: `RUNTIME-285` — Diagnostics stream (log cursor, device status, operation records) (tasks/backlog/runtime/RUNTIME-285-diagnostics-stream.md)
 - blocked by `GEOM-110`: `RUNTIME-286` — Mesh health report (tasks/backlog/runtime/RUNTIME-286-mesh-health-report.md)
+- unblocked: `RUNTIME-312` — Agent control lane: MCP hardening, conformance and tool coverage (tasks/backlog/runtime/RUNTIME-312-agent-lane-mcp-hardening-and-coverage.md)
 - blocked by `RUNTIME-277`: `UI-058` — All-reasons readiness tooltip and offending-control markers (tasks/backlog/ui/UI-058-all-reasons-readiness-tooltips.md)
 - blocked by `RUNTIME-278`: `UI-059` — Property Inspector window (tasks/backlog/ui/UI-059-property-inspector-window.md)
 - blocked by `RUNTIME-279`: `UI-060` — Jobs window (tasks/backlog/ui/UI-060-jobs-window.md)

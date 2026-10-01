@@ -57,6 +57,7 @@ and their paired UI or method work are recorded there, not here.
 - [RUNTIME-284 — History label listing and entity-property checkpoints](RUNTIME-284-history-labels-and-checkpoints.md)
 - [RUNTIME-285 — Diagnostics stream (log cursor, device status, operation records)](RUNTIME-285-diagnostics-stream.md)
 - [RUNTIME-286 — Mesh health report](RUNTIME-286-mesh-health-report.md)
+- [RUNTIME-312 — Agent control lane: MCP hardening, conformance and tool coverage](RUNTIME-312-agent-lane-mcp-hardening-and-coverage.md)
 
 ## Compilation locality
 
