@@ -943,9 +943,19 @@ TEST(SandboxAgentServer, RunOperationTakesExplicitParamsAndUndoes)
         const auto featureUndo = c.Tool("undo", {{"steps", featureSteps}}, &isError);
         rig.Check(!isError && entityCount() == before, "undoing both steps removes the graph again: " + featureUndo.dump());
 
-        // Topology operations: each is one undo step that restores the face count.
-        // (The mesh's custom vertex properties do not survive a topology undo: BUG-230. The ridge
-        // runs above come first for that reason, and nothing below reads "height".)
+        // Topology operations: each is one undo step that restores the face count and the user
+        // vertex property "height" (BUG-230). The reply names what the edit dropped.
+        const auto hasHeight = [&] {
+            for (const auto& row : c.Tool("entity_properties", {{"entity", grid}})["properties"])
+                if (row["name"] == "height") return true;
+            return false;
+        };
+        rig.Check(hasHeight(), "the grid starts with its height property");
+        const auto droppedHeight = [](const Json& run) {
+            for (const auto& name : run["dropped_properties"])
+                if (name == "vertex:height") return true;
+            return false;
+        };
         const auto topology = [&](const char* operation, const Json& params, const std::function<bool(int)>& expected) {
             const auto preview = c.Tool("preview_operation", {{"operation", operation}, {"entity", grid}, {"params", params}}, &isError);
             rig.Check(!isError && preview["enabled"].is_boolean(), std::string("preview ") + operation + ": " + preview.dump());
@@ -953,9 +963,15 @@ TEST(SandboxAgentServer, RunOperationTakesExplicitParamsAndUndoes)
             rig.Check(!isError && run["succeeded"] == true && run["input_faces"] == 50 || std::string(operation) == "mesh_denoise",
                       std::string(operation) + ": " + run.dump());
             rig.Check(expected(faces()), std::string(operation) + " left " + std::to_string(faces()) + " faces");
+            rig.Check(run["dropped_properties"].is_array(), std::string(operation) + " reports dropped_properties: " + run.dump());
+            // Simplify carries the surviving vertices' values; remesh and subdivide drop and name them.
+            rig.Check(std::string(operation) == "mesh_simplify" ? (hasHeight() && !droppedHeight(run))
+                                                                 : (!hasHeight() && droppedHeight(run)),
+                      std::string(operation) + " height outcome: " + run.dump());
             const auto undone = c.Tool("undo", Json::object(), &isError);
             rig.Check(!isError && undone["undone"].size() == 1u, std::string(operation) + " is one undo step: " + undone.dump());
             rig.Check(faces() == 50, std::string("undo of ") + operation + " restored the mesh");
+            rig.Check(hasHeight(), std::string("undo of ") + operation + " restored the height property");
         };
         topology("mesh_simplify", {{"target_faces", 20}}, [](int f) { return f < 50 && f >= 1; });
         topology("mesh_subdivide", {{"iterations", 1}}, [](int f) { return f == 200; });

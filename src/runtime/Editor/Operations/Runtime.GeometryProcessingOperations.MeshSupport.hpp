@@ -97,10 +97,56 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
         using MeshTopologySnapshot =
             std::shared_ptr<const Geometry::HalfedgeMesh::Mesh>;
 
+        // Exact copy of the four stored mesh source components and their
+        // provenance markers. A topology edit replaces all of them, and the
+        // halfedge mesh it is rebuilt from is a re-derivation (halfedge, edge
+        // and face numbering do not survive the triangle-soup round trip, and
+        // user properties never entered it), so the undo side of the edit is
+        // this snapshot rather than a mesh.
+        struct MeshStoredSourceSnapshot
+        {
+            GS::Vertices Vertices{};
+            GS::Edges Edges{};
+            GS::Halfedges Halfedges{};
+            GS::Faces Faces{};
+            bool HasMeshTopology{false};
+            bool HasGraphTopology{false};
+        };
+        using MeshStoredSourceState =
+            std::shared_ptr<const MeshStoredSourceSnapshot>;
+
+        // Null when the view lacks any of the four mesh domains.
+        [[nodiscard]] MeshStoredSourceState CaptureMeshStoredSources(
+            const GS::ConstSourceView& view);
+
+        // Publishes `mesh` through `GS::PopulateFromMesh`, or, when `stored`
+        // is given, restores that snapshot instead (the undo side).
         [[nodiscard]] EditorCommandHistoryStatus ApplyMeshTopologyState(
             ECS::Scene::Registry* scene,
             const std::uint32_t stableEntityId,
-            const Geometry::HalfedgeMesh::Mesh& mesh);
+            const Geometry::HalfedgeMesh::Mesh& mesh,
+            const MeshStoredSourceSnapshot* stored = nullptr);
+
+        // Names of the user-authored properties in one stored or scratch
+        // property set: everything except what the halfedge mesh owns itself,
+        // what `GS::PopulateFromMesh` regenerates, derived geometry the
+        // engine recomputes (normals, curvature), and UVs, which
+        // `EditorMeshTexcoordOutcome` reports separately.
+        [[nodiscard]] std::vector<std::string> MeshUserPropertyNames(
+            const Geometry::PropertySet& properties);
+
+        // Carries the stored vertex-domain user properties into a scratch mesh
+        // that shares its vertex numbering with the stored mesh (simplify).
+        // Mesh garbage collection later moves them with their vertices.
+        void ForwardMeshUserVertexProperties(
+            const GS::ConstSourceView& stored,
+            Geometry::HalfedgeMesh::Mesh& scratch);
+
+        // "<domain>:<name>" for every stored user property that `after` does
+        // not carry, i.e. what publishing `after` removes from the entity.
+        [[nodiscard]] std::vector<std::string> DroppedMeshUserProperties(
+            const GS::ConstSourceView& stored,
+            const Geometry::HalfedgeMesh::Mesh& after);
 
 
         // A topology operation commits a whole replacement mesh, so

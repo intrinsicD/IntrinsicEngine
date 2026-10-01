@@ -8,6 +8,7 @@ module;
 #include <optional>
 #include <span>
 #include <string>
+#include <vector>
 export module Extrinsic.Runtime.MeshTopologyOperations;
 export import Extrinsic.Runtime.EditorProcessing;
 export import Extrinsic.Runtime.EditorCommon;
@@ -171,6 +172,9 @@ export namespace Extrinsic::Runtime
         std::size_t FlipCount{0u};
         EditorMeshTexcoordOutcome TexcoordOutcome{
             EditorMeshTexcoordOutcome::None};
+        // User properties the edit removed from the entity, as
+        // "<domain>:<name>". Undo restores them. Empty when nothing was lost.
+        std::vector<std::string> DroppedProperties{};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
 
@@ -204,6 +208,9 @@ export namespace Extrinsic::Runtime
         std::size_t OutputFaceCount{0u};
         EditorMeshTexcoordOutcome TexcoordOutcome{
             EditorMeshTexcoordOutcome::None};
+        // User properties the edit removed from the entity, as
+        // "<domain>:<name>". Undo restores them. Empty when nothing was lost.
+        std::vector<std::string> DroppedProperties{};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
 
@@ -249,6 +256,9 @@ export namespace Extrinsic::Runtime
         std::size_t SeamVerticesPinned{0u};
         EditorMeshTexcoordOutcome TexcoordOutcome{
             EditorMeshTexcoordOutcome::None};
+        // User properties the edit removed from the entity, as
+        // "<domain>:<name>". Undo restores them. Empty when nothing was lost.
+        std::vector<std::string> DroppedProperties{};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
 

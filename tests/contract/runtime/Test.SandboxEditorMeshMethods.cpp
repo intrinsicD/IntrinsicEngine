@@ -1,5 +1,6 @@
 // ARCH-006 runtime Sandbox editor MeshMethods contract partition.
 #include <algorithm>
+#include <set>
 #include <array>
 #include <bit>
 #include <chrono>
@@ -6871,4 +6872,147 @@ TEST(SandboxEditorUi, DirectMeshPostProcessSurvivesUnrelatedEntityRemoval)
     EXPECT_TRUE(view.VertexSource->Properties.Exists("v:texcoord") || view.HalfedgeSource->Properties.Exists("h:texcoord"));
     EXPECT_EQ(view.VertexSource->Properties.Get<float>("v:paint").Vector(), std::vector<float>(3u, 0.75f));
     engine.Shutdown();
+}
+
+// BUG-230 — topology edits rebuild the entity from a positions-and-topology
+// triangle soup and publish the property sets wholesale, so user properties
+// were lost and undo could not bring them back. Simplify carries the surviving
+// vertices' values; remesh and subdivide drop and name them; undo restores
+// every domain exactly, and redo replays the edit.
+TEST(SandboxEditorUi, TopologyEditsPreserveOrReportUserPropertiesAndUndoRestoresThemExactly)
+{
+    constexpr int kGrid = 4;
+    enum class Edit { Simplify, Remesh, Subdivide };
+
+    struct Stored
+    {
+        std::vector<float> Height{};
+        std::vector<float> Weight{};
+        std::vector<std::uint32_t> Tag{};
+        std::size_t Vertices{0u};
+    };
+    const auto read = [](ECS::Scene::Registry& registry, const ECS::EntityHandle mesh) {
+        const auto& raw = registry.Raw();
+        Stored out{};
+        const auto& vertices = raw.get<GS::Vertices>(mesh).Properties;
+        if (const auto height = vertices.Get<float>("height"))
+            out.Height = height.Vector();
+        if (const auto weight = raw.get<GS::Edges>(mesh).Properties.Get<float>("weight"))
+            out.Weight = weight.Vector();
+        if (const auto tag = raw.get<GS::Faces>(mesh).Properties.Get<std::uint32_t>("tag"))
+            out.Tag = tag.Vector();
+        out.Vertices = vertices.Size();
+        return out;
+    };
+
+    for (const Edit edit : {Edit::Simplify, Edit::Remesh, Edit::Subdivide})
+    {
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        Runtime::EditorCommandHistory history;
+        Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+        context.CommandHistory = &history;
+
+        Geometry::HalfedgeMesh::Mesh grid = MakeGridPlaneMesh(kGrid);
+        const ECS::EntityHandle mesh = MakeSelectable(registry, "UserProps");
+        GS::PopulateFromMesh(registry.Raw(), mesh, grid);
+        registry.Raw().emplace<G::RenderSurface>(mesh);
+        auto& vertices = registry.Raw().get<GS::Vertices>(mesh);
+        auto& edges = registry.Raw().get<GS::Edges>(mesh);
+        auto& faces = registry.Raw().get<GS::Faces>(mesh);
+        auto height = vertices.Properties.GetOrAdd<float>("height", 0.0f);
+        for (std::size_t i = 0u; i < height.Vector().size(); ++i)
+            height.Vector()[i] = 1.0f + 0.37f * static_cast<float>(i); // all distinct
+        auto weight = edges.Properties.GetOrAdd<float>("weight", 0.0f);
+        for (std::size_t i = 0u; i < weight.Vector().size(); ++i)
+            weight.Vector()[i] = 0.5f + static_cast<float>(i);
+        auto tag = faces.Properties.GetOrAdd<std::uint32_t>("tag", 0u);
+        for (std::size_t i = 0u; i < tag.Vector().size(); ++i)
+            tag.Vector()[i] = 100u + static_cast<std::uint32_t>(i);
+        const Stored original = read(registry, mesh);
+        ASSERT_FALSE(original.Height.empty());
+        const std::uint32_t stableId = Runtime::SelectionController::ToStableEntityId(mesh);
+
+        std::vector<std::string> dropped{};
+        std::string message{};
+        switch (edit)
+        {
+        case Edit::Simplify:
+        {
+            const auto result = Runtime::ApplyEditorMeshSimplifyCommand(
+                context, Runtime::EditorMeshSimplifyCommand{.StableEntityId = stableId, .TargetFaces = 8u});
+            ASSERT_TRUE(result.Succeeded()) << result.Message;
+            dropped = result.DroppedProperties;
+            message = result.Message;
+            break;
+        }
+        case Edit::Remesh:
+        {
+            const auto result = Runtime::ApplyEditorMeshRemeshCommand(
+                context, Runtime::EditorMeshRemeshCommand{
+                             .StableEntityId = stableId, .Iterations = 1u, .TargetEdgeLength = 0.5});
+            ASSERT_TRUE(result.Succeeded()) << result.Message;
+            dropped = result.DroppedProperties;
+            message = result.Message;
+            break;
+        }
+        case Edit::Subdivide:
+        {
+            const auto result = Runtime::ApplyEditorMeshSubdivideCommand(
+                context, Runtime::EditorMeshSubdivideCommand{.StableEntityId = stableId, .Iterations = 1u});
+            ASSERT_TRUE(result.Succeeded()) << result.Message;
+            dropped = result.DroppedProperties;
+            message = result.Message;
+            break;
+        }
+        }
+        const auto reported = [&](const char* name) {
+            return std::find(dropped.begin(), dropped.end(), name) != dropped.end();
+        };
+
+        const Stored edited = read(registry, mesh);
+        // Edge and face user properties have no old-to-new map in any of the three operations.
+        EXPECT_TRUE(reported("edge:weight")) << message;
+        EXPECT_TRUE(reported("face:tag")) << message;
+        EXPECT_TRUE(edited.Weight.empty());
+        EXPECT_TRUE(edited.Tag.empty());
+        if (edit == Edit::Simplify)
+        {
+            EXPECT_FALSE(reported("vertex:height")) << message;
+            ASSERT_EQ(edited.Height.size(), edited.Vertices);
+            EXPECT_LT(edited.Vertices, original.Vertices);
+            for (const float value : edited.Height)
+                EXPECT_NE(std::find(original.Height.begin(), original.Height.end(), value),
+                          original.Height.end())
+                    << "a surviving vertex must keep one of its own original values, got " << value;
+            EXPECT_EQ(std::set<float>(edited.Height.begin(), edited.Height.end()).size(),
+                      edited.Height.size())
+                << "no vertex value may be duplicated or invented";
+        }
+        else
+        {
+            EXPECT_TRUE(reported("vertex:height")) << message;
+            EXPECT_TRUE(edited.Height.empty());
+        }
+        for (const std::string& name : dropped)
+            EXPECT_NE(message.find(name), std::string::npos) << name << " missing from: " << message;
+
+        ASSERT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+        const Stored undone = read(registry, mesh);
+        EXPECT_EQ(undone.Height, original.Height);
+        EXPECT_EQ(undone.Weight, original.Weight);
+        EXPECT_EQ(undone.Tag, original.Tag);
+        EXPECT_EQ(undone.Vertices, original.Vertices);
+
+        ASSERT_EQ(history.Redo().Status, Runtime::EditorCommandHistoryStatus::Redone);
+        const Stored redone = read(registry, mesh);
+        EXPECT_EQ(redone.Height, edited.Height);
+        EXPECT_TRUE(redone.Weight.empty());
+        EXPECT_EQ(redone.Vertices, edited.Vertices);
+
+        // A second round trip restores from the same immutable snapshot.
+        ASSERT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+        EXPECT_EQ(read(registry, mesh).Height, original.Height);
+        EXPECT_EQ(read(registry, mesh).Weight, original.Weight);
+    }
 }

@@ -325,6 +325,13 @@ export namespace Geometry
         /// Removes a property by id.
         bool Remove(PropertyId id);
 
+        /// Copies the named property, whatever its element type, out of
+        /// `source` into this registry, replacing any same-named property
+        /// here. Fails (returns false, no change) when `source` has no such
+        /// property or the two registries disagree on element count. The copy
+        /// carries a fresh revision in this registry.
+        bool CopyPropertyFrom(const PropertyRegistry& source, std::string_view name);
+
     private:
         void EnsureRevisionState();
         void MarkModified();
@@ -921,6 +928,13 @@ export namespace Geometry
         /// Removes a property and resets the handle.
         template <class T>
         void Remove(Property<T>& property);
+
+        /// Type-erased copy of one named property from another set; see
+        /// `PropertyRegistry::CopyPropertyFrom`.
+        bool CopyPropertyFrom(const PropertySet& source, std::string_view name)
+        {
+            return m_Registry.CopyPropertyFrom(source.m_Registry, name);
+        }
 
         PropertyRegistry& Registry() noexcept { return m_Registry; }
         [[nodiscard]] const PropertyRegistry& Registry() const noexcept { return m_Registry; }

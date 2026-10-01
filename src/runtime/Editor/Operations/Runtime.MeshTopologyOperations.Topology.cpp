@@ -449,6 +449,17 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
         }
 
 
+        // One side of a topology edit. The mesh is what the entity's
+        // topology is published from; the stored snapshot, present on the
+        // before side only, is the exact pre-edit source components, which is
+        // how undo brings back user properties and the original halfedge, edge
+        // and face numbering that the mesh re-derivation cannot carry.
+        struct MeshTopologyState
+        {
+            MeshTopologySnapshot Mesh{};
+            MeshStoredSourceState Stored{};
+        };
+
         struct MeshTopologyMutationGeneration
         {
             std::uint64_t GeometryMetadataSignature{0u};
@@ -539,12 +550,32 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             const std::uint64_t expectedGeometryMetadataSignature,
             Geometry::HalfedgeMesh::Mesh before,
             Geometry::HalfedgeMesh::Mesh after,
-            std::optional<GeometryPropertyRef> feature = std::nullopt)
+            std::optional<GeometryPropertyRef> feature = std::nullopt,
+            std::vector<std::string>* droppedProperties = nullptr)
         {
             if (before.HasGarbage())
                 before.GarbageCollection();
             if (after.HasGarbage())
                 after.GarbageCollection();
+
+            // What publishing `after` removes from the entity, named before the
+            // apply rewrites it, plus (for undo) the exact stored components.
+            MeshStoredSourceState storedBefore{};
+            if (context.Scene != nullptr)
+            {
+                entt::registry& sourceRaw = context.Scene->Raw();
+                if (const auto sourceEntity =
+                        ResolveStableEntity(sourceRaw, stableEntityId))
+                {
+                    const GS::ConstSourceView sourceView =
+                        GS::BuildConstView(sourceRaw, *sourceEntity);
+                    if (droppedProperties != nullptr)
+                        *droppedProperties =
+                            DroppedMeshUserProperties(sourceView, after);
+                    if (context.CommandHistory != nullptr)
+                        storedBefore = CaptureMeshStoredSources(sourceView);
+                }
+            }
 
             if (context.CommandHistory != nullptr)
             {
@@ -558,12 +589,15 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                               context.Scene->Raw(),
                               stableEntityId)
                         : std::nullopt;
-                const MeshTopologySnapshot beforeState =
-                    std::make_shared<Geometry::HalfedgeMesh::Mesh>(
-                        std::move(before));
-                const MeshTopologySnapshot afterState =
-                    std::make_shared<Geometry::HalfedgeMesh::Mesh>(
-                        std::move(after));
+                const MeshTopologyState beforeState{
+                    .Mesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>(
+                        std::move(before)),
+                    .Stored = std::move(storedBefore),
+                };
+                const MeshTopologyState afterState{
+                    .Mesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>(
+                        std::move(after)),
+                };
                 const EditorCommandHistoryResult history =
                     Internal::ExecuteUndoableEntityMutation(
                         *context.CommandHistory,
@@ -577,7 +611,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                             .GeometryMetadataSignature =
                                 expectedGeometryMetadataSignature,
                             .TopologySignature = beforeTopology,
-                            .Mesh = beforeState,
+                            .Mesh = beforeState.Mesh,
                             .FeatureRef = feature,
                             .FeatureValues = CaptureMeshFeature(context.Scene->Raw(), stableEntityId, feature),
                         },
@@ -586,7 +620,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                         [](
                             const MeshPropertyMutationIdentity& identity,
                             const MeshTopologyMutationGeneration& expected,
-                            const MeshTopologySnapshot& target)
+                            const MeshTopologyState& target)
                         {
                             if (identity.Scene == nullptr ||
                                 !identity.World.IsValid())
@@ -614,7 +648,8 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                                 return EditorCommandHistoryStatus::
                                     UnsupportedOperation;
                             }
-                            if (expected.Mesh == nullptr || target == nullptr)
+                            if (expected.Mesh == nullptr ||
+                                target.Mesh == nullptr)
                             {
                                 return EditorCommandHistoryStatus::CommandFailed;
                             }
@@ -635,9 +670,9 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                         },
                         [](
                             const MeshPropertyMutationIdentity& identity,
-                            const MeshTopologySnapshot& target)
+                            const MeshTopologyState& target)
                         {
-                            if (target == nullptr)
+                            if (target.Mesh == nullptr)
                             {
                                 return EditorCommandHistoryStatus::
                                     CommandFailed;
@@ -645,12 +680,13 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                             return ApplyMeshTopologyState(
                                 identity.Scene,
                                 identity.StableEntityId,
-                                *target);
+                                *target.Mesh,
+                                target.Stored.get());
                         },
                         [](
                             const MeshPropertyMutationIdentity& identity,
                             const MeshTopologyMutationGeneration& expected,
-                            const MeshTopologySnapshot& target)
+                            const MeshTopologyState& target)
                         {
                             entt::registry& raw = identity.Scene->Raw();
                             const std::optional<ECS::EntityHandle> entity =
@@ -676,7 +712,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                                         ? MeshTopologyValueSignature(
                                               GS::BuildConstView(raw, *entity))
                                         : std::nullopt,
-                                .Mesh = target,
+                                .Mesh = target.Mesh,
                                 .FeatureRef = expected.FeatureRef,
                                 .FeatureValues = CaptureMeshFeature(raw, identity.StableEntityId, expected.FeatureRef),
                             };
@@ -799,6 +835,25 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                    "onto it. Re-parameterize the result if you need UVs.";
         }
 
+        // Dropped user properties are named in the message too, so the panel
+        // and the agent both see them without reading a separate field.
+        [[nodiscard]] std::string AppendedDroppedPropertiesSentence(
+            const std::vector<std::string>& dropped)
+        {
+            if (dropped.empty())
+                return {};
+            std::string sentence = " User properties dropped (the operation "
+                                   "cannot map them onto the new topology; "
+                                   "undo restores them):";
+            for (std::size_t i = 0u; i < dropped.size(); ++i)
+            {
+                sentence += i == 0u ? " " : ", ";
+                sentence += dropped[i];
+            }
+            sentence += ".";
+            return sentence;
+        }
+
         [[nodiscard]] std::string BuildMeshRemeshSuccessMessage(
             const EditorMeshRemeshResult& result)
         {
@@ -815,6 +870,8 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 result.TexcoordOutcome);
             message += ").";
             message += AppendedTexcoordDiscardSentence(result.TexcoordOutcome);
+            message += AppendedDroppedPropertiesSentence(
+                result.DroppedProperties);
             return message;
         }
 
@@ -835,6 +892,8 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 result.TexcoordOutcome);
             message += ").";
             message += AppendedTexcoordDiscardSentence(result.TexcoordOutcome);
+            message += AppendedDroppedPropertiesSentence(
+                result.DroppedProperties);
             return message;
         }
 
@@ -855,6 +914,8 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 result.TexcoordOutcome);
             message += ").";
             message += AppendedTexcoordDiscardSentence(result.TexcoordOutcome);
+            message += AppendedDroppedPropertiesSentence(
+                result.DroppedProperties);
             return message;
         }
 
@@ -1095,6 +1156,13 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
         {
             if (view.VertexSource == nullptr)
                 return EditorMeshTexcoordOutcome::None;
+
+            // Vertex numbering survives the scratch round trip, so user vertex
+            // properties of the surviving vertices ride along through mesh
+            // garbage collection. No edge, halfedge or face map exists (faces
+            // are re-fanned into triangles, edges and halfedges renumbered),
+            // so those domains' user properties are dropped and reported.
+            ForwardMeshUserVertexProperties(view, mesh);
 
             const bool hadTexcoords = MeshHasResolvableTexcoords(view);
             bool carried = CopyStoredCornerTexcoordsToScratchMesh(view, mesh);
@@ -1756,7 +1824,9 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                     "Remesh mesh",
                     job.GeometryMetadataSignature,
                     std::move(job.BeforeMesh),
-                    std::move(job.Mesh));
+                    std::move(job.Mesh),
+                    std::nullopt,
+                    &result.DroppedProperties);
             if (commitStatus != EditorCommandStatus::Applied)
             {
                 result.Status = commitStatus;
@@ -1799,7 +1869,8 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                     job.GeometryMetadataSignature,
                     std::move(job.BeforeMesh),
                     std::move(job.Mesh),
-                    job.SubdivideCommand.PreserveLoopFeatureEdges ? std::optional{job.SubdivideCommand.FeatureEdges} : std::nullopt);
+                    job.SubdivideCommand.PreserveLoopFeatureEdges ? std::optional{job.SubdivideCommand.FeatureEdges} : std::nullopt,
+                    &result.DroppedProperties);
             if (commitStatus != EditorCommandStatus::Applied)
             {
                 result.Status = commitStatus;
@@ -1845,7 +1916,9 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                     "Simplify mesh",
                     job.GeometryMetadataSignature,
                     std::move(job.BeforeMesh),
-                    std::move(job.Mesh));
+                    std::move(job.Mesh),
+                    std::nullopt,
+                    &result.DroppedProperties);
             if (commitStatus != EditorCommandStatus::Applied)
             {
                 result.Status = commitStatus;
@@ -2809,7 +2882,9 @@ ApplyEditorMeshRemeshCommand(
                 "Remesh mesh",
                 GeometryMetadataSignatureForEntity(raw, *entity),
                 std::move(before),
-                std::move(source.Mesh));
+                std::move(source.Mesh),
+                std::nullopt,
+                &result.DroppedProperties);
         if (commitStatus != EditorCommandStatus::Applied)
         {
             result.Status = commitStatus;
@@ -2890,7 +2965,8 @@ ApplyEditorMeshSubdivideCommand(
                 GeometryMetadataSignatureForEntity(raw, *entity),
                 std::move(before),
                 std::move(source.Mesh),
-                    command.PreserveLoopFeatureEdges ? std::optional{command.FeatureEdges} : std::nullopt);
+                    command.PreserveLoopFeatureEdges ? std::optional{command.FeatureEdges} : std::nullopt,
+                    &result.DroppedProperties);
         if (commitStatus != EditorCommandStatus::Applied)
         {
             result.Status = commitStatus;
@@ -2975,7 +3051,9 @@ ApplyEditorMeshSimplifyCommand(
                 "Simplify mesh",
                 GeometryMetadataSignatureForEntity(raw, *entity),
                 std::move(before),
-                std::move(source.Mesh));
+                std::move(source.Mesh),
+                std::nullopt,
+                &result.DroppedProperties);
         if (commitStatus != EditorCommandStatus::Applied)
         {
             result.Status = commitStatus;

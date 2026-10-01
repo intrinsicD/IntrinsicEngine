@@ -379,6 +379,33 @@ therefore owes an explicit decision, reported in its result as
 
 A silent discard is a defect, not a policy. See `BUG-146`.
 
+### Topology-replacing operations and user properties
+
+The same rebuild also removes user-defined properties (for example a vertex
+scalar `height`), and `BUG-230` applies the same rule: carry what has a map,
+report what does not, and make undo exact.
+
+- **Apply.** User property names exclude what the halfedge mesh owns, what
+  `GS::PopulateFromMesh` regenerates, derived normals and curvature, and UVs
+  (see above). Simplify forwards the surviving vertices' user values into the
+  scratch mesh, so they ride through garbage collection with their vertices; no
+  edge, halfedge or face map exists, so those domains' user properties are
+  dropped. Remesh and subdivide drop every user property that their output
+  mesh does not carry; subdivision's crease flags, which the operation
+  refines, are the carried case. No value is interpolated.
+- **Report.** Dropped properties are listed as `<domain>:<name>` in
+  `DroppedProperties` on the simplify, remesh and subdivide results, appended to
+  the result message (what the panels render) and returned by the agent
+  `run_operation` reply as `dropped_properties`. All of it sits behind
+  `CommitMeshTopologyReplacement`, so the panels and the agent share one path.
+- **Undo and redo.** The before side of the history record is an exact copy of
+  the four stored source components and their provenance markers
+  (`MeshStoredSourceSnapshot`), not a halfedge mesh, because the mesh is a
+  re-derivation whose edge, halfedge and face numbering differs from the stored
+  one and which never held user properties. Undo reinstalls the copy, which
+  stamps fresh property revisions and so reaches residency and catalogs; redo
+  republishes the after mesh, which carries whatever the apply produced.
+
 Same-cardinality scalar and mask publication updates the named property's
 revision and workspace snapshot, without setting geometry-wide GPU or vertex
 attribute dirty tags. This also applies to undo/redo: visualization buffers

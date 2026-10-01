@@ -369,6 +369,7 @@ namespace Extrinsic::Runtime
             out["output_vertices"] = r.OutputVertexCount;
             out["output_faces"] = r.OutputFaceCount;
             out["texcoords"] = DebugNameForEditorMeshTexcoordOutcome(r.TexcoordOutcome);
+            out["dropped_properties"] = r.DroppedProperties;
             return out;
         }
 

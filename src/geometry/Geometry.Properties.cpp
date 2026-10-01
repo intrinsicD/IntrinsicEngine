@@ -260,6 +260,27 @@ namespace Geometry
         return *this;
     }
 
+    bool PropertyRegistry::CopyPropertyFrom(const PropertyRegistry& source, const std::string_view name)
+    {
+        if (this == &source || source.m_Size != m_Size)
+            return false;
+        const std::optional<PropertyId> sourceId = source.Find(name);
+        if (!sourceId.has_value() || source.m_Storages[*sourceId] == nullptr)
+            return false;
+
+        if (const std::optional<PropertyId> existing = Find(name))
+            (void)Remove(*existing);
+
+        EnsureRevisionState();
+        MarkModified();
+        auto storage = source.m_Storages[*sourceId]->Clone(m_Revisions);
+        storage->MarkModified();
+        const PropertyId id = m_Storages.size();
+        m_NameIndex.emplace(std::string(storage->Name()), id);
+        m_Storages.push_back(std::move(storage));
+        return true;
+    }
+
     bool PropertyRegistry::Remove(PropertyId id)
     {
         if (id >= m_Storages.size())
