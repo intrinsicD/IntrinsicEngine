@@ -59,12 +59,11 @@ namespace
         P::LocalSocketConnection Connection;
         std::string Buffer;
         int NextId{1};
-        Json Request(const std::string& method, Json params = Json::object())
+        std::vector<Json> Notifications; // server notifications read while waiting for a response
+        // One line from the socket, empty when nothing arrives within `attempts` x 20 ms.
+        Json ReadLine(int attempts = 500)
         {
-            const int id = NextId++;
-            const Json request{{"jsonrpc", "2.0"}, {"id", id}, {"method", method}, {"params", std::move(params)}};
-            if (Connection.SendAll(request.dump() + "\n") != P::LocalSocketStatus::Ok) return {};
-            for (int attempt = 0; attempt < 500; ++attempt)
+            for (int attempt = 0; attempt < attempts; ++attempt)
             {
                 if (const auto newline = Buffer.find('\n'); newline != std::string::npos)
                 {
@@ -75,6 +74,33 @@ namespace
                 if (Connection.Receive(Buffer, 20) == P::LocalSocketStatus::Closed) return {};
             }
             return {};
+        }
+        // Sends a request and returns its id; the response is read with Await.
+        int Send(const std::string& method, Json params = Json::object())
+        {
+            const int id = NextId++;
+            const Json request{{"jsonrpc", "2.0"}, {"id", id}, {"method", method}, {"params", std::move(params)}};
+            return Connection.SendAll(request.dump() + "\n") == P::LocalSocketStatus::Ok ? id : -1;
+        }
+        bool Notify(const std::string& method, Json params)
+        {
+            return Connection.SendAll(Json{{"jsonrpc", "2.0"}, {"method", method}, {"params", std::move(params)}}.dump() + "\n") ==
+                   P::LocalSocketStatus::Ok;
+        }
+        Json Await(int id, int attempts = 500)
+        {
+            for (;;)
+            {
+                Json line = ReadLine(attempts);
+                if (line.is_discarded() || line.is_null()) return {};
+                if (line.contains("id") && line["id"] == id) return line;
+                if (line.contains("method") && !line.contains("id")) Notifications.push_back(std::move(line));
+            }
+        }
+        Json Request(const std::string& method, Json params = Json::object())
+        {
+            const int id = Send(method, std::move(params));
+            return id < 0 ? Json{} : Await(id);
         }
         Json Tool(const std::string& name, Json arguments = Json::object(), bool* isError = nullptr)
         {
@@ -251,6 +277,113 @@ TEST(SandboxAgentServer, ClientRunsSmoothingThroughTheSocketAndUndoesIt)
     EXPECT_EQ(lastApply.Source, R::RuntimeConfigControlSource::AgentCli) << "config_apply records the agent as the source";
     engine.Shutdown();
     EXPECT_FALSE(std::filesystem::exists(socketPath)) << "the socket file is removed on shutdown";
+}
+
+// RUNTIME-312 slice 5: a CPD call with a progress token streams notifications/progress, and
+// notifications/cancelled drops the pending reply while the connection stays usable.
+TEST(SandboxAgentServer, ProgressAndCancelOverTheSocket)
+{
+    const auto socketPath = (std::filesystem::temp_directory_path() /
+                             ("intrinsic-agent-prog-" + std::to_string(::getpid()) + ".sock")).string();
+    auto sections = Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry();
+    Config::EngineConfig config{};
+    Config::PopulateEngineConfigSectionDefaults(config, sections);
+    config.Simulation.WorkerThreadCount = 1u;
+    config.ReferenceScene.Enabled = false;
+    config.Camera.Enabled = false;
+    config.Window.Backend = Config::WindowBackend::Null;
+    auto driver = std::make_unique<Driver>();
+    Driver* frames = driver.get();
+    Intrinsic::Tests::RuntimeTestKernel engine{config, std::move(driver)};
+    engine.EmplaceModule<R::EngineConfigControl>(std::move(sections));
+    engine.EmplaceModule<R::SceneInteractionModule>();
+    engine.EmplaceModule<R::SceneDocumentModule>();
+    engine.EmplaceModule<R::AsyncWorkModule>();
+    engine.EmplaceModule<R::ViewCaptureModule>(std::filesystem::temp_directory_path());
+    auto* server = &engine.EmplaceModule<R::AgentServerModule>(
+        R::AgentServerOptions{.SocketPath = socketPath, .AllowedRoots = {std::filesystem::temp_directory_path().string()},
+                              .ProgressInterval = std::chrono::milliseconds(0)});
+    engine.Initialize();
+    ASSERT_TRUE(server->Status().Listening) << server->Status().LastError;
+
+    // Two 1200-point clouds: enough EM work to span several frames.
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const auto makeCloud = [&](float shift) {
+        const auto entity = scene.Create();
+        auto& points = scene.Raw().emplace<GS::Vertices>(entity).Properties;
+        points.Resize(1200);
+        auto positions = points.GetOrAdd<glm::vec3>("v:position");
+        for (std::size_t i = 0; i < 1200; ++i)
+            positions[i] = glm::vec3(float(i % 40) * 0.1f + shift, float((i / 40) % 30) * 0.1f, float(i % 7) * 0.05f);
+        return R::SelectionController::ToStableEntityId(entity);
+    };
+    const auto sourceId = makeCloud(0.0f);
+    const auto targetId = makeCloud(0.05f);
+
+    std::atomic_bool done{false};
+    std::vector<std::string> failures;
+    const auto check = [&](bool ok, std::string what) { if (!ok) failures.push_back(std::move(what)); };
+    std::thread client([&] {
+        Client c;
+        for (int attempt = 0; attempt < 50 && P::ConnectLocalSocket(socketPath, c.Connection) != P::LocalSocketStatus::Ok; ++attempt)
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        check(c.Connection.IsOpen(), "connect");
+        check(c.Request("initialize", {{"protocolVersion", "2025-06-18"}, {"capabilities", Json::object()}}).contains("result"), "initialize");
+        check(c.Tool("scene_entities").contains("entities"), "scene_entities warms the workspace attachment");
+        const auto configure = [&](int iterations) {
+            bool isError = true;
+            const auto applied = c.Tool("config_apply", {{"section", "sandbox.coherent_point_drift"},
+                {"payload", {{"source", sourceId}, {"target", targetId}, {"output", 1}, {"outlier_weight", 0.0},
+                             {"max_iterations", iterations}}}}, &isError);
+            check(!isError && applied["applied"] == true, "cpd config_apply: " + applied.dump());
+        };
+
+        // Progress: the run reports with its token, then replies with the same id.
+        configure(40);
+        const int runId = c.Send("tools/call", {{"name", "run_registration"}, {"arguments", {{"method", "cpd"}}},
+                                                {"_meta", {{"progressToken", "run-1"}}}});
+        const auto reply = c.Await(runId);
+        check(reply.contains("result") && reply["result"]["isError"] == false, "run_registration reply: " + reply.dump());
+        check(!c.Notifications.empty(), "at least one progress notification before the reply");
+        double last = -1.0;
+        for (const auto& note : c.Notifications)
+        {
+            check(note["method"] == "notifications/progress" && note["params"]["progressToken"] == "run-1", "note shape: " + note.dump());
+            check(note["params"]["progress"].get<double>() >= last, "progress never decreases");
+            last = note["params"]["progress"].get<double>();
+        }
+        c.Notifications.clear();
+
+        // No token, no notifications.
+        configure(10);
+        bool isError = true;
+        const auto untokened = c.Tool("run_registration", {{"method", "cpd"}}, &isError);
+        check(!isError && c.Notifications.empty(), "no progress without a token: " + untokened.dump() +
+              (c.Notifications.empty() ? "" : c.Notifications.front().dump()));
+
+        // Cancel: the reply never arrives, the connection keeps working.
+        configure(60);
+        const int cancelledId = c.Send("tools/call", {{"name", "run_registration"}, {"arguments", {{"method", "cpd"}}}});
+        check(c.Notify("notifications/cancelled", {{"requestId", cancelledId}}), "send cancel");
+        const int pingId = c.Send("ping");
+        check(c.Await(pingId).contains("result"), "ping is answered after the cancel");
+        for (int i = 0; i < 100; ++i) // 2 s, longer than the cancelled job
+        {
+            const auto line = c.ReadLine(1);
+            if (line.is_object() && line.contains("id"))
+                check(line["id"] != cancelledId, "the cancelled call was answered: " + line.dump());
+        }
+        done.store(true);
+    });
+    int frameCount = 0;
+    frames->OnFrame = [&](R::Engine& kernel) {
+        if (done.load() || ++frameCount > 20000) kernel.RequestExit();
+    };
+    engine.Run();
+    client.join();
+    for (const auto& failure : failures) ADD_FAILURE() << failure;
+    EXPECT_TRUE(done.load()) << "client did not finish";
+    engine.Shutdown();
 }
 
 namespace

@@ -7,6 +7,7 @@
 module;
 
 #include <array>
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -43,12 +44,18 @@ export namespace Extrinsic::Runtime
         AgentProtocol(const AgentOperationRegistry& registry, bool readOnly) noexcept
             : m_Registry(&registry), m_ReadOnly(readOnly) {}
         [[nodiscard]] std::optional<std::string> Handle(std::string_view message, const AgentOperationContext& context);
-        // Replies for deferred tool calls that finished this frame.
+        // Replies for deferred tool calls that finished this frame, plus `notifications/progress`
+        // lines for pending calls that sent a `_meta.progressToken` (at most one per interval).
+        // Progress follows the oldest queued or running editor job (determinate: percent of 100;
+        // otherwise elapsed seconds), or the call's own age with message "waiting" when there is
+        // none. With several concurrent jobs the pick is ambiguous until per-call job tokens exist
+        // (RUNTIME-279).
         [[nodiscard]] std::vector<std::string> PollPending(const AgentOperationContext& context);
         [[nodiscard]] std::size_t PendingCount() const noexcept { return m_Pending.size(); }
         // tools/call is refused with -32000 while this many deferred calls are waiting.
         static constexpr std::size_t kMaxPendingCalls = 16;
         void DropPending() noexcept { m_Pending.clear(); }
+        void SetProgressInterval(std::chrono::milliseconds interval) noexcept { m_ProgressInterval = interval; }
         [[nodiscard]] bool Initialized() const noexcept { return m_Initialized; }
         [[nodiscard]] const std::string& ClientName() const noexcept { return m_ClientName; }
         [[nodiscard]] const std::string& NegotiatedVersion() const noexcept { return m_NegotiatedVersion; }
@@ -59,7 +66,19 @@ export namespace Extrinsic::Runtime
         bool m_Initialized{false};
         std::string m_ClientName{};
         std::string m_NegotiatedVersion{kAgentProtocolVersion};
-        std::vector<std::pair<std::string, AgentOperationContinuation>> m_Pending{}; // (JSON id, continuation)
+        // `notifications/cancelled` drops the entry without a reply; the editor job keeps running
+        // until RUNTIME-279 offers a cancel path.
+        struct PendingCall
+        {
+            std::string Id{};                // dumped JSON-RPC id
+            AgentOperationContinuation Continue{};
+            std::string ProgressToken{};     // dumped JSON token; empty when the call sent none
+            std::chrono::steady_clock::time_point Started{};
+            std::chrono::steady_clock::time_point LastEmit{};
+            double LastProgress{0.0};
+        };
+        std::vector<PendingCall> m_Pending{};
+        std::chrono::milliseconds m_ProgressInterval{250};
     };
 
     struct AgentServerOptions
@@ -69,6 +88,7 @@ export namespace Extrinsic::Runtime
         std::vector<std::string> AllowedRoots{}; // empty selects the working directory
         std::uint32_t MaxCallsPerFrame{4};
         std::size_t MaxMessageBytes{8u << 20u};
+        std::chrono::milliseconds ProgressInterval{250}; // between progress notifications of one call
     };
 
     struct AgentServerStatus

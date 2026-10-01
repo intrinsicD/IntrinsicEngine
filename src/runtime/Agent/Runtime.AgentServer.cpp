@@ -1,6 +1,8 @@
 module;
 
+#include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <deque>
@@ -106,7 +108,21 @@ namespace Extrinsic::Runtime
         const auto paramsIt = request.find("params");
         const Json params = paramsIt != request.end() && paramsIt->is_object() ? *paramsIt : Json::object();
 
-        if (isNotification) return std::nullopt; // notifications/initialized, notifications/cancelled, ...
+        if (isNotification && method == "notifications/cancelled")
+        {
+            if (const auto requestId = params.find("requestId"); requestId != params.end())
+            {
+                const std::string wanted = Dump(*requestId);
+                const auto it = std::find_if(m_Pending.begin(), m_Pending.end(), [&](const PendingCall& call) { return call.Id == wanted; });
+                if (it != m_Pending.end())
+                {
+                    m_Pending.erase(it); // destroying the continuation releases its subscriptions
+                    Core::Log::Info("[AgentServer] request {} cancelled; the editor job continues (RUNTIME-279)", wanted);
+                }
+            }
+            return std::nullopt;
+        }
+        if (isNotification) return std::nullopt; // notifications/initialized, ...
         if (method == "initialize")
         {
             std::string version{kAgentProtocolVersion};
@@ -154,7 +170,12 @@ namespace Extrinsic::Runtime
             auto outcome = InvokeAgentOperation(*m_Registry, name, context, arguments, m_ReadOnly);
             if (outcome.Continuation)
             {
-                m_Pending.emplace_back(Dump(id), std::move(outcome.Continuation));
+                PendingCall call{.Id = Dump(id), .Continue = std::move(outcome.Continuation)};
+                if (const auto meta = params.find("_meta"); meta != params.end() && meta->is_object())
+                    if (const auto token = meta->find("progressToken"); token != meta->end() && (token->is_string() || token->is_number_integer()))
+                        call.ProgressToken = Dump(*token);
+                call.Started = call.LastEmit = std::chrono::steady_clock::now();
+                m_Pending.push_back(std::move(call));
                 return std::nullopt;
             }
             return Dump(ToolResultResponse(id, outcome, m_NegotiatedVersion));
@@ -165,12 +186,43 @@ namespace Extrinsic::Runtime
     std::vector<std::string> AgentProtocol::PollPending(const AgentOperationContext& context)
     {
         std::vector<std::string> replies;
+        const auto now = std::chrono::steady_clock::now();
         for (auto it = m_Pending.begin(); it != m_Pending.end();)
         {
             AgentOperationOutcome outcome{};
-            if (!it->second(context, outcome)) { ++it; continue; }
-            replies.push_back(Dump(ToolResultResponse(Json::parse(it->first, nullptr, false), outcome, m_NegotiatedVersion)));
-            it = m_Pending.erase(it);
+            if (it->Continue(context, outcome))
+            {
+                replies.push_back(Dump(ToolResultResponse(Json::parse(it->Id, nullptr, false), outcome, m_NegotiatedVersion)));
+                it = m_Pending.erase(it);
+                continue;
+            }
+            if (!it->ProgressToken.empty() && now - it->LastEmit >= m_ProgressInterval)
+            {
+                it->LastEmit = now;
+                // The oldest queued or running job stands in for the call (see PollPending in the header).
+                const JobSnapshot* oldest = nullptr;
+                std::vector<JobSnapshot> jobs;
+                if (context.Jobs) jobs = context.Jobs->SnapshotAll();
+                for (const auto& job : jobs)
+                    if ((job.State == JobState::Queued || job.State == JobState::Running) &&
+                        (!oldest || job.ElapsedMilliseconds > oldest->ElapsedMilliseconds))
+                        oldest = &job;
+                Json params{{"progressToken", Json::parse(it->ProgressToken, nullptr, false)}};
+                double progress = std::chrono::duration<double>(now - it->Started).count();
+                if (oldest && oldest->Progress.Determinate)
+                {
+                    progress = static_cast<double>(oldest->Progress.Normalized) * 100.0;
+                    params["total"] = 100.0;
+                }
+                else if (oldest)
+                    progress = static_cast<double>(oldest->ElapsedMilliseconds) / 1000.0;
+                progress = std::max(progress, it->LastProgress);
+                it->LastProgress = progress;
+                params["progress"] = progress;
+                params["message"] = oldest ? oldest->DebugName : std::string{"waiting"};
+                replies.push_back(Dump(Json{{"jsonrpc", "2.0"}, {"method", "notifications/progress"}, {"params", std::move(params)}}));
+            }
+            ++it;
         }
         return replies;
     }
@@ -331,6 +383,7 @@ namespace Extrinsic::Runtime
         RegisterEditorAgentOperations(m_Impl->Registry);
         RegisterViewCaptureAgentOperations(m_Impl->Registry);
         m_Impl->Protocol = std::make_unique<AgentProtocol>(m_Impl->Registry, m_Impl->Options.ReadOnly);
+        m_Impl->Protocol->SetProgressInterval(m_Impl->Options.ProgressInterval);
         m_Impl->Status.ReadOnly = m_Impl->Options.ReadOnly;
         m_Impl->Status.SocketPath = m_Impl->Options.SocketPath;
         m_Impl->Status.AllowedRoots = m_Impl->Options.AllowedRoots;

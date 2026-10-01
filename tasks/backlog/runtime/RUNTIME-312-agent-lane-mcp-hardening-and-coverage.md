@@ -127,7 +127,7 @@ the editor operations the Sandbox UI already offers.
 - [x] Slice 2: a tool call to a minimized Sandbox completes (non-capture) or fails fast with a typed error (capture); a deferred reply outliving 120 s is still delivered to its connection.
 - [ ] Slice 3: the bridge answers `ping` during a pending call, forwards server notifications, keeps the connection after a per-call timeout, and announces a later-started Sandbox via `tools/list_changed` without a manual call.
 - [ ] Slice 4: unsupported `protocolVersion` gets the server's own version; tool results carry `structuredContent`; annotations match undoability; `view_capture` never overwrites without `overwrite: true`.
-- [ ] Slice 5: progress notifications arrive for a long continuation tool with a progress token; cancellation drops the pending reply (and cancels the job once RUNTIME-279 landed, else documented).
+- [x] Slice 5: progress notifications arrive for a long continuation tool with a progress token; cancellation drops the pending reply (the job itself keeps running: cancelling it waits for RUNTIME-279, documented in `agent-control-lane.md`).
 - [ ] Slice 6: keypoint, k-means and consolidation have `preview_*` tools and one shared argument convention recorded in this note.
 - [ ] Slice 7: every command of finding 9 is reachable through an agent tool with undo coverage where it edits the scene; `run_mesh_operation` keeps working.
 - [ ] `agent-control-lane.md`, `tools/agents/README.md` and the module inventory are current after every slice.

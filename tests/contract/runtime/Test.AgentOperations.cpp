@@ -1,8 +1,10 @@
 // RUNTIME-287/288: agent operation registry, MCP protocol core, read-only policy, path
 // containment and the "Agent:" history label, without sockets or an engine.
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <gtest/gtest.h>
@@ -285,6 +287,93 @@ TEST(AgentOperations, LateContinuationStillRepliesAfterManyPollRounds)
     ASSERT_EQ(replies.size(), 1u);
     EXPECT_EQ(Json::parse(replies.front())["id"], "slow");
     EXPECT_EQ(protocol.PendingCount(), 0u);
+}
+
+namespace
+{
+    R::AgentOperationRegistry NeverFinishingRegistry(std::shared_ptr<int> alive)
+    {
+        R::AgentOperationRegistry registry;
+        EXPECT_TRUE(registry.Register({.Name = "forever", .Title = "Forever", .ReadOnly = true,
+            .Invoke = [alive](const R::AgentOperationContext&, std::string_view) {
+                R::AgentOperationOutcome outcome{};
+                outcome.Continuation = [alive](const R::AgentOperationContext&, R::AgentOperationOutcome&) { return false; };
+                return outcome; }}));
+        return registry;
+    }
+    Json ForeverCall(const Json& id, const Json& meta = Json::object())
+    {
+        Json params{{"name", "forever"}};
+        if (!meta.empty()) params["_meta"] = meta;
+        return {{"jsonrpc", "2.0"}, {"id", id}, {"method", "tools/call"}, {"params", params}};
+    }
+}
+
+TEST(AgentOperations, ProgressNotificationsAreRateLimited)
+{
+    auto registry = NeverFinishingRegistry(std::make_shared<int>(0));
+    R::AgentProtocol protocol{registry, false};
+    protocol.SetProgressInterval(std::chrono::hours(1));
+    const R::AgentOperationContext context{};
+    ASSERT_FALSE(protocol.Handle(ForeverCall("p1", {{"progressToken", "tok"}}).dump(), context).has_value());
+    for (int i = 0; i < 5; ++i) EXPECT_TRUE(protocol.PollPending(context).empty()) << "inside the interval";
+    protocol.SetProgressInterval(std::chrono::milliseconds(0));
+    double last = -1.0;
+    for (int i = 0; i < 3; ++i)
+    {
+        const auto lines = protocol.PollPending(context);
+        ASSERT_EQ(lines.size(), 1u);
+        const Json note = Json::parse(lines.front());
+        EXPECT_FALSE(note.contains("id")) << "a notification";
+        EXPECT_EQ(note["method"], "notifications/progress");
+        EXPECT_EQ(note["params"]["progressToken"], "tok");
+        EXPECT_EQ(note["params"]["message"], "waiting");
+        EXPECT_FALSE(note["params"].contains("total")) << "no job, so no total";
+        EXPECT_GE(note["params"]["progress"].get<double>(), last) << "progress never decreases";
+        last = note["params"]["progress"].get<double>();
+    }
+    EXPECT_EQ(protocol.PendingCount(), 1u);
+}
+
+TEST(AgentOperations, ProgressOnlyWithToken)
+{
+    auto registry = NeverFinishingRegistry(std::make_shared<int>(0));
+    R::AgentProtocol protocol{registry, false};
+    protocol.SetProgressInterval(std::chrono::milliseconds(0));
+    const R::AgentOperationContext context{};
+    ASSERT_FALSE(protocol.Handle(ForeverCall("a").dump(), context).has_value());
+    ASSERT_FALSE(protocol.Handle(ForeverCall("b", {{"progressToken", 7}}).dump(), context).has_value());
+    ASSERT_FALSE(protocol.Handle(ForeverCall("c", {{"progressToken", Json::array()}}).dump(), context).has_value());
+    const auto lines = protocol.PollPending(context);
+    ASSERT_EQ(lines.size(), 1u) << "only the call with a string or integer token reports";
+    EXPECT_EQ(Json::parse(lines.front())["params"]["progressToken"], 7);
+}
+
+TEST(AgentOperations, CancelledNotificationDropsPendingCall)
+{
+    auto alive = std::make_shared<int>(0);
+    auto registry = NeverFinishingRegistry(alive);
+    R::AgentProtocol protocol{registry, false};
+    protocol.SetProgressInterval(std::chrono::milliseconds(0));
+    const R::AgentOperationContext context{};
+    ASSERT_FALSE(protocol.Handle(ForeverCall(41, {{"progressToken", "t"}}).dump(), context).has_value());
+    ASSERT_FALSE(protocol.Handle(ForeverCall("keep").dump(), context).has_value());
+    ASSERT_EQ(protocol.PendingCount(), 2u);
+    const auto cancel = [&](const Json& requestId) {
+        return protocol.Handle(Json{{"jsonrpc", "2.0"}, {"method", "notifications/cancelled"},
+                                    {"params", {{"requestId", requestId}, {"reason", "test"}}}}.dump(), context);
+    };
+    EXPECT_FALSE(cancel("41").has_value()) << "string 41 is not integer 41";
+    EXPECT_EQ(protocol.PendingCount(), 2u);
+    EXPECT_FALSE(cancel(99).has_value()) << "unknown ids are ignored";
+    EXPECT_EQ(protocol.PendingCount(), 2u);
+    EXPECT_FALSE(cancel(41).has_value()) << "notifications never get a reply";
+    EXPECT_EQ(protocol.PendingCount(), 1u);
+    for (const auto& line : protocol.PollPending(context)) EXPECT_NE(Json::parse(line).value("id", Json{}), 41);
+    const auto baseline = alive.use_count(); // test + invoker + the surviving continuation
+    EXPECT_EQ(baseline, 3) << "the dropped continuation released its capture";
+    protocol.DropPending();
+    EXPECT_EQ(alive.use_count(), baseline - 1);
 }
 
 TEST(AgentOperations, NegotiatesProtocolVersion)

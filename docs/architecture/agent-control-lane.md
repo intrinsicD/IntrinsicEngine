@@ -56,6 +56,19 @@ are discarded. Nothing exists without the launch flag: no module, thread or sock
 - Version negotiation: `initialize` echoes the client's `protocolVersion` when it is one of
   `kAgentSupportedProtocolVersions` (`2025-06-18`, `2025-03-26`, `2024-11-05`) and otherwise
   answers the newest, `2025-06-18`; the client then decides whether to continue.
+- Progress: a `tools/call` with `_meta.progressToken` (string or integer) that defers its reply
+  gets `notifications/progress` lines, at most one per 250 ms (`AgentServerOptions::ProgressInterval`),
+  until the reply. The source is `JobService::SnapshotAll()`: the oldest Queued or Running job
+  stands in for the call. A determinate job reports `progress` = percent with `total` 100;
+  otherwise `progress` is the job's elapsed seconds without `total`; `message` is the job's
+  debug name. With no active job, `progress` is the call's age in seconds and `message` is
+  `waiting`. `progress` never decreases. Several concurrent jobs make the pick ambiguous; exact
+  per-call job tokens are future work tied to
+  [RUNTIME-279](../../tasks/backlog/runtime/RUNTIME-279-editor-job-snapshot-and-cancel.md).
+- Cancellation: `notifications/cancelled {requestId}` removes the pending entry with that id
+  (JSON-typed comparison: `1` is not `"1"`) and sends no reply; destroying the continuation
+  releases its event subscriptions. The editor job itself keeps running and its result still
+  lands (undoable) until RUNTIME-279 gives the agent path a job cancel.
 - Tool results are the existing JSON text content plus, when the negotiated version is
   `2025-06-18` or newer, `structuredContent`: the JSON object the tool returned, or
   `{"error":{"code","message"}}` for errors that carry a machine-readable `ErrorCode`
@@ -133,8 +146,7 @@ diagnostics ([CORE-011](../../tasks/backlog/architecture/CORE-011-log-entry-curs
 mesh health ([GEOM-110](../../tasks/backlog/geometry/GEOM-110-connected-components-and-topology.md),
 [RUNTIME-286](../../tasks/backlog/runtime/RUNTIME-286-mesh-health-report.md),
 [UI-066](../../tasks/backlog/ui/UI-066-mesh-health-window.md)).
-Planned: lane hardening (minimized sessions, bridge concurrency, protocol conformance,
-progress and cancel) and the remaining operation tools in
+Planned: lane hardening (the remaining protocol conformance) and the remaining operation tools in
 [RUNTIME-312](../../tasks/backlog/runtime/RUNTIME-312-agent-lane-mcp-hardening-and-coverage.md).
 
 ## Limitations
