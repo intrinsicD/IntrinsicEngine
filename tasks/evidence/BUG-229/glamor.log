@@ -1,0 +1,191 @@
+WSI_PROBE_COMPLETED stage=3 repeats=1
+
+=================================================================
+==1349662==ERROR: LeakSanitizer: detected memory leaks
+
+Direct leak of 1392 byte(s) in 1 object(s) allocated from:
+    #0 0x6523a1328a34 in malloc (/tmp/intrinsic-bug229/wsi+0xd2a34) (BuildId: ef2c5f9da2f184ce65def9f7c06249778ca76554)
+    #1 0x7930b400c0d1  (<unknown module>)
+    #2 0x7930b3fef518  (<unknown module>)
+    #3 0x7930b3ffc7e9  (<unknown module>)
+    #4 0x7d30b8573b53  (<unknown module>)
+    #5 0x7d30b857474e  (<unknown module>)
+    #6 0x7930b4002d78  (<unknown module>)
+    #7 0x7930b3ffdc9c  (<unknown module>)
+    #8 0x7930b431eca8  (<unknown module>)
+    #9 0x7930b4317fd4  (<unknown module>)
+    #10 0x7930b4326b9e  (<unknown module>)
+    #11 0x7930b436a915  (<unknown module>)
+    #12 0x6523a136c8ce in main /tmp/intrinsic-bug229/wsi.c:29:82
+    #13 0x7d30b8a29d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #14 0x7d30b8a29e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #15 0x6523a12844d4 in _start (/tmp/intrinsic-bug229/wsi+0x2e4d4) (BuildId: ef2c5f9da2f184ce65def9f7c06249778ca76554)
+
+Direct leak of 1392 byte(s) in 1 object(s) allocated from:
+    #0 0x6523a1328a34 in malloc (/tmp/intrinsic-bug229/wsi+0xd2a34) (BuildId: ef2c5f9da2f184ce65def9f7c06249778ca76554)
+    #1 0x7930b400c0d1  (<unknown module>)
+    #2 0x7930b3fef518  (<unknown module>)
+    #3 0x7930b3ffc733  (<unknown module>)
+    #4 0x7d30b8573b53  (<unknown module>)
+    #5 0x7d30b857474e  (<unknown module>)
+    #6 0x7930b4002d78  (<unknown module>)
+    #7 0x7930b3ffdc9c  (<unknown module>)
+    #8 0x7930b431eca8  (<unknown module>)
+    #9 0x7930b4317fd4  (<unknown module>)
+    #10 0x7930b4326b9e  (<unknown module>)
+    #11 0x7930b436a915  (<unknown module>)
+    #12 0x6523a136c8ce in main /tmp/intrinsic-bug229/wsi.c:29:82
+    #13 0x7d30b8a29d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #14 0x7d30b8a29e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #15 0x6523a12844d4 in _start (/tmp/intrinsic-bug229/wsi+0x2e4d4) (BuildId: ef2c5f9da2f184ce65def9f7c06249778ca76554)
+
+Direct leak of 32 byte(s) in 1 object(s) allocated from:
+    #0 0x6523a1328a34 in malloc (/tmp/intrinsic-bug229/wsi+0xd2a34) (BuildId: ef2c5f9da2f184ce65def9f7c06249778ca76554)
+    #1 0x7d30b8ee61b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #2 0x7d30b8ee6a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #3 0x7d30b8ee6eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #4 0x7d30b8ee7e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #5 0x7d30b85ca299  (<unknown module>)
+    #6 0x7d30b85bd110  (<unknown module>)
+    #7 0x7930b43129d3  (<unknown module>)
+    #8 0x7930b436a5e0  (<unknown module>)
+    #9 0x6523a136c648 in main /tmp/intrinsic-bug229/wsi.c:27:160
+    #10 0x7d30b8a29d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #11 0x7d30b8a29e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #12 0x6523a12844d4 in _start (/tmp/intrinsic-bug229/wsi+0x2e4d4) (BuildId: ef2c5f9da2f184ce65def9f7c06249778ca76554)
+
+Direct leak of 32 byte(s) in 1 object(s) allocated from:
+    #0 0x6523a1328a34 in malloc (/tmp/intrinsic-bug229/wsi+0xd2a34) (BuildId: ef2c5f9da2f184ce65def9f7c06249778ca76554)
+    #1 0x7d30b8ee61b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #2 0x7d30b8ee6a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #3 0x7d30b8ee6eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #4 0x7d30b8ee7e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #5 0x7d30b85ca299  (<unknown module>)
+    #6 0x7d30b85bd110  (<unknown module>)
+    #7 0x7930b4312bf8  (<unknown module>)
+    #8 0x7930b432bce4  (<unknown module>)
+    #9 0x7930b4327ff0  (<unknown module>)
+    #10 0x7930b4328f61  (<unknown module>)
+    #11 0x7d30b8f40b50  (/lib/x86_64-linux-gnu/libvulkan.so.1+0x3cb50) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+    #12 0x6523a136c7e0 in main /tmp/intrinsic-bug229/wsi.c:29:8
+    #13 0x7d30b8a29d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #14 0x7d30b8a29e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #15 0x6523a12844d4 in _start (/tmp/intrinsic-bug229/wsi+0x2e4d4) (BuildId: ef2c5f9da2f184ce65def9f7c06249778ca76554)
+
+Direct leak of 32 byte(s) in 1 object(s) allocated from:
+    #0 0x6523a1328a34 in malloc (/tmp/intrinsic-bug229/wsi+0xd2a34) (BuildId: ef2c5f9da2f184ce65def9f7c06249778ca76554)
+    #1 0x7d30b8ee61b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #2 0x7d30b8ee6a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #3 0x7d30b8ee6eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #4 0x7d30b8ee7e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #5 0x7d30b85ca299  (<unknown module>)
+    #6 0x7d30b85bd110  (<unknown module>)
+    #7 0x7930b4312bf8  (<unknown module>)
+    #8 0x7930b432bd26  (<unknown module>)
+    #9 0x7930b436a6b9  (<unknown module>)
+    #10 0x6523a136c1b2 in main /tmp/intrinsic-bug229/wsi.c:24:42
+    #11 0x7d30b8a29d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #12 0x7d30b8a29e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #13 0x6523a12844d4 in _start (/tmp/intrinsic-bug229/wsi+0x2e4d4) (BuildId: ef2c5f9da2f184ce65def9f7c06249778ca76554)
+
+Direct leak of 32 byte(s) in 1 object(s) allocated from:
+    #0 0x6523a1328a34 in malloc (/tmp/intrinsic-bug229/wsi+0xd2a34) (BuildId: ef2c5f9da2f184ce65def9f7c06249778ca76554)
+    #1 0x7d30b8ee61b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #2 0x7d30b8ee6a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #3 0x7d30b8ee6eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #4 0x7d30b8ee7e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #5 0x7d30b85ca299  (<unknown module>)
+    #6 0x7d30b85bd110  (<unknown module>)
+    #7 0x7930b43128c9  (<unknown module>)
+    #8 0x6523a136c074 in main /tmp/intrinsic-bug229/wsi.c:21:79
+    #9 0x7d30b8a29d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #10 0x7d30b8a29e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #11 0x6523a12844d4 in _start (/tmp/intrinsic-bug229/wsi+0x2e4d4) (BuildId: ef2c5f9da2f184ce65def9f7c06249778ca76554)
+
+Direct leak of 32 byte(s) in 1 object(s) allocated from:
+    #0 0x6523a1328a34 in malloc (/tmp/intrinsic-bug229/wsi+0xd2a34) (BuildId: ef2c5f9da2f184ce65def9f7c06249778ca76554)
+    #1 0x7d30b8ee61b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #2 0x7d30b8ee6a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #3 0x7d30b8ee6eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #4 0x7d30b8ee7e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #5 0x7d30b85ca299  (<unknown module>)
+    #6 0x7d30b85bd110  (<unknown module>)
+    #7 0x7930b4312ace  (<unknown module>)
+    #8 0x7930b431280b  (<unknown module>)
+    #9 0x6523a136c074 in main /tmp/intrinsic-bug229/wsi.c:21:79
+    #10 0x7d30b8a29d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #11 0x7d30b8a29e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #12 0x6523a12844d4 in _start (/tmp/intrinsic-bug229/wsi+0x2e4d4) (BuildId: ef2c5f9da2f184ce65def9f7c06249778ca76554)
+
+Direct leak of 32 byte(s) in 1 object(s) allocated from:
+    #0 0x6523a1328a34 in malloc (/tmp/intrinsic-bug229/wsi+0xd2a34) (BuildId: ef2c5f9da2f184ce65def9f7c06249778ca76554)
+    #1 0x7d30b8ee61b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #2 0x7d30b8ee6a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #3 0x7d30b8ee6eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #4 0x7d30b8ee7e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #5 0x7d30b85ca299  (<unknown module>)
+    #6 0x7d30b85bd110  (<unknown module>)
+    #7 0x7930b43128c9  (<unknown module>)
+    #8 0x6523a136c57a in main /tmp/intrinsic-bug229/wsi.c:27:38
+    #9 0x7d30b8a29d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #10 0x7d30b8a29e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #11 0x6523a12844d4 in _start (/tmp/intrinsic-bug229/wsi+0x2e4d4) (BuildId: ef2c5f9da2f184ce65def9f7c06249778ca76554)
+
+Direct leak of 32 byte(s) in 1 object(s) allocated from:
+    #0 0x6523a1328a34 in malloc (/tmp/intrinsic-bug229/wsi+0xd2a34) (BuildId: ef2c5f9da2f184ce65def9f7c06249778ca76554)
+    #1 0x7d30b8ee61b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #2 0x7d30b8ee6a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #3 0x7d30b8ee6eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #4 0x7d30b8ee7e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #5 0x7d30b85ca299  (<unknown module>)
+    #6 0x7d30b85bd110  (<unknown module>)
+    #7 0x7d30b85bd15e  (<unknown module>)
+    #8 0x7930b43184a4  (<unknown module>)
+    #9 0x7930b4324afb  (<unknown module>)
+    #10 0x7930b432843e  (<unknown module>)
+    #11 0x7930b4328f61  (<unknown module>)
+    #12 0x7d30b8f40b50  (/lib/x86_64-linux-gnu/libvulkan.so.1+0x3cb50) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+    #13 0x6523a136c7e0 in main /tmp/intrinsic-bug229/wsi.c:29:8
+    #14 0x7d30b8a29d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #15 0x7d30b8a29e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #16 0x6523a12844d4 in _start (/tmp/intrinsic-bug229/wsi+0x2e4d4) (BuildId: ef2c5f9da2f184ce65def9f7c06249778ca76554)
+
+Direct leak of 32 byte(s) in 1 object(s) allocated from:
+    #0 0x6523a1328a34 in malloc (/tmp/intrinsic-bug229/wsi+0xd2a34) (BuildId: ef2c5f9da2f184ce65def9f7c06249778ca76554)
+    #1 0x7d30b8ee61b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #2 0x7d30b8ee6a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #3 0x7d30b8ee6eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #4 0x7d30b8ee7e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #5 0x7d30b85ca299  (<unknown module>)
+    #6 0x7d30b85bd110  (<unknown module>)
+    #7 0x7930b4312ace  (<unknown module>)
+    #8 0x7930b431280b  (<unknown module>)
+    #9 0x6523a136c57a in main /tmp/intrinsic-bug229/wsi.c:27:38
+    #10 0x7d30b8a29d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #11 0x7d30b8a29e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #12 0x6523a12844d4 in _start (/tmp/intrinsic-bug229/wsi+0x2e4d4) (BuildId: ef2c5f9da2f184ce65def9f7c06249778ca76554)
+
+Indirect leak of 2800 byte(s) in 1 object(s) allocated from:
+    #0 0x6523a1328c12 in calloc (/tmp/intrinsic-bug229/wsi+0xd2c12) (BuildId: ef2c5f9da2f184ce65def9f7c06249778ca76554)
+    #1 0x7930b400c38d  (<unknown module>)
+    #2 0x7930b3ffc683  (<unknown module>)
+    #3 0x7d30b8573b53  (<unknown module>)
+    #4 0x7d30b857474e  (<unknown module>)
+    #5 0x7930b4002d78  (<unknown module>)
+    #6 0x7930b3ffdc9c  (<unknown module>)
+    #7 0x7930b431eca8  (<unknown module>)
+    #8 0x7930b4317fd4  (<unknown module>)
+    #9 0x7930b4326b9e  (<unknown module>)
+    #10 0x7930b436a915  (<unknown module>)
+    #11 0x6523a136c8ce in main /tmp/intrinsic-bug229/wsi.c:29:82
+    #12 0x7d30b8a29d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #13 0x7d30b8a29e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #14 0x6523a12844d4 in _start (/tmp/intrinsic-bug229/wsi+0x2e4d4) (BuildId: ef2c5f9da2f184ce65def9f7c06249778ca76554)
+
+-----------------------------------------------------
+Suppressions used:
+  count      bytes template
+      3       2018 dbus_connection_send_with_reply_and_block
+-----------------------------------------------------
+
+SUMMARY: AddressSanitizer: 5840 byte(s) leaked in 11 allocation(s).

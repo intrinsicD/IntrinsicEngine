@@ -1,0 +1,451 @@
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start 5202: ExtrinsicSandbox.VulkanShutdownLsanContract
+1/1 Test #5202: ExtrinsicSandbox.VulkanShutdownLsanContract ...***Failed    3.86 sec
+CMake Error at /home/alex/Documents/IntrinsicEngine/tests/regression/graphics/Run.VulkanShutdownLsanContract.cmake:102 (message):
+  BUG-083 five-frame Sandbox process exited 86; the narrow leak policy is not
+  clean.
+
+  [32m[INFO] Initialized Scheduler with 31 worker threads.[0m
+
+  [33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains
+  fail-closed until the first clean default-recipe validation promotes
+  it.[0m
+
+  [33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created
+  logical-device, queue, VMA, per-frame command/sync, swapchain
+  image/view/handle, bindless heap, transfer queue, and global
+  pipeline-layout state; canonical frame execution waits for the first clean
+  recipe validation publish, so device remains non-operational during cold
+  start.[0m
+
+  [33m[WARN] [Runtime] VulkanRequestedButNotOperational
+  status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+
+
+
+  =================================================================
+
+  ==1341978==ERROR: LeakSanitizer: detected memory leaks
+
+
+
+  Direct leak of 1392 byte(s) in 1 object(s) allocated from:
+
+      #0 0x61c6d21f00f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x77ba5620c0d1  (<unknown module>)
+      #2 0x77ba561ef518  (<unknown module>)
+      #3 0x77ba561fc733  (<unknown module>)
+      #4 0x77ba582e7b53  (<unknown module>)
+      #5 0x77ba582e874e  (<unknown module>)
+      #6 0x77ba56202d78  (<unknown module>)
+      #7 0x77ba561fdc9c  (<unknown module>)
+      #8 0x77ba5651eca8  (<unknown module>)
+      #9 0x77ba56517fd4  (<unknown module>)
+      #10 0x77ba56526b9e  (<unknown module>)
+      #11 0x77ba5656a915  (<unknown module>)
+      #12 0x77ba33a62e2f  (<unknown module>)
+      #13 0x77ba33d50d9d  (<unknown module>)
+      #14 0x61c6d63d18eb in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Shutdown() /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:2387:13
+      #15 0x61c6d2bf04dc in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Shutdown() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:675:31
+      #16 0x61c6d223555b in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:495:12
+      #17 0x7bba82229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #18 0x7bba82229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #19 0x61c6d214bb94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 1392 byte(s) in 1 object(s) allocated from:
+
+      #0 0x61c6d21f00f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x77ba5620c0d1  (<unknown module>)
+      #2 0x77ba561ef518  (<unknown module>)
+      #3 0x77ba561fc7e9  (<unknown module>)
+      #4 0x77ba582e7b53  (<unknown module>)
+      #5 0x77ba582e874e  (<unknown module>)
+      #6 0x77ba56202d78  (<unknown module>)
+      #7 0x77ba561fdc9c  (<unknown module>)
+      #8 0x77ba5651eca8  (<unknown module>)
+      #9 0x77ba56517fd4  (<unknown module>)
+      #10 0x77ba56526b9e  (<unknown module>)
+      #11 0x77ba5656a915  (<unknown module>)
+      #12 0x77ba33a62e2f  (<unknown module>)
+      #13 0x77ba33d50d9d  (<unknown module>)
+      #14 0x61c6d63d18eb in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Shutdown() /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:2387:13
+      #15 0x61c6d2bf04dc in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Shutdown() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:675:31
+      #16 0x61c6d223555b in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:495:12
+      #17 0x7bba82229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #18 0x7bba82229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #19 0x61c6d214bb94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 256 byte(s) in 1 object(s) allocated from:
+
+      #0 0x61c6d21f0501 in realloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d36501) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x77ba4a29e428  (<unknown module>)
+      #2 0x77ba4a29ea9e  (<unknown module>)
+      #3 0x7bba82299ea7 in __pthread_once_slow nptl/pthread_once.c:116:7
+      #4 0x77ba4a4bb2b6  (<unknown module>)
+      #5 0x77ba4a261d45  (<unknown module>)
+      #6 0x77ba4a440ad5  (<unknown module>)
+      #7 0x77ba4a440a46  (<unknown module>)
+      #8 0x77ba4a261fb9  (<unknown module>)
+      #9 0x77ba4a2630bf  (<unknown module>)
+      #10 0x77ba4a3034a8  (<unknown module>)
+      #11 0x77ba4a304050  (<unknown module>)
+      #12 0x7bba82a1aa5b  (/lib/x86_64-linux-gnu/libvulkan.so.1+0x21a5b) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+      #13 0x7bba82a1b19b  (/lib/x86_64-linux-gnu/libvulkan.so.1+0x2219b) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+      #14 0x77ba34117606  (<unknown module>)
+      #15 0x77ba33db7c4f  (<unknown module>)
+      #16 0x77ba4fd6b136  (<unknown module>)
+      #17 0x7bba82a140de  (/lib/x86_64-linux-gnu/libvulkan.so.1+0x1b0de) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+      #18 0x7bba82a28ee5 in vkCreateInstance (/lib/x86_64-linux-gnu/libvulkan.so.1+0x2fee5) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+      #19 0x61c6d63c64eb in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:1542:23
+      #20 0x61c6d2bf8c20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+      #21 0x61c6d223543a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+      #22 0x7bba82229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #23 0x7bba82229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #24 0x61c6d214bb94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 256 byte(s) in 1 object(s) allocated from:
+
+      #0 0x61c6d21f0501 in realloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d36501) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x77ba35206a08  (<unknown module>)
+      #2 0x77ba3520707e  (<unknown module>)
+      #3 0x7bba82299ea7 in __pthread_once_slow nptl/pthread_once.c:116:7
+      #4 0x77ba35205497  (<unknown module>)
+      #5 0x77ba35242f4a  (<unknown module>)
+      #6 0x61c6d21ed666 in asan_thread_start(void*) asan_interceptors.cpp.o
+      #7 0x7bba82294a82 in start_thread nptl/pthread_create.c:442:8
+      #8 0x7bba823268df  misc/../sysdeps/unix/sysv/linux/x86_64/clone3.S:81
+
+
+
+  Direct leak of 192 byte(s) in 6 object(s) allocated from:
+
+      #0 0x61c6d21f00f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x7bba817541b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #2 0x7bba81754a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #3 0x7bba81754eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #4 0x7bba81755e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #5 0x77ba5833e299  (<unknown module>)
+      #6 0x77ba58331110  (<unknown module>)
+      #7 0x77ba56512bf8  (<unknown module>)
+      #8 0x77ba5652bd26  (<unknown module>)
+      #9 0x77ba5656a6b9  (<unknown module>)
+      #10 0x77ba33d4fa92  (<unknown module>)
+      #11 0x61c6d63d61ca in Extrinsic::Backends::Vulkan::(anonymous namespace)::ProbeQueueFamilies(VkPhysicalDevice_T*, VkSurfaceKHR_T*) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:253:17
+      #12 0x61c6d63c70af in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:1600:45
+      #13 0x61c6d2bf8c20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+      #14 0x61c6d223543a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+      #15 0x7bba82229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #16 0x7bba82229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #17 0x61c6d214bb94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 32 byte(s) in 1 object(s) allocated from:
+
+      #0 0x61c6d21f00f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x7bba817541b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #2 0x7bba81754a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #3 0x7bba81754eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #4 0x7bba81755e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #5 0x77ba5833e299  (<unknown module>)
+      #6 0x77ba58331110  (<unknown module>)
+      #7 0x77ba565128c9  (<unknown module>)
+      #8 0x77ba33d4fe6d  (<unknown module>)
+      #9 0x61c6d63cc039 in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:1950:18
+      #10 0x61c6d2bf8c20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+      #11 0x61c6d223543a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+      #12 0x7bba82229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #13 0x7bba82229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #14 0x61c6d214bb94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 32 byte(s) in 1 object(s) allocated from:
+
+      #0 0x61c6d21f00f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x7bba817541b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #2 0x7bba81754a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #3 0x7bba81754eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #4 0x7bba81755e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #5 0x77ba5833e299  (<unknown module>)
+      #6 0x77ba58331110  (<unknown module>)
+      #7 0x77ba565129d3  (<unknown module>)
+      #8 0x77ba5656a5e0  (<unknown module>)
+      #9 0x77ba33d50252  (<unknown module>)
+      #10 0x61c6d63cc297 in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:1962:18
+      #11 0x61c6d2bf8c20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+      #12 0x61c6d223543a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+      #13 0x7bba82229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #14 0x7bba82229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #15 0x61c6d214bb94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 32 byte(s) in 1 object(s) allocated from:
+
+      #0 0x61c6d21f00f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x7bba817541b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #2 0x7bba81754a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #3 0x7bba81754eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #4 0x7bba81755e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #5 0x77ba5833e299  (<unknown module>)
+      #6 0x77ba58331110  (<unknown module>)
+      #7 0x77ba565129d3  (<unknown module>)
+      #8 0x77ba5656a5e0  (<unknown module>)
+      #9 0x77ba340a4c2b  (<unknown module>)
+      #10 0x77ba33ccb25f  (<unknown module>)
+      #11 0x77ba33ccdec0  (<unknown module>)
+      #12 0x77ba33d50919  (<unknown module>)
+      #13 0x61c6d63cd252 in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:2029:18
+      #14 0x61c6d2bf8c20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+      #15 0x61c6d223543a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+      #16 0x7bba82229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #17 0x7bba82229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #18 0x61c6d214bb94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 32 byte(s) in 1 object(s) allocated from:
+
+      #0 0x61c6d21f00f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x7bba817541b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #2 0x7bba81754a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #3 0x7bba81754eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #4 0x7bba81755e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #5 0x77ba5833e299  (<unknown module>)
+      #6 0x77ba58331110  (<unknown module>)
+      #7 0x77ba565128c9  (<unknown module>)
+      #8 0x77ba33d4fe6d  (<unknown module>)
+      #9 0x61c6d63d79c6 in Extrinsic::Backends::Vulkan::(anonymous namespace)::HasSwapchainSurfaceSupport(VkPhysicalDevice_T*, VkSurfaceKHR_T*) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:304:13
+      #10 0x61c6d63c7153 in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:1603:48
+      #11 0x61c6d2bf8c20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+      #12 0x61c6d223543a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+      #13 0x7bba82229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #14 0x7bba82229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #15 0x61c6d214bb94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 32 byte(s) in 1 object(s) allocated from:
+
+      #0 0x61c6d21f00f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x7bba817541b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #2 0x7bba81754a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #3 0x7bba81754eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #4 0x7bba81755e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #5 0x77ba5833e299  (<unknown module>)
+      #6 0x77ba58331110  (<unknown module>)
+      #7 0x77ba565129d3  (<unknown module>)
+      #8 0x77ba5656a5e0  (<unknown module>)
+      #9 0x77ba33d50252  (<unknown module>)
+      #10 0x61c6d63d7a5a in Extrinsic::Backends::Vulkan::(anonymous namespace)::HasSwapchainSurfaceSupport(VkPhysicalDevice_T*, VkSurfaceKHR_T*) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:308:13
+      #11 0x61c6d63c7153 in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:1603:48
+      #12 0x61c6d2bf8c20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+      #13 0x61c6d223543a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+      #14 0x7bba82229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #15 0x7bba82229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #16 0x61c6d214bb94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 32 byte(s) in 1 object(s) allocated from:
+
+      #0 0x61c6d21f00f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x7bba817541b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #2 0x7bba81754a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #3 0x7bba81754eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #4 0x7bba81755e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #5 0x77ba5833e299  (<unknown module>)
+      #6 0x77ba58331110  (<unknown module>)
+      #7 0x77ba56512ace  (<unknown module>)
+      #8 0x77ba5651280b  (<unknown module>)
+      #9 0x77ba33d4fe6d  (<unknown module>)
+      #10 0x61c6d63d79c6 in Extrinsic::Backends::Vulkan::(anonymous namespace)::HasSwapchainSurfaceSupport(VkPhysicalDevice_T*, VkSurfaceKHR_T*) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:304:13
+      #11 0x61c6d63c7153 in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:1603:48
+      #12 0x61c6d2bf8c20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+      #13 0x61c6d223543a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+      #14 0x7bba82229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #15 0x7bba82229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #16 0x61c6d214bb94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 32 byte(s) in 1 object(s) allocated from:
+
+      #0 0x61c6d21f00f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x7bba817541b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #2 0x7bba81754a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #3 0x7bba81754eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #4 0x7bba81755e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #5 0x77ba5833e299  (<unknown module>)
+      #6 0x77ba58331110  (<unknown module>)
+      #7 0x77ba565129d3  (<unknown module>)
+      #8 0x77ba5656a5e0  (<unknown module>)
+      #9 0x77ba33d50252  (<unknown module>)
+      #10 0x61c6d63cc659 in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:1976:18
+      #11 0x61c6d2bf8c20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+      #12 0x61c6d223543a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+      #13 0x7bba82229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #14 0x7bba82229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #15 0x61c6d214bb94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 32 byte(s) in 1 object(s) allocated from:
+
+      #0 0x61c6d21f00f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x7bba817541b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #2 0x7bba81754a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #3 0x7bba81754eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #4 0x7bba81755e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #5 0x77ba5833e299  (<unknown module>)
+      #6 0x77ba58331110  (<unknown module>)
+      #7 0x77ba565129d3  (<unknown module>)
+      #8 0x77ba5656a5e0  (<unknown module>)
+      #9 0x77ba340a4bed  (<unknown module>)
+      #10 0x77ba33ccb25f  (<unknown module>)
+      #11 0x77ba33ccdec0  (<unknown module>)
+      #12 0x77ba33d50919  (<unknown module>)
+      #13 0x61c6d63cd252 in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:2029:18
+      #14 0x61c6d2bf8c20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+      #15 0x61c6d223543a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+      #16 0x7bba82229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #17 0x7bba82229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #18 0x61c6d214bb94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 32 byte(s) in 1 object(s) allocated from:
+
+      #0 0x61c6d21f00f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x7bba817541b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #2 0x7bba81754a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #3 0x7bba81754eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #4 0x7bba81755e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #5 0x77ba5833e299  (<unknown module>)
+      #6 0x77ba58331110  (<unknown module>)
+      #7 0x77ba56512bf8  (<unknown module>)
+      #8 0x77ba5652bce4  (<unknown module>)
+      #9 0x77ba56527ff0  (<unknown module>)
+      #10 0x77ba56528f61  (<unknown module>)
+      #11 0x7bba82a35b50  (/lib/x86_64-linux-gnu/libvulkan.so.1+0x3cb50) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+      #12 0x77ba33e1e198  (<unknown module>)
+      #13 0x77ba33d509d3  (<unknown module>)
+      #14 0x61c6d63cd252 in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:2029:18
+      #15 0x61c6d2bf8c20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+      #16 0x61c6d223543a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+      #17 0x7bba82229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #18 0x7bba82229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #19 0x61c6d214bb94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 32 byte(s) in 1 object(s) allocated from:
+
+      #0 0x61c6d21f00f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x7bba817541b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #2 0x7bba81754a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #3 0x7bba81754eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #4 0x7bba81755e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #5 0x77ba5833e299  (<unknown module>)
+      #6 0x77ba58331110  (<unknown module>)
+      #7 0x77ba5833115e  (<unknown module>)
+      #8 0x77ba565184a4  (<unknown module>)
+      #9 0x77ba56524afb  (<unknown module>)
+      #10 0x77ba5652843e  (<unknown module>)
+      #11 0x77ba56528f61  (<unknown module>)
+      #12 0x7bba82a35b50  (/lib/x86_64-linux-gnu/libvulkan.so.1+0x3cb50) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+      #13 0x77ba33e1e198  (<unknown module>)
+      #14 0x77ba33d509d3  (<unknown module>)
+      #15 0x61c6d63cd252 in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:2029:18
+      #16 0x61c6d2bf8c20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+      #17 0x61c6d223543a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+      #18 0x7bba82229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #19 0x7bba82229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #20 0x61c6d214bb94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 32 byte(s) in 1 object(s) allocated from:
+
+      #0 0x61c6d21f00f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x7bba817541b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #2 0x7bba81754a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #3 0x7bba81754eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #4 0x7bba81755e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #5 0x77ba5833e299  (<unknown module>)
+      #6 0x77ba58331110  (<unknown module>)
+      #7 0x77ba56512ace  (<unknown module>)
+      #8 0x77ba5651280b  (<unknown module>)
+      #9 0x77ba33d4fe6d  (<unknown module>)
+      #10 0x61c6d63cc039 in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:1950:18
+      #11 0x61c6d2bf8c20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+      #12 0x61c6d223543a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+      #13 0x7bba82229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #14 0x7bba82229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #15 0x61c6d214bb94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Indirect leak of 2800 byte(s) in 1 object(s) allocated from:
+
+      #0 0x61c6d21f02d2 in calloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d362d2) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x77ba5620c38d  (<unknown module>)
+      #2 0x77ba561fc683  (<unknown module>)
+      #3 0x77ba582e7b53  (<unknown module>)
+      #4 0x77ba582e874e  (<unknown module>)
+      #5 0x77ba56202d78  (<unknown module>)
+      #6 0x77ba561fdc9c  (<unknown module>)
+      #7 0x77ba5651eca8  (<unknown module>)
+      #8 0x77ba56517fd4  (<unknown module>)
+      #9 0x77ba56526b9e  (<unknown module>)
+      #10 0x77ba5656a915  (<unknown module>)
+      #11 0x77ba33a62e2f  (<unknown module>)
+      #12 0x77ba33d50d9d  (<unknown module>)
+      #13 0x61c6d63d18eb in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Shutdown() /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:2387:13
+      #14 0x61c6d2bf04dc in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Shutdown() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:675:31
+      #15 0x61c6d223555b in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:495:12
+      #16 0x7bba82229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #17 0x7bba82229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #18 0x61c6d214bb94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  -----------------------------------------------------
+
+  Suppressions used:
+
+    count      bytes template
+       18     113760 VulkanCommandContext@Extrinsic.Backends.Vulkan::PushConstants
+        3       1986 dbus_connection_send_with_reply_and_block
+
+  -----------------------------------------------------
+
+
+
+  SUMMARY: AddressSanitizer: 6640 byte(s) leaked in 22 allocation(s).
+
+
+
+
+
+0% tests passed, 1 tests failed out of 1
+
+Label Time Summary:
+gpu           =   3.86 sec*proc (1 test)
+graphics      =   3.86 sec*proc (1 test)
+regression    =   3.86 sec*proc (1 test)
+runtime       =   3.86 sec*proc (1 test)
+vulkan        =   3.86 sec*proc (1 test)
+
+Total Test time (real) =   4.03 sec
+
+The following tests FAILED:
+	5202 - ExtrinsicSandbox.VulkanShutdownLsanContract (Failed) gpu graphics regression runtime vulkan
+Errors while running CTest

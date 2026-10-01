@@ -1,0 +1,1659 @@
+   1343652:	
+   1343652:	file=libm.so.6 [0];  needed by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=libm.so.6 [0];  generating link map
+   1343652:	  dynamic: 0x000073d0d6601d90  base: 0x000073d0d651c000   size: 0x00000000000e6108
+   1343652:	    entry: 0x000073d0d651c000  phdr: 0x000073d0d651c040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libvulkan.so.1 [0];  needed by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=libvulkan.so.1 [0];  generating link map
+   1343652:	  dynamic: 0x000073d0d651adf0  base: 0x000073d0d64a4000   size: 0x0000000000077370
+   1343652:	    entry: 0x000073d0d64a4000  phdr: 0x000073d0d64a4040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libstdc++.so.6 [0];  needed by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=libstdc++.so.6 [0];  generating link map
+   1343652:	  dynamic: 0x000073d0d6499cd8  base: 0x000073d0d6200000   size: 0x00000000002a1440
+   1343652:	    entry: 0x000073d0d6200000  phdr: 0x000073d0d6200040  phnum:                 12
+   1343652:	
+   1343652:	
+   1343652:	file=libresolv.so.2 [0];  needed by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=libresolv.so.2 [0];  generating link map
+   1343652:	  dynamic: 0x000073d0d61fcd88  base: 0x000073d0d61ed000   size: 0x0000000000012a48
+   1343652:	    entry: 0x000073d0d61ed000  phdr: 0x000073d0d61ed040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libgcc_s.so.1 [0];  needed by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=libgcc_s.so.1 [0];  generating link map
+   1343652:	  dynamic: 0x000073d0d61ebdc8  base: 0x000073d0d61bf000   size: 0x000000000002d3a8
+   1343652:	    entry: 0x000073d0d61bf000  phdr: 0x000073d0d61bf040  phnum:                 12
+   1343652:	
+   1343652:	
+   1343652:	file=libc.so.6 [0];  needed by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=libc.so.6 [0];  generating link map
+   1343652:	  dynamic: 0x000073d0d6019bc0  base: 0x000073d0d5e00000   size: 0x0000000000228e50
+   1343652:	    entry: 0x000073d0d5e29f50  phdr: 0x000073d0d5e00040  phnum:                 14
+   1343652:	
+   1343652:	
+   1343652:	calling preinit: ./bin/ExtrinsicSandbox
+   1343652:	
+   1343652:	./bin/ExtrinsicSandbox: error: symbol lookup error: undefined symbol: __isoc23_scanf (fatal)
+   1343652:	./bin/ExtrinsicSandbox: error: symbol lookup error: undefined symbol: __isoc23_sscanf (fatal)
+   1343652:	./bin/ExtrinsicSandbox: error: symbol lookup error: undefined symbol: __isoc23_fscanf (fatal)
+   1343652:	./bin/ExtrinsicSandbox: error: symbol lookup error: undefined symbol: __isoc23_vscanf (fatal)
+   1343652:	./bin/ExtrinsicSandbox: error: symbol lookup error: undefined symbol: __isoc23_vsscanf (fatal)
+   1343652:	./bin/ExtrinsicSandbox: error: symbol lookup error: undefined symbol: __isoc23_vfscanf (fatal)
+   1343652:	./bin/ExtrinsicSandbox: error: symbol lookup error: undefined symbol: __isoc99_printf (fatal)
+   1343652:	./bin/ExtrinsicSandbox: error: symbol lookup error: undefined symbol: __isoc99_sprintf (fatal)
+   1343652:	./bin/ExtrinsicSandbox: error: symbol lookup error: undefined symbol: __isoc99_snprintf (fatal)
+   1343652:	./bin/ExtrinsicSandbox: error: symbol lookup error: undefined symbol: __isoc99_fprintf (fatal)
+   1343652:	./bin/ExtrinsicSandbox: error: symbol lookup error: undefined symbol: __isoc99_vprintf (fatal)
+   1343652:	./bin/ExtrinsicSandbox: error: symbol lookup error: undefined symbol: __isoc99_vsprintf (fatal)
+   1343652:	./bin/ExtrinsicSandbox: error: symbol lookup error: undefined symbol: __isoc99_vsnprintf (fatal)
+   1343652:	./bin/ExtrinsicSandbox: error: symbol lookup error: undefined symbol: __isoc99_vfprintf (fatal)
+   1343652:	./bin/ExtrinsicSandbox: error: symbol lookup error: undefined symbol: __isoc23_strtoimax (fatal)
+   1343652:	./bin/ExtrinsicSandbox: error: symbol lookup error: undefined symbol: __isoc23_strtoumax (fatal)
+   1343652:	./bin/ExtrinsicSandbox: error: symbol lookup error: undefined symbol: pthread_mutexattr_getrobust_np (fatal)
+   1343652:	./bin/ExtrinsicSandbox: error: symbol lookup error: undefined symbol: xdr_quad_t (fatal)
+   1343652:	./bin/ExtrinsicSandbox: error: symbol lookup error: undefined symbol: xdr_u_quad_t (fatal)
+   1343652:	./bin/ExtrinsicSandbox: error: symbol lookup error: undefined symbol: xdr_destroy (fatal)
+   1343652:	./bin/ExtrinsicSandbox: error: symbol lookup error: undefined symbol: __isoc23_strtol (fatal)
+   1343652:	./bin/ExtrinsicSandbox: error: symbol lookup error: undefined symbol: __isoc23_strtoll (fatal)
+   1343652:	./bin/ExtrinsicSandbox: error: symbol lookup error: undefined symbol: __cxa_rethrow_primary_exception (fatal)
+   1343652:	./bin/ExtrinsicSandbox: error: symbol lookup error: undefined symbol: swift_demangle (fatal)
+   1343652:	
+   1343652:	calling init: /lib64/ld-linux-x86-64.so.2
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libc.so.6
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libgcc_s.so.1
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libresolv.so.2
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libm.so.6
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libstdc++.so.6
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libvulkan.so.1
+   1343652:	
+   1343652:	
+   1343652:	initialize program: ./bin/ExtrinsicSandbox
+   1343652:	
+   1343652:	
+   1343652:	transferring control: ./bin/ExtrinsicSandbox
+   1343652:	
+[32m[INFO] Initialized Scheduler with 31 worker threads.[0m
+   1343652:	
+   1343652:	file=libX11.so.6 [0];  dynamically loaded by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=libX11.so.6 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d3cb9c90  base: 0x00006fd0d3b7e000   size: 0x000000000013fd30
+   1343652:	    entry: 0x00006fd0d3b7e000  phdr: 0x00006fd0d3b7e040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libxcb.so.1 [0];  needed by /lib/x86_64-linux-gnu/libX11.so.6 [0]
+   1343652:	file=libxcb.so.1 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d3b7cdc8  base: 0x00006fd0d3b54000   size: 0x0000000000029288
+   1343652:	    entry: 0x00006fd0d3b54000  phdr: 0x00006fd0d3b54040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libXau.so.6 [0];  needed by /lib/x86_64-linux-gnu/libxcb.so.1 [0]
+   1343652:	file=libXau.so.6 [0];  generating link map
+   1343652:	  dynamic: 0x000073d0d5904e10  base: 0x000073d0d5900000   size: 0x0000000000005108
+   1343652:	    entry: 0x000073d0d5900000  phdr: 0x000073d0d5900040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libXdmcp.so.6 [0];  needed by /lib/x86_64-linux-gnu/libxcb.so.1 [0]
+   1343652:	file=libXdmcp.so.6 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d5007e00  base: 0x00006fd0d5001000   size: 0x0000000000007080
+   1343652:	    entry: 0x00006fd0d5001000  phdr: 0x00006fd0d5001040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libbsd.so.0 [0];  needed by /lib/x86_64-linux-gnu/libXdmcp.so.6 [0]
+   1343652:	file=libbsd.so.0 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d3b51970  base: 0x00006fd0d3b3c000   size: 0x00000000000170e0
+   1343652:	    entry: 0x00006fd0d3b3c000  phdr: 0x00006fd0d3b3c040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libmd.so.0 [0];  needed by /lib/x86_64-linux-gnu/libbsd.so.0 [0]
+   1343652:	file=libmd.so.0 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d3b3ad68  base: 0x00006fd0d3b2f000   size: 0x000000000000c0e8
+   1343652:	    entry: 0x00006fd0d3b2f000  phdr: 0x00006fd0d3b2f040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libmd.so.0
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libbsd.so.0
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libXdmcp.so.6
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libXau.so.6
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libxcb.so.1
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libX11.so.6
+   1343652:	
+   1343652:	opening file=/lib/x86_64-linux-gnu/libX11.so.6 [0]; direct_opencount=1
+   1343652:	
+   1343652:	
+   1343652:	file=libXxf86vm.so.1 [0];  dynamically loaded by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=libXxf86vm.so.1 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d3b2ddf0  base: 0x00006fd0d3b28000   size: 0x0000000000006148
+   1343652:	    entry: 0x00006fd0d3b28000  phdr: 0x00006fd0d3b28040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libXext.so.6 [0];  needed by /lib/x86_64-linux-gnu/libXxf86vm.so.1 [0]
+   1343652:	file=libXext.so.6 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d3b26dc0  base: 0x00006fd0d3b13000   size: 0x00000000000148e0
+   1343652:	    entry: 0x00006fd0d3b13000  phdr: 0x00006fd0d3b13040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libXext.so.6
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libXxf86vm.so.1
+   1343652:	
+   1343652:	opening file=/lib/x86_64-linux-gnu/libXxf86vm.so.1 [0]; direct_opencount=1
+   1343652:	
+   1343652:	
+   1343652:	file=libXi.so.6 [0];  dynamically loaded by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=libXi.so.6 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d39fede8  base: 0x00006fd0d39ec000   size: 0x00000000000131a8
+   1343652:	    entry: 0x00006fd0d39ec000  phdr: 0x00006fd0d39ec040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libXi.so.6
+   1343652:	
+   1343652:	opening file=/lib/x86_64-linux-gnu/libXi.so.6 [0]; direct_opencount=1
+   1343652:	
+   1343652:	
+   1343652:	file=libXrandr.so.2 [0];  dynamically loaded by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=libXrandr.so.2 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d3b11de0  base: 0x00006fd0d3b06000   size: 0x000000000000c188
+   1343652:	    entry: 0x00006fd0d3b06000  phdr: 0x00006fd0d3b06040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libXrender.so.1 [0];  needed by /lib/x86_64-linux-gnu/libXrandr.so.2 [0]
+   1343652:	file=libXrender.so.1 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d39eadd8  base: 0x00006fd0d39df000   size: 0x000000000000c270
+   1343652:	    entry: 0x00006fd0d39df000  phdr: 0x00006fd0d39df040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libXrender.so.1
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libXrandr.so.2
+   1343652:	
+   1343652:	opening file=/lib/x86_64-linux-gnu/libXrandr.so.2 [0]; direct_opencount=1
+   1343652:	
+   1343652:	
+   1343652:	file=libXcursor.so.1 [0];  dynamically loaded by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=libXcursor.so.1 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d39dddc0  base: 0x00006fd0d39d3000   size: 0x000000000000b1c8
+   1343652:	    entry: 0x00006fd0d39d3000  phdr: 0x00006fd0d39d3040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libXfixes.so.3 [0];  needed by /lib/x86_64-linux-gnu/libXcursor.so.1 [0]
+   1343652:	file=libXfixes.so.3 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d39d1020  base: 0x00006fd0d39cb000   size: 0x0000000000007108
+   1343652:	    entry: 0x00006fd0d39cb000  phdr: 0x00006fd0d39cb040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libXfixes.so.3
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libXcursor.so.1
+   1343652:	
+   1343652:	opening file=/lib/x86_64-linux-gnu/libXcursor.so.1 [0]; direct_opencount=1
+   1343652:	
+   1343652:	
+   1343652:	file=libXinerama.so.1 [0];  dynamically loaded by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=libXinerama.so.1 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d3b04020  base: 0x00006fd0d3b01000   size: 0x0000000000004128
+   1343652:	    entry: 0x00006fd0d3b01000  phdr: 0x00006fd0d3b01040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libXinerama.so.1
+   1343652:	
+   1343652:	opening file=/lib/x86_64-linux-gnu/libXinerama.so.1 [0]; direct_opencount=1
+   1343652:	
+   1343652:	
+   1343652:	file=libX11-xcb.so.1 [0];  dynamically loaded by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=libX11-xcb.so.1 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d39c9e80  base: 0x00006fd0d39c6000   size: 0x0000000000004028
+   1343652:	    entry: 0x00006fd0d39c6000  phdr: 0x00006fd0d39c6040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libX11-xcb.so.1
+   1343652:	
+   1343652:	opening file=/lib/x86_64-linux-gnu/libX11-xcb.so.1 [0]; direct_opencount=1
+   1343652:	
+   1343652:	opening file=/lib/x86_64-linux-gnu/libXrender.so.1 [0]; direct_opencount=1
+   1343652:	
+   1343652:	opening file=/lib/x86_64-linux-gnu/libXext.so.6 [0]; direct_opencount=1
+   1343652:	
+[33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.[0m
+   1343652:	opening file=/lib/x86_64-linux-gnu/libvulkan.so.1 [0]; direct_opencount=1
+   1343652:	
+   1343652:	opening file=/lib/x86_64-linux-gnu/libvulkan.so.1 [0]; direct_opencount=2
+   1343652:	
+   1343652:	
+   1343652:	file=libGLX_nvidia.so.0 [0];  dynamically loaded by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=libGLX_nvidia.so.0 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0ac1b5d28  base: 0x00006fd0ac092000   size: 0x000000000012a558
+   1343652:	    entry: 0x00006fd0ac0e3660  phdr: 0x00006fd0ac092040  phnum:                  9
+   1343652:	
+   1343652:	
+   1343652:	file=libnvidia-glsi.so.580.159.04 [0];  needed by /lib/x86_64-linux-gnu/libGLX_nvidia.so.0 [0]
+   1343652:	file=libnvidia-glsi.so.580.159.04 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d39bcdb8  base: 0x00006fd0d392a000   size: 0x000000000009bc78
+   1343652:	    entry: 0x00006fd0d393a7a0  phdr: 0x00006fd0d392a040  phnum:                  9
+   1343652:	
+   1343652:	
+   1343652:	file=libnvidia-tls.so.580.159.04 [0];  needed by /lib/x86_64-linux-gnu/libGLX_nvidia.so.0 [0]
+   1343652:	file=libnvidia-tls.so.580.159.04 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d3928e00  base: 0x00006fd0d3924000   size: 0x0000000000005280
+   1343652:	    entry: 0x00006fd0d3925050  phdr: 0x00006fd0d3924040  phnum:                 10
+   1343652:	
+   1343652:	
+   1343652:	file=libnvidia-glcore.so.580.159.04 [0];  needed by /lib/x86_64-linux-gnu/libGLX_nvidia.so.0 [0]
+   1343652:	file=libnvidia-glcore.so.580.159.04 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0ab8f5d28  base: 0x00006fd0a9600000   size: 0x0000000002378190
+   1343652:	    entry: 0x00006fd0a987a000  phdr: 0x00006fd0a9600040  phnum:                  7
+   1343652:	
+   1343652:	
+   1343652:	file=libdl.so.2 [0];  needed by /lib/x86_64-linux-gnu/libGLX_nvidia.so.0 [0]
+   1343652:	file=libdl.so.2 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d3922e10  base: 0x00006fd0d391f000   size: 0x0000000000004028
+   1343652:	    entry: 0x00006fd0d391f000  phdr: 0x00006fd0d391f040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libpthread.so.0 [0];  needed by /lib/x86_64-linux-gnu/libnvidia-glsi.so.580.159.04 [0]
+   1343652:	file=libpthread.so.0 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d391de10  base: 0x00006fd0d391a000   size: 0x0000000000004028
+   1343652:	    entry: 0x00006fd0d391a000  phdr: 0x00006fd0d391a040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=librt.so.1 [0];  needed by /lib/x86_64-linux-gnu/libnvidia-glsi.so.580.159.04 [0]
+   1343652:	file=librt.so.1 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d3918dd0  base: 0x00006fd0d3915000   size: 0x0000000000004038
+   1343652:	    entry: 0x00006fd0d3915000  phdr: 0x00006fd0d3915040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libnvidia-gpucomp.so.580.159.04 [0];  needed by /lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04 [0]
+   1343652:	file=libnvidia-gpucomp.so.580.159.04 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0a93dcca8  base: 0x00006fd0a5000000   size: 0x000000000458bea0
+   1343652:	    entry: 0x00006fd0a52abea0  phdr: 0x00006fd0a5000040  phnum:                 10
+   1343652:	
+   1343652:	activating NODELETE for /lib/x86_64-linux-gnu/librt.so.1 [0]
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libpthread.so.0
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/librt.so.1
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libdl.so.2
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libnvidia-gpucomp.so.580.159.04
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libnvidia-tls.so.580.159.04
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libnvidia-glsi.so.580.159.04
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libGLX_nvidia.so.0
+   1343652:	
+   1343652:	opening file=/lib/x86_64-linux-gnu/libc.so.6 [0]; direct_opencount=1
+   1343652:	
+   1343652:	
+   1343652:	closing file=/lib/x86_64-linux-gnu/libc.so.6; direct_opencount=0
+   1343652:	/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04: error: symbol lookup error: undefined symbol: __malloc_hook (fatal)
+   1343652:	/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04: error: symbol lookup error: undefined symbol: __realloc_hook (fatal)
+   1343652:	/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04: error: symbol lookup error: undefined symbol: __free_hook (fatal)
+   1343652:	/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04: error: symbol lookup error: undefined symbol: __memalign_hook (fatal)
+   1343652:	/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04: error: symbol lookup error: undefined symbol: ErrorF (fatal)
+   1343652:	opening file= [0]; direct_opencount=2
+   1343652:	
+   1343652:	
+   1343652:	closing file=; direct_opencount=1
+   1343652:	opening file= [0]; direct_opencount=2
+   1343652:	
+   1343652:	
+   1343652:	closing file=; direct_opencount=1
+   1343652:	opening file=/lib/x86_64-linux-gnu/libpthread.so.0 [0]; direct_opencount=1
+   1343652:	
+   1343652:	opening file= [0]; direct_opencount=2
+   1343652:	
+   1343652:	
+   1343652:	closing file=; direct_opencount=1
+   1343652:	opening file= [0]; direct_opencount=2
+   1343652:	
+   1343652:	
+   1343652:	closing file=; direct_opencount=1
+   1343652:	opening file= [0]; direct_opencount=2
+   1343652:	
+   1343652:	
+   1343652:	closing file=; direct_opencount=1
+   1343652:	opening file= [0]; direct_opencount=2
+   1343652:	
+   1343652:	
+   1343652:	closing file=; direct_opencount=1
+   1343652:	opening file=/lib/x86_64-linux-gnu/libGLX_nvidia.so.0 [0]; direct_opencount=1
+   1343652:	
+   1343652:	opening file=/lib/x86_64-linux-gnu/libX11-xcb.so.1 [0]; direct_opencount=2
+   1343652:	
+   1343652:	
+   1343652:	closing file=/lib/x86_64-linux-gnu/libX11-xcb.so.1; direct_opencount=1
+   1343652:	opening file=/lib/x86_64-linux-gnu/libxcb.so.1 [0]; direct_opencount=1
+   1343652:	
+   1343652:	
+   1343652:	file=libxcb-glx.so.0 [0];  dynamically loaded by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=libxcb-glx.so.0 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d37b0df8  base: 0x00006fd0d3795000   size: 0x000000000001c058
+   1343652:	    entry: 0x00006fd0d3795000  phdr: 0x00006fd0d3795040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libxcb-glx.so.0
+   1343652:	
+   1343652:	opening file=/lib/x86_64-linux-gnu/libxcb-glx.so.0 [0]; direct_opencount=1
+   1343652:	
+   1343652:	
+   1343652:	file=libxcb-randr.so.0 [0];  dynamically loaded by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=libxcb-randr.so.0 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d3913df8  base: 0x00006fd0d3902000   size: 0x0000000000012068
+   1343652:	    entry: 0x00006fd0d3902000  phdr: 0x00006fd0d3902040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libxcb-randr.so.0
+   1343652:	
+   1343652:	opening file=/lib/x86_64-linux-gnu/libxcb-randr.so.0 [0]; direct_opencount=1
+   1343652:	
+   1343652:	
+   1343652:	file=libxcb-dri3.so.0 [0];  dynamically loaded by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=libxcb-dri3.so.0 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d3793df8  base: 0x00006fd0d378e000   size: 0x0000000000006068
+   1343652:	    entry: 0x00006fd0d378e000  phdr: 0x00006fd0d378e040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libxcb-dri3.so.0
+   1343652:	
+   1343652:	opening file=/lib/x86_64-linux-gnu/libxcb-dri3.so.0 [0]; direct_opencount=1
+   1343652:	
+   1343652:	opening file=/lib/x86_64-linux-gnu/libX11-xcb.so.1 [0]; direct_opencount=2
+   1343652:	
+   1343652:	
+   1343652:	file=/usr/lib/x86_64-linux-gnu/libvulkan_lvp.so [0];  dynamically loaded by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=/usr/lib/x86_64-linux-gnu/libvulkan_lvp.so [0];  generating link map
+   1343652:	  dynamic: 0x00006fd097bacbf0  base: 0x00006fd097400000   size: 0x00000000007e0d70
+   1343652:	    entry: 0x00006fd097400000  phdr: 0x00006fd097400040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libLLVM-15.so.1 [0];  needed by /usr/lib/x86_64-linux-gnu/libvulkan_lvp.so [0]
+   1343652:	file=libLLVM-15.so.1 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd094529290  base: 0x00006fd08d600000   size: 0x0000000006ff1d69
+   1343652:	    entry: 0x00006fd08d600000  phdr: 0x00006fd08d600040  phnum:                  9
+   1343652:	
+   1343652:	
+   1343652:	file=libz.so.1 [0];  needed by /usr/lib/x86_64-linux-gnu/libvulkan_lvp.so [0]
+   1343652:	file=libz.so.1 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d378cdf0  base: 0x00006fd0d3772000   size: 0x000000000001b0b8
+   1343652:	    entry: 0x00006fd0d3772000  phdr: 0x00006fd0d3772040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libzstd.so.1 [0];  needed by /usr/lib/x86_64-linux-gnu/libvulkan_lvp.so [0]
+   1343652:	file=libzstd.so.1 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0a0281d58  base: 0x00006fd0a01b4000   size: 0x00000000000ce038
+   1343652:	    entry: 0x00006fd0a01b4000  phdr: 0x00006fd0a01b4040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libdrm.so.2 [0];  needed by /usr/lib/x86_64-linux-gnu/libvulkan_lvp.so [0]
+   1343652:	file=libdrm.so.2 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d3770df0  base: 0x00006fd0d375c000   size: 0x0000000000015bf8
+   1343652:	    entry: 0x00006fd0d375c000  phdr: 0x00006fd0d375c040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libexpat.so.1 [0];  needed by /usr/lib/x86_64-linux-gnu/libvulkan_lvp.so [0]
+   1343652:	file=libexpat.so.1 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d375adf0  base: 0x00006fd0d372a000   size: 0x00000000000310b8
+   1343652:	    entry: 0x00006fd0d372a000  phdr: 0x00006fd0d372a040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libwayland-client.so.0 [0];  needed by /usr/lib/x86_64-linux-gnu/libvulkan_lvp.so [0]
+   1343652:	file=libwayland-client.so.0 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d3728dc8  base: 0x00006fd0d3719000   size: 0x0000000000010488
+   1343652:	    entry: 0x00006fd0d3719000  phdr: 0x00006fd0d3719040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libxcb-present.so.0 [0];  needed by /usr/lib/x86_64-linux-gnu/libvulkan_lvp.so [0]
+   1343652:	file=libxcb-present.so.0 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d3717df8  base: 0x00006fd0d3714000   size: 0x0000000000004058
+   1343652:	    entry: 0x00006fd0d3714000  phdr: 0x00006fd0d3714040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libxcb-xfixes.so.0 [0];  needed by /usr/lib/x86_64-linux-gnu/libvulkan_lvp.so [0]
+   1343652:	file=libxcb-xfixes.so.0 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d3712df8  base: 0x00006fd0d370a000   size: 0x0000000000009058
+   1343652:	    entry: 0x00006fd0d370a000  phdr: 0x00006fd0d370a040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libxcb-sync.so.1 [0];  needed by /usr/lib/x86_64-linux-gnu/libvulkan_lvp.so [0]
+   1343652:	file=libxcb-sync.so.1 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d3708df8  base: 0x00006fd0d3700000   size: 0x0000000000009078
+   1343652:	    entry: 0x00006fd0d3700000  phdr: 0x00006fd0d3700040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libxcb-shm.so.0 [0];  needed by /usr/lib/x86_64-linux-gnu/libvulkan_lvp.so [0]
+   1343652:	file=libxcb-shm.so.0 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0ac090df8  base: 0x00006fd0ac08d000   size: 0x0000000000004068
+   1343652:	    entry: 0x00006fd0ac08d000  phdr: 0x00006fd0ac08d040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libxshmfence.so.1 [0];  needed by /usr/lib/x86_64-linux-gnu/libvulkan_lvp.so [0]
+   1343652:	file=libxshmfence.so.1 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0ac08be10  base: 0x00006fd0ac088000   size: 0x0000000000004078
+   1343652:	    entry: 0x00006fd0ac088000  phdr: 0x00006fd0ac088040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libffi.so.8 [0];  needed by /lib/x86_64-linux-gnu/libLLVM-15.so.1 [0]
+   1343652:	file=libffi.so.8 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0ac086dd8  base: 0x00006fd0ac07b000   size: 0x000000000000c630
+   1343652:	    entry: 0x00006fd0ac07b000  phdr: 0x00006fd0ac07b040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libedit.so.2 [0];  needed by /lib/x86_64-linux-gnu/libLLVM-15.so.1 [0]
+   1343652:	file=libedit.so.2 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0ac075cb0  base: 0x00006fd0ac041000   size: 0x0000000000039040
+   1343652:	    entry: 0x00006fd0ac041000  phdr: 0x00006fd0ac041040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libtinfo.so.6 [0];  needed by /lib/x86_64-linux-gnu/libLLVM-15.so.1 [0]
+   1343652:	file=libtinfo.so.6 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0ac03fb18  base: 0x00006fd0ac00f000   size: 0x0000000000031920
+   1343652:	    entry: 0x00006fd0ac00f000  phdr: 0x00006fd0ac00f040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libxml2.so.2 [0];  needed by /lib/x86_64-linux-gnu/libLLVM-15.so.1 [0]
+   1343652:	file=libxml2.so.2 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0a01b1808  base: 0x00006fd09ffd2000   size: 0x00000000001e1dd8
+   1343652:	    entry: 0x00006fd09ffd2000  phdr: 0x00006fd09ffd2040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libicuuc.so.70 [0];  needed by /lib/x86_64-linux-gnu/libxml2.so.2 [0]
+   1343652:	file=libicuuc.so.70 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd09ffceab8  base: 0x00006fd09fdd7000   size: 0x00000000001fa2e0
+   1343652:	    entry: 0x00006fd09fdd7000  phdr: 0x00006fd09fdd7040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=liblzma.so.5 [0];  needed by /lib/x86_64-linux-gnu/libxml2.so.2 [0]
+   1343652:	file=liblzma.so.5 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0ac00ddd8  base: 0x00006fd0abfe4000   size: 0x000000000002a108
+   1343652:	    entry: 0x00006fd0abfe4000  phdr: 0x00006fd0abfe4040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libicudata.so.70 [0];  needed by /lib/x86_64-linux-gnu/libicuuc.so.70 [0]
+   1343652:	file=libicudata.so.70 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd08d41ce78  base: 0x00006fd08b800000   size: 0x0000000001c1d018
+   1343652:	    entry: 0x00006fd08b800000  phdr: 0x00006fd08b800040  phnum:                 10
+   1343652:	
+   1343652:	activating NODELETE for /lib/x86_64-linux-gnu/libLLVM-15.so.1 [0]
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libicudata.so.70
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/liblzma.so.5
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libicuuc.so.70
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libz.so.1
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libxml2.so.2
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libtinfo.so.6
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libedit.so.2
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libffi.so.8
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libxshmfence.so.1
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libxcb-shm.so.0
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libxcb-sync.so.1
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libxcb-xfixes.so.0
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libxcb-present.so.0
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libwayland-client.so.0
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libexpat.so.1
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libdrm.so.2
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libzstd.so.1
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libLLVM-15.so.1
+   1343652:	
+   1343652:	
+   1343652:	calling init: /usr/lib/x86_64-linux-gnu/libvulkan_lvp.so
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_lvp.so [0]; direct_opencount=1
+   1343652:	
+   1343652:	
+   1343652:	file=/usr/lib/x86_64-linux-gnu/libvulkan_virtio.so [0];  dynamically loaded by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=/usr/lib/x86_64-linux-gnu/libvulkan_virtio.so [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0973f7c78  base: 0x00006fd0972bc000   size: 0x00000000001431f0
+   1343652:	    entry: 0x00006fd0972bc000  phdr: 0x00006fd0972bc040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	calling init: /usr/lib/x86_64-linux-gnu/libvulkan_virtio.so
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_virtio.so [0]; direct_opencount=1
+   1343652:	
+   1343652:	
+   1343652:	file=/usr/lib/x86_64-linux-gnu/libvulkan_intel_hasvk.so [0];  dynamically loaded by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=/usr/lib/x86_64-linux-gnu/libvulkan_intel_hasvk.so [0];  generating link map
+   1343652:	  dynamic: 0x00006fd08b6e5c48  base: 0x00006fd08aa00000   size: 0x0000000000cef0b8
+   1343652:	    entry: 0x00006fd08aa00000  phdr: 0x00006fd08aa00040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	calling init: /usr/lib/x86_64-linux-gnu/libvulkan_intel_hasvk.so
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_intel_hasvk.so [0]; direct_opencount=1
+   1343652:	
+   1343652:	
+   1343652:	file=/usr/lib/x86_64-linux-gnu/libvulkan_intel.so [0];  dynamically loaded by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=/usr/lib/x86_64-linux-gnu/libvulkan_intel.so [0];  generating link map
+   1343652:	  dynamic: 0x00006fd08a9b9c38  base: 0x00006fd089a00000   size: 0x0000000000fc32d8
+   1343652:	    entry: 0x00006fd089a00000  phdr: 0x00006fd089a00040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	calling init: /usr/lib/x86_64-linux-gnu/libvulkan_intel.so
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_intel.so [0]; direct_opencount=1
+   1343652:	
+   1343652:	
+   1343652:	file=/usr/lib/x86_64-linux-gnu/libvulkan_radeon.so [0];  dynamically loaded by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=/usr/lib/x86_64-linux-gnu/libvulkan_radeon.so [0];  generating link map
+   1343652:	  dynamic: 0x00006fd08998abe0  base: 0x00006fd089000000   size: 0x000000000099ce40
+   1343652:	    entry: 0x00006fd089000000  phdr: 0x00006fd089000040  phnum:                 12
+   1343652:	
+   1343652:	
+   1343652:	file=libdrm_amdgpu.so.1 [0];  needed by /usr/lib/x86_64-linux-gnu/libvulkan_radeon.so [0]
+   1343652:	file=libdrm_amdgpu.so.1 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0abfe2de8  base: 0x00006fd0abfd8000   size: 0x000000000000b268
+   1343652:	    entry: 0x00006fd0abfd8000  phdr: 0x00006fd0abfd8040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libelf.so.1 [0];  needed by /usr/lib/x86_64-linux-gnu/libvulkan_radeon.so [0]
+   1343652:	file=libelf.so.1 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0ab9fedb0  base: 0x00006fd0ab9e2000   size: 0x000000000001d188
+   1343652:	    entry: 0x00006fd0ab9e2000  phdr: 0x00006fd0ab9e2040  phnum:                 12
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libelf.so.1
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libdrm_amdgpu.so.1
+   1343652:	
+   1343652:	
+   1343652:	calling init: /usr/lib/x86_64-linux-gnu/libvulkan_radeon.so
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_radeon.so [0]; direct_opencount=1
+   1343652:	
+   1343652:	opening file=/lib/x86_64-linux-gnu/libGLX_nvidia.so.0 [0]; direct_opencount=2
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_lvp.so [0]; direct_opencount=2
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_virtio.so [0]; direct_opencount=2
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_intel_hasvk.so [0]; direct_opencount=2
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_intel.so [0]; direct_opencount=2
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_radeon.so [0]; direct_opencount=2
+   1343652:	
+   1343652:	
+   1343652:	closing file=/lib/x86_64-linux-gnu/libGLX_nvidia.so.0; direct_opencount=1
+   1343652:	
+   1343652:	closing file=/usr/lib/x86_64-linux-gnu/libvulkan_lvp.so; direct_opencount=1
+   1343652:	
+   1343652:	closing file=/usr/lib/x86_64-linux-gnu/libvulkan_virtio.so; direct_opencount=1
+   1343652:	
+   1343652:	closing file=/usr/lib/x86_64-linux-gnu/libvulkan_intel_hasvk.so; direct_opencount=1
+   1343652:	
+   1343652:	closing file=/usr/lib/x86_64-linux-gnu/libvulkan_intel.so; direct_opencount=1
+   1343652:	
+   1343652:	closing file=/usr/lib/x86_64-linux-gnu/libvulkan_radeon.so; direct_opencount=1
+   1343652:	opening file=/lib/x86_64-linux-gnu/libGLX_nvidia.so.0 [0]; direct_opencount=2
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_lvp.so [0]; direct_opencount=2
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_virtio.so [0]; direct_opencount=2
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_intel_hasvk.so [0]; direct_opencount=2
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_intel.so [0]; direct_opencount=2
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_radeon.so [0]; direct_opencount=2
+   1343652:	
+   1343652:	
+   1343652:	closing file=/lib/x86_64-linux-gnu/libGLX_nvidia.so.0; direct_opencount=1
+   1343652:	
+   1343652:	closing file=/usr/lib/x86_64-linux-gnu/libvulkan_lvp.so; direct_opencount=1
+   1343652:	
+   1343652:	closing file=/usr/lib/x86_64-linux-gnu/libvulkan_virtio.so; direct_opencount=1
+   1343652:	
+   1343652:	closing file=/usr/lib/x86_64-linux-gnu/libvulkan_intel_hasvk.so; direct_opencount=1
+   1343652:	
+   1343652:	closing file=/usr/lib/x86_64-linux-gnu/libvulkan_intel.so; direct_opencount=1
+   1343652:	
+   1343652:	closing file=/usr/lib/x86_64-linux-gnu/libvulkan_radeon.so; direct_opencount=1
+   1343652:	opening file=/lib/x86_64-linux-gnu/libGLX_nvidia.so.0 [0]; direct_opencount=2
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_lvp.so [0]; direct_opencount=2
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_virtio.so [0]; direct_opencount=2
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_intel_hasvk.so [0]; direct_opencount=2
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_intel.so [0]; direct_opencount=2
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_radeon.so [0]; direct_opencount=2
+   1343652:	
+   1343652:	
+   1343652:	closing file=/lib/x86_64-linux-gnu/libGLX_nvidia.so.0; direct_opencount=1
+   1343652:	
+   1343652:	closing file=/usr/lib/x86_64-linux-gnu/libvulkan_lvp.so; direct_opencount=1
+   1343652:	
+   1343652:	closing file=/usr/lib/x86_64-linux-gnu/libvulkan_virtio.so; direct_opencount=1
+   1343652:	
+   1343652:	closing file=/usr/lib/x86_64-linux-gnu/libvulkan_intel_hasvk.so; direct_opencount=1
+   1343652:	
+   1343652:	closing file=/usr/lib/x86_64-linux-gnu/libvulkan_intel.so; direct_opencount=1
+   1343652:	
+   1343652:	closing file=/usr/lib/x86_64-linux-gnu/libvulkan_radeon.so; direct_opencount=1
+   1343652:	opening file=/lib/x86_64-linux-gnu/libGLX_nvidia.so.0 [0]; direct_opencount=2
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_lvp.so [0]; direct_opencount=2
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_virtio.so [0]; direct_opencount=2
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_intel_hasvk.so [0]; direct_opencount=2
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_intel.so [0]; direct_opencount=2
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_radeon.so [0]; direct_opencount=2
+   1343652:	
+   1343652:	
+   1343652:	closing file=/lib/x86_64-linux-gnu/libGLX_nvidia.so.0; direct_opencount=1
+   1343652:	
+   1343652:	closing file=/usr/lib/x86_64-linux-gnu/libvulkan_lvp.so; direct_opencount=1
+   1343652:	
+   1343652:	closing file=/usr/lib/x86_64-linux-gnu/libvulkan_virtio.so; direct_opencount=1
+   1343652:	
+   1343652:	closing file=/usr/lib/x86_64-linux-gnu/libvulkan_intel_hasvk.so; direct_opencount=1
+   1343652:	
+   1343652:	closing file=/usr/lib/x86_64-linux-gnu/libvulkan_intel.so; direct_opencount=1
+   1343652:	
+   1343652:	closing file=/usr/lib/x86_64-linux-gnu/libvulkan_radeon.so; direct_opencount=1
+   1343652:	opening file=/lib/x86_64-linux-gnu/libGLX_nvidia.so.0 [0]; direct_opencount=2
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_lvp.so [0]; direct_opencount=2
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_virtio.so [0]; direct_opencount=2
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_intel_hasvk.so [0]; direct_opencount=2
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_intel.so [0]; direct_opencount=2
+   1343652:	
+   1343652:	opening file=/usr/lib/x86_64-linux-gnu/libvulkan_radeon.so [0]; direct_opencount=2
+   1343652:	
+   1343652:	
+   1343652:	file=libVkLayer_khronos_validation.so [0];  dynamically loaded by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=libVkLayer_khronos_validation.so [0];  generating link map
+   1343652:	  dynamic: 0x00006fd088de2aa8  base: 0x00006fd087600000   size: 0x000000000186ee28
+   1343652:	    entry: 0x00006fd087600000  phdr: 0x00006fd087600040  phnum:                 12
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libVkLayer_khronos_validation.so
+   1343652:	
+   1343652:	opening file=/lib/x86_64-linux-gnu/libVkLayer_khronos_validation.so [0]; direct_opencount=1
+   1343652:	
+   1343652:	
+   1343652:	file=libVkLayer_MESA_device_select.so [0];  dynamically loaded by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=libVkLayer_MESA_device_select.so [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0ab9deda0  base: 0x00006fd0ab9d0000   size: 0x00000000000114d8
+   1343652:	    entry: 0x00006fd0ab9d0000  phdr: 0x00006fd0ab9d0040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libVkLayer_MESA_device_select.so
+   1343652:	
+   1343652:	opening file=/lib/x86_64-linux-gnu/libVkLayer_MESA_device_select.so [0]; direct_opencount=1
+   1343652:	
+   1343652:	opening file= [0]; direct_opencount=2
+   1343652:	
+   1343652:	
+   1343652:	closing file=; direct_opencount=1
+   1343652:	opening file= [0]; direct_opencount=2
+   1343652:	
+   1343652:	
+   1343652:	closing file=; direct_opencount=1
+   1343652:	
+   1343652:	file=libdbus-1.so.3 [0];  dynamically loaded by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=libdbus-1.so.3 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0a3b969e8  base: 0x00006fd0a3b4a000   size: 0x000000000004d2e8
+   1343652:	    entry: 0x00006fd0a3b4a000  phdr: 0x00006fd0a3b4a040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libsystemd.so.0 [0];  needed by /lib/x86_64-linux-gnu/libdbus-1.so.3 [0]
+   1343652:	file=libsystemd.so.0 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0a03865e0  base: 0x00006fd0a02c2000   size: 0x00000000000c6560
+   1343652:	    entry: 0x00006fd0a02c2000  phdr: 0x00006fd0a02c2040  phnum:                 12
+   1343652:	
+   1343652:	
+   1343652:	file=liblz4.so.1 [0];  needed by /lib/x86_64-linux-gnu/libsystemd.so.0 [0]
+   1343652:	file=liblz4.so.1 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0a3b48e08  base: 0x00006fd0a3b2a000   size: 0x000000000001f060
+   1343652:	    entry: 0x00006fd0a3b2a000  phdr: 0x00006fd0a3b2a040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libcap.so.2 [0];  needed by /lib/x86_64-linux-gnu/libsystemd.so.0 [0]
+   1343652:	file=libcap.so.2 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0d3cd5c90  base: 0x00006fd0d3ccc000   size: 0x000000000000a038
+   1343652:	    entry: 0x00006fd0d3ccc000  phdr: 0x00006fd0d3ccc040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libgcrypt.so.20 [0];  needed by /lib/x86_64-linux-gnu/libsystemd.so.0 [0]
+   1343652:	file=libgcrypt.so.20 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd09dcd5b10  base: 0x00006fd09db9d000   size: 0x000000000013f410
+   1343652:	    entry: 0x00006fd09db9d000  phdr: 0x00006fd09db9d040  phnum:                 11
+   1343652:	
+   1343652:	
+   1343652:	file=libgpg-error.so.0 [0];  needed by /lib/x86_64-linux-gnu/libgcrypt.so.20 [0]
+   1343652:	file=libgpg-error.so.0 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0a3b28b10  base: 0x00006fd0a3b04000   size: 0x00000000000251b8
+   1343652:	    entry: 0x00006fd0a3b04000  phdr: 0x00006fd0a3b04040  phnum:                 11
+   1343652:	
+   1343652:	activating NODELETE for /lib/x86_64-linux-gnu/libdbus-1.so.3 [0]
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libgpg-error.so.0
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libgcrypt.so.20
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libcap.so.2
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/liblz4.so.1
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libsystemd.so.0
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libdbus-1.so.3
+   1343652:	
+   1343652:	opening file=/lib/x86_64-linux-gnu/libdbus-1.so.3 [0]; direct_opencount=1
+   1343652:	
+   1343652:	/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04: error: symbol lookup error: undefined symbol: dbus_bus_get (fatal)
+   1343652:	opening file=/lib/x86_64-linux-gnu/libdrm.so.2 [0]; direct_opencount=1
+   1343652:	
+   1343652:	
+   1343652:	file=libnvidia-allocator.so.1 [0];  dynamically loaded by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=libnvidia-allocator.so.1 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd0a3b00de8  base: 0x00006fd0a3ad8000   size: 0x000000000002b030
+   1343652:	    entry: 0x00006fd0a3adc520  phdr: 0x00006fd0a3ad8040  phnum:                  9
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libnvidia-allocator.so.1
+   1343652:	
+   1343652:	opening file=/lib/x86_64-linux-gnu/libnvidia-allocator.so.1 [0]; direct_opencount=1
+   1343652:	
+   1343652:	
+   1343652:	file=libnvidia-glvkspirv.so.580.159.04 [0];  dynamically loaded by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=libnvidia-glvkspirv.so.580.159.04 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd086291850  base: 0x00006fd085a00000   size: 0x00000000009315e0
+   1343652:	    entry: 0x00006fd085a31b10  phdr: 0x00006fd085a00040  phnum:                 10
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libnvidia-glvkspirv.so.580.159.04
+   1343652:	
+   1343652:	opening file=/lib/x86_64-linux-gnu/libnvidia-glvkspirv.so.580.159.04 [0]; direct_opencount=1
+   1343652:	
+   1343652:	
+   1343652:	closing file=/usr/lib/x86_64-linux-gnu/libvulkan_intel.so; direct_opencount=1
+   1343652:	
+   1343652:	calling fini: /usr/lib/x86_64-linux-gnu/libvulkan_intel.so [0]
+   1343652:	
+   1343652:	
+   1343652:	file=/usr/lib/x86_64-linux-gnu/libvulkan_intel.so [0];  destroying link map
+   1343652:	
+   1343652:	closing file=/usr/lib/x86_64-linux-gnu/libvulkan_intel_hasvk.so; direct_opencount=1
+   1343652:	
+   1343652:	calling fini: /usr/lib/x86_64-linux-gnu/libvulkan_intel_hasvk.so [0]
+   1343652:	
+   1343652:	
+   1343652:	file=/usr/lib/x86_64-linux-gnu/libvulkan_intel_hasvk.so [0];  destroying link map
+   1343652:	/lib/x86_64-linux-gnu/libVkLayer_MESA_device_select.so: error: symbol lookup error: undefined symbol: vkGetDeviceProcAddr (fatal)
+   1343652:	
+   1343652:	file=libnvidia-rtcore.so.580.159.04 [0];  dynamically loaded by ./bin/ExtrinsicSandbox [0]
+   1343652:	file=libnvidia-rtcore.so.580.159.04 [0];  generating link map
+   1343652:	  dynamic: 0x00006fd084407bf8  base: 0x00006fd07e000000   size: 0x00000000064f3938
+   1343652:	    entry: 0x00006fd07e095e40  phdr: 0x00006fd07e000040  phnum:                 10
+   1343652:	
+   1343652:	
+   1343652:	calling init: /lib/x86_64-linux-gnu/libnvidia-rtcore.so.580.159.04
+   1343652:	
+   1343652:	opening file=/lib/x86_64-linux-gnu/libnvidia-rtcore.so.580.159.04 [0]; direct_opencount=1
+   1343652:	
+   1343652:	opening file=/lib/x86_64-linux-gnu/libnvidia-gpucomp.so.580.159.04 [0]; direct_opencount=1
+   1343652:	
+[33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.[0m
+[33m[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+   1343652:	
+   1343652:	closing file=/lib/x86_64-linux-gnu/libGLX_nvidia.so.0; direct_opencount=1
+   1343652:	
+   1343652:	closing file=/usr/lib/x86_64-linux-gnu/libvulkan_lvp.so; direct_opencount=1
+   1343652:	
+   1343652:	closing file=/usr/lib/x86_64-linux-gnu/libvulkan_virtio.so; direct_opencount=1
+   1343652:	
+   1343652:	closing file=/usr/lib/x86_64-linux-gnu/libvulkan_radeon.so; direct_opencount=1
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libVkLayer_MESA_device_select.so [0]
+   1343652:	
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libVkLayer_MESA_device_select.so [0];  destroying link map
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libVkLayer_khronos_validation.so [0]
+   1343652:	
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libVkLayer_khronos_validation.so [0];  destroying link map
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libGLX_nvidia.so.0 [0]
+   1343652:	
+   1343652:	
+   1343652:	closing file=/lib/x86_64-linux-gnu/libnvidia-rtcore.so.580.159.04; direct_opencount=0
+   1343652:	
+   1343652:	closing file=/lib/x86_64-linux-gnu/libnvidia-glvkspirv.so.580.159.04; direct_opencount=0
+   1343652:	
+   1343652:	closing file=/lib/x86_64-linux-gnu/libxcb.so.1; direct_opencount=0
+   1343652:	
+   1343652:	closing file=/lib/x86_64-linux-gnu/libdrm.so.2; direct_opencount=0
+   1343652:	
+   1343652:	closing file=/lib/x86_64-linux-gnu/libnvidia-allocator.so.1; direct_opencount=0
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libnvidia-glsi.so.580.159.04 [0]
+   1343652:	
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04 [0]
+   1343652:	
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libnvidia-tls.so.580.159.04 [0]
+   1343652:	
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libnvidia-gpucomp.so.580.159.04 [0]
+   1343652:	
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libGLX_nvidia.so.0 [0];  destroying link map
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libnvidia-glsi.so.580.159.04 [0];  destroying link map
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04 [0];  destroying link map
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libnvidia-tls.so.580.159.04 [0];  destroying link map
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libnvidia-gpucomp.so.580.159.04 [0];  destroying link map
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libnvidia-allocator.so.1 [0]
+   1343652:	
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libnvidia-glvkspirv.so.580.159.04 [0]
+   1343652:	
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libnvidia-rtcore.so.580.159.04 [0]
+   1343652:	
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libdl.so.2 [0]
+   1343652:	
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libpthread.so.0 [0]
+   1343652:	
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libnvidia-allocator.so.1 [0];  destroying link map
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libnvidia-glvkspirv.so.580.159.04 [0];  destroying link map
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libnvidia-rtcore.so.580.159.04 [0];  destroying link map
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libdl.so.2 [0];  destroying link map
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libpthread.so.0 [0];  destroying link map
+   1343652:	
+   1343652:	calling fini: /usr/lib/x86_64-linux-gnu/libvulkan_lvp.so [0]
+   1343652:	
+   1343652:	
+   1343652:	file=/usr/lib/x86_64-linux-gnu/libvulkan_lvp.so [0];  destroying link map
+   1343652:	
+   1343652:	calling fini: /usr/lib/x86_64-linux-gnu/libvulkan_virtio.so [0]
+   1343652:	
+   1343652:	
+   1343652:	file=/usr/lib/x86_64-linux-gnu/libvulkan_virtio.so [0];  destroying link map
+   1343652:	
+   1343652:	calling fini: /usr/lib/x86_64-linux-gnu/libvulkan_radeon.so [0]
+   1343652:	
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libxshmfence.so.1 [0]
+   1343652:	
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libxcb-shm.so.0 [0]
+   1343652:	
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libxcb-sync.so.1 [0]
+   1343652:	
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libxcb-xfixes.so.0 [0]
+   1343652:	
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libxcb-present.so.0 [0]
+   1343652:	
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libexpat.so.1 [0]
+   1343652:	
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libwayland-client.so.0 [0]
+   1343652:	
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libdrm_amdgpu.so.1 [0]
+   1343652:	
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libdrm.so.2 [0]
+   1343652:	
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libelf.so.1 [0]
+   1343652:	
+   1343652:	
+   1343652:	file=/usr/lib/x86_64-linux-gnu/libvulkan_radeon.so [0];  destroying link map
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libxshmfence.so.1 [0];  destroying link map
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libxcb-shm.so.0 [0];  destroying link map
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libxcb-sync.so.1 [0];  destroying link map
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libxcb-xfixes.so.0 [0];  destroying link map
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libxcb-present.so.0 [0];  destroying link map
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libexpat.so.1 [0];  destroying link map
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libwayland-client.so.0 [0];  destroying link map
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libdrm_amdgpu.so.1 [0];  destroying link map
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libdrm.so.2 [0];  destroying link map
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libelf.so.1 [0];  destroying link map
+   1343652:	
+   1343652:	closing file=/lib/x86_64-linux-gnu/libvulkan.so.1; direct_opencount=1
+   1343652:	
+   1343652:	closing file=/lib/x86_64-linux-gnu/libX11-xcb.so.1; direct_opencount=1
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libXcursor.so.1 [0]
+   1343652:	
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libXfixes.so.3 [0]
+   1343652:	
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libXcursor.so.1 [0];  destroying link map
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libXfixes.so.3 [0];  destroying link map
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libXrandr.so.2 [0]
+   1343652:	
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libXrandr.so.2 [0];  destroying link map
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libXinerama.so.1 [0]
+   1343652:	
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libXinerama.so.1 [0];  destroying link map
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libXrender.so.1 [0]
+   1343652:	
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libXrender.so.1 [0];  destroying link map
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libXxf86vm.so.1 [0]
+   1343652:	
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libXxf86vm.so.1 [0];  destroying link map
+   1343652:	
+   1343652:	calling fini: /lib/x86_64-linux-gnu/libXi.so.6 [0]
+   1343652:	
+   1343652:	
+   1343652:	file=/lib/x86_64-linux-gnu/libXi.so.6 [0];  destroying link map
+   1343652:	
+   1343652:	calling fini: ./bin/ExtrinsicSandbox [0]
+   1343652:	
+   1343712:	
+   1343712:	file=libLLVM.so.23.0 [0];  needed by /usr/bin/llvm-symbolizer-23 [0]
+   1343712:	file=libLLVM.so.23.0 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1db02bf70  base: 0x00007eb1d1c00000   size: 0x00000000094f9fb9
+   1343712:	    entry: 0x00007eb1d1c00000  phdr: 0x00007eb1d1c00040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libcurl.so.4 [0];  needed by /usr/bin/llvm-symbolizer-23 [0]
+   1343712:	file=libcurl.so.4 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1d1bfbdc0  base: 0x00007eb1d1b59000   size: 0x00000000000a6368
+   1343712:	    entry: 0x00007eb1d1b59000  phdr: 0x00007eb1d1b59040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libstdc++.so.6 [0];  needed by /usr/bin/llvm-symbolizer-23 [0]
+   1343712:	file=libstdc++.so.6 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1d1a99cd8  base: 0x00007eb1d1800000   size: 0x00000000002a1440
+   1343712:	    entry: 0x00007eb1d1800000  phdr: 0x00007eb1d1800040  phnum:                 12
+   1343712:	
+   1343712:	
+   1343712:	file=libm.so.6 [0];  needed by /usr/bin/llvm-symbolizer-23 [0]
+   1343712:	file=libm.so.6 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1d17fed90  base: 0x00007eb1d1719000   size: 0x00000000000e6108
+   1343712:	    entry: 0x00007eb1d1719000  phdr: 0x00007eb1d1719040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libgcc_s.so.1 [0];  needed by /usr/bin/llvm-symbolizer-23 [0]
+   1343712:	file=libgcc_s.so.1 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1d1b57dc8  base: 0x00007eb1d1b2b000   size: 0x000000000002d3a8
+   1343712:	    entry: 0x00007eb1d1b2b000  phdr: 0x00007eb1d1b2b040  phnum:                 12
+   1343712:	
+   1343712:	
+   1343712:	file=libc.so.6 [0];  needed by /usr/bin/llvm-symbolizer-23 [0]
+   1343712:	file=libc.so.6 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1d1619bc0  base: 0x00007eb1d1400000   size: 0x0000000000228e50
+   1343712:	    entry: 0x00007eb1d1429f50  phdr: 0x00007eb1d1400040  phnum:                 14
+   1343712:	
+   1343712:	
+   1343712:	file=libffi.so.8 [0];  needed by /usr/lib/llvm-23/bin/../lib/libLLVM.so.23.0 [0]
+   1343712:	file=libffi.so.8 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1db107dd8  base: 0x00007eb1db0fc000   size: 0x000000000000c630
+   1343712:	    entry: 0x00007eb1db0fc000  phdr: 0x00007eb1db0fc040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libedit.so.2 [0];  needed by /usr/lib/llvm-23/bin/../lib/libLLVM.so.23.0 [0]
+   1343712:	file=libedit.so.2 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1d1b25cb0  base: 0x00007eb1d1af1000   size: 0x0000000000039040
+   1343712:	    entry: 0x00007eb1d1af1000  phdr: 0x00007eb1d1af1040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libz3.so.4 [0];  needed by /usr/lib/llvm-23/bin/../lib/libLLVM.so.23.0 [0]
+   1343712:	file=libz3.so.4 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1d1332780  base: 0x00007eb1d0400000   size: 0x0000000000f347b0
+   1343712:	    entry: 0x00007eb1d0475440  phdr: 0x00007eb1d0400040  phnum:                 12
+   1343712:	
+   1343712:	
+   1343712:	file=libz.so.1 [0];  needed by /usr/lib/llvm-23/bin/../lib/libLLVM.so.23.0 [0]
+   1343712:	file=libz.so.1 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1d1aefdf0  base: 0x00007eb1d1ad5000   size: 0x000000000001b0b8
+   1343712:	    entry: 0x00007eb1d1ad5000  phdr: 0x00007eb1d1ad5040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libzstd.so.1 [0];  needed by /usr/lib/llvm-23/bin/../lib/libLLVM.so.23.0 [0]
+   1343712:	file=libzstd.so.1 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1d1717d58  base: 0x00007eb1d164a000   size: 0x00000000000ce038
+   1343712:	    entry: 0x00007eb1d164a000  phdr: 0x00007eb1d164a040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libxml2.so.2 [0];  needed by /usr/lib/llvm-23/bin/../lib/libLLVM.so.23.0 [0]
+   1343712:	file=libxml2.so.2 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1d03fd808  base: 0x00007eb1d021e000   size: 0x00000000001e1dd8
+   1343712:	    entry: 0x00007eb1d021e000  phdr: 0x00007eb1d021e040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libnghttp2.so.14 [0];  needed by /lib/x86_64-linux-gnu/libcurl.so.4 [0]
+   1343712:	file=libnghttp2.so.14 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1d1ad3e00  base: 0x00007eb1d1aab000   size: 0x0000000000029110
+   1343712:	    entry: 0x00007eb1d1aab000  phdr: 0x00007eb1d1aab040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libidn2.so.0 [0];  needed by /lib/x86_64-linux-gnu/libcurl.so.4 [0]
+   1343712:	file=libidn2.so.0 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1d1648cb0  base: 0x00007eb1d1629000   size: 0x0000000000020010
+   1343712:	    entry: 0x00007eb1d1629000  phdr: 0x00007eb1d1629040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=librtmp.so.1 [0];  needed by /lib/x86_64-linux-gnu/libcurl.so.4 [0]
+   1343712:	file=librtmp.so.1 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1d13fed80  base: 0x00007eb1d13e1000   size: 0x000000000001e3b0
+   1343712:	    entry: 0x00007eb1d13e1000  phdr: 0x00007eb1d13e1040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libssh.so.4 [0];  needed by /lib/x86_64-linux-gnu/libcurl.so.4 [0]
+   1343712:	file=libssh.so.4 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1d13de3f0  base: 0x00007eb1d1373000   size: 0x000000000006d5e0
+   1343712:	    entry: 0x00007eb1d1373000  phdr: 0x00007eb1d1373040  phnum:                 12
+   1343712:	
+   1343712:	
+   1343712:	file=libpsl.so.5 [0];  needed by /lib/x86_64-linux-gnu/libcurl.so.4 [0]
+   1343712:	file=libpsl.so.5 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1d1371cc8  base: 0x00007eb1d135f000   size: 0x0000000000013010
+   1343712:	    entry: 0x00007eb1d135f000  phdr: 0x00007eb1d135f040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libssl.so.3 [0];  needed by /lib/x86_64-linux-gnu/libcurl.so.4 [0]
+   1343712:	file=libssl.so.3 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1d0218e30  base: 0x00007eb1d0179000   size: 0x00000000000a47f0
+   1343712:	    entry: 0x00007eb1d0179000  phdr: 0x00007eb1d0179040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libcrypto.so.3 [0];  needed by /lib/x86_64-linux-gnu/libcurl.so.4 [0]
+   1343712:	file=libcrypto.so.3 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1d003d8a0  base: 0x00007eb1cfc00000   size: 0x00000000004434c0
+   1343712:	    entry: 0x00007eb1cfc00000  phdr: 0x00007eb1cfc00040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libgssapi_krb5.so.2 [0];  needed by /lib/x86_64-linux-gnu/libcurl.so.4 [0]
+   1343712:	file=libgssapi_krb5.so.2 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1d0176c80  base: 0x00007eb1d0125000   size: 0x00000000000533e0
+   1343712:	    entry: 0x00007eb1d0125000  phdr: 0x00007eb1d0125040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libldap-2.5.so.0 [0];  needed by /lib/x86_64-linux-gnu/libcurl.so.4 [0]
+   1343712:	file=libldap-2.5.so.0 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1d01214e8  base: 0x00007eb1d00c5000   size: 0x000000000005fb48
+   1343712:	    entry: 0x00007eb1d00c5000  phdr: 0x00007eb1d00c5040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=liblber-2.5.so.0 [0];  needed by /lib/x86_64-linux-gnu/libcurl.so.4 [0]
+   1343712:	file=liblber-2.5.so.0 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1d135dcb8  base: 0x00007eb1d134e000   size: 0x00000000000101a8
+   1343712:	    entry: 0x00007eb1d134e000  phdr: 0x00007eb1d134e040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libbrotlidec.so.1 [0];  needed by /lib/x86_64-linux-gnu/libcurl.so.4 [0]
+   1343712:	file=libbrotlidec.so.1 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1d134cdd0  base: 0x00007eb1d1340000   size: 0x000000000000d068
+   1343712:	    entry: 0x00007eb1d1340000  phdr: 0x00007eb1d1340040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libtinfo.so.6 [0];  needed by /lib/x86_64-linux-gnu/libedit.so.2 [0]
+   1343712:	file=libtinfo.so.6 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1d00c3b18  base: 0x00007eb1d0093000   size: 0x0000000000031920
+   1343712:	    entry: 0x00007eb1d0093000  phdr: 0x00007eb1d0093040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libbsd.so.0 [0];  needed by /lib/x86_64-linux-gnu/libedit.so.2 [0]
+   1343712:	file=libbsd.so.0 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1d0090970  base: 0x00007eb1d007b000   size: 0x00000000000170e0
+   1343712:	    entry: 0x00007eb1d007b000  phdr: 0x00007eb1d007b040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libicuuc.so.70 [0];  needed by /lib/x86_64-linux-gnu/libxml2.so.2 [0]
+   1343712:	file=libicuuc.so.70 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1cfbfcab8  base: 0x00007eb1cfa05000   size: 0x00000000001fa2e0
+   1343712:	    entry: 0x00007eb1cfa05000  phdr: 0x00007eb1cfa05040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=liblzma.so.5 [0];  needed by /lib/x86_64-linux-gnu/libxml2.so.2 [0]
+   1343712:	file=liblzma.so.5 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1d0079dd8  base: 0x00007eb1d0050000   size: 0x000000000002a108
+   1343712:	    entry: 0x00007eb1d0050000  phdr: 0x00007eb1d0050040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libunistring.so.2 [0];  needed by /lib/x86_64-linux-gnu/libidn2.so.0 [0]
+   1343712:	file=libunistring.so.2 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1cfa037f0  base: 0x00007eb1cf85b000   size: 0x00000000001a98e8
+   1343712:	    entry: 0x00007eb1cf85b000  phdr: 0x00007eb1cf85b040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libgnutls.so.30 [0];  needed by /lib/x86_64-linux-gnu/librtmp.so.1 [0]
+   1343712:	file=libgnutls.so.30 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1cf855f28  base: 0x00007eb1cf66e000   size: 0x00000000001ec800
+   1343712:	    entry: 0x00007eb1cf66e000  phdr: 0x00007eb1cf66e040  phnum:                 12
+   1343712:	
+   1343712:	
+   1343712:	file=libhogweed.so.6 [0];  needed by /lib/x86_64-linux-gnu/librtmp.so.1 [0]
+   1343712:	file=libhogweed.so.6 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1cf66cd48  base: 0x00007eb1cf626000   size: 0x0000000000047338
+   1343712:	    entry: 0x00007eb1cf626000  phdr: 0x00007eb1cf626040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libnettle.so.8 [0];  needed by /lib/x86_64-linux-gnu/librtmp.so.1 [0]
+   1343712:	file=libnettle.so.8 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1cf624d30  base: 0x00007eb1cf5e0000   size: 0x00000000000450d8
+   1343712:	    entry: 0x00007eb1cf5e0000  phdr: 0x00007eb1cf5e0040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libgmp.so.10 [0];  needed by /lib/x86_64-linux-gnu/librtmp.so.1 [0]
+   1343712:	file=libgmp.so.10 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1cf5ded40  base: 0x00007eb1cf55e000   size: 0x0000000000081210
+   1343712:	    entry: 0x00007eb1cf55e000  phdr: 0x00007eb1cf55e040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libkrb5.so.3 [0];  needed by /lib/x86_64-linux-gnu/libgssapi_krb5.so.2 [0]
+   1343712:	file=libkrb5.so.3 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1cf55bce0  base: 0x00007eb1cf493000   size: 0x00000000000cac70
+   1343712:	    entry: 0x00007eb1cf493000  phdr: 0x00007eb1cf493040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libk5crypto.so.3 [0];  needed by /lib/x86_64-linux-gnu/libgssapi_krb5.so.2 [0]
+   1343712:	file=libk5crypto.so.3 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1cf490dc0  base: 0x00007eb1cf464000   size: 0x000000000002e038
+   1343712:	    entry: 0x00007eb1cf464000  phdr: 0x00007eb1cf464040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libcom_err.so.2 [0];  needed by /lib/x86_64-linux-gnu/libgssapi_krb5.so.2 [0]
+   1343712:	file=libcom_err.so.2 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1d133ecb8  base: 0x00007eb1d133a000   size: 0x0000000000005048
+   1343712:	    entry: 0x00007eb1d133a000  phdr: 0x00007eb1d133a040  phnum:                 12
+   1343712:	
+   1343712:	
+   1343712:	file=libkrb5support.so.0 [0];  needed by /lib/x86_64-linux-gnu/libgssapi_krb5.so.2 [0]
+   1343712:	file=libkrb5support.so.0 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1cf462d68  base: 0x00007eb1cf456000   size: 0x000000000000d3d0
+   1343712:	    entry: 0x00007eb1cf456000  phdr: 0x00007eb1cf456040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libsasl2.so.2 [0];  needed by /lib/x86_64-linux-gnu/libldap-2.5.so.0 [0]
+   1343712:	file=libsasl2.so.2 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1cf454ba8  base: 0x00007eb1cf43b000   size: 0x000000000001a3f0
+   1343712:	    entry: 0x00007eb1cf43b000  phdr: 0x00007eb1cf43b040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libbrotlicommon.so.1 [0];  needed by /lib/x86_64-linux-gnu/libbrotlidec.so.1 [0]
+   1343712:	file=libbrotlicommon.so.1 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1cf439e10  base: 0x00007eb1cf418000   size: 0x0000000000022038
+   1343712:	    entry: 0x00007eb1cf418000  phdr: 0x00007eb1cf418040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libmd.so.0 [0];  needed by /lib/x86_64-linux-gnu/libbsd.so.0 [0]
+   1343712:	file=libmd.so.0 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1cf416d68  base: 0x00007eb1cf40b000   size: 0x000000000000c0e8
+   1343712:	    entry: 0x00007eb1cf40b000  phdr: 0x00007eb1cf40b040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libicudata.so.70 [0];  needed by /lib/x86_64-linux-gnu/libicuuc.so.70 [0]
+   1343712:	file=libicudata.so.70 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1cf21ce78  base: 0x00007eb1cd600000   size: 0x0000000001c1d018
+   1343712:	    entry: 0x00007eb1cd600000  phdr: 0x00007eb1cd600040  phnum:                 10
+   1343712:	
+   1343712:	
+   1343712:	file=libp11-kit.so.0 [0];  needed by /lib/x86_64-linux-gnu/libgnutls.so.30 [0]
+   1343712:	file=libp11-kit.so.0 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1cf400a60  base: 0x00007eb1cf2d0000   size: 0x000000000013abc8
+   1343712:	    entry: 0x00007eb1cf2d0000  phdr: 0x00007eb1cf2d0040  phnum:                 12
+   1343712:	
+   1343712:	
+   1343712:	file=libtasn1.so.6 [0];  needed by /lib/x86_64-linux-gnu/libgnutls.so.30 [0]
+   1343712:	file=libtasn1.so.6 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1cf2cec98  base: 0x00007eb1cf2b8000   size: 0x0000000000017228
+   1343712:	    entry: 0x00007eb1cf2b8000  phdr: 0x00007eb1cf2b8040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libkeyutils.so.1 [0];  needed by /lib/x86_64-linux-gnu/libkrb5.so.3 [0]
+   1343712:	file=libkeyutils.so.1 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1d004ed28  base: 0x00007eb1d0049000   size: 0x0000000000006010
+   1343712:	    entry: 0x00007eb1d0049000  phdr: 0x00007eb1d0049040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	file=libresolv.so.2 [0];  needed by /lib/x86_64-linux-gnu/libkrb5.so.3 [0]
+   1343712:	file=libresolv.so.2 [0];  generating link map
+   1343712:	  dynamic: 0x00007eb1cf2b4d88  base: 0x00007eb1cf2a5000   size: 0x0000000000012a48
+   1343712:	    entry: 0x00007eb1cf2a5000  phdr: 0x00007eb1cf2a5040  phnum:                 11
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib64/ld-linux-x86-64.so.2
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libc.so.6
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libresolv.so.2
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libkeyutils.so.1
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libtasn1.so.6
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libffi.so.8
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libp11-kit.so.0
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libicudata.so.70
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libmd.so.0
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libbrotlicommon.so.1
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libsasl2.so.2
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libkrb5support.so.0
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libcom_err.so.2
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libk5crypto.so.3
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libkrb5.so.3
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libgmp.so.10
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libnettle.so.8
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libhogweed.so.6
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libunistring.so.2
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libidn2.so.0
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libgnutls.so.30
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/liblzma.so.5
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libm.so.6
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libgcc_s.so.1
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libstdc++.so.6
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libicuuc.so.70
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libbsd.so.0
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libtinfo.so.6
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libbrotlidec.so.1
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/liblber-2.5.so.0
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libldap-2.5.so.0
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libgssapi_krb5.so.2
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libcrypto.so.3
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libssl.so.3
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libpsl.so.5
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libz.so.1
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libssh.so.4
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/librtmp.so.1
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libnghttp2.so.14
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libxml2.so.2
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libzstd.so.1
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libz3.so.4
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libedit.so.2
+   1343712:	
+   1343712:	
+   1343712:	calling init: /lib/x86_64-linux-gnu/libcurl.so.4
+   1343712:	
+   1343712:	
+   1343712:	calling init: /usr/lib/llvm-23/bin/../lib/libLLVM.so.23.0
+   1343712:	
+   1343712:	
+   1343712:	initialize program: /usr/bin/llvm-symbolizer-23
+   1343712:	
+   1343712:	
+   1343712:	transferring control: /usr/bin/llvm-symbolizer-23
+   1343712:	
+
+=================================================================
+==1343652==ERROR: LeakSanitizer: detected memory leaks
+
+Direct leak of 256 byte(s) in 1 object(s) allocated from:
+    #0 0x5efd41f42501 in realloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d36501) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+    #1 0x6fd089206a08  (<unknown module>)
+    #2 0x6fd08920707e  (<unknown module>)
+    #3 0x73d0d5e99ea7 in __pthread_once_slow nptl/pthread_once.c:116:7
+    #4 0x6fd089205497  (<unknown module>)
+    #5 0x6fd089242f4a  (<unknown module>)
+    #6 0x5efd41f3f666 in asan_thread_start(void*) asan_interceptors.cpp.o
+    #7 0x73d0d5e94a82 in start_thread nptl/pthread_create.c:442:8
+    #8 0x73d0d5f268df  misc/../sysdeps/unix/sysv/linux/x86_64/clone3.S:81
+
+Direct leak of 256 byte(s) in 1 object(s) allocated from:
+    #0 0x5efd41f42501 in realloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d36501) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+    #1 0x6fd09749e428  (<unknown module>)
+    #2 0x6fd09749ea9e  (<unknown module>)
+    #3 0x73d0d5e99ea7 in __pthread_once_slow nptl/pthread_once.c:116:7
+    #4 0x6fd0976bb2b6  (<unknown module>)
+    #5 0x6fd097461d45  (<unknown module>)
+    #6 0x6fd097640ad5  (<unknown module>)
+    #7 0x6fd097640a46  (<unknown module>)
+    #8 0x6fd097461fb9  (<unknown module>)
+    #9 0x6fd0974630bf  (<unknown module>)
+    #10 0x6fd0975034a8  (<unknown module>)
+    #11 0x6fd097504050  (<unknown module>)
+    #12 0x73d0d64c5a5b  (/lib/x86_64-linux-gnu/libvulkan.so.1+0x21a5b) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+    #13 0x73d0d64c619b  (/lib/x86_64-linux-gnu/libvulkan.so.1+0x2219b) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+    #14 0x6fd088117606  (<unknown module>)
+    #15 0x6fd087db7c4f  (<unknown module>)
+    #16 0x6fd0ab9d4136  (<unknown module>)
+    #17 0x73d0d64bf0de  (/lib/x86_64-linux-gnu/libvulkan.so.1+0x1b0de) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+    #18 0x73d0d64d3ee5 in vkCreateInstance (/lib/x86_64-linux-gnu/libvulkan.so.1+0x2fee5) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+    #19 0x5efd461184eb in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:1542:23
+    #20 0x5efd4294ac20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+    #21 0x5efd41f8743a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+    #22 0x73d0d5e29d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #23 0x73d0d5e29e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #24 0x5efd41e9db94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+-----------------------------------------------------
+Suppressions used:
+  count      bytes template
+     18     113760 VulkanCommandContext@Extrinsic.Backends.Vulkan::PushConstants
+      3       1986 dbus_connection_send_with_reply_and_block
+      1        408 _XimRegisterIMInstantiateCallback
+-----------------------------------------------------
+
+SUMMARY: AddressSanitizer: 512 byte(s) leaked in 2 allocation(s).
+   1343712:	
+   1343712:	calling fini: /usr/bin/llvm-symbolizer-23 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /usr/lib/llvm-23/bin/../lib/libLLVM.so.23.0 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libcurl.so.4 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libedit.so.2 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libz3.so.4 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libzstd.so.1 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libxml2.so.2 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libnghttp2.so.14 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/librtmp.so.1 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libssh.so.4 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libz.so.1 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libpsl.so.5 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libssl.so.3 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libcrypto.so.3 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libgssapi_krb5.so.2 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libldap-2.5.so.0 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/liblber-2.5.so.0 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libbrotlidec.so.1 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libtinfo.so.6 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libbsd.so.0 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libicuuc.so.70 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libstdc++.so.6 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libgcc_s.so.1 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libm.so.6 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/liblzma.so.5 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libgnutls.so.30 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libidn2.so.0 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libunistring.so.2 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libhogweed.so.6 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libnettle.so.8 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libgmp.so.10 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libkrb5.so.3 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libk5crypto.so.3 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libcom_err.so.2 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libkrb5support.so.0 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libsasl2.so.2 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libbrotlicommon.so.1 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libmd.so.0 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libicudata.so.70 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libp11-kit.so.0 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libffi.so.8 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libtasn1.so.6 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libkeyutils.so.1 [0]
+   1343712:	
+   1343712:	
+   1343712:	calling fini: /lib/x86_64-linux-gnu/libresolv.so.2 [0]
+   1343712:	

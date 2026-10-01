@@ -220,6 +220,8 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-221` — Vulkan shutdown LSan contract fails on NVIDIA 580.159.04 instance creation (tasks/backlog/bugs/BUG-221-vulkan-shutdown-lsan-nvidia-580-instance-leak.md)
 - unblocked: `BUG-222` — UV atlas smoke baseline output mismatch (tasks/backlog/bugs/BUG-222-uv-atlas-smoke-baseline-output-mismatch.md)
 - unblocked: `BUG-225` — Archived tasks cannot follow links to tasks that retire later (tasks/backlog/bugs/BUG-225-archived-task-links-to-retiring-tasks.md)
+- unblocked: `BUG-228` — Vulkan smoke timeout depends on the display environment (tasks/backlog/bugs/BUG-228-desktop-display-vulkan-smoke-timeouts.md)
+- unblocked: `BUG-229` — NVIDIA shutdown retention on a nested Xephyr display (tasks/backlog/bugs/BUG-229-nvidia-xephyr-shutdown-retention.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 - unblocked: `GRAPHICS-147` — Refine shared Morton cells in the GPU point LBVH (tasks/backlog/rendering/GRAPHICS-147-gpu-lbvh-shared-cell-refinement.md)
 

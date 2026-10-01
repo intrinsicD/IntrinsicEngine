@@ -1,0 +1,454 @@
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start 5202: ExtrinsicSandbox.VulkanShutdownLsanContract
+1/1 Test #5202: ExtrinsicSandbox.VulkanShutdownLsanContract ...***Failed    3.93 sec
+CMake Error at /home/alex/Documents/IntrinsicEngine/tests/regression/graphics/Run.VulkanShutdownLsanContract.cmake:102 (message):
+  BUG-083 five-frame Sandbox process exited 86; the narrow leak policy is not
+  clean.
+
+  [32m[INFO] Initialized Scheduler with 31 worker threads.[0m
+
+  [33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains
+  fail-closed until the first clean default-recipe validation promotes
+  it.[0m
+
+  [33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created
+  logical-device, queue, VMA, per-frame command/sync, swapchain
+  image/view/handle, bindless heap, transfer queue, and global
+  pipeline-layout state; canonical frame execution waits for the first clean
+  recipe validation publish, so device remains non-operational during cold
+  start.[0m
+
+  [33m[WARN] [Runtime] VulkanRequestedButNotOperational
+  status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+
+  wrote frame-pacing report:
+  "/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/Testing/Temporary/extrinsic_sandbox_vulkan_shutdown_lsan.json"
+
+
+
+  =================================================================
+
+  ==1342809==ERROR: LeakSanitizer: detected memory leaks
+
+
+
+  Direct leak of 1392 byte(s) in 1 object(s) allocated from:
+
+      #0 0x606c399e20f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x753071e0c0d1  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xa0c0d1) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #2 0x753071def518  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0x9ef518) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #3 0x753071dfc733  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0x9fc733) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #4 0x75307415db53  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0x55b53) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #5 0x75307415e74e  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0x5674e) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #6 0x753071e02d78  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xa02d78) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #7 0x753071dfdc9c  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0x9fdc9c) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #8 0x75307211eca8  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd1eca8) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #9 0x753072117fd4  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd17fd4) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #10 0x753072126b9e  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd26b9e) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #11 0x75307216a915  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd6a915) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #12 0x713024862e2f  (<unknown module>)
+      #13 0x713024b50d9d  (<unknown module>)
+      #14 0x606c3dbc38eb in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Shutdown() /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:2387:13
+      #15 0x606c3a3e24dc in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Shutdown() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:675:31
+      #16 0x606c39a2755b in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:495:12
+      #17 0x753073829d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #18 0x753073829e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #19 0x606c3993db94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 1392 byte(s) in 1 object(s) allocated from:
+
+      #0 0x606c399e20f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x753071e0c0d1  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xa0c0d1) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #2 0x753071def518  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0x9ef518) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #3 0x753071dfc7e9  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0x9fc7e9) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #4 0x75307415db53  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0x55b53) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #5 0x75307415e74e  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0x5674e) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #6 0x753071e02d78  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xa02d78) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #7 0x753071dfdc9c  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0x9fdc9c) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #8 0x75307211eca8  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd1eca8) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #9 0x753072117fd4  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd17fd4) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #10 0x753072126b9e  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd26b9e) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #11 0x75307216a915  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd6a915) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #12 0x713024862e2f  (<unknown module>)
+      #13 0x713024b50d9d  (<unknown module>)
+      #14 0x606c3dbc38eb in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Shutdown() /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:2387:13
+      #15 0x606c3a3e24dc in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Shutdown() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:675:31
+      #16 0x606c39a2755b in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:495:12
+      #17 0x753073829d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #18 0x753073829e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #19 0x606c3993db94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 256 byte(s) in 1 object(s) allocated from:
+
+      #0 0x606c399e2501 in realloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d36501) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x71303149e428  (<unknown module>)
+      #2 0x71303149ea9e  (<unknown module>)
+      #3 0x753073899ea7 in __pthread_once_slow nptl/pthread_once.c:116:7
+      #4 0x7130316bb2b6  (<unknown module>)
+      #5 0x713031461d45  (<unknown module>)
+      #6 0x713031640ad5  (<unknown module>)
+      #7 0x713031640a46  (<unknown module>)
+      #8 0x713031461fb9  (<unknown module>)
+      #9 0x7130314630bf  (<unknown module>)
+      #10 0x7130315034a8  (<unknown module>)
+      #11 0x713031504050  (<unknown module>)
+      #12 0x753073fa1a5b  (/lib/x86_64-linux-gnu/libvulkan.so.1+0x21a5b) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+      #13 0x753073fa219b  (/lib/x86_64-linux-gnu/libvulkan.so.1+0x2219b) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+      #14 0x713024f17606  (<unknown module>)
+      #15 0x713024bb7c4f  (<unknown module>)
+      #16 0x71306a30a136  (<unknown module>)
+      #17 0x753073f9b0de  (/lib/x86_64-linux-gnu/libvulkan.so.1+0x1b0de) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+      #18 0x753073fafee5 in vkCreateInstance (/lib/x86_64-linux-gnu/libvulkan.so.1+0x2fee5) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+      #19 0x606c3dbb84eb in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:1542:23
+      #20 0x606c3a3eac20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+      #21 0x606c39a2743a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+      #22 0x753073829d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #23 0x753073829e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #24 0x606c3993db94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 256 byte(s) in 1 object(s) allocated from:
+
+      #0 0x606c399e2501 in realloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d36501) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x713026006a08  (<unknown module>)
+      #2 0x71302600707e  (<unknown module>)
+      #3 0x753073899ea7 in __pthread_once_slow nptl/pthread_once.c:116:7
+      #4 0x713026005497  (<unknown module>)
+      #5 0x713026042f4a  (<unknown module>)
+      #6 0x606c399df666 in asan_thread_start(void*) asan_interceptors.cpp.o
+      #7 0x753073894a82 in start_thread nptl/pthread_create.c:442:8
+      #8 0x7530739268df  misc/../sysdeps/unix/sysv/linux/x86_64/clone3.S:81
+
+
+
+  Direct leak of 192 byte(s) in 6 object(s) allocated from:
+
+      #0 0x606c399e20f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x753073ef11b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #2 0x753073ef1a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #3 0x753073ef1eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #4 0x753073ef2e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #5 0x7530741b4299  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0xac299) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #6 0x7530741a7110  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0x9f110) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #7 0x753072112bf8  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd12bf8) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #8 0x75307212bd26  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd2bd26) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #9 0x75307216a6b9  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd6a6b9) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #10 0x713024b4fa92  (<unknown module>)
+      #11 0x606c3dbc81ca in Extrinsic::Backends::Vulkan::(anonymous namespace)::ProbeQueueFamilies(VkPhysicalDevice_T*, VkSurfaceKHR_T*) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:253:17
+      #12 0x606c3dbb90af in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:1600:45
+      #13 0x606c3a3eac20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+      #14 0x606c39a2743a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+      #15 0x753073829d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #16 0x753073829e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #17 0x606c3993db94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 32 byte(s) in 1 object(s) allocated from:
+
+      #0 0x606c399e20f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x753073ef11b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #2 0x753073ef1a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #3 0x753073ef1eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #4 0x753073ef2e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #5 0x7530741b4299  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0xac299) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #6 0x7530741a7110  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0x9f110) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #7 0x7530721129d3  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd129d3) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #8 0x75307216a5e0  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd6a5e0) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #9 0x713024ea4bed  (<unknown module>)
+      #10 0x713024acb25f  (<unknown module>)
+      #11 0x713024acdec0  (<unknown module>)
+      #12 0x713024b50919  (<unknown module>)
+      #13 0x606c3dbbf252 in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:2029:18
+      #14 0x606c3a3eac20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+      #15 0x606c39a2743a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+      #16 0x753073829d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #17 0x753073829e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #18 0x606c3993db94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 32 byte(s) in 1 object(s) allocated from:
+
+      #0 0x606c399e20f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x753073ef11b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #2 0x753073ef1a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #3 0x753073ef1eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #4 0x753073ef2e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #5 0x7530741b4299  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0xac299) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #6 0x7530741a7110  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0x9f110) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #7 0x7530721129d3  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd129d3) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #8 0x75307216a5e0  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd6a5e0) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #9 0x713024b50252  (<unknown module>)
+      #10 0x606c3dbbe659 in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:1976:18
+      #11 0x606c3a3eac20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+      #12 0x606c39a2743a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+      #13 0x753073829d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #14 0x753073829e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #15 0x606c3993db94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 32 byte(s) in 1 object(s) allocated from:
+
+      #0 0x606c399e20f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x753073ef11b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #2 0x753073ef1a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #3 0x753073ef1eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #4 0x753073ef2e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #5 0x7530741b4299  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0xac299) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #6 0x7530741a7110  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0x9f110) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #7 0x7530741a715e  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0x9f15e) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #8 0x7530721184a4  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd184a4) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #9 0x753072124afb  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd24afb) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #10 0x75307212843e  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd2843e) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #11 0x753072128f61  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd28f61) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #12 0x753073fbcb50  (/lib/x86_64-linux-gnu/libvulkan.so.1+0x3cb50) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+      #13 0x713024c1e198  (<unknown module>)
+      #14 0x713024b509d3  (<unknown module>)
+      #15 0x606c3dbbf252 in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:2029:18
+      #16 0x606c3a3eac20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+      #17 0x606c39a2743a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+      #18 0x753073829d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #19 0x753073829e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #20 0x606c3993db94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 32 byte(s) in 1 object(s) allocated from:
+
+      #0 0x606c399e20f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x753073ef11b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #2 0x753073ef1a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #3 0x753073ef1eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #4 0x753073ef2e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #5 0x7530741b4299  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0xac299) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #6 0x7530741a7110  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0x9f110) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #7 0x7530721128c9  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd128c9) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #8 0x713024b4fe6d  (<unknown module>)
+      #9 0x606c3dbc99c6 in Extrinsic::Backends::Vulkan::(anonymous namespace)::HasSwapchainSurfaceSupport(VkPhysicalDevice_T*, VkSurfaceKHR_T*) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:304:13
+      #10 0x606c3dbb9153 in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:1603:48
+      #11 0x606c3a3eac20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+      #12 0x606c39a2743a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+      #13 0x753073829d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #14 0x753073829e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #15 0x606c3993db94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 32 byte(s) in 1 object(s) allocated from:
+
+      #0 0x606c399e20f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x753073ef11b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #2 0x753073ef1a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #3 0x753073ef1eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #4 0x753073ef2e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #5 0x7530741b4299  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0xac299) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #6 0x7530741a7110  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0x9f110) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #7 0x753072112ace  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd12ace) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #8 0x75307211280b  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd1280b) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #9 0x713024b4fe6d  (<unknown module>)
+      #10 0x606c3dbc99c6 in Extrinsic::Backends::Vulkan::(anonymous namespace)::HasSwapchainSurfaceSupport(VkPhysicalDevice_T*, VkSurfaceKHR_T*) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:304:13
+      #11 0x606c3dbb9153 in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:1603:48
+      #12 0x606c3a3eac20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+      #13 0x606c39a2743a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+      #14 0x753073829d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #15 0x753073829e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #16 0x606c3993db94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 32 byte(s) in 1 object(s) allocated from:
+
+      #0 0x606c399e20f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x753073ef11b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #2 0x753073ef1a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #3 0x753073ef1eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #4 0x753073ef2e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #5 0x7530741b4299  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0xac299) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #6 0x7530741a7110  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0x9f110) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #7 0x7530721129d3  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd129d3) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #8 0x75307216a5e0  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd6a5e0) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #9 0x713024b50252  (<unknown module>)
+      #10 0x606c3dbc9a5a in Extrinsic::Backends::Vulkan::(anonymous namespace)::HasSwapchainSurfaceSupport(VkPhysicalDevice_T*, VkSurfaceKHR_T*) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:308:13
+      #11 0x606c3dbb9153 in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:1603:48
+      #12 0x606c3a3eac20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+      #13 0x606c39a2743a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+      #14 0x753073829d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #15 0x753073829e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #16 0x606c3993db94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 32 byte(s) in 1 object(s) allocated from:
+
+      #0 0x606c399e20f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x753073ef11b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #2 0x753073ef1a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #3 0x753073ef1eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #4 0x753073ef2e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #5 0x7530741b4299  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0xac299) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #6 0x7530741a7110  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0x9f110) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #7 0x7530721129d3  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd129d3) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #8 0x75307216a5e0  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd6a5e0) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #9 0x713024b50252  (<unknown module>)
+      #10 0x606c3dbbe297 in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:1962:18
+      #11 0x606c3a3eac20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+      #12 0x606c39a2743a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+      #13 0x753073829d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #14 0x753073829e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #15 0x606c3993db94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 32 byte(s) in 1 object(s) allocated from:
+
+      #0 0x606c399e20f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x753073ef11b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #2 0x753073ef1a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #3 0x753073ef1eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #4 0x753073ef2e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #5 0x7530741b4299  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0xac299) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #6 0x7530741a7110  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0x9f110) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #7 0x7530721128c9  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd128c9) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #8 0x713024b4fe6d  (<unknown module>)
+      #9 0x606c3dbbe039 in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:1950:18
+      #10 0x606c3a3eac20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+      #11 0x606c39a2743a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+      #12 0x753073829d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #13 0x753073829e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #14 0x606c3993db94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 32 byte(s) in 1 object(s) allocated from:
+
+      #0 0x606c399e20f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x753073ef11b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #2 0x753073ef1a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #3 0x753073ef1eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #4 0x753073ef2e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #5 0x7530741b4299  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0xac299) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #6 0x7530741a7110  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0x9f110) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #7 0x753072112bf8  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd12bf8) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #8 0x75307212bce4  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd2bce4) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #9 0x753072127ff0  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd27ff0) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #10 0x753072128f61  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd28f61) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #11 0x753073fbcb50  (/lib/x86_64-linux-gnu/libvulkan.so.1+0x3cb50) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+      #12 0x713024c1e198  (<unknown module>)
+      #13 0x713024b509d3  (<unknown module>)
+      #14 0x606c3dbbf252 in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:2029:18
+      #15 0x606c3a3eac20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+      #16 0x606c39a2743a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+      #17 0x753073829d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #18 0x753073829e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #19 0x606c3993db94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 32 byte(s) in 1 object(s) allocated from:
+
+      #0 0x606c399e20f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x753073ef11b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #2 0x753073ef1a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #3 0x753073ef1eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #4 0x753073ef2e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #5 0x7530741b4299  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0xac299) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #6 0x7530741a7110  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0x9f110) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #7 0x7530721129d3  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd129d3) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #8 0x75307216a5e0  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd6a5e0) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #9 0x713024ea4c2b  (<unknown module>)
+      #10 0x713024acb25f  (<unknown module>)
+      #11 0x713024acdec0  (<unknown module>)
+      #12 0x713024b50919  (<unknown module>)
+      #13 0x606c3dbbf252 in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:2029:18
+      #14 0x606c3a3eac20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+      #15 0x606c39a2743a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+      #16 0x753073829d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #17 0x753073829e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #18 0x606c3993db94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Direct leak of 32 byte(s) in 1 object(s) allocated from:
+
+      #0 0x606c399e20f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x753073ef11b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #2 0x753073ef1a08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #3 0x753073ef1eb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #4 0x753073ef2e44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+      #5 0x7530741b4299  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0xac299) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #6 0x7530741a7110  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0x9f110) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #7 0x753072112ace  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd12ace) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #8 0x75307211280b  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd1280b) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #9 0x713024b4fe6d  (<unknown module>)
+      #10 0x606c3dbbe039 in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:1950:18
+      #11 0x606c3a3eac20 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:520:27
+      #12 0x606c39a2743a in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:485:12
+      #13 0x753073829d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #14 0x753073829e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #15 0x606c3993db94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  Indirect leak of 2800 byte(s) in 1 object(s) allocated from:
+
+      #0 0x606c399e22d2 in calloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d362d2) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+      #1 0x753071e0c38d  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xa0c38d) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #2 0x753071dfc683  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0x9fc683) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #3 0x75307415db53  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0x55b53) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #4 0x75307415e74e  (/lib/x86_64-linux-gnu/libGLX_nvidia.so.0+0x5674e) (BuildId: bf6f34531b75a5d42c2e394729c6308a2bebcd8d)
+      #5 0x753071e02d78  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xa02d78) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #6 0x753071dfdc9c  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0x9fdc9c) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #7 0x75307211eca8  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd1eca8) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #8 0x753072117fd4  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd17fd4) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #9 0x753072126b9e  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd26b9e) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #10 0x75307216a915  (/lib/x86_64-linux-gnu/libnvidia-glcore.so.580.159.04+0xd6a915) (BuildId: 181195aec545ef5def6e1edb0d561a49d93899db)
+      #11 0x713024862e2f  (<unknown module>)
+      #12 0x713024b50d9d  (<unknown module>)
+      #13 0x606c3dbc38eb in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Shutdown() /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:2387:13
+      #14 0x606c3a3e24dc in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Shutdown() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:675:31
+      #15 0x606c39a2755b in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:495:12
+      #16 0x753073829d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #17 0x753073829e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #18 0x606c3993db94 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4c91b94) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+
+
+
+  -----------------------------------------------------
+
+  Suppressions used:
+
+    count      bytes template
+       18     113760 VulkanCommandContext@Extrinsic.Backends.Vulkan::PushConstants
+        3       1986 dbus_connection_send_with_reply_and_block
+
+  -----------------------------------------------------
+
+
+
+  SUMMARY: AddressSanitizer: 6640 byte(s) leaked in 22 allocation(s).
+
+
+
+
+
+0% tests passed, 1 tests failed out of 1
+
+Label Time Summary:
+gpu           =   3.93 sec*proc (1 test)
+graphics      =   3.93 sec*proc (1 test)
+regression    =   3.93 sec*proc (1 test)
+runtime       =   3.93 sec*proc (1 test)
+vulkan        =   3.93 sec*proc (1 test)
+
+Total Test time (real) =   4.09 sec
+
+The following tests FAILED:
+	5202 - ExtrinsicSandbox.VulkanShutdownLsanContract (Failed) gpu graphics regression runtime vulkan
+Errors while running CTest

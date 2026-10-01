@@ -1,0 +1,45 @@
+enumeration=0 devices=3
+
+=================================================================
+==1345399==ERROR: LeakSanitizer: detected memory leaks
+
+Direct leak of 256 byte(s) in 1 object(s) allocated from:
+    #0 0x57e50dce7cf1 in realloc (/tmp/intrinsic-bug221-225/enumerate+0xd1cf1) (BuildId: d6c3e3b0c1c1ec64f2099c5873e8d07a462978df)
+    #1 0x6cb82ac06a08  (<unknown module>)
+    #2 0x6cb82ac0707e  (<unknown module>)
+    #3 0x70b850299ea7 in __pthread_once_slow nptl/pthread_once.c:116:7
+    #4 0x6cb82ac05497  (<unknown module>)
+    #5 0x6cb82ac42f4a  (<unknown module>)
+    #6 0x57e50dce4e56 in asan_thread_start(void*) asan_interceptors.cpp.o
+    #7 0x70b850294a82 in start_thread nptl/pthread_create.c:442:8
+    #8 0x70b8503268df  misc/../sysdeps/unix/sysv/linux/x86_64/clone3.S:81
+
+Direct leak of 256 byte(s) in 1 object(s) allocated from:
+    #0 0x57e50dce7cf1 in realloc (/tmp/intrinsic-bug221-225/enumerate+0xd1cf1) (BuildId: d6c3e3b0c1c1ec64f2099c5873e8d07a462978df)
+    #1 0x6cb83629e428  (<unknown module>)
+    #2 0x6cb83629ea9e  (<unknown module>)
+    #3 0x70b850299ea7 in __pthread_once_slow nptl/pthread_once.c:116:7
+    #4 0x6cb8364bb2b6  (<unknown module>)
+    #5 0x6cb836261d45  (<unknown module>)
+    #6 0x6cb836440ad5  (<unknown module>)
+    #7 0x6cb836440a46  (<unknown module>)
+    #8 0x6cb836261fb9  (<unknown module>)
+    #9 0x6cb8362630bf  (<unknown module>)
+    #10 0x6cb8363034a8  (<unknown module>)
+    #11 0x6cb836304050  (<unknown module>)
+    #12 0x70b850742a5b  (/lib/x86_64-linux-gnu/libvulkan.so.1+0x21a5b) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+    #13 0x70b85074319b  (/lib/x86_64-linux-gnu/libvulkan.so.1+0x2219b) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+    #14 0x6cb84df0840b  (<unknown module>)
+    #15 0x70b85074dbbb in vkEnumeratePhysicalDevices (/lib/x86_64-linux-gnu/libvulkan.so.1+0x2cbbb) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+    #16 0x57e50dd2a6d2 in main /tmp/intrinsic-bug221-225/enumerate.c:9:4
+    #17 0x70b850229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #18 0x70b850229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #19 0x57e50dc43384 in _start (/tmp/intrinsic-bug221-225/enumerate+0x2d384) (BuildId: d6c3e3b0c1c1ec64f2099c5873e8d07a462978df)
+
+-----------------------------------------------------
+Suppressions used:
+  count      bytes template
+      3       1890 dbus_connection_send_with_reply_and_block
+-----------------------------------------------------
+
+SUMMARY: AddressSanitizer: 512 byte(s) leaked in 2 allocation(s).

@@ -1,0 +1,346 @@
+LAYER:             Searching for implicit layer manifest files
+LAYER:                In following locations:
+LAYER:                   /home/alex/.config/vulkan/implicit_layer.d
+LAYER:                   /etc/xdg/xdg-ubuntu/vulkan/implicit_layer.d
+LAYER:                   /etc/xdg/vulkan/implicit_layer.d
+LAYER:                   /etc/vulkan/implicit_layer.d
+LAYER:                   /home/alex/.local/share/vulkan/implicit_layer.d
+LAYER:                   /usr/share/ubuntu/vulkan/implicit_layer.d
+LAYER:                   /usr/share/gnome/vulkan/implicit_layer.d
+LAYER:                   /home/alex/.local/share/flatpak/exports/share/vulkan/implicit_layer.d
+LAYER:                   /var/lib/flatpak/exports/share/vulkan/implicit_layer.d
+LAYER:                   /usr/local/share/vulkan/implicit_layer.d
+LAYER:                   /usr/share/vulkan/implicit_layer.d
+LAYER:                   /var/lib/snapd/desktop/vulkan/implicit_layer.d
+LAYER:                Found the following files:
+LAYER:                   /usr/share/vulkan/implicit_layer.d/nvidia_layers.json
+LAYER:                   /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json
+LAYER:             Searching for explicit layer manifest files
+LAYER:                In following locations:
+LAYER:                   /home/alex/.config/vulkan/explicit_layer.d
+LAYER:                   /etc/xdg/xdg-ubuntu/vulkan/explicit_layer.d
+LAYER:                   /etc/xdg/vulkan/explicit_layer.d
+LAYER:                   /etc/vulkan/explicit_layer.d
+LAYER:                   /home/alex/.local/share/vulkan/explicit_layer.d
+LAYER:                   /usr/share/ubuntu/vulkan/explicit_layer.d
+LAYER:                   /usr/share/gnome/vulkan/explicit_layer.d
+LAYER:                   /home/alex/.local/share/flatpak/exports/share/vulkan/explicit_layer.d
+LAYER:                   /var/lib/flatpak/exports/share/vulkan/explicit_layer.d
+LAYER:                   /usr/local/share/vulkan/explicit_layer.d
+LAYER:                   /usr/share/vulkan/explicit_layer.d
+LAYER:                   /var/lib/snapd/desktop/vulkan/explicit_layer.d
+LAYER:                Found the following files:
+LAYER:                   /usr/share/vulkan/explicit_layer.d/VkLayer_gfxreconstruct.json
+LAYER:                   /usr/share/vulkan/explicit_layer.d/VkLayer_khronos_shader_object.json
+LAYER:                   /usr/share/vulkan/explicit_layer.d/VkLayer_api_dump.json
+LAYER:                   /usr/share/vulkan/explicit_layer.d/VkLayer_MESA_overlay.json
+LAYER:                   /usr/share/vulkan/explicit_layer.d/VkLayer_khronos_validation.json
+LAYER:                   /usr/share/vulkan/explicit_layer.d/VkLayer_crash_diagnostic.json
+LAYER:                   /usr/share/vulkan/explicit_layer.d/VkLayer_monitor.json
+LAYER:                   /usr/share/vulkan/explicit_layer.d/VkLayer_INTEL_nullhw.json
+LAYER:                   /usr/share/vulkan/explicit_layer.d/VkLayer_screenshot.json
+LAYER:                   /usr/share/vulkan/explicit_layer.d/VkLayer_khronos_profiles.json
+LAYER:                   /usr/share/vulkan/explicit_layer.d/VkLayer_khronos_synchronization2.json
+WARNING | LAYER:   env var 'VK_INSTANCE_LAYERS' defined and adding layers "VK_LAYER_KHRONOS_validation"
+WARNING | LAYER:   env var 'VK_INSTANCE_LAYERS' defined and adding layers "VK_LAYER_KHRONOS_validation"
+DEBUG | LAYER:     Loading layer library libVkLayer_khronos_validation.so
+INFO | LAYER:      Insert instance layer "VK_LAYER_KHRONOS_validation" (libVkLayer_khronos_validation.so)
+DEBUG | LAYER:     Loading layer library libVkLayer_MESA_device_select.so
+INFO | LAYER:      Insert instance layer "VK_LAYER_MESA_device_select" (libVkLayer_MESA_device_select.so)
+LAYER:             vkCreateInstance layer callstack setup to:
+LAYER:                <Application>
+LAYER:                  ||
+LAYER:                <Loader>
+LAYER:                  ||
+LAYER:                VK_LAYER_MESA_device_select
+LAYER:                        Type: Implicit
+LAYER:                            Disable Env Var:  NODEVICE_SELECT
+LAYER:                        Manifest: /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json
+LAYER:                        Library:  libVkLayer_MESA_device_select.so
+LAYER:                  ||
+LAYER:                VK_LAYER_KHRONOS_validation
+LAYER:                        Type: Explicit
+LAYER:                        Manifest: /usr/share/vulkan/explicit_layer.d/VkLayer_khronos_validation.json
+LAYER:                        Library:  libVkLayer_khronos_validation.so
+LAYER:                  ||
+LAYER:                <Drivers>
+INFO | LAYER:      Inserted device layer "VK_LAYER_KHRONOS_validation" (libVkLayer_khronos_validation.so)
+INFO | LAYER:      Failed to find vkGetDeviceProcAddr in layer "libVkLayer_MESA_device_select.so"
+DRIVER | LAYER:    vkCreateDevice layer callstack setup to:
+DRIVER | LAYER:       <Application>
+DRIVER | LAYER:         ||
+DRIVER | LAYER:       <Loader>
+DRIVER | LAYER:         ||
+LAYER:                VK_LAYER_KHRONOS_validation
+LAYER:                        Type: Explicit
+LAYER:                        Manifest: /usr/share/vulkan/explicit_layer.d/VkLayer_khronos_validation.json
+LAYER:                        Library:  libVkLayer_khronos_validation.so
+LAYER:                  ||
+DRIVER | LAYER:       <Device>
+DRIVER | LAYER:           Using "NVIDIA GeForce RTX 4090" with driver: "libGLX_nvidia.so.0"
+DEBUG | LAYER:     Unloading layer library libVkLayer_MESA_device_select.so
+DEBUG | LAYER:     Unloading layer library libVkLayer_khronos_validation.so
+WSI_PROBE_COMPLETED stage=3 repeats=1
+
+=================================================================
+==1351234==ERROR: LeakSanitizer: detected memory leaks
+
+Direct leak of 1392 byte(s) in 1 object(s) allocated from:
+    #0 0x5b43a2373a34 in malloc (/tmp/intrinsic-bug229/wsi-closefirst+0xd2a34) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+    #1 0x7b9ecc80c0d1  (<unknown module>)
+    #2 0x7b9ecc7ef518  (<unknown module>)
+    #3 0x7b9ecc7fc7e9  (<unknown module>)
+    #4 0x7b9ed0508b53  (<unknown module>)
+    #5 0x7b9ed050974e  (<unknown module>)
+    #6 0x7b9ecc802d78  (<unknown module>)
+    #7 0x7b9ecc7fdc9c  (<unknown module>)
+    #8 0x7b9eccb1eca8  (<unknown module>)
+    #9 0x7b9eccb17fd4  (<unknown module>)
+    #10 0x7b9eccb26b9e  (<unknown module>)
+    #11 0x7b9eccb6a915  (<unknown module>)
+    #12 0x7b9eb5e62e2f  (<unknown module>)
+    #13 0x7b9eb6150d9d  (<unknown module>)
+    #14 0x5b43a23b78ce in main /tmp/intrinsic-bug229/wsi-closefirst.c:29:82
+    #15 0x7f9ed1229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #16 0x7f9ed1229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #17 0x5b43a22cf4d4 in _start (/tmp/intrinsic-bug229/wsi-closefirst+0x2e4d4) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+
+Direct leak of 1392 byte(s) in 1 object(s) allocated from:
+    #0 0x5b43a2373a34 in malloc (/tmp/intrinsic-bug229/wsi-closefirst+0xd2a34) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+    #1 0x7b9ecc80c0d1  (<unknown module>)
+    #2 0x7b9ecc7ef518  (<unknown module>)
+    #3 0x7b9ecc7fc733  (<unknown module>)
+    #4 0x7b9ed0508b53  (<unknown module>)
+    #5 0x7b9ed050974e  (<unknown module>)
+    #6 0x7b9ecc802d78  (<unknown module>)
+    #7 0x7b9ecc7fdc9c  (<unknown module>)
+    #8 0x7b9eccb1eca8  (<unknown module>)
+    #9 0x7b9eccb17fd4  (<unknown module>)
+    #10 0x7b9eccb26b9e  (<unknown module>)
+    #11 0x7b9eccb6a915  (<unknown module>)
+    #12 0x7b9eb5e62e2f  (<unknown module>)
+    #13 0x7b9eb6150d9d  (<unknown module>)
+    #14 0x5b43a23b78ce in main /tmp/intrinsic-bug229/wsi-closefirst.c:29:82
+    #15 0x7f9ed1229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #16 0x7f9ed1229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #17 0x5b43a22cf4d4 in _start (/tmp/intrinsic-bug229/wsi-closefirst+0x2e4d4) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+
+Direct leak of 32 byte(s) in 1 object(s) allocated from:
+    #0 0x5b43a2373a34 in malloc (/tmp/intrinsic-bug229/wsi-closefirst+0xd2a34) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+    #1 0x7f9ed156b1b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #2 0x7f9ed156ba08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #3 0x7f9ed156beb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #4 0x7f9ed156ce44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #5 0x7b9ed055f299  (<unknown module>)
+    #6 0x7b9ed0552110  (<unknown module>)
+    #7 0x7b9eccb12bf8  (<unknown module>)
+    #8 0x7b9eccb2bd26  (<unknown module>)
+    #9 0x7b9eccb6a6b9  (<unknown module>)
+    #10 0x7b9eb64a467b  (<unknown module>)
+    #11 0x7b9eb60c5387  (<unknown module>)
+    #12 0x7b9eb614fd64  (<unknown module>)
+    #13 0x5b43a23b7074 in main /tmp/intrinsic-bug229/wsi-closefirst.c:21:79
+    #14 0x7f9ed1229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #15 0x7f9ed1229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #16 0x5b43a22cf4d4 in _start (/tmp/intrinsic-bug229/wsi-closefirst+0x2e4d4) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+
+Direct leak of 32 byte(s) in 1 object(s) allocated from:
+    #0 0x5b43a2373a34 in malloc (/tmp/intrinsic-bug229/wsi-closefirst+0xd2a34) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+    #1 0x7f9ed156b1b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #2 0x7f9ed156ba08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #3 0x7f9ed156beb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #4 0x7f9ed156ce44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #5 0x7b9ed055f299  (<unknown module>)
+    #6 0x7b9ed0552110  (<unknown module>)
+    #7 0x7b9eccb12ace  (<unknown module>)
+    #8 0x7b9eccb1280b  (<unknown module>)
+    #9 0x7b9eb614fe6d  (<unknown module>)
+    #10 0x5b43a23b757a in main /tmp/intrinsic-bug229/wsi-closefirst.c:27:38
+    #11 0x7f9ed1229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #12 0x7f9ed1229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #13 0x5b43a22cf4d4 in _start (/tmp/intrinsic-bug229/wsi-closefirst+0x2e4d4) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+
+Direct leak of 32 byte(s) in 1 object(s) allocated from:
+    #0 0x5b43a2373a34 in malloc (/tmp/intrinsic-bug229/wsi-closefirst+0xd2a34) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+    #1 0x7f9ed156b1b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #2 0x7f9ed156ba08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #3 0x7f9ed156beb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #4 0x7f9ed156ce44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #5 0x7b9ed055f299  (<unknown module>)
+    #6 0x7b9ed0552110  (<unknown module>)
+    #7 0x7b9eccb128c9  (<unknown module>)
+    #8 0x7b9eb614fe6d  (<unknown module>)
+    #9 0x5b43a23b757a in main /tmp/intrinsic-bug229/wsi-closefirst.c:27:38
+    #10 0x7f9ed1229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #11 0x7f9ed1229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #12 0x5b43a22cf4d4 in _start (/tmp/intrinsic-bug229/wsi-closefirst+0x2e4d4) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+
+Direct leak of 32 byte(s) in 1 object(s) allocated from:
+    #0 0x5b43a2373a34 in malloc (/tmp/intrinsic-bug229/wsi-closefirst+0xd2a34) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+    #1 0x7f9ed156b1b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #2 0x7f9ed156ba08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #3 0x7f9ed156beb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #4 0x7f9ed156ce44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #5 0x7b9ed055f299  (<unknown module>)
+    #6 0x7b9ed0552110  (<unknown module>)
+    #7 0x7b9eccb128c9  (<unknown module>)
+    #8 0x7b9eb614fe6d  (<unknown module>)
+    #9 0x5b43a23b7074 in main /tmp/intrinsic-bug229/wsi-closefirst.c:21:79
+    #10 0x7f9ed1229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #11 0x7f9ed1229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #12 0x5b43a22cf4d4 in _start (/tmp/intrinsic-bug229/wsi-closefirst+0x2e4d4) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+
+Direct leak of 32 byte(s) in 1 object(s) allocated from:
+    #0 0x5b43a2373a34 in malloc (/tmp/intrinsic-bug229/wsi-closefirst+0xd2a34) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+    #1 0x7f9ed156b1b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #2 0x7f9ed156ba08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #3 0x7f9ed156beb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #4 0x7f9ed156ce44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #5 0x7b9ed055f299  (<unknown module>)
+    #6 0x7b9ed0552110  (<unknown module>)
+    #7 0x7b9eccb129d3  (<unknown module>)
+    #8 0x7b9eccb6a5e0  (<unknown module>)
+    #9 0x7b9eb64a4c2b  (<unknown module>)
+    #10 0x7b9eb60cb25f  (<unknown module>)
+    #11 0x7b9eb60cdec0  (<unknown module>)
+    #12 0x7b9eb6150919  (<unknown module>)
+    #13 0x5b43a23b77e0 in main /tmp/intrinsic-bug229/wsi-closefirst.c:29:8
+    #14 0x7f9ed1229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #15 0x7f9ed1229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #16 0x5b43a22cf4d4 in _start (/tmp/intrinsic-bug229/wsi-closefirst+0x2e4d4) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+
+Direct leak of 32 byte(s) in 1 object(s) allocated from:
+    #0 0x5b43a2373a34 in malloc (/tmp/intrinsic-bug229/wsi-closefirst+0xd2a34) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+    #1 0x7f9ed156b1b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #2 0x7f9ed156ba08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #3 0x7f9ed156beb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #4 0x7f9ed156ce44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #5 0x7b9ed055f299  (<unknown module>)
+    #6 0x7b9ed0552110  (<unknown module>)
+    #7 0x7b9eccb129d3  (<unknown module>)
+    #8 0x7b9eccb6a5e0  (<unknown module>)
+    #9 0x7b9eb64a4bed  (<unknown module>)
+    #10 0x7b9eb60cb25f  (<unknown module>)
+    #11 0x7b9eb60cdec0  (<unknown module>)
+    #12 0x7b9eb6150919  (<unknown module>)
+    #13 0x5b43a23b77e0 in main /tmp/intrinsic-bug229/wsi-closefirst.c:29:8
+    #14 0x7f9ed1229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #15 0x7f9ed1229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #16 0x5b43a22cf4d4 in _start (/tmp/intrinsic-bug229/wsi-closefirst+0x2e4d4) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+
+Direct leak of 32 byte(s) in 1 object(s) allocated from:
+    #0 0x5b43a2373a34 in malloc (/tmp/intrinsic-bug229/wsi-closefirst+0xd2a34) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+    #1 0x7f9ed156b1b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #2 0x7f9ed156ba08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #3 0x7f9ed156beb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #4 0x7f9ed156ce44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #5 0x7b9ed055f299  (<unknown module>)
+    #6 0x7b9ed0552110  (<unknown module>)
+    #7 0x7b9eccb12bf8  (<unknown module>)
+    #8 0x7b9eccb2bce4  (<unknown module>)
+    #9 0x7b9eccb27ff0  (<unknown module>)
+    #10 0x7b9eccb28f61  (<unknown module>)
+    #11 0x7f9ed15c5b50  (/lib/x86_64-linux-gnu/libvulkan.so.1+0x3cb50) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+    #12 0x7b9eb621e198  (<unknown module>)
+    #13 0x7b9eb61509d3  (<unknown module>)
+    #14 0x5b43a23b77e0 in main /tmp/intrinsic-bug229/wsi-closefirst.c:29:8
+    #15 0x7f9ed1229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #16 0x7f9ed1229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #17 0x5b43a22cf4d4 in _start (/tmp/intrinsic-bug229/wsi-closefirst+0x2e4d4) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+
+Direct leak of 32 byte(s) in 1 object(s) allocated from:
+    #0 0x5b43a2373a34 in malloc (/tmp/intrinsic-bug229/wsi-closefirst+0xd2a34) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+    #1 0x7f9ed156b1b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #2 0x7f9ed156ba08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #3 0x7f9ed156beb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #4 0x7f9ed156ce44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #5 0x7b9ed055f299  (<unknown module>)
+    #6 0x7b9ed0552110  (<unknown module>)
+    #7 0x7b9ed055215e  (<unknown module>)
+    #8 0x7b9eccb184a4  (<unknown module>)
+    #9 0x7b9eccb24afb  (<unknown module>)
+    #10 0x7b9eccb2843e  (<unknown module>)
+    #11 0x7b9eccb28f61  (<unknown module>)
+    #12 0x7f9ed15c5b50  (/lib/x86_64-linux-gnu/libvulkan.so.1+0x3cb50) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+    #13 0x7b9eb621e198  (<unknown module>)
+    #14 0x7b9eb61509d3  (<unknown module>)
+    #15 0x5b43a23b77e0 in main /tmp/intrinsic-bug229/wsi-closefirst.c:29:8
+    #16 0x7f9ed1229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #17 0x7f9ed1229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #18 0x5b43a22cf4d4 in _start (/tmp/intrinsic-bug229/wsi-closefirst+0x2e4d4) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+
+Direct leak of 32 byte(s) in 1 object(s) allocated from:
+    #0 0x5b43a2373a34 in malloc (/tmp/intrinsic-bug229/wsi-closefirst+0xd2a34) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+    #1 0x7f9ed156b1b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #2 0x7f9ed156ba08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #3 0x7f9ed156beb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #4 0x7f9ed156ce44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #5 0x7b9ed055f299  (<unknown module>)
+    #6 0x7b9ed0552110  (<unknown module>)
+    #7 0x7b9eccb12bf8  (<unknown module>)
+    #8 0x7b9eccb2bd26  (<unknown module>)
+    #9 0x7b9eccb6a6b9  (<unknown module>)
+    #10 0x7b9eb614fa92  (<unknown module>)
+    #11 0x5b43a23b71b2 in main /tmp/intrinsic-bug229/wsi-closefirst.c:24:42
+    #12 0x7f9ed1229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #13 0x7f9ed1229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #14 0x5b43a22cf4d4 in _start (/tmp/intrinsic-bug229/wsi-closefirst+0x2e4d4) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+
+Direct leak of 32 byte(s) in 1 object(s) allocated from:
+    #0 0x5b43a2373a34 in malloc (/tmp/intrinsic-bug229/wsi-closefirst+0xd2a34) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+    #1 0x7f9ed156b1b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #2 0x7f9ed156ba08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #3 0x7f9ed156beb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #4 0x7f9ed156ce44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #5 0x7b9ed055f299  (<unknown module>)
+    #6 0x7b9ed0552110  (<unknown module>)
+    #7 0x7b9eccb12ace  (<unknown module>)
+    #8 0x7b9eccb1280b  (<unknown module>)
+    #9 0x7b9eb614fe6d  (<unknown module>)
+    #10 0x5b43a23b7074 in main /tmp/intrinsic-bug229/wsi-closefirst.c:21:79
+    #11 0x7f9ed1229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #12 0x7f9ed1229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #13 0x5b43a22cf4d4 in _start (/tmp/intrinsic-bug229/wsi-closefirst+0x2e4d4) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+
+Direct leak of 32 byte(s) in 1 object(s) allocated from:
+    #0 0x5b43a2373a34 in malloc (/tmp/intrinsic-bug229/wsi-closefirst+0xd2a34) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+    #1 0x7f9ed156b1b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #2 0x7f9ed156ba08  (/lib/x86_64-linux-gnu/libxcb.so.1+0xca08) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #3 0x7f9ed156beb0  (/lib/x86_64-linux-gnu/libxcb.so.1+0xceb0) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #4 0x7f9ed156ce44 in xcb_wait_for_reply (/lib/x86_64-linux-gnu/libxcb.so.1+0xde44) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+    #5 0x7b9ed055f299  (<unknown module>)
+    #6 0x7b9ed0552110  (<unknown module>)
+    #7 0x7b9eccb129d3  (<unknown module>)
+    #8 0x7b9eccb6a5e0  (<unknown module>)
+    #9 0x7b9eb6150252  (<unknown module>)
+    #10 0x5b43a23b7648 in main /tmp/intrinsic-bug229/wsi-closefirst.c:27:160
+    #11 0x7f9ed1229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #12 0x7f9ed1229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #13 0x5b43a22cf4d4 in _start (/tmp/intrinsic-bug229/wsi-closefirst+0x2e4d4) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+
+Indirect leak of 2800 byte(s) in 1 object(s) allocated from:
+    #0 0x5b43a2373c12 in calloc (/tmp/intrinsic-bug229/wsi-closefirst+0xd2c12) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+    #1 0x7b9ecc80c38d  (<unknown module>)
+    #2 0x7b9ecc7fc683  (<unknown module>)
+    #3 0x7b9ed0508b53  (<unknown module>)
+    #4 0x7b9ed050974e  (<unknown module>)
+    #5 0x7b9ecc802d78  (<unknown module>)
+    #6 0x7b9ecc7fdc9c  (<unknown module>)
+    #7 0x7b9eccb1eca8  (<unknown module>)
+    #8 0x7b9eccb17fd4  (<unknown module>)
+    #9 0x7b9eccb26b9e  (<unknown module>)
+    #10 0x7b9eccb6a915  (<unknown module>)
+    #11 0x7b9eb5e62e2f  (<unknown module>)
+    #12 0x7b9eb6150d9d  (<unknown module>)
+    #13 0x5b43a23b78ce in main /tmp/intrinsic-bug229/wsi-closefirst.c:29:82
+    #14 0x7f9ed1229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #15 0x7f9ed1229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #16 0x5b43a22cf4d4 in _start (/tmp/intrinsic-bug229/wsi-closefirst+0x2e4d4) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+
+-----------------------------------------------------
+Suppressions used:
+  count      bytes template
+      3       2002 dbus_connection_send_with_reply_and_block
+-----------------------------------------------------
+
+SUMMARY: AddressSanitizer: 5936 byte(s) leaked in 14 allocation(s).

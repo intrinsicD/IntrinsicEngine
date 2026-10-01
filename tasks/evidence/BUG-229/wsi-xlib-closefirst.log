@@ -1,0 +1,65 @@
+WSI_PROBE_COMPLETED stage=3 repeats=1
+
+=================================================================
+==1351082==ERROR: LeakSanitizer: detected memory leaks
+
+Direct leak of 1392 byte(s) in 1 object(s) allocated from:
+    #0 0x5dc772a949f4 in malloc (/tmp/intrinsic-bug229/wsi-xlib-closefirst+0xd29f4) (BuildId: 57a97e92591ef34651e29b6d925da121f9a63f75)
+    #1 0x702d59e0c0d1  (<unknown module>)
+    #2 0x702d59def518  (<unknown module>)
+    #3 0x702d59dfc7e9  (<unknown module>)
+    #4 0x702d5db08b53  (<unknown module>)
+    #5 0x702d5db0974e  (<unknown module>)
+    #6 0x702d59e02d78  (<unknown module>)
+    #7 0x702d59dfdc9c  (<unknown module>)
+    #8 0x702d5a11eca8  (<unknown module>)
+    #9 0x702d5a117fd4  (<unknown module>)
+    #10 0x702d5a126b9e  (<unknown module>)
+    #11 0x702d5a16a915  (<unknown module>)
+    #12 0x5dc772ad882e in main /tmp/intrinsic-bug229/wsi-xlib-closefirst.c:27:82
+    #13 0x742d5e829d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #14 0x742d5e829e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #15 0x5dc7729f0494 in _start (/tmp/intrinsic-bug229/wsi-xlib-closefirst+0x2e494) (BuildId: 57a97e92591ef34651e29b6d925da121f9a63f75)
+
+Direct leak of 1392 byte(s) in 1 object(s) allocated from:
+    #0 0x5dc772a949f4 in malloc (/tmp/intrinsic-bug229/wsi-xlib-closefirst+0xd29f4) (BuildId: 57a97e92591ef34651e29b6d925da121f9a63f75)
+    #1 0x702d59e0c0d1  (<unknown module>)
+    #2 0x702d59def518  (<unknown module>)
+    #3 0x702d59dfc733  (<unknown module>)
+    #4 0x702d5db08b53  (<unknown module>)
+    #5 0x702d5db0974e  (<unknown module>)
+    #6 0x702d59e02d78  (<unknown module>)
+    #7 0x702d59dfdc9c  (<unknown module>)
+    #8 0x702d5a11eca8  (<unknown module>)
+    #9 0x702d5a117fd4  (<unknown module>)
+    #10 0x702d5a126b9e  (<unknown module>)
+    #11 0x702d5a16a915  (<unknown module>)
+    #12 0x5dc772ad882e in main /tmp/intrinsic-bug229/wsi-xlib-closefirst.c:27:82
+    #13 0x742d5e829d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #14 0x742d5e829e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #15 0x5dc7729f0494 in _start (/tmp/intrinsic-bug229/wsi-xlib-closefirst+0x2e494) (BuildId: 57a97e92591ef34651e29b6d925da121f9a63f75)
+
+Indirect leak of 2800 byte(s) in 1 object(s) allocated from:
+    #0 0x5dc772a94bd2 in calloc (/tmp/intrinsic-bug229/wsi-xlib-closefirst+0xd2bd2) (BuildId: 57a97e92591ef34651e29b6d925da121f9a63f75)
+    #1 0x702d59e0c38d  (<unknown module>)
+    #2 0x702d59dfc683  (<unknown module>)
+    #3 0x702d5db08b53  (<unknown module>)
+    #4 0x702d5db0974e  (<unknown module>)
+    #5 0x702d59e02d78  (<unknown module>)
+    #6 0x702d59dfdc9c  (<unknown module>)
+    #7 0x702d5a11eca8  (<unknown module>)
+    #8 0x702d5a117fd4  (<unknown module>)
+    #9 0x702d5a126b9e  (<unknown module>)
+    #10 0x702d5a16a915  (<unknown module>)
+    #11 0x5dc772ad882e in main /tmp/intrinsic-bug229/wsi-xlib-closefirst.c:27:82
+    #12 0x742d5e829d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #13 0x742d5e829e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #14 0x5dc7729f0494 in _start (/tmp/intrinsic-bug229/wsi-xlib-closefirst+0x2e494) (BuildId: 57a97e92591ef34651e29b6d925da121f9a63f75)
+
+-----------------------------------------------------
+Suppressions used:
+  count      bytes template
+      3       2002 dbus_connection_send_with_reply_and_block
+-----------------------------------------------------
+
+SUMMARY: AddressSanitizer: 5584 byte(s) leaked in 3 allocation(s).

@@ -1,0 +1,7 @@
+enumeration=0 devices=1
+-----------------------------------------------------
+Suppressions used:
+  count      bytes template
+      3       1890 dbus_connection_send_with_reply_and_block
+-----------------------------------------------------
+

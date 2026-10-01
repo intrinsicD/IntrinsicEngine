@@ -9,6 +9,30 @@ foreach(_required IN ITEMS
     endif()
 endforeach()
 
+# This contract measures the selected operational ICD, not every installed
+# loader candidate. Unselected Mesa ICDs can allocate during enumeration and
+# unload before LSan runs, leaving both allocations and unsymbolized stacks.
+# Require the same explicit driver selection as the hosted Vulkan batch.
+set(_driver_file "$ENV{VK_DRIVER_FILES}")
+if(_driver_file STREQUAL "")
+    set(_driver_file "$ENV{VK_ICD_FILENAMES}")
+endif()
+if(_driver_file STREQUAL "" OR _driver_file MATCHES "[:;]"
+   OR NOT IS_ABSOLUTE "${_driver_file}" OR IS_DIRECTORY "${_driver_file}"
+   OR NOT EXISTS "${_driver_file}")
+    message(FATAL_ERROR
+        "BUG-221: select one operational Vulkan ICD with VK_DRIVER_FILES "
+        "(or VK_ICD_FILENAMES): an absolute path to one existing driver JSON. "
+        "Use the native display for that driver; a nested X server exercises a different WSI path. "
+        "No leak check was skipped or suppressed.")
+endif()
+file(READ "${_driver_file}" _driver_json)
+string(JSON _driver_library ERROR_VARIABLE _driver_error GET "${_driver_json}" ICD library_path)
+if(_driver_error OR _driver_library STREQUAL "")
+    message(FATAL_ERROR "BUG-221: selected file is not a Vulkan ICD manifest: ${_driver_file}")
+endif()
+message(STATUS "Vulkan shutdown LSan ICD: ${_driver_file}; DISPLAY=$ENV{DISPLAY}")
+
 if(NOT EXISTS "${SUPPRESSIONS_PATH}")
     message(FATAL_ERROR "BUG-083 suppression file is missing: ${SUPPRESSIONS_PATH}")
 endif()
@@ -75,6 +99,7 @@ endif()
 file(REMOVE "${REPORT_PATH}")
 
 set(_sandbox_environment
+    "VK_DRIVER_FILES=${_driver_file}"
     "ASAN_OPTIONS=detect_leaks=1:symbolize=1:fast_unwind_on_malloc=0:halt_on_error=1"
     "LSAN_OPTIONS=${_lsan_options}"
 )

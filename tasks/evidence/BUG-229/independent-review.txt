@@ -1,0 +1,34 @@
+## BUG-229 review (read-only, no edits or builds)
+
+**Verdict:** I agree with the proposed resolution. I found no engine-owned correction you've missed. The alternative acceptance path is met once the documentation is written and two small evidence gaps are either closed or named as limits.
+
+### The probe is valid
+- **Teardown order meets the Vulkan spec:** the probe destroys the swapchain, then the device, then the surface, then the instance, and closes the X connection last. It waits for the device to go idle before teardown and never presents, so no in-flight work can explain the retention.
+- **The probe reproduces the engine's leak:**
+  - Engine baseline: 2×1392 B + 2800 B + 32-byte replies from `xcb_wait_for_reply`.
+  - XCB probe at stage 3 (`nested-3.log`): the same 2×1392 + 2800 + 8×32.
+  - The 32-byte replies show up as soon as the capability query runs (stage 2). Ten queries leak ten times as much (640 B / 20). Growth per call means a real per-call leak, not a one-time cache that LSan misreads after the driver library unloads.
+- **The probe's leak is inside `vkDestroySwapchainKHR`.** `wsi.c:29:82` and `wsi-xlib.c:27:82` point at the destroy call: column 82 is past the create and wait-idle calls. The engine's 1392-byte stacks also land on `vkDestroySwapchainKHR` at `Backends.Vulkan.Device.cpp:2387`. The driver allocates during destroy and never frees it. The engine can't fix that without breaking the spec: every child object must be destroyed before `vkDestroyDevice`.
+- **The driver attribution holds across logs.** The probe's frames are unsymbolized (`<unknown module>`). But their offsets (`…c0d1`, `…f518`, `…c733`, `…b53`, `…74e`, `…2d78`, `…eca8`) match the symbolized `libnvidia-glcore.so.580.159.04` / `libGLX_nvidia.so.0` frames in BUG-221's `pinned-driver.log`.
+- **The extra engine leak is just more WSI queries.** The engine's ~9 extra 32-byte replies come from `ProbeQueueFamilies` (:253), `HasSwapchainSurfaceSupport` (:304/:308) for each physical device, and the surface-format queries (:1962/:1976). Every engine-side allocation stack ends in a WSI entry point.
+- **Control runs are clean:** native stages 2 and 3 show only the dbus suppression. The glamor Xephyr run gives the same 5840 B. `lsan.supp` is unchanged: 4 entries, last touched in `da8934651`.
+
+### No engine fix is being overlooked
+- **Fewer surface queries:** this only shrinks the 32-byte share. Swapchain creation needs at least one query, and the 1392/2800 B from destroy stays.
+- **Skipping `vkDestroySwapchainKHR` or the device/instance destroy:** this breaks the spec and hides the leak instead of fixing it.
+- **Pinning the driver library, or freeing driver memory ourselves:** BUG-221 already ruled out pinning, and pinning can't make per-call direct leaks reachable anyway. Freeing the driver's memory is unsafe.
+- **Switching to Xlib:** still leaks 5584 B / 3 allocations.
+
+### Gaps (cheap, not blocking)
+1. **No non-NVIDIA control on Xephyr.** Run the stage-3 probe on `:9` with `VK_DRIVER_FILES=lvp_icd…json` (lavapipe, Mesa's software driver). A clean result makes "NVIDIA, not Xephyr/libxcb" a measurement instead of an inference. If you skip it, say the vendor attribution rests on the symbolized pinned stacks.
+2. **No validation-layer run of the probe.** `compositeAlpha=OPAQUE` is used without checking `supportedCompositeAlpha` (VUID-VkSwapchainCreateInfoKHR-compositeAlpha-01280). It's almost certainly supported on Xephyr, but one separate validation-layer run, outside LSan, would close the "the probe misused the API" objection.
+3. **Optional:** loop swapchain create/destroy N times. If the leak scales, each window resize on Xephyr leaks about 4–5.6 KB. That's worth stating precisely in the "unsupported combination" note.
+4. **Nit:** the probe packs create, wait-idle and destroy onto one source line, so attribution depends on reading column numbers. Splitting the line would make the stacks readable on their own.
+
+### Acceptance criteria
+- **Probe reproduces the leak:** met.
+- **Correct an engine cause, or document the unsupported combination with independent review:** met once the doc is written. It should name the exact combination: RTX 4090, driver 580.159.04, Xephyr 21.1.4-2ubuntu1.7, libxcb 1.14-3ubuntu3, loader 1.3.296, both XCB and Xlib, glamor and non-glamor. It should also update the task's Verification block: the `:9` command is an expected failure, and `:1` is the authoritative check.
+- **Negative control and suppressions unchanged:** met, provided the failing Xephyr test isn't relabeled or suppressed.
+- **Housekeeping:** `tasks/backlog/bugs/BUG-229…md` and `tasks/evidence/BUG-229/` are still untracked in the main checkout, so the source, logs and `reproduce.sh` must actually be committed.
+
+Your planned user-facing wording ("vendor leak remains; no driver upgrade tested") is the right level of claim. Don't call it "fixed", and don't describe it as an Xephyr limitation in general unless gap 1 is closed.

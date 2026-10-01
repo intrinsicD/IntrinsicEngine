@@ -1,0 +1,28 @@
+WSI_PROBE_COMPLETED stage=0 repeats=1
+
+=================================================================
+==1351252==ERROR: LeakSanitizer: detected memory leaks
+
+Direct leak of 256 byte(s) in 1 object(s) allocated from:
+    #0 0x611af486ce41 in realloc (/tmp/intrinsic-bug229/wsi-closefirst+0xd2e41) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+    #1 0x73a6a7e9e428  (<unknown module>)
+    #2 0x73a6a7e9ea9e  (<unknown module>)
+    #3 0x77a6ab699ea7 in __pthread_once_slow nptl/pthread_once.c:116:7
+    #4 0x73a6a80bb2b6  (<unknown module>)
+    #5 0x73a6a7e61d45  (<unknown module>)
+    #6 0x73a6a8040ad5  (<unknown module>)
+    #7 0x73a6a8040a46  (<unknown module>)
+    #8 0x73a6a7e61fb9  (<unknown module>)
+    #9 0x73a6a7e630bf  (<unknown module>)
+    #10 0x73a6a7f034a8  (<unknown module>)
+    #11 0x73a6a7f04050  (<unknown module>)
+    #12 0x77a6abb2da5b  (/lib/x86_64-linux-gnu/libvulkan.so.1+0x21a5b) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+    #13 0x77a6abb2e19b  (/lib/x86_64-linux-gnu/libvulkan.so.1+0x2219b) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+    #14 0x77a6aaf2f40b  (<unknown module>)
+    #15 0x77a6abb38bbb in vkEnumeratePhysicalDevices (/lib/x86_64-linux-gnu/libvulkan.so.1+0x2cbbb) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+    #16 0x611af48afe26 in main /tmp/intrinsic-bug229/wsi-closefirst.c:18:50
+    #17 0x77a6ab629d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #18 0x77a6ab629e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #19 0x611af47c84d4 in _start (/tmp/intrinsic-bug229/wsi-closefirst+0x2e4d4) (BuildId: 1bc51e60c9b910d8e7ab962c8c44db0e3656d819)
+
+SUMMARY: AddressSanitizer: 256 byte(s) leaked in 1 allocation(s).

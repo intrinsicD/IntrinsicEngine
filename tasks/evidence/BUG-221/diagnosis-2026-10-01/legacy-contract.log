@@ -1,0 +1,14 @@
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start 5202: ExtrinsicSandbox.VulkanShutdownLsanContract
+1/1 Test #5202: ExtrinsicSandbox.VulkanShutdownLsanContract ...   Passed    7.10 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+gpu           =   7.10 sec*proc (1 test)
+graphics      =   7.10 sec*proc (1 test)
+regression    =   7.10 sec*proc (1 test)
+runtime       =   7.10 sec*proc (1 test)
+vulkan        =   7.10 sec*proc (1 test)
+
+Total Test time (real) =   7.27 sec

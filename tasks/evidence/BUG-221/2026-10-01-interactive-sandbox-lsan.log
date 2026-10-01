@@ -1,0 +1,47 @@
+[INFO] Initialized Scheduler with 31 worker threads.
+[WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.
+[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.
+[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed
+[INFO] [AgentServer] listening on /tmp/intrinsic-method-review-20261001/sandbox.sock
+[INFO] [Runtime] Queued geometry import: source=ManualImport path='/tmp/intrinsic-method-review-20261001/mesh_0000.obj' payload=Mesh candidate_count=1
+[INFO] [Runtime] Queued direct mesh post-process: path='/tmp/intrinsic-method-review-20261001/mesh_0000.obj'
+[INFO] [Runtime] Asset import succeeded: path='/tmp/intrinsic-method-review-20261001/mesh_0000.obj' requested_payload=Mesh result_payload=Mesh ingest_diagnostic=None primitive_entities=1 embedded_textures=0 texture_upload_requests=0 materialized_model_scene=false requested_texture_upload=false
+[INFO] [Runtime] Direct mesh enrichment applied: path='/tmp/intrinsic-method-review-20261001/mesh_0000.obj' vertices=10002 (source 10002) faces=20000 (source polygons 20000) uv-domain=corner uv-provenance=generated-atlas atlas-backend='fast-staged' gpu-split-vertices=3105
+[INFO] [Runtime] Window close requested; stopping Engine::Run loop. source=platform-event
+
+=================================================================
+==1169728==ERROR: LeakSanitizer: detected memory leaks
+
+Direct leak of 113760 byte(s) in 18 object(s) allocated from:
+    #0 0x606aef2e72d2 in calloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d192d2) (BuildId: bb482ebbf13ace31334b1911e8f3473d9ac0d9a5)
+    #1 0x70de6a60c38d  (<unknown module>)
+
+Direct leak of 3024 byte(s) in 5 object(s) allocated from:
+    #0 0x606aef2e70f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d190f4) (BuildId: bb482ebbf13ace31334b1911e8f3473d9ac0d9a5)
+    #1 0x70de6a60c0d1  (<unknown module>)
+
+Direct leak of 544 byte(s) in 17 object(s) allocated from:
+    #0 0x606aef2e70f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d190f4) (BuildId: bb482ebbf13ace31334b1911e8f3473d9ac0d9a5)
+    #1 0x70de956291b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+
+Direct leak of 256 byte(s) in 1 object(s) allocated from:
+    #0 0x606aef2e7501 in realloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d19501) (BuildId: bb482ebbf13ace31334b1911e8f3473d9ac0d9a5)
+    #1 0x70de5449e428  (<unknown module>)
+
+Direct leak of 256 byte(s) in 1 object(s) allocated from:
+    #0 0x606aef2e7501 in realloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d19501) (BuildId: bb482ebbf13ace31334b1911e8f3473d9ac0d9a5)
+    #1 0x70de49006a08  (<unknown module>)
+
+Direct leak of 184 byte(s) in 1 object(s) allocated from:
+    #0 0x606aef2e72d2 in calloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d192d2) (BuildId: bb482ebbf13ace31334b1911e8f3473d9ac0d9a5)
+    #1 0x70de6c79016f  (/lib/x86_64-linux-gnu/libdbus-1.so.3+0x2116f) (BuildId: 63e8b99215502138cb63afd6d65851a5e837ed49)
+
+Indirect leak of 2800 byte(s) in 1 object(s) allocated from:
+    #0 0x606aef2e72d2 in calloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d192d2) (BuildId: bb482ebbf13ace31334b1911e8f3473d9ac0d9a5)
+    #1 0x70de6a60c38d  (<unknown module>)
+
+Indirect leak of 1818 byte(s) in 2 object(s) allocated from:
+    #0 0x606aef2e7501 in realloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d19501) (BuildId: bb482ebbf13ace31334b1911e8f3473d9ac0d9a5)
+    #1 0x70de6c79e3f4  (/lib/x86_64-linux-gnu/libdbus-1.so.3+0x2f3f4) (BuildId: 63e8b99215502138cb63afd6d65851a5e837ed49)
+
+SUMMARY: AddressSanitizer: 122642 byte(s) leaked in 46 allocation(s).

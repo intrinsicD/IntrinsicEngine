@@ -1,0 +1,59 @@
+[32m[INFO] Initialized Scheduler with 31 worker threads.[0m
+[33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.[0m
+[33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.[0m
+[33m[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+[32m[INFO] [AgentServer] listening on /tmp/intrinsic-method-review-20261001/sandbox.sock[0m
+[32m[INFO] [Runtime] Queued geometry import: source=ManualImport path='/tmp/intrinsic-method-review-20261001/mesh_0000.obj' payload=Mesh candidate_count=1[0m
+[32m[INFO] [Runtime] Queued direct mesh post-process: path='/tmp/intrinsic-method-review-20261001/mesh_0000.obj'[0m
+[32m[INFO] [Runtime] Asset import succeeded: path='/tmp/intrinsic-method-review-20261001/mesh_0000.obj' requested_payload=Mesh result_payload=Mesh ingest_diagnostic=None primitive_entities=1 embedded_textures=0 texture_upload_requests=0 materialized_model_scene=false requested_texture_upload=false[0m
+[32m[INFO] [Runtime] Queued geometry import: source=ManualImport path='/tmp/intrinsic-method-review-20261001/mesh_0000.obj' payload=Mesh candidate_count=1[0m
+[32m[INFO] [Runtime] Queued direct mesh post-process: path='/tmp/intrinsic-method-review-20261001/mesh_0000.obj'[0m
+[32m[INFO] [Runtime] Asset import succeeded: path='/tmp/intrinsic-method-review-20261001/mesh_0000.obj' requested_payload=Mesh result_payload=Mesh ingest_diagnostic=None primitive_entities=1 embedded_textures=0 texture_upload_requests=0 materialized_model_scene=false requested_texture_upload=false[0m
+[32m[INFO] [Runtime] Direct mesh enrichment applied: path='/tmp/intrinsic-method-review-20261001/mesh_0000.obj' vertices=10002 (source 10002) faces=20000 (source polygons 20000) uv-domain=corner uv-provenance=generated-atlas atlas-backend='fast-staged' gpu-split-vertices=3105[0m
+[32m[INFO] [Runtime] Direct mesh enrichment applied: path='/tmp/intrinsic-method-review-20261001/mesh_0000.obj' vertices=10002 (source 10002) faces=20000 (source polygons 20000) uv-domain=corner uv-provenance=generated-atlas atlas-backend='fast-staged' gpu-split-vertices=3105[0m
+[32m[INFO] [Runtime] Queued geometry import: source=ManualImport path='/tmp/intrinsic-method-review-20261001/cpd-source.obj' payload=Mesh candidate_count=1[0m
+[32m[INFO] [Runtime] Queued direct mesh post-process: path='/tmp/intrinsic-method-review-20261001/cpd-source.obj'[0m
+[32m[INFO] [Runtime] Asset import succeeded: path='/tmp/intrinsic-method-review-20261001/cpd-source.obj' requested_payload=Mesh result_payload=Mesh ingest_diagnostic=None primitive_entities=1 embedded_textures=0 texture_upload_requests=0 materialized_model_scene=false requested_texture_upload=false[0m
+[32m[INFO] [Runtime] Direct mesh enrichment applied: path='/tmp/intrinsic-method-review-20261001/cpd-source.obj' vertices=194 (source 194) faces=200 (source polygons 200) uv-domain=corner uv-provenance=generated-atlas atlas-backend='fast-staged' gpu-split-vertices=22[0m
+[32m[INFO] [Runtime] Queued geometry import: source=ManualImport path='/tmp/intrinsic-method-review-20261001/cpd-target.obj' payload=Mesh candidate_count=1[0m
+[32m[INFO] [Runtime] Queued direct mesh post-process: path='/tmp/intrinsic-method-review-20261001/cpd-target.obj'[0m
+[32m[INFO] [Runtime] Asset import succeeded: path='/tmp/intrinsic-method-review-20261001/cpd-target.obj' requested_payload=Mesh result_payload=Mesh ingest_diagnostic=None primitive_entities=1 embedded_textures=0 texture_upload_requests=0 materialized_model_scene=false requested_texture_upload=false[0m
+[32m[INFO] [Runtime] Direct mesh enrichment applied: path='/tmp/intrinsic-method-review-20261001/cpd-target.obj' vertices=194 (source 194) faces=200 (source polygons 200) uv-domain=corner uv-provenance=generated-atlas atlas-backend='fast-staged' gpu-split-vertices=22[0m
+[32m[INFO] [Runtime] Window close requested; stopping Engine::Run loop. source=platform-event[0m
+
+=================================================================
+==1339665==ERROR: LeakSanitizer: detected memory leaks
+
+Direct leak of 113760 byte(s) in 18 object(s) allocated from:
+    #0 0x5b78cd8272d2 in calloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d362d2) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+    #1 0x70a10c60c38d  (<unknown module>)
+
+Direct leak of 3024 byte(s) in 5 object(s) allocated from:
+    #0 0x5b78cd8270f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+    #1 0x70a10c60c0d1  (<unknown module>)
+
+Direct leak of 544 byte(s) in 17 object(s) allocated from:
+    #0 0x5b78cd8270f4 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d360f4) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+    #1 0x70a1362c91b7  (/lib/x86_64-linux-gnu/libxcb.so.1+0xc1b7) (BuildId: 1bef862a339557aa16c34c7a4b27f8f3aea90517)
+
+Direct leak of 256 byte(s) in 1 object(s) allocated from:
+    #0 0x5b78cd827501 in realloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d36501) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+    #1 0x70a0f669e428  (<unknown module>)
+
+Direct leak of 256 byte(s) in 1 object(s) allocated from:
+    #0 0x5b78cd827501 in realloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d36501) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+    #1 0x70a0eb206a08  (<unknown module>)
+
+Direct leak of 184 byte(s) in 1 object(s) allocated from:
+    #0 0x5b78cd8272d2 in calloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d362d2) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+    #1 0x70a10dfd316f  (/lib/x86_64-linux-gnu/libdbus-1.so.3+0x2116f) (BuildId: 63e8b99215502138cb63afd6d65851a5e837ed49)
+
+Indirect leak of 2800 byte(s) in 1 object(s) allocated from:
+    #0 0x5b78cd8272d2 in calloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d362d2) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+    #1 0x70a10c60c38d  (<unknown module>)
+
+Indirect leak of 1802 byte(s) in 2 object(s) allocated from:
+    #0 0x5b78cd827501 in realloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x4d36501) (BuildId: 4008a95a817fc57898ffe7d380ba2147a943be7d)
+    #1 0x70a10dfe13f4  (/lib/x86_64-linux-gnu/libdbus-1.so.3+0x2f3f4) (BuildId: 63e8b99215502138cb63afd6d65851a5e837ed49)
+
+SUMMARY: AddressSanitizer: 122626 byte(s) leaked in 46 allocation(s).

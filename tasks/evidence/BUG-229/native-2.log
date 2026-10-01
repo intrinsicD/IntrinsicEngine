@@ -1,0 +1,7 @@
+WSI_PROBE_COMPLETED stage=2 repeats=1
+-----------------------------------------------------
+Suppressions used:
+  count      bytes template
+      3       2002 dbus_connection_send_with_reply_and_block
+-----------------------------------------------------
+

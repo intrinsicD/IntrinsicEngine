@@ -526,6 +526,27 @@ when multiple installed ICDs would otherwise expose non-selected driver-loader
 allocations. Broad loader, Mesa, ICD, unknown-module, pthread, and X11/GLFW
 suppressions remain forbidden.
 
+The runner rejects missing, multiple, or invalid driver manifests before launching
+either process. Set `VK_DRIVER_FILES` to one absolute ICD JSON path (the legacy
+`VK_ICD_FILENAMES` variable is accepted when `VK_DRIVER_FILES` is unset or empty;
+the runner explicitly forwards the resolved path as `VK_DRIVER_FILES`). Use the
+driver's native display: Xephyr exercises a separate WSI path and is not equivalent
+shutdown evidence. For example, on a native NVIDIA X11 desktop:
+
+```bash
+VK_DRIVER_FILES=/usr/share/vulkan/icd.d/nvidia_icd.json \
+  ctest --test-dir build/ci-vulkan --output-on-failure \
+  -R '^ExtrinsicSandbox.VulkanShutdownLsanContract$' --timeout 180
+```
+
+NVIDIA 580.159.04 on RTX 4090 with Xephyr 21.1.4 is **not supported for
+leak-clean shutdown qualification**. Independent Vulkan/XCB and Vulkan/Xlib
+probes reproduce retention without engine or GLFW code; switching surface APIs
+or enabling Xephyr glamor does not eliminate it. Use the native X11 display for
+this driver's shutdown gate. Nested UI results do not establish clean shutdown,
+and that combination still fails the unchanged leak gate. Reproduction and
+version-specific evidence are in [BUG-229](../tasks/backlog/bugs/BUG-229-nvidia-xephyr-shutdown-retention.md).
+
 ```bash
 ctest --test-dir build/ci-vulkan --output-on-failure \
   -R '^(ExtrinsicSandbox\.(FramePacingDiagnosticCapture|VulkanShutdownLsanContract)|GpuResultReadbackGpuSmoke\.SharedBatchParksJobAndReleasesDerivedUpload)$' \

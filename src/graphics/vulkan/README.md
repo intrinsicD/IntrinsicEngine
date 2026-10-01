@@ -468,6 +468,10 @@ available through the Vulkan 1.2/1.3 feature chain.
   broad loader, Mesa, ICD, unknown-module, pthread, and GLFW/X11 suppressions
   are forbidden. The general GoogleTest binaries embed no default suppression;
   these four exact exceptions are scoped to this process runner.
+  NVIDIA 580.159.04 with Xephyr 21.1.4 is not qualified for leak-clean shutdown;
+  its nested WSI path retains memory in independent Vulkan probes. The native
+  X11 path passes. See the [shutdown environment requirements](../../../tests/README.md)
+  and [BUG-229](../../../tasks/backlog/bugs/BUG-229-nvidia-xephyr-shutdown-retention.md).
 - Runtime resource-slot reclamation is separate from deferred Vulkan-object
   destruction. `DestroyBuffer`/`DestroyTexture`/`DestroySampler`/
   `DestroyPipeline` move the live Vulkan handles into the per-frame deletion

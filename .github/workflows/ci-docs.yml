@@ -142,6 +142,7 @@ jobs:
           python3 tests/regression/tooling/Test.TestCohortParity.py
           python3 tests/regression/tooling/Test.SanitizerPresets.py
           python3 tests/regression/tooling/Test.ClangToolchainSelection.py
+          python3 tests/regression/tooling/Test.VulkanShutdownLsanPrerequisites.py
           python3 tests/regression/tooling/Test.CpuTestSelection.py
           python3 tests/regression/tooling/Test_BenchmarkResultValidator.py
           python3 tests/regression/tooling/Test.BenchmarkComparison.py
