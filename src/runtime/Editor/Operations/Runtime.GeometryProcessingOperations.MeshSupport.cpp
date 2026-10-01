@@ -2,6 +2,7 @@
 // publication shared by several geometry-operation families. Compiled once as an
 // ordinary translation unit so no family depends on another family module.
 #include "GeometryIntegration/Runtime.GeometryValueComparison.hpp"
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
@@ -742,7 +743,17 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
                              PN::kHalfedgeToVertex, PN::kHalfedgeNext,
                              PN::kHalfedgeFace, PN::kFaceHalfedge,
                              // Derived geometry the engine recomputes.
-                             PN::kNormal, PN::kMeanCurvature,
+                             PN::kNormal, std::string_view{"f:normal"},
+                             PN::kVertexConnectivity, PN::kHalfedgeConnectivity,
+                             // Curvature-segmentation outputs.
+                             PN::kCurvatureRegionBoundary,
+                             PN::kCurvatureRegionBoundaryColor,
+                             PN::kCurvatureHardFeature,
+                             PN::kCurvatureSoftFeatureConfidence,
+                             PN::kCurvaturePatchBoundaryRole,
+                             PN::kCurvatureFeaturePatchColor,
+                             PN::kCurvatureComponent, PN::kCurvatureRegion,
+                             PN::kCurvatureRegionColor, PN::kMeanCurvature,
                              PN::kGaussianCurvature,
                              PN::kMinPrincipalCurvature,
                              PN::kMaxPrincipalCurvature, PN::kPrincipalDir1,
@@ -773,48 +784,65 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             return out;
         }
 
-        void ForwardMeshUserVertexProperties(
+        std::vector<std::string> ForwardMeshUserVertexProperties(
             const GS::ConstSourceView& stored,
             Geometry::HalfedgeMesh::Mesh& scratch)
         {
+            std::vector<std::string> carried;
             if (stored.VertexSource == nullptr)
-                return;
+                return carried;
             const Geometry::PropertySet& source = stored.VertexSource->Properties;
             if (source.Size() != scratch.VerticesSize())
-                return;
+                return carried;
             for (const std::string& name : MeshUserPropertyNames(source))
-                (void)scratch.VertexProperties().CopyPropertyFrom(source, name);
+            {
+                if (scratch.VertexProperties().CopyPropertyFrom(source, name))
+                    carried.push_back("vertex:" + name);
+            }
+            return carried;
+        }
+
+        MeshUserVertexRevisions CaptureMeshUserVertexRevisions(
+            const GS::ConstSourceView& stored)
+        {
+            MeshUserVertexRevisions out;
+            if (stored.VertexSource == nullptr)
+                return out;
+            const Geometry::PropertySet& source = stored.VertexSource->Properties;
+            for (std::string& name : MeshUserPropertyNames(source))
+            {
+                if (const auto revision = source.FindPropertyRevision(name))
+                    out.emplace_back(std::move(name), *revision);
+            }
+            std::sort(out.begin(), out.end());
+            return out;
         }
 
         std::vector<std::string> DroppedMeshUserProperties(
             const GS::ConstSourceView& stored,
-            const Geometry::HalfedgeMesh::Mesh& after)
+            const std::span<const std::string> carried)
         {
             std::vector<std::string> dropped;
             const auto collect = [&](const char* domain,
-                                     const Geometry::PropertySet* source,
-                                     const Geometry::ConstPropertySet kept)
+                                     const Geometry::PropertySet* source)
             {
                 if (source == nullptr)
                     return;
                 for (const std::string& name : MeshUserPropertyNames(*source))
                 {
-                    if (!kept.Exists(name))
-                        dropped.push_back(std::string{domain} + ":" + name);
+                    // Carried is what the operation itself reports it moved;
+                    // a same-named property the output mesh happens to own is
+                    // not the user's values.
+                    std::string label = std::string{domain} + ":" + name;
+                    if (std::find(carried.begin(), carried.end(), label) ==
+                        carried.end())
+                        dropped.push_back(std::move(label));
                 }
             };
-            collect("vertex",
-                    stored.VertexSource ? &stored.VertexSource->Properties : nullptr,
-                    after.VertexProperties());
-            collect("edge",
-                    stored.EdgeSource ? &stored.EdgeSource->Properties : nullptr,
-                    after.EdgeProperties());
-            collect("halfedge",
-                    stored.HalfedgeSource ? &stored.HalfedgeSource->Properties : nullptr,
-                    after.HalfedgeProperties());
-            collect("face",
-                    stored.FaceSource ? &stored.FaceSource->Properties : nullptr,
-                    after.FaceProperties());
+            collect("vertex", stored.VertexSource ? &stored.VertexSource->Properties : nullptr);
+            collect("edge", stored.EdgeSource ? &stored.EdgeSource->Properties : nullptr);
+            collect("halfedge", stored.HalfedgeSource ? &stored.HalfedgeSource->Properties : nullptr);
+            collect("face", stored.FaceSource ? &stored.FaceSource->Properties : nullptr);
             return dropped;
         }
 

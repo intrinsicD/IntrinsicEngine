@@ -386,13 +386,19 @@ scalar `height`), and `BUG-230` applies the same rule: carry what has a map,
 report what does not, and make undo exact.
 
 - **Apply.** User property names exclude what the halfedge mesh owns, what
-  `GS::PopulateFromMesh` regenerates, derived normals and curvature, and UVs
+  `GS::PopulateFromMesh` regenerates, derived normals (`v:normal`,
+  `f:normal`) and curvature, curvature-segmentation outputs, and UVs
   (see above). Simplify forwards the surviving vertices' user values into the
   scratch mesh, so they ride through garbage collection with their vertices; no
   edge, halfedge or face map exists, so those domains' user properties are
   dropped. Remesh and subdivide drop every user property that their output
   mesh does not carry; subdivision's crease flags, which the operation
-  refines, are the carried case. No value is interpolated.
+  refines, are the carried case. No value is interpolated. A property counts
+  as carried only when the operation moved the user's values; a same-named
+  property that the output mesh happens to own is still reported dropped. A
+  queued simplify forwards at submit and records the user vertex properties'
+  revisions; if any changed while it ran (a paint stroke, a new property) the
+  apply gate reports it stale rather than overwrite the edit.
 - **Report.** Dropped properties are listed as `<domain>:<name>` in
   `DroppedProperties` on the simplify, remesh and subdivide results, appended to
   the result message (what the panels render) and returned by the agent
@@ -405,6 +411,12 @@ report what does not, and make undo exact.
   one and which never held user properties. Undo reinstalls the copy, which
   stamps fresh property revisions and so reaches residency and catalogs; redo
   republishes the after mesh, which carries whatever the apply produced.
+  The undo/redo comparison also runs against that snapshot (deleted slots
+  included), so redo after undo succeeds on an entity that had deleted
+  vertices. Cost: the history entry holds one copy of the four components
+  (shared between the generations) plus the after mesh, and no before-side
+  halfedge mesh; a mesh whose sources lack a domain falls back to the
+  re-derived mesh.
 
 Same-cardinality scalar and mask publication updates the named property's
 revision and workspace snapshot, without setting geometry-wide GPU or vertex

@@ -454,6 +454,10 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
         // before side only, is the exact pre-edit source components, which is
         // how undo brings back user properties and the original halfedge, edge
         // and face numbering that the mesh re-derivation cannot carry.
+        //
+        // Memory: the before side holds exactly one copy of the stored
+        // components and no halfedge mesh (`Mesh` stays null when `Stored`
+        // exists); redo and undo compare against, and restore from, `Stored`.
         struct MeshTopologyState
         {
             MeshTopologySnapshot Mesh{};
@@ -466,7 +470,11 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             // `std::nullopt` means the stored topology could not be read, which
             // no later reading may match. See `MeshTopologyValueSignature`.
             std::optional<std::uint64_t> TopologySignature{};
+            // The side this generation describes: `Stored` when it holds the
+            // exact source components (compared slot for slot, deleted slots
+            // included), otherwise the re-derived `Mesh`.
             MeshTopologySnapshot Mesh{};
+            MeshStoredSourceState Stored{};
             std::optional<GeometryPropertyRef> FeatureRef{};
             GeometryScalarPropertySnapshot FeatureValues{};
         };
@@ -531,6 +539,43 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
         }
 
 
+        // Same comparison as `SameMeshVertexState`, against the exact stored
+        // snapshot a topology edit captured, so deleted slots (which the
+        // halfedge mesh garbage-collects) still compare equal.
+        [[nodiscard]] bool SameStoredVertexState(
+            const GS::ConstSourceView& view,
+            const MeshStoredSourceSnapshot& snapshot) noexcept
+        {
+            if (view.VertexSource == nullptr ||
+                view.VertexSource->NumDeleted != snapshot.Vertices.NumDeleted ||
+                view.VertexSource->Properties.Size() !=
+                    snapshot.Vertices.Properties.Size())
+            {
+                return false;
+            }
+            const auto current = view.VertexSource->Properties.Get<glm::vec3>(
+                GS::PropertyNames::kPosition);
+            const auto expected = snapshot.Vertices.Properties.Get<glm::vec3>(
+                GS::PropertyNames::kPosition);
+            if (!current || !expected ||
+                current.Vector().size() != expected.Vector().size())
+            {
+                return false;
+            }
+            if (!SameKnownPropertyValues(
+                    Geometry::ConstPropertySet(view.VertexSource->Properties),
+                    Geometry::ConstPropertySet(snapshot.Vertices.Properties)))
+            {
+                return false;
+            }
+            for (std::size_t i = 0u; i < current.Vector().size(); ++i)
+            {
+                if (current.Vector()[i] != expected.Vector()[i])
+                    return false;
+            }
+            return true;
+        }
+
         [[nodiscard]] GeometryScalarPropertySnapshot CaptureMeshFeature(
             const entt::registry& raw, std::uint32_t stableId,
             const std::optional<GeometryPropertyRef>& ref)
@@ -543,6 +588,10 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                                    : GeometryScalarPropertySnapshot{};
         }
 
+        // Stands in for a null mesh when the stored snapshot is applied; the
+        // mesh argument is not read on that path.
+        inline const Geometry::HalfedgeMesh::Mesh kEmptyMeshTopology{};
+
         [[nodiscard]] EditorCommandStatus CommitMeshTopologyReplacement(
             const EditorProcessingContext& context,
             const std::uint32_t stableEntityId,
@@ -551,31 +600,50 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             Geometry::HalfedgeMesh::Mesh before,
             Geometry::HalfedgeMesh::Mesh after,
             std::optional<GeometryPropertyRef> feature = std::nullopt,
-            std::vector<std::string>* droppedProperties = nullptr)
+            std::vector<std::string>* droppedProperties = nullptr,
+            const bool carryVertexUserProperties = false)
         {
-            if (before.HasGarbage())
-                before.GarbageCollection();
-            if (after.HasGarbage())
-                after.GarbageCollection();
-
             // What publishing `after` removes from the entity, named before the
             // apply rewrites it, plus (for undo) the exact stored components.
             MeshStoredSourceState storedBefore{};
+            std::vector<std::string> carried{};
+            std::optional<GS::ConstSourceView> sourceView{};
             if (context.Scene != nullptr)
             {
                 entt::registry& sourceRaw = context.Scene->Raw();
                 if (const auto sourceEntity =
                         ResolveStableEntity(sourceRaw, stableEntityId))
                 {
-                    const GS::ConstSourceView sourceView =
-                        GS::BuildConstView(sourceRaw, *sourceEntity);
+                    sourceView = GS::BuildConstView(sourceRaw, *sourceEntity);
+                    // Simplify forwarded the surviving vertices' user values
+                    // into `after` when it was built; any other operation
+                    // carried none, whatever its output mesh happens to own.
+                    if (carryVertexUserProperties && sourceView->VertexSource != nullptr)
+                    {
+                        for (const std::string& name :
+                             MeshUserPropertyNames(sourceView->VertexSource->Properties))
+                            if (after.VertexProperties().Exists(name))
+                                carried.push_back("vertex:" + name);
+                    }
+                    if (feature.has_value() &&
+                        feature->Domain == GeometryElementDomain::MeshEdge &&
+                        after.EdgeProperties().Exists(feature->Name))
+                        carried.push_back("edge:" + feature->Name);
                     if (droppedProperties != nullptr)
                         *droppedProperties =
-                            DroppedMeshUserProperties(sourceView, after);
+                            DroppedMeshUserProperties(*sourceView, carried);
                     if (context.CommandHistory != nullptr)
-                        storedBefore = CaptureMeshStoredSources(sourceView);
+                        storedBefore = CaptureMeshStoredSources(*sourceView);
                 }
             }
+            if (after.HasGarbage())
+                after.GarbageCollection();
+            // The stored snapshot is the exact before side; the halfedge mesh
+            // re-derivation is kept only when no snapshot could be taken.
+            if (storedBefore != nullptr)
+                before = Geometry::HalfedgeMesh::Mesh{};
+            else if (before.HasGarbage())
+                before.GarbageCollection();
 
             if (context.CommandHistory != nullptr)
             {
@@ -590,8 +658,10 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                               stableEntityId)
                         : std::nullopt;
                 const MeshTopologyState beforeState{
-                    .Mesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>(
-                        std::move(before)),
+                    .Mesh = storedBefore != nullptr
+                        ? nullptr
+                        : std::make_shared<Geometry::HalfedgeMesh::Mesh>(
+                              std::move(before)),
                     .Stored = std::move(storedBefore),
                 };
                 const MeshTopologyState afterState{
@@ -612,6 +682,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                                 expectedGeometryMetadataSignature,
                             .TopologySignature = beforeTopology,
                             .Mesh = beforeState.Mesh,
+                            .Stored = beforeState.Stored,
                             .FeatureRef = feature,
                             .FeatureValues = CaptureMeshFeature(context.Scene->Raw(), stableEntityId, feature),
                         },
@@ -648,8 +719,10 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                                 return EditorCommandHistoryStatus::
                                     UnsupportedOperation;
                             }
-                            if (expected.Mesh == nullptr ||
-                                target.Mesh == nullptr)
+                            if ((expected.Mesh == nullptr &&
+                                 expected.Stored == nullptr) ||
+                                (target.Mesh == nullptr &&
+                                 target.Stored == nullptr))
                             {
                                 return EditorCommandHistoryStatus::CommandFailed;
                             }
@@ -657,7 +730,9 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                                     raw,
                                     *entity) !=
                                     expected.GeometryMetadataSignature ||
-                                !SameMeshVertexState(view, *expected.Mesh) ||
+                                !(expected.Stored != nullptr
+                                      ? SameStoredVertexState(view, *expected.Stored)
+                                      : SameMeshVertexState(view, *expected.Mesh)) ||
                                 !SameStoredMeshTopology(
                                     view,
                                     expected.TopologySignature) ||
@@ -672,7 +747,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                             const MeshPropertyMutationIdentity& identity,
                             const MeshTopologyState& target)
                         {
-                            if (target.Mesh == nullptr)
+                            if (target.Mesh == nullptr && target.Stored == nullptr)
                             {
                                 return EditorCommandHistoryStatus::
                                     CommandFailed;
@@ -680,7 +755,8 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                             return ApplyMeshTopologyState(
                                 identity.Scene,
                                 identity.StableEntityId,
-                                *target.Mesh,
+                                target.Mesh != nullptr ? *target.Mesh
+                                                       : kEmptyMeshTopology,
                                 target.Stored.get());
                         },
                         [](
@@ -713,6 +789,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                                               GS::BuildConstView(raw, *entity))
                                         : std::nullopt,
                                 .Mesh = target.Mesh,
+                                .Stored = target.Stored,
                                 .FeatureRef = expected.FeatureRef,
                                 .FeatureValues = CaptureMeshFeature(raw, identity.StableEntityId, expected.FeatureRef),
                             };
@@ -1161,8 +1238,10 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             // properties of the surviving vertices ride along through mesh
             // garbage collection. No edge, halfedge or face map exists (faces
             // are re-fanned into triangles, edges and halfedges renumbered),
-            // so those domains' user properties are dropped and reported.
-            ForwardMeshUserVertexProperties(view, mesh);
+            // so those domains' user properties are dropped and reported. A
+            // queued job also records the properties' revisions
+            // (`UserVertexRevisions`), so an edit made while it ran stales it.
+            (void)ForwardMeshUserVertexProperties(view, mesh);
 
             const bool hadTexcoords = MeshHasResolvableTexcoords(view);
             bool carried = CopyStoredCornerTexcoordsToScratchMesh(view, mesh);
@@ -1203,6 +1282,9 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             // the topology could not be read, which no later reading may match.
             // See `MeshTopologyValueSignature`.
             std::optional<std::uint64_t> TopologySignature{};
+            // Simplify only: revisions of the user vertex properties whose
+            // values were forwarded into `Mesh` at submit.
+            MeshUserVertexRevisions UserVertexRevisions{};
             Geometry::HalfedgeMesh::Mesh BeforeMesh{};
             Geometry::HalfedgeMesh::Mesh Mesh{};
             std::vector<glm::vec3> DenoiseAfterPositions{};
@@ -1270,6 +1352,16 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 {
                     return JobApplyValidation::StaleGeneration;
                 }
+            }
+
+            if (job.Kind == EditorMeshCpuJobKind::Simplify)
+            {
+                entt::registry& raw = context.Scene->Raw();
+                const auto entity = ResolveStableEntity(raw, job.StableEntityId);
+                if (!entity.has_value() ||
+                    CaptureMeshUserVertexRevisions(GS::BuildConstView(raw, *entity)) !=
+                        job.UserVertexRevisions)
+                    return JobApplyValidation::StaleGeneration;
             }
 
             if (job.Kind == EditorMeshCpuJobKind::Subdivide && job.SubdivideCommand.PreserveLoopFeatureEdges &&
@@ -1918,7 +2010,8 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                     std::move(job.BeforeMesh),
                     std::move(job.Mesh),
                     std::nullopt,
-                    &result.DroppedProperties);
+                    &result.DroppedProperties,
+                true);
             if (commitStatus != EditorCommandStatus::Applied)
             {
                 result.Status = commitStatus;
@@ -2313,6 +2406,13 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                           context.Scene->Raw(),
                           command.StableEntityId)
                     : std::nullopt;
+            if (context.Scene != nullptr)
+            {
+                entt::registry& raw = context.Scene->Raw();
+                if (const auto entity = ResolveStableEntity(raw, command.StableEntityId))
+                    state->UserVertexRevisions = CaptureMeshUserVertexRevisions(
+                        GS::BuildConstView(raw, *entity));
+            }
             state->Mesh = std::move(source.Mesh);
             state->SimplifyCommand = command;
             state->SimplifyResult = MakeMeshSimplifyBaseResult(command);
@@ -3053,7 +3153,8 @@ ApplyEditorMeshSimplifyCommand(
                 std::move(before),
                 std::move(source.Mesh),
                 std::nullopt,
-                &result.DroppedProperties);
+                &result.DroppedProperties,
+                true);
         if (commitStatus != EditorCommandStatus::Applied)
         {
             result.Status = commitStatus;

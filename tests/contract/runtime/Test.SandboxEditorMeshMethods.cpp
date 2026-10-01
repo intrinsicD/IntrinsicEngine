@@ -102,6 +102,8 @@ import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.VertexAttributeBinding;
+import Extrinsic.Runtime.VisualizationRecipes;
+import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.Graph.Vertex.Normals;
@@ -6886,6 +6888,7 @@ TEST(SandboxEditorUi, TopologyEditsPreserveOrReportUserPropertiesAndUndoRestores
 
     struct Stored
     {
+        std::vector<glm::vec3> Positions{};
         std::vector<float> Height{};
         std::vector<float> Weight{};
         std::vector<std::uint32_t> Tag{};
@@ -6897,6 +6900,8 @@ TEST(SandboxEditorUi, TopologyEditsPreserveOrReportUserPropertiesAndUndoRestores
         const auto& vertices = raw.get<GS::Vertices>(mesh).Properties;
         if (const auto height = vertices.Get<float>("height"))
             out.Height = height.Vector();
+        if (const auto positions = vertices.Get<glm::vec3>(std::string{GS::PropertyNames::kPosition}))
+            out.Positions = positions.Vector();
         if (const auto weight = raw.get<GS::Edges>(mesh).Properties.Get<float>("weight"))
             out.Weight = weight.Vector();
         if (const auto tag = raw.get<GS::Faces>(mesh).Properties.Get<std::uint32_t>("tag"))
@@ -6988,6 +6993,21 @@ TEST(SandboxEditorUi, TopologyEditsPreserveOrReportUserPropertiesAndUndoRestores
             EXPECT_EQ(std::set<float>(edited.Height.begin(), edited.Height.end()).size(),
                       edited.Height.size())
                 << "no vertex value may be duplicated or invented";
+            // A survivor still sitting on an original position carries that
+            // vertex's own value (collapses may move the rest).
+            std::size_t matched = 0u;
+            for (std::size_t i = 0u; i < edited.Positions.size(); ++i)
+            {
+                const auto original_it = std::find(original.Positions.begin(), original.Positions.end(),
+                                                   edited.Positions[i]);
+                if (original_it == original.Positions.end())
+                    continue;
+                ++matched;
+                EXPECT_EQ(edited.Height[i],
+                          original.Height[static_cast<std::size_t>(original_it - original.Positions.begin())])
+                    << "vertex " << i;
+            }
+            EXPECT_GT(matched, 0u);
         }
         else
         {
@@ -6997,7 +7017,20 @@ TEST(SandboxEditorUi, TopologyEditsPreserveOrReportUserPropertiesAndUndoRestores
         for (const std::string& name : dropped)
             EXPECT_NE(message.find(name), std::string::npos) << name << " missing from: " << message;
 
+        // Undo republishes the stored components: observers must see new
+        // property revisions and fresh dirty tags, not a silent swap.
+        auto& rawScene = registry.Raw();
+        rawScene.remove<Dirty::DirtyVertexPositions, Dirty::DirtyVertexAttributes, Dirty::DirtyEdgeTopology,
+                        Dirty::DirtyFaceTopology>(mesh);
+        const auto vertexRevision = rawScene.get<GS::Vertices>(mesh).Properties.Revision();
+        const auto edgeRevision = rawScene.get<GS::Edges>(mesh).Properties.Revision();
         ASSERT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+        EXPECT_NE(rawScene.get<GS::Vertices>(mesh).Properties.Revision(), vertexRevision);
+        EXPECT_NE(rawScene.get<GS::Edges>(mesh).Properties.Revision(), edgeRevision);
+        EXPECT_TRUE(rawScene.all_of<Dirty::DirtyVertexPositions>(mesh));
+        EXPECT_TRUE(rawScene.all_of<Dirty::DirtyVertexAttributes>(mesh));
+        EXPECT_TRUE(rawScene.all_of<Dirty::DirtyEdgeTopology>(mesh));
+        EXPECT_TRUE(rawScene.all_of<Dirty::DirtyFaceTopology>(mesh));
         const Stored undone = read(registry, mesh);
         EXPECT_EQ(undone.Height, original.Height);
         EXPECT_EQ(undone.Weight, original.Weight);
@@ -7015,4 +7048,213 @@ TEST(SandboxEditorUi, TopologyEditsPreserveOrReportUserPropertiesAndUndoRestores
         EXPECT_EQ(read(registry, mesh).Height, original.Height);
         EXPECT_EQ(read(registry, mesh).Weight, original.Weight);
     }
+}
+
+// BUG-230 review: the stored before-side snapshot keeps deleted slots, so the
+// redo that follows an undo must compare against that snapshot, not against a
+// garbage-collected re-derivation of it.
+TEST(SandboxEditorUi, SimplifyUndoRedoSucceedsWhenTheEntityHadDeletedVertexSlots)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    Geometry::HalfedgeMesh::Mesh grid = MakeGridPlaneMesh(4);
+    const auto isolated = grid.AddVertex(glm::vec3{50.0f, 50.0f, 0.0f});
+    grid.DeleteVertex(isolated); // leaves one deleted slot behind
+    ASSERT_TRUE(grid.HasGarbage());
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "DeletedSlots");
+    GS::PopulateFromMesh(registry.Raw(), mesh, grid);
+    registry.Raw().emplace<G::RenderSurface>(mesh);
+    auto& vertices = registry.Raw().get<GS::Vertices>(mesh);
+    ASSERT_EQ(vertices.NumDeleted, 1u);
+    auto height = vertices.Properties.GetOrAdd<float>("height", 0.0f);
+    for (std::size_t i = 0u; i < height.Vector().size(); ++i)
+        height.Vector()[i] = 1.0f + static_cast<float>(i);
+    const std::size_t originalSlots = vertices.Properties.Size();
+    const std::vector<float> originalHeight = height.Vector();
+
+    const auto result = Runtime::ApplyEditorMeshSimplifyCommand(
+        context,
+        Runtime::EditorMeshSimplifyCommand{
+            .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh), .TargetFaces = 8u});
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    const std::size_t editedSlots = registry.Raw().get<GS::Vertices>(mesh).Properties.Size();
+    EXPECT_LT(editedSlots, originalSlots);
+
+    for (int round = 0; round < 2; ++round)
+    {
+        ASSERT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone) << round;
+        const auto& undone = registry.Raw().get<GS::Vertices>(mesh);
+        EXPECT_EQ(undone.NumDeleted, 1u);
+        EXPECT_EQ(undone.Properties.Size(), originalSlots);
+        EXPECT_EQ(undone.Properties.Get<float>("height").Vector(), originalHeight);
+        ASSERT_EQ(history.Redo().Status, Runtime::EditorCommandHistoryStatus::Redone) << round;
+        EXPECT_EQ(registry.Raw().get<GS::Vertices>(mesh).Properties.Size(), editedSlots);
+    }
+}
+
+// BUG-230 review: a queued simplify forwards user vertex values at submit, so
+// an edit to those properties while it runs must stale the result instead of
+// being overwritten by the older values; an untouched entity still carries them.
+TEST(SandboxEditorUi, QueuedSimplifyIsStaleWhenAUserVertexPropertyIsEditedWhileTheJobRan)
+{
+    for (const bool paint : {false, true})
+    {
+        SCOPED_TRACE(paint);
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        Runtime::EditorCommandHistory history;
+        Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+        context.CommandHistory = &history;
+        Extrinsic::Tests::EditorJobHarness jobs;
+        jobs.Attach(context);
+
+        Geometry::HalfedgeMesh::Mesh grid = MakeGridPlaneMesh(4);
+        const ECS::EntityHandle mesh = MakeSelectable(registry, "PaintDuringJob");
+        GS::PopulateFromMesh(registry.Raw(), mesh, grid);
+        registry.Raw().emplace<G::RenderSurface>(mesh);
+        auto height = registry.Raw().get<GS::Vertices>(mesh).Properties.GetOrAdd<float>("height", 0.0f);
+        for (std::size_t i = 0u; i < height.Vector().size(); ++i)
+            height.Vector()[i] = 1.0f;
+        const std::size_t originalVertices = height.Vector().size();
+
+        std::optional<Runtime::EditorMeshSimplifyResult> completion;
+        const auto submitted = Runtime::ApplyEditorMeshSimplifyCommand(
+            context,
+            Runtime::EditorMeshSimplifyCommand{
+                .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh), .TargetFaces = 8u},
+            [&](auto value) { completion = std::move(value); });
+        ASSERT_EQ(submitted.Status, Runtime::EditorCommandStatus::Pending);
+
+        if (paint) // a stroke lands while the job is in flight
+            for (std::size_t i = 0u; i < height.Vector().size(); ++i)
+                height.Vector()[i] = 7.0f;
+
+        ASSERT_TRUE(jobs.DrainUntilTerminal());
+        ASSERT_TRUE(completion.has_value());
+        const auto& edited = std::as_const(registry.Raw().get<GS::Vertices>(mesh)).Properties;
+        const auto values = edited.Get<float>("height");
+        ASSERT_TRUE(values);
+        if (paint)
+        {
+            EXPECT_FALSE(completion->Succeeded()) << "the stroke must not be overwritten";
+            EXPECT_EQ(values.Vector().size(), originalVertices);
+            for (const float value : values.Vector())
+                EXPECT_EQ(value, 7.0f);
+            EXPECT_EQ(history.UndoCount(), 0u);
+        }
+        else
+        {
+            ASSERT_TRUE(completion->Succeeded()) << completion->Message;
+            EXPECT_LT(values.Vector().size(), originalVertices);
+            for (const float value : values.Vector())
+                EXPECT_EQ(value, 1.0f);
+        }
+    }
+}
+
+// BUG-230 review: the dropped report names what the user authored and lost.
+// Derived properties the engine recomputes are not user data, and a
+// same-named property an operation creates is not the user's carried values.
+TEST(SandboxEditorUi, DroppedPropertyReportExcludesDerivedNamesAndSameNamedOutputs)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const auto build = [&](const char* name) {
+        Geometry::HalfedgeMesh::Mesh grid = MakeGridPlaneMesh(3);
+        const ECS::EntityHandle mesh = MakeSelectable(registry, name);
+        GS::PopulateFromMesh(registry.Raw(), mesh, grid);
+        registry.Raw().emplace<G::RenderSurface>(mesh);
+        auto& faces = registry.Raw().get<GS::Faces>(mesh).Properties;
+        auto normals = faces.GetOrAdd<glm::vec3>("f:normal", glm::vec3{0.0f, 0.0f, 1.0f});
+        (void)normals;
+        auto region = faces.GetOrAdd<std::uint32_t>(std::string{GS::PropertyNames::kCurvatureRegion}, 0u);
+        (void)region;
+        auto tag = faces.GetOrAdd<std::uint32_t>("tag", 0u);
+        (void)tag;
+        auto& edges = registry.Raw().get<GS::Edges>(mesh).Properties;
+        auto crease = edges.GetOrAdd<bool>("e:feature", false);
+        for (std::size_t i = 0u; i < crease.Vector().size(); i += 3u)
+            crease.Vector()[i] = true;
+        return mesh;
+    };
+    const auto has = [](const std::vector<std::string>& names, const char* name) {
+        return std::find(names.begin(), names.end(), name) != names.end();
+    };
+
+    {
+        const ECS::EntityHandle mesh = build("NoFeaturePreserve");
+        const auto result = Runtime::ApplyEditorMeshSubdivideCommand(
+            context,
+            Runtime::EditorMeshSubdivideCommand{
+                .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh), .Iterations = 1u});
+        ASSERT_TRUE(result.Succeeded()) << result.Message;
+        EXPECT_TRUE(has(result.DroppedProperties, "face:tag"));
+        EXPECT_FALSE(has(result.DroppedProperties, "face:f:normal"));
+        EXPECT_FALSE(has(result.DroppedProperties, "face:f:curvature_region"));
+        // Not asked to preserve: the user's crease flags were not carried,
+        // even if the output mesh happens to own an "e:feature" property.
+        EXPECT_TRUE(has(result.DroppedProperties, "edge:e:feature")) << result.Message;
+    }
+    {
+        const ECS::EntityHandle mesh = build("FeaturePreserve");
+        const auto result = Runtime::ApplyEditorMeshSubdivideCommand(
+            context,
+            Runtime::EditorMeshSubdivideCommand{
+                .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh),
+                .Iterations = 1u,
+                .PreserveLoopFeatureEdges = true});
+        ASSERT_TRUE(result.Succeeded()) << result.Message;
+        EXPECT_FALSE(has(result.DroppedProperties, "edge:e:feature")) << result.Message;
+        EXPECT_TRUE(has(result.DroppedProperties, "face:tag"));
+    }
+}
+
+// BUG-230 review: a visualization bound to a user property a topology edit
+// dropped keeps its config, reports the source as missing and encodes nothing.
+TEST(SandboxEditorUi, VisualizationBoundToADroppedUserPropertyDegradesToAMissingSource)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    Geometry::HalfedgeMesh::Mesh grid = MakeGridPlaneMesh(3);
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "BoundToDropped");
+    GS::PopulateFromMesh(registry.Raw(), mesh, grid);
+    registry.Raw().emplace<G::RenderSurface>(mesh);
+    auto height = registry.Raw().get<GS::Vertices>(mesh).Properties.GetOrAdd<float>("height", 0.0f);
+    for (std::size_t i = 0u; i < height.Vector().size(); ++i)
+        height.Vector()[i] = static_cast<float>(i);
+    const Runtime::VisualizationRecipe recipe{.Data = Runtime::ScalarVisualizationRecipe{
+        .Source = {.Domain = Runtime::GeometryElementDomain::MeshVertex, .Name = "height"}}};
+    const auto encode = [&] {
+        const auto view = GS::BuildConstView(registry.Raw(), mesh);
+        return Runtime::EncodeVisualizationRecipe(Runtime::BuildGeometryAvailability(view), recipe);
+    };
+    ASSERT_EQ(encode().Status, Runtime::VisualizationRecipeStatus::Encoded);
+
+    const auto result = Runtime::ApplyEditorMeshRemeshCommand(
+        context,
+        Runtime::EditorMeshRemeshCommand{
+            .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh),
+            .Iterations = 1u,
+            .TargetEdgeLength = 0.5});
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+
+    const Runtime::VisualizationEncodingResult degraded = encode();
+    EXPECT_EQ(degraded.Status, Runtime::VisualizationRecipeStatus::MissingSource);
+    EXPECT_TRUE(degraded.Batch.Scalars.empty());
+
+    ASSERT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(encode().Status, Runtime::VisualizationRecipeStatus::Encoded)
+        << "undo brings the bound property back";
 }

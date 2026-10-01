@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <string_view>
 #include <type_traits>
 #include <utility>
@@ -489,4 +490,77 @@ TEST(GeometryPropertiesContract, ConstDomainViewsExposeReadOnlyLiveRanges)
 
     EXPECT_EQ(CollectIndices(graphView.LiveVertices()), (std::vector<std::uint32_t>{0u, 1u, 2u}));
     EXPECT_EQ(CollectIndices(cloudView.LivePoints()), (std::vector<std::uint32_t>{0u, 1u, 2u}));
+}
+
+TEST(GeometryPropertiesContract, CopyPropertyFromClonesAnyTypeAndReplacesSameNamedTarget)
+{
+    Geometry::PropertySet source;
+    source.Resize(3u);
+    auto flag = source.Add<bool>("flag", false);
+    flag[0] = true;
+    flag[2] = true;
+    auto label = source.Add<std::string>("label", std::string{});
+    label[0] = "a";
+    label[1] = "bb";
+    label[2] = "ccc";
+    auto weight = source.Add<float>("weight", 0.0f);
+    weight[0] = 1.5f;
+    weight[1] = 2.5f;
+    weight[2] = 3.5f;
+
+    Geometry::PropertySet target;
+    target.Resize(3u);
+    EXPECT_TRUE(target.CopyPropertyFrom(source, "flag"));
+    EXPECT_TRUE(target.CopyPropertyFrom(source, "label"));
+    ASSERT_TRUE(target.Get<bool>("flag"));
+    EXPECT_EQ(target.Get<bool>("flag").Vector(), (std::vector<bool>{true, false, true}));
+    ASSERT_TRUE(target.Get<std::string>("label"));
+    EXPECT_EQ(target.Get<std::string>("label").Vector(),
+              (std::vector<std::string>{"a", "bb", "ccc"}));
+
+    // The copy is independent of its source.
+    source.Get<float>("weight")[1] = 99.0f;
+    EXPECT_TRUE(target.CopyPropertyFrom(source, "weight"));
+    source.Get<float>("weight")[1] = -1.0f;
+    EXPECT_EQ(target.Get<float>("weight").Vector(), (std::vector<float>{1.5f, 99.0f, 3.5f}));
+
+    // An existing same-named property is replaced, whatever its old type, and
+    // the replacement carries a revision newer than the old one.
+    auto stale = target.Add<std::uint32_t>("weight2", 7u);
+    (void)stale;
+    Geometry::PropertySet other;
+    other.Resize(3u);
+    auto otherWeight2 = other.Add<double>("weight2", 0.25);
+    otherWeight2[2] = 4.0;
+    const auto before = target.FindPropertyRevision("weight2");
+    ASSERT_TRUE(before.has_value());
+    EXPECT_TRUE(target.CopyPropertyFrom(other, "weight2"));
+    EXPECT_FALSE(target.Get<std::uint32_t>("weight2"));
+    ASSERT_TRUE(target.Get<double>("weight2"));
+    EXPECT_EQ(target.Get<double>("weight2").Vector(), (std::vector<double>{0.25, 0.25, 4.0}));
+    ASSERT_TRUE(target.FindPropertyRevision("weight2").has_value());
+    EXPECT_GT(*target.FindPropertyRevision("weight2"), *before);
+}
+
+TEST(GeometryPropertiesContract, CopyPropertyFromFailsClosedOnSizeMismatchMissingNameAndSelf)
+{
+    Geometry::PropertySet source;
+    source.Resize(3u);
+    auto weight = source.Add<float>("weight", 1.0f);
+    (void)weight;
+
+    Geometry::PropertySet shorter;
+    shorter.Resize(2u);
+    auto keep = shorter.Add<float>("weight", 5.0f);
+    (void)keep;
+    EXPECT_FALSE(shorter.CopyPropertyFrom(source, "weight"));
+    EXPECT_EQ(shorter.Get<float>("weight").Vector(), (std::vector<float>{5.0f, 5.0f}))
+        << "a refused copy must leave the target untouched";
+
+    Geometry::PropertySet same;
+    same.Resize(3u);
+    EXPECT_FALSE(same.CopyPropertyFrom(source, "absent"));
+    EXPECT_FALSE(same.Exists("absent"));
+    EXPECT_FALSE(source.CopyPropertyFrom(source, "weight"));
+    EXPECT_TRUE(source.Exists("weight"));
 }

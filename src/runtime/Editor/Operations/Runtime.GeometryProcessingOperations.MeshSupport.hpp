@@ -138,16 +138,27 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
         // Carries the stored vertex-domain user properties into a scratch mesh
         // that shares its vertex numbering with the stored mesh (simplify).
         // Mesh garbage collection later moves them with their vertices.
-        void ForwardMeshUserVertexProperties(
+        // Returns "vertex:<name>" for each property actually copied; nothing
+        // is copied when the vertex counts differ.
+        [[nodiscard]] std::vector<std::string> ForwardMeshUserVertexProperties(
             const GS::ConstSourceView& stored,
             Geometry::HalfedgeMesh::Mesh& scratch);
 
-        // "<domain>:<name>" for every stored user property that `after` does
-        // not carry, i.e. what publishing `after` removes from the entity.
+        // Revision of every stored vertex user property, by name. A job that
+        // forwards those values at submit compares this at apply: a stroke or
+        // a new property made while it ran changes it, and the result is then
+        // stale rather than overwriting the edit.
+        using MeshUserVertexRevisions =
+            std::vector<std::pair<std::string, Geometry::PropertyRevision>>;
+        [[nodiscard]] MeshUserVertexRevisions CaptureMeshUserVertexRevisions(
+            const GS::ConstSourceView& stored);
+
+        // "<domain>:<name>" for every stored user property the operation did
+        // not report in `carried`, i.e. what publishing its output removes
+        // from the entity.
         [[nodiscard]] std::vector<std::string> DroppedMeshUserProperties(
             const GS::ConstSourceView& stored,
-            const Geometry::HalfedgeMesh::Mesh& after);
-
+            std::span<const std::string> carried);
 
         // A topology operation commits a whole replacement mesh, so
         // the honest change signal is whether that mesh differs from the one it
