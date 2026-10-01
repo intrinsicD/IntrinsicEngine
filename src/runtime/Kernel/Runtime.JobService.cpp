@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <bit>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -69,8 +70,10 @@ namespace Extrinsic::Runtime
         std::uint64_t CancellationGeneration{0u};
         std::move_only_function<bool()> IsReadyToApply{};
         std::move_only_function<JobApplyValidation()> ValidateBeforeApply{};
-        std::atomic<float> ProgressNormalized{0.0f};
-        std::atomic<bool> ProgressDeterminate{true};
+        // Packed progress (see `PackProgress`); zero = never reported.
+        std::shared_ptr<std::atomic<std::uint64_t>> Progress{
+            std::make_shared<std::atomic<std::uint64_t>>(0u)};
+        std::uint64_t CorrelationId{0u};
         std::chrono::steady_clock::time_point SubmittedAt{};
         std::move_only_function<void()> FinalizeUnpublishedOnMainThread{};
         // Set when the finalizer has been queued, so the several terminal-
@@ -226,6 +229,35 @@ namespace Extrinsic::Runtime
         m_State->Draining = false;
     }
 
+    namespace
+    {
+        constexpr std::uint64_t kProgressDeterminateBit = 1ull << 32;
+
+        [[nodiscard]] std::uint64_t PackProgress(const JobProgress progress) noexcept
+        {
+            const float clamped = progress.Normalized >= 0.0f
+                ? (progress.Normalized <= 1.0f ? progress.Normalized : 1.0f)
+                : 0.0f; // NaN falls through to 0
+            return static_cast<std::uint64_t>(std::bit_cast<std::uint32_t>(clamped)) |
+                   (progress.Determinate ? kProgressDeterminateBit : 0u);
+        }
+
+        [[nodiscard]] JobProgress UnpackProgress(const std::uint64_t packed) noexcept
+        {
+            return JobProgress{
+                .Normalized = std::bit_cast<float>(
+                    static_cast<std::uint32_t>(packed & 0xFFFFFFFFull)),
+                .Determinate = (packed & kProgressDeterminateBit) != 0u,
+            };
+        }
+    }
+
+    void JobCancellation::ReportProgress(const JobProgress progress) const noexcept
+    {
+        if (m_Progress)
+            m_Progress->store(PackProgress(progress), std::memory_order_release);
+    }
+
     bool JobCancellation::IsCancelled() const noexcept
     {
         return m_Flag && m_Flag->load(std::memory_order_acquire);
@@ -333,6 +365,7 @@ namespace Extrinsic::Runtime
             job->Scope = desc.Scope.IsValid() ? desc.Scope : DefaultWorldHandle;
             job->Target = desc.Target;
             job->DebugName = std::move(desc.DebugName);
+            job->CorrelationId = desc.CorrelationId;
             job->SubmittedAt = std::chrono::steady_clock::now();
             job->Work = std::move(desc.Work);
             job->PublishCompletion = std::move(desc.PublishCompletion);
@@ -409,7 +442,7 @@ namespace Extrinsic::Runtime
             job->State.store(JobState::Running, std::memory_order_release);
 
             JobResultEnvelope result =
-                job->Work(JobCancellation(job->CancelRequested));
+                job->Work(JobCancellation(job->CancelRequested, job->Progress));
 
             if (job->CancelRequested->load(std::memory_order_acquire))
             {
@@ -821,10 +854,7 @@ namespace Extrinsic::Runtime
         }
         if (!job)
             return;
-        job->ProgressNormalized.store(progress.Normalized,
-                                      std::memory_order_release);
-        job->ProgressDeterminate.store(progress.Determinate,
-                                       std::memory_order_release);
+        job->Progress->store(PackProgress(progress), std::memory_order_release);
     }
 
     JobProgress JobService::GetProgress(const JobToken token) const
@@ -842,11 +872,7 @@ namespace Extrinsic::Runtime
         }
         if (!job)
             return {};
-        return JobProgress{
-            .Normalized = job->ProgressNormalized.load(std::memory_order_acquire),
-            .Determinate =
-                job->ProgressDeterminate.load(std::memory_order_acquire),
-        };
+        return UnpackProgress(job->Progress->load(std::memory_order_acquire));
     }
 
     std::uint64_t JobService::AdvanceWorldGeneration(const WorldHandle world)
@@ -953,13 +979,9 @@ namespace Extrinsic::Runtime
                     .DebugName = job->DebugName,
                     .State = job->State.load(std::memory_order_acquire),
                     .Scope = job->Scope,
-                    .Progress =
-                        JobProgress{
-                            .Normalized = job->ProgressNormalized.load(
-                                std::memory_order_acquire),
-                            .Determinate = job->ProgressDeterminate.load(
-                                std::memory_order_acquire),
-                        },
+                    .Progress = UnpackProgress(
+                        job->Progress->load(std::memory_order_acquire)),
+                    .CorrelationId = job->CorrelationId,
                     .ElapsedMilliseconds = static_cast<std::uint64_t>(
                         std::max<std::int64_t>(0, elapsed.count())),
                 });

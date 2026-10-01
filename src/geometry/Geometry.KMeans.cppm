@@ -2,6 +2,7 @@ module;
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <span>
 #include <vector>
@@ -93,11 +94,17 @@ export namespace Geometry::KMeans
     // CPU scratch owns only temporary acceleration structures. In particular,
     // the implementation rebuilds the centroid KD-tree each iteration because
     // centroid positions are mutable within the solve.
+    //
+    // `onIteration(completed, maxIterations)` runs after each Lloyd iteration
+    // on the calling thread; a run that converges early stops short of
+    // `maxIterations`. Callers use it for progress only.
+    using IterationObserver = std::function<void(uint32_t completed, uint32_t maxIterations)>;
     [[nodiscard]] std::optional<KMeansResult> Cluster(
         std::span<const glm::vec3> points,
         std::span<const glm::vec3> initialCentroids,
         const KMeansParams& params,
-        CpuScratch* cpuScratch);
+        CpuScratch* cpuScratch,
+        const IterationObserver& onIteration = {});
 
     // Build an initial centroid set from either persistent ECS-provided seeds
     // or the algorithm's configured seeding policy. KMeansPlusPlus uses the

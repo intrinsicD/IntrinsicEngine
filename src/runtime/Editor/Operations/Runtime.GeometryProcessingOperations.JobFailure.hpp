@@ -15,10 +15,13 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
     };
 
     // Worker detail is copied only for Current; stale/cancelled reasons stand alone.
+    // A non-empty `staleReason` replaces the generic text of StaleGeneration for
+    // gates that know precisely what changed.
     [[nodiscard]] UnpublishedEditorJobFailure BuildUnpublishedEditorJobFailure(
         JobApplyValidation validation,
         std::string_view label,
-        std::string_view detail = {});
+        std::string_view detail = {},
+        std::string_view staleReason = {});
 
 }
 }

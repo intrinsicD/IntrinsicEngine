@@ -54,6 +54,13 @@ namespace Extrinsic::Runtime
         commands.m_Context = std::make_shared<const EditorProcessingContext>(std::move(context));
         return commands;
     }
+    EditorOperationProgress GetEditorOperationProgress(
+        const EditorProcessingCommands& commands, const EditorOperationRunKey& key)
+    {
+        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
+        return context.JobCommands.Progress ? context.JobCommands.Progress(key)
+                                            : EditorOperationProgress{};
+    }
     bool AreEditorProcessingConfigCommandsAvailable(
         const EditorProcessingCommands& commands) noexcept
     {

@@ -538,6 +538,7 @@ namespace Extrinsic::Runtime
         std::shared_ptr<SpatialGpuResult> Gpu{};
         EditorPropertySmoothingResult Result{};
         EditorJobIdentity Identity{};
+        JobToken Token{}; // the compute job, for main-thread progress reports
         bool Abandoned{}, Delivered{};
         std::function<void(EditorPropertySmoothingResult)> Sink{};
         // Residency: the output ring (and a float presentation ring beside a double scalar's
@@ -787,6 +788,17 @@ namespace Extrinsic::Runtime
                 PublishPreview(w);
                 if (w->FinalQueued) return true;
                 w->Solver->Observe(w->Gpu->Data);
+                if (ctx.JobCommands.ReportProgress && w->Token.IsValid())
+                {
+                    // Chained solves (iterations x channels) are the one place a
+                    // count is known; the explicit kernels are a single dispatch.
+                    const auto total = std::max<std::uint32_t>(
+                        1u, w->Publication.Config.Filter.Iterations * std::uint32_t(w->Plan.Channels));
+                    ctx.JobCommands.ReportProgress(
+                        w->Token,
+                        {.Normalized = std::min(1.0f, float(w->Solver->CompletedSolves()) / float(total)),
+                         .Determinate = true});
+                }
                 if (w->Solver->Finished())
                 {
                     // The final store needs a write slot: wait for one rather than accept a stale front.
@@ -1079,7 +1091,8 @@ namespace Extrinsic::Runtime
                     Finish(w, EditorGpuTransactionPhase::Discarded, EditorCommandStatus::StaleEntity,
                            "Vulkan property smoothing cancelled or stale; previous output retained.");
                 }};
-            if (!context.JobCommands.Submit(std::move(gpu), w->Identity).IsValid())
+            w->Token = context.JobCommands.Submit(std::move(gpu), w->Identity);
+            if (!w->Token.IsValid())
             {
                 w->Abandoned = true;
                 result.Status = EditorCommandStatus::GeometryProcessingFailed;
@@ -1116,11 +1129,12 @@ namespace Extrinsic::Runtime
         if (run) run->StopRequested = true;
     }
 
-    EditorPropertySmoothingTransactionSnapshot SnapshotEditorPropertySmoothing(const EditorProcessingCommands&,
+    EditorPropertySmoothingTransactionSnapshot SnapshotEditorPropertySmoothing(const EditorProcessingCommands& commands,
                                                                                const EditorPropertySmoothingTransactionHandle& run)
     {
         EditorPropertySmoothingTransactionSnapshot snapshot;
         if (!run) return snapshot;
+        snapshot.Progress = GetEditorOperationProgress(commands, run->Identity);
         snapshot.Phase = run->Phase;
         snapshot.Previews = run->Previews;
         snapshot.DeviceWorkQueued = run->Gpu != nullptr;

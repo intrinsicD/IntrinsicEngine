@@ -202,6 +202,10 @@ export namespace Extrinsic::Runtime
         std::uint32_t Previews{};            // fronts published so far
         bool DeviceWorkQueued{};             // a submission of this run has been queued to the device
         EditorPropertySmoothingResult Result{}; // Pending until Applied, Failed or Discarded
+        // The run's own job (compute, then the Accept readback); the chained
+        // implicit solves report a determinate fraction, everything else is
+        // indeterminate Running.
+        EditorOperationProgress Progress{};
     };
     // The run's job state; the handle keeps it alive across frames.
     struct EditorPropertySmoothingTransaction;

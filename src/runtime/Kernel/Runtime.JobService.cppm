@@ -116,10 +116,12 @@ namespace Extrinsic::Runtime
         MissingTarget,
     };
 
+    // A job that never reported reads as indeterminate: `Determinate` stays
+    // false until the worker (or `ReportProgress`) publishes a fraction.
     export struct JobProgress
     {
         float Normalized{0.0f};
-        bool  Determinate{true};
+        bool  Determinate{false};
     };
 
     export class JobCancellation
@@ -132,14 +134,27 @@ namespace Extrinsic::Runtime
         // token must outlive the kernel; consumers cannot change the flag.
         [[nodiscard]] const std::atomic<bool>* Flag() const noexcept { return m_Flag.get(); }
 
+        // Worker-side progress report for the job this token belongs to, so a
+        // worker never needs its own `JobToken`. Thread-safe; a default-constructed
+        // token ignores it.
+        void ReportProgress(JobProgress progress) const noexcept;
+        void ReportProgress(float normalized) const noexcept
+        {
+            ReportProgress(JobProgress{.Normalized = normalized, .Determinate = true});
+        }
+
     private:
         friend class JobService;
-        explicit JobCancellation(std::shared_ptr<std::atomic<bool>> flag)
-            : m_Flag(std::move(flag))
+        JobCancellation(std::shared_ptr<std::atomic<bool>> flag,
+                        std::shared_ptr<std::atomic<std::uint64_t>> progress)
+            : m_Flag(std::move(flag)), m_Progress(std::move(progress))
         {
         }
 
         std::shared_ptr<std::atomic<bool>> m_Flag{};
+        // Float bits in the low word, determinate flag in bit 32: one atomic so
+        // a reader never pairs a fraction with a stale flag.
+        std::shared_ptr<std::atomic<std::uint64_t>> m_Progress{};
     };
 
     export class JobResultEnvelope
@@ -193,6 +208,9 @@ namespace Extrinsic::Runtime
         std::string DebugName{};
         JobTarget Target{JobTarget::CpuPool};
         WorldHandle Scope{DefaultWorldHandle};
+        // Opaque submitter key (a command correlation id); 0 = none. Lets the
+        // submitter find this job again without keeping its token.
+        std::uint64_t CorrelationId{0u};
 
         // Scheduling metadata. Dependencies must all reach a terminal state
         // before this job is queued; a dependency that cancels or is discarded
@@ -290,6 +308,7 @@ namespace Extrinsic::Runtime
         JobState      State{JobState::Invalid};
         WorldHandle   Scope{DefaultWorldHandle};
         JobProgress   Progress{};
+        std::uint64_t CorrelationId{0u};
         // Age since submit, measured when the snapshot is taken. It keeps
         // growing after a job reaches a terminal state, matching the retired
         // registry's semantics.

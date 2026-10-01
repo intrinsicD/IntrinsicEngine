@@ -486,7 +486,8 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
         UnpublishedEditorJobFailure BuildUnpublishedEditorJobFailure(
             const JobApplyValidation validation,
             const std::string_view label,
-            const std::string_view detail)
+            const std::string_view detail,
+            const std::string_view staleReason)
         {
             UnpublishedEditorJobFailure failure{};
             if (validation == JobApplyValidation::MissingTarget ||
@@ -498,7 +499,9 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             }
             failure.Message = label;
             failure.Message += " did not apply: ";
-            failure.Message += QueuedCpuJobUnpublishedReason(validation);
+            failure.Message += validation == JobApplyValidation::StaleGeneration && !staleReason.empty()
+                ? staleReason
+                : QueuedCpuJobUnpublishedReason(validation);
             if (validation == JobApplyValidation::Current && !detail.empty())
             {
                 failure.Message += " (";

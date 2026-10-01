@@ -2018,8 +2018,10 @@ namespace Extrinsic::Runtime
                     scene = processing.Scene, attached = job.Snapshot.Request.AttachmentActive] {
                     return worlds && worlds->ActiveWorld() == world && worlds->Get(world) == scene && (!attached || attached());
                 };
-                processing.JobCommands.Submit = [jobs, history, prefix = job.Snapshot.Request.LabelPrefix](JobDesc desc, EditorJobIdentity) {
+                processing.JobCommands.Submit = [jobs, history, prefix = job.Snapshot.Request.LabelPrefix,
+                                                 correlation = job.Snapshot.Correlation.Value](JobDesc desc, EditorJobIdentity) {
                     CarryEditorLabelPrefix(desc, history, prefix); // the GPU transaction publishes after the call that queued it
+                    desc.CorrelationId = correlation;
                     return jobs ? jobs->Submit(std::move(desc)) : JobToken{};
                 };
                 const PointCloudConsolidationGpuSubmission submission =
@@ -2332,6 +2334,7 @@ namespace Extrinsic::Runtime
                             Core::ErrorCode::InvalidState,
                             "Point-set consolidation was cancelled before its result could be committed."));
                 };
+            job.CorrelationId = correlation.Value;
             const JobToken token = jobs.Submit(std::move(job));
             if (!token.IsValid())
             {
@@ -2499,6 +2502,7 @@ namespace Extrinsic::Runtime
             auto submit=[&](JobDesc job)
             {
                 if(previous.IsValid())job.DependsOn.push_back({previous,"Complete previous consolidation stage before using its points"});
+                job.CorrelationId=correlation.Value;
                 previous=jobs.Submit(std::move(job));
                 if(previous.IsValid()){++stats.JobsSubmitted;return true;}
                 ++stats.JobSubmissionFailures;return false;

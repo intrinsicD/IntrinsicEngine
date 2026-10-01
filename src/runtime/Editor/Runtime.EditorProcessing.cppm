@@ -9,7 +9,7 @@ export import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.EditorCommandHistory;
-import Extrinsic.Runtime.EditorJobProjection;
+export import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.JobService;
 // These services are borrowed only; their existing owners expose matching C++ linkage.
@@ -92,6 +92,10 @@ export namespace Extrinsic::Runtime
         friend EditorProcessingCommands BindEditorProcessingCommands(EditorProcessingContext);
     };
     [[nodiscard]] EditorProcessingCommands BindEditorProcessingCommands(EditorProcessingContext);
+    // Progress of the run `key` names (see `EditorJobCommandSurface::Progress`);
+    // `State::None` for an unbound handle or a key that resolves to no job.
+    [[nodiscard]] EditorOperationProgress GetEditorOperationProgress(
+        const EditorProcessingCommands&, const EditorOperationRunKey& key);
     // True when an attached handle can preview and hot-apply an engine config
     // document. Every family's `ApplyEditor*Config` needs exactly this, so panels
     // gate their controls on it instead of discovering the rejection.

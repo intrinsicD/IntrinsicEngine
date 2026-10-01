@@ -7140,7 +7140,11 @@ TEST(SandboxEditorUi, QueuedSimplifyIsStaleWhenAUserVertexPropertyIsEditedWhileT
         ASSERT_TRUE(values);
         if (paint)
         {
-            EXPECT_FALSE(completion->Succeeded()) << "the stroke must not be overwritten";
+            EXPECT_EQ(completion->Status, Runtime::EditorCommandStatus::StaleEntity)
+                << "the stroke must not be overwritten";
+            EXPECT_NE(completion->Message.find("a vertex property was edited while simplify ran; run it again"),
+                      std::string::npos)
+                << completion->Message;
             EXPECT_EQ(values.Vector().size(), originalVertices);
             for (const float value : values.Vector())
                 EXPECT_EQ(value, 7.0f);

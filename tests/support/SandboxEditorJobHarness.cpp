@@ -42,6 +42,17 @@ namespace Extrinsic::Tests
             }
             return std::nullopt;
         };
+        commands.Progress =
+            [this](const Runtime::EditorOperationRunKey& key)
+        {
+            return Runtime::ResolveEditorOperationProgress(Snapshot().Entries, key);
+        };
+        commands.ReportProgress =
+            [this](const Runtime::JobToken token, const Runtime::JobProgress progress)
+        {
+            if (m_Identities.contains(token))
+                m_Jobs.ReportProgress(token, progress);
+        };
         commands.SnapshotEntity =
             [this](const std::uint32_t stableEntityId)
         {
@@ -62,12 +73,14 @@ namespace Extrinsic::Tests
         for (const Runtime::JobSnapshot& job : m_Jobs.SnapshotAll())
         {
             const auto identity = m_Identities.find(job.Token);
-            if (identity == m_Identities.end())
+            if (identity == m_Identities.end() && job.CorrelationId == 0u)
                 continue;
 
             snapshot.Entries.push_back(Runtime::EditorJobRecord{
                 .Token = job.Token,
-                .Identity = identity->second,
+                .Identity = identity != m_Identities.end() ? identity->second
+                                                           : Runtime::EditorJobIdentity{},
+                .CorrelationId = job.CorrelationId,
                 .Name = job.DebugName,
                 .State = job.State,
                 .NormalizedProgress = job.Progress.Normalized,

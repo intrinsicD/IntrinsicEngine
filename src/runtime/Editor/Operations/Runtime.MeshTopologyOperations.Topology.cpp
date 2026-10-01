@@ -601,12 +601,13 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             Geometry::HalfedgeMesh::Mesh after,
             std::optional<GeometryPropertyRef> feature = std::nullopt,
             std::vector<std::string>* droppedProperties = nullptr,
-            const bool carryVertexUserProperties = false)
+            // "vertex:<name>" of the user properties the operation forwarded
+            // into `after` (simplify); every other user property is dropped.
+            std::vector<std::string> carriedProperties = {})
         {
             // What publishing `after` removes from the entity, named before the
             // apply rewrites it, plus (for undo) the exact stored components.
             MeshStoredSourceState storedBefore{};
-            std::vector<std::string> carried{};
             std::optional<GS::ConstSourceView> sourceView{};
             if (context.Scene != nullptr)
             {
@@ -615,16 +616,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                         ResolveStableEntity(sourceRaw, stableEntityId))
                 {
                     sourceView = GS::BuildConstView(sourceRaw, *sourceEntity);
-                    // Simplify forwarded the surviving vertices' user values
-                    // into `after` when it was built; any other operation
-                    // carried none, whatever its output mesh happens to own.
-                    if (carryVertexUserProperties && sourceView->VertexSource != nullptr)
-                    {
-                        for (const std::string& name :
-                             MeshUserPropertyNames(sourceView->VertexSource->Properties))
-                            if (after.VertexProperties().Exists(name))
-                                carried.push_back("vertex:" + name);
-                    }
+                    std::vector<std::string> carried = std::move(carriedProperties);
                     if (feature.has_value() &&
                         feature->Domain == GeometryElementDomain::MeshEdge &&
                         after.EdgeProperties().Exists(feature->Name))
@@ -1229,7 +1221,8 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
         [[nodiscard]] EditorMeshTexcoordOutcome
         CopyMeshSimplifyAuxiliaryProperties(
             const GS::ConstSourceView& view,
-            Geometry::HalfedgeMesh::Mesh& mesh)
+            Geometry::HalfedgeMesh::Mesh& mesh,
+            std::vector<std::string>& carriedUserProperties)
         {
             if (view.VertexSource == nullptr)
                 return EditorMeshTexcoordOutcome::None;
@@ -1241,7 +1234,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             // so those domains' user properties are dropped and reported. A
             // queued job also records the properties' revisions
             // (`UserVertexRevisions`), so an edit made while it ran stales it.
-            (void)ForwardMeshUserVertexProperties(view, mesh);
+            carriedUserProperties = ForwardMeshUserVertexProperties(view, mesh);
 
             const bool hadTexcoords = MeshHasResolvableTexcoords(view);
             bool carried = CopyStoredCornerTexcoordsToScratchMesh(view, mesh);
@@ -1285,6 +1278,10 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             // Simplify only: revisions of the user vertex properties whose
             // values were forwarded into `Mesh` at submit.
             MeshUserVertexRevisions UserVertexRevisions{};
+            // "vertex:<name>" of each user property forwarded into `Mesh`.
+            std::vector<std::string> CarriedUserProperties{};
+            // Why the apply gate answered StaleGeneration, when it knows.
+            std::string StaleReason{};
             Geometry::HalfedgeMesh::Mesh BeforeMesh{};
             Geometry::HalfedgeMesh::Mesh Mesh{};
             std::vector<glm::vec3> DenoiseAfterPositions{};
@@ -1323,8 +1320,9 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
 
         [[nodiscard]] JobApplyValidation ValidateMeshCpuJobApply(
             const EditorProcessingContext& context,
-            const EditorMeshCpuJobState& job)
+            EditorMeshCpuJobState& job)
         {
+            job.StaleReason.clear();
             const JobApplyValidation source = ValidateMeshCpuJobSource(
                 context,
                 job.StableEntityId,
@@ -1361,7 +1359,10 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 if (!entity.has_value() ||
                     CaptureMeshUserVertexRevisions(GS::BuildConstView(raw, *entity)) !=
                         job.UserVertexRevisions)
+                {
+                    job.StaleReason = "a vertex property was edited while simplify ran; run it again";
                     return JobApplyValidation::StaleGeneration;
+                }
             }
 
             if (job.Kind == EditorMeshCpuJobKind::Subdivide && job.SubdivideCommand.PreserveLoopFeatureEdges &&
@@ -2011,7 +2012,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                     std::move(job.Mesh),
                     std::nullopt,
                     &result.DroppedProperties,
-                true);
+                    std::move(job.CarriedUserProperties));
             if (commitStatus != EditorCommandStatus::Applied)
             {
                 result.Status = commitStatus;
@@ -2062,7 +2063,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 return;
 
             auto failure = BuildUnpublishedEditorJobFailure(
-                job.LastApplyValidation, MeshCpuJobName(job.Kind));
+                job.LastApplyValidation, MeshCpuJobName(job.Kind), {}, job.StaleReason);
 
             switch (job.Kind)
             {
@@ -2389,10 +2390,12 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             MeshTopologySourceResult source,
             const std::uint64_t geometryMetadataSignature,
             const EditorMeshTexcoordOutcome texcoordOutcome,
+            std::vector<std::string> carriedUserProperties,
             std::function<void(EditorMeshSimplifyResult)> onComplete)
         {
             auto state = std::make_shared<EditorMeshCpuJobState>();
             state->Kind = EditorMeshCpuJobKind::Simplify;
+            state->CarriedUserProperties = std::move(carriedUserProperties);
             state->StableEntityId = command.StableEntityId;
             state->GeometryMetadataSignature = geometryMetadataSignature;
             state->SnapshotPositions = ExtractMeshPositions(source.Mesh);
@@ -3115,8 +3118,9 @@ ApplyEditorMeshSimplifyCommand(
         // PreserveUvSeams can actually see a seam, and -- since the publish step
         // replaces the entity's properties wholesale -- so the mesh keeps the
         // UVs it came in with.
+        std::vector<std::string> carriedUserProperties{};
         const EditorMeshTexcoordOutcome texcoordOutcome =
-            CopyMeshSimplifyAuxiliaryProperties(view, source.Mesh);
+            CopyMeshSimplifyAuxiliaryProperties(view, source.Mesh, carriedUserProperties);
 
         if (context.JobCommands.Available())
         {
@@ -3126,6 +3130,7 @@ ApplyEditorMeshSimplifyCommand(
                 std::move(source),
                 GeometryMetadataSignatureForEntity(raw, *entity),
                 texcoordOutcome,
+                std::move(carriedUserProperties),
                 std::move(onComplete));
         }
         result.TexcoordOutcome = texcoordOutcome;
@@ -3154,7 +3159,7 @@ ApplyEditorMeshSimplifyCommand(
                 std::move(source.Mesh),
                 std::nullopt,
                 &result.DroppedProperties,
-                true);
+                std::move(carriedUserProperties));
         if (commitStatus != EditorCommandStatus::Applied)
         {
             result.Status = commitStatus;

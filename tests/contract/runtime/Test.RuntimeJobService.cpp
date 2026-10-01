@@ -1450,6 +1450,53 @@ TEST(RuntimeJobService, SnapshotAllEnumeratesRetainedJobsInTokenOrder)
     EXPECT_TRUE(jobs.SnapshotAll().empty());
 }
 
+TEST(RuntimeJobService, NeverReportedProgressIsIndeterminateAndWorkReportsThroughItsToken)
+{
+    SchedulerScope scheduler{2};
+    Runtime::JobService jobs;
+    Runtime::KernelEventBus events;
+    std::atomic_bool reported{false};
+    std::atomic_bool release{false};
+
+    Runtime::JobDesc silent = Runtime::MakeCpuJobDesc<int>(
+        "silent", Runtime::DefaultWorldHandle,
+        [&release](const Runtime::JobCancellation&)
+        {
+            while (!release.load(std::memory_order_acquire))
+                std::this_thread::sleep_for(1ms);
+            return 1;
+        },
+        [](const int& v) { return CountedCompleted{.Value = v}; });
+    const Runtime::JobToken silentToken = jobs.Submit(std::move(silent));
+    ASSERT_TRUE(silentToken.IsValid());
+    EXPECT_FALSE(jobs.GetProgress(silentToken).Determinate) << "never reported is not 0%";
+    EXPECT_FLOAT_EQ(jobs.GetProgress(silentToken).Normalized, 0.0f);
+
+    Runtime::JobDesc reporting = Runtime::MakeCpuJobDesc<int>(
+        "reporting", Runtime::DefaultWorldHandle,
+        [&reported, &release](const Runtime::JobCancellation& cancellation)
+        {
+            cancellation.ReportProgress(2.0f); // clamped
+            reported.store(true, std::memory_order_release);
+            while (!release.load(std::memory_order_acquire))
+                std::this_thread::sleep_for(1ms);
+            return 2;
+        },
+        [](const int& v) { return CountedCompleted{.Value = v}; });
+    const Runtime::JobToken reportingToken = jobs.Submit(std::move(reporting));
+    ASSERT_TRUE(reportingToken.IsValid());
+    ASSERT_TRUE(WaitUntil([&] { return reported.load(std::memory_order_acquire); }));
+    EXPECT_TRUE(jobs.GetProgress(reportingToken).Determinate);
+    EXPECT_FLOAT_EQ(jobs.GetProgress(reportingToken).Normalized, 1.0f);
+    EXPECT_FALSE(jobs.GetProgress(silentToken).Determinate);
+
+    release.store(true, std::memory_order_release);
+    ASSERT_TRUE(WaitUntil([&] {
+        (void)jobs.DrainCompletions(events);
+        return jobs.IsComplete(silentToken) && jobs.IsComplete(reportingToken);
+    }));
+}
+
 TEST(RuntimeJobService, SnapshotAllCarriesReportedProgressAndAge)
 {
     SchedulerScope scheduler{2};

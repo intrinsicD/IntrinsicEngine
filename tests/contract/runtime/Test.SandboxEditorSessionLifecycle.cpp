@@ -1,6 +1,7 @@
 // ARCH-006 runtime Sandbox editor SessionLifecycle contract partition.
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -77,6 +78,7 @@ import Geometry.HalfedgeMesh.Builder;
 import Geometry.Properties;
 
 #include "RuntimeTestModule.hpp"
+#include "SandboxEditorJobHarness.hpp"
 
 namespace Runtime = Extrinsic::Runtime;
 namespace Assets = Extrinsic::Assets;
@@ -2834,4 +2836,229 @@ TEST_F(EditorKeypointAgent, MeshTopologyAndRidgeCommandsRejectValuesOutsideTheir
     EXPECT_TRUE(Runtime::PreviewEditorScalarRidgeCommand(Commands, ridge).Enabled) << "inside the range the preview is ready";
     ridge.PublishGraph = false;
     EXPECT_FALSE(Runtime::PreviewEditorScalarRidgeCommand(Commands, ridge).Enabled) << "no output selected";
+}
+
+// UI-069 / RUNTIME-312 slice 8: the operation-progress read model. One run's
+// own job answers for it (by output identity or by command correlation id),
+// never the oldest job of anyone else, and a job that has not reported reads
+// as indeterminate rather than 0%.
+namespace
+{
+    struct ProgressProbeContext
+    {
+        Runtime::EditorJobCommandSurface JobCommands{};
+    };
+
+    template <typename Predicate>
+    [[nodiscard]] bool WaitFor(Predicate&& predicate,
+                               const std::chrono::milliseconds timeout = std::chrono::seconds{5})
+    {
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        while (!predicate())
+        {
+            if (std::chrono::steady_clock::now() >= deadline)
+                return false;
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
+        }
+        return true;
+    }
+
+    // A job that optionally reports `fraction`, then blocks until `release`.
+    [[nodiscard]] Runtime::JobDesc MakeProgressProbeJob(
+        std::string name, std::atomic_bool& release, const float fraction = -1.0f)
+    {
+        Runtime::JobDesc desc{};
+        desc.DebugName = std::move(name);
+        desc.Work = [&release, fraction](const Runtime::JobCancellation& cancellation)
+        {
+            if (fraction >= 0.0f)
+                cancellation.ReportProgress(fraction);
+            while (!release.load(std::memory_order_acquire) && !cancellation.IsCancelled())
+                std::this_thread::sleep_for(std::chrono::milliseconds{1});
+            return Runtime::JobResultEnvelope::Make(true);
+        };
+        desc.PublishCompletion = [](Runtime::KernelEventBus&, const Runtime::JobResultEnvelope&) { return true; };
+        return desc;
+    }
+
+    [[nodiscard]] Runtime::EditorJobIdentity ProbeIdentity(std::string output, const std::uint32_t entity = 7u)
+    {
+        return Runtime::EditorJobIdentity{.EntityId = entity,
+                                          .Scope = Runtime::EditorJobScope::MeshSurface,
+                                          .OutputSemantic = Runtime::GeometryPresentationSlotSemantic::ScalarField,
+                                          .OutputName = std::move(output)};
+    }
+}
+
+TEST(SandboxEditorSessionLifecycle, OperationProgressProjectsQueuedRunningNeverReportedAndOwnJob)
+{
+    using State = Runtime::EditorOperationState;
+    Extrinsic::Tests::EditorJobHarness harness{3u};
+    ProgressProbeContext context;
+    harness.Attach(context);
+    const auto& commands = context.JobCommands;
+    std::atomic_bool release{false};
+    std::atomic_bool releaseOld{false};
+
+    // The older run reports 90%; the run under test reports 20%. A heuristic
+    // that follows "the oldest running job" would read the wrong one. Two
+    // workers: the silent run starts once the older one is released.
+    const auto oldId = ProbeIdentity("old");
+    const auto ownId = ProbeIdentity("own");
+    const auto silentId = ProbeIdentity("silent");
+    const Runtime::JobToken old = commands.Submit(MakeProgressProbeJob("old", releaseOld, 0.9f), oldId);
+    const Runtime::JobToken own = commands.Submit(MakeProgressProbeJob("own", release, 0.2f), ownId);
+    const Runtime::JobToken silent = commands.Submit(MakeProgressProbeJob("silent", release), silentId);
+    ASSERT_TRUE(old.IsValid() && own.IsValid() && silent.IsValid());
+
+    // The dependent never starts while the others block: Queued, indeterminate.
+    const auto queuedId = ProbeIdentity("queued");
+    Runtime::JobDesc queued = MakeProgressProbeJob("queued", release);
+    queued.DependsOn.push_back({.Job = own, .Reason = "test"});
+    ASSERT_TRUE(commands.Submit(std::move(queued), queuedId).IsValid());
+    const auto queuedProgress = commands.Progress(queuedId);
+    EXPECT_EQ(queuedProgress.State, State::Queued);
+    EXPECT_FALSE(queuedProgress.Determinate);
+    EXPECT_EQ(queuedProgress.Label, "queued");
+
+    ASSERT_TRUE(WaitFor([&] { return commands.Progress(ownId).Determinate; }));
+    const auto progress = commands.Progress(ownId);
+    EXPECT_EQ(progress.State, State::Running);
+    EXPECT_FLOAT_EQ(progress.Normalized, 0.2f);
+    EXPECT_FALSE(progress.CanCancel); // cancel arrives with RUNTIME-279
+    EXPECT_FLOAT_EQ(commands.Progress(oldId).Normalized, 0.9f);
+    releaseOld.store(true, std::memory_order_release);
+
+    // Never reported: Running but indeterminate, not 0%.
+    ASSERT_TRUE(WaitFor([&] { return commands.Progress(silentId).State == State::Running; }));
+    EXPECT_FALSE(commands.Progress(silentId).Determinate);
+    EXPECT_FLOAT_EQ(commands.Progress(silentId).Normalized, 0.0f);
+
+    // Unknown output: nothing to show.
+    EXPECT_EQ(commands.Progress(ProbeIdentity("absent")).State, State::None);
+
+    release.store(true, std::memory_order_release);
+    ASSERT_TRUE(harness.DrainUntilTerminal());
+    const auto done = commands.Progress(ownId);
+    EXPECT_EQ(done.State, State::Succeeded);
+    EXPECT_TRUE(done.Determinate);
+    EXPECT_FLOAT_EQ(done.Normalized, 1.0f);
+
+    // Pruned: a reaped job is no run at all.
+    EXPECT_GT(harness.Jobs().ReapCompleted(), 0u);
+    EXPECT_EQ(commands.Progress(ownId).State, State::None);
+}
+
+TEST(SandboxEditorSessionLifecycle, OperationProgressReportsFailedAndCancelledRuns)
+{
+    using State = Runtime::EditorOperationState;
+    Extrinsic::Tests::EditorJobHarness harness{2u};
+    ProgressProbeContext context;
+    harness.Attach(context);
+    const auto& commands = context.JobCommands;
+    std::atomic_bool release{false};
+
+    const auto failedId = ProbeIdentity("failed");
+    Runtime::JobDesc failing{};
+    failing.DebugName = "failing";
+    failing.Work = [](const Runtime::JobCancellation&) { return Runtime::JobResultEnvelope{}; }; // dropped
+    failing.PublishCompletion = [](Runtime::KernelEventBus&, const Runtime::JobResultEnvelope&) { return true; };
+    ASSERT_TRUE(commands.Submit(std::move(failing), failedId).IsValid());
+
+    const auto blockerId = ProbeIdentity("blocker");
+    const Runtime::JobToken blocker = commands.Submit(MakeProgressProbeJob("blocker", release), blockerId);
+    const auto cancelledId = ProbeIdentity("cancelled");
+    Runtime::JobDesc dependent = MakeProgressProbeJob("cancelled", release);
+    dependent.DependsOn.push_back({.Job = blocker, .Reason = "test"});
+    const Runtime::JobToken cancelled = commands.Submit(std::move(dependent), cancelledId);
+    ASSERT_TRUE(cancelled.IsValid());
+    ASSERT_TRUE(harness.Jobs().Cancel(cancelled));
+    release.store(true, std::memory_order_release);
+    ASSERT_TRUE(harness.DrainUntilTerminal());
+
+    const auto failedProgress = commands.Progress(failedId);
+    EXPECT_EQ(failedProgress.State, State::Failed);
+    EXPECT_FALSE(failedProgress.Diagnostic.empty());
+    const auto cancelledProgress = commands.Progress(cancelledId);
+    EXPECT_EQ(cancelledProgress.State, State::Cancelled);
+    EXPECT_FALSE(cancelledProgress.Diagnostic.empty());
+}
+
+TEST(SandboxEditorSessionLifecycle, OperationProgressResolvesCorrelationKeysToTheRunsOwnJob)
+{
+    using State = Runtime::EditorOperationState;
+    Extrinsic::Tests::EditorJobHarness harness{3u};
+    ProgressProbeContext context;
+    harness.Attach(context);
+    const auto& commands = context.JobCommands;
+    std::atomic_bool release{false};
+
+    // Service runs (K-Means, consolidation) submit straight to JobService and
+    // stamp the command correlation id; no identity is ever recorded.
+    const auto submit = [&](const char* name, const std::uint64_t correlation, const float fraction) {
+        Runtime::JobDesc desc = MakeProgressProbeJob(name, release, fraction);
+        desc.CorrelationId = correlation;
+        return harness.Jobs().Submit(std::move(desc));
+    };
+    ASSERT_TRUE(submit("older run", 11u, 0.9f).IsValid());
+    ASSERT_TRUE(submit("this run", 12u, 0.4f).IsValid());
+    ASSERT_TRUE(WaitFor([&] {
+        return commands.Progress(Runtime::CommandCorrelationId{12u}).Determinate &&
+               commands.Progress(Runtime::CommandCorrelationId{11u}).Determinate;
+    }));
+
+    const auto own = commands.Progress(Runtime::CommandCorrelationId{12u});
+    EXPECT_EQ(own.State, State::Running);
+    EXPECT_FLOAT_EQ(own.Normalized, 0.4f);
+    EXPECT_EQ(own.Label, "this run");
+    EXPECT_FLOAT_EQ(commands.Progress(Runtime::CommandCorrelationId{11u}).Normalized, 0.9f);
+    EXPECT_EQ(commands.Progress(Runtime::CommandCorrelationId{13u}).State, State::None);
+    EXPECT_EQ(commands.Progress(Runtime::CommandCorrelationId{}).State, State::None);
+
+    release.store(true, std::memory_order_release);
+    ASSERT_TRUE(harness.DrainUntilTerminal());
+    EXPECT_EQ(commands.Progress(Runtime::CommandCorrelationId{12u}).State, State::Succeeded);
+}
+
+TEST(SandboxEditorSession, OperationProgressRejectsStaleEpochHandlesAndFindsServiceRunsByCorrelation)
+{
+    using State = Runtime::EditorOperationState;
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
+    engine.EmplaceModule<Runtime::AsyncWorkModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.Initialize();
+
+    Runtime::EditorWorkspaceAttachment attachment;
+    attachment.Attach(engine.Worlds(), engine.Services());
+    ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment, MakeNoEditorModelBuildRequest()).has_value());
+    const Runtime::EditorProcessingCommands commands = Runtime::PrepareEditorProcessingCommands(attachment);
+    ASSERT_TRUE(commands.IsBound());
+
+    std::atomic_bool release{false};
+    Runtime::JobDesc desc = MakeProgressProbeJob("session service run", release, 0.5f);
+    desc.CorrelationId = 99u;
+    auto& jobs = RequiredEngineService<Runtime::JobService>(engine);
+    ASSERT_TRUE(jobs.Submit(std::move(desc)).IsValid());
+
+    const Runtime::EditorOperationRunKey key = Runtime::CommandCorrelationId{99u};
+    ASSERT_TRUE(WaitFor([&] { return Runtime::GetEditorOperationProgress(commands, key).Determinate; }));
+    EXPECT_EQ(Runtime::GetEditorOperationProgress(commands, key).State, State::Running);
+    EXPECT_FLOAT_EQ(Runtime::GetEditorOperationProgress(commands, key).Normalized, 0.5f);
+
+    attachment.Detach();
+    attachment.Attach(engine.Worlds(), engine.Services());
+    ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment, MakeNoEditorModelBuildRequest()).has_value());
+    EXPECT_EQ(Runtime::GetEditorOperationProgress(commands, key).State, State::None)
+        << "a handle copied from the previous attachment must not read the job";
+    EXPECT_EQ(Runtime::GetEditorOperationProgress(Runtime::PrepareEditorProcessingCommands(attachment), key).State,
+              State::Running);
+
+    release.store(true, std::memory_order_release);
+    ASSERT_TRUE(WaitFor([&] {
+        (void)jobs.DrainCompletions(engine.Events());
+        return Runtime::GetEditorOperationProgress(Runtime::PrepareEditorProcessingCommands(attachment), key).State ==
+               State::Succeeded;
+    }));
+    attachment.Detach();
+    engine.Shutdown();
 }

@@ -444,7 +444,14 @@ namespace Extrinsic::Runtime
             std::optional<GK::KMeansResult> clustered = GK::Cluster(
                 std::span<const glm::vec3>{
                     snapshot.Points.data(), snapshot.Points.size()},
-                snapshot.Params);
+                {},
+                snapshot.Params,
+                nullptr,
+                [&cancellation](const std::uint32_t completed, const std::uint32_t maxIterations)
+                {
+                    cancellation.ReportProgress(
+                        static_cast<float>(completed) / static_cast<float>(maxIterations));
+                });
             if (!clustered.has_value())
             {
                 KMeansJobResult failed{};
@@ -950,6 +957,7 @@ namespace Extrinsic::Runtime
                         "K-Means work was cancelled before its result could be committed.");
                     PublishCompletion(events, std::move(cancelled));
                 };
+            job.CorrelationId = correlation.Value;
             const JobToken token = jobs.Submit(std::move(job));
             if (!token.IsValid())
             {
@@ -1036,8 +1044,9 @@ namespace Extrinsic::Runtime
                 processing.AttachmentActive = [worlds=context.Worlds,world,scene=processing.Scene,attached=command.AttachmentActive] {
                     return worlds && worlds->ActiveWorld()==world && worlds->Get(world)==scene && (!attached || attached());
                 };
-                processing.JobCommands.Submit = [jobs=context.Jobs,history,prefix=command.LabelPrefix](JobDesc desc, EditorJobIdentity) {
+                processing.JobCommands.Submit = [jobs=context.Jobs,history,prefix=command.LabelPrefix,correlation=context.Correlation.Value](JobDesc desc, EditorJobIdentity) {
                     CarryEditorLabelPrefix(desc, history, prefix); // the GPU transaction publishes after the call that queued it
+                    desc.CorrelationId = correlation;
                     return jobs->Submit(std::move(desc));};
                 const auto captured = std::make_shared<KMeansSnapshot>();
                 const auto entity = SelectionController::ToEntityHandle(command.StableEntityId);

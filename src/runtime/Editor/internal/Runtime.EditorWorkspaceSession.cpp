@@ -14,6 +14,7 @@ module;
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 #include <vector>
 
 module Extrinsic.Runtime.Private.EditorWorkspaceAttachment;
@@ -183,6 +184,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
             return EditorJobRecord{
                 .Token = job.Token,
                 .Identity = identity,
+                .CorrelationId = job.CorrelationId,
                 .Name = job.DebugName,
                 .State = job.State,
                 .NormalizedProgress = job.Progress.Normalized,
@@ -243,6 +245,26 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
             }
             return rows;
         }
+        // Every job this session can attribute to a run: the ones it submitted
+        // with an identity, and service runs stamped with a correlation id.
+        [[nodiscard]] EditorOperationProgress
+        ProgressForEditorRun(
+            const JobService& jobs,
+            const EditorJobIdentityIndex& identities,
+            const EditorOperationRunKey& key)
+        {
+            std::vector<EditorJobRecord> records{};
+            for (const JobSnapshot& job : jobs.SnapshotAll())
+            {
+                const auto identity = identities.find(job.Token);
+                if (identity != identities.end())
+                    records.push_back(ToEditorJobRecord(job, identity->second));
+                else if (job.CorrelationId != 0u)
+                    records.push_back(ToEditorJobRecord(job, EditorJobIdentity{}));
+            }
+            return ResolveEditorOperationProgress(records, key);
+        }
+
         [[nodiscard]] bool AttachmentEpochIsActive(
             const std::shared_ptr<std::atomic_bool>& epoch) noexcept
         {
@@ -614,6 +636,23 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                         *m_Jobs,
                         m_JobIdentities,
                         stableEntityId);
+                };
+            context.JobCommands.Progress =
+                [epoch = m_AttachmentEpoch,
+                 this](const EditorOperationRunKey& key)
+                    -> EditorOperationProgress
+                {
+                    if (!AttachmentEpochIsActive(epoch) || m_Jobs == nullptr)
+                        return {};
+                    return ProgressForEditorRun(*m_Jobs, m_JobIdentities, key);
+                };
+            context.JobCommands.ReportProgress =
+                [epoch = m_AttachmentEpoch,
+                 this](const JobToken token, const JobProgress progress)
+                {
+                    if (AttachmentEpochIsActive(epoch) && m_Jobs != nullptr &&
+                        m_JobIdentities.contains(token))
+                        m_Jobs->ReportProgress(token, progress);
                 };
         }
         context.SpatialIndices = m_SpatialIndices;

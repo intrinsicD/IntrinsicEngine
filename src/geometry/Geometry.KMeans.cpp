@@ -227,7 +227,8 @@ namespace Geometry::KMeans
     std::optional<KMeansResult> Cluster(std::span<const glm::vec3> points,
                                   std::span<const glm::vec3> initialCentroids,
                                   const KMeansParams& params,
-                                  CpuScratch* cpuScratch)
+                                  CpuScratch* cpuScratch,
+                                  const IterationObserver& onIteration)
     {
         if (points.empty() || params.ClusterCount == 0 || params.MaxIterations == 0)
             return std::nullopt;
@@ -308,6 +309,8 @@ namespace Geometry::KMeans
             result.Inertia = inertia;
             result.MaxDistanceIndex = maxDistanceIndex;
             result.Labels = nextLabels;
+            if (onIteration)
+                onIteration(iter + 1, params.MaxIterations);
 
             if (!anyLabelChanged || maxShift <= tol2)
             {
