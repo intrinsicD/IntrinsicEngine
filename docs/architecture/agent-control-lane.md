@@ -125,12 +125,19 @@ Nothing exists without the launch flag: no module, thread or socket.
   `preview_registration`, `preview_point_sampling`, `preview_keypoint_analysis`, `preview_kmeans`,
   `preview_point_cloud_consolidation`, `preview_operation`, `preview_mesh_operation` and
   `view_screenshot`. State-changing: `select_entity`, `import_file`, `show_property`,
-  `config_apply`, `save_scene`, `load_scene`, `undo`, `redo`, `run_operation`,
+  `config_apply`, `save_scene`, `load_scene`, `set_visibility`, `set_camera`, `undo`, `redo`,
+  `run_operation`,
   `run_mesh_operation`, `run_registration` (ICP
   or Coherent Point Drift from their config sections; the reply waits for the job),
   `run_point_sampling` (the `sandbox.point_sampling` section), `run_keypoint_analysis`,
   `run_kmeans` and `run_point_cloud_consolidation`. `view_capture` writes a PNG inside the
   allowed roots.
+- Appearance and camera. `set_visibility` shows or hides an entity's primary lane (mesh surface, graph
+  edges, point-cloud points) through `ApplyEditorRenderHintCommand` exactly as the appearance
+  panel's checkbox does (one undoable step). `set_camera` switches the main camera controller
+  kind (orbit, fly, free look, top down) through `ApplyEditorCameraControllerCommand`, like the
+  Camera panel's buttons; it is editor state, not scene data, so it is neither undoable nor
+  destructive. Camera pose, presets and focus have no editor command, so they are not tools.
 - Scene files. `save_scene` writes the scene document to a path inside the allowed roots (it
   refuses an existing file unless `overwrite: true`, error code `file_exists`) and `load_scene`
   replaces the whole scene document with a file inside them; both resolve the path with
@@ -242,8 +249,8 @@ Planned: lane hardening (the remaining protocol conformance) and the remaining o
 
 - Operation tools exist for the configured operations of the table above, registration (ICP,
   Coherent Point Drift), point sampling, keypoint analysis, k-means and point-cloud
-  consolidation. The remaining editor commands (visibility, camera controller)
-  are owned by [RUNTIME-312](../../tasks/backlog/runtime/RUNTIME-312-agent-lane-mcp-hardening-and-coverage.md).
+  consolidation, scene files, visibility and the camera controller kind. Camera pose, presets
+  and focus have no editor command yet; see [RUNTIME-312](../../tasks/backlog/runtime/RUNTIME-312-agent-lane-mcp-hardening-and-coverage.md).
 - Imports are asynchronous (`Pending`): pass `wait: true`, or poll `scene_entities` for the result.
 - Unix-domain sockets only; Windows builds report `Unsupported`.
 - A Sandbox killed by a signal leaves its socket file; the next start replaces it.

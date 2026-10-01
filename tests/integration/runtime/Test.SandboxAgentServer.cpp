@@ -31,6 +31,7 @@ import Extrinsic.Platform.LocalSocket;
 import Extrinsic.Runtime.AgentServer;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AsyncWorkModule;
+import Extrinsic.Runtime.CameraModule;
 import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Runtime.SpatialIndexCache;
@@ -143,7 +144,7 @@ namespace
         std::vector<std::string> Failures; // written by the client thread only, read after join
         std::atomic_bool Done{false};
 
-        explicit AgentRig(const std::string& tag)
+        explicit AgentRig(const std::string& tag, bool withCamera = false)
         {
             SocketPath = (std::filesystem::temp_directory_path() / ("intrinsic-agent-" + tag + "-" + std::to_string(::getpid()) + ".sock")).string();
             auto sections = Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry();
@@ -151,7 +152,7 @@ namespace
             Config::PopulateEngineConfigSectionDefaults(config, sections);
             config.Simulation.WorkerThreadCount = 1u;
             config.ReferenceScene.Enabled = false;
-            config.Camera.Enabled = false;
+            config.Camera.Enabled = withCamera;
             config.Window.Backend = Config::WindowBackend::Null;
             auto driver = std::make_unique<Driver>();
             Frames = driver.get();
@@ -161,6 +162,7 @@ namespace
             Engine->EmplaceModule<R::SceneDocumentModule>();
             Engine->EmplaceModule<R::AsyncWorkModule>();
             Engine->EmplaceModule<R::AssetWorkflowModule>();
+            if (withCamera) Engine->EmplaceModule<R::CameraModule>();
             Engine->EmplaceModule<R::SpatialIndexCache>();
             Engine->EmplaceModule<R::ClusteringModule>();
             Engine->EmplaceModule<R::PointCloudConsolidationModule>();
@@ -1001,6 +1003,51 @@ TEST(SandboxAgentServer, SceneSaveLoadAndImportWaitUseTheAllowedRoot)
         rig.Check(entityCount() == before, "the loaded scene has the saved entities only: " + std::to_string(entityCount()));
         const auto outside = c.Tool("load_scene", {{"path", "/etc/hostname"}}, &isError);
         rig.Check(isError, "paths outside the root are refused: " + outside.dump());
+    });
+    fs::remove_all(directory);
+}
+
+// RUNTIME-312 slice 7F: set_visibility goes through the panel's render-hint command (one undo
+// step); set_camera switches the main camera controller kind.
+TEST(SandboxAgentServer, SetVisibilityAndSetCameraUseTheEditorCommands)
+{
+    namespace fs = std::filesystem;
+    const fs::path directory = fs::temp_directory_path() / ("intrinsic-agent-vis-" + std::to_string(::getpid()));
+    fs::remove_all(directory);
+    fs::create_directories(directory);
+    { std::ofstream(directory / "triangle.obj") << "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n"; }
+    AgentRig rig("vis", true);
+    ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
+    rig.Run([&](Client& c) {
+        bool isError = true;
+        const auto imported = c.Tool("import_file", {{"path", (directory / "triangle.obj").string()}, {"wait", true}}, &isError);
+        rig.Check(!isError && imported["new_entities"].size() == 1u, "import: " + imported.dump());
+        if (imported["new_entities"].size() != 1u) return;
+        const auto mesh = imported["new_entities"][0].get<std::uint32_t>();
+        const auto undoCount = [&] { return c.Tool("history")["undo_count"].get<int>(); };
+        const int before = undoCount();
+        const auto hidden = c.Tool("set_visibility", {{"entity", mesh}, {"visible", false}}, &isError);
+        rig.Check(!isError && hidden["status"] == "Applied" && hidden["lane"] == "surface", "hide: " + hidden.dump());
+        rig.Check(undoCount() == before + 1, "one undo step");
+        const auto again = c.Tool("set_visibility", {{"entity", mesh}, {"visible", false}}, &isError);
+        rig.Check(!isError && again["status"] == "NoChange", "hiding twice changes nothing: " + again.dump());
+        const auto undone = c.Tool("undo", Json::object(), &isError);
+        rig.Check(!isError && undone["undone"].size() == 1u, "undo: " + undone.dump());
+        const auto hiddenAfterUndo = c.Tool("set_visibility", {{"entity", mesh}, {"visible", false}}, &isError);
+        rig.Check(!isError && hiddenAfterUndo["status"] == "Applied", "undo made the surface visible again: " + hiddenAfterUndo.dump());
+        c.Tool("set_visibility", {{"entity", mesh}}, &isError);
+        rig.Check(isError, "visible is required");
+        c.Tool("set_visibility", {{"entity", 999999}, {"visible", true}}, &isError);
+        rig.Check(isError, "an unknown entity is an error");
+        // Camera: controller kind of the main camera.
+        const auto fly = c.Tool("set_camera", {{"controller", "fly"}}, &isError);
+        rig.Check(!isError && fly["status"] == "Applied" && fly["controller"] == "fly", "set_camera fly: " + fly.dump());
+        const auto same = c.Tool("set_camera", {{"controller", "fly"}}, &isError);
+        rig.Check(!isError && same["status"] == "NoChange", "the same controller changes nothing: " + same.dump());
+        c.Tool("set_camera", {{"controller", "orbit"}}, &isError);
+        rig.Check(!isError, "orbit");
+        c.Tool("set_camera", {{"controller", "spin"}}, &isError);
+        rig.Check(isError, "unknown controllers are refused");
     });
     fs::remove_all(directory);
 }

@@ -227,6 +227,67 @@ namespace Extrinsic::Runtime
                                                    {"domain", std::string(ToString(row->Descriptor.Domain))}, {"name", row->Name}})};
         }
 
+        // The entity's primary base lane, like the panel's Surface / Edges / Points checkbox:
+        // surface for meshes, edges for graphs and points for point clouds.
+        AgentOperationOutcome SetVisibility(const AgentOperationContext& context, std::string_view arguments)
+        {
+            const auto args = ParseObject(arguments);
+            const auto entity = args ? UInt(*args, "entity") : std::nullopt;
+            if (!entity || !args->contains("visible") || !(*args)["visible"].is_boolean())
+                return Fail("Pass {\"entity\": <stable id>, \"visible\": true | false}.");
+            const bool visible = (*args)["visible"].get<bool>();
+            const auto prepared = PrepareSnapshot(context);
+            if (!prepared) return Fail(kNoWorkspace);
+            for (const auto kind : {EditorDomainWindowKind::Mesh, EditorDomainWindowKind::Graph, EditorDomainWindowKind::PointCloud})
+            {
+                const auto model = BuildEditorDomainWindowModel(prepared->SnapshotQueries, kind, nullptr, *entity);
+                if (!model.HasSelectedEntity || !model.DomainMatches || !model.VisualizationTargetAvailable) continue;
+                const bool mesh = kind == EditorDomainWindowKind::Mesh;
+                const bool graph = kind == EditorDomainWindowKind::Graph;
+                const auto visualization = PrepareEditorVisualizationEditingFrame(*context.Attachment);
+                // Exactly the panel's command, with the current domain values it reads from the same model.
+                const auto status = ApplyEditorRenderHintCommand(
+                    visualization.Commands,
+                    EditorRenderHintCommand{.StableEntityId = *entity,
+                                            .SetSurface = mesh, .EnableSurface = visible,
+                                            .SurfaceDomain = model.RenderHints.SurfaceDomainValue,
+                                            .SetEdges = graph, .EnableEdges = visible,
+                                            .EdgeDomain = model.RenderHints.EdgeDomainValue,
+                                            .SetPoints = !mesh && !graph, .EnablePoints = visible,
+                                            .PointType = model.RenderHints.PointRenderTypeValue});
+                const bool ok = status == EditorCommandStatus::Applied || status == EditorCommandStatus::NoChange;
+                return {.IsError = !ok, .Text = Dump({{"status", DebugNameForEditorCommandStatus(status)}, {"entity", *entity},
+                                                       {"lane", mesh ? "surface" : graph ? "edges" : "points"}, {"visible", visible}})};
+            }
+            return Fail("Entity " + std::to_string(*entity) + " has no mesh, graph or point-cloud appearance to show or hide.");
+        }
+
+        // The camera controller kind of the main camera, as the Camera panel's buttons. Pose, presets and focus
+        // have no editor command yet (RUNTIME-312 notes).
+        AgentOperationOutcome SetCamera(const AgentOperationContext& context, std::string_view arguments)
+        {
+            const auto args = ParseObject(arguments);
+            const auto name = args ? String(*args, "controller") : std::nullopt;
+            using Kind = EditorCameraControllerKind;
+            std::optional<Kind> kind;
+            if (name == "orbit") kind = Kind::Orbit;
+            else if (name == "fly") kind = Kind::Fly;
+            else if (name == "free_look") kind = Kind::FreeLook;
+            else if (name == "top_down") kind = Kind::TopDown;
+            if (!kind) return Fail("Pass {\"controller\": \"orbit\" | \"fly\" | \"free_look\" | \"top_down\"}.");
+            const auto prepared = PrepareSnapshot(context);
+            if (!prepared) return Fail(kNoWorkspace);
+            if (!prepared->Frame.CameraRender.CameraControlsAvailable) return Fail("Camera controls are unavailable in this workspace.");
+            const std::string previous = prepared->Frame.CameraRender.HasMainCameraController
+                ? std::string(DebugNameForEditorCameraControllerKind(prepared->Frame.CameraRender.MainCameraControllerKind))
+                : std::string("none");
+            const auto scene = PrepareEditorSceneEditingFrame(*context.Attachment);
+            const auto status = ApplyEditorCameraControllerCommand(scene.Commands, EditorCameraControllerCommand{.Kind = *kind});
+            const bool ok = status == EditorCommandStatus::Applied || status == EditorCommandStatus::NoChange;
+            return {.IsError = !ok, .Text = Dump({{"status", DebugNameForEditorCommandStatus(status)}, {"controller", *name},
+                                                   {"previous", previous}})};
+        }
+
         // ---- history ---------------------------------------------------------------------
         Json HistoryJson(const AgentOperationContext& context)
         {
@@ -429,6 +490,15 @@ namespace Extrinsic::Runtime
                        R"(,"normal_direction":{"type":"boolean","default":false}})",
                    R"(["entity","name"])"),
             false, ShowProperty);
+        add("set_visibility", "Set visibility",
+            "Show or hide an entity's primary lane like the appearance panel's checkbox: the surface of a mesh, the edges of a "
+            "graph, the points of a point cloud. One undoable step.",
+            Schema("{" + kEntityProperty + R"(,"visible":{"type":"boolean"}})", R"(["entity","visible"])"), false, SetVisibility);
+        add("set_camera", "Set camera controller",
+            "Switch the main camera controller (orbit, fly, free look or top down) like the Camera panel's buttons, keeping the "
+            "current view. Camera pose, presets and focus are not controllable yet.",
+            Schema(R"({"controller":{"type":"string","enum":["orbit","fly","free_look","top_down"]}})", R"(["controller"])"), false,
+            SetCamera);
         add("history", "Undo history", "Undo/redo availability, top labels, counts and dirty state.", none, true, History);
         const std::string steps = Schema(R"({"steps":{"type":"integer","minimum":1,"maximum":64,"default":1}})");
         add("undo", "Undo", "Undo editor commands, like Edit > Undo.", steps, false,

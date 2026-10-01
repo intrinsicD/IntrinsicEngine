@@ -101,15 +101,7 @@ the editor operations the Sandbox UI already offers.
    runtime readiness as their panels; decide (and record here) whether entity
    and domain come from config sections or arguments for all point families;
    bring the three registrations to the file's formatting.
-7. **Coverage of existing editor commands.** A table-driven
-   `preview_operation` / `run_operation` pair over the configured editor
-   commands of finding 9 (operation enum → existing `Preview*`/`ApplyEditorConfigured*`
-   path, continuation for `Pending`), migrating `run_mesh_operation` into it
-   without breaking its name; plus `save_scene`/`load_scene` (allowed roots),
-   `set_visibility`, `set_camera` (pose or preset, same path as the camera
-   controller command), and an `import_file` `wait` option that answers once the
-   import materialized or failed.
-   *Done:* `preview_keypoint_analysis` (config entity), `preview_kmeans` and
+   *Slice 6 done:* `preview_keypoint_analysis` (config entity), `preview_kmeans` and
    `preview_point_cloud_consolidation` (entity and domain arguments) answer with the panels'
    readiness behind `ResolveEditorProcessingActionReadiness` (consolidation uses
    `PrepareEditorPointCloudConsolidationAvailability`, plus `pending`, `input_points`).
@@ -118,13 +110,21 @@ the editor operations the Sandbox UI already offers.
    clustering, consolidation, geodesics, curvature segmentation, parameterization, Poisson,
    mesh topology, ridge) takes `entity` as an argument; `domain` is one shared enum.
    `FinishApply`/`AwaitServiceRun` replace the hand-written continuations.
+7. **Coverage of existing editor commands.** A table-driven
+   `preview_operation` / `run_operation` pair over the configured editor
+   commands of finding 9 (operation enum → existing `Preview*`/`ApplyEditorConfigured*`
+   path, continuation for `Pending`), migrating `run_mesh_operation` into it
+   without breaking its name; plus `save_scene`/`load_scene` (allowed roots),
+   `set_visibility`, `set_camera` (controller kind only, see 7F), and an `import_file` `wait` option that answers once the
+   import materialized or failed.
    *Slice 7C done:* `run_operation`/`preview_operation` over a table (`Runtime.AgentOperations.Operations.cpp`,
    helpers in `Agent/internal/Runtime.AgentOperations.Detail.hpp`) cover the four mesh-field rows,
    mesh curvature, geodesics, curvature segmentation and the point rows (normal estimation, kernel
    density, point spacing, outlier analysis, density weight, descriptor analysis, bilateral
    filter, point construction); `run_mesh_operation` stays an alias of the mesh-field rows.
    `NeedsPresentedFrame` stays per tool (so CPU-only rows are refused while minimized too).
-   Known gap: history entries published by a queued job lack the `Agent: ` prefix.
+   Jobs queued during an agent call keep the `Agent: ` history prefix on their later commit
+   (`CarryEditorLabelPrefix`; k-means and consolidation carry it on their request).
    *Slice 7D done:* mesh denoise/remesh/subdivide/simplify and scalar ridge take a `params` object over
    the command structs' own defaults (typed `invalid_params` errors); progressive Poisson and
    parameterization are table rows over their sections. Parameterization has no exact readiness
@@ -136,6 +136,14 @@ the editor operations the Sandbox UI already offers.
    and enums accept names next to the integer codes of config sections.
    *Slice 7E done:* `save_scene`/`load_scene` (`ResolveAgentPath`, both `Destructive`; save refuses an
    existing file unless `overwrite: true`) and `import_file` with `wait`.
+   *Slice 7F done, with one scope decision:* `set_visibility` (the panel's `ApplyEditorRenderHintCommand`,
+   one undo step) and `set_camera`, which switches the camera controller kind only
+   (`ApplyEditorCameraControllerCommand`). No editor command sets a camera pose, preset or
+   focus (the viewport camera is driven by input, and the screenshot presets live in
+   `ViewCaptureModule`), and the constraint above makes a missing UI action a prerequisite, not
+   part of this task. Suggested follow-up (task not created here): an editor camera-pose
+   command with a UI action (for example Camera panel fields plus Focus selection) in
+   `Runtime.SceneEditingOperations`, then `set_camera` gains `pose`/`preset`/`focus` over it.
 
 8. **Per-run progress source (after UI-069 slice 1).** Each `Run*` captures its run
    key (editor job identity or correlation id) in its outcome; `PollPending` asks
@@ -160,7 +168,7 @@ the editor operations the Sandbox UI already offers.
 - [x] Slice 4: unsupported `protocolVersion` gets the server's own version; tool results carry `structuredContent`; annotations match undoability; `view_capture` never overwrites without `overwrite: true`.
 - [x] Slice 5: progress notifications arrive for a long continuation tool with a progress token; cancellation drops the pending reply (the job itself keeps running: cancelling it waits for RUNTIME-279, documented in `agent-control-lane.md`).
 - [x] Slice 6: keypoint, k-means and consolidation have `preview_*` tools and one shared argument convention recorded in this note.
-- [ ] Slice 7: every command of finding 9 is reachable through an agent tool with undo coverage where it edits the scene; `run_mesh_operation` keeps working.
+- [x] Slice 7: every command of finding 9 is reachable through an agent tool with undo coverage where it edits the scene; `run_mesh_operation` keeps working. (Camera pose is the one exception: no editor command exists, so `set_camera` covers the controller kind; see the slice text.)
 - [ ] Slice 8: `notifications/progress` for a deferred call comes from that run's own job via UI-069's `EditorJobCommandSurface::Progress(key)`; the oldest-job heuristic in `Runtime.AgentServer.cpp` is removed; a two-concurrent-jobs test proves it.
 - [ ] `agent-control-lane.md`, `tools/agents/README.md` and the module inventory are current after every slice.
 
