@@ -3631,9 +3631,12 @@ namespace Extrinsic::Sandbox::Editor
         // A fresh snapshot: the handle may have been replaced by a start this frame.
         const auto transaction = Runtime::SnapshotEditorPropertySmoothing(commands, SmoothingTransaction);
         ImGui::SeparatorText("GPU result");
-        ImGui::TextDisabled("State: %s%s", Runtime::ToString(transaction.Phase),
-                            transaction.Phase == Phase::ReadyToAccept && transaction.Stale ? " (stale)" : "");
-        DrawOperationProgress(transaction.Progress, {}, "smoothing_progress");
+        // The widget reports a running or accepting job; the other phases have no job to show.
+        if (transaction.Phase == Phase::Running || transaction.Phase == Phase::Accepting)
+            DrawOperationProgress(transaction.Progress, {}, "smoothing_progress");
+        else
+            ImGui::TextDisabled("State: %s%s", Runtime::ToString(transaction.Phase),
+                                transaction.Phase == Phase::ReadyToAccept && transaction.Stale ? " (stale)" : "");
         ImGui::BeginDisabled(transaction.Phase != Phase::Running);
         if (ImGui::Button("Stop##Smoothing")) Runtime::StopEditorPropertySmoothing(SmoothingTransaction);
         ImGui::EndDisabled();

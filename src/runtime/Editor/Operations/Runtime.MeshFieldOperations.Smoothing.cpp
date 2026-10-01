@@ -538,7 +538,7 @@ namespace Extrinsic::Runtime
         std::shared_ptr<SpatialGpuResult> Gpu{};
         EditorPropertySmoothingResult Result{};
         EditorJobIdentity Identity{};
-        JobToken Token{}; // the compute job, for main-thread progress reports
+        JobToken Token{}, AcceptToken{}; // the compute job (it reports progress) and the Accept readback job
         bool Abandoned{}, Delivered{};
         std::function<void(EditorPropertySmoothingResult)> Sink{};
         // Residency: the output ring (and a float presentation ring beside a double scalar's
@@ -971,7 +971,8 @@ namespace Extrinsic::Runtime
                     Finish(w, EditorGpuTransactionPhase::Discarded, EditorCommandStatus::StaleEntity,
                            "Vulkan property smoothing cancelled or stale; previous output retained.");
                 }};
-            if (!ctx.JobCommands.Submit(std::move(accept), w->Identity).IsValid())
+            w->AcceptToken = ctx.JobCommands.Submit(std::move(accept), w->Identity);
+            if (!w->AcceptToken.IsValid())
             {
                 Finish(w, EditorGpuTransactionPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
                        "Vulkan property smoothing accept submission rejected.");
@@ -1134,7 +1135,10 @@ namespace Extrinsic::Runtime
     {
         EditorPropertySmoothingTransactionSnapshot snapshot;
         if (!run) return snapshot;
-        snapshot.Progress = GetEditorOperationProgress(commands, run->Identity);
+        // Key by the run's own jobs, not the output: the Accept readback job
+        // shares the identity and would otherwise mask the solver's fraction.
+        snapshot.Progress = GetEditorOperationProgress(
+            commands, run->Phase == EditorGpuTransactionPhase::Accepting ? run->AcceptToken : run->Token);
         snapshot.Phase = run->Phase;
         snapshot.Previews = run->Previews;
         snapshot.DeviceWorkQueued = run->Gpu != nullptr;

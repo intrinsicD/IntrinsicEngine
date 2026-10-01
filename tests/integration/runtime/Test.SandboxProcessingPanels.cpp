@@ -3808,28 +3808,28 @@ TEST(SandboxProcessingPanels, OperationProgressViewFollowsTheReadModel)
     R::EditorOperationProgress progress{};
 
     EXPECT_FALSE(Editor::DescribeOperationProgress(progress, true).Visible) << "None draws nothing";
-    progress.State = State::Succeeded;
-    EXPECT_FALSE(Editor::DescribeOperationProgress(progress, true).Visible) << "the panel's result line reports success";
 
-    progress = {.State = State::Running, .Determinate = true, .Normalized = 0.42f, .ElapsedSeconds = 3.25,
-                .Label = "solve", .CanCancel = true};
+    progress = {.State = State::Running, .Determinate = true, .Normalized = 0.42f, .ElapsedSeconds = 3.3,
+                .Label = "solve"};
     auto view = Editor::DescribeOperationProgress(progress, true);
     ASSERT_TRUE(view.Visible && view.Bar);
     EXPECT_FLOAT_EQ(view.Fraction, 0.42f);
-    EXPECT_EQ(view.Overlay, "42%  3.2s");
+    EXPECT_EQ(view.Overlay, "42%  3.3s");
     EXPECT_TRUE(view.ShowCancel);
-    EXPECT_FALSE(Editor::DescribeOperationProgress(progress, false).ShowCancel) << "no handler, no button";
-    progress.CanCancel = false;
-    EXPECT_FALSE(Editor::DescribeOperationProgress(progress, true).ShowCancel) << "only when the read model allows it";
+    EXPECT_FALSE(Editor::DescribeOperationProgress(progress, false).ShowCancel) << "no cancel path, no button";
 
     progress.Determinate = false;
     view = Editor::DescribeOperationProgress(progress, true);
     EXPECT_LT(view.Fraction, 0.0f) << "indeterminate is an animated bar, never 0%";
-    EXPECT_EQ(view.Overlay, "running  3.2s");
+    EXPECT_EQ(view.Overlay, "solve  3.3s") << "an indeterminate bar names the run";
 
     progress.State = State::Queued;
     progress.ElapsedSeconds = 0.0;
+    progress.Label.clear();
     EXPECT_EQ(Editor::DescribeOperationProgress(progress, true).Overlay, "queued  0.0s");
+    progress.State = State::Running;
+    EXPECT_EQ(Editor::DescribeOperationProgress(progress, true).Overlay, "running  0.0s");
+    progress.State = State::Queued;
 
     progress = {.State = State::Failed, .Diagnostic = "solver diverged"};
     view = Editor::DescribeOperationProgress(progress, true);
@@ -3837,19 +3837,51 @@ TEST(SandboxProcessingPanels, OperationProgressViewFollowsTheReadModel)
     EXPECT_FALSE(view.Bar);
     EXPECT_EQ(view.Overlay, "Failed");
     EXPECT_EQ(view.Diagnostic, "solver diverged");
+    EXPECT_FALSE(view.ShowCancel) << "a finished run cannot be cancelled";
     progress.State = State::Cancelled;
     EXPECT_EQ(Editor::DescribeOperationProgress(progress, true).Overlay, "Cancelled");
+    progress = {.State = State::Succeeded, .ElapsedSeconds = 3.3};
+    view = Editor::DescribeOperationProgress(progress, true);
+    EXPECT_TRUE(view.Visible);
+    EXPECT_FALSE(view.Bar);
+    EXPECT_EQ(view.Overlay, "100%  3.3s");
+    EXPECT_FALSE(view.ShowCancel);
 
     // The asset queue's overlay is the same helper without elapsed time.
     EXPECT_EQ(Editor::FormatProgressOverlay(true, 1.5f, "ignored"), "100%");
     EXPECT_EQ(Editor::FormatProgressOverlay(false, 0.0f, "decoding"), "decoding");
 }
 
-TEST(SandboxProcessingPanels, OperationProgressWidgetCancelRequiresReadModelPermissionAndHandler)
+// The runtime reaps a finished job a frame after it ends; the panel's memory
+// keeps the last projection until the next run or a scope (entity) change.
+TEST(SandboxProcessingPanels, OperationProgressMemoryKeepsTheLastFinishedRunUntilTheNextOne)
+{
+    using State = R::EditorOperationState;
+    Editor::OperationProgressMemory memory;
+    const R::EditorOperationProgress none{};
+    const R::EditorOperationProgress running{.State = State::Running, .Determinate = true, .Normalized = 0.5f};
+    const R::EditorOperationProgress failed{.State = State::Failed, .Diagnostic = "diverged"};
+
+    EXPECT_EQ(memory.Observe(none, 1u).State, State::None);
+    EXPECT_EQ(memory.Observe(running, 1u).State, State::Running);
+    EXPECT_EQ(memory.Observe(failed, 1u).State, State::Failed);
+    EXPECT_EQ(memory.Observe(none, 1u).State, State::Failed) << "the reaped job's outcome stays visible";
+    EXPECT_EQ(memory.Observe(none, 1u).Diagnostic, "diverged");
+    EXPECT_EQ(memory.Observe(running, 1u).State, State::Running) << "the next run replaces it";
+    EXPECT_EQ(memory.Observe(none, 1u).State, State::None) << "a run that vanished unseen has no outcome to show";
+
+    EXPECT_EQ(memory.Observe(failed, 1u).State, State::Failed);
+    EXPECT_EQ(memory.Observe(none, 2u).State, State::None) << "another entity does not inherit it";
+    EXPECT_EQ(memory.Observe(failed, 2u).State, State::Failed);
+    memory.Clear();
+    EXPECT_EQ(memory.Observe(none, 2u).State, State::None);
+}
+
+TEST(SandboxProcessingPanels, OperationProgressWidgetCancelRequiresAnActiveRunAndAHandler)
 {
     PanelHarness h;
     R::EditorOperationProgress progress{.State = R::EditorOperationState::Running, .Determinate = true,
-                                        .Normalized = 0.5f, .CanCancel = true};
+                                        .Normalized = 0.5f};
     int cancels = 0;
     bool useHandler = true;
     const auto windowHandle = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
@@ -3864,6 +3896,7 @@ TEST(SandboxProcessingPanels, OperationProgressWidgetCancelRequiresReadModelPerm
         }});
     int frames = 0, step = 0;
     bool done = false;
+    float determinateHeight = 0.0f, indeterminateHeight = 0.0f;
     h.Driver->OnFrame = [&](R::Engine& engine) {
         if (++frames > 200) { ADD_FAILURE() << "operation progress test did not finish"; engine.RequestExit(); return; }
         auto* window = ImGui::FindWindowByName("Operation progress test");
@@ -3872,6 +3905,9 @@ TEST(SandboxProcessingPanels, OperationProgressWidgetCancelRequiresReadModelPerm
         ImGui::SetWindowPos(window, {0, 0});
         const ImGuiID cancel = ImHashStr("Cancel", 0, ImHashStr("operation_test", 0, window->ID));
         ++step;
+        if (step == 2) determinateHeight = window->ContentSize.y; // a determinate bar was laid out
+        if (step == 4) progress.Determinate = false;
+        if (step == 5) { indeterminateHeight = window->ContentSize.y; progress.Determinate = true; }
         if (step == 3) ImGui::ActivateItemByID(cancel);
         if (step == 6)
         {
@@ -3883,12 +3919,16 @@ TEST(SandboxProcessingPanels, OperationProgressWidgetCancelRequiresReadModelPerm
         {
             EXPECT_EQ(cancels, 1);
             useHandler = true;
-            progress.CanCancel = false;  // the read model forbids it
+            progress.State = R::EditorOperationState::Failed; // a finished run has no Cancel
             ImGui::ActivateItemByID(cancel);
         }
+        if (step == 10) progress.State = R::EditorOperationState::None;
         if (step == 12)
         {
             EXPECT_EQ(cancels, 1);
+            EXPECT_GT(determinateHeight, 0.0f);
+            EXPECT_GT(indeterminateHeight, 0.0f) << "an indeterminate bar draws too";
+            EXPECT_LT(window->ContentSize.y, determinateHeight) << "None draws nothing";
             done = true;
             engine.RequestExit();
         }

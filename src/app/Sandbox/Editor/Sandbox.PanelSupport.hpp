@@ -84,7 +84,7 @@ namespace Extrinsic::Sandbox::Editor
     struct OperationProgressView
     {
         bool Visible{false};
-        bool Bar{false};            // Queued / Running: a bar; Failed / Cancelled: a status line
+        bool Bar{false};            // Queued / Running: a bar; a finished run: a status line
         float Fraction{-1.0f};
         std::string Overlay{};
         std::string Diagnostic{};
@@ -93,15 +93,33 @@ namespace Extrinsic::Sandbox::Editor
     [[nodiscard]] OperationProgressView DescribeOperationProgress(
         const Runtime::EditorOperationProgress& progress, bool hasCancelHandler);
 
-    // The one progress widget of every method panel: draws nothing for
-    // `State::None` and for a finished run (the panel's result line reports
-    // that); a bar with overlay for Queued/Running; a status line for
-    // Failed/Cancelled; Cancel only when the read model says `CanCancel` and
-    // `onCancel` is bound. `id` keeps several widgets in one window apart.
+    // The one progress widget of every method panel: nothing for `State::None`;
+    // a bar with overlay for Queued/Running; a status line for a finished run;
+    // a Cancel button only while the run is active and the panel supplies a
+    // cancel path (`onCancel`; the read model itself has none until
+    // RUNTIME-279). `id` (required) keeps several widgets in one window apart. The
+    // overlay shows the run's label for indeterminate bars.
     void DrawOperationProgress(
         const Runtime::EditorOperationProgress& progress,
-        const std::function<void()>& onCancel = {},
-        const char* id = "operation");
+        const std::function<void()>& onCancel,
+        const char* id);
+
+    // The runtime drops a finished job a frame after it ends, so a panel keeps
+    // the last projection it saw per key: a finished run stays visible until
+    // the next run of the same `scope` (for example the entity) starts or the
+    // scope changes. A run that vanishes while still active leaves no outcome
+    // to show.
+    class OperationProgressMemory
+    {
+    public:
+        [[nodiscard]] const Runtime::EditorOperationProgress& Observe(
+            const Runtime::EditorOperationProgress& live, std::uint64_t scope = 0u);
+        void Clear() noexcept { m_Held = {}; }
+
+    private:
+        Runtime::EditorOperationProgress m_Held{};
+        std::uint64_t m_Scope{0u};
+    };
 
     void DrawDisabledReasonTooltip(std::string_view disabledReason);
     [[nodiscard]] bool DrawProcessingActionButton(

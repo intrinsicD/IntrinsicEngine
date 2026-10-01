@@ -2925,7 +2925,6 @@ TEST(SandboxEditorSessionLifecycle, OperationProgressProjectsQueuedRunningNeverR
     const auto progress = commands.Progress(ownId);
     EXPECT_EQ(progress.State, State::Running);
     EXPECT_FLOAT_EQ(progress.Normalized, 0.2f);
-    EXPECT_FALSE(progress.CanCancel); // cancel arrives with RUNTIME-279
     EXPECT_FLOAT_EQ(commands.Progress(oldId).Normalized, 0.9f);
     releaseOld.store(true, std::memory_order_release);
 
@@ -2947,6 +2946,53 @@ TEST(SandboxEditorSessionLifecycle, OperationProgressProjectsQueuedRunningNeverR
     // Pruned: a reaped job is no run at all.
     EXPECT_GT(harness.Jobs().ReapCompleted(), 0u);
     EXPECT_EQ(commands.Progress(ownId).State, State::None);
+}
+
+// An identity names an output, so the newest run of it answers; a token names
+// one job; a correlation-only job never answers an identity key.
+TEST(SandboxEditorSessionLifecycle, OperationProgressSeparatesNewerRunsTokensAndCorrelationOnlyJobs)
+{
+    using State = Runtime::EditorOperationState;
+    Extrinsic::Tests::EditorJobHarness harness{2u};
+    ProgressProbeContext context;
+    harness.Attach(context);
+    const auto& commands = context.JobCommands;
+    std::atomic_bool releaseFirst{false};
+    std::atomic_bool releaseSecond{false};
+
+    const auto id = ProbeIdentity("same output");
+    const Runtime::JobToken first = commands.Submit(MakeProgressProbeJob("first", releaseFirst, 0.8f), id);
+    ASSERT_TRUE(first.IsValid());
+    ASSERT_TRUE(WaitFor([&] { return commands.Progress(first).Determinate; }));
+    releaseFirst.store(true, std::memory_order_release);
+    ASSERT_TRUE(harness.DrainUntilTerminal());
+    EXPECT_EQ(commands.Progress(id).State, State::Succeeded);
+
+    // A newer run of the same output replaces the finished one for the identity
+    // key, while the first run's token still names the first job.
+    const Runtime::JobToken second = commands.Submit(MakeProgressProbeJob("second", releaseSecond, 0.1f), id);
+    ASSERT_TRUE(second.IsValid());
+    ASSERT_TRUE(WaitFor([&] { return commands.Progress(second).Determinate; }));
+    EXPECT_EQ(commands.Progress(id).State, State::Running);
+    EXPECT_FLOAT_EQ(commands.Progress(id).Normalized, 0.1f);
+    EXPECT_EQ(commands.Progress(id).Label, "second");
+    EXPECT_EQ(commands.Progress(first).State, State::Succeeded);
+    EXPECT_EQ(commands.Progress(first).Label, "first");
+    EXPECT_FLOAT_EQ(commands.Progress(second).Normalized, 0.1f);
+    EXPECT_EQ(commands.Progress(Runtime::JobToken{}).State, State::None);
+
+    // A service job (correlation only, no identity) is invisible to an identity
+    // key, including the default identity, and visible to its token.
+    Runtime::JobDesc service = MakeProgressProbeJob("service", releaseSecond, 0.7f);
+    service.CorrelationId = 5u;
+    const Runtime::JobToken serviceToken = harness.Jobs().Submit(std::move(service));
+    ASSERT_TRUE(serviceToken.IsValid());
+    ASSERT_TRUE(WaitFor([&] { return commands.Progress(serviceToken).State == State::Running; }));
+    EXPECT_EQ(commands.Progress(Runtime::EditorJobIdentity{}).State, State::None);
+    EXPECT_EQ(commands.Progress(id).Label, "second");
+
+    releaseSecond.store(true, std::memory_order_release);
+    ASSERT_TRUE(harness.DrainUntilTerminal());
 }
 
 TEST(SandboxEditorSessionLifecycle, OperationProgressReportsFailedAndCancelledRuns)
@@ -3003,21 +3049,21 @@ TEST(SandboxEditorSessionLifecycle, OperationProgressResolvesCorrelationKeysToTh
     ASSERT_TRUE(submit("older run", 11u, 0.9f).IsValid());
     ASSERT_TRUE(submit("this run", 12u, 0.4f).IsValid());
     ASSERT_TRUE(WaitFor([&] {
-        return commands.Progress(Runtime::CommandCorrelationId{12u}).Determinate &&
-               commands.Progress(Runtime::CommandCorrelationId{11u}).Determinate;
+        return commands.Progress(Runtime::EditorRunCorrelation{12u}).Determinate &&
+               commands.Progress(Runtime::EditorRunCorrelation{11u}).Determinate;
     }));
 
-    const auto own = commands.Progress(Runtime::CommandCorrelationId{12u});
+    const auto own = commands.Progress(Runtime::EditorRunCorrelation{12u});
     EXPECT_EQ(own.State, State::Running);
     EXPECT_FLOAT_EQ(own.Normalized, 0.4f);
     EXPECT_EQ(own.Label, "this run");
-    EXPECT_FLOAT_EQ(commands.Progress(Runtime::CommandCorrelationId{11u}).Normalized, 0.9f);
-    EXPECT_EQ(commands.Progress(Runtime::CommandCorrelationId{13u}).State, State::None);
-    EXPECT_EQ(commands.Progress(Runtime::CommandCorrelationId{}).State, State::None);
+    EXPECT_FLOAT_EQ(commands.Progress(Runtime::EditorRunCorrelation{11u}).Normalized, 0.9f);
+    EXPECT_EQ(commands.Progress(Runtime::EditorRunCorrelation{13u}).State, State::None);
+    EXPECT_EQ(commands.Progress(Runtime::EditorRunCorrelation{}).State, State::None);
 
     release.store(true, std::memory_order_release);
     ASSERT_TRUE(harness.DrainUntilTerminal());
-    EXPECT_EQ(commands.Progress(Runtime::CommandCorrelationId{12u}).State, State::Succeeded);
+    EXPECT_EQ(commands.Progress(Runtime::EditorRunCorrelation{12u}).State, State::Succeeded);
 }
 
 TEST(SandboxEditorSession, OperationProgressRejectsStaleEpochHandlesAndFindsServiceRunsByCorrelation)
@@ -3040,7 +3086,7 @@ TEST(SandboxEditorSession, OperationProgressRejectsStaleEpochHandlesAndFindsServ
     auto& jobs = RequiredEngineService<Runtime::JobService>(engine);
     ASSERT_TRUE(jobs.Submit(std::move(desc)).IsValid());
 
-    const Runtime::EditorOperationRunKey key = Runtime::CommandCorrelationId{99u};
+    const Runtime::EditorOperationRunKey key = Runtime::EditorRunCorrelation{99u};
     ASSERT_TRUE(WaitFor([&] { return Runtime::GetEditorOperationProgress(commands, key).Determinate; }));
     EXPECT_EQ(Runtime::GetEditorOperationProgress(commands, key).State, State::Running);
     EXPECT_FLOAT_EQ(Runtime::GetEditorOperationProgress(commands, key).Normalized, 0.5f);

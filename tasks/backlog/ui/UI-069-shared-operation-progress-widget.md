@@ -36,7 +36,9 @@ MCP progress notifications read the same model.
 - Owner: `Runtime.EditorJobProjection.cppm`, which already holds
   `EditorJobRecord`. No new service or registry.
 - Cancel stays with [RUNTIME-279](../runtime/RUNTIME-279-editor-job-snapshot-and-cancel.md).
-  The widget shows Cancel only when the read model says `CanCancel`.
+  The read model carries no `CanCancel` until that task adds `Cancel` to the job
+  surface; the widget shows Cancel while a run is active and the panel supplies a
+  cancel path (registration/CPD now).
 - [UI-060](UI-060-jobs-window.md) should reuse the widget and projection for its
   rows.
 - The agent side is RUNTIME-312 slice 8
@@ -44,14 +46,14 @@ MCP progress notifications read the same model.
 
 ## Slice plan
 1. **Read model.**
-   - Add `EditorOperationProgress` {State None/Queued/Running/Succeeded/Failed/Cancelled, Determinate, Normalized, ElapsedSeconds, Label, Diagnostic, CanCancel}.
-   - Add `EditorOperationRunKey` {Identity | CommandCorrelationId}, pure projections from `EditorJobRecord`/`JobSnapshot`, and `EditorJobCommandSurface::Progress(key)` bound next to `FindActive`.
+   - Add `EditorOperationProgress` {State None/Queued/Running/Succeeded/Failed/Cancelled, Determinate, Normalized, ElapsedSeconds, Label, Diagnostic}.
+   - Add `EditorOperationRunKey` {JobToken | Identity | EditorRunCorrelation}, pure projections from `EditorJobRecord`/`JobSnapshot`, and `EditorJobCommandSurface::Progress(key)` bound next to `FindActive`. A token names one job; an identity names an output (newest run); a correlation id names a service run.
    - K-Means and consolidation record correlation → job token at submit. Route them through `EditorJobCommandSurface::Submit` if layering allows.
    - A job that never reported progress projects as indeterminate.
    - The K-Means and mesh-field solver workers call `ReportProgress`.
 2. **Widget.**
    - Move `ProgressOverlayText` into PanelSupport as a shared `FormatProgressOverlay`; the asset queue uses it.
-   - Add `DrawOperationProgress(const EditorOperationProgress&, onCancel)` with a determinate or animated indeterminate bar, a percent/label + elapsed overlay, the diagnostic, and Cancel only if `CanCancel`. It draws nothing for `None`.
+   - Add `DrawOperationProgress(const EditorOperationProgress&, onCancel, id)` with a determinate or animated indeterminate bar, a percent/label + elapsed overlay, the diagnostic, and Cancel only while the run is active and the panel supplies `onCancel`. It draws nothing for `None`. `OperationProgressMemory` keeps a panel's last finished projection (the runtime reaps a job a frame after it ends).
    - First adopter: a mesh-field panel.
 3. **Representative adoption.** UV regeneration (replaces the text line and the DerivedJob cell), K-Means (correlation key), and registration/CPD (wraps `EditorRegistrationProgress`; its trace stays panel-specific).
 4. **Mechanical adoption.** One chunk each:

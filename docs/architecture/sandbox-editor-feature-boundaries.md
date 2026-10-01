@@ -31,8 +31,9 @@ queue changes.
 
 Operation progress (UI-069) is one read model, `EditorOperationProgress` in the same
 module, resolved by `EditorJobCommandSurface::Progress(key)` (panels reach it
-through `GetEditorOperationProgress(EditorProcessingCommands, key)`). A key is the
-`EditorJobIdentity` of an editor-job output or the `CommandCorrelationId` of a
+through `GetEditorOperationProgress(EditorProcessingCommands, key)`). A key is a
+`JobToken` captured at submit (exactly one job), the `EditorJobIdentity` of an
+editor-job output (its newest run) or the `EditorRunCorrelation` (a command correlation id) of a
 service run (K-Means, consolidation), which stamps it on its job as
 `JobDesc::CorrelationId`; neither falls back to "the oldest job". A job that never
 reported projects as indeterminate (`JobProgress` defaults to indeterminate), and
@@ -40,8 +41,11 @@ workers report through `JobCancellation::ReportProgress`; device-polled
 transactions use `EditorJobCommandSurface::ReportProgress`. The agent lane's
 progress notifications read the same model. Panels draw it with the shared
 `DrawOperationProgress` in `Sandbox.PanelSupport.*`; `FormatProgressOverlay` is
-the single overlay formatter, also used by the AssetIO queue. Cancel appears only
-when the read model sets `CanCancel` (RUNTIME-279).
+the single overlay formatter, also used by the AssetIO queue. A finished job is
+reaped a frame after it ends, so `OperationProgressMemory` keeps a panel's last
+projection until the next run. Cancel appears only while a run is active and the
+panel supplies a cancel path (registration's own cancel; editor jobs after
+RUNTIME-279 adds `Cancel` to the surface).
 
 Property-binding targets and presentation slots own vectors of the canonical
 `GeometryPresentationPropertyOption` from `Runtime.GeometryPresentation.cppm`.
@@ -278,6 +282,13 @@ C++ linkage; selection config, pick and primitive records remain module-attached
 History's selection command implementation imports the controller, while the
 history interface and generic processing code do not. Compiler dependencies are
 guarded by `EditorCompilationLocality.SelectionControllerBorrows`.
+
+`EditorProcessing` re-exports `EditorJobProjection`: its context embeds
+`EditorJobCommandSurface` and `GetEditorOperationProgress` returns the read
+model, so panels and operation families reach the projection types through the
+one processing import. The projection itself imports only `GeometryAvailability`,
+`GeometryPresentation` and `JobService`; it restates the correlation id as
+`EditorRunCorrelation` rather than import the command bus.
 
 Scene-facing interfaces borrow `ECS::Scene::Registry` the same way. Its sole
 definition in `ECS.Scene.Registry` has C++ linkage and still owns EnTT storage

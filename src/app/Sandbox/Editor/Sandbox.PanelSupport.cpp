@@ -5,6 +5,7 @@ module;
 #include <algorithm>
 #include <array>
 #include <format>
+#include <cfloat>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -1638,9 +1639,14 @@ namespace Extrinsic::Sandbox::Editor
             view.Fraction = progress.Determinate ? std::clamp(progress.Normalized, 0.0f, 1.0f) : -1.0f;
             view.Overlay = FormatProgressOverlay(
                 progress.Determinate, progress.Normalized,
-                progress.State == EditorOperationState::Queued ? "queued" : "running",
+                !progress.Label.empty() ? std::string_view{progress.Label}
+                    : progress.State == EditorOperationState::Queued ? "queued" : "running",
                 progress.ElapsedSeconds);
-            view.ShowCancel = progress.CanCancel && hasCancelHandler;
+            view.ShowCancel = hasCancelHandler;
+            break;
+        case EditorOperationState::Succeeded:
+            view.Visible = true;
+            view.Overlay = FormatProgressOverlay(true, 1.0f, {}, progress.ElapsedSeconds);
             break;
         case EditorOperationState::Failed:
         case EditorOperationState::Cancelled:
@@ -1648,12 +1654,26 @@ namespace Extrinsic::Sandbox::Editor
             view.Overlay = progress.State == EditorOperationState::Failed ? "Failed" : "Cancelled";
             break;
         case EditorOperationState::None:
-        case EditorOperationState::Succeeded:
             break;
         }
         if (view.Visible)
             view.Diagnostic = progress.Diagnostic;
         return view;
+    }
+
+    const EditorOperationProgress& OperationProgressMemory::Observe(
+        const EditorOperationProgress& live, const std::uint64_t scope)
+    {
+        if (scope != m_Scope)
+        {
+            m_Held = {};
+            m_Scope = scope;
+        }
+        if (live.State != EditorOperationState::None)
+            m_Held = live;
+        else if (m_Held.State == EditorOperationState::Queued || m_Held.State == EditorOperationState::Running)
+            m_Held = {};
+        return m_Held;
     }
 
     void DrawOperationProgress(
@@ -1675,7 +1695,9 @@ namespace Extrinsic::Sandbox::Editor
                 ? ImGui::CalcTextSize("Cancel").x + 2.0f * ImGui::GetStyle().FramePadding.x +
                       ImGui::GetStyle().ItemSpacing.x
                 : 0.0f;
-            ImGui::ProgressBar(fraction, ImVec2(-cancelWidth, 0.0f), view.Overlay.c_str());
+            // Negative width fills the row minus the Cancel button; -FLT_MIN
+            // fills it entirely (0 would fall back to the item width).
+            ImGui::ProgressBar(fraction, ImVec2(-std::max(cancelWidth, FLT_MIN), 0.0f), view.Overlay.c_str());
             if (view.ShowCancel)
             {
                 ImGui::SameLine();

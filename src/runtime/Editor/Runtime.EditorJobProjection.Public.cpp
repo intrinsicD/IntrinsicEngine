@@ -112,11 +112,15 @@ ResolveEditorOperationProgress(const std::vector<EditorJobRecord> &records,
     return best == nullptr || job.Token.Index >= best->Token.Index;
   };
   for (const EditorJobRecord &job : records) {
-    const bool matches =
-        std::holds_alternative<EditorJobIdentity>(key)
-            ? SameEditorJobOutput(job.Identity, std::get<EditorJobIdentity>(key))
-            : (std::get<CommandCorrelationId>(key).IsValid() &&
-               job.CorrelationId == std::get<CommandCorrelationId>(key).Value);
+    bool matches = false;
+    if (const auto *identity = std::get_if<EditorJobIdentity>(&key))
+      matches = identity->Scope != EditorJobScope::Unknown &&
+                job.Identity.Scope != EditorJobScope::Unknown &&
+                SameEditorJobOutput(job.Identity, *identity);
+    else if (const auto *correlation = std::get_if<EditorRunCorrelation>(&key))
+      matches = correlation->IsValid() && job.CorrelationId == correlation->Value;
+    else
+      matches = job.Token == std::get<JobToken>(key);
     if (!matches)
       continue;
     if (IsActiveEditorJobState(job.State)) {

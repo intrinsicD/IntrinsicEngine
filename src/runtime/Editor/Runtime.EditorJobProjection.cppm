@@ -10,7 +10,6 @@ module;
 
 export module Extrinsic.Runtime.EditorJobProjection;
 
-import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.JobService;
@@ -94,20 +93,29 @@ export namespace Extrinsic::Runtime
         double ElapsedSeconds{0.0};
         std::string Label{};
         std::string Diagnostic{};
-        bool CanCancel{false};
     };
-    // Which run a panel is watching: an editor-job output identity, or the
-    // command correlation id of a service run (K-Means, consolidation).
+    // A service run's command correlation id (`CommandCorrelationId::Value`),
+    // restated here so the projection does not import the command bus.
+    struct EditorRunCorrelation
+    {
+        std::uint64_t Value{0u};
+        [[nodiscard]] bool IsValid() const noexcept { return Value != 0u; }
+    };
+    // Which run a panel is watching. A `JobToken` names exactly one job (the
+    // caller captured it at submit); an `EditorJobIdentity` names an output, so
+    // the newest run of that output answers; a `CommandCorrelationId` names a
+    // service run (K-Means, consolidation) that stamped it on its job(s).
     using EditorOperationRunKey =
-        std::variant<EditorJobIdentity, CommandCorrelationId>;
+        std::variant<EditorJobIdentity, EditorRunCorrelation, JobToken>;
     [[nodiscard]] EditorOperationState ToEditorOperationState(
         JobState state) noexcept;
     [[nodiscard]] EditorOperationProgress ProjectEditorOperationProgress(
         const EditorJobRecord& job);
-    // Progress of one run among `records`: those whose identity equals the
-    // key's, or whose correlation id equals it. A service run can chain jobs,
-    // so the newest active one wins, else the newest terminal one; never the
-    // oldest job of anyone else. `None` for a key that matches nothing.
+    // Progress of one run among `records`. An identity key never matches a
+    // record without an identity (a correlation-only service job). A service
+    // run can chain jobs, so the newest active match wins, else the newest
+    // terminal one; never the oldest job of anyone else. `None` for a key that
+    // matches nothing.
     [[nodiscard]] EditorOperationProgress ResolveEditorOperationProgress(
         const std::vector<EditorJobRecord>& records,
         const EditorOperationRunKey& key);
