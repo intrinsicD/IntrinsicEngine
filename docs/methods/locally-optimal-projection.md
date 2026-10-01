@@ -17,9 +17,11 @@ and initial-position copies after resident GPU admission; admission fallback
 still retains the positions it needs.
 
 `SpatialIndexCache::QueueGpuCompute` owns submission and completion. Source-grid
-construction, initialization pages, projected-grid construction, projection pages,
-iteration finalization and diagnostic reduction run as separate chunks. The next
-chunk uses immediate completion. Grid scatter measures the maximum 27-cell
+construction, initialization pages, projected-grid construction, projection pages
+and diagnostic reduction run as separate chunks. The single-invocation iteration
+finalize closes the iteration's last projection page, and a preview copy is
+recorded at the start of the following grid or reduction chunk; neither costs its
+own chunk. The next chunk uses immediate completion. Grid scatter measures the maximum 27-cell
 candidate count over occupied query cells (source plus projected candidates for
 projection). A dispatch uses `max(1, 2^18 / maximum_candidates)` rows; several
 dispatches share a submission of at most `max(1, 2^24 / maximum_candidates)` rows.
@@ -29,6 +31,11 @@ contain at most 4096 entries. Grid planning and each iteration's finalize read
 64-byte diagnostics; other intermediate chunks request completion only. Finalize
 stops on the CPU reference's maximum-displacement convergence criterion.
 Grid/resource and support-workload admission retain their existing limits.
+Pipelines and the private scratch buffers persist across runs: a completed run
+returns its owned buffers per role, and the next run (LOP or isotropic WLOP)
+reuses each one whose capacity covers its plan, replacing only outgrown buffers.
+The resident input view is never retained. Buffers of a failed recording stay
+retired until device-idle shutdown and are not reused.
 
 For same-cardinality in-place positions, runtime begins a positions run before
 recording. At each `gpu_preview_interval` boundary (default 5), and at termination,
@@ -37,7 +44,7 @@ slot becomes the front only after completion. Intermediate ring pressure drops
 a preview; terminal pressure waits for a slot. The renderer's existing GpuWorld
 position observer consumes the front. CPU positions remain unchanged.
 An observation's iteration count advances at finalization, before the copy's
-completion. Consumers checking a preview boundary must also wait for its preview
+completion, which publishes with the next grid or reduction chunk. Consumers checking a preview boundary must also wait for its preview
 publication count: before the first publication, residency `Front()` can return
 the canonical input even though the run already owns a ring.
 
@@ -113,3 +120,7 @@ The preview-boundary and paging assertions require execution on a Vulkan host;
 mock contracts verify recording/publication order but do not execute shaders.
 See [property coherence](../architecture/property-coherence.md) and
 [RUNTIME-300](../../tasks/done/RUNTIME-300-fully-gpu-methods-on-residency-inputs-and-rings.md).
+
+Normal-refinement rounds constrain the iteration limit only for EAR and anisotropic
+WLOP. LOP, isotropic WLOP and CLOP permit shorter runs while preserving that unused
+setting through config serialization.

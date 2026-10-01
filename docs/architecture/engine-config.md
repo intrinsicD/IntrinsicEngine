@@ -284,7 +284,7 @@ table abbreviates `app.sections[name=sandbox.progressive_poisson].payload` as
 | `consolidation` | `wlop_anisotropic` | Boolean normal-aware WLOP weighting toggle |
 | `consolidation` | `normal_source` | `authored_or_estimate`, `require_authored` |
 | `consolidation` | `normal_angle_radians` | Finite number in `[1e-6, pi-1e-6]` |
-| `consolidation` | `normal_refinement_rounds` | Integer in `[1, 4096]`, no greater than `max_iterations` after validated fallback |
+| `consolidation` | `normal_refinement_rounds` | Integer in `[1, 4096]`; for EAR and anisotropic WLOP, no greater than `max_iterations` after validated fallback |
 | `consolidation` | `clop_mixture_component_count` | Integer in `[1, 1000000]` |
 | `consolidation` | `clop_mixture_max_iterations` | Integer in `[1, 4096]` |
 | `consolidation` | `clop_mixture_relative_tolerance` | Finite number in `[0, 1]` |

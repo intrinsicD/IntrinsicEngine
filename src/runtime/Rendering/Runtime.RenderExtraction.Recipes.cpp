@@ -1,6 +1,9 @@
 module;
 
 #include <cstddef>
+#include <cmath>
+#include <algorithm>
+#include <entt/entity/entity.hpp>
 #include <cstdint>
 #include <cstring>
 #include <limits>
@@ -134,12 +137,33 @@ namespace Extrinsic::Runtime
                     }
                 }
             }
+            for (auto& scalar : batch.Scalars)
+            {
+                if (scalar.Domain != domain || scalar.ScalarBufferBDA == 0u) continue;
+                for (const auto row : sourceForGpuElement)
+                    if (row >= scalar.ElementCount) return false;
+                scalar.SourceElementCount = scalar.ElementCount;
+                scalar.ElementCount = static_cast<std::uint32_t>(sourceForGpuElement.size());
+                scalar.ElementRemapSourceKey = scalar.SourceBufferKey + ".element_indices";
+                auto& payload = batch.PropertyBufferPayloads.emplace_back(sourceForGpuElement.size_bytes());
+                std::memcpy(payload.data(), sourceForGpuElement.data(), payload.size());
+                batch.PropertyBuffers.push_back({
+                    .SourceKey = scalar.ElementRemapSourceKey,
+                    .Domain = domain,
+                    .ValueType = Graphics::VisualizationValueType::LabelUint32,
+                    .ElementCount = scalar.ElementCount,
+                    .StrideBytes = sizeof(std::uint32_t),
+                    .DirtyStamp = remapRevision,
+                    .SourceLayoutStamp = remapRevision,
+                    .Bytes = payload});
+            }
             return true;
         }
     }
 
     void RenderExtractionCache::State::AppendVisualizationRecipe(
         const GeometryEntityAvailability& availability,
+        const entt::entity entity,
         const VisualizationRecipe& recipe,
         RuntimeRenderExtractionStats& stats,
         const std::span<const std::uint32_t> surfaceVertexRemap,
@@ -147,8 +171,32 @@ namespace Extrinsic::Runtime
         const std::span<const std::uint32_t> surfaceFaceRemap,
         const std::uint64_t surfaceFaceRemapRevision)
     {
+        auto observedRecipe = recipe;
+        if (auto* scalar = std::get_if<ScalarVisualizationRecipe>(&observedRecipe.Data);
+            scalar && m_GpuPropertyObserver)
+        {
+            if (const auto front = m_GpuPropertyObserver(m_World, entity, scalar->Source))
+            {
+                scalar->BufferBDA = front->Address;
+                scalar->DirtyStamp = front->Stamp;
+                scalar->ExternalElementCount = front->Count;
+                if (scalar->AutoRange && front->ScalarRange)
+                {
+                    scalar->AutoRange = false;
+                    scalar->RangeMin = (*front->ScalarRange)[0];
+                    scalar->RangeMax = (*front->ScalarRange)[1];
+                    if (scalar->RangeMin == scalar->RangeMax)
+                    {
+                        const float extent = std::max(0.5f, std::abs(scalar->RangeMin) * 1e-5f);
+                        scalar->RangeMin -= extent;
+                        scalar->RangeMax += extent;
+                    }
+                }
+                ++stats.VisualizationRecipeScalarGpuFrontsObserved;
+            }
+        }
         VisualizationEncodingResult encoded =
-            EncodeVisualizationRecipe(availability, recipe);
+            EncodeVisualizationRecipe(availability, observedRecipe);
         if (!RemapSurfacePropertyBuffers(
                 encoded.Batch,
                 surfaceVertexRemap,

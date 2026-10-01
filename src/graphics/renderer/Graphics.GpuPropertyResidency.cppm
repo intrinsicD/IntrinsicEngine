@@ -8,6 +8,7 @@
 // least recently used ones are evicted and re-uploaded on their next use. Render buffers are
 // never a source: data flows CPU -> residency -> render.
 module;
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -82,6 +83,8 @@ export namespace Extrinsic::Graphics
         // this, not the buffer, identifies a front's bytes.
         std::uint64_t Publication{};
         GpuPropertyLayout Layout{};
+        // Finite display bounds supplied by the producer for unaccepted scalar values.
+        std::optional<std::array<float, 2>> ScalarRange{};
         RHI::TransferToken Upload{};
         std::shared_ptr<const void> Lease{};
         [[nodiscard]] bool Valid() const noexcept { return Buffer.IsValid() && Layout.Count > 0u; }
@@ -132,7 +135,7 @@ export namespace Extrinsic::Graphics
             const GpuPropertyKey& key, const GpuPropertyLayout& layout, std::uint32_t depth);
         // The last acquired back becomes the front (the previous front is reusable once its
         // completions are done). False without a back.
-        bool Publish(const GpuPropertyKey& key);
+        bool Publish(const GpuPropertyKey& key, std::optional<std::array<float, 2>> scalarRange = {});
         // Releases the ring; its buffers are freed once their completions and leases are gone.
         void Discard(const GpuPropertyKey& key);
         // The key's current ring identity (residency-wide, assigned when the ring is created;

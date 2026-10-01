@@ -248,7 +248,9 @@ namespace Extrinsic::Runtime
                 config.NormalAngleRadians <= 0.0 ||
                 config.NormalAngleRadians >= 3.14159265358979323846 ||
                 config.NormalRefinementRounds == 0u ||
-                config.NormalRefinementRounds > config.MaxIterations ||
+                ((config.Strategy == PointCloudConsolidationStrategy::Ear ||
+                  (config.Strategy == PointCloudConsolidationStrategy::Wlop && config.WlopAnisotropic)) &&
+                 config.NormalRefinementRounds > config.MaxIterations) ||
                 config.ClopMixtureComponentCount == 0u ||
                 config.ClopMixtureComponentCount > kMaximumPointCount ||
                 config.ClopMixtureMaxIterations == 0u ||

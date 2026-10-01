@@ -23,7 +23,14 @@ without a second upload. Canonical prior labels, when needed to preserve deleted
 as resident inputs. All-live runs do not upload prior output labels.
 
 Assignment and update pages visit at most 2^18 point/cluster pairs; a
-submission visits at most 2^24 pairs. It also has a conservative serial-depth
+submission visits at most 2^24 pairs. One submission records consecutive
+gather, assignment, reduction and update pages, and a due preview's scatter and
+presentation pages before the next iteration, until a budget is exhausted or an
+iteration's update completes. Each submission reads back the small convergence
+diagnostics; only the host decides whether another iteration runs. The terminal
+preview submission reads back the final centroids instead. Page shapes depend
+only on point count, cluster count and the page budget, never on where a
+submission boundary falls. It also has a conservative serial-depth
 budget of 2^14: sum the longest lane path across every dispatch, even when
 workgroups overlap. Assignment costs `innerCount + 1`; Update costs
 `ceil(innerCount / 64) + 7`; Reduce costs `ceil(rowCount / 64) + 7`;
@@ -40,6 +47,12 @@ The existing cluster-count contract is [1, 1024] in config, validation and UI;
 CPU seeding remains synchronous. There is no point-count cap beyond 32-bit row
 representability and successful storage allocation. Every submission completes
 before the next one. Internal test knobs force smaller pair budgets.
+
+The service retains the last run's workspace buffers and three pipelines while
+idle and reuses any buffer whose capacity suffices. A workspace returns to the
+pool only when its last submission completed; a run finished with a submission
+still in flight, or a failed recording, does not return it. Results report
+the buffers and pipelines created at admission.
 
 The integer label ring and float presentation ring are reserved together at
 admission, and publish only after all
@@ -73,7 +86,10 @@ termination fields. The tests record label mismatch count and centroid Linf and
 include split centroid pages with duplicate-seed ties, a 2049-row k=8 fixture,
 and preserved deleted-slot labels. Both typed and float fronts are read after
 terminal preview publication. Each case discards the first run,
-and checks zero input upload on the repeat run with forced multi-page budgets.
+and checks zero input upload and zero workspace buffer/pipeline creation on the
+repeat run with forced multi-page budgets. When budgets fit a whole iteration
+(the 2049-row case), the repeat run uses exactly one submission per iteration
+plus the terminal preview; tighter budgets still split iterations.
 
 Measured delta (RTX 3050 under Xephyr, 2026-10-01): all three
 `ClusteringServiceGpuSmoke` cases, including 2,049 points with k=8 and a deleted slot,

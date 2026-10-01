@@ -127,7 +127,7 @@ namespace
                     {.Scalar = Extrinsic::Graphics::GpuScalarType::Float64, .Count = std::uint32_t(Weights.size())},
                     [this](auto out) { std::memcpy(out.data(), Weights.data(), out.size()); });
                 if (!positions || !weights) { Reason = "Resident input acquisition failed"; Kernel().RequestExit(); return; }
-                Run = std::make_unique<Runtime::PointSamplingGpuRun>(Kernel().GetDevice(),
+                Run = std::make_unique<Runtime::PointSamplingGpuRun>(*Context.SpatialIndices,
                     Extrinsic::Graphics::FarthestPointGpuInput{.Positions = *positions, .Weights = *weights, .FirstIndex = 5u, .Count = 3000u},
                     Direct, params);
                 Gpu = Run->QueueNext(*Context.SpatialIndices);
@@ -152,7 +152,10 @@ namespace
                 Phase = 2;
                 return;
             }
-            if (Phase == 6) { Kernel().RequestExit(); return; }
+            if (Phase == 6) {
+                EXPECT_GT(Context.SpatialIndices->Stats().WorkspaceReuses, 0u);
+                Kernel().RequestExit(); return;
+            }
             if (Phase >= 2 && !Waiting)
             {
                 // 2: CPU backend; 3-5: Vulkan backend three times (rank properties compared).

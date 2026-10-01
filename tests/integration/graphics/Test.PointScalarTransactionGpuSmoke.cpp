@@ -48,6 +48,8 @@ namespace
         entt::entity Entity{};
         int Step{},Method{};
         bool Done{};int Boundary{};
+        unsigned Starts{};
+        R::SpatialIndexCacheStats Final{};
         std::vector<float> Saved{},Reference{};
         std::vector<glm::vec3> Points{};
         std::chrono::steady_clock::time_point Started{};
@@ -82,7 +84,7 @@ namespace
             if(Method==0){R::EditorKernelDensityResult r;Run=R::StartEditorKernelDensityTransaction(Commands(),Density,r);why=r.Message;}
             else if(Method==1){R::EditorPointSpacingResult r;Run=R::StartEditorPointSpacingTransaction(Commands(),Spacing,r);why=r.Message;}
             else {R::EditorDensityWeightResult r;Run=R::StartEditorDensityWeightTransaction(Commands(),Weight,r);why=r.Message;}
-            if(!Run)Fail(why);
+            if(!Run)Fail(why);else ++Starts;
         }
         void Frame(double,double) override
         {
@@ -130,7 +132,7 @@ namespace
                 EXPECT_EQ(snapshot.GpuInputUploadBytes,0u);
                 R::DiscardEditorPointScalar(Commands(),Run);EXPECT_EQ(std::as_const(Rows()).Get<float>("scalar").Vector(),Saved);
                 Run.reset();
-                if(Boundary==2){Done=true;Kernel().RequestExit();}
+                if(Boundary==2){Done=true;Final=Context.SpatialIndices->Stats();Kernel().RequestExit();}
                 else if(++Method==8){++Boundary;Method=Boundary==2?1:0;Step=0;}
                 else Step=0;
             }
@@ -148,4 +150,8 @@ TEST(RUNTIME298PointScalarResidency,ParityResidentSecondRunAndDiscard)
     struct Shutdown { R::Engine& Engine;~Shutdown(){Engine.Shutdown();} } shutdown{engine};
     if(!engine.GetDevice().SupportsShaderFloat64())GTEST_SKIP()<<"Shader float64 unavailable";
     engine.Run();ASSERT_TRUE(engine.GetDevice().IsOperational());ASSERT_TRUE(run->Done)<<"step "<<run->Step;
+    // Every run leased the scalar workspace from the spatial cache; later runs of every method,
+    // count and width reuse a retired one and still match the CPU reference above.
+    EXPECT_EQ(run->Final.WorkspaceLeases,run->Starts);
+    EXPECT_GT(run->Final.WorkspaceReuses,0u);
 }

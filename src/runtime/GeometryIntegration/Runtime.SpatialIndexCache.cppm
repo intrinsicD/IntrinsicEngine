@@ -5,6 +5,7 @@ module;
 #include <functional>
 #include <entt/entity/entity.hpp>
 #include <glm/vec3.hpp>
+#include <glm/mat4x4.hpp>
 #include <memory>
 #include <optional>
 #include <string>
@@ -24,7 +25,7 @@ import Extrinsic.RHI.Handles;
 // linkage keeps this interface out of the WorldRegistry job/RHI import closure.
 extern "C++" {
     namespace Extrinsic::Runtime { class WorldRegistry; }
-    namespace Extrinsic::RHI { class ICommandContext; }
+    namespace Extrinsic::RHI { class ICommandContext; class IDevice; }
 }
 
 export namespace Extrinsic::Runtime
@@ -49,6 +50,10 @@ export namespace Extrinsic::Runtime
         // GRAPHICS-153: device buffer sets created for query batches (a reused batch that fits
         // allocates nothing), and private workspaces updated in place instead of rebuilt.
         std::uint64_t GpuBatchAllocations{}, WorkspaceUpdates{};
+        // Device workspaces handed out by LeaseGpuWorkspace, and those served by a retained one.
+        std::uint64_t WorkspaceLeases{}, WorkspaceReuses{};
+        // Query-input writes only, excluding target-index builds and result readback.
+        std::uint64_t GpuQueryUploadBytes{}, GpuQueryTransformUploads{}, GpuQueryImmediateSubmissions{};
     };
     enum class SpatialIndexSpace : std::uint8_t { Property, EntityTransform };
     struct SpatialIndexSnapshot
@@ -137,6 +142,12 @@ export namespace Extrinsic::Runtime
             std::uint32_t capacity, std::span<const std::uint32_t> excludedSlots = {},
             std::shared_ptr<SpatialNearestBatch> reuse = {});
         [[nodiscard]] bool GpuQueriesAvailable() const noexcept;
+        // Fixed source points stay uploaded while exact values match the completed batch.
+        // Each iteration updates only a double-precision pose; requires shader float64.
+        // Once the target is built, submits immediately where supported; otherwise framed.
+        [[nodiscard]] std::shared_ptr<SpatialNearestBatch> QueueGpuNearestTransformed(
+            SpatialIndexHandle handle, std::span<const glm::vec3> source, const glm::dmat4& transform,
+            std::shared_ptr<SpatialNearestBatch> reuse = {});
         // Record against the retained, current index on the device-owner thread.
         // Recorder owns its buffers (including a TransferSrc result of readbackBytes)
         // through captured leases. The cache retains it until the final readback is safe.
@@ -191,12 +202,29 @@ export namespace Extrinsic::Runtime
         };
         enum class GpuPositionCommitStatus : std::uint8_t { Acknowledged, AcknowledgedCopyPending, NotAcknowledged };
         [[nodiscard]] GpuPositionCommitStatus CommitGpuPositions(const GpuPositionCommit& commit);
+        // Device-owner thread. A device workspace of kind T (constructed from RHI::IDevice&) for
+        // one run: the retained idle one when no recorded submission can still use it, else a new
+        // one; null without a device. Overlapping leases never share an object. Dropping the last
+        // copy (any thread) returns it; it is leasable again only GetFramesInFlight() + 1 frames
+        // later, and at most one idle workspace per kind is kept until device-idle shutdown.
+        // Capture the lease in the QueueGpuCompute recorder (or state it captures) and release it
+        // early only after the result is Ready: a recorder that failed after recording, or an
+        // immediate submit refused after recording, is retained until device-idle shutdown.
+        template <class T>
+        [[nodiscard]] std::shared_ptr<T> LeaseGpuWorkspace()
+        {
+            static const char kind{};
+            return std::static_pointer_cast<T>(LeaseErasedGpuWorkspace(&kind,
+                [](RHI::IDevice& device) -> std::shared_ptr<void> { return std::make_shared<T>(device); }));
+        }
 
       private:
+        [[nodiscard]] std::shared_ptr<void> LeaseErasedGpuWorkspace(const void* kind,
+                                                                    std::shared_ptr<void> (*make)(RHI::IDevice&));
         [[nodiscard]] std::shared_ptr<SpatialNearestBatch> QueueGpuBatch(
             SpatialIndexHandle handle, std::span<const glm::vec3> queries, std::uint32_t capacity,
             float radius, std::span<const std::uint32_t> excludedSlots,
-            std::shared_ptr<SpatialNearestBatch> reuse);
+            std::shared_ptr<SpatialNearestBatch> reuse, const glm::dmat4* transform = nullptr);
         struct Impl;
         std::unique_ptr<Impl> m_Impl;
     };

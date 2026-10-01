@@ -124,6 +124,8 @@ export namespace Extrinsic::Runtime
         std::string ImplementationId{};
         std::uint64_t GpuInputUploadBytes{}, GpuInputCacheHits{}, CpuStageUploadBytes{}, CpuStageReadbackBytes{};
         std::uint32_t GpuSubmissions{}, GpuPreviews{};
+        // Workspace buffers/pipelines created at admission; a retained idle workspace reports zero.
+        std::uint32_t GpuWorkspaceBuffersCreated{}, GpuWorkspacePipelinesCreated{};
         std::vector<glm::vec3> Centroids{};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};

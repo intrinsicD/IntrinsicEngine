@@ -800,7 +800,13 @@ E-step (METHOD-056) runs the dense two-pass form on the device while the kernel 
 solver's external evaluator) blocks the step worker while a companion pump job, polled on
 the main thread through `IsReadyToApply`, submits it with `SpatialIndexCache::QueueGpuCompute`
 as an immediate (off-frame, GRAPHICS-150) request (`Extrinsic.Graphics.CoherentPointDriftEStep`)
-and hands the readback back, usually within the frame. Without the job
+and hands the readback back, usually within the frame. The broker leases its workspace from
+`SpatialIndexCache::LeaseGpuWorkspace` for each step and returns it when the step's pump ends;
+workspace buffers only grow, the float-float target is converted once and uploaded only when
+the workspace last held another target generation, and the per-iteration source staging is
+reused. Only the E-step is on the device: the M-step, objective and exactly evaluated rows stay
+on the CPU, so each iteration still uploads the moved source (32 bytes per point, plus 4 bytes
+per row of skip flags when any) and reads back `2n + 4m` doubles. Without the job
 lane, an operational device with shader float64, or after a device failure or timeout, the
 iterations run the exact CPU choice; results count them in `e_step_fallbacks` and say why in
 `gpu_diagnostic`, and count device iterations in `e_step_device_iterations` (kernels too narrow

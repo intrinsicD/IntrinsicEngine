@@ -1234,7 +1234,7 @@ namespace Extrinsic::Runtime
                         ECS::Components::GeometrySources::Domain::Mesh &&
                     sidecar.MeshGeometry.IsValid();
                 AppendVisualizationRecipe(
-                    availability,
+                    availability, entity,
                     *projected,
                     stats,
                     meshSurfaceSlot
@@ -2114,7 +2114,7 @@ namespace Extrinsic::Runtime
                 const std::size_t vectorFieldsBefore =
                     m_VisualizationState.Batch.VectorFields.size();
                 AppendVisualizationRecipe(
-                    *availabilityThisFrame,
+                    *availabilityThisFrame, entity,
                     recipe,
                     stats,
                     meshBoundThisFrame
@@ -2186,20 +2186,8 @@ namespace Extrinsic::Runtime
                         auto& scalarRecipe = std::get<ScalarVisualizationRecipe>(scalar->Data);
                         if (alreadyEncoded(m_VisualizationState.Batch.Scalars, scalarRecipe))
                             continue;
-                        // A GPU method's ring front replaces the CPU upload while it exists;
-                        // a seam-split surface keeps the remapped CPU payload.
-                        const bool splitSurface = i == 0u && meshBoundThisFrame &&
-                                                  !sidecar->MeshSourceVertexForGpuVertex.empty();
-                        if (m_GpuPropertyObserver && !splitSurface)
-                            if (const auto front = m_GpuPropertyObserver(m_World, entity, scalarRecipe.Source))
-                            {
-                                scalarRecipe.BufferBDA = front->Address;
-                                scalarRecipe.DirtyStamp = front->Stamp;
-                                scalarRecipe.ExternalElementCount = front->Count;
-                                ++stats.VisualizationRecipeScalarGpuFrontsObserved;
-                            }
                         AppendVisualizationRecipe(
-                            *availabilityThisFrame,
+                            *availabilityThisFrame, entity,
                             *scalar,
                             stats,
                             i == 0u && meshBoundThisFrame
@@ -2224,7 +2212,7 @@ namespace Extrinsic::Runtime
                                            std::get<ColorVisualizationRecipe>(color->Data)))
                             continue;
                         AppendVisualizationRecipe(
-                            *availabilityThisFrame,
+                            *availabilityThisFrame, entity,
                             *color,
                             stats,
                             i == 0u && meshBoundThisFrame

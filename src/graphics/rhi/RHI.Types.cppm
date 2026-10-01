@@ -226,13 +226,13 @@ export namespace Extrinsic::RHI
         alignas(16) glm::vec4 IsoValuesA{0.f};
         glm::vec4 IsoValuesB{0.f};
         std::uint32_t IsoValueCount = 0;
-        std::uint32_t _padIso0 = 0;
-        std::uint32_t _padIso1 = 0;
-        std::uint32_t _padIso2 = 0;
+        std::uint32_t ScalarSourceCount = 0;
+        std::uint64_t ScalarIndexBDA = 0;
     };
     // Matches assets/shaders/common/gpu_scene.glsl (scalar block layout):
     // 8-byte BDAs + packed scalar/vector fields, total 176 bytes.
     static_assert(sizeof(GpuEntityConfig) == 176);
+    static_assert(offsetof(GpuEntityConfig, ScalarIndexBDA) == 168);
     static_assert(offsetof(GpuEntityConfig, VertexNormalBDA) == 0);
     static_assert(offsetof(GpuEntityConfig, ScalarBDA) == 8);
     static_assert(offsetof(GpuEntityConfig, ColorBDA) == 16);

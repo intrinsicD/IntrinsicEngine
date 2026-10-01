@@ -29,6 +29,8 @@ namespace Extrinsic::Graphics
         RHI::IDevice& Device;
         RHI::PipelineHandle Pipeline{};
         RHI::BufferHandle Neighbors{}, Stats{};
+        std::uint64_t NeighborBytes{}; // capacity; a run's pages need at most PageBytes
+        std::uint64_t PageBytes{};
         explicit Impl(RHI::IDevice& device) : Device(device) {}
         ~Impl()
         {
@@ -53,19 +55,29 @@ namespace Extrinsic::Graphics
         if (!count || first >= count || count > (1u << 20) || (!p.RadiusSearch && width > 64) ||
             !io.Positions.Address || !io.Nodes || !io.LiveSlots || !io.Output.Address ||
             !s.Device.IsOperational() || !s.Device.SupportsShaderFloat64()) return {};
-        if (first == 0 && s.Pipeline.IsValid()) return {};
-        if (first == 0)
-            s.Pipeline = CreateComputePipeline(s.Device, "shaders/point_normals.comp.spv", sizeof(Push), "PointNormals");
         const std::uint32_t batch = RowsPerSubmission(p.RadiusSearch, p.BatchSize);
-        const auto allocate = [&](std::uint64_t bytes) { return s.Device.CreateBuffer({.SizeBytes = bytes,
-            .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc | RHI::BufferUsage::TransferDst,
-            .DebugName = "PointNormals.Scratch"}); };
+        const std::uint64_t pageBytes = std::uint64_t(std::min(count, batch)) * width * 8;
+        // A run starts at page 0: the pipeline is kept and only an undersized scratch buffer is
+        // replaced. Later pages continue that run, so they must fit what page 0 prepared.
         if (first == 0)
         {
-            s.Neighbors = allocate(std::uint64_t(std::min(count, batch)) * width * 8);
-            s.Stats = allocate(sizeof(PointNormalsGpuStats));
+            const auto allocate = [&](std::uint64_t bytes) { return s.Device.CreateBuffer({.SizeBytes = bytes,
+                .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc | RHI::BufferUsage::TransferDst,
+                .DebugName = "PointNormals.Scratch"}); };
+            s.PageBytes = 0;
+            if (!s.Pipeline.IsValid())
+                s.Pipeline = CreateComputePipeline(s.Device, "shaders/point_normals.comp.spv", sizeof(Push), "PointNormals");
+            if (!s.Neighbors.IsValid() || s.NeighborBytes < pageBytes)
+            {
+                if (s.Neighbors.IsValid()) s.Device.DestroyBuffer(s.Neighbors);
+                s.Neighbors = allocate(pageBytes);
+                s.NeighborBytes = s.Neighbors.IsValid() ? pageBytes : 0;
+            }
+            if (!s.Stats.IsValid()) s.Stats = allocate(sizeof(PointNormalsGpuStats));
+            if (!s.Pipeline.IsValid() || !s.Neighbors.IsValid() || !s.Stats.IsValid()) return {};
+            s.PageBytes = pageBytes;
         }
-        if (!s.Pipeline.IsValid() || !s.Neighbors.IsValid() || !s.Stats.IsValid()) return {};
+        else if (!s.PageBytes || pageBytes > s.PageBytes) return {};
         const auto shader = RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite;
         cmd.BufferBarrier(io.Positions.Buffer, RHI::MemoryAccess::TransferWrite | shader, RHI::MemoryAccess::ShaderRead);
         if (first == 0)
@@ -78,6 +90,8 @@ namespace Extrinsic::Graphics
             }
             else cmd.FillBuffer(io.Output.Buffer, 0, io.Output.Bytes, 0);
             cmd.BufferBarrier(io.Output.Buffer, RHI::MemoryAccess::TransferWrite, shader);
+            // A reused workspace: the previous run's stats readback precedes the reset.
+            cmd.BufferBarrier(s.Stats, shader | RHI::MemoryAccess::TransferRead, RHI::MemoryAccess::TransferWrite);
             cmd.FillBuffer(s.Stats, 0, sizeof(PointNormalsGpuStats), 0);
             cmd.BufferBarrier(s.Stats, RHI::MemoryAccess::TransferWrite, shader);
         }

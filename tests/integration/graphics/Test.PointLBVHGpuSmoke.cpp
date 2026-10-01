@@ -359,6 +359,14 @@ TEST(PointLBVHGpuSmoke, FramedRegistrationReusesTargetAcrossRunsAndMatchesCpuSol
     }
     EXPECT_LE(maxTransformError,1e-4);
     EXPECT_EQ(run->Stats.Builds,1);EXPECT_EQ(run->Stats.GpuBuilds,1);
+    if (engine.GetDevice().SupportsShaderFloat64())
+    {
+        EXPECT_GE(run->Stats.GpuQueryTransformUploads, 3u);
+        EXPECT_GT(run->Stats.GpuQueryImmediateSubmissions, 0u);
+        EXPECT_LE(run->Stats.GpuQueryUploadBytes,
+                  3u * 1024u * 12u + run->Stats.GpuQueryTransformUploads * sizeof(glm::dmat4));
+    }
+
     EXPECT_EQ(run->Results[6].EffectiveVariant,Runtime::EditorICPVariant::PointToPlane);
     const auto& pose=run->Context.Scene->Raw().get<Transform::Component>(run->Source);
     EXPECT_NEAR(pose.Position.x,-.2,1e-4);EXPECT_NEAR(pose.Position.y,.3,1e-4);EXPECT_NEAR(pose.Position.z,-.1,1e-4);

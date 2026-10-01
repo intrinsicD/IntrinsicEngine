@@ -79,23 +79,29 @@ export namespace Extrinsic::Graphics
         // Dispatches Record would issue; runs above MaxDispatches are refused.
         [[nodiscard]] static std::uint64_t DispatchCount(const PropertyFilterGpuParams& params);
         static constexpr std::uint64_t MaxDispatches = 1u << 20;
-        // Uploads the inputs, records every iteration on the device and returns the buffer holding
-        // the filtered rows x channels doubles, ready for transfer reads; invalid on refusal
+        // Starts a run: uploads the inputs, records every iteration on the device and returns the
+        // buffer holding the filtered rows x channels doubles at its head, ready for transfer
+        // reads (read rows x channels doubles, not the buffer's capacity); invalid on refusal
         // (non-operational device, no shader double support, bad shape or dispatch budget).
         // With `resident`, the values come from its input (input.Values may be empty, or equal
         // in shape) and the result is also stored into its output. The caller keeps the
-        // workspace alive until the readback completes.
+        // workspace alive until the readback completes. A workspace is reusable once its
+        // previous run's submissions completed: the pipeline and buffers are kept, only an
+        // undersized buffer is replaced, and every input of the run is rewritten.
         [[nodiscard]] RHI::BufferHandle Record(RHI::ICommandContext& commands,
             const PropertyFilterGpuInput& input, const PropertyFilterGpuParams& params,
             const PropertyFilterResidentIo* resident = nullptr);
         // Stores rows x `channels` doubles held elsewhere on the device (element (i, c) at
         // `source` + (i * rowStride + c * channelStride) * 8) into the resident output and
-        // presentation, e.g. a conjugate-gradient solution block. False on refusal.
+        // presentation, e.g. a conjugate-gradient solution block. Uses the row map and restore
+        // mask uploaded by the run's Record or RecordLoad; false on refusal, including endpoints
+        // whose map or mask length differs from that run's.
         [[nodiscard]] bool RecordStore(RHI::ICommandContext& commands, const PropertyFilterResidentIo& resident,
             std::uint32_t channels, RHI::BufferHandle source, std::uint64_t sourceAddress,
             std::uint32_t rowStride, std::uint32_t channelStride);
-        // Gathers the resident input into rows x `channels` doubles held elsewhere on the device
-        // (the same element layout), e.g. a solver's seed block. False on refusal.
+        // Starts a run (uploading its row map and restore mask) and gathers the resident input
+        // into rows x `channels` doubles held elsewhere on the device (the same element layout),
+        // e.g. a solver's seed block. False on refusal.
         [[nodiscard]] bool RecordLoad(RHI::ICommandContext& commands, const PropertyFilterResidentIo& resident,
             std::uint32_t channels, RHI::BufferHandle target, std::uint64_t targetAddress,
             std::uint32_t rowStride, std::uint32_t channelStride);

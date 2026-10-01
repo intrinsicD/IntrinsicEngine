@@ -36,6 +36,7 @@ export namespace Extrinsic::Graphics
         [[nodiscard]] static std::uint32_t RowsPerSubmission(bool radiusSearch, std::uint32_t batchSize);
         // Sequential pages share scratch/stats/output; caller waits for each page before
         // recording the next, and publishes the output only after the last page succeeds.
+        // Page 0 starts a run: a completed workspace is reused, growing only undersized scratch.
         [[nodiscard]] RHI::BufferHandle Record(RHI::ICommandContext&, const PointNormalsGpuParams&,
                                                const PointNormalsResidentIo&, std::uint32_t first = 0);
     private:

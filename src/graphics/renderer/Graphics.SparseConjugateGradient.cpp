@@ -1,5 +1,6 @@
 module;
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -39,15 +40,22 @@ namespace Extrinsic::Graphics
 
     struct SparseConjugateGradientWorkspace::Impl
     {
+        // Retained device buffers: a run grows only an undersized one and writes every region it
+        // reads (host uploads, or device passes before their first read).
+        enum Slot : std::size_t { OffsetSlot, ColumnSlot, ValueSlot, RhsSlot, DiagonalSlot, ConstantSlot, WorkSlot,
+                                  PartialSlot, ResultSlot, SlotCount };
+        static constexpr std::array<const char*, SlotCount> kNames{"SparseCG.RowOffsets", "SparseCG.Columns",
+            "SparseCG.Values", "SparseCG.RightHandSides", "SparseCG.RhsDiagonal", "SparseCG.RhsConstant", "SparseCG.Work",
+            "SparseCG.Partials", "SparseCG.Result"};
         RHI::IDevice& Device;
         RHI::PipelineHandle Pipeline{};
-        std::vector<RHI::BufferHandle> Buffers{};
+        std::array<RHI::BufferHandle, SlotCount> Buffers{};
+        std::array<std::uint64_t, SlotCount> Capacity{};
         // Owned copy of the problem.
         std::uint32_t Rows{}, Solves{}, ChainStride{}, MaxIterations{}, Groups{};
         double Tolerance{};
         std::vector<std::uint32_t> Offsets, Columns;
         std::vector<double> Values, Rhs, Guesses, RhsDiagonal, RhsConstant;
-        RHI::BufferHandle RhsBuffer{}, Work{}, PartialBuffer{}, Result{}, DiagonalBuffer{}, ConstantBuffer{};
         Push Base{};
         // Progress: the solve being recorded, whether it started, and its recorded iterations.
         std::uint32_t Solve{}, Iteration{}, ChunkCount{};
@@ -60,17 +68,26 @@ namespace Extrinsic::Graphics
                 if (buffer.IsValid()) Device.DestroyBuffer(buffer);
             if (Pipeline.IsValid()) Device.DestroyPipeline(Pipeline);
         }
-        RHI::BufferHandle Create(const void* data, std::size_t bytes, const char* name)
+        bool Ensure(const Slot slot, const std::uint64_t bytes)
         {
-            const auto buffer = Device.CreateBuffer({.SizeBytes = std::max<std::size_t>(bytes, 8),
+            const auto size = std::max<std::uint64_t>(bytes, 8);
+            if (Buffers[slot].IsValid() && Capacity[slot] >= size) return true;
+            if (Buffers[slot].IsValid()) Device.DestroyBuffer(Buffers[slot]);
+            Buffers[slot] = Device.CreateBuffer({.SizeBytes = size,
                 .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc | RHI::BufferUsage::TransferDst,
-                .HostVisible = true, .DebugName = name});
-            if (!buffer.IsValid()) { Failed = true; return {}; }
-            Buffers.push_back(buffer);
-            if (data && bytes) Device.WriteBuffer(buffer, data, bytes);
-            return buffer;
+                .HostVisible = true, .DebugName = kNames[slot]});
+            Capacity[slot] = Buffers[slot].IsValid() ? size : 0u;
+            if (!Buffers[slot].IsValid()) Failed = true;
+            return Buffers[slot].IsValid();
+        }
+        bool Write(const Slot slot, const void* data, const std::size_t bytes, const std::uint64_t capacity)
+        {
+            if (!Ensure(slot, capacity)) return false;
+            if (data && bytes) Device.WriteBuffer(Buffers[slot], data, bytes, 0u);
+            return true;
         }
         std::uint64_t Address(RHI::BufferHandle b) const { return Device.GetBufferDeviceAddress(b); }
+        std::uint64_t Address(const Slot slot) const { return Address(Buffers[slot]); }
         std::size_t ReportBytes() const { return std::size_t(Solves) * sizeof(SparseCgReport); }
 
         bool Upload()
@@ -80,24 +97,26 @@ namespace Extrinsic::Graphics
                 Pipeline = CreateComputePipeline(Device, "shaders/sparse_cg.comp.spv", sizeof(Push), "SparseConjugateGradient");
                 if (!Pipeline.IsValid()) return false;
             }
-            const std::size_t n = Rows;
-            // Reports start zeroed; each solve's slot of the solutions starts at its initial guess.
-            std::vector<std::byte> output(ReadbackBytes(Rows, Solves), std::byte{0});
-            if (!Guesses.empty()) std::memcpy(output.data() + ReportBytes(), Guesses.data(), Guesses.size() * sizeof(double));
-            std::vector<double> rhs(std::size_t(Solves) * n, 0.0);
-            std::copy(Rhs.begin(), Rhs.end(), rhs.begin());
-            const auto offsets = Create(Offsets.data(), Offsets.size() * 4, "SparseCG.RowOffsets");
-            const auto columns = Create(Columns.data(), Columns.size() * 4, "SparseCG.Columns");
-            const auto values = Create(Values.data(), Values.size() * 8, "SparseCG.Values");
-            RhsBuffer = Create(rhs.data(), rhs.size() * 8, "SparseCG.RightHandSides");
-            DiagonalBuffer = Create(RhsDiagonal.data(), RhsDiagonal.size() * 8, "SparseCG.RhsDiagonal");
-            ConstantBuffer = Create(RhsConstant.data(), RhsConstant.size() * 8, "SparseCG.RhsConstant");
-            Work = Create(nullptr, 5 * n * 8, "SparseCG.Work");
-            PartialBuffer = Create(nullptr, 3 * std::size_t(Groups) * 8, "SparseCG.Partials");
-            Result = Create(output.data(), output.size(), "SparseCG.Result");
-            if (Failed) return false;
-            Base = {.Offsets = Address(offsets), .Columns = Address(columns), .Values = Address(values),
-                    .Work = Address(Work), .Partials = Address(PartialBuffer), .Rows = Rows, .Groups = Groups,
+            const std::uint64_t n = Rows;
+            const auto bytes = [](const auto& v) { return v.size() * sizeof(v[0]); };
+            // Host right-hand sides cover only the unchained (or first ChainStride) solves; every
+            // later one, and every device-seeded one, is formed by ChainRhs before it is read.
+            if (!Write(OffsetSlot, Offsets.data(), bytes(Offsets), bytes(Offsets)) ||
+                !Write(ColumnSlot, Columns.data(), bytes(Columns), bytes(Columns)) ||
+                !Write(ValueSlot, Values.data(), bytes(Values), bytes(Values)) ||
+                !Write(RhsSlot, Rhs.data(), bytes(Rhs), std::uint64_t(Solves) * n * 8) ||
+                !Write(DiagonalSlot, RhsDiagonal.data(), bytes(RhsDiagonal), bytes(RhsDiagonal)) ||
+                !Write(ConstantSlot, RhsConstant.data(), bytes(RhsConstant), bytes(RhsConstant)) ||
+                !Ensure(WorkSlot, 5 * n * 8) || !Ensure(PartialSlot, 3 * std::uint64_t(Groups) * 8) ||
+                !Ensure(ResultSlot, ReadbackBytes(Rows, Solves)))
+                return false;
+            // Reports start zeroed every run; each solve's solution starts at its initial guess
+            // (host guesses, a device seed, or the chained previous solution).
+            const std::vector<std::byte> reports(ReportBytes(), std::byte{0});
+            Device.WriteBuffer(Buffers[ResultSlot], reports.data(), reports.size(), 0u);
+            if (!Guesses.empty()) Device.WriteBuffer(Buffers[ResultSlot], Guesses.data(), bytes(Guesses), ReportBytes());
+            Base = {.Offsets = Address(OffsetSlot), .Columns = Address(ColumnSlot), .Values = Address(ValueSlot),
+                    .Work = Address(WorkSlot), .Partials = Address(PartialSlot), .Rows = Rows, .Groups = Groups,
                     .Tolerance = Tolerance};
             return true;
         }
@@ -121,14 +140,17 @@ namespace Extrinsic::Graphics
     {
         auto& s = *m_Impl;
         if (s.Failed || !s.Uploaded || !Finished()) return {};
-        commands.BufferBarrier(s.Result, RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite,
+        commands.BufferBarrier(s.Buffers[Impl::ResultSlot], RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite,
                                RHI::MemoryAccess::TransferRead);
-        return s.Result;
+        return s.Buffers[Impl::ResultSlot];
     }
 
     bool SparseConjugateGradientWorkspace::Begin(const SparseCgProblem& p)
     {
         auto& s = *m_Impl;
+        // A refused problem leaves no earlier run recordable.
+        s.Rows = s.Solves = 0;
+        s.Started = s.Uploaded = false;
         const auto& m = p.Matrix;
         const std::uint64_t n = m.Rows;
         const bool chained = p.ChainStride > 0;
@@ -173,9 +195,12 @@ namespace Extrinsic::Graphics
         if (s.Uploaded) return true;
         if (!s.Upload()) return false;
         s.Uploaded = true;
+        // A reused buffer's previous reads (an earlier run's readback included) precede this run.
         for (auto buffer : s.Buffers)
-            commands.BufferBarrier(buffer, RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderRead,
-                                   RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite);
+            if (buffer.IsValid())
+                commands.BufferBarrier(buffer, RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::TransferRead |
+                                               RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite,
+                                       RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite);
         return true;
     }
 
@@ -192,18 +217,18 @@ namespace Extrinsic::Graphics
             push.Mode = mode;
             commands.PushConstants(&push, sizeof(push), 0);
             commands.Dispatch(single ? 1u : s.Groups, 1, 1);
-            for (auto buffer : {s.RhsBuffer, s.Work, s.PartialBuffer, s.Result})
-                commands.BufferBarrier(buffer, RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite,
+            for (const auto slot : {Impl::RhsSlot, Impl::WorkSlot, Impl::PartialSlot, Impl::ResultSlot})
+                commands.BufferBarrier(s.Buffers[slot], RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite,
                                        RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite);
             --budget;
         };
-        const auto result = s.Address(s.Result);
+        const auto result = s.Address(Impl::ResultSlot);
         if (s.ChunkCount == 0) dispatch(Diagonal);
         while (s.Solve < s.Solves && budget > kIterationDispatches + 5)
         {
             push.State = result + s.Solve * sizeof(SparseCgReport);
             push.X = result + s.ReportBytes() + std::uint64_t(s.Solve) * n * sizeof(double);
-            push.B = s.Address(s.RhsBuffer) + std::uint64_t(s.Solve) * n * sizeof(double);
+            push.B = s.Address(Impl::RhsSlot) + std::uint64_t(s.Solve) * n * sizeof(double);
             if (!s.Started)
             {
                 if (s.ChainStride && (s.Solve >= s.ChainStride || s.SeedsOnDevice))
@@ -214,8 +239,8 @@ namespace Extrinsic::Graphics
                     push.Previous = s.Solve >= s.ChainStride
                         ? result + s.ReportBytes() + std::uint64_t(s.Solve - s.ChainStride) * n * sizeof(double)
                         : push.X;
-                    push.RhsDiagonal = s.Address(s.DiagonalBuffer) + std::uint64_t(lane) * n * sizeof(double);
-                    push.RhsConstant = s.Address(s.ConstantBuffer) + std::uint64_t(lane) * n * sizeof(double);
+                    push.RhsDiagonal = s.Address(Impl::DiagonalSlot) + std::uint64_t(lane) * n * sizeof(double);
+                    push.RhsConstant = s.Address(Impl::ConstantSlot) + std::uint64_t(lane) * n * sizeof(double);
                     dispatch(ChainRhs);
                 }
                 dispatch(Initialize);
@@ -236,9 +261,9 @@ namespace Extrinsic::Graphics
             s.Started = false;
         }
         ++s.ChunkCount;
-        commands.BufferBarrier(s.Result, RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite,
+        commands.BufferBarrier(s.Buffers[Impl::ResultSlot], RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite,
                                RHI::MemoryAccess::TransferRead);
-        return s.Result;
+        return s.Buffers[Impl::ResultSlot];
     }
 
     void SparseConjugateGradientWorkspace::Observe(std::span<const std::byte> readback)
@@ -256,10 +281,10 @@ namespace Extrinsic::Graphics
     }
 
     bool SparseConjugateGradientWorkspace::Finished() const noexcept { return m_Impl->Solve >= m_Impl->Solves; }
-    RHI::BufferHandle SparseConjugateGradientWorkspace::ResultBuffer() const noexcept { return m_Impl->Uploaded ? m_Impl->Result : RHI::BufferHandle{}; }
+    RHI::BufferHandle SparseConjugateGradientWorkspace::ResultBuffer() const noexcept { return m_Impl->Uploaded ? m_Impl->Buffers[Impl::ResultSlot] : RHI::BufferHandle{}; }
     std::uint64_t SparseConjugateGradientWorkspace::SolutionsAddress() const
     {
-        return m_Impl->Uploaded ? m_Impl->Address(m_Impl->Result) + m_Impl->ReportBytes() : 0u;
+        return m_Impl->Uploaded ? m_Impl->Address(Impl::ResultSlot) + m_Impl->ReportBytes() : 0u;
     }
     std::uint32_t SparseConjugateGradientWorkspace::CompletedSolves() const noexcept { return m_Impl->Solve; }
     std::uint32_t SparseConjugateGradientWorkspace::Chunks() const noexcept { return m_Impl->ChunkCount; }

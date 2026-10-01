@@ -577,6 +577,7 @@ namespace Extrinsic::Runtime
         std::optional<Graphics::GpuPropertyView> Input{}, Base{}, Topology{}, Back{};
         Graphics::VertexNormalsTopologyLayout Layout{};
         std::vector<std::uint32_t> Bundle{};
+        // Leased from the spatial cache; the recorder closures keep them while their work may run.
         std::shared_ptr<Graphics::VertexNormalsWorkspace> Workspace{};
         std::shared_ptr<Graphics::PointNormalsWorkspace> PointWorkspace{};
         std::uint32_t PointFirst{};
@@ -755,12 +756,21 @@ namespace Extrinsic::Runtime
             w->Delivered = true;
             if (w->Sink) w->Sink(std::move(result));
         }
+        // Only completed (or never queued) work returns its workspace early; otherwise the
+        // recorder closure that captures the run keeps it until the cache knows it is safe.
+        void ReleaseWorkspaces(const Run& w)
+        {
+            if (w->Gpu && w->Gpu->State != SpatialQueryState::Ready) return;
+            w->Workspace.reset();
+            w->PointWorkspace.reset();
+        }
         void ReleaseRings(const Run& w)
         {
             w->Input.reset();
             w->Base.reset();
             w->Topology.reset();
             w->Back.reset();
+            ReleaseWorkspaces(w);
             if (w->Readback) w->Readback->Lease.reset();
             if (w->Residency) (void)w->Residency->Discard(w->Key, w->Ring);
         }
@@ -881,11 +891,16 @@ namespace Extrinsic::Runtime
             if (PointNormals(*w->Work))
             {
                 if (!w->PointWorkspace)
-                    w->PointWorkspace = std::make_shared<Graphics::PointNormalsWorkspace>(*ctx.Device);
+                    w->PointWorkspace = ctx.SpatialIndices->LeaseGpuWorkspace<Graphics::PointNormalsWorkspace>();
+                if (!w->PointWorkspace)
+                {
+                    w->Gpu = FailedResult("PCA normal device workspace unavailable.");
+                    return;
+                }
                 w->StoreRecorded = true;
                 w->Gpu = ctx.SpatialIndices->QueueGpuCompute(w->Work->GpuIndex, sizeof(Graphics::PointNormalsGpuStats),
                     [w](RHI::ICommandContext& commands, const SpatialGpuIndexView& index) -> RHI::BufferHandle {
-                        if (!Current(w) || !w->Input || !w->Back) return {};
+                        if (!Current(w) || !w->Input || !w->Back || !w->PointWorkspace) return {};
                         NoteUses(w);
                         const auto& c = w->Work->Config;
                         return w->PointWorkspace->Record(commands,
@@ -900,11 +915,16 @@ namespace Extrinsic::Runtime
                 if (!w->Gpu) w->Gpu = FailedResult("PCA normal compute submission rejected.");
                 return;
             }
-            w->Workspace = std::make_shared<Graphics::VertexNormalsWorkspace>(*ctx.Device);
+            w->Workspace = ctx.SpatialIndices->LeaseGpuWorkspace<Graphics::VertexNormalsWorkspace>();
+            if (!w->Workspace)
+            {
+                w->Gpu = FailedResult("Vertex normal device workspace unavailable.");
+                return;
+            }
             w->StoreRecorded = true;
             w->Gpu = ctx.SpatialIndices->QueueGpuCompute(std::size_t(Graphics::VertexNormalsWorkspace::StatsReadbackBytes),
                 [w](RHI::ICommandContext& commands, const SpatialGpuIndexView&) -> RHI::BufferHandle {
-                    if (w->Abandoned || !w->Back) return {};
+                    if (w->Abandoned || !w->Back || !w->Workspace) return {};
                     NoteUses(w);
                     const Graphics::VertexNormalsResidentIo io{.Positions = View(w->Input), .Topology = View(w->Topology),
                                                                .Output = View(w->Back), .Base = View(w->Base),
@@ -932,12 +952,13 @@ namespace Extrinsic::Runtime
                 w->PointFirst < w->Work->Result.LiveCount)
             {
                 w->Work->Result.CpuStageReadbackBytes += w->Gpu->Data.size();
+                const auto fail = [&](std::string why) { ReleaseWorkspaces(w); w->Gpu = FailedResult(std::move(why)); };
                 Graphics::PointNormalsGpuStats stats{};
-                if (w->Gpu->Data.size() != sizeof(stats)) w->Gpu = FailedResult("Invalid PCA normal diagnostics readback.");
+                if (w->Gpu->Data.size() != sizeof(stats)) fail("Invalid PCA normal diagnostics readback.");
                 else
                 {
                     std::memcpy(&stats, w->Gpu->Data.data(), sizeof(stats));
-                    if (stats.Overflow) w->Gpu = FailedResult("Vulkan PCA radius neighborhoods exceed 1024 candidates; use a CPU backend.");
+                    if (stats.Overflow) fail("Vulkan PCA radius neighborhoods exceed 1024 candidates; use a CPU backend.");
                     else
                     {
                         const auto& c = w->Work->Config;
@@ -959,6 +980,7 @@ namespace Extrinsic::Runtime
             w->Input.reset();
             w->Base.reset();
             w->Topology.reset();
+            ReleaseWorkspaces(w);
             auto& r = w->Work->Result;
             if (!w->Gpu || w->Gpu->State != SpatialQueryState::Ready)
             {

@@ -1054,11 +1054,10 @@ namespace Extrinsic::Runtime
                 {
                     const std::optional<Graphics::VisualizationAttributeDomain> externalDomain =
                         ToVisualizationDomain(authored.Source.Domain);
-                    if (authored.BufferBDA != 0u && authored.ExternalElementCount != 0u && externalDomain.has_value() &&
-                        !ResolveGeometryProperty(availability, authored.Source, std::nullopt, /*requireFiniteValues=*/false).Resolved())
+                    if (authored.BufferBDA != 0u && authored.ExternalElementCount != 0u && externalDomain.has_value())
                     {
-                        // A device-resident scalar without a CPU property: bound as is, with the
-                        // manual range (auto-range has no CPU values to scan) or 0..1.
+                        // A preview's bytes and range belong to its publication, even when an
+                        // older accepted CPU property exists under the same name.
                         const bool manual = !authored.AutoRange && ValidRange(authored.RangeMin, authored.RangeMax);
                         if (!manual) ++result.Diagnostics.InvalidRangeCount;
                         else ++result.Diagnostics.ManualRangeCount;
@@ -1072,6 +1071,7 @@ namespace Extrinsic::Runtime
                             .RangeMax = manual ? authored.RangeMax : 1.0f,
                             .Colormap = authored.Colormap,
                             .ScalarBufferBDA = authored.BufferBDA,
+                            .SourceElementCount = authored.ExternalElementCount,
                         });
                         ++result.Diagnostics.PacketAppendCount;
                         result.Status = VisualizationRecipeStatus::Encoded;

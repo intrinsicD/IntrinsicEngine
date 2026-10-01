@@ -186,6 +186,13 @@ namespace
                 p.Guesses = {0.0};
                 Problems.push_back(std::move(p));
             }
+            if (Shared)
+            {
+                // After the 1-row system, the first one again: the shared workspace grows back.
+                auto again = Problems[0];
+                again.Name = "heat_step_after_shrink";
+                Problems.push_back(std::move(again));
+            }
             for (auto& p : Problems)
             {
                 for (const auto o : p.Matrix.RowOffsets) p.Offsets.push_back(std::uint32_t(o));
@@ -203,6 +210,11 @@ namespace
                 return;
             }
             if (!Kernel().GetDevice().IsOperational() || !Cache) return;
+            if (Shared)
+            {
+                SharedFrame();
+                return;
+            }
             if (!Queued)
             {
                 Queued = true;
@@ -231,6 +243,38 @@ namespace
             if (pending) return;
             GpuMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - QueuedAt).count();
             for (auto& p : Problems) Compare(p);
+            Done = true;
+            Kernel().RequestExit();
+        }
+
+        // One workspace solves the problems in turn, each Begin after the previous run's last
+        // readback: smaller and larger systems, chained and failing solves share its buffers.
+        void SharedFrame()
+        {
+            if (!Workspace) Workspace = std::make_shared<G::SparseConjugateGradientWorkspace>(Kernel().GetDevice());
+            auto& p = Problems[Current];
+            if (!p.Gpu)
+            {
+                p.Workspace = Workspace;
+                ASSERT_TRUE(Workspace->Begin({.Matrix = {.Rows = std::uint32_t(p.Matrix.Rows), .RowOffsets = p.Offsets,
+                    .Columns = p.Columns, .Values = p.Matrix.Values}, .Solves = p.Solves, .RightHandSides = p.Rhs,
+                    .InitialGuesses = p.Guesses, .RhsDiagonal = p.RhsDiagonal, .RhsConstant = p.RhsConstant,
+                    .ChainStride = p.ChainStride, .MaxIterations = p.MaxIterations, .Tolerance = p.Tolerance})) << p.Name;
+                Queue(p);
+                return;
+            }
+            if (p.Gpu->State != Runtime::SpatialQueryState::Ready && p.Gpu->State != Runtime::SpatialQueryState::Failed) return;
+            if (p.Gpu->State == Runtime::SpatialQueryState::Ready && !Workspace->Finished())
+            {
+                Workspace->Observe(p.Gpu->Data);
+                if (!Workspace->Finished())
+                {
+                    Queue(p);
+                    return;
+                }
+            }
+            Compare(p);
+            if (++Current < Problems.size()) return;
             Done = true;
             Kernel().RequestExit();
         }
@@ -311,15 +355,20 @@ namespace
             }
         }
 
-        void Shutdown() override { Problems.clear(); }
+        void Shutdown() override
+        {
+            Problems.clear();
+            Workspace.reset();
+        }
 
         Runtime::SpatialIndexCache* Cache{};
         std::vector<Problem> Problems;
         std::vector<std::vector<double>> CpuSolutions;
         std::chrono::steady_clock::time_point Started{}, QueuedAt{};
         double GpuMs{}, CpuMs{}, MaxSolutionDelta{}, MaxIterationGap{};
-        std::size_t Compared{}, Chunks{};
-        bool Queued{}, Done{}, TimedOut{};
+        std::size_t Compared{}, Chunks{}, Current{};
+        std::shared_ptr<G::SparseConjugateGradientWorkspace> Workspace;
+        bool Queued{}, Done{}, TimedOut{}, Shared{};
     };
 }
 
@@ -361,4 +410,29 @@ TEST(RUNTIME269VulkanSparseSolve, MatchesTheCpuConjugateGradientOnConsumerSystem
         std::ofstream stream(output);
         stream << json.dump(2) << '\n';
     }
+}
+
+TEST(RUNTIME269VulkanSparseSolve, OneWorkspaceSolvesEveryProblemInTurnAcrossShrinkAndGrowth)
+{
+    auto config = Runtime::CreateReferenceEngineConfig();
+    config.Window.Width = 64;
+    config.Window.Height = 64;
+    config.Render.EnableValidation = true;
+    config.Render.EnableVSync = false;
+    config.ReferenceScene.Enabled = false;
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize()) GTEST_SKIP() << "GLFW unavailable";
+    auto app = std::make_unique<SolveApp>();
+    auto* run = app.get();
+    run->Shared = true;
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.Initialize();
+    Shutdown shutdown{engine};
+    if (!engine.GetDevice().SupportsShaderFloat64()) GTEST_SKIP() << "Shader float64 unavailable";
+    engine.Run();
+    ASSERT_TRUE(engine.GetDevice().IsOperational());
+    ASSERT_FALSE(run->TimedOut);
+    ASSERT_TRUE(run->Done);
+    // The per-problem test's twelve converged solves plus the regrown heat step.
+    EXPECT_GE(run->Compared, 13u);
 }

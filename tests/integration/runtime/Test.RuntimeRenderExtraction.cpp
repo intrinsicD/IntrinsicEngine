@@ -2509,3 +2509,72 @@ TEST(RuntimeRenderExtraction, PublishedAnalysisPropertiesReuseMeshGeometry)
         EXPECT_GT(changed.MeshGeometryUploads + changed.MeshGeometryReuploads, 0u);
     }
 }
+
+TEST(RuntimeRenderExtraction, PendingScalarShowRemapsSplitSurfaceAndOverridesStaleCpuValues)
+{
+    using Config = Graphics::Components::VisualizationConfig;
+    for (const bool explicitShow : {false, true})
+    {
+        SCOPED_TRACE(explicitShow);
+        RendererFixture fixture;
+        ECS::Scene::Registry scene;
+        const auto entity = scene.Create();
+        auto& registry = scene.Raw();
+        registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1};
+        registry.emplace<Graphics::Components::RenderSurface>(entity);
+        AttachCornerSplitQuadMeshSources(scene, entity);
+        auto& config = registry.emplace<Config>(entity);
+        config.Source = Config::ColorSource::ScalarField;
+        config.ScalarDomain = Config::Domain::Vertex;
+        config.ScalarFieldName = "v:split_scalar";
+        if (explicitShow)
+            fixture.Extraction.SetVisualizationRecipe(StableId(entity), {
+                .Data = Runtime::ScalarVisualizationRecipe{
+                    .Source = {.Domain = Runtime::GeometryElementDomain::MeshVertex,
+                               .Name = "v:split_scalar", .ValueKind = Geometry::PropertyValueKind::Float},
+                    .OutputName = "v:split_scalar"}});
+        constexpr std::uint64_t previewAddress = 0xABCD0000ull;
+        fixture.Extraction.SetGpuPropertyObserver(
+            [entity](auto, auto observedEntity, const auto& property)
+                -> std::optional<Runtime::RenderExtractionCache::GpuPropertyFront> {
+                if (observedEntity != entity || property.Name != "v:split_scalar") return {};
+                return Runtime::RenderExtractionCache::GpuPropertyFront{
+                    .Buffer = {9, 1}, .Address = previewAddress, .Bytes = 16,
+                    .Count = 4, .Stamp = 1, .ScalarRange = std::array{-8.f, 12.f}};
+            });
+        for (unsigned frame = 0; frame < 2; ++frame)
+        {
+            const auto stats = fixture.Extract(scene);
+            EXPECT_GT(stats.VisualizationRecipeScalarGpuFrontsObserved, 0u);
+            auto world = fixture.Renderer->ExtractRenderWorld({});
+            fixture.Renderer->PrepareFrame(world);
+            const auto sidecar = fixture.Extraction.FindRenderableSidecarForTest(StableId(entity));
+            ASSERT_TRUE(sidecar);
+            const auto surface = fixture.Renderer->GetGpuWorld().GetEntityConfigForTest(sidecar->Instance);
+            EXPECT_EQ(surface.ScalarBDA, previewAddress);
+            EXPECT_EQ(surface.ElementCount, 6u);
+            EXPECT_EQ(surface.ScalarSourceCount, 4u);
+            EXPECT_FLOAT_EQ(surface.ScalarRangeMin, -8.f);
+            EXPECT_FLOAT_EQ(surface.ScalarRangeMax, 12.f);
+            ASSERT_GE(surface.ScalarIndexBDA, 0x1'0000'0000ull);
+            const auto handle = (surface.ScalarIndexBDA - 0x1'0000'0000ull) / 0x1000ull;
+            const Tests::MockDevice::BufferWriteRecord* write = nullptr;
+            for (auto it = fixture.Device.BufferWrites.rbegin(); it != fixture.Device.BufferWrites.rend(); ++it)
+                if (it->Handle.Index == handle && it->Offset == 0u) { write = &*it; break; }
+            ASSERT_NE(write, nullptr);
+            const std::array<unsigned, 6> expected{1, 2, 0, 2, 3, 0};
+            ASSERT_EQ(write->Data.size(), sizeof(expected));
+            EXPECT_EQ(std::memcmp(write->Data.data(), expected.data(), sizeof(expected)), 0);
+        }
+        fixture.Extraction.SetGpuPropertyObserver({});
+        fixture.Extract(scene);
+        auto world = fixture.Renderer->ExtractRenderWorld({});
+        fixture.Renderer->PrepareFrame(world);
+        const auto sidecar = fixture.Extraction.FindRenderableSidecarForTest(StableId(entity));
+        const auto restored = fixture.Renderer->GetGpuWorld().GetEntityConfigForTest(sidecar->Instance);
+        EXPECT_NE(restored.ScalarBDA, previewAddress);
+        EXPECT_EQ(restored.ScalarIndexBDA, 0u);
+        EXPECT_FLOAT_EQ(restored.ScalarRangeMin, 1.f);
+        EXPECT_FLOAT_EQ(restored.ScalarRangeMax, 4.f);
+    }
+}

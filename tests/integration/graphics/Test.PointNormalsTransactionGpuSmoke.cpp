@@ -48,8 +48,9 @@ namespace
         entt::entity Entity{};
         std::vector<glm::vec3> Reference, Before;
         std::chrono::steady_clock::time_point Started;
-        unsigned Step{}, Mode{};
+        unsigned Step{}, Mode{}, Starts{};
         bool Done{};
+        R::SpatialIndexCacheStats Final{};
         auto Commands() { return R::BindEditorProcessingCommands(Context); }
         Geometry::PropertySet& Props() { return Context.Scene->Raw().get<GS::Vertices>(Entity).Properties; }
         auto Rows() { return std::as_const(Props()).Get<glm::vec3>("normals").Vector(); }
@@ -89,6 +90,7 @@ namespace
             R::EditorNormalEstimationResult failure;
             Run = R::StartEditorNormalEstimationTransaction(Commands(), Config, failure);
             if (!Run) Fail(failure.Message);
+            else ++Starts;
             return bool(Run);
         }
         bool Ready()
@@ -181,7 +183,7 @@ namespace
                 const auto result = R::SnapshotEditorNormalEstimation(Commands(), Run).Result;
                 EXPECT_EQ(result.GpuInputUploadBytes, 0u); EXPECT_GT(result.GpuInputCacheHits, 0u);
                 R::DiscardEditorNormalEstimation(Commands(), Run); EXPECT_EQ(Rows(), Before);
-                if (++Mode == 2) { Done = true; Kernel().RequestExit(); }
+                if (++Mode == 2) { Done = true; Final = Context.SpatialIndices->Stats(); Kernel().RequestExit(); }
                 else Step = 0;
             }
         }
@@ -200,4 +202,8 @@ TEST(RUNTIME299PointNormalsResidency, PcaParityAcceptZeroUploadAndDiscard)
     struct Shutdown { R::Engine& Engine; ~Shutdown() { Engine.Shutdown(); } } shutdown{engine};
     if (!engine.GetDevice().SupportsShaderFloat64()) GTEST_SKIP() << "Shader float64 unavailable";
     engine.Run(); EXPECT_TRUE(engine.GetDevice().IsOperational()); EXPECT_TRUE(run->Done);
+    // Runs lease the PCA workspace from the spatial cache: a later run restarts page 0 on a
+    // retired workspace (the radius mode growing the k-NN scratch) and still matches the CPU.
+    EXPECT_EQ(run->Final.WorkspaceLeases, run->Starts);
+    EXPECT_GT(run->Final.WorkspaceReuses, 0u);
 }

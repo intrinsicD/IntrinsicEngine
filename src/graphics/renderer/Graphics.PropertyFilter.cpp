@@ -36,11 +36,26 @@ namespace Extrinsic::Graphics
 
     struct PropertyFilterWorkspace::Impl
     {
+        // Retained device buffers: a run grows only an undersized one and rewrites every input it
+        // reads, so nothing of an earlier run's data or capacity is observable.
+        enum Slot : std::size_t
+        {
+            Values, Next, Term, Sum, Edges, BaseWeights, Weights, Offsets, Incidences, Degree, Fixed, SlotMap, RestoreMap,
+            SlotCount
+        };
+        static constexpr std::array<const char*, SlotCount> kNames{"PropertyFilter.Values", "PropertyFilter.Next",
+            "PropertyFilter.Term", "PropertyFilter.Sum", "PropertyFilter.Edges", "PropertyFilter.BaseWeights",
+            "PropertyFilter.Weights", "PropertyFilter.Offsets", "PropertyFilter.Incidences", "PropertyFilter.Degree",
+            "PropertyFilter.Fixed", "PropertyFilter.Slots", "PropertyFilter.Restore"};
         RHI::IDevice& Device;
         RHI::PipelineHandle Pipeline{};
-        std::vector<RHI::BufferHandle> Buffers{};
-        RHI::BufferHandle Slots{}, Restore{}; // the resident row map and restore mask, uploaded once
-        std::size_t SlotCount{}, RestoreCount{};
+        std::array<RHI::BufferHandle, SlotCount> Buffers{};
+        std::array<std::uint64_t, SlotCount> Capacity{};
+        // The resident row map and restore mask of the current run (Record or RecordLoad starts
+        // one), uploaded once and shared by its later stores; 0: none.
+        bool RunStarted{};
+        std::uint64_t SlotsAddress{}, RestoreAddress{};
+        std::size_t SlotRows{}, RestoreRows{};
         explicit Impl(RHI::IDevice& device) : Device(device) {}
         ~Impl()
         {
@@ -48,37 +63,49 @@ namespace Extrinsic::Graphics
                 if (buffer.IsValid()) Device.DestroyBuffer(buffer);
             if (Pipeline.IsValid()) Device.DestroyPipeline(Pipeline);
         }
-        RHI::BufferHandle Upload(const void* data, std::size_t bytes, const char* name)
+        bool Ensure(const Slot slot, const std::uint64_t bytes)
         {
-            const auto buffer = Device.CreateBuffer({.SizeBytes = std::max<std::size_t>(bytes, 8),
+            const auto size = std::max<std::uint64_t>(bytes, 8);
+            if (Buffers[slot].IsValid() && Capacity[slot] >= size) return true;
+            if (Buffers[slot].IsValid()) Device.DestroyBuffer(Buffers[slot]);
+            Buffers[slot] = Device.CreateBuffer({.SizeBytes = size,
                 .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc | RHI::BufferUsage::TransferDst,
-                .HostVisible = true, .DebugName = name});
-            if (!buffer.IsValid()) return {};
-            Buffers.push_back(buffer);
-            if (data && bytes) Device.WriteBuffer(buffer, data, bytes);
-            return buffer;
+                .HostVisible = true, .DebugName = kNames[slot]});
+            Capacity[slot] = Buffers[slot].IsValid() ? size : 0u;
+            return Buffers[slot].IsValid();
         }
+        bool Write(const Slot slot, const void* data, const std::size_t bytes)
+        {
+            if (!Ensure(slot, bytes)) return false;
+            if (data && bytes) Device.WriteBuffer(Buffers[slot], data, bytes, 0u);
+            return true;
+        }
+        std::uint64_t Address(const Slot slot) const { return Device.GetBufferDeviceAddress(Buffers[slot]); }
         bool EnsurePipeline()
         {
             if (!Pipeline.IsValid())
                 Pipeline = CreateComputePipeline(Device, "shaders/property_filter.comp.spv", sizeof(Push), "PropertyFilter");
             return Pipeline.IsValid();
         }
-        // A per-row uint map, uploaded on first use (0: none).
-        std::uint64_t MapAddress(RHI::BufferHandle& buffer, std::size_t& count, const std::span<const std::uint32_t> map,
-                                 const char* name)
+        // Starts a run's resident endpoints: its row map and restore mask replace the previous run's.
+        bool BeginRun(const PropertyFilterResidentIo& io)
         {
-            if (map.empty()) return 0u;
-            if (!buffer.IsValid() || count != map.size())
+            RunStarted = false;
+            SlotsAddress = RestoreAddress = 0u;
+            SlotRows = io.Slots.size();
+            RestoreRows = io.RestoreMask.size();
+            if (!io.Slots.empty())
             {
-                buffer = Upload(map.data(), map.size_bytes(), name);
-                count = map.size();
+                if (!Write(SlotMap, io.Slots.data(), io.Slots.size_bytes())) return false;
+                SlotsAddress = Address(SlotMap);
             }
-            return buffer.IsValid() ? Device.GetBufferDeviceAddress(buffer) : 0u;
-        }
-        std::uint64_t SlotsAddress(const std::span<const std::uint32_t> slots)
-        {
-            return MapAddress(Slots, SlotCount, slots, "PropertyFilter.Slots");
+            if (!io.RestoreMask.empty())
+            {
+                if (!Write(RestoreMap, io.RestoreMask.data(), io.RestoreMask.size_bytes())) return false;
+                RestoreAddress = Address(RestoreMap);
+            }
+            RunStarted = true;
+            return true;
         }
         static std::uint32_t Rows(const PropertyFilterResidentIo& io)
         {
@@ -104,28 +131,23 @@ namespace Extrinsic::Graphics
             else
                 commands.BufferBarrier(view.Buffer, kShaderAccess | RHI::MemoryAccess::TransferRead, kShaderAccess);
         }
-        // Load or Store between a working block and the resident property (see the shader).
+        // Load or Store between a working block and the resident property (see the shader), over
+        // the current run's row map; a store whose endpoints do not match that run is refused.
         bool Move(RHI::ICommandContext& commands, const PropertyFilterResidentIo& io, const std::uint32_t channels,
                   const RHI::BufferHandle working, const std::uint64_t workingAddress,
                   const std::uint32_t rowStride, const std::uint32_t channelStride, const bool store)
         {
             const auto rows = Rows(io);
             const auto& property = store ? io.Output : io.Input;
-            if (!property.Valid() || rows == 0u || channels < 1u || channels > 4u || !working.IsValid() || !workingAddress ||
+            if (!RunStarted || io.Slots.size() != SlotRows || io.RestoreMask.size() != RestoreRows ||
+                !property.Valid() || rows == 0u || channels < 1u || channels > 4u || !working.IsValid() || !workingAddress ||
                 !Device.IsOperational() || !EnsurePipeline())
                 return false;
-            const auto slots = SlotsAddress(io.Slots);
-            if (!io.Slots.empty() && !slots) return false;
-            std::uint64_t restore = 0u, restoreMask = 0u;
+            const bool restore = store && RestoreAddress && io.Input.Valid();
             if (store)
             {
-                if (!io.RestoreMask.empty() && io.Input.Valid())
-                {
-                    restoreMask = MapAddress(Restore, RestoreCount, io.RestoreMask, "PropertyFilter.Restore");
-                    if (!restoreMask) return false;
-                    restore = io.Input.Address;
+                if (restore)
                     commands.BufferBarrier(io.Input.Buffer, RHI::MemoryAccess::TransferWrite | kShaderAccess, RHI::MemoryAccess::ShaderRead);
-                }
                 PrepareTarget(commands, io.Output, io.OutputBytes, io.Base);
                 PrepareTarget(commands, io.Presentation, io.PresentationBytes);
                 commands.BufferBarrier(working, kShaderAccess | RHI::MemoryAccess::TransferRead, RHI::MemoryAccess::ShaderRead);
@@ -135,12 +157,13 @@ namespace Extrinsic::Graphics
                 commands.BufferBarrier(io.Input.Buffer, RHI::MemoryAccess::TransferWrite | kShaderAccess, RHI::MemoryAccess::ShaderRead);
                 commands.BufferBarrier(working, RHI::MemoryAccess::TransferWrite | kShaderAccess, RHI::MemoryAccess::ShaderWrite);
             }
-            for (const auto map : {Slots, Restore})
-                if (map.IsValid())
-                    commands.BufferBarrier(map, RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderRead, RHI::MemoryAccess::ShaderRead);
+            if (SlotsAddress)
+                commands.BufferBarrier(Buffers[SlotMap], RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderRead, RHI::MemoryAccess::ShaderRead);
+            if (restore)
+                commands.BufferBarrier(Buffers[RestoreMap], RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderRead, RHI::MemoryAccess::ShaderRead);
             commands.BindPipeline(Pipeline);
             Push push{.Src = store ? workingAddress : io.Input.Address, .Dst = store ? io.Output.Address : workingAddress,
-                      .Degree = restore, .Fixed = restoreMask, .Slots = slots,
+                      .Degree = restore ? io.Input.Address : 0u, .Fixed = restore ? RestoreAddress : 0u, .Slots = SlotsAddress,
                       .Presentation = store && io.Presentation.Valid() ? io.Presentation.Address : 0u,
                       .Rows = rows, .Channels = channels, .Mode = store ? Mode::Store : Mode::Load,
                       .RandomWalk = io.Input.Double ? Scalar::Float64 : Scalar::Float32,
@@ -185,13 +208,15 @@ namespace Extrinsic::Graphics
         const std::uint32_t channels, const RHI::BufferHandle target, const std::uint64_t targetAddress,
         const std::uint32_t rowStride, const std::uint32_t channelStride)
     {
-        return m_Impl->Move(commands, resident, channels, target, targetAddress, rowStride, channelStride, false);
+        return m_Impl->BeginRun(resident) &&
+               m_Impl->Move(commands, resident, channels, target, targetAddress, rowStride, channelStride, false);
     }
 
     RHI::BufferHandle PropertyFilterWorkspace::Record(RHI::ICommandContext& commands,
         const PropertyFilterGpuInput& input, const PropertyFilterGpuParams& p, const PropertyFilterResidentIo* resident)
     {
         auto& s = *m_Impl;
+        s.RunStarted = false; // a refused run leaves no earlier run's row map for RecordStore
         const std::size_t C = input.Channels;
         if (C < 1 || C > 4 || input.Values.size() % C) return {};
         const bool residentInput = resident && resident->Input.Valid();
@@ -220,29 +245,34 @@ namespace Extrinsic::Graphics
             incidences[cursor[input.Edges[2 * e]]++] = e;
             incidences[cursor[input.Edges[2 * e + 1]]++] = e;
         }
+        using I = Impl;
         const std::size_t valueBytes = rows * C * sizeof(double);
-        const std::array values{s.Upload(residentInput ? nullptr : input.Values.data(), valueBytes, "PropertyFilter.Values"),
-                                s.Upload(nullptr, valueBytes, "PropertyFilter.Next"),
-                                s.Upload(nullptr, valueBytes, "PropertyFilter.Term"),
-                                s.Upload(nullptr, valueBytes, "PropertyFilter.Sum")};
-        const auto edges = s.Upload(input.Edges.data(), input.Edges.size_bytes(), "PropertyFilter.Edges");
-        const auto base = s.Upload(input.Weights.data(), input.Weights.size_bytes(), "PropertyFilter.BaseWeights");
-        const auto weights = s.Upload(input.Weights.data(), input.Weights.size_bytes(), "PropertyFilter.Weights");
-        const auto offsetBuffer = s.Upload(offsets.data(), offsets.size() * 4, "PropertyFilter.Offsets");
-        const auto incidenceBuffer = s.Upload(incidences.data(), incidences.size() * 4, "PropertyFilter.Incidences");
-        const auto degree = s.Upload(input.Degree.data(), input.Degree.size_bytes(), "PropertyFilter.Degree");
-        const auto fixed = s.Upload(input.Fixed.data(), input.Fixed.size_bytes(), "PropertyFilter.Fixed");
-        const std::uint64_t slots = residentInput ? s.SlotsAddress(resident->Slots) : 0u;
-        if (std::ranges::any_of(s.Buffers, [](auto b) { return !b.IsValid(); }) || (residentInput && !resident->Slots.empty() && !slots))
+        // Bilateral passes rebuild the weights and degree from the base weights before every
+        // apply; the other filters read the base weights and the uploaded degree directly.
+        const bool bilateral = p.Method == PropertyFilterGpuMethod::Bilateral;
+        if (!s.Write(I::Values, residentInput ? nullptr : input.Values.data(), valueBytes) ||
+            !s.Ensure(I::Next, valueBytes) || !s.Ensure(I::Term, valueBytes) || !s.Ensure(I::Sum, valueBytes) ||
+            !s.Write(I::Edges, input.Edges.data(), input.Edges.size_bytes()) ||
+            !s.Write(I::BaseWeights, input.Weights.data(), input.Weights.size_bytes()) ||
+            (bilateral && !s.Ensure(I::Weights, input.Weights.size_bytes())) ||
+            !s.Write(I::Offsets, offsets.data(), offsets.size() * 4) ||
+            !s.Write(I::Incidences, incidences.data(), incidences.size() * 4) ||
+            !s.Write(I::Degree, bilateral ? nullptr : input.Degree.data(), input.Degree.size_bytes()) ||
+            !s.Write(I::Fixed, input.Fixed.data(), input.Fixed.size_bytes()) ||
+            (resident && !s.BeginRun(*resident)))
             return {};
         const auto address = [&](RHI::BufferHandle b) { return s.Device.GetBufferDeviceAddress(b); };
-        Push push{.Edges = address(edges), .Weights = address(weights), .BaseWeights = address(base),
-                  .Offsets = address(offsetBuffer), .Incidences = address(incidenceBuffer), .Degree = address(degree),
-                  .Fixed = address(fixed), .Rows = std::uint32_t(rows), .Channels = std::uint32_t(C),
+        const auto weights = s.Buffers[bilateral ? I::Weights : I::BaseWeights], degree = s.Buffers[I::Degree];
+        Push push{.Edges = s.Address(I::Edges), .Weights = address(weights), .BaseWeights = s.Address(I::BaseWeights),
+                  .Offsets = s.Address(I::Offsets), .Incidences = s.Address(I::Incidences), .Degree = address(degree),
+                  .Fixed = s.Address(I::Fixed), .Rows = std::uint32_t(rows), .Channels = std::uint32_t(C),
                   .EdgeCount = std::uint32_t(edgeCount), .RandomWalk = p.RandomWalk ? 1u : 0u};
-        for (auto buffer : s.Buffers)
-            commands.BufferBarrier(buffer, RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderRead,
-                                   RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite);
+        // A reused buffer's previous reads (an earlier run's readback included) precede this run.
+        for (std::size_t slot = I::Values; slot <= I::Fixed; ++slot)
+            if (s.Buffers[slot].IsValid() && (slot != I::Weights || bilateral))
+                commands.BufferBarrier(s.Buffers[slot], RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::TransferRead | kShaderAccess,
+                                       kShaderAccess);
+        const std::array values{s.Buffers[I::Values], s.Buffers[I::Next], s.Buffers[I::Term], s.Buffers[I::Sum]};
         // Resident input: gathered on the device into the working layout (uploaded once per revision).
         if (residentInput && !s.Move(commands, *resident, std::uint32_t(C), values[0], address(values[0]), std::uint32_t(C), 1u, false))
             return {};

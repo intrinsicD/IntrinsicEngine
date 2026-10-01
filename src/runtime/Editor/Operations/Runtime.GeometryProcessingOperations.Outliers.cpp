@@ -375,6 +375,7 @@ namespace Extrinsic::Runtime
         std::array<std::optional<Graphics::GpuPropertyView>,3> Back{};
         std::array<std::optional<Graphics::GpuPropertyView>,2> Base{};
         std::array<std::shared_ptr<GeometryProcessingDetail::GpuFrontReadback>,2> Readback{};
+        // Leased from the spatial cache; the recorder closure keeps it while its work may run.
         std::shared_ptr<Graphics::OutlierWorkspace> Workspace{};
         std::shared_ptr<SpatialGpuResult> Gpu{};
         EditorGpuTransactionPhase Phase{EditorGpuTransactionPhase::Running};
@@ -395,6 +396,8 @@ namespace Extrinsic::Runtime
         void Release(const Run& w)
         {
             w->Input.reset();
+            // Only completed (or never queued) work returns the workspace early.
+            if(!w->Gpu||w->Gpu->State==SpatialQueryState::Ready)w->Workspace.reset();
             for(auto& v:w->Back)v.reset();
             for(auto& v:w->Base)v.reset();
             for(auto& r:w->Readback)if(r){r->Abandoned=true;r->Lease.reset();}
@@ -452,11 +455,12 @@ namespace Extrinsic::Runtime
                     if(++w->Deferrals<600)return false;
                     Fail(w,"The residency refused an input or output slot.");return true;}
                 auto& ctx=w->Context;
-                w->Workspace=std::make_shared<Graphics::OutlierWorkspace>(*ctx.Device);
+                w->Workspace=ctx.SpatialIndices->LeaseGpuWorkspace<Graphics::OutlierWorkspace>();
+                if(!w->Workspace){Fail(w,"Outlier device workspace unavailable.");return true;}
                 w->Work->Result.GpuQueryBatches=1;
                 w->Gpu=ctx.SpatialIndices->QueueGpuCompute(w->Work->GpuIndex,sizeof(Graphics::OutlierGpuStats),
                     [w](RHI::ICommandContext& cmd,const SpatialGpuIndexView& index)->RHI::BufferHandle{
-                        if(!Current(w)||!w->Input||!w->Back[0]||!w->Back[1]||!w->Back[2])return {};
+                        if(!Current(w)||!w->Input||!w->Back[0]||!w->Back[1]||!w->Back[2]||!w->Workspace)return {};
                         const auto frame=w->Context.Device->GetGlobalFrameNumber();
                         w->Residency->NoteUse(w->Input->Buffer,frame);
                         for(const auto& v:w->Back)w->Residency->NoteUse(v->Buffer,frame);
@@ -545,6 +549,7 @@ namespace Extrinsic::Runtime
                     if(!w->Gpu||w->Gpu->State!=SpatialQueryState::Ready||w->Gpu->Data.size()!=sizeof(Graphics::OutlierGpuStats)){
                         Fail(w,w->Gpu?w->Gpu->Diagnostic:"Outlier compute failed.");return false;}
                     Graphics::OutlierGpuStats stats{};std::memcpy(&stats,w->Gpu->Data.data(),sizeof(stats));
+                    w->Workspace.reset();
                     if(stats.Invalid){Fail(w,"Unrepresentable device outlier score.");return false;}
                     for(std::size_t i=0;i<3;++i){w->Back[i].reset();if(!w->Residency->Publish(w->Keys[i])){Fail(w,"Outlier ring publication failed.");return false;}}
                     w->Input.reset();for(auto& base:w->Base)base.reset();

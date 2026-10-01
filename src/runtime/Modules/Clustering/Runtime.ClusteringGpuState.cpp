@@ -1,4 +1,6 @@
 module;
+
+#include <array>
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -50,7 +52,7 @@ namespace Extrinsic::Runtime
             KMeansGpuPhase Phase{KMeansGpuPhase::Initialize};
             KMeansPagingLimits Limits{KMeansPagingForTesting};
             std::uint32_t Row{}, Inner{}, Count{}, Clusters{}, PreviewDeferrals{};
-            bool Boundary{}, Terminal{}, Ready{}, Accepting{}, Stop{}, Discard{}, CentroidReadback{}, Recorded{};
+            bool Boundary{}, Presented{}, Terminal{}, Ready{}, Accepting{}, Stop{}, Discard{}, Recorded{};
         };
         RHI::IDevice& Device;
         std::shared_ptr<bool> Alive{std::make_shared<bool>(true)};
@@ -58,6 +60,9 @@ namespace Extrinsic::Runtime
         // Recorder failures can follow recorded commands. Retain their workspaces and
         // leases until the participant's device-idle shutdown.
         std::vector<std::shared_ptr<Operation>> Retired{};
+        // One run at a time: the last run's buffers and pipelines, kept only
+        // when no submission recorded with them can still execute.
+        std::shared_ptr<KMeansGpuWorkspace> Idle{};
         std::optional<ClusteringGpuResult> Completed{};
         explicit Impl(RHI::IDevice& d):Device(d){}
         ~Impl(){*Alive=false;if(Active)DiscardEditorPointScalar(Active->Commands,Active->Transaction);}
@@ -66,7 +71,9 @@ namespace Extrinsic::Runtime
             auto a=std::move(Active);if(!a)return;
             a->Result.Status=status;a->Result.Message=std::move(why);
             a->Result.Error=status==KMeansRunStatus::Applied?Core::ErrorCode::Success:Core::ErrorCode::InvalidState;
+            const bool settled=!a->Page||a->Page->State==SpatialQueryState::Ready||a->Page->State==SpatialQueryState::Failed;
             if(a->Recorded&&a->Page&&a->Page->State==SpatialQueryState::Failed)Retired.push_back(a);
+            else if(settled&&a->Workspace&&!Idle)Idle=std::move(a->Workspace);
             DiscardEditorPointScalar(a->Commands,a->Transaction);
             Completed=ClusteringGpuResult{.Published=std::move(a->Result)};
         }
@@ -92,17 +99,23 @@ namespace Extrinsic::Runtime
             a->Input=ResolveGpuPropertyInput(r,*context.Scene,context.World,entity,snapshot.Command.Properties.InputPositions);
             if(!a->Input)return {.Refused=true,.Diagnostic="K-Means resident input is busy or unavailable."};
             auto seeds=Geometry::KMeans::BuildInitialCentroids(snapshot.Points,{},snapshot.Params,a->Clusters);
-            a->Workspace=std::make_shared<KMeansGpuWorkspace>(Device);
+            if(seeds.size()!=a->Clusters)return {.Diagnostic="K-Means GPU workspace or seed preparation failed."};
+            // A failed Prepare may leave partial state; that workspace is dropped.
+            a->Workspace=Idle?std::move(Idle):std::make_shared<KMeansGpuWorkspace>(Device);
             const bool identity=snapshot.SlotCount==a->Count;
-            if(seeds.size()!=a->Clusters||!a->Workspace->Prepare(a->Count,seeds,identity?std::span<const std::uint32_t>{}:snapshot.Slots))
+            if(!a->Workspace->Prepare(a->Count,seeds,identity?std::span<const std::uint32_t>{}:snapshot.Slots))
                 return {.Diagnostic="K-Means GPU workspace or seed preparation failed."};
+            const auto refuse=[&](std::string why)->ClusteringGpuSubmission{
+                Idle=std::move(a->Workspace);return {.Refused=true,.Diagnostic=std::move(why)};};
             a->Result.CpuStageUploadBytes=a->Workspace->CpuUploadBytes();
+            a->Result.GpuWorkspaceBuffersCreated=a->Workspace->PreparedBufferCreations();
+            a->Result.GpuWorkspacePipelinesCreated=a->Workspace->PreparedPipelineCreations();
             auto typed=snapshot.Command.Properties.OutputLabels;typed.ValueKind=Geometry::PropertyValueKind::UInt32;
             // Existing integer bytes preserve deleted slots in every preview and Accept.
             if(!identity && snapshot.BeforeOutputs.Labels.Exists)
             {
                 a->Base=ResolveGpuPropertyInput(r,*context.Scene,context.World,entity,typed);
-                if(!a->Base)return {.Refused=true,.Diagnostic="Prior K-Means labels are busy or unavailable for deleted-slot preservation."};
+                if(!a->Base)return refuse("Prior K-Means labels are busy or unavailable for deleted-slot preservation.");
             }
             a->Result.GpuInputUploadBytes=r.Stats().UploadBytes-before.UploadBytes;
             a->Result.GpuInputCacheHits=r.Stats().Hits-before.Hits;
@@ -128,7 +141,7 @@ namespace Extrinsic::Runtime
                         result.Status==EditorCommandStatus::Applied||result.Status==EditorCommandStatus::NoChange?
                         KMeansRunStatus::Applied:KMeansRunStatus::GeometryProcessingFailed,result.Message);
                  });
-            if(!a->Transaction)return {.Refused=true,.Diagnostic=admission.Message};
+            if(!a->Transaction)return refuse(admission.Message);
             // The caller moves the full before-state into the publication callback
             // only after admission. Iteration retains just its live-slot map/config.
             a->Snapshot.Command=snapshot.Command;a->Snapshot.World=snapshot.World;
@@ -139,7 +152,7 @@ namespace Extrinsic::Runtime
             result.StableEntityId=command.StableEntityId;result.Properties=command.Properties;result.Parameters=command.Parameters;
             result.RequestedBackend=result.ActualBackend=ClusteringBackend::VulkanCompute;
             result.ImplementationId="vulkan_resident_paged_lloyd";
-            result.BackendDiagnostic="Resident stride-12 positions; ordered paged Lloyd assignment/update; host convergence diagnostics.";
+            result.BackendDiagnostic="Resident stride-12 positions; ordered paged Lloyd phases share bounded submissions up to each host convergence readback.";
             result.LabelCount=a->Count;result.ClusterCount=a->Clusters;
             Active=std::move(a);return {.Accepted=true};
         }
@@ -176,10 +189,12 @@ namespace Extrinsic::Runtime
         }
         RHI::BufferHandle Record(const std::shared_ptr<Operation>& a,RHI::ICommandContext& cmd)
         {
-            a->Recorded=true;
-            if(a->CentroidReadback)return a->Workspace->Centroids();
+            a->Recorded=true;a->Boundary=a->Presented=false;
             auto& residency=*a->Context.SpatialIndices->PropertyResidency();
             residency.NoteUse(a->Input->Buffer,Device.GetGlobalFrameNumber());
+            // Terminal preview pages read the final centroids back instead of
+            // diagnostics; Advance consumes them only after presentation completes.
+            const bool terminalPreview=a->Terminal&&(a->Phase==KMeansGpuPhase::Preview||a->Phase==KMeansGpuPhase::Presentation);
             if(a->Phase==KMeansGpuPhase::Preview&&a->Row==0){
                 const auto shader=RHI::MemoryAccess::ShaderRead|RHI::MemoryAccess::ShaderWrite;
                 cmd.BufferBarrier(a->Back->Typed.Buffer,shader|RHI::MemoryAccess::TransferRead,RHI::MemoryAccess::TransferWrite);
@@ -191,35 +206,47 @@ namespace Extrinsic::Runtime
                 }
                 cmd.BufferBarrier(a->Back->Typed.Buffer,RHI::MemoryAccess::TransferWrite,shader);
             }
-            const auto outer=a->Phase==KMeansGpuPhase::Update?a->Clusters:
-                a->Phase==KMeansGpuPhase::Presentation?std::uint32_t(a->Snapshot.SlotCount):a->Count;
-            const auto inner=a->Phase==KMeansGpuPhase::Assign?a->Clusters:a->Phase==KMeansGpuPhase::Update?a->Count:1u;
             std::uint64_t budget=a->Limits.SubmissionPairs;
             std::uint32_t depth=KMeansSubmissionSerialDepth;
-            RHI::BufferHandle result{};
-            while(a->Row<outer){
+            // Device-only phase transitions continue in this command buffer under
+            // the shared pair/depth budgets. Recording stops at the host boundaries:
+            // completed Update (convergence diagnostics) and terminal Presentation.
+            for(;;){
+                const auto outer=a->Phase==KMeansGpuPhase::Update?a->Clusters:
+                    a->Phase==KMeansGpuPhase::Presentation?std::uint32_t(a->Snapshot.SlotCount):a->Count;
+                const auto inner=a->Phase==KMeansGpuPhase::Assign?a->Clusters:a->Phase==KMeansGpuPhase::Update?a->Count:1u;
+                if(a->Row==outer){
+                    if(a->Phase==KMeansGpuPhase::Update){a->Boundary=true;break;}
+                    if(a->Phase==KMeansGpuPhase::Presentation){a->Presented=true;if(a->Terminal)break;}
+                    a->Phase=a->Phase==KMeansGpuPhase::Initialize?KMeansGpuPhase::Assign:
+                        a->Phase==KMeansGpuPhase::Assign?KMeansGpuPhase::Reduce:
+                        a->Phase==KMeansGpuPhase::Reduce?KMeansGpuPhase::Update:
+                        a->Phase==KMeansGpuPhase::Preview?KMeansGpuPhase::Presentation:KMeansGpuPhase::Assign;
+                    a->Row=a->Inner=0;continue;
+                }
                 const auto scan=std::min({inner,a->Limits.PagePairs,KMeansPageScanRows});
                 const auto rows=std::min({outer-a->Row,std::max(1u,a->Limits.PagePairs/scan),
                     a->Phase==KMeansGpuPhase::Update?65535u:65535u*64u,
                     a->Phase==KMeansGpuPhase::Reduce?KMeansPageScanRows:std::numeric_limits<std::uint32_t>::max()});
-                if(budget<rows)break;
-                const auto columns=std::uint32_t(std::min<std::uint64_t>(std::min(inner-a->Inner,scan),std::min<std::uint64_t>(a->Limits.PagePairs,budget)/rows));
+                // Page shape never depends on the remaining budget, so ordered
+                // double combines group identically however phases share submissions.
+                const auto columns=std::min({inner-a->Inner,scan,a->Limits.PagePairs/rows});
                 // Conservatively sum the longest lane path of every dispatch,
                 // even though workgroups can overlap on the device.
                 const auto serial=a->Phase==KMeansGpuPhase::Assign?columns+1:
                     a->Phase==KMeansGpuPhase::Update?(columns+63)/64+7:
                     a->Phase==KMeansGpuPhase::Reduce?(rows+63)/64+7:1u;
-                if(serial>depth)break;
-                depth-=serial;
-                result=a->Workspace->Record(cmd,*a->Input,{a->Phase,a->Row,rows,a->Inner,columns},
-                    a->Back?a->Back->Typed:Graphics::GpuPropertyView{},a->Back?a->Back->Presentation:Graphics::GpuPropertyView{});
-                budget-=std::uint64_t(rows)*columns;a->Inner+=columns;
+                if(std::uint64_t(rows)*columns>budget||serial>depth)break;
+                depth-=serial;budget-=std::uint64_t(rows)*columns;
+                const bool preview=a->Phase==KMeansGpuPhase::Preview||a->Phase==KMeansGpuPhase::Presentation;
+                (void)a->Workspace->Record(cmd,*a->Input,{a->Phase,a->Row,rows,a->Inner,columns},
+                    preview?a->Back->Typed:Graphics::GpuPropertyView{},preview?a->Back->Presentation:Graphics::GpuPropertyView{});
+                a->Inner+=columns;
                 if(a->Inner==inner){a->Inner=0;a->Row+=rows;}
             }
-            a->Boundary=a->Row==outer;
             if(a->Back){residency.NoteUse(a->Back->Typed.Buffer,Device.GetGlobalFrameNumber());
                 residency.NoteUse(a->Back->Presentation.Buffer,Device.GetGlobalFrameNumber());}
-            return result;
+            return terminalPreview?a->Workspace->Centroids():a->Workspace->Diagnostics();
         }
         void Advance()
         {
@@ -235,58 +262,51 @@ namespace Extrinsic::Runtime
             if(a->Page){
                 if(a->Page->State==SpatialQueryState::Failed){Finish(KMeansRunStatus::GeometryProcessingFailed,a->Page->Diagnostic);return;}
                 a->Result.CpuStageReadbackBytes+=a->Page->Data.size();
-                if(a->CentroidReadback){
-                    if(a->Page->Data.size()!=std::size_t(a->Clusters)*12){Finish(KMeansRunStatus::GeometryProcessingFailed,"K-Means centroid readback size mismatch.");return;}
-                    a->Geometry.Centroids.resize(a->Clusters);std::memcpy(a->Geometry.Centroids.data(),a->Page->Data.data(),a->Page->Data.size());
-                    for(const auto& centroid:a->Geometry.Centroids)
-                        if(!std::isfinite(centroid.x)||!std::isfinite(centroid.y)||!std::isfinite(centroid.z)){
-                            Finish(KMeansRunStatus::GeometryProcessingFailed,"K-Means centroid readback contains non-finite values.");return;
-                        }
-                    a->Result.Centroids=a->Geometry.Centroids;a->Ready=true;a->Page.reset();
-                    if(a->Snapshot.Command.AutoAccept)Accept();return;
+                // A non-terminal preview recorded before the next iteration in
+                // the same submission publishes before that iteration's diagnostics.
+                if(a->Presented){
+                    a->Presented=false;a->Back.reset();
+                    if(!PublishEditorPointScalarBack(a->Transaction,a->Terminal, std::array{0.f, float(std::max(1u, a->Clusters - 1u))})){Finish(KMeansRunStatus::GeometryProcessingFailed,"K-Means preview publication refused.");return;}
+                    ++a->Result.GpuPreviews;
+                    if(a->Terminal){
+                        if(a->Page->Data.size()!=std::size_t(a->Clusters)*12){Finish(KMeansRunStatus::GeometryProcessingFailed,"K-Means centroid readback size mismatch.");return;}
+                        a->Geometry.Centroids.resize(a->Clusters);std::memcpy(a->Geometry.Centroids.data(),a->Page->Data.data(),a->Page->Data.size());
+                        for(const auto& centroid:a->Geometry.Centroids)
+                            if(!std::isfinite(centroid.x)||!std::isfinite(centroid.y)||!std::isfinite(centroid.z)){
+                                Finish(KMeansRunStatus::GeometryProcessingFailed,"K-Means centroid readback contains non-finite values.");return;
+                            }
+                        a->Result.Centroids=a->Geometry.Centroids;a->Ready=true;a->Page.reset();
+                        if(a->Snapshot.Command.AutoAccept)Accept();return;
+                    }
                 }
                 if(a->Boundary){
                     a->Row=a->Inner=0;a->Boundary=false;
-                    switch(a->Phase){
-                    case KMeansGpuPhase::Initialize:a->Phase=KMeansGpuPhase::Assign;break;
-                    case KMeansGpuPhase::Assign:a->Phase=KMeansGpuPhase::Reduce;break;
-                    case KMeansGpuPhase::Reduce:a->Phase=KMeansGpuPhase::Update;break;
-                    case KMeansGpuPhase::Update:{
-                        if(a->Page->Data.size()!=sizeof(KMeansGpuDiagnostics)){Finish(KMeansRunStatus::GeometryProcessingFailed,"K-Means diagnostic readback size mismatch.");return;}
-                        KMeansGpuDiagnostics d;std::memcpy(&d,a->Page->Data.data(),sizeof(d));
-                        if(d.Invalid||!std::isfinite(d.Inertia)||!std::isfinite(d.MaxShift)){Finish(KMeansRunStatus::GeometryProcessingFailed,"K-Means device numerical failure.");return;}
-                        ++a->Result.Iterations;a->Result.Inertia=d.Inertia;a->Result.MaxDistanceIndex=d.MaxDistanceIndex;
-                        a->Result.Converged=!d.Changed||d.MaxShift<=a->Snapshot.Params.ConvergenceTolerance*a->Snapshot.Params.ConvergenceTolerance;
-                        a->Geometry.Iterations=a->Result.Iterations;a->Geometry.Converged=a->Result.Converged;
-                        a->Geometry.Inertia=d.Inertia;a->Geometry.MaxDistanceIndex=d.MaxDistanceIndex;
-                        a->Terminal=a->Stop||a->Result.Converged||a->Result.Iterations==a->Snapshot.Params.MaxIterations;
-                        a->Phase=a->Terminal||a->Result.Iterations%a->Snapshot.Command.Parameters.GpuPreviewInterval==0?
-                            KMeansGpuPhase::Preview:KMeansGpuPhase::Assign;break;}
-                    case KMeansGpuPhase::Preview:a->Phase=KMeansGpuPhase::Presentation;break;
-                    case KMeansGpuPhase::Presentation:
-                        a->Back.reset();
-                        if(!PublishEditorPointScalarBack(a->Transaction,a->Terminal)){Finish(KMeansRunStatus::GeometryProcessingFailed,"K-Means preview publication refused.");return;}
-                        ++a->Result.GpuPreviews;
-                        if(a->Terminal)a->CentroidReadback=true;
-                        else a->Phase=KMeansGpuPhase::Assign;
-                        break;
-                    }
+                    if(a->Page->Data.size()!=sizeof(KMeansGpuDiagnostics)){Finish(KMeansRunStatus::GeometryProcessingFailed,"K-Means diagnostic readback size mismatch.");return;}
+                    KMeansGpuDiagnostics d;std::memcpy(&d,a->Page->Data.data(),sizeof(d));
+                    if(d.Invalid||!std::isfinite(d.Inertia)||!std::isfinite(d.MaxShift)){Finish(KMeansRunStatus::GeometryProcessingFailed,"K-Means device numerical failure.");return;}
+                    ++a->Result.Iterations;a->Result.Inertia=d.Inertia;a->Result.MaxDistanceIndex=d.MaxDistanceIndex;
+                    a->Result.Converged=!d.Changed||d.MaxShift<=a->Snapshot.Params.ConvergenceTolerance*a->Snapshot.Params.ConvergenceTolerance;
+                    a->Geometry.Iterations=a->Result.Iterations;a->Geometry.Converged=a->Result.Converged;
+                    a->Geometry.Inertia=d.Inertia;a->Geometry.MaxDistanceIndex=d.MaxDistanceIndex;
+                    a->Terminal=a->Stop||a->Result.Converged||a->Result.Iterations==a->Snapshot.Params.MaxIterations;
+                    a->Phase=a->Terminal||a->Result.Iterations%a->Snapshot.Command.Parameters.GpuPreviewInterval==0?
+                        KMeansGpuPhase::Preview:KMeansGpuPhase::Assign;
                 }
                 a->Page.reset();
             }
-            if(a->Phase==KMeansGpuPhase::Preview&&!a->CentroidReadback&&!a->Back){
+            if(a->Phase==KMeansGpuPhase::Preview&&!a->Back){
                 a->Back=AcquireEditorPointScalarBack(a->Transaction);
                 if(!a->Back){
-                    if(!a->Terminal)a->Phase=KMeansGpuPhase::Assign;
-                    else if(++a->PreviewDeferrals>=600)Finish(KMeansRunStatus::GeometryProcessingFailed,"K-Means terminal preview residency remained busy for 600 retries.");
-                    return;
+                    if(a->Terminal){
+                        if(++a->PreviewDeferrals>=600)Finish(KMeansRunStatus::GeometryProcessingFailed,"K-Means terminal preview residency remained busy for 600 retries.");
+                        return;
+                    }
+                    a->Phase=KMeansGpuPhase::Assign; // Skip a busy interval preview without idling a frame.
                 }
             }
             a->PreviewDeferrals=0;
-            // Every update submission returns only the small diagnostics. Other
-            // intermediate submissions use completion-only immediate execution.
-            const auto bytes=a->CentroidReadback?std::uint64_t(a->Clusters)*12:
-                a->Phase==KMeansGpuPhase::Update?sizeof(KMeansGpuDiagnostics):0;
+            const bool terminalPreview=a->Terminal&&(a->Phase==KMeansGpuPhase::Preview||a->Phase==KMeansGpuPhase::Presentation);
+            const auto bytes=terminalPreview?std::uint64_t(a->Clusters)*12:std::uint64_t(sizeof(KMeansGpuDiagnostics));
             a->Recorded=false;
             a->Page=a->Context.SpatialIndices->QueueGpuCompute(bytes,
                 [this,alive=Alive,a](RHI::ICommandContext& cmd,const SpatialGpuIndexView&){return *alive?Record(a,cmd):RHI::BufferHandle{};},SpatialGpuLatency::Immediate);

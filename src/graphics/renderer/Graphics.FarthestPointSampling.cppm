@@ -35,7 +35,8 @@ export namespace Extrinsic::Graphics
         static constexpr std::uint32_t MaxPoints = 65535u * 256u;
         // Readback: Count clearance doubles (+inf for the first), then Count order uints.
         [[nodiscard]] static std::size_t ReadbackBytes(std::uint32_t count) noexcept;
-        // Retains the resident views and copies row/transform metadata; refuses invalid layouts.
+        // Retains resident views and copies row/transform metadata; refuses invalid layouts.
+        // Call only after the previous run completed; scratch capacity and pipeline are reused.
         [[nodiscard]] bool Begin(const FarthestPointGpuInput& input);
         // Gathers and converts resident inputs on the first call, records bounded rounds and returns the
         // result buffer, ready for transfer reads; invalid on refusal (non-operational device,

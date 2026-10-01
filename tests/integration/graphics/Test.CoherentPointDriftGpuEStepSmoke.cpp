@@ -285,7 +285,7 @@ namespace
             ++Frames;
             if (Phase == 0)
             {
-                Broker = std::make_shared<Runtime::CoherentPointDriftGpuEStep>(*Context.SpatialIndices, Kernel().GetDevice());
+                Broker = std::make_shared<Runtime::CoherentPointDriftGpuEStep>(*Context.SpatialIndices);
                 PhaseStarted = std::chrono::steady_clock::now();
                 Worker = std::thread([this] { ParityWork(); ParityDone = true; });
                 Phase = 1;
@@ -502,7 +502,7 @@ namespace
             if (!Broker)
             {
                 Broker = std::make_shared<Runtime::CoherentPointDriftGpuEStep>(
-                    *Kernel().Services().Find<Runtime::SpatialIndexCache>(), Kernel().GetDevice(), std::chrono::minutes{10});
+                    *Kernel().Services().Find<Runtime::SpatialIndexCache>(), std::chrono::minutes{10});
                 Worker = std::thread([this] { Work(); Finished = true; });
                 return;
             }

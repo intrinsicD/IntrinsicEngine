@@ -277,7 +277,7 @@ namespace Extrinsic::Runtime
                     run->GpuUnavailable = reason + "; the E-step ran on the CPU.";
                 else
                 {
-                    run->GpuEStep = std::make_shared<CoherentPointDriftGpuEStep>(*context.SpatialIndices, *context.Device);
+                    run->GpuEStep = std::make_shared<CoherentPointDriftGpuEStep>(*context.SpatialIndices);
                     run->Params.EStepExternal = [broker = run->GpuEStep](const CPD::EStep::ExternalRequest& request) {
                         return broker->Evaluate(request);
                     };

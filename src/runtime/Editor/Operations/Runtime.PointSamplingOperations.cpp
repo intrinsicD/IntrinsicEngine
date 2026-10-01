@@ -307,7 +307,7 @@ namespace Extrinsic::Runtime
             const auto model = ModelMatrix(captured->Transform ? &*captured->Transform : nullptr);
             for (std::size_t column = 0; column < 4; ++column)
                 for (std::size_t row = 0; row < 4; ++row) input.Model[4 * column + row] = model[column][row];
-            auto run = std::make_shared<PointSamplingGpuRun>(*context.Device, input, captured->World, params);
+            auto run = std::make_shared<PointSamplingGpuRun>(*context.SpatialIndices, input, captured->World, params);
             auto sink = GuardEditorProcessingResult(context, std::move(onComplete));
             auto delivered = std::make_shared<bool>(false);
             const auto started = std::chrono::steady_clock::now();

@@ -1,7 +1,9 @@
 // RUNTIME-296: the vertex-normals kernels' size contract on a mock device. A pass over more
 // threads than one dispatch may cover is issued in chunks with a base index, every dispatch
 // staying within the guaranteed 65535 workgroups; a bundle or a layout beyond the 32-bit
-// index limits is refused before anything is allocated.
+// index limits is refused before anything is allocated. The resident point workspaces
+// (normals, scalar analysis, outliers) are reusable across runs: warm runs create no
+// pipeline or scratch, only an undersized buffer is replaced, and each run resets its state.
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -11,6 +13,8 @@
 #include "MockRHI.hpp"
 import Extrinsic.Graphics.VertexNormals;
 import Extrinsic.Graphics.PointNormals;
+import Extrinsic.Graphics.PointScalarAnalysis;
+import Extrinsic.Graphics.OutlierAnalysis;
 import Extrinsic.Graphics.GpuPropertyResidency;
 import Extrinsic.RHI.Handles;
 namespace G = Extrinsic::Graphics;
@@ -163,4 +167,142 @@ TEST(PointNormalsWorkspace, InputBeyondTheLbvhLimitIsRefusedBeforeRecording)
     }
     EXPECT_TRUE(commands.DispatchRecords.empty());
     EXPECT_EQ(device.CreatePipelineCount, 0);
+}
+
+namespace
+{
+    template <class T>
+    T PushField(const Extrinsic::Tests::MockCommandContext& commands, std::size_t offset)
+    {
+        T value{};
+        const auto& payload = commands.PushConstantPayloads.back();
+        EXPECT_GE(payload.size(), offset + sizeof(T));
+        if (payload.size() >= offset + sizeof(T)) std::memcpy(&value, payload.data() + offset, sizeof(T));
+        return value;
+    }
+    G::GpuPropertyView ResidentView(Extrinsic::Tests::MockDevice& device, std::uint32_t count)
+    {
+        const auto handle = device.CreateBuffer({.SizeBytes = std::uint64_t(count) * 12u, .Usage = Extrinsic::RHI::BufferUsage::Storage});
+        return {.Buffer = handle, .Address = device.GetBufferDeviceAddress(handle), .Bytes = std::uint64_t(count) * 4u,
+                .Layout = {.Count = count}};
+    }
+}
+
+TEST(PointScalarWorkspace, WarmRunsKeepPipelineAndScratchAndGrowOnlyUndersizedBuffers)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.ShaderFloat64 = true;
+    Extrinsic::Tests::MockCommandContext commands;
+    G::PointScalarWorkspace workspace(device);
+    const auto view = ResidentView(device, 4096u);
+    const auto io = [&](std::uint32_t count) {
+        return G::PointScalarResidentIo{.Positions = view, .Output = view, .Nodes = 16, .LiveSlots = 32, .LiveCount = count};
+    };
+    const int buffers = device.CreateBufferCount;
+    // A refusal records and allocates nothing and leaves the workspace usable.
+    EXPECT_FALSE(workspace.Record(commands, {.Method = 1, .K = 4}, {.Positions = view, .Output = view, .LiveCount = 100}).IsValid());
+    EXPECT_TRUE(commands.DispatchRecords.empty());
+    EXPECT_EQ(device.CreatePipelineCount, 0);
+    EXPECT_EQ(device.CreateBufferCount, buffers);
+
+    const auto stats = workspace.Record(commands, {.Method = 1, .K = 4}, io(100));
+    ASSERT_TRUE(stats.IsValid());
+    EXPECT_EQ(device.CreatePipelineCount, 1);
+    EXPECT_EQ(device.CreateBufferCount - buffers, 3); // neighbors, nearest/means, stats
+    EXPECT_EQ(commands.FillBufferCalls, 2);          // output and stats
+    // Same capacity: nothing is created and the run's stats are zeroed again.
+    EXPECT_EQ(workspace.Record(commands, {.Method = 1, .K = 4}, io(100)), stats);
+    EXPECT_EQ(device.CreatePipelineCount, 1);
+    EXPECT_EQ(device.CreateBufferCount - buffers, 3);
+    EXPECT_EQ(device.DestroyBufferCount, 0);
+    EXPECT_EQ(commands.FillBufferCalls, 4);
+    // Smaller, different parameters: no allocation; the run addresses only its own rows.
+    EXPECT_EQ(workspace.Record(commands, {.Method = 0, .K = 2}, io(10)), stats);
+    EXPECT_EQ(device.CreateBufferCount - buffers, 3);
+    EXPECT_EQ(commands.FillBufferCalls, 6);
+    EXPECT_EQ(PushField<std::uint32_t>(commands, 64), 10u); // Count
+    EXPECT_EQ(PushField<std::uint32_t>(commands, 68), 3u);  // Width
+    EXPECT_EQ(PushField<std::uint32_t>(commands, 72), 0u);  // Method
+    // A wider neighborhood replaces only the neighbor scratch.
+    EXPECT_EQ(workspace.Record(commands, {.Method = 1, .K = 8}, io(100)), stats);
+    EXPECT_EQ(device.CreateBufferCount - buffers, 4);
+    EXPECT_EQ(device.DestroyBufferCount, 1);
+    // More rows replace both row-sized buffers, never the stats.
+    EXPECT_EQ(workspace.Record(commands, {.Method = 1, .K = 8}, io(200)), stats);
+    EXPECT_EQ(device.CreateBufferCount - buffers, 6);
+    EXPECT_EQ(device.DestroyBufferCount, 3);
+    // A failed growth refuses before recording; the next run allocates it.
+    const auto dispatches = commands.DispatchRecords.size();
+    device.FailNextBufferCreate = true;
+    EXPECT_FALSE(workspace.Record(commands, {.Method = 1, .K = 8}, io(400)).IsValid());
+    EXPECT_EQ(commands.DispatchRecords.size(), dispatches);
+    EXPECT_EQ(workspace.Record(commands, {.Method = 1, .K = 8}, io(400)), stats);
+    EXPECT_EQ(device.CreatePipelineCount, 1);
+}
+
+TEST(OutlierWorkspace, WarmRunsKeepPipelineAndScratchAndGrowOnlyUndersizedBuffers)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.ShaderFloat64 = true;
+    Extrinsic::Tests::MockCommandContext commands;
+    G::OutlierWorkspace workspace(device);
+    const auto io = [&](std::uint32_t count) {
+        const auto view = ResidentView(device, count);
+        return G::OutlierResidentIo{.Positions = view, .Score = view, .Mask = view, .Presentation = view,
+                                    .Nodes = 16, .LiveSlots = 32, .LiveCount = count};
+    };
+    const auto small = io(100), large = io(300);
+    const int buffers = device.CreateBufferCount;
+    const auto stats = workspace.Record(commands, {.Method = 0, .K = 4}, small);
+    ASSERT_TRUE(stats.IsValid());
+    EXPECT_EQ(device.CreatePipelineCount, 1);
+    EXPECT_EQ(device.CreateBufferCount - buffers, 3);
+    // Same capacity, then a smaller radius run: nothing is created.
+    EXPECT_EQ(workspace.Record(commands, {.Method = 0, .K = 4}, small), stats);
+    EXPECT_EQ(workspace.Record(commands, {.Method = 1, .MinimumNeighbors = 2, .Radius = 1}, small), stats);
+    EXPECT_EQ(device.CreatePipelineCount, 1);
+    EXPECT_EQ(device.CreateBufferCount - buffers, 3);
+    EXPECT_EQ(PushField<std::uint32_t>(commands, 76), 1u); // Width of the radius run
+    EXPECT_EQ(PushField<std::uint32_t>(commands, 80), 1u); // Method
+    // A wider neighborhood replaces only the neighbor scratch; more slots also the means.
+    EXPECT_EQ(workspace.Record(commands, {.Method = 2, .K = 16}, small), stats);
+    EXPECT_EQ(device.CreateBufferCount - buffers, 4);
+    EXPECT_EQ(device.DestroyBufferCount, 1);
+    EXPECT_EQ(workspace.Record(commands, {.Method = 2, .K = 16}, large), stats);
+    EXPECT_EQ(device.CreateBufferCount - buffers, 6);
+    EXPECT_EQ(device.DestroyBufferCount, 3);
+    EXPECT_EQ(device.CreatePipelineCount, 1);
+}
+
+TEST(PointNormalsWorkspace, NewRunAfterCompletionReusesScratchAndRefusesOversizedLaterPages)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.ShaderFloat64 = true;
+    Extrinsic::Tests::MockCommandContext commands;
+    G::PointNormalsWorkspace workspace(device);
+    const auto view = ResidentView(device, 2048u);
+    const auto io = [&](std::uint32_t count) {
+        return G::PointNormalsResidentIo{.Positions = view, .Output = view, .Nodes = 16, .LiveSlots = 32, .LiveCount = count};
+    };
+    const int buffers = device.CreateBufferCount;
+    const G::PointNormalsGpuParams wide{.K = 15, .BatchSize = 64};
+    const auto stats = workspace.Record(commands, wide, io(128));
+    ASSERT_TRUE(stats.IsValid());
+    ASSERT_EQ(workspace.Record(commands, wide, io(128), 64), stats);
+    EXPECT_EQ(commands.FillBufferCalls, 2);
+    // Page 0 of the next run starts over on the kept pipeline and scratch.
+    const G::PointNormalsGpuParams narrow{.K = 7, .BatchSize = 64};
+    EXPECT_EQ(workspace.Record(commands, narrow, io(64)), stats);
+    EXPECT_EQ(device.CreatePipelineCount, 1);
+    EXPECT_EQ(device.CreateBufferCount - buffers, 2);
+    EXPECT_EQ(commands.FillBufferCalls, 4); // output and stats reset again
+    // A later page needing more scratch than its run's page 0 prepared is refused unrecorded.
+    const auto dispatches = commands.DispatchRecords.size();
+    EXPECT_FALSE(workspace.Record(commands, wide, io(128), 64).IsValid());
+    EXPECT_EQ(commands.DispatchRecords.size(), dispatches);
+    // A larger run replaces only the neighbor scratch.
+    EXPECT_EQ(workspace.Record(commands, {.K = 31, .BatchSize = 64}, io(128)), stats);
+    EXPECT_EQ(device.CreateBufferCount - buffers, 3);
+    EXPECT_EQ(device.DestroyBufferCount, 1);
+    EXPECT_EQ(device.CreatePipelineCount, 1);
 }

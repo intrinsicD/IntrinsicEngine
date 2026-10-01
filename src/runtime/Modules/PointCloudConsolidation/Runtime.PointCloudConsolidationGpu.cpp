@@ -229,6 +229,26 @@ namespace Extrinsic::Runtime
             }
         };
 
+        using LopBufferRole = RHI::BufferHandle LopGpuResources::*;
+        constexpr LopBufferRole kLopBufferRoles[] = {
+            &LopGpuResources::State, &LopGpuResources::SourcePositions,
+            &LopGpuResources::SourceWeights, &LopGpuResources::ProjectedA,
+            &LopGpuResources::ProjectedB, &LopGpuResources::ProjectedWeights,
+            &LopGpuResources::Displacements, &LopGpuResources::SourceCounts,
+            &LopGpuResources::SourceOffsets, &LopGpuResources::SourceCursors,
+            &LopGpuResources::SourceIndices, &LopGpuResources::ProjectedCounts,
+            &LopGpuResources::ProjectedOffsets, &LopGpuResources::ProjectedCursors,
+            &LopGpuResources::ProjectedIndices, &LopGpuResources::Diagnostics,
+            &LopGpuResources::ScanScratch, &LopGpuResources::SeedRows,
+        };
+
+        [[nodiscard]] std::vector<RHI::BufferManager::BufferLease>::iterator FindLease(
+            LopGpuResources& resources, const RHI::BufferHandle handle)
+        {
+            return std::ranges::find_if(resources.Leases,
+                [handle](const auto& lease) { return lease.GetHandle() == handle; });
+        }
+
         [[nodiscard]] constexpr std::uint32_t CeilDiv(
             const std::uint32_t value,
             const std::uint32_t divisor) noexcept
@@ -411,9 +431,53 @@ namespace Extrinsic::Runtime
             return true;
         }
 
+        // Moves the spare buffer of `role` into `resources` when its capacity
+        // still covers `desc`, otherwise releases it and creates a new one. Spare
+        // buffers come only from completed runs, so no GPU work references them.
+        [[nodiscard]] bool AcquireBuffer(
+            RHI::BufferManager& buffers,
+            LopGpuResources& spare,
+            const LopBufferRole role,
+            const RHI::BufferDesc& desc,
+            LopGpuResources& resources)
+        {
+            const RHI::BufferHandle retained = std::exchange(spare.*role, RHI::BufferHandle{});
+            if (const auto lease = FindLease(spare, retained); lease != spare.Leases.end())
+            {
+                const RHI::BufferDesc* current = buffers.GetDesc(retained);
+                const bool fits = current != nullptr && desc.SizeBytes > 0u &&
+                    current->SizeBytes >= desc.SizeBytes;
+                if (fits)
+                {
+                    resources.*role = retained;
+                    resources.Leases.push_back(std::move(*lease));
+                }
+                spare.Leases.erase(lease);
+                if (fits)
+                    return true;
+            }
+            return CreateBuffer(buffers, desc, resources.*role, resources.Leases);
+        }
+
+        // Returns a completed run's owned buffers to the spare set. A resident
+        // input view has no lease here, so its address is never kept as scratch.
+        void RecycleResources(LopGpuResources&& done, LopGpuResources& spare)
+        {
+            for (const LopBufferRole role : kLopBufferRoles)
+            {
+                const auto lease = FindLease(done, done.*role);
+                if (!(done.*role).IsValid() || lease == done.Leases.end() || (spare.*role).IsValid())
+                    continue;
+                spare.*role = done.*role;
+                spare.Leases.push_back(std::move(*lease));
+                done.Leases.erase(lease);
+            }
+        }
+
         [[nodiscard]] bool AllocateResources(
             RHI::BufferManager& buffers,
             const LopGpuPlan& plan,
+            LopGpuResources& spare,
             LopGpuResources& resources, RHI::BufferHandle resident = {})
         {
             const std::uint64_t sourceVec4Bytes =
@@ -440,71 +504,33 @@ namespace Extrinsic::Runtime
 
             LopGpuResources allocated{};
             allocated.SourcePositions = resident;
-            const bool created =
-                CreateBuffer(
-                    buffers,
-                    StorageBufferDesc(
-                        sizeof(LopGpuStateBufferRecord),
-                        "LopGpu.State"),
-                    allocated.State,
-                    allocated.Leases) &&
-                (resident.IsValid() || CreateBuffer(
-                    buffers,
-                    StorageBufferDesc(
-                        sourceVec4Bytes, "LopGpu.SourcePositions"),
-                    allocated.SourcePositions,
-                    allocated.Leases)) &&
-                CreateBuffer(
-                    buffers,
-                    StorageBufferDesc(
-                        sourceFloatBytes, "LopGpu.SourceWeights"),
-                    allocated.SourceWeights,
-                    allocated.Leases) &&
-                CreateBuffer(
-                    buffers,
-                    StorageBufferDesc(targetVec4Bytes, "LopGpu.ProjectedA"),
-                    allocated.ProjectedA,
-                    allocated.Leases) &&
-                CreateBuffer(
-                    buffers,
-                    StorageBufferDesc(targetVec4Bytes, "LopGpu.ProjectedB"),
-                    allocated.ProjectedB,
-                    allocated.Leases) &&
-                CreateBuffer(
-                    buffers,
-                    StorageBufferDesc(
-                        targetFloatBytes, "LopGpu.ProjectedWeights"),
-                    allocated.ProjectedWeights,
-                    allocated.Leases) &&
-                CreateBuffer(
-                    buffers,
-                    StorageBufferDesc(
-                        targetFloatBytes, "LopGpu.Displacements"),
-                    allocated.Displacements,
-                    allocated.Leases) &&
-                CreateBuffer(buffers, StorageBufferDesc(cellBytes, "LopGpu.SourceCounts"), allocated.SourceCounts, allocated.Leases) &&
-                CreateBuffer(buffers, StorageBufferDesc(cellBytes, "LopGpu.SourceOffsets"), allocated.SourceOffsets, allocated.Leases) &&
-                CreateBuffer(buffers, StorageBufferDesc(cellBytes, "LopGpu.SourceCursors"), allocated.SourceCursors, allocated.Leases) &&
-                CreateBuffer(buffers, StorageBufferDesc(sourceIndexBytes, "LopGpu.SourceIndices"), allocated.SourceIndices, allocated.Leases) &&
-                CreateBuffer(buffers, StorageBufferDesc(cellBytes, "LopGpu.ProjectedCounts"), allocated.ProjectedCounts, allocated.Leases) &&
-                CreateBuffer(buffers, StorageBufferDesc(cellBytes, "LopGpu.ProjectedOffsets"), allocated.ProjectedOffsets, allocated.Leases) &&
-                CreateBuffer(buffers, StorageBufferDesc(cellBytes, "LopGpu.ProjectedCursors"), allocated.ProjectedCursors, allocated.Leases) &&
-                CreateBuffer(buffers, StorageBufferDesc(targetIndexBytes, "LopGpu.ProjectedIndices"), allocated.ProjectedIndices, allocated.Leases) &&
-                CreateBuffer(buffers, StorageBufferDesc(sizeof(LopGpuDiagnosticsRecord), "LopGpu.Diagnostics"), allocated.Diagnostics, allocated.Leases);
-            if (!created)
-                return false;
-            if (plan.ScanPlan.ScratchBytes > 0u &&
-                !CreateBuffer(
-                    buffers,
-                    Graphics::BuildParallelPrimitiveScratchBufferDesc(
-                        plan.ScanPlan,
-                        "LopGpu.ScanScratch"),
-                    allocated.ScanScratch,
-                    allocated.Leases))
+            const auto acquire = [&](const LopBufferRole role, const std::uint64_t bytes, const char* name)
             {
-                return false;
-            }
-            if (!allocated.IsValid())
+                return AcquireBuffer(buffers, spare, role, StorageBufferDesc(bytes, name), allocated);
+            };
+            const bool created =
+                acquire(&LopGpuResources::State, sizeof(LopGpuStateBufferRecord), "LopGpu.State") &&
+                (resident.IsValid() ||
+                 acquire(&LopGpuResources::SourcePositions, sourceVec4Bytes, "LopGpu.SourcePositions")) &&
+                acquire(&LopGpuResources::SourceWeights, sourceFloatBytes, "LopGpu.SourceWeights") &&
+                acquire(&LopGpuResources::ProjectedA, targetVec4Bytes, "LopGpu.ProjectedA") &&
+                acquire(&LopGpuResources::ProjectedB, targetVec4Bytes, "LopGpu.ProjectedB") &&
+                acquire(&LopGpuResources::ProjectedWeights, targetFloatBytes, "LopGpu.ProjectedWeights") &&
+                acquire(&LopGpuResources::Displacements, targetFloatBytes, "LopGpu.Displacements") &&
+                acquire(&LopGpuResources::SourceCounts, cellBytes, "LopGpu.SourceCounts") &&
+                acquire(&LopGpuResources::SourceOffsets, cellBytes, "LopGpu.SourceOffsets") &&
+                acquire(&LopGpuResources::SourceCursors, cellBytes, "LopGpu.SourceCursors") &&
+                acquire(&LopGpuResources::SourceIndices, sourceIndexBytes, "LopGpu.SourceIndices") &&
+                acquire(&LopGpuResources::ProjectedCounts, cellBytes, "LopGpu.ProjectedCounts") &&
+                acquire(&LopGpuResources::ProjectedOffsets, cellBytes, "LopGpu.ProjectedOffsets") &&
+                acquire(&LopGpuResources::ProjectedCursors, cellBytes, "LopGpu.ProjectedCursors") &&
+                acquire(&LopGpuResources::ProjectedIndices, targetIndexBytes, "LopGpu.ProjectedIndices") &&
+                acquire(&LopGpuResources::Diagnostics, sizeof(LopGpuDiagnosticsRecord), "LopGpu.Diagnostics") &&
+                (plan.ScanPlan.ScratchBytes == 0u ||
+                 AcquireBuffer(buffers, spare, &LopGpuResources::ScanScratch,
+                     Graphics::BuildParallelPrimitiveScratchBufferDesc(plan.ScanPlan, "LopGpu.ScanScratch"),
+                     allocated));
+            if (!created || !allocated.IsValid())
                 return false;
             resources = std::move(allocated);
             return true;
@@ -549,7 +575,9 @@ namespace Extrinsic::Runtime
 
     struct PointCloudConsolidationGpuState::Impl
     {
-        enum class LopPhase { Upload, Initialize, Grid, Project, Finalize, Publish, Reduce, Readback };
+        // Publish is a host-only step: the preview copy rides the next Grid or Reduce
+        // page, and the last Project page of an iteration also records Finalize.
+        enum class LopPhase { Upload, Initialize, Grid, Project, Publish, Reduce, Readback };
 
         struct ActiveOperation
         {
@@ -563,7 +591,7 @@ namespace Extrinsic::Runtime
             LopPhase Phase{LopPhase::Upload};
             std::uint32_t Row{}, Iteration{}, MaximumCandidates{1u}, SubmittedRows{};
             LopPagingLimits Paging{LopPagingForTesting};
-            bool Stop{}, Discarded{}, Ready{}, Accepting{}, TerminalPage{}, PageRecorded{};
+            bool Stop{}, Discarded{}, Ready{}, Accepting{}, TerminalPage{}, PageRecorded{}, PublishPending{};
             LopGpuPlan Plan{};
             LopGpuResources Resources{};
             std::uint64_t ProducerCompletedFrame{0u};
@@ -710,6 +738,8 @@ namespace Extrinsic::Runtime
                 if (finished.Input) RetiredViews.push_back(*finished.Input);
                 if (finished.Back) RetiredViews.push_back(*finished.Back);
             }
+            // Pages are serial, so every recorded page has completed here.
+            else RecycleResources(std::move(finished.Resources), Spare);
             // Discard is idempotent after Accept bound the front to the CPU revision.
             if (finished.PositionRun) DiscardEditorGpuPositionRun(finished.Commands, finished.PositionRun, *finished.Context.SpatialIndices->PropertyResidency());
             Completed = PointCloudConsolidationGpuResult{.Published = std::move(result)};
@@ -765,6 +795,26 @@ namespace Extrinsic::Runtime
             return std::max(1u, Active->Paging.PagePairs / Active->MaximumCandidates);
         }
 
+        // True for the Project page covering the last rows of the current iteration.
+        [[nodiscard]] bool FinalizesIteration() const noexcept
+        {
+            const auto& a = *Active;
+            return a.Phase == LopPhase::Project && a.Plan.TargetCount - a.Row == a.SubmittedRows;
+        }
+
+        void RecordPublishCopy(RHI::ICommandContext& commands)
+        {
+            auto& a = *Active;
+            if (!a.PublishPending || !a.Back) return;
+            const auto rw = RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite;
+            const auto source = (a.Iteration & 1u) ? a.Resources.ProjectedB : a.Resources.ProjectedA;
+            commands.BufferBarrier(source, RHI::MemoryAccess::ShaderWrite, RHI::MemoryAccess::TransferRead);
+            commands.CopyBuffer(source, a.Back->Buffer, 0u, 0u, a.Back->Bytes);
+            commands.BufferBarrier(source, RHI::MemoryAccess::TransferRead, rw);
+            commands.BufferBarrier(a.Back->Buffer, RHI::MemoryAccess::TransferWrite, RHI::MemoryAccess::ShaderRead);
+            Residency().NoteUse(a.Back->Buffer, Device->GetGlobalFrameNumber());
+        }
+
         RHI::BufferHandle RecordLopPage(RHI::ICommandContext& commands)
         {
             if (!Active || Active->Discarded) return {};
@@ -775,11 +825,12 @@ namespace Extrinsic::Runtime
             if (a.Phase != LopPhase::Upload) commands.BufferBarrier(r.Diagnostics, rw | RHI::MemoryAccess::TransferRead, rw);
             if (a.Phase == LopPhase::Upload)
             {
-                if (!EnsurePipelines() || !AllocateResources(*Buffers, a.Plan, r, a.Input->Buffer)) return {};
+                if (!EnsurePipelines() || !AllocateResources(*Buffers, a.Plan, Spare, r, a.Input->Buffer)) return {};
                 if (a.Plan.TargetCount != a.Plan.SourceCount)
                 {
                     const auto bytes = a.Snapshot.GpuSeedRows.size() * sizeof(std::uint32_t);
-                    if (!CreateBuffer(*Buffers, StorageBufferDesc(bytes, "LopGpu.SeedRows"), r.SeedRows, r.Leases)) return {};
+                    if (!AcquireBuffer(*Buffers, Spare, &LopGpuResources::SeedRows,
+                            StorageBufferDesc(bytes, "LopGpu.SeedRows"), r)) return {};
                     if (!Graphics::SubmitBufferUpload(*Device, r.SeedRows, a.Snapshot.GpuSeedRows.data(), bytes).Accepted()) return {};
                     a.Result.CpuStageUploadBytes += bytes;
                     commands.BufferBarrier(r.SeedRows, RHI::MemoryAccess::TransferWrite, RHI::MemoryAccess::ShaderRead);
@@ -800,9 +851,7 @@ namespace Extrinsic::Runtime
             }
             else if (a.Phase == LopPhase::Initialize || a.Phase == LopPhase::Project)
             {
-                const auto rows = std::min(a.Plan.TargetCount - a.Row,
-                    std::max(1u, a.Paging.SubmissionPairs / a.MaximumCandidates));
-                a.SubmittedRows = rows;
+                const auto rows = a.SubmittedRows;
                 for (std::uint32_t offset = 0u; offset < rows;)
                 {
                     auto push = Push(a.Iteration, a.Phase == LopPhase::Initialize ? 0u : 1u);
@@ -814,32 +863,24 @@ namespace Extrinsic::Runtime
                 }
                 for (const auto buffer : {r.ProjectedA, r.ProjectedB, r.Displacements, r.Diagnostics})
                     commands.BufferBarrier(buffer, RHI::MemoryAccess::ShaderWrite, rw);
+                // Finalize reads only the iteration's diagnostics record (one invocation),
+                // so it closes the last projection page instead of costing its own round trip.
+                if (FinalizesIteration())
+                {
+                    Dispatch(commands, Pipelines.IterationFinalize, Push(a.Iteration, 1u), 1u);
+                    commands.BufferBarrier(r.Diagnostics, RHI::MemoryAccess::ShaderWrite, rw);
+                }
             }
             else if (a.Phase == LopPhase::Grid)
             {
+                RecordPublishCopy(commands);
                 Dispatch(commands, Pipelines.IterationReset, Push(a.Iteration, 1u), 1u);
                 commands.BufferBarrier(r.Diagnostics, RHI::MemoryAccess::ShaderWrite, rw);
                 if (!RecordGrid(commands, false, a.Iteration)) return {};
             }
-            else if (a.Phase == LopPhase::Finalize)
-            {
-                Dispatch(commands, Pipelines.IterationFinalize, Push(a.Iteration, 1u), 1u);
-                commands.BufferBarrier(r.Diagnostics, RHI::MemoryAccess::ShaderWrite, rw);
-            }
-            else if (a.Phase == LopPhase::Publish)
-            {
-                if (a.Back)
-                {
-                    const auto source = (a.Iteration & 1u) ? r.ProjectedB : r.ProjectedA;
-                    commands.BufferBarrier(source, RHI::MemoryAccess::ShaderWrite, RHI::MemoryAccess::TransferRead);
-                    commands.CopyBuffer(source, a.Back->Buffer, 0u, 0u, a.Back->Bytes);
-                    commands.BufferBarrier(source, RHI::MemoryAccess::TransferRead, rw);
-                    commands.BufferBarrier(a.Back->Buffer, RHI::MemoryAccess::TransferWrite, RHI::MemoryAccess::ShaderRead);
-                    Residency().NoteUse(a.Back->Buffer, Device->GetGlobalFrameNumber());
-                }
-            }
             else if (a.Phase == LopPhase::Reduce)
             {
+                RecordPublishCopy(commands);
                 auto push = Push(a.Iteration - 1u, 1u);
                 push.Reserved0 = a.Row;
                 push.PageCount = std::min(a.Paging.ReduceRows, a.Plan.TargetCount - a.Row);
@@ -884,7 +925,20 @@ namespace Extrinsic::Runtime
                     return;
                 }
                 a.Result.CpuStageReadbackBytes += a.Page->Data.size();
-                if (a.Phase == LopPhase::Upload || a.Phase == LopPhase::Grid || a.Phase == LopPhase::Finalize)
+                if (a.PublishPending)
+                {
+                    // The page carrying the preview copy completed, so the back is filled.
+                    a.PublishPending = false;
+                    if (!Residency().Publish(EditorGpuPositionRunKey(a.PositionRun)))
+                    {
+                        FinishLop(PointCloudConsolidationRunStatus::GeometryProcessingFailed, "LOP preview publication refused.");
+                        return;
+                    }
+                    ++a.Result.GpuPreviews;
+                    a.Back.reset();
+                }
+                const bool finalized = FinalizesIteration();
+                if (a.Phase == LopPhase::Upload || a.Phase == LopPhase::Grid || finalized)
                 {
                     if (a.Page->Data.size() != sizeof(LopGpuDiagnosticsRecord))
                     {
@@ -899,8 +953,9 @@ namespace Extrinsic::Runtime
                         return;
                     }
                     a.MaximumCandidates = std::max(1u, diagnostic.MaximumCandidates);
-                    if (a.Phase == LopPhase::Finalize)
+                    if (finalized)
                     {
+                        a.Row = 0u;
                         ++a.Iteration;
                         a.TerminalPage = a.Stop || diagnostic.Active == 0u || a.Iteration == a.Snapshot.Params.MaxIterations;
                         const bool publish = a.PositionRun && (a.TerminalPage ||
@@ -915,22 +970,8 @@ namespace Extrinsic::Runtime
                     if (a.Row == a.Plan.TargetCount)
                     {
                         a.Row = 0u;
-                        a.Phase = a.Phase == LopPhase::Initialize ? LopPhase::Grid : LopPhase::Finalize;
+                        a.Phase = LopPhase::Grid;
                     }
-                }
-                else if (a.Phase == LopPhase::Publish)
-                {
-                    if (a.Back)
-                    {
-                        if (!Residency().Publish(EditorGpuPositionRunKey(a.PositionRun)))
-                        {
-                            FinishLop(PointCloudConsolidationRunStatus::GeometryProcessingFailed, "LOP preview publication refused.");
-                            return;
-                        }
-                        ++a.Result.GpuPreviews;
-                        a.Back.reset();
-                    }
-                    a.Phase = a.TerminalPage ? LopPhase::Reduce : LopPhase::Grid;
                 }
                 else if (a.Phase == LopPhase::Reduce)
                 {
@@ -1004,6 +1045,7 @@ namespace Extrinsic::Runtime
                     result.Diagnostics.MaxDisplacement = a.Result.MaxDisplacement;
                     Completed = PointCloudConsolidationGpuResult{.Status = PointCloudConsolidationGpuResultStatus::Completed,
                         .Snapshot = std::move(a.Snapshot), .Consolidated = std::move(result), .Metrics = a.Result};
+                    RecycleResources(std::move(a.Resources), Spare);
                     Active.reset();
                     return;
                 }
@@ -1015,9 +1057,14 @@ namespace Extrinsic::Runtime
                     a.Back = Residency().AcquireBack(EditorGpuPositionRunKey(a.PositionRun), a.Input->Layout, 2u);
                 // A terminal front must be retained; preview ring pressure merely drops a preview.
                 if (a.TerminalPage && !a.Back) return;
+                a.PublishPending = a.Back.has_value();
+                a.Phase = a.TerminalPage ? LopPhase::Reduce : LopPhase::Grid;
             }
+            if (a.Phase == LopPhase::Initialize || a.Phase == LopPhase::Project)
+                a.SubmittedRows = std::min(a.Plan.TargetCount - a.Row,
+                    std::max(1u, a.Paging.SubmissionPairs / a.MaximumCandidates));
             const bool diagnostics = a.Phase == LopPhase::Upload || a.Phase == LopPhase::Grid ||
-                a.Phase == LopPhase::Finalize ||
+                FinalizesIteration() ||
                 (a.Phase == LopPhase::Reduce && a.Plan.TargetCount - a.Row <= a.Paging.ReduceRows);
             const std::size_t bytes = diagnostics ? sizeof(LopGpuDiagnosticsRecord) :
                 a.Phase == LopPhase::Readback ? std::size_t(a.Plan.TargetCount) * sizeof(glm::vec3) : 0u;
@@ -1446,7 +1493,7 @@ namespace Extrinsic::Runtime
         {
             if (!EnsurePipelines() ||
                 !AllocateResources(
-                    *Buffers, Active->Plan, Active->Resources))
+                    *Buffers, Active->Plan, Spare, Active->Resources))
             {
                 CompleteFallback(
                     "Point-cloud consolidation Vulkan pipelines or bounded resources are unavailable.");
@@ -1599,11 +1646,17 @@ namespace Extrinsic::Runtime
             const std::uint64_t positionBytes =
                 static_cast<std::uint64_t>(Active->Plan.TargetCount) *
                 sizeof(glm::vec4);
+            // Retained buffers may exceed this run's plan; describe their real shape.
+            const auto actualDesc = [this](const RHI::BufferHandle handle, const std::uint64_t bytes, const char* name)
+            {
+                const RHI::BufferDesc* desc = Buffers->GetDesc(handle);
+                return desc != nullptr ? *desc : StorageBufferDesc(bytes, name);
+            };
             Active->Ranges = {
                 Graphics::GpuTransferReadbackRangeDesc{
                     .Source = finalPositions,
-                    .SourceDesc = StorageBufferDesc(
-                        positionBytes, finalName),
+                    .SourceDesc = actualDesc(
+                        finalPositions, positionBytes, finalName),
                     .SourceRange = RHI::BufferRange{
                         .OffsetBytes = 0u,
                         .SizeBytes = positionBytes,
@@ -1612,7 +1665,8 @@ namespace Extrinsic::Runtime
                 },
                 Graphics::GpuTransferReadbackRangeDesc{
                     .Source = Active->Resources.Diagnostics,
-                    .SourceDesc = StorageBufferDesc(
+                    .SourceDesc = actualDesc(
+                        Active->Resources.Diagnostics,
                         sizeof(LopGpuDiagnosticsRecord),
                         "LopGpu.Diagnostics"),
                     .SourceRange = RHI::BufferRange{
@@ -1755,6 +1809,8 @@ namespace Extrinsic::Runtime
                 .Consolidated = std::move(consolidated),
                 .Diagnostic = diagnostic,
             };
+            // The readback completed after every producer pass.
+            RecycleResources(std::move(Active->Resources), Spare);
             Active.reset();
         }
 
@@ -1787,6 +1843,8 @@ namespace Extrinsic::Runtime
         RHI::BufferManager* Buffers{nullptr};
         Graphics::GpuTransfer Transfer;
         LopGpuPipelineSet Pipelines{};
+        // Buffers of completed runs, kept at their capacity for the next run.
+        LopGpuResources Spare{};
         std::optional<ActiveOperation> Active{};
         std::optional<PointCloudConsolidationGpuResult> Completed{};
         std::vector<LopGpuResources> RetiredResources{};

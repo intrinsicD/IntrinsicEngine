@@ -49,12 +49,12 @@ namespace Extrinsic::Runtime
         bool Began{false};
     };
 
-    PointSamplingGpuRun::PointSamplingGpuRun(RHI::IDevice& device, const Graphics::FarthestPointGpuInput& input,
+    PointSamplingGpuRun::PointSamplingGpuRun(SpatialIndexCache& cache, const Graphics::FarthestPointGpuInput& input,
                                              const std::span<const glm::vec3> points, const PS::Params& params)
         : m_Impl(std::make_unique<Impl>())
     {
         auto& s = *m_Impl;
-        s.Workspace = std::make_shared<Graphics::FarthestPointSamplingWorkspace>(device);
+        s.Workspace = cache.LeaseGpuWorkspace<Graphics::FarthestPointSamplingWorkspace>();
         // The CPU reference converts the same floats to doubles, so both see identical inputs.
         for (const auto& p : points)
         {
@@ -66,7 +66,7 @@ namespace Extrinsic::Runtime
         s.Params = params;
         s.Params.Weights = s.Weights;
         s.Count = input.Count;
-        s.Began = points.size() > 0u && s.Workspace->Begin(input);
+        s.Began = s.Workspace && points.size() > 0u && s.Workspace->Begin(input);
     }
 
     PointSamplingGpuRun::~PointSamplingGpuRun() = default;
@@ -74,7 +74,7 @@ namespace Extrinsic::Runtime
     std::shared_ptr<SpatialGpuResult> PointSamplingGpuRun::QueueNext(SpatialIndexCache& cache)
     {
         auto& s = *m_Impl;
-        if (!s.Began) return nullptr;
+        if (!s.Began || !s.Workspace) return nullptr;
         // Earlier chunks wait for completion without moving any intermediate values to the CPU.
         const std::size_t bytes = s.Workspace->NextChunkFinishes()
             ? Graphics::FarthestPointSamplingWorkspace::ReadbackBytes(std::uint32_t(s.Count)) : 0u;
@@ -87,6 +87,7 @@ namespace Extrinsic::Runtime
     bool PointSamplingGpuRun::Observe(const SpatialGpuResult& chunk)
     {
         auto& s = *m_Impl;
+        if (!s.Workspace) return true;
         const std::size_t produced = s.Workspace->Produced();
         if (produced > s.Count) return true;
         // An intermediate chunk carries no samples; the order arrives with the last one.
@@ -101,7 +102,9 @@ namespace Extrinsic::Runtime
         s.Prefix.Clearance.insert(s.Prefix.Clearance.end(), clearance.begin() + std::ptrdiff_t(s.Prefix.Clearance.size()),
                                   clearance.end());
         s.Prefix.DistancePairs = std::uint64_t(s.X.size()) * (produced > 0u ? produced - 1u : 0u);
-        return s.Workspace->Finished();
+        const bool finished = s.Workspace->Finished();
+        if (finished) s.Workspace.reset(); // Observe is called only after GPU completion.
+        return finished;
     }
 
     const PS::Result& PointSamplingGpuRun::Current() const noexcept { return m_Impl->Prefix; }

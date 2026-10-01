@@ -28,6 +28,8 @@ namespace Extrinsic::Runtime
     public:
         explicit KMeansGpuWorkspace(RHI::IDevice&);
         ~KMeansGpuWorkspace();
+        // Reuses retained pipelines and any buffer with enough capacity. Call
+        // only after every submission that recorded this workspace completed.
         bool Prepare(std::uint32_t count, std::span<const glm::vec3> seeds,
                      std::span<const std::uint32_t> slots);
         RHI::BufferHandle Record(RHI::ICommandContext&, const Graphics::GpuPropertyView& input,
@@ -36,7 +38,11 @@ namespace Extrinsic::Runtime
         [[nodiscard]] RHI::BufferHandle Labels() const;
         [[nodiscard]] RHI::BufferHandle Centroids() const;
         [[nodiscard]] RHI::BufferHandle Distances() const;
+        [[nodiscard]] RHI::BufferHandle Diagnostics() const;
         [[nodiscard]] std::uint64_t CpuUploadBytes() const;
+        // Device objects created by the last Prepare; zero when fully reused.
+        [[nodiscard]] std::uint32_t PreparedBufferCreations() const;
+        [[nodiscard]] std::uint32_t PreparedPipelineCreations() const;
     private:
         struct Impl;
         std::unique_ptr<Impl> m_Impl;

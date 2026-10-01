@@ -33,6 +33,8 @@ export namespace Extrinsic::Graphics
     public:
         explicit PointScalarWorkspace(RHI::IDevice&);
         ~PointScalarWorkspace();
+        // One run per call. Reusable once the previous run's submission completed: the pipeline is
+        // kept and only undersized scratch is replaced.
         [[nodiscard]] RHI::BufferHandle Record(RHI::ICommandContext&, const PointScalarGpuParams&, const PointScalarResidentIo&);
     private:
         struct Impl;

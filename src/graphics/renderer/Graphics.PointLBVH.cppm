@@ -41,6 +41,12 @@ export namespace Extrinsic::Graphics
         std::uint32_t KNearestCount{};
         // Optional queryCount uint32 original source IDs. ~0u excludes nothing; equal positions remain eligible.
         RHI::BufferHandle ExcludedIndices{};
+        // Optional column-major dmat4 applied in double precision before querying. Both buffers
+        // must be supplied: Transform holds 128 bytes; TransformedQueries holds Count float3s.
+        // The scratch must not alias Queries and must remain alive through command completion.
+        RHI::BufferHandle Transform{}, TransformedQueries{};
+        // Byte offset of queryCount headers; supports one packed correspondence readback.
+        std::uint64_t HeaderOffset{};
     };
     class PointLbvhWorkspace
     {

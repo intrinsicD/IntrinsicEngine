@@ -1728,6 +1728,29 @@ namespace
     };
 }
 
+TEST_F(ConsolidationReadiness, UnusedNormalRoundsDoNotRejectShortProjectionRuns)
+{
+    Request.Config.MaxIterations = 1u;
+    Request.Config.NormalRefinementRounds = 3u;
+    for (const auto strategy : {Runtime::PointCloudConsolidationStrategy::Lop,
+                               Runtime::PointCloudConsolidationStrategy::Wlop,
+                               Runtime::PointCloudConsolidationStrategy::Clop})
+    {
+        Request.Config.Strategy = strategy;
+        Request.Config.WlopAnisotropic = false;
+        const auto result = Runtime::ResolvePointCloudConsolidationAvailability(
+            Runtime::BuildGeometryAvailability(Scene->Raw(), Entity), Request.Properties, Request.Config);
+        EXPECT_TRUE(result.Available) << result.Message;
+    }
+    Request.Config.Strategy = Runtime::PointCloudConsolidationStrategy::Ear;
+    EXPECT_FALSE(Runtime::ResolvePointCloudConsolidationAvailability(
+        Runtime::BuildGeometryAvailability(Scene->Raw(), Entity), Request.Properties, Request.Config).Available);
+    Request.Config.Strategy = Runtime::PointCloudConsolidationStrategy::Wlop;
+    Request.Config.WlopAnisotropic = true;
+    EXPECT_FALSE(Runtime::ResolvePointCloudConsolidationAvailability(
+        Runtime::BuildGeometryAvailability(Scene->Raw(), Entity), Request.Properties, Request.Config).Available);
+}
+
 TEST_F(ConsolidationReadiness, RepeatedPreparationOnlyReadsMetadataAndCachedVerdicts)
 {
     for (int i = 0; i < 20; ++i)
@@ -2110,6 +2133,13 @@ namespace
         }
         auto Observation() { return Service->GpuRun(Correlation); }
         void Start() { Correlation = Service->Run(Request); }
+        const std::string& PipelinePath(Extrinsic::RHI::PipelineHandle handle) const
+        {
+            static const std::string none;
+            const auto found = std::find(Device.CreatedPipelineHandles.begin(), Device.CreatedPipelineHandles.end(), handle);
+            return found == Device.CreatedPipelineHandles.end() ? none
+                : Device.CreatedPipelineDescs[found - Device.CreatedPipelineHandles.begin()].ComputeShaderPath;
+        }
         void CompleteDiagnostics()
         {
             ASSERT_TRUE(DiagnosticSink);
@@ -2142,7 +2172,7 @@ TEST_F(ResidentLop, ResidentInputCompletionPagesPreviewCadenceAndDiscardReuse)
     PendingCompletion->Deliver(std::as_bytes(std::span(grid)));
     PendingCompletion.reset();
     ASSERT_TRUE(Until([&] { return DiagnosticSink.has_value(); }));
-    EXPECT_EQ(Observation().Previews, 2u);
+    EXPECT_EQ(Observation().Previews, 1u); // Terminal copy is still in flight.
     EXPECT_EQ(std::count_if(Device.TransferQueue.BufferUploads.begin(), Device.TransferQueue.BufferUploads.end(),
         [&](const auto& upload) { return upload.Data.size() == Before.size() * 12u; }), 1);
     EXPECT_EQ(std::count_if(Device.TransferQueue.BufferUploads.begin(), Device.TransferQueue.BufferUploads.end(),
@@ -2151,6 +2181,8 @@ TEST_F(ResidentLop, ResidentInputCompletionPagesPreviewCadenceAndDiscardReuse)
     EXPECT_GT(Observation().Submissions, Request.Config.MaxIterations);
     EXPECT_EQ(std::as_const(Properties()).Get<glm::vec3>("v:position").Vector(), Before);
     CompleteDiagnostics();
+    ASSERT_TRUE(Until([&] { return Observation().ReadyToAccept; }));
+    EXPECT_EQ(Observation().Previews, 2u);
     ASSERT_TRUE(Until([&] { return Observation().ReadyToAccept; }));
     EXPECT_TRUE(Observation().CanAccept);
     EXPECT_TRUE(Results.empty());
@@ -2169,7 +2201,7 @@ TEST_F(ResidentLop, PreviewCopiesOnlyAtIntervalAndTerminalBoundaries)
     Request.Config.GpuPreviewInterval = 5u;
     Start();
     ASSERT_TRUE(Until([&] { return DiagnosticSink.has_value(); }));
-    EXPECT_EQ(Observation().Previews, 2u);
+    EXPECT_EQ(Observation().Previews, 1u); // Terminal copy is still in flight.
     // The first two copies seed the private ping-pong buffers. Every remaining
     // position copy must target a preview slot, exactly at iterations 5 and 10.
     const auto& copies = Device.CommandContext.CopyBufferRecords;
@@ -2181,6 +2213,9 @@ TEST_F(ResidentLop, PreviewCopiesOnlyAtIntervalAndTerminalBoundaries)
         EXPECT_NE(copies[i].Dst, copies[0].Dst);
         EXPECT_NE(copies[i].Dst, copies[1].Dst);
     }
+    CompleteDiagnostics();
+    ASSERT_TRUE(Until([&] { return Observation().ReadyToAccept; }));
+    EXPECT_EQ(Observation().Previews, 2u);
 }
 
 TEST_F(ResidentLop, BoundaryPublishesCopiedBackOnlyAfterCompletion)
@@ -2191,27 +2226,25 @@ TEST_F(ResidentLop, BoundaryPublishesCopiedBackOnlyAfterCompletion)
     Extrinsic::RHI::BufferHandle copiedBack{}, copiedSource{}, input{};
     const auto submit = Device.ComputeReadback;
     Device.ComputeReadback = [&](auto record, auto bytes, auto sink) {
-        const bool boundary = bytes == 0u && Observation().Previews == 0u &&
-            Observation().Iterations == Request.Config.GpuPreviewInterval;
-        HoldCompletion = boundary;
         const auto token = submit([&](auto& commands) {
             const auto before = Device.CommandContext.CopyBufferRecords.size();
             const auto output = record(commands);
-            if (boundary)
+            const auto& copies = Device.CommandContext.CopyBufferRecords;
+            // The preview copy rides the Grid page that follows the interval's Finalize.
+            if (!copiedBack.IsValid() && before >= 2u && copies.size() > before)
             {
-                const auto& copies = Device.CommandContext.CopyBufferRecords;
-                EXPECT_EQ(copies.size(), before + 1u) << "Boundary must copy into the back before Publish";
-                if (copies.size() == before + 1u && before >= 2u)
-                {
-                    input = copies[0].Src;
-                    copiedBack = copies.back().Dst;
-                    copiedSource = copies.back().Src;
-                    // Upload seeds B, then A; iteration 2 completes in A.
-                    EXPECT_EQ(copiedSource, copies[1].Dst);
-                    EXPECT_NE(copiedBack, input);
-                    EXPECT_NE(copiedBack, copies[0].Dst);
-                    EXPECT_NE(copiedBack, copies[1].Dst);
-                }
+                HoldCompletion = true;
+                EXPECT_EQ(copies.size(), before + 1u);
+                EXPECT_EQ(bytes, 64u) << "The copy shares the next grid rebuild page";
+                EXPECT_EQ(Observation().Iterations, Request.Config.GpuPreviewInterval);
+                input = copies[0].Src;
+                copiedBack = copies.back().Dst;
+                copiedSource = copies.back().Src;
+                // Upload seeds B, then A; iteration 2 completes in A.
+                EXPECT_EQ(copiedSource, copies[1].Dst);
+                EXPECT_NE(copiedBack, input);
+                EXPECT_NE(copiedBack, copies[0].Dst);
+                EXPECT_NE(copiedBack, copies[1].Dst);
             }
             return output;
         }, bytes, std::move(sink));
@@ -2229,7 +2262,10 @@ TEST_F(ResidentLop, BoundaryPublishesCopiedBackOnlyAfterCompletion)
     for (unsigned i = 0; i < 4u; ++i) Tick();
     EXPECT_EQ(Observation().Previews, 0u);
     EXPECT_EQ(residency->Front(key)->Buffer, input);
-    PendingCompletion->Deliver({});
+    std::array<std::uint32_t, 16> grid{};
+    grid[3] = 1u;
+    grid[11] = 2u * Before.size();
+    PendingCompletion->Deliver(std::as_bytes(std::span(grid)));
     PendingCompletion.reset();
     ASSERT_TRUE(Until([&] { return Observation().Previews == 1u; }));
     ASSERT_TRUE(residency->Front(key));
@@ -2247,37 +2283,50 @@ TEST_F(ResidentLop, BatchesPagesWithinCandidateBudgetAndCoversReductionTail)
     } restore;
     Runtime::LopPagingForTesting = {.PagePairs = 150u, .SubmissionPairs = 512u, .ReduceRows = 7u};
     Request.Config.MaxIterations = 2u;
-    std::vector<std::uint32_t> initialized, projected, reduced;
+    std::vector<std::uint32_t> initialized, projected, reduced, finalizedAfterRow;
     bool batched = false;
     const auto submit = Device.ComputeReadback;
     Device.ComputeReadback = [&](auto record, auto bytes, auto sink) {
         return submit([&](auto& commands) {
             const auto begin = Device.CommandContext.PushConstantPayloads.size();
+            const auto bindBegin = Device.CommandContext.BoundPipelines.size();
             const auto output = record(commands);
-            const auto pipeline = std::find(Device.CreatedPipelineHandles.begin(),
-                Device.CreatedPipelineHandles.end(), Device.CommandContext.LastBoundPipeline);
-            const auto& path = Device.CreatedPipelineDescs[pipeline - Device.CreatedPipelineHandles.begin()].ComputeShaderPath;
-            const bool initialize = path.find("lop_initialize") != std::string::npos;
-            const bool project = path.find("lop_project") != std::string::npos;
-            const bool reduce = path.find("lop_final_reduce") != std::string::npos;
-            if (initialize || project || reduce)
+            const auto& pushes = Device.CommandContext.PushConstantPayloads;
+            const auto& binds = Device.CommandContext.BoundPipelines;
+            // Grid pages also record scan pushes; they carry no row-paged dispatch.
+            if (pushes.size() - begin != binds.size() - bindBegin) return output;
+            std::uint32_t rows = 0u, rowDispatches = 0u;
+            bool finalized = false;
+            for (auto i = begin; i < pushes.size(); ++i)
             {
-                std::uint32_t rows = 0u;
-                const auto& pushes = Device.CommandContext.PushConstantPayloads;
-                if (!reduce && pushes.size() - begin > 1u) batched = true;
-                for (auto i = begin; i < pushes.size(); ++i)
+                const auto& path = PipelinePath(binds[bindBegin + (i - begin)]);
+                if (path.find("lop_iteration_finalize") != std::string::npos)
                 {
-                    EXPECT_EQ(pushes[i].size(), 88u);
-                    std::uint32_t first{}, count{};
-                    std::memcpy(&first, pushes[i].data() + 52u, sizeof(first));
-                    std::memcpy(&count, pushes[i].data() + 80u, sizeof(count));
-                    EXPECT_LE(count, reduce ? 7u : 3u);
-                    auto& covered = initialize ? initialized : project ? projected : reduced;
-                    for (auto row = first; row < first + count; ++row) covered.push_back(row);
-                    rows += count;
+                    finalized = true;
+                    finalizedAfterRow.push_back(projected.empty() ? ~0u : projected.back());
+                    EXPECT_EQ(bytes, 64u) << "The finalizing page reads back the diagnostics";
+                    continue;
                 }
-                if (!reduce) EXPECT_LE(rows * 50u, 512u);
+                const bool initialize = path.find("lop_initialize") != std::string::npos;
+                const bool project = path.find("lop_project") != std::string::npos;
+                const bool reduce = path.find("lop_final_reduce") != std::string::npos;
+                if (!initialize && !project && !reduce) continue;
+                EXPECT_FALSE(finalized) << "Finalize closes the last projection page";
+                EXPECT_EQ(pushes[i].size(), 88u);
+                std::uint32_t first{}, count{};
+                std::memcpy(&first, pushes[i].data() + 52u, sizeof(first));
+                std::memcpy(&count, pushes[i].data() + 80u, sizeof(count));
+                EXPECT_LE(count, reduce ? 7u : 3u);
+                auto& covered = initialize ? initialized : project ? projected : reduced;
+                for (auto row = first; row < first + count; ++row) covered.push_back(row);
+                if (!reduce)
+                {
+                    rows += count;
+                    ++rowDispatches;
+                }
             }
+            if (rowDispatches > 1u) batched = true;
+            EXPECT_LE(rows * 50u, 512u);
             return output;
         }, bytes, std::move(sink));
     };
@@ -2294,24 +2343,103 @@ TEST_F(ResidentLop, BatchesPagesWithinCandidateBudgetAndCoversReductionTail)
         EXPECT_EQ(projected[i + Before.size()], i);
         EXPECT_EQ(reduced[i], i);
     }
+    ASSERT_EQ(finalizedAfterRow.size(), Request.Config.MaxIterations);
+    for (const auto row : finalizedAfterRow) EXPECT_EQ(row, Before.size() - 1u);
     CompleteDiagnostics();
     ASSERT_TRUE(Until([&] { return Observation().CanAccept; }));
 }
 
-TEST_F(ResidentLop, TwoIterationFixtureRequiresValidNormalRefinementBudget)
+TEST_F(ResidentLop, RepeatRunsRetainScratchCapacityAndPipelines)
+{
+    // LOP creates all of its buffers while recording the Upload page; later pages
+    // and the shared ring/residency never allocate inside a LOP page recording.
+    struct RunShape
+    {
+        int UploadCreates{-1}, LaterPageCreates{0}, PipelineCreates{0};
+        Extrinsic::RHI::BufferHandle SeedB{}, SeedA{};
+        std::uint32_t Submissions{}, Previews{};
+    } shape;
+    const auto submit = Device.ComputeReadback;
+    Device.ComputeReadback = [&](auto record, auto bytes, auto sink) {
+        return submit([&](auto& commands) {
+            const int created = Device.CreateBufferCount;
+            const auto copies = Device.CommandContext.CopyBufferRecords.size();
+            const auto output = record(commands);
+            const int delta = Device.CreateBufferCount - created;
+            if (shape.UploadCreates < 0)
+            {
+                shape.UploadCreates = delta;
+                const auto& records = Device.CommandContext.CopyBufferRecords;
+                EXPECT_EQ(records.size(), copies + 2u) << "Upload seeds both ping-pong buffers";
+                if (records.size() == copies + 2u)
+                {
+                    shape.SeedB = records[copies].Dst;
+                    shape.SeedA = records[copies + 1u].Dst;
+                }
+            }
+            else shape.LaterPageCreates += delta;
+            return output;
+        }, bytes, std::move(sink));
+    };
+    const auto run = [&](ECS::EntityHandle entity, std::size_t points) {
+        shape = {};
+        const int pipelines = Device.CreatePipelineCount;
+        const auto completed = Results.size();
+        Request.StableEntityId = Runtime::SelectionController::ToStableEntityId(entity);
+        Start();
+        EXPECT_TRUE(Until([&] { return DiagnosticSink.has_value(); }));
+        shape.Submissions = Observation().Submissions;
+        CompleteDiagnostics();
+        EXPECT_TRUE(Until([&] { return Observation().ReadyToAccept; }));
+        shape.Previews = Observation().Previews;
+        (void)Service->GpuRun(Correlation, Runtime::PointCloudConsolidationGpuAction::Discard);
+        EXPECT_TRUE(Until([&] { return Results.size() == completed + 1u; }));
+        EXPECT_EQ(Results.back().Status, Runtime::PointCloudConsolidationRunStatus::Cancelled);
+        EXPECT_EQ(Results.back().InputPointCount, points);
+        shape.PipelineCreates = Device.CreatePipelineCount - pipelines;
+        EXPECT_EQ(shape.LaterPageCreates, 0);
+        return shape;
+    };
+
+    std::vector<glm::vec3> fewer = Before;
+    fewer.resize(15u); // three of the five rows: a smaller cell grid and fewer rows
+    const auto smaller = AddPointCloud(Scene(), fewer);
+
+    const RunShape cold = run(smaller, fewer.size());
+    EXPECT_GT(cold.UploadCreates, 0);
+    EXPECT_GT(cold.PipelineCreates, 0);
+
+    const RunShape grown = run(Entity, Before.size());
+    EXPECT_GT(grown.UploadCreates, 0) << "Row and cell capacity must grow";
+    EXPECT_LT(grown.UploadCreates, cold.UploadCreates) << "Fixed-size state and diagnostics stay retained";
+    EXPECT_NE(grown.SeedA, cold.SeedA);
+    EXPECT_EQ(grown.PipelineCreates, 0);
+
+    const RunShape warm = run(Entity, Before.size());
+    EXPECT_EQ(warm.UploadCreates, 0);
+    EXPECT_EQ(warm.PipelineCreates, 0);
+    EXPECT_EQ(warm.SeedB, grown.SeedB);
+    EXPECT_EQ(warm.SeedA, grown.SeedA);
+    // Upload + Initialize + four iterations of (Grid, Project+Finalize) + Reduce. The two
+    // previews ride the following Grid/Reduce pages instead of costing their own pages.
+    EXPECT_EQ(warm.Previews, 2u);
+    EXPECT_EQ(warm.Submissions, 11u);
+
+    const RunShape shrunk = run(smaller, fewer.size());
+    EXPECT_EQ(shrunk.UploadCreates, 0) << "A smaller run reuses the grown capacity";
+    EXPECT_EQ(shrunk.PipelineCreates, 0);
+    EXPECT_EQ(shrunk.SeedB, grown.SeedB);
+    EXPECT_EQ(shrunk.SeedA, grown.SeedA);
+    EXPECT_EQ(Service->Stats().GpuFallbacks, 0u);
+}
+
+TEST_F(ResidentLop, TwoIterationLopIgnoresUnusedNormalRefinementBudget)
 {
     Request.Config.SupportRadius = 0.5;
     Request.Config.TargetPointCount = 0u;
     Request.Config.Seed = 42u;
     Request.Config.MaxIterations = 2u;
     Request.Config.NormalRefinementRounds = 3u;
-    Start();
-    ASSERT_TRUE(Until([&] { return Results.size() == 1u; }));
-    EXPECT_FALSE(Results.back().Succeeded());
-    EXPECT_NE(Results.back().Message.find("outside the validated runtime control surface"), std::string::npos);
-    EXPECT_EQ(Observation().Submissions, 0u);
-
-    Request.Config.NormalRefinementRounds = 1u;
     Start();
     ASSERT_TRUE(Until([&] { return DiagnosticSink.has_value(); }));
     CompleteDiagnostics();
@@ -2388,9 +2516,9 @@ TEST_F(ResidentLop, StopPublishesATerminalFrontBetweenPreviewIntervals)
     (void)Service->GpuRun(Correlation, Runtime::PointCloudConsolidationGpuAction::Stop);
     ASSERT_TRUE(Until([&] { return DiagnosticSink.has_value(); }));
     EXPECT_LT(Observation().Iterations, Request.Config.MaxIterations);
-    EXPECT_GE(Observation().Previews, 1u);
     CompleteDiagnostics();
     ASSERT_TRUE(Until([&] { return Observation().CanAccept; }));
+    EXPECT_GE(Observation().Previews, 1u);
     EXPECT_EQ(std::as_const(Properties()).Get<glm::vec3>("v:position").Vector(), Before);
     (void)Service->GpuRun(Correlation, Runtime::PointCloudConsolidationGpuAction::Accept);
     ASSERT_TRUE(Until([&] { return Results.size() == 1u; }));
@@ -2405,9 +2533,10 @@ TEST_F(ResidentLop, ConvergencePublishesTerminalFrontBeforePreviewInterval)
     Start();
     ASSERT_TRUE(Until([&] { return DiagnosticSink.has_value(); }));
     EXPECT_EQ(Observation().Iterations, 1u);
-    EXPECT_EQ(Observation().Previews, 1u);
+    EXPECT_EQ(Observation().Previews, 0u);
     CompleteDiagnostics();
     ASSERT_TRUE(Until([&] { return Observation().CanAccept; }));
+    EXPECT_EQ(Observation().Previews, 1u);
     (void)Service->GpuRun(Correlation, Runtime::PointCloudConsolidationGpuAction::Accept);
     ASSERT_TRUE(Until([&] { return Results.size() == 1u; }));
     EXPECT_TRUE(Results.back().Converged);

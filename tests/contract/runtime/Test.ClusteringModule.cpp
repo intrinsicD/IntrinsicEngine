@@ -1392,6 +1392,7 @@ namespace
         std::vector<Runtime::KMeansRunCompleted> Results;
         std::vector<std::function<void()>> Completions;
         std::optional<Extrinsic::RHI::ReadbackSink> Held;
+        std::vector<std::byte> HeldData;
         bool Hold{}, Attached{true}, Converged{};
         std::uint32_t MaximumDispatches{};
         Runtime::KMeansPagingLimits SavedLimits{Runtime::KMeansPagingForTesting};
@@ -1437,13 +1438,13 @@ namespace
                 EXPECT_LE(pairs,Runtime::KMeansPagingForTesting.SubmissionPairs);
                 EXPECT_LE(serialDepth,Runtime::KMeansSubmissionSerialDepth);
                 MaximumDispatches=std::max(MaximumDispatches,std::uint32_t(Device.CommandContext.DispatchCalls-before));
-                if(Hold){Held=std::move(sink);return Extrinsic::RHI::ReadbackToken{2};}
                 std::vector<std::byte> data(bytes);
                 if(bytes==32){
                     std::array<std::uint32_t,6> diagnostics{};
                     diagnostics[2]=std::bit_cast<std::uint32_t>(1.0f);diagnostics[4]=!Converged;
                     std::memcpy(data.data(),diagnostics.data(),24);
                 }
+                if(Hold){Held=std::move(sink);HeldData=std::move(data);return Extrinsic::RHI::ReadbackToken{2};}
                 Completions.push_back([sink=std::move(sink),data=std::move(data)]()mutable{sink.Deliver(data);});
                 return Extrinsic::RHI::ReadbackToken{2};
             };
@@ -1474,7 +1475,7 @@ namespace
     protected:
         void TearDown()override
         {
-            if(Held){Held->Deliver({});Held.reset();}
+            if(Held){Held->Deliver(HeldData);Held.reset();}
             if(Service){(void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Discard);Service->Unsubscribe(Subscription);}
             for(int i=0;i<5;++i)Tick();
             Jobs.Jobs().CancelAndDrain();(void)Jobs.Jobs().ShutdownGpuQueueParticipants([this]{Device.WaitIdle();});
@@ -1490,9 +1491,12 @@ TEST_F(ClusteringModuleResident, ResidentInputWaitsForCompletionAndRepeatRunUplo
     EXPECT_EQ(Observation().InputUploadBytes,12u*12u);
     const auto submissions=Observation().Submissions;for(int i=0;i<5;++i)Tick();
     EXPECT_EQ(Observation().Submissions,submissions);
-    Hold=false;Held->Deliver({});Held.reset();
+    Hold=false;Held->Deliver(HeldData);Held.reset();
     ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
     EXPECT_EQ(Observation().Iterations,4u);EXPECT_EQ(Observation().Previews,2u);
+    // One submission per iteration (the interval preview shares iteration 3's)
+    // plus the terminal preview, which also reads the centroids back.
+    EXPECT_EQ(Observation().Submissions,5u);
     EXPECT_EQ(Observation().CpuStageUploadBytes,3u*12u);
     EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
     (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Discard);
@@ -1500,6 +1504,32 @@ TEST_F(ClusteringModuleResident, ResidentInputWaitsForCompletionAndRepeatRunUplo
     EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
     Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
     EXPECT_EQ(Observation().InputUploadBytes,0u);EXPECT_GT(Observation().InputCacheHits,0u);
+}
+TEST_F(ClusteringModuleResident, RetainedWorkspaceReusesCapacityAndUnbindsSlots)
+{
+    const auto run=[&](std::size_t results){
+        Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+        (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Discard);
+        ASSERT_TRUE(Until([&]{return Results.size()==results;}));
+    };
+    run(1);
+    EXPECT_GT(Results[0].GpuWorkspaceBuffersCreated,0u);EXPECT_EQ(Results[0].GpuWorkspacePipelinesCreated,3u);
+    Properties().GetOrAdd<bool>("v:deleted",false)[4]=true;
+    run(2);
+    // Eleven live rows fit the retained buffers; only the live-slot map is new.
+    EXPECT_EQ(Results[1].GpuWorkspaceBuffersCreated,1u);EXPECT_EQ(Results[1].GpuWorkspacePipelinesCreated,0u);
+    Properties().GetOrAdd<bool>("v:deleted",false)[4]=false;
+    const auto firstPush=Device.CommandContext.PushConstantPayloads.size();
+    run(3);
+    EXPECT_EQ(Results[2].GpuWorkspaceBuffersCreated,0u);EXPECT_EQ(Results[2].GpuWorkspacePipelinesCreated,0u);
+    std::size_t pushes=0;
+    for(std::size_t i=firstPush;i<Device.CommandContext.PushConstantPayloads.size();++i){
+        const auto& payload=Device.CommandContext.PushConstantPayloads[i];
+        if(payload.size()!=128u)continue;
+        std::uint64_t slots{};std::memcpy(&slots,payload.data()+16,8);
+        EXPECT_EQ(slots,0u)<<"an all-live run must not bind the retained slot map";++pushes;
+    }
+    EXPECT_GT(pushes,0u);
 }
 TEST_F(ClusteringModuleResident, MultiPageSubmissionsAndConvergence)
 {
@@ -1546,17 +1576,24 @@ TEST_F(ClusteringModuleResident, PreviewCopiesOnlyAtCadenceAndPublishesAfterComp
     const auto submit=Device.ComputeReadback;
     bool heldOnce=false;
     std::uint64_t copiedBack{};
+    std::vector<std::uint32_t> phases{};
     Device.ComputeReadback=[&](auto record,auto bytes,auto sink){
-        const bool boundary=!heldOnce&&bytes==0&&Observation().Iterations==2;
+        // The interval preview is recorded in the submission after iteration 2.
+        const bool boundary=!heldOnce&&Observation().Iterations==2;
         Hold=boundary;heldOnce|=boundary;
         const auto token=submit([&](auto& cmd){
             const auto count=Device.CommandContext.CopyBufferRecords.size();
+            const auto firstPush=Device.CommandContext.PushConstantPayloads.size();
             const auto result=record(cmd);
             if(boundary){
                 EXPECT_EQ(Device.CommandContext.CopyBufferRecords.size(),count);
-                // Phase 4 scatters every live label; all-live previews need no copy.
-                const auto& push=Device.CommandContext.PushConstantPayloads.back();
-                std::memcpy(&copiedBack,push.data()+80,8);
+                for(std::size_t i=firstPush;i<Device.CommandContext.PushConstantPayloads.size();++i){
+                    const auto& push=Device.CommandContext.PushConstantPayloads[i];
+                    std::uint32_t phase{};std::memcpy(&phase,push.data()+104,4);
+                    if(phases.empty()||phases.back()!=phase)phases.push_back(phase);
+                    // Phase 4 scatters every live label; all-live previews need no copy.
+                    if(phase==4)std::memcpy(&copiedBack,push.data()+80,8);
+                }
                 EXPECT_FALSE(residency->Front(key));
             }
             return result;
@@ -1564,8 +1601,11 @@ TEST_F(ClusteringModuleResident, PreviewCopiesOnlyAtCadenceAndPublishesAfterComp
         Hold=false;return token;
     };
     Start();ASSERT_TRUE(Until([&]{return Held.has_value();}));ASSERT_NE(copiedBack,0u);
+    // Preview scatter and presentation share the submission with iteration 3:
+    // Assign(1), Reduce(3), Update(2), stopping at its diagnostics boundary.
+    EXPECT_EQ(phases,(std::vector<std::uint32_t>{4u,5u,1u,3u,2u}));
     EXPECT_EQ(Observation().Previews,0u);for(int i=0;i<5;++i)Tick();EXPECT_FALSE(residency->Front(key));
-    Held->Deliver({});Held.reset();
+    Held->Deliver(HeldData);Held.reset();
     ASSERT_TRUE(Until([&]{return Observation().Previews==1;}));
     ASSERT_TRUE(residency->Front(key));EXPECT_EQ(residency->Front(key)->Address,copiedBack);
     ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
@@ -1741,7 +1781,7 @@ TEST_F(ClusteringModuleResident, MillionRowsRespectPairAndSerialBudgets)
     Request.Parameters.ClusterCount=8;Request.Parameters.MaxIterations=1;
     Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
     // Fixture checks every recorded submission's pair and lane-depth totals.
-    // Reduce/Update each require > 2^14 depth for 256 pages (256 * 71).
-    EXPECT_GE(Observation().Submissions,9u);
+    // Fused phases still split at the serial-depth budget and host boundary.
+    EXPECT_EQ(Observation().Submissions,4u);
     EXPECT_LE(MaximumDispatches,Runtime::KMeansSubmissionSerialDepth);
 }

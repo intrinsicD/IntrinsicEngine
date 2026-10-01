@@ -37,6 +37,7 @@ namespace Extrinsic::Graphics
         RHI::PipelineHandle Pipeline{};
         // Working points/weights, clearance, selection, winners, results, row map and transform.
         std::array<RHI::BufferHandle, 8> Buffers{};
+        std::array<std::size_t, 8> Capacity{};
         GpuPropertyView Positions{}, Weights{};
         std::vector<std::uint32_t> Rows{};
         std::array<double, 16> Model{};
@@ -55,15 +56,23 @@ namespace Extrinsic::Graphics
             for (auto& buffer : Buffers)
                 if (buffer.IsValid()) Device.DestroyBuffer(buffer);
             Buffers = {};
+            Capacity = {};
             if (Pipeline.IsValid()) Device.DestroyPipeline(Pipeline);
             Pipeline = {};
         }
         bool Create(std::size_t index, std::size_t bytes, const void* data, const char* name)
         {
-            Buffers[index] = Device.CreateBuffer({.SizeBytes = std::max<std::size_t>(bytes, 16),
-                .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc | RHI::BufferUsage::TransferDst,
-                .HostVisible = true, .DebugName = name});
-            if (!Buffers[index].IsValid()) return false;
+            const auto required = std::max<std::size_t>(bytes, 16);
+            if (!Buffers[index].IsValid() || Capacity[index] < required)
+            {
+                const auto replacement = Device.CreateBuffer({.SizeBytes = required,
+                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc | RHI::BufferUsage::TransferDst,
+                    .HostVisible = true, .DebugName = name});
+                if (!replacement.IsValid()) return false;
+                if (Buffers[index].IsValid()) Device.DestroyBuffer(Buffers[index]);
+                Buffers[index] = replacement;
+                Capacity[index] = required;
+            }
             if (data != nullptr && bytes > 0u) Device.WriteBuffer(Buffers[index], data, bytes);
             return true;
         }
@@ -105,7 +114,6 @@ namespace Extrinsic::Graphics
             weights.Layout.Channels != 1u || weights.Layout.RowMap != 0u ||
             (weights.Layout.Scalar != GpuScalarType::Float32 && weights.Layout.Scalar != GpuScalarType::Float64) ||
             weights.Layout.ElementBytes() != GpuScalarBytes(weights.Layout.Scalar))) return false;
-        s.Release();
         s.N = std::uint32_t(n);
         s.Count = input.Count;
         s.First = input.FirstIndex;
@@ -137,14 +145,14 @@ namespace Extrinsic::Graphics
             return s.Buffers[index].IsValid() ? s.Device.GetBufferDeviceAddress(s.Buffers[index]) : 0u;
         };
         const std::uint32_t groups = (s.N + kGroup - 1u) / kGroup;
-        Push push{.Points = address(0), .Weights = address(1), .Clearance = address(2), .Selected = address(3),
+        Push push{.Points = address(0), .Weights = s.Weights.Valid() ? address(1) : 0u, .Clearance = address(2), .Selected = address(3),
                   .Partials = address(4), .Results = address(5), .Count = s.N, .Groups = groups, .Capacity = s.Count,
                   .First = s.First, .SourcePoints = s.Positions.Address, .SourceWeights = s.Weights.Address,
-                  .Rows = address(6), .Model = address(7),
+                  .Rows = s.Rows.empty() ? 0u : address(6), .Model = address(7),
                   .WeightBytes = s.Weights.Valid() ? GpuScalarBytes(s.Weights.Layout.Scalar) : 0u};
         for (const auto buffer : s.Buffers)
             if (buffer.IsValid())
-                commands.BufferBarrier(buffer, RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderRead,
+                commands.BufferBarrier(buffer, RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::TransferRead | RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite,
                                        RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite);
         for (const auto& view : {s.Positions, s.Weights})
             if (view.Valid()) commands.BufferBarrier(view.Buffer, RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderWrite,

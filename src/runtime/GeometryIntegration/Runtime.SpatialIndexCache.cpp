@@ -8,6 +8,7 @@ module;
 #include <entt/entity/entity.hpp>
 #include <glm/glm.hpp>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -105,6 +106,39 @@ namespace Extrinsic::Runtime
                 return {};
             return result;
         }
+        // LeaseGpuWorkspace storage. Returned objects arrive from any thread; the owner thread
+        // stamps them, and they become leasable once that frame's submissions have retired.
+        struct WorkspacePool
+        {
+            struct Slot
+            {
+                const void* Kind;
+                std::shared_ptr<void> Object{};
+                std::uint64_t SafeFrame{};
+            };
+            std::mutex Mutex{};
+            std::vector<Slot> Returned{}; // guarded by Mutex
+            std::vector<Slot> Waiting{}, Idle{};
+        };
+        // The control block behind one lease: the last copy returns the object to its pool.
+        struct WorkspaceLease
+        {
+            const void* Kind;
+            std::shared_ptr<void> Object{};
+            std::weak_ptr<WorkspacePool> Pool{};
+            WorkspaceLease(const void* kind, std::shared_ptr<void> object, std::weak_ptr<WorkspacePool> pool)
+                : Kind(kind), Object(std::move(object)), Pool(std::move(pool)) {}
+            WorkspaceLease(const WorkspaceLease&) = delete;
+            WorkspaceLease& operator=(const WorkspaceLease&) = delete;
+            ~WorkspaceLease()
+            {
+                if (const auto pool = Pool.lock(); pool && Object)
+                {
+                    std::scoped_lock lock{pool->Mutex};
+                    pool->Returned.push_back({Kind, std::move(Object)});
+                }
+            }
+        };
     } // namespace
     extern "C++"
     {
@@ -150,6 +184,7 @@ namespace Extrinsic::Runtime
         GpuQueueParticipantHandle Participant{};
         struct Batch
         {
+            explicit Batch(RHI::IDevice& device) : Device(&device) {}
             std::shared_ptr<SpatialNearestBatch> State{std::make_shared<SpatialNearestBatch>()};
             std::shared_ptr<Entry> Target{};
             std::vector<glm::vec3> Queries{};
@@ -157,7 +192,10 @@ namespace Extrinsic::Runtime
             std::uint32_t Capacity{1};
             float Radius{-1.f};
             RHI::IDevice* Device{};
-            RHI::BufferHandle Input{}, Output{}, Header{}, Exclusions{};
+            RHI::BufferHandle Input{}, Output{}, Header{}, Exclusions{}, TransformBuffer{}, TransformedQueries{}, PackedResult{};
+            std::optional<glm::dmat4> Transform{};
+            std::size_t TransformedRows{}, PackedRows{};
+            bool InputDirty{true};
             // Allocated rows: queries, and neighbor entries (queries x capacity). A reused batch
             // may serve any request that fits (GRAPHICS-153), e.g. a shorter last page.
             std::size_t QueryRows{}, NeighborRows{};
@@ -167,7 +205,7 @@ namespace Extrinsic::Runtime
             ~Batch()
             {
                 if (Device)
-                    for (auto buffer : {Input, Output, Header, Exclusions})
+                    for (auto buffer : {Input, Output, Header, Exclusions, TransformBuffer, TransformedQueries, PackedResult})
                         if (buffer.IsValid()) Device->DestroyBuffer(buffer);
             }
         };
@@ -180,12 +218,64 @@ namespace Extrinsic::Runtime
             RHI::BufferHandle Output{};
             std::uint64_t SubmittedFrame{};
             bool DownloadQueued{};
+            // The recorder ran (it may have recorded commands even when it then failed), into a
+            // frame's command buffer, and whether the device is known to be done with them.
+            bool Recorded{}, Framed{}, Completed{};
         };
         std::vector<std::shared_ptr<Computation>> Computations{};
+        std::shared_ptr<WorkspacePool> Pool{std::make_shared<WorkspacePool>()};
+        // Owner thread: stamps returned workspaces and moves those whose stamp frame has retired
+        // to Idle, keeping the most recently matured one per kind.
+        void MatureWorkspaces()
+        {
+            std::vector<WorkspacePool::Slot> returned;
+            {
+                std::scoped_lock lock{Pool->Mutex};
+                returned.swap(Pool->Returned);
+            }
+            if (!Device)
+            {
+                Pool->Waiting.clear();
+                Pool->Idle.clear();
+                return;
+            }
+            const auto frame = Device->GetGlobalFrameNumber();
+            for (auto& slot : returned)
+            {
+                slot.SafeFrame = frame + Device->GetFramesInFlight() + 1u;
+                Pool->Waiting.push_back(std::move(slot));
+            }
+            for (auto it = Pool->Waiting.begin(); it != Pool->Waiting.end();)
+            {
+                if (frame < it->SafeFrame) { ++it; continue; }
+                std::erase_if(Pool->Idle, [&](const auto& idle) { return idle.Kind == it->Kind; });
+                Pool->Idle.push_back(std::move(*it));
+                it = Pool->Waiting.erase(it);
+            }
+        }
+        bool HoldsWorkspaces()
+        {
+            std::scoped_lock lock{Pool->Mutex};
+            return !Pool->Returned.empty() || !Pool->Waiting.empty() || !Pool->Idle.empty();
+        }
+        void ReleaseWorkspacesAfterDeviceIdle()
+        {
+            std::vector<WorkspacePool::Slot> returned;
+            {
+                std::scoped_lock lock{Pool->Mutex};
+                returned.swap(Pool->Returned);
+            }
+            returned.clear();
+            Pool->Waiting.clear();
+            Pool->Idle.clear();
+            // Leases still held past shutdown destroy their workspace instead of returning it.
+            Pool = std::make_shared<WorkspacePool>();
+        }
         // Delivers a computation's readback bytes (framed download or immediate submit).
         static RHI::ReadbackSink ComputationSink(const std::shared_ptr<Computation>& work)
         {
             return RHI::ReadbackSink::Invoke([work](std::span<const std::byte> data) {
+                work->Completed = true;
                 if (data.size() != work->Result->Data.size())
                 {
                     work->Result->Diagnostic = "GPU computation returned an incomplete result.";
@@ -211,7 +301,10 @@ namespace Extrinsic::Runtime
                                                Device->GetBufferDeviceAddress(e.Mapping),
                                                std::uint32_t(e.Snapshot->Slots.size())});
             };
-            if (!Device->SubmitComputeReadback(record, work->Result->Data.size(), ComputationSink(work)).IsValid())
+            const bool submitted = Device->SubmitComputeReadback(record, work->Result->Data.size(), ComputationSink(work)).IsValid();
+            // An invalid token guarantees that no commands were submitted.
+            work->Recorded = submitted;
+            if (!submitted)
             {
                 // A recorder can advance a chunk cursor. Replaying it after submission refusal
                 // would skip work that never reached the device. Only unsupported calls fall back.
@@ -244,15 +337,21 @@ namespace Extrinsic::Runtime
                 work->Result->Diagnostic = "Spatial compute service stopped.";
             }
             Computations.clear();
+            ReleaseWorkspacesAfterDeviceIdle();
         }
         void Drain()
         {
             for (auto& work : Computations)
             {
+                // A recorder that failed in a frame: done once that frame has retired.
+                if (work->Result->State == SpatialQueryState::Failed && work->Framed && !work->Completed &&
+                    Device->GetGlobalFrameNumber() >= work->SubmittedFrame + Device->GetFramesInFlight() + 1u)
+                    work->Completed = true;
                 if (work->Result->State != SpatialQueryState::Submitted || work->DownloadQueued ||
                     Device->GetGlobalFrameNumber() < work->SubmittedFrame + Device->GetFramesInFlight() +
                         (work->Result->Data.empty() ? 1u : 0u)) continue;
                 work->DownloadQueued = true;
+                work->Completed = true; // its frame has retired
                 if (work->Result->Data.empty())
                 {
                     work->Result->State = SpatialQueryState::Ready;
@@ -266,9 +365,13 @@ namespace Extrinsic::Runtime
                     work->Result->Diagnostic = "GPU computation readback submission failed.";
                 }
             }
-            std::erase_if(Computations, [](const auto& work) {
-                return (work->Result->State == SpatialQueryState::Ready ||
-                        work->Result->State == SpatialQueryState::Failed) && work.use_count() == 1;
+            std::erase_if(Computations, [this](const auto& work) {
+                const auto state = work->Result->State;
+                if ((state != SpatialQueryState::Ready && state != SpatialQueryState::Failed) || work.use_count() != 1)
+                    return false;
+                if (state == SpatialQueryState::Failed && work->Recorded && !work->Completed)
+                    return false; // a failed frame recorder may still have commands in flight
+                return true;
             });
             for (auto& batch : Batches)
             {
@@ -321,8 +424,10 @@ namespace Extrinsic::Runtime
                 }
             }
             std::erase_if(Batches, [](const auto& b) {
-                return b->State.use_count() == 1 && b->State->State != SpatialQueryState::Queued &&
+                const bool finished = b->State.use_count() == 1 && b->State->State != SpatialQueryState::Queued &&
                     b->State->State != SpatialQueryState::Submitted && b.use_count() == 1;
+                if (finished) b->Target.reset(); // the pooled scratch does not retain a scene index
+                return finished;
             });
         }
         std::uint64_t Next{1};
@@ -449,6 +554,75 @@ namespace Extrinsic::Runtime
             }
             return true;
         }
+        bool RecordBatch(const std::shared_ptr<Batch>& batch, RHI::ICommandContext& commands, bool packed)
+        {
+            if (batch->InputDirty)
+            {
+                Device->WriteBuffer(batch->Input, batch->Queries.data(), batch->Queries.size()*12);
+                Stats.GpuQueryUploadBytes += batch->Queries.size()*12;
+                batch->InputDirty = false;
+            }
+            if (batch->Transform)
+            {
+                Device->WriteBuffer(batch->TransformBuffer, &*batch->Transform, sizeof(glm::dmat4));
+                Stats.GpuQueryUploadBytes += sizeof(glm::dmat4);
+                ++Stats.GpuQueryTransformUploads;
+            }
+            else
+            {
+                Device->WriteBuffer(batch->Exclusions, batch->Excluded.data(), batch->Excluded.size()*4);
+                Stats.GpuQueryUploadBytes += batch->Excluded.size()*4;
+            }
+            return RecordQueries({batch->Target->Id}, commands,
+                {.Queries = {.Buffer = batch->Input, .Count = std::uint32_t(batch->Queries.size())},
+                 .Neighbors = packed ? batch->PackedResult : batch->Output,
+                 .Headers = packed ? batch->PackedResult : batch->Header,
+                 .Capacity = batch->Capacity, .Radius = batch->Radius,
+                 .KNearestCount = batch->Radius < 0 ? batch->Capacity : 0u,
+                 .ExcludedIndices = batch->Transform ? RHI::BufferHandle{} : batch->Exclusions,
+                 .Transform = batch->Transform ? batch->TransformBuffer : RHI::BufferHandle{},
+                 .TransformedQueries = batch->Transform ? batch->TransformedQueries : RHI::BufferHandle{},
+                 .HeaderOffset = packed ? batch->Queries.size()*8u : 0u});
+        }
+        void SubmitBatchImmediate(const std::shared_ptr<Batch>& batch)
+        {
+            // Never build the target inside a submission that may be refused: its workspace
+            // otherwise could report a build that was recorded but never executed.
+            if (!batch->Transform || !batch->Target->Gpu || !batch->Target->Gpu->View().NodesBDA ||
+                batch->Target->GpuStale) return;
+            bool recorded = false;
+            const auto token = Device->SubmitComputeReadback(
+                [this, batch, &recorded](RHI::ICommandContext& commands) {
+                    recorded = true;
+                    return RecordBatch(batch, commands, true) ? batch->PackedResult : RHI::BufferHandle{};
+                }, batch->Queries.size()*16u,
+                RHI::ReadbackSink::Invoke([batch](std::span<const std::byte> data) {
+                    const auto bytes = batch->Queries.size()*8u;
+                    if (data.size() != bytes*2u)
+                    {
+                        batch->State->State = SpatialQueryState::Failed;
+                        batch->State->Diagnostic = "GPU spatial query returned an incomplete result.";
+                        return;
+                    }
+                    std::memcpy(batch->State->Neighbors.data(), data.data(), bytes);
+                    std::memcpy(batch->Headers.data(), data.data()+bytes, bytes);
+                    batch->Downloads = 2u;
+                }));
+            if (!token.IsValid())
+            {
+                if (recorded)
+                {
+                    batch->State->State = SpatialQueryState::Failed;
+                    batch->State->Diagnostic = "GPU spatial submission refused after recording.";
+                }
+                return; // unsupported immediate submission stays queued for the frame
+            }
+            batch->DownloadQueued = true;
+            batch->SubmittedFrame = Device->GetGlobalFrameNumber();
+            if (batch->State->State != SpatialQueryState::Failed)
+                batch->State->State = SpatialQueryState::Submitted;
+            ++Stats.GpuQueryImmediateSubmissions;
+        }
         bool RecordQueries(SpatialIndexHandle handle, RHI::ICommandContext& commands,
                            const Graphics::PointLbvhQuery& query)
         {
@@ -484,14 +658,22 @@ namespace Extrinsic::Runtime
                     for (auto& work : m_Impl->Computations)
                     {
                         if (work->Result->State != SpatialQueryState::Queued) continue;
+                        work->Framed = true;
+                        work->SubmittedFrame = m_Impl->Device->GetGlobalFrameNumber();
                         if (!work->Target)
+                        {
+                            work->Recorded = true;
                             work->Output = work->Record(commands, {});
+                        }
                         else if (auto& e = *work->Target; m_Impl->RecordBuild({e.Id}, commands, &work->Result->CpuStageUploadBytes))
+                        {
+                            work->Recorded = true;
                             work->Output = work->Record(commands,
                                 {e.Gpu->View().NodesBDA,
                                  m_Impl->Device->GetBufferDeviceAddress(e.Points),
                                  m_Impl->Device->GetBufferDeviceAddress(e.Mapping),
                                  std::uint32_t(e.Snapshot->Slots.size())});
+                        }
                         if (!work->Output.IsValid())
                         {
                             work->Result->State = SpatialQueryState::Failed;
@@ -504,14 +686,7 @@ namespace Extrinsic::Runtime
                     for (auto& batch : m_Impl->Batches)
                     {
                         if (batch->State->State != SpatialQueryState::Queued) continue;
-                        m_Impl->Device->WriteBuffer(batch->Input, batch->Queries.data(), batch->Queries.size()*12);
-                        m_Impl->Device->WriteBuffer(batch->Exclusions, batch->Excluded.data(), batch->Excluded.size()*4);
-                        if (!m_Impl->RecordQueries({batch->Target->Id}, commands,
-                            {.Queries = {.Buffer = batch->Input, .Count = std::uint32_t(batch->Queries.size())},
-                             .Neighbors = batch->Output, .Headers = batch->Header,
-                             .Capacity = batch->Capacity, .Radius = batch->Radius,
-                             .KNearestCount = batch->Radius < 0 ? batch->Capacity : 0u,
-                             .ExcludedIndices = batch->Exclusions}))
+                        if (!m_Impl->RecordBatch(batch, commands, false))
                         {
                             batch->State->State = SpatialQueryState::Failed;
                             batch->State->Diagnostic = "GPU spatial query could not record against a current index.";
@@ -522,7 +697,10 @@ namespace Extrinsic::Runtime
                     }
                 },
                 .DrainCompletedTransfers = [this]() { m_Impl->Drain(); },
-                .HasInFlightWork = [this]() { return !m_Impl->Batches.empty() || !m_Impl->Computations.empty(); },
+                .HasInFlightWork = [this]() {
+                    return !m_Impl->Batches.empty() || !m_Impl->Computations.empty() ||
+                           m_Impl->HoldsWorkspaces();
+                },
                 .ShutdownAfterDeviceIdle = [this]() { m_Impl->ShutdownBatches(); m_Impl->Participant = {}; }
             });
         return setup.RegisterFrameHook(FramePhase::Maintenance,
@@ -550,7 +728,7 @@ namespace Extrinsic::Runtime
                     if (!front) return std::nullopt;
                     return RenderExtractionCache::GpuPropertyFront{.Buffer = front->Buffer, .Address = front->Address,
                                                                    .Bytes = front->Bytes, .Count = front->Count,
-                                                                   .Stamp = front->Stamp};
+                                                                   .Stamp = front->Stamp, .ScalarRange = front->ScalarRange};
                 });
         }
         return Core::Ok();
@@ -561,6 +739,8 @@ namespace Extrinsic::Runtime
         m_Impl->Extraction = nullptr;
         if (m_Impl->Jobs && m_Impl->Participant.IsValid())
             m_Impl->Jobs->UnregisterGpuQueueParticipant(m_Impl->Participant, [this]() { m_Impl->Device->WaitIdle(); });
+        else if (m_Impl->Device && m_Impl->HoldsWorkspaces())
+            m_Impl->Device->WaitIdle();
         m_Impl->ShutdownBatches();
         m_Impl->Jobs = nullptr;
         m_Impl->Entries.clear();
@@ -667,6 +847,12 @@ namespace Extrinsic::Runtime
     {
         return QueueGpuKNearest(handle, queries, 1, {}, std::move(reuse));
     }
+    std::shared_ptr<SpatialNearestBatch> SpatialIndexCache::QueueGpuNearestTransformed(
+        SpatialIndexHandle handle, std::span<const glm::vec3> source, const glm::dmat4& transform,
+        std::shared_ptr<SpatialNearestBatch> reuse)
+    {
+        return QueueGpuBatch(handle, source, 1, -1.f, {}, std::move(reuse), &transform);
+    }
     std::shared_ptr<SpatialNearestBatch> SpatialIndexCache::QueueGpuKNearest(
         SpatialIndexHandle handle, std::span<const glm::vec3> queries, std::uint32_t k,
         std::span<const std::uint32_t> excludedSlots, std::shared_ptr<SpatialNearestBatch> reuse)
@@ -693,7 +879,8 @@ namespace Extrinsic::Runtime
     }
     std::shared_ptr<SpatialNearestBatch> SpatialIndexCache::QueueGpuBatch(
         SpatialIndexHandle handle, std::span<const glm::vec3> queries, std::uint32_t k, float radius,
-        std::span<const std::uint32_t> excludedSlots, std::shared_ptr<SpatialNearestBatch> reuse)
+        std::span<const std::uint32_t> excludedSlots, std::shared_ptr<SpatialNearestBatch> reuse,
+        const glm::dmat4* transform)
     {
         auto& s = *m_Impl;
         auto fail = [](std::string diagnostic) {
@@ -709,47 +896,102 @@ namespace Extrinsic::Runtime
             (!excludedSlots.empty() && excludedSlots.size() != queries.size()) ||
             !std::ranges::all_of(queries, Geometry::PointLBVH::ValidPoint))
             return fail("Vulkan queries require an operational framed device, a current target (1..2^20 rows), finite queries (1..2^20), k in 1..64 or radius capacity in 1..1024, and zero or query-count exclusions.");
+        if (transform)
+        {
+            if (!s.Device->SupportsShaderFloat64()) return fail("Transformed queries require shader float64.");
+            for (unsigned column = 0; column < 4; ++column)
+                for (unsigned row = 0; row < 4; ++row)
+                    if (!std::isfinite((*transform)[column][row])) return fail("Query transform must be finite.");
+        }
         std::shared_ptr<Impl::Batch> batch;
+        bool completedSameTarget = false;
         if (reuse)
         {
             auto found = std::ranges::find_if(s.Batches, [&](const auto& b) { return b->State == reuse; });
             if (found == s.Batches.end() || reuse->State != SpatialQueryState::Ready)
                 return fail("Only a completed batch can be reused.");
             batch = *found;
-            // Too small for this request: release its buffers and allocate below.
-            if (batch->QueryRows < queries.size() || batch->NeighborRows < queries.size() * k)
-            {
-                for (auto buffer : {batch->Input, batch->Output, batch->Header, batch->Exclusions})
-                    if (buffer.IsValid()) s.Device->DestroyBuffer(buffer);
-                batch->Input = batch->Output = batch->Header = batch->Exclusions = {};
-            }
+            completedSameTarget = batch->Target && batch->Target->Id == handle.Value;
+            // Keep pooled ICP scratch bounded to nearest-query storage. A radius/kNN request
+            // starts its own non-pooled batch rather than growing this lease to k*N neighbors.
+            if (!transform && batch->Transform) batch.reset();
         }
         if (!batch)
         {
-            batch = std::make_shared<Impl::Batch>();
-            batch->Device = s.Device;
+            batch = transform ? LeaseGpuWorkspace<Impl::Batch>() : std::make_shared<Impl::Batch>(*s.Device);
+            if (!batch) return fail("GPU query workspace unavailable.");
             s.Batches.push_back(batch);
         }
-        if (!batch->Input.IsValid())
+        const bool allocateInput = !batch->Input.IsValid() || batch->QueryRows < queries.size();
+        const bool allocateOutput = !batch->Output.IsValid() || batch->NeighborRows < queries.size()*k;
+        if (allocateInput || allocateOutput || !batch->Header.IsValid() || !batch->Exclusions.IsValid())
+        {
+            auto ensure = [&](RHI::BufferHandle& buffer, std::size_t bytes, bool host, bool grow) {
+                if (buffer.IsValid() && !grow) return true;
+                const auto replacement = s.Device->CreateBuffer({.SizeBytes = bytes,
+                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc | RHI::BufferUsage::TransferDst,
+                    .HostVisible = host, .DebugName = "SpatialIndex.QueryBatch"});
+                if (!replacement.IsValid()) return false;
+                if (buffer.IsValid()) s.Device->DestroyBuffer(buffer);
+                buffer = replacement;
+                return true;
+            };
+            batch->InputDirty = batch->InputDirty || allocateInput;
+            if (!ensure(batch->Input, queries.size()*12, true, allocateInput) ||
+                !ensure(batch->Output, queries.size()*k*8, false, allocateOutput) ||
+                !ensure(batch->Header, queries.size()*8, false, allocateInput) ||
+                !ensure(batch->Exclusions, queries.size()*4, true, allocateInput))
+            {
+                batch->State->State = SpatialQueryState::Failed;
+                return fail("GPU spatial batch allocation failed.");
+            }
+            batch->QueryRows = std::max(batch->QueryRows, queries.size());
+            batch->NeighborRows = std::max(batch->NeighborRows, queries.size()*k);
+            ++s.Stats.GpuBatchAllocations;
+        }
+        if (transform)
         {
             auto allocate = [&](std::size_t bytes, bool host) {
                 return s.Device->CreateBuffer({.SizeBytes = bytes,
-                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc | RHI::BufferUsage::TransferDst,
-                    .HostVisible = host, .DebugName = "SpatialIndex.QueryBatch"});
+                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
+                    .HostVisible = host, .DebugName = "SpatialIndex.QueryTransform"});
             };
-            batch->Input = allocate(queries.size()*12, true);
-            batch->Output = allocate(queries.size()*k*8, false);
-            batch->Header = allocate(queries.size()*8, false);
-            batch->Exclusions = allocate(queries.size()*4, true);
-            if (!batch->Input.IsValid() || !batch->Output.IsValid() || !batch->Header.IsValid() || !batch->Exclusions.IsValid())
+            if (!batch->TransformBuffer.IsValid()) batch->TransformBuffer = allocate(sizeof(glm::dmat4), true);
+            if (batch->TransformedRows < queries.size())
             {
-                batch->State->State = SpatialQueryState::Failed; // lets Drain drop it
-                return fail("GPU spatial batch allocation failed.");
+                const auto replacement = allocate(queries.size()*12, false);
+                if (!replacement.IsValid())
+                {
+                    batch->State->State = SpatialQueryState::Failed;
+                    return fail("GPU transformed query allocation failed.");
+                }
+                if (batch->TransformedQueries.IsValid()) s.Device->DestroyBuffer(batch->TransformedQueries);
+                batch->TransformedQueries = replacement;
+                batch->TransformedRows = queries.size();
             }
-            batch->QueryRows = queries.size();
-            batch->NeighborRows = queries.size() * k;
-            ++s.Stats.GpuBatchAllocations;
+            if (batch->PackedRows < queries.size())
+            {
+                const auto replacement = s.Device->CreateBuffer({.SizeBytes = queries.size()*16u,
+                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc,
+                    .DebugName = "SpatialIndex.PackedCorrespondences"});
+                if (!replacement.IsValid())
+                {
+                    batch->State->State = SpatialQueryState::Failed;
+                    return fail("GPU packed query allocation failed.");
+                }
+                if (batch->PackedResult.IsValid()) s.Device->DestroyBuffer(batch->PackedResult);
+                batch->PackedResult = replacement;
+                batch->PackedRows = queries.size();
+            }
+            if (!batch->TransformBuffer.IsValid())
+            {
+                batch->State->State = SpatialQueryState::Failed;
+                return fail("GPU query transform allocation failed.");
+            }
         }
+        batch->InputDirty = batch->InputDirty || allocateInput || !transform || batch->Queries.size() != queries.size() ||
+            !std::equal(batch->Queries.begin(), batch->Queries.end(), queries.begin(), queries.end());
+        batch->Transform = transform ? std::optional{*transform} : std::nullopt;
         batch->Target = *std::ranges::find_if(s.Entries, [&](const auto& e) { return e->Id == handle.Value; });
         batch->Queries.assign(queries.begin(), queries.end());
         batch->Capacity = k;
@@ -764,6 +1006,7 @@ namespace Extrinsic::Runtime
         batch->State->State = SpatialQueryState::Queued;
         batch->Downloads = 0;
         batch->DownloadQueued = false;
+        if (completedSameTarget) s.SubmitBatchImmediate(batch);
         return batch->State;
     }
     std::shared_ptr<SpatialGpuResult> SpatialIndexCache::QueueGpuCompute(
@@ -855,6 +1098,29 @@ namespace Extrinsic::Runtime
             });
             s.Residency->Tick();
         }
+        s.MatureWorkspaces();
+    }
+    std::shared_ptr<void> SpatialIndexCache::LeaseErasedGpuWorkspace(const void* kind,
+                                                                    std::shared_ptr<void> (*make)(RHI::IDevice&))
+    {
+        auto& s = *m_Impl;
+        if (!s.Device || !make) return {};
+        s.MatureWorkspaces();
+        std::shared_ptr<void> object;
+        const auto idle = std::ranges::find_if(s.Pool->Idle, [&](const auto& slot) { return slot.Kind == kind; });
+        const bool reused = idle != s.Pool->Idle.end();
+        if (reused)
+        {
+            object = std::move(idle->Object);
+            s.Pool->Idle.erase(idle);
+        }
+        else object = make(*s.Device);
+        if (!object) return {};
+        ++s.Stats.WorkspaceLeases;
+        if (reused) ++s.Stats.WorkspaceReuses;
+        auto lease = std::make_shared<WorkspaceLease>(kind, std::move(object), s.Pool);
+        void* const raw = lease->Object.get();
+        return std::shared_ptr<void>(std::move(lease), raw);
     }
     Graphics::GpuPropertyResidency* SpatialIndexCache::PropertyResidency() noexcept
     {

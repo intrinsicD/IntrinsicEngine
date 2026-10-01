@@ -36,7 +36,9 @@ namespace Extrinsic::Graphics
         RHI::IDevice& Device;
         RHI::PipelineHandle TargetPass{}, SourcePass{};
         RHI::BufferHandle Target{}, Source{}, Results{}, Skip{};
-        std::size_t TargetBytes{0u}, SourceBytes{0u}, ResultBytes{0u}, SkipBytes{0u};
+        std::size_t TargetCapacity{0u}, SourceCapacity{0u}, ResultCapacity{0u}, SkipCapacity{0u};
+        // The uploaded target: its byte size and generation (0: none is current).
+        std::size_t TargetBytes{0u};
         std::uint64_t TargetGeneration{0u};
         explicit Impl(RHI::IDevice& device) : Device(device) {}
         ~Impl()
@@ -46,15 +48,19 @@ namespace Extrinsic::Graphics
             for (auto pipeline : {TargetPass, SourcePass})
                 if (pipeline.IsValid()) Device.DestroyPipeline(pipeline);
         }
-        // Keeps a host-visible buffer of exactly `bytes`, recreating it when the size changes.
-        bool Ensure(RHI::BufferHandle& buffer, std::size_t& current, std::size_t bytes, const char* name)
+        // Keeps a host-visible buffer of at least `bytes`, replacing it only when it is too small,
+        // so iterations and pooled reuse across runs keep the largest allocation. The shaders
+        // address it through the counts in the push constants, never its size. The caller has
+        // retired every submission that used it (one computation at a time; pooled leases mature).
+        bool Ensure(RHI::BufferHandle& buffer, std::size_t& capacity, std::size_t bytes, const char* name)
         {
-            if (buffer.IsValid() && current == bytes) return true;
+            if (buffer.IsValid() && capacity >= bytes) return true;
             if (buffer.IsValid()) Device.DestroyBuffer(buffer);
-            buffer = Device.CreateBuffer({.SizeBytes = std::max<std::size_t>(bytes, 16),
+            const std::size_t size = std::max<std::size_t>(bytes, 16);
+            buffer = Device.CreateBuffer({.SizeBytes = size,
                 .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc | RHI::BufferUsage::TransferDst,
                 .HostVisible = true, .DebugName = name});
-            current = buffer.IsValid() ? bytes : 0u;
+            capacity = buffer.IsValid() ? size : 0u;
             return buffer.IsValid();
         }
         RHI::PipelineHandle Pipeline(RHI::PipelineHandle& pipeline, const char* shader, const char* name)
@@ -87,21 +93,27 @@ namespace Extrinsic::Graphics
         if (!s.Pipeline(s.TargetPass, "shaders/cpd_estep_target_pass.comp.spv", "CoherentPointDrift.EStep.TargetPass").IsValid() ||
             !s.Pipeline(s.SourcePass, "shaders/cpd_estep_source_pass.comp.spv", "CoherentPointDrift.EStep.SourcePass").IsValid())
             return {};
-        const bool targetCurrent = s.Target.IsValid() && s.TargetBytes == input.Target.size_bytes() &&
-                                   s.TargetGeneration == input.TargetGeneration;
+        // Generations are process-unique, so a pooled workspace never mistakes another run's
+        // target for this one; generation 0 is never treated as current.
+        const bool targetCurrent = s.Target.IsValid() && input.TargetGeneration != 0u &&
+                                   s.TargetGeneration == input.TargetGeneration &&
+                                   s.TargetBytes == input.Target.size_bytes();
         if (!targetCurrent)
         {
-            if (!s.Ensure(s.Target, s.TargetBytes, input.Target.size_bytes(), "CoherentPointDrift.EStep.Target")) return {};
+            s.TargetGeneration = 0u;
+            s.TargetBytes = 0u;
+            if (!s.Ensure(s.Target, s.TargetCapacity, input.Target.size_bytes(), "CoherentPointDrift.EStep.Target")) return {};
             s.Device.WriteBuffer(s.Target, input.Target.data(), input.Target.size_bytes());
             s.TargetGeneration = input.TargetGeneration;
+            s.TargetBytes = input.Target.size_bytes();
         }
-        if (!s.Ensure(s.Source, s.SourceBytes, input.Source.size_bytes(), "CoherentPointDrift.EStep.Source") ||
-            !s.Ensure(s.Results, s.ResultBytes, ReadbackBytes(n, m), "CoherentPointDrift.EStep.Results"))
+        if (!s.Ensure(s.Source, s.SourceCapacity, input.Source.size_bytes(), "CoherentPointDrift.EStep.Source") ||
+            !s.Ensure(s.Results, s.ResultCapacity, ReadbackBytes(n, m), "CoherentPointDrift.EStep.Results"))
             return {};
         s.Device.WriteBuffer(s.Source, input.Source.data(), input.Source.size_bytes());
         if (!input.SkipRows.empty())
         {
-            if (!s.Ensure(s.Skip, s.SkipBytes, input.SkipRows.size_bytes(), "CoherentPointDrift.EStep.SkipRows")) return {};
+            if (!s.Ensure(s.Skip, s.SkipCapacity, input.SkipRows.size_bytes(), "CoherentPointDrift.EStep.SkipRows")) return {};
             s.Device.WriteBuffer(s.Skip, input.SkipRows.data(), input.SkipRows.size_bytes());
         }
 

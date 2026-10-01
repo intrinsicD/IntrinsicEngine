@@ -27,11 +27,27 @@ namespace Extrinsic::Graphics
         RHI::IDevice& Device;
         RHI::PipelineHandle Pipeline{};
         RHI::BufferHandle Neighbors{}, Means{}, Stats{};
+        std::uint64_t NeighborBytes{}, MeanBytes{};
         explicit Impl(RHI::IDevice& device):Device(device){}
         ~Impl()
         {
             for(auto b:{Neighbors,Means,Stats})if(b.IsValid())Device.DestroyBuffer(b);
             if(Pipeline.IsValid())Device.DestroyPipeline(Pipeline);
+        }
+        // Repeated runs keep the pipeline and grow only an undersized scratch buffer. The
+        // reduction pass assigns every stats field, and scratch rows are written before read.
+        bool Ensure(std::uint64_t neighborBytes,std::uint64_t meanBytes)
+        {
+            if(!Pipeline.IsValid())Pipeline=CreateComputePipeline(Device,"shaders/outlier_analysis.comp.spv",sizeof(Push),"OutlierAnalysis");
+            const auto allocate=[&](std::uint64_t bytes){return Device.CreateBuffer({.SizeBytes=bytes,
+                .Usage=RHI::BufferUsage::Storage|RHI::BufferUsage::TransferSrc,.DebugName="OutlierAnalysis.Scratch"});};
+            const auto grow=[&](RHI::BufferHandle& buffer,std::uint64_t& capacity,std::uint64_t bytes){
+                if(buffer.IsValid()&&capacity>=bytes)return;
+                if(buffer.IsValid())Device.DestroyBuffer(buffer);
+                buffer=allocate(bytes);capacity=buffer.IsValid()?bytes:0;};
+            grow(Neighbors,NeighborBytes,neighborBytes);grow(Means,MeanBytes,meanBytes);
+            if(!Stats.IsValid())Stats=allocate(sizeof(OutlierGpuStats));
+            return Pipeline.IsValid()&&Neighbors.IsValid()&&Means.IsValid()&&Stats.IsValid();
         }
     };
     std::uint32_t OutlierNeighborWidth(std::uint32_t method, std::uint32_t k, std::uint32_t count)
@@ -50,12 +66,8 @@ namespace Extrinsic::Graphics
         const auto width=OutlierNeighborWidth(p.Method,p.K,count);
         if(!width||!count||count>(1u<<20)||width>65||std::uint64_t(count)*width>(1u<<24)||
            !io.Positions.Address||!io.Nodes||!io.LiveSlots||!io.Score.Address||!io.Mask.Address||!io.Presentation.Address||
-           !s.Device.IsOperational()||!s.Device.SupportsShaderFloat64()||s.Pipeline.IsValid())return {};
-        s.Pipeline=CreateComputePipeline(s.Device,"shaders/outlier_analysis.comp.spv",sizeof(Push),"OutlierAnalysis");
-        const auto allocate=[&](std::uint64_t bytes){return s.Device.CreateBuffer({.SizeBytes=bytes,
-            .Usage=RHI::BufferUsage::Storage|RHI::BufferUsage::TransferSrc,.DebugName="OutlierAnalysis.Scratch"});};
-        s.Neighbors=allocate(std::uint64_t(count)*width*8);s.Means=allocate(io.Score.Bytes*4);s.Stats=allocate(sizeof(OutlierGpuStats));
-        if(!s.Pipeline.IsValid()||!s.Neighbors.IsValid()||!s.Means.IsValid()||!s.Stats.IsValid())return {};
+           !s.Device.IsOperational()||!s.Device.SupportsShaderFloat64()||
+           !s.Ensure(std::uint64_t(count)*width*8,io.Score.Bytes*4))return {};
         const auto shader=RHI::MemoryAccess::ShaderRead|RHI::MemoryAccess::ShaderWrite;
         cmd.BufferBarrier(io.Positions.Buffer,RHI::MemoryAccess::TransferWrite|shader,RHI::MemoryAccess::ShaderRead);
         const auto initialize=[&](const GpuPropertyView& output,const GpuPropertyView& base){
@@ -66,6 +78,8 @@ namespace Extrinsic::Graphics
             cmd.BufferBarrier(output.Buffer,RHI::MemoryAccess::TransferWrite,shader);
         };
         initialize(io.Score,io.ScoreBase);initialize(io.Mask,io.MaskBase);initialize(io.Presentation,{});
+        // A reused workspace: the previous run's scratch reads and stats readback precede these writes.
+        for(auto b:{s.Neighbors,s.Means,s.Stats})cmd.BufferBarrier(b,shader|RHI::MemoryAccess::TransferRead,RHI::MemoryAccess::ShaderWrite);
         Push push{.Positions=io.Positions.Address,.Nodes=io.Nodes,.Slots=io.LiveSlots,
             .Neighbors=s.Device.GetBufferDeviceAddress(s.Neighbors),.Means=s.Device.GetBufferDeviceAddress(s.Means),
             .Score=io.Score.Address,.Mask=io.Mask.Address,.Presentation=io.Presentation.Address,.Stats=s.Device.GetBufferDeviceAddress(s.Stats),

@@ -37,7 +37,7 @@ export namespace Extrinsic::Runtime
     {
     public:
         // Device input is canonical residency. CPU points/weights are retained only for the parity check.
-        PointSamplingGpuRun(RHI::IDevice& device, const Graphics::FarthestPointGpuInput& input,
+        PointSamplingGpuRun(SpatialIndexCache& cache, const Graphics::FarthestPointGpuInput& input,
                             std::span<const glm::vec3> referencePoints, const Geometry::PointSampling::Params& params);
         ~PointSamplingGpuRun();
         PointSamplingGpuRun(const PointSamplingGpuRun&) = delete;

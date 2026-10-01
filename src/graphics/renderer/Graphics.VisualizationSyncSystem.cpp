@@ -392,14 +392,25 @@ namespace Extrinsic::Graphics
                         cfg.ScalarRangeMax = center + 0.5f;
                     }
                 }
-                setBdaAndCount(visCfg->ScalarFieldName, cfg.ScalarBDA);
-                if (cfg.ScalarBDA == 0u && scalarPacket != nullptr &&
-                    scalarPacket->ScalarBufferBDA != 0u)
+                const bool externalScalar = scalarPacket != nullptr && scalarPacket->ScalarBufferBDA != 0u &&
+                    scalarPacket->SourceElementCount != 0u;
+                if (externalScalar)
                 {
                     cfg.ScalarBDA = scalarPacket->ScalarBufferBDA;
                     cfg.ElementCount = scalarPacket->ElementCount;
+                    cfg.ScalarSourceCount = scalarPacket->SourceElementCount;
+                    if (!scalarPacket->ElementRemapSourceKey.empty())
+                    {
+                        const auto* remap = FindPropertyBufferAddress(propertyBufferAddresses,
+                            scalarPacket->ElementRemapSourceKey, {}, scalarDomain,
+                            [](const VisualizationValueType type) { return type == VisualizationValueType::LabelUint32; });
+                        if (remap && remap->ElementCount == cfg.ElementCount)
+                            cfg.ScalarIndexBDA = remap->BufferBDA;
+                        if (cfg.ScalarIndexBDA == 0u) cfg.ScalarBDA = 0u;
+                    }
                 }
-                if (cfg.ScalarBDA == 0u)
+                else setBdaAndCount(visCfg->ScalarFieldName, cfg.ScalarBDA);
+                if (!externalScalar && cfg.ScalarBDA == 0u)
                 {
                     const VisualizationPropertyBufferAddress* address =
                         FindPropertyBufferAddress(

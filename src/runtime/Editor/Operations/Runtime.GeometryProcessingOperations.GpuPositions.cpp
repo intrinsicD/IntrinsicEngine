@@ -328,7 +328,9 @@ namespace Extrinsic::Runtime
             w->Result = result;
             if (w->Delivered) return;
             w->Delivered = true;
-            if (w->Sink) w->Sink(std::move(result));
+            // A terminal callback may capture this run; remove the back-reference before delivery.
+            auto sink = std::move(w->Sink);
+            if (sink) sink(std::move(result));
         }
         // A failed or stale Accept ends the run: nothing is published, the previous
         // positions stay, and the ring this run acquired is released (the scalar

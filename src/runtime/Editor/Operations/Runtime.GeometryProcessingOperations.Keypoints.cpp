@@ -337,7 +337,11 @@ namespace Extrinsic::Runtime
         w->Limits.Rows=std::max(1u,std::min({w->Limits.Rows,
             std::max(1u,w->Limits.Pairs/w->Limits.Visits),16384u}));
         w->Page={.Rows=std::min(w->Limits.Rows,std::uint32_t(w->LiveCount)),.Visits=w->Limits.Visits};
-        w->Workspace=std::make_shared<Graphics::PointKeypointWorkspace>(*context.Device);
+        w->Workspace=context.SpatialIndices->LeaseGpuWorkspace<Graphics::PointKeypointWorkspace>();
+        if(!w->Workspace) {
+            DiscardEditorPointScalar(commands,transaction);
+            return refuse("Keypoint device workspace unavailable.");
+        }
         const auto current=[context,w] {
             const auto t=w->Transaction.lock();
             return t && !w->Abandoned && CurrentInput(context,*w) &&
@@ -351,7 +355,7 @@ namespace Extrinsic::Runtime
                 if(w->Page.Mode==2 && w->Page.First==0 && !w->Page.Resume)w->Result.CpuStageUploadBytes+=4;
                 return context.SpatialIndices->QueueGpuCompute(w->GpuIndex,sizeof(Graphics::PointKeypointHeader),
                     [context,w,residency,input=w->Input,back=w->Back,scoreBase=w->ScoreBase,maskBase=w->MaskBase](RHI::ICommandContext& cmd,const SpatialGpuIndexView& index) {
-                        if(w->Abandoned || !input || !back)return RHI::BufferHandle{};
+                        if(w->Abandoned || !w->Workspace || !input || !back)return RHI::BufferHandle{};
                         const auto frame=context.Device->GetGlobalFrameNumber();
                         for(auto buffer:{input->Buffer,back->Typed.Buffer,back->Companion.Buffer})residency->NoteUse(buffer,frame);
                         if(w->Page.Mode==4 && w->Page.First==0) {
@@ -401,6 +405,7 @@ namespace Extrinsic::Runtime
                 auto& r=w->Result;r.MeanSpacing=w->Header.MeanSpacing;r.SalientRadius=w->Header.SalientRadius;
                 r.NonMaxRadius=w->Header.NonMaxRadius;r.MaximumNeighbors=w->Header.MaximumNeighbors;r.KeypointCount=w->Header.KeypointCount;
                 w->Back.reset();w->Input.reset();w->ScoreBase.reset();w->MaskBase.reset();
+                w->Workspace.reset(); // Final page completion proves scratch is no longer in use.
                 if(!PublishEditorPointScalarBack(transaction,true)){DiscardEditorPointScalar(commands,transaction);return false;}
                 if(automatic) {
                     const auto accepted=AcceptEditorPointScalar(commands,transaction);

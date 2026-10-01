@@ -301,6 +301,9 @@ namespace
             }
             if (Next == Cases.size())
             {
+                const auto stats = Context.SpatialIndices->Stats();
+                WorkspaceLeases = stats.WorkspaceLeases;
+                WorkspaceReuses = stats.WorkspaceReuses;
                 Done = true;
                 Kernel().RequestExit();
                 return;
@@ -414,6 +417,7 @@ namespace
         std::optional<Runtime::EditorPropertySmoothingResult> Result;
         std::chrono::steady_clock::time_point Started{}, PhaseStarted{};
         std::size_t Next{}, Compared{}, Frames{};
+        std::uint64_t WorkspaceLeases{}, WorkspaceReuses{};
         double MaxLinearError{}, MaxBilateralError{}, GpuMs{}, CpuMs{};
         bool Waiting{}, Done{}, TimedOut{}, StaleOnly{}, ImplicitOnly{};
     };
@@ -446,6 +450,10 @@ TEST(GEOM081VulkanPropertySmoothing, ExplicitFiltersMatchTheCpuReferenceOnEveryD
     ASSERT_FALSE(run->TimedOut);
     ASSERT_TRUE(run->Done);
     EXPECT_EQ(run->Compared, run->Cases.size());
+    // Every run leases its filter workspace from the spatial cache; sequential runs of changing
+    // rows, channels and filters (bilateral before averaging included) reuse retired ones.
+    EXPECT_EQ(run->WorkspaceLeases, run->Cases.size());
+    EXPECT_GT(run->WorkspaceReuses, 0u);
     std::printf("GEOM-081 parity: %zu cases, max relative error linear %.3g, bilateral %.3g; GPU %.1f ms, CPU %.1f ms\n",
                 run->Compared, run->MaxLinearError, run->MaxBilateralError, run->GpuMs, run->CpuMs);
     if (const auto* output = std::getenv("INTRINSIC_GEOM081_BENCHMARK_OUTPUT"))
@@ -501,6 +509,9 @@ TEST(GEOM089VulkanImplicitSmoothing, ConjugateGradientStepsMatchTheCpuReference)
     ASSERT_FALSE(run->TimedOut);
     ASSERT_TRUE(run->Done);
     EXPECT_EQ(run->Compared, run->Cases.size());
+    // Each run leases a solver and a store workspace (the non-converging one included).
+    EXPECT_EQ(run->WorkspaceLeases, 2u * run->Cases.size());
+    EXPECT_GT(run->WorkspaceReuses, 0u);
     std::printf("GEOM-089 implicit parity: %zu cases, max relative error %.3g; GPU %.1f ms, CPU %.1f ms\n",
                 run->Compared, run->MaxLinearError, run->GpuMs, run->CpuMs);
 }

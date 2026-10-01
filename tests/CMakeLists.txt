@@ -2158,6 +2158,7 @@ set(_graphics_contract_cpu_test_files
     Test.RenderSubsystemRegistry.cpp
     Test.GpuPropertyResidency.cpp
     Test.VertexNormalsWorkspace.cpp
+    Test.PropertySmoothingWorkspaces.cpp
     Test.RendererFrameLifecycle.cpp
     Test.RenderWorldContract.cpp
     Test.RenderGraphParallelRecording.cpp

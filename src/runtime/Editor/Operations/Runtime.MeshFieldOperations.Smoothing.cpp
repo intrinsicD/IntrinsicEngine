@@ -530,6 +530,8 @@ namespace Extrinsic::Runtime
         bool Implicit{};
         std::vector<std::uint32_t> Offsets{}, Columns{};
         S::PropertyImplicitSystem System{};
+        // Device workspaces leased from the spatial cache; the recorders reach them through this
+        // run, so they stay leased while queued work may still record or execute.
         std::shared_ptr<Graphics::SparseConjugateGradientWorkspace> Solver{};
         std::shared_ptr<Graphics::PropertyFilterWorkspace> Filter{}; // the explicit kernels, or the CG path's store
         bool FinalQueued{}; // the last chunk (reports only) is under way
@@ -569,6 +571,7 @@ namespace Extrinsic::Runtime
         using Work = std::shared_ptr<EditorPropertySmoothingTransaction>;
         constexpr std::uint32_t kRingDepth = 3u;   // fronts bound directly by the renderer (ADR 0030 decision 4)
         constexpr std::uint32_t kMaxDeferrals = 600u; // frames the residency may refuse before the run fails
+        constexpr const char* kRefused = "Vulkan property smoothing could not queue its device work; previous output retained.";
 
         // The captured inputs and the output are unchanged (an edit or undo of either while
         // the run computes or waits makes it stale; the publication keeps its own value guard).
@@ -585,8 +588,18 @@ namespace Extrinsic::Runtime
             w->Delivered = true;
             if (w->Sink) w->Sink(std::move(result));
         }
+        // The workspaces return to the cache once no queued submission can use them: nothing was
+        // queued, or the latest one (chunks are sequential) completed. Otherwise the run keeps them
+        // until its recorders are released.
+        void ReleaseWorkspaces(const Work& w)
+        {
+            if (w->Gpu && w->Gpu->State != SpatialQueryState::Ready) return;
+            w->Solver.reset();
+            w->Filter.reset();
+        }
         void ReleaseRings(const Work& w)
         {
+            ReleaseWorkspaces(w);
             w->Input.reset();
             w->Base.reset();
             w->Back.reset();
@@ -663,13 +676,19 @@ namespace Extrinsic::Runtime
             }
             return true;
         }
+        // Ends the compute job as failed without queueing more work.
+        bool Refuse(const Work& w, std::string diagnostic)
+        {
+            ReleaseWorkspaces(w);
+            w->Gpu = std::make_shared<SpatialGpuResult>();
+            w->Gpu->State = SpatialQueryState::Failed;
+            w->Gpu->Diagnostic = std::move(diagnostic);
+            return true;
+        }
         bool Defer(const Work& w)
         {
             if (++w->Deferrals < kMaxDeferrals) return false;
-            w->Gpu = std::make_shared<SpatialGpuResult>();
-            w->Gpu->State = SpatialQueryState::Failed;
-            w->Gpu->Diagnostic = "The GPU property residency refused the run's input or output slot; previous output retained.";
-            return true;
+            return Refuse(w, "The GPU property residency refused the run's input or output slot; previous output retained.");
         }
         // The submission that wrote Back has finished: its slot becomes the front the renderer shows.
         void PublishPreview(const Work& w)
@@ -681,27 +700,29 @@ namespace Extrinsic::Runtime
             if (w->Residency->Publish(w->Key)) ++w->Previews;
             if (w->Presentation) (void)w->Residency->Publish(w->PresentationKey);
         }
-        void QueueExplicit(const Work& w)
+        bool QueueExplicit(const Work& w)
         {
             const auto& ctx = w->Context;
-            w->Filter = std::make_shared<Graphics::PropertyFilterWorkspace>(*ctx.Device);
+            w->Filter = ctx.SpatialIndices->LeaseGpuWorkspace<Graphics::PropertyFilterWorkspace>();
+            if (!w->Filter) return false;
             w->StoreRecorded = true;
             // The result stays on the device (the ring); the readback is one word that only
             // reports completion.
             w->Gpu = ctx.SpatialIndices->QueueGpuCompute(sizeof(double),
                 [w](RHI::ICommandContext& commands, const SpatialGpuIndexView&) -> RHI::BufferHandle {
-                    if (w->Abandoned) return {};
+                    if (w->Abandoned || !w->Filter) return {};
                     NoteUses(w);
                     const auto io = ResidentIo(w);
                     return w->Filter->Record(commands, {.Values = w->Values, .Channels = std::uint32_t(w->Plan.Channels),
                         .Edges = w->Edges, .Weights = w->Weights, .Degree = w->Plan.Degree, .Fixed = w->Fixed}, w->Params, &io);
                 });
+            return w->Gpu != nullptr;
         }
         // One bounded chunk per immediate submission (GRAPHICS-150); each chunk reads back only
         // the reports it is observed by. A chunk also stores the latest complete time step into
         // the ring when a write slot is held (a dropped preview otherwise); the final pass, after
         // every solve finished, stores the result.
-        void QueueChunk(const Work& w, const bool final)
+        bool QueueChunk(const Work& w, const bool final)
         {
             const auto& ctx = w->Context;
             const std::uint32_t solves = w->Publication.Config.Filter.Iterations * std::uint32_t(w->Plan.Channels);
@@ -709,7 +730,7 @@ namespace Extrinsic::Runtime
             w->Gpu = ctx.SpatialIndices->QueueGpuCompute(
                 Graphics::SparseConjugateGradientWorkspace::ReportReadbackBytes(solves),
                 [w, final](RHI::ICommandContext& commands, const SpatialGpuIndexView&) -> RHI::BufferHandle {
-                    if (w->Abandoned) return {};
+                    if (w->Abandoned || !w->Solver || !w->Filter) return {};
                     const auto channels = std::uint32_t(w->Plan.Channels), rows = std::uint32_t(w->Plan.Count);
                     if (w->Solver->Chunks() == 0u)
                     {
@@ -734,6 +755,7 @@ namespace Extrinsic::Runtime
                     }
                     return buffer;
                 }, SpatialGpuLatency::Immediate);
+            return w->Gpu != nullptr;
         }
         // Main-thread readiness poll of the compute job: queues the device work, publishes each
         // finished preview and reports when the run reached its end (or failed / was stopped).
@@ -746,8 +768,9 @@ namespace Extrinsic::Runtime
                 if (!w->Solver)
                 {
                     if (!AcquireSlots(w)) return Defer(w);
-                    w->Solver = std::make_shared<Graphics::SparseConjugateGradientWorkspace>(*ctx.Device);
-                    w->Filter = std::make_shared<Graphics::PropertyFilterWorkspace>(*ctx.Device);
+                    w->Solver = ctx.SpatialIndices->LeaseGpuWorkspace<Graphics::SparseConjugateGradientWorkspace>();
+                    w->Filter = ctx.SpatialIndices->LeaseGpuWorkspace<Graphics::PropertyFilterWorkspace>();
+                    if (!w->Solver || !w->Filter) return Refuse(w, "Vulkan property smoothing device workspace unavailable; previous output retained.");
                     const auto& f = w->Publication.Config.Filter;
                     const auto channelCount = std::uint32_t(w->Plan.Channels);
                     if (!w->Solver->Begin({.Matrix = {.Rows = std::uint32_t(w->Plan.Count), .RowOffsets = w->Offsets,
@@ -756,9 +779,8 @@ namespace Extrinsic::Runtime
                             .RhsDiagonal = w->System.RhsDiagonal, .RhsConstant = w->System.RhsConstant,
                             .ChainStride = channelCount, .SeedsOnDevice = true,
                             .MaxIterations = f.MaxSolverIterations, .Tolerance = f.SolverTolerance}))
-                        return true;
-                    QueueChunk(w, false);
-                    return false;
+                        return Refuse(w, "The Vulkan solver refused the implicit system; previous output retained.");
+                    return QueueChunk(w, false) ? false : Refuse(w, kRefused);
                 }
                 if (!w->Gpu || w->Gpu->State == SpatialQueryState::Failed) return true;
                 if (w->Gpu->State != SpatialQueryState::Ready) return false;
@@ -769,19 +791,16 @@ namespace Extrinsic::Runtime
                 {
                     // The final store needs a write slot: wait for one rather than accept a stale front.
                     if (!AcquireSlots(w)) return Defer(w);
-                    QueueChunk(w, true);
-                    return false;
+                    return QueueChunk(w, true) ? false : Refuse(w, kRefused);
                 }
                 if (w->StopRequested) { w->Stopped = true; return true; }
                 (void)AcquireSlots(w); // no slot: this chunk computes without a preview
-                QueueChunk(w, false);
-                return false;
+                return QueueChunk(w, false) ? false : Refuse(w, kRefused);
             }
             if (!w->Gpu)
             {
                 if (!AcquireSlots(w)) return Defer(w);
-                QueueExplicit(w);
-                return false;
+                return QueueExplicit(w) ? false : Refuse(w, kRefused);
             }
             if (w->Gpu->State == SpatialQueryState::Ready) PublishPreview(w);
             return w->Gpu->State == SpatialQueryState::Ready || w->Gpu->State == SpatialQueryState::Failed;
@@ -827,6 +846,7 @@ namespace Extrinsic::Runtime
                                   : "Vulkan property smoothing published no preview; previous output retained.");
                 return;
             }
+            ReleaseWorkspaces(w);
             w->Phase = EditorGpuTransactionPhase::ReadyToAccept;
             w->Result.Status = EditorCommandStatus::Pending;
             w->Result.Message = w->Stopped ? "Stopped; the latest preview waits for Accept or Discard."

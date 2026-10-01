@@ -86,6 +86,9 @@ export namespace Extrinsic::Graphics
         float RangeMax{1.f};
         Colormap::Type Colormap{Colormap::Type::Viridis};
         std::uint64_t ScalarBufferBDA{0u};
+        std::string ElementRemapSourceKey{};
+        // Nonzero for an externally resident source, which takes precedence over CPU uploads.
+        std::uint32_t SourceElementCount{0u};
     };
 
     struct ColorAttributePacket

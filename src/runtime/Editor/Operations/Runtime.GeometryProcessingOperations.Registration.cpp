@@ -699,8 +699,12 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
                     return true;
                 }
             }
-            state.Batch = context.SpatialIndices->QueueGpuNearest(state.TargetIndex,
-                Reg::MakeICPQueries(state.SourceWorld, state.Outcome.Result.Transform), state.Batch);
+            if (context.Device && context.Device->SupportsShaderFloat64())
+                state.Batch = context.SpatialIndices->QueueGpuNearestTransformed(state.TargetIndex,
+                    state.SourceWorld, state.Outcome.Result.Transform, state.Batch);
+            else
+                state.Batch = context.SpatialIndices->QueueGpuNearest(state.TargetIndex,
+                    Reg::MakeICPQueries(state.SourceWorld, state.Outcome.Result.Transform), state.Batch);
             if (state.Batch->State == SpatialQueryState::Failed) return fail(state.Batch->Diagnostic);
             return false;
         }

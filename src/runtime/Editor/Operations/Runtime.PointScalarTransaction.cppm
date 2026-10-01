@@ -1,5 +1,6 @@
 // Resident scalar previews and typed, undoable publication for point methods.
 module;
+#include <array>
 #include <cstdint>
 #include <cstddef>
 #include <functional>
@@ -53,7 +54,8 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::optional<EditorPointScalarBack> AcquireEditorPointScalarBack(
         const EditorPointScalarTransactionHandle&);
     // Call only after the producer completion, after releasing its back leases.
-    [[nodiscard]] bool PublishEditorPointScalarBack(const EditorPointScalarTransactionHandle&, bool ready);
+    [[nodiscard]] bool PublishEditorPointScalarBack(const EditorPointScalarTransactionHandle&, bool ready,
+        std::optional<std::array<float, 2>> scalarRange = {});
     [[nodiscard]] EditorPointScalarTransactionSnapshot SnapshotEditorPointScalar(
         const EditorProcessingCommands&,const EditorPointScalarTransactionHandle&);
     // A nonempty Accept sink replaces the Start sink after admission succeeds.

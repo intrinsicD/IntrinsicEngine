@@ -32,6 +32,7 @@ export namespace Extrinsic::Graphics
         explicit OutlierWorkspace(RHI::IDevice&);
         ~OutlierWorkspace();
         // Inputs and outputs remain leased by the caller until the returned stats are read.
+        // Reusable once that submission completed: the pipeline is kept, undersized scratch replaced.
         [[nodiscard]] RHI::BufferHandle Record(RHI::ICommandContext&, const OutlierGpuParams&, const OutlierResidentIo&);
     private:
         struct Impl;

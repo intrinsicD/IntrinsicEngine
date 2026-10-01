@@ -184,6 +184,7 @@ namespace
                 DiscardRestored=Completion->Status==Runtime::KMeansRunStatus::Cancelled && labels &&
                     std::ranges::all_of(labels.Vector(),[](auto value){return value==9u;}) && !properties.Exists("p:kmeans_color");
                 FirstUploadBytes=Completion->GpuInputUploadBytes;FirstCentroids=Completion->Centroids;
+                FirstBuffersCreated=Completion->GpuWorkspaceBuffersCreated;FirstPipelinesCreated=Completion->GpuWorkspacePipelinesCreated;
                 Completion.reset();Repeated=true;Submitted=false;return;
             }
             if (Completion.has_value())
@@ -239,6 +240,7 @@ namespace
         bool ColorsCommitted{false};
         bool Repeated{}, PreviewObserved{}, DiscardSent{}, DiscardRestored{};
         std::uint64_t FirstUploadBytes{};
+        std::uint32_t FirstBuffersCreated{}, FirstPipelinesCreated{};
         std::shared_ptr<Runtime::SpatialGpuResult> Preview{},TypedPreview{};
         std::vector<std::uint32_t> TypedLabels{};
         std::vector<glm::vec3> FirstCentroids{};
@@ -323,7 +325,14 @@ TEST_P(ClusteringServiceGpuSmoke,
     EXPECT_EQ(appPtr->FirstUploadBytes,appPtr->Points.size()*(appPtr->Deleted?16u:12u));
     EXPECT_EQ(appPtr->Completion->GpuInputUploadBytes,0u);
     EXPECT_GT(appPtr->Completion->GpuInputCacheHits,0u);
-    EXPECT_GT(appPtr->Completion->GpuSubmissions,6u);
+    // The discarded first run created the workspace; the repeat run reuses it.
+    EXPECT_GT(appPtr->FirstBuffersCreated,0u);EXPECT_EQ(appPtr->FirstPipelinesCreated,3u);
+    EXPECT_EQ(appPtr->Completion->GpuWorkspaceBuffersCreated,0u);
+    EXPECT_EQ(appPtr->Completion->GpuWorkspacePipelinesCreated,0u);
+    // Case 2's budgets fit a whole iteration (and a due preview) per submission:
+    // one per iteration plus the terminal preview/centroid submission.
+    if(GetParam()==2)EXPECT_EQ(appPtr->Completion->GpuSubmissions,appPtr->Completion->Iterations+1u);
+    else EXPECT_GT(appPtr->Completion->GpuSubmissions,appPtr->Completion->Iterations+1u);
     EXPECT_EQ(appPtr->Completion->LabelCount, livePoints.size());
     EXPECT_EQ(appPtr->Completion->ClusterCount,
               appPtr->Parameters.ClusterCount);

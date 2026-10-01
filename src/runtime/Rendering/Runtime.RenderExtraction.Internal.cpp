@@ -271,6 +271,7 @@ namespace Extrinsic::Runtime
 
         void AppendVisualizationRecipe(
             const GeometryEntityAvailability& availability,
+            entt::entity entity,
             const VisualizationRecipe& recipe,
             RuntimeRenderExtractionStats& stats,
             std::span<const std::uint32_t> surfaceVertexRemap = {},

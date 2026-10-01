@@ -64,12 +64,14 @@ export namespace Extrinsic::Graphics
         // The reports alone (the head of the result buffer): what a chunk's readback needs for
         // Observe (GRAPHICS-153); the solutions are read once, after RecordFinal.
         [[nodiscard]] static std::uint64_t ReportReadbackBytes(std::uint32_t solves);
-        // Validates and copies the problem; false on malformed CSR, shapes, parameters, or a device
-        // without operational state or shader double support.
+        // Starts a run: validates and copies the problem; false on malformed CSR, shapes,
+        // parameters, or a device without operational state or shader double support (a refused
+        // problem also ends the previous run). Call only once the previous run's submissions
+        // completed: the pipeline and buffers are kept and only an undersized buffer is replaced.
         [[nodiscard]] bool Begin(const SparseCgProblem& problem);
-        // Creates and uploads the device buffers (the operator, right-hand sides, seeds) once;
-        // RecordNext does this itself, so callers only need it to record into the solution
-        // block before the first chunk. False on failure.
+        // Uploads the run's operator, host right-hand sides and seeds into the retained buffers
+        // and zeroes its reports, once per run; RecordNext does this itself, so callers only need
+        // it to record into the solution block before the first chunk. False on failure.
         [[nodiscard]] bool RecordUpload(RHI::ICommandContext& commands);
         // Records the next bounded chunk (uploading the operator on the first call) and returns the
         // buffer holding every report and solution, ready for transfer reads; invalid on failure.
@@ -80,7 +82,8 @@ export namespace Extrinsic::Graphics
         // iterations.
         void Observe(std::span<const std::byte> readback);
         // Once Finished: the result buffer (reports and solutions) ready for transfer reads, for
-        // the single final readback of ReadbackBytes; invalid before.
+        // the single final readback of ReadbackBytes (the buffer may be larger; its tail beyond
+        // this run's ReadbackBytes is not part of the result); invalid before.
         [[nodiscard]] RHI::BufferHandle RecordFinal(RHI::ICommandContext& commands);
         [[nodiscard]] bool Finished() const noexcept;
         [[nodiscard]] std::uint32_t Chunks() const noexcept;

@@ -32,10 +32,15 @@ smoke compares the complete order and clearances with the CPU reference (toleran
 zero), records `max_clearance_delta`, compares published rank/mask fields on weighted,
 transformed inputs with deleted rows, and checks zero input uploads on repeat runs.
 Its direct run spans multiple submissions and requires empty intermediate payloads.
-This residency revision has not been executed on Vulkan in the implementation
-session; the delta must be measured by running the smoke on a display-capable host.
 Mock-device `ResidentPointSampling.*` tests cover residency reuse, metadata-only
 writes, terminal publication/undo, stale watches, cancellation and admission refusal.
 
 The remaining LOP, k-means and keypoint residency migrations are owned by
 [RUNTIME-300](../../tasks/done/RUNTIME-300-fully-gpu-methods-on-residency-inputs-and-rings.md).
+
+The runtime leases sampling workspaces from the spatial cache. Completed workspaces
+retain scratch capacity and their pipeline across requests; `Begin` resets the
+order and per-run parameters, uploads current row/transform metadata, and unbinds
+retained row/weight buffers when those inputs are absent. Larger requests grow
+only undersized buffers. A new request cannot reuse a workspace still held by a
+GPU submission.

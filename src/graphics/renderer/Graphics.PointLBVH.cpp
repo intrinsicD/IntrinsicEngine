@@ -24,6 +24,12 @@ namespace Extrinsic::Graphics
             std::uint32_t Count{}, Padded{}, Stride{}, J{}, K{}, Reserved{};
             std::uint64_t ObjectIndices{};
         };
+        struct TransformPush
+        {
+            std::uint64_t Source{}, Pose{}, Destination{};
+            std::uint32_t Count{}, Stride{};
+        };
+        static_assert(sizeof(TransformPush) == 32);
         struct QueryPush
         {
             std::uint64_t Nodes{}, Bounds{}, Queries{}, Neighbors{}, Headers{};
@@ -67,7 +73,7 @@ namespace Extrinsic::Graphics
         }
         RHI::IDevice& Device;
         RHI::BufferHandle Storage{}, SortScratch{};
-        std::array<RHI::PipelineHandle, 4> Pipelines{};
+        std::array<RHI::PipelineHandle, 5> Pipelines{};
         ParallelPrimitivePipelineSet Sort{}; // radix sort of the (Morton code, index) keys
         std::uint32_t Capacity{}, Count{}, Padded{};
         std::uint64_t Allocations{}, Builds{}, Keys{}, Nodes{}, Bounds{};
@@ -192,24 +198,52 @@ namespace Extrinsic::Graphics
         const auto qb = s.Device.GetBufferDeviceAddress(query.Queries.Buffer),
                    nb = s.Device.GetBufferDeviceAddress(query.Neighbors),
                    hb = s.Device.GetBufferDeviceAddress(query.Headers);
-        if (!qb || !nb || !hb || query.Queries.Offset > ~std::uint64_t{} - qb)
+        if (!qb || !nb || !hb || query.Queries.Offset > ~std::uint64_t{} - qb ||
+            query.HeaderOffset % 8u || query.HeaderOffset > ~std::uint64_t{} - hb)
             return false;
         const auto excluded = query.ExcludedIndices.IsValid() ?
             s.Device.GetBufferDeviceAddress(query.ExcludedIndices) : 0;
         if (query.ExcludedIndices.IsValid() && !excluded) return false;
+        auto queryAddress = qb + query.Queries.Offset;
+        auto queryStride = query.Queries.Stride;
+        auto queryBuffer = query.Queries.Buffer;
+        if (query.Transform.IsValid() != query.TransformedQueries.IsValid()) return false;
+        if (query.Transform.IsValid())
+        {
+            if (!s.Device.SupportsShaderFloat64() || query.TransformedQueries == query.Queries.Buffer) return false;
+            const auto matrix = s.Device.GetBufferDeviceAddress(query.Transform);
+            const auto output = s.Device.GetBufferDeviceAddress(query.TransformedQueries);
+            if (!matrix || !output) return false;
+            if (!s.Pipelines[4].IsValid())
+                s.Pipelines[4] = CreateComputePipeline(s.Device, "shaders/lbvh_transform_queries.comp.spv",
+                                                      sizeof(TransformPush), "LBVH query transform");
+            if (!s.Pipelines[4].IsValid()) return false;
+            for (auto input : {query.Queries.Buffer, query.Transform})
+                cmd.BufferBarrier(input, RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderWrite,
+                                  RHI::MemoryAccess::ShaderRead);
+            cmd.BufferBarrier(query.TransformedQueries, RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite,
+                              RHI::MemoryAccess::ShaderWrite);
+            const TransformPush transform{queryAddress, matrix, output, query.Queries.Count, queryStride};
+            cmd.BindPipeline(s.Pipelines[4]);
+            cmd.PushConstants(&transform, sizeof(transform), 0);
+            cmd.Dispatch((query.Queries.Count + 255u) / 256u, 1, 1);
+            queryAddress = output;
+            queryStride = 12;
+            queryBuffer = query.TransformedQueries;
+        }
         const QueryPush push{.Nodes = s.Nodes,
                              .Bounds = s.Bounds,
-                             .Queries = qb + query.Queries.Offset,
+                             .Queries = queryAddress,
                              .Neighbors = nb,
-                             .Headers = hb,
+                             .Headers = hb + query.HeaderOffset,
                              .PointCount = s.Count,
                              .QueryCount = query.Queries.Count,
-                             .Stride = query.Queries.Stride,
+                             .Stride = queryStride,
                              .Capacity = query.Capacity,
                              .Radius = query.Radius,
                              .KNearestCount = query.KNearestCount,
                              .ExcludedIndices = excluded};
-        cmd.BufferBarrier(query.Queries.Buffer,
+        cmd.BufferBarrier(queryBuffer,
                           RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderWrite,
                           RHI::MemoryAccess::ShaderRead);
         if (query.ExcludedIndices.IsValid())

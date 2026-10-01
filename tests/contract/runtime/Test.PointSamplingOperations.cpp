@@ -424,3 +424,35 @@ TEST_F(ResidentPointSampling, WorkspacePagesRoundsWithinTheSubmissionBudget)
     EXPECT_GT(workspace.Produced(), first);
     for (const auto& dispatch : Device.CommandContext.DispatchRecords) EXPECT_LE(dispatch.X, 65535u);
 }
+
+TEST_F(ResidentPointSampling, WarmWorkspaceKeepsCapacityAndUnbindsPriorRowMap)
+{
+    namespace G = Extrinsic::Graphics;
+    auto view = R::ResolveGpuPropertyInput(*Cache.PropertyResidency(), S.Registry, S.World, Entity,
+        {.Domain = D::PointCloudPoint, .Name = "v:position", .ValueKind = Geometry::PropertyValueKind::Vec3});
+    ASSERT_TRUE(view);
+    std::vector<std::uint32_t> rows(view->Layout.Count);
+    for (std::uint32_t i = 0; i < rows.size(); ++i) rows[i] = std::uint32_t(rows.size()) - i - 1;
+    G::FarthestPointSamplingWorkspace workspace(Device);
+    ASSERT_TRUE(workspace.Begin({.Positions = *view, .Rows = rows, .Count = 3}));
+    ASSERT_TRUE(workspace.RecordNext(Device.CommandContext).IsValid());
+    const auto buffers = Device.CreateBufferCount;
+    const auto pipelines = Device.CreatePipelineCount;
+    Device.BufferWrites.clear();
+    ASSERT_TRUE(workspace.Begin({.Positions = *view, .FirstIndex = 1, .Count = 2}));
+    ASSERT_TRUE(workspace.RecordNext(Device.CommandContext).IsValid());
+    EXPECT_EQ(Device.CreateBufferCount, buffers);
+    EXPECT_EQ(Device.CreatePipelineCount, pipelines);
+    EXPECT_EQ(workspace.Produced(), 2u);
+    ASSERT_EQ(Device.BufferWrites.size(), 1u); // New transform, no stale row map upload.
+    const auto& push = Device.CommandContext.PushConstantPayloads.back();
+    ASSERT_EQ(push.size(), 112u);
+    std::uint64_t rowAddress{};
+    std::memcpy(&rowAddress, push.data() + 88, sizeof(rowAddress));
+    EXPECT_EQ(rowAddress, 0u);
+    // Growing only the result count preserves the other scratch buffers and pipeline.
+    ASSERT_TRUE(workspace.Begin({.Positions = *view, .Count = 4}));
+    ASSERT_TRUE(workspace.RecordNext(Device.CommandContext).IsValid());
+    EXPECT_EQ(Device.CreateBufferCount, buffers + 1);
+    EXPECT_EQ(Device.CreatePipelineCount, pipelines);
+}

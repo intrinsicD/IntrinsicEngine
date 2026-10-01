@@ -4,6 +4,7 @@
 // functions; SpatialIndexCache owns the residency and the per-run state stays in the caller's
 // job.
 module;
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <entt/entity/entity.hpp>
@@ -45,6 +46,7 @@ export namespace Extrinsic::Runtime
         std::uint64_t Bytes{};
         std::uint32_t Count{};
         std::uint64_t Stamp{}; // changes with the observed slot
+        std::optional<std::array<float, 2>> ScalarRange{};
     };
     // The observation stamp of a front: its residency-wide publication. A ring slot is
     // reused without changing its buffer, so only the publication identifies the bytes a

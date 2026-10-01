@@ -1,6 +1,6 @@
 # Runtime Architecture
 
-Point-neighbor consumers share the runtime-owned [spatial index cache](spatial-indices.md). Vulkan k-means uses the same LBVH kernels with a reusable centroid workspace.
+Point-neighbor consumers share the runtime-owned [spatial index cache](spatial-indices.md). Vulkan k-means submits through the same cache's GPU compute path and retains its idle workspace across runs.
 
 `runtime` is the composition root for IntrinsicEngine.
 
@@ -702,6 +702,14 @@ or presentation slots. Mesh surface buffers use the GPU vertex/triangle layout;
 point and edge lanes use separate canonical-layout keys, even when they select
 the same property. Clear vis removes entity and lane overrides and the transient
 recipe.
+Pending scalar fronts bind through the same extraction path for Appearance,
+Show recipes, and presentation slots. A front can supply its display range so
+an earlier CPU property does not determine the preview range. Scalar analysis
+previews use device min/max; accepted CPU values retain the existing robust
+auto-range policy, so the display range can change on Accept. Split mesh
+surfaces upload a canonical-element index map and sample the resident scalar
+buffer through it; canonical point/edge lanes sample that buffer directly.
+Accept or Discard restores extraction from the current CPU property.
 After a successful FPFH histogram display request, moving the display-bin slider
 selects the corresponding output property without recomputing descriptors.
 Changing the analysis configuration resets this live display selection.

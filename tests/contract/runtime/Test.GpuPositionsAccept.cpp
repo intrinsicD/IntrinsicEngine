@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -494,4 +495,25 @@ TEST(GpuPositionsAccept, LocalOnlyAuthoredBoundsFollowTheAcceptedRowsAndTheirUnd
     ASSERT_TRUE(h.History.Undo().Succeeded());
     EXPECT_EQ(raw.get<Culling::Local::Bounds>(h.Entity).LocalBoundingAABB.Max, local.LocalBoundingAABB.Max);
     EXPECT_EQ(raw.get<Culling::Local::Bounds>(h.Entity).LocalBoundingSphere.Radius, local.LocalBoundingSphere.Radius);
+}
+
+TEST(GpuPositionsAccept, TerminalDeliveryReleasesCallbacksThatCaptureTheirRun)
+{
+    for (const bool discard : {false, true})
+    {
+        Harness h;
+        const auto run = h.Ready();
+        ASSERT_TRUE(run);
+        auto captured = std::make_shared<int>(42);
+        std::weak_ptr<int> watched = captured;
+        unsigned delivered = 0;
+        ASSERT_EQ(R::AcceptEditorGpuPositionRun(h.Commands(), run, h.Residency, "Move",
+            [run, captured, &delivered](R::EditorGpuPositionAcceptResult) { ++delivered; },
+            h.Shifted({1.f, 0.f, 0.f})).Status, R::EditorCommandStatus::Pending);
+        captured.reset();
+        if (discard) R::DiscardEditorGpuPositionRun(h.Commands(), run, h.Residency);
+        ASSERT_TRUE(h.Jobs.DrainUntilTerminal());
+        EXPECT_EQ(delivered, 1u);
+        EXPECT_TRUE(watched.expired()) << "the run must not retain its terminal callback";
+    }
 }

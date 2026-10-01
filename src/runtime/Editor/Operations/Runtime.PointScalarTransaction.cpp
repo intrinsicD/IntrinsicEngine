@@ -73,6 +73,7 @@ namespace Extrinsic::Runtime
         std::uint64_t Generation{};
         std::optional<Graphics::GpuPropertyView> Input{},Base{},Back{};
         std::shared_ptr<GP::GpuFrontReadback> Readback{};
+        // Leased from the spatial cache; the recorder closure keeps it while its work may run.
         std::shared_ptr<Graphics::PointScalarWorkspace> Workspace{};
         SpatialIndexHandle Index{};
         std::shared_ptr<SpatialGpuResult> Gpu{};
@@ -91,6 +92,8 @@ namespace Extrinsic::Runtime
         void Release(const Run& w)
         {
             w->Input.reset();w->Base.reset();w->Back.reset();w->CompanionBack.reset();
+            // Only completed (or never queued) work returns the workspace early.
+            if(!w->Gpu||w->Gpu->State==SpatialQueryState::Ready)w->Workspace.reset();
             if(w->CompanionReadback){w->CompanionReadback->Abandoned=true;w->CompanionReadback->Lease.reset();}
             if(w->Readback){w->Readback->Abandoned=true;w->Readback->Lease.reset();}
             if(w->Residency){
@@ -128,10 +131,11 @@ namespace Extrinsic::Runtime
             if(!Current(w))return true;
             if(!w->Gpu){
                 if(!Acquire(w)){if(++w->Deferrals<600)return false;Fail(w,"Scalar residency refused an input or output slot.");return true;}
-                w->Workspace=std::make_shared<Graphics::PointScalarWorkspace>(*w->Context.Device);
+                w->Workspace=w->Context.SpatialIndices->LeaseGpuWorkspace<Graphics::PointScalarWorkspace>();
+                if(!w->Workspace){Fail(w,"Scalar device workspace unavailable.");return true;}
                 w->Gpu=w->Context.SpatialIndices->QueueGpuCompute(w->Index,sizeof(Graphics::PointScalarGpuStats),
                     [w](RHI::ICommandContext& cmd,const SpatialGpuIndexView& index)->RHI::BufferHandle{
-                        if(!Current(w)||!w->Input||!w->Back)return {};
+                        if(!Current(w)||!w->Input||!w->Back||!w->Workspace)return {};
                         const auto frame=w->Context.Device->GetGlobalFrameNumber();
                         w->Residency->NoteUse(w->Input->Buffer,frame);w->Residency->NoteUse(w->Back->Buffer,frame);
                         if(w->Base)w->Residency->NoteUse(w->Base->Buffer,frame);
@@ -285,8 +289,10 @@ namespace Extrinsic::Runtime
                     if(!w->Gpu||w->Gpu->State!=SpatialQueryState::Ready||w->Gpu->Data.size()!=sizeof(Graphics::PointScalarGpuStats)){
                         Fail(w,w->Gpu?w->Gpu->Diagnostic:"Scalar compute failed.");return false;}
                     std::memcpy(&w->Result.Statistics,w->Gpu->Data.data(),sizeof(Graphics::PointScalarGpuStats));
+                    w->Workspace.reset();
                     if(w->Result.Statistics.Invalid){Fail(w,"Scalar numerical failure or radius candidate overflow; increase capacity or select CPU.");return false;}
-                    w->Back.reset();if(!w->Residency->Publish(w->Key)){Fail(w,"Scalar ring publication failed.");return false;}
+                    w->Back.reset();if(!w->Residency->Publish(w->Key, std::array<float, 2>{
+                        float(w->Result.Statistics.Minimum), float(w->Result.Statistics.Maximum)})){Fail(w,"Scalar ring publication failed.");return false;}
                     w->Input.reset();w->Base.reset();w->Result.Message="GPU scalar awaits Accept or Discard.";w->Result.Phase=EditorGpuTransactionPhase::ReadyToAccept;
                     if(w->Automatic){const auto accepted=Accept(w);if(accepted.Status!=EditorCommandStatus::Pending)Finish(w,EditorGpuTransactionPhase::Failed,accepted.Status,accepted.Message);}
                     return !w->Delivered;},
@@ -368,10 +374,11 @@ namespace Extrinsic::Runtime
         }
         return EditorPointScalarBack{*typed, *presentation, companion.value_or(Graphics::GpuPropertyView{})};
     }
-    bool PublishEditorPointScalarBack(const EditorPointScalarTransactionHandle& w, bool ready)
+    bool PublishEditorPointScalarBack(const EditorPointScalarTransactionHandle& w, bool ready,
+        std::optional<std::array<float, 2>> scalarRange)
     {
-        if (!w || !w->Publication || !Current(w) || !w->Residency->Publish(w->Key)) return false;
-        if (w->PresentationGeneration && !w->Residency->Publish(w->PresentationKey)) return false;
+        if (!w || !w->Publication || !Current(w) || !w->Residency->Publish(w->Key, scalarRange)) return false;
+        if (w->PresentationGeneration && !w->Residency->Publish(w->PresentationKey, scalarRange)) return false;
         if (w->CompanionGeneration && !w->Residency->Publish(w->CompanionKey)) return false;
         if (ready) w->Result.Phase = EditorGpuTransactionPhase::ReadyToAccept;
         return true;

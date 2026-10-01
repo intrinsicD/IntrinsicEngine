@@ -178,9 +178,8 @@ struct GpuEntityConfig {
     vec4 IsoValuesA;
     vec4 IsoValuesB;
     uint IsoValueCount;
-    uint _padIso0;
-    uint _padIso1;
-    uint _padIso2;
+    uint ScalarSourceCount;
+    uint64_t ScalarIndexBDA;
 };
 
 
@@ -389,6 +388,10 @@ float GpuVisualizationReadScalar(GpuEntityConfig cfg, uint elementId, float fall
 {
     if (cfg.ScalarBDA == uint64_t(0) || !GpuVisualizationHasElement(cfg, elementId)) {
         return fallback;
+    }
+    if (cfg.ScalarIndexBDA != uint64_t(0)) {
+        elementId = GpuUIntBufferRef(cfg.ScalarIndexBDA).Data[elementId];
+        if (elementId >= cfg.ScalarSourceCount) return fallback;
     }
     return GpuFloatBufferRef(cfg.ScalarBDA).Data[elementId];
 }

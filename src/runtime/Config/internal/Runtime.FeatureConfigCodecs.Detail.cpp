@@ -1973,7 +1973,9 @@ namespace Extrinsic::Runtime
                 CountParsed(context);
             }
 
-            if (config.NormalRefinementRounds > config.MaxIterations)
+            if ((config.Strategy == PointCloudConsolidationStrategy::Ear ||
+                 (config.Strategy == PointCloudConsolidationStrategy::Wlop && config.WlopAnisotropic)) &&
+                config.NormalRefinementRounds > config.MaxIterations)
             {
                 AddWarning(
                     context,

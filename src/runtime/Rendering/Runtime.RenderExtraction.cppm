@@ -1,5 +1,6 @@
 // Extracts owned runtime render snapshots and geometry uploads from canonical scene sources.
 module;
+#include <array>
 
 #include <cstddef>
 #include <cstdint>
@@ -531,6 +532,7 @@ export namespace Extrinsic::Runtime
             std::uint64_t Bytes{};
             std::uint32_t Count{};
             std::uint64_t Stamp{};
+            std::optional<std::array<float, 2>> ScalarRange{};
         };
         using GpuPropertyObserver = std::function<std::optional<GpuPropertyFront>(
             WorldHandle world, entt::entity entity, const GeometryPropertyRef& property)>;

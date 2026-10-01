@@ -34,11 +34,27 @@ namespace Extrinsic::Graphics
         RHI::IDevice& Device;
         RHI::PipelineHandle Pipeline{};
         RHI::BufferHandle Neighbors{}, Means{}, Stats{};
+        std::uint64_t NeighborBytes{}, MeanBytes{};
         explicit Impl(RHI::IDevice& device):Device(device){}
         ~Impl()
         {
             for(auto b:{Neighbors,Means,Stats})if(b.IsValid())Device.DestroyBuffer(b);
             if(Pipeline.IsValid())Device.DestroyPipeline(Pipeline);
+        }
+        // Repeated runs keep the pipeline and grow only an undersized scratch buffer; every
+        // run zeroes the stats and indexes scratch rows by its own count and width.
+        bool Ensure(std::uint64_t neighborBytes,std::uint64_t meanBytes)
+        {
+            if(!Pipeline.IsValid())Pipeline=CreateComputePipeline(Device,"shaders/point_scalar_analysis.comp.spv",sizeof(Push),"PointScalarAnalysis");
+            const auto allocate=[&](std::uint64_t bytes){return Device.CreateBuffer({.SizeBytes=bytes,
+                .Usage=RHI::BufferUsage::Storage|RHI::BufferUsage::TransferSrc|RHI::BufferUsage::TransferDst,.DebugName="PointScalarAnalysis.Scratch"});};
+            const auto grow=[&](RHI::BufferHandle& buffer,std::uint64_t& capacity,std::uint64_t bytes){
+                if(buffer.IsValid()&&capacity>=bytes)return;
+                if(buffer.IsValid())Device.DestroyBuffer(buffer);
+                buffer=allocate(bytes);capacity=buffer.IsValid()?bytes:0;};
+            grow(Neighbors,NeighborBytes,neighborBytes);grow(Means,MeanBytes,meanBytes);
+            if(!Stats.IsValid())Stats=allocate(sizeof(PointScalarGpuStats));
+            return Pipeline.IsValid()&&Neighbors.IsValid()&&Means.IsValid()&&Stats.IsValid();
         }
     };
     std::uint32_t PointScalarNeighborWidth(const PointScalarGpuParams& p, std::uint32_t count)
@@ -56,12 +72,8 @@ namespace Extrinsic::Graphics
         const auto width=PointScalarNeighborWidth(p,count);
         if(!width||!count||count>(1u<<20)||width>4096||std::uint64_t(count)*width>(1u<<24)||
            !io.Positions.Address||!io.Nodes||!io.LiveSlots||!io.Output.Address||
-           !s.Device.IsOperational()||!s.Device.SupportsShaderFloat64()||s.Pipeline.IsValid())return {};
-        s.Pipeline=CreateComputePipeline(s.Device,"shaders/point_scalar_analysis.comp.spv",sizeof(Push),"PointScalarAnalysis");
-        const auto allocate=[&](std::uint64_t bytes){return s.Device.CreateBuffer({.SizeBytes=bytes,
-            .Usage=RHI::BufferUsage::Storage|RHI::BufferUsage::TransferSrc|RHI::BufferUsage::TransferDst,.DebugName="PointScalarAnalysis.Scratch"});};
-        s.Neighbors=allocate(std::uint64_t(count)*width*8);s.Means=allocate(std::uint64_t(count)*16);s.Stats=allocate(sizeof(PointScalarGpuStats));
-        if(!s.Pipeline.IsValid()||!s.Neighbors.IsValid()||!s.Means.IsValid()||!s.Stats.IsValid())return {};
+           !s.Device.IsOperational()||!s.Device.SupportsShaderFloat64()||
+           !s.Ensure(std::uint64_t(count)*width*8,std::uint64_t(count)*16))return {};
         const auto shader=RHI::MemoryAccess::ShaderRead|RHI::MemoryAccess::ShaderWrite;
         cmd.BufferBarrier(io.Positions.Buffer,RHI::MemoryAccess::TransferWrite|shader,RHI::MemoryAccess::ShaderRead);
         cmd.BufferBarrier(io.Output.Buffer,shader|RHI::MemoryAccess::TransferRead,RHI::MemoryAccess::TransferWrite);
@@ -69,8 +81,11 @@ namespace Extrinsic::Graphics
             cmd.CopyBuffer(io.Base.Buffer,io.Output.Buffer,0,0,io.Output.Bytes);}
         else cmd.FillBuffer(io.Output.Buffer,0,io.Output.Bytes,0);
         cmd.BufferBarrier(io.Output.Buffer,RHI::MemoryAccess::TransferWrite,shader);
+        cmd.BufferBarrier(s.Stats,shader|RHI::MemoryAccess::TransferRead,RHI::MemoryAccess::TransferWrite);
         cmd.FillBuffer(s.Stats,0,sizeof(PointScalarGpuStats),0);
         cmd.BufferBarrier(s.Stats,RHI::MemoryAccess::TransferWrite,shader);
+        // A reused workspace: the previous run's scratch reads precede these writes.
+        for(auto b:{s.Neighbors,s.Means})cmd.BufferBarrier(b,shader,RHI::MemoryAccess::ShaderWrite);
         Push push{.Positions=io.Positions.Address,.Nodes=io.Nodes,.Slots=io.LiveSlots,
             .Neighbors=s.Device.GetBufferDeviceAddress(s.Neighbors),.Nearest=s.Device.GetBufferDeviceAddress(s.Means),
             // Distinct float coordinates cannot lie inside a double-subnormal support.

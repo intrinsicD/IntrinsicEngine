@@ -20,7 +20,7 @@ export namespace Extrinsic::Graphics
         // Float-float coordinates: per point hi (x, y, z, w) then lo (x, y, z, unused), where
         // lo = float(x - hi); the target's w is unused, the source's w is its log-weight (<= 0).
         std::span<const float> Target;       // n x 8
-        std::uint64_t TargetGeneration{0u};  // the target is uploaded again when this changes
+        std::uint64_t TargetGeneration{0u};  // the target is uploaded again when this changes (always when 0)
         std::span<const float> Source;       // m x 8
         std::span<const std::uint32_t> SkipRows; // n flags (nonzero: row evaluated on the CPU) or empty
         double Sigma2{1.0};
@@ -37,10 +37,12 @@ export namespace Extrinsic::Graphics
         // Kernel pairs one dispatch may evaluate, so no dispatch runs long enough for a watchdog.
         static constexpr std::uint64_t MaxPairsPerDispatch = std::uint64_t{1} << 30;
         static constexpr std::size_t MaxPoints = std::size_t{1} << 24;
-        // Records both passes and returns the buffer to read back, ready for transfer reads;
-        // invalid on refusal (non-operational device, no shader double support, bad shape).
-        // The caller keeps the workspace alive, and does not record again, until the readback
-        // has completed.
+        // Records both passes and returns the buffer to read back (its first ReadbackBytes(n, m)
+        // bytes), ready for transfer reads; invalid on refusal (non-operational device, no shader
+        // double support, bad shape). Buffers only grow and pipelines persist, so the workspace
+        // may serve later iterations and runs (a pooled SpatialIndexCache lease); the target is
+        // uploaded only when its generation or size differs from the last upload. The caller
+        // keeps the workspace alive, and does not record again, until the readback has completed.
         [[nodiscard]] RHI::BufferHandle Record(RHI::ICommandContext& commands, const CoherentPointDriftEStepGpuInput& input);
     private:
         struct Impl;

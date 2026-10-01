@@ -46,6 +46,16 @@ context and shader-readable index view. A failed recording/readback returns a
 diagnostic, and runtime consumers still validate source revisions before
 publishing properties. Keypoint computation uses this path.
 
+Method workspaces come from `LeaseGpuWorkspace<T>()` instead of a fresh object per
+run. Overlapping leases never share an object; a dropped lease becomes leasable
+again only after the frames in flight plus one, and the cache keeps at most one
+idle workspace per kind until device-idle shutdown. A recorder that failed in a
+frame keeps its captured workspace until that frame retires; an immediate submit
+refused after recording releases its lease because an invalid token guarantees no submission. Scalar analysis
+(density, spacing, weights), PCA/vertex/face normals and outliers lease this way;
+the CPD E-step broker holds one lease per step of a run, so later steps and runs get
+its pipelines, grown buffers and (for the same target generation) uploaded target back.
+
 By default the recorder runs inside the next frame's command buffer and is read
 back after the frames in flight (4-6 frames per round trip). Iterative consumers
 pass `SpatialGpuLatency::Immediate` (GRAPHICS-150): the cache hands the same
@@ -251,3 +261,15 @@ Vulkan preserves the extra candidate (k<=63) and canonical-domain publication.
 `SpatialIndexCache::CreateWorkspace` creates an owned immutable point index with identity source IDs. The returned snapshot is the caller's lifetime lease; releasing the final caller lease expires the handle, and `Prune` evicts the entry. Queued/submitted batches retain the underlying entry and GPU resources through safe completion. Calls and GPU resource retirement stay on the device-owner thread. Immutable CPU snapshots can outlive cache eviction.
 
 [Bilateral point filtering](bilateral-point-filter.md) uses the entity cache for its initial positions and private workspaces for subsequent passes. Original ECS revisions independently guard terminal publication. These workspaces rebuild indices; they do not implement refit or allocation reuse across iterations. Lower-layer methods can still own direct geometry/graphics workspaces without runtime dependencies.
+
+`QueueGpuNearestTransformed` retains immutable source coordinates in its reusable
+query batch and uploads only a double-precision matrix when those values are
+unchanged. Its transform dispatch requires shader float64; ordinary queries keep
+their existing capability requirements. Transformed nearest-query scratch returns to the device-owned
+workspace pool after completion and retirement; it does not retain the target
+scene index while idle. `GpuQueryUploadBytes` counts query input writes (including
+poses), separately from index-build uploads and result readbacks.
+
+Property smoothing leases its explicit filter and implicit conjugate-gradient
+workspaces from the same pool. Completed runs retain sufficient scratch capacity;
+each run refreshes its operator data, channel state, row map and restore mask.

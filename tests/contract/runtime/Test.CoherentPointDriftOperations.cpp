@@ -2,6 +2,12 @@
 // on point-cloud and graph-node domains with its publication path and undo/redo, step
 // mode (synchronous and on the job service), cancellation, and stale-input rejection.
 #include <cmath>
+#include <utility>
+#include <span>
+#include <ranges>
+#include <optional>
+#include <cstring>
+#include <algorithm>
 #include <random>
 #include <string>
 #include <vector>
@@ -18,6 +24,15 @@
 #include <thread>
 import Extrinsic.Runtime.CoherentPointDriftGpuEStep;
 import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.Module;
+import Extrinsic.Runtime.CommandBus;
+import Extrinsic.Runtime.KernelEvents;
+import Extrinsic.Runtime.ServiceRegistry;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.RHI.Device;
+import Extrinsic.RHI.TransferQueue;
+import Extrinsic.RHI.Handles;
+import Extrinsic.Graphics.CoherentPointDriftEStep;
 import Geometry.Registration.CoherentPointDrift;
 import Extrinsic.Runtime.RegistrationOperations;
 import Extrinsic.Runtime.WorldRegistry;
@@ -542,8 +557,7 @@ TEST(CoherentPointDriftOperations, VulkanEStepBrokerFailsClosedAndTimesOut)
     // METHOD-056 review: the worker/main-thread handoff without a framed device. A refused
     // computation closes the broker (later iterations do not wait), and a request nobody pumps
     // times out and closes it too; both make Evaluate return false (the CPU runs the iteration).
-    Extrinsic::Tests::MockDevice device{};
-    R::SpatialIndexCache cache;
+    R::SpatialIndexCache cache; // no device: no workspace lease, so the computation is refused
     const std::vector<double> x{0.0, 1.0}, zero(2, 0.0), weights(2, 0.0);
     std::vector<double> logDen(2), pt1(2), p1(2), px(2), py(2), pz(2);
     const Geometry::CoherentPointDrift::EStep::ExternalRequest request{
@@ -551,7 +565,7 @@ TEST(CoherentPointDriftOperations, VulkanEStepBrokerFailsClosedAndTimesOut)
         .LogOutlier = -std::numeric_limits<double>::infinity(), .LogWeights = weights,
         .LogDenominator = logDen, .Pt1 = pt1, .P1 = p1, .PXx = px, .PXy = py, .PXz = pz};
     {
-        R::CoherentPointDriftGpuEStep broker(cache, device);
+        R::CoherentPointDriftGpuEStep broker(cache);
         std::atomic<bool> done{false};
         bool evaluated = true;
         std::thread worker([&] { evaluated = broker.Evaluate(request); done = true; });
@@ -564,11 +578,218 @@ TEST(CoherentPointDriftOperations, VulkanEStepBrokerFailsClosedAndTimesOut)
         EXPECT_FALSE(broker.Evaluate(request)) << "a closed broker answers at once";
     }
     {
-        R::CoherentPointDriftGpuEStep broker(cache, device, std::chrono::milliseconds{20});
+        R::CoherentPointDriftGpuEStep broker(cache, std::chrono::milliseconds{20});
         EXPECT_FALSE(broker.Evaluate(request)) << "nobody pumps: the wait times out";
         EXPECT_TRUE(broker.Closed());
         EXPECT_NE(broker.Diagnostic().find("in time"), std::string::npos) << broker.Diagnostic();
     }
+}
+
+namespace
+{
+    // A broker on a cache bound to a mock framed device whose immediate submits record the real
+    // workspace and hold the readback until the test delivers it (as the GPU would, later).
+    class CpdBrokerWorkspaceReuse : public ::testing::Test
+    {
+    protected:
+        Extrinsic::Tests::MockDevice Device;
+        Extrinsic::Tests::EditorJobHarness Jobs;
+        R::WorldRegistry Worlds;
+        R::CommandBus Commands;
+        R::KernelEventBus Events;
+        R::ServiceRegistry Services;
+        R::SpatialIndexCache Cache;
+        std::optional<Extrinsic::RHI::ReadbackSink> Held{};
+        std::uint64_t HeldBytes{0u}, Tokens{0u};
+        bool Stopped{false};
+
+        // One request's storage: n targets on the x axis, m sources, a target generation.
+        struct Case
+        {
+            std::vector<double> TX, TZero, SX, SZero, Weights, LogDen, Pt1, P1, PX, PY, PZ;
+            std::uint64_t Generation{};
+            Case(std::size_t n, std::size_t m, std::uint64_t generation, double offset = 0.0)
+                : TX(n), TZero(n, 0.0), SX(m), SZero(m, 0.0), Weights(m, 0.0), LogDen(n), Pt1(n), P1(m), PX(m),
+                  PY(m), PZ(m), Generation(generation)
+            {
+                for (std::size_t j = 0; j < n; ++j) TX[j] = offset + double(j);
+                for (std::size_t i = 0; i < m; ++i) SX[i] = 0.5 + double(i);
+            }
+            [[nodiscard]] Geometry::CoherentPointDrift::EStep::ExternalRequest Request()
+            {
+                return {.Target = {TX, TZero, TZero}, .Moved = {SX, SZero, SZero}, .TargetGeneration = Generation,
+                        .Sigma2 = 1.0, .LogOutlier = -std::numeric_limits<double>::infinity(), .LogWeights = Weights,
+                        .LogDenominator = LogDen, .Pt1 = Pt1, .P1 = P1, .PXx = PX, .PXy = PY, .PXz = PZ};
+            }
+        };
+
+        void SetUp() override
+        {
+            Device.ShaderFloat64 = true;
+            Device.ComputeReadback = [this](auto record, std::uint64_t bytes, Extrinsic::RHI::ReadbackSink sink) {
+                if (!record(Device.CommandContext).IsValid()) return Extrinsic::RHI::ReadbackToken{};
+                Held = std::move(sink);
+                HeldBytes = bytes;
+                return Extrinsic::RHI::ReadbackToken{++Tokens};
+            };
+            Services.BeginRegistration();
+            ASSERT_TRUE(Services.Provide<Extrinsic::RHI::IDevice>(Device, "test").has_value());
+            R::EngineSetup setup{Commands, Events, Jobs.Jobs(), Worlds, Services, [](R::FramePhase, R::RuntimeFrameHook) {}};
+            ASSERT_TRUE(Cache.OnRegister(setup).has_value());
+        }
+        void TearDown() override
+        {
+            if (std::exchange(Stopped, true)) return;
+            R::RuntimeModuleShutdownContext shutdown{Commands, Events, Jobs.Jobs(), Worlds, Services};
+            Cache.OnShutdown(shutdown);
+        }
+        // The GPU finishes: every double of the readback is its index.
+        void Deliver()
+        {
+            std::vector<double> values(HeldBytes / sizeof(double));
+            for (std::size_t k = 0; k < values.size(); ++k) values[k] = double(k);
+            Held->Deliver(std::as_bytes(std::span<const double>(values)));
+            Held.reset();
+        }
+        // Drains completed computations and retires every frame that may have used their buffers.
+        void RetireFrames()
+        {
+            for (int i = 0; i < 2; ++i)
+            {
+                Device.GlobalFrameNumber += Device.FramesInFlight + 1u;
+                Jobs.Jobs().RecordGpuQueueFrameCommands(Device.CommandContext);
+                (void)Jobs.Jobs().DrainGpuQueueCompletedTransfers();
+                Cache.Prune();
+            }
+        }
+        // A worker evaluates while this (main) thread pumps and completes the device work.
+        bool Evaluate(R::CoherentPointDriftGpuEStep& broker, Case& c)
+        {
+            std::atomic<bool> done{false};
+            bool evaluated = false;
+            std::thread worker([&] { evaluated = broker.Evaluate(c.Request()); done = true; });
+            while (!done)
+            {
+                broker.Pump();
+                if (Held) Deliver();
+                std::this_thread::yield();
+            }
+            worker.join();
+            return evaluated;
+        }
+        [[nodiscard]] std::size_t WritesOf(std::size_t bytes) const
+        {
+            return std::size_t(std::ranges::count_if(Device.BufferWrites, [&](const auto& w) { return w.Data.size() == bytes; }));
+        }
+    };
+}
+
+TEST_F(CpdBrokerWorkspaceReuse, StepsAndRunsReuseThePooledWorkspaceAndUploadEachTargetOnce)
+{
+    // n = 3 targets (96 bytes as float-float), m = 2 sources (64 bytes).
+    constexpr std::size_t kTargetBytes = 3u * 32u, kSourceBytes = 2u * 32u;
+    Case first(3, 2, 101);
+    R::CoherentPointDriftGpuEStep run(Cache);
+    ASSERT_TRUE(Evaluate(run, first)) << run.Diagnostic();
+    // The readback lands in the solver's spans in the LogDenominator, Pt1, P1, PX order.
+    EXPECT_EQ(first.LogDen, (std::vector<double>{0, 1, 2}));
+    EXPECT_EQ(first.Pt1, (std::vector<double>{3, 4, 5}));
+    EXPECT_EQ(first.P1, (std::vector<double>{6, 7}));
+    EXPECT_EQ(first.PZ, (std::vector<double>{12, 13}));
+    ASSERT_TRUE(Evaluate(run, first));
+    EXPECT_EQ(Device.CreatePipelineCount, 2);
+    const int buffers = Device.CreateBufferCount;
+    EXPECT_EQ(WritesOf(kTargetBytes), 1u) << "the fixed target is uploaded once per step";
+    EXPECT_EQ(WritesOf(kSourceBytes), 2u) << "the moved source every iteration";
+
+    // The step's pump ends: the lease returns to the pool and the next step is served by it,
+    // keeping pipelines, buffers and the uploaded target of this generation.
+    run.ReleaseDeviceResources();
+    RetireFrames();
+    ASSERT_TRUE(Evaluate(run, first));
+    EXPECT_EQ(Cache.Stats().WorkspaceReuses, 1u);
+    EXPECT_EQ(Device.CreatePipelineCount, 2);
+    EXPECT_EQ(Device.CreateBufferCount, buffers);
+    EXPECT_EQ(WritesOf(kTargetBytes), 1u);
+
+    // Growth replaces only undersized buffers (source, results); shrinking keeps them.
+    Case wider(3, 4, 101);
+    ASSERT_TRUE(Evaluate(run, wider));
+    EXPECT_EQ(Device.CreateBufferCount, buffers + 2);
+    ASSERT_TRUE(Evaluate(run, first));
+    EXPECT_EQ(Device.CreateBufferCount, buffers + 2);
+    EXPECT_EQ(first.P1, (std::vector<double>{6, 7})) << "the readback is the current shape's prefix";
+    EXPECT_EQ(WritesOf(kTargetBytes), 1u);
+    run.ReleaseDeviceResources();
+    RetireFrames();
+
+    // Another run (a new target generation of the same size) on the same pooled workspace
+    // uploads its own target; generation 0 is never taken as current.
+    Case other(3, 2, 202, 10.0);
+    R::CoherentPointDriftGpuEStep next(Cache);
+    ASSERT_TRUE(Evaluate(next, other)) << next.Diagnostic();
+    EXPECT_EQ(Cache.Stats().WorkspaceReuses, 2u);
+    EXPECT_EQ(Device.CreatePipelineCount, 2);
+    ASSERT_EQ(WritesOf(kTargetBytes), 2u) << "a pooled workspace never keeps another run's target";
+    const auto& upload = *std::ranges::find_if(Device.BufferWrites | std::views::reverse,
+                                               [&](const auto& w) { return w.Data.size() == kTargetBytes; });
+    float x0{};
+    std::memcpy(&x0, upload.Data.data(), sizeof(float));
+    EXPECT_EQ(x0, 10.0f);
+    Case unversioned(3, 2, 0);
+    ASSERT_TRUE(Evaluate(next, unversioned));
+    ASSERT_TRUE(Evaluate(next, unversioned));
+    EXPECT_EQ(WritesOf(kTargetBytes), 4u);
+    EXPECT_EQ(next.Stats().Completed, 3u);
+    EXPECT_EQ(next.Stats().Failed, 0u);
+}
+
+TEST_F(CpdBrokerWorkspaceReuse, CancelledAndRefusedComputationsKeepTheirLeaseUntilDoneAndFailClosed)
+{
+    Case c(3, 2, 303);
+    {
+        // Cancelled while in flight: the worker returns at once (the CPU runs the iteration),
+        // the late result is dropped, and the workspace only returns once the work completed.
+        R::CoherentPointDriftGpuEStep run(Cache);
+        std::atomic<bool> done{false};
+        bool evaluated = true;
+        std::thread worker([&] { evaluated = run.Evaluate(c.Request()); done = true; });
+        while (!Held) { run.Pump(); std::this_thread::yield(); }
+        run.Close("cancelled");
+        worker.join();
+        EXPECT_FALSE(evaluated);
+        auto late = std::move(*Held);
+        const auto lateBytes = HeldBytes;
+        Held.reset();
+        run.ReleaseDeviceResources();
+        RetireFrames();
+        R::CoherentPointDriftGpuEStep during(Cache);
+        Case probe(3, 2, 304);
+        ASSERT_TRUE(Evaluate(during, probe));
+        EXPECT_EQ(Cache.Stats().WorkspaceReuses, 0u) << "the in-flight lease is not served to another run";
+        during.ReleaseDeviceResources();
+        Held = std::move(late);
+        HeldBytes = lateBytes;
+        Deliver();
+        run.Pump();
+        EXPECT_EQ(run.Stats().Completed, 1u);
+        EXPECT_TRUE(run.Closed());
+        EXPECT_EQ(run.Diagnostic(), "cancelled");
+        EXPECT_FALSE(run.Evaluate(c.Request()));
+        RetireFrames();
+        R::CoherentPointDriftGpuEStep after(Cache);
+        ASSERT_TRUE(Evaluate(after, c));
+        EXPECT_EQ(Cache.Stats().WorkspaceReuses, 1u);
+        after.ReleaseDeviceResources();
+    }
+    // Refused on the device (no shader float64): fail closed, later iterations do not wait.
+    Device.ShaderFloat64 = false;
+    R::CoherentPointDriftGpuEStep refused(Cache);
+    EXPECT_FALSE(Evaluate(refused, c));
+    EXPECT_TRUE(refused.Closed());
+    EXPECT_FALSE(refused.Diagnostic().empty());
+    EXPECT_EQ(refused.Stats().Failed, 1u);
+    EXPECT_FALSE(refused.Evaluate(c.Request()));
 }
 
 TEST(CoherentPointDriftOperations, CancelAnswersAtOnceAndTraceRowsCarryElapsedTime)

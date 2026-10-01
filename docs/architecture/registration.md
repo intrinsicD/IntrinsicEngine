@@ -49,9 +49,16 @@ CPU job prepares snapshots; its main-thread readiness callback advances the
 solve when a GPU batch completes. The cache records through a JobService GPU
 participant and uses asynchronous transfer readbacks after producer submission.
 It never starts a nested frame or blocks a worker waiting for GPU results.
-Buffer capacity is reused across iterations; immutable target CPU/GPU indices
-are reused across requests. In-flight batches retain their target entry through
-eviction; shutdown retires work before freeing GPU resources.
+Buffer capacity is reused across iterations and pooled across completed requests;
+immutable target CPU/GPU indices are reused across requests. On float64-capable
+devices the prealigned source is uploaded once, then each iteration uploads a
+128-byte double-precision pose and transforms the query coordinates on the device.
+The resulting float3 coordinates feed the existing LBVH query. After the first
+completed query, subsequent iterations use an immediate submission and one packed
+correspondence/header readback when the device supports that submission path. Devices without
+shader float64 retain the CPU query-transform path. Correspondence readback and
+the double-precision CPU solve remain hybrid. In-flight batches retain their target
+entry through eviction; shutdown retires work before freeing GPU resources.
 
 The result reports requested/actual backend, CPU fallback reason and target
 index reuse. Missing cache/device/job capability falls back explicitly to CPU.

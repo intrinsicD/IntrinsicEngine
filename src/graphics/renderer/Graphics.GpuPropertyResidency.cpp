@@ -1,4 +1,5 @@
 module;
+#include <array>
 #include <algorithm>
 #include <chrono>
 #include <cstddef>
@@ -249,11 +250,12 @@ namespace Extrinsic::Graphics
         return s.Use(ring->Slots[std::size_t(pick)]);
     }
 
-    bool GpuPropertyResidency::Publish(const GpuPropertyKey& key)
+    bool GpuPropertyResidency::Publish(const GpuPropertyKey& key, std::optional<std::array<float, 2>> scalarRange)
     {
         auto* ring = m_Impl->FindRing(key);
         if (!ring || ring->Back < 0) return false;
         ring->Front = std::exchange(ring->Back, -1);
+        ring->Slots[std::size_t(ring->Front)].View.ScalarRange = scalarRange;
         ring->FrontPublication = m_Impl->NextPublication++;
         ++m_Impl->Stats.Publishes;
         return true;

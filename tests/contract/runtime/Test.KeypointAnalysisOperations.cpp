@@ -440,7 +440,13 @@ TEST_F(KeypointResident, ResidentPagingPreviewAcceptAtomicHistoryAndRepeatZeroUp
     EXPECT_GT(Results[0].CpuStageReadbackBytes,20u*8);EXPECT_EQ(Results[0].ImplementationId,"vulkan.keypoints.resident.paged.v1");
     EXPECT_EQ(History.Undo().Status,R::EditorCommandHistoryStatus::Undone);
     EXPECT_FALSE(Rows().Exists(C.Score.Name));EXPECT_FALSE(Rows().Exists(C.Mask.Name));
+    for (unsigned i = 0; i < Device.FramesInFlight + 2u; ++i) { Cache.Prune(); Tick(); }
+    const auto reuses = Cache.Stats().WorkspaceReuses;
+    const auto pipelines = Device.CreatePipelineCount;
     Start();ASSERT_TRUE(Run);EXPECT_EQ(Initial.GpuInputUploadBytes,0u);EXPECT_GT(Initial.GpuInputCacheHits,0u);
+    EXPECT_EQ(Cache.Stats().WorkspaceReuses, reuses + 1);
+    ASSERT_TRUE(Until([&]{return Phase()==R::EditorGpuTransactionPhase::ReadyToAccept;}));
+    EXPECT_EQ(Device.CreatePipelineCount, pipelines);
 }
 TEST_F(KeypointResident, CompletionGatesPreviewAndDiscardKeepsResourcesUntilIdle)
 {

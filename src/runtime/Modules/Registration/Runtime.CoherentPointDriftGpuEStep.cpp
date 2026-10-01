@@ -25,9 +25,12 @@ namespace Extrinsic::Runtime
 
     namespace
     {
-        // Immutable once queued; the recording closure keeps it alive.
+        // One iteration's device input, reused (capacity kept) by every iteration of the run. The
+        // worker fills it only while the slot is Idle, so no computation can still read it; the
+        // recording closure keeps it alive and reads it only before its result is Ready or Failed.
         struct Request
         {
+            // Float-float target, converted once per target generation (every request for 0).
             std::shared_ptr<const std::vector<float>> Target{};
             std::uint64_t TargetGeneration{0u};
             std::vector<float> Source{};
@@ -41,31 +44,27 @@ namespace Extrinsic::Runtime
     struct CoherentPointDriftGpuEStep::Impl
     {
         SpatialIndexCache& Cache;
-        RHI::IDevice& Device;
         std::chrono::milliseconds Timeout;
-        std::shared_ptr<Graphics::CoherentPointDriftEStepWorkspace> Workspace{}; // main thread
-
-        // Worker-side fp32 copy of the fixed target.
-        std::shared_ptr<const std::vector<float>> Target{};
-        std::uint64_t TargetGeneration{0u};
+        // Main thread: a SpatialIndexCache lease, held from a step's first request until its pump
+        // ends; the pool then serves it (pipelines, grown buffers, uploaded target) to the next.
+        std::shared_ptr<Graphics::CoherentPointDriftEStepWorkspace> Workspace{};
+        const std::shared_ptr<Request> Staging{std::make_shared<Request>()};
 
         mutable std::mutex Mutex{};
         std::condition_variable Changed{};
         Slot State{Slot::Idle};
-        std::shared_ptr<const Request> Pending{};
+        bool Pending{false}; // a worker waits for the queued or in-flight computation
         std::shared_ptr<SpatialGpuResult> Gpu{};
         std::vector<std::byte> Data{};
         bool IsClosed{false}, IsWorkerActive{false};
         std::string LastDiagnostic{};
         CoherentPointDriftGpuEStepStats Counters{};
 
-        Impl(SpatialIndexCache& cache, RHI::IDevice& device, std::chrono::milliseconds timeout)
-            : Cache(cache), Device(device), Timeout(timeout) {}
+        Impl(SpatialIndexCache& cache, std::chrono::milliseconds timeout) : Cache(cache), Timeout(timeout) {}
     };
 
-    CoherentPointDriftGpuEStep::CoherentPointDriftGpuEStep(SpatialIndexCache& cache, RHI::IDevice& device,
-                                                           std::chrono::milliseconds timeout)
-        : m_Impl(std::make_unique<Impl>(cache, device, timeout)) {}
+    CoherentPointDriftGpuEStep::CoherentPointDriftGpuEStep(SpatialIndexCache& cache, std::chrono::milliseconds timeout)
+        : m_Impl(std::make_unique<Impl>(cache, timeout)) {}
 
     CoherentPointDriftGpuEStep::~CoherentPointDriftGpuEStep() = default;
 
@@ -79,7 +78,7 @@ namespace Extrinsic::Runtime
             return false;
         {
             std::scoped_lock lock{s.Mutex};
-            if (s.IsClosed) return false;
+            if (s.IsClosed || s.State != Slot::Idle) return false; // the staging may still be read
         }
         // Normalized coordinates convert to float-float pairs here, off the main thread; the
         // target once per run.
@@ -88,23 +87,21 @@ namespace Extrinsic::Runtime
             to[0] = hx; to[1] = hy; to[2] = hz; to[3] = float(w);
             to[4] = float(x - double(hx)); to[5] = float(y - double(hy)); to[6] = float(z - double(hz)); to[7] = 0.0f;
         };
-        if (!s.Target || s.TargetGeneration != request.TargetGeneration)
+        Request& staged = *s.Staging;
+        if (!staged.Target || request.TargetGeneration == 0u || staged.TargetGeneration != request.TargetGeneration)
         {
             auto target = std::make_shared<std::vector<float>>(8u * n);
             for (std::size_t j = 0; j < n; ++j)
                 split(target->data() + 8u * j, request.Target.X[j], request.Target.Y[j], request.Target.Z[j], 0.0);
-            s.Target = std::move(target);
-            s.TargetGeneration = request.TargetGeneration;
+            staged.Target = std::move(target);
+            staged.TargetGeneration = request.TargetGeneration;
         }
-        auto pending = std::make_shared<Request>();
-        pending->Target = s.Target;
-        pending->TargetGeneration = s.TargetGeneration;
-        pending->Sigma2 = request.Sigma2;
-        pending->LogOutlier = request.LogOutlier;
-        pending->SkipRows.assign(request.SkipRows.begin(), request.SkipRows.end());
-        pending->Source.resize(8u * m);
+        staged.Sigma2 = request.Sigma2;
+        staged.LogOutlier = request.LogOutlier;
+        staged.SkipRows.assign(request.SkipRows.begin(), request.SkipRows.end());
+        staged.Source.resize(8u * m);
         for (std::size_t i = 0; i < m; ++i)
-            split(pending->Source.data() + 8u * i, request.Moved.X[i], request.Moved.Y[i], request.Moved.Z[i],
+            split(staged.Source.data() + 8u * i, request.Moved.X[i], request.Moved.Y[i], request.Moved.Z[i],
                   request.LogWeights[i]);
 
         const auto start = std::chrono::steady_clock::now();
@@ -112,7 +109,7 @@ namespace Extrinsic::Runtime
         {
             std::unique_lock lock{s.Mutex};
             if (s.IsClosed || s.State != Slot::Idle) return false;
-            s.Pending = std::move(pending);
+            s.Pending = true;
             s.State = Slot::Queued;
             ++s.Counters.Requests;
             const bool ended = s.Changed.wait_for(lock, s.Timeout, [&] {
@@ -128,7 +125,7 @@ namespace Extrinsic::Runtime
             const bool done = s.State == Slot::Done;
             if (done) data = std::move(s.Data);
             if (s.State != Slot::InFlight) s.State = Slot::Idle; // a timed-out computation keeps its slot
-            s.Pending.reset();
+            s.Pending = false;
             if (!done) return false;
         }
         if (data.size() != Graphics::CoherentPointDriftEStepWorkspace::ReadbackBytes(n, m)) return false;
@@ -156,8 +153,17 @@ namespace Extrinsic::Runtime
                 s.Changed.notify_all();
                 return;
             }
-            if (!s.Workspace) s.Workspace = std::make_shared<Graphics::CoherentPointDriftEStepWorkspace>(s.Device);
-            const auto request = s.Pending;
+            if (!s.Workspace) s.Workspace = s.Cache.LeaseGpuWorkspace<Graphics::CoherentPointDriftEStepWorkspace>();
+            if (!s.Workspace)
+            {
+                s.LastDiagnostic = "No Vulkan E-step workspace (no device); the run continues on the CPU.";
+                ++s.Counters.Failed;
+                s.IsClosed = true;
+                s.State = Slot::Failed;
+                s.Changed.notify_all();
+                return;
+            }
+            const auto request = s.Staging;
             const std::size_t n = request->Target->size() / 8u, m = request->Source.size() / 8u;
             s.Gpu = s.Cache.QueueGpuCompute(Graphics::CoherentPointDriftEStepWorkspace::ReadbackBytes(n, m),
                 [workspace = s.Workspace, request](RHI::ICommandContext& commands, const SpatialGpuIndexView&) {
@@ -196,7 +202,7 @@ namespace Extrinsic::Runtime
     void CoherentPointDriftGpuEStep::ReleaseDeviceResources()
     {
         std::scoped_lock lock{m_Impl->Mutex};
-        m_Impl->Workspace.reset(); // an in-flight computation keeps its own reference
+        m_Impl->Workspace.reset(); // back to the pool; an in-flight computation keeps its own lease
     }
 
     void CoherentPointDriftGpuEStep::Close(std::string diagnostic)

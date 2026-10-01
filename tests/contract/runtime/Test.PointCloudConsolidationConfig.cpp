@@ -92,7 +92,7 @@ TEST(PointCloudConsolidationConfig, RoundTripsAndFallsBackPerField)
     EXPECT_EQ(fallback->MaxPredictedContributions,
               configured.MaxPredictedContributions);
     EXPECT_EQ(fallback->MaxIterations, 7u);
-    EXPECT_EQ(fallback->NormalRefinementRounds, 4u);
+    EXPECT_EQ(fallback->NormalRefinementRounds, 9u); // CLOP does not consume normal rounds.
     EXPECT_DOUBLE_EQ(fallback->EarEdgeSensitivity, 6.0);
 
     CoreConfig::EngineConfigSectionRegistry registry{};
@@ -197,4 +197,22 @@ TEST(PointCloudConsolidationConfig, InitialSamplingRoundTripsAndInvalidBlocksKee
     EXPECT_FALSE(result.Diagnostics.empty()) << "eta 1 with a cap of 8 is rejected with a warning";
     const auto bad = R::ValidatePointCloudConsolidationConfigSection(R"({"initial_beta": 0.5})", {}, "test");
     EXPECT_FALSE(bad.Diagnostics.empty());
+}
+
+TEST(PointCloudConsolidationConfig, ShortLopPreservesUnusedNormalSettings)
+{
+    Runtime::PointCloudConsolidationConfig config{};
+    config.Strategy = Runtime::PointCloudConsolidationStrategy::Lop;
+    config.MaxIterations = 1u;
+    config.NormalRefinementRounds = 3u;
+    const auto validation = Runtime::ValidatePointCloudConsolidationConfigSection(
+        Runtime::SerializePointCloudConsolidationConfig(config),
+        Runtime::SerializePointCloudConsolidationConfig(Runtime::PointCloudConsolidationConfig{}), "test");
+    EXPECT_EQ(validation.State, CoreConfig::EngineConfigState::Valid);
+    CoreConfig::EngineConfig document{};
+    Runtime::SetPointCloudConsolidationConfig(document, config);
+    const auto decoded = Runtime::GetPointCloudConsolidationConfig(document);
+    ASSERT_TRUE(decoded);
+    EXPECT_EQ(decoded->MaxIterations, 1u);
+    EXPECT_EQ(decoded->NormalRefinementRounds, 3u);
 }
