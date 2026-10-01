@@ -425,6 +425,9 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::optional<CurvatureSegmentationConfig>
     GetEditorCurvatureSegmentationConfig(const EditorProcessingCommands&) noexcept;
 
+    // Admission: the run needs at least one source vertex or a source vertex property.
+    [[nodiscard]] ActionReadiness PreviewEditorGeodesicsCommand(
+        const EditorProcessingCommands&, const GeodesicsConfig&);
     [[nodiscard]] EditorGeodesicsResult ApplyEditorGeodesicsCommand(
         const EditorProcessingCommands&, const EditorGeodesicsCommand&);
     [[nodiscard]] EditorGeodesicsResult ApplyEditorConfiguredGeodesicsCommand(

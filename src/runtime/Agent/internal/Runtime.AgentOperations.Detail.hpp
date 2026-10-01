@@ -1,10 +1,12 @@
 // Shared helpers of the editor-backed agent operations (Editor.cpp, Operations.cpp): JSON
 // argument access, outcome builders, schema fragments, readiness and asynchronous
 // completion. Private to the Extrinsic.Runtime.AgentOperations implementation units: include it
-// after the module declaration, the imports and a global module fragment that already
-// provides <optional>, <memory>, <string> and <nlohmann/json.hpp>.
+// after the module declaration and the imports, with a global module fragment that provides
+// <cstdint>, <functional>, <memory>, <optional>, <string>, <string_view>, <utility>, <vector>
+// and <nlohmann/json.hpp>.
 #pragma once
-
+extern "C++"
+{
 namespace Extrinsic::Runtime::AgentDetail
 {
     using Json = nlohmann::json;
@@ -240,4 +242,5 @@ namespace Extrinsic::Runtime
 {
     // Registers the point, registration and configured-operation tools (Operations.cpp).
     void RegisterProcessingAgentOperations(AgentOperationRegistry& registry);
+}
 }

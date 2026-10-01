@@ -825,15 +825,19 @@ TEST(SandboxAgentServer, RunOperationOutlierAnalysisPublishesAndUndoes)
         rig.Check(!isError && run["succeeded"] == true && run["operation"] == "outlier_analysis", "run_operation: " + run.dump());
         rig.Check(hasProperty("outlier_score") && hasProperty("outlier_mask"), "the run published its properties");
         const auto history = c.Tool("history");
-        // A queued job publishes on a later frame, after the call's "Agent: " label scope ended
-        // (documented limitation), so only the entry itself is asserted here.
-        rig.Check(history["undo_count"] == 1 && !history["undo_label"].get<std::string>().empty(), "one history entry: " + history.dump());
+        // The queued job publishes on a later frame; its entry still carries the call's label.
+        rig.Check(history["undo_count"] == 1 && history["undo_label"].get<std::string>().starts_with("Agent: "),
+                  "labeled history entry: " + history.dump());
         const auto undone = c.Tool("undo", Json::object(), &isError);
         rig.Check(!isError && undone["undone"].size() == 1u, "one undo step: " + undone.dump());
         rig.Check(!hasProperty("outlier_score") && !hasProperty("outlier_mask"), "undo removed the properties");
-        // An operation without readiness check says so instead of inventing one.
-        const auto noCheck = c.Tool("preview_operation", {{"operation", "geodesics"}, {"entity", cloud}}, &isError);
-        rig.Check(!isError && noCheck["enabled"].is_null() && !noCheck["reason"].get<std::string>().empty(), "geodesics preview: " + noCheck.dump());
+        // Geodesics reports the panel's readiness: no source vertex yet, so it is disabled with a reason.
+        const auto geodesics = c.Tool("preview_operation", {{"operation", "geodesics"}, {"entity", cloud}}, &isError);
+        rig.Check(!isError && geodesics["enabled"] == false && geodesics["reason"].get<std::string>().find("source") != std::string::npos,
+                  "geodesics preview: " + geodesics.dump());
+        // Parameterization has no readiness function and says so instead of inventing one.
+        const auto noCheck = c.Tool("preview_operation", {{"operation", "parameterization"}, {"entity", cloud}}, &isError);
+        rig.Check(!isError && noCheck["enabled"].is_null() && !noCheck["reason"].get<std::string>().empty(), "parameterization preview: " + noCheck.dump());
         // Every Config row names a real section.
         for (const char* op : {"mesh_curvature", "normal_estimation", "kernel_density", "point_spacing", "outlier_analysis",
                                "density_weight", "descriptor_analysis", "bilateral_filter", "point_construction"})

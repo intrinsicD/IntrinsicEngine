@@ -115,6 +115,12 @@ namespace Extrinsic::Runtime
         return GetGeodesicsConfig(context.EngineConfigControlState->ActiveConfig);
     }
 
+    ActionReadiness PreviewEditorGeodesicsCommand(const EditorProcessingCommands&, const GeodesicsConfig& config)
+    {
+        return {!config.SourceVertices.empty() || !config.SourceVertexProperty.Name.empty(),
+                "Add a source vertex or choose a source property."};
+    }
+
     EditorGeodesicsResult ApplyEditorConfiguredGeodesicsCommand(
         const EditorProcessingCommands& commands, const std::uint32_t stableEntityId)
     {

@@ -19,6 +19,7 @@ import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.EngineConfigControl;
 // Named only so the shared job declarations in the point-field header resolve.
 import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.KernelEvents;
 import Geometry.Properties;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
@@ -69,6 +70,18 @@ namespace Extrinsic::Runtime
         else if (method.DisabledReason.empty())
             method.DisabledReason = "Processing prerequisites are unavailable. Check the selected inputs and settings.";
         return method;
+    }
+    void CarryEditorLabelPrefix(JobDesc& desc, EditorCommandHistory* history, std::string prefix,
+                                std::function<bool()> active)
+    {
+        if (history == nullptr || prefix.empty() || !desc.PublishCompletion) return;
+        desc.PublishCompletion = [inner = std::move(desc.PublishCompletion), history, prefix = std::move(prefix),
+                                  active = std::move(active)](KernelEventBus& bus, const JobResultEnvelope& result) mutable
+        {
+            if (active && !active()) return inner(bus, result);
+            const ScopedEditorCommandLabelPrefix scope{history, prefix};
+            return inner(bus, result);
+        };
     }
     GeometryPropertyCatalogSnapshot GetEditorPointInputCatalog(
         const EditorProcessingCommands& commands, std::uint32_t stableId)

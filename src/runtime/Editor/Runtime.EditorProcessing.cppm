@@ -11,6 +11,7 @@ import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.JobService;
 // These services are borrowed only; their existing owners expose matching C++ linkage.
 extern "C++" {
     namespace Extrinsic::ECS::Scene { class Registry; }
@@ -100,6 +101,12 @@ export namespace Extrinsic::Runtime
     // Missing config commands take priority; otherwise preserve the method's reason.
     [[nodiscard]] ActionReadiness ResolveEditorProcessingActionReadiness(
         const EditorProcessingCommands&, ActionReadiness method);
+    // A queued job publishes on a later frame, after the call that queued it (an agent call under
+    // "Agent: ") has ended. Wraps `desc.PublishCompletion` so history entries recorded while it
+    // runs carry `prefix` (the history's prefix at submission); an empty prefix changes nothing.
+    // `active` (optional) guards against a history that no longer belongs to the live session.
+    void CarryEditorLabelPrefix(JobDesc& desc, EditorCommandHistory* history, std::string prefix,
+                                std::function<bool()> active = {});
     // Live finite vec3 rows on every resolved element domain of the entity, with
     // each entry's property revision and membership folded into the generation.
     // Prepared sessions omit pending entries until the command drain validates

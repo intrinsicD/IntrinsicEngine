@@ -87,6 +87,8 @@ export namespace Extrinsic::Runtime
         PointCloudConsolidationConfig Config{};
         bool AutoAccept{true};
         std::function<bool()> AttachmentActive{};
+        // History label prefix active when the run was queued; the commit applies it again.
+        std::string LabelPrefix{};
     };
 
     struct PointCloudConsolidationResult

@@ -4126,8 +4126,7 @@ namespace Extrinsic::Sandbox::Editor
                 ? "" : "Geodesics config was rejected; check property names and expansion budget.";
         const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
             context.MeshFields.Commands,
-            {!config.SourceVertices.empty() || !config.SourceVertexProperty.Name.empty(),
-             "Add a source vertex or choose a source property."});
+            Runtime::PreviewEditorGeodesicsCommand(context.MeshFields.Commands, config));
         if (DrawProcessingActionButton("Compute geodesics", readiness))
             ApplyProcessingExecution(Geodesics, config, apply,
                 [&] { return Runtime::ApplyEditorConfiguredGeodesicsCommand(

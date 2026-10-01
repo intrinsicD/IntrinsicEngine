@@ -101,6 +101,9 @@ export namespace Extrinsic::Runtime
         ClusteringBackend Backend{ClusteringBackend::CpuReference};
         bool AutoAccept{true};
         std::function<bool()> AttachmentActive{};
+        // History label prefix active when the run was queued (an agent call's "Agent: "); the
+        // commit on a later frame applies it again.
+        std::string LabelPrefix{};
     };
 
     struct KMeansRunCompleted

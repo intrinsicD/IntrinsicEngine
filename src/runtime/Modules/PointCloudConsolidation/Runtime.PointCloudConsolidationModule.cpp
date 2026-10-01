@@ -2018,7 +2018,8 @@ namespace Extrinsic::Runtime
                     scene = processing.Scene, attached = job.Snapshot.Request.AttachmentActive] {
                     return worlds && worlds->ActiveWorld() == world && worlds->Get(world) == scene && (!attached || attached());
                 };
-                processing.JobCommands.Submit = [jobs](JobDesc desc, EditorJobIdentity) {
+                processing.JobCommands.Submit = [jobs, history, prefix = job.Snapshot.Request.LabelPrefix](JobDesc desc, EditorJobIdentity) {
+                    CarryEditorLabelPrefix(desc, history, prefix); // the GPU transaction publishes after the call that queued it
                     return jobs ? jobs->Submit(std::move(desc)) : JobToken{};
                 };
                 const PointCloudConsolidationGpuSubmission submission =
@@ -2152,6 +2153,7 @@ namespace Extrinsic::Runtime
 
             EditorCommandHistoryStatus commit =
                 EditorCommandHistoryStatus::CommandFailed;
+            const ScopedEditorCommandLabelPrefix labelPrefix{history, job.Snapshot.Request.LabelPrefix};
             if (hasPropertyPublication)
             {
                 const ElementDomainPropertyState beforeOutputs =

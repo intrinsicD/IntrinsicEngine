@@ -73,6 +73,7 @@ namespace Extrinsic::Runtime
         }
         auto request = command;
         request.AttachmentActive = context.AttachmentActive;
+        if (context.CommandHistory != nullptr) request.LabelPrefix = context.CommandHistory->LabelPrefix();
         result.Correlation = clustering->RunKMeans(std::move(request));
         result.Status = KMeansRunStatus::Queued;
         result.Message = "K-Means runtime job queued.";
@@ -99,6 +100,7 @@ namespace Extrinsic::Runtime
             return result;
 
         request.AttachmentActive = context.AttachmentActive;
+        if (context.CommandHistory != nullptr) request.LabelPrefix = context.CommandHistory->LabelPrefix();
         result.Correlation = consolidation->Run(std::move(request));
         if (!result.Correlation.IsValid())
         {

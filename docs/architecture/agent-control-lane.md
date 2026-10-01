@@ -143,9 +143,13 @@ Nothing exists without the launch flag: no module, thread or socket.
   `property` from the entity's vertex scalars like the panel's combo. A row whose section carries the entity refuses an
   `entity` argument, naming the section. `run_mesh_operation` and `preview_mesh_operation` are
   aliases limited to the four mesh-field rows. A `Pending` command answers when its job
-  delivered (`result_unavailable` when none can). Geodesics has no readiness check, so its
-  preview answers `"enabled": null`. The tool flag `NeedsPresentedFrame` is per tool, so
+  delivered (`result_unavailable` when none can). Parameterization has no readiness
+  function (its panel gates on the selection), so its preview answers `"enabled": null`. The tool flag `NeedsPresentedFrame` is per tool, so
   `run_operation` (as `run_mesh_operation`) is refused while minimized even for CPU-only rows.
+  Behavior of the mesh aliases after the move into the table: a missing config section answers
+  `enabled: false` with a reason (it was a call error), and a Vulkan property smoothing waits
+  for its job (it was reported as an error while pending). Agent runs do not feed the panels'
+  "last result" displays; the reply is the result.
 - Screenshots complete a few frames after the call: an operation may return an
   `AgentOperationContinuation`, which the server polls each frame and answers with
   the original JSON-RPC id; a reconnecting client drops pending replies. Both tools
@@ -172,7 +176,10 @@ Nothing exists without the launch flag: no module, thread or socket.
   the previewed request, which can evict the panel's two-entry readiness cache entry (the panel
   recomputes it on its next frame).
 - Mutating calls run under `ScopedEditorCommandLabelPrefix("Agent: ")`, so the
-  undo history shows each agent change and the operator can undo it.
+  undo history shows each agent change and the operator can undo it. A job queued by the call
+  publishes on a later frame, so the submit paths (`CarryEditorLabelPrefix` in the workspace
+  session's job surface, the k-means and consolidation requests) carry the prefix to that
+  commit; a job a panel queues carries none.
 - Excluded by design: raw ECS or property-buffer writes, code execution, RHI
   access, runtime threading/memory/debug-layer settings, file deletion, network
   access from the engine, credentials, persisting editor settings, git, and
@@ -221,9 +228,5 @@ Planned: lane hardening (the remaining protocol conformance) and the remaining o
   consolidation. The remaining editor commands (scene save/load, visibility, camera controller)
   are owned by [RUNTIME-312](../../tasks/backlog/runtime/RUNTIME-312-agent-lane-mcp-hardening-and-coverage.md).
 - Imports are asynchronous (`Pending`); poll `scene_entities` for the result.
-- History entries that a queued editor job publishes on a later frame (every `Pending` run:
-  registration, point analysis, normal estimation and the like) carry the command's own label
-  without the `Agent: ` prefix, because the label scope covers only the call itself;
-  synchronous operations are prefixed.
 - Unix-domain sockets only; Windows builds report `Unsupported`.
 - A Sandbox killed by a signal leaves its socket file; the next start replaces it.

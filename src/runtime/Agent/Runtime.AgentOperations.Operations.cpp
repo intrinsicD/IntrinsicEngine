@@ -385,7 +385,11 @@ namespace Extrinsic::Runtime
                     }));
                 ops.push_back(EntityOperation<EditorGeodesicsResult>(
                     "geodesics", "mesh_analysis", "sandbox.geodesics", &PrepareEditorMeshFieldFrame,
-                    [](const auto&, std::uint32_t) { return std::optional<ActionReadiness>{}; },
+                    [](const auto& c, std::uint32_t) -> std::optional<ActionReadiness> {
+                        const auto config = GetEditorGeodesicsConfig(c);
+                        if (!config) return ActionReadiness{false, "The sandbox.geodesics section is unavailable."};
+                        return PreviewEditorGeodesicsCommand(c, *config);
+                    },
                     [](const auto& c, std::uint32_t id, auto) { return ApplyEditorConfiguredGeodesicsCommand(c, id); }));
                 ops.push_back(EntityOperation<EditorCurvatureSegmentationResult>(
                     "curvature_segmentation", "mesh_analysis", "sandbox.curvature_segmentation", &PrepareEditorMeshFieldFrame,
@@ -893,7 +897,7 @@ namespace Extrinsic::Runtime
         }
     }
 
-    void RegisterProcessingAgentOperations(AgentOperationRegistry& registry)
+    extern "C++" void RegisterProcessingAgentOperations(AgentOperationRegistry& registry)
     {
         const auto add = [&](const char* name, const char* title, std::string description, std::string schema,
                              bool readOnly, AgentOperationInvoker invoke, bool destructive = false, bool gpu = false) {

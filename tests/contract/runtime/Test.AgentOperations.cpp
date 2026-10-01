@@ -14,6 +14,7 @@
 #include <nlohmann/json.hpp>
 import Extrinsic.Runtime.AgentServer;
 import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Core.Tasks;
 import Extrinsic.Runtime.JobService;
@@ -682,6 +683,52 @@ TEST(AgentOperations, EditorOperationsShareTheDomainEnum)
     const auto badShow = R::InvokeAgentOperation(registry, "show_property", context,
                                                  R"({"entity":1,"name":"x","domain":"Bogus"})", false);
     EXPECT_NE(badShow.Text.find("Unknown domain 'Bogus'"), std::string::npos) << badShow.Text;
+}
+
+// A job queued during an agent call publishes on a later frame, after the call's label scope
+// ended: the submit path carries the prefix. A job queued without a prefix (a panel) gets none.
+TEST(AgentOperations, QueuedJobsKeepTheSubmittingCallsLabelPrefix)
+{
+    if (Extrinsic::Core::Tasks::Scheduler::IsInitialized()) Extrinsic::Core::Tasks::Scheduler::Shutdown();
+    Extrinsic::Core::Tasks::Scheduler::Initialize(1);
+    {
+        R::JobService jobs;
+        R::KernelEventBus events;
+        R::EditorCommandHistory history;
+        const auto submit = [&](const char* label) {
+            R::JobDesc desc;
+            desc.DebugName = label;
+            desc.Work = [](const R::JobCancellation&) { return R::JobResultEnvelope::Make(1); };
+            desc.PublishCompletion = [&history, label](R::KernelEventBus&, const R::JobResultEnvelope&) {
+                (void)history.Execute({.Label = label, .Redo = [] { return R::EditorCommandHistoryStatus::Applied; },
+                                       .Undo = [] { return R::EditorCommandHistoryStatus::Applied; }});
+                return true;
+            };
+            R::CarryEditorLabelPrefix(desc, &history, history.LabelPrefix());
+            EXPECT_TRUE(jobs.Submit(std::move(desc)).IsValid());
+        };
+        {
+            const R::ScopedEditorCommandLabelPrefix scope{&history, "Agent: "};
+            submit("agent job");
+        }
+        EXPECT_TRUE(history.LabelPrefix().empty()) << "the call's scope ended before the job publishes";
+        submit("panel job");
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+        while (history.UndoCount() < 2 && std::chrono::steady_clock::now() < deadline)
+        {
+            (void)jobs.DrainCompletions(events);
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        ASSERT_EQ(history.UndoCount(), 2u);
+        std::vector<std::string> labels;
+        for (int i = 0; i < 2; ++i) labels.push_back(history.Undo().Label);
+        std::ranges::sort(labels);
+        EXPECT_EQ(labels, (std::vector<std::string>{"Agent: agent job", "panel job"}));
+        EXPECT_TRUE(history.LabelPrefix().empty()) << "publishing restored the prefix";
+        jobs.CancelAndDrain();
+    }
+    Extrinsic::Core::Tasks::Scheduler::WaitForAll();
+    Extrinsic::Core::Tasks::Scheduler::Shutdown();
 }
 
 TEST(AgentOperations, ConfiguredOperationEnumMatchesTable)

@@ -826,6 +826,7 @@ namespace Extrinsic::Runtime
                 return;
             }
 
+            const ScopedEditorCommandLabelPrefix labelPrefix{history, job.Snapshot.Command.LabelPrefix};
             const EditorCommandHistoryStatus commitStatus =
                 CommitKMeansOutputs(
                     scene,
@@ -1032,7 +1033,9 @@ namespace Extrinsic::Runtime
                 processing.AttachmentActive = [worlds=context.Worlds,world,scene=processing.Scene,attached=command.AttachmentActive] {
                     return worlds && worlds->ActiveWorld()==world && worlds->Get(world)==scene && (!attached || attached());
                 };
-                processing.JobCommands.Submit = [jobs=context.Jobs](JobDesc desc, EditorJobIdentity) {return jobs->Submit(std::move(desc));};
+                processing.JobCommands.Submit = [jobs=context.Jobs,history,prefix=command.LabelPrefix](JobDesc desc, EditorJobIdentity) {
+                    CarryEditorLabelPrefix(desc, history, prefix); // the GPU transaction publishes after the call that queued it
+                    return jobs->Submit(std::move(desc));};
                 const auto captured = std::make_shared<KMeansSnapshot>();
                 const auto entity = SelectionController::ToEntityHandle(command.StableEntityId);
                 const auto availability = BuildGeometryAvailability(processing.Scene->Raw(), entity);
