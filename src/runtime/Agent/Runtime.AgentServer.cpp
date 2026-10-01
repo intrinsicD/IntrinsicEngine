@@ -163,14 +163,19 @@ namespace Extrinsic::Runtime
             const auto nameIt = params.find("name");
             if (nameIt == params.end() || !nameIt->is_string()) return Dump(ErrorResponse(id, -32602, "tools/call needs a tool name"));
             const auto name = nameIt->get<std::string>();
-            if (m_Registry->Find(name) == nullptr) return Dump(ErrorResponse(id, -32602, "Unknown tool: " + name));
-            if (m_Pending.size() >= kMaxPendingCalls) return Dump(ErrorResponse(id, -32000, "too many pending calls"));
+            const AgentOperationSpec* spec = m_Registry->Find(name);
+            if (spec == nullptr) return Dump(ErrorResponse(id, -32602, "Unknown tool: " + name));
+            const bool atCap = m_Pending.size() >= kMaxPendingCalls;
+            if (atCap && !spec->ReadOnly) return Dump(ErrorResponse(id, -32000, "too many pending calls"));
             const auto argsIt = params.find("arguments");
             const std::string arguments = argsIt != params.end() && argsIt->is_object() ? Dump(*argsIt) : "{}";
             auto outcome = InvokeAgentOperation(*m_Registry, name, context, arguments, m_ReadOnly);
             if (outcome.Continuation)
             {
+                // A read-only tool that defers at the cap is refused after it ran; it changed nothing.
+                if (atCap) return Dump(ErrorResponse(id, -32000, "too many pending calls"));
                 PendingCall call{.Id = Dump(id), .Continue = std::move(outcome.Continuation)};
+                call.NeedsPresentedFrame = spec->NeedsPresentedFrame;
                 if (const auto meta = params.find("_meta"); meta != params.end() && meta->is_object())
                     if (const auto token = meta->find("progressToken"); token != meta->end() && (token->is_string() || token->is_number_integer()))
                         call.ProgressToken = Dump(*token);
@@ -190,6 +195,18 @@ namespace Extrinsic::Runtime
         for (auto it = m_Pending.begin(); it != m_Pending.end();)
         {
             AgentOperationOutcome outcome{};
+            if (it->NeedsPresentedFrame && !context.ViewportPresentable)
+            {
+                // GPU work only progresses on presented frames; the editor job itself keeps its state
+                // and publishes after the window is restored, without a reply.
+                outcome = {.IsError = true,
+                           .Text = "The Sandbox window was minimized while this call was waiting for GPU work; it may still "
+                                   "finish after the window is restored. Check the scene or jobs before retrying.",
+                           .ErrorCode = "viewport_not_presentable"};
+                replies.push_back(Dump(ToolResultResponse(Json::parse(it->Id, nullptr, false), outcome, m_NegotiatedVersion)));
+                it = m_Pending.erase(it);
+                continue;
+            }
             if (it->Continue(context, outcome))
             {
                 replies.push_back(Dump(ToolResultResponse(Json::parse(it->Id, nullptr, false), outcome, m_NegotiatedVersion)));

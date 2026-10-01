@@ -56,8 +56,8 @@ export namespace Extrinsic::Runtime
         // Canonical absolute directories file arguments must stay inside.
         std::vector<std::string> AllowedRoots{};
         std::uint64_t FrameIndex{0};
-        // False on minimized frames: no frame is rendered, so captures fail fast with
-        // the error code "viewport_not_presentable" instead of waiting.
+        // False on minimized frames: nothing is rendered, so GPU work and captures cannot
+        // progress. Tools that need a presented frame fail with "viewport_not_presentable".
         bool ViewportPresentable{true};
     };
 
@@ -71,7 +71,11 @@ export namespace Extrinsic::Runtime
         std::string Description{};
         std::string InputSchemaJson{R"({"type":"object","properties":{},"additionalProperties":false})"};
         bool ReadOnly{true};
-        bool Destructive{false}; // a mutation the undo history does not cover (written files)
+        // A mutation the undo history cannot restore: written files, applied engine config.
+        bool Destructive{false};
+        // May dispatch GPU work, which only progresses on presented frames: refused while the
+        // viewport is not presentable, and a pending call fails with "viewport_not_presentable".
+        bool NeedsPresentedFrame{false};
         AgentOperationInvoker Invoke{};
     };
 

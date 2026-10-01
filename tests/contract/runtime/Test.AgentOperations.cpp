@@ -245,24 +245,71 @@ TEST(AgentOperations, PendingCapIsEnforced)
 {
     R::AgentOperationRegistry registry;
     int invocations = 0;
-    ASSERT_TRUE(registry.Register({.Name = "stuck", .Title = "Stuck", .ReadOnly = true,
+    const auto stuck = [&invocations](const R::AgentOperationContext&, std::string_view) {
+        ++invocations;
+        R::AgentOperationOutcome outcome{};
+        outcome.Continuation = [](const R::AgentOperationContext&, R::AgentOperationOutcome&) { return false; };
+        return outcome; };
+    ASSERT_TRUE(registry.Register({.Name = "stuck", .Title = "Stuck", .ReadOnly = false, .Invoke = stuck}));
+    ASSERT_TRUE(registry.Register({.Name = "stuck_read", .Title = "Stuck read", .ReadOnly = true, .Invoke = stuck}));
+    ASSERT_TRUE(registry.Register({.Name = "quick", .Title = "Quick", .ReadOnly = true,
+        .Invoke = [](const R::AgentOperationContext&, std::string_view) { return R::AgentOperationOutcome{.Text = R"({"ok":true})"}; }}));
+    R::AgentProtocol protocol{registry, false};
+    const R::AgentOperationContext context{};
+    const auto call = [&](const char* name, int id) {
+        return protocol.Handle(Json{{"jsonrpc", "2.0"}, {"id", id}, {"method", "tools/call"}, {"params", {{"name", name}}}}.dump(), context);
+    };
+    for (std::size_t i = 0; i < R::AgentProtocol::kMaxPendingCalls; ++i) EXPECT_FALSE(call("stuck", int(i)).has_value());
+    EXPECT_EQ(protocol.PendingCount(), 16u);
+    const auto refused = Json::parse(*call("stuck", 99));
+    EXPECT_EQ(refused["error"]["code"], -32000);
+    EXPECT_EQ(refused["error"]["message"], "too many pending calls");
+    EXPECT_EQ(invocations, 16) << "a refused state-changing call never runs the tool";
+    // Read-only tools that answer immediately are still served at the cap.
+    const auto served = Json::parse(*call("quick", 100));
+    EXPECT_EQ(served["result"]["isError"], false);
+    // A read-only tool that would defer is refused (it ran, but changed nothing).
+    EXPECT_EQ(Json::parse(*call("stuck_read", 101))["error"]["code"], -32000);
+    EXPECT_EQ(protocol.PendingCount(), 16u);
+}
+
+TEST(AgentOperations, GpuToolsAreRefusedAndPendingGpuCallsFailWhileMinimized)
+{
+    R::AgentOperationRegistry registry;
+    int invocations = 0;
+    ASSERT_TRUE(registry.Register({.Name = "gpu_job", .Title = "GPU job", .ReadOnly = false, .NeedsPresentedFrame = true,
         .Invoke = [&invocations](const R::AgentOperationContext&, std::string_view) {
             ++invocations;
             R::AgentOperationOutcome outcome{};
             outcome.Continuation = [](const R::AgentOperationContext&, R::AgentOperationOutcome&) { return false; };
             return outcome; }}));
+    ASSERT_TRUE(registry.Register({.Name = "cpu_job", .Title = "CPU job", .ReadOnly = false,
+        .Invoke = [](const R::AgentOperationContext&, std::string_view) {
+            R::AgentOperationOutcome outcome{};
+            outcome.Continuation = [](const R::AgentOperationContext&, R::AgentOperationOutcome&) { return false; };
+            return outcome; }}));
     R::AgentProtocol protocol{registry, false};
-    const R::AgentOperationContext context{};
-    for (std::size_t i = 0; i < R::AgentProtocol::kMaxPendingCalls; ++i)
-        EXPECT_FALSE(protocol.Handle(Json{{"jsonrpc", "2.0"}, {"id", int(i)}, {"method", "tools/call"},
-                                          {"params", {{"name", "stuck"}}}}.dump(), context).has_value());
-    EXPECT_EQ(protocol.PendingCount(), 16u);
-    const auto refused = Call(protocol, context, {{"jsonrpc", "2.0"}, {"id", 99}, {"method", "tools/call"},
-                                                  {"params", {{"name", "stuck"}}}});
-    EXPECT_EQ(refused["error"]["code"], -32000);
-    EXPECT_EQ(refused["error"]["message"], "too many pending calls");
-    EXPECT_EQ(invocations, 16) << "a refused call never runs the tool";
-    EXPECT_EQ(protocol.PendingCount(), 16u);
+    const R::AgentOperationContext presented{};
+    const R::AgentOperationContext minimized{.ViewportPresentable = false};
+    const auto request = [](const char* name, int id) {
+        return Json{{"jsonrpc", "2.0"}, {"id", id}, {"method", "tools/call"}, {"params", {{"name", name}}}}.dump(); };
+
+    // Not started while minimized: no job, no pending slot.
+    const auto refused = Json::parse(*protocol.Handle(request("gpu_job", 1), minimized));
+    EXPECT_EQ(refused["result"]["structuredContent"]["error"]["code"], "viewport_not_presentable");
+    EXPECT_EQ(invocations, 0);
+    EXPECT_EQ(protocol.PendingCount(), 0u);
+
+    // Already pending when the window minimizes: failed instead of occupying a slot forever.
+    EXPECT_FALSE(protocol.Handle(request("gpu_job", 2), presented).has_value());
+    EXPECT_FALSE(protocol.Handle(request("cpu_job", 3), presented).has_value());
+    EXPECT_EQ(protocol.PendingCount(), 2u);
+    const auto replies = protocol.PollPending(minimized);
+    ASSERT_EQ(replies.size(), 1u);
+    const Json reply = Json::parse(replies.front());
+    EXPECT_EQ(reply["id"], 2);
+    EXPECT_EQ(reply["result"]["structuredContent"]["error"]["code"], "viewport_not_presentable");
+    EXPECT_EQ(protocol.PendingCount(), 1u) << "CPU-only calls keep waiting";
 }
 
 TEST(AgentOperations, LateContinuationStillRepliesAfterManyPollRounds)
@@ -447,7 +494,8 @@ TEST(AgentOperations, AnnotationsReflectUndoability)
     for (const auto& tool : list["result"]["tools"])
     {
         const bool destructive = tool["annotations"]["destructiveHint"].get<bool>();
-        EXPECT_EQ(destructive, tool["name"] == "view_capture") << tool["name"];
+        // Destructive: files and engine config, the two effects the undo history does not cover.
+        EXPECT_EQ(destructive, tool["name"] == "view_capture" || tool["name"] == "config_apply") << tool["name"];
         sawCapture |= tool["name"] == "view_capture";
     }
     EXPECT_TRUE(sawCapture);
@@ -456,9 +504,13 @@ TEST(AgentOperations, AnnotationsReflectUndoability)
 TEST(AgentOperations, ViewCaptureRefusesToOverwriteUnlessAsked)
 {
     namespace fs = std::filesystem;
-    const auto root = fs::weakly_canonical(fs::temp_directory_path() / "intrinsic-agent-overwrite");
+    const auto info = ::testing::UnitTest::GetInstance()->current_test_info();
+    const auto root = fs::weakly_canonical(fs::temp_directory_path() / (std::string("intrinsic-agent-overwrite-") + info->name()));
+    fs::remove_all(root);
     fs::create_directories(root);
     { std::ofstream(root / "shot.png") << "x"; }
+    std::error_code linkError;
+    fs::create_symlink(root / "nowhere.png", root / "dangling.png", linkError);
     R::AgentOperationRegistry registry;
     R::RegisterViewCaptureAgentOperations(registry);
     R::AgentProtocol protocol{registry, false};
@@ -470,12 +522,17 @@ TEST(AgentOperations, ViewCaptureRefusesToOverwriteUnlessAsked)
     const auto refused = capture({{"path", "shot.png"}});
     EXPECT_TRUE(refused["isError"].get<bool>());
     EXPECT_EQ(refused["structuredContent"]["error"]["code"], "file_exists");
+    if (!linkError)
+        EXPECT_EQ(capture({{"path", "dangling.png"}})["structuredContent"]["error"]["code"], "file_exists") << "dangling symlinks are occupied";
     // With overwrite the preflight passes and the call reaches the (absent) capture service.
     const auto allowed = capture({{"path", "shot.png"}, {"overwrite", true}});
     EXPECT_TRUE(allowed["isError"].get<bool>());
     EXPECT_FALSE(allowed.contains("structuredContent")) << allowed.dump();
-    // A new file name is not an overwrite.
-    EXPECT_FALSE(capture({{"path", "fresh.png"}}).contains("structuredContent"));
+    EXPECT_NE(allowed["content"][0]["text"].get<std::string>().find("not available"), std::string::npos);
+    // A new file name is not an overwrite: it gets past the preflight to the missing service.
+    const auto fresh = capture({{"path", "fresh.png"}});
+    EXPECT_FALSE(fresh.contains("structuredContent")) << fresh.dump();
+    EXPECT_NE(fresh["content"][0]["text"].get<std::string>().find("not available"), std::string::npos);
     EXPECT_TRUE(capture({{"path", "shot.png"}, {"overwrite", "yes"}})["isError"].get<bool>());
     fs::remove_all(root);
 }

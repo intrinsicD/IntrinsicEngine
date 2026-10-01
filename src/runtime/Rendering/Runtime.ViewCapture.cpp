@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <atomic>
 #include <array>
 #include <cmath>
 #include <memory>
@@ -258,51 +259,66 @@ namespace Extrinsic::Runtime
         return png;
     }
 
-    std::optional<std::string> WriteViewCaptureFile(const std::filesystem::path& path,
-                                                     const std::span<const std::uint8_t> bytes, const bool overwrite)
+    std::optional<ViewCaptureWriteError> WriteViewCaptureFile(const std::filesystem::path& path,
+                                                              const std::span<const std::uint8_t> bytes, const bool overwrite)
     {
+        namespace fs = std::filesystem;
+        const auto exists = [](const fs::path& candidate) {
+            std::error_code status;
+            const fs::file_status s = fs::symlink_status(candidate, status); // a dangling symlink occupies the path
+            return !status && s.type() != fs::file_type::not_found;
+        };
+        const auto fileExists = [&] {
+            return ViewCaptureWriteError{ViewCaptureFailure::FileExists, path.string() + " already exists"};
+        };
         std::error_code error;
-        if (!overwrite && std::filesystem::exists(path, error)) return path.string() + " already exists";
+        if (!overwrite && exists(path)) return fileExists();
         if (path.has_parent_path())
         {
-            std::filesystem::create_directories(path.parent_path(), error);
-            if (error) return "Cannot create " + path.parent_path().string() + ": " + error.message();
+            fs::create_directories(path.parent_path(), error);
+            if (error) return ViewCaptureWriteError{ViewCaptureFailure::None,
+                                                    "Cannot create " + path.parent_path().string() + ": " + error.message()};
         }
-        std::filesystem::path temporary = path;
-        temporary += ".partial";
+        // A unique name per write: concurrent captures and user files named *.partial stay untouched.
+        static std::atomic<std::uint64_t> counter{0};
+        fs::path temporary;
+        for (int attempt = 0; attempt < 16; ++attempt)
+        {
+            temporary = path;
+            temporary += ".partial-" + std::to_string(counter.fetch_add(1) + 1) + "-" +
+                         std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+            if (!exists(temporary)) break;
+            temporary.clear();
+        }
+        if (temporary.empty()) return ViewCaptureWriteError{ViewCaptureFailure::None, "Cannot pick a temporary name next to " + path.string()};
         {
             std::ofstream out(temporary, std::ios::binary | std::ios::trunc);
-            if (!out) return "Cannot open " + temporary.string() + " for writing";
+            if (!out) return ViewCaptureWriteError{ViewCaptureFailure::None, "Cannot open " + temporary.string() + " for writing"};
             out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
             out.close();
             if (!out)
             {
-                std::filesystem::remove(temporary, error);
-                return "Cannot write " + temporary.string();
+                fs::remove(temporary, error);
+                return ViewCaptureWriteError{ViewCaptureFailure::None, "Cannot write " + temporary.string()};
             }
         }
         if (!overwrite)
         {
-            // create_hard_link fails when the target exists, which makes check-and-publish atomic.
-            std::filesystem::create_hard_link(temporary, path, error);
-            if (!error)
-            {
-                std::filesystem::remove(temporary, error);
-                return std::nullopt;
-            }
-            if (std::filesystem::exists(path))
-            {
-                std::filesystem::remove(temporary, error);
-                return path.string() + " already exists";
-            }
-            // No hard links on this filesystem: fall through to the rename (the exists check above still ran).
+            fs::create_hard_link(temporary, path, error);
+            const std::error_code linkError = error;
+            fs::remove(temporary, error);
+            if (!linkError) return std::nullopt;
+            if (linkError == std::errc::file_exists) return fileExists();
+            return ViewCaptureWriteError{ViewCaptureFailure::None,
+                                         "Cannot publish " + path.string() + " without replacing a file: " + linkError.message()};
         }
-        std::filesystem::rename(temporary, path, error);
+        fs::rename(temporary, path, error);
         if (error)
         {
-            const std::string message = "Cannot move the capture to " + path.string() + ": " + error.message();
-            std::filesystem::remove(temporary, error);
-            return message;
+            ViewCaptureWriteError failure{ViewCaptureFailure::None,
+                                          "Cannot move the capture to " + path.string() + ": " + error.message()};
+            fs::remove(temporary, error);
+            return failure;
         }
         return std::nullopt;
     }
@@ -552,7 +568,8 @@ namespace Extrinsic::Runtime
                 if (auto error = WriteViewCaptureFile(path, png, entry.Request.Overwrite || entry.Request.OutputPath.empty()))
                 {
                     entry.Status.State = ViewCaptureState::Failed;
-                    entry.Status.Diagnostic = std::move(*error);
+                    entry.Status.Diagnostic = std::move(error->Message);
+                    entry.Status.Failure = error->Kind;
                     Finish(entry);
                     continue;
                 }

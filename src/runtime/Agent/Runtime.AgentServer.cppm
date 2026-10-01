@@ -52,7 +52,8 @@ export namespace Extrinsic::Runtime
         // (RUNTIME-279).
         [[nodiscard]] std::vector<std::string> PollPending(const AgentOperationContext& context);
         [[nodiscard]] std::size_t PendingCount() const noexcept { return m_Pending.size(); }
-        // tools/call is refused with -32000 while this many deferred calls are waiting.
+        // While this many deferred calls wait, state-changing tools/call requests are refused with
+        // -32000 before they run; read-only tools still run and are refused only if they would defer.
         static constexpr std::size_t kMaxPendingCalls = 16;
         void DropPending() noexcept { m_Pending.clear(); }
         void SetProgressInterval(std::chrono::milliseconds interval) noexcept { m_ProgressInterval = interval; }
@@ -76,6 +77,7 @@ export namespace Extrinsic::Runtime
             std::chrono::steady_clock::time_point Started{};
             std::chrono::steady_clock::time_point LastEmit{};
             double LastProgress{0.0};
+            bool NeedsPresentedFrame{false}; // fails with viewport_not_presentable while minimized
         };
         std::vector<PendingCall> m_Pending{};
         std::chrono::milliseconds m_ProgressInterval{250};

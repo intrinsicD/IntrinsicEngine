@@ -260,6 +260,45 @@ TEST(RuntimeEngineLayering, RunFrameAppliesJobCompletionsWithBoundedBudget)
               std::string::npos);
 }
 
+TEST(RuntimeEngineLayering, MinimizedFrameWorkKeepsTheFrameOrderAndExcludesTheFullFrame)
+{
+    const auto content = ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cpp");
+    const auto minimized = SliceBetween(content, "void Engine::RunMinimizedFrameWork(", "void Engine::RunFrame()");
+    const auto runFrame = SliceBetween(content, "void Engine::RunFrame()", "bool Engine::IsRunning() const noexcept");
+
+    // The two DrainCompletions sites are mutually exclusive: RunFrame returns right after the
+    // minimized path, so a frame never drains completions twice.
+    EXPECT_EQ(CountOccurrences(minimized, "m_Impl->m_JobService.DrainCompletions("), 1u);
+    EXPECT_NE(minimized.find("kJobCompletionApplyBudgetPerFrame"), std::string::npos);
+    const auto drain = minimized.find("m_Impl->m_CommandBus.Drain(");
+    const auto pumpA = minimized.find("m_Impl->m_KernelEvents.Pump()", drain);
+    const auto hooks = minimized.find("RunRuntimeModuleFrameHooks(FramePhase::Idle", pumpA);
+    const auto completions = minimized.find("m_Impl->m_JobService.DrainCompletions(", hooks);
+    const auto pumpB = minimized.find("m_Impl->m_KernelEvents.Pump()", completions);
+    const auto reap = minimized.find("m_Impl->m_JobService.ReapCompleted()", pumpB);
+    ASSERT_NE(drain, std::string::npos);
+    ASSERT_NE(pumpA, std::string::npos);
+    ASSERT_NE(hooks, std::string::npos);
+    ASSERT_NE(completions, std::string::npos);
+    ASSERT_NE(pumpB, std::string::npos);
+    ASSERT_NE(reap, std::string::npos);
+    EXPECT_LT(drain, pumpA);
+    EXPECT_LT(pumpA, hooks);
+    EXPECT_LT(hooks, completions);
+    EXPECT_LT(completions, pumpB);
+    EXPECT_LT(pumpB, reap);
+    // Nothing of the presented frame leaks into the minimized path.
+    for (const char* forbidden : {"RunFixedStepSimulationTicks", "ExtractAndSubmit", "BeginFrame(", "FramePhase::UiBuild"})
+        EXPECT_EQ(minimized.find(forbidden), std::string::npos) << forbidden;
+
+    const auto call = runFrame.find("RunMinimizedFrameWork(");
+    const auto callReturn = runFrame.find("return;", call);
+    const auto fixedStep = runFrame.find("RunFixedStepSimulationTicks(");
+    ASSERT_NE(call, std::string::npos);
+    EXPECT_LT(call, callReturn);
+    EXPECT_LT(callReturn, fixedStep) << "the minimized path returns before the full frame starts";
+}
+
 TEST(RuntimeEngineLayering, RunFrameStopsAfterPlatformCloseBeforeRenderer)
 {
     const auto content = ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.Engine.cpp");

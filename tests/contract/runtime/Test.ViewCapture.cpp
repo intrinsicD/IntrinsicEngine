@@ -90,7 +90,8 @@ TEST(ViewCapture, WritesCompleteFilesOrNothing)
     const auto blocked = dir / "blocker" / "shot.png";
     const auto error = R::WriteViewCaptureFile(blocked, bytes);
     ASSERT_TRUE(error.has_value());
-    EXPECT_FALSE(error->empty());
+    EXPECT_FALSE(error->Message.empty());
+    EXPECT_EQ(error->Kind, R::ViewCaptureFailure::None);
     EXPECT_FALSE(std::filesystem::exists(blocked));
     std::filesystem::remove_all(dir);
 }
@@ -102,14 +103,34 @@ TEST(ViewCapture, NoOverwriteKeepsAnExistingFile)
     const std::vector<std::uint8_t> first{1, 2, 3, 4};
     const std::vector<std::uint8_t> second{9, 9};
     ASSERT_FALSE(R::WriteViewCaptureFile(path, first, false).has_value()) << "a new file is written";
-    EXPECT_FALSE(std::filesystem::exists(path.string() + ".partial"));
     const auto refused = R::WriteViewCaptureFile(path, second, false);
     ASSERT_TRUE(refused.has_value());
-    EXPECT_NE(refused->find("already exists"), std::string::npos);
+    EXPECT_EQ(refused->Kind, R::ViewCaptureFailure::FileExists);
     EXPECT_EQ(std::filesystem::file_size(path), 4u) << "the existing file is untouched";
-    EXPECT_FALSE(std::filesystem::exists(path.string() + ".partial"));
     ASSERT_FALSE(R::WriteViewCaptureFile(path, second).has_value()) << "overwrite is the default";
     EXPECT_EQ(std::filesystem::file_size(path), 2u);
+    for (const auto& entry : std::filesystem::directory_iterator(dir))
+        EXPECT_EQ(entry.path().filename(), "shot.png") << "no temporary file is left behind";
+    std::filesystem::remove_all(dir);
+}
+
+TEST(ViewCapture, NoOverwriteTreatsDanglingSymlinksAsOccupiedAndLeavesUserFilesAlone)
+{
+    const auto dir = TempDir("intrinsic-capture-symlink");
+    const std::vector<std::uint8_t> bytes{1, 2, 3};
+    std::error_code ec;
+    std::filesystem::create_symlink(dir / "missing-target.png", dir / "link.png", ec);
+    ASSERT_FALSE(ec) << ec.message();
+    const auto refused = R::WriteViewCaptureFile(dir / "link.png", bytes, false);
+    ASSERT_TRUE(refused.has_value());
+    EXPECT_EQ(refused->Kind, R::ViewCaptureFailure::FileExists);
+    EXPECT_FALSE(std::filesystem::exists(dir / "missing-target.png")) << "the link target was not created";
+
+    // A user's file that looks like the old fixed temporary name is neither used nor removed.
+    { std::ofstream(dir / "shot.png.partial") << "mine"; }
+    ASSERT_FALSE(R::WriteViewCaptureFile(dir / "shot.png", bytes, false).has_value());
+    EXPECT_EQ(std::filesystem::file_size(dir / "shot.png.partial"), 4u);
+    EXPECT_EQ(std::filesystem::file_size(dir / "shot.png"), 3u);
     std::filesystem::remove_all(dir);
 }
 

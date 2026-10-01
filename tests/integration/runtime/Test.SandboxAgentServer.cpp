@@ -329,7 +329,13 @@ TEST(SandboxAgentServer, ProgressAndCancelOverTheSocket)
             std::this_thread::sleep_for(std::chrono::milliseconds(20));
         check(c.Connection.IsOpen(), "connect");
         check(c.Request("initialize", {{"protocolVersion", "2025-06-18"}, {"capabilities", Json::object()}}).contains("result"), "initialize");
-        check(c.Tool("scene_entities").contains("entities"), "scene_entities warms the workspace attachment");
+        // No warm-up: the first call of a session may be a feature preview (frames are prepared per call).
+        bool firstError = true;
+        c.Tool("config_apply", {{"section", "sandbox.coherent_point_drift"},
+            {"payload", {{"source", sourceId}, {"target", targetId}, {"output", 1}, {"outlier_weight", 0.0}}}}, &firstError);
+        check(!firstError, "first config_apply");
+        const auto firstPreview = c.Tool("preview_registration", {{"method", "cpd"}}, &firstError);
+        check(!firstError && firstPreview["enabled"] == true, "preview_registration as the first feature call: " + firstPreview.dump());
         const auto configure = [&](int iterations) {
             bool isError = true;
             const auto applied = c.Tool("config_apply", {{"section", "sandbox.coherent_point_drift"},

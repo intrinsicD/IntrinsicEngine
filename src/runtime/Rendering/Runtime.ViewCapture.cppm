@@ -55,6 +55,13 @@ export namespace Extrinsic::Runtime
         Failed,
     };
 
+    // Typed cause of a failed capture, for callers that must not parse Diagnostic text.
+    enum class ViewCaptureFailure : std::uint8_t
+    {
+        None = 0,
+        FileExists, // OutputPath exists and the request did not allow overwriting it
+    };
+
     struct ViewCaptureRequest
     {
         ViewCaptureRegion Region{ViewCaptureRegion::Viewport};
@@ -91,6 +98,13 @@ export namespace Extrinsic::Runtime
         ViewCapturePreset Preset{ViewCapturePreset::Current};
         std::optional<ViewCaptureLegend> Legend{};
         std::string Diagnostic{};
+        ViewCaptureFailure Failure{ViewCaptureFailure::None};
+    };
+
+    struct ViewCaptureWriteError
+    {
+        ViewCaptureFailure Kind{ViewCaptureFailure::None};
+        std::string Message{};
     };
 
     struct ViewCaptureImage
@@ -117,11 +131,12 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] ViewCaptureImage CropViewCaptureImage(const ViewCaptureImage& image, Core::Rect2D rect);
     // PNG bytes, or empty on failure (empty or inconsistent image).
     [[nodiscard]] std::vector<std::uint8_t> EncodeViewCapturePng(const ViewCaptureImage& image);
-    // Writes through a sibling temporary file and a rename, creating parent directories;
-    // returns a diagnostic on failure, after which no file (partial or temporary) remains.
-    // With overwrite=false an existing file is kept and reported ("already exists"); the
-    // check and the publish are one hard-link step, so a concurrent writer cannot be replaced.
-    [[nodiscard]] std::optional<std::string> WriteViewCaptureFile(
+    // Writes through a uniquely named sibling temporary file, creating parent directories;
+    // returns the failure, after which no temporary file remains. overwrite=true publishes
+    // with a rename. overwrite=false publishes with a hard link, which fails when anything
+    // (also a dangling symlink) occupies the path, so nothing is ever replaced: that case is
+    // reported as FileExists, and any other publish failure fails closed.
+    [[nodiscard]] std::optional<ViewCaptureWriteError> WriteViewCaptureFile(
         const std::filesystem::path& path, std::span<const std::uint8_t> bytes, bool overwrite = true);
     // <directory>/intrinsic-<YYYYmmdd-HHMMSS>-<ticket>.png in local time.
     [[nodiscard]] std::filesystem::path DefaultViewCapturePath(

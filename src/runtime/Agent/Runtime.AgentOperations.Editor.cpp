@@ -511,6 +511,7 @@ namespace Extrinsic::Runtime
         AgentOperationOutcome RunPointSampling(const AgentOperationContext& context, bool preview)
         {
             if (context.Attachment == nullptr || !context.Attachment->IsAttached()) return Fail(kNoWorkspace);
+            if (!PrepareSnapshot(context)) return Fail(kNoWorkspace); // prepares the session frame the feature frames read
             const auto commands = PrepareEditorRegistrationFrame(*context.Attachment).Commands;
             const auto config = GetEditorPointSamplingConfig(commands);
             if (!config) return Fail("The sandbox.point_sampling section is unavailable.");
@@ -543,6 +544,7 @@ namespace Extrinsic::Runtime
         AgentOperationOutcome RunKeypoints(const AgentOperationContext& context)
         {
             if(!context.Attachment || !context.Attachment->IsAttached())return Fail(kNoWorkspace);
+            if (!PrepareSnapshot(context)) return Fail(kNoWorkspace); // prepares the session frame the feature frames read
             const auto commands=PrepareEditorPointAnalysisFrame(*context.Attachment).Commands;
             auto done=std::make_shared<std::optional<EditorKeypointAnalysisResult>>();
             const auto json=[](const EditorKeypointAnalysisResult& r) {
@@ -571,6 +573,7 @@ namespace Extrinsic::Runtime
             for (unsigned i=1;i<=unsigned(GeometryElementDomain::PointCloudPoint);++i)
                 if(name&&*name==ToString(static_cast<GeometryElementDomain>(i)))domain=static_cast<GeometryElementDomain>(i);
             if(!entity||domain==GeometryElementDomain::Unknown)return Fail("Expected an entity ID and property domain.");
+            if (!PrepareSnapshot(context)) return Fail(kNoWorkspace); // prepares the session frame the feature frames read
             const auto frame=PrepareEditorPointCloudServiceFrame(*context.Attachment);
             const auto config=GetEditorClusteringConfig(frame.Commands);
             if(!config||!frame.ClusteringAvailable)return Fail("Clustering is unavailable.");
@@ -620,6 +623,7 @@ namespace Extrinsic::Runtime
                 if (domainName && *domainName == ToString(static_cast<GeometryElementDomain>(i)))
                     domain = static_cast<GeometryElementDomain>(i);
             if (!entity || domain == GeometryElementDomain::Unknown) return Fail("Expected an entity ID and a supported property domain.");
+            if (!PrepareSnapshot(context)) return Fail(kNoWorkspace); // prepares the session frame the feature frames read
             const auto frame = PrepareEditorPointCloudServiceFrame(*context.Attachment);
             const auto config = GetEditorPointCloudConsolidationConfig(frame.Commands);
             if (!config || !frame.PointCloudConsolidationAvailable) return Fail("Point-cloud consolidation is unavailable.");
@@ -681,6 +685,7 @@ namespace Extrinsic::Runtime
             const auto method = args ? String(*args, "method") : std::nullopt;
             if (!method || (*method != "icp" && *method != "cpd")) return Fail("Pass {\"method\": \"icp\" | \"cpd\"}.");
             if (context.Attachment == nullptr || !context.Attachment->IsAttached()) return Fail(kNoWorkspace);
+            if (!PrepareSnapshot(context)) return Fail(kNoWorkspace); // prepares the session frame the feature frames read
             const auto commands = PrepareEditorRegistrationFrame(*context.Attachment).Commands;
             if (*method == "icp")
             {
@@ -725,9 +730,10 @@ namespace Extrinsic::Runtime
     void RegisterEditorAgentOperations(AgentOperationRegistry& registry)
     {
         const auto add = [&](const char* name, const char* title, std::string description, std::string schema,
-                             bool readOnly, AgentOperationInvoker invoke) {
+                             bool readOnly, AgentOperationInvoker invoke, bool destructive = false, bool gpu = false) {
             (void)registry.Register({.Name = name, .Title = title, .Description = std::move(description),
-                                     .InputSchemaJson = std::move(schema), .ReadOnly = readOnly, .Invoke = std::move(invoke)});
+                                     .InputSchemaJson = std::move(schema), .ReadOnly = readOnly, .Destructive = destructive,
+                                     .NeedsPresentedFrame = gpu, .Invoke = std::move(invoke)});
         };
         const std::string none = Schema("{}");
         add("scene_entities", "Scene entities",
@@ -767,7 +773,8 @@ namespace Extrinsic::Runtime
         add("config_apply", "Apply config section",
             "Validate and apply a section payload to the running engine (same path as the panels; recorded as an agent change). "
             "The payload follows the section's schema from config_schema or config_get.",
-            Schema("{" + kSectionProperty + "," + kPayloadProperty + "}", R"(["section","payload"])"), false, ConfigApply);
+            Schema("{" + kSectionProperty + "," + kPayloadProperty + "}", R"(["section","payload"])"), false, ConfigApply,
+            true); // engine config is not part of the undo history
         add("jobs", "Jobs", "Background jobs with state, progress and elapsed time.", none, true, Jobs);
         add("log", "Engine log",
             "Recent engine log entries (warnings, errors, Vulkan validation messages).",
@@ -782,25 +789,27 @@ namespace Extrinsic::Runtime
         add("run_registration", "Run registration",
             "Register the configured source entity onto the target with ICP or Coherent Point Drift and publish the "
             "result (source transform, positions or a displacement property) as one undoable step; answers when done.",
-            registration, false, [](const AgentOperationContext& c, std::string_view a) { return RunRegistration(c, a, false); });
+            registration, false, [](const AgentOperationContext& c, std::string_view a) { return RunRegistration(c, a, false); },
+            false, true);
         add("preview_point_sampling", "Preview point sampling",
             "Whether the configured point sampling (sandbox.point_sampling) can run, and why not.", none, true,
             [](const AgentOperationContext& c, std::string_view) { return RunPointSampling(c, true); });
         add("run_point_sampling", "Run point sampling",
             "Order the configured entity's points with the chosen sampling method (sandbox.point_sampling; config_apply "
             "first) and publish rank/selection properties or a new point cloud as one undoable step.",
-            none, false, [](const AgentOperationContext& c, std::string_view) { return RunPointSampling(c, false); });
+            none, false, [](const AgentOperationContext& c, std::string_view) { return RunPointSampling(c, false); },
+            false, true);
         add("run_keypoint_analysis", "Run keypoint analysis",
             "Run sandbox.keypoint_analysis; GPU score and mask auto-accept in one undoable entry. Reports backend and IO.",
-            none, false, [](const AgentOperationContext& c,std::string_view){return RunKeypoints(c);});
+            none, false, [](const AgentOperationContext& c,std::string_view){return RunKeypoints(c);}, false, true);
         add("run_kmeans", "Run K-Means",
             "Cluster the configured point property (sandbox.clustering); GPU results auto-accept atomically. Reports backend and IO.",
             Schema(R"({"entity":{"type":"integer","minimum":1},"domain":{"type":"string"},"positions":{"type":"string"}})",
-                R"(["entity","domain"])") , false, RunKMeansOperation);
+                R"(["entity","domain"])") , false, RunKMeansOperation, false, true);
         add("run_point_cloud_consolidation", "Run point-cloud consolidation",
             "Consolidate the named vec3 point property using sandbox.point_cloud_consolidation; GPU runs auto-accept. Reports backend and IO.",
             Schema(R"({"entity":{"type":"integer","minimum":1},"domain":{"type":"string","enum":["MeshVertex","MeshEdge","MeshHalfedge","MeshFace","GraphNode","GraphHalfedge","GraphEdge","PointCloudPoint"]},"positions":{"type":"string","default":"v:position"}})",
-                   R"(["entity","domain"])") , false, RunConsolidation);
+                   R"(["entity","domain"])") , false, RunConsolidation, false, true);
         const std::string meshField = Schema(
             R"({"operation":{"type":"string","enum":)" + OperationEnum() +
                 R"(,"description":"Mesh-field operation; its settings come from the matching config section (config_apply first)."},)" +

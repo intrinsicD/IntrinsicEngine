@@ -34,6 +34,10 @@ namespace Extrinsic::Runtime
         if (readOnlySession && !spec->ReadOnly)
             return {.IsError = true,
                     .Text = "'" + spec->Name + "' changes the scene or files, but the Sandbox agent lane is read-only (--agent-readonly)."};
+        if (spec->NeedsPresentedFrame && !context.ViewportPresentable)
+            return {.IsError = true,
+                    .Text = "'" + spec->Name + "' needs a presented frame, but the Sandbox window is minimized; restore it and retry.",
+                    .ErrorCode = "viewport_not_presentable"};
         const ScopedEditorCommandLabelPrefix prefix{context.History, "Agent: "};
         return spec->Invoke(context, argumentsJson.empty() ? std::string_view{"{}"} : argumentsJson);
     }

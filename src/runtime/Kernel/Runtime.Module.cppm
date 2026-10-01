@@ -50,9 +50,13 @@ namespace Extrinsic::Runtime
         // Engine::RunFrame rather than relying on enum order.
         Simulation,
         // Runs only on minimized frames, which skip every other phase: after the command
-        // drain and event pump, before job completions are published. No simulation,
-        // extraction or rendering happens, so Idle hooks must not touch ImGui or the GPU.
-        // Opt-in; the engine skips the minimized-frame work when no Idle hook is registered.
+        // drain and event pump, before job completions are published and pumped. Opt-in; the
+        // engine skips the minimized-frame work when no Idle hook is registered.
+        // Invariants of an Idle frame: no simulation, extraction, render or GPU queue
+        // progress (so Idle hooks must not touch ImGui or wait on GPU work); no pre-render
+        // transform flush, so world matrices and bounds stay as of the last presented frame
+        // until restore; world maintenance is deferred; FrameIndex is frozen. With such a hook
+        // registered, every module's commands and job completions apply while minimized.
         Idle,
     };
     }

@@ -706,7 +706,10 @@ namespace Extrinsic::Runtime
             return;
         // Minimized: no simulation, extraction or render, but modules that opted
         // into FramePhase::Idle (the agent lane) keep being served. Same order as
-        // the full frame: drain, pump, hooks, completions, pump, reap.
+        // the full frame: drain, pump, hooks, completions, pump, reap. Mutually
+        // exclusive with the full frame (RunFrame returns after this), so
+        // DrainCompletions never runs twice per frame. No pre-render transform
+        // flush, world maintenance or frame-index advance happens here.
         m_Impl->m_CommandBus.Drain(*m_Impl->m_Scene,
                                    CommandDrainServices{
                                        .Events = &m_Impl->m_KernelEvents,

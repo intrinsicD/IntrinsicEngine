@@ -44,11 +44,20 @@ phase). The drain attaches its own editor workspace attachment on first use and 
 most `MaxCallsPerFrame` (default 4) messages per frame on the main thread, so calls are served
 while the window is minimized too. An Idle frame does only the command drain, event pump,
 Idle hooks, job completions, pump and reap: no simulation, extraction or rendering.
-Tools that need a presented frame (`view_screenshot`, `view_capture`) fail fast on a
-minimized frame with the error code `viewport_not_presentable`, also for a capture queued
-before the window was minimized (the capture itself still finishes later). A connection
-may have at most 16 deferred calls; `tools/call` beyond that gets `-32000 too many pending calls`
-before the tool runs. Responses go back through the socket thread; responses for a dropped client
+Idle frames also leave out the pre-render transform flush (world matrices and bounds stay as of
+the last presented frame until the window is restored), world maintenance and the frame-index
+advance, and with `--agent-socket` every module's queued commands and job completions apply while
+minimized. GPU work only progresses on presented frames, so tools that may dispatch it fail fast
+on a minimized frame with the error code `viewport_not_presentable`: `view_screenshot`,
+`view_capture`, `run_registration`, `run_point_sampling`, `run_keypoint_analysis`, `run_kmeans`
+and `run_point_cloud_consolidation` (`AgentOperationSpec::NeedsPresentedFrame`). A call of those
+tools that is already waiting when the window minimizes is answered with the same code instead of
+occupying a slot; its editor job or capture is not cancelled and can still finish after the
+window is restored (a capture may then still write its file, so check the path or pass
+`overwrite: true` when retrying). CPU-only tools, queries and the `preview_*` tools keep
+working. A connection may have at most 16 deferred calls; state-changing `tools/call` requests
+beyond that get `-32000 too many pending calls` before the tool runs, and read-only tools are served
+unless they would defer. Responses go back through the socket thread; responses for a dropped client
 are discarded. Nothing exists without the launch flag: no module, thread or socket.
 
 ## Protocol
@@ -75,11 +84,18 @@ are discarded. Nothing exists without the launch flag: no module, thread or sock
   (for example `file_exists`). Older revisions get the text content only.
 - There is no `outputSchema`: it is optional in the specification and the per-tool result
   shapes are still moving, so a schema now would be a promise the tools do not yet keep.
-- Annotations: `readOnlyHint` follows `ReadOnly`; `destructiveHint` is true only for a mutation
-  the undo history does not cover (`AgentOperationSpec::Destructive`, today `view_capture`,
-  which writes a file). `view_capture` refuses an existing `path` unless `overwrite: true`
-  (error code `file_exists`); the capture write repeats the check atomically, so a file
-  created between the call and the write is never replaced either.
+- Annotations: `readOnlyHint` follows `ReadOnly`. `destructiveHint` (`AgentOperationSpec::Destructive`)
+  is true for a mutation the undo history cannot restore and false for everything that records an
+  `Agent: ` history entry: today `view_capture` (writes a file) and `config_apply` (changes engine
+  configuration, which is not in the history). Mutating tools that edit the scene or its
+  properties (`import_file`, `show_property`, `run_*`) are undoable, `undo`/`redo` operate on
+  the history itself, and `select_entity` changes selection only, which is editor state, not scene
+  data. New tools classify themselves with this rule.
+- `view_capture` refuses an existing `path` unless `overwrite: true` (error code `file_exists`;
+  a dangling symlink counts as occupied). The capture write repeats the check atomically
+  with a hard link to a uniquely named temporary file, so a file created between the call and the
+  write is never replaced; a filesystem without hard links makes `overwrite: false` fail
+  closed instead of replacing.
 
 ## Operations and policy
 

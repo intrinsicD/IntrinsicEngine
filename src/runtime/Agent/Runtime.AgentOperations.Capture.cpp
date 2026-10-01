@@ -111,22 +111,32 @@ namespace Extrinsic::Runtime
             if (context.ViewCapture == nullptr) return Fail("Screenshots are not available in this Sandbox build.");
             if (auto reason = context.ViewCapture->UnavailableReason()) return Fail(std::move(*reason));
             request.KeepPng = returnImage;
+            std::string target = request.SaveToFile
+                ? (request.OutputPath.empty() ? "a timestamped file in " + (request.OutputDirectory.empty()
+                                                                                ? std::string("the screenshot directory")
+                                                                                : request.OutputDirectory)
+                                              : request.OutputPath)
+                : std::string{};
             const std::uint64_t ticket = context.ViewCapture->Request(std::move(request));
             AgentOperationOutcome outcome{};
-            outcome.Continuation = [ticket, returnImage](const AgentOperationContext& ctx, AgentOperationOutcome& out)
+            outcome.Continuation = [ticket, returnImage, target = std::move(target)](const AgentOperationContext& ctx, AgentOperationOutcome& out)
             {
                 if (ctx.ViewCapture == nullptr) { out = Fail("The capture service went away."); return true; }
                 const ViewCaptureStatus status = ctx.ViewCapture->Status(ticket);
                 if (status.State == ViewCaptureState::Queued || status.State == ViewCaptureState::Pending)
                 {
                     if (ctx.ViewportPresentable) return false;
-                    out = Fail("The Sandbox window was minimized before the capture finished.", "viewport_not_presentable");
+                    out = Fail("The Sandbox window was minimized before the capture finished." +
+                                   (target.empty() ? std::string{}
+                                                   : " It may still finish and write " + target +
+                                                         "; check that path before retrying, or pass overwrite: true."),
+                               "viewport_not_presentable");
                     return true;
                 }
                 if (status.State != ViewCaptureState::Completed)
                 {
                     out = Fail(status.Diagnostic.empty() ? "The capture was lost." : status.Diagnostic,
-                               status.Diagnostic.ends_with(" already exists") ? "file_exists" : "");
+                               status.Failure == ViewCaptureFailure::FileExists ? "file_exists" : "");
                     return true;
                 }
                 const bool inline_ = returnImage && !status.Png.empty() && status.Width <= kMaxInlineImageSide &&
@@ -223,7 +233,8 @@ namespace Extrinsic::Runtime
                 if (!args->Path.empty() && !args->Overwrite)
                 {
                     std::error_code exists;
-                    if (std::filesystem::exists(*resolved, exists))
+                    const auto occupied = std::filesystem::symlink_status(*resolved, exists); // dangling symlinks count
+                    if (!exists && occupied.type() != std::filesystem::file_type::not_found)
                         return Fail("'" + args->Path + "' already exists; pass overwrite: true to replace it.", "file_exists");
                 }
                 ViewCaptureRequest request{.Region = args->Region, .SaveToFile = true, .Overwrite = args->Overwrite, // also checked at write time
