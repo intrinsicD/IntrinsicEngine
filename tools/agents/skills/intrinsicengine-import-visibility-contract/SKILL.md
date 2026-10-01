@@ -1,6 +1,6 @@
 ---
 name: intrinsicengine-import-visibility-contract
-description: The checklist a new or changed asset import/materialization path in IntrinsicEngine must satisfy so that a "successful" import is actually visible AND selectable in the sandbox — render-critical component parity with the reference triangle (GeometrySources residency, RenderSurface, SelectableTag, VisualizationConfig, StableId), resolved corner-over-vertex normals (authored preserved, area-weighted fallback, never overwritten), resolved texcoords (authored or generated atlas UVs before first extraction), runtime-authored culling bounds plus one-shot camera focus for off-origin geometry, derived post-processing that never blocks the first upload or clobbers recomputed attributes, deferred generated-normal/texture bindings, and receipt/route/queue/completion logging so failures are never silent. Use this skill whenever adding or changing a mesh/point-cloud/graph import, drag-and-drop or file-backed materialization, progressive raw-model handoff, or post-import derived work; whenever an import "succeeds" but nothing renders or is pickable; or when normals/UVs are dropped, geometry is off-origin/culled/out-of-view, or a dropped file fails silently.
+description: The checklist a new or changed asset import/materialization path in IntrinsicEngine must satisfy so that a "successful" import is actually visible AND selectable in the sandbox — render-critical component parity with the reference triangle (GeometrySources residency, RenderSurface, SelectableTag, VisualizationConfig, StableId), resolved corner-over-vertex normals (authored preserved, area-weighted fallback, never overwritten), resolved texcoords (authored preserved at first extraction, missing UVs generated asynchronously), runtime-authored culling bounds plus one-shot camera focus for off-origin geometry, derived post-processing that never blocks the first upload or clobbers recomputed attributes, deferred generated-normal/texture bindings, and receipt/route/queue/completion logging so failures are never silent. Use this skill whenever adding or changing a mesh/point-cloud/graph import, drag-and-drop or file-backed materialization, progressive raw-model handoff, or post-import derived work; whenever an import "succeeds" but nothing renders or is pickable; or when normals/UVs are dropped, geometry is off-origin/culled/out-of-view, or a dropped file fails silently.
 ---
 
 # IntrinsicEngine Import Visibility Contract
@@ -57,10 +57,14 @@ overwrote recomputed normals), `BUG-047` (a normal texture overrode
 vertex-normal shading), `BUG-154` (OBJ normal identity fractured topology and
 made curvature unsupported).
 
-### 3. Resolved `v:texcoord` policy — authored UVs preserved, else generated atlas UVs before first extraction
+### 3. Resolved texcoord policy — authored UVs first, missing UVs generated asynchronously
 
-Authored UVs survive materialization with corner-over-vertex authority. Missing
-or invalid UVs go through the canonical validated atlas generator. Automatic
+Authored UVs survive first publication with corner-over-vertex authority. Direct
+mesh imports without texture coordinates queue the canonical validated atlas
+generator as a separate background task after geometry publication. Existing
+coordinates are never automatically regenerated; explicit regeneration owns
+that choice. Deferred UV publication updates only UV attributes, retaining
+topology, normals, and unrelated properties. Automatic
 import retains renderable, selectable geometry and normals when atlas generation
 fails quality admission, reports the missing UVs, and leaves texture baking
 unavailable until an accepted atlas exists. It must neither invent UVs nor drop

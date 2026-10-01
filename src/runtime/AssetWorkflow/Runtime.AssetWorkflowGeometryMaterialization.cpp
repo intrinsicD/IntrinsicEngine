@@ -971,7 +971,72 @@ BuildRuntimeHalfedgeMeshGeometryOnly(
           Core::ErrorCode::AssetInvalidData);
     }
   }
+  const auto sourceVertices = resolved->Mesh.VertexProperties().Get<std::uint32_t>(kSourceVertexProperty);
+  CopyVertexPropertyRemapped<glm::vec2>(Geometry::ConstPropertySet(meshPayload.Vertices),
+      resolved->Mesh.VertexProperties(), kTexcoordProperty, sourceVertices.Vector());
+  if (const auto corners = GatherAuthoredCornerTexcoords(
+          meshPayload, faces.Vector(), source->Mesh)) {
+    if (resolved->UsedDisconnectedFallback)
+      PublishVertexTexcoords(resolved->Mesh, corners->CornerUvs);
+    else if (!PublishCornerTexcoords(resolved->Mesh, source->Mesh, *corners))
+      return Core::Err<Geometry::HalfedgeMesh::Mesh>(Core::ErrorCode::AssetInvalidData);
+  }
   return std::move(resolved->Mesh);
+}
+
+Core::Expected<RuntimeMeshMaterializationResult>
+GenerateRuntimeMeshTexcoords(Geometry::HalfedgeMesh::Mesh mesh,
+    const Geometry::MeshIO::MeshIOResult& payload) {
+  RuntimeMeshMaterializationDiagnostics diagnostics{};
+  diagnostics.SourceVertexCount = diagnostics.ResolvedVertexCount = mesh.VerticesSize();
+  diagnostics.SourceFaceCount = diagnostics.ResolvedFaceCount = mesh.FacesSize();
+  if (mesh.VertexProperties().Exists(kTexcoordProperty) ||
+      mesh.HalfedgeProperties().Exists(kCornerTexcoordProperty)) {
+    diagnostics.TexcoordProvenance = RuntimeMeshResolvedUvProvenance::AuthoredPreserved;
+    diagnostics.ResolvedTexcoordsValid = HasValidTexcoords(mesh);
+    diagnostics.TexcoordsOnCornerDomain = mesh.HalfedgeProperties().Exists(kCornerTexcoordProperty);
+    return RuntimeMeshMaterializationResult{std::move(mesh), diagnostics};
+  }
+  const auto positions = payload.Vertices.Get<glm::vec3>(kPositionProperty);
+  const auto faces = payload.Faces.Get<std::vector<std::uint32_t>>(kFaceVerticesProperty);
+  if (!positions || !faces)
+    return Core::Err<RuntimeMeshMaterializationResult>(Core::ErrorCode::AssetInvalidData);
+  auto source = BuildTriangulatedSourceMesh(positions.Vector(), faces.Vector());
+  if (!source.has_value())
+    return Core::Err<RuntimeMeshMaterializationResult>(source.error());
+  // Atlas adjacency belongs to the original source, even when display topology
+  // needed the disconnected renderable fallback.
+  const auto xrefs = mesh.VertexProperties().Get<std::uint32_t>(kSourceVertexProperty);
+  if (!xrefs || xrefs.Vector().size() != mesh.VerticesSize())
+    return Core::Err<RuntimeMeshMaterializationResult>(Core::ErrorCode::AssetInvalidData);
+  bool disconnected = mesh.VerticesSize() != positions.Vector().size();
+  for (std::size_t i = 0; !disconnected && i < xrefs.Vector().size(); ++i)
+    disconnected = xrefs.Vector()[i] != i;
+  const Geometry::UvAtlas::UvAtlasInput input{
+      .Positions = positions.Vector(), .Faces = source->Mesh.Faces()};
+  const auto atlas = Geometry::UvAtlas::ResolveUvAtlas(
+      input, MakeUvAtlasOptions(RuntimeMeshUvResolutionOptions{}), nullptr);
+  diagnostics = MakeRuntimeDiagnostics(atlas,
+      Geometry::UvAtlas::UvAtlasStatus::EmptyInput,
+      positions.Vector().size(), faces.Vector().size());
+  diagnostics.ResolvedVertexCount = mesh.VerticesSize();
+  diagnostics.ResolvedFaceCount = mesh.FacesSize();
+  if (atlas.Succeeded()) {
+    if (const auto corners = GatherAtlasCornerTexcoords(atlas, source->Mesh)) {
+      diagnostics.UnmappedCornerCount = corners->UnmappedCornerCount;
+      if (disconnected)
+        PublishVertexTexcoords(mesh, corners->CornerUvs);
+      else if (corners->HasSeam)
+        diagnostics.TexcoordsOnCornerDomain = PublishCornerTexcoords(mesh, source->Mesh, *corners);
+      else
+        PublishVertexTexcoords(mesh, corners->VertexUvs);
+    }
+  }
+  diagnostics.ResolvedTexcoordsValid = HasValidTexcoords(mesh);
+  if (!diagnostics.ResolvedTexcoordsValid)
+    diagnostics.TexcoordProvenance = RuntimeMeshResolvedUvProvenance::None;
+  diagnostics.GpuSplitVertexCount = diagnostics.TexcoordsOnCornerDomain ? CountGpuSplitVertices(mesh) : 0u;
+  return RuntimeMeshMaterializationResult{std::move(mesh), diagnostics};
 }
 
 Core::Expected<Geometry::HalfedgeMesh::Mesh>

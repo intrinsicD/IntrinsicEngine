@@ -737,3 +737,25 @@ TEST(ECSGeometrySourcesPopulate, CloudToMeshRePopulationProducesMeshDomain)
     const auto view = GeometrySources::BuildConstView(raw, entity);
     EXPECT_EQ(view.ActiveDomain, GeometrySources::Domain::Mesh);
 }
+
+TEST(ECSGeometrySourcesPopulate, PreparedMeshPublishesOwnedBuffersWithoutRebuildingTopology)
+{
+    auto mesh = MakeQuadMesh();
+    auto prepared = GeometrySources::PrepareFromMesh(mesh);
+    const auto positions = prepared.VertexSource.Properties.Get<glm::vec3>(PropertyNames::kPosition);
+    const auto* positionData = positions.Vector().data();
+    const auto halfedges = prepared.HalfedgeSource.Properties.Get<std::uint32_t>(PropertyNames::kHalfedgeNext);
+    const auto* halfedgeData = halfedges.Vector().data();
+    mesh.Clear();
+
+    Registry scene;
+    const auto entity = scene.Create();
+    GeometrySources::PublishPreparedMesh(scene.Raw(), entity, std::move(prepared));
+    const auto view = GeometrySources::BuildConstView(scene.Raw(), entity);
+    ASSERT_NE(view.VertexSource, nullptr);
+    ASSERT_NE(view.HalfedgeSource, nullptr);
+    EXPECT_EQ(view.VertexSource->Properties.Get<glm::vec3>(PropertyNames::kPosition).Vector().data(), positionData);
+    EXPECT_EQ(view.HalfedgeSource->Properties.Get<std::uint32_t>(PropertyNames::kHalfedgeNext).Vector().data(), halfedgeData);
+    EXPECT_EQ(view.VertexSource->Properties.Size(), 4u);
+    EXPECT_EQ(view.FaceSource->Properties.Size(), 2u);
+}

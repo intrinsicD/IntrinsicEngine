@@ -6,6 +6,7 @@ module;
 #include <limits>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
@@ -54,19 +55,16 @@ namespace Extrinsic::ECS::Components::GeometrySources
         }
     }
 
-    void PopulateFromMesh(entt::registry& registry,
-                          entt::entity entity,
-                          Geometry::HalfedgeMesh::Mesh& mesh)
+    PreparedMeshSources PrepareFromMesh(Geometry::HalfedgeMesh::Mesh& mesh)
     {
-        ResetGeometrySourceComponents(registry, entity);
-
+        PreparedMeshSources sources;
         const std::size_t vSize = mesh.VerticesSize();
         const std::size_t eSize = mesh.EdgesSize();
         const std::size_t hSize = mesh.HalfedgesSize();
         const std::size_t fSize = mesh.FacesSize();
 
         // ---- Vertices -------------------------------------------------------
-        auto& vComp = registry.emplace_or_replace<Vertices>(entity);
+        auto& vComp = sources.VertexSource;
         vComp.Properties = mesh.VertexProperties();
         vComp.NumDeleted = vSize - mesh.VertexCount();
 
@@ -83,7 +81,7 @@ namespace Extrinsic::ECS::Components::GeometrySources
         }
 
         // ---- Edges ----------------------------------------------------------
-        auto& eComp = registry.emplace_or_replace<Edges>(entity);
+        auto& eComp = sources.EdgeSource;
         eComp.Properties = mesh.EdgeProperties();
         eComp.NumDeleted = eSize - mesh.EdgeCount();
 
@@ -107,7 +105,7 @@ namespace Extrinsic::ECS::Components::GeometrySources
         }
 
         // ---- Halfedges ------------------------------------------------------
-        auto& hComp = registry.emplace_or_replace<Halfedges>(entity);
+        auto& hComp = sources.HalfedgeSource;
         hComp.Properties = mesh.HalfedgeProperties();
 
         {
@@ -138,7 +136,7 @@ namespace Extrinsic::ECS::Components::GeometrySources
         }
 
         // ---- Faces ----------------------------------------------------------
-        auto& fComp = registry.emplace_or_replace<Faces>(entity);
+        auto& fComp = sources.FaceSource;
         fComp.Properties = mesh.FaceProperties();
         fComp.NumDeleted = fSize - mesh.FaceCount();
 
@@ -157,6 +155,23 @@ namespace Extrinsic::ECS::Components::GeometrySources
                     : kInvalidIndex;
             }
         }
+        return sources;
+    }
+
+    void PublishPreparedMesh(entt::registry& registry, entt::entity entity,
+                             PreparedMeshSources sources)
+    {
+        ResetGeometrySourceComponents(registry, entity);
+        registry.emplace_or_replace<Vertices>(entity, std::move(sources.VertexSource));
+        registry.emplace_or_replace<Edges>(entity, std::move(sources.EdgeSource));
+        registry.emplace_or_replace<Halfedges>(entity, std::move(sources.HalfedgeSource));
+        registry.emplace_or_replace<Faces>(entity, std::move(sources.FaceSource));
+    }
+
+    void PopulateFromMesh(entt::registry& registry, entt::entity entity,
+                          Geometry::HalfedgeMesh::Mesh& mesh)
+    {
+        PublishPreparedMesh(registry, entity, PrepareFromMesh(mesh));
     }
 
     void PopulateFromGraph(entt::registry& registry,

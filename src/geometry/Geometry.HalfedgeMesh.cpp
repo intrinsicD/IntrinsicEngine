@@ -786,10 +786,16 @@ namespace Geometry::HalfedgeMesh
 
     void Mesh::Reserve(std::size_t nVertices, std::size_t nEdges, std::size_t nFaces)
     {
-        m_Vertices.Registry().Reserve(nVertices);
-        m_Halfedges.Registry().Reserve(2 * nEdges);
-        m_Edges.Registry().Reserve(nEdges);
-        m_Faces.Registry().Reserve(nFaces);
+        // Registry::Reserve reserves named-property slots, not mesh elements.
+        // Construction grows these built-in arrays before derived attributes exist.
+        m_VPoint.Vector().reserve(nVertices);
+        m_VConn.Vector().reserve(nVertices);
+        m_VDeleted.Vector().reserve(nVertices);
+        m_HConn.Vector().reserve(2 * nEdges);
+        m_HFace.Vector().reserve(2 * nEdges);
+        m_EDeleted.Vector().reserve(nEdges);
+        m_FConn.Vector().reserve(nFaces);
+        m_FDeleted.Vector().reserve(nFaces);
     }
 
     VertexHandle Mesh::NewVertex()

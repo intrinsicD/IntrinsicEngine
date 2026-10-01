@@ -182,25 +182,26 @@ Successful scene-changing import completion uses
 advances document revision/dirty state but deliberately creates no undo entry.
 Entity creation, automatic authoring, and post-import enrichment are one import
 lifecycle rather than editor-authored mutations. Deferred direct-mesh
-enrichment captures an exact signature over the active mesh domain and topology
-markers, every vertex/edge/halfedge/face property descriptor and value, deleted
-counts, and vertex-channel binding generation and property references. Its
+UV enrichment uses property revision signatures, topology identity and channel
+bindings to validate its inputs. A revision change triggers a geometry comparison,
+so relocating components or editing unrelated properties does not discard valid
+UV results. Existing UVs skip atlas generation. Its
 world-scoped `JobService` completion applies only when the entity is still live,
 the asset-workflow binding epoch still names the same active world and scene,
-the entity-sidecar job token still matches, and that signature is unchanged.
+the entity-sidecar job token still matches, and its geometry and UV inputs remain current.
 Apply and unpublished finalization resolve the scene through `WorldRegistry`
 at callback time instead of retaining a scene reference across worker
 execution. World switches, document replacement, destroyed worlds, recycled
-entities, and signature mismatches therefore terminate without targeting
+entities, and changed geometry or UV inputs therefore terminate without targeting
 retired storage or writing ECS, history, or selection state. The selected-entity
 processing model exposes the sidecar's pending or terminal status and nonempty
-reason, and pending enrichment removes all geometry-mutating actions until the
-job resolves. The staged workflow preserves this validation, lifetime, and
-readiness contract.
+reason. Pending UV work leaves geometry actions available under their own
+input validation; only UV-dependent actions wait for usable coordinates.
 Before geometry payload population, the workflow applies the recipe's
 `ImportAuthoringRecipe`; the default recipe attaches the current selectable,
 render-lane, and visualization authoring state. The named postprocess stage
-prepares direct-mesh normals and UVs and routes generated property textures only
+generates only missing direct-mesh UVs after geometry and normals are published,
+and routes generated property textures only
 through `TextureBakeService`. Completion applies the recipe's selection and
 focus choices exactly once after all created entities and their aggregate bounds
 are known. Optional `SelectionController` and `CameraControllerRegistry`

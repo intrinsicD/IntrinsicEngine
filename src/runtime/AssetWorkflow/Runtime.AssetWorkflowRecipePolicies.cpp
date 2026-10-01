@@ -54,13 +54,15 @@ namespace Extrinsic::Runtime
         struct DirectMeshPostProcessState
         {
             std::string Path{};
-            Geometry::MeshIO::MeshIOResult Payload{};
+            Geometry::HalfedgeMesh::Mesh Mesh{};
+            std::shared_ptr<const Geometry::MeshIO::MeshIOResult> Payload{};
             ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
             JobToken Job{};
             WorldRegistry* Worlds{};
             WorldHandle World{};
             std::function<bool()> BindingValid{};
             std::uint64_t SubmittedSignature{0u};
+            std::uint64_t SubmittedBindingSignature{0u};
             Core::ErrorCode Error{Core::ErrorCode::Success};
             std::optional<RuntimeMeshMaterializationResult> Materialized{};
         };
@@ -106,111 +108,6 @@ namespace Extrinsic::Runtime
             }
         }
 
-        template <typename TValue>
-        void MixDirectMeshPropertyValue(
-            std::uint64_t& signature,
-            const TValue& value) noexcept
-        {
-            if constexpr (std::is_same_v<TValue, bool>)
-            {
-                MixDirectMeshSignature(signature, value ? 1u : 0u);
-            }
-            else if constexpr (std::is_same_v<TValue, std::int32_t>)
-            {
-                MixDirectMeshSignature(
-                    signature,
-                    std::bit_cast<std::uint32_t>(value));
-            }
-            else if constexpr (
-                std::is_same_v<TValue, std::uint32_t> ||
-                std::is_same_v<TValue, std::uint64_t>)
-            {
-                MixDirectMeshSignature(signature, value);
-            }
-            else if constexpr (std::is_same_v<TValue, float>)
-            {
-                MixDirectMeshSignature(
-                    signature,
-                    std::bit_cast<std::uint32_t>(value));
-            }
-            else if constexpr (std::is_same_v<TValue, double>)
-            {
-                MixDirectMeshSignature(
-                    signature,
-                    std::bit_cast<std::uint64_t>(value));
-            }
-            else if constexpr (std::is_same_v<TValue, glm::vec2>)
-            {
-                MixDirectMeshPropertyValue(signature, value.x);
-                MixDirectMeshPropertyValue(signature, value.y);
-            }
-            else if constexpr (std::is_same_v<TValue, glm::vec3>)
-            {
-                MixDirectMeshPropertyValue(signature, value.x);
-                MixDirectMeshPropertyValue(signature, value.y);
-                MixDirectMeshPropertyValue(signature, value.z);
-            }
-            else if constexpr (std::is_same_v<TValue, glm::vec4>)
-            {
-                MixDirectMeshPropertyValue(signature, value.x);
-                MixDirectMeshPropertyValue(signature, value.y);
-                MixDirectMeshPropertyValue(signature, value.z);
-                MixDirectMeshPropertyValue(signature, value.w);
-            }
-            else if constexpr (std::is_same_v<
-                                   TValue,
-                                   Geometry::HalfedgeMesh::VertexConnectivity>)
-            {
-                MixDirectMeshSignature(signature, value.Halfedge.Index);
-            }
-            else if constexpr (std::is_same_v<
-                                   TValue,
-                                   Geometry::HalfedgeMesh::HalfedgeConnectivity>)
-            {
-                MixDirectMeshSignature(signature, value.Vertex.Index);
-                MixDirectMeshSignature(signature, value.Next.Index);
-                MixDirectMeshSignature(signature, value.Prev.Index);
-            }
-            else if constexpr (std::is_same_v<
-                                   TValue,
-                                   Geometry::HalfedgeMesh::HalfedgeFaceConnectivity>)
-            {
-                MixDirectMeshSignature(signature, value.Face.Index);
-            }
-            else if constexpr (std::is_same_v<
-                                   TValue,
-                                   Geometry::HalfedgeMesh::FaceConnectivity>)
-            {
-                MixDirectMeshSignature(signature, value.Halfedge.Index);
-            }
-        }
-
-        template <typename TValue>
-        [[nodiscard]] bool AppendDirectMeshTypedPropertySignature(
-            std::uint64_t& signature,
-            const Geometry::PropertySet& properties,
-            const Geometry::PropertyDescriptor& descriptor)
-        {
-            const auto property = properties.Get<TValue>(descriptor.Name);
-            if (!property ||
-                property.Vector().size() != descriptor.ElementCount)
-            {
-                return false;
-            }
-
-            if constexpr (std::is_same_v<TValue, bool>)
-            {
-                for (const bool value : property.Vector())
-                    MixDirectMeshPropertyValue(signature, value);
-            }
-            else
-            {
-                for (const TValue& value : property.Vector())
-                    MixDirectMeshPropertyValue(signature, value);
-            }
-            return true;
-        }
-
         [[nodiscard]] bool AppendDirectMeshPropertySetSignature(
             std::uint64_t& signature,
             const std::uint64_t domainTag,
@@ -249,81 +146,8 @@ namespace Extrinsic::Runtime
                     signature,
                     static_cast<std::uint64_t>(descriptor.ElementCount));
 
-                bool appended = false;
-                switch (descriptor.ValueKind)
-                {
-                case Geometry::PropertyValueKind::Bool:
-                    appended = AppendDirectMeshTypedPropertySignature<bool>(
-                        signature, *properties, descriptor);
-                    break;
-                case Geometry::PropertyValueKind::Int32:
-                    appended =
-                        AppendDirectMeshTypedPropertySignature<std::int32_t>(
-                            signature, *properties, descriptor);
-                    break;
-                case Geometry::PropertyValueKind::UInt32:
-                    appended =
-                        AppendDirectMeshTypedPropertySignature<std::uint32_t>(
-                            signature, *properties, descriptor);
-                    break;
-                case Geometry::PropertyValueKind::UInt64:
-                    appended =
-                        AppendDirectMeshTypedPropertySignature<std::uint64_t>(
-                            signature, *properties, descriptor);
-                    break;
-                case Geometry::PropertyValueKind::Float:
-                    appended = AppendDirectMeshTypedPropertySignature<float>(
-                        signature, *properties, descriptor);
-                    break;
-                case Geometry::PropertyValueKind::Double:
-                    appended = AppendDirectMeshTypedPropertySignature<double>(
-                        signature, *properties, descriptor);
-                    break;
-                case Geometry::PropertyValueKind::Vec2:
-                    appended = AppendDirectMeshTypedPropertySignature<glm::vec2>(
-                        signature, *properties, descriptor);
-                    break;
-                case Geometry::PropertyValueKind::Vec3:
-                    appended = AppendDirectMeshTypedPropertySignature<glm::vec3>(
-                        signature, *properties, descriptor);
-                    break;
-                case Geometry::PropertyValueKind::Vec4:
-                    appended = AppendDirectMeshTypedPropertySignature<glm::vec4>(
-                        signature, *properties, descriptor);
-                    break;
-                case Geometry::PropertyValueKind::Unknown:
-                    if (descriptor.Name == "v:connectivity")
-                    {
-                        appended = AppendDirectMeshTypedPropertySignature<
-                            Geometry::HalfedgeMesh::VertexConnectivity>(
-                                signature, *properties, descriptor);
-                    }
-                    else if (descriptor.Name == "h:connectivity")
-                    {
-                        appended = AppendDirectMeshTypedPropertySignature<
-                            Geometry::HalfedgeMesh::HalfedgeConnectivity>(
-                                signature, *properties, descriptor);
-                    }
-                    else if (descriptor.Name == "h:face")
-                    {
-                        appended = AppendDirectMeshTypedPropertySignature<
-                            Geometry::HalfedgeMesh::HalfedgeFaceConnectivity>(
-                                signature, *properties, descriptor);
-                    }
-                    else if (descriptor.Name == "f:connectivity")
-                    {
-                        appended = AppendDirectMeshTypedPropertySignature<
-                            Geometry::HalfedgeMesh::FaceConnectivity>(
-                                signature, *properties, descriptor);
-                    }
-                    else
-                    {
-                        return false;
-                    }
-                    break;
-                }
-                if (!appended)
-                    return false;
+                MixDirectMeshSignature(signature, descriptor.ContentRevision);
+                MixDirectMeshSignature(signature, descriptor.Id);
             }
             return true;
         }
@@ -339,6 +163,91 @@ namespace Extrinsic::Runtime
             MixDirectMeshSignature(
                 signature,
                 static_cast<std::uint64_t>(property.ValueKind));
+        }
+
+        std::uint64_t CaptureDirectMeshBindingSignature(const entt::registry& raw,
+            ECS::EntityHandle entity)
+        {
+            std::uint64_t signature = kDirectMeshSignatureOffset;
+            if (const auto* bindings =
+                    raw.try_get<VertexChannelBindingSet>(entity))
+            {
+                MixDirectMeshSignature(signature, 1u);
+                MixDirectMeshSignature(
+                    signature,
+                    bindings->BindingGeneration);
+                MixDirectMeshSignature(
+                    signature,
+                    bindings->Normal.Enabled ? 1u : 0u);
+                AppendDirectMeshPropertyRefSignature(
+                    signature,
+                    bindings->Normal.Property);
+                MixDirectMeshSignature(
+                    signature,
+                    bindings->Color.Enabled ? 1u : 0u);
+                AppendDirectMeshPropertyRefSignature(
+                    signature,
+                    bindings->Color.Property);
+            }
+            else
+            {
+                MixDirectMeshSignature(signature, 0u);
+            }
+
+            return signature;
+        }
+
+        bool MatchesDirectMeshGeometry(const entt::registry& raw, ECS::EntityHandle entity,
+            const Geometry::HalfedgeMesh::Mesh& mesh)
+        {
+            namespace GS = ECS::Components::GeometrySources;
+            const auto view = GS::BuildConstView(raw, entity);
+            if (view.ActiveDomain != GS::Domain::Mesh || !view.VertexSource ||
+                !view.EdgeSource || !view.HalfedgeSource || !view.FaceSource ||
+                view.VertexSource->Properties.Size() != mesh.VerticesSize() ||
+                view.EdgeSource->Properties.Size() != mesh.EdgesSize() ||
+                view.HalfedgeSource->Properties.Size() != mesh.HalfedgesSize() ||
+                view.FaceSource->Properties.Size() != mesh.FacesSize() ||
+                view.VertexSource->NumDeleted || view.EdgeSource->NumDeleted || view.FaceSource->NumDeleted)
+                return false;
+            const auto& vertices = view.VertexSource->Properties;
+            const auto& edges = view.EdgeSource->Properties;
+            const auto& halfedges = view.HalfedgeSource->Properties;
+            const auto& faces = view.FaceSource->Properties;
+            if (vertices.Exists("v:texcoord") || halfedges.Exists("h:texcoord")) return false;
+            const auto positions = vertices.Get<glm::vec3>("v:position");
+            const auto v0 = edges.Get<std::uint32_t>("e:v0");
+            const auto v1 = edges.Get<std::uint32_t>("e:v1");
+            const auto to = halfedges.Get<std::uint32_t>("h:to_vertex");
+            const auto next = halfedges.Get<std::uint32_t>("h:next");
+            const auto face = halfedges.Get<std::uint32_t>("h:face");
+            const auto first = faces.Get<std::uint32_t>("f:halfedge");
+            if (!positions || !v0 || !v1 || !to || !next || !face || !first ||
+                positions.Vector().size() != mesh.VerticesSize() ||
+                v0.Vector().size() != mesh.EdgesSize() || v1.Vector().size() != mesh.EdgesSize() ||
+                to.Vector().size() != mesh.HalfedgesSize() || next.Vector().size() != mesh.HalfedgesSize() ||
+                face.Vector().size() != mesh.HalfedgesSize() || first.Vector().size() != mesh.FacesSize()) return false;
+            for (const auto* properties : {&vertices, &edges, &faces})
+                for (const auto* name : {"v:deleted", "e:deleted", "f:deleted"})
+                    if (const auto deleted = properties->Get<bool>(name))
+                        for (const bool value : deleted.Vector())
+                            if (value) return false;
+            for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+                if (positions.Vector()[i] != mesh.Position(Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(i)})) return false;
+            for (std::size_t i = 0; i < mesh.EdgesSize(); ++i)
+            {
+                const auto h = mesh.Halfedge(Geometry::EdgeHandle{static_cast<Geometry::PropertyIndex>(i)}, 0);
+                if (v0.Vector()[i] != mesh.FromVertex(h).Index || v1.Vector()[i] != mesh.ToVertex(h).Index) return false;
+            }
+            for (std::size_t i = 0; i < mesh.HalfedgesSize(); ++i)
+            {
+                const Geometry::HalfedgeHandle h{static_cast<Geometry::PropertyIndex>(i)};
+                if (to.Vector()[i] != mesh.ToVertex(h).Index || next.Vector()[i] != mesh.NextHalfedge(h).Index ||
+                    face.Vector()[i] != mesh.Face(h).Index) return false;
+            }
+            for (std::size_t i = 0; i < mesh.FacesSize(); ++i)
+                if (first.Vector()[i] != mesh.Halfedge(Geometry::FaceHandle{static_cast<Geometry::PropertyIndex>(i)}).Index) return false;
+            return true;
         }
 
         [[nodiscard]] std::optional<std::uint64_t>
@@ -400,30 +309,7 @@ namespace Extrinsic::Runtime
                 return std::nullopt;
             }
 
-            if (const auto* bindings =
-                    raw.try_get<VertexChannelBindingSet>(entity))
-            {
-                MixDirectMeshSignature(signature, 1u);
-                MixDirectMeshSignature(
-                    signature,
-                    bindings->BindingGeneration);
-                MixDirectMeshSignature(
-                    signature,
-                    bindings->Normal.Enabled ? 1u : 0u);
-                AppendDirectMeshPropertyRefSignature(
-                    signature,
-                    bindings->Normal.Property);
-                MixDirectMeshSignature(
-                    signature,
-                    bindings->Color.Enabled ? 1u : 0u);
-                AppendDirectMeshPropertyRefSignature(
-                    signature,
-                    bindings->Color.Property);
-            }
-            else
-            {
-                MixDirectMeshSignature(signature, 0u);
-            }
+            MixDirectMeshSignature(signature, CaptureDirectMeshBindingSignature(raw, entity));
 
             return signature;
         }
@@ -811,6 +697,25 @@ namespace Extrinsic::Runtime
             }
         }
 
+        void RequestDirectMeshNormalBake(JobService* jobs, WorldRegistry* worlds,
+            WorldHandle world, const std::function<bool()>& bindingValid,
+            ECS::Scene::Registry& scene, TextureBakeService* textureBake,
+            ECS::EntityHandle entity, const std::string& path,
+            std::uint32_t width = 0u, std::uint32_t height = 0u)
+        {
+            if (textureBake == nullptr) return;
+            ConfigureDirectMeshNormalPresentationTarget(scene, entity, "generated-normal");
+            const auto result = textureBake->Bake(
+                BuildDirectMeshNormalBakeRequest(entity, world, width, height));
+            if (result.Status == PropertyTextureBakeStatus::NonOperationalBackend)
+                DeferDirectMeshNormalBakeUntilOperational(*jobs, worlds, world,
+                    bindingValid, *textureBake, entity, width, height, path);
+            else if (!result.Succeeded())
+                Core::Log::Warn(
+                    "[Runtime] Direct mesh normal texture bake request failed: path='{}' status={} diagnostic='{}'",
+                    path, DebugNameForPropertyTextureBakeStatus(result.Status), result.Diagnostic);
+        }
+
         void QueueDirectMeshPostProcess(
             JobService* jobs,
             WorldRegistry* worlds,
@@ -819,7 +724,8 @@ namespace Extrinsic::Runtime
             ECS::Scene::Registry& scene,
             TextureBakeService* textureBake,
             std::string meshPath,
-            const Geometry::MeshIO::MeshIOResult& meshPayload,
+            Geometry::HalfedgeMesh::Mesh mesh,
+            std::shared_ptr<const Geometry::MeshIO::MeshIOResult> payload,
             const ECS::EntityHandle entity)
         {
             if (jobs == nullptr ||
@@ -832,9 +738,20 @@ namespace Extrinsic::Runtime
                 return;
             }
 
+            // Presence is authoritative: importing must never silently regenerate
+            // authored coordinates, including tiled or quality-rejected UVs.
+            if (mesh.VertexProperties().Exists("v:texcoord") ||
+                mesh.HalfedgeProperties().Exists("h:texcoord"))
+            {
+                RequestDirectMeshNormalBake(jobs, worlds, world, bindingValid,
+                    scene, textureBake, entity, meshPath);
+                return;
+            }
+
             auto state = std::make_shared<DirectMeshPostProcessState>();
             state->Path = std::move(meshPath);
-            state->Payload = meshPayload;
+            state->Mesh = std::move(mesh);
+            state->Payload = std::move(payload);
             state->Entity = entity;
             state->Worlds = worlds;
             state->World = world;
@@ -862,6 +779,7 @@ namespace Extrinsic::Runtime
             }
 
             state->SubmittedSignature = *submittedSignature;
+            state->SubmittedBindingSignature = CaptureDirectMeshBindingSignature(raw, entity);
             raw.emplace_or_replace<AssetImportMeshEnrichmentState>(
                 entity,
                 AssetImportMeshEnrichmentState{
@@ -883,15 +801,7 @@ namespace Extrinsic::Runtime
                     .Work =
                         [state](const JobCancellation&)
                         {
-                            auto materialized =
-                                BuildRuntimeHalfedgeMeshMaterialization(
-                                    state->Payload,
-                                    RuntimeMeshMaterializationOptions{
-                                        .AllowDisconnectedRenderableFallback =
-                                            true,
-                                        .UvResolution = {
-                                            .FailurePolicy = RuntimeMeshUvFailurePolicy::Optional},
-                                    });
+                            auto materialized = GenerateRuntimeMeshTexcoords(std::move(state->Mesh), *state->Payload);
                             if (materialized.has_value())
                             {
                                 state->Materialized = std::move(*materialized);
@@ -938,15 +848,25 @@ namespace Extrinsic::Runtime
                                 return JobApplyValidation::StaleGeneration;
                             }
 
+                            if (state->Error != Core::ErrorCode::Success)
+                                return JobApplyValidation::Current;
+
                             const std::optional<std::uint64_t>
                                 currentSignature =
                                     CaptureDirectMeshGenerationSignature(
                                         scene->Raw(),
                                         state->Entity);
-                            if (!currentSignature.has_value() ||
-                                *currentSignature != state->SubmittedSignature)
-                            {
+                            if (!currentSignature.has_value())
                                 return JobApplyValidation::StaleGeneration;
+                            if (*currentSignature != state->SubmittedSignature)
+                            {
+                                // EnTT relocation and mutable reads may advance revisions
+                                // without changing geometry. Only that uncommon case needs
+                                // a content comparison; UV apply never replaces other attributes.
+                                if (CaptureDirectMeshBindingSignature(scene->Raw(), state->Entity) !=
+                                        state->SubmittedBindingSignature || !state->Materialized ||
+                                    !MatchesDirectMeshGeometry(scene->Raw(), state->Entity, state->Materialized->Mesh))
+                                    return JobApplyValidation::StaleGeneration;
                             }
                             return JobApplyValidation::Current;
                         },
@@ -1003,12 +923,16 @@ namespace Extrinsic::Runtime
                             const RuntimeMeshMaterializationDiagnostics&
                                 meshDiagnostics =
                                     state->Materialized->Diagnostics;
-                            Geometry::HalfedgeMesh::Mesh mesh =
-                                std::move(state->Materialized->Mesh);
-                            ECS::Components::GeometrySources::PopulateFromMesh(
-                                raw,
-                                state->Entity,
-                                mesh);
+                            auto& mesh = state->Materialized->Mesh;
+                            namespace GS = ECS::Components::GeometrySources;
+                            // Publish only UVs. Topology, normals, and unrelated current
+                            // properties retain their storage and revisions.
+                            if (auto uv = mesh.HalfedgeProperties().Get<glm::vec2>("h:texcoord"))
+                                raw.get<GS::Halfedges>(state->Entity).Properties
+                                    .GetOrAdd<glm::vec2>("h:texcoord").Vector() = std::move(uv.Vector());
+                            else if (auto uv = mesh.VertexProperties().Get<glm::vec2>("v:texcoord"))
+                                raw.get<GS::Vertices>(state->Entity).Properties
+                                    .GetOrAdd<glm::vec2>("v:texcoord").Vector() = std::move(uv.Vector());
                             // Only a generated atlas has an extent; authored
                             // UVs clear any record and use the bake default.
                             const bool generatedAtlas =
@@ -1047,44 +971,10 @@ namespace Extrinsic::Runtime
                                 meshDiagnostics.AtlasBackendName,
                                 meshDiagnostics.GpuSplitVertexCount);
 
-                            if (textureBake != nullptr)
-                            {
-                                ConfigureDirectMeshNormalPresentationTarget(
-                                    *scene,
-                                    state->Entity,
-                                    "generated-normal");
-                                const PropertyTextureBakeResult result =
-                                    textureBake->Bake(
-                                        BuildDirectMeshNormalBakeRequest(
-                                            state->Entity,
-                                            state->World,
-                                            meshDiagnostics.AtlasWidth,
-                                            meshDiagnostics.AtlasHeight));
-                                if (result.Status ==
-                                    PropertyTextureBakeStatus::
-                                        NonOperationalBackend)
-                                {
-                                    DeferDirectMeshNormalBakeUntilOperational(
-                                        *jobs,
-                                        state->Worlds,
-                                        state->World,
-                                        state->BindingValid,
-                                        *textureBake,
-                                        state->Entity,
-                                        meshDiagnostics.AtlasWidth,
-                                        meshDiagnostics.AtlasHeight,
-                                        state->Path);
-                                }
-                                else if (!result.Succeeded())
-                                {
-                                    Core::Log::Warn(
-                                        "[Runtime] Direct mesh normal texture bake request failed: path='{}' status={} diagnostic='{}'",
-                                        state->Path,
-                                        DebugNameForPropertyTextureBakeStatus(
-                                            result.Status),
-                                        result.Diagnostic);
-                                }
-                            }
+                            if (meshDiagnostics.ResolvedTexcoordsValid)
+                                RequestDirectMeshNormalBake(jobs, state->Worlds, state->World,
+                                    state->BindingValid, *scene, textureBake, state->Entity,
+                                    state->Path, meshDiagnostics.AtlasWidth, meshDiagnostics.AtlasHeight);
                             return true;
                         },
                     .FinalizeUnpublishedOnMainThread =
@@ -1264,7 +1154,8 @@ namespace Extrinsic::Runtime
         ECS::Scene::Registry& scene,
         TextureBakeService* const textureBake,
         std::string path,
-        const Geometry::MeshIO::MeshIOResult& payload,
+        Geometry::HalfedgeMesh::Mesh mesh,
+        std::shared_ptr<const Geometry::MeshIO::MeshIOResult> payload,
         const ECS::EntityHandle entity)
     {
         if (jobs == nullptr || worlds == nullptr || !bindingValid)
@@ -1277,7 +1168,8 @@ namespace Extrinsic::Runtime
             scene,
             textureBake,
             std::move(path),
-            payload,
+            std::move(mesh),
+            std::move(payload),
             entity);
     }
 }

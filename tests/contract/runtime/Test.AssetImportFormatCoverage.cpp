@@ -1659,7 +1659,19 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesVertexNormalsInGe
     ExpectMeshLacksVertexProperty(*engine.Worlds().Get(engine.ActiveWorld()), *meshEntity, "v:texcoord");
     EXPECT_FALSE(HasGeneratedNormalTextureBinding(engine, *meshEntity));
 
+    const auto before = GS::BuildConstView(engine.Worlds().Get(engine.ActiveWorld())->Raw(), *meshEntity);
+    const auto* positionsBefore = before.VertexSource->Properties.Get<glm::vec3>("v:position").Vector().data();
+    const auto* topologyBefore = before.HalfedgeSource->Properties.Get<std::uint32_t>("h:next").Vector().data();
+    bool uvJobQueued = false;
+    for (const auto& job : RequiredEngineService<Runtime::JobService>(engine).SnapshotAll())
+        uvJobQueued |= job.DebugName.starts_with("Runtime.DirectMeshPostProcess.");
+    EXPECT_TRUE(uvJobQueued);
+
     engine.Run();
+
+    const auto after = GS::BuildConstView(engine.Worlds().Get(engine.ActiveWorld())->Raw(), *meshEntity);
+    EXPECT_EQ(after.VertexSource->Properties.Get<glm::vec3>("v:position").Vector().data(), positionsBefore);
+    EXPECT_EQ(after.HalfedgeSource->Properties.Get<std::uint32_t>("h:next").Vector().data(), topologyBefore);
 
     EXPECT_TRUE(engine.Worlds().Get(engine.ActiveWorld())->IsValid(*meshEntity));
     ASSERT_TRUE(DirectMeshPostProcessReady(
@@ -1854,6 +1866,12 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesAuthoredCornerUvs
     meshEntity = FindFirstEntityWithDomain(
         *engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
     ASSERT_TRUE(meshEntity.has_value());
+
+    // Authored coordinates are available at first publication and never queue
+    // automatic atlas generation.
+    ExpectMeshCornerTexcoordsFinite(*engine.Worlds().Get(engine.ActiveWorld()), *meshEntity);
+    for (const auto& job : RequiredEngineService<Runtime::JobService>(engine).SnapshotAll())
+        EXPECT_FALSE(job.DebugName.starts_with("Runtime.DirectMeshPostProcess."));
 
     engine.Run();
     ASSERT_TRUE(DirectMeshPostProcessReady(engine, *meshEntity, bakeProbe));
@@ -3970,5 +3988,64 @@ TEST(RuntimeAssetImportFormatCoverage, SlowQueuedTextureReadDoesNotBlockRunFrame
     EXPECT_EQ(queue.Entries[0].TerminalStatus,
               Runtime::RuntimeAssetImportQueueTerminalStatus::Complete);
 
+    engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, AuthoredVertexUvsArePublishedWithoutAtlasJob)
+{
+    TempAssetFile file("authored_vertex_uvs.obj",
+        "v 0 0 0\nv 1 0 0\nv 0 1 0\nvt 0 0\nvt 2 0\nvt 0 2\nf 1/1 2/2 3/3\n");
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    InitializeAssetImportEngine(engine);
+    InstallSandboxDefaultRuntimePolicies(engine);
+    const auto imported = RequiredEngineService<Runtime::AssetWorkflowModule>(engine).ImportAssetFromPath({.Path = file.Path.string()});
+    ASSERT_TRUE(imported.has_value());
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const auto entity = FindFirstEntityWithDomain(scene, GS::Domain::Mesh);
+    ASSERT_TRUE(entity.has_value());
+    const auto view = GS::BuildConstView(scene.Raw(), *entity);
+    const auto uv = view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(uv);
+    EXPECT_EQ(uv.Vector(), (std::vector<glm::vec2>{{0,0}, {2,0}, {0,2}}));
+    for (const auto& job : RequiredEngineService<Runtime::JobService>(engine).SnapshotAll())
+        EXPECT_FALSE(job.DebugName.starts_with("Runtime.DirectMeshPostProcess."));
+    auto& assets = RequiredEngineService<Assets::AssetService>(engine);
+    ASSERT_TRUE(assets.Reload(imported->Asset).has_value());
+    ASSERT_TRUE(assets.CompleteCpuLoadAndFlushEvent(imported->Asset).has_value());
+    const auto reloaded = assets.Read<Geometry::MeshIO::MeshIOResult>(imported->Asset);
+    ASSERT_TRUE(reloaded.has_value());
+    ASSERT_EQ(reloaded->size(), 1u);
+    EXPECT_EQ(reloaded->front().Vertices.Size(), 3u);
+    EXPECT_EQ(reloaded->front().Faces.Size(), 1u);
+    engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, DeferredUvUsesSourceAdjacencyForNonManifoldFallback)
+{
+    TempAssetFile file("uv_source_adjacency.obj",
+        "v 0 0 0\nv 1 0 0\nv 0 1 0\nv 1 1 0\nv 0 -1 0\nv 0 0 1\n"
+        "f 1 2 3\nf 2 4 3\nf 1 2 5\nf 1 2 6\n");
+    std::optional<ECS::EntityHandle> entity;
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+        std::make_unique<WaitForConditionApplication>([&](Runtime::Engine& kernel) {
+            return entity && MeshHasVertexProperty(kernel, *entity, "v:texcoord");
+        }));
+    InitializeAssetImportEngine(engine);
+    InstallSandboxDefaultRuntimePolicies(engine);
+    const auto imported = RequiredEngineService<Runtime::AssetWorkflowModule>(engine)
+        .ImportAssetFromPath({.Path = file.Path.string()});
+    ASSERT_TRUE(imported.has_value());
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    entity = FindFirstEntityWithDomain(scene, GS::Domain::Mesh);
+    ASSERT_TRUE(entity.has_value());
+    engine.Run();
+    const auto view = GS::BuildConstView(scene.Raw(), *entity);
+    const auto uv = view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(uv);
+    ASSERT_EQ(uv.Vector().size(), 12u);
+    // The first two coplanar triangles share a chart despite their disconnected
+    // render vertices. Atlasing display topology would separate all triangles.
+    EXPECT_EQ(uv.Vector()[1], uv.Vector()[3]);
+    EXPECT_EQ(uv.Vector()[2], uv.Vector()[5]);
     engine.Shutdown();
 }

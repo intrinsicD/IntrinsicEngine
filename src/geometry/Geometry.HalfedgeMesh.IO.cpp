@@ -1139,6 +1139,7 @@ namespace Geometry::MeshIO
         bool hasFaceTexcoords = false;
         std::size_t cursor = 0;
         std::string_view line;
+        std::vector<std::string_view> tokens;
         while (NextLine(*text, cursor, line))
         {
             const std::size_t comment = line.find('#');
@@ -1151,7 +1152,7 @@ namespace Geometry::MeshIO
                 continue;
             }
 
-            const auto tokens = SplitWhitespace(line);
+            SplitWhitespace(line, tokens);
             if (tokens.empty())
             {
                 continue;

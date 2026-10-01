@@ -110,6 +110,11 @@ namespace Geometry::Mesh::Conversion
             return result;
         }
 
+        std::size_t cornerCount = 0u;
+        for (const auto& face : view.Faces)
+            cornerCount += face.Indices.size();
+        // Interior edges have two corners. Boundary edges can grow the estimate.
+        result.Mesh.Reserve(view.Positions.size(), cornerCount / 2u, view.Faces.size());
         std::vector<VertexHandle> vertices;
         vertices.reserve(view.Positions.size());
         for (const glm::vec3& position : view.Positions)

@@ -130,9 +130,21 @@ namespace Extrinsic::Runtime
             return name;
         }
 
+        struct GeometryImportBounds
+        {
+            glm::vec3 Min{0.0f};
+            glm::vec3 Max{0.0f};
+            bool Valid{false};
+        };
+
         struct DecodedMeshImport
         {
             std::shared_ptr<const Geometry::MeshIO::MeshIOResult> Payload{};
+            std::shared_ptr<std::optional<Geometry::MeshIO::MeshIOResult>> PreparedAsset{};
+            Core::ErrorCode PreparationError{Core::ErrorCode::Success};
+            std::shared_ptr<Geometry::HalfedgeMesh::Mesh> Mesh{};
+            std::shared_ptr<ECS::Components::GeometrySources::PreparedMeshSources> Sources{};
+            std::optional<GeometryImportBounds> Bounds{};
         };
 
         struct DecodedGraphImport
@@ -185,13 +197,6 @@ namespace Extrinsic::Runtime
             std::shared_ptr<AssetImportStageTrace> StageTrace{};
             std::optional<DecodedModelTextureImport> Decoded{};
             Core::ErrorCode Error{Core::ErrorCode::Unknown};
-        };
-
-        struct GeometryImportBounds
-        {
-            glm::vec3 Min{0.0f};
-            glm::vec3 Max{0.0f};
-            bool Valid{false};
         };
 
         struct MaterializedGeometryImport
@@ -975,7 +980,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] Core::Expected<DecodedGeometryImport> DecodeGeometryImport(
-            const RuntimeAssetImportRequest& request)
+            const RuntimeAssetImportRequest& request, const bool prepareGeometry)
         {
             auto route = Assets::ResolveAssetImportRoute(
                 request.Path,
@@ -1021,13 +1026,27 @@ namespace Extrinsic::Runtime
                         meshPayload.error());
                 }
 
+                DecodedMeshImport decoded;
+                if (prepareGeometry)
+                {
+                    auto mesh = BuildRuntimeHalfedgeMeshGeometryOnly(
+                        *meshPayload, {.AllowDisconnectedRenderableFallback = true});
+                    if (!mesh.has_value())
+                        decoded.PreparationError = mesh.error();
+                    else
+                    {
+                        decoded.Bounds = BoundsFromHalfedgeMesh(*mesh);
+                        decoded.Sources = std::make_shared<ECS::Components::GeometrySources::PreparedMeshSources>(
+                            ECS::Components::GeometrySources::PrepareFromMesh(*mesh));
+                        decoded.Mesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>(std::move(*mesh));
+                    }
+                    decoded.PreparedAsset = std::make_shared<std::optional<Geometry::MeshIO::MeshIOResult>>(*meshPayload);
+                }
+                decoded.Payload = std::make_shared<Geometry::MeshIO::MeshIOResult>(std::move(*meshPayload));
                 return DecodedGeometryImport{
                     .Path = request.Path,
                     .PayloadKind = route->PayloadKind,
-                    .Payload = DecodedMeshImport{
-                        .Payload = std::make_shared<Geometry::MeshIO::MeshIOResult>(
-                            std::move(*meshPayload)),
-                    },
+                    .Payload = std::move(decoded),
                 };
             }
             case Assets::AssetPayloadKind::Graph:
@@ -1143,11 +1162,15 @@ namespace Extrinsic::Runtime
                             return Core::Err<MaterializedGeometryImport>(
                                 Core::ErrorCode::AssetInvalidData);
                         }
+                        if (payload.PreparationError != Core::ErrorCode::Success)
+                            return Core::Err<MaterializedGeometryImport>(payload.PreparationError);
+                        if (!payload.Sources || !payload.Mesh || !payload.PreparedAsset)
+                            return Core::Err<MaterializedGeometryImport>(Core::ErrorCode::AssetInvalidData);
                         const auto meshPayload = payload.Payload;
                         auto asset =
                             assetService.Load<Geometry::MeshIO::MeshIOResult>(
                                 decoded.Path,
-                                [meshPayload](std::string_view,
+                                [meshPayload, prepared = payload.PreparedAsset](std::string_view,
                                               Assets::AssetId)
                                     -> Core::Expected<Geometry::MeshIO::MeshIOResult>
                                 {
@@ -1155,6 +1178,12 @@ namespace Extrinsic::Runtime
                                     {
                                         return Core::Err<Geometry::MeshIO::MeshIOResult>(
                                             Core::ErrorCode::AssetInvalidData);
+                                    }
+                                    if (prepared->has_value())
+                                    {
+                                        auto value = std::move(**prepared);
+                                        prepared->reset();
+                                        return value;
                                     }
                                     return *meshPayload;
                                 });
@@ -1171,16 +1200,6 @@ namespace Extrinsic::Runtime
                                 drained.error());
                         }
 
-                        auto rawMesh = BuildRuntimeHalfedgeMeshGeometryOnly(
-                            *meshPayload,
-                            RuntimeMeshGeometryOnlyOptions{
-                                .AllowDisconnectedRenderableFallback = true,
-                            });
-                        if (!rawMesh.has_value())
-                        {
-                            return Core::Err<MaterializedGeometryImport>(
-                                rawMesh.error());
-                        }
 
                         const ECS::EntityHandle entity =
                             ECS::Scene::CreateDefault(
@@ -1199,16 +1218,13 @@ namespace Extrinsic::Runtime
                             return Core::Err<MaterializedGeometryImport>(
                                 authored.error());
                         }
-                        const std::optional<GeometryImportBounds> bounds =
-                            BoundsFromHalfedgeMesh(*rawMesh);
+                        const auto& bounds = payload.Bounds;
                         if (bounds.has_value())
                         {
                             AttachGeometryBounds(raw, entity, *bounds);
                         }
-                        ECS::Components::GeometrySources::PopulateFromMesh(
-                            raw,
-                            entity,
-                            *rawMesh);
+                        ECS::Components::GeometrySources::PublishPreparedMesh(
+                            raw, entity, std::move(*payload.Sources));
                         if (recipe.Postprocess ==
                             AssetImportPostprocessPolicy::PrepareRenderableGeometry)
                         {
@@ -1220,7 +1236,8 @@ namespace Extrinsic::Runtime
                                 scene,
                                 textureBake,
                                 decoded.Path,
-                                *meshPayload,
+                                std::move(*payload.Mesh),
+                                meshPayload,
                                 entity);
                         }
 
@@ -2190,7 +2207,7 @@ namespace Extrinsic::Runtime
                             .Path = path,
                             .PayloadKind = payloadKind,
                         };
-                        auto decoded = DecodeGeometryImport(request);
+                        auto decoded = DecodeGeometryImport(request, !state->Recipe.ExistingAsset.IsValid());
                         state->Request = request;
                         if (decoded.has_value())
                         {
@@ -3265,7 +3282,7 @@ namespace Extrinsic::Runtime
                 RuntimeAssetImportRequest{
                     .Path = request.Path,
                     .PayloadKind = route->PayloadKind,
-                });
+                }, !existingAsset.IsValid());
             if (!decoded.has_value())
             {
                 return Core::Err<RuntimeAssetImportResult>(decoded.error());

@@ -104,3 +104,29 @@ TEST(MeshConversion, ConvertedHalfedgeMeshOutlivesSourceViaMoveOwnershipTransfer
     EXPECT_EQ(converted.Position(Geometry::VertexHandle{0u}), (glm::vec3{0.0f, 0.0f, 0.0f}));
     EXPECT_EQ(converted.Position(Geometry::VertexHandle{1u}), (glm::vec3{1.0f, 0.0f, 0.0f}));
 }
+
+TEST(MeshConversion, MeshReservePreallocatesConstructionArraysWithoutChangingCounts)
+{
+    Geometry::HalfedgeMesh::Mesh mesh;
+    mesh.Reserve(128u, 192u, 64u);
+    const auto points = mesh.VertexProperties().Get<glm::vec3>("v:point");
+    const auto vertices = mesh.VertexProperties().Get<Geometry::HalfedgeMesh::VertexConnectivity>("v:connectivity");
+    const auto halfedges = mesh.HalfedgeProperties().Get<Geometry::HalfedgeMesh::HalfedgeConnectivity>("h:connectivity");
+    const auto halfedgeFaces = mesh.HalfedgeProperties().Get<Geometry::HalfedgeMesh::HalfedgeFaceConnectivity>("h:face");
+    const auto faces = mesh.FaceProperties().Get<Geometry::HalfedgeMesh::FaceConnectivity>("f:connectivity");
+    EXPECT_GE(points.Vector().capacity(), 128u);
+    EXPECT_GE(vertices.Vector().capacity(), 128u);
+    EXPECT_GE(halfedges.Vector().capacity(), 384u);
+    EXPECT_GE(halfedgeFaces.Vector().capacity(), 384u);
+    EXPECT_GE(faces.Vector().capacity(), 64u);
+    EXPECT_GE(mesh.VertexProperties().Get<bool>("v:deleted").Vector().capacity(), 128u);
+    EXPECT_GE(mesh.EdgeProperties().Get<bool>("e:deleted").Vector().capacity(), 192u);
+    EXPECT_GE(mesh.FaceProperties().Get<bool>("f:deleted").Vector().capacity(), 64u);
+    EXPECT_EQ(mesh.VerticesSize(), 0u);
+    EXPECT_EQ(mesh.EdgesSize(), 0u);
+    EXPECT_EQ(mesh.FacesSize(), 0u);
+    const auto* data = points.Vector().data();
+    for (unsigned i = 0; i < 128u; ++i)
+        (void)mesh.AddVertex({static_cast<float>(i), 0.0f, 0.0f});
+    EXPECT_EQ(points.Vector().data(), data);
+}

@@ -93,9 +93,9 @@ namespace Geometry::IOText
         return true;
     }
 
-    [[nodiscard]] inline std::vector<std::string_view> SplitWhitespace(std::string_view line)
+    inline void SplitWhitespace(std::string_view line, std::vector<std::string_view>& tokens)
     {
-        std::vector<std::string_view> tokens;
+        tokens.clear();
         std::size_t cursor = 0;
         while (cursor < line.size())
         {
@@ -113,6 +113,12 @@ namespace Geometry::IOText
                 tokens.emplace_back(line.substr(start, cursor - start));
             }
         }
+    }
+
+    [[nodiscard]] inline std::vector<std::string_view> SplitWhitespace(std::string_view line)
+    {
+        std::vector<std::string_view> tokens;
+        SplitWhitespace(line, tokens);
         return tokens;
     }
 

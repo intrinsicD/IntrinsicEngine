@@ -523,7 +523,8 @@ namespace Extrinsic::Runtime
                             localBounds.error());
                     }
 
-                    const bool hasAuthoredTexcoords = MeshPayloadHasValidVertexTexcoords(**meshPayload);
+                    const bool hasAuthoredTexcoords = MeshPayloadHasValidVertexTexcoords(**meshPayload) ||
+                        mesh->HalfedgeProperties().Exists("h:texcoord");
                     prepared.push_back(PreparedPrimitive{
                         .PrimitiveIndex = static_cast<std::uint32_t>(primitiveIndex),
                         .GeometryPayloadIndex = primitive.GeometryPayloadIndex,

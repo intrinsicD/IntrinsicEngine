@@ -1,3 +1,4 @@
+// Builds imported mesh geometry and resolves UV attributes for runtime publication.
 module;
 
 #include <cstddef>
@@ -81,6 +82,11 @@ struct RuntimeMeshMaterializationOptions {
 struct RuntimeMeshGeometryOnlyOptions {
   bool AllowDisconnectedRenderableFallback{false};
 };
+
+// Uses the existing topology and normals; only missing UV attributes are added.
+[[nodiscard]] Core::Expected<RuntimeMeshMaterializationResult>
+GenerateRuntimeMeshTexcoords(Geometry::HalfedgeMesh::Mesh mesh,
+    const Geometry::MeshIO::MeshIOResult& source);
 
 [[nodiscard]] bool MeshPayloadHasValidVertexTexcoords(
     const Geometry::MeshIO::MeshIOResult &meshPayload) noexcept;

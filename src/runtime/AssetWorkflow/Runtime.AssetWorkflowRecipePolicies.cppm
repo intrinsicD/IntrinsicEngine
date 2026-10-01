@@ -1,4 +1,7 @@
+// Runtime import publication policies and deferred UV enrichment jobs.
 module;
+
+#include <memory>
 
 #include <functional>
 #include <optional>
@@ -20,6 +23,7 @@ import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
+import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.IO;
 
 export namespace Extrinsic::Runtime
@@ -56,6 +60,7 @@ export namespace Extrinsic::Runtime
         ECS::Scene::Registry& scene,
         TextureBakeService* textureBake,
         std::string path,
-        const Geometry::MeshIO::MeshIOResult& payload,
+        Geometry::HalfedgeMesh::Mesh mesh,
+        std::shared_ptr<const Geometry::MeshIO::MeshIOResult> payload,
         ECS::EntityHandle entity);
 }

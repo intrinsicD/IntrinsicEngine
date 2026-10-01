@@ -491,14 +491,25 @@ Asset import is intentionally outside that undoable editor-mutation set.
 Successful scene-changing materialization calls
 `EditorCommandHistory::MarkDirty` to advance document dirty/revision state
 without adding an undo record; entity creation, authoring defaults, and
-post-import enrichment remain one automatic import lifecycle. Deferred
-direct-mesh enrichment captures the complete published mesh-source generation:
+post-import enrichment remain one automatic import lifecycle. Queued
+direct-mesh import prepares topology, normals, bounds, and owned ECS component
+buffers in the decode worker; main-thread publication moves the prepared buffers.
+Authored vertex/corner UVs are available at first publication. Only meshes without
+texture coordinates queue a separate background atlas job. That job reuses the
+prepared topology and publishes only UV attributes, retaining existing position,
+normal, topology, and unrelated property buffers. Existing UVs bypass atlas work;
+generated-normal texture baking remains a separate follow-up.
+
+Deferred direct-mesh enrichment captures the published mesh-source generation:
 active domain and topology markers, all vertex/edge/halfedge/face property
-metadata and values, deleted counts, and vertex-channel binding generation and
+metadata and mutation revisions, deleted counts, and vertex-channel binding generation and
 property references. Its world-scoped job reaches the main-thread apply only
 while the asset-workflow binding epoch still names the same active world and
 scene, the raw entity is still live, its entity-sidecar token still names that
-job, and the captured generation matches exactly. Apply and unpublished
+job, and its geometry and UV inputs remain current. An unchanged revision
+signature takes the fast path. Changed revisions trigger a geometry comparison
+against the prepared mesh; component relocation and unrelated attribute edits
+therefore retain a valid UV result. Apply and unpublished
 finalization resolve the scene through `WorldRegistry` at callback time; they
 never retain a scene reference across worker execution. A world switch,
 document replacement, destroyed world, recycled entity, or generation mismatch
@@ -508,8 +519,9 @@ pending/terminal status plus a nonempty reason into the selected-entity
 processing model. Pending enrichment does not gate geometry processing:
 each action retains its canonical property/topology and kernel-readiness
 checks, so a geometry-only mesh can run curvature before UV/texture work
-finishes. An intervening geometry or property edit invalidates the captured
-generation; late enrichment is discarded without replacing the newer result.
+finishes. An intervening geometry, UV, or channel-binding edit invalidates the pending
+result. Changes to unrelated attributes, including curvature results, survive
+UV publication because only the UV property is applied.
 UV-dependent operations still require usable UVs, and enrichment progress and
 terminal diagnostics remain visible independently of action readiness.
 
