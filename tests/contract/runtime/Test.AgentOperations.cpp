@@ -8,6 +8,7 @@
 #include <fstream>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <gtest/gtest.h>
@@ -15,6 +16,8 @@
 import Extrinsic.Runtime.AgentServer;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorProcessing;
+import Extrinsic.Runtime.MeshTopologyOperations;
+import Extrinsic.Runtime.ScalarRidgeOperations;
 import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Core.Tasks;
 import Extrinsic.Runtime.JobService;
@@ -757,10 +760,31 @@ TEST(AgentOperations, ConfiguredOperationEnumMatchesTable)
     const auto required = Json::parse(registry.Find("run_operation")->InputSchemaJson)["required"];
     EXPECT_EQ(required, (Json{"operation"})) << "entity is optional: config-sourced rows take none";
     const auto description = registry.Find("run_operation")->Description;
-    EXPECT_NE(description.find("mesh_simplify (entity argument; params metric=fa_qem, target_faces=0"), std::string::npos)
+    EXPECT_NE(description.find("mesh_simplify (entity argument; params metric=fa_qem [one of: classical_qem, fa_qem], target_faces=0 [0 to 1e+09], max_error=0.0 [at least 0]"), std::string::npos)
         << "params defaults come from the command structs: " << description;
     const Json schema = Json::parse(registry.Find("run_operation")->InputSchemaJson);
     EXPECT_TRUE(schema["properties"].contains("params"));
+    // Each explicit-parameter operation exposes exactly the fields its owner declares, with the owner's ranges.
+    const auto paramsOf = [&](const char* operation) {
+        for (const auto& rule : schema["allOf"])
+            if (rule["if"]["properties"]["operation"]["const"] == operation) return rule["then"]["properties"]["params"];
+        return Json{};
+    };
+    const struct { const char* Operation; std::span<const R::ConfigFieldSpec> Fields; } owners[] = {
+        {"mesh_denoise", R::EditorMeshDenoiseFieldSpecs()}, {"mesh_remesh", R::EditorMeshRemeshFieldSpecs()},
+        {"mesh_subdivide", R::EditorMeshSubdivideFieldSpecs()}, {"mesh_simplify", R::EditorMeshSimplifyFieldSpecs()},
+        {"scalar_ridge", R::EditorScalarRidgeFieldSpecs()}};
+    for (const auto& owner : owners)
+    {
+        const Json params = paramsOf(owner.Operation);
+        ASSERT_TRUE(params.contains("properties")) << owner.Operation;
+        EXPECT_EQ(params["properties"].size(), owner.Fields.size()) << owner.Operation;
+        for (const auto& field : owner.Fields) EXPECT_TRUE(params["properties"].contains(std::string(field.Name))) << owner.Operation << "." << field.Name;
+    }
+    EXPECT_EQ(paramsOf("mesh_subdivide")["properties"]["iterations"]["maximum"], R::kMeshSubdivideMaxIterations);
+    EXPECT_EQ(paramsOf("mesh_subdivide")["properties"]["iterations"]["default"], 1);
+    EXPECT_EQ(paramsOf("mesh_remesh")["properties"]["iterations"]["maximum"], R::kMeshRemeshMaxIterations);
+
 }
 
 TEST(AgentOperations, ConfiguredOperationEntityRulesFollowTheSection)

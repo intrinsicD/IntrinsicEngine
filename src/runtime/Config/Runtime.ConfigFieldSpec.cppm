@@ -56,4 +56,7 @@ export namespace Extrinsic::Runtime
     // Clamps a numeric value into the declared closed range (exclusive bounds are the
     // validator's job; hints only keep inputs near the valid interval).
     [[nodiscard]] double ClampToConfigFieldRange(const ConfigFieldSpec& field, double value) noexcept;
+    // True when `value` is finite and inside the declared range, exclusive bounds included. Command
+    // owners and the agent's params share this check, so a range is declared once.
+    [[nodiscard]] bool AcceptsConfigFieldNumber(const ConfigFieldSpec& field, double value) noexcept;
 }

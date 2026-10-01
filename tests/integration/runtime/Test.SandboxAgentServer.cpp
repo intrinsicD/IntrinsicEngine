@@ -856,12 +856,13 @@ TEST(SandboxAgentServer, RunOperationOutlierAnalysisPublishesAndUndoes)
 }
 
 // RUNTIME-312 slice 7D: explicit-parameter operations over the command defaults, with undo, and
-// typed errors for bad params.
+// typed errors for bad params and for values outside the ranges the command owners declare.
 TEST(SandboxAgentServer, RunOperationTakesExplicitParamsAndUndoes)
 {
     AgentRig rig("params");
     ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
     const auto grid = rig.AddGrid();
+    const auto cloud = rig.AddCloud(64);
     rig.Run([&](Client& c) {
         const auto faces = [&] {
             for (const auto& row : c.Tool("scene_entities")["entities"])
@@ -869,37 +870,95 @@ TEST(SandboxAgentServer, RunOperationTakesExplicitParamsAndUndoes)
             return -1;
         };
         const auto entityCount = [&] { return c.Tool("scene_entities")["entities"].size(); };
+        const auto undoCount = [&] { return c.Tool("history")["undo_count"].get<int>(); };
         bool isError = true;
+        const auto invalid = [&](const Json& arguments, const std::string& what) {
+            const auto reply = c.Request("tools/call", {{"name", "run_operation"}, {"arguments", arguments}});
+            const bool ok = reply["result"]["isError"] == true && reply["result"]["structuredContent"]["error"]["code"] == "invalid_params";
+            rig.Check(ok, what + ": " + reply.dump().substr(0, 400));
+            return reply["result"]["content"][0]["text"].get<std::string>();
+        };
         rig.Check(faces() == 50, "the grid has 50 triangles");
         // Bad params are typed errors before anything runs.
-        const auto badType = c.Tool("run_operation", {{"operation", "mesh_simplify"}, {"entity", grid}, {"params", {{"target_faces", "many"}}}}, &isError);
-        rig.Check(isError && badType.dump().find("target_faces") != std::string::npos, "param type error: " + badType.dump());
-        const auto badName = c.Request("tools/call", {{"name", "run_operation"}, {"arguments", {{"operation", "mesh_simplify"}, {"entity", grid}, {"params", {{"faces", 5}}}}}});
-        rig.Check(badName["result"]["isError"] == true && badName["result"]["structuredContent"]["error"]["code"] == "invalid_params",
-                  "unknown param is invalid_params: " + badName.dump().substr(0, 400));
-        c.Tool("run_operation", {{"operation", "mesh_simplify"}, {"entity", grid}, {"params", {{"metric", "bogus"}}}}, &isError);
-        rig.Check(isError, "an enum value outside the list is refused");
+        const auto type = invalid({{"operation", "mesh_simplify"}, {"entity", grid}, {"params", {{"target_faces", "many"}}}}, "param type");
+        rig.Check(type.find("target_faces") != std::string::npos, "the message names the parameter: " + type);
+        invalid({{"operation", "mesh_simplify"}, {"entity", grid}, {"params", {{"faces", 5}}}}, "unknown param");
+        invalid({{"operation", "mesh_simplify"}, {"entity", grid}, {"params", {{"metric", "bogus"}}}}, "enum value outside the list");
+        // Ranges are the command owners': the agent cannot ask for more than the panel's controls allow.
+        const auto range = invalid({{"operation", "mesh_subdivide"}, {"entity", grid}, {"params", {{"iterations", 30}}}}, "subdivide iterations");
+        rig.Check(range.find("1 to 10") != std::string::npos, "the range is reported: " + range);
+        invalid({{"operation", "mesh_remesh"}, {"entity", grid}, {"params", {{"iterations", 65}}}}, "remesh iterations");
+        invalid({{"operation", "mesh_denoise"}, {"entity", grid}, {"params", {{"vertex_iterations", 5000}}}}, "denoise iterations");
+        invalid({{"operation", "mesh_denoise"}, {"entity", grid}, {"params", {{"sigma_spatial", -1.0}}}}, "negative sigma");
+        invalid({{"operation", "scalar_ridge"}, {"entity", grid}, {"params", {{"radius_ratio", 0.5}}}}, "ridge radius");
         c.Tool("run_operation", {{"operation", "outlier_analysis"}, {"params", {{"k", 1}}}}, &isError);
         rig.Check(isError, "a config-backed operation takes no params");
         rig.Check(faces() == 50, "refused calls changed nothing");
-        // scalar_ridge: the property is picked from the catalog; the graph is a new entity.
+        // The ranges and defaults are discoverable in the schema.
+        const auto tools = c.Request("tools/list");
+        for (const auto& tool : tools["result"]["tools"])
+        {
+            if (tool["name"] != "run_operation") continue;
+            std::string rules = tool["inputSchema"]["allOf"].dump();
+            rig.Check(rules.find("\"maximum\":10") != std::string::npos && rules.find("x-enum-names") != std::string::npos &&
+                          rules.find("\"const\":\"mesh_subdivide\"") != std::string::npos,
+                      "per-operation params schema in allOf: " + rules.substr(0, 300));
+        }
+
+        // scalar_ridge: the property comes from the catalog; the graph is a new entity.
         const auto before = entityCount();
+        const int undoBefore = undoCount();
+        const auto ridgeArgs = Json{{"operation", "scalar_ridge"}, {"entity", grid},
+            {"params", {{"property", "height"}, {"radius_ratio", 0.25}, {"scale", 2}, {"minimum_sharpness", 0.0}, {"minimum_strength", 0.0}}}};
         const auto missing = c.Tool("run_operation", {{"operation", "scalar_ridge"}, {"entity", grid}, {"params", {{"property", "nope"}}}}, &isError);
         rig.Check(isError && missing.dump().find("nope") != std::string::npos, "unknown ridge property: " + missing.dump());
-        const auto ridge = c.Tool("run_operation", {{"operation", "scalar_ridge"}, {"entity", grid}, {"params", {{"property", "height"}, {"radius_ratio", 0.4}, {"minimum_sharpness", 0.0}, {"minimum_strength", 0.0}}}}, &isError);
+        const auto ridgePreview = c.Tool("preview_operation", ridgeArgs, &isError);
+        rig.Check(!isError && ridgePreview["enabled"] == true, "scalar_ridge has the panel's readiness: " + ridgePreview.dump());
+        const auto noOutput = c.Tool("preview_operation", {{"operation", "scalar_ridge"}, {"entity", grid},
+            {"params", {{"property", "height"}, {"publish_graph", false}}}}, &isError);
+        rig.Check(!isError && noOutput["enabled"] == false && !noOutput["reason"].get<std::string>().empty(),
+                  "no output selected is disabled with a reason: " + noOutput.dump());
+        const auto ridge = c.Tool("run_operation", ridgeArgs, &isError);
         rig.Check(!isError && ridge["succeeded"] == true, "scalar_ridge: " + ridge.dump());
         rig.Check(entityCount() == before + 1, "the ridge graph is a new entity");
-        const auto history = c.Tool("history");
-        const int steps = history["undo_count"].get<int>();
-        const auto ridgeUndo = c.Tool("undo", {{"steps", steps}}, &isError);
+        // Publishing only the graph is one undo step; mesh features add a second one (documented).
+        rig.Check(undoCount() - undoBefore == 1, "graph-only ridge is one undo step, not " + std::to_string(undoCount() - undoBefore));
+        const auto ridgeUndo = c.Tool("undo", Json::object(), &isError);
         rig.Check(!isError && entityCount() == before, "undo removed the graph entity: " + ridgeUndo.dump());
-        // mesh_simplify: defaults from the command struct plus target_faces.
-        const auto preview = c.Tool("preview_operation", {{"operation", "mesh_simplify"}, {"entity", grid}, {"params", {{"target_faces", 20}}}}, &isError);
-        rig.Check(!isError && preview["enabled"].is_boolean(), "preview mesh_simplify: " + preview.dump());
-        const auto simplified = c.Tool("run_operation", {{"operation", "mesh_simplify"}, {"entity", grid}, {"params", {{"target_faces", 20}}}}, &isError);
-        rig.Check(!isError && simplified["succeeded"] == true && simplified["input_faces"] == 50, "mesh_simplify: " + simplified.dump());
-        rig.Check(faces() < 50 && faces() >= 1, "simplification reduced the faces to " + std::to_string(faces()));
-        const auto undone = c.Tool("undo", Json::object(), &isError);
-        rig.Check(!isError && undone["undone"].size() == 1u && faces() == 50, "one undo restores the mesh: " + undone.dump());
+        auto featureArgs = ridgeArgs;
+        featureArgs["params"]["publish_mesh_features"] = true;
+        const int featuresBefore = undoCount();
+        const auto features = c.Tool("run_operation", featureArgs, &isError);
+        rig.Check(!isError && features["succeeded"] == true, "scalar_ridge with mesh features: " + features.dump());
+        const int featureSteps = undoCount() - featuresBefore;
+        rig.Check(featureSteps == 2, "graph plus mesh features are two undo steps, not " + std::to_string(featureSteps));
+        const auto featureUndo = c.Tool("undo", {{"steps", featureSteps}}, &isError);
+        rig.Check(!isError && entityCount() == before, "undoing both steps removes the graph again: " + featureUndo.dump());
+
+        // Topology operations: each is one undo step that restores the face count.
+        // (The mesh's custom vertex properties do not survive a topology undo: BUG-230. The ridge
+        // runs above come first for that reason, and nothing below reads "height".)
+        const auto topology = [&](const char* operation, const Json& params, const std::function<bool(int)>& expected) {
+            const auto preview = c.Tool("preview_operation", {{"operation", operation}, {"entity", grid}, {"params", params}}, &isError);
+            rig.Check(!isError && preview["enabled"].is_boolean(), std::string("preview ") + operation + ": " + preview.dump());
+            const auto run = c.Tool("run_operation", {{"operation", operation}, {"entity", grid}, {"params", params}}, &isError);
+            rig.Check(!isError && run["succeeded"] == true && run["input_faces"] == 50 || std::string(operation) == "mesh_denoise",
+                      std::string(operation) + ": " + run.dump());
+            rig.Check(expected(faces()), std::string(operation) + " left " + std::to_string(faces()) + " faces");
+            const auto undone = c.Tool("undo", Json::object(), &isError);
+            rig.Check(!isError && undone["undone"].size() == 1u, std::string(operation) + " is one undo step: " + undone.dump());
+            rig.Check(faces() == 50, std::string("undo of ") + operation + " restored the mesh");
+        };
+        topology("mesh_simplify", {{"target_faces", 20}}, [](int f) { return f < 50 && f >= 1; });
+        topology("mesh_subdivide", {{"iterations", 1}}, [](int f) { return f == 200; });
+        topology("mesh_remesh", {{"iterations", 1}, {"target_edge_length", 1.5}}, [](int f) { return f > 0 && f != 50; });
+        // Denoise of a flat grid moves nothing (NoChange), so only the reply is asserted.
+        const auto denoise = c.Tool("run_operation", {{"operation", "mesh_denoise"}, {"entity", grid}, {"params", {{"normal_iterations", 2}, {"vertex_iterations", 2}}}}, &isError);
+        rig.Check(denoise.is_object() && denoise["operation"] == "mesh_denoise", "mesh_denoise answers: " + denoise.dump());
+        // Section-backed rows answer too: progressive Poisson on a cloud, parameterization on the mesh.
+        const auto poisson = c.Tool("run_operation", {{"operation", "progressive_poisson"}, {"entity", cloud}}, &isError);
+        rig.Check(poisson.is_object() && poisson["operation"] == "progressive_poisson", "progressive_poisson answers: " + poisson.dump());
+        const auto uv = c.Tool("run_operation", {{"operation", "parameterization"}, {"entity", grid}}, &isError);
+        rig.Check(uv.is_object() && uv["operation"] == "parameterization", "parameterization answers: " + uv.dump());
     });
 }

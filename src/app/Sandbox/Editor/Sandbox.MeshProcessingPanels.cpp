@@ -871,19 +871,19 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         Denoise.NormalIterations =
-            std::clamp(Denoise.NormalIterations, 1, 4096);
+            std::clamp(Denoise.NormalIterations, 1, static_cast<int>(Runtime::kMeshDenoiseMaxIterations));
         Denoise.VertexIterations =
-            std::clamp(Denoise.VertexIterations, 1, 4096);
+            std::clamp(Denoise.VertexIterations, 1, static_cast<int>(Runtime::kMeshDenoiseMaxIterations));
         Denoise.SigmaSpatial =
             std::clamp(Denoise.SigmaSpatial, 0.0f, 1.0e6f);
         Denoise.SigmaRange =
             std::clamp(Denoise.SigmaRange, 0.0f, 1.0e6f);
         ImGui::DragInt(
             "Normal iterations##MeshDenoise", &Denoise.NormalIterations,
-            1.0f, 1, 4096);
+            1.0f, 1, static_cast<int>(Runtime::kMeshDenoiseMaxIterations));
         ImGui::DragInt(
             "Vertex iterations##MeshDenoise", &Denoise.VertexIterations,
-            1.0f, 1, 4096);
+            1.0f, 1, static_cast<int>(Runtime::kMeshDenoiseMaxIterations));
         ImGui::DragFloat(
             "Sigma spatial##MeshDenoise", &Denoise.SigmaSpatial,
             0.01f, 0.0f, 1.0e6f);
@@ -1520,7 +1520,7 @@ namespace Extrinsic::Sandbox::Editor
             }
             ImGui::EndCombo();
         }
-        ImGui::DragInt("Iterations##MeshRemesh", &Remesh.Iterations, 1.0f, 1, 64);
+        ImGui::DragInt("Iterations##MeshRemesh", &Remesh.Iterations, 1.0f, 1, static_cast<int>(Runtime::kMeshRemeshMaxIterations));
         ImGui::DragFloat("Target edge length##MeshRemesh", &Remesh.TargetEdgeLength, 0.01f, 0.0f, 1.0e6f);
 
         const auto mode = FromIndex(kMeshRemeshModes, Remesh.Mode);
@@ -1630,7 +1630,7 @@ namespace Extrinsic::Sandbox::Editor
             }
             ImGui::EndCombo();
         }
-        ImGui::DragInt("Iterations##MeshSubdivide", &Subdivide.Iterations, 1.0f, 1, 10);
+        ImGui::DragInt("Iterations##MeshSubdivide", &Subdivide.Iterations, 1.0f, 1, static_cast<int>(Runtime::kMeshSubdivideMaxIterations));
         const auto op = FromIndex(kMeshSubdivideOperators, Subdivide.Operator);
         if (op != Runtime::EditorMeshSubdivideOperator::Loop)
             Subdivide.PreserveLoopFeatures = false;
@@ -1730,7 +1730,7 @@ namespace Extrinsic::Sandbox::Editor
 
         ImGui::DragInt(
             "Target faces##MeshSimplify", &Simplify.TargetFaces,
-            1.0f, 0, 1000000000);
+            1.0f, 0, static_cast<int>(Runtime::kMeshSimplifyMaxTargetFaces));
         ImGui::DragFloat(
             "Max error (0 = unlimited)##MeshSimplify", &Simplify.MaxError,
             0.001f, 0.0f, 1.0e30f, "%.6g");
@@ -4199,14 +4199,14 @@ namespace Extrinsic::Sandbox::Editor
         if (watershed)
         {
             float persistence = static_cast<float>(command.MinimumPersistence * 100.0);
-            if (ImGui::SliderFloat("Min persistence (% of range)", &persistence, 0.0f, 50.0f, "%.2f"))
+            if (ImGui::SliderFloat("Min persistence (% of range)", &persistence, 0.0f, static_cast<float>(Runtime::kScalarRidgeMaxMinimumPersistence * 100.0), "%.2f"))
                 command.MinimumPersistence = persistence / 100.0;
             ImGui::TextDisabled("Shallower basins merge into their older neighbor.");
         }
         else
         {
             float radiusPercent = static_cast<float>(command.RadiusRatio * 100.0);
-            if (ImGui::SliderFloat("Fit radius (% of diagonal)", &radiusPercent, 0.5f, 25.0f, "%.2f"))
+            if (ImGui::SliderFloat("Fit radius (% of diagonal)", &radiusPercent, static_cast<float>(Runtime::kScalarRidgeMinRadiusRatio * 100.0), static_cast<float>(Runtime::kScalarRidgeMaxRadiusRatio * 100.0), "%.2f"))
                 command.RadiusRatio = radiusPercent / 100.0;
             int scale = command.Scale;
             if (ImGui::Combo("Scale", &scale, "0.5x radius\0" "1x radius\0" "2x radius\0"))
@@ -4231,14 +4231,11 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::TextDisabled("Curves snap to the nearest mesh vertices and edges; "
                                 "vertex features can seed Geodesics.");
         }
-        const Runtime::ActionReadiness readiness{
-            command.Property.HasName() && (command.Ridges || command.Valleys) &&
-                (command.PublishGraph || command.PublishMeshFeatures),
-            "Choose a scalar vertex property, ridges and/or valleys, and an output."};
+        auto request = command;
+        request.StableEntityId = model.SelectedStableId;
+        const Runtime::ActionReadiness readiness = Runtime::PreviewEditorScalarRidgeCommand(context.Processing, request);
         if (DrawProcessingActionButton("Extract ridges", readiness))
         {
-            auto request = command;
-            request.StableEntityId = model.SelectedStableId;
             ScalarRidgesResult = Runtime::ApplyEditorScalarRidgeCommand(context.Processing, request);
         }
         if (command.PublishGraph)

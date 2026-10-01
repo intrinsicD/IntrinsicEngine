@@ -2153,32 +2153,35 @@ namespace Extrinsic::Runtime
 
             EditorCommandHistoryStatus commit =
                 EditorCommandHistoryStatus::CommandFailed;
-            const ScopedEditorCommandLabelPrefix labelPrefix{history, job.Snapshot.Request.LabelPrefix};
-            if (hasPropertyPublication)
             {
-                const ElementDomainPropertyState beforeOutputs =
-                    SelectPropertyState(
-                        job.Snapshot.BeforeOutputs,
+                // The history entry carries the prefix of the call that queued the run (an agent's).
+                const ScopedEditorCommandLabelPrefix labelPrefix{history, job.Snapshot.Request.LabelPrefix};
+                if (hasPropertyPublication)
+                {
+                    const ElementDomainPropertyState beforeOutputs =
+                        SelectPropertyState(
+                            job.Snapshot.BeforeOutputs,
+                            *job.AfterOutputs);
+                    commit = CommitPropertyOutputs(
+                        scene,
+                        job.Snapshot.World,
+                        history,
+                        job.Snapshot.Request.StableEntityId,
+                        job.Snapshot.Request.Properties,
+                        beforeOutputs,
                         *job.AfterOutputs);
-                commit = CommitPropertyOutputs(
-                    scene,
-                    job.Snapshot.World,
-                    history,
-                    job.Snapshot.Request.StableEntityId,
-                    job.Snapshot.Request.Properties,
-                    beforeOutputs,
-                    *job.AfterOutputs);
-            }
-            else
-            {
-                commit = CommitPointCloudReplacement(
-                    scene,
-                    job.Snapshot.World,
-                    history,
-                    job.Snapshot.Request.StableEntityId,
-                    job.Snapshot.Request.Properties,
-                    *job.Snapshot.PointCloudReplacementBefore,
-                    *job.PointCloudReplacementAfter);
+                }
+                else
+                {
+                    commit = CommitPointCloudReplacement(
+                        scene,
+                        job.Snapshot.World,
+                        history,
+                        job.Snapshot.Request.StableEntityId,
+                        job.Snapshot.Request.Properties,
+                        *job.Snapshot.PointCloudReplacementBefore,
+                        *job.PointCloudReplacementAfter);
+                }
             }
             if (commit != EditorCommandHistoryStatus::Applied)
             {

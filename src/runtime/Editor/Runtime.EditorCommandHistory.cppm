@@ -123,6 +123,7 @@ export namespace Extrinsic::Runtime
         std::uint64_t m_SavedRevision{0u};
         bool m_HasActivePath{false};
         std::string m_ActivePath{};
+        // Main-thread state: the agent scope, job completions and panels all run there.
         std::string m_LabelPrefix{};
     };
 

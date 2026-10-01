@@ -6,10 +6,12 @@ module;
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <span>
 #include <string>
 export module Extrinsic.Runtime.MeshTopologyOperations;
 export import Extrinsic.Runtime.EditorProcessing;
 export import Extrinsic.Runtime.EditorCommon;
+export import Extrinsic.Runtime.ConfigFieldSpec;
 export import Extrinsic.Runtime.GeometryProperty.Types;
 export import Extrinsic.Core.Error;
 export import Geometry.Smoothing.Types;
@@ -268,6 +270,18 @@ export namespace Extrinsic::Runtime
         MeshSubdivide,
         MeshSimplify,
     };
+
+    // Accepted ranges: one declaration read by the commands' validation, the panels' controls and the
+    // agent's params. Field names are the agent's parameter names.
+    inline constexpr std::uint32_t kMeshDenoiseMaxIterations = 4096u;
+    inline constexpr std::uint32_t kMeshRemeshMaxIterations = 64u;
+    inline constexpr std::uint32_t kMeshRemeshMaxProjectionNeighbors = 4096u;
+    inline constexpr std::uint32_t kMeshSubdivideMaxIterations = 10u;
+    inline constexpr double kMeshSimplifyMaxTargetFaces = 1.0e9;
+    [[nodiscard]] std::span<const ConfigFieldSpec> EditorMeshDenoiseFieldSpecs() noexcept;
+    [[nodiscard]] std::span<const ConfigFieldSpec> EditorMeshRemeshFieldSpecs() noexcept;
+    [[nodiscard]] std::span<const ConfigFieldSpec> EditorMeshSubdivideFieldSpecs() noexcept;
+    [[nodiscard]] std::span<const ConfigFieldSpec> EditorMeshSimplifyFieldSpecs() noexcept;
 
     // Incomplete borrowed containers keep sibling workspace features independent
     // of mesh-topology records; prepared frames copy their values.

@@ -42,6 +42,14 @@ namespace Extrinsic::Runtime
         return text;
     }
 
+    bool AcceptsConfigFieldNumber(const ConfigFieldSpec& field, const double value) noexcept
+    {
+        if (!(value - value == 0.0)) return false; // NaN or infinity
+        if (field.Min && (field.ExclusiveMin ? value <= *field.Min : value < *field.Min)) return false;
+        if (field.Max && (field.ExclusiveMax ? value >= *field.Max : value > *field.Max)) return false;
+        return true;
+    }
+
     double ClampToConfigFieldRange(const ConfigFieldSpec& field, double value) noexcept
     {
         if (field.Min) value = std::max(value, *field.Min);

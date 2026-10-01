@@ -826,14 +826,17 @@ namespace Extrinsic::Runtime
                 return;
             }
 
-            const ScopedEditorCommandLabelPrefix labelPrefix{history, job.Snapshot.Command.LabelPrefix};
-            const EditorCommandHistoryStatus commitStatus =
-                CommitKMeansOutputs(
+            EditorCommandHistoryStatus commitStatus{};
+            {
+                // The history entry carries the prefix of the call that queued the run (an agent's).
+                const ScopedEditorCommandLabelPrefix labelPrefix{history, job.Snapshot.Command.LabelPrefix};
+                commitStatus = CommitKMeansOutputs(
                     scene,
                     job.Snapshot.World,
                     history,
                     job.Snapshot,
                     *job.Clustered);
+            }
             if (commitStatus != EditorCommandHistoryStatus::Applied)
             {
                 stats.CommitsDropped += 1u;

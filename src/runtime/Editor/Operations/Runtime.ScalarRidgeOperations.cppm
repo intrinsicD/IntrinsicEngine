@@ -5,10 +5,12 @@
 module;
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <string>
 export module Extrinsic.Runtime.ScalarRidgeOperations;
 export import Extrinsic.Runtime.EditorProcessing;
 export import Extrinsic.Runtime.EditorCommon;
+export import Extrinsic.Runtime.ConfigFieldSpec;
 export import Extrinsic.Runtime.GeometryProperty.Types;
 export namespace Extrinsic::Runtime
 {
@@ -77,6 +79,16 @@ export namespace Extrinsic::Runtime
     // not an empty entity. Edge property "e:scalar_extremum" is +1 on ridge and
     // -1 on valley segments; "e:strength" is the relative field height. Mesh
     // features and the graph are separate undo steps (features first).
+    // Accepted ranges, read by the command's validation, the panel's sliders and the agent's params
+    // (field names are the agent's parameter names).
+    inline constexpr double kScalarRidgeMinRadiusRatio = 0.005;
+    inline constexpr double kScalarRidgeMaxRadiusRatio = 0.25;
+    inline constexpr double kScalarRidgeMaxMinimumPersistence = 0.5;
+    [[nodiscard]] std::span<const ConfigFieldSpec> EditorScalarRidgeFieldSpecs() noexcept;
+
+    // Admission: the property, method, ranges and outputs; the entity's geometry is checked when it runs.
+    [[nodiscard]] ActionReadiness PreviewEditorScalarRidgeCommand(
+        const EditorProcessingCommands& commands, const EditorScalarRidgeCommand& command);
     [[nodiscard]] EditorScalarRidgeResult ApplyEditorScalarRidgeCommand(
         const EditorProcessingCommands& commands, const EditorScalarRidgeCommand& command);
 }

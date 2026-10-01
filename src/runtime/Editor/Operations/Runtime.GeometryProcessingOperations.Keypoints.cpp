@@ -465,7 +465,7 @@ namespace Extrinsic::Runtime
             .OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Config.Mask.Name};
         if (auto active = GeometryProcessingDetail::MeshSupport::FindActiveEditorJob(context, identity);
             active && IsActiveEditorJobState(active->State))
-            return report(EditorCommandStatus::GeometryProcessingFailed,"A keypoint job for this output is already active.");
+            return report(EditorCommandStatus::Pending,"A keypoint job for this output is already active."); // the active job owns the callback
         auto sink=GuardEditorProcessingResult(context, std::move(onComplete));auto delivered=std::make_shared<bool>(false);
         auto pending=report(EditorCommandStatus::Pending,"Keypoint analysis queued.");
         // Once submitted, Result belongs to the running stage. Submission failures

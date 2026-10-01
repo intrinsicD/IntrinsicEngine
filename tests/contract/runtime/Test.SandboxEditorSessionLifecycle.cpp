@@ -2757,6 +2757,7 @@ TEST_F(EditorKeypointAgent, AgentOperationDuplicateKeypointRequestTerminatesBusy
     EXPECT_TRUE(duplicate.IsError)<<duplicate.Text;
     EXPECT_FALSE(duplicate.Continuation);
     EXPECT_NE(duplicate.Text.find("already active"),std::string::npos)<<duplicate.Text;
+    EXPECT_EQ(duplicate.ErrorCode,"result_unavailable")<<"a duplicate is Pending without a callback, like the other operations";
     bool completed=false;
     const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(5);
     FrameProbe->OnFrame=[&] {

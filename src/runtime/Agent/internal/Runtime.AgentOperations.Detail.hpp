@@ -156,7 +156,8 @@ namespace Extrinsic::Runtime::AgentDetail
             return !state->has_value() && state.use_count() == 1;
         };
         if (orphaned(done))
-            return {.IsError = true, .Text = kResultUnavailable, .ErrorCode = "result_unavailable"};
+            return {.IsError = true, .Text = (immediate.Message.empty() ? std::string{} : immediate.Message + " ") + kResultUnavailable,
+                    .ErrorCode = "result_unavailable"};
         return {.Continuation = [done, describe, orphaned](const AgentOperationContext& current, AgentOperationOutcome& out) {
             if (!current.Attachment || !current.Attachment->IsAttached()) { out = Fail(kNoWorkspace); return true; }
             if (done->has_value())

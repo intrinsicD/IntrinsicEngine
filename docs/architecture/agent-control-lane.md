@@ -135,21 +135,30 @@ Nothing exists without the launch flag: no module, thread or socket.
   spacing, outlier analysis, density weight, descriptor analysis, bilateral filter, point
   construction, progressive Poisson, parameterization, scalar ridges and the mesh topology
   operations (denoise, remesh, subdivide, simplify). Each row calls its panel's
-  `Preview*`/`Apply*` path with the settings of its config section (`config_apply` first); the
-  mesh topology operations and scalar ridges have no section and take a `params` object whose
-  keys and defaults (taken from the command structs' own initializers) the tool description
-  lists; bad params end with the error code `invalid_params`. The tool description lists every row
-  with its section or params and whether the entity is an argument. A scalar ridge picks its
-  `property` from the entity's vertex scalars like the panel's combo. A row whose section carries the entity refuses an
-  `entity` argument, naming the section. `run_mesh_operation` and `preview_mesh_operation` are
-  aliases limited to the four mesh-field rows. A `Pending` command answers when its job
-  delivered (`result_unavailable` when none can). Parameterization has no readiness
-  function (its panel gates on the selection), so its preview answers `"enabled": null`. The tool flag `NeedsPresentedFrame` is per tool, so
-  `run_operation` (as `run_mesh_operation`) is refused while minimized even for CPU-only rows.
-  Behavior of the mesh aliases after the move into the table: a missing config section answers
-  `enabled: false` with a reason (it was a call error), and a Vulkan property smoothing waits
-  for its job (it was reported as an error while pending). Agent runs do not feed the panels'
-  "last result" displays; the reply is the result.
+  `Preview*`/`Apply*` path with the settings of its config section (`config_apply` first). The
+  mesh topology operations and scalar ridges have no section and take a `params` object. Their
+  command owners declare every field once as a `ConfigFieldSpec` table (name, type, range, enum
+  names, description: `EditorMeshDenoiseFieldSpecs()` and siblings, `EditorScalarRidgeFieldSpecs()`);
+  the commands validate against it (so an agent cannot exceed the ranges the panel's controls
+  allow, for example 10 subdivision iterations), the panels' controls read the same constants,
+  and the tool schema is generated from it: `run_operation`/`preview_operation` carry one JSON
+  Schema `if/then` per operation in `allOf` (type, range, enum names and the defaults of the
+  command struct's own member initializers) and the description lists the same. Enums take their
+  name or integer code. Bad params end with the error code `invalid_params`. `mesh_simplify` needs
+  `target_faces` or `max_error` above 0 (its defaults alone do not run). The tool description lists
+  every row with its section or params and whether the entity is an argument. A scalar ridge
+  picks its `property` from the entity's vertex scalars like the panel's combo, publishes its
+  curve graph as one undo step and, with `publish_mesh_features`, mesh feature properties as a
+  second one (undo with `steps: 2`). Geodesics, curvature segmentation, scalar ridges and the
+  topology operations report their panel's readiness; parameterization alone has no readiness
+  function (its panel gates on the selection), so its preview answers `"enabled": null`. A
+  `Pending` command answers when its job delivered (`result_unavailable` when none can). The
+  tool flag `NeedsPresentedFrame` is per tool, so `run_operation` (as `run_mesh_operation`) is
+  refused while minimized even for CPU-only rows. Behavior of the mesh aliases after the move
+  into the table: a missing config section answers `enabled: false` with a reason (it was a call
+  error), and a Vulkan property smoothing waits for its job (it was reported as an error while
+  pending). Agent runs do not feed the panels' "last result" displays; the reply is the result.
+  `run_mesh_operation` and `preview_mesh_operation` are aliases limited to the four mesh-field rows.
 - Screenshots complete a few frames after the call: an operation may return an
   `AgentOperationContinuation`, which the server polls each frame and answers with
   the original JSON-RPC id; a reconnecting client drops pending replies. Both tools

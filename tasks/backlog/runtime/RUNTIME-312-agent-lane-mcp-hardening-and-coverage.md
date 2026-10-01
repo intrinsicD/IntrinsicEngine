@@ -129,6 +129,11 @@ the editor operations the Sandbox UI already offers.
    the command structs' own defaults (typed `invalid_params` errors); progressive Poisson and
    parameterization are table rows over their sections. Parameterization has no exact readiness
    function (the panel gates on the selection), so its preview answers `enabled: null`.
+   Params vocabulary: the command owners declare each field once (`ConfigFieldSpec` tables, ranges
+   enforced by the commands and read by the panels); the agent maps JSON values onto struct
+   members and generates the schema with `BuildSectionSchemaJson`. Remaining gap: the member
+   mapping and struct defaults are agent-side lists (a `ConfigFieldSpec` has no member binding),
+   and enums accept names next to the integer codes of config sections.
 
 8. **Per-run progress source (after UI-069 slice 1).** Each `Run*` captures its run
    key (editor job identity or correlation id) in its outcome; `PollPending` asks

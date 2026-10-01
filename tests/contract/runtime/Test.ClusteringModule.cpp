@@ -1651,7 +1651,8 @@ TEST(ClusteringModule, AgentRunAutoAcceptsAndReportsBackendAndIo)
     Runtime::EditorWorkspaceAttachment attachment;attachment.Attach(engine.Worlds(),engine.Services());
     ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment));
     Runtime::AgentOperationRegistry registry;Runtime::RegisterEditorAgentOperations(registry);
-    const Runtime::AgentOperationContext context{.Attachment=&attachment};
+    auto* history=engine.Services().Find<Runtime::EditorCommandHistory>();ASSERT_NE(history,nullptr);
+    const Runtime::AgentOperationContext context{.Attachment=&attachment,.History=history};
     auto outcome=Runtime::InvokeAgentOperation(registry,"run_kmeans",context,
         "{\"entity\":"+std::to_string(Runtime::SelectionController::ToStableEntityId(entity))+",\"domain\":\"PointCloudPoint\"}",false);
     ASSERT_TRUE(outcome.Continuation)<<outcome.Text;
@@ -1665,6 +1666,7 @@ TEST(ClusteringModule, AgentRunAutoAcceptsAndReportsBackendAndIo)
     EXPECT_TRUE(done);EXPECT_FALSE(completed.IsError)<<completed.Text;
     for(const auto key:{"gpu_input_upload_bytes","gpu_input_cache_hits","cpu_stage_upload_bytes","cpu_stage_readback_bytes","implementation_id"})
         EXPECT_NE(completed.Text.find(key),std::string::npos);
+    EXPECT_TRUE(history->Snapshot().UndoLabel.starts_with("Agent: "))<<"the run commits on a later frame but keeps the call's label: "<<history->Snapshot().UndoLabel;
     EXPECT_TRUE(vertices.Properties.Exists("p:kmeans_label"));
     outcome.Continuation={};attachment.Detach();engine.Shutdown();
 }
