@@ -2767,3 +2767,41 @@ TEST_F(EditorKeypointAgent, AgentOperationDuplicateKeypointRequestTerminatesBusy
     };
     Engine.Run();EXPECT_TRUE(completed);
 }
+
+// FinishApply: a workspace that detaches, or detaches and re-attaches, while a keypoint run is
+// pending ends the call with an error instead of waiting forever.
+TEST_F(EditorKeypointAgent, PendingKeypointCallEndsWhenTheWorkspaceDetaches)
+{
+    ASSERT_TRUE(Runtime::ApplyEditorKeypointAnalysisConfig(Commands,Keypoints).Succeeded());
+    Runtime::AgentOperationRegistry registry;
+    Runtime::RegisterEditorAgentOperations(registry);
+    const Runtime::AgentOperationContext context{.Attachment=&Attachment};
+    auto first=Runtime::InvokeAgentOperation(registry,"run_keypoint_analysis",context,"{}",false);
+    ASSERT_TRUE(first.Continuation)<<first.Text;
+    Attachment.Detach();
+    Runtime::AgentOperationOutcome result;
+    EXPECT_TRUE(first.Continuation(context,result));
+    EXPECT_TRUE(result.IsError);
+    EXPECT_NE(result.Text.find("not attached"),std::string::npos)<<result.Text;
+}
+TEST_F(EditorKeypointAgent, PendingKeypointCallEndsWhenTheWorkspaceReattaches)
+{
+    ASSERT_TRUE(Runtime::ApplyEditorKeypointAnalysisConfig(Commands,Keypoints).Succeeded());
+    Runtime::AgentOperationRegistry registry;
+    Runtime::RegisterEditorAgentOperations(registry);
+    const Runtime::AgentOperationContext context{.Attachment=&Attachment};
+    auto first=Runtime::InvokeAgentOperation(registry,"run_keypoint_analysis",context,"{}",false);
+    ASSERT_TRUE(first.Continuation)<<first.Text;
+    Attachment.Detach();
+    Attachment.Attach(Engine.Worlds(),Engine.Services());
+    bool completed=false;
+    Runtime::AgentOperationOutcome result;
+    const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(5);
+    FrameProbe->OnFrame=[&] {
+        if(first.Continuation(context,result)) {completed=true;Engine.RequestExit();}
+        else if(std::chrono::steady_clock::now()>deadline)Engine.RequestExit();
+    };
+    Engine.Run();
+    EXPECT_TRUE(completed)<<"the call must not wait forever";
+    EXPECT_TRUE(result.IsError)<<result.Text;
+}

@@ -117,9 +117,10 @@ namespace Extrinsic::Runtime
                                                                                 : request.OutputDirectory)
                                               : request.OutputPath)
                 : std::string{};
+            const bool overwrite = request.Overwrite;
             const std::uint64_t ticket = context.ViewCapture->Request(std::move(request));
             AgentOperationOutcome outcome{};
-            outcome.Continuation = [ticket, returnImage, target = std::move(target)](const AgentOperationContext& ctx, AgentOperationOutcome& out)
+            outcome.Continuation = [ticket, returnImage, overwrite, target = std::move(target)](const AgentOperationContext& ctx, AgentOperationOutcome& out)
             {
                 if (ctx.ViewCapture == nullptr) { out = Fail("The capture service went away."); return true; }
                 const ViewCaptureStatus status = ctx.ViewCapture->Status(ticket);
@@ -129,7 +130,8 @@ namespace Extrinsic::Runtime
                     out = Fail("The Sandbox window was minimized before the capture finished." +
                                    (target.empty() ? std::string{}
                                                    : " It may still finish and write " + target +
-                                                         "; check that path before retrying, or pass overwrite: true."),
+                                                         (overwrite ? "; check that path before retrying."
+                                                                    : "; check that path before retrying, or pass overwrite: true.")),
                                "viewport_not_presentable");
                     return true;
                 }

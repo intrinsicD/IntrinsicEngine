@@ -1668,6 +1668,49 @@ TEST(ClusteringModule, AgentRunAutoAcceptsAndReportsBackendAndIo)
     EXPECT_TRUE(vertices.Properties.Exists("p:kmeans_label"));
     outcome.Continuation={};attachment.Detach();engine.Shutdown();
 }
+TEST(ClusteringModule, AgentCompletionListenerIsReleasedOnDetachAndCancellation)
+{
+    auto config=NullWindowHeadlessConfig();
+    Intrinsic::Tests::RuntimeTestKernel engine{std::move(config)};
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.EmplaceModule<Runtime::ClusteringModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    CoreConfig::EngineConfigSectionRegistry sections;
+    ASSERT_TRUE(sections.Register(Runtime::MakeClusteringConfigSectionRegistration()));
+    engine.EmplaceModule<Runtime::EngineConfigControl>(std::move(sections));engine.Initialize();
+    auto* scene=engine.Worlds().Get(engine.ActiveWorld());ASSERT_NE(scene,nullptr);
+    const auto entity=scene->Create();auto& vertices=scene->Raw().emplace<GS::Vertices>(entity);
+    SetPositions(vertices,{{0,0,0},{1,0,0},{3,0,0}});
+    Runtime::AgentOperationRegistry registry;Runtime::RegisterEditorAgentOperations(registry);
+    Runtime::EditorWorkspaceAttachment attachment;
+    const Runtime::AgentOperationContext context{.Attachment=&attachment};
+    const auto listenerCalls=[&]{
+        const auto before=engine.Events().Stats().ListenerInvocations;
+        engine.Events().Publish(Runtime::KMeansRunCompleted{});(void)engine.Events().Pump();
+        return engine.Events().Stats().ListenerInvocations-before;
+    };
+    const auto baseline=listenerCalls();
+    for(const auto mode:{"detach","cancel"})
+    {
+        SCOPED_TRACE(mode);
+        attachment.Attach(engine.Worlds(),engine.Services());
+        ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment));
+        const auto attached=listenerCalls();
+        auto outcome=Runtime::InvokeAgentOperation(registry,"run_kmeans",context,
+            "{\"entity\":"+std::to_string(Runtime::SelectionController::ToStableEntityId(entity))+",\"domain\":\"PointCloudPoint\"}",false);
+        ASSERT_TRUE(outcome.Continuation)<<outcome.Text;
+        EXPECT_EQ(listenerCalls(),attached+1u);
+        if(std::string_view(mode)=="detach")
+        {
+            attachment.Detach();Runtime::AgentOperationOutcome completed;
+            EXPECT_TRUE(outcome.Continuation(context,completed));EXPECT_TRUE(completed.IsError);
+            EXPECT_EQ(listenerCalls(),baseline);
+        }
+        else {outcome.Continuation={};EXPECT_EQ(listenerCalls(),attached);}
+        outcome.Continuation={};attachment.Detach();
+    }
+    engine.Shutdown();
+}
 TEST_F(ClusteringModuleResident, BusyAdmissionHasOneRefusedCompletionAndPreservesPendingRun)
 {
     Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));

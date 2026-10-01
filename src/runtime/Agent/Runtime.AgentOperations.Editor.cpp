@@ -139,7 +139,9 @@ namespace Extrinsic::Runtime
             return R"("domain":{"type":"string","enum":[)" + DomainNames() + R"(],"description":")" + description + R"("})";
         }
         const std::string kPositionsProperty =
-            R"("positions":{"type":"string","description":"Name of the vec3 position property; default v:position."})";
+            R"("positions":{"type":"string","description":"Name of the vec3 position property."})";
+        const std::string kPositionsDefaultProperty =
+            R"("positions":{"type":"string","default":"v:position","description":"Name of the vec3 position property."})";
         std::optional<GeometryElementDomain> ParseDomain(const std::optional<std::string>& name)
         {
             if (!name) return std::nullopt;
@@ -173,6 +175,9 @@ namespace Extrinsic::Runtime
         // queued job) and answers with its immediate result or, for Pending, a continuation
         // that replies once the callback delivered. A detached workspace ends the wait with
         // an error because the callback never fires for a detached attachment.
+        constexpr const char* kResultUnavailable =
+            "No result will be delivered to this call: an identical job was already running, or the workspace was "
+            "re-attached while it ran. Check jobs and the scene.";
         template <class Result, class Apply, class Describe>
         AgentOperationOutcome FinishApply(Apply apply, Describe describe)
         {
@@ -180,11 +185,22 @@ namespace Extrinsic::Runtime
             const auto immediate = apply([done](Result result) { *done = std::move(result); });
             if (immediate.Status != EditorCommandStatus::Pending)
                 return {.IsError = !immediate.Succeeded(), .Text = Dump(describe(immediate))};
-            return {.Continuation = [done, describe](const AgentOperationContext& current, AgentOperationOutcome& out) {
+            // Only a queued job's callback holds `done`; when nobody does (a duplicate Pending
+            // registers none, a dropped job releases it) no result can ever arrive.
+            const auto orphaned = [](const std::shared_ptr<std::optional<Result>>& state) {
+                return !state->has_value() && state.use_count() == 1;
+            };
+            if (orphaned(done))
+                return {.IsError = true, .Text = kResultUnavailable, .ErrorCode = "result_unavailable"};
+            return {.Continuation = [done, describe, orphaned](const AgentOperationContext& current, AgentOperationOutcome& out) {
                 if (!current.Attachment || !current.Attachment->IsAttached()) { out = Fail(kNoWorkspace); return true; }
-                if (!done->has_value()) return false;
-                out = {.IsError = !(*done)->Succeeded(), .Text = Dump(describe(**done))};
-                return true;
+                if (done->has_value())
+                {
+                    out = {.IsError = !(*done)->Succeeded(), .Text = Dump(describe(**done))};
+                    return true;
+                }
+                if (orphaned(done)) { out = {.IsError = true, .Text = kResultUnavailable, .ErrorCode = "result_unavailable"}; return true; }
+                return false;
             }};
         }
         template <class Result, class Apply>
@@ -317,7 +333,9 @@ namespace Extrinsic::Runtime
             const auto entity = args ? UInt(*args, "entity") : std::nullopt;
             const auto name = args ? String(*args, "name") : std::nullopt;
             if (!entity || !name) return Fail("Pass {\"entity\": <stable id>, \"name\": <property>, \"domain\": <optional domain>}.");
-            const auto domain = args ? String(*args, "domain") : std::nullopt;
+            const auto domainName = args ? String(*args, "domain") : std::nullopt;
+            const auto domain = ParseDomain(domainName);
+            if (domainName && !domain) return Fail(UnknownDomainMessage(*domainName));
             const bool normalDirection = args && args->contains("normal_direction") && (*args)["normal_direction"].is_boolean() &&
                                          (*args)["normal_direction"].get<bool>();
             const auto prepared = PrepareSnapshot(context);
@@ -325,11 +343,11 @@ namespace Extrinsic::Runtime
             const auto inspector = BuildEditorInspectorModel(prepared->SnapshotQueries, nullptr, *entity);
             if (!inspector.HasEntity) return Fail("No entity with id " + std::to_string(*entity) + ".");
             const auto row = std::ranges::find_if(inspector.PropertyCatalog.Rows, [&](const EditorPropertyCatalogRow& r) {
-                return r.Name == *name && !r.Internal && (!domain || ToString(r.Descriptor.Domain) == *domain);
+                return r.Name == *name && !r.Internal && (!domain || r.Descriptor.Domain == *domain);
             });
             if (row == inspector.PropertyCatalog.Rows.end())
                 return Fail("Entity " + std::to_string(*entity) + " has no property '" + *name + "'" +
-                            (domain ? " on " + *domain : std::string{}) + "; see entity_properties.");
+                            (domain ? " on " + *domainName : std::string{}) + "; see entity_properties.");
             const auto visualization = PrepareEditorVisualizationEditingFrame(*context.Attachment);
             const auto status = ApplyEditorVisualizationRecipeCommand(visualization.Commands,
                 {.StableEntityId = *entity, .Recipe = MakeEditorPropertyVisualizationRecipe(row->Descriptor, normalDirection)});
@@ -662,7 +680,7 @@ namespace Extrinsic::Runtime
             if (!PrepareSnapshot(context)) return Fail(kNoWorkspace);
             const auto commands = PrepareEditorPointAnalysisFrame(*context.Attachment).Commands;
             const auto config = GetEditorKeypointAnalysisConfig(commands);
-            if (!config) return Fail("The sandbox.keypoint_analysis section is unavailable.");
+            if (!config) return Ok(ReadinessJson(commands, {false, "The sandbox.keypoint_analysis section is unavailable."}));
             return Ok(ReadinessJson(commands, PreviewEditorKeypointAnalysisCommand(commands, *config)));
         }
 
@@ -672,11 +690,11 @@ namespace Extrinsic::Runtime
         {
             EditorPointCloudServicePreparedFrame Frame{};
             RunKMeans Request{};
+            std::string Unavailable{}; // preview only: why the service or section cannot be used at all
         };
         std::optional<KMeansCall> PrepareKMeansCall(const AgentOperationContext& context, std::string_view arguments,
-                                                    AgentOperationOutcome& failure)
+                                                    AgentOperationOutcome& failure, bool preview)
         {
-            if (!context.Attachment || !context.Attachment->IsAttached()) { failure = Fail(kNoWorkspace); return std::nullopt; }
             const auto args = ParseObject(arguments);
             const auto entity = args ? UInt(*args, "entity") : std::nullopt;
             if (!entity) { failure = Fail("Pass {\"entity\": <stable id>, \"domain\": <domain>}."); return std::nullopt; }
@@ -686,7 +704,12 @@ namespace Extrinsic::Runtime
             if (!PrepareSnapshot(context)) { failure = Fail(kNoWorkspace); return std::nullopt; } // prepares the session frame the feature frames read
             KMeansCall call{.Frame = PrepareEditorPointCloudServiceFrame(*context.Attachment)};
             const auto config = GetEditorClusteringConfig(call.Frame.Commands);
-            if (!config || !call.Frame.ClusteringAvailable) { failure = Fail("Clustering is unavailable."); return std::nullopt; }
+            if (!config || !call.Frame.ClusteringAvailable)
+            {
+                if (preview) { call.Unavailable = "Clustering is unavailable."; return call; }
+                failure = Fail("Clustering is unavailable.");
+                return std::nullopt;
+            }
             if (!config->Properties && !domain)
             {
                 failure = Fail("Pass a domain: the sandbox.clustering section binds no properties.");
@@ -701,14 +724,15 @@ namespace Extrinsic::Runtime
         AgentOperationOutcome PreviewKMeansOperation(const AgentOperationContext& context, std::string_view arguments)
         {
             AgentOperationOutcome failure;
-            const auto call = PrepareKMeansCall(context, arguments, failure);
+            const auto call = PrepareKMeansCall(context, arguments, failure, true);
             if (!call) return failure;
+            if (!call->Unavailable.empty()) return Ok(ReadinessJson(call->Frame.Commands, {false, call->Unavailable}));
             return Ok(ReadinessJson(call->Frame.Commands, PreviewEditorKMeansRun(call->Frame.Commands, call->Frame.Clustering, call->Request)));
         }
         AgentOperationOutcome RunKMeansOperation(const AgentOperationContext& context, std::string_view arguments)
         {
             AgentOperationOutcome failure;
-            const auto call = PrepareKMeansCall(context, arguments, failure);
+            const auto call = PrepareKMeansCall(context, arguments, failure, false);
             if (!call) return failure;
             const auto& frame = call->Frame;
             const auto& request = call->Request;
@@ -736,11 +760,11 @@ namespace Extrinsic::Runtime
         {
             EditorPointCloudServicePreparedFrame Frame{};
             PointCloudConsolidationRequest Request{};
+            std::string Unavailable{}; // preview only: why the service or section cannot be used at all
         };
         std::optional<ConsolidationCall> PrepareConsolidationCall(const AgentOperationContext& context, std::string_view arguments,
-                                                                  AgentOperationOutcome& failure)
+                                                                  AgentOperationOutcome& failure, bool preview)
         {
-            if (!context.Attachment || !context.Attachment->IsAttached()) { failure = Fail(kNoWorkspace); return std::nullopt; }
             const auto args = ParseObject(arguments);
             if (!args) { failure = Fail("Expected an object with entity and domain."); return std::nullopt; }
             const auto entity = UInt(*args, "entity");
@@ -753,6 +777,7 @@ namespace Extrinsic::Runtime
             const auto config = GetEditorPointCloudConsolidationConfig(call.Frame.Commands);
             if (!config || !call.Frame.PointCloudConsolidationAvailable)
             {
+                if (preview) { call.Unavailable = "Point-cloud consolidation is unavailable."; return call; }
                 failure = Fail("Point-cloud consolidation is unavailable.");
                 return std::nullopt;
             }
@@ -771,8 +796,9 @@ namespace Extrinsic::Runtime
         AgentOperationOutcome PreviewConsolidation(const AgentOperationContext& context, std::string_view arguments)
         {
             AgentOperationOutcome failure;
-            const auto call = PrepareConsolidationCall(context, arguments, failure);
+            const auto call = PrepareConsolidationCall(context, arguments, failure, true);
             if (!call) return failure;
+            if (!call->Unavailable.empty()) return Ok(ReadinessJson(call->Frame.Commands, {false, call->Unavailable}));
             const auto availability = PrepareEditorPointCloudConsolidationAvailability(
                 call->Frame.Commands, call->Frame.PointCloudConsolidation, call->Request);
             return Ok(ReadinessJson(call->Frame.Commands, {availability.Available, availability.Message},
@@ -782,7 +808,7 @@ namespace Extrinsic::Runtime
         AgentOperationOutcome RunConsolidation(const AgentOperationContext& context, std::string_view arguments)
         {
             AgentOperationOutcome failure;
-            auto call = PrepareConsolidationCall(context, arguments, failure);
+            auto call = PrepareConsolidationCall(context, arguments, failure, false);
             if (!call) return failure;
             auto& frame = call->Frame;
             return AwaitServiceRun<PointCloudConsolidationResult>(
@@ -920,7 +946,7 @@ namespace Extrinsic::Runtime
         const std::string kmeansSchema = Schema("{" + kEntityProperty + "," + DomainProperty("Element domain of the positions; needed only while sandbox.clustering binds no properties.") +
                        "," + kPositionsProperty + "}",
                    R"(["entity"])");
-        const std::string consolidationSchema = Schema("{" + kEntityProperty + "," + DomainProperty("Element domain of the positions.") + "," + kPositionsProperty + "}",
+        const std::string consolidationSchema = Schema("{" + kEntityProperty + "," + DomainProperty("Element domain of the positions.") + "," + kPositionsDefaultProperty + "}",
                    R"(["entity","domain"])");
         add("preview_kmeans", "Preview K-Means",
             "Whether K-Means can run on an entity with sandbox.clustering, and why not.", kmeansSchema, true, PreviewKMeansOperation);

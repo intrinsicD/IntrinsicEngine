@@ -694,8 +694,22 @@ TEST(SandboxAgentServer, PreviewKMeansAndConsolidationReportReadiness)
         }
         rig.Check(!isError && consolidation["pending"] == false && consolidation["input_points"] == 36,
                   "preview_point_cloud_consolidation: " + consolidation.dump());
+        // A property the entity lacks is a settled "no", not a pending scan.
+        Json absent;
+        for (int attempt = 0; attempt < 200; ++attempt)
+        {
+            absent = c.Tool("preview_point_cloud_consolidation",
+                            {{"entity", cloud}, {"domain", "PointCloudPoint"}, {"positions", "no_such_property"}}, &isError);
+            if (isError || absent["pending"] == false) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        rig.Check(!isError && absent["enabled"] == false && absent["pending"] == false && !absent["reason"].get<std::string>().empty(),
+                  "consolidation preview of a missing property is disabled with a reason: " + absent.dump());
         const auto noEntity = c.Tool("preview_point_cloud_consolidation", {{"domain", "PointCloudPoint"}}, &isError);
         rig.Check(isError, "consolidation preview needs an entity: " + noEntity.dump());
+        const auto unconfigured = c.Tool("preview_keypoint_analysis", Json::object(), &isError);
+        rig.Check(!isError && unconfigured["enabled"] == false && !unconfigured["reason"].get<std::string>().empty(),
+                  "keypoint preview before config_apply explains itself: " + unconfigured.dump());
         c.Tool("config_apply", {{"section", "sandbox.keypoint_analysis"}, {"payload", {{"entity", cloud}}}}, &isError);
         rig.Check(!isError, "keypoint config_apply");
         // Input validation runs for a few frames before the preview turns ready.
@@ -709,4 +723,27 @@ TEST(SandboxAgentServer, PreviewKMeansAndConsolidationReportReadiness)
         rig.Check(!isError && keypoints["enabled"] == true && keypoints["reason"] == "",
                   "preview_keypoint_analysis: " + keypoints.dump());
     });
+}
+
+// Two identical runs requested back to back are both answered (a run that cannot get a result
+// of its own ends with a result_unavailable error instead of waiting forever).
+TEST(SandboxAgentServer, OverlappingIdenticalRunsAreBothAnswered)
+{
+    AgentRig rig("dup");
+    ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
+    const auto source = rig.AddCloud(1200);
+    const auto target = rig.AddCloud(1200);
+    rig.Run([&](Client& c) {
+        bool isError = true;
+        c.Tool("config_apply", {{"section", "sandbox.coherent_point_drift"},
+            {"payload", {{"source", source}, {"target", target}, {"output", 1}, {"outlier_weight", 0.0}, {"max_iterations", 60}}}}, &isError);
+        rig.Check(!isError, "cpd config_apply");
+        const Json call{{"name", "run_registration"}, {"arguments", {{"method", "cpd"}}}};
+        const int first = c.Send("tools/call", call);
+        const int second = c.Send("tools/call", call);
+        const auto a = c.Await(first), b = c.Await(second);
+        rig.Check(a.contains("result") && b.contains("result"), "both calls are answered: " + a.dump() + " " + b.dump());
+        const bool aError = a["result"]["isError"].get<bool>(), bError = b["result"]["isError"].get<bool>();
+        rig.Check(!aError || !bError, "at most one of the calls is a duplicate: " + a.dump() + " " + b.dump());
+    }, std::chrono::seconds(60));
 }

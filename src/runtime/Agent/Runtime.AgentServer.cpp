@@ -168,13 +168,17 @@ namespace Extrinsic::Runtime
             const AgentOperationSpec* spec = m_Registry->Find(name);
             if (spec == nullptr) return Dump(ErrorResponse(id, -32602, "Unknown tool: " + name));
             const bool atCap = m_Pending.size() >= kMaxPendingCalls;
-            if (atCap && !spec->ReadOnly) return Dump(ErrorResponse(id, -32000, "too many pending calls"));
+            // Mutating tools and read-only tools that always defer to a presented frame (captures
+            // that move the camera) are refused before they run; any other read-only tool that
+            // defers at the cap is refused after it ran, which is harmless because it changed nothing.
+            if (atCap && (!spec->ReadOnly || spec->NeedsPresentedFrame))
+                return Dump(ErrorResponse(id, -32000, "too many pending calls"));
             const auto argsIt = params.find("arguments");
             const std::string arguments = argsIt != params.end() && argsIt->is_object() ? Dump(*argsIt) : "{}";
             auto outcome = InvokeAgentOperation(*m_Registry, name, context, arguments, m_ReadOnly);
             if (outcome.Continuation)
             {
-                // A read-only tool that defers at the cap is refused after it ran; it changed nothing.
+                // A read-only tool without side effects that defers at the cap is refused after it ran.
                 if (atCap) return Dump(ErrorResponse(id, -32000, "too many pending calls"));
                 PendingCall call{.Id = Dump(id), .Continue = std::move(outcome.Continuation)};
                 call.NeedsPresentedFrame = spec->NeedsPresentedFrame;

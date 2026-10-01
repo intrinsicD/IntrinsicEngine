@@ -56,9 +56,12 @@ tools that is already waiting when the window minimizes is answered with the sam
 occupying a slot; its editor job or capture is not cancelled and can still finish after the
 window is restored (a capture may then still write its file, so check the path or pass
 `overwrite: true` when retrying). CPU-only tools, queries and the `preview_*` tools keep
-working. A connection may have at most 16 deferred calls; state-changing `tools/call` requests
-beyond that get `-32000 too many pending calls` before the tool runs, and read-only tools are served
-unless they would defer. Responses go back through the socket thread; responses for a dropped client
+working. A connection may have at most 16 deferred calls; state-changing `tools/call` requests and read-only
+tools that need a presented frame (`view_screenshot`) beyond that get `-32000 too many pending calls`
+before the tool runs, and other read-only tools are served unless they would defer (then the reply is
+refused after they ran, which is harmless because they change nothing). A call whose result can never
+arrive (an identical job was already running, or the workspace was re-attached while it ran) ends
+with the error code `result_unavailable`. Responses go back through the socket thread; responses for a dropped client
 are discarded. Nothing exists without the launch flag: no module, thread or socket.
 
 ## Protocol
@@ -102,8 +105,9 @@ are discarded. Nothing exists without the launch flag: no module, thread or sock
 - `view_capture` refuses an existing `path` unless `overwrite: true` (error code `file_exists`;
   a dangling symlink counts as occupied). The capture write repeats the check atomically
   with a hard link to a uniquely named temporary file, so a file created between the call and the
-  write is never replaced; a filesystem without hard links makes `overwrite: false` fail
-  closed instead of replacing.
+  write is never replaced; a filesystem without hard links falls back to an exclusive
+  (`O_EXCL`) create written in place, which still never replaces (readers may see a partial file
+  while it is written; Windows builds fail closed instead).
 
 ## Operations and policy
 
@@ -116,8 +120,9 @@ are discarded. Nothing exists without the launch flag: no module, thread or sock
   (`MakeEditorPropertyVisualizationRecipe`). There is no generic scene or property write.
 - Naming. Read-only (`readOnlyHint`): `scene_entities`, `entity_properties`, `config_sections`,
   `config_schema`, `config_get`, `config_preview`, `history`, `jobs`, `log`,
-  `preview_registration`, `preview_point_sampling`, `preview_keypoint_analysis`, `preview_kmeans`,
-  `preview_point_cloud_consolidation`, `preview_mesh_operation` and `view_screenshot`. State-changing: `select_entity`, `import_file`, `show_property`,
+  `preview_registration`, `preview_point_sampling`,
+  `preview_keypoint_analysis`, `preview_kmeans`, `preview_point_cloud_consolidation`,
+  `preview_mesh_operation` and `view_screenshot`. State-changing: `select_entity`, `import_file`, `show_property`,
   `config_apply`, `undo`, `redo`, `run_mesh_operation`, `run_registration` (ICP or Coherent
   Point Drift from their config sections; the reply waits for the job),
   `run_point_sampling` (the `sandbox.point_sampling` section), `run_keypoint_analysis`,
@@ -133,13 +138,21 @@ are discarded. Nothing exists without the launch flag: no module, thread or sock
 - Entity convention. A config section that carries an entity field supplies the entity (the
   tool takes none; `config_apply` first): mesh curvature, normal estimation, outlier analysis,
   kernel density, density weight, descriptor and keypoint analysis, bilateral filter, point
-  spacing, point construction, point sampling and registration. Operations whose section holds
-  no entity take `entity` as a tool argument, as their panels take the selection: k-means
-  (`domain` needed only while `sandbox.clustering` binds no properties), consolidation (`domain`
+  spacing, point construction, point sampling and registration. Every other operation takes
+  `entity` as a tool argument, as its panel takes the selection: the mesh-field operations
+  (property smoothing, spectral modes, harmonic field, scalar gradient), k-means (`domain`
+  needed only while `sandbox.clustering` binds no properties), consolidation (`domain`
   required), geodesics, curvature segmentation, parameterization, progressive Poisson, mesh
-  topology operations and scalar ridge. Every `domain` argument shares one enum generated from
-  `GeometryElementDomain`. A `preview_*` tool answers `{"enabled","reason"}` with the same
-  readiness as the panel's button, behind `ResolveEditorProcessingActionReadiness`.
+  topology operations and scalar ridge. The rule governs the tools added by later slices of
+  RUNTIME-312 too. Every `domain` argument shares one enum generated from `GeometryElementDomain`.
+- Previews. A `preview_*` tool answers `{"enabled","reason"}` with the same readiness as the
+  panel's button, behind `ResolveEditorProcessingActionReadiness`; a missing service or section
+  is a `false` readiness, not a call error. Known gaps: the panels also disable their run
+  button while the panel's own GPU run (k-means, consolidation, keypoint transaction) awaits
+  Accept, state the agent cannot see because the correlation is held by the panel; and
+  `preview_point_cloud_consolidation` asks the consolidation service for the availability of
+  the previewed request, which can evict the panel's two-entry readiness cache entry (the panel
+  recomputes it on its next frame).
 - Mutating calls run under `ScopedEditorCommandLabelPrefix("Agent: ")`, so the
   undo history shows each agent change and the operator can undo it.
 - Excluded by design: raw ECS or property-buffer writes, code execution, RHI

@@ -1,6 +1,8 @@
 // RUNTIME-287/288: agent operation registry, MCP protocol core, read-only policy, path
 // containment and the "Agent:" history label, without sockets or an engine.
+#include <atomic>
 #include <chrono>
+#include <thread>
 #include <filesystem>
 #include <fstream>
 #include <cstdint>
@@ -12,6 +14,9 @@
 import Extrinsic.Runtime.AgentServer;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GeometryProperty.Types;
+import Extrinsic.Core.Tasks;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.KernelEvents;
 namespace R = Extrinsic::Runtime;
 using Json = nlohmann::json;
 namespace
@@ -464,6 +469,92 @@ TEST(AgentOperations, ProgressStrictlyIncreasesAndKeepsOneUnit)
     EXPECT_GT(emitted, 0);
 }
 
+// A determinate job reports percent with total 100, capped at 100; an indeterminate job pauses
+// the notifications instead of switching unit, and a later determinate value resumes them.
+TEST(AgentOperations, ProgressPercentModeCapsAndSkipsIndeterminateJobs)
+{
+    if (Extrinsic::Core::Tasks::Scheduler::IsInitialized()) Extrinsic::Core::Tasks::Scheduler::Shutdown();
+    Extrinsic::Core::Tasks::Scheduler::Initialize(1);
+    R::JobService jobs;
+    std::atomic_bool release{false};
+    const auto token = jobs.Submit({.DebugName = "long job",
+        .Work = [&release](const R::JobCancellation&) {
+            while (!release.load()) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            return R::JobResultEnvelope{}; },
+        .PublishCompletion = [](R::KernelEventBus&, const R::JobResultEnvelope&) { return true; }});
+    ASSERT_TRUE(token.IsValid());
+    auto registry = NeverFinishingRegistry(std::make_shared<int>(0));
+    R::AgentProtocol protocol{registry, false};
+    protocol.SetProgressInterval(std::chrono::milliseconds(0));
+    const R::AgentOperationContext context{.Jobs = &jobs};
+    ASSERT_FALSE(protocol.Handle(ForeverCall("p", {{"progressToken", "tok"}}).dump(), context).has_value());
+    const auto next = [&](float normalized, bool determinate) -> std::optional<Json> {
+        jobs.ReportProgress(token, {normalized, determinate});
+        const auto lines = protocol.PollPending(context);
+        if (lines.empty()) return std::nullopt;
+        return Json::parse(lines.front())["params"];
+    };
+    const auto first = next(0.25f, true);
+    ASSERT_TRUE(first.has_value());
+    EXPECT_DOUBLE_EQ((*first)["progress"].get<double>(), 25.0);
+    EXPECT_DOUBLE_EQ((*first)["total"].get<double>(), 100.0);
+    EXPECT_EQ((*first)["message"], "long job");
+    EXPECT_FALSE(next(0.25f, true).has_value()) << "an equal value is not an increase";
+    EXPECT_FALSE(next(0.9f, false).has_value()) << "indeterminate: no switch of unit, no notification";
+    EXPECT_DOUBLE_EQ((*next(0.5f, true))["progress"].get<double>(), 50.0) << "a determinate job resumes";
+    EXPECT_DOUBLE_EQ((*next(3.0f, true))["progress"].get<double>(), 100.0) << "capped at total";
+    EXPECT_FALSE(next(3.0f, true).has_value());
+    release.store(true);
+    jobs.CancelAndDrain();
+    Extrinsic::Core::Tasks::Scheduler::WaitForAll();
+    Extrinsic::Core::Tasks::Scheduler::Shutdown();
+}
+
+// A cancelled GPU call that then sees the window minimized frees its slot without a reply.
+TEST(AgentOperations, CancelledGpuCallIsFreedWithoutReplyWhenMinimized)
+{
+    R::AgentOperationRegistry registry;
+    ASSERT_TRUE(registry.Register({.Name = "gpu_job", .Title = "GPU job", .ReadOnly = false, .NeedsPresentedFrame = true,
+        .Invoke = [](const R::AgentOperationContext&, std::string_view) {
+            R::AgentOperationOutcome outcome{};
+            outcome.Continuation = [](const R::AgentOperationContext&, R::AgentOperationOutcome&) { return false; };
+            return outcome; }}));
+    R::AgentProtocol protocol{registry, false};
+    const R::AgentOperationContext presented{};
+    const R::AgentOperationContext minimized{.ViewportPresentable = false};
+    ASSERT_FALSE(protocol.Handle(Json{{"jsonrpc", "2.0"}, {"id", 5}, {"method", "tools/call"},
+                                      {"params", {{"name", "gpu_job"}}}}.dump(), presented).has_value());
+    ASSERT_FALSE(protocol.Handle(Json{{"jsonrpc", "2.0"}, {"method", "notifications/cancelled"},
+                                      {"params", {{"requestId", 5}}}}.dump(), presented).has_value());
+    EXPECT_EQ(protocol.PendingCount(), 1u) << "the tombstone holds its slot";
+    EXPECT_TRUE(protocol.PollPending(minimized).empty()) << "no reply for a cancelled call";
+    EXPECT_EQ(protocol.PendingCount(), 0u);
+}
+
+// A read-only tool that needs a presented frame is refused at the pending cap before it runs.
+TEST(AgentOperations, ReadOnlyGpuToolIsRefusedAtTheCapBeforeItRuns)
+{
+    R::AgentOperationRegistry registry;
+    int runs = 0;
+    const auto stuck = [&runs](const R::AgentOperationContext&, std::string_view) {
+        ++runs;
+        R::AgentOperationOutcome outcome{};
+        outcome.Continuation = [](const R::AgentOperationContext&, R::AgentOperationOutcome&) { return false; };
+        return outcome;
+    };
+    ASSERT_TRUE(registry.Register({.Name = "stuck", .Title = "Stuck", .ReadOnly = false, .Invoke = stuck}));
+    ASSERT_TRUE(registry.Register({.Name = "shot", .Title = "Shot", .ReadOnly = true, .NeedsPresentedFrame = true, .Invoke = stuck}));
+    R::AgentProtocol protocol{registry, false};
+    const R::AgentOperationContext context{};
+    const auto call = [&](const char* name, int id) {
+        return protocol.Handle(Json{{"jsonrpc", "2.0"}, {"id", id}, {"method", "tools/call"}, {"params", {{"name", name}}}}.dump(), context);
+    };
+    for (int i = 0; i < 16; ++i) ASSERT_FALSE(call("stuck", i).has_value());
+    EXPECT_EQ(runs, 16);
+    EXPECT_EQ(Json::parse(*call("shot", 100))["error"]["code"], -32000);
+    EXPECT_EQ(runs, 16) << "the capture never started";
+}
+
 TEST(AgentOperations, NegotiatesProtocolVersion)
 {
     int mutations = 0;
@@ -585,6 +676,10 @@ TEST(AgentOperations, EditorOperationsShareTheDomainEnum)
     const R::AgentOperationContext context{};
     const auto bad = R::InvokeAgentOperation(registry, "run_kmeans", context, R"({"entity":1,"domain":"Bogus"})", false);
     EXPECT_TRUE(bad.IsError);
+    EXPECT_NE(bad.Text.find("Unknown domain 'Bogus'"), std::string::npos) << bad.Text;
+    const auto badShow = R::InvokeAgentOperation(registry, "show_property", context,
+                                                 R"({"entity":1,"name":"x","domain":"Bogus"})", false);
+    EXPECT_NE(badShow.Text.find("Unknown domain 'Bogus'"), std::string::npos) << badShow.Text;
 }
 
 TEST(AgentOperations, ViewCaptureRefusesToOverwriteUnlessAsked)

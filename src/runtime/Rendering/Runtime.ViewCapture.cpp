@@ -3,6 +3,7 @@ module;
 #include <algorithm>
 #include <atomic>
 #include <array>
+#include <cerrno>
 #include <cmath>
 #include <memory>
 #include <chrono>
@@ -18,6 +19,10 @@ module;
 #include <utility>
 #include <vector>
 
+#if !defined(_WIN32)
+#include <fcntl.h>
+#include <unistd.h>
+#endif
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 #include <stb_image_write.h>
@@ -309,8 +314,36 @@ namespace Extrinsic::Runtime
             fs::remove(temporary, error);
             if (!linkError) return std::nullopt;
             if (linkError == std::errc::file_exists) return fileExists();
+#if !defined(_WIN32)
+            // Filesystems without hard links (FAT, some network mounts): create the target
+            // exclusively and write it in place. Not atomic for readers, but it never replaces.
+            const int fd = ::open(path.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0644);
+            if (fd < 0)
+            {
+                if (errno == EEXIST) return fileExists();
+                return ViewCaptureWriteError{ViewCaptureFailure::None, "Cannot create " + path.string() + ": " +
+                                                                           std::error_code(errno, std::generic_category()).message()};
+            }
+            std::size_t written = 0;
+            while (written < bytes.size())
+            {
+                const ssize_t n = ::write(fd, bytes.data() + written, bytes.size() - written);
+                if (n < 0 && errno == EINTR) continue;
+                if (n <= 0) break;
+                written += static_cast<std::size_t>(n);
+            }
+            const bool closed = ::close(fd) == 0;
+            if (written != bytes.size() || !closed)
+            {
+                std::error_code ignored;
+                fs::remove(path, ignored);
+                return ViewCaptureWriteError{ViewCaptureFailure::None, "Cannot write " + path.string()};
+            }
+            return std::nullopt;
+#else
             return ViewCaptureWriteError{ViewCaptureFailure::None,
                                          "Cannot publish " + path.string() + " without replacing a file: " + linkError.message()};
+#endif
         }
         fs::rename(temporary, path, error);
         if (error)
