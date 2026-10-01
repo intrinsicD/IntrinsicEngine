@@ -71,13 +71,20 @@ are discarded. Nothing exists without the launch flag: no module, thread or sock
   stands in for the call. A determinate job reports `progress` = percent with `total` 100;
   otherwise `progress` is the job's elapsed seconds without `total`; `message` is the job's
   debug name. With no active job, `progress` is the call's age in seconds and `message` is
-  `waiting`. `progress` never decreases. Several concurrent jobs make the pick ambiguous; exact
-  per-call job tokens are future work tied to
-  [RUNTIME-279](../../tasks/backlog/runtime/RUNTIME-279-editor-job-snapshot-and-cancel.md).
-- Cancellation: `notifications/cancelled {requestId}` removes the pending entry with that id
-  (JSON-typed comparison: `1` is not `"1"`) and sends no reply; destroying the continuation
-  releases its event subscriptions. The editor job itself keeps running and its result still
-  lands (undoable) until RUNTIME-279 gives the agent path a job cancel.
+  `waiting`. MCP requires `progress` to strictly increase, so a call keeps the unit chosen at its
+  first notification (percent with `total`, or seconds without `total`; percent never exceeds
+  100) and a notification is skipped unless its value is larger than the previous one. The
+  oldest-job pick is a heuristic: several concurrent jobs make it ambiguous, and a cancelled job
+  that is still running keeps feeding it. Exact per-call job tokens are future work tied to
+  [RUNTIME-279](../../tasks/backlog/runtime/RUNTIME-279-editor-job-snapshot-and-cancel.md) and
+  the shared progress widget ([UI-069](../../tasks/backlog/ui/UI-069-shared-operation-progress-widget.md)).
+- Cancellation: `notifications/cancelled {requestId}` (JSON-typed comparison: `1` is not `"1"`)
+  stops the reply and the progress of that call, but the entry stays as a tombstone that counts
+  against the 16-call cap until its continuation completes, then it is dropped silently, so
+  call-and-cancel cannot grow the queue. One or two progress notifications already queued may
+  still arrive after the cancel (allowed by the specification). The editor job itself keeps
+  running and its result still lands (undoable) until RUNTIME-279 gives the agent path a job
+  cancel.
 - Tool results are the existing JSON text content plus, when the negotiated version is
   `2025-06-18` or newer, `structuredContent`: the JSON object the tool returned, or
   `{"error":{"code","message"}}` for errors that carry a machine-readable `ErrorCode`

@@ -24,7 +24,7 @@ surface, for the Jobs window (UI-060) and agent job operations.
 ## Control surfaces
 - Config: N/A.
 - UI: Jobs window (UI-060).
-- Agent cancellation: `notifications/cancelled` (RUNTIME-312 slice 5) currently only drops the pending reply of a continuation call; once `Cancel` lands, that path should call it for the dropped continuation's job (tracked per call), and progress notifications should use that job instead of the oldest active one.
+- Agent cancellation: `notifications/cancelled` (RUNTIME-312 slice 5) currently only silences the reply of a continuation call (the entry stays a tombstone counted against the pending cap until its continuation ends), and a cancelled job that keeps running still feeds the oldest-active-job progress heuristic until per-call job tracking (this task, UI-069) replaces it; once `Cancel` lands, that path should call it for the dropped continuation's job (tracked per call), and progress notifications should use that job instead of the oldest active one.
 - Agent/CLI: `jobs_list` (read-only), `jobs_wait {token|identity, timeout_ms ≤ 60000}` (read-only; returns when finished or after the timeout while frames keep running), `jobs_cancel {token}` (mutating) in `Runtime.AgentOperations`.
 
 ## Acceptance criteria

@@ -114,9 +114,11 @@ namespace Extrinsic::Runtime
             {
                 const std::string wanted = Dump(*requestId);
                 const auto it = std::find_if(m_Pending.begin(), m_Pending.end(), [&](const PendingCall& call) { return call.Id == wanted; });
-                if (it != m_Pending.end())
+                if (it != m_Pending.end() && !it->Cancelled)
                 {
-                    m_Pending.erase(it); // destroying the continuation releases its subscriptions
+                    // Tombstone: no reply or progress, but the slot stays taken until the continuation ends.
+                    it->Cancelled = true;
+                    it->ProgressToken.clear();
                     Core::Log::Info("[AgentServer] request {} cancelled; the editor job continues (RUNTIME-279)", wanted);
                 }
             }
@@ -203,13 +205,15 @@ namespace Extrinsic::Runtime
                            .Text = "The Sandbox window was minimized while this call was waiting for GPU work; it may still "
                                    "finish after the window is restored. Check the scene or jobs before retrying.",
                            .ErrorCode = "viewport_not_presentable"};
-                replies.push_back(Dump(ToolResultResponse(Json::parse(it->Id, nullptr, false), outcome, m_NegotiatedVersion)));
+                if (!it->Cancelled)
+                    replies.push_back(Dump(ToolResultResponse(Json::parse(it->Id, nullptr, false), outcome, m_NegotiatedVersion)));
                 it = m_Pending.erase(it);
                 continue;
             }
             if (it->Continue(context, outcome))
             {
-                replies.push_back(Dump(ToolResultResponse(Json::parse(it->Id, nullptr, false), outcome, m_NegotiatedVersion)));
+                if (!it->Cancelled)
+                    replies.push_back(Dump(ToolResultResponse(Json::parse(it->Id, nullptr, false), outcome, m_NegotiatedVersion)));
                 it = m_Pending.erase(it);
                 continue;
             }
@@ -224,18 +228,22 @@ namespace Extrinsic::Runtime
                     if ((job.State == JobState::Queued || job.State == JobState::Running) &&
                         (!oldest || job.ElapsedMilliseconds > oldest->ElapsedMilliseconds))
                         oldest = &job;
-                Json params{{"progressToken", Json::parse(it->ProgressToken, nullptr, false)}};
-                double progress = std::chrono::duration<double>(now - it->Started).count();
-                if (oldest && oldest->Progress.Determinate)
+                // One unit per call, chosen at its first notification, so the value only ever grows.
+                const bool determinate = oldest && oldest->Progress.Determinate;
+                if (it->Unit == ProgressUnit::Unset) it->Unit = determinate ? ProgressUnit::Percent : ProgressUnit::Seconds;
+                double progress = 0.0;
+                if (it->Unit == ProgressUnit::Percent)
                 {
-                    progress = static_cast<double>(oldest->Progress.Normalized) * 100.0;
-                    params["total"] = 100.0;
+                    if (!determinate) { ++it; continue; } // the job changed; wait for a determinate one
+                    progress = std::min(static_cast<double>(oldest->Progress.Normalized) * 100.0, 100.0);
                 }
-                else if (oldest)
-                    progress = static_cast<double>(oldest->ElapsedMilliseconds) / 1000.0;
-                progress = std::max(progress, it->LastProgress);
+                else
+                    progress = oldest ? static_cast<double>(oldest->ElapsedMilliseconds) / 1000.0
+                                      : std::chrono::duration<double>(now - it->Started).count();
+                if (progress <= it->LastProgress) { ++it; continue; }
                 it->LastProgress = progress;
-                params["progress"] = progress;
+                Json params{{"progressToken", Json::parse(it->ProgressToken, nullptr, false)}, {"progress", progress}};
+                if (it->Unit == ProgressUnit::Percent) params["total"] = 100.0;
                 params["message"] = oldest ? oldest->DebugName : std::string{"waiting"};
                 replies.push_back(Dump(Json{{"jsonrpc", "2.0"}, {"method", "notifications/progress"}, {"params", std::move(params)}}));
             }

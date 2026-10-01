@@ -396,31 +396,71 @@ TEST(AgentOperations, ProgressOnlyWithToken)
     EXPECT_EQ(Json::parse(lines.front())["params"]["progressToken"], 7);
 }
 
-TEST(AgentOperations, CancelledNotificationDropsPendingCall)
+TEST(AgentOperations, CancelledCallsStayAsSilentTombstonesUntilTheirContinuationEnds)
 {
-    auto alive = std::make_shared<int>(0);
-    auto registry = NeverFinishingRegistry(alive);
+    auto finish = std::make_shared<bool>(false);
+    R::AgentOperationRegistry registry;
+    ASSERT_TRUE(registry.Register({.Name = "gated", .Title = "Gated", .ReadOnly = false,
+        .Invoke = [finish](const R::AgentOperationContext&, std::string_view) {
+            R::AgentOperationOutcome outcome{};
+            outcome.Continuation = [finish](const R::AgentOperationContext&, R::AgentOperationOutcome& out) {
+                if (!*finish) return false;
+                out = R::AgentOperationOutcome{.Text = "{}"};
+                return true;
+            };
+            return outcome; }}));
     R::AgentProtocol protocol{registry, false};
     protocol.SetProgressInterval(std::chrono::milliseconds(0));
     const R::AgentOperationContext context{};
-    ASSERT_FALSE(protocol.Handle(ForeverCall(41, {{"progressToken", "t"}}).dump(), context).has_value());
-    ASSERT_FALSE(protocol.Handle(ForeverCall("keep").dump(), context).has_value());
-    ASSERT_EQ(protocol.PendingCount(), 2u);
+    const auto call = [&](const Json& id, const Json& meta = Json::object()) {
+        Json params{{"name", "gated"}};
+        if (!meta.empty()) params["_meta"] = meta;
+        return protocol.Handle(Json{{"jsonrpc", "2.0"}, {"id", id}, {"method", "tools/call"}, {"params", params}}.dump(), context);
+    };
     const auto cancel = [&](const Json& requestId) {
         return protocol.Handle(Json{{"jsonrpc", "2.0"}, {"method", "notifications/cancelled"},
                                     {"params", {{"requestId", requestId}, {"reason", "test"}}}}.dump(), context);
     };
+    ASSERT_FALSE(call(41, {{"progressToken", "t"}}).has_value());
     EXPECT_FALSE(cancel("41").has_value()) << "string 41 is not integer 41";
-    EXPECT_EQ(protocol.PendingCount(), 2u);
     EXPECT_FALSE(cancel(99).has_value()) << "unknown ids are ignored";
-    EXPECT_EQ(protocol.PendingCount(), 2u);
     EXPECT_FALSE(cancel(41).has_value()) << "notifications never get a reply";
-    EXPECT_EQ(protocol.PendingCount(), 1u);
-    for (const auto& line : protocol.PollPending(context)) EXPECT_NE(Json::parse(line).value("id", Json{}), 41);
-    const auto baseline = alive.use_count(); // test + invoker + the surviving continuation
-    EXPECT_EQ(baseline, 3) << "the dropped continuation released its capture";
-    protocol.DropPending();
-    EXPECT_EQ(alive.use_count(), baseline - 1);
+    EXPECT_EQ(protocol.PendingCount(), 1u) << "the tombstone still counts";
+    EXPECT_TRUE(protocol.PollPending(context).empty()) << "a cancelled call reports no progress";
+
+    // Call + cancel in a loop cannot dodge the cap: every tombstone keeps its slot.
+    for (std::size_t i = 1; i < R::AgentProtocol::kMaxPendingCalls; ++i)
+    {
+        ASSERT_FALSE(call(int(100 + i)).has_value());
+        (void)cancel(int(100 + i));
+    }
+    EXPECT_EQ(protocol.PendingCount(), 16u);
+    EXPECT_EQ(Json::parse(*call(999))["error"]["code"], -32000);
+
+    *finish = true;
+    EXPECT_TRUE(protocol.PollPending(context).empty()) << "finished tombstones are dropped without a reply";
+    EXPECT_EQ(protocol.PendingCount(), 0u);
+}
+
+TEST(AgentOperations, ProgressStrictlyIncreasesAndKeepsOneUnit)
+{
+    auto registry = NeverFinishingRegistry(std::make_shared<int>(0));
+    R::AgentProtocol protocol{registry, false};
+    protocol.SetProgressInterval(std::chrono::milliseconds(0));
+    const R::AgentOperationContext context{};
+    ASSERT_FALSE(protocol.Handle(ForeverCall("p", {{"progressToken", "tok"}}).dump(), context).has_value());
+    double last = -1.0;
+    int emitted = 0;
+    for (int i = 0; i < 200; ++i)
+        for (const auto& line : protocol.PollPending(context))
+        {
+            const Json params = Json::parse(line)["params"];
+            EXPECT_GT(params["progress"].get<double>(), last);
+            EXPECT_FALSE(params.contains("total")) << "seconds never carry a total";
+            last = params["progress"].get<double>();
+            ++emitted;
+        }
+    EXPECT_GT(emitted, 0);
 }
 
 TEST(AgentOperations, NegotiatesProtocolVersion)

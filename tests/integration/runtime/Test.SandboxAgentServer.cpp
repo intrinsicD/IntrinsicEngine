@@ -355,7 +355,9 @@ TEST(SandboxAgentServer, ProgressAndCancelOverTheSocket)
         for (const auto& note : c.Notifications)
         {
             check(note["method"] == "notifications/progress" && note["params"]["progressToken"] == "run-1", "note shape: " + note.dump());
-            check(note["params"]["progress"].get<double>() >= last, "progress never decreases");
+            check(note["params"]["progress"].get<double>() > last, "progress strictly increases");
+            check(!note["params"].contains("total") || note["params"]["progress"].get<double>() <= note["params"]["total"].get<double>(),
+                  "progress stays within total: " + note.dump());
             last = note["params"]["progress"].get<double>();
         }
         c.Notifications.clear();
@@ -373,7 +375,23 @@ TEST(SandboxAgentServer, ProgressAndCancelOverTheSocket)
         check(c.Notify("notifications/cancelled", {{"requestId", cancelledId}}), "send cancel");
         const int pingId = c.Send("ping");
         check(c.Await(pingId).contains("result"), "ping is answered after the cancel");
-        for (int i = 0; i < 100; ++i) // 2 s, longer than the cancelled job
+        // Wait (bounded by wall clock) until no job is active, then make sure no reply surfaced.
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);
+        bool idle = false;
+        while (!idle && std::chrono::steady_clock::now() < deadline)
+        {
+            const auto jobs = c.Tool("jobs");
+            idle = true;
+            for (const auto& job : jobs.value("jobs", Json::array()))
+            {
+                const auto state = job.value("state", std::string{});
+                idle &= state != "queued" && state != "running" && state != "awaiting-dependencies" &&
+                        state != "awaiting-gate" && state != "awaiting-apply";
+            }
+            if (!idle) std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+        check(idle, "the cancelled job finished within the time limit");
+        for (int i = 0; i < 10; ++i)
         {
             const auto line = c.ReadLine(1);
             if (line.is_object() && line.contains("id"))
@@ -381,9 +399,9 @@ TEST(SandboxAgentServer, ProgressAndCancelOverTheSocket)
         }
         done.store(true);
     });
-    int frameCount = 0;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(60);
     frames->OnFrame = [&](R::Engine& kernel) {
-        if (done.load() || ++frameCount > 20000) kernel.RequestExit();
+        if (done.load() || std::chrono::steady_clock::now() > deadline) kernel.RequestExit();
     };
     engine.Run();
     client.join();

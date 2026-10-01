@@ -46,10 +46,12 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] std::optional<std::string> Handle(std::string_view message, const AgentOperationContext& context);
         // Replies for deferred tool calls that finished this frame, plus `notifications/progress`
         // lines for pending calls that sent a `_meta.progressToken` (at most one per interval).
-        // Progress follows the oldest queued or running editor job (determinate: percent of 100;
-        // otherwise elapsed seconds), or the call's own age with message "waiting" when there is
-        // none. With several concurrent jobs the pick is ambiguous until per-call job tokens exist
-        // (RUNTIME-279).
+        // Progress follows the oldest queued or running editor job (determinate: percent of 100
+        // with total; otherwise elapsed seconds without total), or the call's own age with message
+        // "waiting" when there is none. The unit is fixed at a call's first notification and a
+        // notification is sent only when its value exceeds the previous one. The pick is ambiguous
+        // with several concurrent jobs, and a cancelled job still counts, until per-call job
+        // tokens exist (RUNTIME-279, UI-069).
         [[nodiscard]] std::vector<std::string> PollPending(const AgentOperationContext& context);
         [[nodiscard]] std::size_t PendingCount() const noexcept { return m_Pending.size(); }
         // While this many deferred calls wait, state-changing tools/call requests are refused with
@@ -67,8 +69,10 @@ export namespace Extrinsic::Runtime
         bool m_Initialized{false};
         std::string m_ClientName{};
         std::string m_NegotiatedVersion{kAgentProtocolVersion};
-        // `notifications/cancelled` drops the entry without a reply; the editor job keeps running
-        // until RUNTIME-279 offers a cancel path.
+        // `notifications/cancelled` turns the entry into a reply-less tombstone that still counts
+        // against kMaxPendingCalls until its continuation completes (then it is dropped silently);
+        // the editor job keeps running until RUNTIME-279 offers a cancel path.
+        enum class ProgressUnit : std::uint8_t { Unset, Percent, Seconds };
         struct PendingCall
         {
             std::string Id{};                // dumped JSON-RPC id
@@ -76,7 +80,9 @@ export namespace Extrinsic::Runtime
             std::string ProgressToken{};     // dumped JSON token; empty when the call sent none
             std::chrono::steady_clock::time_point Started{};
             std::chrono::steady_clock::time_point LastEmit{};
-            double LastProgress{0.0};
+            double LastProgress{-1.0};       // MCP: progress strictly increases per notification
+            ProgressUnit Unit{ProgressUnit::Unset}; // fixed at the first emission
+            bool Cancelled{false};           // tombstone: no reply, no progress
             bool NeedsPresentedFrame{false}; // fails with viewport_not_presentable while minimized
         };
         std::vector<PendingCall> m_Pending{};
