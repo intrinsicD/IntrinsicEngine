@@ -72,6 +72,7 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `RUNTIME-284`: `UI-064` — History window (tasks/backlog/ui/UI-064-history-window.md)
 - blocked by `RUNTIME-285`: `UI-065` — Diagnostics / Log window (tasks/backlog/ui/UI-065-diagnostics-log-window.md)
 - blocked by `RUNTIME-286`: `UI-066` — Mesh Health window (tasks/backlog/ui/UI-066-mesh-health-window.md)
+- unblocked: `UI-069` — Shared operation progress read model and panel widget (tasks/backlog/ui/UI-069-shared-operation-progress-widget.md)
 
 ## Theme G — Active bugs
 
