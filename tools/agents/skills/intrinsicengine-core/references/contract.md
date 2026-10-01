@@ -569,7 +569,10 @@ reference, append the narrative to the append-only
 generated open/unblocked view consulted when picking backlog work. Theme
 rationale lives in `tasks/backlog/README.md`; older retired tasks are swept
 from `tasks/done/` to `tasks/archive/` (frozen read-only history; IDs stay
-authoritative for dependency resolution). Keep roadmap details in those files
+authoritative for dependency resolution). The sole maintenance exception is a
+task-link directory repair under `tasks/archive/README.md`: the validator pins
+the original text, task filename and fragment and requires an existing target
+inside a task lifecycle directory. Keep roadmap details in those files
 rather than expanding this contract with task-specific plans.
 
 ### Standing Claude Code authorization

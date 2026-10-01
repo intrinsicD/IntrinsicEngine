@@ -10,6 +10,14 @@ record of the agentic development of this repository.
 
 - **Archived tasks are read-only history.** Do not edit, reopen, or re-gate
   them. Follow-up work gets a new task with a new ID.
+- **Task links follow the linked task.** When a linked task changes lifecycle
+  directory (for example, it retires from `backlog/` to `done/`), rewrite only
+  the directory part of that link target so it stays clickable. The task file
+  name, fragment, link text and every other byte stay frozen;
+  `validate_tasks.py` accepts exactly this diff against the contract baseline,
+  and the rewritten target must be a canonical relative path resolving inside
+  a task lifecycle directory. The same rule covers baseline tasks
+  still in `tasks/done/`.
 - **IDs stay authoritative.** Archived IDs participate in duplicate-ID
   detection and resolve `depends_on` references (`validate_tasks.py` /
   `generate_session_brief.py` treat archive IDs as done), so an archived ID

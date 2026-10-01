@@ -18,8 +18,7 @@ its dependencies, conditional gates, scope and verification.
 
 ## Agent lane and inspection windows
 
-Each window is the user-facing surface of a runtime capability that agents reach
-through the same runtime functions ([ARCH-019](../../done/ARCH-019-agent-control-lane-mcp.md)).
+Each window uses the same runtime functions as agent operations.
 
 - [UI-058 — All-reasons readiness tooltip and offending-control markers](UI-058-all-reasons-readiness-tooltips.md)
 - [UI-059 — Property Inspector window](UI-059-property-inspector-window.md)
@@ -32,3 +31,7 @@ through the same runtime functions ([ARCH-019](../../done/ARCH-019-agent-control
 
 Completed and superseded work is recorded in the
 [retirement log](../../done/RETIREMENT-LOG.md) and Git history.
+
+## Completed agent-control foundation
+
+See [ARCH-019](../../done/ARCH-019-agent-control-lane-mcp.md).

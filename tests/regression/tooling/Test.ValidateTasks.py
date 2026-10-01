@@ -19,6 +19,12 @@ UNCONSUMED_LEGACY_TASK = next(iter(sorted(json.loads(
 )["tasks"])))
 
 
+# BUG-225: an archived task whose baseline links to a task that later retired.
+ARCHIVED_LINKING_TASK = "archive/GEOM-020-sparse-direct-factorization-seam.md"
+RETIRED_LINK_TARGET_NAME = "GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md"
+RETIRED_LINK_BASELINE_TARGET = f"../backlog/geometry/{RETIRED_LINK_TARGET_NAME}"
+
+
 def run_validator(root: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, str(VALIDATOR), "--root", str(root), "--strict"],
@@ -675,6 +681,102 @@ contract_review: fixture has no subsystem contract
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn("outside the prospective contract baseline", result.stdout)
         self.assertIn("`contract_schema: 1`", result.stdout)
+
+    def write_archived_task_with_retargeted_link(
+        self, root: Path, new_target: str, *, copy_target: bool = True
+    ) -> Path:
+        target = root / ARCHIVED_LINKING_TASK
+        target.parent.mkdir(parents=True, exist_ok=True)
+        baseline = task_bytes_at_contract_baseline(ARCHIVED_LINKING_TASK)
+        old_link = f"]({RETIRED_LINK_BASELINE_TARGET})".encode()
+        self.assertIn(old_link, baseline)
+        target.write_bytes(baseline.replace(old_link, f"]({new_target})".encode()))
+        if copy_target:
+            linked = root / "done" / RETIRED_LINK_TARGET_NAME
+            linked.parent.mkdir(parents=True, exist_ok=True)
+            copyfile(REPO_ROOT / "tasks/done" / RETIRED_LINK_TARGET_NAME, linked)
+        return target
+
+    def test_archived_task_link_may_follow_retired_target(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "tasks"
+            self.write_archived_task_with_retargeted_link(
+                root, f"../done/{RETIRED_LINK_TARGET_NAME}"
+            )
+
+            result = run_validator(root)
+
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_archived_task_link_retarget_must_resolve(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "tasks"
+            self.write_archived_task_with_retargeted_link(
+                root, f"../active/{RETIRED_LINK_TARGET_NAME}"
+            )
+
+            result = run_validator(root)
+
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("was retargeted but does not resolve", result.stdout)
+
+    def test_archived_task_link_retarget_cannot_change_linked_task(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "tasks"
+            self.write_archived_task_with_retargeted_link(
+                root, "../done/GEOM-025-unrelated-fixture.md"
+            )
+            other = root / "done" / "GEOM-025-unrelated-fixture.md"
+            copyfile(root / "done" / RETIRED_LINK_TARGET_NAME, other)
+
+            result = run_validator(root)
+
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("outside the prospective contract baseline", result.stdout)
+
+    def test_archived_task_link_cannot_escape_task_lifecycle_directories(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "tasks"
+            self.write_archived_task_with_retargeted_link(
+                root, f"../../elsewhere/{RETIRED_LINK_TARGET_NAME}"
+            )
+            external = Path(tmp) / "elsewhere" / RETIRED_LINK_TARGET_NAME
+            external.parent.mkdir()
+            copyfile(root / "done" / RETIRED_LINK_TARGET_NAME, external)
+            result = run_validator(root)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("task lifecycle directory", result.stdout)
+
+    def test_archived_task_links_must_remain_canonical_relative_paths(self) -> None:
+        for absolute in (True, False):
+            with self.subTest(absolute=absolute), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp) / "tasks"
+                destination = (
+                    str(root / "done" / RETIRED_LINK_TARGET_NAME) if absolute
+                    else f"../archive/../done/{RETIRED_LINK_TARGET_NAME}"
+                )
+                self.write_archived_task_with_retargeted_link(root, destination)
+                result = run_validator(root)
+                self.assertEqual(result.returncode, 1, result.stdout)
+                self.assertIn("canonical relative path", result.stdout)
+
+    def test_archived_task_link_retarget_cannot_carry_text_edits(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "tasks"
+            target = self.write_archived_task_with_retargeted_link(
+                root, f"../done/{RETIRED_LINK_TARGET_NAME}"
+            )
+            target.write_text(
+                target.read_text(encoding="utf-8").replace(
+                    "is owned by follow-up", "was owned by follow-up"
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_validator(root)
+
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("outside the prospective contract baseline", result.stdout)
 
     def test_consumed_legacy_snapshot_cannot_be_replayed(self) -> None:
         relative = (

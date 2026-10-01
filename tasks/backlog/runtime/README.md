@@ -37,7 +37,6 @@ The canonical property-domain contract for method integration is
 - [`RUNTIME-218` — Default scene lighting and light authoring](RUNTIME-218-default-scene-lighting-and-light-authoring.md)
   owns default scene lighting and editor light authoring.
 - [`RUNTIME-222` — Model-space point radius rendering](RUNTIME-222-model-space-point-radius-rendering.md)
-- [RUNTIME-290 — Shared Vulkan execution seam for Geometry.PointSampling](RUNTIME-290-point-sampling-vulkan-execution-seam.md)
 - [RUNTIME-275 — Gaussian noise editor operation](RUNTIME-275-gaussian-noise-editor-operation.md)
   owns published radius-property binding and camera projection in model-space units.
 
@@ -46,10 +45,6 @@ commands. Read those notes before scheduling: dependencies between local tasks
 and their paired UI or method work are recorded there, not here.
 
 ## Agent control lane and inspection operations
-
-Operator direction 2026-09-27; architecture decision in
-[ARCH-019](../../done/ARCH-019-agent-control-lane-mcp.md). The registry
-[RUNTIME-287](../../done/RUNTIME-287-agent-operations-registry.md) is done.
 
 - [RUNTIME-276 — Declarative `ConfigFieldSpec` tables, schema generation and conformance test](RUNTIME-276-declarative-config-field-specs.md)
 - [RUNTIME-277 — Structured `ActionReadiness` reasons](RUNTIME-277-structured-action-readiness-reasons.md)
@@ -83,3 +78,9 @@ For completed work, the [retirement log](../../done/RETIREMENT-LOG.md) links
 retired task records. The directory indexes are
 [`tasks/done/README.md`](../../done/README.md) and
 [`tasks/archive/README.md`](../../archive/README.md).
+
+## Completed agent-control foundations
+
+Operator direction 2026-09-27; architecture decision in
+[ARCH-019](../../done/ARCH-019-agent-control-lane-mcp.md). The registry
+[RUNTIME-287](../../done/RUNTIME-287-agent-operations-registry.md) is done.

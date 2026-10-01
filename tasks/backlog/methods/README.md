@@ -36,7 +36,6 @@ its dependencies, conditional gates, scope and verification.
 - [METHOD-052 — Anderson acceleration for Coherent Point Drift EM](METHOD-052-coherent-point-drift-anderson-acceleration.md)
 - [METHOD-054 — Geodesic Bayesian Coherent Point Drift (GBCPD)](METHOD-054-geodesic-bayesian-coherent-point-drift.md)
 - [METHOD-055 — Vulkan compute port of the hole-sieve farthest-point sampler](METHOD-055-vulkan-hole-sieve-farthest-point-sampling.md)
-- [METHOD-056 — Vulkan dense E-step for Coherent Point Drift](METHOD-056-coherent-point-drift-vulkan-dense-e-step.md)
 - [METHOD-057 — Vulkan truncated and Nystroem E-steps for Coherent Point Drift (gated)](METHOD-057-coherent-point-drift-vulkan-truncated-and-nystrom.md)
 - [METHOD-058 — Permutohedral-lattice E-step for Coherent Point Drift (FilterReg), CPU](METHOD-058-coherent-point-drift-lattice-e-step.md)
 - [METHOD-059 — Vulkan permutohedral-lattice E-step for Coherent Point Drift (gated)](METHOD-059-coherent-point-drift-vulkan-lattice-e-step.md)

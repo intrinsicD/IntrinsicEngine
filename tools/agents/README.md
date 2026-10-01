@@ -5,7 +5,7 @@ Agent workflow and task policy tooling.
 ## Current scripts
 
 - `check_task_policy.py` validates required task directories, rejects legacy root planning files, and delegates strict structured-task checks. Runs strict in `ci-docs.yml`; `check_todo_active_only.sh` is a thin compatibility wrapper for it.
-- `validate_tasks.py` validates task IDs, required sections, completion metadata for `tasks/done/`, and checkbox todos in actionable sections. Invoked by `check_task_policy.py`.
+- `validate_tasks.py` validates task IDs, required sections, completion metadata for `tasks/done/`, and checkbox todos in actionable sections. Baseline retired tasks under `tasks/done/` and `tasks/archive/` must stay byte-identical except for task-link directory rewrites that follow a linked task to its current, resolving lifecycle path. Invoked by `check_task_policy.py`.
 - `workflow_evidence.py` records exact command receipts, generates completion
   reports from task/Git/artifact facts, seals completed dirty reports against
   an exact commit containing their unchanged evidence, appends high-risk

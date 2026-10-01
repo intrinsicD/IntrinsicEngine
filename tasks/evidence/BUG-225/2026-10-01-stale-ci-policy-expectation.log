@@ -1,0 +1,29 @@
+F......
+======================================================================
+FAIL: test_ci_docs_enforces_task_state_and_docs_sync_strictly (__main__.CheckTaskStateLinksTests.test_ci_docs_enforces_task_state_and_docs_sync_strictly)
+The docs-sync step must route a real diff range per event.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/alex/Documents/IntrinsicEngine/tests/regression/tooling/Test.CheckTaskStateLinks.py", line 182, in test_ci_docs_enforces_task_state_and_docs_sync_strictly
+    self.assertEqual(
+AssertionError: Lists differ: ['tes[142 chars]CheckCompilerHazards.py', 'tests/regression/to[132 chars].py'] != ['tes[142 chars]CheckAraClaims.py', 'tests/regression/tooling/[29 chars].py']
+
+First differing element 2:
+'tests/regression/tooling/Test.CheckCompilerHazards.py'
+'tests/regression/tooling/Test.CheckAraClaims.py'
+
+First list contains 2 additional elements.
+First extra element 4:
+'tests/regression/tooling/Test.CheckAraClaims.py'
+
+  ['tests/regression/tooling/Test.CheckTaskStateLinks.py',
+   'tests/regression/tooling/Test.CheckKernelConvergence.py',
+-  'tests/regression/tooling/Test.CheckCompilerHazards.py',
+-  'tests/regression/tooling/Test.McpBridge.py',
+   'tests/regression/tooling/Test.CheckAraClaims.py',
+   'tests/regression/tooling/Test.SourceDocumentationAudit.py']
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.257s
+
+FAILED (failures=1)

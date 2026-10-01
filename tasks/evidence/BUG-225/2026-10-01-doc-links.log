@@ -1,0 +1,11 @@
+[check_doc_links] Root: /home/alex/Documents/IntrinsicEngine
+[check_doc_links] Checked relative links: 4309
+[check_doc_links] Mode: strict
+[check_doc_links] Broken relative links:
+  - tasks/archive/GEOM-020-sparse-direct-factorization-seam.md -> ../backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md
+  - tasks/archive/GEOM-020-sparse-direct-factorization-seam.md -> ../backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md
+  - tasks/backlog/methods/README.md -> METHOD-056-coherent-point-drift-vulkan-dense-e-step.md
+  - tasks/backlog/rendering/README.md -> GRAPHICS-148-vulkan-radix-sort-primitive.md
+  - tasks/backlog/runtime/README.md -> RUNTIME-290-point-sampling-vulkan-execution-seam.md
+[check_doc_links] Action: update moved paths or convert to canonical links.
+[check_doc_links] STRICT MODE: failing.

@@ -11,6 +11,7 @@ import argparse
 import hashlib
 import io
 import json
+import os
 import re
 import subprocess
 import sys
@@ -68,6 +69,8 @@ CONTRACT_LEGACY_INVENTORY = (
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 CONTRACT_ID_RE = re.compile(r"^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$")
 GIT_REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
+MARKDOWN_LINK_TARGET_RE = re.compile(r"\]\(([^()\s]+)\)")
+TASK_FILE_NAME_RE = re.compile(r"[A-Z]+-[0-9]+[A-Z0-9-]*-[^/]+\.md")
 METHOD_INTEGRATION_CONTRACT = "method.engine-integration"
 METHOD_INTEGRATION_FIELDS = (
     "Least-structured input",
@@ -264,8 +267,8 @@ def find_archive_files(root: Path) -> list[Path]:
     return files
 
 
-def task_snapshot_hashes_at_revision(revision: str) -> dict[str, str]:
-    """Return SHA-256 task-file hashes from one immutable Git revision."""
+def task_snapshot_at_revision(revision: str) -> dict[str, bytes]:
+    """Return task-file bytes from one immutable Git revision."""
     if not GIT_REVISION_RE.fullmatch(revision):
         raise ValueError("source_revision must be an exact 40-hex Git revision")
     result = subprocess.run(
@@ -288,7 +291,7 @@ def task_snapshot_hashes_at_revision(revision: str) -> dict[str, str]:
             f"cannot read contract source_revision `{revision}`: {detail}"
         )
 
-    hashes: dict[str, str] = {}
+    snapshot: dict[str, bytes] = {}
     with tarfile.open(fileobj=io.BytesIO(result.stdout), mode="r:") as archive:
         for member in archive.getmembers():
             if not member.isfile() or not member.name.endswith(".md"):
@@ -306,8 +309,53 @@ def task_snapshot_hashes_at_revision(revision: str) -> dict[str, str]:
                 raise ValueError(
                     f"cannot read `{member.name}` from contract source revision"
                 )
-            hashes[member.name] = hashlib.sha256(stream.read()).hexdigest()
-    return hashes
+            snapshot[member.name] = stream.read()
+    return snapshot
+
+
+def retargeted_task_links(baseline: bytes, current: bytes) -> list[str] | None:
+    """Return the new targets when only task-link directories changed.
+
+    Retired task files are frozen, but a link to another task breaks when that
+    task changes lifecycle directory. The one permitted edit rewrites the
+    directory part of such a link: every byte outside link targets, the task
+    file name and the fragment must match the baseline. Returns ``None`` for
+    any other difference and an empty list when nothing changed.
+    """
+    try:
+        baseline_text = baseline.decode("utf-8")
+        current_text = current.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    baseline_links = list(MARKDOWN_LINK_TARGET_RE.finditer(baseline_text))
+    current_links = list(MARKDOWN_LINK_TARGET_RE.finditer(current_text))
+    if len(baseline_links) != len(current_links):
+        return None
+
+    retargeted: list[str] = []
+    baseline_cursor = current_cursor = 0
+    for old, new in zip(baseline_links, current_links):
+        if (
+            baseline_text[baseline_cursor : old.start(1)]
+            != current_text[current_cursor : new.start(1)]
+        ):
+            return None
+        baseline_cursor, current_cursor = old.end(1), new.end(1)
+        if old.group(1) == new.group(1):
+            continue
+        old_path, old_hash, old_fragment = old.group(1).partition("#")
+        new_path, new_hash, new_fragment = new.group(1).partition("#")
+        old_name = old_path.rsplit("/", 1)[-1]
+        if (
+            not TASK_FILE_NAME_RE.fullmatch(old_name)
+            or new_path.rsplit("/", 1)[-1] != old_name
+            or (old_hash, old_fragment) != (new_hash, new_fragment)
+        ):
+            return None
+        retargeted.append(new_path)
+    if baseline_text[baseline_cursor:] != current_text[current_cursor:]:
+        return None
+    return retargeted
 
 
 def is_micro_task(parsed: ParsedTask) -> bool:
@@ -488,6 +536,9 @@ def validate_front_matter(
     contract_consumed_hashes: dict[str, str] = {}
     contract_source_hashes: dict[str, str] = {}
     contract_parallel_retired_hashes: dict[str, str] = {}
+    # Baseline bytes of retired (done/archive) tasks, keyed by inventory path,
+    # for the task-link retargeting exemption.
+    retired_baseline_bytes: dict[str, bytes] = {}
     if CONTRACT_LEGACY_INVENTORY.is_file():
         try:
             inventory = json.loads(
@@ -502,9 +553,13 @@ def validate_front_matter(
             ):
                 contract_legacy_hashes = inventory["tasks"]
                 contract_consumed_hashes = inventory["consumed"]
-                contract_source_hashes = task_snapshot_hashes_at_revision(
+                contract_source_snapshot = task_snapshot_at_revision(
                     inventory["source_revision"]
                 )
+                contract_source_hashes = {
+                    name: hashlib.sha256(content).hexdigest()
+                    for name, content in contract_source_snapshot.items()
+                }
                 parallel_retired = inventory.get("parallel_retired", {})
                 if not isinstance(parallel_retired, dict):
                     raise ValueError("parallel_retired must be a mapping")
@@ -530,9 +585,13 @@ def validate_front_matter(
                             "parallel_retired requires a source_revision and "
                             "tasks mapping"
                         )
-                    parallel_source_hashes = task_snapshot_hashes_at_revision(
+                    parallel_source_snapshot = task_snapshot_at_revision(
                         parallel_revision
                     )
+                    parallel_source_hashes = {
+                        name: hashlib.sha256(content).hexdigest()
+                        for name, content in parallel_source_snapshot.items()
+                    }
                     for rel, expected_hash in parallel_tasks.items():
                         rel_path = Path(rel) if isinstance(rel, str) else Path()
                         if (
@@ -560,6 +619,15 @@ def validate_front_matter(
                                 "in the primary source_revision"
                             )
                     contract_parallel_retired_hashes = parallel_tasks
+                retired_baseline_bytes = {
+                    name.removeprefix("tasks/"): content
+                    for name, content in contract_source_snapshot.items()
+                    if name.split("/", 2)[1] in {"done", "archive"}
+                }
+                for rel in contract_parallel_retired_hashes:
+                    retired_baseline_bytes[rel] = parallel_source_snapshot[
+                        f"tasks/{rel}"
+                    ]
                 overlap = set(contract_legacy_hashes) & set(
                     contract_consumed_hashes
                 )
@@ -657,9 +725,8 @@ def validate_front_matter(
             Finding("error", CONTRACT_CATALOG, f"contract catalog is invalid: {exc}")
         )
 
-    tasks_root = _tasks_root(parsed_tasks)
-
     all_contract_tasks = [*parsed_tasks, *(parsed_archive or [])]
+    tasks_root = _tasks_root(all_contract_tasks)
     parsed_by_inventory_path = {
         _task_inventory_path(parsed.path, tasks_root): parsed
         for parsed in all_contract_tasks
@@ -719,6 +786,42 @@ def validate_front_matter(
             continue
 
         if expected_legacy_hash == actual_hash:
+            continue
+
+        baseline_bytes = (
+            retired_baseline_bytes.get(rel)
+            if expected_legacy_hash is not None
+            else None
+        )
+        retargeted = (
+            retargeted_task_links(baseline_bytes, parsed.path.read_bytes())
+            if baseline_bytes is not None
+            else None
+        )
+        if retargeted is not None:
+            unresolved = [
+                target
+                for target in retargeted
+                if not (parsed.path.parent / target).resolve().is_file()
+                or target != os.path.relpath(
+                    (parsed.path.parent / target).resolve(), parsed.path.parent
+                )
+                or not any(
+                    (parsed.path.parent / target).resolve().is_relative_to(tasks_root / state)
+                    for state in ("active", "backlog", "done", "archive")
+                )
+            ]
+            for target in unresolved:
+                findings.append(
+                    Finding(
+                        "error",
+                        parsed.path,
+                        f"retired task link `{target}` was retargeted but does "
+                        "not resolve to a canonical relative path in a task lifecycle directory; "
+                        "frozen history may only follow the "
+                        "linked task to its current lifecycle path.",
+                    )
+                )
             continue
 
         if parsed.front_matter is None:

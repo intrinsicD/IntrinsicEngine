@@ -24,9 +24,38 @@ archived file as outside the contract baseline, yet `check_doc_links.py` now rep
 the link as broken (warning mode, non-fatal). Any archived task that links to a
 still-open task hits the same conflict when that task retires.
 
+### 2026-10-01 verification observation
+
+The strict link check on the method-review session still fails on the two
+GEOM-020 references. It also reports stale retired-task paths in the methods,
+rendering, and runtime backlog README files (METHOD-056, GRAPHICS-148,
+RUNTIME-290). These files were unchanged by this session. The complete
+[strict output](../../evidence/BUG-225/2026-10-01-doc-links.log) is retained;
+the default warning-mode exit is not a passing strict gate. No archive or
+checker policy was changed.
+
+## Resolution — 2026-10-01
+
+Archived task links may change only their directory when the same task moves.
+`validate_tasks.py` compares against immutable Git baseline bytes: task filename,
+fragment, link labels, and all other text stay unchanged; the new target must
+exist inside a task lifecycle directory. Regression tests reject content changes,
+wrong tasks, missing destinations, absolute/noncanonical paths, and destinations outside the task tree.
+The GEOM-020 links now point to GEOM-024 in `done/`. Retired entries were removed
+from open indexes and completed agent-control references placed under history
+headings. The canonical contract and archive README state this narrow exception.
+
+Verification: 31 task-validator tests, 3 doc-link tests, 7 task-state-link tests,
+strict doc links, strict task policy and strict task-state links.
+The task-state regression initially had a
+[stale CI-script expectation](../../evidence/BUG-225/2026-10-01-stale-ci-policy-expectation.log);
+it now requires the two already-enabled compiler-hazard/MCP regression scripts
+as well, preserving the exact-list check. No broken links are ignored.
+Implementation is verified in the working tree; retirement awaits a commit reference.
+
 ## Acceptance criteria
-- [ ] Pick one rule and apply it in the tools and `tasks/archive/README.md`: e.g. allow path-only link rewrites in archived files (with the contract baseline ignoring link-only diffs), or have `check_doc_links.py` resolve task links by ID across `backlog/`, `done/` and `archive/`.
-- [ ] `check_doc_links.py` is clean again, including `tasks/archive/GEOM-020-sparse-direct-factorization-seam.md`.
+- [x] Pick one rule and apply it in the tools and `tasks/archive/README.md`: e.g. allow path-only link rewrites in archived files (with the contract baseline ignoring link-only diffs), or have `check_doc_links.py` resolve task links by ID across `backlog/`, `done/` and `archive/`.
+- [x] `check_doc_links.py` is clean again, including `tasks/archive/GEOM-020-sparse-direct-factorization-seam.md`.
 
 ## Verification
 ```bash

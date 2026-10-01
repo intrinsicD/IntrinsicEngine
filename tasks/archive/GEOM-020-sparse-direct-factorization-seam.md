@@ -12,7 +12,7 @@ completed_on: 2026-06-28
 ## Non-goals
 - No optional SuiteSparse / CHOLMOD / Pardiso / Accelerate / MKL backends in this task; document the seam shape so a later task can add them.
 - No non-symmetric sparse LU; the non-symmetric **iterative** seam (BiCGSTAB) is owned by retired follow-up [`GEOM-023`](GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md), and a direct non-symmetric LU stays unowned until a consumer needs it.
-- No sparse symmetric (generalized) eigensolver; that is METHOD-006's gap and is owned by follow-up [`GEOM-024`](../backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md) (see Context).
+- No sparse symmetric (generalized) eigensolver; that is METHOD-006's gap and is owned by follow-up [`GEOM-024`](../done/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md) (see Context).
 - No changes to public method-package APIs; this task only adds to the geometry solver seam consumed by future method backends.
 - No performance claims without benchmark baselines.
 
@@ -36,7 +36,7 @@ completed_on: 2026-06-28
   symmetric generalized eigensolver (LOBPCG / shift-invert) from
   GEOM-008. That requires Spectra (an Eigen-companion library) and a
   different API surface; that follow-up is filed as
-  [`GEOM-024`](../backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md),
+  [`GEOM-024`](../done/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md),
   which depends on this task for its shift-invert inner solve.
 
 ## Status
