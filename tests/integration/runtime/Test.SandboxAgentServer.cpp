@@ -183,6 +183,26 @@ namespace
                 positions[i] = glm::vec3(float(i % 6) + 0.1f * float(i % 5), float(i / 6), 0.1f * float(i % 3));
             return R::SelectionController::ToStableEntityId(entity);
         }
+        // A 6x6 vertex grid mesh (50 triangles) with a vertex scalar "height" (a ridge along x = 2.5).
+        std::uint32_t AddGrid()
+        {
+            const auto entity = Scene().Create();
+            Geometry::HalfedgeMesh::Mesh mesh;
+            std::vector<Geometry::VertexHandle> v;
+            for (int y = 0; y < 6; ++y)
+                for (int x = 0; x < 6; ++x) v.push_back(mesh.AddVertex({float(x), float(y), 0.0f}));
+            for (int y = 0; y < 5; ++y)
+                for (int x = 0; x < 5; ++x)
+                {
+                    (void)mesh.AddTriangle(v[std::size_t(y * 6 + x)], v[std::size_t(y * 6 + x + 1)], v[std::size_t((y + 1) * 6 + x + 1)]);
+                    (void)mesh.AddTriangle(v[std::size_t(y * 6 + x)], v[std::size_t((y + 1) * 6 + x + 1)], v[std::size_t((y + 1) * 6 + x)]);
+                }
+            GS::PopulateFromMesh(Scene().Raw(), entity, mesh);
+            auto& vertices = Scene().Raw().get<GS::Vertices>(entity).Properties;
+            auto height = vertices.GetOrAdd<double>("height", 0.0);
+            for (std::size_t i = 0; i < vertices.Size(); ++i) height[i] = 1.0 - std::abs(double(i % 6) - 2.5) * 0.3;
+            return R::SelectionController::ToStableEntityId(entity);
+        }
         // Serves `script` on a client thread (already initialized) until it returns.
         void Run(const std::function<void(Client&)>& script, std::chrono::seconds limit = std::chrono::seconds(60))
         {
@@ -828,5 +848,54 @@ TEST(SandboxAgentServer, RunOperationOutlierAnalysisPublishesAndUndoes)
             c.Tool("config_get", {{"section", name}}, &sectionError);
             rig.Check(!sectionError, std::string(op) + " reads the registered section " + name);
         }
+    });
+}
+
+// RUNTIME-312 slice 7D: explicit-parameter operations over the command defaults, with undo, and
+// typed errors for bad params.
+TEST(SandboxAgentServer, RunOperationTakesExplicitParamsAndUndoes)
+{
+    AgentRig rig("params");
+    ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
+    const auto grid = rig.AddGrid();
+    rig.Run([&](Client& c) {
+        const auto faces = [&] {
+            for (const auto& row : c.Tool("scene_entities")["entities"])
+                if (row["entity"] == grid) return row["geometry"]["faces"].get<int>();
+            return -1;
+        };
+        const auto entityCount = [&] { return c.Tool("scene_entities")["entities"].size(); };
+        bool isError = true;
+        rig.Check(faces() == 50, "the grid has 50 triangles");
+        // Bad params are typed errors before anything runs.
+        const auto badType = c.Tool("run_operation", {{"operation", "mesh_simplify"}, {"entity", grid}, {"params", {{"target_faces", "many"}}}}, &isError);
+        rig.Check(isError && badType.dump().find("target_faces") != std::string::npos, "param type error: " + badType.dump());
+        const auto badName = c.Request("tools/call", {{"name", "run_operation"}, {"arguments", {{"operation", "mesh_simplify"}, {"entity", grid}, {"params", {{"faces", 5}}}}}});
+        rig.Check(badName["result"]["isError"] == true && badName["result"]["structuredContent"]["error"]["code"] == "invalid_params",
+                  "unknown param is invalid_params: " + badName.dump().substr(0, 400));
+        c.Tool("run_operation", {{"operation", "mesh_simplify"}, {"entity", grid}, {"params", {{"metric", "bogus"}}}}, &isError);
+        rig.Check(isError, "an enum value outside the list is refused");
+        c.Tool("run_operation", {{"operation", "outlier_analysis"}, {"params", {{"k", 1}}}}, &isError);
+        rig.Check(isError, "a config-backed operation takes no params");
+        rig.Check(faces() == 50, "refused calls changed nothing");
+        // scalar_ridge: the property is picked from the catalog; the graph is a new entity.
+        const auto before = entityCount();
+        const auto missing = c.Tool("run_operation", {{"operation", "scalar_ridge"}, {"entity", grid}, {"params", {{"property", "nope"}}}}, &isError);
+        rig.Check(isError && missing.dump().find("nope") != std::string::npos, "unknown ridge property: " + missing.dump());
+        const auto ridge = c.Tool("run_operation", {{"operation", "scalar_ridge"}, {"entity", grid}, {"params", {{"property", "height"}, {"radius_ratio", 0.4}, {"minimum_sharpness", 0.0}, {"minimum_strength", 0.0}}}}, &isError);
+        rig.Check(!isError && ridge["succeeded"] == true, "scalar_ridge: " + ridge.dump());
+        rig.Check(entityCount() == before + 1, "the ridge graph is a new entity");
+        const auto history = c.Tool("history");
+        const int steps = history["undo_count"].get<int>();
+        const auto ridgeUndo = c.Tool("undo", {{"steps", steps}}, &isError);
+        rig.Check(!isError && entityCount() == before, "undo removed the graph entity: " + ridgeUndo.dump());
+        // mesh_simplify: defaults from the command struct plus target_faces.
+        const auto preview = c.Tool("preview_operation", {{"operation", "mesh_simplify"}, {"entity", grid}, {"params", {{"target_faces", 20}}}}, &isError);
+        rig.Check(!isError && preview["enabled"].is_boolean(), "preview mesh_simplify: " + preview.dump());
+        const auto simplified = c.Tool("run_operation", {{"operation", "mesh_simplify"}, {"entity", grid}, {"params", {{"target_faces", 20}}}}, &isError);
+        rig.Check(!isError && simplified["succeeded"] == true && simplified["input_faces"] == 50, "mesh_simplify: " + simplified.dump());
+        rig.Check(faces() < 50 && faces() >= 1, "simplification reduced the faces to " + std::to_string(faces()));
+        const auto undone = c.Tool("undo", Json::object(), &isError);
+        rig.Check(!isError && undone["undone"].size() == 1u && faces() == 50, "one undo restores the mesh: " + undone.dump());
     });
 }

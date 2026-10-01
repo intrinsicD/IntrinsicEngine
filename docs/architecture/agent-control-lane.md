@@ -132,10 +132,15 @@ Nothing exists without the launch flag: no module, thread or socket.
 - Configured operations. `run_operation` / `preview_operation` select a row of one table by
   `operation`: property smoothing, spectral modes, harmonic field, scalar gradient, mesh
   curvature, geodesics, curvature segmentation, normal estimation, kernel density, point
-  spacing, outlier analysis, density weight, descriptor analysis, bilateral filter and point
-  construction. Each row calls its panel's `Preview*`/`Apply*` path with the settings of its
-  config section (`config_apply` first); the tool description lists every row with its section
-  and whether the entity is an argument. A row whose section carries the entity refuses an
+  spacing, outlier analysis, density weight, descriptor analysis, bilateral filter, point
+  construction, progressive Poisson, parameterization, scalar ridges and the mesh topology
+  operations (denoise, remesh, subdivide, simplify). Each row calls its panel's
+  `Preview*`/`Apply*` path with the settings of its config section (`config_apply` first); the
+  mesh topology operations and scalar ridges have no section and take a `params` object whose
+  keys and defaults (taken from the command structs' own initializers) the tool description
+  lists; bad params end with the error code `invalid_params`. The tool description lists every row
+  with its section or params and whether the entity is an argument. A scalar ridge picks its
+  `property` from the entity's vertex scalars like the panel's combo. A row whose section carries the entity refuses an
   `entity` argument, naming the section. `run_mesh_operation` and `preview_mesh_operation` are
   aliases limited to the four mesh-field rows. A `Pending` command answers when its job
   delivered (`result_unavailable` when none can). Geodesics has no readiness check, so its
@@ -213,10 +218,8 @@ Planned: lane hardening (the remaining protocol conformance) and the remaining o
 
 - Operation tools exist for the configured operations of the table above, registration (ICP,
   Coherent Point Drift), point sampling, keypoint analysis, k-means and point-cloud
-  consolidation. The remaining editor commands (mesh denoise, remesh, subdivide and simplify,
-  scalar ridge, progressive Poisson, parameterization, scene save/load, visibility, camera
-  controller) are owned by
-  [RUNTIME-312](../../tasks/backlog/runtime/RUNTIME-312-agent-lane-mcp-hardening-and-coverage.md).
+  consolidation. The remaining editor commands (scene save/load, visibility, camera controller)
+  are owned by [RUNTIME-312](../../tasks/backlog/runtime/RUNTIME-312-agent-lane-mcp-hardening-and-coverage.md).
 - Imports are asynchronous (`Pending`); poll `scene_entities` for the result.
 - History entries that a queued editor job publishes on a later frame (every `Pending` run:
   registration, point analysis, normal estimation and the like) carry the command's own label

@@ -697,7 +697,8 @@ TEST(AgentOperations, ConfiguredOperationEnumMatchesTable)
     EXPECT_EQ(all, enumOf("preview_operation"));
     for (const char* name : {"property_smoothing", "spectral_modes", "harmonic_field", "scalar_gradient", "mesh_curvature", "geodesics",
                              "curvature_segmentation", "normal_estimation", "kernel_density", "point_spacing", "outlier_analysis",
-                             "density_weight", "descriptor_analysis", "bilateral_filter", "point_construction"})
+                             "density_weight", "descriptor_analysis", "bilateral_filter", "point_construction", "mesh_denoise",
+                             "mesh_remesh", "mesh_subdivide", "mesh_simplify", "scalar_ridge", "progressive_poisson", "parameterization"})
         EXPECT_NE(std::ranges::find(all, name), all.end()) << name;
     // The mesh aliases keep their four-operation enum, all of which the table serves.
     EXPECT_EQ(enumOf("run_mesh_operation"), (Json{"property_smoothing", "spectral_modes", "harmonic_field", "scalar_gradient"}));
@@ -708,6 +709,11 @@ TEST(AgentOperations, ConfiguredOperationEnumMatchesTable)
     EXPECT_FALSE(registry.Find("preview_operation")->NeedsPresentedFrame);
     const auto required = Json::parse(registry.Find("run_operation")->InputSchemaJson)["required"];
     EXPECT_EQ(required, (Json{"operation"})) << "entity is optional: config-sourced rows take none";
+    const auto description = registry.Find("run_operation")->Description;
+    EXPECT_NE(description.find("mesh_simplify (entity argument; params metric=fa_qem, target_faces=0"), std::string::npos)
+        << "params defaults come from the command structs: " << description;
+    const Json schema = Json::parse(registry.Find("run_operation")->InputSchemaJson);
+    EXPECT_TRUE(schema["properties"].contains("params"));
 }
 
 TEST(AgentOperations, ConfiguredOperationEntityRulesFollowTheSection)

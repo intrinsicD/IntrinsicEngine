@@ -125,6 +125,10 @@ the editor operations the Sandbox UI already offers.
    filter, point construction); `run_mesh_operation` stays an alias of the mesh-field rows.
    `NeedsPresentedFrame` stays per tool (so CPU-only rows are refused while minimized too).
    Known gap: history entries published by a queued job lack the `Agent: ` prefix.
+   *Slice 7D done:* mesh denoise/remesh/subdivide/simplify and scalar ridge take a `params` object over
+   the command structs' own defaults (typed `invalid_params` errors); progressive Poisson and
+   parameterization are table rows over their sections. Parameterization has no exact readiness
+   function (the panel gates on the selection), so its preview answers `enabled: null`.
 
 8. **Per-run progress source (after UI-069 slice 1).** Each `Run*` captures its run
    key (editor job identity or correlation id) in its outcome; `PollPending` asks

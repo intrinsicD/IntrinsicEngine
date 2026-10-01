@@ -8,10 +8,12 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <vector>
 #include <glm/glm.hpp>
@@ -31,6 +33,9 @@ import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.RegistrationOperations;
 import Extrinsic.Runtime.PointSamplingOperations;
 import Extrinsic.Runtime.PointAnalysisOperations;
+import Extrinsic.Runtime.MeshTopologyOperations;
+import Extrinsic.Runtime.ScalarRidgeOperations;
+import Extrinsic.Runtime.ParameterizationOperations;
 import Extrinsic.Runtime.NormalOperations;
 import Extrinsic.Runtime.PointFieldOperations;
 import Extrinsic.Runtime.PointSetOperations;
@@ -63,14 +68,16 @@ namespace Extrinsic::Runtime
             const Json& Args;
             std::optional<std::uint32_t> Entity; // set for Argument rows
             bool Preview;
+            const EditorWorkspaceSnapshotPreparedFrame& Prepared;
         };
         struct ConfiguredOperation
         {
             const char* Name;
             const char* Family; // "mesh_field" (also served by run_mesh_operation), "mesh_analysis", "point"
             OperationEntity Entity;
-            const char* Section; // the config section the settings (and a Config row's entity) come from
+            const char* Section; // the config section the settings (and a Config row's entity) come from; empty with Params
             std::function<AgentOperationOutcome(const OperationCall&)> Run;
+            std::string Params{}; // rows without a section: "key=default, ..." of their `params` object
         };
 
         Json OperationResultJson(const char* name, Json result)
@@ -149,6 +156,193 @@ namespace Extrinsic::Runtime
                     if (!config) return MissingSection<Result>(section);
                     return apply(commands, entity, *config, std::move(onComplete));
                 });
+        }
+
+        // ---- explicit parameters ----------------------------------------------------------
+        // Rows without a config section take a `params` object. Defaults come only from the command
+        // struct's own member initializers (`Cmd{}`); params that are absent keep them.
+        template <class Cmd>
+        struct ParamSpec
+        {
+            std::string Name;
+            std::string Type; // JSON type
+            std::string Description;
+            std::vector<std::string> Enum;
+            Json Default;
+            std::function<std::string(Cmd&, const Json&)> Set; // empty on success, else why the value is wrong
+        };
+        template <class Cmd>
+        using ParamSpecs = std::vector<ParamSpec<Cmd>>;
+
+        template <class Cmd, class T>
+        ParamSpec<Cmd> ValueParam(std::string name, T Cmd::* field, std::string description)
+        {
+            const Cmd defaults{};
+            ParamSpec<Cmd> spec;
+            spec.Name = std::move(name);
+            spec.Description = std::move(description);
+            spec.Default = Json(defaults.*field);
+            if constexpr (std::is_same_v<T, bool>)
+            {
+                spec.Type = "boolean";
+                spec.Set = [field](Cmd& command, const Json& value) -> std::string {
+                    if (!value.is_boolean()) return "must be true or false";
+                    command.*field = value.get<bool>();
+                    return {};
+                };
+            }
+            else if constexpr (std::is_integral_v<T>)
+            {
+                spec.Type = "integer";
+                spec.Set = [field](Cmd& command, const Json& value) -> std::string {
+                    if (!value.is_number_integer()) return "must be an integer";
+                    if (value.is_number_unsigned())
+                    {
+                        const auto number = value.get<std::uint64_t>();
+                        if (number > std::uint64_t(std::numeric_limits<T>::max())) return "is out of range";
+                        command.*field = static_cast<T>(number);
+                        return {};
+                    }
+                    const auto number = value.get<std::int64_t>();
+                    if (number < std::int64_t(std::numeric_limits<T>::min()) ||
+                        (std::is_unsigned_v<T> && number < 0) || (!std::is_unsigned_v<T> && number > std::int64_t(std::numeric_limits<T>::max())))
+                        return "is out of range";
+                    command.*field = static_cast<T>(number);
+                    return {};
+                };
+            }
+            else
+            {
+                spec.Type = "number";
+                spec.Set = [field](Cmd& command, const Json& value) -> std::string {
+                    if (!value.is_number()) return "must be a number";
+                    command.*field = static_cast<T>(value.get<double>());
+                    return {};
+                };
+            }
+            return spec;
+        }
+        // A property name; the command's GeometryPropertyRef keeps its other fields until resolved.
+        template <class Cmd>
+        ParamSpec<Cmd> StringParam(std::string name, std::string description, GeometryPropertyRef Cmd::* field)
+        {
+            const Cmd defaults{};
+            ParamSpec<Cmd> spec;
+            spec.Name = std::move(name);
+            spec.Type = "string";
+            spec.Description = std::move(description);
+            spec.Default = (defaults.*field).Name;
+            spec.Set = [field](Cmd& command, const Json& value) -> std::string {
+                if (!value.is_string()) return "must be a property name";
+                (command.*field).Name = value.template get<std::string>();
+                return {};
+            };
+            return spec;
+        }
+        template <class Cmd, class E>
+        ParamSpec<Cmd> EnumParam(std::string name, E Cmd::* field, std::string description,
+                                 std::vector<std::pair<std::string, E>> values)
+        {
+            const Cmd defaults{};
+            ParamSpec<Cmd> spec;
+            spec.Name = std::move(name);
+            spec.Type = "string";
+            spec.Description = std::move(description);
+            for (const auto& [token, value] : values)
+            {
+                spec.Enum.push_back(token);
+                if (value == defaults.*field) spec.Default = token;
+            }
+            spec.Set = [field, values = std::move(values)](Cmd& command, const Json& value) -> std::string {
+                if (!value.is_string()) return "must be a string";
+                for (const auto& [token, mapped] : values)
+                    if (token == value.get<std::string>()) { command.*field = mapped; return {}; }
+                return "is not one of the listed values";
+            };
+            return spec;
+        }
+        template <class Cmd>
+        std::string ApplyParams(const ParamSpecs<Cmd>& specs, const Json& args, Cmd& command)
+        {
+            const auto it = args.find("params");
+            if (it == args.end()) return {};
+            if (!it->is_object()) return "params must be an object.";
+            for (const auto& [key, value] : it->items())
+            {
+                const auto spec = std::ranges::find_if(specs, [&](const ParamSpec<Cmd>& s) { return s.Name == key; });
+                if (spec == specs.end())
+                {
+                    std::string valid;
+                    for (const auto& s : specs) valid += (valid.empty() ? "" : ", ") + s.Name;
+                    return "Unknown parameter '" + key + "'; valid: " + valid + ".";
+                }
+                if (const auto problem = spec->Set(command, value); !problem.empty())
+                    return "Parameter '" + key + "' " + problem + (spec->Enum.empty() ? "" : " (" + [&] {
+                        std::string list;
+                        for (const auto& e : spec->Enum) list += (list.empty() ? "" : "|") + e;
+                        return list; }() + ")") + ".";
+            }
+            return {};
+        }
+        template <class Cmd>
+        std::string ParamsText(const ParamSpecs<Cmd>& specs)
+        {
+            std::string text;
+            for (const auto& spec : specs)
+            {
+                text += (text.empty() ? "" : ", ") + spec.Name + "=";
+                if (!spec.Enum.empty() || spec.Type == "string") text += spec.Default.is_string() ? spec.Default.template get<std::string>() : std::string("<name>");
+                else text += spec.Default.dump();
+            }
+            return text;
+        }
+        AgentOperationOutcome InvalidParams(std::string message)
+        {
+            return {.IsError = true, .Text = std::move(message), .ErrorCode = "invalid_params"};
+        }
+
+        // The call names the entity; the settings are `params` over the command's own defaults.
+        // `resolve(call, command)` may refine the command after the params applied (empty = fine).
+        template <class Result, class Cmd, class Frame, class Preview, class Apply, class Describe, class Resolve>
+        ConfiguredOperation ExplicitOperation(const char* name, const char* family, ParamSpecs<Cmd> specs, Frame frame,
+                                              Preview preview, Apply apply, Describe describe, Resolve resolve)
+        {
+            ConfiguredOperation op{name, family, OperationEntity::Argument, "",
+                [=](const OperationCall& call) -> AgentOperationOutcome {
+                    Cmd command{};
+                    command.StableEntityId = *call.Entity;
+                    if (const auto problem = ApplyParams(specs, call.Args, command); !problem.empty()) return InvalidParams(problem);
+                    if (const auto problem = resolve(call, command); !problem.empty()) return InvalidParams(problem);
+                    const auto commands = frame(*call.Context.Attachment).Commands;
+                    if (call.Preview)
+                    {
+                        const std::optional<ActionReadiness> readiness = preview(commands, command);
+                        if (!readiness) return NoReadinessCheck(name);
+                        return Ok(ReadinessJson(commands, *readiness, {{"operation", name}}));
+                    }
+                    return FinishApply<Result>([&](auto onComplete) { return apply(commands, command, std::move(onComplete)); },
+                                               [name, describe](const Result& r) { return OperationResultJson(name, describe(r)); });
+                }};
+            op.Params = ParamsText(specs);
+            return op;
+        }
+        template <class Result, class Cmd, class Frame, class Preview, class Apply, class Describe>
+        ConfiguredOperation ExplicitOperation(const char* name, const char* family, ParamSpecs<Cmd> specs, Frame frame,
+                                              Preview preview, Apply apply, Describe describe)
+        {
+            return ExplicitOperation<Result>(name, family, std::move(specs), frame, preview, apply, describe,
+                                             [](const OperationCall&, Cmd&) { return std::string{}; });
+        }
+        template <class Result>
+        Json TopologyJson(const Result& r)
+        {
+            Json out = ResultJson(r);
+            out["input_vertices"] = r.InputVertexCount;
+            out["input_faces"] = r.InputFaceCount;
+            out["output_vertices"] = r.OutputVertexCount;
+            out["output_faces"] = r.OutputFaceCount;
+            out["texcoords"] = DebugNameForEditorMeshTexcoordOutcome(r.TexcoordOutcome);
+            return out;
         }
 
         const std::vector<ConfiguredOperation>& ConfiguredOperations()
@@ -238,6 +432,154 @@ namespace Extrinsic::Runtime
                         return ActionReadiness{readiness.Ready, readiness.Diagnostic};
                     },
                     [](const auto& c, auto onComplete) { return ApplyEditorConfiguredPointConstruction(c, std::move(onComplete)); }));
+                // -- topology editing and ridges: explicit params over the command defaults
+                ops.push_back(ExplicitOperation<EditorMeshDenoiseResult, EditorMeshDenoiseCommand>(
+                    "mesh_denoise", "mesh_topology",
+                    ParamSpecs<EditorMeshDenoiseCommand>{
+                        ValueParam("normal_iterations", &EditorMeshDenoiseCommand::NormalIterations, "Normal filtering iterations."),
+                        ValueParam("vertex_iterations", &EditorMeshDenoiseCommand::VertexIterations, "Vertex update iterations."),
+                        ValueParam("sigma_spatial", &EditorMeshDenoiseCommand::SigmaSpatial, "Spatial sigma; 0 derives it from the mesh."),
+                        ValueParam("sigma_range", &EditorMeshDenoiseCommand::SigmaRange, "Range sigma; 0 derives it from the mesh."),
+                        ValueParam("preserve_boundary", &EditorMeshDenoiseCommand::PreserveBoundary, "Keep boundary vertices fixed."),
+                        ValueParam("degenerate_normal_length_epsilon", &EditorMeshDenoiseCommand::DegenerateNormalLengthEpsilon,
+                                   "Face normals shorter than this count as degenerate.")},
+                    &PrepareEditorMeshTopologyFrame,
+                    [](const auto& c, const EditorMeshDenoiseCommand& cmd) -> std::optional<ActionReadiness> { return PreviewEditorMeshDenoiseCommand(c, cmd); },
+                    [](const auto& c, const EditorMeshDenoiseCommand& cmd, auto onComplete) { return ApplyEditorMeshDenoiseCommand(c, cmd, std::move(onComplete)); },
+                    [](const EditorMeshDenoiseResult& r) {
+                        Json out = ResultJson(r);
+                        out["moved_vertices"] = r.MovedVertexCount;
+                        out["pinned_boundary_vertices"] = r.PinnedBoundaryVertexCount;
+                        return out;
+                    }));
+                ops.push_back(ExplicitOperation<EditorMeshRemeshResult, EditorMeshRemeshCommand>(
+                    "mesh_remesh", "mesh_topology",
+                    ParamSpecs<EditorMeshRemeshCommand>{
+                        EnumParam("mode", &EditorMeshRemeshCommand::Mode, "Uniform or curvature-adaptive edge lengths.",
+                                  {{"uniform", EditorMeshRemeshMode::Uniform}, {"adaptive", EditorMeshRemeshMode::Adaptive}}),
+                        EnumParam("sizing_law", &EditorMeshRemeshCommand::SizingLaw, "Adaptive sizing law.",
+                                  {{"mean_curvature", EditorMeshRemeshSizingLaw::MeanCurvature},
+                                   {"error_bounded_taubin", EditorMeshRemeshSizingLaw::ErrorBoundedTaubin}}),
+                        ValueParam("iterations", &EditorMeshRemeshCommand::Iterations, "Remeshing iterations."),
+                        ValueParam("target_edge_length", &EditorMeshRemeshCommand::TargetEdgeLength, "Target edge length; 0 uses the mean edge length."),
+                        ValueParam("lambda", &EditorMeshRemeshCommand::Lambda, "Tangential smoothing weight."),
+                        ValueParam("curvature_adaptation", &EditorMeshRemeshCommand::CurvatureAdaptation, "Adaptive mode: curvature influence."),
+                        ValueParam("approximation_error", &EditorMeshRemeshCommand::ApproximationError, "Adaptive mode: allowed approximation error."),
+                        ValueParam("preserve_boundary", &EditorMeshRemeshCommand::PreserveBoundary, "Keep boundary edges."),
+                        ValueParam("project_to_surface", &EditorMeshRemeshCommand::ProjectToSurface, "Project results back onto the input surface."),
+                        ValueParam("reference_projection_k", &EditorMeshRemeshCommand::ReferenceProjectionK, "Neighbors used for surface projection."),
+                        ValueParam("max_reference_projection_distance", &EditorMeshRemeshCommand::MaxReferenceProjectionDistance,
+                                   "Largest projection distance; 0 means unlimited.")},
+                    &PrepareEditorMeshTopologyFrame,
+                    [](const auto& c, const EditorMeshRemeshCommand& cmd) -> std::optional<ActionReadiness> { return PreviewEditorMeshRemeshCommand(c, cmd); },
+                    [](const auto& c, const EditorMeshRemeshCommand& cmd, auto onComplete) { return ApplyEditorMeshRemeshCommand(c, cmd, std::move(onComplete)); },
+                    [](const EditorMeshRemeshResult& r) {
+                        Json out = TopologyJson(r);
+                        out["splits"] = r.SplitCount;
+                        out["collapses"] = r.CollapseCount;
+                        out["flips"] = r.FlipCount;
+                        return out;
+                    }));
+                ops.push_back(ExplicitOperation<EditorMeshSubdivideResult, EditorMeshSubdivideCommand>(
+                    "mesh_subdivide", "mesh_topology",
+                    ParamSpecs<EditorMeshSubdivideCommand>{
+                        EnumParam("operator", &EditorMeshSubdivideCommand::Operator, "Subdivision scheme.",
+                                  {{"loop", EditorMeshSubdivideOperator::Loop}, {"catmull_clark", EditorMeshSubdivideOperator::CatmullClark},
+                                   {"sqrt3", EditorMeshSubdivideOperator::Sqrt3}}),
+                        ValueParam("iterations", &EditorMeshSubdivideCommand::Iterations, "Subdivision steps."),
+                        ValueParam("preserve_loop_feature_edges", &EditorMeshSubdivideCommand::PreserveLoopFeatureEdges, "Loop: keep creases on e:feature edges."),
+                        ValueParam("max_output_faces", &EditorMeshSubdivideCommand::MaxOutputFaces, "Refuse results above this face count; 0 means unlimited.")},
+                    &PrepareEditorMeshTopologyFrame,
+                    [](const auto& c, const EditorMeshSubdivideCommand& cmd) -> std::optional<ActionReadiness> { return PreviewEditorMeshSubdivideCommand(c, cmd); },
+                    [](const auto& c, const EditorMeshSubdivideCommand& cmd, auto onComplete) { return ApplyEditorMeshSubdivideCommand(c, cmd, std::move(onComplete)); },
+                    [](const EditorMeshSubdivideResult& r) { return TopologyJson(r); }));
+                ops.push_back(ExplicitOperation<EditorMeshSimplifyResult, EditorMeshSimplifyCommand>(
+                    "mesh_simplify", "mesh_topology",
+                    ParamSpecs<EditorMeshSimplifyCommand>{
+                        EnumParam("metric", &EditorMeshSimplifyCommand::Metric, "Collapse error metric.",
+                                  {{"classical_qem", EditorMeshSimplifyMetric::ClassicalQEM}, {"fa_qem", EditorMeshSimplifyMetric::FA_QEM}}),
+                        ValueParam("target_faces", &EditorMeshSimplifyCommand::TargetFaces, "Stop at this face count; 0 disables."),
+                        ValueParam("max_error", &EditorMeshSimplifyCommand::MaxError, "Largest error per collapse; 0 means unlimited."),
+                        ValueParam("preserve_boundary", &EditorMeshSimplifyCommand::PreserveBoundary, "Keep boundary vertices."),
+                        ValueParam("feature_angle_threshold_degrees", &EditorMeshSimplifyCommand::FeatureAngleThresholdDegrees, "fa_qem: sharp feature angle."),
+                        ValueParam("normal_weight", &EditorMeshSimplifyCommand::NormalWeight, "fa_qem: normal weight."),
+                        ValueParam("boundary_weight", &EditorMeshSimplifyCommand::BoundaryWeight, "fa_qem: boundary weight."),
+                        ValueParam("curvature_weight", &EditorMeshSimplifyCommand::CurvatureWeight, "fa_qem: curvature weight."),
+                        ValueParam("preserve_sharp_features", &EditorMeshSimplifyCommand::PreserveSharpFeatures, "Pin sharp feature vertices."),
+                        ValueParam("preserve_uv_seams", &EditorMeshSimplifyCommand::PreserveUvSeams, "Pin UV seam vertices.")},
+                    &PrepareEditorMeshTopologyFrame,
+                    [](const auto& c, const EditorMeshSimplifyCommand& cmd) -> std::optional<ActionReadiness> { return PreviewEditorMeshSimplifyCommand(c, cmd); },
+                    [](const auto& c, const EditorMeshSimplifyCommand& cmd, auto onComplete) { return ApplyEditorMeshSimplifyCommand(c, cmd, std::move(onComplete)); },
+                    [](const EditorMeshSimplifyResult& r) {
+                        Json out = TopologyJson(r);
+                        out["collapses"] = r.CollapseCount;
+                        out["max_collapse_error"] = r.MaxCollapseError;
+                        return out;
+                    }));
+                // The ridge property is picked from the entity's catalog like the panel's combo (vertex scalars).
+                ops.push_back(ExplicitOperation<EditorScalarRidgeResult, EditorScalarRidgeCommand>(
+                    "scalar_ridge", "mesh_analysis",
+                    ParamSpecs<EditorScalarRidgeCommand>{
+                        StringParam("property", "Vertex scalar property to trace; any bindable scalar of the entity.",
+                                    &EditorScalarRidgeCommand::Property),
+                        EnumParam("method", &EditorScalarRidgeCommand::Method, "Ridge detector.",
+                                  {{"hessian_ridge", EditorScalarExtremaMethod::HessianRidge}, {"watershed", EditorScalarExtremaMethod::Watershed}}),
+                        ValueParam("radius_ratio", &EditorScalarRidgeCommand::RadiusRatio, "Hessian fit radius as a fraction of the diagonal."),
+                        ValueParam("scale", &EditorScalarRidgeCommand::Scale, "Hessian scale: 0 (0.5x), 1 (1x) or 2 (2x radius)."),
+                        ValueParam("minimum_sharpness", &EditorScalarRidgeCommand::MinimumSharpness, "Hessian: weakest accepted sharpness."),
+                        ValueParam("minimum_strength", &EditorScalarRidgeCommand::MinimumStrength, "Weakest accepted strength."),
+                        ValueParam("ridges", &EditorScalarRidgeCommand::Ridges, "Trace ridges."),
+                        ValueParam("valleys", &EditorScalarRidgeCommand::Valleys, "Trace valleys."),
+                        ValueParam("require_persistence", &EditorScalarRidgeCommand::RequirePersistence, "Hessian: keep only curves found at another scale too."),
+                        ValueParam("minimum_persistence", &EditorScalarRidgeCommand::MinimumPersistence, "Watershed: basin persistence as a fraction of the range."),
+                        ValueParam("publish_graph", &EditorScalarRidgeCommand::PublishGraph, "Publish the curves as a new graph entity."),
+                        ValueParam("publish_mesh_features", &EditorScalarRidgeCommand::PublishMeshFeatures, "Publish vertex and edge feature properties on the mesh.")},
+                    &PrepareEditorMeshFieldFrame,
+                    [](const auto&, const EditorScalarRidgeCommand&) { return std::optional<ActionReadiness>{}; },
+                    [](const auto& c, const EditorScalarRidgeCommand& cmd, auto) { return ApplyEditorScalarRidgeCommand(c, cmd); },
+                    [](const EditorScalarRidgeResult& r) {
+                        Json out = ResultJson(r);
+                        out["output_entity"] = r.OutputEntityId;
+                        out["ridge_segments"] = r.RidgeSegmentCount;
+                        out["valley_segments"] = r.ValleySegmentCount;
+                        out["feature_vertices"] = r.FeatureVertexCount;
+                        out["feature_edges"] = r.FeatureEdgeCount;
+                        out["basins"] = r.BasinCount;
+                        out["milliseconds"] = r.ComputeMilliseconds;
+                        return out;
+                    },
+                    [](const OperationCall& call, EditorScalarRidgeCommand& command) -> std::string {
+                        const auto params = call.Args.find("params");
+                        if (params == call.Args.end() || !params->contains("property")) return {};
+                        const auto inspector = BuildEditorInspectorModel(call.Prepared.SnapshotQueries, nullptr, command.StableEntityId);
+                        if (!inspector.HasEntity) return "No entity with id " + std::to_string(command.StableEntityId) + ".";
+                        const auto row = std::ranges::find_if(inspector.PropertyCatalog.Rows, [&](const EditorPropertyCatalogRow& r) {
+                            return r.Name == command.Property.Name && !r.Internal && r.Bindable &&
+                                   r.Descriptor.Domain == GeometryElementDomain::MeshVertex &&
+                                   GeometryPropertyComponentCount(r.ValueKind) <= 1u;
+                        });
+                        if (row == inspector.PropertyCatalog.Rows.end())
+                            return "Entity " + std::to_string(command.StableEntityId) + " has no vertex scalar '" + command.Property.Name +
+                                   "'; see entity_properties.";
+                        command.Property = row->Descriptor;
+                        return {};
+                    }));
+                // -- config-backed rows whose command also takes an entity
+                ops.push_back(EntityOverConfig<EditorProgressivePoissonResult, ProgressivePoissonPlaygroundConfig>(
+                    "progressive_poisson", "point", "sandbox.progressive_poisson", &PrepareEditorPointSetFrame,
+                    &GetEditorProgressivePoissonConfig,
+                    [](const auto& c, std::uint32_t id, const ProgressivePoissonPlaygroundConfig& config) {
+                        return PreviewEditorProgressivePoissonCommand(c, {id, config});
+                    },
+                    [](const auto& c, std::uint32_t id, const ProgressivePoissonPlaygroundConfig& config, auto onComplete) {
+                        return ApplyEditorProgressivePoissonCommand(c, {id, config}, std::move(onComplete));
+                    }));
+                ops.push_back(EntityOperation<EditorParameterizationResult>(
+                    "parameterization", "mesh_analysis", "sandbox.parameterization", &PrepareEditorParameterizationFrame,
+                    [](const auto&, std::uint32_t) { return std::optional<ActionReadiness>{}; },
+                    [](const auto& c, std::uint32_t id, auto onComplete) {
+                        return ApplyEditorConfiguredParameterizationCommand(c, EditorConfiguredParameterizationCommand{id}, std::move(onComplete));
+                    }));
                 return ops;
             }();
             return operations;
@@ -257,8 +599,11 @@ namespace Extrinsic::Runtime
             std::string text;
             for (const auto& op : ConfiguredOperations())
                 if (InFamily(op, family))
-                    text += std::string(text.empty() ? "" : "; ") + op.Name + " (" + op.Section +
-                            (op.Entity == OperationEntity::Config ? "; entity from the section)" : "; entity argument)");
+                {
+                    text += std::string(text.empty() ? "" : "; ") + op.Name + " (";
+                    if (!op.Params.empty()) text += "entity argument; params " + op.Params + ")";
+                    else text += std::string(op.Section) + (op.Entity == OperationEntity::Config ? "; entity from the section)" : "; entity argument)");
+                }
             return text;
         }
 
@@ -278,8 +623,11 @@ namespace Extrinsic::Runtime
             if (op->Entity == OperationEntity::Config && args->contains("entity"))
                 return Fail("Operation '" + *name + "' takes its entity from config section '" + op->Section +
                             "' (config_apply first); do not pass entity.");
-            if (!PrepareSnapshot(context)) return Fail(kNoWorkspace);
-            return op->Run({context, *args, entity, preview});
+            const auto prepared = PrepareSnapshot(context);
+            if (!prepared) return Fail(kNoWorkspace);
+            if (op->Params.empty() && args->contains("params"))
+                return Fail("Operation '" + *name + "' takes no params; its settings come from " + op->Section + ".");
+            return op->Run({context, *args, entity, preview, *prepared});
         }
 
         // ---- registration (ICP, Coherent Point Drift) --------------------------------------
@@ -612,7 +960,8 @@ namespace Extrinsic::Runtime
         const std::string configured = Schema(
             R"({"operation":{"type":"string","enum":)" + OperationEnum(nullptr) +
                 R"(,"description":"Operation; its settings come from its config section (config_apply first)."},)" +
-                R"("entity":{"type":"integer","minimum":1,"description":"Stable entity id from scene_entities; required for operations marked 'entity argument', refused for those whose section names the entity."}})",
+                R"("entity":{"type":"integer","minimum":1,"description":"Stable entity id from scene_entities; required for operations marked 'entity argument', refused for those whose section names the entity."},)" +
+                R"("params":{"type":"object","description":"Explicit settings of the operations listed with 'params' (keys and defaults in the description); omitted keys keep their defaults. Refused for operations that read a config section."}})",
             R"(["operation"])");
         add("preview_operation", "Preview operation",
             "Whether a configured editor operation can run with the active settings, and why not. Operations: " +
@@ -620,10 +969,11 @@ namespace Extrinsic::Runtime
             configured, true,
             [](const AgentOperationContext& c, std::string_view a) { return RunConfiguredOperation(c, a, true, nullptr); });
         add("run_operation", "Run operation",
-            "Run a configured editor operation (mesh curvature, geodesics, curvature segmentation, normal estimation, kernel "
-            "density, point spacing, outlier analysis, density weight, descriptor analysis, bilateral filter, point "
-            "construction and the mesh-field operations) with its config section; one undoable step like the panel button, "
-            "answers when done. Operations: " + OperationSummary(nullptr) + ".",
+            "Run a configured editor operation (mesh-field operations, mesh curvature, geodesics, curvature segmentation, "
+            "parameterization, scalar ridges, mesh denoise, remesh, subdivide and simplify, normal estimation, kernel density, "
+            "point spacing, outlier analysis, density weight, descriptor analysis, bilateral filter, point construction, "
+            "progressive Poisson) with its config section or `params`; one undoable step like the panel button, answers when "
+            "done. Operations: " + OperationSummary(nullptr) + ".",
             configured, false, [](const AgentOperationContext& c, std::string_view a) { return RunConfiguredOperation(c, a, false, nullptr); },
             false, true); // several operations can select a Vulkan backend
     }
