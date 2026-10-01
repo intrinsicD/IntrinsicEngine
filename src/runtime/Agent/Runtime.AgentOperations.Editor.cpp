@@ -119,6 +119,123 @@ namespace Extrinsic::Runtime
         }
         constexpr const char* kNoWorkspace = "The editor workspace is not attached yet; retry after the next frame.";
 
+        // ---- shared schema fragments and argument parsing ---------------------------------
+        // Every tool that names an element domain shares one enum: GeometryElementDomain
+        // without Unknown, in declaration order.
+        constexpr unsigned kFirstDomain = 1u;
+        constexpr unsigned kLastDomain = unsigned(GeometryElementDomain::PointCloudPoint);
+        const std::string& DomainNames()
+        {
+            static const std::string names = [] {
+                std::string out;
+                for (unsigned i = kFirstDomain; i <= kLastDomain; ++i)
+                    out += std::string(out.empty() ? "" : ",") + "\"" + std::string(ToString(static_cast<GeometryElementDomain>(i))) + "\"";
+                return out;
+            }();
+            return names;
+        }
+        std::string DomainProperty(const std::string& description)
+        {
+            return R"("domain":{"type":"string","enum":[)" + DomainNames() + R"(],"description":")" + description + R"("})";
+        }
+        const std::string kPositionsProperty =
+            R"("positions":{"type":"string","description":"Name of the vec3 position property; default v:position."})";
+        std::optional<GeometryElementDomain> ParseDomain(const std::optional<std::string>& name)
+        {
+            if (!name) return std::nullopt;
+            for (unsigned i = kFirstDomain; i <= kLastDomain; ++i)
+                if (*name == ToString(static_cast<GeometryElementDomain>(i))) return static_cast<GeometryElementDomain>(i);
+            return std::nullopt;
+        }
+        std::string UnknownDomainMessage(const std::string& name)
+        {
+            return "Unknown domain '" + name + "'; valid: [" + DomainNames() + "].";
+        }
+
+        template <class Result>
+        Json ResultJson(const Result& result)
+        {
+            return {{"status", DebugNameForEditorCommandStatus(result.Status)}, {"succeeded", result.Succeeded()},
+                    {"message", result.Message}};
+        }
+        // A preview answers like the panel's button: the method's readiness behind the same
+        // config-lane gate (ResolveEditorProcessingActionReadiness).
+        Json ReadinessJson(const EditorProcessingCommands& commands, ActionReadiness method, Json extra = Json::object())
+        {
+            const auto readiness = ResolveEditorProcessingActionReadiness(commands, std::move(method));
+            extra["enabled"] = readiness.Enabled;
+            extra["reason"] = readiness.DisabledReason;
+            return extra;
+        }
+
+        // ---- asynchronous completion -------------------------------------------------------
+        // Runs `apply(onComplete)` (an Editor Apply* command whose callback fires for a newly
+        // queued job) and answers with its immediate result or, for Pending, a continuation
+        // that replies once the callback delivered. A detached workspace ends the wait with
+        // an error because the callback never fires for a detached attachment.
+        template <class Result, class Apply, class Describe>
+        AgentOperationOutcome FinishApply(Apply apply, Describe describe)
+        {
+            auto done = std::make_shared<std::optional<Result>>();
+            const auto immediate = apply([done](Result result) { *done = std::move(result); });
+            if (immediate.Status != EditorCommandStatus::Pending)
+                return {.IsError = !immediate.Succeeded(), .Text = Dump(describe(immediate))};
+            return {.Continuation = [done, describe](const AgentOperationContext& current, AgentOperationOutcome& out) {
+                if (!current.Attachment || !current.Attachment->IsAttached()) { out = Fail(kNoWorkspace); return true; }
+                if (!done->has_value()) return false;
+                out = {.IsError = !(*done)->Succeeded(), .Text = Dump(describe(**done))};
+                return true;
+            }};
+        }
+        template <class Result, class Apply>
+        AgentOperationOutcome FinishApply(Apply apply)
+        {
+            return FinishApply<Result>(std::move(apply), [](const Result& result) { return ResultJson(result); });
+        }
+
+        // Same contract for runs reported through a service's completion event (k-means,
+        // consolidation): the subscription lives as long as the pending call and is released
+        // on completion, detach or when the call is dropped.
+        template <class Result, class Service>
+        struct ServiceRun
+        {
+            CommandCorrelationId Correlation{};
+            std::optional<Result> Completed{};
+            Service* Owner{};
+            KernelEventSubscription Subscription{};
+            void Release()
+            {
+                if (Owner && Subscription.IsValid()) Owner->Unsubscribe(Subscription);
+                Subscription = {};
+            }
+            ~ServiceRun() { Release(); }
+        };
+        struct ServiceSubmission
+        {
+            CommandCorrelationId Correlation{};
+            bool Queued{false};
+            std::string Message{};
+        };
+        template <class Result, class Service, class Subscribe, class Submit, class Describe>
+        AgentOperationOutcome AwaitServiceRun(Service* service, Subscribe subscribe, Submit submit, Describe describe)
+        {
+            auto run = std::make_shared<ServiceRun<Result, Service>>();
+            run->Owner = service;
+            run->Subscription = subscribe(*service, [weak = std::weak_ptr<ServiceRun<Result, Service>>(run)](const Result& result) {
+                if (auto state = weak.lock(); state && state->Correlation == result.Correlation) state->Completed = result;
+            });
+            const ServiceSubmission submitted = submit();
+            run->Correlation = submitted.Correlation;
+            if (!submitted.Queued) { run->Release(); return Fail(submitted.Message); }
+            return {.Continuation = [run, describe](const AgentOperationContext& current, AgentOperationOutcome& out) {
+                if (!current.Attachment || !current.Attachment->IsAttached()) { run->Release(); out = Fail(kNoWorkspace); return true; }
+                if (!run->Completed) return false;
+                run->Release();
+                out = {.IsError = !run->Completed->Succeeded(), .Text = Dump(describe(*run->Completed))};
+                return true;
+            }};
+        }
+
         std::string Schema(std::string properties, std::string required = "[]")
         {
             return R"({"type":"object","properties":)" + std::move(properties) + R"(,"required":)" +
@@ -388,12 +505,6 @@ namespace Extrinsic::Runtime
         }
 
         // ---- mesh-field operations -------------------------------------------------------
-        template <class Result>
-        Json ResultJson(const Result& result)
-        {
-            return {{"status", DebugNameForEditorCommandStatus(result.Status)}, {"succeeded", result.Succeeded()},
-                    {"message", result.Message}};
-        }
         struct MeshFieldOperation
         {
             const char* Name;
@@ -411,8 +522,7 @@ namespace Extrinsic::Runtime
                 if (!config) { error = std::string("The active config has no usable section for '") + name + "'."; return std::nullopt; }
                 if (preview)
                 {
-                    const auto readiness = previewFn(commands, entity, *config);
-                    return Json{{"operation", name}, {"enabled", readiness.Enabled}, {"reason", readiness.DisabledReason}};
+                    return ReadinessJson(commands, previewFn(commands, entity, *config), {{"operation", name}});
                 }
                 Json out = ResultJson(apply(commands, entity, *config));
                 out["operation"] = name;
@@ -510,107 +620,84 @@ namespace Extrinsic::Runtime
         // RUNTIME-274: the standalone sampling operation on the sandbox.point_sampling section.
         AgentOperationOutcome RunPointSampling(const AgentOperationContext& context, bool preview)
         {
-            if (context.Attachment == nullptr || !context.Attachment->IsAttached()) return Fail(kNoWorkspace);
             if (!PrepareSnapshot(context)) return Fail(kNoWorkspace); // prepares the session frame the feature frames read
             const auto commands = PrepareEditorRegistrationFrame(*context.Attachment).Commands;
             const auto config = GetEditorPointSamplingConfig(commands);
             if (!config) return Fail("The sandbox.point_sampling section is unavailable.");
-            if (preview)
-            {
-                const auto ready = PreviewEditorPointSamplingCommand(commands, *config);
-                return Ok({{"enabled", ready.Enabled}, {"reason", ready.DisabledReason}});
-            }
-            const auto json = [](const EditorPointSamplingResult& r) {
-                return Dump(Json{{"status", DebugNameForEditorCommandStatus(r.Status)}, {"succeeded", r.Succeeded()},
-                                 {"message", r.Message}, {"method", r.Method}, {"input_points", r.InputCount},
-                                 {"samples", r.SampleCount}, {"output_entity", r.OutputEntityId},
-                                 {"milliseconds", r.Milliseconds}, {"distance_pairs", r.DistancePairs},
-                                 {"gpu_input_upload_bytes", r.GpuInputUploadBytes}, {"gpu_input_cache_hits", r.GpuInputCacheHits},
-                                 {"cpu_stage_readback_bytes", r.CpuStageReadbackBytes},
-                                 {"requested_backend", r.RequestedBackend}, {"backend", r.Backend},
-                                 {"backend_diagnostic", r.BackendDiagnostic}});
-            };
+            if (preview) return Ok(ReadinessJson(commands, PreviewEditorPointSamplingCommand(commands, *config)));
             // A Vulkan run is queued and answers once it has published or failed.
-            auto done = std::make_shared<std::optional<EditorPointSamplingResult>>();
-            const auto r = ApplyEditorPointSamplingCommand(commands, *config,
-                [done](EditorPointSamplingResult result) { *done = std::move(result); });
-            if (r.Status != EditorCommandStatus::Pending) return {.IsError = !r.Succeeded(), .Text = json(r)};
-            return {.Continuation = [done, json](const AgentOperationContext&, AgentOperationOutcome& out) {
-                if (!done->has_value()) return false;
-                out = {.IsError = !(*done)->Succeeded(), .Text = json(**done)};
-                return true;
-            }};
+            return FinishApply<EditorPointSamplingResult>(
+                [&](auto onComplete) { return ApplyEditorPointSamplingCommand(commands, *config, std::move(onComplete)); },
+                [](const EditorPointSamplingResult& r) {
+                    return Json{{"status", DebugNameForEditorCommandStatus(r.Status)}, {"succeeded", r.Succeeded()},
+                                {"message", r.Message}, {"method", r.Method}, {"input_points", r.InputCount},
+                                {"samples", r.SampleCount}, {"output_entity", r.OutputEntityId},
+                                {"milliseconds", r.Milliseconds}, {"distance_pairs", r.DistancePairs},
+                                {"gpu_input_upload_bytes", r.GpuInputUploadBytes}, {"gpu_input_cache_hits", r.GpuInputCacheHits},
+                                {"cpu_stage_readback_bytes", r.CpuStageReadbackBytes},
+                                {"requested_backend", r.RequestedBackend}, {"backend", r.Backend},
+                                {"backend_diagnostic", r.BackendDiagnostic}};
+                });
         }
+
         AgentOperationOutcome RunKeypoints(const AgentOperationContext& context)
         {
-            if(!context.Attachment || !context.Attachment->IsAttached())return Fail(kNoWorkspace);
             if (!PrepareSnapshot(context)) return Fail(kNoWorkspace); // prepares the session frame the feature frames read
-            const auto commands=PrepareEditorPointAnalysisFrame(*context.Attachment).Commands;
-            auto done=std::make_shared<std::optional<EditorKeypointAnalysisResult>>();
-            const auto json=[](const EditorKeypointAnalysisResult& r) {
-                return Dump(Json{{"status",DebugNameForEditorCommandStatus(r.Status)},{"succeeded",r.Succeeded()},
-                    {"message",r.Message},{"requested_backend",ToString(r.RequestedBackend)},{"actual_backend",r.ActualBackend},
-                    {"implementation_id",r.ImplementationId},
-                    {"gpu_input_upload_bytes",r.GpuInputUploadBytes},{"gpu_input_cache_hits",r.GpuInputCacheHits},
-                    {"cpu_stage_upload_bytes",r.CpuStageUploadBytes},{"cpu_stage_readback_bytes",r.CpuStageReadbackBytes},
-                    {"gpu_submissions",r.GpuQueryBatches},{"keypoints",r.KeypointCount}});
-            };
-            const auto result=ApplyEditorConfiguredKeypointAnalysis(commands,[done](auto r){*done=std::move(r);});
-            if(result.Status!=EditorCommandStatus::Pending)return {.IsError=!result.Succeeded(),.Text=json(result)};
-            return {.Continuation=[done,json](const AgentOperationContext& current,AgentOperationOutcome& out) {
-                if(!current.Attachment || !current.Attachment->IsAttached()){out=Fail(kNoWorkspace);return true;}
-                if(!*done)return false;
-                out={.IsError=!(**done).Succeeded(),.Text=json(**done)};return true;
-            }};
+            const auto commands = PrepareEditorPointAnalysisFrame(*context.Attachment).Commands;
+            return FinishApply<EditorKeypointAnalysisResult>(
+                [&](auto onComplete) { return ApplyEditorConfiguredKeypointAnalysis(commands, std::move(onComplete)); },
+                [](const EditorKeypointAnalysisResult& r) {
+                    return Json{{"status", DebugNameForEditorCommandStatus(r.Status)}, {"succeeded", r.Succeeded()},
+                                {"message", r.Message}, {"requested_backend", ToString(r.RequestedBackend)},
+                                {"actual_backend", r.ActualBackend}, {"implementation_id", r.ImplementationId},
+                                {"gpu_input_upload_bytes", r.GpuInputUploadBytes}, {"gpu_input_cache_hits", r.GpuInputCacheHits},
+                                {"cpu_stage_upload_bytes", r.CpuStageUploadBytes},
+                                {"cpu_stage_readback_bytes", r.CpuStageReadbackBytes},
+                                {"gpu_submissions", r.GpuQueryBatches}, {"keypoints", r.KeypointCount}};
+                });
         }
+
+        // K-means and consolidation take their entity and domain as arguments (section
+        // convention in agent-control-lane.md): neither section names an entity.
         AgentOperationOutcome RunKMeansOperation(const AgentOperationContext& context, std::string_view arguments)
         {
             if (!context.Attachment || !context.Attachment->IsAttached()) return Fail(kNoWorkspace);
-            const auto args=ParseObject(arguments);
-            const auto entity=args?UInt(*args,"entity"):std::nullopt;
-            const auto name=args?String(*args,"domain"):std::nullopt;
-            GeometryElementDomain domain=GeometryElementDomain::Unknown;
-            for (unsigned i=1;i<=unsigned(GeometryElementDomain::PointCloudPoint);++i)
-                if(name&&*name==ToString(static_cast<GeometryElementDomain>(i)))domain=static_cast<GeometryElementDomain>(i);
-            if(!entity||domain==GeometryElementDomain::Unknown)return Fail("Expected an entity ID and property domain.");
+            const auto args = ParseObject(arguments);
+            const auto entity = args ? UInt(*args, "entity") : std::nullopt;
+            if (!entity) return Fail("Pass {\"entity\": <stable id>, \"domain\": <domain>}.");
+            const auto domainName = String(*args, "domain");
+            const auto domain = ParseDomain(domainName);
+            if (domainName && !domain) return Fail(UnknownDomainMessage(*domainName));
             if (!PrepareSnapshot(context)) return Fail(kNoWorkspace); // prepares the session frame the feature frames read
-            const auto frame=PrepareEditorPointCloudServiceFrame(*context.Attachment);
-            const auto config=GetEditorClusteringConfig(frame.Commands);
-            if(!config||!frame.ClusteringAvailable)return Fail("Clustering is unavailable.");
-            auto refs=config->Properties.value_or(MakeKMeansPropertyRefs(domain));
-            if(const auto positions=String(*args,"positions"))refs.InputPositions.Name=*positions;
-            auto request=MakeConfiguredKMeansRequest(*entity,std::move(refs),*config);
-            request.AutoAccept=true;
-            struct Pending
-            {
-                CommandCorrelationId Correlation{};
-                std::optional<KMeansRunCompleted> Result{};
-                ClusteringService* Service{};
-                KernelEventSubscription Subscription{};
-                void Release(){if(Service&&Subscription.IsValid())Service->Unsubscribe(Subscription);Subscription={};}
-                ~Pending(){Release();}
-            };
-            auto pending=std::make_shared<Pending>();pending->Service=frame.Clustering;
-            pending->Subscription=pending->Service->SubscribeRunCompleted([weak=std::weak_ptr<Pending>(pending)](const KMeansRunCompleted& result){
-                if(auto p=weak.lock();p&&p->Correlation==result.Correlation)p->Result=result;
-            });
-            const auto submitted=SubmitKMeansRun(frame.Commands,frame.Clustering,request);
-            pending->Correlation=submitted.Correlation;
-            if(submitted.Status!=KMeansRunStatus::Queued){pending->Release();return Fail(submitted.Message);}
-            return {.Continuation=[pending](const AgentOperationContext& current,AgentOperationOutcome& out){
-                if(!current.Attachment||!current.Attachment->IsAttached()){pending->Release();out=Fail(kNoWorkspace);return true;}
-                if(!pending->Result)return false;
-                pending->Release();const auto& r=*pending->Result;
-                out={.IsError=!r.Succeeded(),.Text=Dump(Json{
-                    {"status",ToString(r.Status)},{"message",r.Message},{"succeeded",r.Succeeded()},
-                    {"requested_backend",ToString(r.RequestedBackend)},{"actual_backend",ToString(r.ActualBackend)},
-                    {"implementation_id",r.ImplementationId},{"backend_diagnostic",r.BackendDiagnostic},{"fell_back_to_cpu",r.FellBackToCpu},
-                    {"gpu_input_upload_bytes",r.GpuInputUploadBytes},{"gpu_input_cache_hits",r.GpuInputCacheHits},
-                    {"cpu_stage_upload_bytes",r.CpuStageUploadBytes},{"cpu_stage_readback_bytes",r.CpuStageReadbackBytes},
-                    {"gpu_submissions",r.GpuSubmissions},{"gpu_previews",r.GpuPreviews},
-                    {"iterations",r.Iterations},{"converged",r.Converged},{"inertia",r.Inertia}})};return true;
-            }};
+            const auto frame = PrepareEditorPointCloudServiceFrame(*context.Attachment);
+            const auto config = GetEditorClusteringConfig(frame.Commands);
+            if (!config || !frame.ClusteringAvailable) return Fail("Clustering is unavailable.");
+            if (!config->Properties && !domain)
+                return Fail("Pass a domain: the sandbox.clustering section binds no properties.");
+            auto refs = config->Properties.value_or(MakeKMeansPropertyRefs(domain.value_or(GeometryElementDomain::Unknown)));
+            if (const auto positions = String(*args, "positions")) refs.InputPositions.Name = *positions;
+            auto request = MakeConfiguredKMeansRequest(*entity, std::move(refs), *config);
+            request.AutoAccept = true;
+            return AwaitServiceRun<KMeansRunCompleted>(
+                frame.Clustering,
+                [](ClusteringService& service, auto onCompleted) { return service.SubscribeRunCompleted(std::move(onCompleted)); },
+                [&] {
+                    const auto submitted = SubmitKMeansRun(frame.Commands, frame.Clustering, request);
+                    return ServiceSubmission{submitted.Correlation, submitted.Status == KMeansRunStatus::Queued, submitted.Message};
+                },
+                [](const KMeansRunCompleted& r) {
+                    return Json{{"status", ToString(r.Status)}, {"message", r.Message}, {"succeeded", r.Succeeded()},
+                                {"requested_backend", ToString(r.RequestedBackend)}, {"actual_backend", ToString(r.ActualBackend)},
+                                {"implementation_id", r.ImplementationId}, {"backend_diagnostic", r.BackendDiagnostic},
+                                {"fell_back_to_cpu", r.FellBackToCpu},
+                                {"gpu_input_upload_bytes", r.GpuInputUploadBytes}, {"gpu_input_cache_hits", r.GpuInputCacheHits},
+                                {"cpu_stage_upload_bytes", r.CpuStageUploadBytes},
+                                {"cpu_stage_readback_bytes", r.CpuStageReadbackBytes},
+                                {"gpu_submissions", r.GpuSubmissions}, {"gpu_previews", r.GpuPreviews},
+                                {"iterations", r.Iterations}, {"converged", r.Converged}, {"inertia", r.Inertia}};
+                });
         }
+
         AgentOperationOutcome RunConsolidation(const AgentOperationContext& context, std::string_view arguments)
         {
             if (!context.Attachment || !context.Attachment->IsAttached()) return Fail(kNoWorkspace);
@@ -618,63 +705,36 @@ namespace Extrinsic::Runtime
             if (!args) return Fail("Expected an object with entity and domain.");
             const auto entity = UInt(*args, "entity");
             const auto domainName = String(*args, "domain");
-            GeometryElementDomain domain = GeometryElementDomain::Unknown;
-            for (unsigned i = 1; i <= unsigned(GeometryElementDomain::PointCloudPoint); ++i)
-                if (domainName && *domainName == ToString(static_cast<GeometryElementDomain>(i)))
-                    domain = static_cast<GeometryElementDomain>(i);
-            if (!entity || domain == GeometryElementDomain::Unknown) return Fail("Expected an entity ID and a supported property domain.");
+            const auto domain = ParseDomain(domainName);
+            if (domainName && !domain) return Fail(UnknownDomainMessage(*domainName));
+            if (!entity || !domain) return Fail("Pass {\"entity\": <stable id>, \"domain\": <domain>}.");
             if (!PrepareSnapshot(context)) return Fail(kNoWorkspace); // prepares the session frame the feature frames read
             const auto frame = PrepareEditorPointCloudServiceFrame(*context.Attachment);
             const auto config = GetEditorPointCloudConsolidationConfig(frame.Commands);
             if (!config || !frame.PointCloudConsolidationAvailable) return Fail("Point-cloud consolidation is unavailable.");
             auto request = PointCloudConsolidationRequest{
                 .StableEntityId = *entity,
-                .Properties = MakePointCloudConsolidationPropertyRefs(domain,
-                    String(*args, "positions").value_or("v:position")),
+                .Properties = MakePointCloudConsolidationPropertyRefs(*domain, String(*args, "positions").value_or("v:position")),
                 .Config = *config, .AutoAccept = true};
             if (!IsValidPointCloudConsolidationPropertyRefs(request.Properties)) return Fail("Invalid point property domain or name.");
-            struct Pending
-            {
-                CommandCorrelationId Correlation{};
-                std::optional<PointCloudConsolidationResult> Result{};
-                PointCloudConsolidationService* Service{};
-                KernelEventSubscription Subscription{};
-                void Release()
-                {
-                    if (Service && Subscription.IsValid()) Service->Unsubscribe(Subscription);
-                    Subscription = {};
-                }
-                ~Pending() { Release(); }
-            };
-            auto pending = std::make_shared<Pending>();
-            pending->Service = frame.PointCloudConsolidation;
-            pending->Subscription = pending->Service->SubscribeCompleted(
-                [weak = std::weak_ptr<Pending>(pending)](const PointCloudConsolidationResult& result) {
-                    if (auto state = weak.lock(); state && result.Correlation == state->Correlation) state->Result = result;
+            return AwaitServiceRun<PointCloudConsolidationResult>(
+                frame.PointCloudConsolidation,
+                [](PointCloudConsolidationService& service, auto onCompleted) { return service.SubscribeCompleted(std::move(onCompleted)); },
+                [&] {
+                    const auto submitted = SubmitEditorPointCloudConsolidation(frame.Commands, frame.PointCloudConsolidation, std::move(request));
+                    return ServiceSubmission{submitted.Correlation, submitted.Status == PointCloudConsolidationRunStatus::Queued,
+                                             submitted.Message};
+                },
+                [](const PointCloudConsolidationResult& r) {
+                    return Json{{"status", ToString(r.Status)}, {"message", r.Message}, {"succeeded", r.Succeeded()},
+                                {"requested_backend", StableToken(r.RequestedBackend)}, {"actual_backend", StableToken(r.ActualBackend)},
+                                {"backend_diagnostic", r.BackendDiagnostic}, {"fell_back_to_cpu", r.FellBackToCpu},
+                                {"gpu_input_upload_bytes", r.GpuInputUploadBytes}, {"gpu_input_cache_hits", r.GpuInputCacheHits},
+                                {"cpu_stage_upload_bytes", r.CpuStageUploadBytes},
+                                {"cpu_stage_readback_bytes", r.CpuStageReadbackBytes},
+                                {"gpu_submissions", r.GpuSubmissions}, {"gpu_previews", r.GpuPreviews},
+                                {"iterations", r.Iterations}};
                 });
-            const auto submitted = SubmitEditorPointCloudConsolidation(frame.Commands, frame.PointCloudConsolidation, std::move(request));
-            pending->Correlation = submitted.Correlation;
-            if (submitted.Status != PointCloudConsolidationRunStatus::Queued)
-            {
-                pending->Release();
-                return Fail(submitted.Message);
-            }
-            return {.Continuation = [pending](const AgentOperationContext& current, AgentOperationOutcome& out) {
-                if (!current.Attachment || !current.Attachment->IsAttached())
-                { pending->Release(); out = Fail(kNoWorkspace); return true; }
-                if (!pending->Result) return false;
-                pending->Release();
-                const auto& r = *pending->Result;
-                out = {.IsError = !r.Succeeded(), .Text = Dump(Json{
-                    {"status", ToString(r.Status)}, {"message", r.Message}, {"succeeded", r.Succeeded()},
-                    {"requested_backend", StableToken(r.RequestedBackend)}, {"actual_backend", StableToken(r.ActualBackend)},
-                    {"backend_diagnostic", r.BackendDiagnostic}, {"fell_back_to_cpu", r.FellBackToCpu},
-                    {"gpu_input_upload_bytes", r.GpuInputUploadBytes}, {"gpu_input_cache_hits", r.GpuInputCacheHits},
-                    {"cpu_stage_upload_bytes", r.CpuStageUploadBytes}, {"cpu_stage_readback_bytes", r.CpuStageReadbackBytes},
-                    {"gpu_submissions", r.GpuSubmissions}, {"gpu_previews", r.GpuPreviews},
-                    {"iterations", r.Iterations}})};
-                return true;
-            }};
         }
 
         // Both methods run their configured section (config_apply first). A queued job
@@ -684,7 +744,6 @@ namespace Extrinsic::Runtime
             const auto args = ParseObject(arguments);
             const auto method = args ? String(*args, "method") : std::nullopt;
             if (!method || (*method != "icp" && *method != "cpd")) return Fail("Pass {\"method\": \"icp\" | \"cpd\"}.");
-            if (context.Attachment == nullptr || !context.Attachment->IsAttached()) return Fail(kNoWorkspace);
             if (!PrepareSnapshot(context)) return Fail(kNoWorkspace); // prepares the session frame the feature frames read
             const auto commands = PrepareEditorRegistrationFrame(*context.Attachment).Commands;
             if (*method == "icp")
@@ -693,37 +752,21 @@ namespace Extrinsic::Runtime
                 if (!config) return Fail("The sandbox.registration section is unavailable.");
                 if (preview)
                 {
-                    const auto ready = PreviewEditorRegistrationCommand(commands, *config);
-                    return Ok({{"method", "icp"}, {"enabled", ready.Enabled}, {"reason", ready.DisabledReason}});
+                    return Ok(ReadinessJson(commands, PreviewEditorRegistrationCommand(commands, *config), {{"method", "icp"}}));
                 }
-                auto done = std::make_shared<std::optional<EditorRegistrationResult>>();
-                auto result = ApplyEditorConfiguredRegistrationCommand(commands,
-                    [done](EditorRegistrationResult r) { *done = std::move(r); });
-                if (result.Status != EditorCommandStatus::Pending)
-                    return {.IsError = !result.Succeeded(), .Text = Dump(RegistrationJson(result))};
-                return {.Continuation = [done](const AgentOperationContext&, AgentOperationOutcome& out) {
-                    if (!done->has_value()) return false;
-                    out = {.IsError = !(*done)->Succeeded(), .Text = Dump(RegistrationJson(**done))};
-                    return true;
-                }};
+                return FinishApply<EditorRegistrationResult>(
+                    [&](auto onComplete) { return ApplyEditorConfiguredRegistrationCommand(commands, std::move(onComplete)); },
+                    &RegistrationJson);
             }
             const auto config = GetEditorCoherentPointDriftConfig(commands);
             if (!config) return Fail("The sandbox.coherent_point_drift section is unavailable.");
             if (preview)
             {
-                const auto ready = PreviewEditorCoherentPointDriftCommand(commands, *config);
-                return Ok({{"method", "cpd"}, {"enabled", ready.Enabled}, {"reason", ready.DisabledReason}});
+                return Ok(ReadinessJson(commands, PreviewEditorCoherentPointDriftCommand(commands, *config), {{"method", "cpd"}}));
             }
-            auto done = std::make_shared<std::optional<EditorCoherentPointDriftResult>>();
-            auto result = ApplyEditorConfiguredCoherentPointDrift(commands,
-                [done](EditorCoherentPointDriftResult r) { *done = std::move(r); });
-            if (result.Status != EditorCommandStatus::Pending)
-                return {.IsError = !result.Succeeded(), .Text = Dump(CoherentPointDriftJson(result))};
-            return {.Continuation = [done](const AgentOperationContext&, AgentOperationOutcome& out) {
-                if (!done->has_value()) return false;
-                out = {.IsError = !(*done)->Succeeded(), .Text = Dump(CoherentPointDriftJson(**done))};
-                return true;
-            }};
+            return FinishApply<EditorCoherentPointDriftResult>(
+                [&](auto onComplete) { return ApplyEditorConfiguredCoherentPointDrift(commands, std::move(onComplete)); },
+                &CoherentPointDriftJson);
         }
     }
 
@@ -750,7 +793,8 @@ namespace Extrinsic::Runtime
         add("show_property", "Show property",
             "Color an entity by a property in the viewport, like a panel's Show button: scalars through the colormap, vectors "
             "as component colors (or normal directions).",
-            Schema("{" + kEntityProperty + R"(,"name":{"type":"string"},"domain":{"type":"string","description":"Optional, e.g. MeshVertex or MeshFace."},"normal_direction":{"type":"boolean","default":false}})",
+            Schema("{" + kEntityProperty + R"(,"name":{"type":"string"},)" + DomainProperty("Optional: restrict to one element domain.") +
+                       R"(,"normal_direction":{"type":"boolean","default":false}})",
                    R"(["entity","name"])"),
             false, ShowProperty);
         add("history", "Undo history", "Undo/redo availability, top labels, counts and dirty state.", none, true, History);
@@ -801,15 +845,20 @@ namespace Extrinsic::Runtime
             false, true);
         add("run_keypoint_analysis", "Run keypoint analysis",
             "Run sandbox.keypoint_analysis; GPU score and mask auto-accept in one undoable entry. Reports backend and IO.",
-            none, false, [](const AgentOperationContext& c,std::string_view){return RunKeypoints(c);}, false, true);
+            none, false, [](const AgentOperationContext& c, std::string_view) { return RunKeypoints(c); }, false, true);
         add("run_kmeans", "Run K-Means",
-            "Cluster the configured point property (sandbox.clustering); GPU results auto-accept atomically. Reports backend and IO.",
-            Schema(R"({"entity":{"type":"integer","minimum":1},"domain":{"type":"string"},"positions":{"type":"string"}})",
-                R"(["entity","domain"])") , false, RunKMeansOperation, false, true);
+            "Cluster a point property of an entity with sandbox.clustering (config_apply first); GPU results auto-accept "
+            "atomically. Reports backend and IO. The section's bound properties win over 'domain'.",
+            Schema("{" + kEntityProperty + "," + DomainProperty("Element domain of the positions; needed only while sandbox.clustering binds no properties.") +
+                       "," + kPositionsProperty + "}",
+                   R"(["entity"])"),
+            false, RunKMeansOperation, false, true);
         add("run_point_cloud_consolidation", "Run point-cloud consolidation",
-            "Consolidate the named vec3 point property using sandbox.point_cloud_consolidation; GPU runs auto-accept. Reports backend and IO.",
-            Schema(R"({"entity":{"type":"integer","minimum":1},"domain":{"type":"string","enum":["MeshVertex","MeshEdge","MeshHalfedge","MeshFace","GraphNode","GraphHalfedge","GraphEdge","PointCloudPoint"]},"positions":{"type":"string","default":"v:position"}})",
-                   R"(["entity","domain"])") , false, RunConsolidation, false, true);
+            "Consolidate the named vec3 point property of an entity using sandbox.point_cloud_consolidation; GPU runs "
+            "auto-accept. Reports backend and IO.",
+            Schema("{" + kEntityProperty + "," + DomainProperty("Element domain of the positions.") + "," + kPositionsProperty + "}",
+                   R"(["entity","domain"])"),
+            false, RunConsolidation, false, true);
         const std::string meshField = Schema(
             R"({"operation":{"type":"string","enum":)" + OperationEnum() +
                 R"(,"description":"Mesh-field operation; its settings come from the matching config section (config_apply first)."},)" +
@@ -821,6 +870,7 @@ namespace Extrinsic::Runtime
         add("run_mesh_operation", "Run mesh operation",
             "Run a mesh-field operation (property smoothing, spectral modes, harmonic field, scalar gradient) on an entity "
             "with the active config section; undoable like the panel button.",
-            meshField, false, [](const AgentOperationContext& c, std::string_view a) { return RunMeshField(c, a, false); });
+            meshField, false, [](const AgentOperationContext& c, std::string_view a) { return RunMeshField(c, a, false); },
+            false, true); // property smoothing may select a Vulkan backend that waits on readback
     }
 }

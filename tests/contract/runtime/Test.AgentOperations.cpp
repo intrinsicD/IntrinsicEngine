@@ -11,6 +11,7 @@
 #include <nlohmann/json.hpp>
 import Extrinsic.Runtime.AgentServer;
 import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.GeometryProperty.Types;
 namespace R = Extrinsic::Runtime;
 using Json = nlohmann::json;
 namespace
@@ -539,6 +540,51 @@ TEST(AgentOperations, AnnotationsReflectUndoability)
         sawCapture |= tool["name"] == "view_capture";
     }
     EXPECT_TRUE(sawCapture);
+}
+
+// Every tool that may dispatch GPU work is refused on a minimized frame instead of waiting.
+TEST(AgentOperations, GpuCapableEditorToolsNeedAPresentedFrame)
+{
+    R::AgentOperationRegistry registry;
+    R::RegisterEditorAgentOperations(registry);
+    for (const char* name : {"run_registration", "run_point_sampling", "run_keypoint_analysis", "run_kmeans",
+                             "run_point_cloud_consolidation", "run_mesh_operation"})
+    {
+        ASSERT_NE(registry.Find(name), nullptr) << name;
+        EXPECT_TRUE(registry.Find(name)->NeedsPresentedFrame) << name;
+    }
+    for (const char* name : {"preview_registration", "preview_mesh_operation", "scene_entities", "select_entity"})
+    {
+        ASSERT_NE(registry.Find(name), nullptr) << name;
+        EXPECT_FALSE(registry.Find(name)->NeedsPresentedFrame) << name;
+    }
+    const R::AgentOperationContext minimized{.ViewportPresentable = false};
+    const auto refused = R::InvokeAgentOperation(registry, "run_mesh_operation", minimized,
+                                                 R"({"operation":"property_smoothing","entity":1})", false);
+    EXPECT_TRUE(refused.IsError);
+    EXPECT_EQ(refused.ErrorCode, "viewport_not_presentable");
+}
+
+// Tools that name an element domain share one enum, generated from GeometryElementDomain.
+TEST(AgentOperations, EditorOperationsShareTheDomainEnum)
+{
+    R::AgentOperationRegistry registry;
+    R::RegisterEditorAgentOperations(registry);
+    Json expected = Json::array();
+    for (unsigned i = 1; i <= unsigned(R::GeometryElementDomain::PointCloudPoint); ++i)
+        expected.push_back(std::string(R::ToString(static_cast<R::GeometryElementDomain>(i))));
+    int seen = 0;
+    for (const auto& spec : registry.Entries())
+    {
+        const auto schema = Json::parse(spec.InputSchemaJson);
+        if (!schema["properties"].contains("domain")) continue;
+        ++seen;
+        EXPECT_EQ(schema["properties"]["domain"]["enum"], expected) << spec.Name;
+    }
+    EXPECT_GE(seen, 2) << "k-means and consolidation at least";
+    const R::AgentOperationContext context{};
+    const auto bad = R::InvokeAgentOperation(registry, "run_kmeans", context, R"({"entity":1,"domain":"Bogus"})", false);
+    EXPECT_TRUE(bad.IsError);
 }
 
 TEST(AgentOperations, ViewCaptureRefusesToOverwriteUnlessAsked)

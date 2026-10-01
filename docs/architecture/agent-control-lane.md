@@ -49,8 +49,9 @@ the last presented frame until the window is restored), world maintenance and th
 advance, and with `--agent-socket` every module's queued commands and job completions apply while
 minimized. GPU work only progresses on presented frames, so tools that may dispatch it fail fast
 on a minimized frame with the error code `viewport_not_presentable`: `view_screenshot`,
-`view_capture`, `run_registration`, `run_point_sampling`, `run_keypoint_analysis`, `run_kmeans`
-and `run_point_cloud_consolidation` (`AgentOperationSpec::NeedsPresentedFrame`). A call of those
+`view_capture`, `run_mesh_operation`, `run_registration`, `run_point_sampling`,
+`run_keypoint_analysis`, `run_kmeans` and `run_point_cloud_consolidation`
+(`AgentOperationSpec::NeedsPresentedFrame`; any new tool that may dispatch GPU work sets it). A call of those
 tools that is already waiting when the window minimizes is answered with the same code instead of
 occupying a slot; its editor job or capture is not cancelled and can still finish after the
 window is restored (a capture may then still write its file, so check the path or pass
