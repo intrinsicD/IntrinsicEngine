@@ -2804,4 +2804,5 @@ TEST_F(EditorKeypointAgent, PendingKeypointCallEndsWhenTheWorkspaceReattaches)
     Engine.Run();
     EXPECT_TRUE(completed)<<"the call must not wait forever";
     EXPECT_TRUE(result.IsError)<<result.Text;
+    EXPECT_EQ(result.ErrorCode,"result_unavailable");
 }

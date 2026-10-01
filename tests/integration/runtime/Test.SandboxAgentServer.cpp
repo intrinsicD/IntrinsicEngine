@@ -6,6 +6,7 @@
 #include <cmath>
 #include <filesystem>
 #include <functional>
+#include <map>
 #include <memory>
 #include <string>
 #include <thread>
@@ -21,6 +22,7 @@
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Config.Window;
+import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.Platform.Backend.Null;
@@ -45,6 +47,7 @@ namespace R = Extrinsic::Runtime;
 namespace P = Extrinsic::Platform;
 namespace Config = Extrinsic::Core::Config;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
+namespace TF = Extrinsic::ECS::Components::Transform;
 namespace Editor = Extrinsic::Sandbox::Editor;
 using Json = nlohmann::json;
 namespace
@@ -90,13 +93,25 @@ namespace
             return Connection.SendAll(Json{{"jsonrpc", "2.0"}, {"method", method}, {"params", std::move(params)}}.dump() + "\n") ==
                    P::LocalSocketStatus::Ok;
         }
+        std::map<int, Json> Early; // responses that arrived before the one being awaited
         Json Await(int id, int attempts = 500)
         {
+            if (const auto early = Early.find(id); early != Early.end())
+            {
+                Json line = std::move(early->second);
+                Early.erase(early);
+                return line;
+            }
             for (;;)
             {
                 Json line = ReadLine(attempts);
                 if (line.is_discarded() || line.is_null()) return {};
                 if (line.contains("id") && line["id"] == id) return line;
+                if (line.contains("id") && line["id"].is_number_integer())
+                {
+                    const int other = line["id"].get<int>();
+                    Early[other] = std::move(line);
+                }
                 if (line.contains("method") && !line.contains("id")) Notifications.push_back(std::move(line));
             }
         }
@@ -154,9 +169,13 @@ namespace
         void Check(bool ok, std::string what) { if (!ok) Failures.push_back(std::move(what)); }
         auto& Scene() { return *Engine->Worlds().Get(Engine->ActiveWorld()); }
         // A point cloud of `count` points on a 6-wide lattice.
-        std::uint32_t AddCloud(std::size_t count = 36)
+        std::uint32_t AddCloud(std::size_t count = 36, bool withTransform = false)
         {
             const auto entity = Scene().Create();
+            if (withTransform)
+            {
+                Scene().Raw().emplace<TF::Component>(entity);
+            }
             auto& points = Scene().Raw().emplace<GS::Vertices>(entity).Properties;
             points.Resize(count);
             auto positions = points.GetOrAdd<glm::vec3>("v:position");
@@ -725,25 +744,89 @@ TEST(SandboxAgentServer, PreviewKMeansAndConsolidationReportReadiness)
     });
 }
 
-// Two identical runs requested back to back are both answered (a run that cannot get a result
-// of its own ends with a result_unavailable error instead of waiting forever).
-TEST(SandboxAgentServer, OverlappingIdenticalRunsAreBothAnswered)
+// Two identical ICP runs requested back to back: the second finds the first still active, gets no
+// callback of its own and must end with result_unavailable instead of waiting forever.
+TEST(SandboxAgentServer, DuplicateRunEndsWithResultUnavailable)
 {
     AgentRig rig("dup");
     ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
-    const auto source = rig.AddCloud(1200);
+    const auto source = rig.AddCloud(1200, true);
     const auto target = rig.AddCloud(1200);
     rig.Run([&](Client& c) {
         bool isError = true;
-        c.Tool("config_apply", {{"section", "sandbox.coherent_point_drift"},
-            {"payload", {{"source", source}, {"target", target}, {"output", 1}, {"outlier_weight", 0.0}, {"max_iterations", 60}}}}, &isError);
-        rig.Check(!isError, "cpd config_apply");
-        const Json call{{"name", "run_registration"}, {"arguments", {{"method", "cpd"}}}};
+        const auto configured = c.Tool("config_apply", {{"section", "sandbox.registration"},
+            {"payload", {{"source_entity", source}, {"target_entity", target}, {"max_iterations", 4000},
+                         {"convergence_threshold", 1e-12}}}}, &isError);
+        rig.Check(!isError, "icp config_apply: " + configured.dump());
+        const Json call{{"name", "run_registration"}, {"arguments", {{"method", "icp"}}}};
         const int first = c.Send("tools/call", call);
         const int second = c.Send("tools/call", call);
-        const auto a = c.Await(first), b = c.Await(second);
+        const auto a = c.Await(first, 2500), b = c.Await(second, 2500);
         rig.Check(a.contains("result") && b.contains("result"), "both calls are answered: " + a.dump() + " " + b.dump());
-        const bool aError = a["result"]["isError"].get<bool>(), bError = b["result"]["isError"].get<bool>();
-        rig.Check(!aError || !bError, "at most one of the calls is a duplicate: " + a.dump() + " " + b.dump());
+        const auto unavailable = [](const Json& reply) {
+            if (!reply.contains("result")) return false;
+            const auto structured = reply["result"].value("structuredContent", Json::object());
+            return structured.contains("error") && structured["error"]["code"] == "result_unavailable";
+        };
+        rig.Check(unavailable(b) && !unavailable(a), "the duplicate ends with result_unavailable: " + a.dump().substr(0, 200) + " | " + b.dump().substr(0, 300));
     }, std::chrono::seconds(60));
+}
+
+// RUNTIME-312 slice 7: run_operation on a config-sourced operation, end to end: config, preview,
+// run, the properties it published, and its single undo step.
+TEST(SandboxAgentServer, RunOperationOutlierAnalysisPublishesAndUndoes)
+{
+    AgentRig rig("outlier");
+    ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
+    const auto cloud = rig.AddCloud(64);
+    rig.Run([&](Client& c) {
+        const auto hasProperty = [&](const char* name) {
+            for (const auto& row : c.Tool("entity_properties", {{"entity", cloud}})["properties"])
+                if (row["name"] == name) return true;
+            return false;
+        };
+        bool isError = true;
+        const auto configured = c.Tool("config_apply", {{"section", "sandbox.outlier_analysis"}, {"payload", {{"entity", cloud}}}}, &isError);
+        rig.Check(!isError && configured["applied"] == true, "outlier config_apply: " + configured.dump());
+        // The entity comes from the section: an argument is refused with the section named.
+        const auto refused = c.Tool("run_operation", {{"operation", "outlier_analysis"}, {"entity", cloud}}, &isError);
+        rig.Check(isError && refused.dump().find("sandbox.outlier_analysis") != std::string::npos, "entity refused: " + refused.dump());
+        // Input validation runs for a few frames before the preview turns ready.
+        Json preview;
+        for (int attempt = 0; attempt < 200 && preview["enabled"] != true; ++attempt)
+        {
+            preview = c.Tool("preview_operation", {{"operation", "outlier_analysis"}}, &isError);
+            if (isError) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        rig.Check(!isError && preview["enabled"] == true && preview["operation"] == "outlier_analysis", "preview_operation: " + preview.dump());
+        rig.Check(!hasProperty("outlier_score"), "nothing published before the run");
+        const auto run = c.Tool("run_operation", {{"operation", "outlier_analysis"}}, &isError);
+        rig.Check(!isError && run["succeeded"] == true && run["operation"] == "outlier_analysis", "run_operation: " + run.dump());
+        rig.Check(hasProperty("outlier_score") && hasProperty("outlier_mask"), "the run published its properties");
+        const auto history = c.Tool("history");
+        // A queued job publishes on a later frame, after the call's "Agent: " label scope ended
+        // (documented limitation), so only the entry itself is asserted here.
+        rig.Check(history["undo_count"] == 1 && !history["undo_label"].get<std::string>().empty(), "one history entry: " + history.dump());
+        const auto undone = c.Tool("undo", Json::object(), &isError);
+        rig.Check(!isError && undone["undone"].size() == 1u, "one undo step: " + undone.dump());
+        rig.Check(!hasProperty("outlier_score") && !hasProperty("outlier_mask"), "undo removed the properties");
+        // An operation without readiness check says so instead of inventing one.
+        const auto noCheck = c.Tool("preview_operation", {{"operation", "geodesics"}, {"entity", cloud}}, &isError);
+        rig.Check(!isError && noCheck["enabled"].is_null() && !noCheck["reason"].get<std::string>().empty(), "geodesics preview: " + noCheck.dump());
+        // Every Config row names a real section.
+        for (const char* op : {"mesh_curvature", "normal_estimation", "kernel_density", "point_spacing", "outlier_analysis",
+                               "density_weight", "descriptor_analysis", "bilateral_filter", "point_construction"})
+        {
+            const auto refusal = c.Tool("preview_operation", {{"operation", op}, {"entity", cloud}}, &isError);
+            const auto text = refusal.is_string() ? refusal.get<std::string>() : refusal.dump();
+            const auto open = text.find("section '");
+            rig.Check(isError && open != std::string::npos, std::string(op) + " refuses an entity: " + text);
+            if (open == std::string::npos) continue;
+            const auto name = text.substr(open + 9, text.find('\'', open + 9) - open - 9);
+            bool sectionError = true;
+            c.Tool("config_get", {{"section", name}}, &sectionError);
+            rig.Check(!sectionError, std::string(op) + " reads the registered section " + name);
+        }
+    });
 }

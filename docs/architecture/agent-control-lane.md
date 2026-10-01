@@ -49,20 +49,21 @@ the last presented frame until the window is restored), world maintenance and th
 advance, and with `--agent-socket` every module's queued commands and job completions apply while
 minimized. GPU work only progresses on presented frames, so tools that may dispatch it fail fast
 on a minimized frame with the error code `viewport_not_presentable`: `view_screenshot`,
-`view_capture`, `run_mesh_operation`, `run_registration`, `run_point_sampling`,
+`view_capture`, `run_operation`, `run_mesh_operation`, `run_registration`, `run_point_sampling`,
 `run_keypoint_analysis`, `run_kmeans` and `run_point_cloud_consolidation`
 (`AgentOperationSpec::NeedsPresentedFrame`; any new tool that may dispatch GPU work sets it). A call of those
 tools that is already waiting when the window minimizes is answered with the same code instead of
 occupying a slot; its editor job or capture is not cancelled and can still finish after the
 window is restored (a capture may then still write its file, so check the path or pass
 `overwrite: true` when retrying). CPU-only tools, queries and the `preview_*` tools keep
-working. A connection may have at most 16 deferred calls; state-changing `tools/call` requests and read-only
-tools that need a presented frame (`view_screenshot`) beyond that get `-32000 too many pending calls`
-before the tool runs, and other read-only tools are served unless they would defer (then the reply is
-refused after they ran, which is harmless because they change nothing). A call whose result can never
-arrive (an identical job was already running, or the workspace was re-attached while it ran) ends
-with the error code `result_unavailable`. Responses go back through the socket thread; responses for a dropped client
-are discarded. Nothing exists without the launch flag: no module, thread or socket.
+working. A connection may have at most 16 deferred calls; state-changing `tools/call` requests and
+read-only tools that need a presented frame (`view_screenshot`) beyond that get `-32000 too many
+pending calls` before the tool runs, and other read-only tools are served unless they would defer
+(then the reply is refused after they ran, which is harmless because they change nothing). A call
+whose result can never arrive (an identical job was already running, or the workspace was re-
+attached while it ran) ends with the error code `result_unavailable`. Responses go back through the
+socket thread; responses for a dropped client are discarded.
+Nothing exists without the launch flag: no module, thread or socket.
 
 ## Protocol
 
@@ -120,14 +121,26 @@ are discarded. Nothing exists without the launch flag: no module, thread or sock
   (`MakeEditorPropertyVisualizationRecipe`). There is no generic scene or property write.
 - Naming. Read-only (`readOnlyHint`): `scene_entities`, `entity_properties`, `config_sections`,
   `config_schema`, `config_get`, `config_preview`, `history`, `jobs`, `log`,
-  `preview_registration`, `preview_point_sampling`,
-  `preview_keypoint_analysis`, `preview_kmeans`, `preview_point_cloud_consolidation`,
-  `preview_mesh_operation` and `view_screenshot`. State-changing: `select_entity`, `import_file`, `show_property`,
-  `config_apply`, `undo`, `redo`, `run_mesh_operation`, `run_registration` (ICP or Coherent
-  Point Drift from their config sections; the reply waits for the job),
+  `preview_registration`, `preview_point_sampling`, `preview_keypoint_analysis`, `preview_kmeans`,
+  `preview_point_cloud_consolidation`, `preview_operation`, `preview_mesh_operation` and
+  `view_screenshot`. State-changing: `select_entity`, `import_file`, `show_property`,
+  `config_apply`, `undo`, `redo`, `run_operation`, `run_mesh_operation`, `run_registration` (ICP
+  or Coherent Point Drift from their config sections; the reply waits for the job),
   `run_point_sampling` (the `sandbox.point_sampling` section), `run_keypoint_analysis`,
   `run_kmeans` and `run_point_cloud_consolidation`. `view_capture` writes a PNG inside the
   allowed roots.
+- Configured operations. `run_operation` / `preview_operation` select a row of one table by
+  `operation`: property smoothing, spectral modes, harmonic field, scalar gradient, mesh
+  curvature, geodesics, curvature segmentation, normal estimation, kernel density, point
+  spacing, outlier analysis, density weight, descriptor analysis, bilateral filter and point
+  construction. Each row calls its panel's `Preview*`/`Apply*` path with the settings of its
+  config section (`config_apply` first); the tool description lists every row with its section
+  and whether the entity is an argument. A row whose section carries the entity refuses an
+  `entity` argument, naming the section. `run_mesh_operation` and `preview_mesh_operation` are
+  aliases limited to the four mesh-field rows. A `Pending` command answers when its job
+  delivered (`result_unavailable` when none can). Geodesics has no readiness check, so its
+  preview answers `"enabled": null`. The tool flag `NeedsPresentedFrame` is per tool, so
+  `run_operation` (as `run_mesh_operation`) is refused while minimized even for CPU-only rows.
 - Screenshots complete a few frames after the call: an operation may return an
   `AgentOperationContinuation`, which the server polls each frame and answers with
   the original JSON-RPC id; a reconnecting client drops pending replies. Both tools
@@ -198,11 +211,16 @@ Planned: lane hardening (the remaining protocol conformance) and the remaining o
 
 ## Limitations
 
-- Operation tools exist for mesh-field operations (smoothing, spectral modes, harmonic
-  field, scalar gradient), registration (ICP, Coherent Point Drift), point sampling,
-  keypoint analysis, k-means and point-cloud consolidation. The remaining editor commands
-  (curvature, geodesics, remeshing and others) have no tools yet; coverage is owned by
+- Operation tools exist for the configured operations of the table above, registration (ICP,
+  Coherent Point Drift), point sampling, keypoint analysis, k-means and point-cloud
+  consolidation. The remaining editor commands (mesh denoise, remesh, subdivide and simplify,
+  scalar ridge, progressive Poisson, parameterization, scene save/load, visibility, camera
+  controller) are owned by
   [RUNTIME-312](../../tasks/backlog/runtime/RUNTIME-312-agent-lane-mcp-hardening-and-coverage.md).
 - Imports are asynchronous (`Pending`); poll `scene_entities` for the result.
+- History entries that a queued editor job publishes on a later frame (every `Pending` run:
+  registration, point analysis, normal estimation and the like) carry the command's own label
+  without the `Agent: ` prefix, because the label scope covers only the call itself;
+  synchronous operations are prefixed.
 - Unix-domain sockets only; Windows builds report `Unsupported`.
 - A Sandbox killed by a signal leaves its socket file; the next start replaces it.

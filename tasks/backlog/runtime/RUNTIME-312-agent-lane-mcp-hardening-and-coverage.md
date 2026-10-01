@@ -116,7 +116,15 @@ the editor operations the Sandbox UI already offers.
    Convention (also in the lane doc, and binding for the slice 7 tools): a section with an
    entity field supplies the entity; every other operation (the mesh-field operations,
    clustering, consolidation, geodesics, curvature segmentation, parameterization, Poisson,
-   mesh topology, ridge) takes `entity` as an argument; `domain` is one shared enum. `FinishApply`/`AwaitServiceRun` replace the hand-written continuations.
+   mesh topology, ridge) takes `entity` as an argument; `domain` is one shared enum.
+   `FinishApply`/`AwaitServiceRun` replace the hand-written continuations.
+   *Slice 7C done:* `run_operation`/`preview_operation` over a table (`Runtime.AgentOperations.Operations.cpp`,
+   helpers in `Agent/internal/Runtime.AgentOperations.Detail.hpp`) cover the four mesh-field rows,
+   mesh curvature, geodesics, curvature segmentation and the point rows (normal estimation, kernel
+   density, point spacing, outlier analysis, density weight, descriptor analysis, bilateral
+   filter, point construction); `run_mesh_operation` stays an alias of the mesh-field rows.
+   `NeedsPresentedFrame` stays per tool (so CPU-only rows are refused while minimized too).
+   Known gap: history entries published by a queued job lack the `Agent: ` prefix.
 
 8. **Per-run progress source (after UI-069 slice 1).** Each `Run*` captures its run
    key (editor job identity or correlation id) in its outcome; `PollPending` asks

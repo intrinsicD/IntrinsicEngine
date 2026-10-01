@@ -1,6 +1,7 @@
 // RUNTIME-287/288: agent operation registry, MCP protocol core, read-only policy, path
 // containment and the "Agent:" history label, without sockets or an engine.
 #include <atomic>
+#include <algorithm>
 #include <chrono>
 #include <thread>
 #include <filesystem>
@@ -673,6 +674,7 @@ TEST(AgentOperations, EditorOperationsShareTheDomainEnum)
         EXPECT_EQ(schema["properties"]["domain"]["enum"], expected) << spec.Name;
     }
     EXPECT_GE(seen, 2) << "k-means and consolidation at least";
+    EXPECT_EQ(Json::parse(registry.Find("run_point_cloud_consolidation")->InputSchemaJson)["properties"]["positions"]["default"], "v:position");
     const R::AgentOperationContext context{};
     const auto bad = R::InvokeAgentOperation(registry, "run_kmeans", context, R"({"entity":1,"domain":"Bogus"})", false);
     EXPECT_TRUE(bad.IsError);
@@ -680,6 +682,57 @@ TEST(AgentOperations, EditorOperationsShareTheDomainEnum)
     const auto badShow = R::InvokeAgentOperation(registry, "show_property", context,
                                                  R"({"entity":1,"name":"x","domain":"Bogus"})", false);
     EXPECT_NE(badShow.Text.find("Unknown domain 'Bogus'"), std::string::npos) << badShow.Text;
+}
+
+TEST(AgentOperations, ConfiguredOperationEnumMatchesTable)
+{
+    R::AgentOperationRegistry registry;
+    R::RegisterEditorAgentOperations(registry);
+    const auto enumOf = [&](const char* tool) {
+        const auto* spec = registry.Find(tool);
+        EXPECT_NE(spec, nullptr) << tool;
+        return spec ? Json::parse(spec->InputSchemaJson)["properties"]["operation"]["enum"] : Json::array();
+    };
+    const Json all = enumOf("run_operation");
+    EXPECT_EQ(all, enumOf("preview_operation"));
+    for (const char* name : {"property_smoothing", "spectral_modes", "harmonic_field", "scalar_gradient", "mesh_curvature", "geodesics",
+                             "curvature_segmentation", "normal_estimation", "kernel_density", "point_spacing", "outlier_analysis",
+                             "density_weight", "descriptor_analysis", "bilateral_filter", "point_construction"})
+        EXPECT_NE(std::ranges::find(all, name), all.end()) << name;
+    // The mesh aliases keep their four-operation enum, all of which the table serves.
+    EXPECT_EQ(enumOf("run_mesh_operation"), (Json{"property_smoothing", "spectral_modes", "harmonic_field", "scalar_gradient"}));
+    EXPECT_EQ(enumOf("preview_mesh_operation"), enumOf("run_mesh_operation"));
+    EXPECT_TRUE(registry.Find("run_operation")->NeedsPresentedFrame);
+    EXPECT_FALSE(registry.Find("run_operation")->ReadOnly);
+    EXPECT_TRUE(registry.Find("preview_operation")->ReadOnly);
+    EXPECT_FALSE(registry.Find("preview_operation")->NeedsPresentedFrame);
+    const auto required = Json::parse(registry.Find("run_operation")->InputSchemaJson)["required"];
+    EXPECT_EQ(required, (Json{"operation"})) << "entity is optional: config-sourced rows take none";
+}
+
+TEST(AgentOperations, ConfiguredOperationEntityRulesFollowTheSection)
+{
+    R::AgentOperationRegistry registry;
+    R::RegisterEditorAgentOperations(registry);
+    const R::AgentOperationContext context{};
+    const auto call = [&](const char* tool, const char* arguments) { return R::InvokeAgentOperation(registry, tool, context, arguments, false); };
+    // A section that names the entity supplies it: an argument is refused and the message names the section.
+    const auto refused = call("run_operation", R"({"operation":"outlier_analysis","entity":3})");
+    EXPECT_TRUE(refused.IsError);
+    EXPECT_NE(refused.Text.find("sandbox.outlier_analysis"), std::string::npos) << refused.Text;
+    EXPECT_NE(refused.Text.find("do not pass entity"), std::string::npos) << refused.Text;
+    EXPECT_NE(call("preview_operation", R"({"operation":"mesh_curvature","entity":3})").Text.find("sandbox.mesh_curvature"), std::string::npos);
+    // The other rows need the entity.
+    const auto missing = call("run_operation", R"({"operation":"geodesics"})");
+    EXPECT_TRUE(missing.IsError);
+    EXPECT_NE(missing.Text.find("needs {\"entity\""), std::string::npos) << missing.Text;
+    EXPECT_NE(call("preview_mesh_operation", R"({"operation":"scalar_gradient"})").Text.find("needs"), std::string::npos);
+    // Unknown names list the valid ones; the mesh alias does not serve other families.
+    const auto unknown = call("run_operation", R"({"operation":"nope","entity":1})");
+    EXPECT_NE(unknown.Text.find("Unknown operation 'nope'"), std::string::npos);
+    const auto aliasMiss = call("run_mesh_operation", R"({"operation":"outlier_analysis"})");
+    EXPECT_NE(aliasMiss.Text.find("Unknown operation"), std::string::npos) << aliasMiss.Text;
+    EXPECT_EQ(aliasMiss.Text.find("outlier_analysis\"]"), std::string::npos);
 }
 
 TEST(AgentOperations, ViewCaptureRefusesToOverwriteUnlessAsked)

@@ -249,6 +249,7 @@ target_sources(${target_name}
         Config/Runtime.ConfigFieldSpec.cpp
         Agent/Runtime.AgentOperations.cpp
         Agent/Runtime.AgentOperations.Editor.cpp
+        Agent/Runtime.AgentOperations.Operations.cpp
         Agent/Runtime.AgentOperations.Capture.cpp
         Agent/Runtime.AgentServer.cpp
         Kernel/Runtime.InputActions.cpp
