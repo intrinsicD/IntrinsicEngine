@@ -141,7 +141,7 @@ the editor operations the Sandbox UI already offers.
    (`ApplyEditorCameraControllerCommand`). No editor command sets a camera pose, preset or
    focus (the viewport camera is driven by input, and the screenshot presets live in
    `ViewCaptureModule`), and the constraint above makes a missing UI action a prerequisite, not
-   part of this task. Suggested follow-up (task not created here): an editor camera-pose
+   part of this task. Follow-up [UI-070](../ui/UI-070-camera-pose-command-and-controls.md): an editor camera-pose
    command with a UI action (for example Camera panel fields plus Focus selection) in
    `Runtime.SceneEditingOperations`, then `set_camera` gains `pose`/`preset`/`focus` over it.
 
@@ -168,7 +168,7 @@ the editor operations the Sandbox UI already offers.
 - [x] Slice 4: unsupported `protocolVersion` gets the server's own version; tool results carry `structuredContent`; annotations match undoability; `view_capture` never overwrites without `overwrite: true`.
 - [x] Slice 5: progress notifications arrive for a long continuation tool with a progress token; cancellation drops the pending reply (the job itself keeps running: cancelling it waits for RUNTIME-279, documented in `agent-control-lane.md`).
 - [x] Slice 6: keypoint, k-means and consolidation have `preview_*` tools and one shared argument convention recorded in this note.
-- [x] Slice 7: every command of finding 9 is reachable through an agent tool with undo coverage where it edits the scene; `run_mesh_operation` keeps working. (Camera pose is the one exception: no editor command exists, so `set_camera` covers the controller kind; see the slice text.)
+- [x] Slice 7: every command of finding 9 is reachable through an agent tool with undo coverage where it edits the scene; `run_mesh_operation` keeps working. (Camera pose is the one exception: no editor command exists, so `set_camera` covers the controller kind; owned by UI-070.)
 - [ ] Slice 8: `notifications/progress` for a deferred call comes from that run's own job via UI-069's `EditorJobCommandSurface::Progress(key)`; the oldest-job heuristic in `Runtime.AgentServer.cpp` is removed; a two-concurrent-jobs test proves it.
 - [ ] `agent-control-lane.md`, `tools/agents/README.md` and the module inventory are current after every slice.
 

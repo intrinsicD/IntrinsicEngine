@@ -24,6 +24,7 @@ Each window uses the same runtime functions as agent operations.
 - [UI-059 — Property Inspector window](UI-059-property-inspector-window.md)
 - [UI-060 — Jobs window](UI-060-jobs-window.md)
 - [UI-069 — Shared operation progress read model and panel widget](UI-069-shared-operation-progress-widget.md)
+- [UI-070 — Camera pose command, view presets and Focus selection](UI-070-camera-pose-command-and-controls.md)
 - [UI-061 — Select-by-query controls and "use selection as mask/source"](UI-061-select-by-query-controls.md)
 - [UI-063 — File > Properties import/export window](UI-063-properties-import-export-window.md)
 - [UI-064 — History window](UI-064-history-window.md)

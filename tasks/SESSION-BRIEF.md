@@ -73,6 +73,7 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `RUNTIME-285`: `UI-065` — Diagnostics / Log window (tasks/backlog/ui/UI-065-diagnostics-log-window.md)
 - blocked by `RUNTIME-286`: `UI-066` — Mesh Health window (tasks/backlog/ui/UI-066-mesh-health-window.md)
 - unblocked: `UI-069` — Shared operation progress read model and panel widget (tasks/backlog/ui/UI-069-shared-operation-progress-widget.md)
+- unblocked: `UI-070` — Camera pose command, view presets and Focus selection (tasks/backlog/ui/UI-070-camera-pose-command-and-controls.md)
 
 ## Theme G — Active bugs
 
@@ -80,6 +81,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-097` — Progressive model-scene UV job publishes a zero atlas (tasks/backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md)
 - unblocked: `BUG-149` — Benchmark sealer escapes dotted output directories (tasks/backlog/bugs/BUG-149-benchmark-sealer-dotted-output-directory.md)
 - unblocked: `BUG-193` — Investigate GPU pacing variability and watchdog margin (tasks/backlog/bugs/BUG-193-gpu-pacing-and-watchdog-margin.md)
+- unblocked: `BUG-230` — Topology edits drop user properties, and undo cannot restore them (tasks/backlog/bugs/BUG-230-topology-edits-drop-user-properties.md)
 - unblocked: `RUNTIME-291` — Scale-aware default radii for point operations (tasks/backlog/runtime/RUNTIME-291-scale-aware-radius-defaults.md)
 
 ## Theme H — Agentic workflow hardening
