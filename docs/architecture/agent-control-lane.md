@@ -14,8 +14,13 @@ local-only.
    (repeatable, default: the working directory) bounds file arguments.
 2. The MCP client launches `tools/agents/mcp_bridge.py` (`.mcp.json` entry
    `intrinsic-sandbox`). The bridge starts even without a Sandbox, offers
-   `sandbox_status`, connects when the Sandbox is up and announces the Sandbox's
-   tools with `notifications/tools/list_changed`.
+   `sandbox_status`, probes the socket while the Sandbox is away (after
+   `notifications/initialized`) and announces the Sandbox's tools with
+   `notifications/tools/list_changed`. It is a single-threaded `selectors` loop:
+   tool calls run concurrently with per-call timeouts (the call keeps running in
+   the Sandbox), `ping` is answered locally, progress notifications are
+   forwarded, `notifications/cancelled` is relayed, and MCP versions
+   2025-06-18, 2025-03-26 and 2024-11-05 are negotiated.
 3. **View > Agent Connection** in the Sandbox shows the socket, the connected
    client, the mode, allowed roots and call count, and disconnects the agent.
 

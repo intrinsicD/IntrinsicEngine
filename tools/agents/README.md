@@ -56,9 +56,19 @@ Agent workflow and task policy tooling.
 `mcp_bridge.py` connects an MCP client (the `intrinsic-sandbox` entry in
 `.mcp.json`) to a Sandbox started with `--agent-socket`; stdlib only. See
 [the agent control lane](../../docs/architecture/agent-control-lane.md).
-After a Sandbox restart, `sandbox_status` probes the old connection, reconnects and
-announces the (possibly changed) tool list; a call whose send failed is retried
-once on the new connection. Clients that cache tool schemas still see new tools
-only after they re-read the list.
+The bridge is one single-threaded `selectors` loop, so calls are concurrent: `tools/call`
+is forwarded under a fresh `bridge-N` id (params and `_meta.progressToken` untouched),
+Sandbox notifications such as `notifications/progress` are forwarded verbatim and `ping`
+is answered at once. `--timeout` (default 120 s) is per call: on expiry the client gets an
+error result saying the call may still be running in the Sandbox (poll `jobs` or
+`scene_entities`), the connection stays open and a late reply is dropped.
+`notifications/cancelled` drops the pending call and is forwarded to the Sandbox; if the
+Sandbox exits, pending calls fail with an error result. While the Sandbox is away and the
+client has sent `notifications/initialized`, the bridge probes the socket every
+`--probe-interval` seconds (default 2) and announces the Sandbox's (possibly changed) tools
+with `notifications/tools/list_changed`; `sandbox_status` forces a probe. A call whose send
+failed is retried once on a new connection. MCP versions 2025-06-18, 2025-03-26 and
+2024-11-05 are negotiated. Clients that cache tool schemas still see new tools only after
+they re-read the list.
 Regression cases: `tests/regression/tooling/Test.McpBridge.py`.
 
