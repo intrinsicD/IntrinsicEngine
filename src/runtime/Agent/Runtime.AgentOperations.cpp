@@ -65,7 +65,7 @@ namespace Extrinsic::Runtime
             if (error) continue;
             // Component-wise containment: "/data/a" must not admit "/data/ab" or "/data/a/../b".
             const fs::path relative = resolved.lexically_relative(base);
-            const bool inside = !relative.empty() && *relative.begin() != "..";
+            const bool inside = !relative.empty() && relative != "." && *relative.begin() != ".."; // not the root itself
             if (inside) return resolved.string();
         }
         return std::nullopt;

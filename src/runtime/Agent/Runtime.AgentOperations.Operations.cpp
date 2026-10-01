@@ -693,7 +693,9 @@ namespace Extrinsic::Runtime
             if (!PrepareSnapshot(context)) return Fail(kNoWorkspace); // prepares the session frame the feature frames read
             const auto commands = PrepareEditorRegistrationFrame(*context.Attachment).Commands;
             const auto config = GetEditorPointSamplingConfig(commands);
-            if (!config) return Fail("The sandbox.point_sampling section is unavailable.");
+            if (!config)
+                return preview ? Ok(ReadinessJson(commands, {false, "The sandbox.point_sampling section is unavailable."}))
+                               : Fail("The sandbox.point_sampling section is unavailable.");
             if (preview) return Ok(ReadinessJson(commands, PreviewEditorPointSamplingCommand(commands, *config)));
             // A Vulkan run is queued and answers once it has published or failed.
             return FinishApply<EditorPointSamplingResult>(
@@ -895,7 +897,9 @@ namespace Extrinsic::Runtime
             if (*method == "icp")
             {
                 const auto config = GetEditorRegistrationConfig(commands);
-                if (!config) return Fail("The sandbox.registration section is unavailable.");
+                if (!config)
+                    return preview ? Ok(ReadinessJson(commands, {false, "The sandbox.registration section is unavailable."}, {{"method", "icp"}}))
+                                   : Fail("The sandbox.registration section is unavailable.");
                 if (preview)
                 {
                     return Ok(ReadinessJson(commands, PreviewEditorRegistrationCommand(commands, *config), {{"method", "icp"}}));
@@ -905,7 +909,9 @@ namespace Extrinsic::Runtime
                     &RegistrationJson);
             }
             const auto config = GetEditorCoherentPointDriftConfig(commands);
-            if (!config) return Fail("The sandbox.coherent_point_drift section is unavailable.");
+            if (!config)
+                return preview ? Ok(ReadinessJson(commands, {false, "The sandbox.coherent_point_drift section is unavailable."}, {{"method", "cpd"}}))
+                               : Fail("The sandbox.coherent_point_drift section is unavailable.");
             if (preview)
             {
                 return Ok(ReadinessJson(commands, PreviewEditorCoherentPointDriftCommand(commands, *config), {{"method", "cpd"}}));

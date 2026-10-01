@@ -170,7 +170,7 @@ the editor operations the Sandbox UI already offers.
 - [x] Slice 6: keypoint, k-means and consolidation have `preview_*` tools and one shared argument convention recorded in this note.
 - [x] Slice 7: every command of finding 9 is reachable through an agent tool with undo coverage where it edits the scene; `run_mesh_operation` keeps working. (Camera pose is the one exception: no editor command exists, so `set_camera` covers the controller kind; owned by UI-070.)
 - [ ] Slice 8: `notifications/progress` for a deferred call comes from that run's own job via UI-069's `EditorJobCommandSurface::Progress(key)`; the oldest-job heuristic in `Runtime.AgentServer.cpp` is removed; a two-concurrent-jobs test proves it.
-- [ ] `agent-control-lane.md`, `tools/agents/README.md` and the module inventory are current after every slice.
+- [x] `agent-control-lane.md`, `tools/agents/README.md` and the module inventory are current after every slice.
 
 ## Verification
 ```bash

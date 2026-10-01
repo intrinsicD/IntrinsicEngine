@@ -133,6 +133,27 @@ namespace
             return parsed.is_discarded() ? Json(text) : parsed;
         }
     };
+    // Idle-phase probe: minimized frames skip the Driver's UiBuild hook, so exit is decided here.
+    class IdleExit final : public R::IRuntimeModule
+    {
+    public:
+        IdleExit(std::atomic_bool& done, R::Engine& engine) : m_Done(done), m_Engine(engine) {}
+        [[nodiscard]] std::string_view Name() const noexcept override { return "Z.IdleExit"; }
+        [[nodiscard]] Extrinsic::Core::Result OnRegister(R::EngineSetup& setup) override
+        {
+            return setup.RegisterFrameHook(R::FramePhase::Idle, [this](R::RuntimeFrameHookContext&) {
+                // The Null window does not sleep while minimized, so bound by time, not frames.
+                if (m_Done.load() || std::chrono::steady_clock::now() > m_Deadline) m_Engine.RequestExit();
+            });
+        }
+        void OnShutdown(R::RuntimeModuleShutdownContext&) override {}
+
+    private:
+        std::atomic_bool& m_Done;
+        R::Engine& m_Engine;
+        std::chrono::steady_clock::time_point m_Deadline{std::chrono::steady_clock::now() + std::chrono::seconds(30)};
+    };
+
     // A running engine with the agent server, the editor modules the tools need and a
     // scripted client thread: tests add entities, then Run(script) serves the client.
     struct AgentRig
@@ -143,9 +164,11 @@ namespace
         R::AgentServerModule* Server{nullptr};
         std::vector<std::string> Failures; // written by the client thread only, read after join
         std::atomic_bool Done{false};
+        bool Minimized{false}; // the window minimizes on the first frame: calls are served by Idle frames
         std::function<void(R::Engine&)> EveryFrame{}; // optional main-thread hook, run on every frame
 
-        explicit AgentRig(const std::string& tag, bool withCamera = false)
+        explicit AgentRig(const std::string& tag, bool withCamera = false, bool minimized = false)
+            : Minimized(minimized)
         {
             SocketPath = (std::filesystem::temp_directory_path() / ("intrinsic-agent-" + tag + "-" + std::to_string(::getpid()) + ".sock")).string();
             auto sections = Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry();
@@ -170,6 +193,7 @@ namespace
             Engine->EmplaceModule<R::ViewCaptureModule>(std::filesystem::temp_directory_path());
             Server = &Engine->EmplaceModule<R::AgentServerModule>(
                 R::AgentServerOptions{.SocketPath = SocketPath, .AllowedRoots = {std::filesystem::temp_directory_path().string()}});
+            if (minimized) Engine->EmplaceModule<IdleExit>(Done, *Engine);
             Engine->Initialize();
         }
         void Check(bool ok, std::string what) { if (!ok) Failures.push_back(std::move(what)); }
@@ -225,7 +249,8 @@ namespace
             const auto deadline = std::chrono::steady_clock::now() + limit;
             Frames->OnFrame = [&](R::Engine& kernel) {
                 if (EveryFrame) EveryFrame(kernel);
-                if (Done.load() || std::chrono::steady_clock::now() > deadline) kernel.RequestExit();
+                if (Minimized) static_cast<P::Backends::Null::NullWindow&>(kernel.GetWindow()).QueueResize(0, 0);
+                if (!Minimized && Done.load() || std::chrono::steady_clock::now() > deadline) kernel.RequestExit();
             };
             Engine->Run();
             client.join();
@@ -530,30 +555,6 @@ TEST(SandboxAgentServer, ProgressAndCancelOverTheSocket)
     for (const auto& failure : failures) ADD_FAILURE() << failure;
     EXPECT_TRUE(done.load()) << "client did not finish";
     engine.Shutdown();
-}
-
-namespace
-{
-    // Idle-phase probe: minimized frames skip the Driver's UiBuild hook, so exit is decided here.
-    class IdleExit final : public R::IRuntimeModule
-    {
-    public:
-        IdleExit(std::atomic_bool& done, R::Engine& engine) : m_Done(done), m_Engine(engine) {}
-        [[nodiscard]] std::string_view Name() const noexcept override { return "Z.IdleExit"; }
-        [[nodiscard]] Extrinsic::Core::Result OnRegister(R::EngineSetup& setup) override
-        {
-            return setup.RegisterFrameHook(R::FramePhase::Idle, [this](R::RuntimeFrameHookContext&) {
-                // The Null window does not sleep while minimized, so bound by time, not frames.
-                if (m_Done.load() || std::chrono::steady_clock::now() > m_Deadline) m_Engine.RequestExit();
-            });
-        }
-        void OnShutdown(R::RuntimeModuleShutdownContext&) override {}
-
-    private:
-        std::atomic_bool& m_Done;
-        R::Engine& m_Engine;
-        std::chrono::steady_clock::time_point m_Deadline{std::chrono::steady_clock::now() + std::chrono::seconds(30)};
-    };
 }
 
 TEST(SandboxAgentServer, MinimizedSandboxStillServesCallsAndCapturesFailFast)
@@ -1085,13 +1086,15 @@ TEST(SandboxAgentServer, SetVisibilityAndSetCameraUseTheEditorCommands)
 }
 
 // A scene-file call whose result slot is taken by a later one still answers (result_unavailable instead of hanging).
-TEST(SandboxAgentServer, PipelinedSceneFileCallsAreAllAnswered)
+namespace
 {
+    void RunPipelinedSceneFileCalls(const bool minimized)
+    {
     namespace fs = std::filesystem;
     const fs::path directory = fs::temp_directory_path() / ("intrinsic-agent-pipe-" + std::to_string(::getpid()));
     fs::remove_all(directory);
     fs::create_directories(directory);
-    AgentRig rig("pipe");
+    AgentRig rig(minimized ? "pipemin" : "pipe", false, minimized);
     ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
     (void)rig.AddGrid();
     rig.Run([&](Client& c) {
@@ -1108,11 +1111,17 @@ TEST(SandboxAgentServer, PipelinedSceneFileCallsAreAllAnswered)
             const auto structured = reply["result"].value("structuredContent", Json::object());
             return structured.contains("error") && structured["error"]["code"] == "result_unavailable";
         };
-        rig.Check(loaded["result"]["isError"] == false || unavailable(loaded), "the load succeeded or says its result is unavailable");
-        rig.Check(saved["result"]["isError"] == false || unavailable(saved), "the save succeeded or says its result is unavailable");
+        // The load is the later call and owns the retained slot; the save either finished first or was overtaken.
+        rig.Check(loaded["result"]["isError"] == false, "the later load succeeds: " + loaded.dump().substr(0, 300));
+        rig.Check(saved["result"]["isError"] == false || unavailable(saved), "the save succeeded or is result_unavailable: " + saved.dump().substr(0, 300));
+        rig.Check(unavailable(saved) || fs::exists(directory / "second.scene"), "an answered save wrote its file");
     });
     fs::remove_all(directory);
 }
+}
+
+TEST(SandboxAgentServer, PipelinedSceneFileCallsAreAllAnswered) { RunPipelinedSceneFileCalls(false); }
+TEST(SandboxAgentServer, PipelinedSceneFileCallsAreAllAnsweredWhileMinimized) { RunPipelinedSceneFileCalls(true); }
 
 // "Clear completed" hides terminal queue rows; an import wait is tracked by handle and still answers.
 TEST(SandboxAgentServer, ImportWaitSurvivesClearCompleted)

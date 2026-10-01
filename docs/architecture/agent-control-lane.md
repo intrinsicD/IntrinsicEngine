@@ -147,8 +147,9 @@ Nothing exists without the launch flag: no module, thread or socket.
   replaced document are outside the undo history). `save_scene` with `overwrite: true` replaces
   whatever file lies at the path inside the roots, of any type; the existence check and the
   write are two steps, so a file created in between is overwritten without the check (the lane
-  has one client and one main thread, the path is not reserved). A path that passes through a
-  dangling symlink is outside the roots: `ResolveAgentPath` refuses it, so no file tool can write
+  has one client and one main thread, the path is not reserved, and a symlink planted by another local
+  process between the check and the write is outside the threat model: the socket is owner-only). A path that passes through a
+  dangling symlink, or equal to an allowed root itself, is outside the roots: `ResolveAgentPath` refuses it, so no file tool can write
   through a link to a target elsewhere. Only the latest scene-file event is kept, so a save or
   load that a later one overtook (or a stale job that publishes none) answers with the error code
   `result_unavailable` once its job ended. `import_file` with `wait: true` follows the import by

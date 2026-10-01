@@ -139,7 +139,9 @@ namespace Extrinsic::Runtime
                 Json finished = out;
                 const bool complete = record->Phase == RuntimeAssetIngestPhase::Complete;
                 finished["status"] = complete ? "Applied" : record->Phase == RuntimeAssetIngestPhase::Failed ? "Failed" : "Cancelled";
-                finished["message"] = std::string(DebugNameForRuntimeAssetIngestDiagnostic(record->Diagnostic));
+                finished["message"] = complete ? std::string("Import completed.")
+                                                : std::string("Import ") + (record->Phase == RuntimeAssetIngestPhase::Failed ? "failed: " : "cancelled: ") +
+                                                      DebugNameForRuntimeAssetIngestDiagnostic(record->Diagnostic);
                 finished["entities_created"] = record->Result ? record->Result->PrimitiveEntitiesCreated : 0u;
                 // Best effort: entities that appeared since the call (another import running at the same time is included).
                 Json created = Json::array();
@@ -170,7 +172,8 @@ namespace Extrinsic::Runtime
                 }
                 // Only the latest scene-file event is retained: a later save or load (or a stale job that publishes
                 // none) can leave this one without a result once its job ended.
-                if (current.Jobs != nullptr && current.Jobs->IsComplete(token))
+                // A reaped job is unknown to the service (state Invalid): it ended too.
+                if (current.Jobs != nullptr && (current.Jobs->IsComplete(token) || current.Jobs->GetState(token) == JobState::Invalid))
                 {
                     out = {.IsError = true, .ErrorCode = "result_unavailable",
                            .Text = "The scene file job ended without a result for this call (a later scene file operation replaced it, or "

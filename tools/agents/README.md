@@ -55,7 +55,7 @@ Agent workflow and task policy tooling.
 
 `mcp_bridge.py` connects an MCP client (the `intrinsic-sandbox` entry in
 `.mcp.json`) to a Sandbox started with `--agent-socket`; stdlib only. See
-[the agent control lane](../../docs/architecture/agent-control-lane.md).
+[the agent control lane](../../docs/architecture/agent-control-lane.md), which holds the tool catalog.
 The bridge is one single-threaded `selectors` loop, so calls are concurrent: `tools/call`
 is forwarded under a fresh `bridge-N` id (params and `_meta.progressToken` untouched),
 Sandbox notifications such as `notifications/progress` are forwarded verbatim and `ping`
