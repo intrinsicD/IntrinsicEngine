@@ -59,6 +59,8 @@ namespace Extrinsic::Runtime
             std::function<void(const RuntimeAssetImportRequest&)> hook);
         [[nodiscard]] RuntimeAssetImportQueueSnapshot
             GetAssetImportQueueSnapshot() const;
+        [[nodiscard]] std::optional<RuntimeAssetIngestRecord>
+            GetAssetIngestRecord(RuntimeAssetIngestHandle operation) const;
         [[nodiscard]] TextureBakeService*
             GetTextureBakeServiceForTest() const noexcept;
         [[nodiscard]] std::size_t ClearCompletedAssetImports();

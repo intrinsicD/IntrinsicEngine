@@ -252,6 +252,9 @@ namespace Extrinsic::Runtime
             std::function<void(const RuntimeAssetImportRequest&)> hook);
         [[nodiscard]] RuntimeAssetImportQueueSnapshot
             GetAssetImportQueueSnapshot() const;
+        // One import's record by handle, also after "Clear completed" hid it from the queue.
+        [[nodiscard]] std::optional<RuntimeAssetIngestRecord>
+            GetAssetIngestRecord(RuntimeAssetIngestHandle operation) const;
         [[nodiscard]] TextureBakeService*
             GetTextureBakeServiceForTest() const noexcept;
         [[nodiscard]] std::size_t ClearCompletedAssetImports();

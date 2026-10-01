@@ -918,6 +918,12 @@ namespace Extrinsic::Runtime
         return m_Impl->ImportExecutor.GetAssetImportQueueSnapshot();
     }
 
+    std::optional<RuntimeAssetIngestRecord>
+    AssetWorkflowModule::GetAssetIngestRecord(const RuntimeAssetIngestHandle operation) const
+    {
+        return m_Impl->ImportExecutor.GetAssetIngestRecord(operation);
+    }
+
     TextureBakeService*
     AssetWorkflowModule::GetTextureBakeServiceForTest() const noexcept
     {

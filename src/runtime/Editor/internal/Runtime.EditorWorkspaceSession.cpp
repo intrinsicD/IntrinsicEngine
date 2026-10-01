@@ -336,6 +336,13 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                 {
                     return Core::Err(Core::ErrorCode::InvalidState);
                 });
+            context.AssetImportQueueCommands.Find = GuardAttachmentCommand(
+                std::move(context.AssetImportQueueCommands.Find),
+                epoch,
+                [](const RuntimeAssetIngestHandle) -> std::optional<RuntimeAssetIngestRecord>
+                {
+                    return std::nullopt;
+                });
             context.SceneFileCommands.New = GuardAttachmentCommand(
                 std::move(context.SceneFileCommands.New),
                 epoch,

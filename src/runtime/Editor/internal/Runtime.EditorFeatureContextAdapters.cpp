@@ -2049,6 +2049,14 @@ namespace
                                 : Core::Err(
                                       Core::ErrorCode::InvalidState);
                         },
+                        .Find =
+                            [assetWorkflow](const RuntimeAssetIngestHandle operation)
+                            -> std::optional<RuntimeAssetIngestRecord>
+                        {
+                            return assetWorkflow != nullptr
+                                ? assetWorkflow->GetAssetIngestRecord(operation)
+                                : std::nullopt;
+                        },
                     },
                 .SceneFileCommands =
                     EditorSceneFileCommandSurface{

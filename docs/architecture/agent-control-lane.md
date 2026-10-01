@@ -102,8 +102,9 @@ Nothing exists without the launch flag: no module, thread or socket.
   (replaces the scene document) and `config_apply` (changes engine
   configuration, which is not in the history). Mutating tools that edit the scene or its
   properties (`import_file`, `show_property`, `run_*`) are undoable, `undo`/`redo` operate on
-  the history itself, and `select_entity` changes selection only, which is editor state, not scene
-  data. New tools classify themselves with this rule.
+  the history itself, and `select_entity` and `set_camera` change editor state (selection, the camera
+  controller), not scene data, so they are deliberately not destructive. New tools classify
+  themselves with this rule.
 - `view_capture` refuses an existing `path` unless `overwrite: true` (error code `file_exists`;
   a dangling symlink counts as occupied). The capture write repeats the check atomically
   with a hard link to a uniquely named temporary file, so a file created between the call and the
@@ -132,9 +133,10 @@ Nothing exists without the launch flag: no module, thread or socket.
   `run_point_sampling` (the `sandbox.point_sampling` section), `run_keypoint_analysis`,
   `run_kmeans` and `run_point_cloud_consolidation`. `view_capture` writes a PNG inside the
   allowed roots.
-- Appearance and camera. `set_visibility` shows or hides an entity's primary lane (mesh surface, graph
-  edges, point-cloud points) through `ApplyEditorRenderHintCommand` exactly as the appearance
-  panel's checkbox does (one undoable step). `set_camera` switches the main camera controller
+- Appearance and camera. `set_visibility` shows or hides a lane of an entity (`lane`: surface, edges or
+  points, default the entity's primary one: mesh surface, graph edges, point-cloud points)
+  through `ApplyEditorRenderHintCommand` exactly as the appearance panel's checkboxes do (one
+  undoable step). `set_camera` switches the main camera controller
   kind (orbit, fly, free look, top down) through `ApplyEditorCameraControllerCommand`, like the
   Camera panel's buttons; it is editor state, not scene data, so it is neither undoable nor
   destructive. Camera pose, presets and focus have no editor command, so they are not tools.
@@ -142,8 +144,18 @@ Nothing exists without the launch flag: no module, thread or socket.
   refuses an existing file unless `overwrite: true`, error code `file_exists`) and `load_scene`
   replaces the whole scene document with a file inside them; both resolve the path with
   `ResolveAgentPath`, answer once the job finished and are `Destructive` (a written file and a
-  replaced document are outside the undo history). `import_file` with `wait: true` answers
-  when the import queue row completed or failed and lists the new entities.
+  replaced document are outside the undo history). `save_scene` with `overwrite: true` replaces
+  whatever file lies at the path inside the roots, of any type; the existence check and the
+  write are two steps, so a file created in between is overwritten without the check (the lane
+  has one client and one main thread, the path is not reserved). A path that passes through a
+  dangling symlink is outside the roots: `ResolveAgentPath` refuses it, so no file tool can write
+  through a link to a target elsewhere. Only the latest scene-file event is kept, so a save or
+  load that a later one overtook (or a stale job that publishes none) answers with the error code
+  `result_unavailable` once its job ended. `import_file` with `wait: true` follows the import by
+  its handle (also after "Clear completed" hid its queue row), answers when it completed,
+  failed or was cancelled and reports `entities_created` from the import's own result;
+  `new_entities` lists the entity ids that appeared meanwhile, which also includes entities of
+  other imports running at the same time.
 - Configured operations. `run_operation` / `preview_operation` select a row of one table by
   `operation`: property smoothing, spectral modes, harmonic field, scalar gradient, mesh
   curvature, geodesics, curvature segmentation, normal estimation, kernel density, point

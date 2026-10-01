@@ -241,6 +241,8 @@ export namespace Extrinsic::Runtime
     {
         std::function<std::size_t()> ClearCompleted{};
         std::function<Core::Result(RuntimeAssetIngestHandle)> Cancel{};
+        // One import's record by handle; unlike the queue rows it survives "Clear completed".
+        std::function<std::optional<RuntimeAssetIngestRecord>(RuntimeAssetIngestHandle)> Find{};
 
         [[nodiscard]] bool ClearAvailable() const noexcept
         {

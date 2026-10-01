@@ -130,20 +130,23 @@ namespace Extrinsic::Runtime
             return {.Continuation = [handle = result.Operation, before, out](const AgentOperationContext& current, AgentOperationOutcome& done) {
                 const auto frame = PrepareSnapshot(current);
                 if (!frame) { done = Fail(kNoWorkspace); return true; }
-                const auto row = std::ranges::find_if(frame->Frame.AssetImportQueue.Rows,
-                                                      [&](const EditorAssetImportQueueRow& r) { return r.Operation == handle; });
-                if (row == frame->Frame.AssetImportQueue.Rows.end()) return false; // not listed yet
-                using Stage = RuntimeAssetImportQueueStage;
-                if (row->Stage != Stage::Complete && row->Stage != Stage::Failed && row->Stage != Stage::Cancelled) return false;
+                // By handle, so "Clear completed" hiding the queue row cannot leave the call waiting.
+                const auto scene = PrepareEditorSceneEditingFrame(*current.Attachment);
+                if (!scene.AssetImportQueueCommands.Find) { done = Fail("Import tracking is unavailable in this workspace."); return true; }
+                const auto record = scene.AssetImportQueueCommands.Find(handle);
+                if (!record) { done = Fail("The import is unknown to the asset workflow."); return true; }
+                if (!IsTerminal(record->Phase)) return false;
                 Json finished = out;
-                finished["status"] = row->Stage == Stage::Complete ? "Applied" : row->Stage == Stage::Failed ? "Failed" : "Cancelled";
-                finished["message"] = row->DiagnosticText.empty() ? row->StageText : row->DiagnosticText;
+                const bool complete = record->Phase == RuntimeAssetIngestPhase::Complete;
+                finished["status"] = complete ? "Applied" : record->Phase == RuntimeAssetIngestPhase::Failed ? "Failed" : "Cancelled";
+                finished["message"] = std::string(DebugNameForRuntimeAssetIngestDiagnostic(record->Diagnostic));
+                finished["entities_created"] = record->Result ? record->Result->PrimitiveEntitiesCreated : 0u;
+                // Best effort: entities that appeared since the call (another import running at the same time is included).
                 Json created = Json::array();
                 for (const auto id : StableIds(*frame))
                     if (std::ranges::find(before, id) == before.end()) created.push_back(id);
-                finished["entities_created"] = created.size();
                 finished["new_entities"] = created;
-                done = {.IsError = row->Stage != Stage::Complete, .Text = Dump(finished)};
+                done = {.IsError = !complete, .Text = Dump(finished)};
                 return true;
             }};
         }
@@ -160,9 +163,21 @@ namespace Extrinsic::Runtime
             return {.Continuation = [token = result.Task, describe](const AgentOperationContext& current, AgentOperationOutcome& out) {
                 if (!PrepareSnapshot(current)) { out = Fail(kNoWorkspace); return true; }
                 const auto last = PrepareEditorSceneEditingFrame(*current.Attachment).LastSceneFileResult;
-                if (!last || last->Task != token) return false;
-                out = {.IsError = !last->Succeeded(), .Text = Dump(describe(*last))};
-                return true;
+                if (last && last->Task == token)
+                {
+                    out = {.IsError = !last->Succeeded(), .Text = Dump(describe(*last))};
+                    return true;
+                }
+                // Only the latest scene-file event is retained: a later save or load (or a stale job that publishes
+                // none) can leave this one without a result once its job ended.
+                if (current.Jobs != nullptr && current.Jobs->IsComplete(token))
+                {
+                    out = {.IsError = true, .ErrorCode = "result_unavailable",
+                           .Text = "The scene file job ended without a result for this call (a later scene file operation replaced it, or "
+                                   "the document changed while it ran); check the file and the scene."};
+                    return true;
+                }
+                return false;
             }};
         }
 
@@ -227,21 +242,31 @@ namespace Extrinsic::Runtime
                                                    {"domain", std::string(ToString(row->Descriptor.Domain))}, {"name", row->Name}})};
         }
 
-        // The entity's primary base lane, like the panel's Surface / Edges / Points checkbox:
-        // surface for meshes, edges for graphs and points for point clouds.
+        // Shows or hides one base lane like the appearance panel's checkboxes: Surface (mesh), Edges (graph) and
+        // Points (point cloud) are offered per entity wherever its appearance target exists. Without `lane` it is the
+        // entity's primary one: surface for meshes, edges for graphs, points for point clouds.
         AgentOperationOutcome SetVisibility(const AgentOperationContext& context, std::string_view arguments)
         {
             const auto args = ParseObject(arguments);
             const auto entity = args ? UInt(*args, "entity") : std::nullopt;
             if (!entity || !args->contains("visible") || !(*args)["visible"].is_boolean())
-                return Fail("Pass {\"entity\": <stable id>, \"visible\": true | false}.");
+                return Fail("Pass {\"entity\": <stable id>, \"visible\": true | false, \"lane\": <optional surface | edges | points>}.");
             const bool visible = (*args)["visible"].get<bool>();
+            const auto laneName = String(*args, "lane");
+            if (args->contains("lane") && !laneName) return Fail("lane must be \"surface\", \"edges\" or \"points\".");
+            std::optional<EditorDomainWindowKind> lane;
+            if (laneName == "surface") lane = EditorDomainWindowKind::Mesh;
+            else if (laneName == "edges") lane = EditorDomainWindowKind::Graph;
+            else if (laneName == "points") lane = EditorDomainWindowKind::PointCloud;
+            else if (laneName) return Fail("lane must be \"surface\", \"edges\" or \"points\".");
             const auto prepared = PrepareSnapshot(context);
             if (!prepared) return Fail(kNoWorkspace);
             for (const auto kind : {EditorDomainWindowKind::Mesh, EditorDomainWindowKind::Graph, EditorDomainWindowKind::PointCloud})
             {
+                if (lane && *lane != kind) continue;
                 const auto model = BuildEditorDomainWindowModel(prepared->SnapshotQueries, kind, nullptr, *entity);
-                if (!model.HasSelectedEntity || !model.DomainMatches || !model.VisualizationTargetAvailable) continue;
+                if (!model.HasSelectedEntity || !model.VisualizationTargetAvailable) continue;
+                if (!lane && !model.DomainMatches) continue; // the primary lane is the one of the entity's own domain
                 const bool mesh = kind == EditorDomainWindowKind::Mesh;
                 const bool graph = kind == EditorDomainWindowKind::Graph;
                 const auto visualization = PrepareEditorVisualizationEditingFrame(*context.Attachment);
@@ -259,7 +284,8 @@ namespace Extrinsic::Runtime
                 return {.IsError = !ok, .Text = Dump({{"status", DebugNameForEditorCommandStatus(status)}, {"entity", *entity},
                                                        {"lane", mesh ? "surface" : graph ? "edges" : "points"}, {"visible", visible}})};
             }
-            return Fail("Entity " + std::to_string(*entity) + " has no mesh, graph or point-cloud appearance to show or hide.");
+            return Fail("Entity " + std::to_string(*entity) + " has no " + (laneName ? *laneName : std::string("mesh, graph or point-cloud")) +
+                        " appearance to show or hide.");
         }
 
         // The camera controller kind of the main camera, as the Camera panel's buttons. Pose, presets and focus
@@ -491,9 +517,9 @@ namespace Extrinsic::Runtime
                    R"(["entity","name"])"),
             false, ShowProperty);
         add("set_visibility", "Set visibility",
-            "Show or hide an entity's primary lane like the appearance panel's checkbox: the surface of a mesh, the edges of a "
-            "graph, the points of a point cloud. One undoable step.",
-            Schema("{" + kEntityProperty + R"(,"visible":{"type":"boolean"}})", R"(["entity","visible"])"), false, SetVisibility);
+            "Show or hide a lane of an entity like the appearance panel's Surface / Edges / Points checkboxes; by default the "
+            "primary lane (the surface of a mesh, the edges of a graph, the points of a point cloud). One undoable step.",
+            Schema("{" + kEntityProperty + R"(,"visible":{"type":"boolean"},"lane":{"type":"string","enum":["surface","edges","points"],"description":"Which lane; default the entity's primary one."}})", R"(["entity","visible"])"), false, SetVisibility);
         add("set_camera", "Set camera controller",
             "Switch the main camera controller (orbit, fly, free look or top down) like the Camera panel's buttons, keeping the "
             "current view. Camera pose, presets and focus are not controllable yet.",

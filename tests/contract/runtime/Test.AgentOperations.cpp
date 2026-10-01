@@ -11,6 +11,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <unistd.h>
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
 import Extrinsic.Runtime.AgentServer;
@@ -818,10 +819,18 @@ TEST(AgentOperations, SceneFileToolsStayInsideTheRootsAndRefuseToOverwrite)
 {
     namespace fs = std::filesystem;
     const auto info = ::testing::UnitTest::GetInstance()->current_test_info();
-    const auto root = fs::weakly_canonical(fs::temp_directory_path() / (std::string("intrinsic-agent-scene-") + info->name()));
+    const auto root = fs::weakly_canonical(fs::temp_directory_path() / (std::string("intrinsic-agent-scene-") + info->name() + "-" +
+                                                                         std::to_string(::getpid())));
+    const auto outside = fs::weakly_canonical(fs::temp_directory_path() / (std::string("intrinsic-agent-outside-") + info->name() + "-" +
+                                                                            std::to_string(::getpid())));
     fs::remove_all(root);
+    fs::remove_all(outside);
     fs::create_directories(root);
+    fs::create_directories(outside);
     { std::ofstream(root / "taken.scene") << "x"; }
+    // A dangling symlink inside the root must not lead a write to its target outside the roots.
+    std::error_code linkError;
+    fs::create_symlink(outside / "created.scene", root / "dangling.scene", linkError);
     R::AgentOperationRegistry registry;
     R::RegisterEditorAgentOperations(registry);
     const R::AgentOperationContext context{.AllowedRoots = {root.string()}};
@@ -843,10 +852,18 @@ TEST(AgentOperations, SceneFileToolsStayInsideTheRootsAndRefuseToOverwrite)
     EXPECT_TRUE(call("save_scene", {{"path", "taken.scene"}, {"overwrite", "yes"}}).IsError);
     EXPECT_NE(call("load_scene", {{"path", "missing.scene"}}).Text.find("not an existing file"), std::string::npos);
     EXPECT_NE(call("load_scene", {{"path", "taken.scene"}}).Text.find("workspace is not attached"), std::string::npos);
+    if (!linkError)
+    {
+        const auto dangling = call("save_scene", {{"path", "dangling.scene"}, {"overwrite", true}});
+        EXPECT_TRUE(dangling.IsError);
+        EXPECT_NE(dangling.Text.find("allowed agent roots"), std::string::npos) << dangling.Text;
+        EXPECT_FALSE(fs::exists(outside / "created.scene"));
+    }
     EXPECT_TRUE(registry.Find("save_scene")->Destructive);
     EXPECT_TRUE(registry.Find("load_scene")->Destructive);
     EXPECT_FALSE(registry.Find("import_file")->Destructive);
     fs::remove_all(root);
+    fs::remove_all(outside);
 }
 
 TEST(AgentOperations, ViewCaptureRefusesToOverwriteUnlessAsked)
@@ -871,7 +888,12 @@ TEST(AgentOperations, ViewCaptureRefusesToOverwriteUnlessAsked)
     EXPECT_TRUE(refused["isError"].get<bool>());
     EXPECT_EQ(refused["structuredContent"]["error"]["code"], "file_exists");
     if (!linkError)
-        EXPECT_EQ(capture({{"path", "dangling.png"}})["structuredContent"]["error"]["code"], "file_exists") << "dangling symlinks are occupied";
+    {
+        // A dangling symlink is refused before the capture: path resolution never follows it out of the roots.
+        const auto dangling = capture({{"path", "dangling.png"}});
+        EXPECT_TRUE(dangling["isError"].get<bool>());
+        EXPECT_NE(dangling["content"][0]["text"].get<std::string>().find("outside the Sandbox"), std::string::npos);
+    }
     // With overwrite the preflight passes and the call reaches the (absent) capture service.
     const auto allowed = capture({{"path", "shot.png"}, {"overwrite", true}});
     EXPECT_TRUE(allowed["isError"].get<bool>());

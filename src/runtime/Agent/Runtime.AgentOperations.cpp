@@ -51,6 +51,14 @@ namespace Extrinsic::Runtime
         if (candidate.is_relative()) candidate = fs::path(context.AllowedRoots.front()) / candidate;
         const fs::path resolved = fs::weakly_canonical(candidate, error);
         if (error) return std::nullopt;
+        // weakly_canonical resolves every symlink that has a target; one still in the path is dangling and
+        // a write through it would create its target, possibly outside the roots.
+        fs::path partial;
+        for (const auto& component : resolved)
+        {
+            partial /= component;
+            if (fs::is_symlink(fs::symlink_status(partial, error))) return std::nullopt;
+        }
         for (const auto& root : context.AllowedRoots)
         {
             const fs::path base = fs::weakly_canonical(fs::path(root), error);

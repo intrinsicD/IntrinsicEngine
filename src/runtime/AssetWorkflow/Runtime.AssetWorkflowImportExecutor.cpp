@@ -1714,6 +1714,12 @@ namespace Extrinsic::Runtime
         m_QueuedGeometryImportBeforeDecodeHookForTest = std::move(hook);
     }
 
+    std::optional<RuntimeAssetIngestRecord> AssetWorkflowImportExecutor::GetAssetIngestRecord(
+        const RuntimeAssetIngestHandle operation) const
+    {
+        return m_AssetIngestStateMachine.Snapshot(operation);
+    }
+
     RuntimeAssetImportQueueSnapshot AssetWorkflowImportExecutor::GetAssetImportQueueSnapshot() const
     {
         RuntimeAssetImportQueueSnapshot snapshot =

@@ -143,6 +143,7 @@ namespace
         R::AgentServerModule* Server{nullptr};
         std::vector<std::string> Failures; // written by the client thread only, read after join
         std::atomic_bool Done{false};
+        std::function<void(R::Engine&)> EveryFrame{}; // optional main-thread hook, run on every frame
 
         explicit AgentRig(const std::string& tag, bool withCamera = false)
         {
@@ -223,6 +224,7 @@ namespace
             });
             const auto deadline = std::chrono::steady_clock::now() + limit;
             Frames->OnFrame = [&](R::Engine& kernel) {
+                if (EveryFrame) EveryFrame(kernel);
                 if (Done.load() || std::chrono::steady_clock::now() > deadline) kernel.RequestExit();
             };
             Engine->Run();
@@ -1016,6 +1018,8 @@ TEST(SandboxAgentServer, SetVisibilityAndSetCameraUseTheEditorCommands)
     fs::remove_all(directory);
     fs::create_directories(directory);
     { std::ofstream(directory / "triangle.obj") << "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n"; }
+    { std::ofstream(directory / "points.xyz") << "0 0 0\n1 0 0\n0 1 0\n1 1 1\n"; }
+    { std::ofstream(directory / "graph.tgf") << "1\n2\n3\n#\n1 2\n2 3\n"; }
     AgentRig rig("vis", true);
     ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
     rig.Run([&](Client& c) {
@@ -1029,6 +1033,7 @@ TEST(SandboxAgentServer, SetVisibilityAndSetCameraUseTheEditorCommands)
         const auto hidden = c.Tool("set_visibility", {{"entity", mesh}, {"visible", false}}, &isError);
         rig.Check(!isError && hidden["status"] == "Applied" && hidden["lane"] == "surface", "hide: " + hidden.dump());
         rig.Check(undoCount() == before + 1, "one undo step");
+        rig.Check(c.Tool("history")["undo_label"].get<std::string>().starts_with("Agent: "), "the entry is labeled as an agent change");
         const auto again = c.Tool("set_visibility", {{"entity", mesh}, {"visible", false}}, &isError);
         rig.Check(!isError && again["status"] == "NoChange", "hiding twice changes nothing: " + again.dump());
         const auto undone = c.Tool("undo", Json::object(), &isError);
@@ -1037,11 +1042,38 @@ TEST(SandboxAgentServer, SetVisibilityAndSetCameraUseTheEditorCommands)
         rig.Check(!isError && hiddenAfterUndo["status"] == "Applied", "undo made the surface visible again: " + hiddenAfterUndo.dump());
         c.Tool("set_visibility", {{"entity", mesh}}, &isError);
         rig.Check(isError, "visible is required");
+        c.Tool("set_visibility", {{"entity", mesh}, {"visible", "no"}}, &isError);
+        rig.Check(isError, "visible must be a boolean");
+        c.Tool("set_visibility", {{"entity", mesh}, {"visible", true}, {"lane", "sideways"}}, &isError);
+        rig.Check(isError, "an unknown lane is refused");
+        // The undo entry is an agent change like every other tool's.
+        // A mesh also offers the Edges and Points lanes, as the panel's checkboxes do.
+        for (const char* lane : {"edges", "points"})
+        {
+            const auto result = c.Tool("set_visibility", {{"entity", mesh}, {"visible", false}, {"lane", lane}}, &isError);
+            if (!isError) rig.Check(result["lane"] == lane, std::string("lane ") + lane + ": " + result.dump());
+            else rig.Check(result.dump().find(lane) != std::string::npos, std::string("lane ") + lane + " unavailable names the lane: " + result.dump());
+        }
         c.Tool("set_visibility", {{"entity", 999999}, {"visible", true}}, &isError);
         rig.Check(isError, "an unknown entity is an error");
+        // Graph and point-cloud entities have their own primary lanes.
+        const auto cloudImport = c.Tool("import_file", {{"path", (directory / "points.xyz").string()}, {"wait", true}}, &isError);
+        rig.Check(!isError && cloudImport["new_entities"].size() == 1u, "point cloud import: " + cloudImport.dump());
+        if (cloudImport["new_entities"].size() == 1u)
+        {
+            const auto points = c.Tool("set_visibility", {{"entity", cloudImport["new_entities"][0]}, {"visible", false}}, &isError);
+            rig.Check(!isError && points["lane"] == "points" && points["status"] == "Applied", "point cloud primary lane: " + points.dump());
+        }
+        const auto graphImport = c.Tool("import_file", {{"path", (directory / "graph.tgf").string()}, {"wait", true}}, &isError);
+        rig.Check(!isError && graphImport["new_entities"].size() == 1u, "graph import: " + graphImport.dump());
+        if (graphImport["new_entities"].size() == 1u)
+        {
+            const auto edges = c.Tool("set_visibility", {{"entity", graphImport["new_entities"][0]}, {"visible", false}}, &isError);
+            rig.Check(!isError && edges["lane"] == "edges" && edges["status"] == "Applied", "graph primary lane: " + edges.dump());
+        }
         // Camera: controller kind of the main camera.
         const auto fly = c.Tool("set_camera", {{"controller", "fly"}}, &isError);
-        rig.Check(!isError && fly["status"] == "Applied" && fly["controller"] == "fly", "set_camera fly: " + fly.dump());
+        rig.Check(!isError && fly["status"] == "Applied" && fly["controller"] == "fly" && fly["previous"].is_string(), "set_camera fly: " + fly.dump());
         const auto same = c.Tool("set_camera", {{"controller", "fly"}}, &isError);
         rig.Check(!isError && same["status"] == "NoChange", "the same controller changes nothing: " + same.dump());
         c.Tool("set_camera", {{"controller", "orbit"}}, &isError);
@@ -1050,4 +1082,68 @@ TEST(SandboxAgentServer, SetVisibilityAndSetCameraUseTheEditorCommands)
         rig.Check(isError, "unknown controllers are refused");
     });
     fs::remove_all(directory);
+}
+
+// A scene-file call whose result slot is taken by a later one still answers (result_unavailable instead of hanging).
+TEST(SandboxAgentServer, PipelinedSceneFileCallsAreAllAnswered)
+{
+    namespace fs = std::filesystem;
+    const fs::path directory = fs::temp_directory_path() / ("intrinsic-agent-pipe-" + std::to_string(::getpid()));
+    fs::remove_all(directory);
+    fs::create_directories(directory);
+    AgentRig rig("pipe");
+    ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
+    (void)rig.AddGrid();
+    rig.Run([&](Client& c) {
+        bool isError = true;
+        const auto first = (directory / "first.scene").string();
+        rig.Check(c.Tool("save_scene", {{"path", first}}, &isError)["succeeded"] == true, "baseline save");
+        // Save and load back to back: the load's event replaces the save's in the single retained slot.
+        const int save = c.Send("tools/call", {{"name", "save_scene"}, {"arguments", {{"path", (directory / "second.scene").string()}}}});
+        const int load = c.Send("tools/call", {{"name", "load_scene"}, {"arguments", {{"path", first}}}});
+        const auto saved = c.Await(save, 1500), loaded = c.Await(load, 1500);
+        rig.Check(saved.contains("result") && loaded.contains("result"), "both calls are answered: " + saved.dump().substr(0, 200) + " | " + loaded.dump().substr(0, 200));
+        if (!loaded.contains("result")) return;
+        const auto unavailable = [](const Json& reply) {
+            const auto structured = reply["result"].value("structuredContent", Json::object());
+            return structured.contains("error") && structured["error"]["code"] == "result_unavailable";
+        };
+        rig.Check(loaded["result"]["isError"] == false || unavailable(loaded), "the load succeeded or says its result is unavailable");
+        rig.Check(saved["result"]["isError"] == false || unavailable(saved), "the save succeeded or says its result is unavailable");
+    });
+    fs::remove_all(directory);
+}
+
+// "Clear completed" hides terminal queue rows; an import wait is tracked by handle and still answers.
+TEST(SandboxAgentServer, ImportWaitSurvivesClearCompleted)
+{
+    namespace fs = std::filesystem;
+    const fs::path directory = fs::temp_directory_path() / ("intrinsic-agent-clear-" + std::to_string(::getpid()));
+    fs::remove_all(directory);
+    fs::create_directories(directory);
+    { std::ofstream(directory / "triangle.obj") << "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n"; }
+    AgentRig rig("clear");
+    ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
+    rig.EveryFrame = [](R::Engine& kernel) {
+        if (auto* workflow = kernel.Services().Find<R::AssetWorkflowModule>()) (void)workflow->ClearCompletedAssetImports();
+    };
+    rig.Run([&](Client& c) {
+        bool isError = true;
+        const auto imported = c.Tool("import_file", {{"path", (directory / "triangle.obj").string()}, {"wait", true}}, &isError);
+        rig.Check(!isError && imported["status"] == "Applied" && imported["entities_created"].get<int>() >= 1,
+                  "import wait with rows cleared every frame: " + imported.dump());
+    });
+    fs::remove_all(directory);
+}
+
+// Without camera controls (no camera module) set_camera fails with a clear message instead of doing nothing.
+TEST(SandboxAgentServer, SetCameraReportsUnavailableControls)
+{
+    AgentRig rig("nocam");
+    ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
+    rig.Run([&](Client& c) {
+        bool isError = false;
+        const auto result = c.Tool("set_camera", {{"controller", "fly"}}, &isError);
+        rig.Check(isError && result.dump().find("unavailable") != std::string::npos, "camera controls unavailable: " + result.dump());
+    });
 }
