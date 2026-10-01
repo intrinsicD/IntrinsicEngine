@@ -27,6 +27,9 @@ import Extrinsic.Platform.Backend.Null;
 import Extrinsic.Platform.LocalSocket;
 import Extrinsic.Runtime.AgentServer;
 import Extrinsic.Runtime.AsyncWorkModule;
+import Extrinsic.Runtime.ClusteringModule;
+import Extrinsic.Runtime.PointCloudConsolidationModule;
+import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.MeshFieldOperations;
@@ -110,6 +113,79 @@ namespace
             const auto text = response["result"]["content"][0]["text"].get<std::string>();
             const auto parsed = Json::parse(text, nullptr, false);
             return parsed.is_discarded() ? Json(text) : parsed;
+        }
+    };
+    // A running engine with the agent server, the editor modules the tools need and a
+    // scripted client thread: tests add entities, then Run(script) serves the client.
+    struct AgentRig
+    {
+        std::string SocketPath;
+        Driver* Frames{nullptr};
+        std::unique_ptr<Intrinsic::Tests::RuntimeTestKernel> Engine;
+        R::AgentServerModule* Server{nullptr};
+        std::vector<std::string> Failures; // written by the client thread only, read after join
+        std::atomic_bool Done{false};
+
+        explicit AgentRig(const std::string& tag)
+        {
+            SocketPath = (std::filesystem::temp_directory_path() / ("intrinsic-agent-" + tag + "-" + std::to_string(::getpid()) + ".sock")).string();
+            auto sections = Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry();
+            Config::EngineConfig config{};
+            Config::PopulateEngineConfigSectionDefaults(config, sections);
+            config.Simulation.WorkerThreadCount = 1u;
+            config.ReferenceScene.Enabled = false;
+            config.Camera.Enabled = false;
+            config.Window.Backend = Config::WindowBackend::Null;
+            auto driver = std::make_unique<Driver>();
+            Frames = driver.get();
+            Engine = std::make_unique<Intrinsic::Tests::RuntimeTestKernel>(config, std::move(driver));
+            Engine->EmplaceModule<R::EngineConfigControl>(std::move(sections));
+            Engine->EmplaceModule<R::SceneInteractionModule>();
+            Engine->EmplaceModule<R::SceneDocumentModule>();
+            Engine->EmplaceModule<R::AsyncWorkModule>();
+            Engine->EmplaceModule<R::SpatialIndexCache>();
+            Engine->EmplaceModule<R::ClusteringModule>();
+            Engine->EmplaceModule<R::PointCloudConsolidationModule>();
+            Engine->EmplaceModule<R::ViewCaptureModule>(std::filesystem::temp_directory_path());
+            Server = &Engine->EmplaceModule<R::AgentServerModule>(
+                R::AgentServerOptions{.SocketPath = SocketPath, .AllowedRoots = {std::filesystem::temp_directory_path().string()}});
+            Engine->Initialize();
+        }
+        void Check(bool ok, std::string what) { if (!ok) Failures.push_back(std::move(what)); }
+        auto& Scene() { return *Engine->Worlds().Get(Engine->ActiveWorld()); }
+        // A point cloud of `count` points on a 6-wide lattice.
+        std::uint32_t AddCloud(std::size_t count = 36)
+        {
+            const auto entity = Scene().Create();
+            auto& points = Scene().Raw().emplace<GS::Vertices>(entity).Properties;
+            points.Resize(count);
+            auto positions = points.GetOrAdd<glm::vec3>("v:position");
+            for (std::size_t i = 0; i < count; ++i)
+                positions[i] = glm::vec3(float(i % 6) + 0.1f * float(i % 5), float(i / 6), 0.1f * float(i % 3));
+            return R::SelectionController::ToStableEntityId(entity);
+        }
+        // Serves `script` on a client thread (already initialized) until it returns.
+        void Run(const std::function<void(Client&)>& script, std::chrono::seconds limit = std::chrono::seconds(60))
+        {
+            std::thread client([&] {
+                Client c;
+                for (int attempt = 0; attempt < 50 && P::ConnectLocalSocket(SocketPath, c.Connection) != P::LocalSocketStatus::Ok; ++attempt)
+                    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+                Check(c.Connection.IsOpen(), "connect");
+                Check(c.Request("initialize", {{"protocolVersion", "2025-06-18"}, {"capabilities", Json::object()}}).contains("result"),
+                      "initialize");
+                script(c);
+                Done.store(true);
+            });
+            const auto deadline = std::chrono::steady_clock::now() + limit;
+            Frames->OnFrame = [&](R::Engine& kernel) {
+                if (Done.load() || std::chrono::steady_clock::now() > deadline) kernel.RequestExit();
+            };
+            Engine->Run();
+            client.join();
+            for (const auto& failure : Failures) ADD_FAILURE() << failure;
+            EXPECT_TRUE(Done.load()) << "client did not finish";
+            Engine->Shutdown();
         }
     };
 }
@@ -588,4 +664,49 @@ TEST(SandboxScreenshotWindow, SavePngIsDisabledWithoutAnOperationalDevice)
     EXPECT_FALSE(capture->LastFinished().has_value()) << "a disabled Save PNG / F12 must not queue captures";
     shell.Detach();
     engine.Shutdown();
+}
+
+// RUNTIME-312 slice 6: keypoint, k-means and consolidation previews answer with the panels'
+// readiness (behind the same config-lane gate).
+TEST(SandboxAgentServer, PreviewKMeansAndConsolidationReportReadiness)
+{
+    AgentRig rig("ready");
+    ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
+    const auto cloud = rig.AddCloud();
+    rig.Run([&](Client& c) {
+        bool isError = true;
+        const auto kmeans = c.Tool("preview_kmeans", {{"entity", cloud}, {"domain", "PointCloudPoint"}}, &isError);
+        rig.Check(!isError && kmeans["enabled"] == true && kmeans["reason"] == "", "preview_kmeans: " + kmeans.dump());
+        const auto missing = c.Tool("preview_kmeans", {{"entity", 999999}, {"domain", "PointCloudPoint"}}, &isError);
+        rig.Check(!isError && missing["enabled"] == false && !missing["reason"].get<std::string>().empty(),
+                  "preview_kmeans on a missing entity explains itself: " + missing.dump());
+        c.Tool("preview_kmeans", {{"entity", cloud}, {"domain", "Bogus"}}, &isError);
+        rig.Check(isError, "an unknown domain is a call error");
+        // The first preview starts the validation scan (pending); a later one is ready.
+        Json consolidation;
+        for (int attempt = 0; attempt < 200; ++attempt)
+        {
+            consolidation = c.Tool("preview_point_cloud_consolidation", {{"entity", cloud}, {"domain", "PointCloudPoint"}}, &isError);
+            if (isError || consolidation["pending"] == false) break;
+            rig.Check(consolidation["enabled"] == false && !consolidation["reason"].get<std::string>().empty(),
+                      "a pending scan explains itself: " + consolidation.dump());
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        rig.Check(!isError && consolidation["pending"] == false && consolidation["input_points"] == 36,
+                  "preview_point_cloud_consolidation: " + consolidation.dump());
+        const auto noEntity = c.Tool("preview_point_cloud_consolidation", {{"domain", "PointCloudPoint"}}, &isError);
+        rig.Check(isError, "consolidation preview needs an entity: " + noEntity.dump());
+        c.Tool("config_apply", {{"section", "sandbox.keypoint_analysis"}, {"payload", {{"entity", cloud}}}}, &isError);
+        rig.Check(!isError, "keypoint config_apply");
+        // Input validation runs for a few frames before the preview turns ready.
+        Json keypoints;
+        for (int attempt = 0; attempt < 200 && keypoints["enabled"] != true; ++attempt)
+        {
+            keypoints = c.Tool("preview_keypoint_analysis", Json::object(), &isError);
+            if (isError) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        rig.Check(!isError && keypoints["enabled"] == true && keypoints["reason"] == "",
+                  "preview_keypoint_analysis: " + keypoints.dump());
+    });
 }

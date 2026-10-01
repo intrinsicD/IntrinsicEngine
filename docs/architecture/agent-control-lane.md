@@ -116,8 +116,8 @@ are discarded. Nothing exists without the launch flag: no module, thread or sock
   (`MakeEditorPropertyVisualizationRecipe`). There is no generic scene or property write.
 - Naming. Read-only (`readOnlyHint`): `scene_entities`, `entity_properties`, `config_sections`,
   `config_schema`, `config_get`, `config_preview`, `history`, `jobs`, `log`,
-  `preview_registration`, `preview_point_sampling`, `preview_mesh_operation` and
-  `view_screenshot`. State-changing: `select_entity`, `import_file`, `show_property`,
+  `preview_registration`, `preview_point_sampling`, `preview_keypoint_analysis`, `preview_kmeans`,
+  `preview_point_cloud_consolidation`, `preview_mesh_operation` and `view_screenshot`. State-changing: `select_entity`, `import_file`, `show_property`,
   `config_apply`, `undo`, `redo`, `run_mesh_operation`, `run_registration` (ICP or Coherent
   Point Drift from their config sections; the reply waits for the job),
   `run_point_sampling` (the `sandbox.point_sampling` section), `run_keypoint_analysis`,
@@ -130,6 +130,16 @@ are discarded. Nothing exists without the launch flag: no module, thread or sock
   accept a camera `preset` (restored afterwards, so `view_screenshot` stays
   read-only), `fit_entity`, and `legend_entity`, which appends a colormap strip and
   returns the property, colormap and the range the renderer uses.
+- Entity convention. A config section that carries an entity field supplies the entity (the
+  tool takes none; `config_apply` first): mesh curvature, normal estimation, outlier analysis,
+  kernel density, density weight, descriptor and keypoint analysis, bilateral filter, point
+  spacing, point construction, point sampling and registration. Operations whose section holds
+  no entity take `entity` as a tool argument, as their panels take the selection: k-means
+  (`domain` needed only while `sandbox.clustering` binds no properties), consolidation (`domain`
+  required), geodesics, curvature segmentation, parameterization, progressive Poisson, mesh
+  topology operations and scalar ridge. Every `domain` argument shares one enum generated from
+  `GeometryElementDomain`. A `preview_*` tool answers `{"enabled","reason"}` with the same
+  readiness as the panel's button, behind `ResolveEditorProcessingActionReadiness`.
 - Mutating calls run under `ScopedEditorCommandLabelPrefix("Agent: ")`, so the
   undo history shows each agent change and the operator can undo it.
 - Excluded by design: raw ECS or property-buffer writes, code execution, RHI

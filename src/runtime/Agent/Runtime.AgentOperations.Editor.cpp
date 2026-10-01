@@ -657,27 +657,61 @@ namespace Extrinsic::Runtime
                 });
         }
 
+        AgentOperationOutcome PreviewKeypoints(const AgentOperationContext& context)
+        {
+            if (!PrepareSnapshot(context)) return Fail(kNoWorkspace);
+            const auto commands = PrepareEditorPointAnalysisFrame(*context.Attachment).Commands;
+            const auto config = GetEditorKeypointAnalysisConfig(commands);
+            if (!config) return Fail("The sandbox.keypoint_analysis section is unavailable.");
+            return Ok(ReadinessJson(commands, PreviewEditorKeypointAnalysisCommand(commands, *config)));
+        }
+
         // K-means and consolidation take their entity and domain as arguments (section
         // convention in agent-control-lane.md): neither section names an entity.
-        AgentOperationOutcome RunKMeansOperation(const AgentOperationContext& context, std::string_view arguments)
+        struct KMeansCall
         {
-            if (!context.Attachment || !context.Attachment->IsAttached()) return Fail(kNoWorkspace);
+            EditorPointCloudServicePreparedFrame Frame{};
+            RunKMeans Request{};
+        };
+        std::optional<KMeansCall> PrepareKMeansCall(const AgentOperationContext& context, std::string_view arguments,
+                                                    AgentOperationOutcome& failure)
+        {
+            if (!context.Attachment || !context.Attachment->IsAttached()) { failure = Fail(kNoWorkspace); return std::nullopt; }
             const auto args = ParseObject(arguments);
             const auto entity = args ? UInt(*args, "entity") : std::nullopt;
-            if (!entity) return Fail("Pass {\"entity\": <stable id>, \"domain\": <domain>}.");
+            if (!entity) { failure = Fail("Pass {\"entity\": <stable id>, \"domain\": <domain>}."); return std::nullopt; }
             const auto domainName = String(*args, "domain");
             const auto domain = ParseDomain(domainName);
-            if (domainName && !domain) return Fail(UnknownDomainMessage(*domainName));
-            if (!PrepareSnapshot(context)) return Fail(kNoWorkspace); // prepares the session frame the feature frames read
-            const auto frame = PrepareEditorPointCloudServiceFrame(*context.Attachment);
-            const auto config = GetEditorClusteringConfig(frame.Commands);
-            if (!config || !frame.ClusteringAvailable) return Fail("Clustering is unavailable.");
+            if (domainName && !domain) { failure = Fail(UnknownDomainMessage(*domainName)); return std::nullopt; }
+            if (!PrepareSnapshot(context)) { failure = Fail(kNoWorkspace); return std::nullopt; } // prepares the session frame the feature frames read
+            KMeansCall call{.Frame = PrepareEditorPointCloudServiceFrame(*context.Attachment)};
+            const auto config = GetEditorClusteringConfig(call.Frame.Commands);
+            if (!config || !call.Frame.ClusteringAvailable) { failure = Fail("Clustering is unavailable."); return std::nullopt; }
             if (!config->Properties && !domain)
-                return Fail("Pass a domain: the sandbox.clustering section binds no properties.");
+            {
+                failure = Fail("Pass a domain: the sandbox.clustering section binds no properties.");
+                return std::nullopt;
+            }
             auto refs = config->Properties.value_or(MakeKMeansPropertyRefs(domain.value_or(GeometryElementDomain::Unknown)));
             if (const auto positions = String(*args, "positions")) refs.InputPositions.Name = *positions;
-            auto request = MakeConfiguredKMeansRequest(*entity, std::move(refs), *config);
-            request.AutoAccept = true;
+            call.Request = MakeConfiguredKMeansRequest(*entity, std::move(refs), *config);
+            call.Request.AutoAccept = true;
+            return call;
+        }
+        AgentOperationOutcome PreviewKMeansOperation(const AgentOperationContext& context, std::string_view arguments)
+        {
+            AgentOperationOutcome failure;
+            const auto call = PrepareKMeansCall(context, arguments, failure);
+            if (!call) return failure;
+            return Ok(ReadinessJson(call->Frame.Commands, PreviewEditorKMeansRun(call->Frame.Commands, call->Frame.Clustering, call->Request)));
+        }
+        AgentOperationOutcome RunKMeansOperation(const AgentOperationContext& context, std::string_view arguments)
+        {
+            AgentOperationOutcome failure;
+            const auto call = PrepareKMeansCall(context, arguments, failure);
+            if (!call) return failure;
+            const auto& frame = call->Frame;
+            const auto& request = call->Request;
             return AwaitServiceRun<KMeansRunCompleted>(
                 frame.Clustering,
                 [](ClusteringService& service, auto onCompleted) { return service.SubscribeRunCompleted(std::move(onCompleted)); },
@@ -698,30 +732,64 @@ namespace Extrinsic::Runtime
                 });
         }
 
-        AgentOperationOutcome RunConsolidation(const AgentOperationContext& context, std::string_view arguments)
+        struct ConsolidationCall
         {
-            if (!context.Attachment || !context.Attachment->IsAttached()) return Fail(kNoWorkspace);
+            EditorPointCloudServicePreparedFrame Frame{};
+            PointCloudConsolidationRequest Request{};
+        };
+        std::optional<ConsolidationCall> PrepareConsolidationCall(const AgentOperationContext& context, std::string_view arguments,
+                                                                  AgentOperationOutcome& failure)
+        {
+            if (!context.Attachment || !context.Attachment->IsAttached()) { failure = Fail(kNoWorkspace); return std::nullopt; }
             const auto args = ParseObject(arguments);
-            if (!args) return Fail("Expected an object with entity and domain.");
+            if (!args) { failure = Fail("Expected an object with entity and domain."); return std::nullopt; }
             const auto entity = UInt(*args, "entity");
             const auto domainName = String(*args, "domain");
             const auto domain = ParseDomain(domainName);
-            if (domainName && !domain) return Fail(UnknownDomainMessage(*domainName));
-            if (!entity || !domain) return Fail("Pass {\"entity\": <stable id>, \"domain\": <domain>}.");
-            if (!PrepareSnapshot(context)) return Fail(kNoWorkspace); // prepares the session frame the feature frames read
-            const auto frame = PrepareEditorPointCloudServiceFrame(*context.Attachment);
-            const auto config = GetEditorPointCloudConsolidationConfig(frame.Commands);
-            if (!config || !frame.PointCloudConsolidationAvailable) return Fail("Point-cloud consolidation is unavailable.");
-            auto request = PointCloudConsolidationRequest{
+            if (domainName && !domain) { failure = Fail(UnknownDomainMessage(*domainName)); return std::nullopt; }
+            if (!entity || !domain) { failure = Fail("Pass {\"entity\": <stable id>, \"domain\": <domain>}."); return std::nullopt; }
+            if (!PrepareSnapshot(context)) { failure = Fail(kNoWorkspace); return std::nullopt; } // prepares the session frame the feature frames read
+            ConsolidationCall call{.Frame = PrepareEditorPointCloudServiceFrame(*context.Attachment)};
+            const auto config = GetEditorPointCloudConsolidationConfig(call.Frame.Commands);
+            if (!config || !call.Frame.PointCloudConsolidationAvailable)
+            {
+                failure = Fail("Point-cloud consolidation is unavailable.");
+                return std::nullopt;
+            }
+            call.Request = PointCloudConsolidationRequest{
                 .StableEntityId = *entity,
                 .Properties = MakePointCloudConsolidationPropertyRefs(*domain, String(*args, "positions").value_or("v:position")),
                 .Config = *config, .AutoAccept = true};
-            if (!IsValidPointCloudConsolidationPropertyRefs(request.Properties)) return Fail("Invalid point property domain or name.");
+            if (!IsValidPointCloudConsolidationPropertyRefs(call.Request.Properties))
+            {
+                failure = Fail("Invalid point property domain or name.");
+                return std::nullopt;
+            }
+            return call;
+        }
+        // The panel's readiness: the service's availability for exactly this request.
+        AgentOperationOutcome PreviewConsolidation(const AgentOperationContext& context, std::string_view arguments)
+        {
+            AgentOperationOutcome failure;
+            const auto call = PrepareConsolidationCall(context, arguments, failure);
+            if (!call) return failure;
+            const auto availability = PrepareEditorPointCloudConsolidationAvailability(
+                call->Frame.Commands, call->Frame.PointCloudConsolidation, call->Request);
+            return Ok(ReadinessJson(call->Frame.Commands, {availability.Available, availability.Message},
+                                    {{"pending", availability.Pending}, {"input_points", availability.InputPointCount},
+                                     {"cardinality_changing", availability.CardinalityChanging}}));
+        }
+        AgentOperationOutcome RunConsolidation(const AgentOperationContext& context, std::string_view arguments)
+        {
+            AgentOperationOutcome failure;
+            auto call = PrepareConsolidationCall(context, arguments, failure);
+            if (!call) return failure;
+            auto& frame = call->Frame;
             return AwaitServiceRun<PointCloudConsolidationResult>(
                 frame.PointCloudConsolidation,
                 [](PointCloudConsolidationService& service, auto onCompleted) { return service.SubscribeCompleted(std::move(onCompleted)); },
                 [&] {
-                    const auto submitted = SubmitEditorPointCloudConsolidation(frame.Commands, frame.PointCloudConsolidation, std::move(request));
+                    const auto submitted = SubmitEditorPointCloudConsolidation(frame.Commands, frame.PointCloudConsolidation, std::move(call->Request));
                     return ServiceSubmission{submitted.Correlation, submitted.Status == PointCloudConsolidationRunStatus::Queued,
                                              submitted.Message};
                 },
@@ -843,22 +911,30 @@ namespace Extrinsic::Runtime
             "first) and publish rank/selection properties or a new point cloud as one undoable step.",
             none, false, [](const AgentOperationContext& c, std::string_view) { return RunPointSampling(c, false); },
             false, true);
+        add("preview_keypoint_analysis", "Preview keypoint analysis",
+            "Whether the configured keypoint analysis (sandbox.keypoint_analysis) can run, and why not.", none, true,
+            [](const AgentOperationContext& c, std::string_view) { return PreviewKeypoints(c); });
         add("run_keypoint_analysis", "Run keypoint analysis",
             "Run sandbox.keypoint_analysis; GPU score and mask auto-accept in one undoable entry. Reports backend and IO.",
             none, false, [](const AgentOperationContext& c, std::string_view) { return RunKeypoints(c); }, false, true);
+        const std::string kmeansSchema = Schema("{" + kEntityProperty + "," + DomainProperty("Element domain of the positions; needed only while sandbox.clustering binds no properties.") +
+                       "," + kPositionsProperty + "}",
+                   R"(["entity"])");
+        const std::string consolidationSchema = Schema("{" + kEntityProperty + "," + DomainProperty("Element domain of the positions.") + "," + kPositionsProperty + "}",
+                   R"(["entity","domain"])");
+        add("preview_kmeans", "Preview K-Means",
+            "Whether K-Means can run on an entity with sandbox.clustering, and why not.", kmeansSchema, true, PreviewKMeansOperation);
         add("run_kmeans", "Run K-Means",
             "Cluster a point property of an entity with sandbox.clustering (config_apply first); GPU results auto-accept "
             "atomically. Reports backend and IO. The section's bound properties win over 'domain'.",
-            Schema("{" + kEntityProperty + "," + DomainProperty("Element domain of the positions; needed only while sandbox.clustering binds no properties.") +
-                       "," + kPositionsProperty + "}",
-                   R"(["entity"])"),
-            false, RunKMeansOperation, false, true);
+            kmeansSchema, false, RunKMeansOperation, false, true);
+        add("preview_point_cloud_consolidation", "Preview point-cloud consolidation",
+            "Whether consolidation can run on an entity's point property with sandbox.point_cloud_consolidation, and why not.",
+            consolidationSchema, true, PreviewConsolidation);
         add("run_point_cloud_consolidation", "Run point-cloud consolidation",
             "Consolidate the named vec3 point property of an entity using sandbox.point_cloud_consolidation; GPU runs "
             "auto-accept. Reports backend and IO.",
-            Schema("{" + kEntityProperty + "," + DomainProperty("Element domain of the positions.") + "," + kPositionsProperty + "}",
-                   R"(["entity","domain"])"),
-            false, RunConsolidation, false, true);
+            consolidationSchema, false, RunConsolidation, false, true);
         const std::string meshField = Schema(
             R"({"operation":{"type":"string","enum":)" + OperationEnum() +
                 R"(,"description":"Mesh-field operation; its settings come from the matching config section (config_apply first)."},)" +

@@ -109,6 +109,14 @@ the editor operations the Sandbox UI already offers.
    `set_visibility`, `set_camera` (pose or preset, same path as the camera
    controller command), and an `import_file` `wait` option that answers once the
    import materialized or failed.
+   *Done:* `preview_keypoint_analysis` (config entity), `preview_kmeans` and
+   `preview_point_cloud_consolidation` (entity and domain arguments) answer with the panels'
+   readiness behind `ResolveEditorProcessingActionReadiness` (consolidation uses
+   `PrepareEditorPointCloudConsolidationAvailability`, plus `pending`, `input_points`).
+   Convention (also in the lane doc): a section with an entity field supplies the entity;
+   sections without one (clustering, consolidation, geodesics, curvature segmentation,
+   parameterization, Poisson, mesh topology, ridge) take `entity` as an argument; `domain` is
+   one shared enum. `FinishApply`/`AwaitServiceRun` replace the hand-written continuations.
 
 8. **Per-run progress source (after UI-069 slice 1).** Each `Run*` captures its run
    key (editor job identity or correlation id) in its outcome; `PollPending` asks
@@ -132,7 +140,7 @@ the editor operations the Sandbox UI already offers.
 - [x] Slice 3: the bridge answers `ping` during a pending call, forwards server notifications, keeps the connection after a per-call timeout, and announces a later-started Sandbox via `tools/list_changed` without a manual call.
 - [x] Slice 4: unsupported `protocolVersion` gets the server's own version; tool results carry `structuredContent`; annotations match undoability; `view_capture` never overwrites without `overwrite: true`.
 - [x] Slice 5: progress notifications arrive for a long continuation tool with a progress token; cancellation drops the pending reply (the job itself keeps running: cancelling it waits for RUNTIME-279, documented in `agent-control-lane.md`).
-- [ ] Slice 6: keypoint, k-means and consolidation have `preview_*` tools and one shared argument convention recorded in this note.
+- [x] Slice 6: keypoint, k-means and consolidation have `preview_*` tools and one shared argument convention recorded in this note.
 - [ ] Slice 7: every command of finding 9 is reachable through an agent tool with undo coverage where it edits the scene; `run_mesh_operation` keeps working.
 - [ ] Slice 8: `notifications/progress` for a deferred call comes from that run's own job via UI-069's `EditorJobCommandSurface::Progress(key)`; the oldest-job heuristic in `Runtime.AgentServer.cpp` is removed; a two-concurrent-jobs test proves it.
 - [ ] `agent-control-lane.md`, `tools/agents/README.md` and the module inventory are current after every slice.
