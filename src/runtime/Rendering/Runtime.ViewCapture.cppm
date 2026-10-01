@@ -61,6 +61,7 @@ export namespace Extrinsic::Runtime
         bool SaveToFile{true};
         std::string OutputPath{};      // empty: DefaultViewCapturePath(OutputDirectory, ticket)
         std::string OutputDirectory{}; // empty: the module's screenshot directory
+        bool Overwrite{true};          // false: fail instead of replacing an existing OutputPath file
         bool KeepPng{false};      // keep the encoded bytes in the status (agents)
         ViewCapturePreset Preset{ViewCapturePreset::Current};
         std::uint32_t FitEntity{0};    // stable entity id framed by a preset; 0 frames the scene
@@ -118,8 +119,10 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::vector<std::uint8_t> EncodeViewCapturePng(const ViewCaptureImage& image);
     // Writes through a sibling temporary file and a rename, creating parent directories;
     // returns a diagnostic on failure, after which no file (partial or temporary) remains.
+    // With overwrite=false an existing file is kept and reported ("already exists"); the
+    // check and the publish are one hard-link step, so a concurrent writer cannot be replaced.
     [[nodiscard]] std::optional<std::string> WriteViewCaptureFile(
-        const std::filesystem::path& path, std::span<const std::uint8_t> bytes);
+        const std::filesystem::path& path, std::span<const std::uint8_t> bytes, bool overwrite = true);
     // <directory>/intrinsic-<YYYYmmdd-HHMMSS>-<ticket>.png in local time.
     [[nodiscard]] std::filesystem::path DefaultViewCapturePath(
         const std::filesystem::path& directory, std::uint64_t ticket);

@@ -46,13 +46,23 @@ namespace Extrinsic::Runtime
         {
             return {{"jsonrpc", "2.0"}, {"id", id}, {"result", std::move(result)}};
         }
-        Json ToolResultResponse(const Json& id, const AgentOperationOutcome& outcome)
+        // ISO dates compare chronologically as strings.
+        bool HasStructuredContent(std::string_view negotiatedVersion) { return negotiatedVersion >= std::string_view{"2025-06-18"}; }
+        Json ToolResultResponse(const Json& id, const AgentOperationOutcome& outcome, std::string_view negotiatedVersion)
         {
             Json content = Json::array();
             content.push_back({{"type", "text"}, {"text", outcome.Text}});
             for (const auto& image : outcome.Images)
                 content.push_back({{"type", "image"}, {"data", image.Base64Data}, {"mimeType", image.MimeType}});
-            return ResultResponse(id, {{"content", content}, {"isError", outcome.IsError}});
+            Json result{{"content", content}, {"isError", outcome.IsError}};
+            if (HasStructuredContent(negotiatedVersion))
+            {
+                if (outcome.IsError && !outcome.ErrorCode.empty())
+                    result["structuredContent"] = {{"error", {{"code", outcome.ErrorCode}, {"message", outcome.Text}}}};
+                else if (Json parsed = Json::parse(outcome.Text, nullptr, false); parsed.is_object())
+                    result["structuredContent"] = std::move(parsed);
+            }
+            return ResultResponse(id, std::move(result));
         }
         Json ParsedSchema(const std::string& text)
         {
@@ -100,7 +110,10 @@ namespace Extrinsic::Runtime
         if (method == "initialize")
         {
             std::string version{kAgentProtocolVersion};
-            if (const auto v = params.find("protocolVersion"); v != params.end() && v->is_string()) version = v->get<std::string>();
+            if (const auto v = params.find("protocolVersion"); v != params.end() && v->is_string())
+                for (const auto supported : kAgentSupportedProtocolVersions)
+                    if (v->get<std::string>() == supported) version = supported;
+            m_NegotiatedVersion = version;
             if (const auto info = params.find("clientInfo"); info != params.end() && info->is_object())
                 if (const auto name = info->find("name"); name != info->end() && name->is_string()) m_ClientName = name->get<std::string>();
             m_Initialized = true;
@@ -124,7 +137,7 @@ namespace Extrinsic::Runtime
                 tools.push_back({{"name", spec.Name}, {"title", spec.Title}, {"description", spec.Description},
                                  {"inputSchema", ParsedSchema(spec.InputSchemaJson)},
                                  {"annotations", {{"title", spec.Title}, {"readOnlyHint", spec.ReadOnly},
-                                                  {"destructiveHint", false}, {"idempotentHint", spec.ReadOnly},
+                                                  {"destructiveHint", spec.Destructive}, {"idempotentHint", spec.ReadOnly},
                                                   {"openWorldHint", false}}}});
             }
             return Dump(ResultResponse(id, {{"tools", tools}}));
@@ -143,7 +156,7 @@ namespace Extrinsic::Runtime
                 m_Pending.emplace_back(Dump(id), std::move(outcome.Continuation));
                 return std::nullopt;
             }
-            return Dump(ToolResultResponse(id, outcome));
+            return Dump(ToolResultResponse(id, outcome, m_NegotiatedVersion));
         }
         return Dump(ErrorResponse(id, -32601, "Method not found: " + method));
     }
@@ -155,7 +168,7 @@ namespace Extrinsic::Runtime
         {
             AgentOperationOutcome outcome{};
             if (!it->second(context, outcome)) { ++it; continue; }
-            replies.push_back(Dump(ToolResultResponse(Json::parse(it->first, nullptr, false), outcome)));
+            replies.push_back(Dump(ToolResultResponse(Json::parse(it->first, nullptr, false), outcome, m_NegotiatedVersion)));
             it = m_Pending.erase(it);
         }
         return replies;

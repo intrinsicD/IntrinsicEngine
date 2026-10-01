@@ -259,9 +259,10 @@ namespace Extrinsic::Runtime
     }
 
     std::optional<std::string> WriteViewCaptureFile(const std::filesystem::path& path,
-                                                     const std::span<const std::uint8_t> bytes)
+                                                     const std::span<const std::uint8_t> bytes, const bool overwrite)
     {
         std::error_code error;
+        if (!overwrite && std::filesystem::exists(path, error)) return path.string() + " already exists";
         if (path.has_parent_path())
         {
             std::filesystem::create_directories(path.parent_path(), error);
@@ -279,6 +280,22 @@ namespace Extrinsic::Runtime
                 std::filesystem::remove(temporary, error);
                 return "Cannot write " + temporary.string();
             }
+        }
+        if (!overwrite)
+        {
+            // create_hard_link fails when the target exists, which makes check-and-publish atomic.
+            std::filesystem::create_hard_link(temporary, path, error);
+            if (!error)
+            {
+                std::filesystem::remove(temporary, error);
+                return std::nullopt;
+            }
+            if (std::filesystem::exists(path))
+            {
+                std::filesystem::remove(temporary, error);
+                return path.string() + " already exists";
+            }
+            // No hard links on this filesystem: fall through to the rename (the exists check above still ran).
         }
         std::filesystem::rename(temporary, path, error);
         if (error)
@@ -532,7 +549,7 @@ namespace Extrinsic::Runtime
                                                  : std::filesystem::path(entry.Request.OutputDirectory),
                                              entry.Status.Ticket)
                     : std::filesystem::path(entry.Request.OutputPath);
-                if (auto error = WriteViewCaptureFile(path, png))
+                if (auto error = WriteViewCaptureFile(path, png, entry.Request.Overwrite || entry.Request.OutputPath.empty()))
                 {
                     entry.Status.State = ViewCaptureState::Failed;
                     entry.Status.Diagnostic = std::move(*error);

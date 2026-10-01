@@ -1,6 +1,7 @@
 // RUNTIME-287/288: agent operation registry, MCP protocol core, read-only policy, path
 // containment and the "Agent:" history label, without sockets or an engine.
 #include <filesystem>
+#include <fstream>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -219,6 +220,110 @@ TEST(AgentOperations, CaptureToolsFailClearlyWithoutTheCaptureServiceOrOutsideTh
     const auto fitWithoutPreset = Call(protocol, context, {{"jsonrpc", "2.0"}, {"id", 6}, {"method", "tools/call"},
         {"params", {{"name", "view_screenshot"}, {"arguments", {{"fit_entity", 3}}}}}});
     EXPECT_NE(fitWithoutPreset["result"]["content"][0]["text"].get<std::string>().find("needs a preset"), std::string::npos);
+}
+
+TEST(AgentOperations, NegotiatesProtocolVersion)
+{
+    int mutations = 0;
+    auto registry = TestRegistry(mutations);
+    const R::AgentOperationContext context{};
+    const auto initialize = [&](R::AgentProtocol& protocol, const char* version) {
+        return Call(protocol, context, {{"jsonrpc", "2.0"}, {"id", 1}, {"method", "initialize"},
+                                        {"params", {{"protocolVersion", version}, {"capabilities", Json::object()}}}});
+    };
+    const auto callEcho = [&](R::AgentProtocol& protocol) {
+        return Call(protocol, context, {{"jsonrpc", "2.0"}, {"id", 2}, {"method", "tools/call"},
+                                        {"params", {{"name", "echo"}, {"arguments", {{"x", 1}}}}}});
+    };
+    for (const char* version : {"2025-06-18", "2025-03-26", "2024-11-05"})
+    {
+        R::AgentProtocol protocol{registry, false};
+        EXPECT_EQ(initialize(protocol, version)["result"]["protocolVersion"], version);
+        EXPECT_EQ(protocol.NegotiatedVersion(), version);
+    }
+    R::AgentProtocol unknown{registry, false};
+    EXPECT_EQ(initialize(unknown, "1999-01-01")["result"]["protocolVersion"], "2025-06-18");
+    EXPECT_EQ(unknown.NegotiatedVersion(), "2025-06-18");
+
+    R::AgentProtocol legacy{registry, false};
+    (void)initialize(legacy, "2024-11-05");
+    EXPECT_FALSE(callEcho(legacy)["result"].contains("structuredContent")) << "older revisions predate structured results";
+    R::AgentProtocol current{registry, false};
+    (void)initialize(current, "2025-06-18");
+    EXPECT_TRUE(callEcho(current)["result"].contains("structuredContent"));
+}
+
+TEST(AgentOperations, ToolResultsCarryStructuredContent)
+{
+    R::AgentOperationRegistry registry;
+    ASSERT_TRUE(registry.Register({.Name = "object", .ReadOnly = true, .Invoke = [](const R::AgentOperationContext&, std::string_view) {
+        return R::AgentOperationOutcome{.Text = R"({"a":1})"}; }}));
+    ASSERT_TRUE(registry.Register({.Name = "plain", .ReadOnly = true, .Invoke = [](const R::AgentOperationContext&, std::string_view) {
+        return R::AgentOperationOutcome{.IsError = true, .Text = "not json"}; }}));
+    ASSERT_TRUE(registry.Register({.Name = "coded", .ReadOnly = true, .Invoke = [](const R::AgentOperationContext&, std::string_view) {
+        return R::AgentOperationOutcome{.IsError = true, .Text = "it exists", .ErrorCode = "file_exists"}; }}));
+    ASSERT_TRUE(registry.Register({.Name = "array", .ReadOnly = true, .Invoke = [](const R::AgentOperationContext&, std::string_view) {
+        return R::AgentOperationOutcome{.Text = "[1,2]"}; }}));
+    R::AgentProtocol protocol{registry, false};
+    const R::AgentOperationContext context{};
+    const auto call = [&](const char* name) {
+        return Call(protocol, context, {{"jsonrpc", "2.0"}, {"id", 1}, {"method", "tools/call"}, {"params", {{"name", name}}}})["result"];
+    };
+    const auto object = call("object");
+    EXPECT_EQ(object["structuredContent"], (Json{{"a", 1}}));
+    EXPECT_EQ(object["content"][0]["text"], R"({"a":1})") << "the text content stays";
+    const auto plain = call("plain");
+    EXPECT_FALSE(plain.contains("structuredContent"));
+    EXPECT_TRUE(plain["isError"].get<bool>());
+    const auto coded = call("coded");
+    EXPECT_EQ(coded["structuredContent"]["error"]["code"], "file_exists");
+    EXPECT_EQ(coded["structuredContent"]["error"]["message"], "it exists");
+    EXPECT_FALSE(call("array").contains("structuredContent")) << "structuredContent is an object";
+}
+
+TEST(AgentOperations, AnnotationsReflectUndoability)
+{
+    R::AgentOperationRegistry registry;
+    R::RegisterEditorAgentOperations(registry);
+    R::RegisterViewCaptureAgentOperations(registry);
+    R::AgentProtocol protocol{registry, false};
+    const R::AgentOperationContext context{};
+    const auto list = Call(protocol, context, {{"jsonrpc", "2.0"}, {"id", 1}, {"method", "tools/list"}});
+    bool sawCapture = false;
+    for (const auto& tool : list["result"]["tools"])
+    {
+        const bool destructive = tool["annotations"]["destructiveHint"].get<bool>();
+        EXPECT_EQ(destructive, tool["name"] == "view_capture") << tool["name"];
+        sawCapture |= tool["name"] == "view_capture";
+    }
+    EXPECT_TRUE(sawCapture);
+}
+
+TEST(AgentOperations, ViewCaptureRefusesToOverwriteUnlessAsked)
+{
+    namespace fs = std::filesystem;
+    const auto root = fs::weakly_canonical(fs::temp_directory_path() / "intrinsic-agent-overwrite");
+    fs::create_directories(root);
+    { std::ofstream(root / "shot.png") << "x"; }
+    R::AgentOperationRegistry registry;
+    R::RegisterViewCaptureAgentOperations(registry);
+    R::AgentProtocol protocol{registry, false};
+    const R::AgentOperationContext context{.AllowedRoots = {root.string()}};
+    const auto capture = [&](const Json& arguments) {
+        return Call(protocol, context, {{"jsonrpc", "2.0"}, {"id", 1}, {"method", "tools/call"},
+                                        {"params", {{"name", "view_capture"}, {"arguments", arguments}}}})["result"];
+    };
+    const auto refused = capture({{"path", "shot.png"}});
+    EXPECT_TRUE(refused["isError"].get<bool>());
+    EXPECT_EQ(refused["structuredContent"]["error"]["code"], "file_exists");
+    // With overwrite the preflight passes and the call reaches the (absent) capture service.
+    const auto allowed = capture({{"path", "shot.png"}, {"overwrite", true}});
+    EXPECT_TRUE(allowed["isError"].get<bool>());
+    EXPECT_FALSE(allowed.contains("structuredContent")) << allowed.dump();
+    // A new file name is not an overwrite.
+    EXPECT_FALSE(capture({{"path", "fresh.png"}}).contains("structuredContent"));
+    EXPECT_TRUE(capture({{"path", "shot.png"}, {"overwrite", "yes"}})["isError"].get<bool>());
+    fs::remove_all(root);
 }
 
 TEST(AgentOperations, Base64MatchesTheRfcVectors)

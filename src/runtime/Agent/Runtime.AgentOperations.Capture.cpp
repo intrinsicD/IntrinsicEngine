@@ -6,11 +6,13 @@ module;
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <optional>
 #include <span>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <nlohmann/json.hpp>
 
@@ -28,13 +30,17 @@ namespace Extrinsic::Runtime
         constexpr std::uint32_t kMaxInlineImageSide = 2048;
 
         std::string Dump(const Json& value) { return value.dump(-1, ' ', false, Json::error_handler_t::replace); }
-        AgentOperationOutcome Fail(std::string message) { return {.IsError = true, .Text = std::move(message)}; }
+        AgentOperationOutcome Fail(std::string message, std::string code = {})
+        {
+            return {.IsError = true, .Text = std::move(message), .ErrorCode = std::move(code)};
+        }
 
         struct CaptureArguments
         {
             ViewCaptureRegion Region{ViewCaptureRegion::Viewport};
             std::string Path{};
             bool PathOnly{false};
+            bool Overwrite{false};
             ViewCapturePreset Preset{ViewCapturePreset::Current};
             std::uint32_t FitEntity{0};
             std::uint32_t LegendEntity{0};
@@ -89,6 +95,11 @@ namespace Extrinsic::Runtime
                 if (!it->is_boolean()) { error = "path_only must be a boolean."; return std::nullopt; }
                 out.PathOnly = it->get<bool>();
             }
+            if (const auto it = args.find("overwrite"); it != args.end())
+            {
+                if (!it->is_boolean()) { error = "overwrite must be a boolean."; return std::nullopt; }
+                out.Overwrite = it->get<bool>();
+            }
             return out;
         }
 
@@ -107,7 +118,8 @@ namespace Extrinsic::Runtime
                 if (status.State == ViewCaptureState::Queued || status.State == ViewCaptureState::Pending) return false;
                 if (status.State != ViewCaptureState::Completed)
                 {
-                    out = Fail(status.Diagnostic.empty() ? "The capture was lost." : status.Diagnostic);
+                    out = Fail(status.Diagnostic.empty() ? "The capture was lost." : status.Diagnostic,
+                               status.Diagnostic.ends_with(" already exists") ? "file_exists" : "");
                     return true;
                 }
                 const bool inline_ = returnImage && !status.Png.empty() && status.Width <= kMaxInlineImageSide &&
@@ -185,11 +197,14 @@ namespace Extrinsic::Runtime
             .Title = "Save a screenshot",
             .Description = "Saves a PNG of the viewport or window, like File > Save Screenshot, and returns it. "
                            "'path' must stay inside the Sandbox's allowed roots (default: screenshots/ with a "
-                           "timestamped name); path_only skips returning the image.",
+                           "timestamped name); path_only skips returning the image. An existing file is "
+                           "never replaced unless overwrite is true.",
             .InputSchemaJson = std::string(R"({"type":"object","properties":{)") + std::string(kRegionSchema) +
                                R"(,"path":{"type":"string","description":"PNG file path, relative to the first allowed root"},)"
-                               R"("path_only":{"type":"boolean","description":"Return only the saved path and size"}},"additionalProperties":false})",
+                               R"("path_only":{"type":"boolean","description":"Return only the saved path and size"},)"
+                               R"("overwrite":{"type":"boolean","description":"Replace an existing file at path; default false, which fails with file_exists"}},"additionalProperties":false})",
             .ReadOnly = false,
+            .Destructive = true, // writes a file the undo history does not track
             .Invoke = [](const AgentOperationContext& context, std::string_view argumentsJson)
             {
                 std::string error;
@@ -198,8 +213,15 @@ namespace Extrinsic::Runtime
                 // A given path names the file; otherwise a timestamped file goes to screenshots/.
                 const auto resolved = ResolveAgentPath(context, args->Path.empty() ? "screenshots" : args->Path);
                 if (!resolved) return Fail("path '" + args->Path + "' is outside the Sandbox's allowed roots.");
-                ViewCaptureRequest request{.Region = args->Region, .SaveToFile = true, .Preset = args->Preset,
-                                           .FitEntity = args->FitEntity, .LegendEntity = args->LegendEntity};
+                if (!args->Path.empty() && !args->Overwrite)
+                {
+                    std::error_code exists;
+                    if (std::filesystem::exists(*resolved, exists))
+                        return Fail("'" + args->Path + "' already exists; pass overwrite: true to replace it.", "file_exists");
+                }
+                ViewCaptureRequest request{.Region = args->Region, .SaveToFile = true, .Overwrite = args->Overwrite, // also checked at write time
+                                           .Preset = args->Preset, .FitEntity = args->FitEntity,
+                                           .LegendEntity = args->LegendEntity};
                 (args->Path.empty() ? request.OutputDirectory : request.OutputPath) = *resolved;
                 return StartCapture(context, std::move(request), !args->PathOnly);
             },

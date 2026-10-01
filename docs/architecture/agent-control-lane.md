@@ -39,6 +39,23 @@ messages per frame on the main thread. Responses go back through the socket
 thread; responses for a dropped client are discarded. Nothing exists without the
 launch flag: no module, thread or socket.
 
+## Protocol
+
+- Version negotiation: `initialize` echoes the client's `protocolVersion` when it is one of
+  `kAgentSupportedProtocolVersions` (`2025-06-18`, `2025-03-26`, `2024-11-05`) and otherwise
+  answers the newest, `2025-06-18`; the client then decides whether to continue.
+- Tool results are the existing JSON text content plus, when the negotiated version is
+  `2025-06-18` or newer, `structuredContent`: the JSON object the tool returned, or
+  `{"error":{"code","message"}}` for errors that carry a machine-readable `ErrorCode`
+  (for example `file_exists`). Older revisions get the text content only.
+- There is no `outputSchema`: it is optional in the specification and the per-tool result
+  shapes are still moving, so a schema now would be a promise the tools do not yet keep.
+- Annotations: `readOnlyHint` follows `ReadOnly`; `destructiveHint` is true only for a mutation
+  the undo history does not cover (`AgentOperationSpec::Destructive`, today `view_capture`,
+  which writes a file). `view_capture` refuses an existing `path` unless `overwrite: true`
+  (error code `file_exists`); the capture write repeats the check atomically, so a file
+  created between the call and the write is never replaced either.
+
 ## Operations and policy
 
 - Every operation calls an existing editor query, command or config function:

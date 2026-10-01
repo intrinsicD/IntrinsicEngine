@@ -95,6 +95,24 @@ TEST(ViewCapture, WritesCompleteFilesOrNothing)
     std::filesystem::remove_all(dir);
 }
 
+TEST(ViewCapture, NoOverwriteKeepsAnExistingFile)
+{
+    const auto dir = TempDir("intrinsic-capture-keep");
+    const auto path = dir / "shot.png";
+    const std::vector<std::uint8_t> first{1, 2, 3, 4};
+    const std::vector<std::uint8_t> second{9, 9};
+    ASSERT_FALSE(R::WriteViewCaptureFile(path, first, false).has_value()) << "a new file is written";
+    EXPECT_FALSE(std::filesystem::exists(path.string() + ".partial"));
+    const auto refused = R::WriteViewCaptureFile(path, second, false);
+    ASSERT_TRUE(refused.has_value());
+    EXPECT_NE(refused->find("already exists"), std::string::npos);
+    EXPECT_EQ(std::filesystem::file_size(path), 4u) << "the existing file is untouched";
+    EXPECT_FALSE(std::filesystem::exists(path.string() + ".partial"));
+    ASSERT_FALSE(R::WriteViewCaptureFile(path, second).has_value()) << "overwrite is the default";
+    EXPECT_EQ(std::filesystem::file_size(path), 2u);
+    std::filesystem::remove_all(dir);
+}
+
 TEST(ViewCapture, DefaultNamesAreTimestampedPngsInTheDirectory)
 {
     const auto path = R::DefaultViewCapturePath("/shots", 42);

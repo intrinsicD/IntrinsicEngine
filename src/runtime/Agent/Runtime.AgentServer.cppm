@@ -5,6 +5,7 @@
 // editor commands, history and config lane as the panels.
 module;
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -21,14 +22,20 @@ import Extrinsic.Runtime.ModuleLifecycle;
 
 export namespace Extrinsic::Runtime
 {
-    inline constexpr std::string_view kAgentProtocolVersion = "2025-06-18";
+    // MCP revisions the server speaks, newest first. `initialize` echoes a requested version
+    // from this list and otherwise answers kAgentProtocolVersion. Results carry
+    // `structuredContent` from 2025-06-18 on.
+    inline constexpr std::array<std::string_view, 3> kAgentSupportedProtocolVersions{"2025-06-18", "2025-03-26", "2024-11-05"};
+    inline constexpr std::string_view kAgentProtocolVersion = kAgentSupportedProtocolVersions[0];
 
     // $XDG_RUNTIME_DIR/intrinsic-sandbox.sock, else /tmp/intrinsic-sandbox-<uid>.sock.
     [[nodiscard]] std::string DefaultAgentSocketPath();
 
     // Socket-free MCP/JSON-RPC core: one message in, the response line out (nullopt for
-    // notifications). Supports initialize, ping, tools/list and tools/call; mutating tools
-    // are hidden and refused in a read-only session.
+    // notifications). Supports initialize (version negotiation), ping, tools/list and
+    // tools/call; mutating tools are hidden and refused in a read-only session. Tool results
+    // are text content plus, for 2025-06-18 and newer, `structuredContent` (the JSON object
+    // the tool returned, or {"error":{"code","message"}} for coded errors).
     class AgentProtocol
     {
     public:
@@ -41,12 +48,14 @@ export namespace Extrinsic::Runtime
         void DropPending() noexcept { m_Pending.clear(); }
         [[nodiscard]] bool Initialized() const noexcept { return m_Initialized; }
         [[nodiscard]] const std::string& ClientName() const noexcept { return m_ClientName; }
+        [[nodiscard]] const std::string& NegotiatedVersion() const noexcept { return m_NegotiatedVersion; }
 
     private:
         const AgentOperationRegistry* m_Registry{nullptr};
         bool m_ReadOnly{false};
         bool m_Initialized{false};
         std::string m_ClientName{};
+        std::string m_NegotiatedVersion{kAgentProtocolVersion};
         std::vector<std::pair<std::string, AgentOperationContinuation>> m_Pending{}; // (JSON id, continuation)
     };
 

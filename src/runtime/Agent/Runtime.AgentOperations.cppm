@@ -39,6 +39,7 @@ export namespace Extrinsic::Runtime
     {
         bool IsError{false};
         std::string Text{"{}"}; // JSON document (or a plain message for errors)
+        std::string ErrorCode{}; // machine-readable code for errors, e.g. "file_exists"; empty when none
         std::vector<AgentImage> Images{};
         // Set by operations that finish on a later frame (captures); the reply waits for it.
         AgentOperationContinuation Continuation{};
@@ -67,6 +68,7 @@ export namespace Extrinsic::Runtime
         std::string Description{};
         std::string InputSchemaJson{R"({"type":"object","properties":{},"additionalProperties":false})"};
         bool ReadOnly{true};
+        bool Destructive{false}; // a mutation the undo history does not cover (written files)
         AgentOperationInvoker Invoke{};
     };
 
