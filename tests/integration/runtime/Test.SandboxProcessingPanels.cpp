@@ -3798,3 +3798,102 @@ TEST(SandboxProcessingPanels, KMeansDismissAndUnrelatedCompletionRetainGpuCorrel
     h.Engine->Run();EXPECT_TRUE(dismissed);EXPECT_TRUE(replaced);
     EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
 }
+
+// UI-069: the shared operation-progress widget. The view is pure; the draw
+// path only maps it to ImGui, so the text and bar mode are asserted on the
+// view and the Cancel wiring through a real frame.
+TEST(SandboxProcessingPanels, OperationProgressViewFollowsTheReadModel)
+{
+    using State = R::EditorOperationState;
+    R::EditorOperationProgress progress{};
+
+    EXPECT_FALSE(Editor::DescribeOperationProgress(progress, true).Visible) << "None draws nothing";
+    progress.State = State::Succeeded;
+    EXPECT_FALSE(Editor::DescribeOperationProgress(progress, true).Visible) << "the panel's result line reports success";
+
+    progress = {.State = State::Running, .Determinate = true, .Normalized = 0.42f, .ElapsedSeconds = 3.25,
+                .Label = "solve", .CanCancel = true};
+    auto view = Editor::DescribeOperationProgress(progress, true);
+    ASSERT_TRUE(view.Visible && view.Bar);
+    EXPECT_FLOAT_EQ(view.Fraction, 0.42f);
+    EXPECT_EQ(view.Overlay, "42%  3.2s");
+    EXPECT_TRUE(view.ShowCancel);
+    EXPECT_FALSE(Editor::DescribeOperationProgress(progress, false).ShowCancel) << "no handler, no button";
+    progress.CanCancel = false;
+    EXPECT_FALSE(Editor::DescribeOperationProgress(progress, true).ShowCancel) << "only when the read model allows it";
+
+    progress.Determinate = false;
+    view = Editor::DescribeOperationProgress(progress, true);
+    EXPECT_LT(view.Fraction, 0.0f) << "indeterminate is an animated bar, never 0%";
+    EXPECT_EQ(view.Overlay, "running  3.2s");
+
+    progress.State = State::Queued;
+    progress.ElapsedSeconds = 0.0;
+    EXPECT_EQ(Editor::DescribeOperationProgress(progress, true).Overlay, "queued  0.0s");
+
+    progress = {.State = State::Failed, .Diagnostic = "solver diverged"};
+    view = Editor::DescribeOperationProgress(progress, true);
+    EXPECT_TRUE(view.Visible);
+    EXPECT_FALSE(view.Bar);
+    EXPECT_EQ(view.Overlay, "Failed");
+    EXPECT_EQ(view.Diagnostic, "solver diverged");
+    progress.State = State::Cancelled;
+    EXPECT_EQ(Editor::DescribeOperationProgress(progress, true).Overlay, "Cancelled");
+
+    // The asset queue's overlay is the same helper without elapsed time.
+    EXPECT_EQ(Editor::FormatProgressOverlay(true, 1.5f, "ignored"), "100%");
+    EXPECT_EQ(Editor::FormatProgressOverlay(false, 0.0f, "decoding"), "decoding");
+}
+
+TEST(SandboxProcessingPanels, OperationProgressWidgetCancelRequiresReadModelPermissionAndHandler)
+{
+    PanelHarness h;
+    R::EditorOperationProgress progress{.State = R::EditorOperationState::Running, .Determinate = true,
+                                        .Normalized = 0.5f, .CanCancel = true};
+    int cancels = 0;
+    bool useHandler = true;
+    const auto windowHandle = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+        .Id = "test.operation_progress", .MenuPath = {"View"}, .Title = "Operation progress test",
+        .OpenByDefault = true,
+        .Draw = [&](bool&, const Editor::SandboxEditorContext&) {
+            if (ImGui::Begin("Operation progress test"))
+                Editor::DrawOperationProgress(progress,
+                    useHandler ? std::function<void()>{[&] { ++cancels; }} : std::function<void()>{},
+                    "operation_test");
+            ImGui::End();
+        }});
+    int frames = 0, step = 0;
+    bool done = false;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        if (++frames > 200) { ADD_FAILURE() << "operation progress test did not finish"; engine.RequestExit(); return; }
+        auto* window = ImGui::FindWindowByName("Operation progress test");
+        if (!window) return;
+        ImGui::SetWindowSize(window, {500, 200});
+        ImGui::SetWindowPos(window, {0, 0});
+        const ImGuiID cancel = ImHashStr("Cancel", 0, ImHashStr("operation_test", 0, window->ID));
+        ++step;
+        if (step == 3) ImGui::ActivateItemByID(cancel);
+        if (step == 6)
+        {
+            EXPECT_EQ(cancels, 1);
+            useHandler = false;          // no handler: no button
+            ImGui::ActivateItemByID(cancel);
+        }
+        if (step == 9)
+        {
+            EXPECT_EQ(cancels, 1);
+            useHandler = true;
+            progress.CanCancel = false;  // the read model forbids it
+            ImGui::ActivateItemByID(cancel);
+        }
+        if (step == 12)
+        {
+            EXPECT_EQ(cancels, 1);
+            done = true;
+            engine.RequestExit();
+        }
+    };
+    h.Engine->Run();
+    EXPECT_TRUE(done);
+    EXPECT_TRUE(h.Shell.UnregisterEditorWindow(windowHandle));
+}

@@ -29,6 +29,20 @@ empty or absent, while present records retain their state, identity, backend
 domains, dependency reasons, progress and diagnostics independently of later
 queue changes.
 
+Operation progress (UI-069) is one read model, `EditorOperationProgress` in the same
+module, resolved by `EditorJobCommandSurface::Progress(key)` (panels reach it
+through `GetEditorOperationProgress(EditorProcessingCommands, key)`). A key is the
+`EditorJobIdentity` of an editor-job output or the `CommandCorrelationId` of a
+service run (K-Means, consolidation), which stamps it on its job as
+`JobDesc::CorrelationId`; neither falls back to "the oldest job". A job that never
+reported projects as indeterminate (`JobProgress` defaults to indeterminate), and
+workers report through `JobCancellation::ReportProgress`; device-polled
+transactions use `EditorJobCommandSurface::ReportProgress`. The agent lane's
+progress notifications read the same model. Panels draw it with the shared
+`DrawOperationProgress` in `Sandbox.PanelSupport.*`; `FormatProgressOverlay` is
+the single overlay formatter, also used by the AssetIO queue. Cancel appears only
+when the read model sets `CanCancel` (RUNTIME-279).
+
 Property-binding targets and presentation slots own vectors of the canonical
 `GeometryPresentationPropertyOption` from `Runtime.GeometryPresentation.cppm`.
 The enumerator's ordered records carry the property reference, count, source

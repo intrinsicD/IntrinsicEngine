@@ -116,18 +116,6 @@ namespace Extrinsic::Sandbox::Editor
             return request;
         }
 
-        [[nodiscard]] std::string ProgressOverlayText(
-            const EditorAssetImportQueueRow& row)
-        {
-            if (!row.ProgressDeterminate)
-            {
-                return row.StageText.empty() ? "active" : row.StageText;
-            }
-            const int percent = static_cast<int>(
-                std::round(std::clamp(row.NormalizedProgress, 0.0f, 1.0f) * 100.0f));
-            return std::to_string(percent) + "%";
-        }
-
         void DrawAssetImportQueue(
             const EditorAssetImportQueueModel& model,
             const SandboxEditorContext* context)
@@ -204,7 +192,9 @@ namespace Extrinsic::Sandbox::Editor
                     ImGui::TextUnformatted(row.StageText.c_str());
 
                     ImGui::TableSetColumnIndex(4);
-                    const std::string overlay = ProgressOverlayText(row);
+                    const std::string overlay = FormatProgressOverlay(
+                        row.ProgressDeterminate, row.NormalizedProgress,
+                        row.StageText.empty() ? "active" : row.StageText);
                     ImGui::ProgressBar(
                         row.ProgressDeterminate ? row.NormalizedProgress : 0.0f,
                         ImVec2(-1.0f, 0.0f),

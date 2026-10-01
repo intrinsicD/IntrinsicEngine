@@ -3633,6 +3633,7 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::SeparatorText("GPU result");
         ImGui::TextDisabled("State: %s%s", Runtime::ToString(transaction.Phase),
                             transaction.Phase == Phase::ReadyToAccept && transaction.Stale ? " (stale)" : "");
+        DrawOperationProgress(transaction.Progress, {}, "smoothing_progress");
         ImGui::BeginDisabled(transaction.Phase != Phase::Running);
         if (ImGui::Button("Stop##Smoothing")) Runtime::StopEditorPropertySmoothing(SmoothingTransaction);
         ImGui::EndDisabled();

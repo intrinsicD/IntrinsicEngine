@@ -70,6 +70,39 @@ namespace Extrinsic::Sandbox::Editor
 
     [[nodiscard]] bool DrawDismissLastResultButton(const char* label);
 
+    // Overlay text of every progress bar (asset queue rows and operation
+    // panels): "NN%" when determinate, else `fallbackLabel`, followed by the
+    // elapsed time when `elapsedSeconds` is given.
+    [[nodiscard]] std::string FormatProgressOverlay(
+        bool determinate,
+        float normalized,
+        std::string_view fallbackLabel,
+        std::optional<double> elapsedSeconds = std::nullopt);
+
+    // What `DrawOperationProgress` shows for one read-model value. A negative
+    // `Fraction` is an indeterminate (animated) bar.
+    struct OperationProgressView
+    {
+        bool Visible{false};
+        bool Bar{false};            // Queued / Running: a bar; Failed / Cancelled: a status line
+        float Fraction{-1.0f};
+        std::string Overlay{};
+        std::string Diagnostic{};
+        bool ShowCancel{false};
+    };
+    [[nodiscard]] OperationProgressView DescribeOperationProgress(
+        const Runtime::EditorOperationProgress& progress, bool hasCancelHandler);
+
+    // The one progress widget of every method panel: draws nothing for
+    // `State::None` and for a finished run (the panel's result line reports
+    // that); a bar with overlay for Queued/Running; a status line for
+    // Failed/Cancelled; Cancel only when the read model says `CanCancel` and
+    // `onCancel` is bound. `id` keeps several widgets in one window apart.
+    void DrawOperationProgress(
+        const Runtime::EditorOperationProgress& progress,
+        const std::function<void()>& onCancel = {},
+        const char* id = "operation");
+
     void DrawDisabledReasonTooltip(std::string_view disabledReason);
     [[nodiscard]] bool DrawProcessingActionButton(
         const char* label, const Runtime::ActionReadiness& readiness);

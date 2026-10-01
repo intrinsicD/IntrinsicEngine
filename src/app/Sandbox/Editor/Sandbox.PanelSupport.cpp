@@ -1611,6 +1611,87 @@ namespace Extrinsic::Sandbox::Editor
         return command;
     }
 
+    std::string FormatProgressOverlay(
+        const bool determinate,
+        const float normalized,
+        const std::string_view fallbackLabel,
+        const std::optional<double> elapsedSeconds)
+    {
+        std::string text = determinate
+            ? std::to_string(static_cast<int>(
+                  std::round(std::clamp(normalized, 0.0f, 1.0f) * 100.0f))) + "%"
+            : std::string{fallbackLabel};
+        if (elapsedSeconds.has_value())
+            text += std::format("  {:.1f}s", *elapsedSeconds);
+        return text;
+    }
+
+    OperationProgressView DescribeOperationProgress(
+        const EditorOperationProgress& progress, const bool hasCancelHandler)
+    {
+        OperationProgressView view{};
+        switch (progress.State)
+        {
+        case EditorOperationState::Queued:
+        case EditorOperationState::Running:
+            view.Visible = view.Bar = true;
+            view.Fraction = progress.Determinate ? std::clamp(progress.Normalized, 0.0f, 1.0f) : -1.0f;
+            view.Overlay = FormatProgressOverlay(
+                progress.Determinate, progress.Normalized,
+                progress.State == EditorOperationState::Queued ? "queued" : "running",
+                progress.ElapsedSeconds);
+            view.ShowCancel = progress.CanCancel && hasCancelHandler;
+            break;
+        case EditorOperationState::Failed:
+        case EditorOperationState::Cancelled:
+            view.Visible = true;
+            view.Overlay = progress.State == EditorOperationState::Failed ? "Failed" : "Cancelled";
+            break;
+        case EditorOperationState::None:
+        case EditorOperationState::Succeeded:
+            break;
+        }
+        if (view.Visible)
+            view.Diagnostic = progress.Diagnostic;
+        return view;
+    }
+
+    void DrawOperationProgress(
+        const EditorOperationProgress& progress,
+        const std::function<void()>& onCancel,
+        const char* const id)
+    {
+        const OperationProgressView view = DescribeOperationProgress(progress, static_cast<bool>(onCancel));
+        if (!view.Visible)
+            return;
+        ImGui::PushID(id);
+        if (view.Bar)
+        {
+            // ImGui's negative-fraction idiom animates an indeterminate bar.
+            const float fraction = view.Fraction >= 0.0f
+                ? view.Fraction
+                : -1.0f * static_cast<float>(ImGui::GetTime());
+            const float cancelWidth = view.ShowCancel
+                ? ImGui::CalcTextSize("Cancel").x + 2.0f * ImGui::GetStyle().FramePadding.x +
+                      ImGui::GetStyle().ItemSpacing.x
+                : 0.0f;
+            ImGui::ProgressBar(fraction, ImVec2(-cancelWidth, 0.0f), view.Overlay.c_str());
+            if (view.ShowCancel)
+            {
+                ImGui::SameLine();
+                if (ImGui::Button("Cancel"))
+                    onCancel();
+            }
+        }
+        else
+        {
+            ImGui::TextDisabled("%s", view.Overlay.c_str());
+        }
+        if (!view.Diagnostic.empty())
+            ImGui::TextWrapped("%s", view.Diagnostic.c_str());
+        ImGui::PopID();
+    }
+
     bool DrawDismissLastResultButton(const char* const label)
     {
         return ImGui::SmallButton(label);
