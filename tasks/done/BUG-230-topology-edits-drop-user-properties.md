@@ -12,6 +12,20 @@ contracts: [geometry.property-coherence, geometry.element-domain-sources]
 ---
 # BUG-230 — Topology edits drop user properties, and undo cannot restore them
 
+## Completion — 2026-10-02
+Commit: `5a8172d1a`. Undo restores an exact copy of the stored source
+components (all four domains, so user properties and original numbering return
+bit-exact); redo republishes the after mesh. Simplify forwards surviving
+vertices' user values through mesh garbage collection; edge, halfedge and face
+user properties have no map and are dropped. Remesh and subdivide drop and
+report. Dropped names are `<domain>:<name>` in `DroppedProperties`, appended to
+the result message and returned as `dropped_properties` by the agent. Deviation
+from the task wording: the undo state is the whole stored-component snapshot,
+not only the properties `PopulateFromMesh` does not regenerate, because the
+re-derived mesh renumbers edges, halfedges and faces. Added
+`PropertyRegistry::CopyPropertyFrom` for type-erased copies. See
+`docs/architecture/property-coherence.md`.
+
 ## Goal
 Mesh simplify, remesh and subdivide preserve or explicitly report user-defined
 properties on apply. Undo restores every property the entity had before the
@@ -37,10 +51,10 @@ edit.
   index map. Interpolation is a possible later extension, not part of this fix.
 
 ## Acceptance criteria
-- [ ] The topology history state captures the entity's user property sets (all element domains, excluding those `PopulateFromMesh` regenerates); undo and redo restore them exactly.
-- [ ] Simplify keeps the values of surviving vertices' user properties through the old-to-new map; remesh and subdivide report dropped properties in the result instead of losing them silently.
-- [ ] Regression tests cover simplify, remesh and subdivide followed by undo, checking that `height` returns with its original values, and redo without crashes. The RUNTIME-312 agent test drops its BUG-230 workaround.
-- [ ] Panel and agent paths share the fix, with no agent-only branch.
+- [x] The topology history state captures the entity's user property sets (all element domains, excluding those `PopulateFromMesh` regenerates); undo and redo restore them exactly.
+- [x] Simplify keeps the values of surviving vertices' user properties through the old-to-new map; remesh and subdivide report dropped properties in the result instead of losing them silently.
+- [x] Regression tests cover simplify, remesh and subdivide followed by undo, checking that `height` returns with its original values, and redo without crashes. The RUNTIME-312 agent test drops its BUG-230 workaround.
+- [x] Panel and agent paths share the fix, with no agent-only branch.
 
 ## Verification
 ```bash

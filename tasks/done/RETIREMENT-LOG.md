@@ -8,6 +8,19 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-02 — BUG-230 topology edits drop user properties
+
+Retired [BUG-230](BUG-230-topology-edits-drop-user-properties.md). Simplify,
+remesh and subdivide rebuilt the entity from positions and topology and
+published the property sets wholesale, so user properties such as a vertex
+`height` were lost and undo could not restore them. Undo now reinstalls an
+exact copy of the stored source components. Simplify carries surviving
+vertices' user values; edge, halfedge and face user properties, and everything
+on remesh and subdivide, are dropped and named in the result (`DroppedProperties`,
+the message, and the agent's `dropped_properties`). No interpolation; that
+remains a possible extension. Contract and agent tests cover all three
+operations through undo and redo. Commit `5a8172d1a`.
+
 ## 2026-09-23 — BUG-219 UV panel cache snapshot race
 
 Retired [BUG-219](BUG-219-uv-panel-cache-snapshot-race.md). A fast worker could
