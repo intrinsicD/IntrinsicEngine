@@ -87,6 +87,7 @@ class Bridge:
         self.tools_visible = False    # whether the client last saw the Sandbox's tools
         self.tools_generation = 0     # connection whose tools the client last saw
         self.next_probe = 0.0
+        self.unresponsive = False     # the last ping probe timed out
         self.running = True
 
     # -- client side ------------------------------------------------------------------------------
@@ -96,10 +97,15 @@ class Bridge:
         return self.sock is not None
 
     def write(self, message: dict) -> None:
-        self.out.write(json.dumps(message) + "\n")
-        self.out.flush()
+        try:
+            self.out.write(json.dumps(message) + "\n")
+            self.out.flush()
+        except OSError:  # the client is gone (e.g. BrokenPipeError)
+            self.running = False
 
     def notify_tools_changed_if_needed(self) -> None:
+        if not self.client_initialized:
+            return
         # A restarted Sandbox may be a different build, so a new connection also refreshes the list.
         if self.tools_visible != self.connected or (self.connected and self.tools_generation != self.generation):
             self.write({"jsonrpc": "2.0", "method": "notifications/tools/list_changed"})
@@ -107,7 +113,10 @@ class Bridge:
 
     def status_text(self) -> str:
         if self.connected:
-            return json.dumps({"connected": True, "socket": self.path, "server": self.server_info})
+            status = {"connected": True, "socket": self.path, "server": self.server_info}
+            if self.unresponsive:
+                status["warning"] = "connected but not answering ping; it may be busy"
+            return json.dumps(status)
         return json.dumps({"connected": False, "socket": self.path, "error": self.last_error,
                            "hint": "Start the Sandbox with --agent-socket, then call sandbox_status again."})
 
@@ -202,7 +211,7 @@ class Bridge:
             message["id"] = client_id
             self.write(message)
             return None
-        if server_id in self.abandoned:
+        if isinstance(server_id, (str, int)) and server_id in self.abandoned:
             self.abandoned.discard(server_id)
             return None
         return message
@@ -244,8 +253,10 @@ class Bridge:
 
     def probe(self) -> bool:
         """Reconnects when the current connection no longer answers (e.g. the Sandbox restarted)."""
+        self.unresponsive = False
         if self.connected:
-            self.request_sync("ping")  # a dead connection closes itself through EOF/send errors
+            # A dead connection closes itself through EOF/send errors; a timeout leaves it open.
+            self.unresponsive = self.request_sync("ping") is None and self.connected
         return self.connect()
 
     # -- request handling -------------------------------------------------------------------------
@@ -259,6 +270,7 @@ class Bridge:
             server_id = self.new_id()
             if self.send({"jsonrpc": "2.0", "id": server_id, "method": "tools/call", "params": params}):
                 self.pending[server_id] = (client_id, time.monotonic() + self.timeout)
+                self.notify_tools_changed_if_needed()  # a call-driven reconnect may bring new tools
                 return None
             # The send failed, so the call never reached the dead connection: retry once on a new one.
         self.notify_tools_changed_if_needed()
@@ -269,6 +281,8 @@ class Bridge:
         message_id = message.get("id")
         params = message.get("params")
         params = params if isinstance(params, dict) else {}
+        if message_id is None and "id" in message:
+            return {"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "Invalid request"}}
         if message_id is None:  # notification
             if method == "notifications/initialized":
                 self.client_initialized = True
@@ -290,11 +304,13 @@ class Bridge:
             return result({})
         if method == "tools/list":
             tools = [STATUS_TOOL]
+            listed = False
             if self.connect():
                 reply = self.request_sync("tools/list")
                 if reply is not None and "result" in reply:
                     tools += reply["result"].get("tools", [])
-            self.tools_visible = self.connected
+                    listed = True
+            self.tools_visible = self.connected and listed
             self.tools_generation = self.generation
             return result({"tools": tools})
         if method == "tools/call":
@@ -305,12 +321,17 @@ class Bridge:
             return self.forward_call(message)
         return {"jsonrpc": "2.0", "id": message_id, "error": {"code": -32601, "message": f"Method not found: {method}"}}
 
+    def abandon(self, server_id: str) -> None:
+        if len(self.abandoned) >= 4096:  # bounded; ids are unique per bridge, so stale entries are harmless
+            self.abandoned.clear()
+        self.abandoned.add(server_id)
+
     def cancel(self, params: dict) -> None:
         request_id = params.get("requestId")
         for server_id, (client_id, _) in list(self.pending.items()):
             if client_id == request_id and type(client_id) is type(request_id):
                 del self.pending[server_id]
-                self.abandoned.add(server_id)
+                self.abandon(server_id)
                 self.send({"jsonrpc": "2.0", "method": "notifications/cancelled",
                            "params": {"requestId": server_id,
                                       "reason": params.get("reason", "cancelled by the client")}})
@@ -338,7 +359,7 @@ class Bridge:
         for server_id, (client_id, deadline) in list(self.pending.items()):
             if deadline <= now:
                 del self.pending[server_id]
-                self.abandoned.add(server_id)
+                self.abandon(server_id)
                 self.write(self.error_result(
                     client_id, f"No reply within {self.timeout:g} s. The call is still running in the Sandbox "
                                "and may complete; poll `jobs` or `scene_entities` for its effect."))
@@ -357,7 +378,13 @@ class Bridge:
         return max(0.0, min(deadlines) - now) if deadlines else None
 
     def run(self) -> int:
-        self.selector.register(0, selectors.EVENT_READ, "stdin")
+        try:
+            self.selector.register(0, selectors.EVENT_READ, "stdin")
+        except OSError:  # a regular file as stdin cannot be polled: read it to the end instead
+            while self.running:
+                self.read_stdin()
+            self.close()
+            return 0
         while self.running:
             for key, _ in self.selector.select(self.next_timeout(time.monotonic())):
                 if key.data == "stdin":

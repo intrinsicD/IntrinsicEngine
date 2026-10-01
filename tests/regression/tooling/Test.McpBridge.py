@@ -115,6 +115,7 @@ class FakeSandbox:
                 connection.shutdown(socket.SHUT_RDWR)
             except OSError:
                 pass
+            connection.close()
         if os.path.exists(self.path):
             os.unlink(self.path)
 
@@ -300,6 +301,19 @@ class McpBridgeTests(unittest.TestCase):
             reply = bridge.call("scene_entities", {"n": 2})
         self.assertFalse(reply["result"]["isError"], reply)
         self.assertIn("tools/call", second.calls)
+        bridge.wait_list_changed()  # the call-driven reconnect announces the new Sandbox's tools
+
+    def test_odd_ids_do_not_kill_the_loop(self):
+        bridge = self.bridge()
+        bridge.process.stdin.write('{"jsonrpc":"2.0","id":null,"method":"ping"}\n')
+        bridge.process.stdin.flush()
+        self.assertEqual(bridge.wait(lambda m: m.get("id") is None)["error"]["code"], -32600)
+        sandbox = self.sandbox()
+        bridge.start()
+        bridge.request("tools/list")
+        sandbox.emit({"jsonrpc": "2.0", "id": [1], "result": {}})
+        sandbox.emit({"jsonrpc": "2.0", "id": {}, "result": {}})
+        self.assertEqual(bridge.request("ping")["result"], {})
 
     def test_endpoints_are_unix_socket_paths_only(self):
         # A host:port string is treated as a (missing) socket path, never as a network address.
