@@ -34,7 +34,7 @@ contracts: [geometry.property-coherence, geometry.element-domain-sources, method
 | End-to-end tests | Contract tests on the mock device per method; one gpu;vulkan parity + IO smoke per method. |
 
 ## Completion — 2026-10-01
-Commit: `PENDING` on `claude/runtime-300`. All four fully-GPU methods run on the GPU property
+Commit: `6d0c51c4b` on `claude/runtime-300`. All four fully-GPU methods run on the GPU property
 residency: resident canonical inputs, bounded completion-gated paging (pairs per page and per
 submission plus serial depth per thread), output rings, and Accept/Discard through the
 existing owners:
