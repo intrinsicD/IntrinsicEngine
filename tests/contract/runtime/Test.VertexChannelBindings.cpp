@@ -830,3 +830,68 @@ TEST(VertexChannelBindings, ColorSlotsCountOnlyOnTheOverlayLaneAndRetireWithTheB
     EXPECT_EQ(f.Row(cloud, A::Color, D::PointCloudPoint).Source.Name, "v:heat");
     EXPECT_EQ(slotKind(), Runtime::GeometryPresentationSourceKind::PropertyBuffer);
 }
+
+// Every row of the attribute x element-domain table: a compatible property on
+// that domain binds as one undoable step, the model reports it as the row's
+// source, and Default restores the default source.
+TEST(VertexChannelBindings, EveryTableRowBindsAndRestoresItsDefault)
+{
+    BindingFixture f;
+    const ECS::EntityHandle mesh = MakeSelectable(f.Registry, "Mesh");
+    AddTriangleMeshSource(f.Registry, mesh);
+    f.Registry.Raw().emplace<G::RenderPoints>(mesh);
+    f.Registry.Raw().emplace<G::RenderEdges>(mesh);
+    const ECS::EntityHandle graph = MakeSelectable(f.Registry, "Graph");
+    AddGraphSource(f.Registry, graph);
+    const ECS::EntityHandle cloud = MakeSelectable(f.Registry, "Cloud");
+    AddPointCloudSource(f.Registry, cloud, 3u);
+    SetPositions(f.Registry.Raw().get<GS::Vertices>(cloud), {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}});
+
+    const auto entityFor = [&](const D domain) {
+        switch (domain)
+        {
+        case D::GraphNode:
+        case D::GraphEdge: return graph;
+        case D::PointCloudPoint: return cloud;
+        default: return mesh;
+        }
+    };
+    const auto propertiesFor = [&](const D domain) -> Geometry::PropertySet& {
+        auto& raw = f.Registry.Raw();
+        const ECS::EntityHandle entity = entityFor(domain);
+        switch (domain)
+        {
+        case D::MeshEdge:
+        case D::GraphEdge: return raw.get<GS::Edges>(entity).Properties;
+        case D::MeshHalfedge: return raw.get<GS::Halfedges>(entity).Properties;
+        case D::MeshFace: return raw.get<GS::Faces>(entity).Properties;
+        default: return raw.get<GS::Vertices>(entity).Properties;
+        }
+    };
+
+    for (const Runtime::RenderAttributeRule& rule : Runtime::RenderAttributeRules())
+    {
+        SCOPED_TRACE(std::string{Runtime::ToString(rule.Attribute)} + " on " +
+                     std::string{Runtime::ToString(rule.Domain)});
+        Geometry::PropertySet& properties = propertiesFor(rule.Domain);
+        const std::string name = "x:" + std::string{Runtime::ToString(rule.Attribute)};
+        const std::size_t count = properties.Size();
+        if (rule.AcceptsVec2)
+            SetProperty<glm::vec2>(properties, name, std::vector<glm::vec2>(count, glm::vec2{0.5f}));
+        else if (rule.AcceptsVec3 || rule.ValidatedByVisualizationRecipe)
+            SetProperty<glm::vec3>(properties, name, std::vector<glm::vec3>(count, glm::vec3{0.0f, 0.0f, 1.0f}));
+        else
+            SetProperty<float>(properties, name, std::vector<float>(count, 3.0f));
+
+        const ECS::EntityHandle entity = entityFor(rule.Domain);
+        const std::size_t undoBefore = f.History.UndoCount();
+        ASSERT_EQ(f.Bind(entity, rule.Attribute, rule.Domain, name), Cmd::Applied);
+        EXPECT_EQ(f.History.UndoCount(), undoBefore + 1u);
+        const auto& bound = f.Row(entity, rule.Attribute, rule.Domain);
+        EXPECT_TRUE(bound.Bound);
+        EXPECT_EQ(bound.Source.Name, name);
+        EXPECT_FALSE(bound.UsingFallback);
+        ASSERT_EQ(f.Bind(entity, rule.Attribute, rule.Domain), Cmd::Applied);
+        EXPECT_FALSE(f.Row(entity, rule.Attribute, rule.Domain).Bound);
+    }
+}

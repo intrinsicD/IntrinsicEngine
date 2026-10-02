@@ -236,3 +236,18 @@ python3 tools/agents/check_task_policy.py --root . --strict
   `spatial-index-consumers.md`). Camera focus still frames the canonical
   bounds component. With every table row now drawn, the slice-3 "not drawn
   yet" gate (`Consumed`, `AttributeBindingNotYetSupported`) is removed.
+- 2026-10-02: Slice 7 (coverage and handoff). One table-driven contract test
+  binds and defaults every `RenderAttributeRules()` row on a mesh, a graph and a
+  point cloud; meshes viewed as points/edges use the entity's one binding set
+  (no per-lane copies). Maturity reached: `CPUContracted`. Vulkan evidence is
+  pending in `GRAPHICS-158` (no GPU run in this task): rebound positions drawn,
+  depth-tested and culled at the displayed location on mesh/graph/point cloud
+  (including mesh primitive views), a click pick at the displayed pixel
+  returning the canonical element id, bound normal/texcoord/color streams and
+  per-element point size/line width read back (point size via `PointSizeBDA`
+  on point clouds, mesh vertex views and graph point lanes; line width via
+  `LineWidthBDA` on explicit mesh edges and graph edges), and a GPU method
+  republishing the bound position property observed through the position front
+  without a stale or half-published frame. Agent parity is `RUNTIME-316`, the
+  panel is `UI-075`, the presentation color slots are `RUNTIME-318`, and
+  processed-property persistence is `RUNTIME-319`.
