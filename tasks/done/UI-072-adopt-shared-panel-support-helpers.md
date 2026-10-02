@@ -21,7 +21,7 @@ Source: 2026-10-01 duplication/consistency audit (findings 3.2, 3.5, 4.6), re-ve
 `665c693dd`. MPP = `src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp`. Line numbers are
 at the audit revision. The runtime-side reuse items are in
 [RUNTIME-314](../backlog/runtime/RUNTIME-314-reuse-existing-processing-helpers.md); the GPU row and
-disabled-reason presentation are [UI-071](../backlog/ui/UI-071-gpu-transaction-controls-and-refusal-presentation.md).
+disabled-reason presentation are [UI-071](UI-071-gpu-transaction-controls-and-refusal-presentation.md).
 
 1. "Show ..." buttons bypass `DrawProcessingPropertyShowButton`. Six sites (MPP ~2213, ~2304,
    ~2394, ~2463, ~2535, ~2724) each repeat `Button` + `DebugNameForEditorCommandStatus(ShowProcessingProperty(...))`

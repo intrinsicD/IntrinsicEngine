@@ -21,6 +21,11 @@ using RUNTIME-277's structured readiness, starting with the Smooth Property pane
 - Operator direction 2026-09-27: agent control lane and user-facing inspection capabilities, planned with Fable 5.1; attach-to-running transport; declarative schemas; integer enums.
 - Helpers in `src/app/Sandbox/Editor/Sandbox.PanelSupport.hpp/.cpp`: `DrawProcessingActionButton(label, readiness)`, `DrawDisabledReasonTooltip`. Coordinate adoption in other families with [UI-037](../../active/UI-037-linear-domain-action-readiness-tooltips.md).
 
+- Handed over from UI-071 (2026-10-02):
+  - three MeshProcessingPanels controls still sit in a bare `BeginDisabled` with no reason: the Segmentation Show buttons (~1377), Geodesics "Use selected vertices" (~4120) and "Clear##GeodesicsSourceProperty" (~4163);
+  - the sandbox-editor-feature-boundaries "panel's own gating" wording names only Method panels, but MPP now uses `kPendingGpuRunReason` too;
+  - the CPD Apply Running reason says "cancel it", but the panel offers Discard.
+
 ## Control surfaces
 - Config: N/A.
 - UI: action tooltip lists all reasons; `DrawReadinessFieldMarker(readiness, "<field>")` next to a control.

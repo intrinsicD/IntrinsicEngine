@@ -8,6 +8,18 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-02 — UI-071 GPU transaction controls and refusal presentation
+
+Retired [UI-071](UI-071-gpu-transaction-controls-and-refusal-presentation.md).
+
+- One `DrawGpuTransactionControls` row serves scalar, Outliers, Normals, Smoothing, consolidation and K-Means. CPD is an exception.
+- Run/Stop/Accept/Discard are enabled by phase, with refusal text taken from the runtime lifecycle.
+- MP and MPP disabled actions show their reasons through `DrawProcessingActionButton`.
+- A drift guard rejects hand-written rows.
+- UI-058 owns the remaining three reasonless MPP controls.
+
+Commits `1b0713584` through `ff3d52207`.
+
 ## 2026-10-02 — UI-072 adopt shared panel-support helpers
 
 Retired [UI-072](UI-072-adopt-shared-panel-support-helpers.md).

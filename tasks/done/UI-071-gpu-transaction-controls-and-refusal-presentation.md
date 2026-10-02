@@ -39,13 +39,13 @@ Inconsistencies today:
   in MP, which has 17 `BeginDisabled` blocks and no `DrawDisabledReasonTooltip` call.
 
 Coordination, do not duplicate:
-- [UI-069](../../done/UI-069-shared-operation-progress-widget.md) owns the shared progress read model and
+- [UI-069](UI-069-shared-operation-progress-widget.md) owns the shared progress read model and
   widget; this row sits next to it and must reuse its phase/progress data once it lands.
-- [UI-037](../../active/UI-037-linear-domain-action-readiness-tooltips.md) and
-  [UI-058](UI-058-all-reasons-readiness-tooltips.md) own readiness content and the all-reasons
+- [UI-037](../active/UI-037-linear-domain-action-readiness-tooltips.md) and
+  [UI-058](../backlog/ui/UI-058-all-reasons-readiness-tooltips.md) own readiness content and the all-reasons
   tooltip. This task decides only the presentation rule (where the reason appears) and records it
   there; `DrawProcessingActionButton` draws it.
-- [RUNTIME-311](../runtime/RUNTIME-311-unify-gpu-scalar-outlier-transaction-lifecycle.md) unifies the
+- [RUNTIME-311](../backlog/runtime/RUNTIME-311-unify-gpu-scalar-outlier-transaction-lifecycle.md) unifies the
   runtime lifecycle, and may expose one phase/snapshot shape this helper should consume.
 - `ProcessingDraftState` helpers and widths belong to UI-049 and are out of scope.
 
@@ -55,11 +55,24 @@ phase, `CanAccept`, the refusal reason and the IO counters. It owns the Stop-whi
 Discard-by-phase rule, the unique IDs and one counter format.
 
 ## Acceptance criteria
-- [ ] One helper draws the row for scalar, Outliers, CPD, Normals, Smoothing, consolidation and K-Means; the seven hand-written rows are removed.
-- [ ] A single rule decides when Discard is enabled (by transaction phase) and where the Accept refusal reason is shown (tooltip on the disabled control plus one inline line); K-Means shows its reason.
-- [ ] Buttons use `##Family`-suffixed IDs; the upload/cache-hit counters use one format.
-- [ ] MP's disabled actions show their reasons through the shared presentation; the rule is recorded in UI-037/UI-058 or the sandbox editor boundaries doc.
-- [ ] The per-phase enabled/disabled rule of Accept and Discard is covered by the shared helper's per-phase test (`GpuTransactionRowEnablesButtonsByPhase`), the call-site snapshot adapters (`GpuTransactionPhaseOf` static_asserts, panel tests on the null device) and a source scan that no hand-written row remains. MP's running phases are unreachable on the null device, so no MP panel is driven through them; no behavior change to the runtime commands.
+- [x] One helper draws the row for scalar, Outliers, Normals, Smoothing, consolidation and K-Means; their hand-written rows are removed. CPD is a recorded exception: it is not a GPU two-phase transaction (own run object, Step/Apply/Discard) per RUNTIME-311.
+- [x] A single rule decides when Discard is enabled (by transaction phase) and where the Accept refusal reason is shown (tooltip on the disabled control plus one inline line); K-Means shows its reason.
+- [x] Buttons use `##Family`-suffixed IDs; the upload/cache-hit counters use one format.
+- [x] MP's disabled actions show their reasons through the shared presentation; the rule is recorded in UI-037/UI-058 or the sandbox editor boundaries doc.
+- [x] The per-phase enabled/disabled rule of Accept and Discard is covered by the shared helper's per-phase test (`GpuTransactionRowEnablesButtonsByPhase`), the call-site snapshot adapters (`GpuTransactionPhaseOf` static_asserts, panel tests on the null device) and a source scan that no hand-written row remains. MP's running phases are unreachable on the null device, so no MP panel is driven through them; no behavior change to the runtime commands.
+
+## Completion
+
+Commit: `1b0713584`, `9ed2ff1f1`, `60f79ab53`, `68fa7b807`, `ff3d52207`. Completed 2026-10-02 with an independent Opus review per slice and a final verification.
+- Full CPU suite 5655/5655.
+- `DrawGpuTransactionControls` draws the shared row. Snapshots carry the lifecycle's refusal text in every phase.
+- MP and MPP actions use `DrawProcessingActionButton` with `ReadinessUnlessBlocked` or `ReadinessWhileGpuRunPending`.
+- A drift guard rejects hand-written rows.
+- Left to [UI-058](../backlog/ui/UI-058-all-reasons-readiness-tooltips.md):
+  - three MPP controls still sit in a bare `BeginDisabled` (Segmentation Show buttons, Geodesics "Use selected vertices" and "Clear source property");
+  - the boundaries-doc wording should cover MPP's own gating reasons;
+  - the CPD Apply "cancel it" wording should say Discard.
+- Maturity: Operational for the UI via CPU ImGui tests. No GPU behavior changed.
 
 ## Verification
 ```bash
