@@ -218,7 +218,6 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `UI-048` — Editor opens empty, hides file operations under View, and never remembers layout (tasks/backlog/ui/UI-048-first-run-workspace-and-layout-persistence.md)
 - unblocked: `UI-049` — Editor panels are sized so that labels clip and results are hidden (tasks/backlog/ui/UI-049-editor-panel-sizing-and-readability.md)
 - unblocked: `UI-051` — A mesh does not pass as a graph or a point cloud in the domain windows (tasks/backlog/ui/UI-051-domain-agnostic-appearance-properties-selection-windows.md)
-- unblocked: `UI-074` — Explain "Color interpretation" with tooltips (tasks/backlog/ui/UI-074-color-interpretation-tooltips.md)
 - blocked by `UI-051`: `UI-075` — One Appearance panel for all domains with per-attribute source selectors (tasks/backlog/ui/UI-075-unified-appearance-panel-with-attribute-source-selectors.md)
 
 ## Unthemed

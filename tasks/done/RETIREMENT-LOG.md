@@ -8,6 +8,14 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-02 — UI-074 color interpretation tooltips
+
+Retired [UI-074](UI-074-color-interpretation-tooltips.md).
+
+- The Appearance color interpretation control has one shared combo with tooltips for every domain.
+- The tooltips explain "Components" (values as RGB(A)/RG, label colors for whole numbers and bools, unsupported values hide the property) and "Normal direction" (vec3 only, [-1,1] to [0,1]). They say the result is lit and tone-mapped.
+- Commits `a0041176b`, `0422c549e`, `2ffd59235`.
+
 ## 2026-10-02 — RUNTIME-313 shared queued editor job helper
 
 Retired [RUNTIME-313](RUNTIME-313-queued-editor-job-setup-and-completion-helper.md).

@@ -26,9 +26,21 @@ Behavior to describe (verified in code): with `Components` the property's own co
 - `UI-075` will move this control into the unified Appearance panel; keep the strings in one shared helper so the move is a call-site change.
 
 ## Acceptance criteria
-- [ ] Hovering the combo explains both options in plain language, including the value-range expectation and what happens to out-of-range or zero-length vectors.
-- [ ] Each popup entry shows its own tooltip (`BeginCombo` + `Selectable` instead of the NUL-separated list).
-- [ ] The text matches the encoder behavior above; a test asserts the strings name the 0..1 and [-1,1] ranges.
+- [x] Hovering the combo explains both options in plain language, including the value-range expectation and what happens to out-of-range or zero-length vectors.
+- [x] Each popup entry shows its own tooltip (`BeginCombo` + `Selectable` instead of the NUL-separated list).
+- [x] The text matches the encoder behavior above; a test asserts the strings name the 0..1 and [-1,1] ranges.
+
+## Completion
+
+Commit: `a0041176b`, `0422c549e`, `2ffd59235`. Completed 2026-10-02; two independent Opus reviews.
+- `DrawColorInterpretationCombo` (Sandbox.PanelSupport) is the single call site for meshes, graphs and point clouds, with a combo tooltip and per-entry tooltips.
+- The text is verified against the encoder:
+  - vec3/vec4 are RGB(A) and vec2 is RG.
+  - Whole numbers >= 0 and bools get label colors; a negative, fractional or > uint32 value hides the property.
+  - Normal direction is vec3 only; zero-length shows as +Z.
+  - Colors are shown lit and tone-mapped.
+- Exact strings are asserted by `SandboxDomainPanels` tests.
+- Maturity: Operational for the UI text (CPU ImGui tests). No GPU behavior changed.
 
 ## Verification
 ```bash
