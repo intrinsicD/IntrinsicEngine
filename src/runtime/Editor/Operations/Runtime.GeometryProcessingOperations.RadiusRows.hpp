@@ -50,7 +50,8 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
 
     // Main-thread pagination over `total` queries; callers guard staleness and cancellation.
     // `consume(batch, diagnostic)` decodes a completed batch or writes the diagnostic and returns
-    // false. `queue(first, count, reuse)` submits the next batch; failure drops the batch.
+    // false. `queue(first, count, reuse)` submits the next batch and never returns null: a refused
+    // page is a batch in the Failed state carrying its diagnostic; failure drops the batch.
     template <class Consume, class Queue>
     [[nodiscard]] RowsState AdvanceGpuRowPages(GpuRowPages& pages, std::size_t total, std::uint32_t batchSize,
                                                std::string& diagnostic, Consume&& consume, Queue&& queue)

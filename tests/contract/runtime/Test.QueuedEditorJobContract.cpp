@@ -374,6 +374,35 @@ TEST_F(QueuedEditorJobContract, VulkanConstructionPagesThroughTheSharedRowCursor
     }
 }
 
+// A page of Hoppe grid queries outside the shared LBVH coordinate range is refused by the queue
+// callback before any submission: the cursor reports its diagnostic and no page is consumed.
+TEST_F(QueuedEditorJobContract, VulkanConstructionRefusesGridQueriesOutsideTheCoordinateRange)
+{
+    auto samples = Scene.Raw().get<GS::Vertices>(Entity).Properties.Get<glm::vec3>("samples");
+    for (auto& sample : samples.Vector()) sample *= 9.5e17f; // padding puts the far grid corner past 1e18
+    std::size_t downloads = 0u;
+    Device.TransferQueue.BufferDownload = [&](auto, auto, auto, auto) { ++downloads; return Extrinsic::RHI::ReadbackToken{}; };
+    R::PointConstructionConfig config{.StableEntityId = Id, .Method = R::PointConstructionMethod::Hoppe,
+        .Backend = R::PointConstructionBackend::VulkanLBVH, .Positions = Positions(), .Normals = Normals(),
+        .EstimateNormals = false, .Resolution = 4u};
+    Jobs.Attach(Context);
+    std::optional<R::EditorPointConstructionResult> delivered;
+    const auto queued = R::ApplyEditorPointConstructionCommand(Commands(), config, [&](auto result) { delivered = result; });
+    ASSERT_EQ(queued.Status, R::EditorCommandStatus::Pending) << queued.Message;
+    for (int frame = 0; frame < 50 && !delivered; ++frame)
+    {
+        Jobs.Jobs().RecordGpuQueueFrameCommands(Device.CommandContext);
+        (void)Jobs.Jobs().DrainGpuQueueCompletedTransfers();
+        Device.GlobalFrameNumber += Device.FramesInFlight + 1u;
+        (void)Jobs.DrainUntilTerminal(std::chrono::milliseconds{2});
+    }
+    ASSERT_TRUE(delivered);
+    EXPECT_EQ(delivered->Status, R::EditorCommandStatus::GeometryProcessingFailed);
+    EXPECT_EQ(delivered->Message, "Vulkan grid queries require normal-or-zero components within 1e18.");
+    EXPECT_EQ(delivered->GpuQueryBatches, 0u);
+    EXPECT_EQ(downloads, 0u);
+}
+
 // Drift guard: a queued editor operation reuses the shared helper instead of hand-writing the
 // prologue/epilogue this task consolidated. Scans the operation sources (like the layering
 // tests): no hand-written "already active" refusal or duplicate wording, no direct active-job
