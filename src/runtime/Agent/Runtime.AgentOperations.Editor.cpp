@@ -808,6 +808,18 @@ namespace Extrinsic::Runtime
             const JobToken token{*index, *generation};
             return token.IsValid() ? std::optional{token} : std::nullopt;
         }
+        // The editor part of a jobs_list row: the output it writes, the backend domain its config
+        // requested and the one it resolved to (null while unknown) and the run's diagnostic.
+        Json EditorJobJson(const EditorJobRecord& editor)
+        {
+            const auto domain = [](const std::optional<EditorJobDomain> value) {
+                return value ? Json(std::string(ToString(*value))) : Json(nullptr);
+            };
+            return Json{{"entity", editor.Identity.EntityId}, {"output", editor.Identity.OutputName},
+                        {"requested_backend", domain(editor.RequestedJobDomain)},
+                        {"resolved_backend", domain(editor.ResolvedJobDomain)},
+                        {"diagnostic", editor.Diagnostic.empty() ? Json(nullptr) : Json(editor.Diagnostic)}};
+        }
         // One row per job the service retains. `editor` (the output it writes) and `cancellable`
         // only for jobs the editor queued through its job surface: exactly the ones jobs_cancel accepts.
         Json JobRow(const JobSnapshot& job, const EditorJobRecord* editor)
@@ -815,8 +827,7 @@ namespace Extrinsic::Runtime
             Json row{{"token", TokenText(job.Token)}, {"name", job.DebugName}, {"state", std::string(ToString(job.State))},
                      {"progress", job.Progress.Determinate ? Json(job.Progress.Normalized) : Json(nullptr)},
                      {"elapsed_ms", job.ElapsedMilliseconds},
-                     {"editor", editor != nullptr ? Json{{"entity", editor->Identity.EntityId}, {"output", editor->Identity.OutputName}}
-                                                  : Json(nullptr)},
+                     {"editor", editor != nullptr ? EditorJobJson(*editor) : Json(nullptr)},
                      {"cancellable", editor != nullptr && IsActiveEditorJobState(job.State)}};
             if (job.CorrelationId != 0u) row["correlation_id"] = job.CorrelationId;
             return row;
@@ -1111,7 +1122,8 @@ namespace Extrinsic::Runtime
             true); // engine config is not part of the undo history
         add("jobs_list", "Jobs",
             "Background jobs with token, state, progress and elapsed time; editor jobs also name the entity and output they "
-            "write and whether jobs_cancel accepts them (cancellable).", none, true, JobsList);
+            "write, the requested and resolved backend (cpu, gpu_compute, gpu_graphics, auto; null while unknown), the run's "
+            "diagnostic and whether jobs_cancel accepts them (cancellable).", none, true, JobsList);
         const std::string tokenProperty = R"("token":{"type":"string","pattern":"^[0-9]+:[0-9]+$","description":"Job token from jobs_list, e.g. 3:1."})";
         add("jobs_wait", "Wait for a job",
             "Wait until a job ended (finished: true) or timeout_ms passed (timed_out: true), while frames keep running. Name the "

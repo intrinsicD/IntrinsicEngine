@@ -39,6 +39,30 @@ fallback) and the job's diagnostic for every editor operation, so the Jobs windo
 2. Record the resolved domain and diagnostic when the finalizer or the GPU lifecycle completes, including fallbacks to CPU.
 3. Adopt this in every queued operation family through the shared owners. Add a drift check if it is cheap.
 
+## Implementation log
+- Slice 1 (shared plumbing and every family):
+  - Requested: `EditorJobIdentity::RequestedDomain`, set where each operation builds its identity from
+    its backend config (`EditorJobDomainOfBackend(ToString(config.Backend))`; CPU-only mesh, curvature
+    and UV families `Cpu`; texture bake `GpuGraphics`); `SubmitGpuTransactionRun` sets `GpuCompute`
+    for every GPU transaction stage.
+  - Resolved and diagnostic: `JobService::CompletingJob()` names the job whose main-thread callback
+    runs. `GuardEditorProcessingResult` (every family's result wrapper, now bound without a sink
+    too) reports `EditorJobOutcomeOf(result)` for that job through
+    `EditorJobCommandSurface::ReportOutcome` after the sink. `GpuTransactionCore` reports its run
+    explicitly (Ready: GpuCompute + "awaits Accept or Discard"; terminal: GpuCompute once a device
+    result existed, else unknown, with the lifecycle message).
+  - Records: the session and the job harness keep the outcome per run and build rows with
+    `MakeEditorJobRecord` (a CPU request resolves to the CPU). Every job of a run shows the run's
+    outcome.
+  - `jobs_list` editor rows gain `requested_backend`, `resolved_backend` (`cpu`, `gpu_compute`,
+    `gpu_graphics`, `auto`, null) and `diagnostic` (null when empty); `jobs_wait` rows too.
+  - Drift guard `QueuedEditorJobDriftGuard.EveryEditorJobIdentityNamesItsRequestedDomain` (it found
+    the resident keypoint run identity without one).
+  - Behaviour change: `EditorOperationProgress::Diagnostic` (panels' progress) now carries the run's
+    reported diagnostic instead of the bare job state for failed/cancelled runs.
+  - Texture bake reports GpuGraphics on publication only; a failed bake still has no diagnostic
+    (the bake's failure lives in the bake service, not in a delivered result).
+
 ## Acceptance criteria
 - [ ] For CPU-only, GPU-requested-and-run, and GPU-requested-but-fell-back runs, `SnapshotAll` reports the right requested and resolved domain plus the diagnostic text. Contract tests use the job harness.
 - [ ] The Jobs window and `jobs_list` show the values, with "-" only when the value is truly unknown.

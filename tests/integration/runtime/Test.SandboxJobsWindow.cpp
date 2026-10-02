@@ -347,8 +347,63 @@ TEST(SandboxJobsWindow, BackendColumnShowsRequestedAndResolvedDomain)
     using D = R::EditorJobDomain;
     EXPECT_EQ(Editor::FormatJobBackend(D::Cpu, D::Cpu), "CPU");
     EXPECT_EQ(Editor::FormatJobBackend(D::Auto, D::GpuCompute), "Auto -> GPU compute");
-    // No producer reports domains yet (RUNTIME-317): an unknown domain is "-", never "CPU".
+    // A row nobody reported for: an unknown domain is "-", never "CPU".
     const R::EditorJobRecord live{};
     EXPECT_EQ(Editor::FormatJobBackend(live.RequestedJobDomain, live.ResolvedJobDomain), "-");
     EXPECT_EQ(Editor::FormatJobBackend(D::Auto, std::nullopt), "Auto -> -");
 }
+
+// RUNTIME-317: the row of a run shows the backend its config requested (from submit) and, once the
+// run reported its outcome from its completion callback, the resolved backend and the diagnostic.
+TEST(SandboxJobsWindow, RowsShowTheRequestedAndResolvedBackendAndTheDiagnostic)
+{
+    TestSupport::ImGuiFrameScope frame;
+    Extrinsic::Tests::EditorJobHarness harness{2u};
+    harness.SetSceneEpoch(1u);
+    R::EditorProcessingContext context{};
+    harness.Attach(context);
+    const R::EditorJobCommandSurface surface = context.JobCommands;
+    const R::EditorProcessingCommands commands = R::BindEditorProcessingCommands(std::move(context));
+    Editor::JobsWindowState state;
+    const auto draw = [&] {
+        frame.NextFrame();
+        ImGui::SetNextWindowPos({0, 0});
+        ImGui::SetNextWindowSize({1200, 400});
+        ImGui::Begin("Jobs backend test");
+        ImGui::GetCurrentContext()->LogBuffer.clear();
+        ImGui::LogToBuffer();
+        ImGui::GetCurrentContext()->LogWindow = nullptr;
+        Editor::DrawJobsWindow(commands, state);
+        std::string text{ImGui::GetCurrentContext()->LogBuffer.c_str()};
+        ImGui::LogFinish();
+        ImGui::End();
+        return text;
+    };
+
+    std::atomic_bool release{false};
+    auto identity = Identity("fallback");
+    identity.RequestedDomain = R::EditorJobDomain::GpuCompute;
+    R::JobDesc job = LongJob("Fallback run", release);
+    // As a method's guarded result does: the outcome is reported from the job's own completion.
+    job.PublishCompletion = [surface](R::KernelEventBus&, const R::JobResultEnvelope&) {
+        surface.ReportOutcome(surface.CompletingJob(), {.ResolvedDomain = R::EditorJobDomain::Cpu,
+                                                        .Diagnostic = "Vulkan unavailable; ran the CPU reference."});
+        return true;
+    };
+    const R::JobToken token = surface.Submit(std::move(job), identity);
+    ASSERT_TRUE(token.IsValid());
+    ASSERT_TRUE(WaitFor([&] { return harness.Jobs().GetState(token) == R::JobState::Running; }));
+    std::string text = draw();
+    ASSERT_EQ(state.History.Rows().size(), 1u);
+    EXPECT_EQ(state.History.Rows()[0].RequestedJobDomain, R::EditorJobDomain::GpuCompute);
+    EXPECT_NE(text.find("GPU compute -> -"), std::string::npos) << "resolved is unknown while it runs: " << text;
+
+    release.store(true, std::memory_order_release);
+    ASSERT_TRUE(harness.DrainUntilTerminal());
+    text = draw();
+    ASSERT_EQ(state.History.Rows().size(), 1u);
+    EXPECT_EQ(state.History.Rows()[0].ResolvedJobDomain, R::EditorJobDomain::Cpu);
+    EXPECT_NE(text.find("GPU compute -> CPU"), std::string::npos) << text;
+    EXPECT_NE(text.find("Vulkan unavailable; ran the CPU reference."), std::string::npos) << text;
+}
+

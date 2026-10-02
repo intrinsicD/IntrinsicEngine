@@ -25,6 +25,55 @@ EditorJobScope ToEditorJobScope(GeometryElementDomain domain) noexcept {
   }
 }
 
+std::optional<EditorJobDomain> EditorJobDomainOfBackend(const std::string_view backend) noexcept {
+  const auto contains = [backend](const std::string_view word) {
+    return std::ranges::search(backend, word, [](const char a, const char b) {
+             return (a >= 'A' && a <= 'Z' ? char(a - 'A' + 'a') : a) == b;
+           }).begin() != backend.end();
+  };
+  if (contains("vulkan") || contains("gpu"))
+    return EditorJobDomain::GpuCompute;
+  if (contains("cpu"))
+    return EditorJobDomain::Cpu;
+  if (contains("auto"))
+    return EditorJobDomain::Auto;
+  return std::nullopt;
+}
+
+std::string_view ToString(const EditorJobDomain domain) noexcept {
+  switch (domain) {
+  case EditorJobDomain::Cpu: return "cpu";
+  case EditorJobDomain::GpuCompute: return "gpu_compute";
+  case EditorJobDomain::GpuGraphics: return "gpu_graphics";
+  case EditorJobDomain::Auto: return "auto";
+  }
+  return "unknown";
+}
+
+EditorJobRecord MakeEditorJobRecord(const JobSnapshot &job,
+                                    const EditorJobIdentity &identity,
+                                    const EditorJobOutcome *outcome) {
+  EditorJobRecord record{
+      .Token = job.Token,
+      .Identity = identity,
+      .CorrelationId = job.CorrelationId,
+      .Name = job.DebugName,
+      .State = job.State,
+      .RequestedJobDomain = identity.RequestedDomain,
+      .NormalizedProgress = job.Progress.Normalized,
+      .ProgressDeterminate = job.Progress.Determinate,
+      .ElapsedMilliseconds = job.ElapsedMilliseconds,
+  };
+  if (outcome != nullptr) {
+    record.ResolvedJobDomain = outcome->ResolvedDomain;
+    record.Diagnostic = outcome->Diagnostic;
+  }
+  // A CPU request has nowhere to fall back to.
+  if (!record.ResolvedJobDomain && identity.RequestedDomain == EditorJobDomain::Cpu)
+    record.ResolvedJobDomain = EditorJobDomain::Cpu;
+  return record;
+}
+
 bool SameEditorJobOutput(const EditorJobIdentity &lhs,
                          const EditorJobIdentity &rhs) noexcept {
   return lhs.EntityId == rhs.EntityId && lhs.Scope == rhs.Scope &&

@@ -33,6 +33,17 @@ export namespace Extrinsic::Runtime
     };
     [[nodiscard]] EditorJobScope ToEditorJobScope(
         GeometryElementDomain domain) noexcept;
+    enum class EditorJobDomain : std::uint8_t
+    {
+        Cpu,
+        GpuCompute,
+        GpuGraphics,
+        Auto,
+    };
+    // The domain a backend name runs in, as operation configs and results spell it:
+    // "vulkan..."/"gpu..." GpuCompute, "cpu..." Cpu, "auto" Auto; nullopt for anything else.
+    [[nodiscard]] std::optional<EditorJobDomain> EditorJobDomainOfBackend(std::string_view backend) noexcept;
+    [[nodiscard]] std::string_view ToString(EditorJobDomain domain) noexcept;
     struct EditorJobIdentity
     {
         std::uint32_t EntityId{0u};
@@ -46,19 +57,24 @@ export namespace Extrinsic::Runtime
         // A helper job whose cancel leaves its run going (Coherent Point Drift's Vulkan E-step
         // pump falls back to the CPU), so cancelling it is not a cancel of the run.
         bool Auxiliary{false};
+        // The backend domain the operation's config asked for, known at submit. Every
+        // submission sets it (nullopt only for a caller that cannot know, e.g. a service
+        // sub-job); not part of the output.
+        std::optional<EditorJobDomain> RequestedDomain{};
+    };
+    // What a run resolved to once its result is known: the domain it actually ran in (after
+    // any fallback; nullopt when nothing tells) and its diagnostic (the fallback reason, else
+    // the result's message).
+    struct EditorJobOutcome
+    {
+        std::optional<EditorJobDomain> ResolvedDomain{};
+        std::string Diagnostic{};
     };
     [[nodiscard]] bool SameEditorJobOutput(
         const EditorJobIdentity& lhs,
         const EditorJobIdentity& rhs) noexcept;
     [[nodiscard]] bool IsActiveEditorJobState(JobState state) noexcept;
     [[nodiscard]] bool IsFailedEditorJobState(JobState state) noexcept;
-    enum class EditorJobDomain : std::uint8_t
-    {
-        Cpu,
-        GpuCompute,
-        GpuGraphics,
-        Auto,
-    };
     struct EditorJobRecord
     {
         JobToken Token{};
@@ -68,8 +84,9 @@ export namespace Extrinsic::Runtime
         std::uint64_t CorrelationId{0u};
         std::string Name{};
         JobState State{JobState::Invalid};
-        // Unknown (nullopt) until the submitter and its finalizer report them; no producer
-        // fills them yet (RUNTIME-317), so readers must not assume a CPU job.
+        // `Identity.RequestedDomain`; the resolved domain is the run's reported outcome, or
+        // Cpu for a Cpu request (it has nowhere to fall back to). Unknown (nullopt) otherwise,
+        // e.g. a GPU run still in flight; readers must not assume a CPU job.
         std::optional<EditorJobDomain> RequestedJobDomain{};
         std::optional<EditorJobDomain> ResolvedJobDomain{};
         std::vector<JobDependency> Dependencies{};
@@ -79,8 +96,18 @@ export namespace Extrinsic::Runtime
         bool PreviousOutputRetained{false};
         std::uint64_t PayloadToken{0u};
         std::uint64_t ElapsedMilliseconds{0u};
+        // The run's reported diagnostic; empty until it ended (or when it reported none).
         std::string Diagnostic{};
     };
+    // A surface's row for a job it submitted: the service snapshot joined with the submit-time
+    // identity and the outcome reported for the job's run (null: none yet).
+    [[nodiscard]] EditorJobRecord MakeEditorJobRecord(
+        const JobSnapshot& job, const EditorJobIdentity& identity, const EditorJobOutcome* outcome);
+    // The run a job belongs to: `Identity.Run`, or the job itself as the run's first job.
+    [[nodiscard]] inline JobToken EditorJobRunOf(const JobToken token, const EditorJobIdentity& identity) noexcept
+    {
+        return identity.Run.IsValid() ? identity.Run : token;
+    }
     struct EditorJobQueueSnapshot
     {
         std::vector<EditorJobRecord> Entries{};
@@ -198,6 +225,13 @@ export namespace Extrinsic::Runtime
         // `JobCancellation::ReportProgress`. No-op for tokens this session
         // did not submit.
         std::function<void(JobToken, JobProgress)> ReportProgress{};
+        // Records the outcome of the run `job` belongs to, shown by every job of the run
+        // (`EditorJobRecord::ResolvedJobDomain`/`Diagnostic`); the last report wins. No-op
+        // for a token this surface did not submit. Main thread.
+        std::function<void(JobToken, EditorJobOutcome)> ReportOutcome{};
+        // `JobService::CompletingJob`: the job whose completion callback is running, so a
+        // result delivered from it is reported for its run (`GuardEditorProcessingResult`).
+        std::function<JobToken()> CompletingJob{};
 
         [[nodiscard]] bool Available() const noexcept
         {

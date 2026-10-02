@@ -264,7 +264,8 @@ namespace Extrinsic::Runtime
         }
         if(!context.JobCommands.Available()){Compute(*w);return Publish(context,w);}
         EditorJobIdentity identity{.EntityId=config.StableEntityId,.Scope=ToEditorJobScope(w->Config.Outputs[0].Domain),
-            .OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Config.Outputs[0].Name};
+            .OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Config.Outputs[0].Name,
+            .RequestedDomain=EditorJobDomainOfBackend(ToString(config.Backend))};
         namespace MS = GeometryProcessingDetail::MeshSupport;
         if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Descriptor analysis"))
             return report(EditorCommandStatus::Pending, std::move(busy->Message));

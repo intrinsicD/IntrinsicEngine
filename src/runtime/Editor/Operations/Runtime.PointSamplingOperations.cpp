@@ -280,7 +280,8 @@ namespace Extrinsic::Runtime
             const EditorJobIdentity identity{.EntityId = config.SourceStableEntityId,
                                              .Scope = ToEditorJobScope(config.Positions.Domain),
                                              .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField,
-                                             .OutputName = config.RankName};
+                                             .OutputName = config.RankName,
+                                             .RequestedDomain = EditorJobDomainOfBackend(result.RequestedBackend)};
             // Property output: any run (CPU or Vulkan) would overwrite the rank and selection an active
             // Vulkan run publishes, so a duplicate is refused like every queued editor job (Pending,
             // the active run keeps its callback). A point-cloud output creates a new entity per run

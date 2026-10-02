@@ -265,3 +265,54 @@ TEST(GpuTransactionLifecycle, StaleRingGenerationNeverReleasesTheReplacementRing
     EXPECT_EQ(h.Residency.RingGeneration(key), successor);
     h.Residency.Discard(key);
 }
+
+// RUNTIME-317: every job of a transaction reports GpuCompute as its requested domain; the run
+// resolves to GpuCompute once the device produced a result (ready, then applied), with the
+// lifecycle's message as its diagnostic, on every job of the run.
+TEST(GpuTransactionLifecycle, JobsReportTheGpuRequestAndTheResolvedOutcome)
+{
+    Harness h;
+    auto f = h.Make();
+    f->DeviceDone = true;
+    const auto run = GP::SubmitGpuTransactionRun(GP::GpuTransactionOf(f), "Fake run");
+    auto job = h.Job(run);
+    ASSERT_TRUE(job.has_value());
+    EXPECT_EQ(job->RequestedJobDomain, R::EditorJobDomain::GpuCompute);
+    EXPECT_FALSE(job->ResolvedJobDomain.has_value()) << "unknown while the device works";
+    EXPECT_TRUE(job->Diagnostic.empty());
+    ASSERT_TRUE(h.Jobs.DrainUntilTerminal());
+    job = h.Job(run);
+    ASSERT_TRUE(job.has_value());
+    EXPECT_EQ(job->ResolvedJobDomain, R::EditorJobDomain::GpuCompute);
+    EXPECT_EQ(job->Diagnostic, "Fake transaction result awaits Accept or Discard.");
+
+    ASSERT_TRUE(GP::BeginGpuTransactionAccept(GP::GpuTransactionOf(f)));
+    ASSERT_TRUE(h.Jobs.DrainUntilTerminal());
+    ASSERT_EQ(f->Core.Phase, R::EditorGpuTransactionPhase::Applied);
+    for (const R::JobToken token : {run, f->Core.AcceptToken})
+    {
+        job = h.Job(token);
+        ASSERT_TRUE(job.has_value());
+        EXPECT_EQ(job->RequestedJobDomain, R::EditorJobDomain::GpuCompute);
+        EXPECT_EQ(job->ResolvedJobDomain, R::EditorJobDomain::GpuCompute);
+        EXPECT_EQ(job->Diagnostic, "applied");
+    }
+}
+
+// A run cancelled before the device produced anything resolved to no domain; its diagnostic is
+// the cancellation the caller received.
+TEST(GpuTransactionLifecycle, RunCancelledBeforeAResultResolvesToNoDomain)
+{
+    Harness h;
+    auto f = h.Make();
+    const auto run = GP::SubmitGpuTransactionRun(GP::GpuTransactionOf(f), "Fake run");
+    ASSERT_TRUE(h.Parked(run));
+    EXPECT_EQ(h.Context.JobCommands.Cancel(run), R::EditorJobCancelStatus::Requested);
+    ASSERT_TRUE(h.Jobs.DrainUntilTerminal());
+    const auto job = h.Job(run);
+    ASSERT_TRUE(job.has_value());
+    EXPECT_EQ(job->RequestedJobDomain, R::EditorJobDomain::GpuCompute);
+    EXPECT_FALSE(job->ResolvedJobDomain.has_value());
+    EXPECT_EQ(job->Diagnostic, f->Message);
+    EXPECT_FALSE(job->Diagnostic.empty());
+}

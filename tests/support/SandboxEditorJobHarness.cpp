@@ -83,6 +83,17 @@ namespace Extrinsic::Tests
         {
             return std::find(m_CancelledRuns.begin(), m_CancelledRuns.end(), run) != m_CancelledRuns.end();
         };
+        commands.ReportOutcome = [this](const Runtime::JobToken token, Runtime::EditorJobOutcome outcome)
+        {
+            Runtime::JobToken run{};
+            if (const auto identity = m_Identities.find(token); identity != m_Identities.end())
+                run = Runtime::EditorJobRunOf(token, identity->second);
+            else if (std::ranges::any_of(m_Identities, [token](const auto& entry) { return entry.second.Run == token; }))
+                run = token;
+            if (run.IsValid())
+                m_Outcomes.insert_or_assign(run, std::move(outcome));
+        };
+        commands.CompletingJob = [this] { return m_Jobs.CompletingJob(); };
         commands.SnapshotEntity =
             [this](const std::uint32_t stableEntityId)
         {
@@ -106,17 +117,11 @@ namespace Extrinsic::Tests
             if (identity == m_Identities.end() && job.CorrelationId == 0u)
                 continue;
 
-            snapshot.Entries.push_back(Runtime::EditorJobRecord{
-                .Token = job.Token,
-                .Identity = identity != m_Identities.end() ? identity->second
-                                                           : Runtime::EditorJobIdentity{},
-                .CorrelationId = job.CorrelationId,
-                .Name = job.DebugName,
-                .State = job.State,
-                .NormalizedProgress = job.Progress.Normalized,
-                .ProgressDeterminate = job.Progress.Determinate,
-                .ElapsedMilliseconds = job.ElapsedMilliseconds,
-            });
+            const Runtime::EditorJobIdentity editorIdentity =
+                identity != m_Identities.end() ? identity->second : Runtime::EditorJobIdentity{};
+            const auto outcome = m_Outcomes.find(Runtime::EditorJobRunOf(job.Token, editorIdentity));
+            snapshot.Entries.push_back(Runtime::MakeEditorJobRecord(
+                job, editorIdentity, outcome != m_Outcomes.end() ? &outcome->second : nullptr));
         }
         return snapshot;
     }

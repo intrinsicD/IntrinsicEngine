@@ -575,7 +575,9 @@ namespace Extrinsic::Runtime
             return EditorJobIdentity{.EntityId = run.Config.SourceStableEntityId,
                                      .Scope = ToEditorJobScope(run.Config.SourcePositions.Domain),
                                      .OutputSemantic = GeometryPresentationSlotSemantic::Displacement,
-                                     .OutputName = "coherent_point_drift"};
+                                     .OutputName = "coherent_point_drift",
+                                     .RequestedDomain = run.Config.EStep == CoherentPointDriftEStep::Vulkan
+                                                            ? EditorJobDomain::GpuCompute : EditorJobDomain::Cpu};
         }
 
         // Queues one step job; `publish` applies the result when the run ends (one-shot command).

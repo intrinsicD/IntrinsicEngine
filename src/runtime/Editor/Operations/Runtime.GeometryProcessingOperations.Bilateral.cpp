@@ -334,7 +334,8 @@ namespace Extrinsic::Runtime
         EditorJobIdentity identity{.EntityId = config.StableEntityId,
                                          .Scope = ToEditorJobScope(w->Config.Output.Domain),
                                          .OutputSemantic = GeometryPresentationSlotSemantic::Displacement,
-                                         .OutputName = w->Config.Output.Name};
+                                         .OutputName = w->Config.Output.Name,
+                                         .RequestedDomain = EditorJobDomainOfBackend(ToString(config.Backend))};
         namespace MS = GeometryProcessingDetail::MeshSupport;
         if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Bilateral filter"))
             return report(EditorCommandStatus::Pending, std::move(busy->Message));

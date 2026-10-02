@@ -166,6 +166,9 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         // frame and projected by `EditorJobCommandSurface` queries.
         std::unordered_map<JobToken, EditorJobIdentity, Core::StrongHandleHash<JobTokenTag>>
             m_JobIdentities{};
+        // Reported outcome of each run (by its first job's token), pruned with the index.
+        std::unordered_map<JobToken, EditorJobOutcome, Core::StrongHandleHash<JobTokenTag>>
+            m_JobOutcomes{};
         // Runs (named by their first job's token) a `Cancel` was accepted for, newest last.
         // Bounded instead of pruned with the index: a caller may ask after the run was reaped.
         std::deque<JobToken> m_CancelledRuns{};
@@ -188,41 +191,47 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                                EditorJobIdentity,
                                Core::StrongHandleHash<JobTokenTag>>;
 
+        using EditorJobOutcomeIndex =
+            std::unordered_map<JobToken,
+                               EditorJobOutcome,
+                               Core::StrongHandleHash<JobTokenTag>>;
+
         [[nodiscard]] EditorJobRecord ToEditorJobRecord(
             const JobSnapshot& job,
-            const EditorJobIdentity& identity)
+            const EditorJobIdentity& identity,
+            const EditorJobOutcomeIndex& outcomes)
         {
-            return EditorJobRecord{
-                .Token = job.Token,
-                .Identity = identity,
-                .CorrelationId = job.CorrelationId,
-                .Name = job.DebugName,
-                .State = job.State,
-                .NormalizedProgress = job.Progress.Normalized,
-                .ProgressDeterminate = job.Progress.Determinate,
-                .ElapsedMilliseconds = job.ElapsedMilliseconds,
-            };
+            const auto outcome = outcomes.find(EditorJobRunOf(job.Token, identity));
+            return MakeEditorJobRecord(job, identity, outcome != outcomes.end() ? &outcome->second : nullptr);
         }
 
         void PruneEditorJobIdentities(
             const std::vector<JobSnapshot>& jobs,
-            EditorJobIdentityIndex& identities)
+            EditorJobIdentityIndex& identities,
+            EditorJobOutcomeIndex& outcomes)
         {
             EditorJobIdentityIndex retained{};
+            EditorJobOutcomeIndex retainedOutcomes{};
             retained.reserve(identities.size());
             for (const JobSnapshot& job : jobs)
             {
                 const auto identity = identities.find(job.Token);
-                if (identity != identities.end())
-                    retained.insert(*identity);
+                if (identity == identities.end())
+                    continue;
+                retained.insert(*identity);
+                const JobToken run = EditorJobRunOf(job.Token, identity->second);
+                if (const auto outcome = outcomes.find(run); outcome != outcomes.end())
+                    retainedOutcomes.insert(*outcome);
             }
             identities = std::move(retained);
+            outcomes = std::move(retainedOutcomes);
         }
 
         [[nodiscard]] std::optional<EditorJobRecord>
         FindActiveEditorJob(
             const JobService& jobs,
             const EditorJobIdentityIndex& identities,
+            const EditorJobOutcomeIndex& outcomes,
             const EditorJobIdentity& requested)
         {
             for (const JobSnapshot& job : jobs.SnapshotAll())
@@ -231,7 +240,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                 if (identity != identities.end() && IsActiveEditorJobState(job.State) &&
         SameEditorJobOutput(identity->second, requested))
                 {
-                    return ToEditorJobRecord(job, identity->second);
+                    return ToEditorJobRecord(job, identity->second, outcomes);
                 }
             }
             return std::nullopt;
@@ -241,6 +250,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         SnapshotEditorJobsForEntity(
             const JobService& jobs,
             const EditorJobIdentityIndex& identities,
+            const EditorJobOutcomeIndex& outcomes,
             const std::uint32_t stableEntityId)
         {
             std::vector<EditorJobRecord> rows{};
@@ -252,18 +262,19 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                 {
                     continue;
                 }
-                rows.push_back(ToEditorJobRecord(job, identity->second));
+                rows.push_back(ToEditorJobRecord(job, identity->second, outcomes));
             }
             return rows;
         }
         [[nodiscard]] std::vector<EditorJobRecord> SnapshotAllEditorJobs(
             const JobService& jobs,
-            const EditorJobIdentityIndex& identities)
+            const EditorJobIdentityIndex& identities,
+            const EditorJobOutcomeIndex& outcomes)
         {
             std::vector<EditorJobRecord> rows{};
             for (const JobSnapshot& job : jobs.SnapshotAll())
                 if (const auto identity = identities.find(job.Token); identity != identities.end())
-                    rows.push_back(ToEditorJobRecord(job, identity->second));
+                    rows.push_back(ToEditorJobRecord(job, identity->second, outcomes));
             // The service keeps its jobs unordered; token indices grow with submission.
             std::ranges::sort(rows, {}, [](const EditorJobRecord& row) { return row.Token.Index; });
             return rows;
@@ -274,6 +285,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         ProgressForEditorRun(
             const JobService& jobs,
             const EditorJobIdentityIndex& identities,
+            const EditorJobOutcomeIndex& outcomes,
             const EditorOperationRunKey& key)
         {
             std::vector<EditorJobRecord> records{};
@@ -281,9 +293,9 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
             {
                 const auto identity = identities.find(job.Token);
                 if (identity != identities.end())
-                    records.push_back(ToEditorJobRecord(job, identity->second));
+                    records.push_back(ToEditorJobRecord(job, identity->second, outcomes));
                 else if (job.CorrelationId != 0u)
-                    records.push_back(ToEditorJobRecord(job, EditorJobIdentity{}));
+                    records.push_back(ToEditorJobRecord(job, EditorJobIdentity{}, outcomes));
             }
             return ResolveEditorOperationProgress(records, key);
         }
@@ -635,7 +647,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         // the attachment epoch before reaching session-owned state.
         if (m_Jobs != nullptr)
         {
-            PruneEditorJobIdentities(m_Jobs->SnapshotAll(), m_JobIdentities);
+            PruneEditorJobIdentities(m_Jobs->SnapshotAll(), m_JobIdentities, m_JobOutcomes);
             context.JobCommands.Submit = [epoch = m_AttachmentEpoch, history = context.CommandHistory, this](
                                              JobDesc desc, EditorJobIdentity identity) -> JobToken
             {
@@ -660,6 +672,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                     return FindActiveEditorJob(
                         *m_Jobs,
                         m_JobIdentities,
+                        m_JobOutcomes,
                         identity);
                 };
             context.JobCommands.SnapshotEntity =
@@ -672,6 +685,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                     return SnapshotEditorJobsForEntity(
                         *m_Jobs,
                         m_JobIdentities,
+                        m_JobOutcomes,
                         stableEntityId);
                 };
             context.JobCommands.SnapshotAll =
@@ -679,7 +693,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                 {
                     if (!AttachmentEpochIsActive(epoch) || m_Jobs == nullptr)
                         return {};
-                    return SnapshotAllEditorJobs(*m_Jobs, m_JobIdentities);
+                    return SnapshotAllEditorJobs(*m_Jobs, m_JobIdentities, m_JobOutcomes);
                 };
             // Only tokens this session submitted (the identity index) reach
             // `JobService::Cancel`; asset, scene-file and service jobs never do.
@@ -722,7 +736,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                     if (!AttachmentEpochIsActive(epoch) || m_Jobs == nullptr)
                         return {};
                     EditorOperationProgress progress =
-                        ProgressForEditorRun(*m_Jobs, m_JobIdentities, key);
+                        ProgressForEditorRun(*m_Jobs, m_JobIdentities, m_JobOutcomes, key);
                     progress.Epoch = m_SceneEpoch;
                     return progress;
                 };
@@ -739,6 +753,24 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                         m_JobIdentities.contains(token))
                         m_Jobs->ReportProgress(token, progress);
                 };
+            context.JobCommands.ReportOutcome =
+                [epoch = m_AttachmentEpoch, this](const JobToken token, EditorJobOutcome outcome)
+                {
+                    if (!AttachmentEpochIsActive(epoch))
+                        return;
+                    // A run's first job may be reaped while a later stage (a GPU Accept) still runs.
+                    JobToken run{};
+                    if (const auto identity = m_JobIdentities.find(token); identity != m_JobIdentities.end())
+                        run = EditorJobRunOf(token, identity->second);
+                    else if (std::ranges::any_of(m_JobIdentities, [token](const auto& entry) { return entry.second.Run == token; }))
+                        run = token;
+                    if (run.IsValid())
+                        m_JobOutcomes.insert_or_assign(run, std::move(outcome));
+                };
+            context.JobCommands.CompletingJob = [epoch = m_AttachmentEpoch, this]() -> JobToken
+            {
+                return AttachmentEpochIsActive(epoch) && m_Jobs != nullptr ? m_Jobs->CompletingJob() : JobToken{};
+            };
         }
         context.SpatialIndices = m_SpatialIndices;
         m_PointCloudServices.Clustering = m_ClusteringService;
@@ -1082,6 +1114,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         m_PointCloudServiceResultSinks = {};
         m_ParameterizationUvViewCommands = {};
         m_JobIdentities.clear();
+        m_JobOutcomes.clear();
         m_CancelledRuns.clear(); // token indices restart with a new job service
         m_RenderRecipeContext = {};
         m_RenderRecipeState = {};

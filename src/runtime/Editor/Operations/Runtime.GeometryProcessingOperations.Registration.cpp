@@ -831,6 +831,7 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
                 .Scope = ToEditorJobScope(state.Command.SourcePositions.Domain),
                 .OutputSemantic = GeometryPresentationSlotSemantic::Displacement,
                 .OutputName = "registration_transform",
+                .RequestedDomain = EditorJobDomainOfBackend(ToString(state.Command.Backend)),
             };
         }
 

@@ -264,7 +264,8 @@ namespace Extrinsic::Runtime
         if(config.Backend!=KeypointAnalysisBackend::VulkanCompute)
             return refuse("Resident keypoints require the Vulkan compute backend.");
         const EditorJobIdentity identity{.EntityId=config.StableEntityId,.Scope=ToEditorJobScope(w->Config.Mask.Domain),
-            .OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Config.Mask.Name};
+            .OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Config.Mask.Name,
+            .RequestedDomain=EditorJobDomainOfBackend(ToString(config.Backend))};
         // A duplicate is Pending like every queued editor job; the active run keeps its callback.
         if(auto busy=GeometryProcessingDetail::MeshSupport::ActiveOutputJobRefusal(context,identity,"Keypoint analysis"))
         {result.Status=EditorCommandStatus::Pending;result.Message=std::move(busy->Message);return {};}
@@ -400,7 +401,8 @@ namespace Extrinsic::Runtime
             .Abandon=[commands,w,transaction] {
                 if(!w->Abandoned) {w->Result.Status=EditorCommandStatus::StaleEntity;w->Result.Message="Keypoint job stopped, detached or stale.";DiscardEditorPointScalar(commands,transaction);}
             }});
-        EditorJobIdentity runIdentity{.EntityId=config.StableEntityId,.Scope=ToEditorJobScope(w->Config.Mask.Domain),.OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Config.Mask.Name};
+        EditorJobIdentity runIdentity{.EntityId=config.StableEntityId,.Scope=ToEditorJobScope(w->Config.Mask.Domain),.OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Config.Mask.Name,
+            .RequestedDomain=EditorJobDomainOfBackend(ToString(config.Backend))};
         const auto token=context.JobCommands.Submit(std::move(job),runIdentity);
         if(!token.IsValid()) {
             DiscardEditorPointScalar(commands,transaction);return refuse(GeometryProcessingDetail::MeshSupport::QueuedJobRejectedMessage("Keypoint analysis"));
@@ -447,7 +449,8 @@ namespace Extrinsic::Runtime
         }
         if(!context.JobCommands.Available()){Compute(*w);return Publish(context,w);}
         EditorJobIdentity identity{.EntityId=config.StableEntityId,.Scope=ToEditorJobScope(w->Config.Mask.Domain),
-            .OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Config.Mask.Name};
+            .OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Config.Mask.Name,
+            .RequestedDomain=EditorJobDomainOfBackend(ToString(config.Backend))};
         namespace MS = GeometryProcessingDetail::MeshSupport;
         if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Keypoint analysis"))
             return report(EditorCommandStatus::Pending, std::move(busy->Message)); // the active job owns the callback

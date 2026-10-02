@@ -46,6 +46,16 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
 
     namespace
     {
+        // The transaction's outcome for its run: GpuCompute once the device produced a result
+        // (`ran`), otherwise unknown (cancelled or failed before one); the message is the diagnostic.
+        void ReportOutcome(const GpuTransactionCore& t, const bool ran, std::string diagnostic)
+        {
+            if (!t.RunToken.IsValid() || !t.Context.JobCommands.ReportOutcome) return;
+            t.Context.JobCommands.ReportOutcome(
+                t.RunToken, {.ResolvedDomain = ran ? std::optional{EditorJobDomain::GpuCompute} : std::nullopt,
+                             .Diagnostic = std::move(diagnostic)});
+        }
+
         void Release(GpuTransactionCore& t)
         {
             if (t.Hooks.Release) t.Hooks.Release();
@@ -176,8 +186,13 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         Release(t);
         if (t.Delivered) return; // the result is frozen once delivered
         t.Delivered = true;
+        const bool ran = phase == EditorGpuTransactionPhase::Applied || t.Phase == EditorGpuTransactionPhase::ReadyToAccept ||
+                         t.Phase == EditorGpuTransactionPhase::Accepting;
         t.Phase = phase;
+        // After the typed delivery, whose guarded sink may report the typed result first.
+        const std::string diagnostic = message;
         if (t.Hooks.Deliver) t.Hooks.Deliver(status, std::move(message));
+        ReportOutcome(t, ran, diagnostic);
     }
 
     void FailGpuTransaction(GpuTransactionCore& t, std::string message)
@@ -185,9 +200,11 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         FinishGpuTransaction(t, EditorGpuTransactionPhase::Failed, EditorCommandStatus::GeometryProcessingFailed, std::move(message));
     }
 
-    void ReadyGpuTransaction(GpuTransactionCore& t) noexcept
+    void ReadyGpuTransaction(GpuTransactionCore& t)
     {
-        if (!t.Delivered) t.Phase = EditorGpuTransactionPhase::ReadyToAccept;
+        if (t.Delivered) return;
+        t.Phase = EditorGpuTransactionPhase::ReadyToAccept;
+        ReportOutcome(t, true, t.Label + " result awaits Accept or Discard.");
     }
 
     std::optional<GpuTransactionRefusal> GpuTransactionStartRefusal(const GpuTransactionCore& t)
@@ -228,6 +245,8 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
                 return t->Phase == EditorGpuTransactionPhase::ReadyToAccept || t->Phase == EditorGpuTransactionPhase::Accepting;
             },
             .FinalizeUnpublishedOnMainThread = [t] { Finalize(*t); }};
+        // A GPU transaction is GPU work by definition; every stage carries the request.
+        if (!t->Identity.RequestedDomain) t->Identity.RequestedDomain = EditorJobDomain::GpuCompute;
         const JobToken token = t->Context.JobCommands.Submit(std::move(job), t->Identity);
         if (!token.IsValid())
         {

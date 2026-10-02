@@ -635,7 +635,8 @@ namespace Extrinsic::Runtime
         const EditorJobIdentity identity{.EntityId = config.StableEntityId,
                                          .Scope = ToEditorJobScope(w->Config.Mask.Domain),
                                          .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField,
-                                         .OutputName = w->Config.Mask.Name};
+                                         .OutputName = w->Config.Mask.Name,
+                                         .RequestedDomain = EditorJobDomainOfBackend(ToString(config.Backend))};
         namespace MS = GeometryProcessingDetail::MeshSupport;
         if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Outlier estimation"))
             return report(EditorCommandStatus::Pending, std::move(busy->Message));

@@ -109,11 +109,13 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
     [[nodiscard]] bool GpuTransactionDeferralsExhausted(GpuTransactionCore&) noexcept;
 
     // Releases what the run holds (typed views and workspaces through `Release`, back slots,
-    // readbacks, its own ring generations) and ends it in `phase`, delivering once.
+    // readbacks, its own ring generations) and ends it in `phase`, delivering once. The run's
+    // job outcome (`EditorJobCommandSurface::ReportOutcome`) is GpuCompute once the device produced
+    // a result (Applied, or ended after it was ready), with `message` as its diagnostic.
     void FinishGpuTransaction(GpuTransactionCore&, EditorGpuTransactionPhase, EditorCommandStatus, std::string);
     void FailGpuTransaction(GpuTransactionCore&, std::string);
-    // The Run's result waits for Accept or Discard.
-    void ReadyGpuTransaction(GpuTransactionCore&) noexcept;
+    // The Run's result waits for Accept or Discard (reported as the run's outcome until it ends).
+    void ReadyGpuTransaction(GpuTransactionCore&);
 
     // Refusal of a start before anything is acquired: a duplicate of an active job on the
     // output (Pending, nothing registered), no residency, or a ring of the output that awaits

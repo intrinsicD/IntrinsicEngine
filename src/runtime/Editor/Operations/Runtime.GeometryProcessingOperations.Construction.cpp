@@ -583,7 +583,8 @@ namespace Extrinsic::Runtime
             .EntityId = config.StableEntityId,
             .Scope = ToEditorJobScope(w->Config.Positions.Domain),
             .OutputSemantic = GeometryPresentationSlotSemantic::Displacement,
-            .OutputName = std::string("construct:") + ToString(config.Method)};
+            .OutputName = std::string("construct:") + ToString(config.Method),
+            .RequestedDomain = EditorJobDomainOfBackend(ToString(config.Backend))};
         namespace MS = GeometryProcessingDetail::MeshSupport;
         if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Point construction"))
             return report(EditorCommandStatus::Pending, std::move(busy->Message));

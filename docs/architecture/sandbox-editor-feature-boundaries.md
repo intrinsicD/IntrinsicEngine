@@ -289,7 +289,15 @@ the start refusal (duplicate output, residency, pending ring), the Run job, the 
 Accept (front readbacks through `GpuFrontReadback`, an Accept stage that joins the run), Discard
 (ignored while Accept publishes), the one cancel/stale finalize and exactly-once delivery; an
 accept-only transaction (GPU positions) starts in ReadyToAccept without a Run job. Recorders own
-their workspace leases. The drift guard allows front readbacks only in the lifecycle. Mesh topology, mesh fields, registration and
+their workspace leases. The drift guard allows front readbacks only in the lifecycle. Job records
+carry backend and diagnostic (RUNTIME-317): every submission names its config's requested domain
+on `EditorJobIdentity::RequestedDomain` (the GPU lifecycle sets GpuCompute; a drift guard rejects an
+operation identity without it); `GuardEditorProcessingResult` reports a terminal result's outcome
+(`EditorJobOutcomeOf`: `ActualBackend`/`BackendId`/`Backend`, fallback reason or message) for the
+job whose completion callback delivers it (`JobService::CompletingJob`) through
+`EditorJobCommandSurface::ReportOutcome`, the GPU lifecycle reports its run explicitly, and the
+surface shows that outcome on every job of the run (`MakeEditorJobRecord`; a CPU request resolves
+to the CPU). Mesh topology, mesh fields, registration and
 UV/parameterization each own a public family module. Workspace model assembly lives in
 `Runtime.EditorWorkspaceSnapshots.Models.cpp`. The workspace session stores its
 attachment epoch, retained results, caches and subscriptions behind its private

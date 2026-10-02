@@ -292,6 +292,59 @@ TEST_F(QueuedEditorJobContract, LaterStagesOfAChainJoinTheFirstJobsRun)
             .Iterations = 1, .Backend = R::BilateralFilterBackend::VulkanLBVH}, done); });
 }
 
+// RUNTIME-317: a queued job reports the backend domain its config requested (at submit) and,
+// once its run delivered, the domain it resolved to and the run's diagnostic, through the shared
+// submit identity and result guard. A CPU run resolves to the CPU and carries its message.
+TEST_F(QueuedEditorJobContract, CpuRunReportsTheRequestedAndResolvedDomainAndItsDiagnostic)
+{
+    Jobs.Attach(Context);
+    std::optional<R::EditorOutlierAnalysisResult> delivered;
+    const auto queued = R::ApplyEditorOutlierAnalysisCommand(Commands(), {.StableEntityId = Id, .Positions = Positions(),
+        .Mask = Ref("outliers", Geometry::PropertyValueKind::UInt32),
+        .Score = Ref("scores", Geometry::PropertyValueKind::Float), .KNeighbors = 2},
+        [&](R::EditorOutlierAnalysisResult result) { delivered = std::move(result); });
+    ASSERT_EQ(queued.Status, R::EditorCommandStatus::Pending) << queued.Message;
+    const auto submitted = Context.JobCommands.SnapshotAll();
+    ASSERT_EQ(submitted.size(), 1u);
+    EXPECT_EQ(submitted[0].RequestedJobDomain, R::EditorJobDomain::Cpu);
+    EXPECT_TRUE(submitted[0].Diagnostic.empty()) << "nothing to report before the run ends";
+    ASSERT_TRUE(Jobs.DrainUntilTerminal());
+    ASSERT_TRUE(delivered.has_value());
+    ASSERT_TRUE(delivered->Succeeded()) << delivered->Message;
+    const auto rows = Context.JobCommands.SnapshotAll();
+    ASSERT_EQ(rows.size(), 1u);
+    EXPECT_EQ(rows[0].State, R::JobState::Published);
+    EXPECT_EQ(rows[0].RequestedJobDomain, R::EditorJobDomain::Cpu);
+    EXPECT_EQ(rows[0].ResolvedJobDomain, R::EditorJobDomain::Cpu);
+    EXPECT_EQ(rows[0].Diagnostic, delivered->Message);
+    EXPECT_FALSE(rows[0].Diagnostic.empty());
+}
+
+// A Vulkan request that cannot run on the device falls back to the CPU reference: the job keeps
+// the GPU request, resolves to the CPU and reports the fallback reason as its diagnostic.
+TEST_F(QueuedEditorJobContract, GpuRequestThatFellBackReportsTheCpuItRanAndWhy)
+{
+    Jobs.Attach(Context);
+    auto context = Context;
+    context.Device = nullptr; // no Vulkan execution available
+    R::EditorProgressivePoissonCommand command{.StableEntityId = Id};
+    command.Config.Backend = R::ProgressivePoissonPlaygroundBackend::VulkanCompute;
+    command.Config.Positions = Positions();
+    std::optional<R::EditorProgressivePoissonResult> delivered;
+    const auto queued = R::ApplyEditorProgressivePoissonCommand(R::BindEditorProcessingCommands(context), command,
+        [&](R::EditorProgressivePoissonResult result) { delivered = std::move(result); });
+    ASSERT_EQ(queued.Status, R::EditorCommandStatus::Pending) << queued.Message;
+    ASSERT_TRUE(Jobs.DrainUntilTerminal());
+    ASSERT_TRUE(delivered.has_value());
+    ASSERT_TRUE(delivered->FellBackToCpu) << delivered->Message;
+    ASSERT_FALSE(delivered->BackendFallbackReason.empty());
+    const auto rows = Context.JobCommands.SnapshotAll();
+    ASSERT_EQ(rows.size(), 1u);
+    EXPECT_EQ(rows[0].RequestedJobDomain, R::EditorJobDomain::GpuCompute);
+    EXPECT_EQ(rows[0].ResolvedJobDomain, R::EditorJobDomain::Cpu);
+    EXPECT_EQ(rows[0].Diagnostic, delivered->BackendFallbackReason);
+}
+
 // RUNTIME-314: Vulkan construction pages its kNN queries through the shared GpuRowPages cursor.
 // The mock answers each framed page with the exact neighbors, so the run publishes the CPU
 // reference graph; it counts consumed pages, reuses one completed batch for every page
@@ -345,6 +398,7 @@ TEST_F(QueuedEditorJobContract, VulkanConstructionPagesThroughTheSharedRowCursor
             return Extrinsic::RHI::ReadbackToken{downloads};
         };
         const auto allocations = Cache.Stats().GpuBatchAllocations;
+        const std::size_t earlierJobs = Context.JobCommands.SnapshotAll().size();
         std::optional<R::EditorPointConstructionResult> delivered;
         const auto queued = R::ApplyEditorPointConstructionCommand(Commands(), config, [&](auto result) { delivered = result; });
         ASSERT_EQ(queued.Status, R::EditorCommandStatus::Pending) << queued.Message;
@@ -357,6 +411,17 @@ TEST_F(QueuedEditorJobContract, VulkanConstructionPagesThroughTheSharedRowCursor
         }
         ASSERT_TRUE(delivered);
         EXPECT_EQ(delivered->ActualBackend, "vulkan_lbvh");
+        // RUNTIME-317: every stage of the run (scale, Vulkan support, build) requested the GPU
+        // and resolved to it, with the run's terminal message as diagnostic, failed or not.
+        const auto rows = Context.JobCommands.SnapshotAll();
+        ASSERT_GT(rows.size(), earlierJobs + 1u) << "a multi-stage run";
+        for (std::size_t i = earlierJobs; i < rows.size(); ++i)
+        {
+            SCOPED_TRACE(rows[i].Name);
+            EXPECT_EQ(rows[i].RequestedJobDomain, R::EditorJobDomain::GpuCompute);
+            EXPECT_EQ(rows[i].ResolvedJobDomain, R::EditorJobDomain::GpuCompute);
+            EXPECT_EQ(rows[i].Diagnostic, delivered->Message);
+        }
         if (corruptSecondPage)
         {
             EXPECT_EQ(delivered->Status, R::EditorCommandStatus::GeometryProcessingFailed);
@@ -635,4 +700,38 @@ TEST(RuntimeReuseDriftGuard, RuntimeUsesTheSharedFiniteCheckAndPositionName)
     EXPECT_EQ(publisherMatched, allowedScalarPublishers.size()) << "an allowlisted scalar publisher is missing";
     EXPECT_EQ(positionMatched, allowedPositionLiterals.size()) << "an allowlisted position-literal file is missing";
     EXPECT_EQ(finiteMatched, allowedFiniteChecks.size()) << "an allowlisted finite-check file is missing";
+}
+
+// RUNTIME-317 drift guard: every editor job identity an operation builds names the backend domain
+// its config requested, so the Jobs window and jobs_list never show an unknown request for a new
+// operation. (The shared GPU transaction lifecycle sets GpuCompute for its Run and Accept jobs.)
+TEST(QueuedEditorJobDriftGuard, EveryEditorJobIdentityNamesItsRequestedDomain)
+{
+    namespace fs = std::filesystem;
+    const auto root = fs::path{INTRINSIC_SOURCE_DIR} / "src" / "runtime" / "Editor" / "Operations";
+    ASSERT_TRUE(fs::exists(root)) << root;
+    const std::regex construction{R"(EditorJobIdentity(\s+\w+)?\s*\{)"};
+    std::size_t identities = 0;
+    for (const auto& entry : fs::directory_iterator(root))
+    {
+        const auto extension = entry.path().extension();
+        if (extension != ".cpp" && extension != ".hpp") continue;
+        std::ifstream file(entry.path());
+        const std::string text{std::istreambuf_iterator<char>(file), {}};
+        SCOPED_TRACE(entry.path().filename().string());
+        for (auto it = std::sregex_iterator(text.begin(), text.end(), construction); it != std::sregex_iterator(); ++it)
+        {
+            // The initializer runs to the brace that closes the one the match opened.
+            std::size_t at = static_cast<std::size_t>(it->position() + it->length());
+            for (int depth = 1; depth > 0 && at < text.size(); ++at)
+                depth += text[at] == '{' ? 1 : text[at] == '}' ? -1 : 0;
+            const std::string initializer = text.substr(static_cast<std::size_t>(it->position()),
+                                                        at - static_cast<std::size_t>(it->position()));
+            if (initializer.ends_with("{}")) continue; // a default member, filled before submission
+            ++identities;
+            EXPECT_NE(initializer.find(".RequestedDomain"), std::string::npos)
+                << "an editor job identity names its config's requested backend domain: " << initializer;
+        }
+    }
+    EXPECT_GE(identities, 15u) << "the scan found the operations' identities";
 }

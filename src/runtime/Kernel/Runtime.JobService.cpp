@@ -25,6 +25,21 @@ namespace Extrinsic::Runtime
 {
     namespace
     {
+        // Names the job whose main-thread callback runs for its duration; restores the outer
+        // value, so a callback that drains nothing itself keeps it correct.
+        class CompletingScope
+        {
+        public:
+            CompletingScope(JobToken& slot, const JobToken job) noexcept : m_Slot(slot), m_Outer(slot) { slot = job; }
+            ~CompletingScope() { m_Slot = m_Outer; }
+            CompletingScope(const CompletingScope&) = delete;
+            CompletingScope& operator=(const CompletingScope&) = delete;
+
+        private:
+            JobToken& m_Slot;
+            JobToken m_Outer;
+        };
+
         [[nodiscard]] bool IsTerminal(const JobState state) noexcept
         {
             switch (state)
@@ -128,6 +143,8 @@ namespace Extrinsic::Runtime
                            Core::StrongHandleHash<WorldHandleTag>>
             WorldGenerations{};
         bool Draining{};
+        // The job whose main-thread callback runs (`CompletingJob`); main thread only, no lock.
+        JobToken Completing{};
         JobServiceStats Stats{};
         JobServiceTestHooks TestHooks{};
     };
@@ -298,6 +315,7 @@ namespace Extrinsic::Runtime
                 // Outside the lock: a finalizer may submit or cancel work.
                 // Released afterwards so the consumer's captured state does
                 // not outlive the one call it is entitled to.
+                const CompletingScope completing{m_State->Completing, job->Token};
                 job->FinalizeUnpublishedOnMainThread();
                 job->FinalizeUnpublishedOnMainThread = {};
                 finalized += 1;
@@ -666,6 +684,7 @@ namespace Extrinsic::Runtime
             }
             if (job->IsReadyToApply)
                 ++gateChecks;
+            const CompletingScope completing{m_State->Completing, job->Token};
             if (job->IsReadyToApply && !job->IsReadyToApply())
             {
                 job->State.store(JobState::AwaitingApply,
@@ -762,6 +781,11 @@ namespace Extrinsic::Runtime
         }
 
         return published;
+    }
+
+    JobToken JobService::CompletingJob() const noexcept
+    {
+        return m_State ? m_State->Completing : JobToken{};
     }
 
     JobApplyValidation JobService::ResolveApplyValidation(JobRecord& job) const

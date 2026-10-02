@@ -3380,6 +3380,11 @@ TEST_F(EditorKeypointAgent, EditorJobToolsListWaitAndCancelThroughTheSurface)
     EXPECT_EQ(foreignRow["cancellable"], false);
     ASSERT_TRUE(editorRow.is_object()) << listed.dump();
     EXPECT_EQ(editorRow["editor"]["entity"], Keypoints.StableEntityId);
+    // RUNTIME-317: the backend the config requested; a CPU request resolves to the CPU. No
+    // diagnostic before the run ended.
+    EXPECT_EQ(editorRow["editor"]["requested_backend"], "cpu") << editorRow.dump();
+    EXPECT_EQ(editorRow["editor"]["resolved_backend"], "cpu") << editorRow.dump();
+    EXPECT_TRUE(editorRow["editor"]["diagnostic"].is_null()) << editorRow.dump();
     EXPECT_EQ(editorRow["cancellable"], true);
     EXPECT_EQ(editorRow["state"], "queued");
     const std::string token = editorRow["token"].get<std::string>();
@@ -3431,6 +3436,14 @@ TEST_F(EditorKeypointAgent, EditorJobToolsListWaitAndCancelThroughTheSurface)
     EXPECT_EQ(ran->ErrorCode, "cancelled") << ran->Text;
     EXPECT_FALSE(Properties().Exists(Keypoints.Mask.Name)) << "a cancelled run publishes nothing";
     EXPECT_FALSE(Properties().Exists(Keypoints.Score.Name));
+    // The run's terminal result is its diagnostic in jobs_list.
+    AgentJson ended;
+    for (const auto& row : AgentResult(invoke("jobs_list", AgentJson::object()))["jobs"])
+        if (row["token"] == token) ended = row;
+    ASSERT_TRUE(ended.is_object());
+    EXPECT_EQ(ended["editor"]["requested_backend"], "cpu");
+    EXPECT_EQ(ended["editor"]["diagnostic"], "Keypoint analysis was cancelled or its source became stale; nothing was applied.")
+        << ended.dump();
 
     // A completed job answers at once; once reaped it is unknown.
     EXPECT_EQ(AgentResult(invoke("jobs_wait", {{"token", TokenText(foreign)}}))["job"]["state"], "published");

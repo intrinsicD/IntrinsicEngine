@@ -278,7 +278,8 @@ namespace Extrinsic::Runtime
             const EditorJobIdentity identity{.EntityId = config.StableEntityId,
                                              .Scope = ToEditorJobScope(output.Domain),
                                              .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField,
-                                             .OutputName = output.Name};
+                                             .OutputName = output.Name,
+                                             .RequestedDomain = EditorJobDomainOfBackend(ToString(w->Config.Backend))};
             const std::string label = Join({M::Noun, " estimation"});
             if (auto busy = MeshSupport::ActiveOutputJobRefusal(context, identity, label))
                 return report(EditorCommandStatus::Pending, std::move(busy->Message));

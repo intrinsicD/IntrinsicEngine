@@ -1687,6 +1687,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                 .Scope = EditorJobScope::MeshSurface,
                 .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField,
                 .OutputName = SerializeMeshCurvatureConfig(state.CurvatureCommand),
+                .RequestedDomain = EditorJobDomain::Cpu,
             };
         }
 

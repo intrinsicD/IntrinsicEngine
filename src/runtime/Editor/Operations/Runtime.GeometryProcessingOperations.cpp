@@ -1521,6 +1521,7 @@ namespace Extrinsic::Runtime
                 .Scope = ToEditorJobScope(domain),
                 .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField,
                 .OutputName = ProgressivePoissonOutputName(command.Config),
+                .RequestedDomain = EditorJobDomainOfBackend(ProgressivePoissonBackendId(state->Backend.Requested)),
             };
             if (const auto active =
                     ActiveOutputJobRefusal(context, identity, "Progressive Poisson CPU"))

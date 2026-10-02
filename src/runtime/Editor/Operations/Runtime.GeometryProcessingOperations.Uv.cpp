@@ -1259,6 +1259,7 @@ using namespace GeometryProcessingDetail::MeshSupport;
             .Scope = EditorJobScope::MeshSurface,
             .OutputSemantic = GeometryPresentationSlotSemantic::Albedo,
             .OutputName = std::string{kUvRegenerationJobOutputName},
+            .RequestedDomain = EditorJobDomain::Cpu,
         };
     }
 

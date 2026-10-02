@@ -201,7 +201,8 @@ namespace Extrinsic::Runtime
         }
         if(!context.JobCommands.Available()){Compute(*w);return Publish(context,w);}
         const EditorJobIdentity identity{.EntityId=config.StableEntityId,.Scope=ToEditorJobScope(w->Config.Weights.Domain),
-            .OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Config.Weights.Name};
+            .OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Config.Weights.Name,
+            .RequestedDomain=EditorJobDomainOfBackend(ToString(config.Backend))};
         namespace MS = GeometryProcessingDetail::MeshSupport;
         if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Density weights"))
             return report(EditorCommandStatus::Pending, std::move(busy->Message));

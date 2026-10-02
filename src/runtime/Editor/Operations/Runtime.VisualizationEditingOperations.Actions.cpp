@@ -37,6 +37,8 @@ import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.SelectionController;
@@ -2689,7 +2691,21 @@ ApplyEditorTextureBakeCommand(
                                 .Scope = ToEditorJobScope(command.SourceDomain),
                                 .OutputSemantic = command.TargetSemantic,
                                 .OutputName = request.OutputName,
-                            }](JobDesc desc) { return submit(std::move(desc), identity); };
+                                .RequestedDomain = EditorJobDomain::GpuGraphics,
+                            },
+                            report = context.JobCommands.ReportOutcome,
+                            completing = context.JobCommands.CompletingJob](JobDesc desc) {
+                // The bake rasterizes on the GPU with no CPU fallback; its run job publishes
+                // once the bake is ready, which is the run's outcome.
+                if (report && completing)
+                    desc.PublishCompletion = [publish = std::move(desc.PublishCompletion), report, completing](
+                                                 KernelEventBus& events, const JobResultEnvelope& result) mutable {
+                        const bool published = publish(events, result);
+                        if (published) report(completing(), {.ResolvedDomain = EditorJobDomain::GpuGraphics});
+                        return published;
+                    };
+                return submit(std::move(desc), identity);
+            };
         }
         const PropertyTextureBakeResult bake =
             context.TextureBake->Bake(request, std::move(submitRunJob));

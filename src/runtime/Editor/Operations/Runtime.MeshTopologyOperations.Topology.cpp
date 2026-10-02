@@ -2118,6 +2118,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 .Scope = EditorJobScope::MeshSurface,
                 .OutputSemantic = MeshCpuJobOutputSemantic(state.Kind),
                 .OutputName = std::string{MeshCpuJobOutputName(state.Kind)},
+                .RequestedDomain = EditorJobDomain::Cpu,
             };
         }
 

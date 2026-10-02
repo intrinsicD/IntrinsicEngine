@@ -400,6 +400,11 @@ namespace Extrinsic::Runtime
                                                      std::uint64_t maxGateChecks = 0u);
         [[nodiscard]] std::uint64_t ReapCompleted();
 
+        // The job whose main-thread callback (readiness gate, revalidation, publication or
+        // unpublished finalizer) is running; invalid outside one. Lets a consumer attribute
+        // what such a callback reports to its job without capturing the token. Main thread only.
+        [[nodiscard]] JobToken CompletingJob() const noexcept;
+
         // Worker-callable progress reporting; `GetProgress` is main-thread safe.
         void ReportProgress(JobToken token, JobProgress progress);
         [[nodiscard]] JobProgress GetProgress(JobToken token) const;
