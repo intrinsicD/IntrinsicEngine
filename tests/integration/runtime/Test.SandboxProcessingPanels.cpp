@@ -64,6 +64,10 @@ import Extrinsic.Runtime.CoherentPointDriftConfig;
 import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.SceneInteractionModule;
+import Extrinsic.Runtime.CameraModule;
+import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.CameraFocusCommand;
+import Extrinsic.ECS.Component.Culling.World;
 import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Sandbox.ConfigSections;
@@ -110,19 +114,20 @@ namespace
 
         explicit PanelHarness(Config::EngineConfigSectionRegistry sections =
             Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry(),
-            bool clustering = false, bool consolidation = false)
+            bool clustering = false, bool consolidation = false, bool camera = false)
         {
             Config::EngineConfig config{};
             Config::PopulateEngineConfigSectionDefaults(config, sections);
             config.Simulation.WorkerThreadCount = 1u;
             config.ReferenceScene.Enabled = false;
-            config.Camera.Enabled = false;
+            config.Camera.Enabled = camera;
             config.Window.Backend = Config::WindowBackend::Null;
             auto driver = std::make_unique<PanelDriver>();
             Driver = driver.get();
             Engine = std::make_unique<Intrinsic::Tests::RuntimeTestKernel>(
                 config, std::move(driver));
             Engine->EmplaceModule<R::EngineConfigControl>(std::move(sections));
+            if (camera) Engine->EmplaceModule<R::CameraModule>();
             Engine->EmplaceModule<R::SceneInteractionModule>();
             Engine->EmplaceModule<R::AsyncWorkModule>();
             if (clustering) Engine->EmplaceModule<R::ClusteringModule>();
@@ -339,6 +344,75 @@ TEST(SandboxProcessingPanels, EveryEntityInputFollowsSelectionWithSelectionDetai
     };
     harness.Engine->Run();
     EXPECT_EQ(frame, 21);
+}
+
+TEST(SandboxProcessingPanels, CameraPanelPresetAndFocusButtonsDriveTheMainCamera)
+{
+    PanelHarness harness(Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry(), false, false, true);
+    auto& scene = harness.Scene();
+    const auto entity = scene.Create();
+    PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+    {
+        Extrinsic::ECS::Components::Culling::World::Bounds bounds{};
+        bounds.WorldBoundingSphere.Center = {100.0f, 0.0f, 0.0f};
+        bounds.WorldBoundingSphere.Radius = 2.0f;
+        scene.Raw().emplace_or_replace<Extrinsic::ECS::Components::Culling::World::Bounds>(entity, bounds);
+    }
+    auto* cameras = harness.Engine->Services().Find<R::CameraControllerRegistry>();
+    ASSERT_NE(cameras, nullptr);
+    ASSERT_TRUE(harness.Shell.SetEditorWindowOpen("view.camera_render", true));
+    const Extrinsic::Core::Extent2D extent{640, 480};
+    const auto forward = [&] { return cameras->Resolve(R::CameraControllerSlot::Main).GetView(extent).Forward; };
+    const auto position = [&] { return cameras->Resolve(R::CameraControllerSlot::Main).GetView(extent).Position; };
+
+    int frame = 0;
+    glm::vec3 leftPosition{};
+    harness.Driver->OnFrame = [&](R::Engine& engine) {
+        ++frame;
+        auto* window = ImGui::FindWindowByName("Camera / Render");
+        if (window == nullptr)
+        {
+            if (frame > 20) { ADD_FAILURE() << "camera window never drew"; engine.RequestExit(); }
+            return;
+        }
+        ImGui::SetWindowSize(window, {900, 400});
+        ImGui::SetWindowPos(window, {0, 0});
+        ImGui::FocusWindow(window);
+        if (frame == 3)
+        {
+            ImGui::ActivateItemByID(window->GetID("Top"));
+        }
+        if (frame == 5)
+        {
+            // Whole scene framed from above, over the off-origin bounds.
+            EXPECT_NEAR(glm::dot(forward(), glm::vec3(0, -1, 0)), 1.0f, 1e-3f);
+            EXPECT_NEAR(position().x, 100.0f, 1e-2f);
+            ImGui::ActivateItemByID(window->GetID("Left"));
+        }
+        if (frame == 7)
+        {
+            EXPECT_NEAR(glm::dot(forward(), glm::vec3(1, 0, 0)), 1.0f, 1e-3f);
+            // Focus selection is disabled without a selection: activation must not move the camera.
+            leftPosition = position();
+            ImGui::ActivateItemByID(window->GetID("Focus selection"));
+        }
+        if (frame == 8)
+        {
+            EXPECT_EQ(position(), leftPosition) << "Focus selection is disabled without a selection";
+            EXPECT_TRUE(harness.Selection().SetSelectedEntity(scene, entity));
+        }
+        if (frame == 9)
+            ImGui::ActivateItemByID(window->GetID("Focus selection"));
+        if (frame == 11)
+        {
+            const auto view = cameras->Resolve(R::CameraControllerSlot::Main).GetView(extent);
+            EXPECT_GT(glm::dot(glm::vec3(100, 0, 0) - view.Position, view.Forward), 0.0f)
+                << "focus keeps the direction and looks at the selection";
+            engine.RequestExit();
+        }
+    };
+    harness.Engine->Run();
+    EXPECT_GE(frame, 11);
 }
 
 TEST(SandboxProcessingPanels, ShowButtonsApplyAppearancePropertiesOnMeshGraphAndCloud)
