@@ -64,6 +64,10 @@ contracts:
   of the point-cloud and graph surface is inert on the most common asset kind.
 - Owner: `runtime` owns the domain-window model and eligibility; `app` owns
   presentation.
+- Follow-up (operator feedback 2026-10-02): `UI-075` replaces the three Appearance
+  windows with one panel that has per-attribute source selectors, on top of this
+  task's capability gating; `RUNTIME-315` owns the attribute-binding model. This
+  task keeps the capability test and element-domain statement.
 
 ## Control surfaces
 - Config: none.

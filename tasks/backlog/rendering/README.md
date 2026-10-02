@@ -12,6 +12,7 @@ its dependencies, conditional gates, scope and verification.
 - [GRAPHICS-124 — Slughorn world-space vector annotation proof](GRAPHICS-124-slughorn-world-space-vector-annotation-proof.md)
 - [GRAPHICS-125 — Memory-priced cluster hierarchy evidence](GRAPHICS-125-memory-priced-cluster-hierarchy-evidence.md)
 - [GRAPHICS-126 — Bandwidth-priced frame-recipe trace model](GRAPHICS-126-bandwidth-priced-frame-recipe-trace-model.md)
+- [GRAPHICS-158 — Rebound position, normal, size and width streams render correctly on Vulkan](GRAPHICS-158-operational-evidence-for-rebound-render-attributes.md)
 - [GRAPHICS-135 — Measure current render-prep scheduling and material-sync overhead](GRAPHICS-135-renderprep-per-frame-taskgraph-overhead.md)
 - [GRAPHICS-136 — Rename `Pipeline*` to `GraphicsState*` at the RHI boundary](GRAPHICS-136-rename-pipeline-to-graphics-state-rhi-boundary.md)
 - [GRAPHICS-137 — Shader-object realization spike (ADR-0028 killing experiment)](GRAPHICS-137-shader-object-realization-spike.md)

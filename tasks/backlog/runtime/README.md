@@ -64,6 +64,11 @@ From the 2026-10-01 duplication/consistency audit; each task owns its own scope.
 - [RUNTIME-311 — Unify the two-phase GPU Run/Accept transaction lifecycle](RUNTIME-311-unify-gpu-scalar-outlier-transaction-lifecycle.md)
 - [RUNTIME-314 — Reuse existing runtime helpers instead of local copies](RUNTIME-314-reuse-existing-processing-helpers.md)
 
+## Appearance attribute binding
+
+- [RUNTIME-315 — Choose the source property of every render attribute, per element domain](RUNTIME-315-per-domain-render-attribute-source-binding.md)
+- [RUNTIME-316 — Agent `bind_attribute` and attribute listing for UI parity](RUNTIME-316-agent-bind-attribute-tool.md)
+
 ## Compilation locality
 
 

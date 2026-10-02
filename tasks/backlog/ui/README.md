@@ -17,6 +17,8 @@ its dependencies, conditional gates, scope and verification.
 - [UI-051 — A mesh does not pass as a graph or a point cloud in the domain windows](UI-051-domain-agnostic-appearance-properties-selection-windows.md)
 - [UI-071 — One Stop/Accept/Discard row and one disabled-reason presentation](UI-071-gpu-transaction-controls-and-refusal-presentation.md)
 - [UI-072 — Adopt the shared panel helpers (Show buttons, spec-driven widgets)](UI-072-adopt-shared-panel-support-helpers.md)
+- [UI-074 — Explain "Color interpretation" with tooltips](UI-074-color-interpretation-tooltips.md)
+- [UI-075 — One Appearance panel for all domains with per-attribute source selectors](UI-075-unified-appearance-panel-with-attribute-source-selectors.md)
 
 ## Agent lane and inspection windows
 

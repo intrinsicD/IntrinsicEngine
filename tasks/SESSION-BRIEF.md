@@ -207,14 +207,19 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BENCH-001` — Framework24 golden-workflow comparison harness (tasks/backlog/benchmarks/BENCH-001-framework24-golden-workflow-comparison-harness.md)
 - unblocked: `BUG-171` — Required development receipts cannot be superseded by a passing rerun (tasks/backlog/bugs/BUG-171-required-command-receipt-supersession.md)
 - unblocked: `GRAPHICS-135` — Measure current render-prep scheduling and material-sync overhead (tasks/backlog/rendering/GRAPHICS-135-renderprep-per-frame-taskgraph-overhead.md)
+- blocked by `RUNTIME-315`: `GRAPHICS-158` — Rebound position, normal, size and width streams render correctly on Vulkan (tasks/backlog/rendering/GRAPHICS-158-operational-evidence-for-rebound-render-attributes.md)
 - blocked by `BENCH-001`: `REVIEW-004` — Framework24 product-convergence audit (tasks/backlog/architecture/REVIEW-004-framework24-product-convergence-audit.md)
 - unblocked: `RUNTIME-218` — Nothing in the scene is ever lit: add default lighting and light authoring (tasks/backlog/runtime/RUNTIME-218-default-scene-lighting-and-light-authoring.md)
 - unblocked: `RUNTIME-222` — Model-space point radius rendering (tasks/backlog/runtime/RUNTIME-222-model-space-point-radius-rendering.md)
+- unblocked: `RUNTIME-315` — Choose the source property of every render attribute, per element domain (tasks/backlog/runtime/RUNTIME-315-per-domain-render-attribute-source-binding.md)
+- blocked by `RUNTIME-315`: `RUNTIME-316` — Agent `bind_attribute` and attribute listing for UI parity (tasks/backlog/runtime/RUNTIME-316-agent-bind-attribute-tool.md)
 - unblocked: `UI-046` — Sandbox cannot export geometry at all (tasks/backlog/ui/UI-046-sandbox-geometry-export.md)
 - unblocked: `UI-047` — File paths must be hand-typed into a raw text field (tasks/backlog/ui/UI-047-file-chooser-for-import-and-scene-paths.md)
 - unblocked: `UI-048` — Editor opens empty, hides file operations under View, and never remembers layout (tasks/backlog/ui/UI-048-first-run-workspace-and-layout-persistence.md)
 - unblocked: `UI-049` — Editor panels are sized so that labels clip and results are hidden (tasks/backlog/ui/UI-049-editor-panel-sizing-and-readability.md)
 - unblocked: `UI-051` — A mesh does not pass as a graph or a point cloud in the domain windows (tasks/backlog/ui/UI-051-domain-agnostic-appearance-properties-selection-windows.md)
+- unblocked: `UI-074` — Explain "Color interpretation" with tooltips (tasks/backlog/ui/UI-074-color-interpretation-tooltips.md)
+- blocked by `UI-051`: `UI-075` — One Appearance panel for all domains with per-attribute source selectors (tasks/backlog/ui/UI-075-unified-appearance-panel-with-attribute-source-selectors.md)
 
 ## Unthemed
 
