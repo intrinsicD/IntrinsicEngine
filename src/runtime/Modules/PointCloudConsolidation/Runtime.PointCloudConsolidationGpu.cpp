@@ -745,6 +745,14 @@ namespace Extrinsic::Runtime
             Completed = PointCloudConsolidationGpuResult{.Published = std::move(result)};
         }
 
+        // A stale Accept is StaleSource whichever path observes it first: the accept job's
+        // unpublished finalizer (completion drain) or AdvanceLop's own current check.
+        [[nodiscard]] static PointCloudConsolidationRunStatus AcceptFailureStatus(const EditorCommandStatus status) noexcept
+        {
+            return status == EditorCommandStatus::StaleEntity ? PointCloudConsolidationRunStatus::StaleSource
+                                                              : PointCloudConsolidationRunStatus::GeometryProcessingFailed;
+        }
+
         void AcceptLop()
         {
             if (!Active || !Active->Ready || Active->Accepting) return;
@@ -760,10 +768,10 @@ namespace Extrinsic::Runtime
                     {
                         FinishLop(PointCloudConsolidationRunStatus::Applied, "GPU LOP positions accepted.");
                     }
-                    else FinishLop(PointCloudConsolidationRunStatus::GeometryProcessingFailed, accepted.Message);
+                    else FinishLop(AcceptFailureStatus(accepted.Status), accepted.Message);
                 });
             if (Active && Active->PositionRun == run && accepted.Status != EditorCommandStatus::Pending)
-                FinishLop(PointCloudConsolidationRunStatus::GeometryProcessingFailed, accepted.Message);
+                FinishLop(AcceptFailureStatus(accepted.Status), accepted.Message);
         }
 
         PointCloudConsolidationGpuObservation GpuRun(CommandCorrelationId correlation, PointCloudConsolidationGpuAction action)

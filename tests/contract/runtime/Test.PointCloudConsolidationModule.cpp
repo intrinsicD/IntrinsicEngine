@@ -2579,7 +2579,7 @@ TEST_F(ResidentLop, PendingAcceptStaleCompletesExactlyOnce)
     Properties().Get<glm::vec3>("v:position")[0].x += 0.25f;
     const auto edited = std::as_const(Properties()).Get<glm::vec3>("v:position").Vector();
     ASSERT_TRUE(Until([&] { return Results.size() == 1u; }));
-    EXPECT_EQ(Results.back().Status, Runtime::PointCloudConsolidationRunStatus::StaleSource);
+    EXPECT_EQ(Results.back().Status, Runtime::PointCloudConsolidationRunStatus::StaleSource) << Results.back().Message;
     PendingCompletion->Deliver(std::as_bytes(std::span(Accepted)));
     PendingCompletion.reset();
     for (unsigned i = 0; i < 10u; ++i) Tick();
