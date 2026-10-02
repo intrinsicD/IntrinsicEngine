@@ -273,7 +273,7 @@ Capability/UI pairs:
 property inspection ([GEOM-109](../../tasks/backlog/geometry/GEOM-109-property-statistics-and-comparison.md),
 [RUNTIME-278](../../tasks/backlog/runtime/RUNTIME-278-property-inspection-operations.md),
 [UI-059](../../tasks/backlog/ui/UI-059-property-inspector-window.md)),
-jobs ([RUNTIME-279](../../tasks/backlog/runtime/RUNTIME-279-editor-job-snapshot-and-cancel.md),
+jobs ([RUNTIME-279](../../tasks/done/RUNTIME-279-editor-job-snapshot-and-cancel.md),
 [UI-060](../../tasks/backlog/ui/UI-060-jobs-window.md)),
 selection queries ([RUNTIME-280](../../tasks/backlog/runtime/RUNTIME-280-selection-query-operations.md),
 [UI-061](../../tasks/backlog/ui/UI-061-select-by-query-controls.md)),

@@ -8,6 +8,18 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-02 — RUNTIME-279 editor job snapshot and cancel
+
+Retired [RUNTIME-279](RUNTIME-279-editor-job-snapshot-and-cancel.md).
+
+- `EditorJobCommandSurface` gains `SnapshotAll` and `Cancel(JobToken)`. Both are attachment-epoch guarded and cancel only editor-identity jobs.
+- The agent lane exposes `jobs_list` (renamed from `jobs`), `jobs_wait` (a continuation that never blocks the main thread) and `jobs_cancel`.
+- MCP `notifications/cancelled` now cancels the call's editor runs by output identity, and replies carry `cancelled`.
+- Maturity: CPUContracted. GPU AwaitingApply cancel smoke is owned by RUNTIME-311; cancel-scope semantics are owned by RUNTIME-313.
+- UI-060 (Jobs window) is unblocked.
+
+Commits `750cb5855` and `f34fbf2ab`.
+
 ## 2026-10-02 — RUNTIME-312 agent control lane: MCP hardening, conformance and tool coverage
 
 Retired [RUNTIME-312](RUNTIME-312-agent-lane-mcp-hardening-and-coverage.md). The MCP lane now

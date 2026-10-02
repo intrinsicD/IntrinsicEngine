@@ -45,7 +45,7 @@ MCP progress notifications read the same model.
   - GPU transactions expose only a phase.
 - Owner: `Runtime.EditorJobProjection.cppm`, which already holds
   `EditorJobRecord`. No new service or registry.
-- Cancel stays with [RUNTIME-279](../backlog/runtime/RUNTIME-279-editor-job-snapshot-and-cancel.md).
+- Cancel stays with [RUNTIME-279](RUNTIME-279-editor-job-snapshot-and-cancel.md).
   The read model carries no `CanCancel` until that task adds `Cancel` to the job
   surface; the widget shows Cancel while a run is active and the panel supplies a
   cancel path (registration/CPD now).

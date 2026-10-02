@@ -32,14 +32,25 @@ surface, for the Jobs window (UI-060) and agent job operations.
 - K-Means and consolidation jobs are cancellable at the `JobService` level, but they are submitted by their services with a correlation id and never enter the editor identity index, so `Cancel` and `jobs_cancel` refuse them (`not_editor_job`) per "Forbidden changes"; an MCP-cancelled `run_kmeans`/`run_point_cloud_consolidation` keeps its tombstone until the service run completes. Scene save/load and asset jobs likewise.
 - `JobService::Cancel` sets the flag on any non-terminal job (queued, dependency-blocked, running, awaiting gate/apply); the drain checks it before the readiness gate and before `ValidateBeforeApply`/`PublishCompletion`, so nothing publishes, and the unpublished finalizer runs exactly once (GPU transactions discard there). Editor command results report a cancelled job with their existing stale/not-applied status and message (there is no `EditorCommandStatus::Cancelled`).
 - Review follow-ups (2026-10-02): `notifications/cancelled` cancels by the run's outputs at cancel time (`CancelEditorRuns`), so later same-output stages are reached; a cancelled `jobs_wait` ends at the next poll; a wait whose seen job was reaped between polls answers `finished`/`reaped`; runs ended by a cancel answer `cancelled`. CPU-only evidence: no CPU editor op queues a later stage, so the later-stage path is tested on the harness surface (`CancelEditorOutputRuns`).
-- Operational follow-up (not claimed here): cancelling a GPU transaction parked in `AwaitingApply` (and its later Accept stage) needs a `gpu;vulkan` smoke that runs a Vulkan property smoothing or outlier run, cancels it through `jobs_cancel` while the readback is pending, and reads back that the previous output and the ring are unchanged. Owner: [RUNTIME-311](RUNTIME-311-unify-gpu-scalar-outlier-transaction-lifecycle.md), which owns that lifecycle.
-- Agent: `jobs` became `jobs_list` (all retained jobs; token, `editor` output and `cancellable` for editor jobs). `jobs_wait` is read-only, polled as a continuation, and `NeedsPresentedFrame` so a minimize ends it; `jobs_cancel` is mutating and not destructive (nothing published, nothing outside the undo history changes). `notifications/cancelled` runs the call's `AgentOperationOutcome::Cancel`, which `FinishApply` sets to cancel every job the command queued through the surface.
+- Operational follow-up (not claimed here): cancelling a GPU transaction parked in `AwaitingApply` (and its later Accept stage) needs a `gpu;vulkan` smoke that runs a Vulkan property smoothing or outlier run, cancels it through `jobs_cancel` while the readback is pending, and reads back that the previous output and the ring are unchanged. Owner: [RUNTIME-311](../backlog/runtime/RUNTIME-311-unify-gpu-scalar-outlier-transaction-lifecycle.md), which owns that lifecycle.
+- Agent: `jobs` became `jobs_list` (all retained jobs; token, `editor` output and `cancellable` for editor jobs). `jobs_wait` is read-only, polled as a continuation, and `NeedsPresentedFrame` so a minimize ends it; `jobs_cancel` is mutating and not destructive (nothing published, nothing outside the undo history changes). `notifications/cancelled` runs the call's `AgentOperationOutcome::Cancel`, which cancels the run's output identities at cancel time through `CancelEditorOutputRuns`, so stages queued later are reached too.
 
 ## Acceptance criteria
-- [ ] `SnapshotAll` and `Cancel(JobToken)` added to `EditorJobCommandSurface` and bound next to `SnapshotEntity`, attachment-epoch guarded.
-- [ ] `Cancel` delegates to `JobService::Cancel` only for tokens in the editor identity map (asset decode and other non-editor jobs cannot be cancelled through it).
-- [ ] Agent operations registered; `jobs_wait` never blocks the main thread.
-- [ ] `Test.SandboxEditorSessionLifecycle.cpp` / `SandboxEditorJobHarness`: snapshot contents, cancel-through-surface, refusal for non-editor tokens and stale epochs.
+- [x] `SnapshotAll` and `Cancel(JobToken)` added to `EditorJobCommandSurface` and bound next to `SnapshotEntity`, attachment-epoch guarded.
+- [x] `Cancel` delegates to `JobService::Cancel` only for tokens in the editor identity map (asset decode and other non-editor jobs cannot be cancelled through it).
+- [x] Agent operations registered; `jobs_wait` never blocks the main thread.
+- [x] `Test.SandboxEditorSessionLifecycle.cpp` / `SandboxEditorJobHarness`: snapshot contents, cancel-through-surface, refusal for non-editor tokens and stale epochs.
+
+## Completion
+
+Commit: `750cb5855`, `f34fbf2ab`. Completed 2026-10-02, reviewed by an independent Opus pass.
+- Evidence: `EditorJobSurfaceSnapshotsAndCancelsOnlyItsOwnJobs`, `StaleCopiedCommandSurfacesFailAfterDetachAndReattach`, `EditorJobCancelReachesOnlyThisAttachmentsEditorJobs`, `EditorJobMcpCancelCancelsTheCallsJob`, `EditorJobWaitEndsOnSceneReplacementMinimizeAndDetach` (`Test.SandboxEditorSessionLifecycle.cpp`) and `JobToolsClassifyAndValidateTheirArguments` (`Test.AgentOperations.cpp`). Full CPU suite 5585/5585.
+- Maturity: CPUContracted. Cancel of a GPU stage parked in AwaitingApply needs a gpu;vulkan smoke, owned by RUNTIME-311.
+- Known non-blocking semantics, handed to RUNTIME-313:
+  - Cancelling by output identity also cancels a newer run on the same output.
+  - `RunWasCancelled` can relabel a failure when an older cancelled job on that output is retained.
+  - A reaped `jobs_wait` answer can carry a non-terminal `state` and skips the scene-epoch check.
+- K-Means and consolidation service runs are not cancellable through the lane, because they are not editor-identity jobs.
 
 ## Verification
 ```bash

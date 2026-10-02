@@ -57,6 +57,10 @@ GPU Run/Accept transaction that follows this setup; keep the helper usable by it
 `FinishApply` (`src/runtime/Agent/internal/Runtime.AgentOperations.Detail.hpp`) maps a `Pending`
 duplicate to `result_unavailable`; the single status must keep that mapping.
 
+- Inherited from RUNTIME-279 (2026-10-02):
+  - Cancelling by output identity also cancels a newer run on the same output; key the cancel to the call's own run.
+  - `RunWasCancelled` can relabel a real failure when an older cancelled job on that output is retained.
+  - A reaped `jobs_wait` answer can carry a non-terminal `state` and skips the scene-epoch check.
 ## Acceptance criteria
 - [ ] One compiled helper owns the active-job check (one status, `BuildActiveDerivedJobMessage` wording), deliver-once, and unpublished finalize; the ~10 hand-written copies are removed or reduced to typed callbacks.
 - [ ] Every migrated operation honours `Abandoned` in validation and sets/clears the delivered flag identically; a test per drift item above fails on the old behaviour.

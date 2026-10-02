@@ -20,7 +20,7 @@ covers the editor commands of finding 9 through `run_operation`/`preview_operati
 `save_scene`/`load_scene`, `set_visibility`, `set_camera` (controller kind) and `import_file` with
 `wait`. Evidence is the socket integration tests (`SandboxAgentServer.*`, real engine, Null window),
 `AgentOperations.*` and `Test.McpBridge.py`; no live Vulkan Sandbox session. CPUContracted.
-Remaining work is owned elsewhere: job cancel by [RUNTIME-279](../backlog/runtime/RUNTIME-279-editor-job-snapshot-and-cancel.md),
+Remaining work is owned elsewhere: job cancel by [RUNTIME-279](RUNTIME-279-editor-job-snapshot-and-cancel.md),
 camera pose/preset/focus by [UI-070](../backlog/ui/UI-070-camera-pose-command-and-controls.md), texture bake progress by
 [UI-073](../backlog/ui/UI-073-texture-bake-progress-adoption.md). Known limitation: a panel's draft-output fallback shows
 agent runs only before its first own run and only for the current draft key
@@ -52,7 +52,7 @@ the editor operations the Sandbox UI already offers.
   4. Results are JSON text only; no `structuredContent`/`outputSchema`.
   5. No `notifications/progress` for long operations; `notifications/cancelled`
      is ignored. Job cancellation itself is owned by
-     [RUNTIME-279](../backlog/runtime/RUNTIME-279-editor-job-snapshot-and-cancel.md).
+     [RUNTIME-279](RUNTIME-279-editor-job-snapshot-and-cancel.md).
   6. `destructiveHint` is `false` for every tool; `view_capture` can overwrite
      an existing file outside the undo history.
   7. Without a running Sandbox the client sees only `sandbox_status` and must
