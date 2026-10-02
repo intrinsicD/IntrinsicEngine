@@ -19,6 +19,7 @@ runtime-owned lifecycle over N output rings. Keep typed method calculation,
 statistics, and publication adapters at their existing owners.
 
 ## Context
+- RUNTIME-279 follow-up: add a `gpu;vulkan` smoke that cancels a Run/Accept transaction parked in `AwaitingApply` through the editor job surface (`jobs_cancel`) and reads back that the previous output and ring are unchanged; RUNTIME-279 proved this path on the CPU gate only.
 RUNTIME-298 review found drift in ring-generation validation and Accept callback
 handling. Those defects are fixed there; this task owns the deferred unification.
 The 2026-10-01 duplication audit (re-verified at `665c693dd`) found the same

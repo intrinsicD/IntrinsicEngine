@@ -182,4 +182,18 @@ export namespace Extrinsic::Runtime
             return static_cast<bool>(Submit);
         }
     };
+
+    struct EditorRunCancelCount
+    {
+        std::uint32_t Requested{0u}; // cancels `Cancel` accepted
+        std::uint32_t Refused{0u};   // matching jobs that had already ended or were being cancelled
+        bool Unavailable{false};     // no surface (stale attachment epoch, no job service)
+    };
+    // Cancels every active job of `surface` that writes one of `outputs`, so a
+    // run's later stages (submitted after the run started, under the same
+    // output identity) are cancelled with it. Only jobs `SnapshotAll` lists,
+    // i.e. editor jobs, are reached.
+    [[nodiscard]] EditorRunCancelCount CancelEditorOutputRuns(
+        const EditorJobCommandSurface& surface,
+        const std::vector<EditorJobIdentity>& outputs);
 }

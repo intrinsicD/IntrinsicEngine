@@ -4591,6 +4591,12 @@ TEST(SandboxProcessingPanels, OperationRunSlotCapturesTheKeyAtSubmitAndMapsTrans
              [&](const std::string& t) { EXPECT_EQ(t.find("done"), std::string::npos) << t; }},
         Case{"back", [&] { selected = 7u; },
              [&](const std::string& t) { EXPECT_NE(t.find("done"), std::string::npos) << t; }},
+        // RUNTIME-279: a run cancelled through the job surface reads "cancelled", never "done".
+        Case{"cancelled", [&] { slot.WatchOutput(7u, "a"); canned = {.State = R::EditorOperationState::Cancelled, .Diagnostic = "cancelled"}; },
+             [&](const std::string& t) {
+                 EXPECT_NE(t.find("cancelled"), std::string::npos) << t;
+                 EXPECT_EQ(t.find("done"), std::string::npos) << t;
+             }},
         Case{"discarded", [&] { slot.Forget(); canned = {}; },
              [&](const std::string& t) {
                  EXPECT_EQ(t.find("done"), std::string::npos) << t;

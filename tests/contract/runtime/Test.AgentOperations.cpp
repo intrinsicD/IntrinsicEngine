@@ -994,7 +994,7 @@ TEST(AgentOperations, CancelNotificationCancelsTheCallsJobsOnceAndKeepsTheTombst
     auto finish = std::make_shared<bool>(false);
     auto cancels = std::make_shared<int>(0);
     R::AgentOperationRegistry registry;
-    const auto deferred = [finish](std::function<void(const R::AgentOperationContext&)> cancel) {
+    const auto deferred = [finish](std::function<std::string(const R::AgentOperationContext&)> cancel) {
         return [finish, cancel](const R::AgentOperationContext&, std::string_view) {
             R::AgentOperationOutcome outcome{};
             outcome.Continuation = [finish](const R::AgentOperationContext&, R::AgentOperationOutcome& out) {
@@ -1007,7 +1007,7 @@ TEST(AgentOperations, CancelNotificationCancelsTheCallsJobsOnceAndKeepsTheTombst
         };
     };
     ASSERT_TRUE(registry.Register({.Name = "queues_job", .Title = "Queues a job", .ReadOnly = false,
-                                   .Invoke = deferred([cancels](const R::AgentOperationContext&) { ++*cancels; })}));
+                                   .Invoke = deferred([cancels](const R::AgentOperationContext&) { ++*cancels; return std::string{"1 job"}; })}));
     ASSERT_TRUE(registry.Register({.Name = "service_run", .Title = "Service run", .ReadOnly = false, .Invoke = deferred({})}));
     R::AgentProtocol protocol{registry, false};
     const R::AgentOperationContext context{};

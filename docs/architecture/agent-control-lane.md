@@ -88,17 +88,21 @@ Nothing exists without the launch flag: no module, thread or socket.
   the previous one. The panels draw the same model with the shared widget, so an agent run shows in
   the Sandbox panels too.
 - Cancellation: `notifications/cancelled {requestId}` (JSON-typed comparison: `1` is not `"1"`)
-  stops the reply and the progress of that call and cancels the editor jobs the call queued
-  (`AgentOperationOutcome::Cancel`, RUNTIME-279): an editor-job command (`FinishApply`) cancels
-  every job it queued, through `EditorJobCommandSurface::Cancel`, so only jobs the editor
-  submitted are ever touched. The job ends `Cancelled` on a later drain without publishing
+  stops the reply and the progress of that call and runs its `AgentOperationOutcome::Cancel` hook
+  (RUNTIME-279), whose result the server logs. An editor-job command (`FinishApply`) remembers the
+  outputs its queued editor jobs write and, at cancel time, cancels every active editor job writing
+  them (`CancelEditorRuns`, through `EditorJobCommandSurface::Cancel`), so stages queued after the
+  call started (a GPU Accept queued when the compute stage publishes) are reached too, and only jobs
+  the editor submitted are ever touched. The job ends `Cancelled` on a later drain without publishing
   anything (no property, no history entry) and its unpublished finalizer runs exactly once: it
   delivers the command's terminal failure, or (where a finalizer only abandons its run) releases
   the callback, which ends the call as `result_unavailable`. The entry stays as a tombstone that counts against the 16-call
   cap until its continuation completes (that delivery ends it), then it is dropped silently, so
-  call-and-cancel cannot grow the queue. Calls with no editor job keep running to their end:
+  call-and-cancel cannot grow the queue. A cancelled `jobs_wait` ends at the next poll (its hook
+  ends the wait; the job is not affected). Calls with no editor job keep running to their end:
   K-Means and consolidation runs (their jobs belong to the services, not the editor surface),
-  scene save/load, imports, captures and `jobs_wait` (bounded by its timeout). One or two
+  scene save/load, imports and captures. A run whose job was cancelled some other way
+  (`jobs_cancel`, a panel's Cancel) answers with the error code `cancelled`. One or two
   progress notifications already queued may still arrive after the cancel (allowed by the
   specification).
 - Tool results are the existing JSON text content plus, when the negotiated version is
@@ -159,8 +163,10 @@ Nothing exists without the launch flag: no module, thread or socket.
   (terminal and its result delivered: `finished: true`), at the deadline (`timed_out: true`), or
   with an error when the job is unknown or was reaped (`unknown_job`), the scene was replaced
   (`scene_replaced`, from the session scene epoch), the workspace detached or the window
-  minimized (`viewport_not_presentable`). A job is reaped one frame after it completed, so a
-  wait read after that answers `unknown_job`. By entity and output it waits for the newest editor run
+  minimized (`viewport_not_presentable`). A job the wait has seen that ends and is reaped before the
+  next poll (one with no result to deliver completes and is reaped in the same frame) answers
+  `finished: true, reaped: true` with its last seen row; a job already reaped when the wait is
+  read answers `unknown_job`. By entity and output it waits for the newest editor run
   writing that output when called; later runs are not followed. Several waits on one job are
   independent.
 - Appearance and camera. `set_visibility` shows or hides a lane of an entity (`lane`: surface, edges or

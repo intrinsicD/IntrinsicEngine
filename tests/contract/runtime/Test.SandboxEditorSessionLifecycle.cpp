@@ -3423,6 +3423,7 @@ TEST_F(EditorKeypointAgent, EditorJobToolsListWaitAndCancelThroughTheSurface)
     EXPECT_EQ(finished["finished"], true) << waited->Text;
     EXPECT_EQ(finished["job"]["state"], "cancelled");
     EXPECT_TRUE(ran->IsError) << "the cancelled run answers once, as not applied: " << ran->Text;
+    EXPECT_EQ(ran->ErrorCode, "cancelled") << ran->Text;
     EXPECT_FALSE(Properties().Exists(Keypoints.Mask.Name)) << "a cancelled run publishes nothing";
     EXPECT_FALSE(Properties().Exists(Keypoints.Score.Name));
 
@@ -3518,10 +3519,87 @@ TEST(SandboxEditorSession, EditorJobWaitEndsOnSceneReplacementMinimizeAndDetach)
     EXPECT_TRUE(out.IsError);
     EXPECT_NE(out.Text.find("not attached"), std::string::npos) << out.Text;
 
+    attachment.Attach(engine.Worlds(), engine.Services());
+    ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment, MakeNoEditorModelBuildRequest()).has_value());
+    // Cancelled waits free their slots at the next poll, so 16 of them never lock out a mutating tool.
+    Runtime::AgentProtocol capped{registry, false};
+    for (int id = 100; id < 100 + static_cast<int>(Runtime::AgentProtocol::kMaxPendingCalls); ++id)
+        ASSERT_FALSE(capped.Handle(ToolCall(id, "jobs_wait", AgentJson::parse(arguments)), context).has_value());
+    const auto mutating = [&](const int id) {
+        return AgentJson::parse(*capped.Handle(ToolCall(id, "jobs_cancel", {{"token", TokenText(job)}}), context));
+    };
+    EXPECT_EQ(mutating(200)["error"]["code"], -32000) << "the cap holds while the waits are pending";
+    for (int id = 100; id < 100 + static_cast<int>(Runtime::AgentProtocol::kMaxPendingCalls); ++id)
+        EXPECT_FALSE(capped.Handle(AgentJson{{"jsonrpc", "2.0"}, {"method", "notifications/cancelled"},
+                                             {"params", {{"requestId", id}}}}.dump(), context).has_value());
+    EXPECT_TRUE(capped.PollPending(context).empty()) << "cancelled waits never answer";
+    EXPECT_EQ(capped.PendingCount(), 0u);
+    EXPECT_TRUE(mutating(201).contains("result")) << "a mutating tool runs again";
+
     release.store(true, std::memory_order_release);
     ASSERT_TRUE(WaitFor([&] {
         (void)jobs.DrainCompletions(engine.Events());
         return jobs.IsComplete(job);
     }));
+
+    // A job the wait has seen that ends without a result to deliver and is reaped before the
+    // next poll (one frame: cancelled before running, or dropped) still ends the wait.
+    std::atomic_bool never{false};
+    const Runtime::JobToken vanishing = jobs.Submit(MakeProgressProbeJob("vanishing", never));
+    auto seenWait = Runtime::InvokeAgentOperation(registry, "jobs_wait", context,
+        AgentJson{{"token", TokenText(vanishing)}, {"timeout_ms", 60000}}.dump(), false);
+    ASSERT_TRUE(seenWait.Continuation) << seenWait.Text;
+    ASSERT_TRUE(jobs.Cancel(vanishing));
+    ASSERT_TRUE(WaitFor([&] {
+        (void)jobs.DrainCompletions(engine.Events());
+        return jobs.IsComplete(vanishing);
+    }));
+    (void)jobs.ReapCompleted();
+    ASSERT_EQ(jobs.GetState(vanishing), Runtime::JobState::Invalid) << "reaped before the wait polled again";
+    ASSERT_TRUE(seenWait.Continuation(context, out));
+    const AgentJson reaped = AgentResult(out);
+    EXPECT_FALSE(out.IsError) << out.Text;
+    EXPECT_EQ(reaped.value("finished", false), true) << out.Text;
+    EXPECT_EQ(reaped.value("reaped", false), true) << out.Text;
+
+    attachment.Detach();
     engine.Shutdown();
+}
+
+// A run's later stage (a GPU Accept queued when the compute stage publishes) shares the run's
+// output identity; cancelling the run by output at cancel time reaches it, and nothing else.
+TEST(SandboxEditorSessionLifecycle, EditorJobRunCancelReachesStagesQueuedAfterTheRunStarted)
+{
+    Extrinsic::Tests::EditorJobHarness harness{2u};
+    ProgressProbeContext context;
+    harness.Attach(context);
+    const auto& commands = context.JobCommands;
+    std::atomic_bool releaseFirst{false}, release{false};
+    const auto runId = ProbeIdentity("run");
+    const Runtime::JobToken first = commands.Submit(MakeProgressProbeJob("stage 1", releaseFirst), runId);
+    ASSERT_TRUE(first.IsValid());
+    releaseFirst.store(true, std::memory_order_release);
+    ASSERT_TRUE(WaitFor([&] {
+        (void)harness.Jobs().DrainCompletions(harness.Events());
+        return harness.Jobs().IsComplete(first);
+    }));
+    // Stage 2 is queued only now, after the run (and its first token) is known.
+    const Runtime::JobToken second = commands.Submit(MakeProgressProbeJob("stage 2", release), runId);
+    const Runtime::JobToken other = commands.Submit(MakeProgressProbeJob("other output", release), ProbeIdentity("other"));
+    ASSERT_TRUE(second.IsValid() && other.IsValid());
+
+    const auto count = Runtime::CancelEditorOutputRuns(commands, {runId});
+    EXPECT_EQ(count.Requested, 1u);
+    EXPECT_EQ(count.Refused, 0u) << "the finished first stage is not active, so it is not counted";
+    EXPECT_FALSE(count.Unavailable);
+    ASSERT_TRUE(WaitFor([&] {
+        (void)harness.Jobs().DrainCompletions(harness.Events());
+        return harness.Jobs().IsComplete(second);
+    }));
+    EXPECT_EQ(harness.Jobs().GetState(second), Runtime::JobState::Cancelled);
+    EXPECT_EQ(harness.Jobs().GetState(first), Runtime::JobState::Published);
+    EXPECT_TRUE(Runtime::IsActiveEditorJobState(harness.Jobs().GetState(other))) << "another output is untouched";
+    EXPECT_TRUE(Runtime::CancelEditorOutputRuns(Runtime::EditorJobCommandSurface{}, {runId}).Unavailable);
+    release.store(true, std::memory_order_release);
+    ASSERT_TRUE(harness.DrainUntilTerminal());
 }

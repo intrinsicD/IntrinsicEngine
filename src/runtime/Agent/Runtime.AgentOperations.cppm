@@ -50,11 +50,12 @@ export namespace Extrinsic::Runtime
         // their age: view captures and `import_file` with `wait` (the asset workflow's own queue,
         // not a job of the editor surface).
         std::function<EditorOperationProgress(const AgentOperationContext&)> Progress{};
-        // For a deferred call: run on `notifications/cancelled` to cancel the jobs the call queued,
-        // through `EditorJobCommandSurface::Cancel` (editor-owned jobs only). Empty when the call
-        // queued none it may cancel: service runs (K-Means, consolidation), scene files, imports,
-        // captures and waits. The call's continuation still has to end before its slot frees.
-        std::function<void(const AgentOperationContext&)> Cancel{};
+        // For a deferred call: run once on `notifications/cancelled`. An editor-job command cancels
+        // its run's jobs through `EditorJobCommandSurface::Cancel` (editor-owned jobs only), a wait
+        // ends itself. Returns what happened, for the log. Empty when there is nothing to cancel:
+        // service runs (K-Means, consolidation), scene files, imports and captures. The call's
+        // continuation still has to end before its slot frees.
+        std::function<std::string(const AgentOperationContext&)> Cancel{};
     };
 
     // Borrowed engine services for one call on the main thread; any may be null.

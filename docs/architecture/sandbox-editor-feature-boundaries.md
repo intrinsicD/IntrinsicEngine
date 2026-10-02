@@ -64,7 +64,9 @@ still retains (ordered by token; correlation-only service jobs are not listed), 
 token/identity index, answering `EditorJobCancelStatus` (`Requested`, `NotActive`,
 `NotEditorJob` for unknown, reaped and non-editor tokens, `Unavailable` for a stale
 attachment epoch). Panels and the agent lane reach them through
-`GetEditorJobs(EditorProcessingCommands)` and `CancelEditorJob(EditorProcessingCommands, token)`.
+`GetEditorJobs(EditorProcessingCommands)` and `CancelEditorJob(EditorProcessingCommands, token)`;
+`CancelEditorRuns` (`CancelEditorOutputRuns` over the surface) cancels every active job writing
+given outputs, which reaches a run's later stages too.
 K-Means and consolidation jobs belong to their services, so neither the surface nor
 the agent's `jobs_cancel` cancels them. `FindEditorOperationRun(records, key)` is the
 record `ResolveEditorOperationProgress` projects.

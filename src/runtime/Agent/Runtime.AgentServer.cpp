@@ -120,10 +120,9 @@ namespace Extrinsic::Runtime
                     // which a cancelled job's terminal delivery (or a service run's completion) brings about.
                     it->Cancelled = true;
                     it->ProgressToken.clear();
-                    const bool cancelsJob = static_cast<bool>(it->Cancel);
-                    if (cancelsJob) std::exchange(it->Cancel, {})(context);
-                    Core::Log::Info("[AgentServer] request {} cancelled{}", wanted,
-                                    cancelsJob ? "; its editor jobs are cancelled" : "; it queued no editor job to cancel");
+                    const std::string outcome = it->Cancel ? std::exchange(it->Cancel, {})(context)
+                                                           : std::string{"nothing to cancel; the call runs to its end"};
+                    Core::Log::Info("[AgentServer] request {} cancelled: {}", wanted, outcome);
                 }
             }
             return std::nullopt;

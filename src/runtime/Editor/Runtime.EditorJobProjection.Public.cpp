@@ -1,5 +1,6 @@
 module;
 
+#include <algorithm>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -148,6 +149,29 @@ ResolveEditorOperationProgress(const std::vector<EditorJobRecord> &records,
   const std::optional<EditorJobRecord> run = FindEditorOperationRun(records, key);
   return run.has_value() ? ProjectEditorOperationProgress(*run)
                          : EditorOperationProgress{};
+}
+
+EditorRunCancelCount
+CancelEditorOutputRuns(const EditorJobCommandSurface &surface,
+                       const std::vector<EditorJobIdentity> &outputs) {
+  EditorRunCancelCount count{};
+  if (!surface.SnapshotAll || !surface.Cancel) {
+    count.Unavailable = true;
+    return count;
+  }
+  for (const EditorJobRecord &job : surface.SnapshotAll()) {
+    const bool writes = std::any_of(outputs.begin(), outputs.end(), [&](const EditorJobIdentity &output) {
+      return SameEditorJobOutput(job.Identity, output);
+    });
+    if (!writes || !IsActiveEditorJobState(job.State))
+      continue;
+    switch (surface.Cancel(job.Token)) {
+    case EditorJobCancelStatus::Requested: ++count.Requested; break;
+    case EditorJobCancelStatus::Unavailable: count.Unavailable = true; break;
+    default: ++count.Refused; break;
+    }
+  }
+  return count;
 }
 
 std::string_view ToString(const EditorJobCancelStatus status) noexcept {
