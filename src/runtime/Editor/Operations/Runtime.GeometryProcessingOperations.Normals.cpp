@@ -57,6 +57,7 @@ import Extrinsic.RHI.TransferQueue;
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuFront.hpp"
+#include "Editor/Operations/Runtime.GpuTransactionLifecycle.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -561,34 +562,27 @@ namespace Extrinsic::Runtime
         }
     } // namespace
 
-    // The Vulkan run's job state (RUNTIME-296, ADR 0030 decision 1): the capture, the residency
-    // slots it reads and writes, the device workspace and the transaction phase the panel drives.
-    struct EditorNormalTransaction
+    // The Vulkan run (RUNTIME-296, ADR 0030 decision 1) on the shared Run/Accept lifecycle: the
+    // capture, the slots it reads, the device workspaces and its one output ring (read back on
+    // Accept; ring 0 of the core).
+    struct EditorNormalTransaction : std::enable_shared_from_this<EditorNormalTransaction>
     {
-        EditorProcessingContext Context{};
+        GeometryProcessingDetail::GpuTransactionCore Core{};
         std::shared_ptr<NormalWork> Work{}; // its Result is the transaction's result
-        EditorJobIdentity Identity{};
-        Graphics::GpuPropertyResidency* Residency{};
-        Graphics::GpuPropertyKey Key{};   // the output ring
-        std::uint64_t Ring{};             // the ring generation this run acquired: the only one it discards
         std::uint32_t Count{};            // output rows (vertices, or faces for mesh_face_normals)
         std::uint32_t VertexCount{};      // rows of the positions input
         // Input: the canonical positions slot; Base: the output's canonical slot when the
-        // property exists; Topology: the resident bundle; Back: the ring write slot.
-        std::optional<Graphics::GpuPropertyView> Input{}, Base{}, Topology{}, Back{};
+        // property exists; Topology: the resident bundle.
+        std::optional<Graphics::GpuPropertyView> Input{}, Base{}, Topology{};
         Graphics::VertexNormalsTopologyLayout Layout{};
         std::vector<std::uint32_t> Bundle{};
         // Leased from the spatial cache; the recorder closures keep them while their work may run.
         std::shared_ptr<Graphics::VertexNormalsWorkspace> Workspace{};
         std::shared_ptr<Graphics::PointNormalsWorkspace> PointWorkspace{};
         std::uint32_t PointFirst{};
-        std::shared_ptr<SpatialGpuResult> Gpu{};
         bool StoreRecorded{};
-        std::uint32_t Deferrals{}, Previews{};
-        EditorGpuTransactionPhase Phase{EditorGpuTransactionPhase::Running};
-        bool AutoAccept{}, Abandoned{}, Delivered{};
+        std::uint32_t Previews{};
         std::function<void(EditorNormalEstimationResult)> Sink{};
-        std::shared_ptr<GeometryProcessingDetail::GpuFrontReadback> Readback{};
         std::optional<std::vector<glm::vec3>> TestFront{};
     };
 
@@ -597,7 +591,6 @@ namespace Extrinsic::Runtime
         using Run = EditorNormalTransactionHandle;
         namespace GP = GeometryProcessingDetail;
         constexpr std::uint32_t kRingDepth = 2u;    // terminal-only output (ADR 0030 decision 4)
-        constexpr std::uint32_t kMaxDeferrals = 600u; // frames the residency may refuse before the run fails
         constexpr std::string_view kBackend = "vulkan_mesh_face_weighted", kFaceBackend = "vulkan_mesh_face_normals";
         bool FaceNormals(const NormalWork& w) { return w.Config.Method == NormalEstimationMethod::MeshFaceNormals; }
         Graphics::VertexNormalsBundleKind KindOf(const NormalWork& w)
@@ -746,44 +739,19 @@ namespace Extrinsic::Runtime
             return TopologyState::Ready;
         }
 
-        bool Current(const Run& w)
-        {
-            return !w->Abandoned && (!w->Ring || !w->Residency || w->Residency->RingGeneration(w->Key) == w->Ring) && CurrentNormalInput(w->Context, *w->Work, true) && GP::EditorProcessingContextWorldCurrent(w->Context);
-        }
-        void Deliver(const Run& w, EditorNormalEstimationResult result)
-        {
-            w->Work->Result = result;
-            if (w->Delivered) return;
-            w->Delivered = true;
-            if (w->Sink) w->Sink(std::move(result));
-        }
+        bool Current(const Run& w) { return GP::GpuTransactionCurrent(w->Core); }
+        auto& Ring(const Run& w) { return w->Core.Rings[0]; }
         // Only completed (or never queued) work returns its workspace early; otherwise the
         // recorder closure that captures the run keeps it until the cache knows it is safe.
         void ReleaseWorkspaces(const Run& w)
         {
-            if (w->Gpu && w->Gpu->State != SpatialQueryState::Ready) return;
+            if (!GP::GpuTransactionWorkReleasable(w->Core)) return;
             w->Workspace.reset();
             w->PointWorkspace.reset();
         }
-        void ReleaseRings(const Run& w)
-        {
-            w->Input.reset();
-            w->Base.reset();
-            w->Topology.reset();
-            w->Back.reset();
-            ReleaseWorkspaces(w);
-            if (w->Readback) w->Readback->Lease.reset();
-            if (w->Residency) (void)w->Residency->Discard(w->Key, w->Ring);
-        }
         void Finish(const Run& w, const EditorGpuTransactionPhase phase, const EditorCommandStatus status, std::string message)
         {
-            if (w->Readback) w->Readback->Abandoned = true; // a framed readback still queued records nothing
-            ReleaseRings(w);
-            w->Phase = phase;
-            auto result = w->Work->Result;
-            result.Status = status;
-            result.Message = std::move(message);
-            Deliver(w, std::move(result));
+            GP::FinishGpuTransaction(w->Core, phase, status, std::move(message));
         }
         Graphics::VertexNormalsResidentView View(const std::optional<Graphics::GpuPropertyView>& v)
         {
@@ -793,10 +761,10 @@ namespace Extrinsic::Runtime
         // The frame whose commands touch the run's slots (their reuse waits for it).
         void NoteUses(const Run& w)
         {
-            if (!w->Residency || !w->Context.Device) return;
-            const auto frame = w->Context.Device->GetGlobalFrameNumber();
-            for (const auto* view : {&w->Input, &w->Base, &w->Topology, &w->Back})
-                if (*view) w->Residency->NoteUse((*view)->Buffer, frame);
+            if (!w->Core.Residency || !w->Core.Context.Device) return;
+            const auto frame = w->Core.Context.Device->GetGlobalFrameNumber();
+            for (const auto* view : {&w->Input, &w->Base, &w->Topology, &Ring(w).Back})
+                if (*view) w->Core.Residency->NoteUse((*view)->Buffer, frame);
         }
         Graphics::VertexNormalsGpuParams Params(const NormalEstimationConfig& c)
         {
@@ -822,8 +790,8 @@ namespace Extrinsic::Runtime
         // an exhausted ring); Failed when the topology cannot be built.
         TopologyState AcquireSlots(const Run& w, std::string& why)
         {
-            auto& r = *w->Residency;
-            const auto& ctx = w->Context;
+            auto& r = *w->Core.Residency;
+            const auto& ctx = w->Core.Context;
             auto& work = *w->Work;
             const auto& c = work.Config;
             auto& io = work.Result;
@@ -853,16 +821,13 @@ namespace Extrinsic::Runtime
                 io.GpuTopologyBytes = w->Layout.Bytes();
                 io.GpuTopologyReused = !uploaded;
             }
-            if (!w->Back)
+            switch (GP::AcquireGpuTransactionBack(w->Core, 0, work.Entity, c.Output, w->Count, kRingDepth))
             {
-                if (!w->Ring && r.HasRing(w->Key))
-                {
-                    why = "Another normal result acquired this output ring; previous normals retained.";
-                    return TopologyState::Failed;
-                }
-                w->Back = AcquireGpuPropertyOutput(r, ctx.World, work.Entity, c.Output, w->Count, kRingDepth);
-                if (!w->Back) return TopologyState::Deferred;
-                w->Ring = r.RingGeneration(w->Key);
+            case GP::GpuRingAcquisition::Foreign:
+                why = "Another normal result acquired this output ring; previous normals retained.";
+                return TopologyState::Failed;
+            case GP::GpuRingAcquisition::Deferred: return TopologyState::Deferred;
+            case GP::GpuRingAcquisition::Ready: break;
             }
             return TopologyState::Ready;
         }
@@ -875,33 +840,34 @@ namespace Extrinsic::Runtime
         }
         bool Defer(const Run& w)
         {
-            if (++w->Deferrals < kMaxDeferrals) return false;
-            w->Gpu = FailedResult("The GPU property residency refused the run's input, topology or output slot; previous normals retained.");
+            if (!GP::GpuTransactionDeferralsExhausted(w->Core)) return false;
+            w->Core.Gpu = FailedResult("The GPU property residency refused the run's input, topology or output slot; previous normals retained.");
             return true;
         }
         void PublishPreview(const Run& w)
         {
             const bool recorded = std::exchange(w->StoreRecorded, false);
-            w->Back.reset();
-            if (recorded && w->Residency && w->Residency->Publish(w->Key)) ++w->Previews;
+            Ring(w).Back.reset();
+            if (recorded && w->Core.Residency && w->Core.Residency->Publish(Ring(w).Key)) ++w->Previews;
         }
         // Mesh passes share a submission; point normals submit one completion-gated page.
         void Queue(const Run& w)
         {
-            const auto& ctx = w->Context;
+            const auto& ctx = w->Core.Context;
+            auto& gpu = w->Core.Gpu;
             if (PointNormals(*w->Work))
             {
                 if (!w->PointWorkspace)
                     w->PointWorkspace = ctx.SpatialIndices->LeaseGpuWorkspace<Graphics::PointNormalsWorkspace>();
                 if (!w->PointWorkspace)
                 {
-                    w->Gpu = FailedResult("PCA normal device workspace unavailable.");
+                    gpu = FailedResult("PCA normal device workspace unavailable.");
                     return;
                 }
                 w->StoreRecorded = true;
-                w->Gpu = ctx.SpatialIndices->QueueGpuCompute(w->Work->GpuIndex, sizeof(Graphics::PointNormalsGpuStats),
+                gpu = ctx.SpatialIndices->QueueGpuCompute(w->Work->GpuIndex, sizeof(Graphics::PointNormalsGpuStats),
                     [w](RHI::ICommandContext& commands, const SpatialGpuIndexView& index) -> RHI::BufferHandle {
-                        if (!Current(w) || !w->Input || !w->Back || !w->PointWorkspace) return {};
+                        if (!Current(w) || !w->Input || !Ring(w).Back || !w->PointWorkspace) return {};
                         NoteUses(w);
                         const auto& c = w->Work->Config;
                         return w->PointWorkspace->Record(commands,
@@ -909,56 +875,57 @@ namespace Extrinsic::Runtime
                              .RadiusSearch = c.UseRadiusSearch, .Radius = c.Radius,
                              .Epsilon = c.DegenerateNormalLengthEpsilon, .CollinearRatio = c.CollinearEigenvalueRatioEpsilon,
                              .Fallback = {c.FallbackNormal.x, c.FallbackNormal.y, c.FallbackNormal.z}},
-                            {.Positions = *w->Input, .Output = *w->Back, .Base = w->Base.value_or(Graphics::GpuPropertyView{}),
+                            {.Positions = *w->Input, .Output = *Ring(w).Back, .Base = w->Base.value_or(Graphics::GpuPropertyView{}),
                              .Nodes = index.NodesBDA, .LiveSlots = index.OriginalSlotsBDA, .LiveCount = index.Count}, w->PointFirst);
                     });
                 ++w->Work->Result.GpuQueryBatches;
-                if (!w->Gpu) w->Gpu = FailedResult("PCA normal compute submission rejected.");
+                if (!gpu) gpu = FailedResult("PCA normal compute submission rejected.");
                 return;
             }
             w->Workspace = ctx.SpatialIndices->LeaseGpuWorkspace<Graphics::VertexNormalsWorkspace>();
             if (!w->Workspace)
             {
-                w->Gpu = FailedResult("Vertex normal device workspace unavailable.");
+                gpu = FailedResult("Vertex normal device workspace unavailable.");
                 return;
             }
             w->StoreRecorded = true;
-            w->Gpu = ctx.SpatialIndices->QueueGpuCompute(std::size_t(Graphics::VertexNormalsWorkspace::StatsReadbackBytes),
+            gpu = ctx.SpatialIndices->QueueGpuCompute(std::size_t(Graphics::VertexNormalsWorkspace::StatsReadbackBytes),
                 [w](RHI::ICommandContext& commands, const SpatialGpuIndexView&) -> RHI::BufferHandle {
-                    if (w->Abandoned || !w->Back || !w->Workspace) return {};
+                    const auto& back = Ring(w).Back;
+                    if (w->Core.Abandoned || !back || !w->Workspace) return {};
                     NoteUses(w);
                     const Graphics::VertexNormalsResidentIo io{.Positions = View(w->Input), .Topology = View(w->Topology),
-                                                               .Output = View(w->Back), .Base = View(w->Base),
-                                                               .OutputBytes = w->Back->Bytes, .Layout = w->Layout};
+                                                               .Output = View(back), .Base = View(w->Base),
+                                                               .OutputBytes = back->Bytes, .Layout = w->Layout};
                     return w->Workspace->Record(commands, Params(w->Work->Config), io);
                 });
         }
         // Main-thread readiness poll of the compute job.
         bool Poll(const Run& w)
         {
-            if (!Current(w)) return true;
-            if (!w->Gpu)
+            auto& gpu = w->Core.Gpu;
+            if (!gpu)
             {
                 std::string why;
                 switch (AcquireSlots(w, why))
                 {
-                case TopologyState::Failed: w->Gpu = FailedResult(std::move(why)); return true;
+                case TopologyState::Failed: gpu = FailedResult(std::move(why)); return true;
                 case TopologyState::Deferred: return Defer(w);
                 case TopologyState::Ready: break;
                 }
                 Queue(w);
                 return false;
             }
-            if (w->Gpu->State == SpatialQueryState::Ready && PointNormals(*w->Work) &&
+            if (gpu->State == SpatialQueryState::Ready && PointNormals(*w->Work) &&
                 w->PointFirst < w->Work->Result.LiveCount)
             {
-                w->Work->Result.CpuStageReadbackBytes += w->Gpu->Data.size();
-                const auto fail = [&](std::string why) { ReleaseWorkspaces(w); w->Gpu = FailedResult(std::move(why)); };
+                w->Work->Result.CpuStageReadbackBytes += gpu->Data.size();
+                const auto fail = [&](std::string why) { ReleaseWorkspaces(w); gpu = FailedResult(std::move(why)); };
                 Graphics::PointNormalsGpuStats stats{};
-                if (w->Gpu->Data.size() != sizeof(stats)) fail("Invalid PCA normal diagnostics readback.");
+                if (gpu->Data.size() != sizeof(stats)) fail("Invalid PCA normal diagnostics readback.");
                 else
                 {
-                    std::memcpy(&stats, w->Gpu->Data.data(), sizeof(stats));
+                    std::memcpy(&stats, gpu->Data.data(), sizeof(stats));
                     if (stats.Overflow) fail("Vulkan PCA radius neighborhoods exceed 1024 candidates; use a CPU backend.");
                     else
                     {
@@ -972,8 +939,8 @@ namespace Extrinsic::Runtime
                     }
                 }
             }
-            if (w->Gpu->State == SpatialQueryState::Ready) PublishPreview(w);
-            return w->Gpu->State == SpatialQueryState::Ready || w->Gpu->State == SpatialQueryState::Failed;
+            if (gpu->State == SpatialQueryState::Ready) PublishPreview(w);
+            return gpu->State == SpatialQueryState::Ready || gpu->State == SpatialQueryState::Failed;
         }
         // The compute job ended: the run either waits for Accept or failed.
         void CompleteRun(const Run& w)
@@ -983,10 +950,11 @@ namespace Extrinsic::Runtime
             w->Topology.reset();
             ReleaseWorkspaces(w);
             auto& r = w->Work->Result;
-            if (!w->Gpu || w->Gpu->State != SpatialQueryState::Ready)
+            const auto& gpu = w->Core.Gpu;
+            if (!gpu || gpu->State != SpatialQueryState::Ready)
             {
                 Finish(w, EditorGpuTransactionPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
-                       w->Gpu && !w->Gpu->Diagnostic.empty() ? w->Gpu->Diagnostic
+                       gpu && !gpu->Diagnostic.empty() ? gpu->Diagnostic
                                                             : "Vulkan normals did not return a result; previous normals retained.");
                 return;
             }
@@ -996,18 +964,18 @@ namespace Extrinsic::Runtime
                        "Vulkan normals published no preview; previous normals retained.");
                 return;
             }
-            if (w->Gpu->Data.size() == sizeof(std::uint32_t) * 3u)
+            if (gpu->Data.size() == sizeof(std::uint32_t) * 3u)
             {
                 std::array<std::uint32_t, 3> stats{};
-                std::memcpy(stats.data(), w->Gpu->Data.data(), sizeof(stats));
+                std::memcpy(stats.data(), gpu->Data.data(), sizeof(stats));
                 r.ProcessedFaces = stats[0];
                 r.ValidCount = stats[1];
                 r.FallbackCount = stats[2];
             }
-            if (PointNormals(*w->Work) && w->Gpu->Data.size() == sizeof(Graphics::PointNormalsGpuStats))
+            if (PointNormals(*w->Work) && gpu->Data.size() == sizeof(Graphics::PointNormalsGpuStats))
             {
                 Graphics::PointNormalsGpuStats stats{};
-                std::memcpy(&stats, w->Gpu->Data.data(), sizeof(stats));
+                std::memcpy(&stats, gpu->Data.data(), sizeof(stats));
                 r.ValidCount = stats.Valid;
                 r.FallbackCount = stats.Fallback;
                 r.PointDiagnostics.ValidNormalPointCount = stats.Valid;
@@ -1022,8 +990,8 @@ namespace Extrinsic::Runtime
                 r.PointDiagnostics.FallbackNormalWasRepaired = stats.FallbackRepaired != 0;
             }
             r.ActualBackend = std::string{BackendOf(*w->Work)};
-            if (!PointNormals(*w->Work)) r.CpuStageReadbackBytes += w->Gpu->Data.size();
-            w->Phase = EditorGpuTransactionPhase::ReadyToAccept;
+            if (!PointNormals(*w->Work)) r.CpuStageReadbackBytes += gpu->Data.size();
+            GP::ReadyGpuTransaction(w->Core);
             r.Status = EditorCommandStatus::Pending;
             r.Message = "The GPU normals wait for Accept or Discard.";
         }
@@ -1036,13 +1004,15 @@ namespace Extrinsic::Runtime
         // Accept landed: the front's rows become the published property and the canonical slot.
         void CompleteAccept(const Run& w)
         {
-            const auto& ctx = w->Context;
+            const auto& ctx = w->Core.Context;
             auto& work = *w->Work;
-            const auto testFront = w->TestFront && w->Residency ? w->Residency->Front(w->Key) : std::nullopt;
-            const std::uint64_t accepted = w->Readback && w->Readback->Lease ? w->Readback->Lease->Publication
+            auto* residency = w->Core.Residency;
+            const auto& readback = Ring(w).Readback;
+            const auto testFront = w->TestFront && residency ? residency->Front(Ring(w).Key) : std::nullopt;
+            const std::uint64_t accepted = readback && readback->Lease ? readback->Lease->Publication
                                            : testFront ? testFront->Publication : 0u;
-            if (w->Readback) w->Readback->Lease.reset();
-            if (w->Readback && w->Readback->Failed)
+            if (readback) readback->Lease.reset();
+            if (readback && readback->Failed)
             {
                 Finish(w, EditorGpuTransactionPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
                        "Vulkan normals readback failed; previous normals retained.");
@@ -1052,13 +1022,13 @@ namespace Extrinsic::Runtime
             if (w->TestFront) after = *w->TestFront;
             else
             {
-                if (!w->Readback || w->Readback->Bytes.size() != std::size_t(w->Count) * sizeof(glm::vec3))
+                if (!readback || readback->Bytes.size() != std::size_t(w->Count) * sizeof(glm::vec3))
                 {
                     Finish(w, EditorGpuTransactionPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
                            "Vulkan normals readback has the wrong size; previous normals retained.");
                     return;
                 }
-                std::memcpy(after.data(), w->Readback->Bytes.data(), after.size() * sizeof(glm::vec3));
+                std::memcpy(after.data(), readback->Bytes.data(), after.size() * sizeof(glm::vec3));
             }
             work.Result.CpuStageReadbackBytes += after.size() * sizeof(glm::vec3);
             work.After = std::move(after);
@@ -1071,74 +1041,77 @@ namespace Extrinsic::Runtime
             r.Status = r.ChangedCount ? EditorCommandStatus::Applied : EditorCommandStatus::NoChange;
             r.Message = "Normals computed using " + r.ActualBackend + "; " + IoSummary(r) + ".";
             auto result = PublishNormals(ctx, w->Work);
+            work.Result = result;
             if (!result.Succeeded())
             {
-                ReleaseRings(w);
-                w->Phase = result.Status == EditorCommandStatus::StaleEntity ? EditorGpuTransactionPhase::Discarded
-                                                                             : EditorGpuTransactionPhase::Failed;
-                Deliver(w, std::move(result));
+                Finish(w, result.Status == EditorCommandStatus::StaleEntity ? EditorGpuTransactionPhase::Discarded
+                                                                            : EditorGpuTransactionPhase::Failed,
+                       result.Status, std::move(result.Message));
                 return;
             }
             // The front becomes the canonical slot of the new CPU revision (ADR 0030 decision 6).
-            if (w->Residency)
+            if (residency)
             {
                 const auto watch = GP::ObserveGeometryProperty(BuildGeometryAvailability(ctx.Scene->Raw(), work.Entity),
                                                                work.Config.Output.Domain, work.Config.Output.Name);
-                if (!watch.Revision || !w->Residency->BindRevision(w->Key, *watch.Revision, accepted))
-                    (void)w->Residency->Discard(w->Key, w->Ring);
+                if (!watch.Revision || !residency->BindRevision(Ring(w).Key, *watch.Revision, accepted))
+                    (void)residency->Discard(Ring(w).Key, Ring(w).Generation);
             }
-            w->Phase = EditorGpuTransactionPhase::Applied;
-            Deliver(w, std::move(result));
+            Finish(w, EditorGpuTransactionPhase::Applied, result.Status, std::move(result.Message));
+        }
+        // Builds the transaction on the shared lifecycle; hooks reach it by raw pointer and take
+        // ownership (shared_from_this) for recorders.
+        Run Make(const EditorProcessingContext& context, const std::shared_ptr<NormalWork>& work,
+                 Graphics::GpuPropertyResidency* residency)
+        {
+            const auto& c = work->Config;
+            auto w = std::make_shared<EditorNormalTransaction>();
+            w->Work = work;
+            w->Count = std::uint32_t(work->Result.SlotCount);
+            w->VertexCount = std::uint32_t(work->Deleted.size());
+            auto& t = w->Core;
+            t.Context = context;
+            t.Residency = residency;
+            t.Label = "Vulkan normals";
+            t.AcceptJobName = "Vulkan normals accept";
+            t.Identity = {.EntityId = c.StableEntityId, .Scope = ToEditorJobScope(c.Output.Domain),
+                          .OutputSemantic = GeometryPresentationSlotSemantic::Normal, .OutputName = c.Output.Name};
+            t.Rings[0] = {.Key = MakeGpuPropertyKey(context.World, work->Entity, c.Output), .ReadBack = true};
+            t.RingCount = 1;
+            auto* raw = w.get();
+            const auto self = [raw] { return raw->shared_from_this(); };
+            t.Hooks = {
+                .Current = [raw] { return CurrentNormalInput(raw->Core.Context, *raw->Work, true); },
+                .Poll = [self] { return Poll(self()); },
+                .CompleteRun = [self] { CompleteRun(self()); },
+                .CompleteAccept = [self] { CompleteAccept(self()); },
+                .Release = [self] {
+                    const auto w = self();
+                    w->Input.reset();
+                    w->Base.reset();
+                    w->Topology.reset();
+                    ReleaseWorkspaces(w);
+                },
+                .Deliver = [raw](const EditorCommandStatus status, std::string message) {
+                    auto& r = raw->Work->Result;
+                    r.Status = status;
+                    r.Message = std::move(message);
+                    if (auto sink = std::move(raw->Sink)) sink(r);
+                }};
+            return w;
         }
         // Queues the front's readback and the job that publishes it.
         EditorNormalEstimationResult BeginAccept(const Run& w, std::function<void(EditorNormalEstimationResult)> onComplete)
         {
             auto result = w->Work->Result;
-            const auto refuse = [&](const EditorCommandStatus status, std::string message) {
-                result.Status = status;
-                result.Message = std::move(message);
+            if (auto refused = GP::GpuTransactionAcceptRefusal(w->Core, bool(onComplete)))
+            {
+                result.Status = refused->Status;
+                result.Message = std::move(refused->Message);
                 return result;
-            };
-            if (w->Phase != EditorGpuTransactionPhase::ReadyToAccept)
-                return refuse(EditorCommandStatus::InvalidProcessingParameters, "No GPU result waits for Accept.");
-            if (!Current(w))
-                return refuse(EditorCommandStatus::StaleEntity, "The inputs changed since the run; discard the result and run again.");
-            const auto& ctx = w->Context;
-            if (onComplete) w->Sink = GuardEditorProcessingResult(ctx, std::move(onComplete));
-            w->Readback.reset();
-            if (!w->TestFront)
-            {
-                w->Readback = std::make_shared<GP::GpuFrontReadback>();
-                if (!w->Residency || !GP::BeginGpuFrontReadback(ctx, *w->Residency, w->Key, w->Readback))
-                {
-                    w->Readback.reset();
-                    Finish(w, EditorGpuTransactionPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
-                           "The GPU result is no longer resident; previous normals retained.");
-                    return w->Work->Result;
-                }
             }
-            w->Phase = EditorGpuTransactionPhase::Accepting;
-            JobDesc accept{
-                .DebugName = "Vulkan normals accept", .Scope = ctx.World, .Kind = RuntimeTaskKinds::GeometryProcess,
-                .Work = [](const JobCancellation&) { return JobResultEnvelope::Make(true); },
-                .IsReadyToApply = [w] { return !Current(w) || !w->Readback || GP::PollGpuFrontReadback(*w->Readback); },
-                .ValidateBeforeApply = [w] { return Current(w) ? JobApplyValidation::Current : JobApplyValidation::StaleGeneration; },
-                .PublishCompletion = [w](KernelEventBus&, const JobResultEnvelope&) {
-                    CompleteAccept(w);
-                    return w->Phase == EditorGpuTransactionPhase::Applied;
-                },
-                .FinalizeUnpublishedOnMainThread = [w] {
-                    w->Abandoned = true;
-                    if (w->Delivered) return;
-                    Finish(w, EditorGpuTransactionPhase::Discarded, EditorCommandStatus::StaleEntity,
-                           "Vulkan normals cancelled or stale; previous normals retained.");
-                }};
-            if (!ctx.JobCommands.Submit(std::move(accept), w->Identity).IsValid())
-            {
-                Finish(w, EditorGpuTransactionPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
-                       "Vulkan normals accept submission rejected.");
-                return w->Work->Result;
-            }
+            if (onComplete) w->Sink = GuardEditorProcessingResult(w->Core.Context, std::move(onComplete));
+            if (!GP::BeginGpuTransactionAccept(GP::GpuTransactionOf(w))) return w->Work->Result;
             result.Status = EditorCommandStatus::Pending;
             result.Message = "Reading the GPU normals back.";
             w->Work->Result = result;
@@ -1156,22 +1129,9 @@ namespace Extrinsic::Runtime
                 return Run{};
             };
             const auto& c = work->Config;
-            const EditorJobIdentity identity{.EntityId = c.StableEntityId, .Scope = ToEditorJobScope(c.Output.Domain),
-                                             .OutputSemantic = GeometryPresentationSlotSemantic::Normal, .OutputName = c.Output.Name};
-            if (auto busy = Detail::MeshSupport::ActiveOutputJobRefusal(context, identity, "Normal estimation"))
-                return fail(EditorCommandStatus::Pending, std::move(busy->Message));
-            auto* residency = context.SpatialIndices ? context.SpatialIndices->PropertyResidency() : nullptr;
-            if (!residency) return fail(EditorCommandStatus::InvalidProcessingParameters, "Vulkan normals need the GPU property residency.");
-            auto w = std::make_shared<EditorNormalTransaction>();
-            w->Context = context;
-            w->Work = work;
-            w->Identity = identity;
-            w->Residency = residency;
-            w->Count = std::uint32_t(work->Result.SlotCount);
-            w->VertexCount = std::uint32_t(work->Deleted.size());
-            w->Key = MakeGpuPropertyKey(context.World, work->Entity, c.Output);
-            if (residency->HasRing(w->Key))
-                return fail(EditorCommandStatus::InvalidProcessingParameters, "A GPU result for this output awaits Accept or Discard.");
+            auto w = Make(context, work, context.SpatialIndices ? context.SpatialIndices->PropertyResidency() : nullptr);
+            if (auto refused = GP::GpuTransactionStartRefusal(w->Core, "Normal estimation"))
+                return fail(refused->Status, std::move(refused->Message));
             if (PointNormals(*work))
             {
                 std::string why;
@@ -1180,44 +1140,14 @@ namespace Extrinsic::Runtime
                     != GP::PointIndexState::Ready)
                     return fail(EditorCommandStatus::InvalidProcessingParameters, why);
             }
-            w->AutoAccept = autoAccept;
+            w->Core.AutoAccept = autoAccept;
             w->Sink = GuardEditorProcessingResult(context, std::move(onComplete));
             result = work->Result;
             result.Status = EditorCommandStatus::Pending;
             result.Message = "Vulkan normals queued.";
             work->Result = result;
-            JobDesc gpu{
-                .DebugName = "Vulkan normals", .Scope = context.World, .Kind = RuntimeTaskKinds::GeometryProcess,
-                .Work = [](const JobCancellation&) { return JobResultEnvelope::Make(true); },
-                .IsReadyToApply = [w] { return Poll(w); },
-                .ValidateBeforeApply = [w] { return Current(w) ? JobApplyValidation::Current : JobApplyValidation::StaleGeneration; },
-                .PublishCompletion = [w](KernelEventBus&, const JobResultEnvelope&) {
-                    CompleteRun(w);
-                    if (w->Phase == EditorGpuTransactionPhase::ReadyToAccept && w->AutoAccept)
-                    {
-                        // A refused automatic Accept (e.g. stale) ends the transaction: nothing
-                        // waits for a user here.
-                        const auto accepted = BeginAccept(w, {});
-                        if (accepted.Status != EditorCommandStatus::Pending)
-                            Finish(w, accepted.Status == EditorCommandStatus::StaleEntity ? EditorGpuTransactionPhase::Discarded
-                                                                                          : EditorGpuTransactionPhase::Failed,
-                                   accepted.Status, accepted.Message);
-                    }
-                    return w->Phase != EditorGpuTransactionPhase::Failed;
-                },
-                .FinalizeUnpublishedOnMainThread = [w] {
-                    w->Abandoned = true;
-                    if (w->Delivered) return;
-                    Finish(w, EditorGpuTransactionPhase::Discarded, EditorCommandStatus::StaleEntity,
-                           "Vulkan normals cancelled or stale; previous normals retained.");
-                }};
-            const JobToken token = context.JobCommands.Submit(std::move(gpu), w->Identity);
-            if (!token.IsValid())
-            {
-                w->Abandoned = true;
+            if (!GP::SubmitGpuTransactionRun(GP::GpuTransactionOf(w), "Vulkan normals").IsValid())
                 return fail(EditorCommandStatus::GeometryProcessingFailed, "Vulkan normals submission rejected.");
-            }
-            w->Identity.Run = token; // the Accept stage joins this run
             return w;
         }
     } // namespace NormalTransactionDetail
@@ -1248,14 +1178,14 @@ namespace Extrinsic::Runtime
     {
         EditorNormalTransactionSnapshot snapshot;
         if (!run) return snapshot;
-        snapshot.Phase = run->Phase;
+        snapshot.Phase = run->Core.Phase;
         snapshot.Previews = run->Previews;
-        snapshot.DeviceWorkQueued = run->Gpu != nullptr;
+        snapshot.DeviceWorkQueued = run->Core.Gpu != nullptr;
         snapshot.Result = run->Work->Result;
-        if (run->Phase == EditorGpuTransactionPhase::ReadyToAccept)
+        if (run->Core.Phase == EditorGpuTransactionPhase::ReadyToAccept)
         {
             snapshot.Stale = !NormalTransactionDetail::Current(run);
-            const bool resident = run->TestFront.has_value() || (run->Residency && run->Residency->HasRing(run->Key));
+            const bool resident = run->TestFront.has_value() || (run->Core.Residency && run->Core.Residency->HasRing(run->Core.Rings[0].Key));
             snapshot.CanAccept = !snapshot.Stale && resident;
             if (snapshot.Stale) snapshot.AcceptDisabledReason = "The inputs changed since the run; discard the result and run again.";
             else if (!resident) snapshot.AcceptDisabledReason = "The GPU result is no longer resident; discard it.";
@@ -1273,27 +1203,11 @@ namespace Extrinsic::Runtime
 
     void DiscardEditorNormalEstimation(const EditorProcessingCommands&, const EditorNormalTransactionHandle& run)
     {
-        if (!run) return;
-        namespace NT = NormalTransactionDetail;
-        switch (run->Phase)
-        {
-        case EditorGpuTransactionPhase::Applied:
-        case EditorGpuTransactionPhase::Discarded:
-        case EditorGpuTransactionPhase::Failed:
-            return;
-        case EditorGpuTransactionPhase::Running:
-        case EditorGpuTransactionPhase::Accepting:
-            // The job finalizes as cancelled on its next drain; the ring goes now (freed after
-            // its completions).
-            run->Abandoned = true;
-            NT::Finish(run, EditorGpuTransactionPhase::Discarded, EditorCommandStatus::StaleEntity,
-                       "Vulkan normals discarded; previous normals retained.");
-            return;
-        case EditorGpuTransactionPhase::ReadyToAccept:
-            NT::Finish(run, EditorGpuTransactionPhase::Discarded, EditorCommandStatus::StaleEntity,
-                       "Vulkan normals discarded; previous normals retained.");
-            return;
-        }
+        // A queued job finalizes as cancelled on its next drain; the ring goes now (freed after
+        // its completions).
+        if (run)
+            GeometryProcessingDetail::DiscardGpuTransaction(run->Core, EditorCommandStatus::StaleEntity,
+                                                            "Vulkan normals discarded; previous normals retained.");
     }
 
     EditorNormalTransactionHandle MakeEditorNormalTransactionForTest(
@@ -1315,29 +1229,23 @@ namespace Extrinsic::Runtime
             return {};
         work->Config.Backend = c.Backend;
         work->Result.RequestedBackend = c.Backend;
-        auto w = std::make_shared<EditorNormalTransaction>();
-        w->Context = context;
-        w->Work = work;
-        w->Identity = {.EntityId = c.StableEntityId, .Scope = ToEditorJobScope(work->Config.Output.Domain),
-                       .OutputSemantic = GeometryPresentationSlotSemantic::Normal, .OutputName = work->Config.Output.Name};
-        w->Count = std::uint32_t(work->Result.SlotCount);
-        w->VertexCount = std::uint32_t(work->Deleted.size());
-        w->Key = MakeGpuPropertyKey(context.World, work->Entity, work->Config.Output);
-        w->Residency = residency;
+        auto w = NT::Make(context, work, residency);
         if (residency)
         {
+            auto& ring = w->Core.Rings[0];
             if (const auto back = AcquireGpuPropertyOutput(*residency, context.World, work->Entity, work->Config.Output, w->Count, NT::kRingDepth);
-                back && residency->Publish(w->Key))
+                back && residency->Publish(ring.Key))
                 ++w->Previews;
-            w->Ring = residency->RingGeneration(w->Key);
+            ring.Generation = residency->RingGeneration(ring.Key);
         }
         else ++w->Previews;
         w->TestFront = std::move(front);
+        w->Core.TestFront = true;
         auto& r = work->Result;
         r.Status = EditorCommandStatus::Pending;
         r.Message = "The GPU normals wait for Accept or Discard.";
         r.ActualBackend = std::string{NT::BackendOf(*work)};
-        w->Phase = EditorGpuTransactionPhase::ReadyToAccept;
+        GeometryProcessingDetail::ReadyGpuTransaction(w->Core);
         return w;
     }
 

@@ -167,7 +167,9 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
                     else
                         (void)BeginGpuTransactionAccept(t);
                 }
-                return t->Phase != EditorGpuTransactionPhase::Failed;
+                // Published only while the transaction goes on; a run that ended here (failed,
+                // no preview, refused automatic Accept) already delivered its terminal result.
+                return t->Phase == EditorGpuTransactionPhase::ReadyToAccept || t->Phase == EditorGpuTransactionPhase::Accepting;
             },
             .FinalizeUnpublishedOnMainThread = [t] { Finalize(*t); }};
         const JobToken token = t->Context.JobCommands.Submit(std::move(job), t->Identity);

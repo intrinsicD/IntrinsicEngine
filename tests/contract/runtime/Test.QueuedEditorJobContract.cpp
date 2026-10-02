@@ -305,12 +305,11 @@ TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
     constexpr std::string_view owner = "Runtime.GeometryProcessingOperations.MeshSupport.cpp";
     // Files that own a job lifecycle the helper does not cover (keep this list short; a new
     // queued operation belongs on `QueuedJobDelivery`).
-    constexpr std::array<std::string_view, 10> handWritten{
+    constexpr std::array<std::string_view, 9> handWritten{
         // GPU Run/Accept transactions not yet on Runtime.GpuTransactionLifecycle (RUNTIME-311).
         // Keypoints stays listed for its resident run's guarded publication sink.
         "Runtime.GeometryProcessingOperations.GpuPositions.cpp",
         "Runtime.GeometryProcessingOperations.Keypoints.cpp",
-        "Runtime.GeometryProcessingOperations.Normals.cpp",
         "Runtime.MeshFieldOperations.Smoothing.cpp",
         // Mesh-family jobs that keep their result in a typed state struct with the shared
         // `BuildUnpublishedEditorJobFailure` wording and `ActiveOutputJobRefusal`.
@@ -326,9 +325,8 @@ TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
     // RUNTIME-311: Accept front readbacks belong to the shared GPU transaction lifecycle; these
     // files still read fronts themselves (GpuPositions also defines the readback primitive).
     constexpr std::string_view lifecycle = "Runtime.GpuTransactionLifecycle.cpp";
-    constexpr std::array<std::string_view, 3> ownFrontReadback{
+    constexpr std::array<std::string_view, 2> ownFrontReadback{
         "Runtime.GeometryProcessingOperations.GpuPositions.cpp",
-        "Runtime.GeometryProcessingOperations.Normals.cpp",
         "Runtime.MeshFieldOperations.Smoothing.cpp",
     };
     std::size_t frontMatched = 0;

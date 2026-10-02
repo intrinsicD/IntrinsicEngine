@@ -536,3 +536,27 @@ TEST(NormalTransaction, DuplicateStartIsPendingWithTheSharedMessage)
     R::RuntimeModuleShutdownContext shutdown{commands, events, h.Jobs.Jobs(), worlds, services};
     cache.OnShutdown(shutdown);
 }
+
+// RUNTIME-311: on the shared lifecycle a Discard issued by a history observer while Accept
+// publishes is ignored (before: the normals run ended Discarded/StaleEntity mid-publication,
+// while the normals were published), and the callback fires exactly once; a second Accept
+// while the first is under way answers Pending (before: InvalidProcessingParameters).
+TEST(NormalTransaction, ReentrantDiscardDuringAcceptStillDeliversAppliedOnce)
+{
+    Harness h;
+    R::EditorNormalTransactionHandle run;
+    unsigned discards = 0;
+    h.Context.InvalidateWorkspaceSnapshotCache = [&] { ++discards; R::DiscardEditorNormalEstimation(h.Commands(), run); };
+    run = h.Ready({0.f, 0.f, 1.f});
+    ASSERT_TRUE(run);
+    std::vector<R::EditorNormalEstimationResult> results;
+    ASSERT_EQ(R::AcceptEditorNormalEstimation(h.Commands(), run, [&](auto r) { results.push_back(r); }).Status,
+              R::EditorCommandStatus::Pending);
+    EXPECT_EQ(R::AcceptEditorNormalEstimation(h.Commands(), run, {}).Status, R::EditorCommandStatus::Pending);
+    ASSERT_TRUE(h.Jobs.DrainUntilTerminal());
+    EXPECT_GT(discards, 0u) << "the publication ran its observer";
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results.front().Status, R::EditorCommandStatus::Applied) << results.front().Message;
+    EXPECT_EQ(R::SnapshotEditorNormalEstimation(h.Commands(), run).Phase, R::EditorGpuTransactionPhase::Applied);
+    EXPECT_TRUE(h.Vertices().Exists("v:normal"));
+}

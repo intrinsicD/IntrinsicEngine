@@ -57,6 +57,33 @@ transactions is [UI-071](../ui/UI-071-gpu-transaction-controls-and-refusal-prese
 the per-job setup/completion prologue that precedes them is
 [RUNTIME-313](../../done/RUNTIME-313-queued-editor-job-setup-and-completion-helper.md).
 
+## Progress and recorded behaviour changes
+- Owner: `src/runtime/Editor/Operations/Runtime.GpuTransactionLifecycle.{hpp,cpp}`. `GpuTransactionCore`
+  is embedded by value in each typed transaction (rings with captured generations, readbacks,
+  phase, Abandoned/Delivered/Publishing, run and accept tokens, `AcceptJobName`) with typed hooks
+  (`Current`, `Poll`, `CompleteRun`, `CompleteAccept`, `Release`, `Deliver`). Slices: 1 scalar (typed
+  Start and publication mode), 2 outliers, 3 normals.
+- Shared semantics, recorded as changes where a method differed before:
+  - Start refusal order is: active job on the output (Pending, shared 313 wording), then no residency,
+    then a ring of the output awaiting Accept/Discard (InvalidProcessingParameters, "A GPU result for
+    this output awaits Accept or Discard."). Outliers checked the residency and the ring before the
+    active job; normals already used this order.
+  - Cancel or stale finalize of either job: "<label> cancelled or stale; previous output retained."
+    (StaleEntity, Discarded); before, every method had its own wording and only normals, smoothing
+    and positions set `Abandoned`.
+  - Accept while one is under way: Pending without a sink, InvalidProcessingParameters with one (that
+    sink is never called); before scalar, outliers and normals answered InvalidProcessingParameters.
+  - A refused automatic Accept ends Discarded when stale, otherwise Failed (scalar and outliers always
+    ended Failed); the Run job then counts as not published (JobState `Dropped`), as does a run that
+    ended in its own completion (normals' "no preview" previously counted as published).
+  - A Discard issued from a history observer while Accept publishes is ignored for every method
+    (only scalar had this guard; outliers and normals delivered Discarded mid-publication).
+  - Discard keeps its typed status (scalar/outliers NoChange, normals/smoothing/positions StaleEntity).
+  - A rejected Run submission closes the transaction without calling the sink (the immediate answer
+    reports it); a rejected Accept submission delivers its failure once.
+  - An automatic Accept no longer rewrites the normals result message to "Reading the GPU normals
+    back." (the user Accept still does).
+
 ## Acceptance criteria
 - [ ] One compiled lifecycle owns acquisition, polling, ring publication, Accept, Discard, cancellation and terminal delivery for one or N rings, including the accept-only (no Run phase) shape.
 - [ ] Every ring generation, input/output revision and workspace attachment is checked before publication; stale cleanup preserves replacement rings.

@@ -164,6 +164,7 @@ TEST(GpuTransactionLifecycle, AcceptJoinsTheRunAndItsCancelFinalizesOnce)
     const auto run = GP::SubmitGpuTransactionRun(GP::GpuTransactionOf(f), "Fake run");
     ASSERT_TRUE(h.Jobs.DrainUntilTerminal());
     ASSERT_EQ(f->Core.Phase, R::EditorGpuTransactionPhase::ReadyToAccept);
+    EXPECT_EQ(h.Jobs.Jobs().GetState(run), R::JobState::Published) << "a ready run published its Run stage";
     EXPECT_FALSE(GP::GpuTransactionAcceptRefusal(f->Core).has_value());
     ASSERT_TRUE(GP::BeginGpuTransactionAccept(GP::GpuTransactionOf(f)));
     const auto accept = h.Job(f->Core.AcceptToken);
@@ -189,8 +190,10 @@ TEST(GpuTransactionLifecycle, RefusedAutomaticAcceptOfStaleInputsEndsDiscardedOn
     auto f = h.Make(true);
     f->DeviceDone = true;
     f->StaleAfterRun = true;
-    ASSERT_TRUE(GP::SubmitGpuTransactionRun(GP::GpuTransactionOf(f), "Fake run").IsValid());
+    const auto run = GP::SubmitGpuTransactionRun(GP::GpuTransactionOf(f), "Fake run");
+    ASSERT_TRUE(run.IsValid());
     ASSERT_TRUE(h.Jobs.DrainUntilTerminal());
+    EXPECT_NE(h.Jobs.Jobs().GetState(run), R::JobState::Published) << "the run ended here; it did not publish";
     EXPECT_EQ(f->Deliveries, 1u);
     EXPECT_EQ(f->Status, R::EditorCommandStatus::StaleEntity) << f->Message;
     EXPECT_EQ(f->Core.Phase, R::EditorGpuTransactionPhase::Discarded);
