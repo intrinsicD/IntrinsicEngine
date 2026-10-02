@@ -30,27 +30,39 @@ namespace Extrinsic::Runtime
     }
 
     // The outcome a terminal result of any editor operation reports for its job's run, read
-    // from the shared result vocabulary: the backend it actually ran (`ActualBackend`, a name
-    // or an enum with `ToString`; else `BackendId` or `Backend`) and the first non-empty of
-    // its fallback/backend diagnostics, else its message.
+    // from the shared result vocabulary. Only a run that produced its result (Applied or
+    // NoChange) resolved to a backend: the one it actually ran (`ActualBackend`, a name or an
+    // enum with `ToString`; else `BackendId` or `Backend`), with the first non-empty of its
+    // fallback/backend diagnostics, else its message, as diagnostic. A failed, cancelled, stale
+    // or pending result resolves to nothing (its backend fields are planned or defaults) and
+    // its message is the diagnostic.
     template <typename Result>
     [[nodiscard]] EditorJobOutcome EditorJobOutcomeOf(const Result& result)
     {
         namespace D = EditorJobOutcomeDetail;
         EditorJobOutcome outcome{};
-        if constexpr (requires { result.ActualBackend; }) outcome.ResolvedDomain = D::DomainOf(result.ActualBackend);
-        if constexpr (requires { result.BackendId; })
-            if (!outcome.ResolvedDomain) outcome.ResolvedDomain = D::DomainOf(result.BackendId);
-        if constexpr (requires { result.Backend; })
-            if (!outcome.ResolvedDomain) outcome.ResolvedDomain = D::DomainOf(result.Backend);
+        bool ran = true;
+        if constexpr (requires { result.Status; })
+        {
+            using Status = std::remove_cvref_t<decltype(result.Status)>; // EditorCommandStatus
+            ran = result.Status == Status::Applied || result.Status == Status::NoChange;
+        }
         const auto note = [&outcome](const std::string& text) {
             if (outcome.Diagnostic.empty()) outcome.Diagnostic = text;
         };
-        if constexpr (requires { { result.BackendFallbackReason } -> std::convertible_to<const std::string&>; }) note(result.BackendFallbackReason);
-        if constexpr (requires { { result.FallbackReason } -> std::convertible_to<const std::string&>; }) note(result.FallbackReason);
-        if constexpr (requires { { result.BackendDiagnostic } -> std::convertible_to<const std::string&>; }) note(result.BackendDiagnostic);
-        if constexpr (requires { { result.GpuDiagnostic } -> std::convertible_to<const std::string&>; }) note(result.GpuDiagnostic);
-        if constexpr (requires { { result.Diagnostic } -> std::convertible_to<const std::string&>; }) note(result.Diagnostic);
+        if (ran)
+        {
+            if constexpr (requires { result.ActualBackend; }) outcome.ResolvedDomain = D::DomainOf(result.ActualBackend);
+            if constexpr (requires { result.BackendId; })
+                if (!outcome.ResolvedDomain) outcome.ResolvedDomain = D::DomainOf(result.BackendId);
+            if constexpr (requires { result.Backend; })
+                if (!outcome.ResolvedDomain) outcome.ResolvedDomain = D::DomainOf(result.Backend);
+            if constexpr (requires { { result.BackendFallbackReason } -> std::convertible_to<const std::string&>; }) note(result.BackendFallbackReason);
+            if constexpr (requires { { result.FallbackReason } -> std::convertible_to<const std::string&>; }) note(result.FallbackReason);
+            if constexpr (requires { { result.BackendDiagnostic } -> std::convertible_to<const std::string&>; }) note(result.BackendDiagnostic);
+            if constexpr (requires { { result.GpuDiagnostic } -> std::convertible_to<const std::string&>; }) note(result.GpuDiagnostic);
+            if constexpr (requires { { result.Diagnostic } -> std::convertible_to<const std::string&>; }) note(result.Diagnostic);
+        }
         if constexpr (requires { { result.Message } -> std::convertible_to<const std::string&>; }) note(result.Message);
         return outcome;
     }

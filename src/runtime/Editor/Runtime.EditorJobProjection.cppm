@@ -7,11 +7,13 @@ module;
 #include <span>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 
 export module Extrinsic.Runtime.EditorJobProjection;
 
+import Extrinsic.Core.StrongHandle;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.JobService;
@@ -108,6 +110,19 @@ export namespace Extrinsic::Runtime
     {
         return identity.Run.IsValid() ? identity.Run : token;
     }
+    // A job surface's index of the jobs it submitted (submit-time identity) and of the outcome
+    // reported per run (keyed by the run's first job token). The workspace session and the test
+    // job harness keep the same pair.
+    using EditorJobIdentityIndex = std::unordered_map<JobToken, EditorJobIdentity, Core::StrongHandleHash<JobTokenTag>>;
+    using EditorJobOutcomeIndex = std::unordered_map<JobToken, EditorJobOutcome, Core::StrongHandleHash<JobTokenTag>>;
+    // `EditorJobCommandSurface::ReportOutcome` over that pair: records `outcome` for the run of
+    // `job`, also once the run's first job was pruned while a later stage (a GPU Accept) is
+    // retained; ignored for a token the index does not know.
+    void RecordEditorJobOutcome(const EditorJobIdentityIndex& identities, EditorJobOutcomeIndex& outcomes,
+                                JobToken job, EditorJobOutcome outcome);
+    // The surface row of a retained job of the index (`MakeEditorJobRecord` with its run's outcome).
+    [[nodiscard]] EditorJobRecord ToEditorJobRecord(const JobSnapshot& job, const EditorJobIdentity& identity,
+                                                    const EditorJobOutcomeIndex& outcomes);
     struct EditorJobQueueSnapshot
     {
         std::vector<EditorJobRecord> Entries{};
@@ -130,6 +145,7 @@ export namespace Extrinsic::Runtime
         float Normalized{0.0f};
         double ElapsedSeconds{0.0};
         std::string Label{};
+        // Failed or cancelled runs only: the run's reported diagnostic, else its job state.
         std::string Diagnostic{};
         // Session scene epoch the answer belongs to (also set for `None`);
         // it changes when the scene is replaced (new, load, close) or the

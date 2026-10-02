@@ -1074,7 +1074,8 @@ namespace Extrinsic::Runtime
             t.AcceptJobName = "Vulkan normals accept";
             t.JobLabel = "Normal estimation";
             t.Identity = {.EntityId = c.StableEntityId, .Scope = ToEditorJobScope(c.Output.Domain),
-                          .OutputSemantic = GeometryPresentationSlotSemantic::Normal, .OutputName = c.Output.Name};
+                          .OutputSemantic = GeometryPresentationSlotSemantic::Normal, .OutputName = c.Output.Name,
+                          .RequestedDomain = EditorJobDomain::GpuCompute};
             t.Rings[0] = {.Key = MakeGpuPropertyKey(context.World, work->Entity, c.Output), .ReadBack = true};
             t.RingCount = 1;
             auto* raw = w.get();

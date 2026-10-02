@@ -411,15 +411,17 @@ TEST_F(QueuedEditorJobContract, VulkanConstructionPagesThroughTheSharedRowCursor
         }
         ASSERT_TRUE(delivered);
         EXPECT_EQ(delivered->ActualBackend, "vulkan_lbvh");
-        // RUNTIME-317: every stage of the run (scale, Vulkan support, build) requested the GPU
-        // and resolved to it, with the run's terminal message as diagnostic, failed or not.
+        // RUNTIME-317: every stage of the run (scale, Vulkan support, build) requested the GPU and,
+        // once it produced its result, resolved to it; a failed run resolved to nothing. The run's
+        // terminal message is the diagnostic either way.
         const auto rows = Context.JobCommands.SnapshotAll();
         ASSERT_GT(rows.size(), earlierJobs + 1u) << "a multi-stage run";
         for (std::size_t i = earlierJobs; i < rows.size(); ++i)
         {
             SCOPED_TRACE(rows[i].Name);
             EXPECT_EQ(rows[i].RequestedJobDomain, R::EditorJobDomain::GpuCompute);
-            EXPECT_EQ(rows[i].ResolvedJobDomain, R::EditorJobDomain::GpuCompute);
+            EXPECT_EQ(rows[i].ResolvedJobDomain,
+                      corruptSecondPage ? std::nullopt : std::optional{R::EditorJobDomain::GpuCompute});
             EXPECT_EQ(rows[i].Diagnostic, delivered->Message);
         }
         if (corruptSecondPage)
@@ -704,13 +706,14 @@ TEST(RuntimeReuseDriftGuard, RuntimeUsesTheSharedFiniteCheckAndPositionName)
 
 // RUNTIME-317 drift guard: every editor job identity an operation builds names the backend domain
 // its config requested, so the Jobs window and jobs_list never show an unknown request for a new
-// operation. (The shared GPU transaction lifecycle sets GpuCompute for its Run and Accept jobs.)
+// operation, including the identities GPU transactions assign to their core.
 TEST(QueuedEditorJobDriftGuard, EveryEditorJobIdentityNamesItsRequestedDomain)
 {
     namespace fs = std::filesystem;
     const auto root = fs::path{INTRINSIC_SOURCE_DIR} / "src" / "runtime" / "Editor" / "Operations";
     ASSERT_TRUE(fs::exists(root)) << root;
-    const std::regex construction{R"(EditorJobIdentity(\s+\w+)?\s*\{)"};
+    // A constructed identity, or a GPU transaction's designated `Identity = {.EntityId = ...}`.
+    const std::regex construction{R"(EditorJobIdentity(\s+\w+)?\s*\{|(\.|->)Identity\s*=\s*\{(?=\s*\.))"};
     std::size_t identities = 0;
     for (const auto& entry : fs::directory_iterator(root))
     {
@@ -733,5 +736,5 @@ TEST(QueuedEditorJobDriftGuard, EveryEditorJobIdentityNamesItsRequestedDomain)
                 << "an editor job identity names its config's requested backend domain: " << initializer;
         }
     }
-    EXPECT_GE(identities, 15u) << "the scan found the operations' identities";
+    EXPECT_GE(identities, 22u) << "the scan found the operations' identities";
 }

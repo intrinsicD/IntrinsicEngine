@@ -5,6 +5,7 @@ module;
 #include <span>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 
@@ -74,6 +75,24 @@ EditorJobRecord MakeEditorJobRecord(const JobSnapshot &job,
   return record;
 }
 
+void RecordEditorJobOutcome(const EditorJobIdentityIndex &identities,
+                            EditorJobOutcomeIndex &outcomes, const JobToken job,
+                            EditorJobOutcome outcome) {
+  JobToken run{};
+  if (const auto identity = identities.find(job); identity != identities.end())
+    run = EditorJobRunOf(job, identity->second);
+  else if (std::ranges::any_of(identities, [job](const auto &entry) { return entry.second.Run == job; }))
+    run = job;
+  if (run.IsValid())
+    outcomes.insert_or_assign(run, std::move(outcome));
+}
+
+EditorJobRecord ToEditorJobRecord(const JobSnapshot &job, const EditorJobIdentity &identity,
+                                  const EditorJobOutcomeIndex &outcomes) {
+  const auto outcome = outcomes.find(EditorJobRunOf(job.Token, identity));
+  return MakeEditorJobRecord(job, identity, outcome != outcomes.end() ? &outcome->second : nullptr);
+}
+
 bool SameEditorJobOutput(const EditorJobIdentity &lhs,
                          const EditorJobIdentity &rhs) noexcept {
   return lhs.EntityId == rhs.EntityId && lhs.Scope == rhs.Scope &&
@@ -134,7 +153,6 @@ EditorOperationProgress ProjectEditorOperationProgress(const EditorJobRecord &jo
     return progress;
   progress.Label = job.Name;
   progress.ElapsedSeconds = static_cast<double>(job.ElapsedMilliseconds) / 1000.0;
-  progress.Diagnostic = job.Diagnostic;
   switch (progress.State) {
   case EditorOperationState::Queued:
     break; // nothing has run; the bar stays indeterminate
@@ -147,10 +165,11 @@ EditorOperationProgress ProjectEditorOperationProgress(const EditorJobRecord &jo
     progress.Normalized = job.ProgressDeterminate ? job.NormalizedProgress : 0.0f;
     break;
   }
-  if (progress.Diagnostic.empty() &&
-      (progress.State == EditorOperationState::Failed ||
-       progress.State == EditorOperationState::Cancelled))
-    progress.Diagnostic = std::string{ToString(job.State)};
+  // Only a failed or cancelled run explains itself here: the run's reported diagnostic, else
+  // its job state. A success message or a GPU run's "awaits Accept" note is not a failure.
+  if (progress.State == EditorOperationState::Failed ||
+      progress.State == EditorOperationState::Cancelled)
+    progress.Diagnostic = job.Diagnostic.empty() ? std::string{ToString(job.State)} : job.Diagnostic;
   return progress;
 }
 

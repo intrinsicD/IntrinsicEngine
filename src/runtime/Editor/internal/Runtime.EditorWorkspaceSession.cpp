@@ -186,25 +186,6 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
 
     namespace
     {
-        using EditorJobIdentityIndex =
-            std::unordered_map<JobToken,
-                               EditorJobIdentity,
-                               Core::StrongHandleHash<JobTokenTag>>;
-
-        using EditorJobOutcomeIndex =
-            std::unordered_map<JobToken,
-                               EditorJobOutcome,
-                               Core::StrongHandleHash<JobTokenTag>>;
-
-        [[nodiscard]] EditorJobRecord ToEditorJobRecord(
-            const JobSnapshot& job,
-            const EditorJobIdentity& identity,
-            const EditorJobOutcomeIndex& outcomes)
-        {
-            const auto outcome = outcomes.find(EditorJobRunOf(job.Token, identity));
-            return MakeEditorJobRecord(job, identity, outcome != outcomes.end() ? &outcome->second : nullptr);
-        }
-
         void PruneEditorJobIdentities(
             const std::vector<JobSnapshot>& jobs,
             EditorJobIdentityIndex& identities,
@@ -758,14 +739,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                 {
                     if (!AttachmentEpochIsActive(epoch))
                         return;
-                    // A run's first job may be reaped while a later stage (a GPU Accept) still runs.
-                    JobToken run{};
-                    if (const auto identity = m_JobIdentities.find(token); identity != m_JobIdentities.end())
-                        run = EditorJobRunOf(token, identity->second);
-                    else if (std::ranges::any_of(m_JobIdentities, [token](const auto& entry) { return entry.second.Run == token; }))
-                        run = token;
-                    if (run.IsValid())
-                        m_JobOutcomes.insert_or_assign(run, std::move(outcome));
+                    RecordEditorJobOutcome(m_JobIdentities, m_JobOutcomes, token, std::move(outcome));
                 };
             context.JobCommands.CompletingJob = [epoch = m_AttachmentEpoch, this]() -> JobToken
             {

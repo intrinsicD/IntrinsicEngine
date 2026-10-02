@@ -328,6 +328,27 @@ TEST_F(ResidentPointSampling, DuplicateOutputIsRefusedAndCancelUsesTheSharedWord
     EXPECT_EQ(Last.Message, "Vulkan point sampling was cancelled or its source became stale; nothing was applied.");
 }
 
+// RUNTIME-317: a cancelled Vulkan run keeps its GPU request but resolved to no backend (its
+// result still carries the default "cpu_reference" backend name); the cancellation is its diagnostic.
+TEST_F(ResidentPointSampling, CancelledVulkanRunResolvesToNoBackend)
+{
+    Jobs.Attach(S.Context);
+    ASSERT_EQ(Start().Status, R::EditorCommandStatus::Pending);
+    const auto submitted = S.Context.JobCommands.SnapshotAll();
+    ASSERT_EQ(submitted.size(), 1u);
+    EXPECT_EQ(submitted[0].RequestedJobDomain, R::EditorJobDomain::GpuCompute);
+    EXPECT_EQ(S.Context.JobCommands.Cancel(submitted[0].Token), R::EditorJobCancelStatus::Requested);
+    ASSERT_TRUE(Jobs.DrainUntilTerminal());
+    ASSERT_EQ(Calls, 1u);
+    EXPECT_EQ(Last.Status, R::EditorCommandStatus::StaleEntity);
+    const auto rows = S.Context.JobCommands.SnapshotAll();
+    ASSERT_EQ(rows.size(), 1u);
+    EXPECT_EQ(rows[0].State, R::JobState::Cancelled);
+    EXPECT_EQ(rows[0].RequestedJobDomain, R::EditorJobDomain::GpuCompute);
+    EXPECT_FALSE(rows[0].ResolvedJobDomain.has_value());
+    EXPECT_EQ(rows[0].Diagnostic, Last.Message);
+}
+
 TEST_F(ResidentPointSampling, CompletionOnlyFrameWaitsPastFenceReuseWithoutReadback)
 {
     auto result = Cache.QueueGpuCompute(0u, [](auto&, const auto&) { return Extrinsic::RHI::BufferHandle{1, 1}; });

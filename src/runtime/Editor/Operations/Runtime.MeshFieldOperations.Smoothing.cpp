@@ -1016,7 +1016,8 @@ namespace Extrinsic::Runtime
             w->OutputWatch = std::move(prepared.OutputWatch);
             auto& t = w->Core;
             t.Identity = {.EntityId = id, .Scope = ToEditorJobScope(c.Output.Domain),
-                          .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField, .OutputName = c.Output.Name};
+                          .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField, .OutputName = c.Output.Name,
+                          .RequestedDomain = EditorJobDomain::GpuCompute};
             // The output ring, keyed like every other GPU user of the property (ADR 0030).
             t.Residency = context.SpatialIndices ? context.SpatialIndices->PropertyResidency() : nullptr;
             w->Count = std::uint32_t(prepared.Props->Size());
@@ -1149,7 +1150,8 @@ namespace Extrinsic::Runtime
         w->Publication.Config = c;
         auto& t = w->Core;
         t.Identity = {.EntityId = id, .Scope = ToEditorJobScope(c.Output.Domain),
-                      .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField, .OutputName = c.Output.Name};
+                      .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField, .OutputName = c.Output.Name,
+                          .RequestedDomain = EditorJobDomain::GpuCompute};
         w->Count = std::uint32_t(prepared->Props->Size());
         PS::SetRings(w, prepared->Entity, c);
         t.Residency = residency;

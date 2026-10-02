@@ -58,10 +58,20 @@ fallback) and the job's diagnostic for every editor operation, so the Jobs windo
     `gpu_graphics`, `auto`, null) and `diagnostic` (null when empty); `jobs_wait` rows too.
   - Drift guard `QueuedEditorJobDriftGuard.EveryEditorJobIdentityNamesItsRequestedDomain` (it found
     the resident keypoint run identity without one).
-  - Behaviour change: `EditorOperationProgress::Diagnostic` (panels' progress) now carries the run's
-    reported diagnostic instead of the bare job state for failed/cancelled runs.
+  - Behaviour change: `EditorOperationProgress::Diagnostic` (panels' progress) of a failed or
+    cancelled run is the run's reported diagnostic instead of the bare job state; other runs show none.
   - Texture bake reports GpuGraphics on publication only; a failed bake still has no diagnostic
     (the bake's failure lives in the bake service, not in a delivered result).
+
+- Review fixes (slice 1): a result resolves to a backend only when it produced its result
+  (Applied/NoChange); a failed, cancelled, stale or pending result's backend fields are planned or
+  defaults, so it resolves to nothing (a cancelled Vulkan point-sampling run showed `cpu`). A CPU
+  request still shows CPU. The progress diagnostic is restricted to failed/cancelled runs. The
+  session and harness share `RecordEditorJobOutcome`/`ToEditorJobRecord` over
+  `EditorJobIdentityIndex`/`EditorJobOutcomeIndex`. GPU transactions' `Identity = {...}` sites name
+  GpuCompute and the drift guard covers them. Tests: `ResidentPointSampling.CancelledVulkanRunResolvesToNoBackend`,
+  `SandboxJobsWindow.ProgressCarriesTheDiagnosticOfFailedOrCancelledRunsOnly`,
+  `RuntimeJobService.CompletingJobNamesTheCallbacksJobThroughNestedDrainsAndFinalizers`.
 
 ## Acceptance criteria
 - [ ] For CPU-only, GPU-requested-and-run, and GPU-requested-but-fell-back runs, `SnapshotAll` reports the right requested and resolved domain plus the diagnostic text. Contract tests use the job harness.

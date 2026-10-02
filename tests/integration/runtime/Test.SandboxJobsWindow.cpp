@@ -407,3 +407,21 @@ TEST(SandboxJobsWindow, RowsShowTheRequestedAndResolvedBackendAndTheDiagnostic)
     EXPECT_NE(text.find("Vulkan unavailable; ran the CPU reference."), std::string::npos) << text;
 }
 
+
+// RUNTIME-317: the progress projection panels draw explains only a failed or cancelled run (its
+// reported diagnostic, else its state); a success message or a GPU run's "awaits Accept" note is
+// not shown as a progress diagnostic.
+TEST(SandboxJobsWindow, ProgressCarriesTheDiagnosticOfFailedOrCancelledRunsOnly)
+{
+    auto row = Row(1u, R::JobState::Published);
+    row.Diagnostic = "Estimated 8 outliers.";
+    EXPECT_TRUE(R::ProjectEditorOperationProgress(row).Diagnostic.empty());
+    row.State = R::JobState::AwaitingApply;
+    row.Diagnostic = "Vulkan normals result awaits Accept or Discard.";
+    EXPECT_TRUE(R::ProjectEditorOperationProgress(row).Diagnostic.empty());
+    row.State = R::JobState::Cancelled;
+    row.Diagnostic = "Outlier estimation was cancelled or its source became stale; nothing was applied.";
+    EXPECT_EQ(R::ProjectEditorOperationProgress(row).Diagnostic, row.Diagnostic);
+    row.Diagnostic.clear();
+    EXPECT_EQ(R::ProjectEditorOperationProgress(row).Diagnostic, std::string{R::ToString(R::JobState::Cancelled)});
+}

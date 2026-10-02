@@ -405,7 +405,8 @@ namespace Extrinsic::Runtime
         t.JobLabel = "GPU positions";
         t.AcceptJobName = "GPU positions accept";
         t.Identity = {.EntityId = id, .Scope = ToEditorJobScope(positions.Domain),
-                      .OutputSemantic = GeometryPresentationSlotSemantic::Displacement, .OutputName = positions.Name};
+                      .OutputSemantic = GeometryPresentationSlotSemantic::Displacement, .OutputName = positions.Name,
+                      .RequestedDomain = EditorJobDomain::GpuCompute};
         t.Rings[0] = {.Key = MakeGpuPropertyKey(context.World, *entity, positions), .ReadBack = true};
         t.RingCount = 1;
         auto& ring = t.Rings[0];

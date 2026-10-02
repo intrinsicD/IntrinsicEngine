@@ -159,8 +159,12 @@ Nothing exists without the launch flag: no module, thread or socket.
   allowed roots.
 - Jobs (RUNTIME-279). `jobs_list` lists every job the job service retains with its token
   (`"<index>:<generation>"`), state, progress and elapsed time; a job the editor submitted through
-  `EditorJobCommandSurface::Submit` also names its `editor` output (entity, output property) and
-  `cancellable: true` while active. Those rows, and only those, are what `jobs_cancel {token}`
+  `EditorJobCommandSurface::Submit` also names its `editor` output (entity, output property), the
+  backend domain its config requested (`requested_backend`), the one its run resolved to after any
+  fallback (`resolved_backend`; `cpu`, `gpu_compute`, `gpu_graphics` or `auto`, null while unknown
+  or when the run ended without a result) and the run's `diagnostic` (fallback reason or terminal
+  message, null until reported; RUNTIME-317), and `cancellable: true` while active. `jobs_wait`
+  answers carry the same row. Those rows, and only those, are what `jobs_cancel {token}`
   accepts (it calls `EditorJobCommandSurface::Cancel`): asset decode and imports, scene files and
   K-Means and consolidation runs (service jobs found by correlation id) answer `not_editor_job`,
   an ended job `job_not_active`. A cancel on a queued or running job, or one parked for apply,

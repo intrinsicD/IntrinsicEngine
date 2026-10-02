@@ -256,7 +256,8 @@ namespace Extrinsic::Runtime
             auto w=Make(ctx,residency);auto& t=w->Core;w->Capture=std::move(capture);w->Entity=entity;
             w->Positions=std::move(positions);w->Params=params;w->Label=std::move(label);t.AutoAccept=automatic;t.JobLabel=std::string(jobLabel);
             t.Rings[kTyped]={.Key=MakeGpuPropertyKey(ctx.World,entity,w->Capture->Output),.ReadBack=true};t.RingCount=1;
-            t.Identity={.EntityId=stableId,.Scope=ToEditorJobScope(w->Capture->Output.Domain),.OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Capture->Output.Name};
+            t.Identity={.EntityId=stableId,.Scope=ToEditorJobScope(w->Capture->Output.Domain),.OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Capture->Output.Name,
+                .RequestedDomain=EditorJobDomain::GpuCompute};
             if(residency->HasRing(Typed(w).Key))return refuse("Scalar output awaits Accept or Discard.");
             w->Result.LiveCount=w->Capture->LiveCount;
             if(testResidency){w->Result=testResult;w->Result.LiveCount=w->Capture->LiveCount;

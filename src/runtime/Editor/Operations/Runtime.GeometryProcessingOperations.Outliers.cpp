@@ -488,7 +488,8 @@ namespace Extrinsic::Runtime
             for(std::size_t i=0;i<3;++i)t.Rings[i]={.Key=MakeGpuPropertyKey(context.World,work->Entity,w->Refs[i]),.ReadBack=i<2};
             t.RingCount=3;
             t.Identity={.EntityId=work->Config.StableEntityId,.Scope=ToEditorJobScope(work->Config.Mask.Domain),
-                .OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=work->Config.Mask.Name};
+                .OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=work->Config.Mask.Name,
+                .RequestedDomain=EditorJobDomain::GpuCompute};
             auto* raw=w.get();
             // Hooks run while a job or caller owns the transaction; recorders take ownership.
             const auto self=[raw]{return raw->shared_from_this();};

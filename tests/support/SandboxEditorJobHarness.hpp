@@ -46,15 +46,9 @@ namespace Extrinsic::Tests
 
         Runtime::JobService m_Jobs{};
         Runtime::KernelEventBus m_Events{};
-        std::unordered_map<Runtime::JobToken,
-                           Runtime::EditorJobIdentity,
-                           Core::StrongHandleHash<Runtime::JobTokenTag>>
-            m_Identities{};
-        // Reported outcome per run (its first job's token), as the workspace session keeps it.
-        std::unordered_map<Runtime::JobToken,
-                           Runtime::EditorJobOutcome,
-                           Core::StrongHandleHash<Runtime::JobTokenTag>>
-            m_Outcomes{};
+        Runtime::EditorJobIdentityIndex m_Identities{};
+        // Reported outcome per run, kept as the workspace session keeps it.
+        Runtime::EditorJobOutcomeIndex m_Outcomes{};
         std::vector<Runtime::JobToken> m_CancelledRuns{};
         std::uint64_t m_SceneEpoch{0u};
         // Destroy the scheduler first, while worker-reachable state is alive.

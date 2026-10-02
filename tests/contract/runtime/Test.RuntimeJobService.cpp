@@ -354,6 +354,68 @@ TEST(RuntimeJobService, SubmitRunsOnPoolThreadAndPublishesAtGate)
     EXPECT_EQ(jobs.ReapCompleted(), 1u);
 }
 
+// RUNTIME-317: `CompletingJob` names the job whose main-thread callback runs (gate, publication,
+// unpublished finalizer), is restored after a drain nested in a callback, and is invalid outside one.
+TEST(RuntimeJobService, CompletingJobNamesTheCallbacksJobThroughNestedDrainsAndFinalizers)
+{
+    SchedulerScope scheduler{2};
+    Runtime::JobService jobs;
+    Runtime::KernelEventBus events;
+    EXPECT_FALSE(jobs.CompletingJob().IsValid());
+    const auto job = [](std::string name) {
+        Runtime::JobDesc desc{};
+        desc.DebugName = std::move(name);
+        desc.Work = [](const Runtime::JobCancellation&) { return Runtime::JobResultEnvelope::Make(true); };
+        desc.PublishCompletion = [](Runtime::KernelEventBus&, const Runtime::JobResultEnvelope&) { return true; };
+        return desc;
+    };
+    Runtime::JobToken outer{}, inner{}, gateSeen{}, innerSeen{}, outerBefore{}, outerAfter{};
+    auto outerDesc = job("outer");
+    outerDesc.IsReadyToApply = [&] { gateSeen = jobs.CompletingJob(); return true; };
+    outerDesc.PublishCompletion = [&](Runtime::KernelEventBus& bus, const Runtime::JobResultEnvelope&) {
+        outerBefore = jobs.CompletingJob();
+        auto innerDesc = job("inner");
+        innerDesc.PublishCompletion = [&](Runtime::KernelEventBus&, const Runtime::JobResultEnvelope&) {
+            innerSeen = jobs.CompletingJob();
+            return true;
+        };
+        inner = jobs.Submit(std::move(innerDesc));
+        Extrinsic::Core::Tasks::Scheduler::WaitForAll();
+        EXPECT_EQ(jobs.DrainCompletions(bus), 1u) << "the nested drain publishes the inner job";
+        outerAfter = jobs.CompletingJob();
+        return true;
+    };
+    outer = jobs.Submit(std::move(outerDesc));
+    ASSERT_TRUE(outer.IsValid());
+    Extrinsic::Core::Tasks::Scheduler::WaitForAll();
+    EXPECT_EQ(jobs.DrainCompletions(events), 1u);
+    ASSERT_TRUE(inner.IsValid());
+    EXPECT_EQ(gateSeen, outer);
+    EXPECT_EQ(outerBefore, outer);
+    EXPECT_EQ(innerSeen, inner);
+    EXPECT_EQ(outerAfter, outer) << "restored after the nested drain";
+    EXPECT_FALSE(jobs.CompletingJob().IsValid());
+
+    // A cancelled job's unpublished finalizer runs as that job.
+    std::atomic_bool release{false};
+    Runtime::JobToken finalizerSeen{};
+    auto blocked = job("cancelled");
+    blocked.Work = [&](const Runtime::JobCancellation&) {
+        while (!release.load(std::memory_order_acquire)) std::this_thread::sleep_for(1ms);
+        return Runtime::JobResultEnvelope::Make(true);
+    };
+    blocked.FinalizeUnpublishedOnMainThread = [&] { finalizerSeen = jobs.CompletingJob(); };
+    const Runtime::JobToken cancelled = jobs.Submit(std::move(blocked));
+    ASSERT_TRUE(jobs.Cancel(cancelled));
+    release.store(true, std::memory_order_release);
+    ASSERT_TRUE(WaitUntil([&] {
+        (void)jobs.DrainCompletions(events);
+        return finalizerSeen.IsValid();
+    }));
+    EXPECT_EQ(finalizerSeen, cancelled);
+    EXPECT_FALSE(jobs.CompletingJob().IsValid());
+}
+
 TEST(RuntimeJobService, CompletionQueuePublicationCannotClobberTerminalState)
 {
     SchedulerScope scheduler{1};
