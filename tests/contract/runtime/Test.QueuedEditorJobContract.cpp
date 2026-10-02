@@ -12,8 +12,18 @@
 #include <entt/entity/registry.hpp>
 #include <gtest/gtest.h>
 #include "EditorFeatureTestContext.hpp"
+#include "MockRHI.hpp"
+#include "SandboxEditorJobHarness.hpp"
 
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.RHI.Device;
+import Extrinsic.Runtime.CommandBus;
+import Extrinsic.Runtime.KernelEvents;
+import Extrinsic.Runtime.Module;
+import Extrinsic.Runtime.ServiceRegistry;
+import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.WorldHandle;
+import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.EditorProcessing;
@@ -35,12 +45,21 @@ namespace
     class QueuedEditorJobContract : public ::testing::Test
     {
     protected:
-        Extrinsic::ECS::Scene::Registry Scene;
+        R::WorldRegistry Worlds;
+        R::WorldHandle World{Worlds.CreateWorld("queued jobs")};
+        Extrinsic::ECS::Scene::Registry& Scene{*Worlds.Get(World)};
+        Extrinsic::Tests::MockDevice Device;
+        Extrinsic::Tests::EditorJobHarness Jobs;
+        R::SpatialIndexCache Cache{Worlds};
+        R::CommandBus Bus;
+        R::KernelEventBus Events;
+        R::ServiceRegistry Services;
         entt::entity Entity{};
         std::uint32_t Id{};
         R::EditorProcessingContext Context{};
         std::vector<R::JobDesc> Queued;
-        bool RejectSubmissions{false};
+        // Submissions accepted before the lane rejects (a later stage of a multi-stage run).
+        std::size_t AcceptSubmissions{~std::size_t{0}};
         std::optional<R::EditorJobRecord> Active;
 
         void SetUp() override
@@ -56,9 +75,18 @@ namespace
                 directions[i] = {0, 0, 1};
             }
             Id = R::SelectionController::ToStableEntityId(Entity);
+            Device.ShaderFloat64 = true;
+            Device.TransferQueue.AcceptBufferUploads = true;
+            Services.BeginRegistration();
+            ASSERT_TRUE(Services.Provide<Extrinsic::RHI::IDevice>(Device, "test").has_value());
+            R::EngineSetup setup{Bus, Events, Jobs.Jobs(), Worlds, Services, [](R::FramePhase, R::RuntimeFrameHook) {}};
+            ASSERT_TRUE(Cache.OnRegister(setup).has_value());
             Context.Scene = &Scene;
+            Context.World = World;
+            Context.Device = &Device;
+            Context.SpatialIndices = &Cache;
             Context.JobCommands.Submit = [this](R::JobDesc desc, R::EditorJobIdentity) {
-                if (RejectSubmissions) return R::JobToken{};
+                if (Queued.size() >= AcceptSubmissions) return R::JobToken{};
                 Queued.push_back(std::move(desc));
                 return R::JobToken{static_cast<std::uint32_t>(Queued.size()), 1u};
             };
@@ -67,6 +95,13 @@ namespace
                 if (active) active->Identity = identity;
                 return active;
             };
+        }
+        void TearDown() override
+        {
+            Queued.clear();
+            Jobs.Jobs().CancelAndDrain();
+            R::RuntimeModuleShutdownContext shutdown{Bus, Events, Jobs.Jobs(), Worlds, Services};
+            Cache.OnShutdown(shutdown);
         }
         [[nodiscard]] R::EditorProcessingCommands Commands() { return R::BindEditorProcessingCommands(Context); }
         [[nodiscard]] R::GeometryPropertyRef Ref(const char* name, Geometry::PropertyValueKind kind) const
@@ -104,6 +139,9 @@ namespace
             check("Descriptor analysis", [&](auto done) {
                 return R::ApplyEditorDescriptorAnalysisCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
                     .Normals = Normals(), .Outputs = R::MakeDescriptorOutputProperties(D::PointCloudPoint, "descriptor")}, done); });
+            check("Bilateral filter", [&](auto done) {
+                return R::ApplyEditorBilateralFilterCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
+                    .Normals = Normals(), .Output = Ref("filtered", Geometry::PropertyValueKind::Vec3), .KNeighbors = 2}, done); });
             check("Point construction", [&](auto done) {
                 return R::ApplyEditorPointConstructionCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
                     .Method = R::PointConstructionMethod::KnnGraph, .KNeighbors = 2}, done); });
@@ -128,7 +166,7 @@ TEST_F(QueuedEditorJobContract, DuplicateOutputIsRefusedBeforeSubmissionWithTheS
 
 TEST_F(QueuedEditorJobContract, RejectedSubmissionAnswersOnceWithoutTheCallback)
 {
-    RejectSubmissions = true;
+    AcceptSubmissions = 0u;
     ForEachOperation([&](const std::string& label, auto apply) {
         SCOPED_TRACE(label);
         unsigned calls{0u};
@@ -166,4 +204,42 @@ TEST_F(QueuedEditorJobContract, AbandonedRunRevalidatesAsCancelledAndDeliversOnc
         last.FinalizeUnpublishedOnMainThread();
         EXPECT_EQ(calls, 1u);
     });
+}
+
+// A multi-stage (Vulkan) run whose later stage the lane rejects: the rejection is the
+// immediate answer only, and the stage already queued is abandoned (revalidates as
+// Cancelled, its finalizer delivers nothing).
+TEST_F(QueuedEditorJobContract, RejectedLaterStageAbandonsTheQueuedStagesWithoutACallback)
+{
+    const auto commands = Commands();
+    const auto check = [&](const std::string& label, auto apply) {
+        SCOPED_TRACE(label);
+        Queued.clear();
+        AcceptSubmissions = 1u;
+        unsigned calls{0u};
+        const auto result = apply([&](auto) { ++calls; });
+        EXPECT_EQ(result.Status, R::EditorCommandStatus::GeometryProcessingFailed) << result.Message;
+        EXPECT_EQ(result.Message.rfind(label + " job submission was rejected (", 0), 0u) << result.Message;
+        ASSERT_EQ(Queued.size(), 1u) << result.Message;
+        EXPECT_EQ(Queued.front().ValidateBeforeApply(), R::JobApplyValidation::Cancelled);
+        Queued.front().FinalizeUnpublishedOnMainThread();
+        EXPECT_EQ(calls, 0u);
+    };
+    check("Keypoint analysis", [&](auto done) {
+        return R::ApplyEditorKeypointAnalysisCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
+            .Mask = Ref("keypoints", Geometry::PropertyValueKind::UInt32),
+            .Score = Ref("saliency", Geometry::PropertyValueKind::Float), .MinimumNeighbors = 1,
+            .Backend = R::KeypointAnalysisBackend::VulkanLBVH}, done); });
+    check("Descriptor analysis", [&](auto done) {
+        return R::ApplyEditorDescriptorAnalysisCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
+            .Normals = Normals(), .Outputs = R::MakeDescriptorOutputProperties(D::PointCloudPoint, "descriptor"),
+            .Backend = R::DescriptorAnalysisBackend::VulkanLBVH}, done); });
+    check("Point construction", [&](auto done) {
+        return R::ApplyEditorPointConstructionCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
+            .Method = R::PointConstructionMethod::KnnGraph, .KNeighbors = 2,
+            .Backend = R::PointConstructionBackend::VulkanLBVH}, done); });
+    check("Bilateral filter", [&](auto done) {
+        return R::ApplyEditorBilateralFilterCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
+            .Normals = Normals(), .Output = Ref("filtered", Geometry::PropertyValueKind::Vec3), .KNeighbors = 2,
+            .Iterations = 1, .Backend = R::BilateralFilterBackend::VulkanLBVH}, done); });
 }

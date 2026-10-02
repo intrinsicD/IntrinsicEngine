@@ -52,6 +52,7 @@ import Geometry.Properties;
 #include "Editor/internal/Runtime.EditorGeneratedEntity.hpp"
 #include "Editor/internal/Runtime.EditorTransformHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -284,6 +285,17 @@ namespace Extrinsic::Runtime
             }
 
             // Vulkan: bounded framed chunks, the prefix checked against the CPU before publishing.
+            const EditorJobIdentity identity{.EntityId = config.SourceStableEntityId,
+                                             .Scope = ToEditorJobScope(config.Positions.Domain),
+                                             .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField,
+                                             .OutputName = config.RankName};
+            // A duplicate leaves the active run's callback alone, like every queued editor job.
+            if (auto busy = GPD::MeshSupport::ActiveOutputJobRefusal(context, identity, "Vulkan point sampling"))
+            {
+                result.Status = EditorCommandStatus::Pending;
+                result.Message = std::move(*busy);
+                return result;
+            }
             auto* residency = context.SpatialIndices->PropertyResidency();
             if (!residency) return finish(Failure(EditorCommandStatus::GeometryProcessingFailed, "GPU property residency unavailable."));
             const auto before = residency->Stats();
@@ -308,12 +320,12 @@ namespace Extrinsic::Runtime
             for (std::size_t column = 0; column < 4; ++column)
                 for (std::size_t row = 0; row < 4; ++row) input.Model[4 * column + row] = model[column][row];
             auto run = std::make_shared<PointSamplingGpuRun>(*context.SpatialIndices, input, captured->World, params);
-            auto sink = GuardEditorProcessingResult(context, std::move(onComplete));
-            auto delivered = std::make_shared<bool>(false);
             const auto started = std::chrono::steady_clock::now();
-            auto pending = result;
-            pending.Status = EditorCommandStatus::Pending;
-            pending.Message = "Vulkan point sampling queued.";
+            auto queued = result;
+            queued.Message = "Vulkan point sampling queued.";
+            // `onComplete` stays with `finish`: this operation reports immediate answers through it too.
+            const GPD::MeshSupport::QueuedJobDelivery<EditorPointSamplingResult> delivery{
+                context, onComplete, std::move(queued), "Vulkan point sampling"};
             // Everything the samples depend on: positions, deletions, weights and the world frame.
             const auto current = [context, captured] {
                 if (!GPD::EditorProcessingContextWorldCurrent(context) ||
@@ -332,7 +344,7 @@ namespace Extrinsic::Runtime
                 .DebugName = "Vulkan point sampling", .Scope = context.World, .Current = current,
                 .Queue = [context, run] { return run->QueueNext(*context.SpatialIndices); },
                 .Observe = [run](const SpatialGpuResult& chunk) { return run->Observe(chunk); },
-                .Publish = [context, captured, config, count, params, run, result, sink, delivered, started](
+                .Publish = [context, captured, config, count, params, run, result, delivery, started](
                                const SpatialGpuResult* gpu) {
                     auto final = result;
                     std::string why;
@@ -341,9 +353,7 @@ namespace Extrinsic::Runtime
                     {
                         final.Status = EditorCommandStatus::GeometryProcessingFailed;
                         final.Message = gpu && !gpu->Diagnostic.empty() ? gpu->Diagnostic : "GPU sampling submission refused.";
-                        *delivered = true;
-                        if (sink) sink(final);
-                        return false;
+                        return delivery.Publish(std::move(final));
                     }
                     if (run->Current().Order.size() != count)
                         why = "The Vulkan sampler returned an incomplete order; sampling ran on the CPU.";
@@ -359,29 +369,12 @@ namespace Extrinsic::Runtime
                         order = PS::Order(std::span<const glm::vec3>(captured->World), params, count);
                     }
                     final.Milliseconds = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
-                    final = Publish(context, *captured, config, count, order, std::move(final));
-                    *delivered = true;
-                    if (sink) sink(final);
-                    return final.Succeeded();
+                    return delivery.Publish(Publish(context, *captured, config, count, order, std::move(final)));
                 },
-                .Abandon = [sink, delivered, pending]() mutable {
-                    if (*delivered) return;
-                    *delivered = true;
-                    pending.Status = EditorCommandStatus::StaleEntity;
-                    pending.Message = "Vulkan point sampling cancelled or stale; nothing was changed.";
-                    if (sink) sink(std::move(pending));
-                }});
-            const EditorJobIdentity identity{.EntityId = config.SourceStableEntityId,
-                                             .Scope = ToEditorJobScope(config.Positions.Domain),
-                                             .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField,
-                                             .OutputName = config.RankName};
+                .Abandon = [delivery] { delivery.Finalize(); }});
             if (!context.JobCommands.Submit(std::move(job), identity).IsValid())
-            {
-                pending.Status = EditorCommandStatus::GeometryProcessingFailed;
-                pending.Message = "The job lane rejected the Vulkan point sampling job.";
-                if (!*delivered) { *delivered = true; if (sink) sink(pending); }
-            }
-            return pending;
+                return finish(delivery.Rejected());
+            return delivery.Pending();
         }
     }
 

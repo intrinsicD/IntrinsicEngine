@@ -291,6 +291,30 @@ TEST_F(ResidentPointSampling, RefusedUploadAndRejectedJobNotifyExactlyOnceWithou
     EXPECT_FALSE(Rows().Exists(Config.RankName));
 }
 
+// RUNTIME-313: the Vulkan run is a queued editor job like the others: a second run on the
+// same output is refused before any upload or submission, and a cancelled run reports once
+// with the shared wording.
+TEST_F(ResidentPointSampling, DuplicateOutputIsRefusedAndCancelUsesTheSharedWording)
+{
+    S.Context.JobCommands.FindActive = [](const R::EditorJobIdentity& identity) {
+        return std::optional{R::EditorJobRecord{.Token = R::JobToken{7, 2}, .Identity = identity,
+                                                .State = R::JobState::AwaitingApply}};
+    };
+    const auto duplicate = Start();
+    EXPECT_EQ(duplicate.Status, R::EditorCommandStatus::Pending);
+    EXPECT_EQ(duplicate.Message, "Vulkan point sampling already has an active awaiting-apply job (job 7:2).");
+    EXPECT_FALSE(Queued);
+    EXPECT_EQ(duplicate.GpuInputUploadBytes, 0u) << "refused before acquiring device input";
+    EXPECT_EQ(Calls, 0u);
+    S.Context.JobCommands.FindActive = {};
+    ASSERT_EQ(Start().Status, R::EditorCommandStatus::Pending);
+    ASSERT_TRUE(Queued);
+    Queued->FinalizeUnpublishedOnMainThread();
+    EXPECT_EQ(Calls, 1u);
+    EXPECT_EQ(Last.Status, R::EditorCommandStatus::StaleEntity);
+    EXPECT_EQ(Last.Message, "Vulkan point sampling was cancelled or its source became stale; nothing was applied.");
+}
+
 TEST_F(ResidentPointSampling, CompletionOnlyFrameWaitsPastFenceReuseWithoutReadback)
 {
     auto result = Cache.QueueGpuCompute(0u, [](auto&, const auto&) { return Extrinsic::RHI::BufferHandle{1, 1}; });

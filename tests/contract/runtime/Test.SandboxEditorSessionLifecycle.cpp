@@ -3700,6 +3700,9 @@ TEST_F(EditorQueuedPointJobs, DuplicateSubmissionAnswersPendingWithTheSharedMess
         return Runtime::ApplyEditorKeypointAnalysisCommand(Commands, Keypoints, done); });
     ExpectDuplicateRefused("Point construction", [&](auto done) {
         return Runtime::ApplyEditorPointConstructionCommand(construction, Construction, done); });
+    const auto sets = Runtime::PrepareEditorPointSetFrame(Attachment).Commands;
+    ExpectDuplicateRefused("Bilateral filter", [&](auto done) {
+        return Runtime::ApplyEditorBilateralFilterCommand(sets, Bilateral, done); });
 }
 
 TEST_F(EditorQueuedPointJobs, CancelledRunDeliversOnceWithTheSharedWording)
@@ -3724,4 +3727,7 @@ TEST_F(EditorQueuedPointJobs, CancelledRunDeliversOnceWithTheSharedWording)
         return Runtime::ApplyEditorKeypointAnalysisCommand(Commands, Keypoints, done); });
     ExpectCancelFinalizesOnce("Point construction", [&](auto done) {
         return Runtime::ApplyEditorPointConstructionCommand(construction, Construction, done); });
+    const auto sets = Runtime::PrepareEditorPointSetFrame(Attachment).Commands;
+    ExpectCancelFinalizesOnce("Bilateral filter", [&](auto done) {
+        return Runtime::ApplyEditorBilateralFilterCommand(sets, Bilateral, done); });
 }

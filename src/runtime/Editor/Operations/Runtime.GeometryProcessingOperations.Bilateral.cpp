@@ -34,6 +34,7 @@ import Geometry.Properties;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 
 namespace Extrinsic::Runtime
@@ -334,38 +335,26 @@ namespace Extrinsic::Runtime
                                          .Scope = ToEditorJobScope(w->Config.Output.Domain),
                                          .OutputSemantic = GeometryPresentationSlotSemantic::Displacement,
                                          .OutputName = w->Config.Output.Name};
-        if (auto active = GeometryProcessingDetail::MeshSupport::FindActiveEditorJob(context, identity);
-            active && IsActiveEditorJobState(active->State))
-            return report(EditorCommandStatus::Pending,
-                          "A bilateral filter job for this output is already active.");
-        auto sink = GuardEditorProcessingResult(context, std::move(onComplete));
-        auto delivered = std::make_shared<bool>(false);
-        auto pending = w->Result;
-        pending.Status = EditorCommandStatus::Pending;
-        pending.Message = "Bilateral filtering queued.";
-        auto finalize=[sink,delivered,w,pending]() mutable
-        {
-            w->Abandoned=true;
-            if(sink && !*delivered)
-            {
-                *delivered=true;
-                if(w->MainFailure)pending=*w->MainFailure;
-                else {pending.Status=EditorCommandStatus::StaleEntity;pending.Message="Bilateral job cancelled or source stale; previous positions retained.";}
-                sink(std::move(pending));
-            }
-        };
-        auto validate=[context,w]{if(w->Abandoned)return JobApplyValidation::Cancelled;return CurrentInput(context,*w)?JobApplyValidation::Current:JobApplyValidation::StaleGeneration;};
-        auto publish=[context,w,sink,delivered](KernelEventBus&,const JobResultEnvelope&)
-        {
-            if(w->Abandoned){w->Result.Status=EditorCommandStatus::StaleEntity;w->Result.Message="Bilateral sequence was abandoned; previous positions retained.";}
-            else CompleteOutput(*w);
-            auto result=Publish(context,w);*delivered=true;if(sink)sink(result);return result.Succeeded();
-        };
+        namespace MS = GeometryProcessingDetail::MeshSupport;
+        if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Bilateral filter"))
+            return report(EditorCommandStatus::Pending, std::move(*busy));
+        auto queued = w->Result;
+        queued.Message = "Bilateral filtering queued.";
+        const MS::QueuedJobDelivery<EditorBilateralFilterResult> delivery{
+            context, std::move(onComplete), std::move(queued), "Bilateral filter"};
+        auto finalize=[w,delivery]{w->Abandoned=true;delivery.Finalize(w->MainFailure);};
+        auto validate=[context,w]{return MS::ValidateQueuedJob(w->Abandoned,CurrentInput(context,*w));};
+        // ValidateQueuedJob refuses an abandoned run, so publication never sees one.
+        auto publish=[context,w,delivery](KernelEventBus&,const JobResultEnvelope&)
+        {CompleteOutput(*w);return delivery.Publish(Publish(context,w));};
         JobToken previous{};
+        std::string rejectedStage;
         auto submit=[&](JobDesc desc)
         {
             if(previous.IsValid())desc.DependsOn.push_back({previous,"Complete the previous bilateral stage before this stage"});
+            std::string stage=desc.DebugName;
             previous=context.JobCommands.Submit(std::move(desc),identity);
+            if(!previous.IsValid())rejectedStage=std::move(stage);
             return previous.IsValid();
         };
         bool submitted=true;
@@ -409,10 +398,10 @@ namespace Extrinsic::Runtime
         }
         if(!submitted)
         {
-            w->Abandoned=true;pending.Status=EditorCommandStatus::GeometryProcessingFailed;
-            pending.Message="Bilateral job sequence submission was rejected.";
+            w->Abandoned=true;
+            return delivery.Rejected(rejectedStage);
         }
-        return pending;
+        return delivery.Pending();
     }
     EditorBilateralFilterResult ApplyEditorConfiguredBilateralFilter(
         const EditorProcessingCommands& commands,

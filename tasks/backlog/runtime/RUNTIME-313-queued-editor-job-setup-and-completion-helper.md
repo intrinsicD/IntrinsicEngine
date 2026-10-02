@@ -76,8 +76,16 @@ duplicate to `result_unavailable`; the single status must keep that mapping.
 | Descriptor analysis | "A descriptor job ..." -> "Descriptor analysis already has an active ..." | "Descriptor job cancelled or stale; previous outputs retained." -> "Descriptor analysis was cancelled ..." | "Descriptor scale/GPU/job submission rejected." -> "Descriptor analysis job submission was rejected (scale / Vulkan radius support)." | 2 |
 | Keypoint analysis (CPU) | "A keypoint job ..." -> "Keypoint analysis already has an active ..." | "Keypoint job cancelled or stale; previous outputs retained." -> "Keypoint analysis was cancelled ..." | as descriptors, label "Keypoint analysis" | 2 |
 | Point construction | "A construction job for this source/method is already active." -> "Point construction already has an active ..." | "Construction cancelled or stale; no entity created." -> "Point construction was cancelled ..." | "Construction preparation/GPU/output submission rejected." -> "Point construction job submission was rejected (preparation / Vulkan neighbors)." | 2 |
+| Bilateral filter | "A bilateral filter job for this output is already active." -> "Bilateral filter already has an active ..." | "Bilateral job cancelled or source stale; previous positions retained." -> "Bilateral filter was cancelled ..." | "Bilateral job sequence submission was rejected." -> "Bilateral filter job submission was rejected (<stage debug name>)." | 3 |
+| Vulkan point sampling | new: a second run on the same rank output answers Pending "Vulkan point sampling already has an active <state> job (job i:g)." before any upload or submission, without the callback (before: no guard, two runs raced) | "Vulkan point sampling cancelled or stale; nothing was changed." -> "Vulkan point sampling was cancelled or its source became stale; nothing was applied." | "The job lane rejected the Vulkan point sampling job." -> "Vulkan point sampling job submission was rejected."; still reported through the callback once, as every immediate answer of this operation is | 3 |
 | Normal estimation (Vulkan start), keypoints resident, scalar/outlier/smoothing GPU starts | still the hand-written "... already active." strings and differing statuses; migrated in slice 4 | - | - | 4 |
 
+- `jobs_list` / Jobs window: after a later stage's submission is rejected, the earlier queued stage now
+  ends `cancelled` instead of `stale-discarded` (it revalidates as Cancelled), pinned by
+  `QueuedEditorJobContract.RejectedLaterStageAbandonsTheQueuedStagesWithoutACallback`.
+- Coherent Point Drift keeps its own run object (`Busy` flag, deliver-once flag, interactive steps
+  without a completion callback); it is a run-based transaction rather than a queued Apply and is
+  left to the RUNTIME-311 transaction lifecycle.
 - Validation: an abandoned run now revalidates as `Cancelled` everywhere (JobState `Cancelled`, not
   `StaleDiscarded`). Before, DensityWeights/Descriptors/Keypoints/Construction answered `StaleGeneration`
   and Outliers, Density/Radii and Normals ignored the flag (`Current`); pinned by
