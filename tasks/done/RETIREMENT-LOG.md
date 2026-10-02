@@ -8,6 +8,16 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-02 — BUG-233 repeated scheduled texture bake flake
+
+Retired [BUG-233](BUG-233-scheduled-texture-bake-rebake-flake.md).
+
+- The bake tests raced the asynchronous generated-asset reload that UI-073's one-worker scheduler introduced.
+- Fix: the tests settle the worker. A new deterministic refusal-then-accept test was added, and 53 tests passed 200 repetitions under load.
+- Product behaviour is unchanged.
+
+Commit `6ea69ffa8`.
+
 ## 2026-10-02 — UI-073 texture bake progress adoption
 
 Retired [UI-073](UI-073-texture-bake-progress-adoption.md).

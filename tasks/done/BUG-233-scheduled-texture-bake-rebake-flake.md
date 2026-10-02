@@ -36,8 +36,21 @@ contract_review: A scheduling race inside the texture-bake runtime module; no ca
    that fails before the fix, and run the test 200 times under load.
 
 ## Acceptance criteria
-- [ ] The re-bake path is deterministic: a regression test that drives a re-bake while the previous run job is in flight fails before the fix and passes after.
-- [ ] `CallerOwnedBakeReconciliationIsAtomicAndPreservesUnrelatedChannels` passes 200 consecutive runs under parallel load.
+- [x] The re-bake path is deterministic: a regression test that drives a re-bake while the previous run job is in flight fails before the fix and passes after.
+- [x] `CallerOwnedBakeReconciliationIsAtomicAndPreservesUnrelatedChannels` passes 200 consecutive runs under parallel load.
+
+## Completion
+
+Commit: `6ea69ffa8`. Completed 2026-10-02.
+- Root cause: UI-073 gave the bake tests a one-worker scheduler, which made reloads of the generated texture assets asynchronous. The tests re-baked or forced readiness while the reload was in flight and hit the intended "still loading" refusal.
+- Product behaviour is correct.
+- Fix: the tests settle the worker before re-baking and inside `ForceReady`.
+- New contract test: `RuntimeTextureBakeModule.RebakeWhileTheGeneratedAssetsReloadIsRefusedUntilTheyAreReady`.
+- Evidence:
+  - Before the fix, `-R 'AssetWorkflowModule|TextureBakeModule' --repeat until-fail:200 -j16` failed 3 times.
+  - After the fix, all 53 tests passed 200 repetitions under the same load.
+  - Full CPU suite 5691/5691.
+- Whether the bake panel shows the refusal reason is being checked in RUNTIME-315 slice 6.
 
 ## Verification
 ```bash

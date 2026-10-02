@@ -5,10 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [BUG-233 — A repeated scheduled texture bake intermittently fails](BUG-233-scheduled-texture-bake-rebake-flake.md):
-  `AssetWorkflowModule.CallerOwnedBakeReconciliation...` fails ~1 in 5-30 full-suite runs at a
-  re-bake; tests raced asset loads on the scheduler worker UI-073 slice 1 introduced (fixed in
-  the tests, see the note). Found by the RUNTIME-315 full CPU gate.
 
 - [BUG-232 — A failed frame submit loses an accepted position copy](BUG-232-gpuworld-commit-copy-lost-on-failed-submit.md):
   a `CommitOnCopy` preview is erased once its copy is recorded; a submit failure leaves the block
