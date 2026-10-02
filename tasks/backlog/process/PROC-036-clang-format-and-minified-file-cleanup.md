@@ -43,7 +43,7 @@ Source: 2026-10-01 duplication/consistency audit (finding 2.6), re-verified at `
   compressed style; `clang-format` is not applied to GLSL here, so shaders are out of scope.
 - Several of these files are being edited by open work
   ([RUNTIME-311](../runtime/RUNTIME-311-unify-gpu-scalar-outlier-transaction-lifecycle.md),
-  [RUNTIME-313](../runtime/RUNTIME-313-queued-editor-job-setup-and-completion-helper.md),
+  [RUNTIME-313](../../done/RUNTIME-313-queued-editor-job-setup-and-completion-helper.md),
   [RUNTIME-314](../runtime/RUNTIME-314-reuse-existing-processing-helpers.md), UI-071/UI-072).
   Reformatting under them creates conflicts; land the format-only commit for each file when no branch
   holds it, or immediately before the semantic task starts.
