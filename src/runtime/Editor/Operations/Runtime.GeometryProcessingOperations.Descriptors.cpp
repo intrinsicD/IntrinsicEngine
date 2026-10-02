@@ -34,6 +34,7 @@ import Geometry.PointCloud.Features;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 
 namespace Extrinsic::Runtime
@@ -288,39 +289,31 @@ namespace Extrinsic::Runtime
         if(!context.JobCommands.Available()){Compute(*w);return Publish(context,w);}
         const EditorJobIdentity identity{.EntityId=config.StableEntityId,.Scope=ToEditorJobScope(w->Config.Outputs[0].Domain),
             .OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Config.Outputs[0].Name};
-        if (auto active = GeometryProcessingDetail::MeshSupport::FindActiveEditorJob(context, identity);
-            active && IsActiveEditorJobState(active->State))
-            return report(EditorCommandStatus::Pending,"A descriptor job for this output is already active.");
-        auto sink=GuardEditorProcessingResult(context, std::move(onComplete));auto delivered=std::make_shared<bool>(false);
-        auto pending=report(EditorCommandStatus::Pending,"Descriptor analysis queued.");
+        namespace MS = GeometryProcessingDetail::MeshSupport;
+        if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Descriptor analysis"))
+            return report(EditorCommandStatus::Pending, std::move(*busy));
         // Once submitted, Result belongs to the running stage. Submission failures
-        // report from this immutable snapshot while earlier stages wind down.
-        const auto rejected=[pending](std::string message)
-        {auto result=pending;result.Status=EditorCommandStatus::GeometryProcessingFailed;result.Message=std::move(message);return result;};
+        // report from the delivery's immutable snapshot while earlier stages wind down.
+        const MS::QueuedJobDelivery<EditorDescriptorAnalysisResult> delivery{
+            context, std::move(onComplete), report(EditorCommandStatus::Pending, "Descriptor analysis queued."), "Descriptor analysis"};
+        const auto validate=[context,w]{return MS::ValidateQueuedJob(w->Abandoned,CurrentInput(context,*w));};
         JobDesc desc{
             .DebugName="FPFH histograms",.Scope=context.World,.Kind=RuntimeTaskKinds::GeometryProcess,
             .Work=[w](const JobCancellation&){Compute(*w);return JobResultEnvelope::Make(true);},
-            .ValidateBeforeApply=[context,w]{return !w->Abandoned && CurrentInput(context,*w)?JobApplyValidation::Current:JobApplyValidation::StaleGeneration;},
-            .PublishCompletion=[context,w,sink,delivered](KernelEventBus&,const JobResultEnvelope&)
-            {auto result=Publish(context,w);*delivered=true;if(sink)sink(result);return result.Succeeded();},
-            .FinalizeUnpublishedOnMainThread=[w,sink,delivered,pending]() mutable
-            {
-                w->Abandoned=true;if(*delivered)return;*delivered=true;
-                if(w->MainFailure)pending=*w->MainFailure;
-                else {pending.Status=EditorCommandStatus::StaleEntity;pending.Message="Descriptor job cancelled or stale; previous outputs retained.";}
-                if(sink)sink(std::move(pending));
-            }};
+            .ValidateBeforeApply=validate,
+            .PublishCompletion=[context,w,delivery](KernelEventBus&,const JobResultEnvelope&){return delivery.Publish(Publish(context,w));},
+            .FinalizeUnpublishedOnMainThread=[w,delivery]{w->Abandoned=true;delivery.Finalize(w->MainFailure);}};
         if(w->Config.Backend==DescriptorAnalysisBackend::VulkanLBVH)
         {
             JobDesc prepare{
                 .DebugName="Descriptor scale",.Scope=context.World,.Kind=RuntimeTaskKinds::GeometryProcess,
                 .Work=[w](const JobCancellation&){Prepare(*w);return JobResultEnvelope::Make(true);},
-                .ValidateBeforeApply=[context,w]{return !w->Abandoned && CurrentInput(context,*w)?JobApplyValidation::Current:JobApplyValidation::StaleGeneration;},
+                .ValidateBeforeApply=validate,
                 .PublishCompletion=[w](KernelEventBus&,const JobResultEnvelope&)
                 {if(w->Result.Status==EditorCommandStatus::GeometryProcessingFailed){w->MainFailure=w->Result;return false;}return true;},
                 .FinalizeUnpublishedOnMainThread=[w]{w->Abandoned=true;}};
             const auto scale=context.JobCommands.Submit(std::move(prepare),identity);
-            if(!scale.IsValid())return rejected("Descriptor scale submission rejected.");
+            if(!scale.IsValid())return delivery.Rejected("scale");
             JobDesc gpu{
                 .DebugName="Descriptor radius support (Vulkan)",.Scope=context.World,.Kind=RuntimeTaskKinds::GeometryProcess,
                 .Work=[](const JobCancellation&){return JobResultEnvelope::Make(true);},
@@ -329,12 +322,12 @@ namespace Extrinsic::Runtime
                 .FinalizeUnpublishedOnMainThread=[w]{w->Abandoned=true;}};
             gpu.DependsOn.push_back({scale,"Resolve descriptor radius before complete Vulkan support"});
             const auto support=context.JobCommands.Submit(std::move(gpu),identity);
-            if(!support.IsValid()){w->Abandoned=true;return rejected("Descriptor GPU submission rejected.");}
+            if(!support.IsValid()){w->Abandoned=true;return delivery.Rejected("Vulkan radius support");}
             desc.DependsOn.push_back({support,"Required radius prefix before SPFH and FPFH histograms"});
         }
         const auto token=context.JobCommands.Submit(std::move(desc),identity);
-        if(!token.IsValid()){w->Abandoned=true;return rejected("Descriptor job submission rejected.");}
-        return pending;
+        if(!token.IsValid()){w->Abandoned=true;return delivery.Rejected();}
+        return delivery.Pending();
     }
     EditorDescriptorAnalysisResult ApplyEditorConfiguredDescriptorAnalysis(
         const EditorProcessingCommands& commands,

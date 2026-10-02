@@ -2761,7 +2761,7 @@ TEST_F(EditorKeypointAgent, AgentOperationDuplicateKeypointRequestTerminatesBusy
     const auto duplicate=Runtime::InvokeAgentOperation(registry,"run_keypoint_analysis",context,"{}",false);
     EXPECT_TRUE(duplicate.IsError)<<duplicate.Text;
     EXPECT_FALSE(duplicate.Continuation);
-    EXPECT_NE(duplicate.Text.find("already active"),std::string::npos)<<duplicate.Text;
+    EXPECT_NE(duplicate.Text.find("Keypoint analysis already has an active"),std::string::npos)<<duplicate.Text;
     EXPECT_EQ(duplicate.ErrorCode,"result_unavailable")<<"a duplicate is Pending without a callback, like the other operations";
     bool completed=false;
     const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(5);
@@ -3690,6 +3690,16 @@ TEST_F(EditorQueuedPointJobs, DuplicateSubmissionAnswersPendingWithTheSharedMess
         return Runtime::ApplyEditorKernelDensityCommand(fields, Density, done); });
     ExpectDuplicateRefused("Radii estimation", [&](auto done) {
         return Runtime::ApplyEditorPointSpacingCommand(fields, Spacing, done); });
+    SetNormalInputs();
+    const auto construction = Runtime::PrepareEditorPointConstructionFrame(Attachment).Commands;
+    ExpectDuplicateRefused("Density weights", [&](auto done) {
+        return Runtime::ApplyEditorDensityWeightCommand(Commands, Weights, done); });
+    ExpectDuplicateRefused("Descriptor analysis", [&](auto done) {
+        return Runtime::ApplyEditorDescriptorAnalysisCommand(Commands, Descriptors, done); });
+    ExpectDuplicateRefused("Keypoint analysis", [&](auto done) {
+        return Runtime::ApplyEditorKeypointAnalysisCommand(Commands, Keypoints, done); });
+    ExpectDuplicateRefused("Point construction", [&](auto done) {
+        return Runtime::ApplyEditorPointConstructionCommand(construction, Construction, done); });
 }
 
 TEST_F(EditorQueuedPointJobs, CancelledRunDeliversOnceWithTheSharedWording)
@@ -3704,4 +3714,14 @@ TEST_F(EditorQueuedPointJobs, CancelledRunDeliversOnceWithTheSharedWording)
         return Runtime::ApplyEditorKernelDensityCommand(fields, Density, done); });
     ExpectCancelFinalizesOnce("Radii estimation", [&](auto done) {
         return Runtime::ApplyEditorPointSpacingCommand(fields, Spacing, done); });
+    SetNormalInputs();
+    const auto construction = Runtime::PrepareEditorPointConstructionFrame(Attachment).Commands;
+    ExpectCancelFinalizesOnce("Density weights", [&](auto done) {
+        return Runtime::ApplyEditorDensityWeightCommand(Commands, Weights, done); });
+    ExpectCancelFinalizesOnce("Descriptor analysis", [&](auto done) {
+        return Runtime::ApplyEditorDescriptorAnalysisCommand(Commands, Descriptors, done); });
+    ExpectCancelFinalizesOnce("Keypoint analysis", [&](auto done) {
+        return Runtime::ApplyEditorKeypointAnalysisCommand(Commands, Keypoints, done); });
+    ExpectCancelFinalizesOnce("Point construction", [&](auto done) {
+        return Runtime::ApplyEditorPointConstructionCommand(construction, Construction, done); });
 }

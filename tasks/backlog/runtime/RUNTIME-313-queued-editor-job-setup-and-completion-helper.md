@@ -63,17 +63,25 @@ duplicate to `result_unavailable`; the single status must keep that mapping.
   - A reaped `jobs_wait` answer can carry a non-terminal `state` and skips the scene-epoch check.
 ## Implementation log
 - Shared owner: `MeshSupport::ActiveOutputJobRefusal`, `ValidateQueuedJob`, `QueuedJobDelivery<Result>`
-  (deliver-once; `Publish`, `Finalize`/`FinalizeFrom`, `Rejected`) declared in
+  (deliver-once; `Publish`, `Finalize`/`FinalizeAfterWorker`/`FinalizeFrom`, `Rejected`) declared in
   `Runtime.GeometryProcessingOperations.JobFailure.hpp`, non-template parts compiled in `...MeshSupport.cpp`.
 - User-visible status/message changes (one row per migrated operation):
 
 | Operation (label) | Duplicate submission | Cancelled/stale finalize | Rejected submission | Slice |
 |---|---|---|---|---|
-| Outlier estimation | "An outlier job for this output is already active." -> "Outlier estimation already has an active <state> job (job i:g)." (Pending, unchanged) | "Outlier job was cancelled or its source became stale; previous output retained." -> "Outlier estimation was cancelled or its source became stale; nothing was applied." (StaleEntity) | "Outlier job submission was rejected." -> "Outlier estimation job submission was rejected."; now also delivered once through the callback | 1 |
+| Outlier estimation | "An outlier job for this output is already active." -> "Outlier estimation already has an active <state> job (job i:g)." (Pending, unchanged) | "Outlier job was cancelled or its source became stale; previous output retained." -> "Outlier estimation was cancelled or its source became stale; nothing was applied." (StaleEntity) | "Outlier job submission was rejected." -> "Outlier estimation job submission was rejected." (immediate answer only, no callback, as before) | 1 |
 | Normal estimation (CPU) | same pattern, label "Normal estimation" | same pattern | same pattern | 1 |
 | Density / Radii estimation | "A density/radii job ..." -> "<Density/Radii> estimation already has an active ..." | "<Noun> job was cancelled ..." -> "<Noun> estimation was cancelled ..." | "<Noun> job submission ..." -> "<Noun> estimation job submission ..." | 1 |
+| Density weights | "A density-weight job for this output is already active." -> "Density weights already has an active ..." | "Density job cancelled or stale; previous output retained." -> "Density weights was cancelled ..." | "Density reduction submission rejected." -> "Density weights job submission was rejected." | 2 |
+| Descriptor analysis | "A descriptor job ..." -> "Descriptor analysis already has an active ..." | "Descriptor job cancelled or stale; previous outputs retained." -> "Descriptor analysis was cancelled ..." | "Descriptor scale/GPU/job submission rejected." -> "Descriptor analysis job submission was rejected (scale / Vulkan radius support)." | 2 |
+| Keypoint analysis (CPU) | "A keypoint job ..." -> "Keypoint analysis already has an active ..." | "Keypoint job cancelled or stale; previous outputs retained." -> "Keypoint analysis was cancelled ..." | as descriptors, label "Keypoint analysis" | 2 |
+| Point construction | "A construction job for this source/method is already active." -> "Point construction already has an active ..." | "Construction cancelled or stale; no entity created." -> "Point construction was cancelled ..." | "Construction preparation/GPU/output submission rejected." -> "Point construction job submission was rejected (preparation / Vulkan neighbors)." | 2 |
+| Normal estimation (Vulkan start), keypoints resident, scalar/outlier/smoothing GPU starts | still the hand-written "... already active." strings and differing statuses; migrated in slice 4 | - | - | 4 |
 
-- Validation: Outliers, Density/Radii and Normals now answer `Cancelled` for an abandoned run instead of
+- Validation: an abandoned run now revalidates as `Cancelled` everywhere (JobState `Cancelled`, not
+  `StaleDiscarded`). Before, DensityWeights/Descriptors/Keypoints/Construction answered `StaleGeneration`
+  and Outliers, Density/Radii and Normals ignored the flag (`Current`); pinned by
+  `QueuedEditorJobContract.AbandonedRunRevalidatesAsCancelledAndDeliversOnce`. Outliers, Density/Radii and Normals answer `Cancelled` for an abandoned run instead of
   ignoring the flag. Not observable for these single-stage jobs (the flag is set only by their own
   finalizer, after which nothing revalidates); it unifies the rule for multi-stage runs. The same holds
   for setting the delivered flag in finalize: these jobs already suppressed a second delivery through

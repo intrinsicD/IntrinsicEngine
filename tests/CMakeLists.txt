@@ -1323,6 +1323,7 @@ if(TARGET ExtrinsicRuntime)
     Test.DensityWeightOperations.cpp
     Test.PointConstructionOperations.cpp
     Test.PointSpacingOperations.cpp
+    Test.QueuedEditorJobContract.cpp
         Test.PrimitiveSelectionRefinement.cpp
         Test.PrimitiveSelectionRefinementWiring.cpp
         Test.ProceduralGeometryExtraction.cpp

@@ -60,6 +60,7 @@ import Geometry.HalfedgeMesh.IO;
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/internal/Runtime.EditorGeneratedEntity.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 namespace Extrinsic::Runtime
 {
@@ -564,20 +565,13 @@ namespace Extrinsic::Runtime
             .Scope = ToEditorJobScope(w->Config.Positions.Domain),
             .OutputSemantic = GeometryPresentationSlotSemantic::Displacement,
             .OutputName = std::string("construct:") + ToString(config.Method)};
-        if (auto active = GeometryProcessingDetail::MeshSupport::FindActiveEditorJob(context, identity);
-            active && IsActiveEditorJobState(active->State))
-            return report(EditorCommandStatus::Pending,
-                          "A construction job for this source/method is already active.");
-        const auto pending = report(EditorCommandStatus::Pending, "Point construction queued.");
-        auto delivered = std::make_shared<bool>(false);
-        auto sink = GuardEditorProcessingResult(context, std::move(onComplete));
-        const auto rejected = [pending](std::string message)
-        {
-            auto r = pending;
-            r.Status = EditorCommandStatus::GeometryProcessingFailed;
-            r.Message = std::move(message);
-            return r;
-        };
+        namespace MS = GeometryProcessingDetail::MeshSupport;
+        if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Point construction"))
+            return report(EditorCommandStatus::Pending, std::move(*busy));
+        const MS::QueuedJobDelivery<EditorPointConstructionResult> delivery{
+            context, std::move(onComplete), report(EditorCommandStatus::Pending, "Point construction queued."),
+            "Point construction"};
+        const auto validate = [context, w] { return MS::ValidateQueuedJob(w->Abandoned, Current(context, *w)); };
         JobDesc final{.DebugName = "Point construction",
                       .Scope = context.World,
                       .Kind = RuntimeTaskKinds::GeometryProcess,
@@ -592,39 +586,15 @@ namespace Extrinsic::Runtime
                           BuildOutput(*w);
                           return JobResultEnvelope::Make(true);
                       },
-                      .ValidateBeforeApply =
-                          [context, w]
-                      {
-                          return !w->Abandoned && Current(context, *w)
-                                     ? JobApplyValidation::Current
-                                     : JobApplyValidation::StaleGeneration;
-                      },
+                      .ValidateBeforeApply = validate,
                       .PublishCompletion =
-                          [context, w, sink, delivered](KernelEventBus&, const JobResultEnvelope&)
-                      {
-                          const auto r = Publish(context, w);
-                          *delivered = true;
-                          if (sink)
-                              sink(r);
-                          return r.Succeeded();
-                      },
+                          [context, w, delivery](KernelEventBus&, const JobResultEnvelope&)
+                      { return delivery.Publish(Publish(context, w)); },
                       .FinalizeUnpublishedOnMainThread =
-                          [w, sink, delivered, pending]() mutable
+                          [w, delivery]
                       {
                           w->Abandoned = true;
-                          if (*delivered)
-                              return;
-                          *delivered = true;
-                          auto r = pending;
-                          if (w->MainFailure)
-                              r = *w->MainFailure;
-                          else
-                          {
-                              r.Status = EditorCommandStatus::StaleEntity;
-                              r.Message = "Construction cancelled or stale; no entity created.";
-                          }
-                          if (sink)
-                              sink(std::move(r));
+                          delivery.Finalize(w->MainFailure);
                       }};
         if (w->Config.Backend == PointConstructionBackend::VulkanLBVH)
         {
@@ -637,13 +607,7 @@ namespace Extrinsic::Runtime
                                 Prepare(*w);
                                 return JobResultEnvelope::Make(true);
                             },
-                            .ValidateBeforeApply =
-                                [context, w]
-                            {
-                                return !w->Abandoned && Current(context, *w)
-                                           ? JobApplyValidation::Current
-                                           : JobApplyValidation::StaleGeneration;
-                            },
+                            .ValidateBeforeApply = validate,
                             .PublishCompletion =
                                 [w](KernelEventBus&, const JobResultEnvelope&)
                             {
@@ -654,7 +618,7 @@ namespace Extrinsic::Runtime
                             .FinalizeUnpublishedOnMainThread = [w] { w->Abandoned = true; }};
             const auto prepared = context.JobCommands.Submit(std::move(prepare), identity);
             if (!prepared.IsValid())
-                return rejected("Construction preparation submission rejected.");
+                return delivery.Rejected("preparation");
             JobDesc gpu{.DebugName = "Construction neighbors (Vulkan)",
                         .Scope = context.World,
                         .Kind = RuntimeTaskKinds::GeometryProcess,
@@ -669,7 +633,7 @@ namespace Extrinsic::Runtime
             if (!support.IsValid())
             {
                 w->Abandoned = true;
-                return rejected("Construction GPU submission rejected.");
+                return delivery.Rejected("Vulkan neighbors");
             }
             final.DependsOn.push_back(
                 {support, "Complete Vulkan neighborhoods before geometry extraction"});
@@ -678,9 +642,9 @@ namespace Extrinsic::Runtime
         if (!token.IsValid())
         {
             w->Abandoned = true;
-            return rejected("Construction output submission rejected.");
+            return delivery.Rejected();
         }
-        return pending;
+        return delivery.Pending();
     }
     EditorPointConstructionResult
     ApplyEditorConfiguredPointConstruction(const EditorProcessingCommands& commands,

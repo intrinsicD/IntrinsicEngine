@@ -688,7 +688,7 @@ namespace Extrinsic::Runtime
             },
             .FinalizeUnpublishedOnMainThread = [w, delivery] {
                 w->Abandoned = true;
-                delivery.Finalize(w->Result.Status == EditorCommandStatus::GeometryProcessingFailed ? &w->Result : nullptr);
+                delivery.FinalizeAfterWorker(w->Result);
             }};
         if (!context.JobCommands.Submit(std::move(desc), identity).IsValid())
         {

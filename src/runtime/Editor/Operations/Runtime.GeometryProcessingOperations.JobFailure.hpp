@@ -51,8 +51,8 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
     // Deliver-once completion of a queued editor job. Copies share one state,
     // so every stage of a multi-stage run captures the same delivery. The
     // callback is guarded against a detached attachment and fires at most once
-    // per delivery: from `Publish`, `Finalize` or `Rejected`, whichever comes
-    // first. Main thread only, like the JobService callbacks that call it.
+    // per delivery: from `Publish` or a `Finalize*`, whichever comes first, and
+    // never after `Rejected`. Main thread only, like the JobService callbacks that call it.
     template <class Result>
     class QueuedJobDelivery
     {
@@ -82,18 +82,26 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             return succeeded;
         }
 
-        // `FinalizeUnpublishedOnMainThread`: a worker failure (`failure`) is
-        // delivered as it is; otherwise the pending snapshot, or the caller's
-        // `latest` progress, ends as StaleEntity with the shared wording.
-        void Finalize(const Result* failure = nullptr) const
+        // `FinalizeUnpublishedOnMainThread`. A failure the run recorded (a stage
+        // that refused to continue) is delivered as it is; otherwise the pending
+        // snapshot ends as StaleEntity with the shared wording.
+        void Finalize(const std::optional<Result>& failure = std::nullopt) const
         {
-            if (failure != nullptr)
-            {
+            if (failure)
                 Deliver(*failure);
-                return;
-            }
-            FinalizeFrom(m_State->Pending);
+            else
+                FinalizeFrom(m_State->Pending);
         }
+        // Finalize for jobs whose worker writes its result in place: a worker
+        // that failed (`GeometryProcessingFailed`) is reported as it is.
+        void FinalizeAfterWorker(const Result& worker) const
+        {
+            if (worker.Status == EditorCommandStatus::GeometryProcessingFailed)
+                Deliver(worker);
+            else
+                FinalizeFrom(m_State->Pending);
+        }
+        // As `Finalize`, from the caller's latest progress instead of the snapshot.
         void FinalizeFrom(Result latest) const
         {
             latest.Status = EditorCommandStatus::StaleEntity;
@@ -101,14 +109,15 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             Deliver(std::move(latest));
         }
 
-        // A rejected submission: the failure is both the immediate answer and
-        // the one delivery, so a later stage's finalizer delivers nothing.
+        // A rejected submission. The failure is the immediate answer only (the
+        // caller already reports it, as for every other immediate failure); the
+        // delivery closes so an earlier stage's finalizer delivers nothing.
         [[nodiscard]] Result Rejected(std::string_view stage = {}) const
         {
+            m_State->Delivered = true;
             auto result = m_State->Pending;
             result.Status = EditorCommandStatus::GeometryProcessingFailed;
             result.Message = QueuedJobRejectedMessage(m_State->Label, stage);
-            Deliver(result);
             return result;
         }
 

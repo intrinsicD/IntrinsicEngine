@@ -32,6 +32,7 @@ import Extrinsic.Runtime.JobService;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuScalar.hpp"
 namespace Extrinsic::Runtime
@@ -201,26 +202,18 @@ namespace Extrinsic::Runtime
         if(!context.JobCommands.Available()){Compute(*w);return Publish(context,w);}
         const EditorJobIdentity identity{.EntityId=config.StableEntityId,.Scope=ToEditorJobScope(w->Config.Weights.Domain),
             .OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Config.Weights.Name};
-        if (auto active = GeometryProcessingDetail::MeshSupport::FindActiveEditorJob(context, identity);
-            active && IsActiveEditorJobState(active->State))
-            return report(EditorCommandStatus::Pending,"A density-weight job for this output is already active.");
-        auto sink=GuardEditorProcessingResult(context, std::move(onComplete));auto delivered=std::make_shared<bool>(false);
-        const auto pending=report(EditorCommandStatus::Pending,"Density weights queued.");
-        const auto rejected=[pending](std::string message){auto r=pending;r.Status=EditorCommandStatus::GeometryProcessingFailed;r.Message=std::move(message);return r;};
+        namespace MS = GeometryProcessingDetail::MeshSupport;
+        if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Density weights"))
+            return report(EditorCommandStatus::Pending, std::move(*busy));
+        const MS::QueuedJobDelivery<EditorDensityWeightResult> delivery{
+            context, std::move(onComplete), report(EditorCommandStatus::Pending, "Density weights queued."), "Density weights"};
         JobDesc desc{.DebugName="Compact density weights",.Scope=context.World,.Kind=RuntimeTaskKinds::GeometryProcess,
             .Work=[w](const JobCancellation&){Compute(*w);return JobResultEnvelope::Make(true);},
-            .ValidateBeforeApply=[context,w]{return !w->Abandoned && Current(context,*w)?JobApplyValidation::Current:JobApplyValidation::StaleGeneration;},
-            .PublishCompletion=[context,w,sink,delivered](KernelEventBus&,const JobResultEnvelope&)
-            {auto r=Publish(context,w);*delivered=true;if(sink)sink(r);return r.Succeeded();},
-            .FinalizeUnpublishedOnMainThread=[w,sink,delivered,pending]() mutable
-            {
-                w->Abandoned=true;if(*delivered)return;*delivered=true;auto r=pending;
-                r.Status=EditorCommandStatus::StaleEntity;r.Message="Density job cancelled or stale; previous output retained.";
-                if(sink)sink(std::move(r));
-            }};
-        const auto token=context.JobCommands.Submit(std::move(desc),identity);
-        if(!token.IsValid()){w->Abandoned=true;return rejected("Density reduction submission rejected.");}
-        return pending;
+            .ValidateBeforeApply=[context,w]{return MS::ValidateQueuedJob(w->Abandoned,Current(context,*w));},
+            .PublishCompletion=[context,w,delivery](KernelEventBus&,const JobResultEnvelope&){return delivery.Publish(Publish(context,w));},
+            .FinalizeUnpublishedOnMainThread=[w,delivery]{w->Abandoned=true;delivery.Finalize();}};
+        if(!context.JobCommands.Submit(std::move(desc),identity).IsValid()){w->Abandoned=true;return delivery.Rejected();}
+        return delivery.Pending();
     }
     EditorDensityWeightResult ApplyEditorConfiguredDensityWeight(const EditorProcessingCommands& commands, std::function<void(EditorDensityWeightResult)> onComplete)
     {

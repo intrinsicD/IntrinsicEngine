@@ -46,6 +46,7 @@ import Extrinsic.Runtime.JobService;
 #include "Editor/internal/Runtime.EditorFramedGpuJob.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 
 namespace Extrinsic::Runtime
@@ -463,39 +464,31 @@ namespace Extrinsic::Runtime
         if(!context.JobCommands.Available()){Compute(*w);return Publish(context,w);}
         const EditorJobIdentity identity{.EntityId=config.StableEntityId,.Scope=ToEditorJobScope(w->Config.Mask.Domain),
             .OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Config.Mask.Name};
-        if (auto active = GeometryProcessingDetail::MeshSupport::FindActiveEditorJob(context, identity);
-            active && IsActiveEditorJobState(active->State))
-            return report(EditorCommandStatus::Pending,"A keypoint job for this output is already active."); // the active job owns the callback
-        auto sink=GuardEditorProcessingResult(context, std::move(onComplete));auto delivered=std::make_shared<bool>(false);
-        auto pending=report(EditorCommandStatus::Pending,"Keypoint analysis queued.");
+        namespace MS = GeometryProcessingDetail::MeshSupport;
+        if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Keypoint analysis"))
+            return report(EditorCommandStatus::Pending, std::move(*busy)); // the active job owns the callback
         // Once submitted, Result belongs to the running stage. Submission failures
-        // report from this immutable snapshot while earlier stages wind down.
-        const auto rejected=[pending](std::string message)
-        {auto result=pending;result.Status=EditorCommandStatus::GeometryProcessingFailed;result.Message=std::move(message);return result;};
+        // report from the delivery's immutable snapshot while earlier stages wind down.
+        const MS::QueuedJobDelivery<EditorKeypointAnalysisResult> delivery{
+            context, std::move(onComplete), report(EditorCommandStatus::Pending, "Keypoint analysis queued."), "Keypoint analysis"};
+        const auto validate=[context,w]{return MS::ValidateQueuedJob(w->Abandoned,CurrentInput(context,*w));};
         JobDesc desc{
             .DebugName="Keypoint covariance and suppression",.Scope=context.World,.Kind=RuntimeTaskKinds::GeometryProcess,
             .Work=[w](const JobCancellation&){Compute(*w);return JobResultEnvelope::Make(true);},
-            .ValidateBeforeApply=[context,w]{return !w->Abandoned && CurrentInput(context,*w)?JobApplyValidation::Current:JobApplyValidation::StaleGeneration;},
-            .PublishCompletion=[context,w,sink,delivered](KernelEventBus&,const JobResultEnvelope&)
-            {auto result=Publish(context,w);*delivered=true;if(sink)sink(result);return result.Succeeded();},
-            .FinalizeUnpublishedOnMainThread=[w,sink,delivered,pending]() mutable
-            {
-                w->Abandoned=true;if(*delivered)return;*delivered=true;
-                if(w->MainFailure)pending=*w->MainFailure;
-                else {pending.Status=EditorCommandStatus::StaleEntity;pending.Message="Keypoint job cancelled or stale; previous outputs retained.";}
-                if(sink)sink(std::move(pending));
-            }};
+            .ValidateBeforeApply=validate,
+            .PublishCompletion=[context,w,delivery](KernelEventBus&,const JobResultEnvelope&){return delivery.Publish(Publish(context,w));},
+            .FinalizeUnpublishedOnMainThread=[w,delivery]{w->Abandoned=true;delivery.Finalize(w->MainFailure);}};
         if(w->Config.Backend==KeypointAnalysisBackend::VulkanLBVH)
         {
             JobDesc prepare{
                 .DebugName="Keypoint scale",.Scope=context.World,.Kind=RuntimeTaskKinds::GeometryProcess,
                 .Work=[w](const JobCancellation&){Prepare(*w);return JobResultEnvelope::Make(true);},
-                .ValidateBeforeApply=[context,w]{return !w->Abandoned && CurrentInput(context,*w)?JobApplyValidation::Current:JobApplyValidation::StaleGeneration;},
+                .ValidateBeforeApply=validate,
                 .PublishCompletion=[w](KernelEventBus&,const JobResultEnvelope&)
                 {if(w->Result.Status==EditorCommandStatus::GeometryProcessingFailed){w->MainFailure=w->Result;return false;}return true;},
                 .FinalizeUnpublishedOnMainThread=[w]{w->Abandoned=true;}};
             const auto scale=context.JobCommands.Submit(std::move(prepare),identity);
-            if(!scale.IsValid())return rejected("Keypoint scale submission rejected.");
+            if(!scale.IsValid())return delivery.Rejected("scale");
             JobDesc gpu{
                 .DebugName="Keypoint radius support (Vulkan)",.Scope=context.World,.Kind=RuntimeTaskKinds::GeometryProcess,
                 .Work=[](const JobCancellation&){return JobResultEnvelope::Make(true);},
@@ -504,12 +497,12 @@ namespace Extrinsic::Runtime
                 .FinalizeUnpublishedOnMainThread=[w]{w->Abandoned=true;}};
             gpu.DependsOn.push_back({scale,"Resolve keypoint radii before complete Vulkan support"});
             const auto support=context.JobCommands.Submit(std::move(gpu),identity);
-            if(!support.IsValid()){w->Abandoned=true;return rejected("Keypoint GPU submission rejected.");}
+            if(!support.IsValid()){w->Abandoned=true;return delivery.Rejected("Vulkan radius support");}
             desc.DependsOn.push_back({support,"Complete radius support before keypoint covariance and suppression"});
         }
         const auto token=context.JobCommands.Submit(std::move(desc),identity);
-        if(!token.IsValid()){w->Abandoned=true;return rejected("Keypoint job submission rejected.");}
-        return pending;
+        if(!token.IsValid()){w->Abandoned=true;return delivery.Rejected();}
+        return delivery.Pending();
     }
     EditorKeypointAnalysisResult ApplyEditorConfiguredKeypointAnalysis(const EditorProcessingCommands& commands, std::function<void(EditorKeypointAnalysisResult)> onComplete)
     {
