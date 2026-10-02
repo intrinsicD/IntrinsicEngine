@@ -240,6 +240,11 @@ TEST(CoreTasks, ParkedWorkerDispatchHandshakeMakesRepeatedProgress)
     {
         while (Scheduler::GetStats().ParkedWorkers != 1u)
             std::this_thread::yield();
+        // A published park can still be in the waiter's pre-sleep spin, where a racing
+        // dispatch may legitimately skip the notify. Give the first iteration time to
+        // block so at least one dispatch must notify a sleeping worker.
+        if (iteration == 0u)
+            std::this_thread::sleep_for(std::chrono::milliseconds{20});
 
         Scheduler::Dispatch([&completed]()
         {
@@ -265,7 +270,8 @@ TEST(CoreTasks, ParkedWorkerDispatchHandshakeMakesRepeatedProgress)
     // sees zero parked workers and legitimately skips the notify. The exact
     // count is therefore not an invariant; progress is (checked above and by
     // the completion wait). Require only that notifications are never
-    // over-counted and that the parked-worker path was exercised.
+    // over-counted and that the sleeping-worker notify of the first iteration
+    // was counted (only a spurious futex wake could skip it).
     const auto notifications =
         stats.WorkerWakeNotifications - wakeNotificationsBefore;
     EXPECT_LE(notifications, static_cast<std::uint64_t>(iterationCount));
