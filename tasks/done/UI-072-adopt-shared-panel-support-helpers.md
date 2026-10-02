@@ -20,8 +20,8 @@ re-implementations, so labels, ranges, defaults and result feedback come from on
 Source: 2026-10-01 duplication/consistency audit (findings 3.2, 3.5, 4.6), re-verified at
 `665c693dd`. MPP = `src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp`. Line numbers are
 at the audit revision. The runtime-side reuse items are in
-[RUNTIME-314](../runtime/RUNTIME-314-reuse-existing-processing-helpers.md); the GPU row and
-disabled-reason presentation are [UI-071](UI-071-gpu-transaction-controls-and-refusal-presentation.md).
+[RUNTIME-314](../backlog/runtime/RUNTIME-314-reuse-existing-processing-helpers.md); the GPU row and
+disabled-reason presentation are [UI-071](../backlog/ui/UI-071-gpu-transaction-controls-and-refusal-presentation.md).
 
 1. "Show ..." buttons bypass `DrawProcessingPropertyShowButton`. Six sites (MPP ~2213, ~2304,
    ~2394, ~2463, ~2535, ~2724) each repeat `Button` + `DebugNameForEditorCommandStatus(ShowProcessingProperty(...))`
@@ -31,7 +31,7 @@ disabled-reason presentation are [UI-071](UI-071-gpu-transaction-controls-and-re
    (~3464, ~3521) and Point Sampling (~4298). The runtime already defines tables for Eigenbasis,
    Harmonic Field, Scalar Gradient, Geodesics and Mesh Curvature (RUNTIME-276 slice A), and these
    panels still use raw `Combo`/`InputDouble`/`InputScalar`. The adoption list survives only in the
-   retired [UI-057](../../done/UI-057-schema-driven-field-hints.md) ("when a panel is next touched").
+   retired [UI-057](UI-057-schema-driven-field-hints.md) ("when a panel is next touched").
 3. The topology panels (denoise, remesh, subdivide, simplify) clamp in the panel
    (`std::clamp(NormalIterations, 1, 4096)`, sigma 0..1e6, float where the command takes double)
    although `EditorMeshDenoiseFieldSpecs()`, `...RemeshFieldSpecs()`, `...SubdivideFieldSpecs()` and
@@ -49,12 +49,21 @@ with "Apply configuration"), anonymous-namespace helpers in MPP that MP re-imple
 verb and `##` ID consistency, unit labels (deg vs radians), and widths (UI-049).
 
 ## Acceptance criteria
-- [ ] The six Show sites use `DrawProcessingPropertyShowButton` (optional label); no raw `ShowProcessingProperty` + `Display:` text remains in panels.
-- [ ] Eigenbasis, Harmonic Field, Scalar Gradient, Geodesics and Mesh Curvature panels use the `DrawSpec*` widgets with their runtime tables (tooltip, range and default from the table).
-- [ ] Topology panels derive ranges from `EditorMesh*FieldSpecs()`; panel-local `std::clamp` literals and float/double mismatches are gone.
-- [ ] Backend combo labels for migrated panels come from the owning enum/table; remaining hard-coded combos are listed in the task log.
-- [ ] Tests assert the migrated widgets reject/clamp out-of-range input per the table; no change to what the commands accept.
-- [ ] Point-family adoption is recorded as blocked on RUNTIME-276 slice B, not silently dropped.
+- [x] The six Show sites use `DrawProcessingPropertyShowButton` (optional label); no raw `ShowProcessingProperty` + `Display:` text remains in panels.
+- [x] Eigenbasis, Harmonic Field, Scalar Gradient, Geodesics and Mesh Curvature panels use the `DrawSpec*` widgets with their runtime tables (tooltip, range and default from the table).
+- [x] Topology panels derive ranges from `EditorMesh*FieldSpecs()`; panel-local `std::clamp` literals and float/double mismatches are gone.
+- [x] Backend combo labels for migrated panels come from the owning enum/table; remaining hard-coded combos are listed in the task log.
+- [x] Tests assert the migrated widgets reject/clamp out-of-range input per the table; no change to what the commands accept.
+- [x] Point-family adoption is recorded as blocked on RUNTIME-276 slice B, not silently dropped.
+
+## Completion
+
+Commit: `f16338564`, `63a1836b0`, `099f47115`, `b0b9eebf4`, `110a1ff71`. Completed 2026-10-02 with independent Opus reviews per slice and a final acceptance review.
+- Full CPU suite 5650/5650.
+- Panels share the Show/Display helpers and the `DrawSpec*` widgets. Topology drags read `EditorMesh*FieldSpecs()`.
+- Typed input clamps to the table range, and exclusive bounds are respected (`110a1ff71`).
+- Backend display labels and point-family adoption are owned by RUNTIME-276 slice B.
+- Maturity: Operational for the UI (CPU ImGui tests). No GPU behavior changed.
 
 ## Verification
 ```bash

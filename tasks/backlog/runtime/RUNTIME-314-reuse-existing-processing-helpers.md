@@ -19,7 +19,7 @@ algorithm changes; each item below is its own reviewable commit.
 
 ## Context
 Source: 2026-10-01 duplication/consistency audit (finding set 4), re-verified at `665c693dd`.
-The UI-side items from the same audit are in [UI-072](../ui/UI-072-adopt-shared-panel-support-helpers.md).
+The UI-side items from the same audit are in [UI-072](../../done/UI-072-adopt-shared-panel-support-helpers.md).
 
 1. `Geometry::Validation::IsFinite(vec2/vec3/dvec3)` (`src/geometry/Geometry.Validation.cppm:14-18`)
    is imported by no runtime file, while about 25 local finite-checks exist, for example

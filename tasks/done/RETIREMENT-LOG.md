@@ -8,6 +8,18 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-02 — UI-072 adopt shared panel-support helpers
+
+Retired [UI-072](UI-072-adopt-shared-panel-support-helpers.md).
+
+- Show buttons and display diagnostics use the shared helpers.
+- The mesh-field panels use the `DrawSpec*` widgets with their runtime tables.
+- The topology panels take ranges and defaults from `EditorMesh*FieldSpecs()`.
+- Clamping respects exclusive bounds.
+- RUNTIME-276 slice B owns the point-family adoption and backend display labels.
+
+Commits `f16338564` through `110a1ff71`.
+
 ## 2026-10-02 — UI-070 camera pose command, view presets and Focus selection
 
 Retired [UI-070](UI-070-camera-pose-command-and-controls.md).
