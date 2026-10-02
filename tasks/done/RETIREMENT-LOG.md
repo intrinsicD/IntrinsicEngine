@@ -8,6 +8,22 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-02 — RUNTIME-312 agent control lane: MCP hardening, conformance and tool coverage
+
+Retired [RUNTIME-312](RUNTIME-312-agent-lane-mcp-hardening-and-coverage.md). The MCP lane now
+serves calls while the Sandbox is minimized (captures fail fast with a typed error), keeps a
+deferred reply owned by its connection, and the bridge answers `ping` during calls, forwards
+notifications and announces a later-started Sandbox. The server negotiates protocol versions,
+returns `structuredContent`, marks non-undoable tools destructive and refuses `view_capture`
+overwrites. `notifications/progress` follows each call's own run through the shared UI-069 read
+model (editor job, service correlation id or scene job token) and `notifications/cancelled`
+silences the reply. Tool surface: keypoint, k-means and consolidation previews, a table-driven
+`run_operation`/`preview_operation`, scene save/load, `set_visibility`, `set_camera` (controller
+kind) and `import_file` with `wait`. Maturity: CPUContracted. The lane is exercised by socket
+integration tests against a real engine with the Null window plus the bridge regression; no
+live Vulkan Sandbox session. Owned elsewhere: job cancel by RUNTIME-279, camera pose by UI-070,
+texture bake progress by UI-073. Commits `a5eeaacb9` through the retirement commit.
+
 ## 2026-10-02 — UI-069 shared operation progress read model and panel widget
 
 Retired [UI-069](UI-069-shared-operation-progress-widget.md). No production job ever

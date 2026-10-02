@@ -52,7 +52,7 @@ MCP progress notifications read the same model.
 - [UI-060](../backlog/ui/UI-060-jobs-window.md) should reuse the widget and projection for its
   rows.
 - The agent side is RUNTIME-312 slice 8
-  ([RUNTIME-312](../backlog/runtime/RUNTIME-312-agent-lane-mcp-hardening-and-coverage.md)).
+  ([RUNTIME-312](RUNTIME-312-agent-lane-mcp-hardening-and-coverage.md)).
 
 ## Slice plan
 1. **Read model.**

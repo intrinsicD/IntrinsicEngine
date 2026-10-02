@@ -259,14 +259,14 @@ mesh health ([GEOM-110](../../tasks/backlog/geometry/GEOM-110-connected-componen
 [RUNTIME-286](../../tasks/backlog/runtime/RUNTIME-286-mesh-health-report.md),
 [UI-066](../../tasks/backlog/ui/UI-066-mesh-health-window.md)).
 Planned: lane hardening (the remaining protocol conformance) and the remaining operation tools in
-[RUNTIME-312](../../tasks/backlog/runtime/RUNTIME-312-agent-lane-mcp-hardening-and-coverage.md).
+[RUNTIME-312](../../tasks/done/RUNTIME-312-agent-lane-mcp-hardening-and-coverage.md).
 
 ## Limitations
 
 - Operation tools exist for the configured operations of the table above, registration (ICP,
   Coherent Point Drift), point sampling, keypoint analysis, k-means and point-cloud
   consolidation, scene files, visibility and the camera controller kind. Camera pose, presets
-  and focus have no editor command yet; see [RUNTIME-312](../../tasks/backlog/runtime/RUNTIME-312-agent-lane-mcp-hardening-and-coverage.md).
+  and focus have no editor command yet; see [RUNTIME-312](../../tasks/done/RUNTIME-312-agent-lane-mcp-hardening-and-coverage.md).
 - Imports are asynchronous (`Pending`): pass `wait: true`, or poll `scene_entities` for the result.
 - Unix-domain sockets only; Windows builds report `Unsupported`.
 - A Sandbox killed by a signal leaves its socket file; the next start replaces it.
