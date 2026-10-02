@@ -442,6 +442,74 @@ namespace Extrinsic::Runtime
             return Ok({{"entity", *entity}, {"domains", std::move(domains)}});
         }
 
+        // Why a refused binding was refused, in the panel's words where the model has them.
+        std::string BindingRefusal(const EditorCommandStatus status, const EditorAttributeBindingCommand& command,
+                                   const EditorAttributeBindingRow* row)
+        {
+            const std::string what = std::string(ToString(command.Attribute)) + " on " + std::string(ToString(command.Domain));
+            std::string text = std::string(DebugNameForEditorCommandStatus(status)) + ": ";
+            if (status == EditorCommandStatus::StaleEntity) return text + "no entity with id " + std::to_string(command.StableEntityId) + ".";
+            if (status == EditorCommandStatus::UnsupportedRenderAttribute && row != nullptr)
+                return text + "entity " + std::to_string(command.StableEntityId) + " does not draw the lane that shows " + what +
+                       " (point sizes need a shown points lane, line widths an edges lane; see set_visibility).";
+            if (status == EditorCommandStatus::UnsupportedRenderAttribute || row == nullptr)
+                return text + "entity " + std::to_string(command.StableEntityId) + " has no " + what +
+                       " row (the attribute is not defined on that element domain, or the entity lacks the domain); see attribute_bindings.";
+            if (const auto candidate = std::ranges::find_if(row->Candidates, [&](const EditorAttributeBindingCandidate& c) {
+                    return c.Property.Name == command.PropertyName; });
+                candidate != row->Candidates.end() && !candidate->DisabledReason.empty())
+                return text + "'" + command.PropertyName + "' cannot be the " + what + " source: " + candidate->DisabledReason + ".";
+            return text + "'" + command.PropertyName + "' cannot be the " + what + " source (" + row->ExpectedType +
+                   " on that domain expected); see attribute_bindings.";
+        }
+
+        // Runs the panel's ApplyEditorAttributeBindingCommand (one undo step on the attribute's owner)
+        // and answers with the resulting row of the binding table; refusals carry the status as code.
+        AgentOperationOutcome ApplyAttributeBinding(const AgentOperationContext& context, const EditorAttributeBindingCommand& command,
+                                                    Json reply)
+        {
+            const auto visualization = PrepareEditorVisualizationEditingFrame(*context.Attachment);
+            const EditorCommandStatus status = ApplyEditorAttributeBindingCommand(visualization.Commands, command);
+            const auto model = AttributeBindingModel(context, command.StableEntityId);
+            const EditorAttributeBindingRow* row = nullptr;
+            if (model)
+                for (const EditorAttributeBindingRow& r : model->Rows)
+                    if (r.Attribute == command.Attribute && r.Domain == command.Domain) row = &r;
+            if (status != EditorCommandStatus::Applied && status != EditorCommandStatus::NoChange)
+                return {.IsError = true, .Text = BindingRefusal(status, command, row), .ErrorCode = ErrorCodeFor(status)};
+            reply["status"] = DebugNameForEditorCommandStatus(status);
+            reply["row"] = row != nullptr ? AttributeRowJson(*row) : Json(nullptr);
+            return Ok(reply);
+        }
+
+        AgentOperationOutcome BindAttribute(const AgentOperationContext& context, std::string_view arguments)
+        {
+            constexpr const char* kUsage =
+                "Pass {\"entity\": <stable id>, \"attribute\": <attribute>, \"domain\": <element domain>} and exactly one of "
+                "\"property\": <property name> or \"default\": true.";
+            const auto args = ParseObject(arguments);
+            if (!args) return InvalidParams(kUsage);
+            const auto entity = UInt(*args, "entity");
+            const auto attributeName = String(*args, "attribute");
+            const auto attribute = ParseAttribute(attributeName);
+            const auto domainName = String(*args, "domain");
+            const auto domain = ParseDomain(domainName);
+            const auto property = String(*args, "property");
+            const bool restoreDefault = args->contains("default") && (*args)["default"].is_boolean() && (*args)["default"].get<bool>();
+            if (!entity || !attributeName || !domainName) return InvalidParams(kUsage);
+            if (!attribute) return InvalidParams("Unknown attribute '" + *attributeName + "'; see the tool schema.");
+            if (!domain) return InvalidParams(UnknownDomainMessage(*domainName));
+            if (args->contains("property") == args->contains("default") || (args->contains("property") && (!property || property->empty())) ||
+                (args->contains("default") && !restoreDefault))
+                return InvalidParams(kUsage);
+            if (!PrepareSnapshot(context)) return Fail(kNoWorkspace);
+            return ApplyAttributeBinding(context,
+                                         EditorAttributeBindingCommand{.StableEntityId = *entity, .Attribute = *attribute,
+                                                                       .Domain = *domain, .PropertyName = property.value_or("")},
+                                         Json{{"entity", *entity}, {"attribute", *attributeName}, {"domain", *domainName},
+                                              {"property", property ? Json(*property) : Json(nullptr)}, {"default", restoreDefault}});
+        }
+
         Json PoseJson(const EditorCameraPose& pose)
         {
             const auto vec = [](const glm::vec3& v) { return Json::array({v.x, v.y, v.z}); };
@@ -956,6 +1024,26 @@ namespace Extrinsic::Runtime
             Schema("{" + kEntityProperty + "," + DomainProperty("Optional: only this element domain.") + "," + AttributeProperty() + "}",
                    R"(["entity"])"),
             true, AttributeBindings);
+        add("bind_attribute", "Bind render attribute source",
+            "Choose the property that feeds one render attribute on one element domain of an entity, like the Appearance "
+            "panel's source selector (ApplyEditorAttributeBindingCommand): pass property (a compatible candidate from "
+            "attribute_bindings) or default: true to restore the canonical source. One undoable step; the reply carries "
+            "the resulting row. A binding is a rendering-time choice: canonical data such as v:position is never written. "
+            "Color writes the lane's visualization overlay, the one Color mechanism shared with show_property. Refusals "
+            "end with the snake-case command status as error code: unsupported_render_attribute (no such row on the "
+            "domain, or the entity lacks it), attribute_source_missing, attribute_source_type_mismatch, "
+            "attribute_source_count_mismatch, attribute_source_non_finite, stale_entity; bad arguments invalid_params. "
+            "Rows: " + AttributeTableText(),
+            [] {
+                Json schema = Json::parse(Schema(
+                    "{" + kEntityProperty + "," + AttributeProperty() + "," + DomainProperty("Element domain of the row.") +
+                        R"(,"property":{"type":"string","minLength":1,"description":"Source property on that domain."},)"
+                        R"("default":{"type":"boolean","const":true,"description":"Restore the canonical source."}})",
+                    R"(["entity","attribute","domain"])"));
+                schema["oneOf"] = Json::array({Json{{"required", {"property"}}}, Json{{"required", {"default"}}}});
+                return Dump(schema);
+            }(),
+            false, BindAttribute);
         add("set_visibility", "Set visibility",
             "Show or hide a lane of an entity like the appearance panel's Surface / Edges / Points checkboxes; by default the "
             "primary lane (the surface of a mesh, the edges of a graph, the points of a point cloud). One undoable step.",

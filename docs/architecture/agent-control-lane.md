@@ -124,7 +124,7 @@ Nothing exists without the launch flag: no module, thread or socket.
   `Agent: ` history entry: today `view_capture` and `save_scene` (write files), `load_scene`
   (replaces the scene document) and `config_apply` (changes engine
   configuration, which is not in the history). Mutating tools that edit the scene or its
-  properties (`import_file`, `show_property`, `run_*`) are undoable, `undo`/`redo` operate on
+  properties (`import_file`, `show_property`, `bind_attribute`, `run_*`) are undoable, `undo`/`redo` operate on
   the history itself, and `select_entity` and `set_camera` change editor state (selection, the camera
   controller and pose), not scene data, so they are deliberately not destructive. `jobs_cancel` is not
   destructive either: a cancelled job publishes nothing, so the scene, files and history stay as
@@ -150,7 +150,7 @@ Nothing exists without the launch flag: no module, thread or socket.
   `preview_registration`, `preview_point_sampling`, `preview_keypoint_analysis`, `preview_kmeans`,
   `preview_point_cloud_consolidation`, `preview_operation`, `preview_mesh_operation` and
   `view_screenshot`. State-changing: `select_entity`, `import_file`, `show_property`,
-  `config_apply`, `save_scene`, `load_scene`, `set_visibility`, `set_camera`, `undo`, `redo`, `jobs_cancel`,
+  `config_apply`, `save_scene`, `load_scene`, `set_visibility`, `bind_attribute`, `set_camera`, `undo`, `redo`, `jobs_cancel`,
   `run_operation`,
   `run_mesh_operation`, `run_registration` (ICP
   or Coherent Point Drift from their config sections; the reply waits for the job),
@@ -190,7 +190,14 @@ Nothing exists without the launch flag: no module, thread or socket.
   source (`bound`, `source`, its resolution `status`, `using_fallback` and a `diagnostic` when an authored source no
   longer resolves), the overlay `lane` of Color rows, the compatible `candidates` and the `incompatible` properties
   with their typed status and reason. Its `attribute` enum and the row documentation in its description are
-  generated from `RenderAttributeRules()`. `bind_attribute` is owned by `RUNTIME-316`. `set_camera` takes exactly one of: `controller` (orbit, fly, free look, top down;
+  generated from `RenderAttributeRules()`. `bind_attribute {entity, attribute, domain}` with exactly one of
+  `property` or `default: true` runs the panel's `ApplyEditorAttributeBindingCommand` (one undoable step on the
+  attribute's owner: structural stream, Color overlay or point/line render hint; canonical data is never
+  written) and replies with the resulting row. A refusal ends with the command status in snake case as error
+  code (`unsupported_render_attribute`, `attribute_source_missing`, `attribute_source_type_mismatch`,
+  `attribute_source_count_mismatch`, `attribute_source_non_finite`, `stale_entity`; `ErrorCodeFor`) and the
+  candidate's reason from the model; malformed arguments end with `invalid_params`. Point sizes and line widths
+  need the lane that draws them shown (`set_visibility`). `set_camera` takes exactly one of: `controller` (orbit, fly, free look, top down;
   `ApplyEditorCameraControllerCommand`, like the Camera panel's buttons), `pose` (`position`,
   `target`, optional `up`), `preset` (front, back, left, right, top, bottom, isometric; frames
   `entities`, or everything with world bounds) or `focus: true` (frames `entities`, or the

@@ -795,6 +795,46 @@ TEST(AgentOperations, AttributeBindingToolsFollowTheRuntimeTable)
     EXPECT_NE(detached.Text.find("not attached"), std::string::npos) << detached.Text;
 }
 
+// RUNTIME-316: bind_attribute is one undoable mutation with the same generated enums as the
+// listing, exactly one of property / default, and invalid_params for malformed arguments.
+TEST(AgentOperations, BindAttributeValidatesItsArgumentsBeforeTouchingTheScene)
+{
+    R::AgentOperationRegistry registry;
+    R::RegisterEditorAgentOperations(registry);
+    const auto* bind = registry.Find("bind_attribute");
+    ASSERT_NE(bind, nullptr);
+    EXPECT_FALSE(bind->ReadOnly);
+    EXPECT_FALSE(bind->Destructive) << "undoable: recorded as an Agent: history entry";
+    EXPECT_FALSE(bind->NeedsPresentedFrame);
+    const auto schema = Json::parse(bind->InputSchemaJson);
+    EXPECT_EQ(schema["properties"]["attribute"], Json::parse(registry.Find("attribute_bindings")->InputSchemaJson)["properties"]["attribute"]);
+    EXPECT_EQ(schema["required"], Json::array({"entity", "attribute", "domain"}));
+    EXPECT_EQ(schema["oneOf"].size(), 2u);
+    for (const R::RenderAttributeRule& rule : R::RenderAttributeRules())
+        EXPECT_NE(bind->Description.find(std::string(R::ToString(rule.Domain)) + " [default: " + std::string(rule.DefaultDescription) + "]"),
+                  std::string::npos);
+
+    const R::AgentOperationContext empty{};
+    for (const char* arguments : {
+             R"({})",
+             R"({"entity":1,"attribute":"position","domain":"MeshVertex"})",
+             R"({"entity":1,"attribute":"position","domain":"MeshVertex","property":"p","default":true})",
+             R"({"entity":1,"attribute":"position","domain":"MeshVertex","default":false})",
+             R"({"entity":1,"attribute":"position","domain":"MeshVertex","property":""})",
+             R"({"entity":1,"attribute":"radius","domain":"MeshVertex","property":"p"})",
+             R"({"entity":1,"attribute":"position","domain":"Bogus","property":"p"})"})
+    {
+        const auto refused = R::InvokeAgentOperation(registry, "bind_attribute", empty, arguments, false);
+        EXPECT_TRUE(refused.IsError) << arguments;
+        EXPECT_EQ(refused.ErrorCode, "invalid_params") << arguments;
+    }
+    const auto detached = R::InvokeAgentOperation(registry, "bind_attribute", empty,
+                                                  R"({"entity":1,"attribute":"position","domain":"MeshVertex","default":true})", false);
+    EXPECT_TRUE(detached.IsError);
+    EXPECT_NE(detached.Text.find("not attached"), std::string::npos) << detached.Text;
+    EXPECT_TRUE(R::InvokeAgentOperation(registry, "bind_attribute", empty, "{}", true).IsError) << "refused in a read-only session";
+}
+
 // A job queued during an agent call publishes on a later frame, after the call's label scope
 // ended: the submit path carries the prefix. A job queued without a prefix (a panel) gets none.
 TEST(AgentOperations, QueuedJobsKeepTheSubmittingCallsLabelPrefix)

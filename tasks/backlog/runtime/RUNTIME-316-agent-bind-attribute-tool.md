@@ -57,3 +57,12 @@ python3 tools/agents/check_task_policy.py --root . --strict
   answer `stale_entity` (snake case of the command status, `ErrorCodeFor` in `Detail.hpp`), bad
   arguments `invalid_params`. Tests: `AgentOperations.AttributeBindingToolsFollowTheRuntimeTable`,
   `SandboxAgentServer.AttributeBindingsListThePanelsSourceTable`.
+- 2026-10-02: Slice 2 (`bind_attribute`). `{entity, attribute, domain}` plus exactly one of
+  `property` / `default: true` (schema `oneOf`), through `ApplyEditorAttributeBindingCommand`;
+  one `Agent: ` undo step, reply with the resulting model row. Refusals carry the snake-case
+  command status as error code and the model candidate's reason; an `UnsupportedRenderAttribute`
+  for an existing row names the hidden points/edges lane. Not destructive (undoable). Tests:
+  `AgentOperations.BindAttributeValidatesItsArgumentsBeforeTouchingTheScene`,
+  `SandboxAgentServer.BindAttributeRebindsRefusesAndRestoresTheDefault` (bind, type/missing/domain/
+  entity refusals, default, NoChange, undo, pixel size after showing the points lane, canonical
+  `v:position` untouched).

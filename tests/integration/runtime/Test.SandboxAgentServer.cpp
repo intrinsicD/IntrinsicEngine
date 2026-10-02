@@ -1448,3 +1448,84 @@ TEST(SandboxAgentServer, AttributeBindingsListThePanelsSourceTable)
                   "an unknown entity is a typed error: " + unknown.dump());
     });
 }
+
+// RUNTIME-316: bind_attribute runs the panel's ApplyEditorAttributeBindingCommand: one undoable
+// "Agent: " step per call, typed refusals, and default restores the canonical source.
+TEST(SandboxAgentServer, BindAttributeRebindsRefusesAndRestoresTheDefault)
+{
+    AgentRig rig("attrbind");
+    ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
+    const auto mesh = rig.AddGrid();
+    const auto handle = R::SelectionController::ToEntityHandle(mesh);
+    {
+        auto& vertices = rig.Scene().Raw().get<GS::Vertices>(handle).Properties;
+        auto offset = vertices.GetOrAdd<glm::vec3>("offset");
+        auto radius = vertices.GetOrAdd<float>("radius", 2.0f);
+        for (std::size_t i = 0; i < vertices.Size(); ++i) offset[i] = glm::vec3(float(i), 0.0f, 1.0f);
+        (void)radius;
+    }
+    const auto canonicalPositions = [&] {
+        return rig.Scene().Raw().get<GS::Vertices>(handle).Properties.GetOrAdd<glm::vec3>("v:position").Vector();
+    };
+    const std::vector<glm::vec3> canonical = canonicalPositions();
+    bool canonicalUnchanged = true; // checked on the main thread every frame (the scene ends with Run)
+    rig.EveryFrame = [&](R::Engine&) { canonicalUnchanged = canonicalUnchanged && canonicalPositions() == canonical; };
+    rig.Run([&](Client& c) {
+        bool isError = true;
+        const auto undoCount = [&] { return c.Tool("history")["undo_count"].get<int>(); };
+        const auto errorCode = [&](const Json& arguments) {
+            const auto response = c.Request("tools/call", {{"name", "bind_attribute"}, {"arguments", arguments}});
+            return response["result"]["isError"] == true ? response["result"]["structuredContent"]["error"]["code"] : Json(nullptr);
+        };
+        const int before = undoCount();
+        const auto bound = c.Tool("bind_attribute", {{"entity", mesh}, {"attribute", "position"}, {"domain", "MeshVertex"},
+                                                     {"property", "offset"}}, &isError);
+        rig.Check(!isError && bound["status"] == "Applied" && bound["row"]["bound"] == true && bound["row"]["source"] == "offset" &&
+                      bound["row"]["using_fallback"] == false,
+                  "bind position to offset, reply carries the row: " + bound.dump());
+        rig.Check(undoCount() == before + 1, "one undo step");
+        const auto label = c.Tool("history")["undo_label"].get<std::string>();
+        rig.Check(label.starts_with("Agent: "), "agent history label: " + label);
+
+        rig.Check(errorCode({{"entity", mesh}, {"attribute", "position"}, {"domain", "MeshVertex"}, {"property", "height"}}) ==
+                      "attribute_source_type_mismatch",
+                  "a scalar cannot be the position");
+        rig.Check(errorCode({{"entity", mesh}, {"attribute", "position"}, {"domain", "MeshVertex"}, {"property", "nothing"}}) ==
+                      "attribute_source_missing",
+                  "a missing property is refused");
+        rig.Check(errorCode({{"entity", mesh}, {"attribute", "position"}, {"domain", "MeshFace"}, {"property", "offset"}}) ==
+                      "unsupported_render_attribute",
+                  "faces have no position row");
+        rig.Check(errorCode({{"entity", 999999}, {"attribute", "color"}, {"domain", "MeshVertex"}, {"default", true}}) == "stale_entity",
+                  "unknown entity");
+        rig.Check(undoCount() == before + 1, "refusals change nothing");
+        const auto listing = c.Tool("attribute_bindings", {{"entity", mesh}, {"attribute", "position"}}, &isError);
+        rig.Check(!isError && listing["domains"][0]["attributes"][0]["source"] == "offset", "the refusals kept the binding: " + listing.dump());
+
+        const auto restored = c.Tool("bind_attribute", {{"entity", mesh}, {"attribute", "position"}, {"domain", "MeshVertex"},
+                                                        {"default", true}}, &isError);
+        rig.Check(!isError && restored["status"] == "Applied" && restored["row"]["bound"] == false && restored["row"]["source"].is_null(),
+                  "default restores the canonical source: " + restored.dump());
+        rig.Check(undoCount() == before + 2, "default is one more undo step");
+        const auto again = c.Tool("bind_attribute", {{"entity", mesh}, {"attribute", "position"}, {"domain", "MeshVertex"},
+                                                     {"default", true}}, &isError);
+        rig.Check(!isError && again["status"] == "NoChange", "default twice changes nothing: " + again.dump());
+
+        const auto undone = c.Tool("undo", Json::object(), &isError);
+        rig.Check(!isError && undone["undone"].size() == 1u, "undo: " + undone.dump());
+        const auto afterUndo = c.Tool("attribute_bindings", {{"entity", mesh}, {"attribute", "position"}}, &isError);
+        rig.Check(!isError && afterUndo["domains"][0]["attributes"][0]["source"] == "offset", "undo brings the binding back: " + afterUndo.dump());
+
+        const auto hiddenLane = c.Request("tools/call", {{"name", "bind_attribute"}, {"arguments", {{"entity", mesh},
+            {"attribute", "point_size"}, {"domain", "MeshVertex"}, {"property", "radius"}}}});
+        rig.Check(hiddenLane["result"]["structuredContent"]["error"]["code"] == "unsupported_render_attribute" &&
+                      hiddenLane["result"]["structuredContent"]["error"]["message"].get<std::string>().find("points lane") != std::string::npos,
+                  "a point size needs a shown points lane: " + hiddenLane.dump());
+        c.Tool("set_visibility", {{"entity", mesh}, {"visible", true}, {"lane", "points"}}, &isError);
+        rig.Check(!isError, "show the mesh's points lane");
+        const auto width = c.Tool("bind_attribute", {{"entity", mesh}, {"attribute", "point_size"}, {"domain", "MeshVertex"},
+                                                     {"property", "radius"}}, &isError);
+        rig.Check(!isError && width["row"]["source"] == "radius", "a float binds as a pixel point size: " + width.dump());
+    });
+    EXPECT_TRUE(canonicalUnchanged) << "canonical positions are never written";
+}
