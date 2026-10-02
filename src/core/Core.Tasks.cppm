@@ -18,11 +18,18 @@ export class Job;
     // Fixed, domain-neutral scheduling preferences. Values are ordered from
     // most to least urgent so hot scheduler scans need no dynamic policy
     // state. Priority is preferential rather than realtime or starvation-free.
+    //
+    // Background is also worker-only: external help (TryRunOne, WaitForAll,
+    // and therefore TaskGraphCompletion::Wait) never executes it, so a
+    // waiting frame thread cannot inline a long job. Use it for long work
+    // that no thread waits on synchronously; such work completes only on a
+    // scheduler worker (Initialize() always starts at least one).
     export enum class DispatchPriority : std::uint8_t
     {
         High = 0,
         Normal,
         Low,
+        Background,
     };
 
     export class Scheduler
@@ -128,7 +135,8 @@ export class Job;
         static std::uint32_t UnparkReady(WaitToken token);
         static void MarkWaitTokenNotReady(WaitToken token);
         // Execute at most one queued task on the calling thread. External
-        // callers may consume inject work or steal worker-local work. The
+        // callers may consume inject work or steal worker-local work, except
+        // Background (worker-only) tasks, which this never runs. The
         // final local-deque scan may briefly wait for a queue critical section
         // so a contended queue is not reported as empty before the caller
         // parks.

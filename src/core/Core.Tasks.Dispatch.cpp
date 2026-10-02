@@ -162,8 +162,11 @@ namespace Extrinsic::Core::Tasks
                               const std::optional<unsigned> workerIndex,
                               std::uint8_t& poppedLane)
     {
+        // Helpers stop before the worker-only Background lane so a waiting
+        // thread never inlines a long job. Workers' own loop still drains
+        // that lane, so skipping it here cannot strand the task.
         for (std::uint8_t lane = 0u;
-             lane < Detail::PriorityLaneCount;
+             lane < Detail::HelpableLaneCount;
              ++lane)
         {
             if (workerIndex.has_value() &&

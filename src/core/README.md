@@ -161,11 +161,14 @@ but it exports the domain-free `TaskPlanGraph` API.
 - `Extrinsic.Core.Tasks.Internal`
 - `Extrinsic.Core.Tasks.LocalTask`
 
-`Scheduler::Dispatch()` uses three fixed, domain-neutral preference lanes:
-`High`, `Normal`, and `Low`. Workers scan them in that order. Each worker owns
-one local deque per lane, and external dispatch uses one inject queue per lane.
-The common `Normal` inject queue retains its 65,536-task lock-free capacity;
-the additional `High` and `Low` queues are bounded at 8,192 tasks each. Every
+`Scheduler::Dispatch()` uses four fixed, domain-neutral preference lanes:
+`High`, `Normal`, `Low`, and `Background`. Workers scan them in that order.
+Each worker owns one local deque per lane, and external dispatch uses one
+inject queue per lane. The common `Normal` inject queue retains its
+65,536-task lock-free capacity; the additional queues are bounded at 8,192
+tasks each. `Background` is also worker-only: external help never executes
+it (see `TryRunOne()` below), so it carries long work, such as runtime
+`JobService` jobs, that no thread waits on synchronously. Every
 lane has a mutex-protected overflow deque, so exhausting the bounded lock-free
 queue does not drop accepted work. Priority is deliberately preferential, not
 a realtime or starvation-free contract.
@@ -221,6 +224,14 @@ work and then worker-local deques. Its final worker-local scan waits for each
 short queue critical section to finish so lock contention cannot be mistaken
 for stable queue emptiness immediately before the helper parks. It does not
 impose graph or runtime domain policy.
+
+External help (`TryRunOne()` and the help loop in `WaitForAll()`) never pops
+the worker-only `Background` lane, whether the caller is a worker or not. A
+waiting frame thread therefore cannot inline a long job and stall until it
+ends (`BUG-231`). This stays deadlock-free because only workers' own loops run
+`Background` tasks, `Initialize()` always starts at least one worker, and no
+helped wait may depend on a `Background` task: a waiter that skips one only
+parks on the work-progress epoch, which that task's retirement advances.
 
 Task coroutine handles published to the scheduler are single-use resumption
 tokens. `Scheduler::Reschedule()` resumes a handle but must not inspect

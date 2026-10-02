@@ -41,6 +41,8 @@ namespace Extrinsic::Core::Dag
                 return Tasks::DispatchPriority::High;
             case TaskPriority::Low:
             case TaskPriority::Background:
+                // Never the worker-only Background lane: Wait() must be able
+                // to help-run its own graph's passes on a saturated scheduler.
                 return Tasks::DispatchPriority::Low;
             case TaskPriority::Normal:
             default:

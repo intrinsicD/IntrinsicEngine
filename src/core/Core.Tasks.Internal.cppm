@@ -23,11 +23,15 @@ export namespace Extrinsic::Core::Tasks
 {
     namespace Detail
     {
-        inline constexpr std::size_t PriorityLaneCount = 3u;
+        inline constexpr std::size_t PriorityLaneCount = 4u;
+        // Lanes [0, HelpableLaneCount) may be executed by external help
+        // (TryRunOne, WaitForAll). Later lanes are worker-only.
+        inline constexpr std::size_t HelpableLaneCount = 3u;
         inline constexpr std::size_t WaitShardCount = 16u;
         inline constexpr std::size_t HighPriorityInjectCapacity = 8'192u;
         inline constexpr std::size_t NormalPriorityInjectCapacity = 65'536u;
         inline constexpr std::size_t LowPriorityInjectCapacity = 8'192u;
+        inline constexpr std::size_t BackgroundInjectCapacity = 8'192u;
 
         [[nodiscard]] bool CpuRelaxOnce() noexcept;
         void CpuRelaxOrYield() noexcept;
@@ -79,6 +83,7 @@ export namespace Extrinsic::Core::Tasks
                 InjectLane{HighPriorityInjectCapacity},
                 InjectLane{NormalPriorityInjectCapacity},
                 InjectLane{LowPriorityInjectCapacity},
+                InjectLane{BackgroundInjectCapacity},
             };
 
             alignas(64) std::atomic<uint32_t> workSignal{0};

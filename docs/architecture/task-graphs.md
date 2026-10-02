@@ -33,11 +33,24 @@ graph.
 
 ## Scheduler preferences and wake contract
 
-The Core task scheduler exposes fixed, generic `High`, `Normal`, and `Low`
-preference lanes. `TaskGraph` maps `Critical` and `High` passes to `High`,
-`Normal` to `Normal`, and `Low` and `Background` to `Low` when it dispatches
-worker-eligible callbacks. Workers inspect lanes from high to low, but this is
-a preference policy rather than a realtime or starvation-free guarantee.
+The Core task scheduler exposes fixed, generic `High`, `Normal`, `Low`, and
+`Background` preference lanes. `TaskGraph` maps `Critical` and `High` passes to
+`High`, `Normal` to `Normal`, and `Low` and `Background` to `Low` when it
+dispatches worker-eligible callbacks. Workers inspect lanes from high to low,
+but this is a preference policy rather than a realtime or starvation-free
+guarantee.
+
+The scheduler's `Background` lane is additionally worker-only: external help
+(`TryRunOne()`, `WaitForAll()`, and therefore `TaskGraphCompletion::Wait()`)
+never executes it. Long work that nothing waits on synchronously—every runtime
+`JobService` job—uses it, so a frame-graph `Wait()` on the main thread cannot
+pop a queued job and run it inside the frame (`BUG-231`). Graph passes never
+use it, so a waiter can always help-run its own graph's ready passes and any
+ordinary task they spawned. Waits stay deadlock-free: `Initialize()` starts at
+least one worker, workers' own loops drain `Background`, and a helper that
+finds only `Background` work parks on the work-progress epoch, which that
+work's retirement advances. The rule is that no helped wait may depend on a
+`Background` task.
 
 Each worker has one local deque per lane. The external inject path retains a
 65,536-task lock-free queue for the common `Normal` lane and uses bounded
@@ -86,8 +99,8 @@ The completion contract is:
   and insertion order. It must run on the thread that called `Submit()` and
   returns `ThreadViolation` elsewhere.
 - `Wait()` has the same owner-thread requirement. It pumps owner-thread passes,
-  help-executes one scheduler task from the inject queues or worker-local
-  deques, and parks on a scheduler-work progress epoch when a
+  help-executes one non-`Background` scheduler task from the inject queues or
+  worker-local deques, and parks on a scheduler-work progress epoch when a
   worker-backed graph has no immediately available work. The external
   worker-local scan briefly waits for contended queue critical sections before
   declaring the queues empty.

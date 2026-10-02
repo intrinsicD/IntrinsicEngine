@@ -411,7 +411,11 @@ namespace Extrinsic::Runtime
         const std::shared_ptr<JobService::JobRecord>& job)
     {
         job->State.store(JobState::Queued, std::memory_order_release);
-        Core::Tasks::Scheduler::Dispatch([state, queuedJob = std::shared_ptr<JobRecord>(job)]() mutable
+        // Background is worker-only: a frame-graph Wait() on the main thread
+        // must never inline a long job and freeze the frame.
+        Core::Tasks::Scheduler::Dispatch(
+            Core::Tasks::DispatchPriority::Background,
+            [state, queuedJob = std::shared_ptr<JobRecord>(job)]() mutable
         {
             // Drop this record before the scheduler marks the task finished;
             // its callable storage may survive WaitForAll briefly on a worker.

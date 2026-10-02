@@ -2,6 +2,7 @@
 
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <mutex>
 #include <string>
@@ -431,6 +432,122 @@ TEST(CoreTaskGraphCompletionLifetime, WaitStealsWorkerLocalWorkNeededByGraph)
     ASSERT_TRUE(submitted->Wait().has_value());
 
     EXPECT_EQ(childThread, waitingThread);
+}
+
+namespace
+{
+    // Cancels a spinner after a bound so a pre-fix inline run on the waiting
+    // thread surfaces as an assertion instead of a hang (BUG-231).
+    class SpinnerWatchdog
+    {
+    public:
+        explicit SpinnerWatchdog(std::atomic<bool>& cancel)
+            : m_Thread([this, &cancel]()
+            {
+                const auto deadline =
+                    std::chrono::steady_clock::now() + std::chrono::seconds(2);
+                while (!m_Done.load(std::memory_order_acquire) &&
+                       std::chrono::steady_clock::now() < deadline)
+                {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                }
+                Publish(cancel);
+            })
+        {
+        }
+
+        ~SpinnerWatchdog()
+        {
+            m_Done.store(true, std::memory_order_release);
+            m_Thread.join();
+        }
+
+        SpinnerWatchdog(const SpinnerWatchdog&) = delete;
+        SpinnerWatchdog& operator=(const SpinnerWatchdog&) = delete;
+
+    private:
+        std::atomic<bool> m_Done{false};
+        std::thread m_Thread;
+    };
+}
+
+TEST(CoreTaskGraphCompletionLifetime, ExternalHelpNeverRunsWorkerOnlyBackgroundTasks)
+{
+    SchedulerFixture scheduler{1};
+    std::atomic<bool> blockerStarted{false};
+    std::atomic<bool> releaseBlocker{false};
+    std::atomic<bool> backgroundRan{false};
+    std::thread::id backgroundThread{};
+    const auto waitingThread = std::this_thread::get_id();
+
+    Tasks::Scheduler::Dispatch([&]()
+    {
+        Publish(blockerStarted);
+        WaitUntilPublished(releaseBlocker);
+    });
+    WaitUntilPublished(blockerStarted);
+
+    Tasks::Scheduler::Dispatch(Tasks::DispatchPriority::Background, [&]()
+    {
+        backgroundThread = std::this_thread::get_id();
+        Publish(backgroundRan);
+    });
+
+    EXPECT_FALSE(Tasks::Scheduler::TryRunOne());
+    EXPECT_FALSE(backgroundRan.load(std::memory_order_acquire));
+
+    // WaitForAll still terminates: the worker drains the Background lane.
+    Publish(releaseBlocker);
+    Tasks::Scheduler::WaitForAll();
+    ASSERT_TRUE(backgroundRan.load(std::memory_order_acquire));
+    EXPECT_NE(backgroundThread, waitingThread);
+}
+
+TEST(CoreTaskGraphCompletionLifetime, WaitDoesNotInlineBackgroundWorkWhileItsPassRunsOnTheWorker)
+{
+    // BUG-231: a frame-graph Wait() help-ran a queued long job on the main
+    // thread. The single worker is busy with the graph's own pass, so the
+    // graph is pending with no helpable work while a Background spinner is
+    // queued. Wait() must park until the pass finishes, not run the spinner.
+    SchedulerFixture scheduler{1};
+    std::atomic<bool> passStarted{false};
+    std::atomic<bool> spinnerStarted{false};
+    std::atomic<bool> cancelSpinner{false};
+    std::thread::id spinnerThread{};
+    std::thread::id passThread{};
+    const auto waitingThread = std::this_thread::get_id();
+
+    TaskGraph graph;
+    graph.AddPass("WorkerPass", [&]()
+    {
+        passThread = std::this_thread::get_id();
+        Publish(passStarted);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    });
+
+    auto submitted = graph.Submit();
+    ASSERT_TRUE(submitted.has_value());
+    WaitUntilPublished(passStarted);
+
+    Tasks::Scheduler::Dispatch(Tasks::DispatchPriority::Background, [&]()
+    {
+        spinnerThread = std::this_thread::get_id();
+        Publish(spinnerStarted);
+        WaitUntilPublished(cancelSpinner);
+    });
+
+    {
+        SpinnerWatchdog watchdog{cancelSpinner};
+        ASSERT_TRUE(submitted->Wait().has_value());
+        // Wait() returned while the spinner (if it started) was still
+        // spinning on another thread; let it finish.
+        Publish(cancelSpinner);
+    }
+    Tasks::Scheduler::WaitForAll();
+
+    EXPECT_NE(passThread, waitingThread);
+    ASSERT_TRUE(spinnerStarted.load(std::memory_order_acquire));
+    EXPECT_NE(spinnerThread, waitingThread);
 }
 
 TEST(CoreTaskGraphCompletionLifetime, SingleWorkerRetainsLocalProgressAfterFairnessProbe)

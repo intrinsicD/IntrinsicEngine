@@ -45,6 +45,14 @@ instead of raising its timeout.
   dispatch a worker-only spinner that records its thread id, `TaskGraph::Execute()` a trivial pass on the
   main thread; assert Execute returns and the spinner did not run on the main thread (a watchdog thread
   cancels the spinner after 2 s so the pre-fix failure is an assertion, not a hang).
+- Fix 2026-10-02: the scheduler gained a worker-only `DispatchPriority::Background` lane that external
+  help (`TryRunOne`, `WaitForAll`, hence `TaskGraphCompletion::Wait`) never pops; `JobService` dispatches
+  every job on it. Graph passes stay on the helpable lanes, so a waiter can still finish its own graph and
+  the tasks its passes spawn (`WaitStealsWorkerLocalWorkNeededByGraph` keeps passing). Regressions:
+  `CoreTaskGraphCompletionLifetime.ExternalHelpNeverRunsWorkerOnlyBackgroundTasks`,
+  `CoreTaskGraphCompletionLifetime.WaitDoesNotInlineBackgroundWorkWhileItsPassRunsOnTheWorker`, and
+  `RuntimeJobService.FrameGraphWaitNeverRunsAQueuedJobOnTheWaitingThread` (each fails on the pre-fix code).
+  Rule documented in `docs/architecture/task-graphs.md` and `src/core/README.md`.
 
 ## Acceptance criteria
 - [ ] A stack (or a deterministic repro) shows where the hung frame spins.

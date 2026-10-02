@@ -15,6 +15,7 @@
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
+import Extrinsic.Core.Dag.TaskGraph;
 import Extrinsic.Core.Tasks;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Device;
@@ -548,6 +549,73 @@ TEST(RuntimeJobService, CancelBeforeStartPreventsWork)
     EXPECT_EQ(jobs.DrainCompletions(events), 0u);
     EXPECT_EQ(events.Pump(), 0u);
     EXPECT_EQ(jobs.Stats().CancelledJobs, 1u);
+}
+
+TEST(RuntimeJobService, FrameGraphWaitNeverRunsAQueuedJobOnTheWaitingThread)
+{
+    // BUG-231: with the lone worker busy, a main-thread TaskGraph Wait()
+    // help-ran the queued job inline, freezing the frame for its duration.
+    SchedulerScope scheduler{1};
+    std::atomic<bool> blockerStarted{false};
+    std::atomic<bool> releaseBlocker{false};
+
+    Extrinsic::Core::Tasks::Scheduler::Dispatch(
+        [&]
+        {
+            blockerStarted.store(true, std::memory_order_release);
+            while (!releaseBlocker.load(std::memory_order_acquire))
+                std::this_thread::sleep_for(1ms);
+        });
+    ASSERT_TRUE(WaitUntil(
+        [&] { return blockerStarted.load(std::memory_order_acquire); }));
+
+    Runtime::JobService jobs;
+    const std::thread::id mainThread = std::this_thread::get_id();
+    std::atomic<bool> stopSpinning{false};
+    std::atomic<bool> workStarted{false};
+    std::thread::id workThread{};
+
+    const Runtime::JobToken token = jobs.Submit(
+        Runtime::MakeCpuJobDesc<JobProbeResult>(
+            "long job",
+            Runtime::DefaultWorldHandle,
+            [&](const Runtime::JobCancellation&)
+            {
+                workThread = std::this_thread::get_id();
+                workStarted.store(true, std::memory_order_release);
+                while (!stopSpinning.load(std::memory_order_acquire))
+                    std::this_thread::yield();
+                return JobProbeResult{.Value = 1};
+            },
+            [](const JobProbeResult&)
+            { return JobSuppressedCompleted{.Value = 1}; }));
+    ASSERT_TRUE(token.IsValid());
+
+    // Pre-fix, the spinner ran here on the main thread; the watchdog bounds
+    // that failure to an assertion instead of a hang.
+    std::atomic<bool> frameDone{false};
+    std::thread watchdog([&]
+    {
+        (void)WaitUntil(
+            [&] { return frameDone.load(std::memory_order_acquire); }, 2s);
+        stopSpinning.store(true, std::memory_order_release);
+    });
+
+    std::thread::id passThread{};
+    Extrinsic::Core::Dag::TaskGraph frame;
+    frame.AddPass("FramePass",
+                  [&] { passThread = std::this_thread::get_id(); });
+    const auto executed = frame.Execute();
+    frameDone.store(true, std::memory_order_release);
+    watchdog.join();
+
+    releaseBlocker.store(true, std::memory_order_release);
+    Extrinsic::Core::Tasks::Scheduler::WaitForAll();
+
+    ASSERT_TRUE(executed.has_value());
+    EXPECT_EQ(passThread, mainThread);
+    ASSERT_TRUE(workStarted.load(std::memory_order_acquire));
+    EXPECT_NE(workThread, mainThread);
 }
 
 TEST(RuntimeJobService, CancelMidFlightIsObservedAndDropsCompletion)
