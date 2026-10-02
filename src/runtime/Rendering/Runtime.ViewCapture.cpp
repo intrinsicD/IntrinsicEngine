@@ -78,6 +78,23 @@ namespace Extrinsic::Runtime
             return entity;
         }
 
+        // `Current` never reaches staging; it maps to Front like the old axes table did.
+        CameraViewPreset ToCameraViewPreset(const ViewCapturePreset preset) noexcept
+        {
+            switch (preset)
+            {
+            case ViewCapturePreset::Current:
+            case ViewCapturePreset::Front: return CameraViewPreset::Front;
+            case ViewCapturePreset::Back: return CameraViewPreset::Back;
+            case ViewCapturePreset::Left: return CameraViewPreset::Left;
+            case ViewCapturePreset::Right: return CameraViewPreset::Right;
+            case ViewCapturePreset::Top: return CameraViewPreset::Top;
+            case ViewCapturePreset::Bottom: return CameraViewPreset::Bottom;
+            case ViewCapturePreset::Isometric: return CameraViewPreset::Isometric;
+            }
+            return CameraViewPreset::Front;
+        }
+
         // Moves the main camera to the preset and returns how to put it back.
         std::optional<std::string> StageCamera(RuntimeFrameHookContext& frame, const ViewCaptureRequest& request,
                                                std::function<void()>& restore)
@@ -107,15 +124,7 @@ namespace Extrinsic::Runtime
                 else if (auto* main = cameras->ResolveOrNull(CameraControllerSlot::Main)) main->Seed(current);
                 cameras->MarkCameraTransition(CameraControllerSlot::Main);
             };
-            const auto axes = ViewCapturePresetAxesFor(request.Preset);
-            Graphics::CameraViewInput seed = current;
-            seed.Forward = axes.Forward;
-            seed.Up = axes.Up;
-            seed.Position = target->Center - axes.Forward * (2.0f * target->Radius);
-            seed.Valid = true;
-            controller->Seed(seed);
-            controller->Focus(*target);
-            cameras->MarkCameraTransition(CameraControllerSlot::Main);
+            ApplyCameraPreset(*cameras, CameraControllerSlot::Main, ToCameraViewPreset(request.Preset), *target, extent);
             return std::nullopt;
         }
 
@@ -180,27 +189,6 @@ namespace Extrinsic::Runtime
             const auto* bytes = static_cast<const std::uint8_t*>(data);
             out->insert(out->end(), bytes, bytes + size);
         }
-    }
-
-    ViewCapturePresetAxes ViewCapturePresetAxesFor(const ViewCapturePreset preset) noexcept
-    {
-        switch (preset)
-        {
-        case ViewCapturePreset::Current:
-        case ViewCapturePreset::Front: return {{0, 0, -1}, {0, 1, 0}};
-        case ViewCapturePreset::Back: return {{0, 0, 1}, {0, 1, 0}};
-        case ViewCapturePreset::Left: return {{1, 0, 0}, {0, 1, 0}};
-        case ViewCapturePreset::Right: return {{-1, 0, 0}, {0, 1, 0}};
-        case ViewCapturePreset::Top: return {{0, -1, 0}, {0, 0, -1}};
-        case ViewCapturePreset::Bottom: return {{0, 1, 0}, {0, 0, 1}};
-        case ViewCapturePreset::Isometric:
-        {
-            const glm::vec3 forward = glm::normalize(glm::vec3{-1, -1, -1});
-            const glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3{0, 1, 0}));
-            return {forward, glm::cross(right, forward)};
-        }
-        }
-        return {};
     }
 
     void AppendViewCaptureLegend(ViewCaptureImage& image, const std::span<const std::uint8_t> lutRgb)

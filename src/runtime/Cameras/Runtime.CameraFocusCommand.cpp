@@ -17,9 +17,11 @@ module;
 module Extrinsic.Runtime.CameraFocusCommand;
 
 import Extrinsic.Core.Error;
+import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Component.Culling.World;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.InputActions;
@@ -102,6 +104,55 @@ namespace Extrinsic::Runtime
         }
 
         return ComputeFocusTargetForBoundingSpheres(spheres);
+    }
+
+    CameraPresetAxes CameraPresetAxesFor(const CameraViewPreset preset) noexcept
+    {
+        switch (preset)
+        {
+        case CameraViewPreset::Front: return {{0, 0, -1}, {0, 1, 0}};
+        case CameraViewPreset::Back: return {{0, 0, 1}, {0, 1, 0}};
+        case CameraViewPreset::Left: return {{1, 0, 0}, {0, 1, 0}};
+        case CameraViewPreset::Right: return {{-1, 0, 0}, {0, 1, 0}};
+        case CameraViewPreset::Top: return {{0, -1, 0}, {0, 0, -1}};
+        case CameraViewPreset::Bottom: return {{0, 1, 0}, {0, 0, 1}};
+        case CameraViewPreset::Isometric:
+        {
+            const glm::vec3 forward = glm::normalize(glm::vec3{-1, -1, -1});
+            const glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3{0, 1, 0}));
+            return {forward, glm::cross(right, forward)};
+        }
+        }
+        return {};
+    }
+
+    Graphics::CameraViewInput MakeCameraPresetSeed(const Graphics::CameraViewInput& current,
+                                                   const CameraViewPreset preset,
+                                                   const CameraFocusTarget& target) noexcept
+    {
+        const CameraPresetAxes axes = CameraPresetAxesFor(preset);
+        Graphics::CameraViewInput seed = current;
+        seed.Forward = axes.Forward;
+        seed.Up = axes.Up;
+        seed.Position = target.Center - axes.Forward * (2.0f * target.Radius);
+        seed.Valid = true;
+        return seed;
+    }
+
+    bool ApplyCameraPreset(CameraControllerRegistry&  cameras,
+                           const CameraControllerSlot slot,
+                           const CameraViewPreset     preset,
+                           const CameraFocusTarget&   target,
+                           const Core::Extent2D       viewport) noexcept
+    {
+        ICameraController* controller = cameras.ResolveOrNull(slot);
+        if (controller == nullptr)
+            return false;
+
+        controller->Seed(MakeCameraPresetSeed(controller->GetView(viewport), preset, target));
+        controller->Focus(target);
+        cameras.MarkCameraTransition(slot);
+        return true;
     }
 
     bool ApplyCameraFocus(CameraControllerRegistry&  cameras,

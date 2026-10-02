@@ -1,13 +1,18 @@
 module;
 
+#include <cstdint>
 #include <optional>
 #include <span>
 #include <string>
 
+#include <glm/glm.hpp>
+
 export module Extrinsic.Runtime.CameraFocusCommand;
 
+import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.SelectionController;
@@ -41,6 +46,44 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::optional<CameraFocusTarget> ComputeFocusTargetForEntities(
         const ECS::Scene::Registry& scene,
         std::span<const ECS::EntityHandle> entities) noexcept;
+
+    // Named view directions shared by the editor camera command and screenshot
+    // capture (+Y up; Top/Bottom use -Z/+Z up). Each looks along a world axis or
+    // the (-1,-1,-1) isometric diagonal.
+    enum class CameraViewPreset : std::uint8_t
+    {
+        Front = 0, // looking along -Z
+        Back,      // +Z
+        Left,      // +X
+        Right,     // -X
+        Top,       // -Y
+        Bottom,    // +Y
+        Isometric,
+    };
+
+    struct CameraPresetAxes
+    {
+        glm::vec3 Forward{0.0f, 0.0f, -1.0f};
+        glm::vec3 Up{0.0f, 1.0f, 0.0f};
+    };
+
+    // Viewing direction and up vector of a preset (orthonormal).
+    [[nodiscard]] CameraPresetAxes CameraPresetAxesFor(CameraViewPreset preset) noexcept;
+
+    // The controller seed that looks along the preset at `target`: current view
+    // with Forward/Up replaced and Position = Center - Forward * 2 * Radius.
+    [[nodiscard]] Graphics::CameraViewInput MakeCameraPresetSeed(
+        const Graphics::CameraViewInput& current,
+        CameraViewPreset preset,
+        const CameraFocusTarget& target) noexcept;
+
+    // Seeds the `slot` controller with the preset, focuses `target` and marks an
+    // explicit camera transition. Returns false when the slot has no controller.
+    bool ApplyCameraPreset(CameraControllerRegistry& cameras,
+                           CameraControllerSlot slot,
+                           CameraViewPreset preset,
+                           const CameraFocusTarget& target,
+                           Core::Extent2D viewport) noexcept;
 
     // Applies a focus target to the controller in `slot`: calls Focus() and marks
     // an explicit camera transition. Returns false when the slot has no

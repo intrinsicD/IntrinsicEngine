@@ -269,3 +269,49 @@ TEST(RuntimeCameraFocusCommand, FocusOnEmptySelectionIsNoOp)
     EXPECT_FALSE(Runtime::FocusCameraOnSelection(cameras, selection, scene));
     EXPECT_EQ(recorder->FocusCalls, 0u);
 }
+
+TEST(RuntimeCameraFocusCommand, PresetAxesAreOrthonormalAndLookAlongTheirAxis)
+{
+    using P = Runtime::CameraViewPreset;
+    for (const auto preset : {P::Front, P::Back, P::Left, P::Right, P::Top, P::Bottom, P::Isometric})
+    {
+        const auto axes = Runtime::CameraPresetAxesFor(preset);
+        EXPECT_NEAR(glm::length(axes.Forward), 1.0f, 1e-6f);
+        EXPECT_NEAR(glm::length(axes.Up), 1.0f, 1e-6f);
+        EXPECT_NEAR(glm::dot(axes.Forward, axes.Up), 0.0f, 1e-6f);
+    }
+    EXPECT_EQ(Runtime::CameraPresetAxesFor(P::Front).Forward, glm::vec3(0, 0, -1));
+    EXPECT_EQ(Runtime::CameraPresetAxesFor(P::Right).Forward, glm::vec3(-1, 0, 0));
+    EXPECT_EQ(Runtime::CameraPresetAxesFor(P::Top).Forward, glm::vec3(0, -1, 0));
+    EXPECT_GT(Runtime::CameraPresetAxesFor(P::Isometric).Up.y, 0.0f) << "isometric keeps +Y up";
+}
+
+TEST(RuntimeCameraFocusCommand, PresetSeedPlacesTheCameraTwoRadiiBehindTheTarget)
+{
+    const Runtime::CameraFocusTarget target{{100.0f, 0.0f, 0.0f}, 3.0f};
+    const auto seed = Runtime::MakeCameraPresetSeed(Graphics::CameraViewInput{},
+                                                    Runtime::CameraViewPreset::Top, target);
+    EXPECT_TRUE(seed.Valid);
+    EXPECT_EQ(seed.Forward, glm::vec3(0, -1, 0));
+    EXPECT_EQ(seed.Up, glm::vec3(0, 0, -1));
+    EXPECT_NEAR(seed.Position.x, 100.0f, 1e-5f);
+    EXPECT_NEAR(seed.Position.y, 6.0f, 1e-5f);
+    EXPECT_NEAR(seed.Position.z, 0.0f, 1e-5f);
+}
+
+TEST(RuntimeCameraFocusCommand, ApplyCameraPresetDrivesTheSlotAndReportsMissingController)
+{
+    Runtime::CameraControllerRegistry cameras;
+    const Runtime::CameraFocusTarget target{{50.0f, 0.0f, 0.0f}, 2.0f};
+    const Core::Extent2D extent{800, 600};
+    EXPECT_FALSE(Runtime::ApplyCameraPreset(cameras, Runtime::CameraControllerSlot::Main,
+                                            Runtime::CameraViewPreset::Front, target, extent));
+
+    cameras.Register(Runtime::CameraControllerSlot::Main,
+                     std::make_unique<Runtime::OrbitCameraController>());
+    ASSERT_TRUE(Runtime::ApplyCameraPreset(cameras, Runtime::CameraControllerSlot::Main,
+                                           Runtime::CameraViewPreset::Left, target, extent));
+    const auto view = cameras.ResolveOrNull(Runtime::CameraControllerSlot::Main)->GetView(extent);
+    EXPECT_NEAR(glm::dot(view.Forward, glm::vec3(1, 0, 0)), 1.0f, 1e-3f);
+    EXPECT_LT(view.Position.x, 50.0f) << "the camera sits on the -X side looking toward +X";
+}

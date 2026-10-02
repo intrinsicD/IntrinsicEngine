@@ -185,22 +185,6 @@ TEST(ViewCapture, FailsClosedOnTheNullDevice)
     std::filesystem::remove_all(dir);
 }
 
-TEST(ViewCapture, PresetAxesAreOrthonormalAndLookAlongTheirAxis)
-{
-    using P = R::ViewCapturePreset;
-    for (const auto preset : {P::Current, P::Front, P::Back, P::Left, P::Right, P::Top, P::Bottom, P::Isometric})
-    {
-        const auto axes = R::ViewCapturePresetAxesFor(preset);
-        EXPECT_NEAR(glm::length(axes.Forward), 1.0f, 1e-6f) << R::ToString(preset);
-        EXPECT_NEAR(glm::length(axes.Up), 1.0f, 1e-6f) << R::ToString(preset);
-        EXPECT_NEAR(glm::dot(axes.Forward, axes.Up), 0.0f, 1e-6f) << R::ToString(preset);
-    }
-    EXPECT_EQ(R::ViewCapturePresetAxesFor(P::Front).Forward, glm::vec3(0, 0, -1));
-    EXPECT_EQ(R::ViewCapturePresetAxesFor(P::Right).Forward, glm::vec3(-1, 0, 0));
-    EXPECT_EQ(R::ViewCapturePresetAxesFor(P::Top).Forward, glm::vec3(0, -1, 0));
-    EXPECT_GT(R::ViewCapturePresetAxesFor(P::Isometric).Up.y, 0.0f) << "isometric keeps +Y up";
-}
-
 TEST(ViewCapture, LegendAppendsAColormapStripBelowTheImage)
 {
     auto image = Gradient(40, 10);

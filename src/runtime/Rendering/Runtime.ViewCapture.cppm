@@ -114,14 +114,6 @@ export namespace Extrinsic::Runtime
         std::vector<std::uint8_t> Rgba8{}; // top-down, tightly packed
     };
 
-    struct ViewCapturePresetAxes
-    {
-        glm::vec3 Forward{0.0f, 0.0f, -1.0f};
-        glm::vec3 Up{0.0f, 1.0f, 0.0f};
-    };
-    // Viewing direction and up vector of a preset (Current returns the defaults).
-    [[nodiscard]] ViewCapturePresetAxes ViewCapturePresetAxesFor(ViewCapturePreset preset) noexcept;
-
     inline constexpr std::uint32_t kViewCaptureLegendHeight = 24; // 4 px margins around a 16 px strip
     // Appends a legend band below the image: dark margins and a colormap strip sampled
     // left to right from `lut` (RGB triples, at least one entry).
