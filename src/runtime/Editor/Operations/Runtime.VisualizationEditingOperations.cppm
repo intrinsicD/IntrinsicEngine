@@ -603,6 +603,49 @@ export namespace Extrinsic::Runtime
         const GeometryEntityAvailability& availability,
         const GeometryPresentationRecipe* recipe);
 
+    // One property offered as the source of an attribute row. Incompatible
+    // candidates stay listed with the runtime's typed reason.
+    struct EditorAttributeBindingCandidate
+    {
+        GeometryPropertyRef Property{};
+        std::size_t ElementCount{0u};
+        bool Compatible{false};
+        GeometryPropertyResolutionStatus Reason{
+            GeometryPropertyResolutionStatus::Resolved};
+        std::string DisabledReason{};
+    };
+
+    // One (attribute, element domain) row of the entity's binding table.
+    // `Bound` means an authored non-default source; when it no longer
+    // resolves, `UsingFallback` is set and the default is drawn.
+    struct EditorAttributeBindingRow
+    {
+        RenderAttribute Attribute{RenderAttribute::Position};
+        GeometryElementDomain Domain{GeometryElementDomain::Unknown};
+        std::string ExpectedType{};
+        std::size_t ExpectedElementCount{0u};
+        std::string DefaultSource{};
+        bool Bound{false};
+        GeometryPropertyRef Source{};
+        GeometryPropertyResolution Resolution{};
+        bool UsingFallback{false};
+        std::string Diagnostic{};
+        std::vector<EditorAttributeBindingCandidate> Candidates{};
+    };
+
+    struct EditorAttributeBindingModel
+    {
+        bool HasEntity{false};
+        std::uint32_t StableEntityId{0u};
+        std::vector<EditorAttributeBindingRow> Rows{};
+    };
+
+    // The single attribute-binding table shared by the Appearance panel and the
+    // agent lane: every table row whose element domain the entity has, its
+    // current source and every candidate property with its compatibility.
+    [[nodiscard]] EditorAttributeBindingModel BuildEditorAttributeBindingModel(
+        const ECS::Scene::Registry& scene, std::uint32_t stableEntityId);
+
     struct EditorTextureBakeCommand
     {
         std::uint32_t StableEntityId{0u};

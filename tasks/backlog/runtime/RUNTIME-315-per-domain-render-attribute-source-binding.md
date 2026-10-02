@@ -82,3 +82,29 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+## Log
+- 2026-10-02: Slice 1 design confirmed and adjusted. One table
+  (`RenderAttributeRules()` in `Runtime.VertexChannelBindings`) defines every
+  attribute x element-domain row: Position (vec3, finite; mesh vertex, graph
+  node, point), Normal (vec3; mesh vertex or corner, graph node, point),
+  Texcoord (vec2; mesh vertex or corner), Color (float/vec3/vec4; every vertex,
+  edge and face domain), PointSize (float, finite, px; vertex domains) and
+  LineWidth (float, finite, px; edge domains). `ResolveRenderAttributeSource`
+  is the single validation (missing/kind/count/finite, typed
+  `GeometryPropertyResolutionStatus`); `BuildEditorAttributeBindingModel` lists
+  rows, current sources (a stale source is reported as a fallback) and every
+  candidate with its reason. Storage reuses existing owners, no new model:
+  structural streams stay in `VertexChannelBindingSet` (now Position, Normal,
+  Texcoord); Color is the visualization overlay written by the `show_property`
+  recipe path; PointSize/LineWidth are the existing `RenderPoints::SizeSource` /
+  `RenderEdges::WidthSource` name alternative (already serialized and
+  undoable, and next to the uniform pixel default) instead of the
+  `GeometryPresentationSlotRecipe` PointSize/LineWidth slots, which no default
+  recipe creates and extraction reports unsupported; those slot semantics stay
+  unsupported. The `VertexChannelBindingSet::Color` stream is the duplicate
+  color mechanism and is retired with the old vertex-channel command.
+  Revised slices: 2 command/undo; 3 retire the duplicate color binding and old
+  command; 4 persistence; 5 normal/texcoord/size/width consumption; 6 position
+  consumption (bounds, picking, vector fields, GPU front); 7 graphs/point
+  clouds/primitive views and docs.

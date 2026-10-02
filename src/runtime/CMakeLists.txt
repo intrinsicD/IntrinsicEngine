@@ -188,6 +188,7 @@ target_sources(${target_name}
         Editor/Operations/Runtime.SceneEditingOperations.Debug.cpp
         Editor/Operations/Runtime.VisualizationEditingOperations.Public.cpp
         Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp
+        Editor/Operations/Runtime.VisualizationEditingOperations.AttributeBindings.cpp
         Editor/Operations/Runtime.VisualizationEditingOperations.Debug.cpp
         Editor/Operations/Runtime.RenderRecipeEditingOperations.Public.cpp
         Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp
@@ -293,6 +294,7 @@ target_sources(${target_name}
         Scene/Runtime.StableEntityLookup.cpp
         Modules/TextureBake/Runtime.TextureBakeModule.cpp
         GeometryIntegration/Runtime.VertexAttributeBinding.cpp
+        GeometryIntegration/Runtime.VertexChannelBindings.cpp
         GeometryIntegration/Runtime.VertexChannelStreams.cpp
         Visualization/Runtime.VisualizationRecipes.cpp
 )

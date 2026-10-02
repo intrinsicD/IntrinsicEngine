@@ -1368,6 +1368,7 @@ if(TARGET ExtrinsicRuntime)
         Test.SelectionStableLookupComposition.cpp
         Test.StableEntityLookup.cpp
         Test.VertexAttributeBinding.cpp
+        Test.VertexChannelBindings.cpp
         Test.VertexChannelStreams.cpp
         Test.RenderWorldPool.cpp
         Test.RenderWorldPoolEngineWiring.cpp
