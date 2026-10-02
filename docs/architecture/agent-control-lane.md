@@ -182,10 +182,22 @@ Nothing exists without the launch flag: no module, thread or socket.
 - Appearance and camera. `set_visibility` shows or hides a lane of an entity (`lane`: surface, edges or
   points, default the entity's primary one: mesh surface, graph edges, point-cloud points)
   through `ApplyEditorRenderHintCommand` exactly as the appearance panel's checkboxes do (one
-  undoable step). `set_camera` switches the main camera controller
-  kind (orbit, fly, free look, top down) through `ApplyEditorCameraControllerCommand`, like the
-  Camera panel's buttons; it is editor state, not scene data, so it is neither undoable nor
-  destructive. Camera pose, presets and focus have no editor command, so they are not tools.
+  undoable step). `set_camera` takes exactly one of: `controller` (orbit, fly, free look, top down;
+  `ApplyEditorCameraControllerCommand`, like the Camera panel's buttons), `pose` (`position`,
+  `target`, optional `up`), `preset` (front, back, left, right, top, bottom, isometric; frames
+  `entities`, or everything with world bounds) or `focus: true` (frames `entities`, or the
+  selection). Pose, preset and focus go through `ApplyEditorCameraPoseCommand`, the command the
+  Camera panel's View buttons and "Focus selection" use; presets share their axes and framing
+  with `view_capture`. The reply carries the `previous` and `current` pose
+  (`position`/`forward`/`up`) and two flags: `up_ignored` (fly and top-down have no roll, so `up`
+  is a hint; free look derives its roll from it) and `position_clamped` (the orbit radius limit).
+  A view the active controller cannot look along (top-down only looks along -Y; fly and free
+  look stop 1 degree short of the poles) is refused as `UnsupportedCameraPose` with the camera
+  untouched, as are non-finite or degenerate poses and unknown entities; a preset or focus with
+  nothing bounded to frame is an error too, since the camera did not move. Camera changes are
+  editor view state, not scene data, so they are neither undoable nor destructive. Orbit
+  yaw/pitch/radius are not separate inputs: `position = target - direction * radius` expresses
+  them.
 - Scene files. `save_scene` writes the scene document to a path inside the allowed roots (it
   refuses an existing file unless `overwrite: true`, error code `file_exists`) and `load_scene`
   replaces the whole scene document with a file inside them; both resolve the path with
@@ -308,8 +320,8 @@ Planned: lane hardening (the remaining protocol conformance) and the remaining o
 
 - Operation tools exist for the configured operations of the table above, registration (ICP,
   Coherent Point Drift), point sampling, keypoint analysis, k-means and point-cloud
-  consolidation, scene files, visibility and the camera controller kind. Camera pose, presets
-  and focus have no editor command yet; see [RUNTIME-312](../../tasks/done/RUNTIME-312-agent-lane-mcp-hardening-and-coverage.md).
+  consolidation, scene files, visibility and the main camera (controller kind, pose, presets and
+  focus). The camera is not undoable and `set_camera` pose and presets act on the `Main` slot only.
 - Imports are asynchronous (`Pending`): pass `wait: true`, or poll `scene_entities` for the result.
 - Unix-domain sockets only; Windows builds report `Unsupported`.
 - A Sandbox killed by a signal leaves its socket file; the next start replaces it.

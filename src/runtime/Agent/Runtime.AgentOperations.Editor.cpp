@@ -7,6 +7,7 @@ module;
 #include <array>
 #include <charconv>
 #include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -27,6 +28,7 @@ import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Logging;
 import Extrinsic.Runtime.AssetIngestStateMachine;
+import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
@@ -297,30 +299,133 @@ namespace Extrinsic::Runtime
                         " appearance to show or hide.");
         }
 
-        // The camera controller kind of the main camera, as the Camera panel's buttons. Pose, presets and focus
-        // have no editor command yet (RUNTIME-312 notes).
+        Json PoseJson(const EditorCameraPose& pose)
+        {
+            const auto vec = [](const glm::vec3& v) { return Json::array({v.x, v.y, v.z}); };
+            return {{"position", vec(pose.Position)}, {"forward", vec(pose.Forward)}, {"up", vec(pose.Up)}};
+        }
+
+        std::optional<glm::vec3> Vec3(const Json& object, const char* key)
+        {
+            const auto it = object.find(key);
+            if (it == object.end() || !it->is_array() || it->size() != 3u) return std::nullopt;
+            glm::vec3 out{};
+            for (std::size_t i = 0; i != 3u; ++i)
+            {
+                if (!(*it)[i].is_number()) return std::nullopt;
+                const double value = (*it)[i].get<double>();
+                if (!std::isfinite(value) || std::abs(value) > 1.0e30) return std::nullopt;
+                out[static_cast<glm::length_t>(i)] = static_cast<float>(value);
+            }
+            return out;
+        }
+
+        // The main camera, through the editor commands the Camera panel uses. Exactly one of:
+        //   controller: switch the controller kind (the panel's Orbit / Fly / Free look / Top down buttons);
+        //   pose:       {position, target, up?} through ApplyEditorCameraPoseCommand;
+        //   preset:     a named view framing `entities` (default: everything with world bounds);
+        //   focus:      true, frame `entities` (default: the current selection), keeping the direction.
+        // Camera changes are view state: not undoable and not destructive.
         AgentOperationOutcome SetCamera(const AgentOperationContext& context, std::string_view arguments)
         {
             const auto args = ParseObject(arguments);
-            const auto name = args ? String(*args, "controller") : std::nullopt;
-            using Kind = EditorCameraControllerKind;
-            std::optional<Kind> kind;
-            if (name == "orbit") kind = Kind::Orbit;
-            else if (name == "fly") kind = Kind::Fly;
-            else if (name == "free_look") kind = Kind::FreeLook;
-            else if (name == "top_down") kind = Kind::TopDown;
-            if (!kind) return Fail("Pass {\"controller\": \"orbit\" | \"fly\" | \"free_look\" | \"top_down\"}.");
+            constexpr const char* kUsage =
+                "Pass exactly one of {\"controller\": \"orbit\" | \"fly\" | \"free_look\" | \"top_down\"}, "
+                "{\"pose\": {\"position\": [x,y,z], \"target\": [x,y,z], \"up\": [x,y,z]}}, "
+                "{\"preset\": \"front\" | \"back\" | \"left\" | \"right\" | \"top\" | \"bottom\" | \"isometric\"} or "
+                "{\"focus\": true}; preset and focus take an optional \"entities\": [stable ids].";
+            if (!args) return Fail(kUsage);
+            const int modes = int(args->contains("controller")) + int(args->contains("pose")) +
+                              int(args->contains("preset")) + int(args->contains("focus"));
+            if (modes != 1) return Fail(kUsage);
             const auto prepared = PrepareSnapshot(context);
             if (!prepared) return Fail(kNoWorkspace);
             if (!prepared->Frame.CameraRender.CameraControlsAvailable) return Fail("Camera controls are unavailable in this workspace.");
-            const std::string previous = prepared->Frame.CameraRender.HasMainCameraController
-                ? std::string(DebugNameForEditorCameraControllerKind(prepared->Frame.CameraRender.MainCameraControllerKind))
-                : std::string("none");
             const auto scene = PrepareEditorSceneEditingFrame(*context.Attachment);
-            const auto status = ApplyEditorCameraControllerCommand(scene.Commands, EditorCameraControllerCommand{.Kind = *kind});
-            const bool ok = status == EditorCommandStatus::Applied || status == EditorCommandStatus::NoChange;
-            return {.IsError = !ok, .Text = Dump({{"status", DebugNameForEditorCommandStatus(status)}, {"controller", *name},
-                                                   {"previous", previous}})};
+
+            if (args->contains("controller"))
+            {
+                const auto name = String(*args, "controller");
+                using Kind = EditorCameraControllerKind;
+                std::optional<Kind> kind;
+                if (name == "orbit") kind = Kind::Orbit;
+                else if (name == "fly") kind = Kind::Fly;
+                else if (name == "free_look") kind = Kind::FreeLook;
+                else if (name == "top_down") kind = Kind::TopDown;
+                if (!kind) return Fail(kUsage);
+                const std::string previous = prepared->Frame.CameraRender.HasMainCameraController
+                    ? std::string(DebugNameForEditorCameraControllerKind(prepared->Frame.CameraRender.MainCameraControllerKind))
+                    : std::string("none");
+                const auto status = ApplyEditorCameraControllerCommand(scene.Commands, EditorCameraControllerCommand{.Kind = *kind});
+                const bool ok = status == EditorCommandStatus::Applied || status == EditorCommandStatus::NoChange;
+                return {.IsError = !ok, .Text = Dump({{"status", DebugNameForEditorCommandStatus(status)}, {"controller", *name},
+                                                       {"previous", previous}})};
+            }
+
+            EditorCameraPoseCommand command{};
+            if (args->contains("pose"))
+            {
+                const auto& pose = (*args)["pose"];
+                const auto position = pose.is_object() ? Vec3(pose, "position") : std::nullopt;
+                const auto target = pose.is_object() ? Vec3(pose, "target") : std::nullopt;
+                if (!position || !target) return Fail("pose needs finite numeric position and target, each [x,y,z].");
+                command.Mode = EditorCameraPoseMode::Pose;
+                command.Position = *position;
+                command.Target = *target;
+                if (pose.contains("up"))
+                {
+                    const auto up = Vec3(pose, "up");
+                    if (!up) return Fail("pose.up must be finite numbers [x,y,z].");
+                    command.Up = *up;
+                }
+            }
+            else
+            {
+                if (args->contains("preset"))
+                {
+                    const auto name = String(*args, "preset");
+                    const auto preset = name ? ParseCameraViewPreset(*name) : std::nullopt;
+                    if (!preset) return Fail(kUsage);
+                    command.Mode = EditorCameraPoseMode::Preset;
+                    command.Preset = *preset;
+                }
+                else
+                {
+                    if (!(*args)["focus"].is_boolean() || !(*args)["focus"].get<bool>()) return Fail(kUsage);
+                    command.Mode = EditorCameraPoseMode::Focus;
+                }
+                if (args->contains("entities"))
+                {
+                    const auto& list = (*args)["entities"];
+                    if (!list.is_array() || list.size() > 4096u) return Fail("entities must be an array of stable ids.");
+                    for (const auto& id : list)
+                    {
+                        if (!id.is_number_integer() || id.get<std::int64_t>() < 0 || id.get<std::int64_t>() > std::int64_t(UINT32_MAX))
+                            return Fail("entities must be an array of stable ids.");
+                        command.StableEntityIds.push_back(id.get<std::uint32_t>());
+                    }
+                }
+            }
+
+            const auto result = ApplyEditorCameraPoseCommand(scene.Commands, command);
+            Json out{{"status", DebugNameForEditorCommandStatus(result.Status)}};
+            if (result.HasPose)
+            {
+                out["previous"] = PoseJson(result.Previous);
+                out["current"] = PoseJson(result.Current);
+            }
+            if (result.Status == EditorCommandStatus::Applied)
+            {
+                out["up_ignored"] = result.UpIgnored;
+                out["position_clamped"] = result.PositionClamped;
+                return Ok(out);
+            }
+            out["error"] = result.Status == EditorCommandStatus::NoChange
+                ? "Nothing with world bounds to frame (imported geometry has bounds); the camera did not move."
+                : result.Status == EditorCommandStatus::UnsupportedCameraPose
+                    ? "The main camera controller cannot look that way; switch controller or use another pose."
+                    : "The camera was not changed.";
+            return {.IsError = true, .Text = Dump(out)};
         }
 
         // ---- history ---------------------------------------------------------------------
@@ -703,11 +808,22 @@ namespace Extrinsic::Runtime
             "Show or hide a lane of an entity like the appearance panel's Surface / Edges / Points checkboxes; by default the "
             "primary lane (the surface of a mesh, the edges of a graph, the points of a point cloud). One undoable step.",
             Schema("{" + kEntityProperty + R"(,"visible":{"type":"boolean"},"lane":{"type":"string","enum":["surface","edges","points"],"description":"Which lane; default the entity's primary one."}})", R"(["entity","visible"])"), false, SetVisibility);
-        add("set_camera", "Set camera controller",
-            "Switch the main camera controller (orbit, fly, free look or top down) like the Camera panel's buttons, keeping the "
-            "current view. Camera pose, presets and focus are not controllable yet.",
-            Schema(R"({"controller":{"type":"string","enum":["orbit","fly","free_look","top_down"]}})", R"(["controller"])"), false,
-            SetCamera);
+        add("set_camera", "Set the main camera",
+            "Control the main camera like the Camera panel. Pass exactly one of: controller (orbit, fly, free look or top down; "
+            "keeps the current view), pose (position, target and optional up: the camera looks from position at target; the "
+            "result reports up_ignored for controllers without roll and position_clamped when the orbit radius was limited), "
+            "preset (front, back, left, right, top, bottom or isometric, framing 'entities' or everything with world bounds) "
+            "or focus (frame 'entities' or the selection, keeping the direction). Returns the previous and current pose. A view "
+            "the controller cannot look along is refused (UnsupportedCameraPose) and nothing changes. Not undoable.",
+            Schema(R"({"controller":{"type":"string","enum":["orbit","fly","free_look","top_down"]},)"
+                   R"("pose":{"type":"object","properties":{"position":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3},)"
+                   R"("target":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3},)"
+                   R"("up":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3,"description":"Default [0,1,0]."}},)"
+                   R"("required":["position","target"]},)"
+                   R"("preset":{"type":"string","enum":["front","back","left","right","top","bottom","isometric"]},)"
+                   R"("focus":{"type":"boolean","description":"true: frame the entities or the selection."},)"
+                   R"("entities":{"type":"array","items":{"type":"integer","minimum":0},"description":"Stable ids for preset or focus."}})"),
+            false, SetCamera);
         add("history", "Undo history", "Undo/redo availability, top labels, counts and dirty state.", none, true, History);
         const std::string steps = Schema(R"({"steps":{"type":"integer","minimum":1,"maximum":64,"default":1}})");
         add("undo", "Undo", "Undo editor commands, like Edit > Undo.", steps, false,

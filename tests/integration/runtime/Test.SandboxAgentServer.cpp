@@ -1197,6 +1197,49 @@ TEST(SandboxAgentServer, SetVisibilityAndSetCameraUseTheEditorCommands)
         rig.Check(!isError, "orbit");
         c.Tool("set_camera", {{"controller", "spin"}}, &isError);
         rig.Check(isError, "unknown controllers are refused");
+        // Pose, preset and focus go through ApplyEditorCameraPoseCommand and report both poses.
+        const int historyBefore = undoCount();
+        const auto pose = c.Tool("set_camera", {{"pose", {{"position", {10.0, 2.0, 5.0}}, {"target", {10.0, 2.0, -5.0}}}}}, &isError);
+        rig.Check(!isError && pose["status"] == "Applied" && pose["previous"]["position"].size() == 3u &&
+                      std::abs(pose["current"]["position"][0].get<double>() - 10.0) < 1e-3 &&
+                      std::abs(pose["current"]["forward"][2].get<double>() + 1.0) < 1e-3 &&
+                      pose["up_ignored"] == false && pose["position_clamped"] == false,
+                  "set_camera pose: " + pose.dump());
+        const auto top = c.Tool("set_camera", {{"preset", "top"}, {"entities", {mesh}}}, &isError);
+        rig.Check(!isError && top["status"] == "Applied" && std::abs(top["current"]["forward"][1].get<double>() + 1.0) < 1e-3,
+                  "set_camera preset top: " + top.dump());
+        const auto wholeScene = c.Tool("set_camera", {{"preset", "front"}}, &isError);
+        rig.Check(!isError && std::abs(wholeScene["current"]["forward"][2].get<double>() + 1.0) < 1e-3,
+                  "set_camera preset frames everything when no entities are given: " + wholeScene.dump());
+        const auto focus = c.Tool("set_camera", {{"focus", true}, {"entities", {mesh}}}, &isError);
+        rig.Check(!isError && focus["status"] == "Applied", "set_camera focus: " + focus.dump());
+        rig.Check(undoCount() == historyBefore, "camera changes are not undoable");
+        const auto noSelection = c.Tool("set_camera", {{"focus", true}, {"entities", Json::array()}}, &isError);
+        rig.Check(isError || noSelection["status"] == "Applied", "focus with an empty list uses the selection: " + noSelection.dump());
+        // Refusals: nothing moves.
+        const auto where = c.Tool("set_camera", {{"pose", {{"position", {0.0, 0.0, 5.0}}, {"target", {0.0, 0.0, 0.0}}}}}, &isError);
+        for (const Json& bad : {Json{{"pose", {{"position", {1.0, 1.0, 1.0}}, {"target", {1.0, 1.0, 1.0}}}}},
+                                Json{{"pose", {{"position", {0.0, 0.0, 5.0}}, {"target", {0.0, 0.0, 0.0}}, {"up", {0.0, 0.0, 1.0}}}}},
+                                Json{{"pose", {{"position", {0.0, 0.0}}, {"target", {0.0, 0.0, 0.0}}}}},
+                                Json{{"pose", {{"position", {"a", 0.0, 0.0}}, {"target", {0.0, 0.0, 0.0}}}}},
+                                Json{{"preset", "sideways"}},
+                                Json{{"preset", "top"}, {"entities", {999999}}},
+                                Json{{"focus", true}, {"entities", {999999}}},
+                                Json{{"focus", false}},
+                                Json{{"preset", "top"}, {"focus", true}},
+                                Json{{"controller", "orbit"}, {"preset", "top"}},
+                                Json::object()})
+        {
+            c.Tool("set_camera", bad, &isError);
+            rig.Check(isError, "set_camera refuses " + bad.dump());
+        }
+        const auto after = c.Tool("set_camera", {{"pose", {{"position", {0.0, 0.0, 5.0}}, {"target", {0.0, 0.0, 0.0}}}}}, &isError);
+        rig.Check(!isError && after["previous"]["position"] == where["current"]["position"], "refused calls left the camera where it was: " + after.dump());
+        // A controller that cannot look that way refuses and keeps its pose.
+        c.Tool("set_camera", {{"controller", "top_down"}}, &isError);
+        const auto sideways = c.Tool("set_camera", {{"pose", {{"position", {0.0, 0.0, 5.0}}, {"target", {0.0, 0.0, 0.0}}}}}, &isError);
+        rig.Check(isError && sideways["status"] == "UnsupportedCameraPose", "top-down refuses a sideways pose: " + sideways.dump());
+        c.Tool("set_camera", {{"controller", "orbit"}}, &isError);
     });
     fs::remove_all(directory);
 }
