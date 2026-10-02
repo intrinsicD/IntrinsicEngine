@@ -8,6 +8,15 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-02 — RUNTIME-317 editor job backend and diagnostic producers
+
+Retired [RUNTIME-317](RUNTIME-317-editor-job-backend-and-diagnostic-producers.md).
+
+- Editor job records now carry the requested backend, the resolved backend (applied results only) and the run's diagnostic, through the shared submit helper, result guard and GPU transaction core.
+- The Jobs window and `jobs_list` show them.
+
+Commits `637707ef6`, `e47fbe7b8`.
+
 ## 2026-10-02 — RUNTIME-316 agent attribute-binding tools
 
 Retired [RUNTIME-316](RUNTIME-316-agent-bind-attribute-tool.md).

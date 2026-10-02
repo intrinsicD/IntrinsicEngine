@@ -34,7 +34,7 @@ Show every running and recent editor job with progress and a Cancel button.
 - Cancel semantics (decision): a row's Cancel cancels the row's run (`CancelEditorJobRun` over `CancelEditorRuns`, head = `Identity.Run` or the token), like `notifications/cancelled`, so later stages never start on a cancelled run; the agent's `jobs_cancel` stays token-level. An auxiliary helper job cancels only itself.
 - Runtime additions: `EditorJobCommandSurface::Stats` (epoch-guarded `JobService::Stats`), `GetEditorJobStats`, `ResolveEditorJobCancelReadiness` (reasons: ended, not an editor job, already requested, unavailable), `CancelEditorJobRun`.
 - The runtime reaps finished jobs, so `JobsHistory` keeps the last 32 finished rows and clears on the scene epoch.
-- Backend/diagnostic columns: AC1's backend and diagnostic part is owned by [RUNTIME-317](../backlog/runtime/RUNTIME-317-editor-job-backend-and-diagnostic-producers.md). Until producers fill them, `EditorJobRecord::Requested/ResolvedJobDomain` are `std::optional` (unknown) and the window draws "-" for an unknown domain or an empty diagnostic instead of a made-up "CPU".
+- Backend/diagnostic columns: AC1's backend and diagnostic part is owned by [RUNTIME-317](RUNTIME-317-editor-job-backend-and-diagnostic-producers.md). Until producers fill them, `EditorJobRecord::Requested/ResolvedJobDomain` are `std::optional` (unknown) and the window draws "-" for an unknown domain or an empty diagnostic instead of a made-up "CPU".
 - Review fixes (2026-10-02): rows join `JobsHistory` in token (submission) order whatever order the surface lists them, so newest-first and the 32-row trim are well defined (`SnapshotAll` is also sorted by token in the session); the window reads the scene epoch from `EditorJobCommandSurface::SceneEpoch` (`GetEditorSceneEpoch`) instead of a second progress snapshot; an auxiliary helper job stays cancellable after its run's cancel was requested (it is cancelled on its own; a repeated press answers `not_active`).
 - Tests: `Test.SandboxJobsWindow.cpp` (`SandboxJobsWindow.*`, harness-backed ImGui drive: row, Cancel press, disabled reason, cancelled state, scene-epoch clear through the window; run cancel; history/epoch and row order; unknown backend; auxiliary cancel) and `SandboxProcessingPanels.JobsWindowIsRegisteredUnderView`.
 
@@ -44,7 +44,7 @@ Commit: `006d39746`, `2f614db07`. Completed 2026-10-02 with independent Opus rev
 - View > Jobs lists running jobs and the last 32 finished editor jobs. Rows are in submission order and clear on scene change.
 - Each row shows the shared progress widget. Cancel cancels the row's run (an auxiliary job only itself) with runtime-sourced disabled reasons. Job-service counters are collapsed.
 - Tests are in `Test.SandboxJobsWindow.cpp`. Full CPU suite 5663/5663 at `006d39746`; focused suite 172/172 after the review fixes.
-- Backend and diagnostic values are owned by [RUNTIME-317](../backlog/runtime/RUNTIME-317-editor-job-backend-and-diagnostic-producers.md).
+- Backend and diagnostic values are owned by [RUNTIME-317](RUNTIME-317-editor-job-backend-and-diagnostic-producers.md).
 - Maturity: Operational for the UI via CPU ImGui tests.
 
 ## Verification

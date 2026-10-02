@@ -74,9 +74,19 @@ fallback) and the job's diagnostic for every editor operation, so the Jobs windo
   `RuntimeJobService.CompletingJobNamesTheCallbacksJobThroughNestedDrainsAndFinalizers`.
 
 ## Acceptance criteria
-- [ ] For CPU-only, GPU-requested-and-run, and GPU-requested-but-fell-back runs, `SnapshotAll` reports the right requested and resolved domain plus the diagnostic text. Contract tests use the job harness.
-- [ ] The Jobs window and `jobs_list` show the values, with "-" only when the value is truly unknown.
-- [ ] No per-operation copies; the shared helpers own the plumbing.
+- [x] For CPU-only, GPU-requested-and-run, and GPU-requested-but-fell-back runs, `SnapshotAll` reports the right requested and resolved domain plus the diagnostic text. Contract tests use the job harness.
+- [x] The Jobs window and `jobs_list` show the values, with "-" only when the value is truly unknown.
+- [x] No per-operation copies; the shared helpers own the plumbing.
+
+## Completion
+
+Commit: `637707ef6`, `e47fbe7b8`. Completed 2026-10-02 with an independent Opus review.
+- Full CPU suite 5730/5730.
+- The requested backend comes from each operation's identity; the GPU transaction core supplies GpuCompute.
+- The resolved backend and diagnostic come from the shared result guard through `JobService::CompletingJob()` and `ReportOutcome`, and only applied results resolve a backend. They are stored per run and shown in the Jobs window and in `jobs_list`/`jobs_wait`.
+- A drift guard requires every identity to name its requested backend.
+- Maturity: CPUContracted.
+- A failed texture bake still has no diagnostic, because the failure lives in the bake service.
 
 ## Verification
 ```bash

@@ -46,7 +46,6 @@ and their paired UI or method work are recorded there, not here.
 
 ## Agent control lane and inspection operations
 
-- [RUNTIME-317 — Editor job records report requested/resolved backend and diagnostic](RUNTIME-317-editor-job-backend-and-diagnostic-producers.md)
 - [RUNTIME-276 — Declarative `ConfigFieldSpec` tables, schema generation and conformance test](RUNTIME-276-declarative-config-field-specs.md)
 - [RUNTIME-277 — Structured `ActionReadiness` reasons](RUNTIME-277-structured-action-readiness-reasons.md)
 - [RUNTIME-278 — Property inspection operations (stats, compare, values)](RUNTIME-278-property-inspection-operations.md)
