@@ -1197,18 +1197,38 @@ Version 3 retires the `PointColor`, `PointScalarField`, `LineColor` and
 lanes are colored only by the visualization overlay (lane configs), so a
 document naming one of them, and every version 2 document, fails with
 `InvalidFormat` instead of being converted.
+Version 4 (RUNTIME-319) adds a `properties` table to every element-domain
+section (mesh `vertices`/`edges`/`halfedges`/`faces`, graph `nodes`/`edges`/
+`halfedges`, point-cloud `vertices`), so processed and custom properties that
+bindings, overlays and recipes name survive a reload. It holds every typed
+property (bool, int32, uint32, uint64, float, double, vec2/3/4) that is neither
+topology (`IsTopologyProperty`) nor a stream the section already writes
+(positions, normals, texcoords, corner streams, atlas labels). Each entry is
+`{name, kind, data}`, where `data` is strict base64 (`Extrinsic.Core.Base64`)
+of the little-endian element bytes (bool: one 0/1 byte), so values are
+bit-exact, including infinity and signed zero, at about 1.33x the raw size,
+inline with no sidecar or compression. The element count is the section's own,
+and the payload size must match it before decoding. The reader rejects the
+whole document on a malformed, duplicate, reserved, wrongly sized,
+unknown-kind or NaN-carrying entry. The writer never fails a save over a
+property: it skips one holding NaN, or one whose type has no value kind, and
+counts it in `SceneSerializationStats::UnpersistedGeometryProperties` with a
+warning (`GeometryProperties` counts the persisted ones). Restored properties
+are new storages with fresh content revisions, so renderer and residency
+caches observe them as new content.
 The reader and writer reject non-compact graph sources, endpoint indices outside
 the vertex range, halfedge counts other than twice the edge count, endpoint/
 halfedge-pair disagreement, out-of-range next/previous handles, non-reciprocal
 next/previous links, and successor links that do not continue at the target
-vertex. Versions 1 and 2 are rejected rather than upgraded. Supported
+vertex. Versions 1 to 3 are rejected rather than upgraded. Supported
 persistence is limited to current
 sandbox-authoring CPU state: metadata names, stable ids, transforms, hierarchy,
 selection eligibility, render hints, visualization configs, authored
 `GeometryPresentationRecipe` values, structural render-attribute bindings
 (`attributeBindings`, RUNTIME-315; an optional key, with
 sources that do not resolve on load kept, drawn from the default and counted in
-`StaleAttributeBindings`), and mesh/graph/point-cloud `GeometrySources`. The
+`StaleAttributeBindings`), and mesh/graph/point-cloud `GeometrySources`
+including their typed property tables. The
 next incompatible format change bumps `kSceneDocumentVersion`. The writer emits only `geometryPresentation`; the reader
 also accepts the retired `progressiveRenderData` key and creates a fresh default
 `GeometryPresentationRuntimeState`. Unsupported families such as lights,

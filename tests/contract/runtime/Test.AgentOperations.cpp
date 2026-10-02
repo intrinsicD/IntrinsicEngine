@@ -1052,19 +1052,6 @@ TEST(AgentOperations, ViewCaptureRefusesToOverwriteUnlessAsked)
     fs::remove_all(root);
 }
 
-TEST(AgentOperations, Base64MatchesTheRfcVectors)
-{
-    const auto encode = [](std::string_view text) {
-        return R::EncodeBase64({reinterpret_cast<const std::uint8_t*>(text.data()), text.size()}); };
-    EXPECT_EQ(encode(""), "");
-    EXPECT_EQ(encode("f"), "Zg==");
-    EXPECT_EQ(encode("fo"), "Zm8=");
-    EXPECT_EQ(encode("foo"), "Zm9v");
-    EXPECT_EQ(encode("foob"), "Zm9vYg==");
-    EXPECT_EQ(encode("fooba"), "Zm9vYmE=");
-    EXPECT_EQ(encode("foobar"), "Zm9vYmFy");
-}
-
 // RUNTIME-279: notifications/cancelled runs the call's Cancel hook (its editor jobs) exactly once;
 // the tombstone still holds its slot until the continuation ends. A call without a hook (a
 // service run, a capture, a wait) only loses its reply.

@@ -1,6 +1,9 @@
 module;
 
 #include <algorithm>
+#include <array>
+#include <bit>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -9,6 +12,7 @@ module;
 #include <span>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <variant>
@@ -21,6 +25,7 @@ module;
 
 module Extrinsic.Runtime.SceneSerialization;
 
+import Extrinsic.Core.Base64;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.IOBackend;
 import Extrinsic.Core.Logging;
@@ -46,6 +51,7 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Geometry.Graph.Fwd;
 import Geometry.Properties;
 import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.MeshSurfaceTopology;
 
@@ -73,11 +79,15 @@ namespace Extrinsic::Runtime
         // `DebugNameForGeometryPropertyValueKind`.
         //
         // The filter form additionally persists "Any" for an unconstrained
-        // expectation (`std::nullopt`).
+        // expectation (`std::nullopt`). Bool/Int32/UInt64 joined with the
+        // RUNTIME-319 property tables and use the canonical spelling.
         // ------------------------------------------------------------------
         constexpr std::pair<Geometry::PropertyValueKind, std::string_view>
             kPropertyValueKindWire[]{
                 {Geometry::PropertyValueKind::Unknown, "Unknown"},
+                {Geometry::PropertyValueKind::Bool, "Bool"},
+                {Geometry::PropertyValueKind::Int32, "Int32"},
+                {Geometry::PropertyValueKind::UInt64, "UInt64"},
                 {Geometry::PropertyValueKind::Float, "ScalarFloat"},
                 {Geometry::PropertyValueKind::Double, "ScalarDouble"},
                 {Geometry::PropertyValueKind::UInt32, "UInt32"},
@@ -187,8 +197,9 @@ namespace Extrinsic::Runtime
         // Version 2 makes graph halfedge connectivity mandatory. Version 3
         // retires the PointColor/PointScalarField/LineColor/LineScalarField
         // presentation slot semantics (RUNTIME-318; point/line color is the
-        // visualization overlay). Older versions are rejected, not upgraded.
-        constexpr std::uint32_t kSceneDocumentVersion = 3u;
+        // visualization overlay). Version 4 adds the per-domain typed property
+        // tables (RUNTIME-319). Older versions are rejected, not upgraded.
+        constexpr std::uint32_t kSceneDocumentVersion = 4u;
         constexpr std::uint32_t kInvalidSerializedId = 0xFFFFFFFFu;
 
         [[nodiscard]] std::uint32_t EntitySortKey(const ECS::EntityHandle entity) noexcept
@@ -1650,9 +1661,249 @@ namespace Extrinsic::Runtime
             return true;
         }
 
+        // ------------------------------------------------------------------
+        // RUNTIME-319 — per-domain typed property tables.
+        //
+        // Each element-domain section carries a `properties` array with every
+        // typed property the section does not already write as a dedicated
+        // stream (`dedicated`) and that is not topology (`IsTopologyProperty`).
+        // Entry: {"name", "kind" (value-kind wire string), "data" (base64 of
+        // the little-endian element bytes; bool is one 0/1 byte per element)}.
+        // The element count is the section's own count, so the payload size is
+        // checked against it before anything is decoded. Values are stored
+        // bit-exactly; NaN is never persisted (the writer counts and skips the
+        // property, the reader rejects the document), infinity is kept because
+        // sentinel-valued fields use it. Properties whose type has no value
+        // kind are counted as unpersisted and skipped. Loaded properties are
+        // new storages, so they carry fresh content revisions.
+        // ------------------------------------------------------------------
+        static_assert(std::endian::native == std::endian::little,
+                      "scene property payloads are little-endian element bytes");
+        static_assert(sizeof(glm::vec2) == 8u && sizeof(glm::vec3) == 12u && sizeof(glm::vec4) == 16u);
+
+        using DedicatedPropertyNames = std::span<const std::string_view>;
+
+        template <class Visitor>
+        [[nodiscard]] bool VisitPropertyValueType(const Geometry::PropertyValueKind kind,
+                                                  Visitor&& visitor)
+        {
+            using K = Geometry::PropertyValueKind;
+            switch (kind)
+            {
+            case K::Bool: return visitor.template operator()<bool>();
+            case K::Int32: return visitor.template operator()<std::int32_t>();
+            case K::UInt32: return visitor.template operator()<std::uint32_t>();
+            case K::UInt64: return visitor.template operator()<std::uint64_t>();
+            case K::Float: return visitor.template operator()<float>();
+            case K::Double: return visitor.template operator()<double>();
+            case K::Vec2: return visitor.template operator()<glm::vec2>();
+            case K::Vec3: return visitor.template operator()<glm::vec3>();
+            case K::Vec4: return visitor.template operator()<glm::vec4>();
+            case K::Unknown: return false;
+            }
+            return false;
+        }
+
+        template <class T>
+        [[nodiscard]] bool ContainsNaN(const T& value) noexcept
+        {
+            if constexpr (std::is_floating_point_v<T>)
+                return std::isnan(value);
+            else if constexpr (std::is_same_v<T, glm::vec2> || std::is_same_v<T, glm::vec3> ||
+                               std::is_same_v<T, glm::vec4>)
+            {
+                for (glm::length_t i = 0; i < T::length(); ++i)
+                {
+                    if (std::isnan(value[i]))
+                        return true;
+                }
+                return false;
+            }
+            else
+                return false;
+        }
+
+        template <class T>
+        [[nodiscard]] constexpr std::size_t WireElementSize() noexcept
+        {
+            return std::is_same_v<T, bool> ? 1u : sizeof(T);
+        }
+
+        // Nullopt when the property holds a NaN (or cannot be read as T).
+        template <class T>
+        [[nodiscard]] std::optional<std::string> EncodePropertyPayload(
+            const Geometry::PropertySet& properties,
+            const std::string_view name)
+        {
+            const Geometry::ConstProperty<T> property = properties.Get<T>(name);
+            if (!property.IsValid())
+                return std::nullopt;
+            const std::vector<T>& values = property.Vector();
+            if constexpr (std::is_same_v<T, bool>)
+            {
+                std::vector<std::uint8_t> bytes;
+                bytes.reserve(values.size());
+                for (const bool value : values)
+                    bytes.push_back(value ? 1u : 0u);
+                return Core::Base64::Encode(bytes);
+            }
+            else
+            {
+                for (const T& value : values)
+                {
+                    if (ContainsNaN(value))
+                        return std::nullopt;
+                }
+                return Core::Base64::Encode(std::span<const std::uint8_t>(
+                    reinterpret_cast<const std::uint8_t*>(values.data()), values.size() * sizeof(T)));
+            }
+        }
+
+        void AddElementProperties(json& section,
+                                  const GeometryElementDomain domain,
+                                  const Geometry::PropertySet& properties,
+                                  const DedicatedPropertyNames dedicated,
+                                  SceneSerializationStats& stats)
+        {
+            std::vector<Geometry::PropertyDescriptor> descriptors = properties.Descriptors();
+            std::sort(descriptors.begin(), descriptors.end(),
+                      [](const auto& lhs, const auto& rhs) { return lhs.Name < rhs.Name; });
+            json table = json::array();
+            for (const Geometry::PropertyDescriptor& descriptor : descriptors)
+            {
+                if (IsTopologyProperty(domain, descriptor.Name) ||
+                    std::find(dedicated.begin(), dedicated.end(), descriptor.Name) != dedicated.end())
+                {
+                    continue;
+                }
+                std::optional<std::string> payload{};
+                (void)VisitPropertyValueType(descriptor.ValueKind, [&]<class T>()
+                {
+                    payload = EncodePropertyPayload<T>(properties, descriptor.Name);
+                    return true;
+                });
+                if (!payload.has_value())
+                {
+                    ++stats.UnpersistedGeometryProperties;
+                    Core::Log::Warn(
+                        "[Runtime] Scene save: {} property '{}' ({}) is not persisted: {}",
+                        ToString(domain), descriptor.Name,
+                        DebugNameForGeometryPropertyValueKind(descriptor.ValueKind),
+                        descriptor.ValueKind == Geometry::PropertyValueKind::Unknown
+                            ? "its type has no value kind" : "it holds NaN values");
+                    continue;
+                }
+                table.push_back(json{
+                    {"name", descriptor.Name},
+                    {"kind", PropertyValueKindToWire(descriptor.ValueKind)},
+                    {"data", std::move(*payload)},
+                });
+                ++stats.GeometryProperties;
+            }
+            if (!table.empty())
+                section["properties"] = std::move(table);
+        }
+
+        template <class T>
+        [[nodiscard]] bool TryDecodePropertyPayload(const std::string_view data,
+                                                    const std::size_t count,
+                                                    std::vector<T>& out)
+        {
+            constexpr std::size_t elementSize = WireElementSize<T>();
+            const std::optional<std::size_t> decodedSize = Core::Base64::DecodedSize(data);
+            if (!decodedSize.has_value() || count > SIZE_MAX / elementSize ||
+                *decodedSize != count * elementSize)
+            {
+                return false;
+            }
+            const std::optional<std::vector<std::uint8_t>> bytes = Core::Base64::Decode(data);
+            if (!bytes.has_value() || bytes->size() != count * elementSize)
+                return false;
+            std::vector<T> values(count);
+            if constexpr (std::is_same_v<T, bool>)
+            {
+                for (std::size_t i = 0u; i < count; ++i)
+                {
+                    if ((*bytes)[i] > 1u)
+                        return false;
+                    values[i] = (*bytes)[i] == 1u;
+                }
+            }
+            else
+            {
+                if (count != 0u)
+                    std::memcpy(values.data(), bytes->data(), bytes->size());
+                for (const T& value : values)
+                {
+                    if (ContainsNaN(value))
+                        return false;
+                }
+            }
+            out = std::move(values);
+            return true;
+        }
+
+        // Rejects the section on any malformed, duplicate, reserved, wrongly
+        // sized or NaN-carrying entry; the caller discards the whole document.
+        [[nodiscard]] bool ApplyElementProperties(const json& section,
+                                                  const GeometryElementDomain domain,
+                                                  Geometry::PropertySet& properties,
+                                                  const DedicatedPropertyNames dedicated,
+                                                  SceneSerializationStats& stats)
+        {
+            if (!section.contains("properties"))
+                return true;
+            const json& table = section["properties"];
+            if (!table.is_array())
+                return false;
+            const std::size_t count = properties.Size();
+            for (const json& entry : table)
+            {
+                if (!entry.is_object() || entry.size() != 3u ||
+                    !entry.contains("name") || !entry["name"].is_string() ||
+                    !entry.contains("kind") || !entry["kind"].is_string() ||
+                    !entry.contains("data") || !entry["data"].is_string())
+                {
+                    return false;
+                }
+                const std::string& name = entry["name"].get_ref<const std::string&>();
+                Geometry::PropertyValueKind kind{};
+                if (name.empty() || IsTopologyProperty(domain, name) ||
+                    std::find(dedicated.begin(), dedicated.end(), name) != dedicated.end() ||
+                    properties.Exists(name) ||
+                    !TryPropertyValueKindFromWire(entry["kind"].get_ref<const std::string&>(), kind) ||
+                    kind == Geometry::PropertyValueKind::Unknown)
+                {
+                    return false;
+                }
+                const std::string& data = entry["data"].get_ref<const std::string&>();
+                const bool applied = VisitPropertyValueType(kind, [&]<class T>()
+                {
+                    std::vector<T> values;
+                    if (!TryDecodePropertyPayload<T>(data, count, values))
+                        return false;
+                    Geometry::Property<T> property = properties.GetOrAdd<T>(name, T{});
+                    property.Vector() = std::move(values);
+                    return true;
+                });
+                if (!applied)
+                    return false;
+                ++stats.GeometryProperties;
+            }
+            return true;
+        }
+
+        constexpr std::array<std::string_view, 3> kVertexStreams{
+            PN::kPosition, PN::kNormal, "v:texcoord"};
+        constexpr std::array<std::string_view, 2> kNodeStreams{PN::kPosition, PN::kNormal};
+        constexpr std::array<std::string_view, 2> kMeshHalfedgeStreams{"h:texcoord", "h:normal"};
+        constexpr std::array<std::string_view, 2> kFaceStreams{"f:atlas_region", "f:atlas_chart"};
+
         [[nodiscard]] bool AddVertices(json& geometry,
                                        const GS::Vertices& vertices,
-                                       const bool requirePositions)
+                                       const bool requirePositions,
+                                       const GeometryElementDomain domain,
+                                       SceneSerializationStats& stats)
         {
             json out = json::object();
             out["deleted"] = vertices.NumDeleted;
@@ -1671,11 +1922,13 @@ namespace Extrinsic::Runtime
             {
                 return false;
             }
+            AddElementProperties(out, domain, vertices.Properties, kVertexStreams, stats);
             geometry["vertices"] = std::move(out);
             return true;
         }
 
-        [[nodiscard]] bool AddNodes(json& geometry, const GS::Vertices& nodes)
+        [[nodiscard]] bool AddNodes(json& geometry, const GS::Vertices& nodes,
+                                    SceneSerializationStats& stats)
         {
             json out = json::object();
             out["deleted"] = nodes.NumDeleted;
@@ -1689,11 +1942,15 @@ namespace Extrinsic::Runtime
             {
                 return false;
             }
+            AddElementProperties(out, GeometryElementDomain::GraphNode, nodes.Properties,
+                                 kNodeStreams, stats);
             geometry["nodes"] = std::move(out);
             return true;
         }
 
-        [[nodiscard]] bool AddEdges(json& geometry, const GS::Edges& edges)
+        [[nodiscard]] bool AddEdges(json& geometry, const GS::Edges& edges,
+                                    const GeometryElementDomain domain,
+                                    SceneSerializationStats& stats)
         {
             json out = json::object();
             out["deleted"] = edges.NumDeleted;
@@ -1702,12 +1959,14 @@ namespace Extrinsic::Runtime
             {
                 return false;
             }
+            AddElementProperties(out, domain, edges.Properties, {}, stats);
             geometry["edges"] = std::move(out);
             return true;
         }
 
         [[nodiscard]] bool AddHalfedges(json& geometry,
-                                        const GS::Halfedges& halfedges)
+                                        const GS::Halfedges& halfedges,
+                                        SceneSerializationStats& stats)
         {
             json out = json::object();
             if (!AddUIntProperty(out, "toVertex", halfedges.Properties,
@@ -1731,13 +1990,16 @@ namespace Extrinsic::Runtime
             {
                 return false;
             }
+            AddElementProperties(out, GeometryElementDomain::MeshHalfedge, halfedges.Properties,
+                                 kMeshHalfedgeStreams, stats);
             geometry["halfedges"] = std::move(out);
             return true;
         }
 
         [[nodiscard]] bool AddGraphHalfedges(
             json& geometry,
-            const GS::Halfedges& halfedges)
+            const GS::Halfedges& halfedges,
+            SceneSerializationStats& stats)
         {
             const auto connectivity =
                 halfedges.Properties.Get<
@@ -1768,6 +2030,8 @@ namespace Extrinsic::Runtime
             out["toVertex"] = UIntArrayToJson(toVertex);
             out["next"] = UIntArrayToJson(next);
             out["prev"] = UIntArrayToJson(prev);
+            AddElementProperties(out, GeometryElementDomain::GraphHalfedge, halfedges.Properties,
+                                 {}, stats);
             geometry["halfedges"] = std::move(out);
             return true;
         }
@@ -1857,7 +2121,8 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        [[nodiscard]] bool AddFaces(json& geometry, const GS::Faces& faces)
+        [[nodiscard]] bool AddFaces(json& geometry, const GS::Faces& faces,
+                                    SceneSerializationStats& stats)
         {
             json out = json::object();
             out["deleted"] = faces.NumDeleted;
@@ -1874,6 +2139,8 @@ namespace Extrinsic::Runtime
                 if (!property || property.Vector().size() != faces.Properties.Size()) return false;
                 out[key] = UIntArrayToJson(property.Vector());
             }
+            AddElementProperties(out, GeometryElementDomain::MeshFace, faces.Properties,
+                                 kFaceStreams, stats);
             geometry["faces"] = std::move(out);
             return true;
         }
@@ -1900,10 +2167,11 @@ namespace Extrinsic::Runtime
                 {
                     return false;
                 }
-                if (!AddVertices(geometry, *view.VertexSource, true) ||
-                    !AddEdges(geometry, *view.EdgeSource) ||
-                    !AddHalfedges(geometry, *view.HalfedgeSource) ||
-                    !AddFaces(geometry, *view.FaceSource))
+                if (!AddVertices(geometry, *view.VertexSource, true,
+                                 GeometryElementDomain::MeshVertex, stats) ||
+                    !AddEdges(geometry, *view.EdgeSource, GeometryElementDomain::MeshEdge, stats) ||
+                    !AddHalfedges(geometry, *view.HalfedgeSource, stats) ||
+                    !AddFaces(geometry, *view.FaceSource, stats))
                 {
                     return false;
                 }
@@ -1926,9 +2194,9 @@ namespace Extrinsic::Runtime
                 if (!ValidateGraphSources(*view.VertexSource,
                                           *view.HalfedgeSource,
                                           *view.EdgeSource) ||
-                    !AddNodes(geometry, *view.VertexSource) ||
-                    !AddGraphHalfedges(geometry, *view.HalfedgeSource) ||
-                    !AddEdges(geometry, *view.EdgeSource))
+                    !AddNodes(geometry, *view.VertexSource, stats) ||
+                    !AddGraphHalfedges(geometry, *view.HalfedgeSource, stats) ||
+                    !AddEdges(geometry, *view.EdgeSource, GeometryElementDomain::GraphEdge, stats))
                 {
                     return false;
                 }
@@ -1937,7 +2205,8 @@ namespace Extrinsic::Runtime
             case GS::Domain::PointCloud:
                 if (view.VertexSource == nullptr)
                     return false;
-                if (!AddVertices(geometry, *view.VertexSource, true))
+                if (!AddVertices(geometry, *view.VertexSource, true,
+                                 GeometryElementDomain::PointCloudPoint, stats))
                     return false;
                 ++stats.PointCloudEntities;
                 break;
@@ -1954,6 +2223,8 @@ namespace Extrinsic::Runtime
                                          const ECS::EntityHandle entity,
                                          const json& value,
                                          const bool requirePositions,
+                                         const GeometryElementDomain domain,
+                                         SceneSerializationStats& stats,
                                          GS::Vertices*& out)
         {
             if (!value.is_object())
@@ -1998,6 +2269,8 @@ namespace Extrinsic::Runtime
                 }
                 WriteVec2Property(vertices.Properties, "v:texcoord", std::move(texcoords));
             }
+            if (!ApplyElementProperties(value, domain, vertices.Properties, kVertexStreams, stats))
+                return false;
             vertices.NumDeleted = deleted;
             out = &raw.emplace_or_replace<GS::Vertices>(entity, std::move(vertices));
             return true;
@@ -2005,7 +2278,8 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] bool ApplyGraphVertices(entt::registry& raw,
                                               const ECS::EntityHandle entity,
-                                              const json& value)
+                                              const json& value,
+                                              SceneSerializationStats& stats)
         {
             if (!value.is_object() || !value.contains("positions"))
                 return false;
@@ -2030,6 +2304,11 @@ namespace Extrinsic::Runtime
                 }
                 WriteVec3Property(nodes.Properties, PN::kNormal, std::move(normals));
             }
+            if (!ApplyElementProperties(value, GeometryElementDomain::GraphNode, nodes.Properties,
+                                        kNodeStreams, stats))
+            {
+                return false;
+            }
             nodes.NumDeleted = deleted;
             raw.emplace_or_replace<GS::Vertices>(entity, std::move(nodes));
             return true;
@@ -2037,7 +2316,9 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] bool ApplyEdges(entt::registry& raw,
                                       const ECS::EntityHandle entity,
-                                      const json& value)
+                                      const json& value,
+                                      const GeometryElementDomain domain,
+                                      SceneSerializationStats& stats)
         {
             if (!value.is_object() ||
                 !value.contains("v0") ||
@@ -2060,6 +2341,8 @@ namespace Extrinsic::Runtime
             GS::Edges edges{};
             WriteUIntProperty(edges.Properties, PN::kEdgeV0, std::move(v0));
             WriteUIntProperty(edges.Properties, PN::kEdgeV1, std::move(v1));
+            if (!ApplyElementProperties(value, domain, edges.Properties, {}, stats))
+                return false;
             edges.NumDeleted = deleted;
             raw.emplace_or_replace<GS::Edges>(entity, std::move(edges));
             return true;
@@ -2067,7 +2350,8 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] bool ApplyHalfedges(entt::registry& raw,
                                           const ECS::EntityHandle entity,
-                                          const json& value)
+                                          const json& value,
+                                          SceneSerializationStats& stats)
         {
             if (!value.is_object() ||
                 !value.contains("toVertex") ||
@@ -2114,6 +2398,11 @@ namespace Extrinsic::Runtime
                 }
                 WriteVec3Property(halfedges.Properties, "h:normal", std::move(normals));
             }
+            if (!ApplyElementProperties(value, GeometryElementDomain::MeshHalfedge,
+                                        halfedges.Properties, kMeshHalfedgeStreams, stats))
+            {
+                return false;
+            }
             raw.emplace_or_replace<GS::Halfedges>(entity, std::move(halfedges));
             return true;
         }
@@ -2121,7 +2410,8 @@ namespace Extrinsic::Runtime
         [[nodiscard]] bool ApplyGraphHalfedges(
             entt::registry& raw,
             const ECS::EntityHandle entity,
-            const json& value)
+            const json& value,
+            SceneSerializationStats& stats)
         {
             if (!value.is_object() ||
                 !value.contains("toVertex") ||
@@ -2163,13 +2453,19 @@ namespace Extrinsic::Runtime
                             static_cast<Geometry::PropertyIndex>(prev[i])},
                     };
             }
+            if (!ApplyElementProperties(value, GeometryElementDomain::GraphHalfedge,
+                                        halfedges.Properties, {}, stats))
+            {
+                return false;
+            }
             raw.emplace_or_replace<GS::Halfedges>(entity, std::move(halfedges));
             return true;
         }
 
         [[nodiscard]] bool ApplyFaces(entt::registry& raw,
                                       const ECS::EntityHandle entity,
-                                      const json& value)
+                                      const json& value,
+                                      SceneSerializationStats& stats)
         {
             if (!value.is_object() || !value.contains("halfedge"))
                 return false;
@@ -2191,6 +2487,11 @@ namespace Extrinsic::Runtime
                 std::vector<std::uint32_t> labels{};
                 if (!TryReadUIntArray(value[key], labels) || labels.size() != faces.Properties.Size()) return false;
                 WriteUIntProperty(faces.Properties, propertyName, std::move(labels));
+            }
+            if (!ApplyElementProperties(value, GeometryElementDomain::MeshFace, faces.Properties,
+                                        kFaceStreams, stats))
+            {
+                return false;
             }
             faces.NumDeleted = deleted;
             raw.emplace_or_replace<GS::Faces>(entity, std::move(faces));
@@ -2225,10 +2526,11 @@ namespace Extrinsic::Runtime
                     return false;
                 }
                 GS::Vertices* vertices = nullptr;
-                if (!ApplyVertices(raw, entity, geometry["vertices"], true, vertices) ||
-                    !ApplyEdges(raw, entity, geometry["edges"]) ||
-                    !ApplyHalfedges(raw, entity, geometry["halfedges"]) ||
-                    !ApplyFaces(raw, entity, geometry["faces"]))
+                if (!ApplyVertices(raw, entity, geometry["vertices"], true,
+                                   GeometryElementDomain::MeshVertex, stats, vertices) ||
+                    !ApplyEdges(raw, entity, geometry["edges"], GeometryElementDomain::MeshEdge, stats) ||
+                    !ApplyHalfedges(raw, entity, geometry["halfedges"], stats) ||
+                    !ApplyFaces(raw, entity, geometry["faces"], stats))
                 {
                     return false;
                 }
@@ -2257,9 +2559,9 @@ namespace Extrinsic::Runtime
                     !geometry.contains("halfedges") ||
                     !geometry.contains("edges"))
                     return false;
-                if (!ApplyGraphVertices(raw, entity, geometry["nodes"]) ||
-                    !ApplyGraphHalfedges(raw, entity, geometry["halfedges"]) ||
-                    !ApplyEdges(raw, entity, geometry["edges"]))
+                if (!ApplyGraphVertices(raw, entity, geometry["nodes"], stats) ||
+                    !ApplyGraphHalfedges(raw, entity, geometry["halfedges"], stats) ||
+                    !ApplyEdges(raw, entity, geometry["edges"], GeometryElementDomain::GraphEdge, stats))
                 {
                     return false;
                 }
@@ -2278,7 +2580,8 @@ namespace Extrinsic::Runtime
                 if (!geometry.contains("vertices"))
                     return false;
                 GS::Vertices* vertices = nullptr;
-                if (!ApplyVertices(raw, entity, geometry["vertices"], true, vertices))
+                if (!ApplyVertices(raw, entity, geometry["vertices"], true,
+                                   GeometryElementDomain::PointCloudPoint, stats, vertices))
                     return false;
                 ++stats.PointCloudEntities;
                 break;
@@ -2645,6 +2948,8 @@ namespace Extrinsic::Runtime
             {"renderHintEntities", stats.RenderHintEntities},
             {"geometryPresentationEntities", stats.GeometryPresentationEntities},
             {"attributeBindingEntities", stats.AttributeBindingEntities},
+            {"geometryProperties", stats.GeometryProperties},
+            {"unpersistedGeometryProperties", stats.UnpersistedGeometryProperties},
             {"unsupportedPersistenceEntities", stats.UnsupportedPersistenceEntities},
             {"unsupportedLightEntities", stats.UnsupportedLightEntities},
             {"unsupportedShadowEntities", stats.UnsupportedShadowEntities},
@@ -2691,6 +2996,9 @@ namespace Extrinsic::Runtime
                 "geometryPresentationEntities",
                 statsJson.value("progressiveRenderDataEntities", 0u));
             stats.AttributeBindingEntities = statsJson.value("attributeBindingEntities", 0u);
+            stats.GeometryProperties = statsJson.value("geometryProperties", 0u);
+            stats.UnpersistedGeometryProperties =
+                statsJson.value("unpersistedGeometryProperties", 0u);
             stats.UnsupportedPersistenceEntities =
                 statsJson.value("unsupportedPersistenceEntities", 0u);
             stats.UnsupportedLightEntities =

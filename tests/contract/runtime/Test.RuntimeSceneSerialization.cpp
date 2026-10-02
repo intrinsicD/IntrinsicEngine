@@ -1,8 +1,14 @@
+#include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <span>
+#include <functional>
+#include <limits>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <variant>
@@ -13,6 +19,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <nlohmann/json.hpp>
 
+import Extrinsic.Core.Base64;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.IOBackend;
 import Extrinsic.ECS.Components.AssetInstance;
@@ -302,7 +309,7 @@ TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesPromotedSandboxSceneDa
     const std::string document = backend.Text("scene.json");
     ASSERT_FALSE(document.empty());
     const nlohmann::json parsed = nlohmann::json::parse(document);
-    ASSERT_EQ(parsed["version"].get<std::uint32_t>(), 3u);
+    ASSERT_EQ(parsed["version"].get<std::uint32_t>(), 4u);
     ASSERT_EQ(parsed["entities"].size(), 3u);
     EXPECT_EQ(parsed["stats"]["renderHintEntities"].get<std::uint32_t>(), 3u);
     ASSERT_TRUE(parsed["entities"][0]["render"]["visualization"].is_object());
@@ -484,9 +491,15 @@ TEST(RuntimeSceneSerialization, InvalidDocumentsFailClosed)
         << "version 2 may carry retired presentation color slots (RUNTIME-318)";
     EXPECT_EQ(previousVersion.error(), Core::ErrorCode::InvalidFormat);
 
+    auto version3 = Runtime::DeserializeSceneDocument(
+        scene,
+        R"({"version":3,"entities":[]})");
+    EXPECT_FALSE(version3.has_value()) << "version 3 predates the property tables (RUNTIME-319)";
+    EXPECT_EQ(version3.error(), Core::ErrorCode::InvalidFormat);
+
     auto badGeometry = Runtime::DeserializeSceneDocument(
         scene,
-        R"({"version":3,"entities":[{"id":0,"geometrySources":{"domain":"Mesh"}}]})");
+        R"({"version":4,"entities":[{"id":0,"geometrySources":{"domain":"Mesh"}}]})");
     EXPECT_FALSE(badGeometry.has_value());
     EXPECT_EQ(badGeometry.error(), Core::ErrorCode::InvalidFormat);
 }
@@ -494,7 +507,7 @@ TEST(RuntimeSceneSerialization, InvalidDocumentsFailClosed)
 TEST(RuntimeSceneSerialization, MalformedGraphTopologyFailsClosed)
 {
     const nlohmann::json valid = nlohmann::json::parse(
-        R"({"version":3,"entities":[{"id":0,"geometrySources":{"domain":"Graph","nodes":{"deleted":0,"positions":[[0,0,0],[1,0,0]]},"halfedges":{"toVertex":[1,0],"next":[1,0],"prev":[1,0]},"edges":{"deleted":0,"v0":[0],"v1":[1]}}}]})");
+        R"({"version":4,"entities":[{"id":0,"geometrySources":{"domain":"Graph","nodes":{"deleted":0,"positions":[[0,0,0],[1,0,0]]},"halfedges":{"toVertex":[1,0],"next":[1,0],"prev":[1,0]},"edges":{"deleted":0,"v0":[0],"v1":[1]}}}]})");
 
     {
         ECS::Scene::Registry scene;
@@ -1289,8 +1302,8 @@ TEST(RuntimeSceneSerialization, AttributeBindingsRoundTripAndStaleSourcesLoadAsR
     const ECS::EntityHandle mesh = AddMeshEntity(source);
     source.Raw().get<GS::Vertices>(mesh).Properties.GetOrAdd<glm::vec3>(
         std::string{PN::kNormal}, glm::vec3{0.0f, 0.0f, 1.0f});
-    source.Raw().get<GS::Vertices>(mesh).Properties.GetOrAdd<glm::vec3>(
-        "v:scratch", glm::vec3{1.0f, 0.0f, 0.0f});  // processed: not persisted
+    (void)source.Raw().get<GS::Vertices>(mesh).Properties.GetOrAdd<glm::vec3>(
+        "v:scratch", glm::vec3{1.0f, 0.0f, 0.0f});  // processed property (RUNTIME-319)
     const RT::VertexChannelBindingSet authored{
         .Position = {.Enabled = true,
                      .Property = {RT::GeometryElementDomain::MeshVertex, "v:normal",
@@ -1319,7 +1332,7 @@ TEST(RuntimeSceneSerialization, AttributeBindingsRoundTripAndStaleSourcesLoadAsR
     const auto result = RT::LoadSceneDocument(loaded, "bindings.json", backend);
     ASSERT_TRUE(result.has_value()) << static_cast<int>(result.error());
     EXPECT_EQ(result->Stats.AttributeBindingEntities, 1u);
-    EXPECT_EQ(result->Stats.StaleAttributeBindings, 1u);  // v:scratch was not saved
+    EXPECT_EQ(result->Stats.StaleAttributeBindings, 0u);  // v:scratch is persisted
     const ECS::EntityHandle loadedMesh = FindEntityByName(loaded, "Mesh Entity");
     ASSERT_NE(loadedMesh, ECS::InvalidEntityHandle);
     const auto* bindings = loaded.Raw().try_get<RT::VertexChannelBindingSet>(loadedMesh);
@@ -1333,6 +1346,18 @@ TEST(RuntimeSceneSerialization, AttributeBindingsRoundTripAndStaleSourcesLoadAsR
     ASSERT_TRUE(resaved.has_value());
     EXPECT_EQ(nlohmann::json::parse(backend.Text("again.json"))["entities"][0]["attributeBindings"],
               bindingsJson);
+
+    // A source missing from the document still loads as a counted fallback.
+    nlohmann::json withoutProperties = parsed;
+    withoutProperties["entities"][0]["geometrySources"]["vertices"].erase("properties");
+    ECS::Scene::Registry stale;
+    const auto staleResult = RT::DeserializeSceneDocument(stale, withoutProperties.dump());
+    ASSERT_TRUE(staleResult.has_value());
+    EXPECT_EQ(staleResult->Stats.StaleAttributeBindings, 1u);
+    const auto* staleBindings =
+        stale.Raw().try_get<RT::VertexChannelBindingSet>(FindEntityByName(stale, "Mesh Entity"));
+    ASSERT_NE(staleBindings, nullptr);
+    EXPECT_EQ(staleBindings->Normal, authored.Normal);  // kept as authored intent
 }
 
 TEST(RuntimeSceneSerialization, InvalidAttributeBindingsRejectTheDocument)
@@ -1359,4 +1384,271 @@ TEST(RuntimeSceneSerialization, InvalidAttributeBindingsRejectTheDocument)
     unnamed["entities"][0]["attributeBindings"]["normal"]["name"] = "";
     ECS::Scene::Registry loaded;
     EXPECT_FALSE(Runtime::DeserializeSceneDocument(loaded, unnamed.dump()).has_value());
+}
+
+// ---------------------------------------------------------------------------
+// RUNTIME-319 — processed/custom typed properties on every element domain.
+// ---------------------------------------------------------------------------
+namespace
+{
+    template <class T>
+    void AddProcessedProperty(Geometry::PropertySet& properties, const std::string& name,
+                              std::vector<T> values)
+    {
+        ASSERT_EQ(values.size(), properties.Size()) << name;
+        auto property = properties.GetOrAdd<T>(name, T{});
+        property.Vector() = std::move(values);
+    }
+
+    template <class T>
+    void ExpectSameProperty(const Geometry::PropertySet& loaded,
+                            const Geometry::PropertySet& original,
+                            const std::string& name)
+    {
+        const auto expected = original.Get<T>(name);
+        const auto actual = loaded.Get<T>(name);
+        ASSERT_TRUE(expected.IsValid()) << name;
+        ASSERT_TRUE(actual.IsValid()) << name << " was not restored with its value kind";
+        ASSERT_EQ(actual.Vector().size(), expected.Vector().size()) << name;
+        if constexpr (std::is_same_v<T, bool>)
+        {
+            EXPECT_EQ(actual.Vector(), expected.Vector()) << name;
+        }
+        else
+        {
+            EXPECT_EQ(std::memcmp(actual.Vector().data(), expected.Vector().data(),
+                                  expected.Vector().size() * sizeof(T)),
+                      0)
+                << name << " is not bit-exact";
+        }
+    }
+
+    struct OpaqueValue
+    {
+        int A{0};
+    };
+
+    constexpr float kInf = std::numeric_limits<float>::infinity();
+}
+
+TEST(RuntimeSceneSerialization, ProcessedPropertiesRoundTripBitExactlyOnEveryElementDomain)
+{
+    ECS::Scene::Registry source;
+    const ECS::EntityHandle mesh = AddMeshEntity(source);
+    const ECS::EntityHandle graph = AddGraphEntity(source);
+    const ECS::EntityHandle cloud = AddPointCloudEntity(source);
+    auto& raw = source.Raw();
+
+    auto& meshVertices = raw.get<GS::Vertices>(mesh).Properties;
+    AddProcessedProperty<float>(meshVertices, "v:curvature", {-0.0f, kInf, 1.0e-40f});
+    AddProcessedProperty<glm::vec4>(meshVertices, "v:rgba",
+                                    {{0.1f, 0.2f, 0.3f, 1.0f}, {-kInf, 0.0f, 1.0f, 2.0f}, {3.0f, 4.0f, 5.0f, 6.0f}});
+    auto& meshEdges = raw.get<GS::Edges>(mesh).Properties;
+    AddProcessedProperty<bool>(meshEdges, "e:feature", {true, false, true});
+    AddProcessedProperty<double>(meshEdges, "e:length", {0.1, 1.0 / 3.0, std::numeric_limits<double>::max()});
+    auto& meshHalfedges = raw.get<GS::Halfedges>(mesh).Properties;
+    AddProcessedProperty<std::int32_t>(meshHalfedges, "h:label",
+                                       {-7, std::numeric_limits<std::int32_t>::min(),
+                                        std::numeric_limits<std::int32_t>::max(), 0, 1, -1});
+    AddProcessedProperty<glm::vec2>(meshHalfedges, "h:uv2",
+                                    {{0.0f, 1.0f}, {2.0f, 3.0f}, {4.0f, 5.0f}, {6.0f, 7.0f}, {8.0f, 9.0f}, {0.5f, 0.25f}});
+    auto& meshFaces = raw.get<GS::Faces>(mesh).Properties;
+    AddProcessedProperty<std::uint64_t>(meshFaces, "f:id", {std::numeric_limits<std::uint64_t>::max()});
+    AddProcessedProperty<glm::vec3>(meshFaces, "f:flow", {{1.0f, -2.0f, 3.5f}});
+
+    auto& nodes = raw.get<GS::Vertices>(graph).Properties;
+    AddProcessedProperty<std::uint32_t>(nodes, "v:component", {0u, 7u, 0xFFFFFFFFu});
+    AddProcessedProperty<float>(nodes, "v:heat", {0.25f, 0.5f, 0.75f});
+    auto& graphEdges = raw.get<GS::Edges>(graph).Properties;
+    AddProcessedProperty<double>(graphEdges, "e:weight", {-std::numeric_limits<double>::infinity(), 2.5});
+    auto& graphHalfedges = raw.get<GS::Halfedges>(graph).Properties;
+    AddProcessedProperty<glm::vec3>(graphHalfedges, "h:dir",
+                                    {{1.0f, 0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, -1.0f, 0.0f}});
+
+    auto& points = raw.get<GS::Vertices>(cloud).Properties;
+    AddProcessedProperty<float>(points, "v:density", {3.0f, 4.0f});
+    AddProcessedProperty<bool>(points, "v:outlier", {false, true});
+
+    MemoryIOBackend backend;
+    const auto saved = Runtime::SaveSceneDocument(source, "properties.json", backend);
+    ASSERT_TRUE(saved.has_value()) << static_cast<int>(saved.error());
+    // 14 authored above plus the graph's own `v:point` storage, which
+    // PopulateFromGraph copies next to `v:position`; topology rows are skipped.
+    EXPECT_EQ(saved->Stats.GeometryProperties, 15u);
+    EXPECT_EQ(saved->Stats.UnpersistedGeometryProperties, 0u)
+        << "topology (graph h:connectivity) is skipped silently, not counted";
+
+    const nlohmann::json parsed = nlohmann::json::parse(backend.Text("properties.json"));
+    const auto& meshTable = parsed["entities"][0]["geometrySources"]["vertices"]["properties"];
+    ASSERT_TRUE(meshTable.is_array());
+    ASSERT_EQ(meshTable.size(), 2u) << "dedicated streams (v:position, v:texcoord) stay out of the table";
+    EXPECT_EQ(meshTable[0]["name"], "v:curvature");
+    EXPECT_EQ(meshTable[0]["kind"], "ScalarFloat");
+    EXPECT_EQ(meshTable[1]["name"], "v:rgba");
+
+    ECS::Scene::Registry loaded;
+    const auto result = Runtime::LoadSceneDocument(loaded, "properties.json", backend);
+    ASSERT_TRUE(result.has_value()) << static_cast<int>(result.error());
+    EXPECT_EQ(result->Stats.GeometryProperties, 15u);
+
+    const auto& lraw = loaded.Raw();
+    const ECS::EntityHandle lmesh = FindEntityByName(loaded, "Mesh Entity");
+    const ECS::EntityHandle lgraph = FindEntityByName(loaded, "Graph Entity");
+    const ECS::EntityHandle lcloud = FindEntityByName(loaded, "Cloud Entity");
+    ASSERT_NE(lmesh, ECS::InvalidEntityHandle);
+    ASSERT_NE(lgraph, ECS::InvalidEntityHandle);
+    ASSERT_NE(lcloud, ECS::InvalidEntityHandle);
+
+    ExpectSameProperty<float>(lraw.get<GS::Vertices>(lmesh).Properties, meshVertices, "v:curvature");
+    ExpectSameProperty<glm::vec4>(lraw.get<GS::Vertices>(lmesh).Properties, meshVertices, "v:rgba");
+    ExpectSameProperty<bool>(lraw.get<GS::Edges>(lmesh).Properties, meshEdges, "e:feature");
+    ExpectSameProperty<double>(lraw.get<GS::Edges>(lmesh).Properties, meshEdges, "e:length");
+    ExpectSameProperty<std::int32_t>(lraw.get<GS::Halfedges>(lmesh).Properties, meshHalfedges, "h:label");
+    ExpectSameProperty<glm::vec2>(lraw.get<GS::Halfedges>(lmesh).Properties, meshHalfedges, "h:uv2");
+    ExpectSameProperty<std::uint64_t>(lraw.get<GS::Faces>(lmesh).Properties, meshFaces, "f:id");
+    ExpectSameProperty<glm::vec3>(lraw.get<GS::Faces>(lmesh).Properties, meshFaces, "f:flow");
+    ExpectSameProperty<std::uint32_t>(lraw.get<GS::Vertices>(lgraph).Properties, nodes, "v:component");
+    ExpectSameProperty<float>(lraw.get<GS::Vertices>(lgraph).Properties, nodes, "v:heat");
+    ExpectSameProperty<double>(lraw.get<GS::Edges>(lgraph).Properties, graphEdges, "e:weight");
+    ExpectSameProperty<glm::vec3>(lraw.get<GS::Halfedges>(lgraph).Properties, graphHalfedges, "h:dir");
+    ExpectSameProperty<float>(lraw.get<GS::Vertices>(lcloud).Properties, points, "v:density");
+    ExpectSameProperty<bool>(lraw.get<GS::Vertices>(lcloud).Properties, points, "v:outlier");
+
+    // Restored properties are new storages with their own content revision.
+    const auto restored = lraw.get<GS::Vertices>(lmesh).Properties.FindPropertyRevision("v:curvature");
+    ASSERT_TRUE(restored.has_value());
+    EXPECT_NE(*restored, 0u);
+
+    // Saving the loaded scene reproduces the same document.
+    ASSERT_TRUE(Runtime::SaveSceneDocument(loaded, "again.json", backend).has_value());
+    EXPECT_EQ(nlohmann::json::parse(backend.Text("again.json"))["entities"], parsed["entities"]);
+}
+
+TEST(RuntimeSceneSerialization, UnpersistablePropertiesAreCountedAndSkippedOnSave)
+{
+    ECS::Scene::Registry source;
+    const ECS::EntityHandle cloud = AddPointCloudEntity(source);
+    auto& points = source.Raw().get<GS::Vertices>(cloud).Properties;
+    AddProcessedProperty<float>(points, "v:broken", {1.0f, std::numeric_limits<float>::quiet_NaN()});
+    (void)points.GetOrAdd<OpaqueValue>("v:opaque", OpaqueValue{});
+    AddProcessedProperty<float>(points, "v:fine", {1.0f, 2.0f});
+
+    MemoryIOBackend backend;
+    const auto saved = Runtime::SaveSceneDocument(source, "skip.json", backend);
+    ASSERT_TRUE(saved.has_value());
+    EXPECT_EQ(saved->Stats.GeometryProperties, 1u);
+    EXPECT_EQ(saved->Stats.UnpersistedGeometryProperties, 2u);
+    const nlohmann::json parsed = nlohmann::json::parse(backend.Text("skip.json"));
+    const auto& table = parsed["entities"][0]["geometrySources"]["vertices"]["properties"];
+    ASSERT_EQ(table.size(), 1u);
+    EXPECT_EQ(table[0]["name"], "v:fine");
+}
+
+TEST(RuntimeSceneSerialization, MalformedPropertyTablesRejectTheDocumentWithoutMutation)
+{
+    ECS::Scene::Registry source;
+    const ECS::EntityHandle mesh = AddMeshEntity(source);
+    AddProcessedProperty<float>(source.Raw().get<GS::Vertices>(mesh).Properties, "v:curvature",
+                                {1.0f, 2.0f, 3.0f});
+    AddProcessedProperty<bool>(source.Raw().get<GS::Edges>(mesh).Properties, "e:feature",
+                               {true, false, true});
+    MemoryIOBackend backend;
+    ASSERT_TRUE(Runtime::SaveSceneDocument(source, "valid.json", backend).has_value());
+    const nlohmann::json valid = nlohmann::json::parse(backend.Text("valid.json"));
+    {
+        ECS::Scene::Registry scene;
+        ASSERT_TRUE(Runtime::DeserializeSceneDocument(scene, valid.dump()).has_value());
+    }
+
+    const auto floatPayload = [](const std::vector<float>& values)
+    {
+        return Core::Base64::Encode(std::span<const std::uint8_t>(
+            reinterpret_cast<const std::uint8_t*>(values.data()), values.size() * sizeof(float)));
+    };
+
+    const auto vertexEntry = [](nlohmann::json& doc) -> nlohmann::json&
+    { return doc["entities"][0]["geometrySources"]["vertices"]["properties"][0]; };
+    const auto edgeEntry = [](nlohmann::json& doc) -> nlohmann::json&
+    { return doc["entities"][0]["geometrySources"]["edges"]["properties"][0]; };
+
+    std::vector<std::pair<std::string, std::function<void(nlohmann::json&)>>> cases;
+    cases.emplace_back("table not an array", [&](nlohmann::json& d)
+                       { d["entities"][0]["geometrySources"]["vertices"]["properties"] = nlohmann::json::object(); });
+    cases.emplace_back("entry not an object", [&](nlohmann::json& d) { vertexEntry(d) = 1; });
+    cases.emplace_back("missing data", [&](nlohmann::json& d) { vertexEntry(d).erase("data"); });
+    cases.emplace_back("unknown key", [&](nlohmann::json& d) { vertexEntry(d)["count"] = 3; });
+    cases.emplace_back("non-string name", [&](nlohmann::json& d) { vertexEntry(d)["name"] = 7; });
+    cases.emplace_back("empty name", [&](nlohmann::json& d) { vertexEntry(d)["name"] = ""; });
+    cases.emplace_back("topology name", [&](nlohmann::json& d) { vertexEntry(d)["name"] = "v:deleted"; });
+    cases.emplace_back("dedicated stream name", [&](nlohmann::json& d) { vertexEntry(d)["name"] = "v:position"; });
+    cases.emplace_back("duplicate name", [&](nlohmann::json& d)
+                       {
+                           const nlohmann::json copy = vertexEntry(d);
+                           d["entities"][0]["geometrySources"]["vertices"]["properties"].push_back(copy);
+                       });
+    cases.emplace_back("unknown kind", [&](nlohmann::json& d) { vertexEntry(d)["kind"] = "Quat"; });
+    cases.emplace_back("Unknown kind", [&](nlohmann::json& d) { vertexEntry(d)["kind"] = "Unknown"; });
+    cases.emplace_back("kind/size mismatch", [&](nlohmann::json& d) { vertexEntry(d)["kind"] = "Vec3"; });
+    cases.emplace_back("truncated payload", [&](nlohmann::json& d)
+                       { auto& data = vertexEntry(d)["data"]; data = data.get<std::string>().substr(0, 8); });
+    cases.emplace_back("oversized payload", [&](nlohmann::json& d)
+                       { vertexEntry(d)["data"] = floatPayload({1.0f, 2.0f, 3.0f, 4.0f}); });
+    cases.emplace_back("invalid base64", [&](nlohmann::json& d)
+                       { auto& data = vertexEntry(d)["data"]; auto text = data.get<std::string>(); text[0] = '*'; data = text; });
+    cases.emplace_back("NaN payload", [&](nlohmann::json& d)
+                       { vertexEntry(d)["data"] = floatPayload({1.0f, std::numeric_limits<float>::quiet_NaN(), 3.0f}); });
+    cases.emplace_back("bool byte other than 0/1", [&](nlohmann::json& d)
+                       { edgeEntry(d)["data"] = "AQIB"; });  // bytes 01 02 01
+    cases.emplace_back("bad entry on a later domain", [&](nlohmann::json& d)
+                       { edgeEntry(d)["kind"] = "Vec4"; });
+
+    for (const auto& [label, mutate] : cases)
+    {
+        nlohmann::json document = valid;
+        mutate(document);
+        ECS::Scene::Registry scene;
+        const ECS::EntityHandle existing = ECS::Scene::CreateDefault(scene, "Existing");
+        const auto result = Runtime::DeserializeSceneDocument(scene, document.dump());
+        EXPECT_FALSE(result.has_value()) << label;
+        if (!result.has_value())
+            EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat) << label;
+        EXPECT_EQ(FindEntityByName(scene, "Existing"), existing) << label << ": the scene was mutated";
+        EXPECT_EQ(FindEntityByName(scene, "Mesh Entity"), ECS::InvalidEntityHandle) << label;
+    }
+}
+
+TEST(RuntimeSceneSerialization, LargePropertyPayloadStaysCompactAndRoundTrips)
+{
+    constexpr std::size_t kPoints = 100'000u;
+    ECS::Scene::Registry source;
+    const ECS::EntityHandle cloud = ECS::Scene::CreateDefault(source, "Large Cloud");
+    auto& vertices = source.Raw().emplace<GS::Vertices>(cloud);
+    std::vector<glm::vec3> positions(kPoints);
+    std::vector<glm::vec3> field(kPoints);
+    for (std::size_t i = 0u; i < kPoints; ++i)
+    {
+        positions[i] = glm::vec3{static_cast<float>(i), 0.0f, 0.0f};
+        field[i] = glm::vec3{std::sin(static_cast<float>(i)), 1.0f / static_cast<float>(i + 1u), -0.5f};
+    }
+    SetPositions(vertices, std::move(positions));
+    AddProcessedProperty<glm::vec3>(vertices.Properties, "v:field", field);
+
+    const auto start = std::chrono::steady_clock::now();
+    const auto document = Runtime::SerializeSceneDocument(source);
+    ASSERT_TRUE(document.has_value());
+    const nlohmann::json parsed = nlohmann::json::parse(*document);
+    const std::string& data =
+        parsed["entities"][0]["geometrySources"]["vertices"]["properties"][0]["data"].get_ref<const std::string&>();
+    EXPECT_EQ(data.size(), (kPoints * sizeof(glm::vec3) + 2u) / 3u * 4u)
+        << "one base64 string per property, not one JSON node per element";
+
+    ECS::Scene::Registry loaded;
+    ASSERT_TRUE(Runtime::DeserializeSceneDocument(loaded, *document).has_value());
+    const double seconds =
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+    EXPECT_LT(seconds, 30.0) << "debug-build sanity bound for a 100k-point save+load";
+    const ECS::EntityHandle lcloud = FindEntityByName(loaded, "Large Cloud");
+    ASSERT_NE(lcloud, ECS::InvalidEntityHandle);
+    ExpectSameProperty<glm::vec3>(loaded.Raw().get<GS::Vertices>(lcloud).Properties,
+                                  vertices.Properties, "v:field");
 }

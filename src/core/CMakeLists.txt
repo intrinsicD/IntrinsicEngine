@@ -30,6 +30,7 @@ target_sources(${target_name}
         Core.Geometry2D.cppm
         Core.Filesystem.PathResolver.cppm
         Core.Filesystem.cppm
+        Core.Base64.cppm
         Core.Hash.cppm
         Core.HandleLease.cppm
         Core.LockFreeQueue.cppm

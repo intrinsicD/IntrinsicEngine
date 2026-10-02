@@ -1784,6 +1784,7 @@ set(_core_wrapper_unit_test_files
     Test.CoreFrameGraphTypeTokenHelper.cpp
     Test.Core.GraphCompiler.cpp
     Test.Core.HandleLease.cpp
+    Test.Core.Base64.cpp
     Test.CoreHash.cpp
     Test.Core.LockFreeQueue.cpp
     Test.Core.Logging.cpp

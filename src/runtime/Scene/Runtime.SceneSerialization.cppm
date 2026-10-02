@@ -30,6 +30,11 @@ export namespace Extrinsic::Runtime
         // drawn from the default source, logged as a warning).
         std::uint32_t AttributeBindingEntities{0u};
         std::uint32_t StaleAttributeBindings{0u};
+        // RUNTIME-319: typed element-domain properties written/read through the
+        // per-domain property tables, and properties a save skipped (no value
+        // kind, or NaN values; each logged as a warning).
+        std::uint32_t GeometryProperties{0u};
+        std::uint32_t UnpersistedGeometryProperties{0u};
         std::uint32_t UnsupportedPersistenceEntities{0u};
         std::uint32_t UnsupportedLightEntities{0u};
         std::uint32_t UnsupportedShadowEntities{0u};

@@ -61,3 +61,41 @@ ctest --test-dir build/ci --output-on-failure -R 'RuntimeSceneSerialization|Vert
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+## Log
+- 2026-10-02: Slice 1 (format, codec, tests). Decisions:
+  - Scope: every typed property on all eight element domains except topology
+    (`IsTopologyProperty`) and the streams a section already writes (positions,
+    normals, texcoords, corner normals/texcoords, atlas labels). Nothing else is
+    excluded. Caches such as a graph's `v:point` mirror are ordinary CPU
+    properties, so a reload keeps them exactly. GPU-only ring fronts are not
+    `PropertySet` entries and never reach the writer. No property-backed
+    selection masks exist (selection is ECS state).
+  - Value kinds: bool, int32, uint32, uint64, float, double, vec2/3/4. Strings
+    are not a `PropertyValueKind`. A property whose type has no value kind
+    (an opaque struct) is skipped at save, counted in
+    `UnpersistedGeometryProperties` and logged.
+  - Encoding: one `{name, kind, data}` entry per property in a per-section
+    `properties` array. `data` is strict base64 of the little-endian element
+    bytes. This is bit-exact, including inf and -0, which JSON numbers cannot
+    carry, and costs about 1.33x the raw size. No compression or sidecar: the
+    payload is linear in the element count the document already carries.
+    Sidecars stay with GEOIO-005/RUNTIME-283 if they are ever needed. The base64
+    codec moved from the agent capture code to `Extrinsic.Core.Base64`, with a
+    strict decoder, and is shared, not duplicated. No GEOIO-005/RUNTIME-283
+    typed codec exists yet to reuse.
+  - Validation: the payload length must equal section count x element size
+    before decoding, with an overflow guard. A duplicate, reserved or topology
+    name, an unknown kind, a bool byte other than 0 or 1, or a NaN float rejects
+    the whole document. The load stages into a fresh registry, so a rejected
+    document never mutates the scene. Infinity is allowed because sentinel
+    fields use it, matching `GeometryScalarNonfinitePolicy::AllowInfinity`.
+    NaN is never a live output. The writer therefore skips a NaN-carrying
+    property with a counted warning instead of failing the whole save.
+  - Revisions: loaded properties are new storages, so their content revisions
+    are fresh (`geometry.property-coherence`). Nothing carries over.
+  - `kSceneDocumentVersion` is 4. Version 3 documents fail with
+    `InvalidFormat` (AGENTS.md §5, no converter).
+  - Bindings to processed properties now resolve after reload
+    (`StaleAttributeBindings == 0`). A source that is absent from the document
+    still loads as a counted fallback.

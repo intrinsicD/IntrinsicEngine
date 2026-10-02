@@ -119,6 +119,4 @@ export namespace Extrinsic::Runtime
     void RegisterEditorAgentOperations(AgentOperationRegistry& registry);
     // view_screenshot (image only) and view_capture (PNG file) over ViewCaptureModule.
     void RegisterViewCaptureAgentOperations(AgentOperationRegistry& registry);
-
-    [[nodiscard]] std::string EncodeBase64(std::span<const std::uint8_t> bytes);
 }

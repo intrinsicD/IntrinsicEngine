@@ -18,6 +18,7 @@ module;
 
 module Extrinsic.Runtime.AgentOperations;
 
+import Extrinsic.Core.Base64;
 import Extrinsic.Runtime.ViewCapture;
 
 namespace Extrinsic::Runtime
@@ -153,7 +154,7 @@ namespace Extrinsic::Runtime
                                         {"strip", "bottom rows, min on the left, max on the right"}};
                 if (!status.Path.empty()) result["path"] = status.Path;
                 out = AgentOperationOutcome{.Text = Dump(result)};
-                if (inline_) out.Images.push_back({.MimeType = "image/png", .Base64Data = EncodeBase64(status.Png)});
+                if (inline_) out.Images.push_back({.MimeType = "image/png", .Base64Data = Core::Base64::Encode(status.Png)});
                 return true;
             };
             return outcome;
@@ -164,29 +165,6 @@ namespace Extrinsic::Runtime
             R"("preset":{"type":"string","enum":["current","front","back","left","right","top","bottom","isometric"],"description":"Camera for the shot (default current); presets frame fit_entity or the whole scene, and the view is restored afterwards"},)"
             R"("fit_entity":{"type":"integer","minimum":1,"description":"Stable entity id a preset frames"},)"
             R"("legend_entity":{"type":"integer","minimum":1,"description":"Append a colormap strip for this entity's scalar coloring and return its range"})";
-    }
-
-    std::string EncodeBase64(const std::span<const std::uint8_t> bytes)
-    {
-        static constexpr char kAlphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-        std::string out;
-        out.reserve((bytes.size() + 2) / 3 * 4);
-        std::size_t i = 0;
-        for (; i + 3 <= bytes.size(); i += 3)
-        {
-            const std::uint32_t v = (std::uint32_t(bytes[i]) << 16) | (std::uint32_t(bytes[i + 1]) << 8) | bytes[i + 2];
-            out += kAlphabet[(v >> 18) & 63]; out += kAlphabet[(v >> 12) & 63];
-            out += kAlphabet[(v >> 6) & 63];  out += kAlphabet[v & 63];
-        }
-        if (const std::size_t rest = bytes.size() - i; rest > 0)
-        {
-            std::uint32_t v = std::uint32_t(bytes[i]) << 16;
-            if (rest == 2) v |= std::uint32_t(bytes[i + 1]) << 8;
-            out += kAlphabet[(v >> 18) & 63]; out += kAlphabet[(v >> 12) & 63];
-            out += rest == 2 ? kAlphabet[(v >> 6) & 63] : '=';
-            out += '=';
-        }
-        return out;
     }
 
     void RegisterViewCaptureAgentOperations(AgentOperationRegistry& registry)

@@ -12,6 +12,7 @@ engine subsystems.
 - `Extrinsic.Core.Config.EngineLoad`
 - `Extrinsic.Core.BoundedHeap`
 - `Extrinsic.Core.IndexedHeap`
+- `Extrinsic.Core.Base64`
 - `Extrinsic.Core.CallbackRegistry`
 - `Extrinsic.Core.Dag.Scheduler`
 - `Extrinsic.Core.Dag.TaskGraph`
@@ -102,6 +103,10 @@ Core owns reusable graph/scheduling primitives, not domain-specific GPU policy.
     running on scheduler workers.
 - **`Extrinsic.Core.FrameGraph`**: ECS-oriented facade over `TaskGraph` with
   typed read/write access declarations plus structural and commit tokens.
+- **`Extrinsic.Core.Base64`**: RFC 4648 base64 for byte payloads inside text
+  documents. Decoding is strict (one accepted spelling per byte sequence) and
+  `DecodedSize` bounds a payload before it is decoded. Users: agent PNG replies
+  and the scene document's typed property tables (RUNTIME-319).
 - **`Extrinsic.Core.Hash`**: canonical hashing owner — the 32-bit `HashString` /
   `StringID` naming lane, the constexpr 64-bit FNV-1a `Hash::HashString64`, and
   the RTTI-free compile-time type identity `Core::TypeToken<T>()` built on it.
