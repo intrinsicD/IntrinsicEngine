@@ -1309,6 +1309,7 @@ if(TARGET ExtrinsicRuntime)
         Test.PropertySmoothingTransaction.cpp
         Test.PointScalarTransaction.cpp
         Test.OutlierTransaction.cpp
+        Test.GpuTransactionLifecycleContract.cpp
         Test.NormalTransaction.cpp
         Test.GpuPositionsAccept.cpp
         Test.RegistrationDomains.cpp

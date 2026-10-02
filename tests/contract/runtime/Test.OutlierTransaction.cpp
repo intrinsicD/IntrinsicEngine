@@ -237,3 +237,23 @@ TEST(OutlierTransaction, DuplicateStartIsPendingWithTheSharedMessage)
     R::RuntimeModuleShutdownContext shutdown{commands, events, h.Jobs.Jobs(), worlds, services};
     cache.OnShutdown(shutdown);
 }
+
+// RUNTIME-311: on the shared lifecycle a Discard issued by a history observer while Accept
+// publishes is ignored (before: it ended the outlier run as Discarded/NoChange mid-publication
+// and the Applied fields were never reported), and the callback fires exactly once.
+TEST(OutlierTransaction, ReentrantDiscardDuringAcceptStillDeliversAppliedOnce)
+{
+    Harness h;R::EditorOutlierTransactionHandle run;unsigned discards=0;
+    h.Context.InvalidateWorkspaceSnapshotCache=[&]{++discards;R::DiscardEditorOutlierAnalysis(h.Commands(),run);};
+    run=h.Ready();ASSERT_TRUE(run);
+    std::vector<R::EditorOutlierAnalysisResult> results;
+    ASSERT_EQ(R::AcceptEditorOutlierAnalysis(h.Commands(),run,[&](auto r){results.push_back(r);}).Status,R::EditorCommandStatus::Pending);
+    ASSERT_TRUE(h.Jobs.DrainUntilTerminal());
+    EXPECT_GT(discards,0u)<<"the publication ran its observer";
+    ASSERT_EQ(results.size(),1u);
+    EXPECT_EQ(results.front().Status,R::EditorCommandStatus::Applied)<<results.front().Message;
+    EXPECT_EQ(R::SnapshotEditorOutlierAnalysis(h.Commands(),run).Phase,R::EditorGpuTransactionPhase::Applied);
+    EXPECT_TRUE(h.Rows().Exists(h.Config.Mask.Name));EXPECT_TRUE(h.Rows().Exists(h.Config.Score.Name));
+    R::DiscardEditorOutlierAnalysis(h.Commands(),run);
+    EXPECT_EQ(results.size(),1u);
+}

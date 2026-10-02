@@ -165,7 +165,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
                                                      ? EditorGpuTransactionPhase::Discarded : EditorGpuTransactionPhase::Failed,
                                              refused->Status, std::move(refused->Message));
                     else
-                        (void)BeginGpuTransactionAccept(t, "Accept " + t->Label);
+                        (void)BeginGpuTransactionAccept(t);
                 }
                 return t->Phase != EditorGpuTransactionPhase::Failed;
             },
@@ -185,10 +185,12 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         return token;
     }
 
-    std::optional<GpuTransactionRefusal> GpuTransactionAcceptRefusal(const GpuTransactionCore& t)
+    std::optional<GpuTransactionRefusal> GpuTransactionAcceptRefusal(const GpuTransactionCore& t, const bool withSink)
     {
         if (t.Phase == EditorGpuTransactionPhase::Accepting)
-            return GpuTransactionRefusal{EditorCommandStatus::Pending, "Accept is already under way."};
+            return withSink ? GpuTransactionRefusal{EditorCommandStatus::InvalidProcessingParameters,
+                                                    "Accept is already under way; its result goes to the caller that started it."}
+                            : GpuTransactionRefusal{EditorCommandStatus::Pending, "Accept is already under way."};
         if (t.Phase != EditorGpuTransactionPhase::ReadyToAccept)
             return GpuTransactionRefusal{EditorCommandStatus::InvalidProcessingParameters, "No GPU result waits for Accept."};
         if (!GpuTransactionCurrent(t))
@@ -197,7 +199,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         return std::nullopt;
     }
 
-    bool BeginGpuTransactionAccept(const GpuTransactionHandle& t, std::string debugName)
+    bool BeginGpuTransactionAccept(const GpuTransactionHandle& t)
     {
         if (!t->TestFront)
             for (std::size_t i = 0; i < t->RingCount; ++i)
@@ -213,7 +215,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
             }
         t->Phase = EditorGpuTransactionPhase::Accepting;
         JobDesc accept{
-            .DebugName = std::move(debugName), .Scope = t->Context.World, .Kind = RuntimeTaskKinds::GeometryProcess,
+            .DebugName = t->AcceptJobName, .Scope = t->Context.World, .Kind = RuntimeTaskKinds::GeometryProcess,
             .Work = [](const JobCancellation&) { return JobResultEnvelope::Make(true); },
             .IsReadyToApply = [t] {
                 if (!GpuTransactionCurrent(*t)) return true;

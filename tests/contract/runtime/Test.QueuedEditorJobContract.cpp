@@ -305,13 +305,12 @@ TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
     constexpr std::string_view owner = "Runtime.GeometryProcessingOperations.MeshSupport.cpp";
     // Files that own a job lifecycle the helper does not cover (keep this list short; a new
     // queued operation belongs on `QueuedJobDelivery`).
-    constexpr std::array<std::string_view, 11> handWritten{
+    constexpr std::array<std::string_view, 10> handWritten{
         // GPU Run/Accept transactions not yet on Runtime.GpuTransactionLifecycle (RUNTIME-311).
         // Keypoints stays listed for its resident run's guarded publication sink.
         "Runtime.GeometryProcessingOperations.GpuPositions.cpp",
         "Runtime.GeometryProcessingOperations.Keypoints.cpp",
         "Runtime.GeometryProcessingOperations.Normals.cpp",
-        "Runtime.GeometryProcessingOperations.Outliers.cpp",
         "Runtime.MeshFieldOperations.Smoothing.cpp",
         // Mesh-family jobs that keep their result in a typed state struct with the shared
         // `BuildUnpublishedEditorJobFailure` wording and `ActiveOutputJobRefusal`.
@@ -324,6 +323,15 @@ TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
         "Runtime.RegistrationOperations.CoherentPointDrift.cpp",
     };
     constexpr std::string_view deliverOnceAllowed = "Runtime.RegistrationOperations.CoherentPointDrift.cpp";
+    // RUNTIME-311: Accept front readbacks belong to the shared GPU transaction lifecycle; these
+    // files still read fronts themselves (GpuPositions also defines the readback primitive).
+    constexpr std::string_view lifecycle = "Runtime.GpuTransactionLifecycle.cpp";
+    constexpr std::array<std::string_view, 3> ownFrontReadback{
+        "Runtime.GeometryProcessingOperations.GpuPositions.cpp",
+        "Runtime.GeometryProcessingOperations.Normals.cpp",
+        "Runtime.MeshFieldOperations.Smoothing.cpp",
+    };
+    std::size_t frontMatched = 0;
     std::size_t scanned = 0, matched = 0;
     bool deliverOnceMatched = false;
     for (const auto& entry : fs::directory_iterator(root))
@@ -347,8 +355,20 @@ TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
             deliverOnceMatched = deliverOnce;
         else
             EXPECT_FALSE(deliverOnce) << "deliver-once state belongs to MeshSupport::QueuedJobDelivery";
-        const bool handWrites = text.find("GuardEditorProcessingResult(") != std::string::npos &&
+        // A transaction on the shared lifecycle guards its typed sink; the lifecycle finalizes.
+        const bool onLifecycle = text.find("GpuTransactionCore") != std::string::npos;
+        const bool handWrites = !onLifecycle && text.find("GuardEditorProcessingResult(") != std::string::npos &&
                                 text.find("FinalizeUnpublishedOnMainThread") != std::string::npos;
+        if (name != lifecycle)
+        {
+            const bool readsFronts = text.find("BeginGpuFrontReadback(") != std::string::npos;
+            const bool frontListed = std::find(ownFrontReadback.begin(), ownFrontReadback.end(), name) != ownFrontReadback.end();
+            if (readsFronts)
+                EXPECT_TRUE(frontListed) << "a GPU transaction's Accept readback belongs to Runtime.GpuTransactionLifecycle";
+            else
+                EXPECT_FALSE(frontListed) << "stale front-readback allowlist entry; remove it";
+            if (frontListed) ++frontMatched;
+        }
         const bool listed = std::find(handWritten.begin(), handWritten.end(), name) != handWritten.end();
         if (handWrites)
             EXPECT_TRUE(listed)
@@ -359,5 +379,6 @@ TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
     }
     EXPECT_GT(scanned, 20u);
     EXPECT_EQ(matched, handWritten.size()) << "an allowlisted file is missing";
+    EXPECT_EQ(frontMatched, ownFrontReadback.size()) << "a front-readback allowlisted file is missing";
     EXPECT_TRUE(deliverOnceMatched) << "stale allowance: " << deliverOnceAllowed << " no longer keeps its own deliver-once flag";
 }

@@ -248,7 +248,8 @@ TEST_P(PointScalarTransaction, DuplicateStartIsPendingWithTheSharedMessage)
 }
 
 // RUNTIME-311: the scalar transaction runs on the shared GPU transaction lifecycle. A second
-// Accept while the first is under way answers Pending (before: InvalidProcessingParameters);
+// Accept while the first is under way answers Pending without a sink (before:
+// InvalidProcessingParameters) and is refused with one, whose sink is never called;
 // cancelling the Accept stage through the editor job surface delivers exactly once, as stale,
 // publishes nothing and releases the ring; a later Discard changes nothing.
 TEST_P(PointScalarTransaction, AcceptUnderWayIsPendingAndItsCancelDeliversOnce)
@@ -259,6 +260,9 @@ TEST_P(PointScalarTransaction, AcceptUnderWayIsPendingAndItsCancelDeliversOnce)
     const auto again=R::AcceptEditorPointScalar(Commands(),run);
     EXPECT_EQ(again.Status,R::EditorCommandStatus::Pending)<<again.Message;
     EXPECT_EQ(again.Phase,R::EditorGpuTransactionPhase::Accepting);
+    // A caller with its own sink is refused: the result goes to the first caller only.
+    unsigned second=0;
+    EXPECT_EQ(R::AcceptEditorPointScalar(Commands(),run,[&](auto){++second;}).Status,R::EditorCommandStatus::InvalidProcessingParameters);
     const auto jobs=Context.JobCommands.SnapshotAll();ASSERT_EQ(jobs.size(),1u);
     EXPECT_EQ(Context.JobCommands.Cancel(jobs.front().Token),R::EditorJobCancelStatus::Requested);
     ASSERT_TRUE(Jobs.DrainUntilTerminal());
@@ -267,6 +271,6 @@ TEST_P(PointScalarTransaction, AcceptUnderWayIsPendingAndItsCancelDeliversOnce)
     EXPECT_EQ(last.Phase,R::EditorGpuTransactionPhase::Discarded);
     EXPECT_FALSE(Rows().Exists("result"));EXPECT_FALSE(Residency.HasRing(Key()));
     R::DiscardEditorPointScalar(Commands(),run);
-    EXPECT_EQ(delivered,1u);
+    EXPECT_EQ(delivered,1u);EXPECT_EQ(second,0u);
     EXPECT_EQ(R::SnapshotEditorPointScalar(Commands(),run).Status,R::EditorCommandStatus::StaleEntity);
 }

@@ -73,6 +73,9 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         JobToken RunToken{}, AcceptToken{};
         // Names the transaction in shared wording, e.g. "Vulkan normals".
         std::string Label{};
+        // The Accept job's debug name, the same for a user and an automatic Accept (jobs lists
+        // and tests that intercept a submission name it).
+        std::string AcceptJobName{};
         GpuTransactionHooks Hooks{};
     };
     using GpuTransactionHandle = std::shared_ptr<GpuTransactionCore>;
@@ -123,13 +126,16 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
     // an invalid token.
     [[nodiscard]] JobToken SubmitGpuTransactionRun(const GpuTransactionHandle&, std::string debugName);
 
-    // Why Accept cannot start now (nothing waits, already accepting, stale); empty when it can.
-    [[nodiscard]] std::optional<GpuTransactionRefusal> GpuTransactionAcceptRefusal(const GpuTransactionCore&);
+    // Why Accept cannot start now; empty when it can. An Accept under way answers a caller
+    // without a sink Pending (its result goes to the sink already registered); a caller with a
+    // sink is refused (InvalidProcessingParameters), since it would never be called. Nothing
+    // waiting answers InvalidProcessingParameters, changed inputs StaleEntity.
+    [[nodiscard]] std::optional<GpuTransactionRefusal> GpuTransactionAcceptRefusal(const GpuTransactionCore&, bool withSink = false);
     // Starts Accept on a transaction `GpuTransactionAcceptRefusal` admitted: one front
     // readback per `ReadBack` ring (none for a test front), then the Accept job that joins the
     // run, publishes through `CompleteAccept` once every readback landed and finalizes once
     // when cancelled or stale. False when it already ended (front gone, submission rejected).
-    bool BeginGpuTransactionAccept(const GpuTransactionHandle&, std::string debugName);
+    bool BeginGpuTransactionAccept(const GpuTransactionHandle&);
     // Ends a live transaction as Discarded with the typed status and reason. Ignored once
     // terminal and while Accept's publication runs.
     void DiscardGpuTransaction(GpuTransactionCore&, EditorCommandStatus, std::string);

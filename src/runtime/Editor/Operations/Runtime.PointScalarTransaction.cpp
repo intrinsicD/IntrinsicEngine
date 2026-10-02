@@ -201,7 +201,7 @@ namespace Extrinsic::Runtime
         Run Make(const EditorProcessingContext& ctx,Graphics::GpuPropertyResidency* residency)
         {
             auto w=std::make_shared<EditorPointScalarTransaction>();
-            auto& t=w->Core;t.Context=ctx;t.Residency=residency;t.Label="Scalar analysis";
+            auto& t=w->Core;t.Context=ctx;t.Residency=residency;t.Label="Scalar analysis";t.AcceptJobName="Accept point scalar";
             auto* raw=w.get();
             // Hooks run while a job or caller owns the transaction; recorders take ownership.
             const auto self=[raw]{return raw->shared_from_this();};
@@ -224,10 +224,10 @@ namespace Extrinsic::Runtime
         { auto s=w->Result;s.Phase=w->Core.Phase;return s; }
         EditorPointScalarTransactionSnapshot Accept(const Run& w, std::function<void(EditorPointScalarTransactionSnapshot)> sink = {})
         {
-            if(auto refused=GP::GpuTransactionAcceptRefusal(w->Core)){
+            if(auto refused=GP::GpuTransactionAcceptRefusal(w->Core,bool(sink))){
                 auto result=Snapshot(w);result.Status=refused->Status;result.Message=std::move(refused->Message);return result;}
             if(sink)w->Sink=GuardEditorProcessingResult(w->Core.Context,std::move(sink));
-            (void)GP::BeginGpuTransactionAccept(GP::GpuTransactionOf(w),"Accept point scalar");
+            (void)GP::BeginGpuTransactionAccept(GP::GpuTransactionOf(w));
             return Snapshot(w);
         }
     }
