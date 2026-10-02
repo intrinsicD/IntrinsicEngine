@@ -142,12 +142,12 @@ namespace Extrinsic::Runtime
         {
             return Failure(GraphPackStatus::MissingNodes, outBuffer);
         }
-        const auto posProp = view.VertexSource->Properties.Get<glm::vec3>(PropertyNames::kPosition);
-        if (!posProp)
+        const std::span<const glm::vec3> positions = ResolveDisplayedPositions(
+            view.VertexSource->Properties, GeometryElementDomain::GraphNode, channelBindings).Values;
+        if (positions.empty() && !view.VertexSource->Properties.Get<glm::vec3>(PropertyNames::kPosition))
         {
             return Failure(GraphPackStatus::MissingNodes, outBuffer);
         }
-        const auto& positions = posProp.Vector();
         const std::size_t nodeCount = positions.size();
         if (nodeCount == 0)
         {

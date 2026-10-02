@@ -222,7 +222,7 @@ void DrawAttributeBindings(
       if (ImGui::Selectable("Default", !row.Bound))
         bind({});
       for (const EditorAttributeBindingCandidate &candidate : row.Candidates) {
-        const bool usable = candidate.Compatible && row.Consumed;
+        const bool usable = candidate.Compatible;
         if (!usable)
           ImGui::BeginDisabled();
         const std::string label =
@@ -236,8 +236,7 @@ void DrawAttributeBindings(
         if (!usable) {
           ImGui::EndDisabled();
           ImGui::SameLine();
-          ImGui::TextDisabled("%s", row.Consumed ? candidate.DisabledReason.c_str()
-                                                 : "not drawn yet");
+          ImGui::TextDisabled("%s", candidate.DisabledReason.c_str());
         }
       }
       ImGui::EndCombo();

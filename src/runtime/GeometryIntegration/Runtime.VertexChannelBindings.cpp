@@ -6,6 +6,8 @@ module;
 #include <span>
 #include <string_view>
 
+#include <glm/glm.hpp>
+
 module Extrinsic.Runtime.VertexChannelBindings;
 
 import Extrinsic.ECS.Components.GeometrySources;
@@ -191,6 +193,45 @@ namespace Extrinsic::Runtime
             }
         }
         return resolution;
+    }
+
+    DisplayedPositions ResolveDisplayedPositions(
+        const Geometry::PropertySet& vertices,
+        const GeometryElementDomain vertexDomain,
+        const VertexChannelBindingSet* bindings) noexcept
+    {
+        const Geometry::ConstPropertySet properties{vertices};
+        if (bindings != nullptr && IsVertexChannelBindingEnabled(bindings->Position) &&
+            bindings->Position.Property.Domain == vertexDomain)
+        {
+            const std::string_view name = bindings->Position.Property.Name;
+            const auto bound = properties.Get<glm::vec3>(name);
+            if (bound.IsValid() && bound.Size() == vertices.Size() &&
+                GeometryPropertyValuesAreFinite(vertices, name))
+            {
+                return DisplayedPositions{.Name = name, .Values = bound.Span(), .Bound = true};
+            }
+        }
+        const auto canonical = properties.Get<glm::vec3>(kPosition);
+        return DisplayedPositions{
+            .Name = kPosition,
+            .Values = canonical.IsValid() ? canonical.Span() : std::span<const glm::vec3>{},
+        };
+    }
+
+    GeometryElementDomain DisplayedPositionDomainFor(
+        const ECS::Components::GeometrySources::Domain provenance) noexcept
+    {
+        using SourceDomain = ECS::Components::GeometrySources::Domain;
+        switch (provenance)
+        {
+        case SourceDomain::Mesh: return D::MeshVertex;
+        case SourceDomain::Graph: return D::GraphNode;
+        case SourceDomain::PointCloud: return D::PointCloudPoint;
+        case SourceDomain::None:
+        case SourceDomain::Unknown: break;
+        }
+        return D::Unknown;
     }
 
     VertexChannelSourceBinding* FindVertexChannelSourceBinding(

@@ -1,6 +1,7 @@
 module;
 #include <cmath>
 #include <functional>
+#include <span>
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 module Extrinsic.Runtime.SceneInteractionModule;
@@ -8,6 +9,7 @@ import Geometry.Validation;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.Graphics.RenderWorld;
+import Extrinsic.Runtime.VertexChannelBindings;
 namespace Extrinsic::Runtime
 {
     RuntimeSceneInteractionRenderSnapshot BuildPrimitiveSelectionRenderSnapshot(
@@ -29,14 +31,18 @@ namespace Extrinsic::Runtime
             const auto source = GS::BuildConstView(scene.Raw(), entity);
             if (!source.VertexSource)
                 continue;
-            const auto positions = source.VertexSource->Properties.Get<glm::vec3>(GS::PropertyNames::kPosition);
-            if (!positions)
+            // Highlights sit on the displayed positions (RUNTIME-315).
+            const std::span<const glm::vec3> positions = ResolveDisplayedPositions(
+                source.VertexSource->Properties,
+                DisplayedPositionDomainFor(GS::BuildSourceAvailability(source).ProvenanceDomain),
+                scene.Raw().try_get<VertexChannelBindingSet>(entity)).Values;
+            if (positions.empty())
                 continue;
             const auto* worldMatrix =
                 scene.Raw().try_get<ECS::Components::Transform::WorldMatrix>(entity);
             const auto transform = worldMatrix ? worldMatrix->Matrix : glm::mat4{1.f};
             auto point = [&](std::uint32_t index) -> std::optional<glm::vec3> {
-                if (index >= positions.Size())
+                if (index >= positions.size())
                     return std::nullopt;
                 const auto p = glm::vec3(transform * glm::vec4(positions[index], 1.f));
                 if (!Geometry::Validation::IsFinite(p))

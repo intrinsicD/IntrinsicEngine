@@ -31,6 +31,7 @@ import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.HalfedgeMesh;
 import Geometry.Properties;
@@ -473,4 +474,43 @@ TEST(RuntimeVectorFieldExtraction, ScalarGradientCommandReachesFaceArrowBuffers)
     ASSERT_EQ(vectors.size(), 1u);
     EXPECT_EQ(anchors[0], glm::vec3(1.f/3, 1.f/3, 0));
     EXPECT_EQ(vectors[0], glm::vec3(2,3,0));
+}
+
+// RUNTIME-315: glyph anchors sit on the displayed (bound) positions, and
+// return to the canonical positions when the binding goes away.
+TEST(RuntimeVectorFieldExtraction, AnchorsFollowABoundPositionSource)
+{
+    Fixture fixture;
+    const ECS::EntityHandle entity = AddMesh(fixture.Scene, /*deleteTriangle=*/false);
+    Recipe(fixture.Scene, entity).VectorFields = {Layer(D::MeshVertex, "v:dir"), Layer(D::MeshFace, "f:dir")};
+    auto& raw = fixture.Scene.Raw();
+    auto& vertices = raw.get<GS::Vertices>(entity).Properties;
+    const auto canonical = vertices.Get<glm::vec3>(GS::PropertyNames::kPosition).Vector();
+    auto lifted = canonical;
+    for (glm::vec3& p : lifted)
+        p.z += 2.0f;
+    vertices.GetOrAdd<glm::vec3>("v:lifted", glm::vec3{0.0f}).Vector() = lifted;
+    raw.emplace<Runtime::VertexChannelBindingSet>(
+        entity, Runtime::VertexChannelBindingSet{
+                    .Position = {.Enabled = true,
+                                 .Property = {D::MeshVertex, "v:lifted", Geometry::PropertyValueKind::Vec3}}});
+
+    auto frame = fixture.Extract();
+    const auto* vertex = FindPacket(frame.World, ":v:dir");
+    const auto* face = FindPacket(frame.World, ":f:dir");
+    ASSERT_NE(vertex, nullptr);
+    ASSERT_NE(face, nullptr);
+    EXPECT_EQ(fixture.Read<glm::vec3>(vertex->PositionBufferBDA), lifted);
+    EXPECT_EQ(fixture.Read<glm::vec3>(face->PositionBufferBDA)[0], (glm::vec3{0.5f, 0.5f, 2.0f}));
+    EXPECT_EQ(vertices.Get<glm::vec3>(GS::PropertyNames::kPosition).Vector(), canonical);
+
+    raw.remove<Runtime::VertexChannelBindingSet>(entity);
+    frame = fixture.Extract();
+    EXPECT_EQ(frame.Stats.VectorFieldAnchorCacheBuilds, 2u);
+    vertex = FindPacket(frame.World, ":v:dir");
+    face = FindPacket(frame.World, ":f:dir");
+    ASSERT_NE(vertex, nullptr);
+    ASSERT_NE(face, nullptr);
+    EXPECT_EQ(fixture.Read<glm::vec3>(vertex->PositionBufferBDA), canonical);
+    EXPECT_EQ(fixture.Read<glm::vec3>(face->PositionBufferBDA)[0], (glm::vec3{0.5f, 0.5f, 0.0f}));
 }

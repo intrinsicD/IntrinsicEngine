@@ -1907,3 +1907,74 @@ TEST(MeshGeometryExtraction, ShadingBindingsFeedNormalAndTexcoordStreamsOnVertex
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
 }
+
+// RUNTIME-315: the surface and both primitive views draw a bound Position
+// source; the canonical positions stay untouched and Default restores them.
+TEST(MeshGeometryExtraction, BoundPositionSourceFeedsTheSurfaceAndBothPrimitiveViews)
+{
+    namespace G = Extrinsic::Graphics::Components;
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
+    InitializeAssetWorkflowEngine(engine);
+
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    auto& raw = scene.Raw();
+    const EntityHandle entity = MakeQuadMeshRenderable(scene);
+    raw.emplace<G::RenderEdges>(entity);
+    raw.emplace<G::RenderPoints>(entity);
+    auto& vertices = raw.get<gs::Vertices>(entity).Properties;
+    const std::vector<glm::vec3> canonical = vertices.Get<glm::vec3>("v:position").Vector();
+    std::vector<glm::vec3> lifted = canonical;
+    for (glm::vec3& p : lifted)
+        p.z += 2.0f;
+    vertices.GetOrAdd<glm::vec3>("v:lifted", glm::vec3{0.0f}).Vector() = lifted;
+    const auto fingerprint = [](const std::vector<glm::vec3>& p) {
+        return Extrinsic::Tests::GeometryFloat32Fingerprint(
+            {p[0].x, p[0].y, p[0].z, p[1].x, p[1].y, p[1].z,
+             p[2].x, p[2].y, p[2].z, p[3].x, p[3].y, p[3].z});
+    };
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    const auto extract = [&] {
+        (void)extraction.ExtractAndSubmit(
+            scene, engine.GetRenderer(),
+            &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
+        const auto view = extraction.FindRenderableSidecarForTest(
+            Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
+        std::array<std::uint64_t, 3> prints{};
+        if (!view.has_value())
+            return prints;
+        std::size_t i = 0u;
+        for (const auto geometry : {view->MeshGeometry, view->MeshEdgeViewGeometry, view->MeshVertexViewGeometry})
+        {
+            Extrinsic::Graphics::GpuGeometryResidencyView residency{};
+            EXPECT_TRUE(engine.GetRenderer().GetGpuWorld().TryGetGeometryResidencyView(geometry, residency));
+            prints[i++] = residency.PositionFingerprint;
+        }
+        return prints;
+    };
+    (void)extract();
+    const auto before = extract();
+    EXPECT_EQ(before[0], fingerprint(canonical));
+    EXPECT_EQ(before[1], fingerprint(canonical));
+    EXPECT_EQ(before[2], fingerprint(canonical));
+
+    raw.emplace<Extrinsic::Runtime::VertexChannelBindingSet>(
+        entity, Extrinsic::Runtime::VertexChannelBindingSet{
+                    .Position = {.Enabled = true,
+                                 .Property = {Extrinsic::Runtime::GeometryElementDomain::MeshVertex,
+                                              "v:lifted", Geometry::PropertyValueKind::Vec3}},
+                    .BindingGeneration = 2u});
+    Extrinsic::ECS::Components::DirtyTags::MarkVertexPositionsDirty(raw, entity);
+    const auto bound = extract();
+    EXPECT_EQ(bound[0], fingerprint(lifted));
+    EXPECT_EQ(bound[1], fingerprint(lifted));
+    EXPECT_EQ(bound[2], fingerprint(lifted));
+    EXPECT_EQ(vertices.Get<glm::vec3>("v:position").Vector(), canonical);
+
+    raw.remove<Extrinsic::Runtime::VertexChannelBindingSet>(entity);
+    Extrinsic::ECS::Components::DirtyTags::MarkVertexPositionsDirty(raw, entity);
+    EXPECT_EQ(extract(), before);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}

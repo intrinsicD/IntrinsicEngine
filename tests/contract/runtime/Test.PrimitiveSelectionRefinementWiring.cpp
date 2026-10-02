@@ -14,6 +14,7 @@
 // wins, background clears) is covered on a pure CPU path without a live GPU
 // picking pass.
 
+#include <limits>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -31,6 +32,8 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.SelectionSystem;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.StableEntityLookup;
+import Extrinsic.Runtime.GeometryAvailability;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Properties;
 
 using Extrinsic::ECS::EntityHandle;
@@ -640,4 +643,50 @@ TEST(PrimitiveSelectionRefinementWiring, OrthographicFallbackStillResolvesWithin
     EXPECT_EQ(result->Status, PrimitiveRefineStatus::CpuFallbackResolved);
     EXPECT_EQ(result->Kind, RefinedPrimitiveKind::Vertex);
     EXPECT_EQ(result->VertexId, 1u);
+}
+
+// RUNTIME-315: picks are refined against the displayed (bound) positions and
+// still report canonical element ids; the canonical positions are not used.
+TEST(PrimitiveSelectionRefinementWiring, BoundPositionsDriveRefinementAndKeepCanonicalIds)
+{
+    Registry registry{};
+    const EntityHandle entity = registry.Create();
+    EmplaceCloud(registry, entity);
+    auto& points = registry.Raw().get<Vertices>(entity).Properties;
+    points.GetOrAdd<glm::vec3>("v:lifted", glm::vec3{0.0f}).Vector() = {
+        {0.0f, 0.0f, 10.0f}, {1.0f, 1.0f, 11.0f}, {2.0f, 2.0f, 12.0f}};
+    registry.Raw().emplace<Extrinsic::Runtime::VertexChannelBindingSet>(
+        entity, Extrinsic::Runtime::VertexChannelBindingSet{
+                    .Position = {.Enabled = true,
+                                 .Property = {Extrinsic::Runtime::GeometryElementDomain::PointCloudPoint,
+                                              "v:lifted", Geometry::PropertyValueKind::Vec3}}});
+
+    // A point hint reports the displayed position of the canonical row.
+    std::optional<PrimitiveSelectionResult> result =
+        RefinePickReadbackResult(registry, Hit(entity, SelectionPrimitiveDomain::Point, 1u));
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->PointId, 1u);
+    ASSERT_TRUE(result->HasHitPosition);
+    EXPECT_FLOAT_EQ(result->LocalHit.z, 11.0f);
+
+    // The CPU ray fallback finds the point where it is drawn, not where the
+    // canonical positions are.
+    const Extrinsic::Runtime::PickReadbackContext context{
+        .HasWorldRay = true,
+        .WorldRayOrigin = {2.0f, 2.0f, 100.0f},
+        .WorldRayDirection = {0.0f, 0.0f, -1.0f},
+        .WorldUnitsPerPixelAtUnitDepth = 0.001f,
+        .PickRadiusPixels = 4.0f,
+    };
+    result = RefinePickReadbackResult(registry, Hit(entity, SelectionPrimitiveDomain::None, 0u), &context);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Status, PrimitiveRefineStatus::CpuFallbackResolved);
+    EXPECT_EQ(result->PointId, 2u);
+    EXPECT_FLOAT_EQ(result->LocalHit.z, 12.0f);
+
+    // An unusable bound source falls back to the canonical positions.
+    points.Get<glm::vec3>("v:lifted").Vector()[0].x = std::numeric_limits<float>::infinity();
+    result = RefinePickReadbackResult(registry, Hit(entity, SelectionPrimitiveDomain::Point, 1u));
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FLOAT_EQ(result->LocalHit.z, 1.0f);
 }

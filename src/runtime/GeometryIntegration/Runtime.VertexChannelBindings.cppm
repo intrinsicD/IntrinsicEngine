@@ -7,8 +7,11 @@ module;
 #include <span>
 #include <string_view>
 
+#include <glm/vec3.hpp>
+
 export module Extrinsic.Runtime.VertexChannelBindings;
 
+import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.GeometryAvailability;
 
 export namespace Extrinsic::Runtime
@@ -110,6 +113,28 @@ export namespace Extrinsic::Runtime
         RenderAttribute attribute,
         GeometryElementDomain domain,
         std::string_view propertyName) noexcept;
+
+    // The positions a vertex domain is displayed from: drawn, culled (bounds
+    // come from them), picked and used as vector-field anchors. The bound
+    // Position source when it resolves on `vertexDomain` (vec3, one value per
+    // element, all finite), otherwise canonical `v:position`; `Values` is empty
+    // when neither exists. Every consumer resolves through this one function,
+    // so the displayed and the picked geometry cannot diverge. Spatial indices
+    // of geometry methods keep their own input slots (canonical by default).
+    struct DisplayedPositions
+    {
+        std::string_view Name{};
+        std::span<const glm::vec3> Values{};
+        bool Bound{false};
+    };
+    [[nodiscard]] DisplayedPositions ResolveDisplayedPositions(
+        const Geometry::PropertySet& vertices,
+        GeometryElementDomain vertexDomain,
+        const VertexChannelBindingSet* bindings) noexcept;
+
+    // The vertex domain whose positions an entity of `provenance` displays.
+    [[nodiscard]] GeometryElementDomain DisplayedPositionDomainFor(
+        ECS::Components::GeometrySources::Domain provenance) noexcept;
 
     // The structural binding slot for Position/Normal/Texcoord; nullptr for
     // attributes that are not stored in `VertexChannelBindingSet`.

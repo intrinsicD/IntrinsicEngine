@@ -285,10 +285,12 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] MeshPrimitiveViewPlanBuildResult BuildMeshEdgeViewPlan(
         const ECS::Components::GeometrySources::ConstSourceView& view,
+        const VertexChannelBindingSet* channelBindings,
         const GeometryPlanBuildRequest& request,
         MeshPrimitiveViewBuffer& outBuffer);
     [[nodiscard]] MeshPrimitiveViewPlanBuildResult BuildMeshVertexViewPlan(
         const ECS::Components::GeometrySources::ConstSourceView& view,
+        const VertexChannelBindingSet* channelBindings,
         const GeometryPlanBuildRequest& request,
         MeshPrimitiveViewBuffer& outBuffer);
 

@@ -184,10 +184,6 @@ export namespace Extrinsic::Runtime
         GeometryPropertyRef Source{};
         GeometryPropertyResolution Resolution{};
         bool UsingFallback{false};
-        // False while rendering does not draw this binding yet (per-element
-        // point size/line width until their extraction lands): a bound name
-        // stops that lane from drawing, so the command refuses to author one.
-        bool Consumed{true};
         std::string Diagnostic{};
         std::vector<EditorAttributeBindingCandidate> Candidates{};
     };
@@ -627,12 +623,6 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] EditorVectorFieldModel BuildEditorVectorFieldModel(
         const GeometryEntityAvailability& availability,
         const GeometryPresentationRecipe* recipe);
-
-    // Rows whose bound source extraction draws today. Other table rows are
-    // listed but refused (`AttributeBindingNotYetSupported`) until their
-    // consumer lands (RUNTIME-315 slices 5-7).
-    [[nodiscard]] bool IsRenderAttributeBindingDrawn(
-        RenderAttribute attribute, GeometryElementDomain domain) noexcept;
 
     // Validates a candidate source for one attribute row: the runtime table's
     // domain/kind/count/finite rules, and for Color the visualization recipe

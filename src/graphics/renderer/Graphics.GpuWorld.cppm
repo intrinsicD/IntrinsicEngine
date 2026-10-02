@@ -294,6 +294,7 @@ export namespace Extrinsic::Graphics
         [[nodiscard]] RHI::GpuEntityConfig GetEntityConfigForTest(
             GpuInstanceHandle instance) const noexcept;
         void SetBounds(GpuInstanceHandle instance, const RHI::GpuBounds& bounds);
+        [[nodiscard]] RHI::GpuBounds GetBoundsForTest(GpuInstanceHandle instance) const noexcept;
 
         void SetMaterialBuffer(RHI::BufferHandle materialBuffer, std::uint32_t materialCapacity);
         void SetCamera(const RHI::CameraUBO& camera);

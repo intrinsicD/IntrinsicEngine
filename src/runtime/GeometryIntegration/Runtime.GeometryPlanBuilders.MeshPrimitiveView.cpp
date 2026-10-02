@@ -17,7 +17,9 @@ import Geometry.Validation;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.GeometryResidency;
+import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.VertexAttributeBinding;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.VertexChannelStreams;
 import Geometry.Properties;
 
@@ -114,11 +116,12 @@ namespace Extrinsic::Runtime
                 : FaceRingOutcome::Triangulate;
         }
 
-        // Resolve and validate the mesh vertex positions shared by both views.
-        // On success, returns the positions span; on failure, fills `status`
-        // (the caller turns it into a `Failure`).
-        [[nodiscard]] const std::vector<glm::vec3>* ResolvePositions(
+        // Resolve and validate the displayed mesh vertex positions shared by
+        // both views (the bound Position source or canonical `v:position`).
+        // On failure, returns nullopt and fills `status`.
+        [[nodiscard]] std::optional<std::span<const glm::vec3>> ResolvePositions(
             const ECS::Components::GeometrySources::ConstSourceView& view,
+            const VertexChannelBindingSet* channelBindings,
             MeshPrimitiveViewStatus& status) noexcept
         {
             using namespace ECS::Components::GeometrySources;
@@ -127,34 +130,30 @@ namespace Extrinsic::Runtime
             if (availability.ProvenanceDomain != Domain::Mesh)
             {
                 status = MeshPrimitiveViewStatus::WrongDomain;
-                return nullptr;
+                return std::nullopt;
             }
-            if (view.VertexSource == nullptr)
+            if (view.VertexSource == nullptr ||
+                !view.VertexSource->Properties.Get<glm::vec3>(PropertyNames::kPosition))
             {
                 status = MeshPrimitiveViewStatus::MissingPositions;
-                return nullptr;
+                return std::nullopt;
             }
-            const auto posProp = view.VertexSource->Properties.Get<glm::vec3>(PropertyNames::kPosition);
-            if (!posProp)
-            {
-                status = MeshPrimitiveViewStatus::MissingPositions;
-                return nullptr;
-            }
-            const auto& positions = posProp.Vector();
+            const std::span<const glm::vec3> positions = ResolveDisplayedPositions(
+                view.VertexSource->Properties, GeometryElementDomain::MeshVertex, channelBindings).Values;
             if (positions.empty())
             {
                 status = MeshPrimitiveViewStatus::EmptyMesh;
-                return nullptr;
+                return std::nullopt;
             }
             status = MeshPrimitiveViewStatus::Success;
-            return &positions;
+            return positions;
         }
 
         // Write the shared vertex buffer from `positions`, validating finiteness
         // and accumulating the local AABB. Returns false (and fills `status`)
         // on a non-finite position.
         [[nodiscard]] bool WriteVertexBuffer(
-            const std::vector<glm::vec3>& positions,
+            const std::span<const glm::vec3> positions,
             MeshPrimitiveViewBuffer& outBuffer,
             glm::vec3& minP,
             glm::vec3& maxP,
@@ -184,7 +183,7 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        void PopulateChannelStreams(const std::vector<glm::vec3>& positions,
+        void PopulateChannelStreams(const std::span<const glm::vec3> positions,
                                     MeshPrimitiveViewBuffer& outBuffer)
         {
             const auto vertexCountU32 = static_cast<std::uint32_t>(positions.size());
@@ -344,6 +343,7 @@ namespace Extrinsic::Runtime
 
     MeshPrimitiveViewPlanBuildResult BuildMeshEdgeViewPlan(
         const ECS::Components::GeometrySources::ConstSourceView& view,
+        const VertexChannelBindingSet* channelBindings,
         const GeometryPlanBuildRequest& request,
         MeshPrimitiveViewBuffer& outBuffer)
     {
@@ -352,8 +352,9 @@ namespace Extrinsic::Runtime
         using namespace ECS::Components::GeometrySources;
 
         MeshPrimitiveViewStatus status = MeshPrimitiveViewStatus::Success;
-        const std::vector<glm::vec3>* positions = ResolvePositions(view, status);
-        if (positions == nullptr)
+        const std::optional<std::span<const glm::vec3>> positions =
+            ResolvePositions(view, channelBindings, status);
+        if (!positions.has_value())
         {
             return Failure(status, outBuffer);
         }
@@ -450,14 +451,16 @@ namespace Extrinsic::Runtime
 
     MeshPrimitiveViewPlanBuildResult BuildMeshVertexViewPlan(
         const ECS::Components::GeometrySources::ConstSourceView& view,
+        const VertexChannelBindingSet* channelBindings,
         const GeometryPlanBuildRequest& request,
         MeshPrimitiveViewBuffer& outBuffer)
     {
         outBuffer.Clear();
 
         MeshPrimitiveViewStatus status = MeshPrimitiveViewStatus::Success;
-        const std::vector<glm::vec3>* positions = ResolvePositions(view, status);
-        if (positions == nullptr)
+        const std::optional<std::span<const glm::vec3>> positions =
+            ResolvePositions(view, channelBindings, status);
+        if (!positions.has_value())
         {
             return Failure(status, outBuffer);
         }

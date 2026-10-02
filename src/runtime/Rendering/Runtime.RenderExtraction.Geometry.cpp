@@ -81,14 +81,6 @@ namespace Extrinsic::Runtime
             return properties.FindPropertyRevision(name).value_or(0u);
         }
 
-        [[nodiscard]] std::size_t PositionCountOf(
-            const Geometry::PropertySet& properties) noexcept
-        {
-            const auto position =
-                Geometry::ConstPropertySet{properties}.Get<glm::vec3>(kPosition);
-            return position.IsValid() ? position.Size() : 0u;
-        }
-
         [[nodiscard]] bool BindingMatches(
             const VertexChannelSourceBinding& binding,
             const GeometryElementDomain expectedDomain) noexcept
@@ -112,8 +104,11 @@ namespace Extrinsic::Runtime
             const Geometry::PropertySet& properties =
                 view.VertexSource->Properties;
             snapshot.VertexCount = properties.Size();
-            snapshot.PositionCount = PositionCountOf(properties);
-            snapshot.Position = PropertyRevisionOf(properties, kPosition);
+            // The displayed positions (bound or canonical) are what is drawn.
+            const DisplayedPositions displayed =
+                ResolveDisplayedPositions(properties, expectedDomain, bindings);
+            snapshot.PositionCount = displayed.Values.size();
+            snapshot.Position = PropertyRevisionOf(properties, displayed.Name);
             if (bindings != nullptr)
                 snapshot.BindingGeneration = bindings->BindingGeneration;
             if (meshDefaults)
@@ -228,14 +223,18 @@ namespace Extrinsic::Runtime
         [[nodiscard]] RenderExtractionGeometrySourceRevisions
         CaptureMeshPrimitiveViewSourceRevisions(
             const ConstSourceView& view,
+            const VertexChannelBindingSet* bindings,
             const bool edgeView) noexcept
         {
+            // Primitive views draw the entity's displayed positions only; the
+            // binding generation also tracks a rebind of the Position source.
             RenderExtractionGeometrySourceRevisions snapshot =
                 CaptureVertexChannelRevisions(
                     view,
-                    nullptr,
+                    bindings,
                     GeometryElementDomain::MeshVertex,
                     false);
+            snapshot.Normal = 0u;
             if (edgeView && view.EdgeSource != nullptr)
             {
                 const Geometry::PropertySet& properties =
@@ -966,6 +965,7 @@ namespace Extrinsic::Runtime
     bool RenderExtractionCache::State::ReconcileMeshPrimitiveView(
         MeshPrimitiveViewKind kind,
         const ECS::Components::GeometrySources::ConstSourceView& view,
+        const VertexChannelBindingSet* channelBindings,
         RenderableSidecar& sidecar,
         const glm::mat4& model,
         std::uint32_t materialSlot,
@@ -1016,7 +1016,7 @@ namespace Extrinsic::Runtime
                 ? sidecar.MeshEdgeViewSourceRevisions
                 : sidecar.MeshVertexViewSourceRevisions;
         const RenderExtractionGeometrySourceRevisions sourceRevisions =
-            CaptureMeshPrimitiveViewSourceRevisions(view, isEdge);
+            CaptureMeshPrimitiveViewSourceRevisions(view, channelBindings, isEdge);
         const bool sourceRevisionDirty = hadView &&
             MeshPrimitiveViewRevisionChanged(
                 sourceRevisions, observedSourceRevisions, isEdge);
@@ -1074,8 +1074,8 @@ namespace Extrinsic::Runtime
             .Generation = IssueGeometryPlanGeneration(),
         };
         const MeshPrimitiveViewPlanBuildResult packResult = isEdge
-            ? BuildMeshEdgeViewPlan(view, request, m_MeshPrimitiveViewPack)
-            : BuildMeshVertexViewPlan(view, request, m_MeshPrimitiveViewPack);
+            ? BuildMeshEdgeViewPlan(view, channelBindings, request, m_MeshPrimitiveViewPack)
+            : BuildMeshVertexViewPlan(view, channelBindings, request, m_MeshPrimitiveViewPack);
         if (packResult.Status != MeshPrimitiveViewStatus::Success
             || !packResult.Plan.has_value())
         {

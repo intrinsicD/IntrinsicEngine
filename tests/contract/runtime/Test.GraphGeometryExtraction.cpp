@@ -28,6 +28,7 @@ import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.StableEntityLookup;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Graph;
 import Geometry.Properties;
 
@@ -1120,6 +1121,39 @@ TEST(GraphGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPreservesD
                                    /*baseFrame=*/900u,
                                    framesInFlight);
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 0u);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+// RUNTIME-315: graph nodes draw a bound Position source through the same
+// binding table and resolver as meshes and point clouds.
+TEST(GraphGeometryExtraction, BoundPositionSourceIsDrawnForNodesAndEdges)
+{
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
+    InitializeAssetWorkflowEngine(engine);
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const EntityHandle entity = MakeLineGraphRenderable(scene);
+    scene.Raw().get<gs::Vertices>(entity).Properties.GetOrAdd<glm::vec3>("v:moved", glm::vec3{0.0f}).Vector() =
+        {{0.0f, 0.0f, 4.0f}, {1.0f, 0.0f, 4.0f}, {0.0f, 1.0f, 4.0f}};
+    scene.Raw().emplace<Extrinsic::Runtime::VertexChannelBindingSet>(
+        entity, Extrinsic::Runtime::VertexChannelBindingSet{
+                    .Position = {.Enabled = true,
+                                 .Property = {Extrinsic::Runtime::GeometryElementDomain::GraphNode, "v:moved",
+                                              Geometry::PropertyValueKind::Vec3}}});
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    (void)extraction.ExtractAndSubmit(scene, engine.GetRenderer(),
+                                      &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
+    const auto view = extraction.FindRenderableSidecarForTest(
+        Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
+    ASSERT_TRUE(view.has_value());
+    Extrinsic::Graphics::GpuGeometryResidencyView residency{};
+    ASSERT_TRUE(engine.GetRenderer().GetGpuWorld().TryGetGeometryResidencyView(view->GraphGeometry, residency));
+    EXPECT_EQ(residency.PositionFingerprint,
+              Extrinsic::Tests::GeometryFloat32Fingerprint(
+                  {0.0f, 0.0f, 4.0f, 1.0f, 0.0f, 4.0f, 0.0f, 1.0f, 4.0f}));
+    EXPECT_EQ(residency.Record.LineIndexCount, 4u);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();

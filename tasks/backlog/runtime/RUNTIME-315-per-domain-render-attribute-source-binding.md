@@ -214,3 +214,25 @@ python3 tools/agents/check_task_policy.py --root . --strict
   nothing with or without history; an aborted history group restores the
   pre-group revision (a saved document stays clean). The bake panel now shows
   a refused bake's reason (e.g. the BUG-233 "still loading ... retry").
+- 2026-10-02: Slice 6 (positions). `ResolveDisplayedPositions` is the one
+  answer to "which positions are shown": the bound Position source when it
+  resolves on the vertex domain (vec3, element count, all finite, memoized
+  finiteness), else canonical `v:position`. Every display consumer resolves
+  through it: the mesh, graph and point-cloud plan builders and both mesh
+  primitive views (packed positions and the plan's local bounds), extraction
+  revision tracking (the displayed name's revision, so canonical edits under a
+  bound display re-upload nothing and bound edits re-upload without
+  re-binding), the GRAPHICS-156 position front (observed for the displayed
+  name), instance culling bounds (computed from the displayed span and cached
+  by its revision instead of the canonical `Culling::Local::Bounds`), click
+  refinement and its CPU ray fallback (`PrimitiveRefineRequest::PositionProperty`,
+  canonical element ids), the primitive-pick stamp, selection highlights and
+  vector-field anchors. Canonical `v:position` is never written. Decisions:
+  shading normals stay canonical or explicitly bound (no recompute); geometry
+  methods and their `SpatialIndexCache` queries keep their own input slots
+  (canonical by default), which is the operator's "BVH follows display"
+  reading for picking (the pick path has no BVH; a future cache-backed pick
+  query must index the displayed positions, noted in
+  `spatial-index-consumers.md`). Camera focus still frames the canonical
+  bounds component. With every table row now drawn, the slice-3 "not drawn
+  yet" gate (`Consumed`, `AttributeBindingNotYetSupported`) is removed.

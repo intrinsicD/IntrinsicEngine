@@ -234,11 +234,8 @@ TEST(VertexChannelBindings, ModelListsRowsCandidatesAndCurrentSourcesForEveryEnt
     const auto* size = FindRow(model, A::PointSize, D::MeshVertex);
     ASSERT_TRUE(size->Bound);
     EXPECT_EQ(size->Source.Name, "v:temperature");
-    EXPECT_TRUE(size->Consumed);
     EXPECT_FALSE(size->UsingFallback);
-    // A bound position is listed but not drawn until positions are consumed.
-    EXPECT_FALSE(position->Consumed);
-    EXPECT_NE(position->Diagnostic.find("not drawn yet"), std::string::npos);
+
     EXPECT_FALSE(FindRow(model, A::LineWidth, D::MeshEdge)->Bound);
 
     // Graphs and point clouds read the same table.
@@ -365,21 +362,67 @@ TEST(VertexChannelBindings, StructuralBindingAndDefaultAreOneUndoableStepOnEvery
     }
 }
 
-TEST(VertexChannelBindings, RowsNotDrawnYetAreListedButRefused)
+TEST(VertexChannelBindings, PositionBindingIsOneUndoableStepOnEveryEntityKindAndNeverCopies)
 {
     BindingFixture f;
     const ECS::EntityHandle mesh = MakeSelectable(f.Registry, "Mesh");
     AddTriangleMeshSource(f.Registry, mesh);
-    SetProperty<glm::vec3>(f.Registry.Raw().get<GS::Vertices>(mesh).Properties, "v:offset",
-                           std::vector<glm::vec3>(3u, glm::vec3{0, 0, 2}));
+    const ECS::EntityHandle graph = MakeSelectable(f.Registry, "Graph");
+    AddGraphSource(f.Registry, graph);
+    const ECS::EntityHandle cloud = MakeSelectable(f.Registry, "Cloud");
+    AddPointCloudSource(f.Registry, cloud, 3u);
+    SetPositions(f.Registry.Raw().get<GS::Vertices>(cloud), {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}});
 
-    EXPECT_EQ(f.Bind(mesh, A::Position, D::MeshVertex, "v:offset"), Cmd::AttributeBindingNotYetSupported);
-    EXPECT_FALSE(f.Registry.Raw().all_of<Runtime::VertexChannelBindingSet>(mesh));
-    EXPECT_EQ(f.History.UndoCount(), 0u);
-    EXPECT_FALSE(f.Row(mesh, A::Position, D::MeshVertex).Consumed);
-    EXPECT_TRUE(f.Row(mesh, A::Normal, D::MeshHalfedge).Consumed);
-    EXPECT_TRUE(f.Row(mesh, A::Texcoord, D::MeshVertex).Consumed);
-    EXPECT_TRUE(f.Row(mesh, A::Color, D::MeshFace).Consumed);
+    for (const auto& [entity, domain] : {std::pair{mesh, D::MeshVertex}, std::pair{graph, D::GraphNode},
+                                         std::pair{cloud, D::PointCloudPoint}})
+    {
+        SCOPED_TRACE(std::string{Runtime::ToString(domain)});
+        auto& properties = f.Registry.Raw().get<GS::Vertices>(entity).Properties;
+        SetProperty<glm::vec3>(properties, "v:offset", std::vector<glm::vec3>(3u, glm::vec3{0, 0, 2}));
+        const std::vector<glm::vec3> canonical = properties.Get<glm::vec3>("v:position").Vector();
+        f.Registry.Raw().remove<Dirty::DirtyVertexPositions>(entity);
+        const std::size_t undoBefore = f.History.UndoCount();
+
+        ASSERT_EQ(f.Bind(entity, A::Position, domain, "v:offset"), Cmd::Applied);
+        EXPECT_EQ(f.History.UndoCount(), undoBefore + 1u);
+        EXPECT_EQ(f.Registry.Raw().get<Runtime::VertexChannelBindingSet>(entity).Position.Property,
+                  (Runtime::GeometryPropertyRef{domain, "v:offset", Kind::Vec3}));
+        EXPECT_TRUE(f.Registry.Raw().all_of<Dirty::DirtyVertexPositions>(entity));
+        EXPECT_EQ(properties.Get<glm::vec3>("v:position").Vector(), canonical);  // never copied
+        const auto displayed = Runtime::ResolveDisplayedPositions(
+            properties, domain, f.Registry.Raw().try_get<Runtime::VertexChannelBindingSet>(entity));
+        EXPECT_TRUE(displayed.Bound);
+        EXPECT_EQ(displayed.Name, "v:offset");
+
+        ASSERT_EQ(f.Bind(entity, A::Position, domain), Cmd::Applied);  // Default
+        EXPECT_FALSE(f.Row(entity, A::Position, domain).Bound);
+        ASSERT_EQ(f.History.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+        EXPECT_EQ(f.Row(entity, A::Position, domain).Source.Name, "v:offset");
+    }
+}
+
+TEST(VertexChannelBindings, DisplayedPositionsFallBackToCanonicalWhenTheBoundSourceIsUnusable)
+{
+    ECS::Scene::Registry registry;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
+    SetProperty<glm::vec3>(properties, "v:offset", std::vector<glm::vec3>(3u, glm::vec3{0, 0, 2}));
+    Runtime::VertexChannelBindingSet bindings{
+        .Position = {.Enabled = true, .Property = {D::MeshVertex, "v:offset", Kind::Vec3}}};
+    EXPECT_TRUE(Runtime::ResolveDisplayedPositions(properties, D::MeshVertex, &bindings).Bound);
+
+    properties.Get<glm::vec3>("v:offset").Vector()[1].x = std::numeric_limits<float>::infinity();
+    auto displayed = Runtime::ResolveDisplayedPositions(properties, D::MeshVertex, &bindings);
+    EXPECT_FALSE(displayed.Bound);  // never draws garbage
+    EXPECT_EQ(displayed.Name, "v:position");
+    EXPECT_EQ(displayed.Values.size(), 3u);
+
+    bindings.Position.Property.Name = "v:gone";
+    EXPECT_FALSE(Runtime::ResolveDisplayedPositions(properties, D::MeshVertex, &bindings).Bound);
+    bindings.Position.Property = {D::GraphNode, "v:offset", Kind::Vec3};  // other domain
+    EXPECT_FALSE(Runtime::ResolveDisplayedPositions(properties, D::MeshVertex, &bindings).Bound);
+    EXPECT_EQ(Runtime::ResolveDisplayedPositions(properties, D::MeshVertex, nullptr).Name, "v:position");
 }
 
 TEST(VertexChannelBindings, NormalAndTexcoordBindOnVertexOrCornerDomainsThroughOneSlot)

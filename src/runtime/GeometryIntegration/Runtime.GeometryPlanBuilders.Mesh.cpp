@@ -156,12 +156,14 @@ namespace Extrinsic::Runtime
             return Failure(MeshPackStatus::MissingPositions, outBuffer);
         }
 
-        const auto posProp = view.VertexSource->Properties.Get<glm::vec3>(PropertyNames::kPosition);
-        if (!posProp)
+        // Displayed positions: the bound Position source or canonical
+        // `v:position` (RUNTIME-315); bounds below follow the same span.
+        const std::span<const glm::vec3> positions = ResolveDisplayedPositions(
+            view.VertexSource->Properties, GeometryElementDomain::MeshVertex, channelBindings).Values;
+        if (positions.empty() && !view.VertexSource->Properties.Get<glm::vec3>(PropertyNames::kPosition))
         {
             return Failure(MeshPackStatus::MissingPositions, outBuffer);
         }
-        const auto& positions = posProp.Vector();
         const std::size_t vertexCount = positions.size();
         if (vertexCount == 0)
         {

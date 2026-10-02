@@ -14,6 +14,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.GeometryProcessingOperations;
@@ -264,4 +265,26 @@ TEST(PrimitiveSelection, SettingsUseSharedPreviewApplyAndRemainReproducible)
     EXPECT_FALSE(R::GetSelectionInteractionConfig(loaded.Preview.Config)->Highlight);
     EXPECT_FALSE(R::ApplyEditorSelectionInteractionConfig(commands, {.PointRadius = -1.f}).Succeeded());
     EXPECT_EQ(applies, 1);
+}
+
+// RUNTIME-315: highlights sit on the displayed (bound) positions, so the
+// highlight overlays what is drawn rather than the canonical geometry.
+TEST(PrimitiveSelection, HighlightFollowsBoundPositions)
+{
+    Harness h;
+    auto& vertices = h.Scene.Raw().get<GS::Vertices>(h.Entity).Properties;
+    auto lifted = vertices.Get<glm::vec3>("v:position").Vector();
+    for (glm::vec3& p : lifted)
+        p.z += 3.0f;
+    vertices.GetOrAdd<glm::vec3>("v:lifted", glm::vec3{0.0f}).Vector() = lifted;
+    h.Scene.Raw().emplace<R::VertexChannelBindingSet>(
+        h.Entity, R::VertexChannelBindingSet{
+                      .Position = {.Enabled = true,
+                                   .Property = {D::MeshVertex, "v:lifted",
+                                                Geometry::PropertyValueKind::Vec3}}});
+    ASSERT_TRUE(h.Change(Edit::Replace, {2}).Usable());
+    const auto snapshot =
+        R::BuildPrimitiveSelectionRenderSnapshot(h.Scene, h.Selection, R::DefaultWorldHandle);
+    ASSERT_EQ(snapshot.DebugPoints.size(), 1u);
+    EXPECT_EQ(snapshot.DebugPoints[0].Position, glm::vec3(1, 1, 3));
 }

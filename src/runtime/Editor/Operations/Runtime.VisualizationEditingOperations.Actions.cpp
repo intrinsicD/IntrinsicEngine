@@ -2014,10 +2014,6 @@ ApplyEditorRenderHintCommand(
                 availability, command.Attribute, command.Domain, command.PropertyName);
             if (!resolution.Resolved())
                 return ToAttributeBindingStatus(resolution.Status);
-            // A valid source on a row extraction does not draw yet is refused
-            // rather than stored as a binding that silently changes nothing.
-            if (!IsRenderAttributeBindingDrawn(command.Attribute, command.Domain))
-                return EditorCommandStatus::AttributeBindingNotYetSupported;
             kind = resolution.ResolvedValueKind;
         }
 

@@ -224,23 +224,6 @@ namespace Extrinsic::Runtime
         }
     } // namespace
 
-    bool IsRenderAttributeBindingDrawn(
-        const RenderAttribute attribute, const GeometryElementDomain domain) noexcept
-    {
-        switch (attribute)
-        {
-        case RenderAttribute::Normal:
-        case RenderAttribute::Texcoord:
-        case RenderAttribute::Color:
-        case RenderAttribute::PointSize:
-        case RenderAttribute::LineWidth:
-            return true;  // every table row of these attributes is drawn
-        case RenderAttribute::Position:
-            break;
-        }
-        return false;
-    }
-
     GeometryPropertyResolution ResolveEditorAttributeBindingSource(
         const GeometryEntityAvailability& availability, const RenderAttribute attribute,
         const GeometryElementDomain domain, const std::string_view propertyName)
@@ -292,7 +275,6 @@ namespace Extrinsic::Runtime
                 .ExpectedType = std::string{RenderAttributeExpectedTypeText(rule)},
                 .ExpectedElementCount = properties->Size(),
                 .DefaultSource = std::string{rule.DefaultDescription},
-                .Consumed = IsRenderAttributeBindingDrawn(rule.Attribute, rule.Domain),
             };
             if (const std::optional<std::string> bound = BoundSourceName(raw, *entity, rule))
             {
@@ -305,10 +287,7 @@ namespace Extrinsic::Runtime
                 row.Resolution = ResolveEditorAttributeBindingSource(
                     availability, rule.Attribute, rule.Domain, *bound);
                 row.UsingFallback = !row.Resolution.Resolved();
-                if (!row.Consumed)
-                    row.Diagnostic = "'" + *bound + "' is not drawn yet; drawing the default (" +
-                                     row.DefaultSource + ")";
-                else if (row.UsingFallback)
+                if (row.UsingFallback)
                     row.Diagnostic = "'" + *bound + "' " + ResolutionReason(rule, row.Resolution) +
                                      "; drawing the default (" + row.DefaultSource + ")";
             }

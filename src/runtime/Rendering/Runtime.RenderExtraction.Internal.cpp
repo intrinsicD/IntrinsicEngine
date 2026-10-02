@@ -38,6 +38,7 @@ import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.GeometryPlanBuilders;
 import Extrinsic.Runtime.RenderWorldPool;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.VisualizationRecipes;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.Properties;
@@ -145,6 +146,13 @@ namespace Extrinsic::Runtime
 
         struct RenderableSidecar
         {
+            // RUNTIME-315: local box of a bound Position source, cached by the
+            // source's name and content revision (culling follows it).
+            std::string DisplayedBoundsSource{};
+            Geometry::PropertyRevision DisplayedBoundsRevision{0u};
+            glm::vec3 DisplayedBoundsMin{0.0f};
+            glm::vec3 DisplayedBoundsMax{0.0f};
+
             Graphics::GpuInstanceHandle Instance{};
             Graphics::Components::GpuSceneSlot GpuSlot{};
             Graphics::Components::MaterialInstance Material{};
@@ -250,6 +258,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] bool ReconcileMeshPrimitiveView(
             MeshPrimitiveViewKind kind,
             const ECS::Components::GeometrySources::ConstSourceView& view,
+            const VertexChannelBindingSet* channelBindings,
             RenderableSidecar& sidecar,
             const glm::mat4& model,
             std::uint32_t materialSlot,

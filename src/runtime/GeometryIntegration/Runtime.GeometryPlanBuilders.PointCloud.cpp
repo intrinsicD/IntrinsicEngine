@@ -89,12 +89,12 @@ namespace Extrinsic::Runtime
         {
             return Failure(PointCloudPackStatus::MissingPositions, outBuffer);
         }
-        const auto posProp = view.VertexSource->Properties.Get<glm::vec3>(PropertyNames::kPosition);
-        if (!posProp)
+        const std::span<const glm::vec3> positions = ResolveDisplayedPositions(
+            view.VertexSource->Properties, GeometryElementDomain::PointCloudPoint, channelBindings).Values;
+        if (positions.empty() && !view.VertexSource->Properties.Get<glm::vec3>(PropertyNames::kPosition))
         {
             return Failure(PointCloudPackStatus::MissingPositions, outBuffer);
         }
-        const auto& positions = posProp.Vector();
         const std::size_t pointCount = positions.size();
         if (pointCount == 0)
         {

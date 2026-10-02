@@ -949,9 +949,10 @@ streams write the ECS descriptor `VertexChannelBindingSet` through the shared
 editor mutation transaction (exact undo/redo, intervening edits rejected,
 dirty domain stamped after publication); Color writes the visualization
 overlay through the same recipe path as `show_property`; point size and line
-width write the render hints' name alternative. Rows whose consumer has not
-landed are listed but refused (`AttributeBindingNotYetSupported`); see the
-task for the current set. Canonical `v:color` still feeds the structural color
+width write the render hints' name alternative. `ResolveDisplayedPositions`
+is the single source of the displayed positions (bound Position source, else
+`v:position`): plan builders, culling bounds, the GPU position front, pick
+refinement, highlights and vector-field anchors all resolve through it. Canonical `v:color` still feeds the structural color
 stream when no Color overlay is bound. Structural bindings persist in scene
 documents as `attributeBindings`; a source missing on load stays authored,
 is drawn from the default and is reported in `StaleAttributeBindings`. Runtime render extraction reads the

@@ -19,6 +19,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.SelectionSystem;
 import Extrinsic.Runtime.MeshSurfaceTopology;
 import Extrinsic.Runtime.StableEntityLookup;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Properties;
 
 namespace Extrinsic::Runtime
@@ -272,7 +273,7 @@ namespace Extrinsic::Runtime
             {
                 return Reject(view, request, PrimitiveRefineStatus::MissingGeometrySource);
             }
-            const auto* positions = TryVector<glm::vec3>(view.VertexSource->Properties, pn::kPosition);
+            const auto* positions = TryVector<glm::vec3>(view.VertexSource->Properties, request.PositionProperty);
             if (positions == nullptr)
             {
                 return Reject(view, request, PrimitiveRefineStatus::MissingGeometrySource);
@@ -486,7 +487,7 @@ namespace Extrinsic::Runtime
             {
                 return Reject(view, request, PrimitiveRefineStatus::MissingGeometrySource);
             }
-            const auto* positions = TryVector<glm::vec3>(view.VertexSource->Properties, pn::kPosition);
+            const auto* positions = TryVector<glm::vec3>(view.VertexSource->Properties, request.PositionProperty);
             if (positions == nullptr)
             {
                 return Reject(view, request, PrimitiveRefineStatus::MissingGeometrySource);
@@ -583,7 +584,7 @@ namespace Extrinsic::Runtime
             {
                 return Reject(view, request, PrimitiveRefineStatus::MissingGeometrySource);
             }
-            const auto* positions = TryVector<glm::vec3>(view.VertexSource->Properties, pn::kPosition);
+            const auto* positions = TryVector<glm::vec3>(view.VertexSource->Properties, request.PositionProperty);
             if (positions == nullptr)
             {
                 return Reject(view, request, PrimitiveRefineStatus::MissingGeometrySource);
@@ -829,6 +830,13 @@ namespace Extrinsic::Runtime
 
         const ConstSourceView view =
             ECS::Components::GeometrySources::BuildConstView(scene.Raw(), entity);
+        if (view.VertexSource != nullptr)
+        {
+            request.PositionProperty = std::string{ResolveDisplayedPositions(
+                view.VertexSource->Properties,
+                DisplayedPositionDomainFor(BuildSourceAvailability(view).ProvenanceDomain),
+                scene.Raw().try_get<VertexChannelBindingSet>(entity)).Name};
+        }
         PrimitiveSelectionResult result = RefinePrimitiveSelection(view, request);
         if (request.HasLocalHit && worldCursor.has_value())
         {

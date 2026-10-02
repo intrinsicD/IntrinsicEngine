@@ -60,8 +60,6 @@ export namespace Extrinsic::Runtime
         UnsupportedCameraPose,
         // RUNTIME-315 attribute-binding refusals, one per typed reason.
         UnsupportedRenderAttribute,
-        // Accepted by the table but not drawn yet; refused until extraction consumes it.
-        AttributeBindingNotYetSupported,
         AttributeSourceMissing,
         AttributeSourceTypeMismatch,
         AttributeSourceCountMismatch,

@@ -2167,6 +2167,13 @@ namespace Extrinsic::Graphics
         return m_Impl->EntityConfigCpu[instance.Index];
     }
 
+    RHI::GpuBounds GpuWorld::GetBoundsForTest(const GpuInstanceHandle instance) const noexcept
+    {
+        if (!m_Impl->InstanceSlots.Resolve(instance))
+            return {};
+        return m_Impl->BoundsCpu[instance.Index];
+    }
+
     void GpuWorld::SetBounds(GpuInstanceHandle instance, const RHI::GpuBounds& bounds)
     {
         if (!m_Impl->InstanceSlots.ResolveForUse(instance))

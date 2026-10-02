@@ -7,6 +7,7 @@ module;
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <optional>
 #include <span>
@@ -26,6 +27,7 @@ import :Internal;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.Runtime.GeometryAvailability;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.MeshSurfaceTopology;
 import Extrinsic.Runtime.VisualizationRecipes;
@@ -169,17 +171,21 @@ namespace Extrinsic::Runtime
         // reused), so equal revisions and counts mean an unchanged cache.
         [[nodiscard]] AnchorSources DescribeAnchorSources(
             const GeometryEntityAvailability& availability,
-            const GeometryElementDomain domain)
+            const GeometryElementDomain domain,
+            const VertexChannelBindingSet* bindings)
         {
             AnchorSources sources{};
             sources.Elements = ResolveGeometryPropertySet(availability, domain);
-            sources.Positions =
-                ResolveGeometryPropertySet(availability, IsPointDomain(domain)
-                    ? domain
-                    : PositionDomainFor(domain));
-            sources.PositionName = std::string{PN::kPosition};
+            const GeometryElementDomain positionDomain =
+                IsPointDomain(domain) ? domain : PositionDomainFor(domain);
+            sources.Positions = ResolveGeometryPropertySet(availability, positionDomain);
+            // Anchors sit on the displayed positions (RUNTIME-315).
+            sources.PositionName = sources.Positions != nullptr
+                ? std::string{ResolveDisplayedPositions(*sources.Positions, positionDomain, bindings).Name}
+                : std::string{PN::kPosition};
 
             sources.Revisions.push_back(RevisionOf(sources.Positions, sources.PositionName));
+            sources.Revisions.push_back(std::hash<std::string>{}(sources.PositionName));
             sources.Counts.push_back(sources.Positions != nullptr ? sources.Positions->Size() : 0u);
             sources.Counts.push_back(sources.Elements != nullptr ? sources.Elements->Size() : 0u);
             switch (domain)
@@ -326,11 +332,12 @@ namespace Extrinsic::Runtime
             EntityCache& entityCache,
             const GeometryEntityAvailability& availability,
             const GeometryElementDomain domain,
+            const VertexChannelBindingSet* bindings,
             const std::uint64_t frame,
             RuntimeRenderExtractionStats& stats)
         {
             using AnchorCache = typename decltype(entityCache.Anchors)::value_type;
-            AnchorSources sources = DescribeAnchorSources(availability, domain);
+            AnchorSources sources = DescribeAnchorSources(availability, domain, bindings);
             AnchorCache* cache = nullptr;
             for (AnchorCache& candidate : entityCache.Anchors)
             {
@@ -471,6 +478,7 @@ namespace Extrinsic::Runtime
         VectorFieldEntityCache& entityCache = m_VectorFieldCaches[stableId];
         entityCache.LastUsedFrame = frame;
         const GeometryEntityAvailability availability = BuildGeometryAvailability(registry, entity);
+        const auto* bindings = registry.try_get<VertexChannelBindingSet>(entity);
 
         for (const VectorFieldRequest& request : requests)
         {
@@ -497,7 +505,7 @@ namespace Extrinsic::Runtime
             }
 
             const VectorFieldAnchorCache* anchors = EnsureAnchorCache(
-                entityCache, availability, request.Domain, frame, stats);
+                entityCache, availability, request.Domain, bindings, frame, stats);
             const VectorFieldPayloadCache* payload = EnsurePayloadCache(
                 entityCache, *properties, request.Domain, request.Property, frame, stats);
             if (anchors == nullptr || payload == nullptr)
@@ -507,9 +515,9 @@ namespace Extrinsic::Runtime
             }
             stats.VectorFieldNonFiniteVectorCount += payload->NonFiniteCount;
 
-            // Point domains borrow their own canonical positions.
+            // Point domains borrow their own displayed positions.
             const std::span<const glm::vec3> anchorValues = anchors->BorrowPositions
-                ? properties->Get<glm::vec3>(PN::kPosition).Span()
+                ? ResolveDisplayedPositions(*properties, request.Domain, bindings).Values
                 : std::span<const glm::vec3>{anchors->Anchors};
             const std::span<const glm::vec3> vectorValues = payload->Borrow
                 ? properties->Get<glm::vec3>(request.Property).Span()

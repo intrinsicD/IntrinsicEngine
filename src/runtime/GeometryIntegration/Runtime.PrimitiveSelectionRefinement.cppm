@@ -3,6 +3,7 @@ module;
 
 #include <cstdint>
 #include <optional>
+#include <string>
 
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
@@ -109,6 +110,12 @@ export namespace Extrinsic::Runtime
 
         // Entity local-to-world transform used to report the world-space hit.
         glm::mat4 LocalToWorld{1.0f};
+
+        // RUNTIME-315: the vec3 vertex property the entity is displayed from
+        // (`ResolveDisplayedPositions`), so refinement measures against the
+        // drawn geometry. Result ids are canonical element rows either way.
+        std::string PositionProperty{
+            ECS::Components::GeometrySources::PropertyNames::kPosition};
     };
 
     // Refined primitive selection. `Status`/`Resolved()` report the outcome;

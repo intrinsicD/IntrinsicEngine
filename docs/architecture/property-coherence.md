@@ -338,11 +338,14 @@ Runtime extraction is one independent revision consumer per resident render
 lane. Its private sidecar remembers only the revisions and counts used by that
 lane:
 
-- mesh, graph, and point-cloud positions;
+- mesh, graph, and point-cloud displayed positions: the bound Position
+  source when it resolves (`ResolveDisplayedPositions`, RUNTIME-315), else
+  `v:position`;
 - resolved texcoord, normal, and color channel properties. Resolved texcoords
   follow `h:texcoord` then `v:texcoord`; resolved normals follow `h:normal`
   then `v:normal`, as defined in [geometry API
-  style](geometry-api-style.md#normals-are-corner-domain-capable);
+  style](geometry-api-style.md#normals-are-corner-domain-capable), unless a
+  normal or texcoord binding names another source (`ResolveMeshShadingSources`);
 - exact topology properties consumed by the corresponding plan builder;
 - vertex-channel binding generation; and
 - mesh edge/vertex primitive-view inputs.

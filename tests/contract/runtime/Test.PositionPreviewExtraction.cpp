@@ -3,6 +3,7 @@
 // culling is bypassed, picks stay at the entity level); when it disappears the blocks are
 // restored from the current CPU positions by a forced channel upload, so a CPU edit made
 // during the preview shows after Discard. Null device: the block bytes are the CPU shadow.
+#include <limits>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -34,6 +35,7 @@ import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.StableEntityLookup;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.HalfedgeMesh;
 import Geometry.Properties;
@@ -337,4 +339,59 @@ TEST(PositionPreviewExtraction, AcceptIsNotAcknowledgedForAMeshWhichUsesTheDelta
 
     // An unknown entity or a row count that does not fit is refused, not reinterpreted.
     EXPECT_EQ(f.Extraction.CommitAcceptedPositions(Accepted(id + 1000u, accepted, revision, {})), Status::NotOneToOne);
+}
+
+// RUNTIME-315: a point cloud displayed from a bound Position source uploads,
+// bounds and previews that source; canonical edits leave the display alone;
+// an unusable bound source falls back to the canonical positions.
+TEST(PositionPreviewExtraction, ABoundPositionSourceIsDrawnBoundedAndPreviewedInsteadOfCanonical)
+{
+    Fixture f;
+    const std::vector<glm::vec3> original{{0.f, 0.f, 0.f}, {1.f, 0.f, 0.f}, {0.f, 1.f, 0.f}};
+    const std::vector<glm::vec3> offset{{0.f, 0.f, 5.f}, {1.f, 0.f, 5.f}, {0.f, 1.f, 5.f}};
+    const EntityHandle entity = MakePointCloudRenderable(f.Scene(), original);
+    const auto id = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
+    auto& properties = f.Scene().Raw().get<gs::Vertices>(entity).Properties;
+    properties.GetOrAdd<glm::vec3>("v:offset", glm::vec3{0.f}).Vector() = offset;
+    f.Scene().Raw().emplace<Extrinsic::Runtime::VertexChannelBindingSet>(
+        entity, Extrinsic::Runtime::VertexChannelBindingSet{
+                    .Position = {.Enabled = true,
+                                 .Property = {GeometryElementDomain::PointCloudPoint, "v:offset",
+                                              Geometry::PropertyValueKind::Vec3}}});
+
+    auto stats = f.Extract();
+    EXPECT_EQ(stats.PointCloudGeometryUploads, 1u);
+    ASSERT_FALSE(f.Asked.empty());
+    EXPECT_EQ(f.Asked.back().Name, "v:offset") << "the GPU front of the displayed source is observed";
+    auto sidecar = f.Extraction.FindRenderableSidecarForTest(id);
+    ASSERT_TRUE(sidecar.has_value());
+    EXPECT_EQ(f.View(sidecar->PointCloudGeometry).PositionFingerprint, Fingerprint(offset));
+    auto world = f.Engine.GetRenderer().ExtractRenderWorld({});  // applies the frame's transform records
+    f.Engine.GetRenderer().PrepareFrame(world);
+    const auto bounds = f.Engine.GetRenderer().GetGpuWorld().GetBoundsForTest(sidecar->Instance);
+    EXPECT_FLOAT_EQ(bounds.WorldSphere.z, 5.f) << "culling follows the displayed positions";
+    EXPECT_EQ(properties.Get<glm::vec3>(std::string{pn::kPosition}).Vector(), original);
+
+    // A canonical edit does not change what is displayed.
+    properties.Get<glm::vec3>(std::string{pn::kPosition}).Vector()[1] = glm::vec3{9.f, 9.f, 9.f};
+    stats = f.Extract();
+    EXPECT_EQ(stats.PointCloudGeometryReuseHits, 1u);
+    EXPECT_EQ(stats.PointCloudGeometryReuploads, 0u);
+
+    // Editing the bound source re-uploads it without re-binding.
+    std::vector<glm::vec3> moved = offset;
+    moved[2] = glm::vec3{0.f, 3.f, 5.f};
+    properties.Get<glm::vec3>("v:offset").Vector() = moved;
+    stats = f.Extract();
+    EXPECT_EQ(stats.PointCloudGeometryReuploads, 1u);
+    sidecar = f.Extraction.FindRenderableSidecarForTest(id);
+    EXPECT_EQ(f.View(sidecar->PointCloudGeometry).PositionFingerprint, Fingerprint(moved));
+
+    // A non-finite bound source is never drawn: the canonical positions are.
+    properties.Get<glm::vec3>("v:offset").Vector()[0].x = std::numeric_limits<float>::quiet_NaN();
+    (void)f.Extract();
+    sidecar = f.Extraction.FindRenderableSidecarForTest(id);
+    EXPECT_EQ(f.View(sidecar->PointCloudGeometry).PositionFingerprint,
+              Fingerprint(properties.Get<glm::vec3>(std::string{pn::kPosition}).Vector()));
+    EXPECT_EQ(f.Asked.back().Name, "v:position");
 }
