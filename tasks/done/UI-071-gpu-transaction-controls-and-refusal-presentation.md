@@ -42,7 +42,7 @@ Coordination, do not duplicate:
 - [UI-069](UI-069-shared-operation-progress-widget.md) owns the shared progress read model and
   widget; this row sits next to it and must reuse its phase/progress data once it lands.
 - [UI-037](../active/UI-037-linear-domain-action-readiness-tooltips.md) and
-  [UI-058](../backlog/ui/UI-058-all-reasons-readiness-tooltips.md) own readiness content and the all-reasons
+  [UI-058](UI-058-all-reasons-readiness-tooltips.md) own readiness content and the all-reasons
   tooltip. This task decides only the presentation rule (where the reason appears) and records it
   there; `DrawProcessingActionButton` draws it.
 - [RUNTIME-311](../backlog/runtime/RUNTIME-311-unify-gpu-scalar-outlier-transaction-lifecycle.md) unifies the
@@ -68,7 +68,7 @@ Commit: `1b0713584`, `9ed2ff1f1`, `60f79ab53`, `68fa7b807`, `ff3d52207`. Complet
 - `DrawGpuTransactionControls` draws the shared row. Snapshots carry the lifecycle's refusal text in every phase.
 - MP and MPP actions use `DrawProcessingActionButton` with `ReadinessUnlessBlocked` or `ReadinessWhileGpuRunPending`.
 - A drift guard rejects hand-written rows.
-- Left to [UI-058](../backlog/ui/UI-058-all-reasons-readiness-tooltips.md):
+- Left to [UI-058](UI-058-all-reasons-readiness-tooltips.md):
   - three MPP controls still sit in a bare `BeginDisabled` (Segmentation Show buttons, Geodesics "Use selected vertices" and "Clear source property");
   - the boundaries-doc wording should cover MPP's own gating reasons;
   - the CPD Apply "cancel it" wording should say Discard.

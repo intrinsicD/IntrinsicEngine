@@ -321,7 +321,7 @@ Schemas from declarative config field tables:
 [UI-057](../../tasks/done/UI-057-schema-driven-field-hints.md).
 Structured readiness:
 [RUNTIME-277](../../tasks/done/RUNTIME-277-structured-action-readiness-reasons.md),
-[UI-058](../../tasks/backlog/ui/UI-058-all-reasons-readiness-tooltips.md).
+[UI-058](../../tasks/done/UI-058-all-reasons-readiness-tooltips.md).
 Capability/UI pairs:
 property inspection ([GEOM-109](../../tasks/backlog/geometry/GEOM-109-property-statistics-and-comparison.md),
 [RUNTIME-278](../../tasks/backlog/runtime/RUNTIME-278-property-inspection-operations.md),

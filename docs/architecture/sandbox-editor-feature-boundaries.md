@@ -669,7 +669,7 @@ Stop/Accept/Discard row of a two-phase GPU transaction: families adapt their sna
 enabled only while the run works, Accept only when the runtime allows it, Discard while
 the transaction is live, and the buttons are `##Family`-suffixed. See also
 [UI-037](../../tasks/active/UI-037-linear-domain-action-readiness-tooltips.md) and
-[UI-058](../../tasks/backlog/ui/UI-058-all-reasons-readiness-tooltips.md), which own the
+[UI-058](../../tasks/done/UI-058-all-reasons-readiness-tooltips.md), which own the
 readiness content. Method- and mesh-processing-panel actions disabled by
 the panel's own gating (a missing config control, nothing to undo, a draft that does not
 validate, no selection to copy, a live GPU run: `ReadinessWhileGpuRunPending` with

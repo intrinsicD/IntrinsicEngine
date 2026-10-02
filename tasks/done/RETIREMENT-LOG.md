@@ -8,6 +8,16 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-02 — UI-058 all-reasons readiness tooltips
+
+Retired [UI-058](UI-058-all-reasons-readiness-tooltips.md).
+
+- Disabled actions list every runtime reason, tagged with its field, and offending config fields are marked.
+- The remaining reasonless shell and panel buttons now carry reasons, and a source-scan guard keeps it that way.
+- UI-077 owns the markers in the other panels.
+
+Commits `ab6ee8f89`, `9831b6220`, `3bc398a6d`.
+
 ## 2026-10-02 — RUNTIME-277 structured action readiness reasons
 
 Retired [RUNTIME-277](RUNTIME-277-structured-action-readiness-reasons.md).

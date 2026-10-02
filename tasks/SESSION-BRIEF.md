@@ -64,14 +64,13 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `CORE-011`: `RUNTIME-285` — Diagnostics stream (log cursor, device status, operation records) (tasks/backlog/runtime/RUNTIME-285-diagnostics-stream.md)
 - blocked by `GEOM-110`: `RUNTIME-286` — Mesh health report (tasks/backlog/runtime/RUNTIME-286-mesh-health-report.md)
 - unblocked: `RUNTIME-314` — Reuse existing runtime helpers instead of local copies (tasks/backlog/runtime/RUNTIME-314-reuse-existing-processing-helpers.md)
-- unblocked: `UI-058` — All-reasons readiness tooltip and offending-control markers (tasks/backlog/ui/UI-058-all-reasons-readiness-tooltips.md)
 - blocked by `RUNTIME-278`: `UI-059` — Property Inspector window (tasks/backlog/ui/UI-059-property-inspector-window.md)
 - blocked by `RUNTIME-280`: `UI-061` — Select-by-query controls and "use selection as mask/source" (tasks/backlog/ui/UI-061-select-by-query-controls.md)
 - blocked by `RUNTIME-283`: `UI-063` — File > Properties import/export window (tasks/backlog/ui/UI-063-properties-import-export-window.md)
 - blocked by `RUNTIME-284`: `UI-064` — History window (tasks/backlog/ui/UI-064-history-window.md)
 - blocked by `RUNTIME-285`: `UI-065` — Diagnostics / Log window (tasks/backlog/ui/UI-065-diagnostics-log-window.md)
 - blocked by `RUNTIME-286`: `UI-066` — Mesh Health window (tasks/backlog/ui/UI-066-mesh-health-window.md)
-- blocked by `UI-058`: `UI-077` — Readiness field markers in every config panel (tasks/backlog/ui/UI-077-readiness-field-markers-in-all-panels.md)
+- unblocked: `UI-077` — Readiness field markers in every config panel (tasks/backlog/ui/UI-077-readiness-field-markers-in-all-panels.md)
 
 ## Theme G — Active bugs
 

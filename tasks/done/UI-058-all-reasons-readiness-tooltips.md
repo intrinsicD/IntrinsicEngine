@@ -19,7 +19,7 @@ using RUNTIME-277's structured readiness, starting with the Smooth Property pane
 
 ## Context
 - Operator direction 2026-09-27: agent control lane and user-facing inspection capabilities, planned with Fable 5.1; attach-to-running transport; declarative schemas; integer enums.
-- Helpers in `src/app/Sandbox/Editor/Sandbox.PanelSupport.hpp/.cpp`: `DrawProcessingActionButton(label, readiness)`, `DrawDisabledReasonTooltip`. Coordinate adoption in other families with [UI-037](../../active/UI-037-linear-domain-action-readiness-tooltips.md).
+- Helpers in `src/app/Sandbox/Editor/Sandbox.PanelSupport.hpp/.cpp`: `DrawProcessingActionButton(label, readiness)`, `DrawDisabledReasonTooltip`. Coordinate adoption in other families with [UI-037](../active/UI-037-linear-domain-action-readiness-tooltips.md).
 
 - Handed over from UI-071 (2026-10-02):
   - three MeshProcessingPanels controls still sit in a bare `BeginDisabled` with no reason: the Segmentation Show buttons (~1377), Geodesics "Use selected vertices" (~4120) and "Clear##GeodesicsSourceProperty" (~4163);
@@ -52,9 +52,20 @@ using RUNTIME-277's structured readiness, starting with the Smooth Property pane
 - Agent/CLI: the same reasons are returned by preview/run agent operations (RUNTIME-277).
 
 ## Acceptance criteria
-- [ ] `DrawProcessingActionButton` tooltip lists all reasons; `DrawReadinessFieldMarker` draws a marker plus tooltip for reasons whose `Field` matches.
-- [ ] Smooth Property panel places markers on every configurable field.
-- [ ] `Test.SandboxProcessingPanels.cpp` drives a multi-fault draft and checks the tooltip lists every reason and markers appear on the named fields.
+- [x] `DrawProcessingActionButton` tooltip lists all reasons; `DrawReadinessFieldMarker` draws a marker plus tooltip for reasons whose `Field` matches.
+- [x] Smooth Property panel places markers on every configurable field.
+- [x] `Test.SandboxProcessingPanels.cpp` drives a multi-fault draft and checks the tooltip lists every reason and markers appear on the named fields.
+
+## Completion
+
+Commit: `ab6ee8f89`, `9831b6220`, `3bc398a6d`. Completed 2026-10-02 with independent Opus reviews.
+- Disabled processing actions list every runtime reason, field-tagged, in a wrapped tooltip and in the inline text.
+- `ReadinessUnlessBlocked` keeps all blockers with codes.
+- `DrawReadinessFieldMarker`/`ReadinessMarkerScope` mark offending config fields, adopted in Smooth Property.
+- Shell and PanelSupport buttons carry runtime-sourced reasons, or documented panel-own gating.
+- A nesting-aware source-scan guard covers the four panel files.
+- Field markers in the other panels are owned by [UI-077](../backlog/ui/UI-077-readiness-field-markers-in-all-panels.md).
+- Maturity: Operational for the UI via CPU ImGui tests.
 
 ## Verification
 ```bash
