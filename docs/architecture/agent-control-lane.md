@@ -182,7 +182,9 @@ Nothing exists without the launch flag: no module, thread or socket.
 - Appearance and camera. `set_visibility` shows or hides a lane of an entity (`lane`: surface, edges or
   points, default the entity's primary one: mesh surface, graph edges, point-cloud points)
   through `ApplyEditorRenderHintCommand` exactly as the appearance panel's checkboxes do (one
-  undoable step). `set_camera` takes exactly one of: `controller` (orbit, fly, free look, top down;
+  undoable step). The unified Appearance panel's per-attribute source selectors (Position, Normal, Texcoord,
+  Color, Point size, Line width per element domain) call `ApplyEditorAttributeBindingCommand`; the agent
+  mirror (`attribute_bindings`, `bind_attribute`) is owned by `RUNTIME-316`. `set_camera` takes exactly one of: `controller` (orbit, fly, free look, top down;
   `ApplyEditorCameraControllerCommand`, like the Camera panel's buttons), `pose` (`position`,
   `target`, optional `up`), `preset` (front, back, left, right, top, bottom, isometric; frames
   `entities`, or everything with world bounds) or `focus: true` (frames `entities`, or the

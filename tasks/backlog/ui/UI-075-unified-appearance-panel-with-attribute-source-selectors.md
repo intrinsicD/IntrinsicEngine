@@ -82,3 +82,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
   mapping block; Point size / Line width rows show the uniform pixel field only while on Default
   (a bound row's source is its selector). The row tooltip now states the fallback. The lane
   Settings keep the render-hint combos, the Property dropdown, uniform color and texture baking.
+- 2026-10-02: Slice 4. The read-only "Binding targets" list is removed from Advanced
+  (`DrawPropertyBindingTargets`; the "Vertex channels" block went with RUNTIME-315 slice 3);
+  the catalog's `BindingTargets` model stays for the inspector. README Appearance prose and the
+  agent-control-lane parity note (RUNTIME-316 mirrors the selectors) are updated.

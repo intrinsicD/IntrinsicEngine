@@ -245,7 +245,7 @@ boundary/cleanup diagnostics. It remains experimental and exposes no cut or
 UV-atlas action. The single `View > Appearance` window (`UI-075`) has a
 Vertices, Edges and Faces section for the element domains the selected entity
 carries, each with its lane visibility, an attribute table (one row per render attribute: current source, a selector offering Default and the compatible properties with incompatible ones disabled and the runtime reason shown, fallback status; picks go through `ApplyEditorAttributeBindingCommand`). The controls of an attribute sit with its row: a bound Color row shows the color interpretation (with its tooltips) and the colormap/range, and the Point size / Line width rows show the uniform pixel field only while on Default. Lane settings keep the render-hint combos, the property dropdown and texture baking. Surface properties can use the shared UV texture-bake
-command; advanced binding and bake controls are collapsed. Its entity-level
+command; render state and bake controls are collapsed under Advanced. Its entity-level
 **Vector fields** section (independent of which lanes are visible) chooses an
 element domain, then a vec3 property, and draws it as arrows; each field has
 visibility, normalized/raw length, width, color, depth test and sampling

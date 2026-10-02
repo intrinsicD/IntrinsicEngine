@@ -141,37 +141,6 @@ void DrawPropertyCatalogRows(const EditorPropertyCatalogModel &catalog) {
   }
 }
 
-void DrawPropertyBindingTargets(
-    const EditorPropertyCatalogModel &catalog) {
-  if (catalog.BindingTargets.empty())
-    return;
-
-  ImGui::SeparatorText("Binding targets");
-  for (std::size_t i = 0u; i < catalog.BindingTargets.size(); ++i) {
-    const EditorPropertyBindingTargetModel &target =
-        catalog.BindingTargets[i];
-    ImGui::PushID(static_cast<int>(i));
-    ImGui::Text("%s / %s / %s requires %s %zu",
-                std::string(ToString(target.Lane)).c_str(),
-                target.PresentationKey.c_str(),
-                std::string(ToString(target.Semantic)).c_str(),
-                DebugNameForGeometryPropertyValueKindFilter(
-                    target.ExpectedValueKind),
-                target.ExpectedElementCount);
-    for (const GeometryPresentationPropertyOption &option :
-         target.Options) {
-      if (option.Compatible) {
-        ImGui::BulletText("%s", option.Property.Name.c_str());
-      } else {
-        ImGui::BulletText("%s", option.Property.Name.c_str());
-        ImGui::SameLine();
-        ImGui::TextDisabled("%s", option.DisabledReason.c_str());
-      }
-    }
-    ImGui::PopID();
-  }
-}
-
 // Properties is an exhaustive explorer: internal, connectivity, and generated
 // rows remain visible, with unsupported actions diagnosed rather than hidden.
 // Render, binding, and bake controls belong to Appearance.
@@ -763,7 +732,6 @@ void DrawAppearanceLane(const AppearanceSection &section,
   if (ImGui::CollapsingHeader("Advanced")) {
     DrawRenderHintStatus(model.RenderHints);
     DrawBoundRenderStateRows(model.BoundState);
-    DrawPropertyBindingTargets(model.PropertyCatalog);
     if (mesh) {
       static TextureBakeMutationUiState mutationState{};
       DrawTextureBakeControls(model.TextureBake, &context, draw.TextureBake,
