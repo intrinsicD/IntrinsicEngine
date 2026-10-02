@@ -24,7 +24,6 @@ Each window uses the same runtime functions as agent operations.
 
 - [UI-058 — All-reasons readiness tooltip and offending-control markers](UI-058-all-reasons-readiness-tooltips.md)
 - [UI-059 — Property Inspector window](UI-059-property-inspector-window.md)
-- [UI-073 — Texture bake panels use the shared progress widget](UI-073-texture-bake-progress-adoption.md)
 - [UI-061 — Select-by-query controls and "use selection as mask/source"](UI-061-select-by-query-controls.md)
 - [UI-063 — File > Properties import/export window](UI-063-properties-import-export-window.md)
 - [UI-064 — History window](UI-064-history-window.md)

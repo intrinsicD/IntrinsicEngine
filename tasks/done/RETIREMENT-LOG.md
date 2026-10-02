@@ -8,6 +8,17 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-02 — UI-073 texture bake progress adoption
+
+Retired [UI-073](UI-073-texture-bake-progress-adoption.md).
+
+- Each texture bake is one run job, resolvable by token, output and the Jobs window, with exactly-once settlement. Only a real device loss fails it.
+- JobService parked results no longer starve the completion drain, and gate checks are capped and rotated.
+- The bake controls and UV texture tab show the run through the shared widget, with run-level Cancel.
+- Maturity: CPUContracted. GRAPHICS-159 owns the Vulkan evidence.
+
+Commits `8c1ee6e89` through `e50b4d059`.
+
 ## 2026-10-02 — UI-060 Jobs window
 
 Retired [UI-060](UI-060-jobs-window.md).

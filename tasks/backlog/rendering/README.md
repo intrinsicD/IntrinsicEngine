@@ -23,3 +23,4 @@ spike verdict. Neither is an unconditional rename/redesign instruction.
 
 Completed and superseded work is recorded in the
 [retirement log](../../done/RETIREMENT-LOG.md) and Git history.
+- [GRAPHICS-159 — Texture bake run job and device-loss evidence on Vulkan](GRAPHICS-159-texture-bake-run-and-device-loss-gpu-evidence.md)

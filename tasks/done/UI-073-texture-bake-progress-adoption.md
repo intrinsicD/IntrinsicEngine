@@ -14,7 +14,7 @@ contracts: [runtime.editor-prepared-frame-locality, repo.source-documentation]
 
 ## Goal
 The texture bake panels show their run's progress through `OperationRunSlot`
-and `DrawOperationProgress` ([UI-069](../../done/UI-069-shared-operation-progress-widget.md)),
+and `DrawOperationProgress` ([UI-069](UI-069-shared-operation-progress-widget.md)),
 replacing the "Bake pending." overlay text.
 
 ## Context
@@ -76,6 +76,15 @@ replacing the "Bake pending." overlay text.
 - [x] Bake jobs carry a correlation id (or an editor identity) so the progress surface resolves them; the bake worker reports progress where a fraction is known.
 - [x] The texture bake controls and the UV texture tab draw the widget through a run slot keyed by the submitted bake, shown for its entity only.
 - [x] An ImGui test starts a bake and sees the run, then another entity shows nothing.
+
+## Completion
+
+Commit: `8c1ee6e89`, `fbb94e0ae`, `62955173f`, `18a6a4989`, `be2f10e01`, `e50b4d059`. Completed 2026-10-02 with independent Opus reviews per commit; the reviewer confirmed each acceptance tick.
+- Each scheduled bake submits one run job that ends exactly once. Bakes fail only on a real device loss.
+- Parked results no longer consume the completion-drain apply budget, and gate checks are capped at 32 per drain and rotate through the parked results.
+- The bake controls and the UV texture tab show the run through `OperationRunSlot` with run-level Cancel. A Pending tab without an editor run keeps "Bake pending.".
+- Full CPU suite 5672/5672.
+- Maturity: CPUContracted. The Ready→Published run on a GPU frame and real device-loss evidence are owned by [GRAPHICS-159](../backlog/rendering/GRAPHICS-159-texture-bake-run-and-device-loss-gpu-evidence.md).
 
 ## Verification
 ```bash

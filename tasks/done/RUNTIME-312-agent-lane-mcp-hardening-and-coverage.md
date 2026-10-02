@@ -22,7 +22,7 @@ covers the editor commands of finding 9 through `run_operation`/`preview_operati
 `AgentOperations.*` and `Test.McpBridge.py`; no live Vulkan Sandbox session. CPUContracted.
 Remaining work is owned elsewhere: job cancel by [RUNTIME-279](RUNTIME-279-editor-job-snapshot-and-cancel.md),
 camera pose/preset/focus by [UI-070](UI-070-camera-pose-command-and-controls.md), texture bake progress by
-[UI-073](../backlog/ui/UI-073-texture-bake-progress-adoption.md). Known limitation: a panel's draft-output fallback shows
+[UI-073](UI-073-texture-bake-progress-adoption.md). Known limitation: a panel's draft-output fallback shows
 agent runs only before its first own run and only for the current draft key
 (`sandbox-editor-feature-boundaries.md`).
 

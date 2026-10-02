@@ -51,6 +51,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `GEOM-109` — `Geometry.Properties.Statistics`: statistics, histogram and comparison (tasks/backlog/geometry/GEOM-109-property-statistics-and-comparison.md)
 - unblocked: `GEOM-110` — Connected components and per-component topology/genus (tasks/backlog/geometry/GEOM-110-connected-components-and-topology.md)
 - unblocked: `GEOM-115` — Make 13 halfedge-mesh module names match their file stems (tasks/backlog/geometry/GEOM-115-halfedge-module-names-match-file-stems.md)
+- unblocked: `GRAPHICS-159` — Texture bake run job and device-loss evidence on Vulkan (tasks/backlog/rendering/GRAPHICS-159-texture-bake-run-and-device-loss-gpu-evidence.md)
 - blocked by `GRAPHICS-105`: `LEGACY-043` — Retire stale multi-descriptor-set shader sources (tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `RUNTIME-276` — Declarative `ConfigFieldSpec` tables, schema generation and conformance test (tasks/backlog/runtime/RUNTIME-276-declarative-config-field-specs.md)
@@ -72,7 +73,6 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `RUNTIME-284`: `UI-064` — History window (tasks/backlog/ui/UI-064-history-window.md)
 - blocked by `RUNTIME-285`: `UI-065` — Diagnostics / Log window (tasks/backlog/ui/UI-065-diagnostics-log-window.md)
 - blocked by `RUNTIME-286`: `UI-066` — Mesh Health window (tasks/backlog/ui/UI-066-mesh-health-window.md)
-- unblocked: `UI-073` — Texture bake panels use the shared operation progress widget (tasks/backlog/ui/UI-073-texture-bake-progress-adoption.md)
 
 ## Theme G — Active bugs
 
