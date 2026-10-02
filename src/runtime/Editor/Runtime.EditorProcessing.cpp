@@ -120,16 +120,57 @@ namespace Extrinsic::Runtime
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
         return CanApplyProcessingConfig(context);
     }
+    std::string_view ToString(const ActionReadinessCode code) noexcept
+    {
+        using C = ActionReadinessCode;
+        switch (code)
+        {
+        case C::Ok: return "ok";
+        case C::WorkspaceUnavailable: return "workspace_unavailable";
+        case C::MissingEntity: return "missing_entity";
+        case C::WrongDomain: return "wrong_domain";
+        case C::MissingProperty: return "missing_property";
+        case C::IncompatibleProperty: return "incompatible_property";
+        case C::ElementCountMismatch: return "element_count_mismatch";
+        case C::InvalidConfig: return "invalid_config";
+        case C::ConflictingOptions: return "conflicting_options";
+        case C::DeviceUnavailable: return "device_unavailable";
+        case C::KernelUnavailable: return "kernel_unavailable";
+        case C::JobActive: return "job_active";
+        case C::StaleInput: return "stale_input";
+        case C::PendingVerdict: return "pending_verdict";
+        case C::Unclassified: return "unclassified";
+        }
+        return "unclassified";
+    }
+    ActionReadiness MakeActionReadiness(std::vector<ActionReadinessReason> reasons)
+    {
+        ActionReadiness readiness{.Enabled = reasons.empty()};
+        if (!reasons.empty()) readiness.DisabledReason = reasons.front().Message;
+        readiness.Reasons = std::move(reasons);
+        return readiness;
+    }
+    std::vector<ActionReadinessReason> ActionReadinessReasons(const ActionReadiness& readiness)
+    {
+        if (readiness.Enabled) return {};
+        if (!readiness.Reasons.empty()) return readiness.Reasons;
+        return {{.Code = ActionReadinessCode::Unclassified, .Field = {}, .Message = readiness.DisabledReason}};
+    }
     ActionReadiness ResolveEditorProcessingActionReadiness(
         const EditorProcessingCommands& commands, ActionReadiness method)
     {
-        if (!AreEditorProcessingConfigCommandsAvailable(commands))
-            return {false, "Processing controls are unavailable. Open an active editor session."};
         if (method.Enabled)
-            method.DisabledReason.clear();
-        else if (method.DisabledReason.empty())
-            method.DisabledReason = "Processing prerequisites are unavailable. Check the selected inputs and settings.";
-        return method;
+            method = MakeActionReadiness({});
+        else if (method.DisabledReason.empty() && method.Reasons.empty())
+            method = MakeActionReadiness({{.Code = ActionReadinessCode::Unclassified, .Field = {},
+                .Message = "Processing prerequisites are unavailable. Check the selected inputs and settings."}});
+        if (AreEditorProcessingConfigCommandsAvailable(commands))
+            return method;
+        // The config lane is missing: lead with it, then keep every reason the method reported.
+        std::vector<ActionReadinessReason> reasons{{.Code = ActionReadinessCode::WorkspaceUnavailable, .Field = {},
+            .Message = "Processing controls are unavailable. Open an active editor session."}};
+        for (auto& reason : ActionReadinessReasons(method)) reasons.push_back(std::move(reason));
+        return MakeActionReadiness(std::move(reasons));
     }
     void CarryEditorLabelPrefix(JobDesc& desc, EditorCommandHistory* history, std::string prefix,
                                 std::function<bool()> active)

@@ -29,6 +29,17 @@ contracts: [repo.source-documentation, geometry.element-domain-sources]
 - Coordination: [UI-037](../../active/UI-037-linear-domain-action-readiness-tooltips.md) (active) owns readiness across all families. Land this as a small type-introducing slice that UI-037's remaining slices adopt; check UI-037's current continuation before starting and do not duplicate its cached verdicts. This task does not edit UI-037's note; the UI-037 owner records adoption there.
 - Design: `enum class ActionReadinessCode : std::uint8_t { Ok, WorkspaceUnavailable, MissingEntity, WrongDomain, MissingProperty, IncompatibleProperty, ElementCountMismatch, InvalidConfig, ConflictingOptions, DeviceUnavailable, KernelUnavailable, JobActive, StaleInput, PendingVerdict }`; `ActionReadinessReason { Code; Field /* schema key, empty = whole action */; Message; }`; `ActionReadiness` gains `std::vector<ActionReadinessReason> Reasons` and `DisabledReason` stays the first reason's message (existing `{ok, diagnostic}` aggregate initializations keep compiling); `MakeActionReadiness(std::vector<ActionReadinessReason>)` fills both.
 
+## Slice log
+- Slice 1: `ActionReadinessCode` (plus `Unclassified` for text-only producers),
+  `ActionReadinessReason`, `ActionReadiness::Reasons`, `MakeActionReadiness`,
+  `ActionReadinessReasons` and `ToString`; `ResolveEditorProcessingActionReadiness` prepends
+  `WorkspaceUnavailable`; `ReadinessWhileGpuRunPending` reports `JobActive`. Config reasons come
+  from `CollectDeclaredFieldErrors` (one `InvalidConfig` per out-of-range field with its schema key)
+  through `AppendConfigReadinessReasons`. The four mesh-field `Target()` owners collect config,
+  property and device reasons; `preview_*` answers `reasons[]` (`code`, `field`, `message`).
+  Multi-fault tests in the four family suites, a field-key test and an agent preview test
+  (`EditorMeshFieldAgent`). UI-058 can now render all reasons and field markers.
+
 ## Control surfaces
 - Config: `Field` uses the section schema key from RUNTIME-276.
 - UI: UI-058 lists all reasons and marks offending controls.

@@ -148,6 +148,11 @@ namespace Extrinsic::Runtime::AgentDetail
         const auto readiness = ResolveEditorProcessingActionReadiness(commands, std::move(method));
         extra["enabled"] = readiness.Enabled;
         extra["reason"] = readiness.DisabledReason;
+        // Every blocking reason (RUNTIME-277); `reason` stays the first message.
+        Json reasons = Json::array();
+        for (const auto& entry : ActionReadinessReasons(readiness))
+            reasons.push_back({{"code", ToString(entry.Code)}, {"field", entry.Field}, {"message", entry.Message}});
+        extra["reasons"] = std::move(reasons);
         return extra;
     }
 

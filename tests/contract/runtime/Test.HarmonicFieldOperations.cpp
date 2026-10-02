@@ -317,3 +317,24 @@ TEST(HarmonicFieldOperations, RejectsMissingConstraintPropertiesAndStaleHistory)
     h.Props().Get<double>("values")[0] = 5; // input revision changed after publication
     EXPECT_FALSE(h.History.Undo().Succeeded());
 }
+
+// RUNTIME-277: every independent failure, in check order, with the field to change.
+TEST(HarmonicFieldOperations, ReadinessReportsEveryIndependentReasonInOrder)
+{
+    using C = R::ActionReadinessCode;
+    HarmonicHarness h(D::PointCloudPoint);
+    h.Config.Neighbors = 0;                           // out of range
+    h.Config.Input.Name = "absent";                   // no such input
+    h.Config.HardMask.Name = "no_mask";               // no such constraint
+    (void)h.Props().GetOrAdd<float>("field", 0.f);    // output exists as float, config says double
+    const auto readiness = R::PreviewEditorHarmonicFieldCommand(h.Commands(), h.Id(), h.Config);
+    EXPECT_FALSE(readiness.Enabled);
+    std::vector<std::pair<C, std::string>> actual;
+    for (const auto& reason : readiness.Reasons) actual.emplace_back(reason.Code, reason.Field);
+    const std::vector<std::pair<C, std::string>> expected{{C::InvalidConfig, "neighbors"}, {C::MissingProperty, "input"},
+        {C::MissingProperty, "hard_mask"}, {C::IncompatibleProperty, "output"}};
+    EXPECT_EQ(actual, expected);
+    ASSERT_FALSE(readiness.Reasons.empty());
+    EXPECT_EQ(readiness.DisabledReason, readiness.Reasons.front().Message);
+    EXPECT_EQ(h.Run().Message, readiness.DisabledReason);
+}

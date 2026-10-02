@@ -441,3 +441,70 @@ TEST(PropertySmoothingOperations, VulkanBackendConfigAndAdmission)
     EXPECT_EQ(result.RequestedBackend,R::PropertySmoothingBackend::Vulkan);
     EXPECT_FALSE(h.Props().Exists("smooth"));
 }
+
+// RUNTIME-277: readiness reports every independent failure in check order, each with its code and
+// the config field to change; DisabledReason stays the first message.
+namespace
+{
+    std::vector<std::pair<R::ActionReadinessCode, std::string>> CodesAndFields(const R::ActionReadiness& readiness)
+    {
+        std::vector<std::pair<R::ActionReadinessCode, std::string>> out;
+        for (const auto& reason : readiness.Reasons) out.emplace_back(reason.Code, reason.Field);
+        return out;
+    }
+}
+TEST(PropertySmoothingOperations, ReadinessReportsEveryIndependentReasonInOrder)
+{
+    using C = R::ActionReadinessCode;
+    SmoothingHarness h;
+    h.Config.Filter.Iterations = 0;                 // out of range
+    h.Config.Filter.Lambda = 2.0;                   // out of range
+    h.Config.Input.Name = "missing";                // no such property
+    (void)h.Props().GetOrAdd<float>("smooth", 0.f); // output exists as float, config says double
+    h.Config.Backend = R::PropertySmoothingBackend::Vulkan; // no device in this harness
+    const auto readiness = R::PreviewEditorPropertySmoothingCommand(h.Commands(), h.Id(), h.Config);
+    EXPECT_FALSE(readiness.Enabled);
+    const std::vector<std::pair<C, std::string>> expected{{C::InvalidConfig, "iterations"}, {C::InvalidConfig, "lambda"},
+        {C::MissingProperty, "input"}, {C::IncompatibleProperty, "output"}, {C::DeviceUnavailable, "backend"}};
+    EXPECT_EQ(CodesAndFields(readiness), expected);
+    ASSERT_FALSE(readiness.Reasons.empty());
+    EXPECT_EQ(readiness.DisabledReason, readiness.Reasons.front().Message);
+    // The apply path refuses with the same first reason.
+    EXPECT_EQ(h.Run().Message, readiness.DisabledReason);
+
+    // Without the config lane the shared resolver leads with WorkspaceUnavailable and keeps every reason.
+    const auto resolved = R::ResolveEditorProcessingActionReadiness(h.Commands(), readiness);
+    ASSERT_EQ(resolved.Reasons.size(), expected.size() + 1u);
+    EXPECT_EQ(resolved.Reasons.front().Code, C::WorkspaceUnavailable);
+    EXPECT_EQ(resolved.DisabledReason, resolved.Reasons.front().Message);
+    EXPECT_EQ(resolved.Reasons.back().Field, "backend");
+}
+TEST(PropertySmoothingOperations, OutOfRangeFieldNamesItsSchemaKey)
+{
+    using C = R::ActionReadinessCode;
+    SmoothingHarness h;
+    h.Config.Neighbors = 0;
+    auto readiness = R::PreviewEditorPropertySmoothingCommand(h.Commands(), h.Id(), h.Config);
+    ASSERT_EQ(readiness.Reasons.size(), 1u);
+    EXPECT_EQ(readiness.Reasons[0].Code, C::InvalidConfig);
+    EXPECT_EQ(readiness.Reasons[0].Field, "neighbors");
+    EXPECT_NE(readiness.Reasons[0].Message.find("neighbors"), std::string::npos) << readiness.Reasons[0].Message;
+    EXPECT_EQ(readiness.DisabledReason, readiness.Reasons[0].Message);
+    EXPECT_EQ(R::ToString(C::InvalidConfig), "invalid_config");
+    // A cross-field rule with every field in range names no single field.
+    h.Config.Neighbors = 4;
+    h.Config.Filter.Method = S::PropertyFilter::VariationalFit;
+    h.Config.Filter.FitAlgorithm = S::FitSolver::Reweighted;
+    h.Config.Filter.SmoothnessOrder = S::FitOrder::Second;
+    readiness = R::PreviewEditorPropertySmoothingCommand(h.Commands(), h.Id(), h.Config);
+    ASSERT_EQ(readiness.Reasons.size(), 1u);
+    EXPECT_EQ(readiness.Reasons[0].Code, C::ConflictingOptions);
+    EXPECT_TRUE(readiness.Reasons[0].Field.empty());
+    // An enabled action carries no reasons.
+    h.Config.Filter.Method = S::PropertyFilter::Averaging;
+    h.Config.Filter.SmoothnessOrder = S::FitOrder::First;
+    readiness = R::PreviewEditorPropertySmoothingCommand(h.Commands(), h.Id(), h.Config);
+    EXPECT_TRUE(readiness.Enabled);
+    EXPECT_TRUE(readiness.Reasons.empty());
+    EXPECT_TRUE(readiness.DisabledReason.empty());
+}

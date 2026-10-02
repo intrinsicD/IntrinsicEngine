@@ -42,6 +42,7 @@ import Geometry.Properties;
 #include "Config/internal/Runtime.PointConfigJson.hpp"
 #include "Config/internal/Runtime.ConfigFieldJson.hpp"
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
+#include "Editor/internal/Runtime.ActionReadinessConfig.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.hpp"
@@ -164,28 +165,46 @@ namespace Extrinsic::Runtime
         { return {.Name = std::string{kLaplacianEigenbasisConfigSectionName}, .SchemaId = std::string{kSchema},
                   .SchemaVersion = 1u, .PayloadJson = SerializeLaplacianEigenbasisConfig(c)}; }
 
+        // Every independent blocking reason in check order (see the smoothing owner).
         std::optional<ECS::EntityHandle> Target(const EditorProcessingContext& context, std::uint32_t id,
-            const LaplacianEigenbasisConfig& c, std::string& diagnostic)
+            const LaplacianEigenbasisConfig& c, std::vector<ActionReadinessReason>& reasons)
         {
-            const auto validation = Validate(SerializeLaplacianEigenbasisConfig(c), {}, kLaplacianEigenbasisConfigSectionName);
-            if (!validation.Usable()) { diagnostic = validation.Diagnostics.front().Message; return {}; }
+            using C = ActionReadinessCode;
+            const auto payload = SerializeLaplacianEigenbasisConfig(c);
+            AppendConfigReadinessReasons(reasons, payload, kFields, Validate(payload, {}, kLaplacianEigenbasisConfigSectionName));
             if (!context.Scene || (context.AttachmentActive && !context.AttachmentActive()) || !GP::EditorProcessingContextWorldCurrent(context))
-            { diagnostic = "Workspace is unavailable."; return {}; }
+            {
+                reasons.push_back({C::WorkspaceUnavailable, {}, "Workspace is unavailable."});
+                return {};
+            }
+            const auto open = [&](std::string_view field) { return !ReadinessNamesField(reasons, field); };
             const auto entity = EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(), id);
-            if (!entity) { diagnostic = "Choose an existing geometry entity."; return {}; }
+            if (!entity)
+            {
+                reasons.push_back({C::MissingEntity, {}, "Choose an existing geometry entity."});
+                return {};
+            }
             const auto a = BuildGeometryAvailability(context.Scene->Raw(), *entity);
             const auto* props = ResolveGeometryPropertySet(a, c.Domain);
-            if (!props) { diagnostic = "The entity has no rows on the selected domain."; return {}; }
-            for (const auto& ref : Outputs(c))
+            if (!props) reasons.push_back({C::WrongDomain, "domain", "The entity has no rows on the selected domain."});
+            else
+                for (const auto& ref : Outputs(c))
+                {
+                    const std::string field = ref.Name == c.SignatureOutput ? "signature_output"
+                        : ref.Name == c.DistanceOutput ? "distance_output" : "output_prefix";
+                    if (open(field) && props->Exists(ref.Name) &&
+                        !(ResolveGeometryProperty(a, ref, props->Size(), false).Resolved() && PG::CountMatches(*props, ref)))
+                        reasons.push_back({C::IncompatibleProperty, field, "Output '" + ref.Name + "' exists with a different storage type or cardinality."});
+                }
+            if (open("positions"))
             {
-                if (props->Exists(ref.Name) && !(ResolveGeometryProperty(a, ref, props->Size(), false).Resolved() && PG::CountMatches(*props, ref)))
-                { diagnostic = "Output '" + ref.Name + "' exists with a different storage type or cardinality."; return {}; }
+                const auto* positions = ResolveGeometryPropertySet(a, c.Positions.Domain);
+                if (c.Positions.Domain != c.Domain && c.Positions.Domain != GP::PrimaryPointDomain(a))
+                    reasons.push_back({C::WrongDomain, "positions", "Positions must belong to the selected domain or the entity's vertices/nodes."});
+                else if (!positions || !ResolveGeometryProperty(a, c.Positions, positions->Size(), false).Resolved())
+                    reasons.push_back({C::MissingProperty, "positions", "Choose an existing vec3 position property."});
             }
-            if (c.Positions.Domain != c.Domain && c.Positions.Domain != GP::PrimaryPointDomain(a))
-            { diagnostic = "Positions must belong to the selected domain or the entity's vertices/nodes."; return {}; }
-            const auto* positions = ResolveGeometryPropertySet(a, c.Positions.Domain);
-            if (!positions || !ResolveGeometryProperty(a, c.Positions, positions->Size(), false).Resolved())
-            { diagnostic = "Choose an existing vec3 position property."; return {}; }
+            if (!reasons.empty()) return {};
             return entity;
         }
 
@@ -230,9 +249,9 @@ namespace Extrinsic::Runtime
                                                             const LaplacianEigenbasisConfig& c)
     {
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        std::string diagnostic;
-        const auto entity = Target(context, id, c, diagnostic);
-        return {entity.has_value(), std::move(diagnostic)};
+        std::vector<ActionReadinessReason> reasons;
+        (void)Target(context, id, c, reasons);
+        return MakeActionReadiness(std::move(reasons));
     }
 
     EditorLaplacianEigenbasisResult ApplyEditorLaplacianEigenbasisCommand(const EditorProcessingCommands& commands,
@@ -246,8 +265,9 @@ namespace Extrinsic::Runtime
             return result;
         };
         std::string diagnostic;
-        const auto entity = Target(context, id, c, diagnostic);
-        if (!entity) return fail(diagnostic);
+        std::vector<ActionReadinessReason> reasons;
+        const auto entity = Target(context, id, c, reasons);
+        if (!entity) return fail(reasons.front().Message);
         const auto a = BuildGeometryAvailability(context.Scene->Raw(), *entity);
         GP::PointInputCapture samples;
         if (!PG::CaptureSamples(a, c.Domain, c.Positions, samples, diagnostic)) return fail(diagnostic);

@@ -94,7 +94,7 @@ namespace Extrinsic::Runtime
         AgentOperationOutcome NoReadinessCheck(const char* name)
         {
             return Ok({{"operation", name}, {"enabled", nullptr},
-                       {"reason", "This operation has no readiness check; run it to find out."}});
+                       {"reason", "This operation has no readiness check; run it to find out."}, {"reasons", Json::array()}});
         }
         template <class Result>
         Result MissingSection(const char* section)

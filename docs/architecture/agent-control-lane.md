@@ -288,9 +288,14 @@ Nothing exists without the launch flag: no module, thread or socket.
   required), geodesics, curvature segmentation, parameterization, progressive Poisson, mesh
   topology operations and scalar ridge. The rule governs the tools added by later slices of
   RUNTIME-312 too. Every `domain` argument shares one enum generated from `GeometryElementDomain`.
-- Previews. A `preview_*` tool answers `{"enabled","reason"}` with the same readiness as the
+- Previews. A `preview_*` tool answers `{"enabled","reason","reasons"}` with the same readiness as the
   panel's button, behind `ResolveEditorProcessingActionReadiness`; a missing service or section
-  is a `false` readiness, not a call error. Known gaps: the panels also disable their run
+  is a `false` readiness, not a call error. `reasons` lists every blocking reason as
+  `{"code","field","message"}` (RUNTIME-277): `code` is the snake_case `ActionReadinessCode`
+  (`invalid_config`, `missing_property`, ...; `unclassified` from a producer that reports text
+  only), `field` the config key to change (empty for the whole action) and `reason` stays the
+  first message. An enabled action answers an empty array; a preview without a readiness check
+  answers `enabled: null` with an empty array. Known gaps: the panels also disable their run
   button while the panel's own GPU run (k-means, consolidation, keypoint transaction) awaits
   Accept, state the agent cannot see because the correlation is held by the panel; and
   `preview_point_cloud_consolidation` asks the consolidation service for the availability of

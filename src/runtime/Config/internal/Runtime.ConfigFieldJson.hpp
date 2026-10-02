@@ -14,6 +14,17 @@ extern "C++"
             const nlohmann::json& input, nlohmann::json& merged, std::span<const ConfigFieldSpec> fields,
             std::string_view objectError, std::string_view unknownFieldPrefix);
 
+        // Every declared field of `payload` (a complete section object) that fails its type or
+        // range check, in table order, keyed by the field's schema name. Readiness reports these
+        // all at once (RUNTIME-277); a non-object payload or absent field is skipped.
+        struct ConfigFieldError
+        {
+            std::string Field;
+            std::string Message;
+        };
+        [[nodiscard]] std::vector<ConfigFieldError> CollectDeclaredFieldErrors(
+            const nlohmann::json& payload, std::span<const ConfigFieldSpec> fields);
+
         // JSON Schema (draft 2020-12) of a section payload: one property per declared
         // field with its description, bounds, `x-enum-names`, property-ref kinds and
         // domains, and the default from `defaults`; `additionalProperties:false`.

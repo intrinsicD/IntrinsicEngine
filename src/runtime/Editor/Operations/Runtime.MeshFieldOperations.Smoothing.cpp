@@ -52,6 +52,7 @@ import Geometry.Properties;
 #include "Config/internal/Runtime.PointConfigJson.hpp"
 #include "Config/internal/Runtime.ConfigFieldJson.hpp"
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
+#include "Editor/internal/Runtime.ActionReadinessConfig.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
@@ -241,31 +242,48 @@ namespace Extrinsic::Runtime
         { return {.Name = std::string{kPropertySmoothingConfigSectionName}, .SchemaId = std::string{kSchema},
                   .SchemaVersion = 1u, .PayloadJson = SerializePropertySmoothingConfig(c)}; }
 
+        // Every independent blocking reason in check order; property checks need the workspace and
+        // entity and skip a field whose config value is already invalid.
         std::optional<ECS::EntityHandle> Target(const EditorProcessingContext& context, std::uint32_t id,
-            const PropertySmoothingConfig& c, std::string& diagnostic)
+            const PropertySmoothingConfig& c, std::vector<ActionReadinessReason>& reasons)
         {
-            const auto validation = Validate(SerializePropertySmoothingConfig(c), {}, kPropertySmoothingConfigSectionName);
-            if (!validation.Usable()) { diagnostic = validation.Diagnostics.front().Message; return {}; }
-            if (!context.Scene || (context.AttachmentActive && !context.AttachmentActive()) || !GP::EditorProcessingContextWorldCurrent(context)) { diagnostic = "Workspace is unavailable."; return {}; }
+            using C = ActionReadinessCode;
+            const auto payload = SerializePropertySmoothingConfig(c);
+            AppendConfigReadinessReasons(reasons, payload, kFields, Validate(payload, {}, kPropertySmoothingConfigSectionName));
+            if (!context.Scene || (context.AttachmentActive && !context.AttachmentActive()) || !GP::EditorProcessingContextWorldCurrent(context))
+            {
+                reasons.push_back({C::WorkspaceUnavailable, {}, "Workspace is unavailable."});
+                return {};
+            }
+            const auto open = [&](std::string_view field) { return !ReadinessNamesField(reasons, field); };
             const auto entity = EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(), id);
-            if (!entity) { diagnostic = "Choose an existing geometry entity."; return {}; }
-            const auto a = BuildGeometryAvailability(context.Scene->Raw(), *entity);
-            const auto* props = ResolveGeometryPropertySet(a, c.Input.Domain);
-            if (!props || (!ResolveGeometryProperty(a, c.Input, props->Size(), false).Resolved() || !CountMatches(*props, c.Input)))
-            { diagnostic = "Choose an existing floating scalar or vector property."; return {}; }
-            if (props->Exists(c.Output.Name) && (!ResolveGeometryProperty(a, c.Output, props->Size(), false).Resolved() || !CountMatches(*props, c.Output)))
-            { diagnostic = "Output exists with a different storage type or cardinality."; return {}; }
-            if (c.Positions.Domain != c.Input.Domain && c.Positions.Domain != GP::PrimaryPointDomain(a))
-            { diagnostic = "Positions must belong to the input domain or the entity's vertices/nodes."; return {}; }
-            const auto* positions = ResolveGeometryPropertySet(a, c.Positions.Domain);
-            if (!positions || !ResolveGeometryProperty(a, c.Positions, positions->Size(), false).Resolved())
-            { diagnostic = "Choose an existing vec3 position property."; return {}; }
-            if (PerRowBounds(c) && (!ResolveGeometryProperty(a, c.BoundRadii, props->Size(), false).Resolved() || !CountMatches(*props, c.BoundRadii)))
-            { diagnostic = "Choose an existing float/double bound radius property."; return {}; }
+            if (!entity) reasons.push_back({C::MissingEntity, {}, "Choose an existing geometry entity."});
+            else
+            {
+                const auto a = BuildGeometryAvailability(context.Scene->Raw(), *entity);
+                const auto* props = ResolveGeometryPropertySet(a, c.Input.Domain);
+                if (open("input") && (!props || !ResolveGeometryProperty(a, c.Input, props->Size(), false).Resolved() || !CountMatches(*props, c.Input)))
+                    reasons.push_back({C::MissingProperty, "input", "Choose an existing floating scalar or vector property."});
+                if (props && open("output") && props->Exists(c.Output.Name) &&
+                    (!ResolveGeometryProperty(a, c.Output, props->Size(), false).Resolved() || !CountMatches(*props, c.Output)))
+                    reasons.push_back({C::IncompatibleProperty, "output", "Output exists with a different storage type or cardinality."});
+                if (open("positions"))
+                {
+                    const auto* positions = ResolveGeometryPropertySet(a, c.Positions.Domain);
+                    if (c.Positions.Domain != c.Input.Domain && c.Positions.Domain != GP::PrimaryPointDomain(a))
+                        reasons.push_back({C::WrongDomain, "positions", "Positions must belong to the input domain or the entity's vertices/nodes."});
+                    else if (!positions || !ResolveGeometryProperty(a, c.Positions, positions->Size(), false).Resolved())
+                        reasons.push_back({C::MissingProperty, "positions", "Choose an existing vec3 position property."});
+                }
+                if (props && open("bound_radii") && PerRowBounds(c) &&
+                    (!ResolveGeometryProperty(a, c.BoundRadii, props->Size(), false).Resolved() || !CountMatches(*props, c.BoundRadii)))
+                    reasons.push_back({C::MissingProperty, "bound_radii", "Choose an existing float/double bound radius property."});
+            }
             if (c.Backend == PropertySmoothingBackend::Vulkan &&
                 (!context.Device || !context.Device->IsOperational() || !context.Device->SupportsShaderFloat64() ||
                  !context.SpatialIndices || !context.SpatialIndices->GpuQueriesAvailable() || !context.JobCommands.Available()))
-            { diagnostic = "Vulkan property smoothing needs an operational device with shader double precision and framed GPU jobs."; return {}; }
+                reasons.push_back({C::DeviceUnavailable, "backend", "Vulkan property smoothing needs an operational device with shader double precision and framed GPU jobs."});
+            if (!reasons.empty()) return {};
             return entity;
         }
     }
@@ -367,9 +385,9 @@ namespace Extrinsic::Runtime
     ActionReadiness PreviewEditorPropertySmoothingCommand(const EditorProcessingCommands& commands, std::uint32_t id, const PropertySmoothingConfig& c)
     {
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        std::string diagnostic;
-        const auto entity = Target(context, id, c, diagnostic);
-        return {entity.has_value(), std::move(diagnostic)};
+        std::vector<ActionReadinessReason> reasons;
+        (void)Target(context, id, c, reasons);
+        return MakeActionReadiness(std::move(reasons));
     }
 
     // Publication and the device parameters shared by the synchronous path and the transaction.
@@ -487,8 +505,9 @@ namespace Extrinsic::Runtime
                                         const PropertySmoothingConfig& c, EditorPropertySmoothingResult& result,
                                         std::string& diagnostic)
         {
-            const auto entity = Target(context, id, c, diagnostic);
-            if (!entity) return std::nullopt;
+            std::vector<ActionReadinessReason> reasons;
+            const auto entity = Target(context, id, c, reasons);
+            if (!entity) { diagnostic = reasons.front().Message; return std::nullopt; }
             Prepared prepared{.Entity = *entity};
             const auto a = BuildGeometryAvailability(context.Scene->Raw(), *entity);
             if (!PropertyGraphDetail::CaptureSamples(a, c.Input.Domain, c.Positions, prepared.Samples, diagnostic)) return std::nullopt;

@@ -4074,3 +4074,47 @@ TEST_F(EditorKeypointAgent, ReattachForgetsRememberedRunCancels)
     PrepareFrame();
     EXPECT_FALSE(Runtime::IsEditorRunCancelRequested(Commands, own));
 }
+
+// RUNTIME-277: a preview answers every blocking reason as reasons[] (code, field, message) next to the
+// compatible enabled/reason pair, which stays the first reason.
+namespace
+{
+    class EditorMeshFieldAgent : public EditorPointReadiness
+    {
+        void SetUp() override
+        {
+            Runtime::RuntimeEngineConfigSectionRegistry sections;
+            ASSERT_TRUE(sections.Register(Runtime::MakePropertySmoothingConfigSectionRegistration()));
+            Engine.EmplaceModule<Runtime::EngineConfigControl>(std::move(sections));
+            EditorPointReadiness::SetUp();
+        }
+    };
+}
+TEST_F(EditorMeshFieldAgent, PreviewReturnsEveryReasonWithItsField)
+{
+    using K = Geometry::PropertyValueKind;
+    constexpr auto domain = Runtime::GeometryElementDomain::PointCloudPoint;
+    Runtime::PropertySmoothingConfig smoothing;
+    smoothing.Input = {domain, "missing", K::Double};
+    smoothing.Output = {domain, "samples_smooth", K::Double};
+    smoothing.Positions = {domain, "samples", K::Vec3};
+    (void)Scene->Raw().get<GS::Vertices>(Entity).Properties.GetOrAdd<float>("samples_smooth", 0.f);
+    ASSERT_TRUE(Runtime::ApplyEditorPropertySmoothingConfig(Commands, smoothing).Succeeded());
+    PrepareFrame();
+    Runtime::AgentOperationRegistry registry;
+    Runtime::RegisterEditorAgentOperations(registry);
+    const Runtime::AgentOperationContext context{.Attachment = &Attachment};
+    const auto outcome = Runtime::InvokeAgentOperation(registry, "preview_mesh_operation", context,
+        nlohmann::json{{"operation", "property_smoothing"}, {"entity", Keypoints.StableEntityId}}.dump(), false);
+    ASSERT_FALSE(outcome.IsError) << outcome.Text;
+    const auto preview = nlohmann::json::parse(outcome.Text, nullptr, false);
+    ASSERT_TRUE(preview.is_object()) << outcome.Text;
+    EXPECT_EQ(preview["enabled"], false) << preview.dump();
+    ASSERT_TRUE(preview["reasons"].is_array()) << preview.dump();
+    ASSERT_EQ(preview["reasons"].size(), 2u) << preview.dump();
+    EXPECT_EQ(preview["reasons"][0]["code"], "missing_property");
+    EXPECT_EQ(preview["reasons"][0]["field"], "input");
+    EXPECT_EQ(preview["reasons"][1]["code"], "incompatible_property");
+    EXPECT_EQ(preview["reasons"][1]["field"], "output");
+    EXPECT_EQ(preview["reason"], preview["reasons"][0]["message"]);
+}

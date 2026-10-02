@@ -507,8 +507,29 @@ Normal, outlier, keypoint, descriptor, density-weight, kernel-density, spacing,
 bilateral and registration previews return the shared `ActionReadiness` directly.
 Their method preflight is independent of the config-command lane; config-backed panel
 actions combine it with `ResolveEditorProcessingActionReadiness`, which gives
-missing config commands priority. Construction retains its resolved request
+missing config commands priority: it prepends a `WorkspaceUnavailable` reason and keeps
+the method's reasons. Construction retains its resolved request
 because execution consumes the resolved property bindings.
+
+Structured reasons (RUNTIME-277). `ActionReadiness::Reasons` lists every independent
+blocking check in check order as `ActionReadinessReason { Code, Field, Message }`;
+`DisabledReason` is the first message, so `{enabled, reason}` callers are unchanged.
+`MakeActionReadiness(reasons)` builds both (enabled exactly when the list is empty) and
+`ActionReadinessReasons(readiness)` reads them back, synthesizing one `Unclassified`
+reason for text-only producers that still return `{false, "..."}`. Codes:
+`WorkspaceUnavailable`, `MissingEntity`, `WrongDomain`, `MissingProperty`,
+`IncompatibleProperty`, `ElementCountMismatch`, `InvalidConfig`, `ConflictingOptions`,
+`DeviceUnavailable`, `KernelUnavailable`, `JobActive`, `StaleInput`, `PendingVerdict`,
+`Unclassified` (`ToString` gives the snake_case agent names). `Field` is the config
+section's schema key (`ConfigFieldSpec::Name`), empty for the whole action.
+`AppendConfigReadinessReasons` (`Editor/internal/Runtime.ActionReadinessConfig.hpp`) turns a
+typed config into one `InvalidConfig` reason per declared field outside its type or range
+(`CollectDeclaredFieldErrors`), else the section validator's cross-field verdict as one
+`ConflictingOptions` reason. The mesh-field owners (property smoothing, spectral modes,
+harmonic field, scalar gradient) collect config, property-binding and device reasons together;
+dependent checks still stop early (no workspace, no entity, no valid mesh) and a property
+check skips a field whose config value is already reported. `ReadinessWhileGpuRunPending`
+reports `JobActive`. Other families keep text-only readiness until UI-037 adopts the type.
 
 Density, spacing and density weights share scalar history publication, including
 stale-storage guards, render dirty notifications and workspace invalidation on

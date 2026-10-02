@@ -241,3 +241,24 @@ TEST(LaplacianEigenbasisOperations, ModalConfigValidation)
                                 "{\"signature_output\":\"v:position\"}"})
         EXPECT_FALSE(registration.Validate(invalid, {}, R::kLaplacianEigenbasisConfigSectionName).Usable()) << invalid;
 }
+
+// RUNTIME-277: every independent failure, in check order, with the field to change.
+TEST(LaplacianEigenbasisOperations, ReadinessReportsEveryIndependentReasonInOrder)
+{
+    using C = R::ActionReadinessCode;
+    Harness h(D::GraphNode);
+    h.Config.Count = 0;                  // out of range
+    h.Config.Tolerance = 1.0;            // out of range (exclusive)
+    h.Config.SignatureOutput = "sig";
+    (void)h.Props(D::GraphNode).GetOrAdd<double>("sig", 0.0); // signature output exists as double, publishes float
+    h.Config.Positions.Name = "nowhere";                     // no such positions
+    const auto readiness = R::PreviewEditorLaplacianEigenbasisCommand(h.Commands(), h.Id(), h.Config);
+    EXPECT_FALSE(readiness.Enabled);
+    std::vector<std::pair<C, std::string>> actual;
+    for (const auto& reason : readiness.Reasons) actual.emplace_back(reason.Code, reason.Field);
+    const std::vector<std::pair<C, std::string>> expected{{C::InvalidConfig, "count"}, {C::InvalidConfig, "tolerance"},
+        {C::IncompatibleProperty, "signature_output"}, {C::MissingProperty, "positions"}};
+    EXPECT_EQ(actual, expected);
+    ASSERT_FALSE(readiness.Reasons.empty());
+    EXPECT_EQ(readiness.DisabledReason, readiness.Reasons.front().Message);
+}

@@ -313,6 +313,17 @@ namespace Extrinsic::Runtime::ConfigDetail
         return std::nullopt;
     }
 
+    std::vector<ConfigFieldError> CollectDeclaredFieldErrors(
+        const nlohmann::json& payload, const std::span<const ConfigFieldSpec> fields)
+    {
+        std::vector<ConfigFieldError> errors;
+        if (!payload.is_object()) return errors;
+        for (const auto& field : fields)
+            if (const auto it = payload.find(std::string(field.Name)); it != payload.end())
+                if (auto error = CheckField(field, *it)) errors.push_back({std::string(field.Name), std::move(*error)});
+        return errors;
+    }
+
     std::string BuildSectionSchemaJson(
         const std::string_view schemaId, const std::string_view title, const std::string_view description,
         const std::span<const ConfigFieldSpec> fields, const nlohmann::json& defaults)

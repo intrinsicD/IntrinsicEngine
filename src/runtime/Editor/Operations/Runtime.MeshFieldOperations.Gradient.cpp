@@ -32,6 +32,7 @@ import Geometry.Properties;
 #include "Config/internal/Runtime.PointConfigJson.hpp"
 #include "Config/internal/Runtime.ConfigFieldJson.hpp"
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
+#include "Editor/internal/Runtime.ActionReadinessConfig.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshReadiness.hpp"
@@ -91,34 +92,42 @@ namespace Extrinsic::Runtime
                     .SchemaId = std::string{kSchema}, .SchemaVersion = 1u,
                     .PayloadJson = SerializeScalarGradientConfig(c)};
         }
+        // Every independent blocking reason in check order (see the smoothing owner); the scalar
+        // and output checks need a valid triangle mesh.
         std::optional<ECS::EntityHandle> GradientTarget(
             const EditorProcessingContext& context, std::uint32_t id,
-            const ScalarGradientConfig& c, std::string& diagnostic)
+            const ScalarGradientConfig& c, std::vector<ActionReadinessReason>& reasons)
         {
-            const auto validation = ValidateGradient(SerializeScalarGradientConfig(c), {}, kScalarGradientConfigSectionName);
-            if (!validation.Usable())
+            using C = ActionReadinessCode;
+            const auto payload = SerializeScalarGradientConfig(c);
+            AppendConfigReadinessReasons(reasons, payload, kFields, ValidateGradient(payload, {}, kScalarGradientConfigSectionName));
+            if (!context.Scene)
             {
-                diagnostic = validation.Diagnostics.front().Message;
+                reasons.push_back({C::WorkspaceUnavailable, {}, "Scene is unavailable."});
                 return {};
             }
-            if (!context.Scene) { diagnostic = "Scene is unavailable."; return {}; }
+            const auto open = [&](std::string_view field) { return !ReadinessNamesField(reasons, field); };
             const auto entity = EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(), id);
-            if (!entity) { diagnostic = "Choose an existing mesh entity."; return {}; }
-            const auto view = GS::BuildConstView(context.Scene->Raw(), *entity);
-            if (MS::ValidateMeshSoupSourceMetadata(view, diagnostic, c.Positions.Name) != EditorCommandStatus::Applied)
-                return {};
-            if (DetectGeometryPropertyValueKind(view.VertexSource->Properties, c.Scalar.Name) != c.Scalar.ValueKind)
+            if (!entity)
             {
-                diagnostic = "Choose an existing scalar vertex property with matching storage type.";
+                reasons.push_back({C::MissingEntity, {}, "Choose an existing mesh entity."});
                 return {};
             }
+            const auto view = GS::BuildConstView(context.Scene->Raw(), *entity);
+            if (!open("positions")) return {}; // the mesh is validated through its positions
+            if (std::string diagnostic;
+                MS::ValidateMeshSoupSourceMetadata(view, diagnostic, c.Positions.Name) != EditorCommandStatus::Applied)
+            {
+                reasons.push_back({C::WrongDomain, "positions", std::move(diagnostic)});
+                return {};
+            }
+            if (open("scalar") && DetectGeometryPropertyValueKind(view.VertexSource->Properties, c.Scalar.Name) != c.Scalar.ValueKind)
+                reasons.push_back({C::MissingProperty, "scalar", "Choose an existing scalar vertex property with matching storage type."});
             const auto& faces = view.FaceSource->Properties;
             const auto output = faces.Get<glm::vec3>(c.Output.Name);
-            if (faces.Exists(c.Output.Name) && (!output || output.Size() != faces.Size()))
-            {
-                diagnostic = "The gradient output already exists with incompatible storage.";
-                return {};
-            }
+            if (open("output") && faces.Exists(c.Output.Name) && (!output || output.Size() != faces.Size()))
+                reasons.push_back({C::IncompatibleProperty, "output", "The gradient output already exists with incompatible storage."});
+            if (!reasons.empty()) return {};
             return entity;
         }
     }
@@ -160,11 +169,13 @@ namespace Extrinsic::Runtime
         const EditorProcessingCommands& commands, std::uint32_t id, const ScalarGradientConfig& c)
     {
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        std::string diagnostic;
-        const auto entity = GradientTarget(context, id, c, diagnostic);
-        const bool ready = entity && MS::PrepareMeshSoupFaceRings(context, *entity,
-            BuildGeometryAvailability(context.Scene->Raw(), *entity), diagnostic, c.Positions, true);
-        return {ready, std::move(diagnostic)};
+        std::vector<ActionReadinessReason> reasons;
+        // Face rings need every other check to pass, so they add at most the one reason.
+        if (const auto entity = GradientTarget(context, id, c, reasons); entity)
+            if (std::string diagnostic; !MS::PrepareMeshSoupFaceRings(context, *entity,
+                    BuildGeometryAvailability(context.Scene->Raw(), *entity), diagnostic, c.Positions, true))
+                reasons.push_back({ActionReadinessCode::WrongDomain, "positions", std::move(diagnostic)});
+        return MakeActionReadiness(std::move(reasons));
     }
     EditorScalarGradientResult ApplyEditorScalarGradientCommand(
         const EditorProcessingCommands& commands, std::uint32_t id, const ScalarGradientConfig& c)
@@ -176,8 +187,9 @@ namespace Extrinsic::Runtime
             result.Message = std::move(message);
             return result;
         };
-        const auto entity = GradientTarget(context, id, c, result.Message);
-        if (!entity) return fail(result.Message);
+        std::vector<ActionReadinessReason> reasons;
+        const auto entity = GradientTarget(context, id, c, reasons);
+        if (!entity) return fail(reasons.front().Message);
         const auto view = GS::BuildConstView(context.Scene->Raw(), *entity);
         if (MS::ValidateMeshSoupFaceRings(view, result.Message, c.Positions.Name, true) != EditorCommandStatus::Applied)
             return fail(result.Message);

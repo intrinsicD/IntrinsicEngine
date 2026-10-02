@@ -2054,7 +2054,8 @@ namespace Extrinsic::Sandbox::Editor
     Runtime::ActionReadiness ReadinessWhileGpuRunPending(Runtime::ActionReadiness readiness, const bool pending)
     {
         if (pending && readiness.Enabled)
-            return {.Enabled = false, .DisabledReason = std::string(kPendingGpuRunReason)};
+            return Runtime::MakeActionReadiness({{.Code = Runtime::ActionReadinessCode::JobActive, .Field = {},
+                                                  .Message = std::string(kPendingGpuRunReason)}});
         return readiness;
     }
 

@@ -5,6 +5,7 @@ module;
 #include <memory>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 export module Extrinsic.Runtime.EditorProcessing;
 export import Extrinsic.Runtime.GeometryAvailability;
@@ -71,12 +72,39 @@ export namespace Extrinsic::Runtime
         };
     }
 
+    // Why an action is disabled, as a stable code the UI and agents can branch on. `Unclassified`
+    // marks a reason from a producer that only supplies text (a plain `{false, "..."}` readiness).
+    enum class ActionReadinessCode : std::uint8_t
+    {
+        Ok, WorkspaceUnavailable, MissingEntity, WrongDomain, MissingProperty, IncompatibleProperty,
+        ElementCountMismatch, InvalidConfig, ConflictingOptions, DeviceUnavailable, KernelUnavailable,
+        JobActive, StaleInput, PendingVerdict, Unclassified,
+    };
+    // snake_case name of the code ("invalid_config"); the agent lane's `reasons[].code`.
+    [[nodiscard]] std::string_view ToString(ActionReadinessCode code) noexcept;
+    struct ActionReadinessReason
+    {
+        ActionReadinessCode Code{ActionReadinessCode::Unclassified};
+        // The offending config field's schema key (ConfigFieldSpec::Name); empty = the whole action.
+        std::string Field{};
+        std::string Message{};
+    };
+
     // Copied presentation state; commands still validate current inputs at apply time.
+    // `Reasons` lists every independent failing check in check order; `DisabledReason` is the
+    // first reason's message. Producers that set only `DisabledReason` leave `Reasons` empty
+    // (`ActionReadinessReasons` then supplies one Unclassified reason).
     struct ActionReadiness
     {
         bool Enabled{};
         std::string DisabledReason{};
+        std::vector<ActionReadinessReason> Reasons{};
     };
+    // Enabled exactly when `reasons` is empty; `DisabledReason` is the first message.
+    [[nodiscard]] ActionReadiness MakeActionReadiness(std::vector<ActionReadinessReason> reasons);
+    // Every reason of a disabled readiness: `Reasons`, or one Unclassified reason carrying
+    // `DisabledReason` from a text-only producer; empty when enabled.
+    [[nodiscard]] std::vector<ActionReadinessReason> ActionReadinessReasons(const ActionReadiness& readiness);
 
     struct EditorPointInputReadinessStats
     {

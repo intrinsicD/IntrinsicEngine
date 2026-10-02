@@ -161,3 +161,20 @@ TEST(ScalarGradientOperations, RejectsMalformedOutputCardinality)
     EXPECT_FALSE(h.Run().Succeeded());
     EXPECT_EQ(h.History.UndoCount(), 0u);
 }
+
+// RUNTIME-277: the scalar and output checks are independent; both are reported with their fields.
+TEST(ScalarGradientOperations, ReadinessReportsEveryIndependentReasonInOrder)
+{
+    using C = R::ActionReadinessCode;
+    GradientHarness h;
+    h.Config.Scalar.Name = "pressure";                                 // no such scalar
+    (void)h.Faces().GetOrAdd<float>(h.Config.Output.Name, 0.f);        // output exists, not vec3
+    const auto readiness = R::PreviewEditorScalarGradientCommand(h.Commands(), h.Id(), h.Config);
+    EXPECT_FALSE(readiness.Enabled);
+    std::vector<std::pair<C, std::string>> actual;
+    for (const auto& reason : readiness.Reasons) actual.emplace_back(reason.Code, reason.Field);
+    const std::vector<std::pair<C, std::string>> expected{{C::MissingProperty, "scalar"}, {C::IncompatibleProperty, "output"}};
+    EXPECT_EQ(actual, expected);
+    ASSERT_FALSE(readiness.Reasons.empty());
+    EXPECT_EQ(readiness.DisabledReason, readiness.Reasons.front().Message);
+}
