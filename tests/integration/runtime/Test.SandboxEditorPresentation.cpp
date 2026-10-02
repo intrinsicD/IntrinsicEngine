@@ -2131,6 +2131,39 @@ TEST(SandboxEditorPresentation, DisabledActionReasonTooltipAppearsAfterTwoFrames
     gui.End();
 }
 
+TEST(SandboxEditorPresentation, ShowPropertyButtonTakesAnOptionalLabelAndReportsTheAppliedStatus)
+{
+    ProcessingButtonGui gui;
+    const Editor::SandboxEditorContext context{};
+    const Runtime::GeometryPropertyRef property{.Name = "outlier_mask"};
+    std::string diagnostic;
+    std::optional<Runtime::EditorCommandStatus> status;
+    const auto frame = [&](const char* label, const bool force) {
+        ImGui::NewFrame();
+        ImGui::SetNextWindowPos({10, 10});
+        ImGui::SetNextWindowSize({500, 200});
+        ImGui::Begin("Show button test", nullptr, ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoTitleBar);
+        gui.Context->LogBuffer.clear();
+        ImGui::LogToBuffer();
+        status = Editor::DrawProcessingPropertyShowButton(context, 1u, property, diagnostic, label, false, force);
+        Editor::DrawProcessingDisplayDiagnostic(diagnostic);
+        const std::string drawn = gui.Context->LogBuffer.c_str();
+        gui.End();
+        return drawn;
+    };
+    auto drawn = frame(nullptr, false);
+    EXPECT_NE(drawn.find("Show outlier_mask"), std::string::npos);
+    EXPECT_FALSE(status.has_value());
+    EXPECT_TRUE(diagnostic.empty());
+    EXPECT_EQ(drawn.find("Display:"), std::string::npos);
+    drawn = frame("Show mask", true);
+    EXPECT_NE(drawn.find("Show mask"), std::string::npos);
+    EXPECT_EQ(drawn.find("Show outlier_mask"), std::string::npos);
+    ASSERT_TRUE(status.has_value());
+    EXPECT_EQ(diagnostic, Runtime::DebugNameForEditorCommandStatus(*status));
+    EXPECT_NE(drawn.find("Display: " + diagnostic), std::string::npos);
+}
+
 TEST(SandboxEditorPresentation, ProcessingActionButtonBlocksDisabledClicksAndEmitsEnabledConfigCommand)
 {
     namespace Config = Extrinsic::Core::Config;

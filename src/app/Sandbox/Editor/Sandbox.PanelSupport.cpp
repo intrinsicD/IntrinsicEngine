@@ -271,14 +271,21 @@ namespace Extrinsic::Sandbox::Editor
             {.StableEntityId=entity, .Recipe=Runtime::MakeEditorPropertyVisualizationRecipe(property, normalDirection)});
     }
 
-    bool DrawProcessingPropertyShowButton(const SandboxEditorContext& context,
-        const std::uint32_t entity, const Runtime::GeometryPropertyRef& property,
-        std::string& diagnostic)
+    std::optional<Runtime::EditorCommandStatus> DrawProcessingPropertyShowButton(
+        const SandboxEditorContext& context, const std::uint32_t entity, const Runtime::GeometryPropertyRef& property,
+        std::string& diagnostic, const char* const label, const bool normalDirection, const bool forceShow)
     {
-        const auto label = "Show " + property.Name;
-        if (!ImGui::Button(label.c_str())) return false;
-        diagnostic = Runtime::DebugNameForEditorCommandStatus(ShowProcessingProperty(context, entity, property));
-        return true;
+        const std::string defaultLabel = "Show " + property.Name;
+        const bool clicked = ImGui::Button(label != nullptr ? label : defaultLabel.c_str());
+        if (!clicked && !forceShow) return std::nullopt;
+        const auto status = ShowProcessingProperty(context, entity, property, normalDirection);
+        diagnostic = Runtime::DebugNameForEditorCommandStatus(status);
+        return status;
+    }
+
+    void DrawProcessingDisplayDiagnostic(const std::string& diagnostic, const char* const prefix)
+    {
+        if (!diagnostic.empty()) ImGui::Text("%s: %s", prefix, diagnostic.c_str());
     }
 
     namespace

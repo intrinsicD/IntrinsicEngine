@@ -1039,7 +1039,7 @@ namespace Extrinsic::Sandbox::Editor
             DrawProcessingPropertyShowButton(context, config.StableEntityId, *output, Curvature.VisualizationDiagnostic);
         if (!readiness.Enabled) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
         if (!Curvature.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Curvature.ConfigDiagnostic.c_str());
-        if (!Curvature.VisualizationDiagnostic.empty()) ImGui::Text("Display: %s", Curvature.VisualizationDiagnostic.c_str());
+        DrawProcessingDisplayDiagnostic(Curvature.VisualizationDiagnostic);
         const auto& result = Curvature.LastResult;
         if (!result.has_value())
         {
@@ -1393,7 +1393,7 @@ namespace Extrinsic::Sandbox::Editor
         for (const auto* output : {&config.Components, &config.Regions, &config.RegionColors, &config.Boundaries, &config.BoundaryColors, &config.HardFeatures, &config.FeatureConfidence, &config.BoundaryRoles, &config.FeatureColors})
             DrawProcessingPropertyShowButton(context, model.SelectedStableId, *output, Segmentation.VisualizationDiagnostic);
         ImGui::EndDisabled();
-        if (!Segmentation.VisualizationDiagnostic.empty()) ImGui::Text("Display: %s", Segmentation.VisualizationDiagnostic.c_str());
+        DrawProcessingDisplayDiagnostic(Segmentation.VisualizationDiagnostic);
 
         if (!Segmentation.ConfigDiagnostic.empty())
             ImGui::TextDisabled("%s", Segmentation.ConfigDiagnostic.c_str());
@@ -2100,13 +2100,10 @@ namespace Extrinsic::Sandbox::Editor
                 Normals.VisualizationDiagnostic = Runtime::DebugNameForEditorCommandStatus(status);
             }
         }
-        else if (ImGui::Button("Show normals"))
-        {
-            const auto status = ShowProcessingProperty(context, config.StableEntityId, outputProperty, true);
-            Normals.VisualizationDiagnostic = Runtime::DebugNameForEditorCommandStatus(status);
-        }
-        if (!Normals.VisualizationDiagnostic.empty())
-            ImGui::Text("Normal display: %s", Normals.VisualizationDiagnostic.c_str());
+        else
+            DrawProcessingPropertyShowButton(context, config.StableEntityId, outputProperty, Normals.VisualizationDiagnostic,
+                                             "Show normals", true);
+        DrawProcessingDisplayDiagnostic(Normals.VisualizationDiagnostic, "Normal display");
         if (NormalTransaction) DrawNormalTransaction(context);
         if (Normals.LastResult)
         {
@@ -2265,14 +2262,10 @@ namespace Extrinsic::Sandbox::Editor
             context.PointAnalysis.Commands, removal);
         if (DrawProcessingActionButton("Remove marked points", removalReadiness)) execute(remove);
         ImGui::TextWrapped("Removal compacts point clouds and supports Undo. Detect again after changing positions or the mask.");
-        auto mask=config.Mask,
-             score=config.Score;
-        if(ImGui::Button("Show mask"))
-            Outliers.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(ShowProcessingProperty(context, config.StableEntityId, mask));
+        DrawProcessingPropertyShowButton(context, config.StableEntityId, config.Mask, Outliers.VisualizationDiagnostic, "Show mask");
         ImGui::SameLine();
-        if(ImGui::Button("Show score"))
-            Outliers.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(ShowProcessingProperty(context, config.StableEntityId, score));
-        if(!Outliers.VisualizationDiagnostic.empty())ImGui::Text("Display: %s",Outliers.VisualizationDiagnostic.c_str());
+        DrawProcessingPropertyShowButton(context, config.StableEntityId, config.Score, Outliers.VisualizationDiagnostic, "Show score");
+        DrawProcessingDisplayDiagnostic(Outliers.VisualizationDiagnostic);
         if(Outliers.LastResult)
         {
             const auto& result=*Outliers.LastResult;
@@ -2359,14 +2352,10 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::TextWrapped("Detection writes a mask (1 = retained keypoint) and a score. Geometry stays in source order.");
         if(KeypointTransaction)
             ImGui::TextWrapped("Detection is active. Vulkan previews the completed score; Accept publishes both CPU properties.");
-        auto mask=config.Mask,
-             score=config.Score;
-        if(ImGui::Button("Show mask"))
-            Keypoints.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(ShowProcessingProperty(context, config.StableEntityId, mask));
+        DrawProcessingPropertyShowButton(context, config.StableEntityId, config.Mask, Keypoints.VisualizationDiagnostic, "Show mask");
         ImGui::SameLine();
-        if(ImGui::Button("Show saliency"))
-            Keypoints.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(ShowProcessingProperty(context, config.StableEntityId, score));
-        if(!Keypoints.VisualizationDiagnostic.empty())ImGui::Text("Display: %s",Keypoints.VisualizationDiagnostic.c_str());
+        DrawProcessingPropertyShowButton(context, config.StableEntityId, config.Score, Keypoints.VisualizationDiagnostic, "Show saliency");
+        DrawProcessingDisplayDiagnostic(Keypoints.VisualizationDiagnostic);
         if(Keypoints.LastResult)
         {
             const auto& result=*Keypoints.LastResult;
@@ -2454,16 +2443,15 @@ namespace Extrinsic::Sandbox::Editor
                              "%d", ImGuiSliderFlags_AlwaysClamp);
         const auto score=config.Outputs[Descriptors.DisplayBin];
         ImGui::Text("Property: %s",score.Name.c_str());
-        if(ImGui::Button("Show histogram bin") ||
-           (displayBinChanged && Descriptors.FollowDisplayBin))
+        if (const auto status = DrawProcessingPropertyShowButton(
+                context, config.StableEntityId, score, Descriptors.VisualizationDiagnostic, "Show histogram bin",
+                false, displayBinChanged && Descriptors.FollowDisplayBin))
         {
-            const auto status = ShowProcessingProperty(context, config.StableEntityId, score);
-            Descriptors.VisualizationDiagnostic = Runtime::DebugNameForEditorCommandStatus(status);
-            if (status == Runtime::EditorCommandStatus::Applied ||
-                status == Runtime::EditorCommandStatus::NoChange)
+            if (*status == Runtime::EditorCommandStatus::Applied ||
+                *status == Runtime::EditorCommandStatus::NoChange)
                 Descriptors.FollowDisplayBin = true;
         }
-        if(!Descriptors.VisualizationDiagnostic.empty())ImGui::Text("Display: %s",Descriptors.VisualizationDiagnostic.c_str());
+        DrawProcessingDisplayDiagnostic(Descriptors.VisualizationDiagnostic);
         if(Descriptors.LastResult)
         {
             const auto& result=*Descriptors.LastResult;
@@ -2526,10 +2514,8 @@ namespace Extrinsic::Sandbox::Editor
         const Runtime::EditorOutputRef densityDraft{config.StableEntityId, config.Density.Name};
         Density.Run.Draw(context.PointFields.Commands, config.StableEntityId, "density_progress", &densityDraft);
         ImGui::TextWrapped("Vulkan previews density on the device. Accept publishes the scalar with Undo; Discard retains CPU rows.");
-        if (ImGui::Button("Show density"))
-            Density.VisualizationDiagnostic = Runtime::DebugNameForEditorCommandStatus(
-                ShowProcessingProperty(context, config.StableEntityId, config.Density));
-        if(!Density.VisualizationDiagnostic.empty())ImGui::Text("Display: %s",Density.VisualizationDiagnostic.c_str());
+        DrawProcessingPropertyShowButton(context, config.StableEntityId, config.Density, Density.VisualizationDiagnostic, "Show density");
+        DrawProcessingDisplayDiagnostic(Density.VisualizationDiagnostic);
         if(Density.LastResult)
         {
             const auto& result=*Density.LastResult;
@@ -2600,10 +2586,8 @@ namespace Extrinsic::Sandbox::Editor
         const Runtime::EditorOutputRef densityWeightsDraft{config.StableEntityId, config.Weights.Name};
         DensityWeights.Run.Draw(context.PointAnalysis.Commands, config.StableEntityId, "density_weights_progress", &densityWeightsDraft);
         ImGui::TextWrapped("Vulkan previews compact weights using double kernel sums. Accept publishes with Undo; Discard retains CPU rows.");
-        auto density=config.Weights;
-        if(ImGui::Button("Show weights"))
-            DensityWeights.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(ShowProcessingProperty(context, config.StableEntityId, density));
-        if(!DensityWeights.VisualizationDiagnostic.empty())ImGui::Text("Display: %s",DensityWeights.VisualizationDiagnostic.c_str());
+        DrawProcessingPropertyShowButton(context, config.StableEntityId, config.Weights, DensityWeights.VisualizationDiagnostic, "Show weights");
+        DrawProcessingDisplayDiagnostic(DensityWeights.VisualizationDiagnostic);
         if(DensityWeights.LastResult)
         {
             const auto& result=*DensityWeights.LastResult;
@@ -2800,10 +2784,8 @@ namespace Extrinsic::Sandbox::Editor
         const Runtime::EditorOutputRef spacingDraft{config.StableEntityId, config.Radii.Name};
         Spacing.Run.Draw(context.PointFields.Commands, config.StableEntityId, "spacing_progress", &spacingDraft);
         ImGui::TextWrapped("Vulkan previews spacing and radii on the device. Accept publishes with Undo; Discard retains CPU rows. Show radii maps values to colors; point rendering currently expects pixel sizes.");
-        if (ImGui::Button("Show radii"))
-            Spacing.VisualizationDiagnostic = Runtime::DebugNameForEditorCommandStatus(
-                ShowProcessingProperty(context, config.StableEntityId, config.Radii));
-        if(!Spacing.VisualizationDiagnostic.empty())ImGui::Text("Display: %s",Spacing.VisualizationDiagnostic.c_str());
+        DrawProcessingPropertyShowButton(context, config.StableEntityId, config.Radii, Spacing.VisualizationDiagnostic, "Show radii");
+        DrawProcessingDisplayDiagnostic(Spacing.VisualizationDiagnostic);
         if(Spacing.LastResult)
         {
             const auto& result=*Spacing.LastResult;

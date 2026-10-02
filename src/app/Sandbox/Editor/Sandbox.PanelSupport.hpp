@@ -463,9 +463,13 @@ namespace Extrinsic::Sandbox::Editor
         const SandboxEditorContext& context, std::uint32_t entity,
         const Runtime::GeometryPropertyRef& property,
         bool normalDirection = false);
-    bool DrawProcessingPropertyShowButton(const SandboxEditorContext& context,
-        std::uint32_t entity, const Runtime::GeometryPropertyRef& property,
-        std::string& diagnostic);
+    // Show-property button: label defaults to "Show <property name>". `forceShow` applies the recipe without a
+    // click (a follow-the-selector panel); the result is the applied status, empty when nothing was requested.
+    // The status name lands in `diagnostic`; render it with DrawProcessingDisplayDiagnostic.
+    std::optional<Runtime::EditorCommandStatus> DrawProcessingPropertyShowButton(
+        const SandboxEditorContext& context, std::uint32_t entity, const Runtime::GeometryPropertyRef& property,
+        std::string& diagnostic, const char* label = nullptr, bool normalDirection = false, bool forceShow = false);
+    void DrawProcessingDisplayDiagnostic(const std::string& diagnostic, const char* prefix = "Display");
 
     // Dismissal clears both the panel result and the session slot that
     // rebuilds it. Draw this control after all readers of the panel result.

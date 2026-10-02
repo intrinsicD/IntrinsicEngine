@@ -1682,7 +1682,7 @@ namespace Extrinsic::Sandbox::Editor
                 if (PointCloudConsolidation.Properties.OutputNormals)
                     DrawProcessingPropertyShowButton(context, stableEntityId,
                         *PointCloudConsolidation.Properties.OutputNormals, displayDiagnostic);
-                if (!displayDiagnostic.empty()) ImGui::Text("Display: %s", displayDiagnostic.c_str());
+                DrawProcessingDisplayDiagnostic(displayDiagnostic);
 
                 const Runtime::EditorDocumentModel history =
                     context.Document != nullptr
@@ -1967,7 +1967,7 @@ namespace Extrinsic::Sandbox::Editor
             DrawProcessingPropertyShowButton(context, model.SelectedStableId, KMeans.Properties.OutputColors, KMeans.VisualizationDiagnostic);
             if (KMeans.Properties.OutputScalarLabels)
                 DrawProcessingPropertyShowButton(context, model.SelectedStableId, *KMeans.Properties.OutputScalarLabels, KMeans.VisualizationDiagnostic);
-            if (!KMeans.VisualizationDiagnostic.empty()) ImGui::Text("Display: %s", KMeans.VisualizationDiagnostic.c_str());
+            DrawProcessingDisplayDiagnostic(KMeans.VisualizationDiagnostic);
             if (!clusteringAvailable)
                 ImGui::TextDisabled("ClusteringService is unavailable.");
             if (!configAvailable)
@@ -2455,7 +2455,7 @@ namespace Extrinsic::Sandbox::Editor
             for (const auto* output : {&ProgressivePoisson.Draft.Level, &ProgressivePoisson.Draft.Rank,
                                        &ProgressivePoisson.Draft.SplatRadius, &ProgressivePoisson.Draft.PrefixVisible})
                 DrawProcessingPropertyShowButton(context, model.SelectedStableId, *output, ProgressivePoisson.VisualizationDiagnostic);
-            if (!ProgressivePoisson.VisualizationDiagnostic.empty()) ImGui::Text("Display: %s", ProgressivePoisson.VisualizationDiagnostic.c_str());
+            DrawProcessingDisplayDiagnostic(ProgressivePoisson.VisualizationDiagnostic);
             if (ProgressivePoisson.LastConfigResult.has_value() &&
                 !ProgressivePoisson.LastConfigResult->Succeeded())
             {
@@ -3012,7 +3012,7 @@ namespace Extrinsic::Sandbox::Editor
 
             DrawProcessingPropertyShowButton(context, model.SelectedStableEntityId,
                 Parameterization.Draft.Texcoords, Parameterization.VisualizationDiagnostic);
-            if (!Parameterization.VisualizationDiagnostic.empty()) ImGui::Text("Display: %s", Parameterization.VisualizationDiagnostic.c_str());
+            DrawProcessingDisplayDiagnostic(Parameterization.VisualizationDiagnostic);
             const bool historyAvailable =
                 context.Document != nullptr &&
                 context.DocumentCommands.Available();
