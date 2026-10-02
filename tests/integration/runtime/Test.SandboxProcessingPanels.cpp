@@ -3452,12 +3452,27 @@ TEST(SandboxProcessingPanels, PropertySmoothingAcceptsOrDiscardsAPendingGpuResul
     R::EditorProcessingContext context;
     context.Scene = &scene;
     context.CommandHistory = &history;
-    context.JobCommands.Submit = [&](R::JobDesc desc, const auto&) { return h.Engine->Jobs().Submit(std::move(desc)); };
+    // The correlation stamp makes these jobs visible to the panel's session projection.
+    std::uint64_t correlation = 0u;
+    context.JobCommands.Submit = [&](R::JobDesc desc, const auto&) {
+        desc.CorrelationId = ++correlation;
+        return h.Engine->Jobs().Submit(std::move(desc));
+    };
     const auto commands = R::BindEditorProcessingCommands(context);
     const auto id = R::SelectionController::ToStableEntityId(entity);
     const std::vector<double> front(16, 42.0);
     R::EditorPropertySmoothingTransactionHandle stale, fresh;
-    int frames = 0;
+    int frames = 0, appliedAt = 0;
+    const auto startLog = [] {
+        ImGui::GetCurrentContext()->LogBuffer.clear();
+        ImGui::LogToBuffer();
+        ImGui::GetCurrentContext()->LogWindow = nullptr;
+    };
+    const auto finishLog = [] {
+        std::string text{ImGui::GetCurrentContext()->LogBuffer.c_str()};
+        ImGui::LogFinish();
+        return text;
+    };
     h.Driver->OnFrame = [&](R::Engine& engine) {
         ++frames;
         auto* window = ImGui::FindWindowByName("Smooth Property");
@@ -3482,6 +3497,7 @@ TEST(SandboxProcessingPanels, PropertySmoothingAcceptsOrDiscardsAPendingGpuResul
             ImGui::ActivateItemByID(window->GetID("Discard##Smoothing"));
             break;
         case 19:
+            startLog();
             EXPECT_EQ(R::SnapshotEditorPropertySmoothing(commands, stale).Phase, R::EditorGpuTransactionPhase::Discarded);
             EXPECT_FALSE(std::as_const(vertices).Exists("smooth"));
             fresh = R::MakeEditorPropertySmoothingTransactionForTest(commands, id, smoothing, front);
@@ -3490,11 +3506,21 @@ TEST(SandboxProcessingPanels, PropertySmoothingAcceptsOrDiscardsAPendingGpuResul
             h.Panels.InjectPropertySmoothingTransactionForTest(fresh);
             break;
         case 22:
+            // The discarded result never reads as a finished run.
+            EXPECT_EQ(finishLog().find("done"), std::string::npos);
             ImGui::ActivateItemByID(window->GetID("Accept##Smoothing"));
             break;
         default:
-            if (frames > 22 && R::SnapshotEditorPropertySmoothing(commands, fresh).Phase == R::EditorGpuTransactionPhase::Applied)
+            if (appliedAt == 0 && frames > 22 &&
+                R::SnapshotEditorPropertySmoothing(commands, fresh).Phase == R::EditorGpuTransactionPhase::Applied)
             {
+                appliedAt = frames;
+                startLog();
+            }
+            if (appliedAt != 0 && frames == appliedAt + 5)
+            {
+                // The accepted run's outcome stays on screen after the transaction ends.
+                EXPECT_NE(finishLog().find("done"), std::string::npos);
                 const auto smooth = std::as_const(vertices).Get<float>("smooth");
                 ASSERT_TRUE(smooth);
                 EXPECT_FLOAT_EQ(smooth[3], 42.f);
@@ -3964,6 +3990,16 @@ TEST(SandboxProcessingPanels, OperationProgressMemoryKeepsTheLastFinishedRunPerK
     EXPECT_EQ(memory.Observe(with(done, 2u), "7/b").State, State::Succeeded);
     memory.Clear();
     EXPECT_EQ(memory.Observe(none(2u), "7/b").State, State::None);
+
+    // A discarded result is forgotten, and the memory stays bounded.
+    EXPECT_EQ(memory.Observe(with(done, 2u), "9/a").State, State::Succeeded);
+    memory.Forget("9/a");
+    EXPECT_EQ(memory.Observe(none(2u), "9/a").State, State::None);
+    for (std::size_t i = 0u; i < Editor::OperationProgressMemory::kMaxKeys + 4u; ++i)
+        EXPECT_EQ(memory.Observe(with(done, 2u), "k" + std::to_string(i)).State, State::Succeeded);
+    EXPECT_EQ(memory.Observe(none(2u), "k0").State, State::None) << "the oldest key was evicted";
+    EXPECT_EQ(memory.Observe(none(2u), "k" + std::to_string(Editor::OperationProgressMemory::kMaxKeys + 3u)).State,
+              State::Succeeded);
 }
 
 TEST(SandboxProcessingPanels, OperationProgressWidgetCancelRequiresAnActiveRunAndAHandler)
@@ -4070,6 +4106,12 @@ TEST(SandboxProcessingPanels, IcpProgressWidgetCancelStopsARunThatNeverConverges
     R::SetRegistrationConfig(config, registration);
     ASSERT_TRUE(h.Apply(config));
     ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.registration", true));
+    std::optional<R::EditorRegistrationResult> result;
+    const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+        .Id = "test.icp_cancel_observer", .MenuPath = {"View"}, .Title = "ICP cancel observer", .OpenByDefault = true,
+        .Draw = [&](bool&, const Editor::SandboxEditorContext& context) {
+            result = context.Registration.Results.LastRegistrationResult;
+        }});
     int frame = 0, step = 0, activeFrames = 0, cancelFrame = -1, holdUntil = -1;
     bool completed = false;
     h.Driver->OnFrame = [&](R::Engine& engine) {
@@ -4098,6 +4140,10 @@ TEST(SandboxProcessingPanels, IcpProgressWidgetCancelStopsARunThatNeverConverges
     };
     h.Engine->Run();
     EXPECT_TRUE(completed) << "the 100000-iteration run only ends through Cancel";
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result->Succeeded());
+    EXPECT_NE(result->Message.find("ICP was cancelled"), std::string::npos) << result->Message;
+    EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
 }
 
 TEST(SandboxProcessingPanels, CpdProgressWidgetCancelStopsARunToTheCap)
@@ -4119,8 +4165,8 @@ TEST(SandboxProcessingPanels, CpdProgressWidgetCancelStopsARunToTheCap)
     R::SetCoherentPointDriftConfig(config, cpd);
     ASSERT_TRUE(h.Apply(config));
     ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.coherent_point_drift", true));
-    int frame = 0, step = 0, activeFrames = 0, cancelFrame = -1, holdUntil = -1;
-    bool completed = false;
+    int frame = 0, step = 0, activeFrames = 0, cancelFrame = -1, holdUntil = -1, settled = -1;
+    bool completed = false, cancelledPhase = false;
     h.Driver->OnFrame = [&](R::Engine& engine) {
         if (++frame > 3000) { ADD_FAILURE() << "CPD did not stop"; engine.RequestExit(); return; }
         auto* window = ImGui::FindWindowByName("Coherent Point Drift");
@@ -4137,8 +4183,17 @@ TEST(SandboxProcessingPanels, CpdProgressWidgetCancelStopsARunToTheCap)
         if (cancelFrame >= 0)
         {
             ImGui::ActivateItemByID(ImHashStr("Cancel", 0, ImHashStr("cpd_progress", 0, window->ID)));
-            if (!AnyActiveJob(engine) && frame > cancelFrame + 2)
+            if (!AnyActiveJob(engine) && settled < 0)
             {
+                settled = frame;
+                ImGui::GetCurrentContext()->LogBuffer.clear();
+                ImGui::LogToBuffer();
+                ImGui::GetCurrentContext()->LogWindow = nullptr;
+            }
+            if (settled >= 0 && frame > settled + 4)
+            {
+                cancelledPhase = std::string{ImGui::GetCurrentContext()->LogBuffer.c_str()}.find("Phase: cancelled") != std::string::npos;
+                ImGui::LogFinish();
                 completed = true;
                 engine.RequestExit();
             }
@@ -4146,4 +4201,74 @@ TEST(SandboxProcessingPanels, CpdProgressWidgetCancelStopsARunToTheCap)
     };
     h.Engine->Run();
     EXPECT_TRUE(completed) << "the 10000-iteration run only ends through Cancel";
+    EXPECT_TRUE(cancelledPhase) << "the run ends in the Cancelled phase";
+    if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogFinish();
+}
+
+// UI-069: the derived-job table cell and the UV regeneration status line draw the shared widget.
+TEST(SandboxProcessingPanels, DerivedJobCellsAndUvStatusLineShowTheSharedWidget)
+{
+    PanelHarness h;
+    using State = R::JobState;
+    R::EditorBoundRenderStateModel bound{};
+    const auto row = [](const char* label, const State state, const float progress, const bool determinate) {
+        R::EditorBoundRenderStateRow value{};
+        value.Kind = R::EditorBoundRenderStateRowKind::DerivedJob;
+        value.Label = label;
+        value.JobStatus = state;
+        value.JobProgress = progress;
+        value.JobProgressDeterminate = determinate;
+        return value;
+    };
+    bound.Rows.push_back(row("determinate", State::Running, 0.5f, true));
+    bound.Rows.push_back(row("silent", State::Running, 0.0f, false));
+    bound.Rows.push_back(row("finished", State::Published, 1.0f, true));
+    bound.Rows.push_back(row("broken", State::Dropped, 0.0f, false));
+    R::EditorTextureBakeControlsModel model;
+    model.Uv.UvRegenerationJob = R::EditorJobRecord{.State = State::Running, .Name = "UV atlas",
+                                                    .ProgressDeterminate = false, .ElapsedMilliseconds = 2500u};
+    std::optional<R::EditorUvRegenerationCommandResult> result, adoption;
+    std::int32_t width = 1024, height = 1024, padding = 2;
+    bool force = false, preserve = false;
+    const Editor::SandboxUvRegenerationControls controls{&result, &adoption, &width, &height, &padding, &force, &preserve};
+    const auto windowHandle = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+        .Id = "test.derived_job_cells", .MenuPath = {"View"}, .Title = "Derived job cells test", .OpenByDefault = true,
+        .Draw = [&](bool&, const Editor::SandboxEditorContext& context) {
+            if (ImGui::Begin("Derived job cells test"))
+            {
+                Editor::DrawBoundRenderStateRows(bound);
+                Editor::DrawSandboxUvRegenerationControls(model, &context, controls);
+            }
+            ImGui::End();
+        }});
+    int frames = 0, step = 0;
+    std::string text;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        if (++frames > 200) { ADD_FAILURE() << "derived job cells test did not finish"; engine.RequestExit(); return; }
+        auto* window = ImGui::FindWindowByName("Derived job cells test");
+        if (!window) return;
+        ImGui::SetWindowSize(window, {1400, 900});
+        ImGui::SetWindowPos(window, {0, 0});
+        ++step;
+        if (step == 3)
+        {
+            ImGui::GetCurrentContext()->LogBuffer.clear();
+            ImGui::LogToBuffer();
+            ImGui::GetCurrentContext()->LogWindow = nullptr;
+        }
+        if (step == 6)
+        {
+            text = ImGui::GetCurrentContext()->LogBuffer.c_str();
+            ImGui::LogFinish();
+            engine.RequestExit();
+        }
+    };
+    h.Engine->Run();
+    if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogFinish();
+    EXPECT_NE(text.find("running  50%"), std::string::npos) << text;
+    EXPECT_NE(text.find("done"), std::string::npos) << text;
+    EXPECT_NE(text.find("failed"), std::string::npos) << text;
+    // The UV status line names the run and its time, with no percentage for an indeterminate job.
+    EXPECT_NE(text.find("running \xC2\xB7 UV atlas  2.5s"), std::string::npos) << text;
+    EXPECT_TRUE(h.Shell.UnregisterEditorWindow(windowHandle));
 }

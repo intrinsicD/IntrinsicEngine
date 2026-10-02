@@ -1705,20 +1705,37 @@ namespace Extrinsic::Sandbox::Editor
         // says nothing about the scene and must not wipe what is remembered.
         if (live.Epoch != 0u && live.Epoch != m_Epoch)
         {
-            m_Held.clear();
+            Clear();
             m_Epoch = live.Epoch;
         }
         const auto held = m_Held.find(key);
         if (live.State != EditorOperationState::None)
+        {
+            if (held == m_Held.end())
+            {
+                if (m_Order.size() >= kMaxKeys)
+                {
+                    m_Held.erase(m_Order.front());
+                    m_Order.erase(m_Order.begin());
+                }
+                m_Order.push_back(key);
+            }
             return m_Held.insert_or_assign(key, live).first->second;
+        }
         if (held == m_Held.end())
             return m_None;
         if (held->second.State == EditorOperationState::Queued || held->second.State == EditorOperationState::Running)
         {
-            m_Held.erase(held); // vanished before its outcome was seen
+            Forget(key); // vanished before its outcome was seen
             return m_None;
         }
         return held->second;
+    }
+
+    void OperationProgressMemory::Forget(const std::string& key)
+    {
+        m_Held.erase(key);
+        m_Order.erase(std::remove(m_Order.begin(), m_Order.end(), key), m_Order.end());
     }
 
     void DrawOperationProgress(

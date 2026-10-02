@@ -1140,8 +1140,9 @@ namespace Extrinsic::Runtime
         snapshot.OutputName = run->Identity.OutputName;
         // Key by the run's own jobs, not the output: the Accept readback job
         // shares the identity and would otherwise mask the solver's fraction.
+        // Once Accept started, that job is the run's current (and final) one.
         snapshot.Progress = GetEditorOperationProgress(
-            commands, run->Phase == EditorGpuTransactionPhase::Accepting ? run->AcceptToken : run->Token);
+            commands, run->AcceptToken.IsValid() ? run->AcceptToken : run->Token);
         snapshot.Phase = run->Phase;
         snapshot.Previews = run->Previews;
         snapshot.DeviceWorkQueued = run->Gpu != nullptr;

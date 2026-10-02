@@ -354,6 +354,7 @@ namespace Extrinsic::Sandbox::Editor
             // UI-067: the live view of the last run, its preview and plots.
             Runtime::EditorRegistrationProgressHandle Progress{};
             std::uint32_t RunMaxIterations{0u}; // iteration cap of the run in flight, captured at its start
+            std::chrono::steady_clock::time_point RunStarted{}; // when that run was started
             bool LivePreview{true}, PlotBySeconds{false}, PreviewShown{false};
             std::uint64_t PreviewRevision{0u};
         };
@@ -2898,6 +2899,7 @@ namespace Extrinsic::Sandbox::Editor
         {
             Registration.Progress = Runtime::MakeEditorRegistrationProgress();
             Registration.RunMaxIterations = static_cast<std::uint32_t>(config.MaxIterations); // the run's cap, not the editable draft
+            Registration.RunStarted = std::chrono::steady_clock::now();
             ApplyProcessingExecution(Registration, config,
                 [&](const auto& value) { return Runtime::ApplyEditorRegistrationConfig(context.Registration.Commands, value); },
                 [&] {
@@ -2969,7 +2971,8 @@ namespace Extrinsic::Sandbox::Editor
         {
             const auto* last = live.Trace.empty() ? nullptr : &live.Trace.back();
             DrawOperationProgress(
-                MakeIterationProgress(live.Trace.size(), maxIterations, last ? last->Seconds : 0.0,
+                MakeIterationProgress(live.Trace.size(), maxIterations,
+                                      std::chrono::duration<double>(std::chrono::steady_clock::now() - state.RunStarted).count(),
                                       "ICP iteration " + std::to_string(live.Trace.size())),
                 [&] { Runtime::CancelEditorRegistration(state.Progress); }, "icp_progress");
             ImGui::TextDisabled("RMSE %.6g   inliers %llu", last ? last->RMSE : 0.0,
@@ -3678,6 +3681,10 @@ namespace Extrinsic::Sandbox::Editor
         if (ImGui::Button("Discard##Smoothing"))
         {
             Runtime::DiscardEditorPropertySmoothing(commands, SmoothingTransaction);
+            // A discarded result is not a finished run: nothing may read "done" afterwards.
+            SmoothingProgress.Forget(SmoothingProgressKey);
+            SmoothingProgressKey.clear(); // also stops this frame's pre-discard snapshot from re-adding it
+            SmoothingProgressEntity = 0u;
             Smoothing.LastResult = Runtime::SnapshotEditorPropertySmoothing(commands, SmoothingTransaction).Result;
         }
         ImGui::EndDisabled();

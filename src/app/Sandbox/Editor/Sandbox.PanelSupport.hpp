@@ -115,16 +115,23 @@ namespace Extrinsic::Sandbox::Editor
     // next run of that key starts. Two keys never share an outcome, and the
     // whole memory is dropped when the runtime's scene epoch (`live.Epoch`)
     // changes, so nothing survives a scene load or a new scene. A run that
-    // vanishes while still active leaves no outcome to show.
+    // vanishes while still active leaves no outcome to show. Entities are not
+    // tracked: stable ids are not reused within a scene, so an entry for a
+    // removed entity is never asked for again, and the memory is bounded
+    // (`kMaxKeys`, oldest key evicted) instead of pruned.
     class OperationProgressMemory
     {
     public:
+        static constexpr std::size_t kMaxKeys = 16u;
         [[nodiscard]] const Runtime::EditorOperationProgress& Observe(
             const Runtime::EditorOperationProgress& live, const std::string& key);
-        void Clear() noexcept { m_Held.clear(); }
+        // Drops one key's outcome (a discarded result must not read as done).
+        void Forget(const std::string& key);
+        void Clear() noexcept { m_Held.clear(); m_Order.clear(); }
 
     private:
         std::unordered_map<std::string, Runtime::EditorOperationProgress> m_Held{};
+        std::vector<std::string> m_Order{}; // insertion order, for eviction
         std::uint64_t m_Epoch{0u};
         Runtime::EditorOperationProgress m_None{};
     };
