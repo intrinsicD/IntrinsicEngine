@@ -8,6 +8,19 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-02 — RUNTIME-313 shared queued editor job helper
+
+Retired [RUNTIME-313](RUNTIME-313-queued-editor-job-setup-and-completion-helper.md).
+
+- Queued editor operations share one helper, `ActiveOutputJobRefusal`, `ValidateQueuedJob` and `QueuedJobDelivery` in `JobFailure.hpp`. It gives one duplicate answer and wording, treats an abandoned run as cancelled, delivers exactly once, and a rejected submission no longer calls the callback.
+- Point sampling gained its missing duplicate guard.
+- Later stages carry the run's first token (`EditorJobIdentity::Run`), so an agent cancel reaches only its own run. "cancelled" appears only after a requested cancel, and the session remembers those requests past reaping.
+- Panels show a duplicate refusal in their run slot instead of storing it as the result.
+- A drift guard rejects hand-written copies.
+- Maturity: CPUContracted. RUNTIME-311 owns the Vulkan-host checks.
+
+Commits `b8fa39d41` through `f1f07a323`.
+
 ## 2026-10-02 — BUG-231 main-thread frame waits ran long editor jobs inline
 
 Retired [BUG-231](BUG-231-icp-panel-cancel-test-hangs-under-load.md).

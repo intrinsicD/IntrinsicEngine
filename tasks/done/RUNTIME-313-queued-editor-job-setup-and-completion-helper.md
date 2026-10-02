@@ -52,7 +52,7 @@ service, registry, extra job hop or public template framework. The helper owns: 
 check with one status and one message builder, deliver-once flag, and stale/cancel finalize with
 one wording. Typed work, validation of method inputs and publication stay in each operation.
 
-Relationship: [RUNTIME-311](RUNTIME-311-unify-gpu-scalar-outlier-transaction-lifecycle.md) owns the
+Relationship: [RUNTIME-311](../backlog/runtime/RUNTIME-311-unify-gpu-scalar-outlier-transaction-lifecycle.md) owns the
 GPU Run/Accept transaction that follows this setup; keep the helper usable by it. The agent lane's
 `FinishApply` (`src/runtime/Agent/internal/Runtime.AgentOperations.Detail.hpp`) maps a `Pending`
 duplicate to `result_unavailable`; the single status must keep that mapping.
@@ -167,11 +167,24 @@ duplicate to `result_unavailable`; the single status must keep that mapping.
     lifecycle, or Coherent Point Drift without its own deliver-once flag).
 
 ## Acceptance criteria
-- [ ] One compiled helper owns the active-job check (one status, `BuildActiveDerivedJobMessage` wording), deliver-once, and unpublished finalize; the ~10 hand-written copies are removed or reduced to typed callbacks.
-- [ ] Every migrated operation honours `Abandoned` in validation and sets/clears the delivered flag identically; a test per drift item above fails on the old behaviour.
-- [ ] A duplicate submission returns the same status and wording for every operation, and the agent lane still reports it as `result_unavailable`.
-- [ ] Existing publication, Undo/Redo, stale-source and cancel behaviour are unchanged; no new per-job indirection or public surface.
-- [ ] Documentation (owner routes / sandbox-editor boundaries) and module inventory name the shared owner.
+- [x] One compiled helper owns the active-job check (one status, `BuildActiveDerivedJobMessage` wording), deliver-once, and unpublished finalize; the ~10 hand-written copies are removed or reduced to typed callbacks.
+- [x] Every migrated operation honours `Abandoned` in validation and sets/clears the delivered flag identically; a test per drift item above fails on the old behaviour.
+- [x] A duplicate submission returns the same status and wording for every operation, and the agent lane still reports it as `result_unavailable`.
+- [x] Existing publication, Undo/Redo, stale-source and cancel behaviour are unchanged; no new per-job indirection or public surface.
+- [x] Documentation (owner routes / sandbox-editor boundaries) and module inventory name the shared owner.
+
+## Completion
+
+Commit: `b8fa39d41`, `0f4926355`, `9973fd7e6`, `b7f2c20d5`, `98b683850`, `572ad4ab1`, `073f5944c`, `432d6efe2`, `b002ef27f`, `f1f07a323`. Completed 2026-10-02, with an independent Opus review per slice and a final acceptance review.
+- Full CPU suite 5611/5611, run twice at `b002ef27f`.
+- Evidence:
+  - `QueuedEditorJobContract.*`: `AbandonedRunRevalidatesAsCancelledAndDeliversOnce`, `RejectedSubmissionAnswersOnceWithoutTheCallback`, `RejectedLaterStageAbandonsTheQueuedStagesWithoutACallback`, `LaterStagesOfAChainJoinTheFirstJobsRun`.
+  - `DuplicateStartIsPendingWithTheSharedMessage` tests.
+  - `EditorKeypointAgent.AgentDuplicateOfAGuardedRunEndsAsResultUnavailable`.
+  - `SandboxProcessingPanels.DuplicateRunRefusalIsNotStoredAsThePanelsResult`.
+  - `QueuedEditorJobDriftGuard.OperationsUseTheSharedQueuedJobHelper`.
+- Criterion 4 caveat: `EditorJobIdentity` gained `Run` and `Auxiliary`, which the inherited RUNTIME-279 cancel-scope items require.
+- Maturity: CPUContracted. RUNTIME-311 owns the Vulkan-host checks for GPU duplicate starts, Run carried by GPU Accept stages, and CPD's own run object.
 
 ## Verification
 ```bash

@@ -55,7 +55,7 @@ Sequencing: land the shared lifecycle with scalar and outliers first, then migra
 smoothing and GPU positions as separate reviewed slices. The Sandbox row that drives these
 transactions is [UI-071](../ui/UI-071-gpu-transaction-controls-and-refusal-presentation.md);
 the per-job setup/completion prologue that precedes them is
-[RUNTIME-313](RUNTIME-313-queued-editor-job-setup-and-completion-helper.md).
+[RUNTIME-313](../../done/RUNTIME-313-queued-editor-job-setup-and-completion-helper.md).
 
 ## Acceptance criteria
 - [ ] One compiled lifecycle owns acquisition, polling, ring publication, Accept, Discard, cancellation and terminal delivery for one or N rings, including the accept-only (no Run phase) shape.

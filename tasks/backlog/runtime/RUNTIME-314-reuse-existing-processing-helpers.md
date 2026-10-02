@@ -48,7 +48,7 @@ The UI-side items from the same audit are in [UI-072](../ui/UI-072-adopt-shared-
    `Keypoints.cpp` (~211). RUNTIME-308 owns construction residency only; coordinate if it is
    already rewriting that cursor.
 
-Not in scope: the per-job setup helper ([RUNTIME-313](RUNTIME-313-queued-editor-job-setup-and-completion-helper.md)),
+Not in scope: the per-job setup helper ([RUNTIME-313](../../done/RUNTIME-313-queued-editor-job-setup-and-completion-helper.md)),
 the GPU transaction lifecycle (RUNTIME-311), and any change to what is considered finite.
 
 ## Acceptance criteria

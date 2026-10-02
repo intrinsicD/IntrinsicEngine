@@ -62,7 +62,6 @@ and their paired UI or method work are recorded there, not here.
 From the 2026-10-01 duplication/consistency audit; each task owns its own scope.
 
 - [RUNTIME-311 — Unify the two-phase GPU Run/Accept transaction lifecycle](RUNTIME-311-unify-gpu-scalar-outlier-transaction-lifecycle.md)
-- [RUNTIME-313 — One shared setup/completion helper for queued editor jobs](RUNTIME-313-queued-editor-job-setup-and-completion-helper.md)
 - [RUNTIME-314 — Reuse existing runtime helpers instead of local copies](RUNTIME-314-reuse-existing-processing-helpers.md)
 
 ## Compilation locality
