@@ -425,6 +425,62 @@ TEST(SandboxDomainPanels, SharedScalarControlsPreserveStylingAndEditAuthority)
     }
 }
 
+TEST(SandboxDomainPanels, ColorInterpretationTextNamesRangesClampingAndZeroLength)
+{
+    for (const auto text : {Editor::ColorInterpretationComboTooltip(),
+                            Editor::ColorInterpretationOptionTooltip(0)})
+    {
+        EXPECT_NE(text.find("0..1"), std::string_view::npos) << text;
+        EXPECT_NE(text.find("not remapped"), std::string_view::npos) << text;
+    }
+    for (const auto text : {Editor::ColorInterpretationComboTooltip(),
+                            Editor::ColorInterpretationOptionTooltip(1)})
+    {
+        EXPECT_NE(text.find("[-1,1]"), std::string_view::npos) << text;
+        EXPECT_NE(text.find("[0,1]"), std::string_view::npos) << text;
+        EXPECT_NE(text.find("+X"), std::string_view::npos) << text;
+        EXPECT_NE(text.find("+Z"), std::string_view::npos) << text;
+    }
+    EXPECT_TRUE(Editor::ColorInterpretationOptionTooltip(2).empty());
+}
+
+TEST(SandboxDomainPanels, ColorInterpretationComboShowsTooltipWhenHoveredAndDisabledReasonOtherwise)
+{
+    TestSupport::ImGuiFrameScope gui;
+    ImGui::GetIO().DisplaySize = {800, 600};
+    ImGui::GetStyle().HoverFlagsForTooltipMouse = ImGuiHoveredFlags_None;
+    const auto tooltipActive = [&]
+    {
+        const ImGuiContext* context = ImGui::GetCurrentContext();
+        return std::ranges::any_of(context->Windows, [](const ImGuiWindow* window)
+        {
+            return window != nullptr && window->Active && (window->Flags & ImGuiWindowFlags_Tooltip) != 0;
+        });
+    };
+    for (const bool withReason : {false, true})
+    {
+        SCOPED_TRACE(withReason);
+        bool seen = false;
+        int value = 0;
+        for (int frame = 0; frame != 4; ++frame)
+        {
+            gui.NextFrame();
+            ImGui::GetIO().MousePos = {60.0f, 30.0f};
+            ImGui::SetNextWindowPos({0, 0});
+            ImGui::SetNextWindowSize({600, 300});
+            ImGui::Begin("Color interpretation host", nullptr, ImGuiWindowFlags_NoSavedSettings);
+            if (withReason) ImGui::BeginDisabled(true);
+            (void)Editor::DrawColorInterpretationCombo(
+                value, withReason ? std::string_view{"Not available."} : std::string_view{});
+            if (withReason) ImGui::EndDisabled();
+            seen = seen || tooltipActive();
+            ImGui::End();
+        }
+        EXPECT_TRUE(seen);
+        EXPECT_EQ(value, 0);
+    }
+}
+
 TEST(SandboxDomainPanels, AppearanceCheckboxesCanEnableAndReenableEverySupportedLayer)
 {
     namespace GS = Extrinsic::ECS::Components::GeometrySources;

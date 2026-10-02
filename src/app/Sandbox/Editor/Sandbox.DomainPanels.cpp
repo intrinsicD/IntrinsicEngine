@@ -762,7 +762,10 @@ void DrawDomainVisualizationControls(const EditorDomainWindowModel &model,
   DrawVisualizationPropertyDropdown(model, context, lastStatus);
   if (visualization.HasConfig && static_cast<int>(visualization.Source) >= 3) {
     int interpretation = static_cast<int>(visualization.Interpretation);
-    if (ImGui::Combo("Color interpretation", &interpretation, "Components\0Normal direction\0")) {
+    if (DrawColorInterpretationCombo(
+            interpretation,
+            available ? std::string_view{}
+                      : std::string_view{"Appearance controls are not available for the current selection."})) {
       auto command = MakeVisualizationConfigCommandFromModel(
           model.SelectedStableId, visualization, model.VisualizationTarget);
       command.Interpretation = static_cast<decltype(command.Interpretation)>(interpretation);
