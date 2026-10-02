@@ -8,6 +8,15 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-02 — UI-051 domain-agnostic domain windows
+
+Retired [UI-051](UI-051-domain-agnostic-appearance-properties-selection-windows.md).
+
+- A mesh selection is usable in the PointCloud and Graph Properties and Selection-details windows. The runtime predicate `ResolveGeometryDomainReading` decides this, and the window states its reading.
+- The Appearance part moved to UI-075, which builds the unified panel on the same predicate.
+
+Commits `3d52c4570`, `4a25414fd`.
+
 ## 2026-10-02 — RUNTIME-318 presentation color slots onto the overlay
 
 Retired [RUNTIME-318](RUNTIME-318-migrate-presentation-color-slots-onto-the-color-overlay.md).

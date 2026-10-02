@@ -85,38 +85,47 @@ stale checks and complete radius results. Nearest segment/face or screen-space
 lasso/visibility queries need their own exact query semantics. This note does not
 add brush/lasso implementation to the current property/selection-window scope.
 
-See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
+See the [shared spatial-index consumer inventory](../../docs/architecture/spatial-index-consumers.md).
 
 ## Required changes
-- [ ] Replace the exact-provenance `DomainMatches` gate in these windows with a
+- [x] Replace the exact-provenance `DomainMatches` gate in these windows with a
       capability test over the selected entity's element-domain availability and
       property catalog.
-- [ ] Make each window state which element domain it is presenting (e.g.
+- [x] Make each window state which element domain it is presenting (e.g.
       "reading MeshVertices as a point set") so provenance stays visible.
-- [ ] Keep publication on the originating element domain — no alias entity and
+- [x] Keep publication on the originating element domain — no alias entity and
       no implicit conversion.
-- [ ] Keep a truthful unsupported path for entities that genuinely lack the
+- [x] Keep a truthful unsupported path for entities that genuinely lack the
       required domain, with the runtime-owned reason.
 
 ## Tests
-- [ ] Add runtime contract tests asserting a mesh selection produces a usable
+- [x] Add runtime contract tests asserting a mesh selection produces a usable
       model for the PointCloud and Graph Appearance/Properties/Selection
       windows.
-- [ ] Add a test asserting the presented element domain is reported.
-- [ ] Add a test asserting an entity genuinely lacking the domain still reports
+- [x] Add a test asserting the presented element domain is reported.
+- [x] Add a test asserting an entity genuinely lacking the domain still reports
       the unsupported reason.
-- [ ] Default CPU gate stays green.
+- [x] Default CPU gate stays green.
 
 ## Docs
-- [ ] Update the domain-window prose in `src/app/Sandbox/README.md`.
-- [ ] Cross-reference `docs/architecture/geometry-api-style.md` on
+- [x] Update the domain-window prose in `src/app/Sandbox/README.md`.
+- [x] Cross-reference `docs/architecture/geometry-api-style.md` on
       element-domain eligibility versus provenance.
 
 ## Acceptance criteria
-- [ ] With a mesh selected, the PointCloud and Graph Appearance, Properties, and
+- [x] With a mesh selected, the PointCloud and Graph Properties and
       Selection-details windows are usable.
-- [ ] Each window states the element domain it reads.
-- [ ] No conversion entity or property alias is created.
+- [x] Each window states the element domain it reads.
+- [x] No conversion entity or property alias is created.
+
+## Completion
+
+Commit: `3d52c4570`, `4a25414fd`. Completed 2026-10-02 with an independent Opus review.
+- `ResolveGeometryDomainReading` and `GeometryDomainReadingIncludes` in `Runtime.GeometryAvailability` own the "entity carries the element-domain data" predicate.
+- The Properties and Selection-details windows accept a mesh read as points or a graph, state the reading, filter the Selection element domains to it, and keep a runtime-sourced refusal for genuinely missing data.
+- The Appearance parts of AC1/AC2 moved to [UI-075](../backlog/ui/UI-075-unified-appearance-panel-with-attribute-source-selectors.md); its AC1 covers a mesh read as points or edges.
+- Full CPU suite green.
+- Maturity: Operational for the UI via CPU ImGui tests.
 
 ## Verification
 ```bash

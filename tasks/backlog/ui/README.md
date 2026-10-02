@@ -14,7 +14,6 @@ its dependencies, conditional gates, scope and verification.
 - [UI-047 — File paths must be hand-typed into a raw text field](UI-047-file-chooser-for-import-and-scene-paths.md)
 - [UI-048 — Editor opens empty, hides file operations under View, and never remembers layout](UI-048-first-run-workspace-and-layout-persistence.md)
 - [UI-049 — Editor panels are sized so that labels clip and results are hidden](UI-049-editor-panel-sizing-and-readability.md)
-- [UI-051 — A mesh does not pass as a graph or a point cloud in the domain windows](UI-051-domain-agnostic-appearance-properties-selection-windows.md)
 - [UI-075 — One Appearance panel for all domains with per-attribute source selectors](UI-075-unified-appearance-panel-with-attribute-source-selectors.md)
 - [UI-076 — Camera preset and focus visual smoke](UI-076-camera-preset-visual-smoke.md)
 

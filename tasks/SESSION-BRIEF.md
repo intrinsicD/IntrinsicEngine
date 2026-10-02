@@ -214,8 +214,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `UI-047` — File paths must be hand-typed into a raw text field (tasks/backlog/ui/UI-047-file-chooser-for-import-and-scene-paths.md)
 - unblocked: `UI-048` — Editor opens empty, hides file operations under View, and never remembers layout (tasks/backlog/ui/UI-048-first-run-workspace-and-layout-persistence.md)
 - unblocked: `UI-049` — Editor panels are sized so that labels clip and results are hidden (tasks/backlog/ui/UI-049-editor-panel-sizing-and-readability.md)
-- unblocked: `UI-051` — A mesh does not pass as a graph or a point cloud in the domain windows (tasks/backlog/ui/UI-051-domain-agnostic-appearance-properties-selection-windows.md)
-- blocked by `UI-051`: `UI-075` — One Appearance panel for all domains with per-attribute source selectors (tasks/backlog/ui/UI-075-unified-appearance-panel-with-attribute-source-selectors.md)
+- unblocked: `UI-075` — One Appearance panel for all domains with per-attribute source selectors (tasks/backlog/ui/UI-075-unified-appearance-panel-with-attribute-source-selectors.md)
 - unblocked: `UI-076` — Camera preset and focus visual smoke (tasks/backlog/ui/UI-076-camera-preset-visual-smoke.md)
 
 ## Unthemed
