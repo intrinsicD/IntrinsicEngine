@@ -1,3 +1,4 @@
+#include <unordered_map>
 #include <cstddef>
 #include <functional>
 #include <span>
@@ -760,7 +761,7 @@ TEST(SandboxEditorPresentation, BoundRenderRowsPreserveDiagnosticPriorityAndEmpt
     const auto populated = draw(model);
     for (const auto* expected : {"Rows: 2 generation=42", "Scalar preview",
              "Explicit source label", "v:temperature catalog", "Primary row diagnostic",
-             "Pending bake job", "0.25", "Wait for the bake job", "Model-level diagnostic"})
+             "Pending bake job", "25%", "Wait for the bake job", "Model-level diagnostic"})
         EXPECT_NE(populated.find(expected), std::string::npos) << expected << '\n' << populated;
     EXPECT_EQ(populated.find("Hidden lower-priority reason"), std::string::npos);
 

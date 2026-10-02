@@ -487,6 +487,7 @@ namespace Extrinsic::Sandbox::Editor
             Runtime::KMeansPropertyRefs Properties{};
             std::uint32_t Entity{};
             std::string VisualizationDiagnostic{};
+            OperationProgressMemory Progress{};
             std::int32_t Backend{0};
             std::uint32_t ClusterCount{8u};
             std::int32_t MaxIterations{32};
@@ -1941,6 +1942,15 @@ namespace Extrinsic::Sandbox::Editor
                 }
             }
             ImGui::EndDisabled();
+            // The run's own job, found by the correlation id its submission returned.
+            DrawOperationProgress(
+                KMeans.Progress.Observe(
+                    KMeans.LastResult && KMeans.LastResult->Correlation.IsValid()
+                        ? Runtime::GetEditorOperationProgress(
+                              service.Commands, Runtime::EditorRunCorrelation{KMeans.LastResult->Correlation.Value})
+                        : Runtime::EditorOperationProgress{},
+                    std::to_string(KMeans.Entity) + "/" + KMeans.Properties.OutputLabels.Name),
+                {}, "kmeans_progress");
             ImGui::SeparatorText("Display output properties");
             DrawProcessingPropertyShowButton(context, model.SelectedStableId, KMeans.Properties.OutputLabels, KMeans.VisualizationDiagnostic);
             DrawProcessingPropertyShowButton(context, model.SelectedStableId, KMeans.Properties.OutputColors, KMeans.VisualizationDiagnostic);

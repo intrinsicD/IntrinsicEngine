@@ -1,3 +1,4 @@
+#include <unordered_map>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -3814,37 +3815,38 @@ TEST(SandboxProcessingPanels, OperationProgressViewFollowsTheReadModel)
     auto view = Editor::DescribeOperationProgress(progress, true);
     ASSERT_TRUE(view.Visible && view.Bar);
     EXPECT_FLOAT_EQ(view.Fraction, 0.42f);
-    EXPECT_EQ(view.Overlay, "42%  3.3s");
+    EXPECT_EQ(view.Overlay, "running \xC2\xB7 solve  42%  3.3s");
     EXPECT_TRUE(view.ShowCancel);
     EXPECT_FALSE(Editor::DescribeOperationProgress(progress, false).ShowCancel) << "no cancel path, no button";
 
     progress.Determinate = false;
     view = Editor::DescribeOperationProgress(progress, true);
     EXPECT_LT(view.Fraction, 0.0f) << "indeterminate is an animated bar, never 0%";
-    EXPECT_EQ(view.Overlay, "solve  3.3s") << "an indeterminate bar names the run";
+    EXPECT_EQ(view.Overlay, "running \xC2\xB7 solve  3.3s") << "state word and run label stay visible";
 
     progress.State = State::Queued;
     progress.ElapsedSeconds = 0.0;
     progress.Label.clear();
-    EXPECT_EQ(Editor::DescribeOperationProgress(progress, true).Overlay, "queued  0.0s");
+    EXPECT_EQ(Editor::DescribeOperationProgress(progress, true).Overlay, "queued") << "no measured time, none shown";
+    progress.ElapsedSeconds = 1.0;
     progress.State = State::Running;
-    EXPECT_EQ(Editor::DescribeOperationProgress(progress, true).Overlay, "running  0.0s");
+    EXPECT_EQ(Editor::DescribeOperationProgress(progress, true).Overlay, "running  1.0s");
     progress.State = State::Queued;
 
     progress = {.State = State::Failed, .Diagnostic = "solver diverged"};
     view = Editor::DescribeOperationProgress(progress, true);
     EXPECT_TRUE(view.Visible);
     EXPECT_FALSE(view.Bar);
-    EXPECT_EQ(view.Overlay, "Failed");
+    EXPECT_EQ(view.Overlay, "failed");
     EXPECT_EQ(view.Diagnostic, "solver diverged");
     EXPECT_FALSE(view.ShowCancel) << "a finished run cannot be cancelled";
     progress.State = State::Cancelled;
-    EXPECT_EQ(Editor::DescribeOperationProgress(progress, true).Overlay, "Cancelled");
+    EXPECT_EQ(Editor::DescribeOperationProgress(progress, true).Overlay, "cancelled");
     progress = {.State = State::Succeeded, .ElapsedSeconds = 3.3};
     view = Editor::DescribeOperationProgress(progress, true);
     EXPECT_TRUE(view.Visible);
     EXPECT_FALSE(view.Bar);
-    EXPECT_EQ(view.Overlay, "100%  3.3s");
+    EXPECT_EQ(view.Overlay, "done 3.3s");
     EXPECT_FALSE(view.ShowCancel);
 
     // The asset queue's overlay is the same helper without elapsed time.
@@ -3852,29 +3854,54 @@ TEST(SandboxProcessingPanels, OperationProgressViewFollowsTheReadModel)
     EXPECT_EQ(Editor::FormatProgressOverlay(false, 0.0f, "decoding"), "decoding");
 }
 
+TEST(SandboxProcessingPanels, IterationProgressIsADeterminateFractionOfTheIterationCap)
+{
+    auto progress = Editor::MakeIterationProgress(3u, 12u, 1.5, "ICP iteration 3");
+    EXPECT_EQ(progress.State, R::EditorOperationState::Running);
+    EXPECT_TRUE(progress.Determinate);
+    EXPECT_FLOAT_EQ(progress.Normalized, 0.25f);
+    EXPECT_EQ(Editor::DescribeOperationProgress(progress, true).Overlay, "running \xC2\xB7 ICP iteration 3  25%  1.5s");
+    EXPECT_FLOAT_EQ(Editor::MakeIterationProgress(20u, 12u, 0.0, {}).Normalized, 1.0f) << "converging past the cap clamps";
+    EXPECT_FALSE(Editor::MakeIterationProgress(3u, 0u, 0.0, "x").Determinate) << "no cap, no fraction";
+}
+
 // The runtime reaps a finished job a frame after it ends; the panel's memory
 // keeps the last projection until the next run or a scope (entity) change.
-TEST(SandboxProcessingPanels, OperationProgressMemoryKeepsTheLastFinishedRunUntilTheNextOne)
+TEST(SandboxProcessingPanels, OperationProgressMemoryKeepsTheLastFinishedRunPerKeyUntilTheSceneIsReplaced)
 {
     using State = R::EditorOperationState;
     Editor::OperationProgressMemory memory;
-    const R::EditorOperationProgress none{};
+    const auto with = [](R::EditorOperationProgress progress, const std::uint64_t epoch) {
+        progress.Epoch = epoch;
+        return progress;
+    };
+    const auto none = [&](const std::uint64_t epoch) { return with({}, epoch); };
     const R::EditorOperationProgress running{.State = State::Running, .Determinate = true, .Normalized = 0.5f};
     const R::EditorOperationProgress failed{.State = State::Failed, .Diagnostic = "diverged"};
+    const R::EditorOperationProgress done{.State = State::Succeeded, .ElapsedSeconds = 2.0};
 
-    EXPECT_EQ(memory.Observe(none, 1u).State, State::None);
-    EXPECT_EQ(memory.Observe(running, 1u).State, State::Running);
-    EXPECT_EQ(memory.Observe(failed, 1u).State, State::Failed);
-    EXPECT_EQ(memory.Observe(none, 1u).State, State::Failed) << "the reaped job's outcome stays visible";
-    EXPECT_EQ(memory.Observe(none, 1u).Diagnostic, "diverged");
-    EXPECT_EQ(memory.Observe(running, 1u).State, State::Running) << "the next run replaces it";
-    EXPECT_EQ(memory.Observe(none, 1u).State, State::None) << "a run that vanished unseen has no outcome to show";
+    EXPECT_EQ(memory.Observe(none(1u), "7/a").State, State::None);
+    EXPECT_EQ(memory.Observe(with(running, 1u), "7/a").State, State::Running);
+    EXPECT_EQ(memory.Observe(with(failed, 1u), "7/a").State, State::Failed);
+    EXPECT_EQ(memory.Observe(none(1u), "7/a").State, State::Failed) << "the reaped job's outcome stays visible";
+    EXPECT_EQ(memory.Observe(none(1u), "7/a").Diagnostic, "diverged");
 
-    EXPECT_EQ(memory.Observe(failed, 1u).State, State::Failed);
-    EXPECT_EQ(memory.Observe(none, 2u).State, State::None) << "another entity does not inherit it";
-    EXPECT_EQ(memory.Observe(failed, 2u).State, State::Failed);
+    // Two outputs of one entity never share an outcome.
+    EXPECT_EQ(memory.Observe(none(1u), "7/b").State, State::None);
+    EXPECT_EQ(memory.Observe(with(done, 1u), "7/b").State, State::Succeeded);
+    EXPECT_EQ(memory.Observe(none(1u), "7/a").State, State::Failed);
+    EXPECT_EQ(memory.Observe(none(1u), "7/b").State, State::Succeeded);
+    EXPECT_EQ(memory.Observe(none(1u), "8/a").State, State::None) << "another entity does not inherit it";
+
+    EXPECT_EQ(memory.Observe(with(running, 1u), "7/a").State, State::Running) << "the next run replaces it";
+    EXPECT_EQ(memory.Observe(none(1u), "7/a").State, State::None) << "a run that vanished unseen has no outcome to show";
+    EXPECT_EQ(memory.Observe(none(1u), "7/b").State, State::Succeeded) << "other keys are untouched";
+
+    // A scene load or new scene changes the epoch and drops everything.
+    EXPECT_EQ(memory.Observe(none(2u), "7/b").State, State::None);
+    EXPECT_EQ(memory.Observe(with(done, 2u), "7/b").State, State::Succeeded);
     memory.Clear();
-    EXPECT_EQ(memory.Observe(none, 2u).State, State::None);
+    EXPECT_EQ(memory.Observe(none(2u), "7/b").State, State::None);
 }
 
 TEST(SandboxProcessingPanels, OperationProgressWidgetCancelRequiresAnActiveRunAndAHandler)

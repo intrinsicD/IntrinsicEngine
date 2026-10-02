@@ -104,21 +104,29 @@ namespace Extrinsic::Sandbox::Editor
         const std::function<void()>& onCancel,
         const char* id);
 
+    // A panel-owned iterative run (ICP, CPD) as a Running read-model value: a
+    // determinate fraction of `maxIterations` (0: indeterminate).
+    [[nodiscard]] Runtime::EditorOperationProgress MakeIterationProgress(
+        std::size_t completedIterations, std::uint32_t maxIterations, double elapsedSeconds, std::string label);
+
     // The runtime drops a finished job a frame after it ends, so a panel keeps
-    // the last projection it saw per key: a finished run stays visible until
-    // the next run of the same `scope` (for example the entity) starts or the
-    // scope changes. A run that vanishes while still active leaves no outcome
-    // to show.
+    // the last projection it saw per run `key` (a caller-built string naming
+    // the entity and output or run): a finished run stays visible until the
+    // next run of that key starts. Two keys never share an outcome, and the
+    // whole memory is dropped when the runtime's scene epoch (`live.Epoch`)
+    // changes, so nothing survives a scene load or a new scene. A run that
+    // vanishes while still active leaves no outcome to show.
     class OperationProgressMemory
     {
     public:
         [[nodiscard]] const Runtime::EditorOperationProgress& Observe(
-            const Runtime::EditorOperationProgress& live, std::uint64_t scope = 0u);
-        void Clear() noexcept { m_Held = {}; }
+            const Runtime::EditorOperationProgress& live, const std::string& key);
+        void Clear() noexcept { m_Held.clear(); }
 
     private:
-        Runtime::EditorOperationProgress m_Held{};
-        std::uint64_t m_Scope{0u};
+        std::unordered_map<std::string, Runtime::EditorOperationProgress> m_Held{};
+        std::uint64_t m_Epoch{0u};
+        Runtime::EditorOperationProgress m_None{};
     };
 
     void DrawDisabledReasonTooltip(std::string_view disabledReason);

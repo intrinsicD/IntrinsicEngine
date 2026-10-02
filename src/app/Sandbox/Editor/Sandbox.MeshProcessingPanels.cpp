@@ -16,6 +16,7 @@ module;
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -408,6 +409,7 @@ namespace Extrinsic::Sandbox::Editor
         // The interactive Vulkan run (ADR 0030): its preview shows in the viewport until the
         // user accepts or discards it.
         Runtime::EditorPropertySmoothingTransactionHandle SmoothingTransaction{};
+        OperationProgressMemory SmoothingProgress{};
         std::uint32_t SmoothingEntity{};
         ProcessingDraftState<Runtime::HarmonicFieldConfig, Runtime::EditorHarmonicFieldResult> Harmonic{};
         std::uint32_t HarmonicEntity{};
@@ -497,7 +499,7 @@ namespace Extrinsic::Sandbox::Editor
         void DrawCoherentPointDriftWindow(bool&, const SandboxEditorContext&);
         void DrawPointSamplingWindow(bool&, const SandboxEditorContext&);
         void ClearCoherentPointDriftPreview();
-        void DrawRegistrationProgress(const Runtime::EditorRegistrationProgressSnapshot& live);
+        void DrawRegistrationProgress(const Runtime::EditorRegistrationProgressSnapshot& live, std::uint32_t maxIterations);
 
         void DrawDenoiseControls(
             const Runtime::EditorDomainWindowModel&,
@@ -2898,7 +2900,7 @@ namespace Extrinsic::Sandbox::Editor
                 },
                 context.Registration.ResultSinks.Registration, "Registration config was rejected.");
         }
-        DrawRegistrationProgress(live);
+        DrawRegistrationProgress(live, static_cast<std::uint32_t>(config.MaxIterations));
 
         if (!Registration.LastResult.has_value())
         {
@@ -2952,17 +2954,20 @@ namespace Extrinsic::Sandbox::Editor
     }
 
     // UI-067: the running ICP job's iteration, cancel, moving-source preview and plots.
-    void MeshProcessingPanels::Impl::DrawRegistrationProgress(const Runtime::EditorRegistrationProgressSnapshot& live)
+    void MeshProcessingPanels::Impl::DrawRegistrationProgress(
+        const Runtime::EditorRegistrationProgressSnapshot& live, const std::uint32_t maxIterations)
     {
         auto& state = Registration;
         if (!state.Progress) return;
         if (live.Running)
         {
             const auto* last = live.Trace.empty() ? nullptr : &live.Trace.back();
-            ImGui::TextColored(ImVec4(0.55f, 0.8f, 1.0f, 1.0f), "Running: iteration %zu   RMSE %.6g   inliers %llu   %.1f s",
-                               live.Trace.size(), last ? last->RMSE : 0.0,
-                               static_cast<unsigned long long>(last ? last->InlierCount : 0u), last ? last->Seconds : 0.0);
-            if (ImGui::Button("Cancel##ICP")) Runtime::CancelEditorRegistration(state.Progress);
+            DrawOperationProgress(
+                MakeIterationProgress(live.Trace.size(), maxIterations, last ? last->Seconds : 0.0,
+                                      "ICP iteration " + std::to_string(live.Trace.size())),
+                [&] { Runtime::CancelEditorRegistration(state.Progress); }, "icp_progress");
+            ImGui::TextDisabled("RMSE %.6g   inliers %llu", last ? last->RMSE : 0.0,
+                                static_cast<unsigned long long>(last ? last->InlierCount : 0u));
         }
         ImGui::Checkbox("Preview moving source##ICP", &state.LivePreview);
         auto* interaction = Shell != nullptr ? Shell->SceneInteraction() : nullptr;
@@ -3206,10 +3211,6 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::SameLine();
             if (ImGui::Button("Run to end##CPD")) step(0u);
             ImGui::EndDisabled();
-            ImGui::SameLine();
-            ImGui::BeginDisabled(!running);
-            if (ImGui::Button("Cancel##CPD")) Runtime::CancelEditorCoherentPointDrift(state.Run);
-            ImGui::EndDisabled();
             ImGui::BeginDisabled(!applicable);
             if (ImGui::Button("Apply##CPD"))
             {
@@ -3251,10 +3252,17 @@ namespace Extrinsic::Sandbox::Editor
             const auto& r = snapshot.Result;
             ImGui::Text("Phase: %s   backend: %s", Runtime::ToString(snapshot.Phase), r.Backend.c_str());
             // UI-067: what a running step is doing right now, and for how long.
-            if (snapshot.Phase == Phase::Running && !snapshot.Stage.empty())
-                ImGui::TextColored(ImVec4(0.55f, 0.8f, 1.0f, 1.0f), "Iteration %zu: %s for %.1f s", snapshot.Trace.size() + 1u,
-                                   snapshot.Stage.c_str(),
-                                   std::chrono::duration<double>(std::chrono::steady_clock::now() - snapshot.StageStarted).count());
+            if (snapshot.Phase == Phase::Running)
+            {
+                const double stageSeconds = snapshot.Stage.empty() ? 0.0
+                    : std::chrono::duration<double>(std::chrono::steady_clock::now() - snapshot.StageStarted).count();
+                DrawOperationProgress(
+                    MakeIterationProgress(snapshot.Trace.size(), config.MaxIterations,
+                                          (snapshot.Trace.empty() ? 0.0 : snapshot.Trace.back().Seconds) + stageSeconds,
+                                          "iteration " + std::to_string(snapshot.Trace.size() + 1u) +
+                                              (snapshot.Stage.empty() ? std::string{} : ": " + snapshot.Stage)),
+                    [&] { Runtime::CancelEditorCoherentPointDrift(state.Run); }, "cpd_progress");
+            }
             ImGui::Text("Points: %zu -> %zu   iterations: %u   stop: %s", r.SourcePointCount, r.TargetPointCount, r.Iterations,
                         r.Termination.c_str());
             ImGui::Text("sigma^2: %.4g   matched: %.1f   mean move: %.4g", r.Sigma2, r.MatchedWeight, r.MeanDisplacement);
@@ -3607,6 +3615,11 @@ namespace Extrinsic::Sandbox::Editor
         }
         if (!readiness.Enabled && !readiness.DisabledReason.empty()) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
         if (SmoothingTransaction) DrawSmoothingTransaction(context);
+        // Also outlives the transaction: the last outcome of this output stays until its next run.
+        DrawOperationProgress(
+            SmoothingProgress.Observe(transaction.Progress,
+                                      std::to_string(model.SelectedStableId) + "/" + config.Output.Name),
+            {}, "smoothing_progress");
         DrawProcessingPropertyShowButton(context, model.SelectedStableId, config.Output, Smoothing.VisualizationDiagnostic);
         ImGui::TextDisabled(fit ? "CPU reference; penalties use the Euclidean norm over vector channels, bounds apply per channel."
                                 : "Vectors are filtered componentwise without normalization.");
@@ -3631,10 +3644,8 @@ namespace Extrinsic::Sandbox::Editor
         // A fresh snapshot: the handle may have been replaced by a start this frame.
         const auto transaction = Runtime::SnapshotEditorPropertySmoothing(commands, SmoothingTransaction);
         ImGui::SeparatorText("GPU result");
-        // The widget reports a running or accepting job; the other phases have no job to show.
-        if (transaction.Phase == Phase::Running || transaction.Phase == Phase::Accepting)
-            DrawOperationProgress(transaction.Progress, {}, "smoothing_progress");
-        else
+        // The progress widget (drawn by the panel) reports a running or accepting job.
+        if (transaction.Phase != Phase::Running && transaction.Phase != Phase::Accepting)
             ImGui::TextDisabled("State: %s%s", Runtime::ToString(transaction.Phase),
                                 transaction.Phase == Phase::ReadyToAccept && transaction.Stale ? " (stale)" : "");
         ImGui::BeginDisabled(transaction.Phase != Phase::Running);

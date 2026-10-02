@@ -165,6 +165,11 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         std::unordered_map<JobToken, EditorJobIdentity, Core::StrongHandleHash<JobTokenTag>>
             m_JobIdentities{};
         std::shared_ptr<std::atomic_bool> m_AttachmentEpoch{};
+        // Bumped on attach and whenever the scene is replaced; stamped on every
+        // operation-progress answer so panels can drop remembered outcomes.
+        std::uint64_t m_SceneEpoch{0u};
+        SceneDocumentModule* m_SceneDocuments{};
+        SceneReplacementParticipantHandle m_SceneEpochParticipant{};
         Graphics::RenderRecipeConfigContext m_RenderRecipeContext{};
         EditorRenderRecipeEditorState m_RenderRecipeState{};
         RenderArtifactRegistry m_RenderArtifactRegistry{};
@@ -489,6 +494,20 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         m_Services        = &services;
         m_AttachmentEpoch = std::make_shared<std::atomic_bool>(true);
         m_Jobs = services.Find<JobService>();
+        ++m_SceneEpoch;
+        m_SceneDocuments = services.Find<SceneDocumentModule>();
+        if (m_SceneDocuments != nullptr)
+        {
+            auto participant = m_SceneDocuments->RegisterReplacementParticipant(
+                {.Name = "EditorWorkspaceSession.OperationProgressEpoch",
+                 .AfterReplace = [epoch = m_AttachmentEpoch, this](const SceneReplacementContext&)
+                 {
+                     if (AttachmentEpochIsActive(epoch))
+                         ++m_SceneEpoch;
+                 }});
+            if (participant.has_value())
+                m_SceneEpochParticipant = *participant;
+        }
         m_PointInputReadiness = MakeEditorPointInputReadiness(
             worlds, services.Find<CommandBus>(), m_Jobs);
         m_SpatialIndices = services.Find<SpatialIndexCache>();
@@ -644,7 +663,10 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                 {
                     if (!AttachmentEpochIsActive(epoch) || m_Jobs == nullptr)
                         return {};
-                    return ProgressForEditorRun(*m_Jobs, m_JobIdentities, key);
+                    EditorOperationProgress progress =
+                        ProgressForEditorRun(*m_Jobs, m_JobIdentities, key);
+                    progress.Epoch = m_SceneEpoch;
+                    return progress;
                 };
             context.JobCommands.ReportProgress =
                 [epoch = m_AttachmentEpoch,
@@ -930,6 +952,10 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
             }
             m_KMeansCompletionSubscription = {};
             m_ClusteringService = nullptr;
+            if (m_SceneDocuments != nullptr && m_SceneEpochParticipant.IsValid())
+                (void)m_SceneDocuments->UnregisterReplacementParticipant(m_SceneEpochParticipant);
+            m_SceneEpochParticipant = {};
+            m_SceneDocuments = nullptr;
             if (m_PointCloudConsolidationService != nullptr &&
                 m_PointCloudConsolidationCompletionSubscription.IsValid())
             {
@@ -948,6 +974,8 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
             m_ClusteringService = nullptr;
             m_PointCloudConsolidationCompletionSubscription = {};
             m_PointCloudConsolidationService = nullptr;
+            m_SceneEpochParticipant = {};
+            m_SceneDocuments = nullptr;
             m_Jobs = nullptr;
         }
         m_AttachmentEpoch.reset();

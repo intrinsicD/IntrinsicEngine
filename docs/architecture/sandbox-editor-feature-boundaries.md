@@ -43,7 +43,9 @@ progress notifications read the same model. Panels draw it with the shared
 `DrawOperationProgress` in `Sandbox.PanelSupport.*`; `FormatProgressOverlay` is
 the single overlay formatter, also used by the AssetIO queue. A finished job is
 reaped a frame after it ends, so `OperationProgressMemory` keeps a panel's last
-projection until the next run. Cancel appears only while a run is active and the
+projection per run key until that key's next run; every answer carries the session
+scene epoch (advanced by scene new/load/close and reattachment), which empties the
+memory. Cancel appears only while a run is active and the
 panel supplies a cancel path (registration's own cancel; editor jobs after
 RUNTIME-279 adds `Cancel` to the surface).
 

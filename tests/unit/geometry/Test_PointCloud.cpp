@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <limits>
 #include <numbers>
+#include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -739,6 +740,33 @@ TEST(PointCloud_KMeans, TwoSeparatedBlobsProduceTwoCentroids)
     EXPECT_NEAR(result->Centroids[0].x, -9.845f, 0.25f);
     EXPECT_NEAR(result->Centroids[1].x, 10.155f, 0.25f);
     EXPECT_LT(result->Inertia, 1.0f);
+}
+
+TEST(PointCloud_KMeans, IterationObserverSeesEveryCompletedIterationAndDoesNotChangeTheResult)
+{
+    std::vector<glm::vec3> points;
+    for (int i = 0; i < 40; ++i)
+        points.emplace_back(0.37f * static_cast<float>(i % 9), 0.11f * static_cast<float>(i % 5), 0.0f);
+    Geometry::KMeans::KMeansParams params{};
+    params.ClusterCount = 4u;
+    params.MaxIterations = 6u;
+    params.ConvergenceTolerance = 0.0f; // never converges early: all iterations run
+
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> seen;
+    const auto observed = Geometry::KMeans::Cluster(
+        points, {}, params, nullptr,
+        [&](const std::uint32_t completed, const std::uint32_t max) { seen.emplace_back(completed, max); });
+    const auto plain = Geometry::KMeans::Cluster(points, params);
+    ASSERT_TRUE(observed.has_value() && plain.has_value());
+    ASSERT_FALSE(seen.empty());
+    for (std::size_t i = 0u; i < seen.size(); ++i)
+    {
+        EXPECT_EQ(seen[i].first, static_cast<std::uint32_t>(i + 1u));
+        EXPECT_EQ(seen[i].second, 6u);
+    }
+    EXPECT_EQ(seen.size(), observed->Iterations);
+    EXPECT_EQ(observed->Labels, plain->Labels);
+    EXPECT_EQ(observed->Centroids, plain->Centroids);
 }
 
 TEST(PointCloud_KMeans, CpuEntryReportsGpuRequestAsCpuFallback)

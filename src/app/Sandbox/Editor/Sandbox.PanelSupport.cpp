@@ -15,6 +15,7 @@ module;
 #include <span>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -611,9 +612,13 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::TableSetColumnIndex(6);
                 if (row.Kind == EditorBoundRenderStateRowKind::DerivedJob)
                 {
-                    ImGui::Text("%s %.2f",
-                                std::string(ToString(row.JobStatus)).c_str(),
-                                row.JobProgress);
+                    // The row's own Diagnostic column carries the text.
+                    EditorOperationProgress job{
+                        .State = ToEditorOperationState(row.JobStatus),
+                        .Determinate = row.JobProgressDeterminate,
+                        .Normalized = row.JobProgress,
+                    };
+                    DrawOperationProgress(job, {}, std::to_string(row.Job.Index).c_str());
                 }
                 else if (row.TextureAsset.IsValid() ||
                          row.AuthoredTexture.IsValid() ||
@@ -1406,12 +1411,8 @@ namespace Extrinsic::Sandbox::Editor
         {
             if (uv.UvRegenerationJob.has_value())
             {
-                const EditorJobRecord& job = *uv.UvRegenerationJob;
-                ImGui::Text("UV job: %s %.0f%%",
-                            std::string(ToString(job.State)).c_str(),
-                            job.NormalizedProgress * 100.0f);
-                if (!job.Diagnostic.empty())
-                    ImGui::TextWrapped("%s", job.Diagnostic.c_str());
+                DrawOperationProgress(
+                    ProjectEditorOperationProgress(*uv.UvRegenerationJob), {}, "uv_regeneration_progress");
             }
 
             if (!lastResult.has_value())
@@ -1627,31 +1628,52 @@ namespace Extrinsic::Sandbox::Editor
         return text;
     }
 
+    namespace
+    {
+        // A run with no measured time (a table row without it) shows none.
+        [[nodiscard]] std::optional<double> Elapsed(const EditorOperationProgress& progress)
+        {
+            return progress.ElapsedSeconds > 0.0 ? std::optional{progress.ElapsedSeconds} : std::nullopt;
+        }
+        [[nodiscard]] std::string ElapsedSuffix(const EditorOperationProgress& progress)
+        {
+            return progress.ElapsedSeconds > 0.0 ? std::format(" {:.1f}s", progress.ElapsedSeconds) : std::string{};
+        }
+    }
+
     OperationProgressView DescribeOperationProgress(
         const EditorOperationProgress& progress, const bool hasCancelHandler)
     {
         OperationProgressView view{};
+        const auto withLabel = [&](std::string_view word) {
+            return progress.Label.empty() ? std::string{word} : std::string{word} + " \xC2\xB7 " + progress.Label;
+        };
         switch (progress.State)
         {
         case EditorOperationState::Queued:
         case EditorOperationState::Running:
+        {
             view.Visible = view.Bar = true;
             view.Fraction = progress.Determinate ? std::clamp(progress.Normalized, 0.0f, 1.0f) : -1.0f;
-            view.Overlay = FormatProgressOverlay(
-                progress.Determinate, progress.Normalized,
-                !progress.Label.empty() ? std::string_view{progress.Label}
-                    : progress.State == EditorOperationState::Queued ? "queued" : "running",
-                progress.ElapsedSeconds);
+            // The state word stays visible beside the label and the percentage.
+            const std::string word = withLabel(progress.State == EditorOperationState::Queued ? "queued" : "running");
+            view.Overlay = FormatProgressOverlay(progress.Determinate, progress.Normalized, word, Elapsed(progress));
+            if (progress.Determinate)
+                view.Overlay = word + "  " + view.Overlay;
             view.ShowCancel = hasCancelHandler;
             break;
+        }
         case EditorOperationState::Succeeded:
             view.Visible = true;
-            view.Overlay = FormatProgressOverlay(true, 1.0f, {}, progress.ElapsedSeconds);
+            view.Overlay = "done" + ElapsedSuffix(progress);
             break;
         case EditorOperationState::Failed:
+            view.Visible = true;
+            view.Overlay = "failed" + ElapsedSuffix(progress);
+            break;
         case EditorOperationState::Cancelled:
             view.Visible = true;
-            view.Overlay = progress.State == EditorOperationState::Failed ? "Failed" : "Cancelled";
+            view.Overlay = "cancelled" + ElapsedSuffix(progress);
             break;
         case EditorOperationState::None:
             break;
@@ -1661,19 +1683,40 @@ namespace Extrinsic::Sandbox::Editor
         return view;
     }
 
-    const EditorOperationProgress& OperationProgressMemory::Observe(
-        const EditorOperationProgress& live, const std::uint64_t scope)
+    EditorOperationProgress MakeIterationProgress(
+        const std::size_t completedIterations, const std::uint32_t maxIterations,
+        const double elapsedSeconds, std::string label)
     {
-        if (scope != m_Scope)
+        return EditorOperationProgress{
+            .State = EditorOperationState::Running,
+            .Determinate = maxIterations > 0u,
+            .Normalized = maxIterations > 0u
+                ? std::min(1.0f, static_cast<float>(completedIterations) / static_cast<float>(maxIterations))
+                : 0.0f,
+            .ElapsedSeconds = elapsedSeconds,
+            .Label = std::move(label),
+        };
+    }
+
+    const EditorOperationProgress& OperationProgressMemory::Observe(
+        const EditorOperationProgress& live, const std::string& key)
+    {
+        if (live.Epoch != m_Epoch)
         {
-            m_Held = {};
-            m_Scope = scope;
+            m_Held.clear();
+            m_Epoch = live.Epoch;
         }
+        const auto held = m_Held.find(key);
         if (live.State != EditorOperationState::None)
-            m_Held = live;
-        else if (m_Held.State == EditorOperationState::Queued || m_Held.State == EditorOperationState::Running)
-            m_Held = {};
-        return m_Held;
+            return m_Held.insert_or_assign(key, live).first->second;
+        if (held == m_Held.end())
+            return m_None;
+        if (held->second.State == EditorOperationState::Queued || held->second.State == EditorOperationState::Running)
+        {
+            m_Held.erase(held); // vanished before its outcome was seen
+            return m_None;
+        }
+        return held->second;
     }
 
     void DrawOperationProgress(

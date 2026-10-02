@@ -32,12 +32,14 @@ import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.PointFieldOperations;
 import Extrinsic.Runtime.PointScalarTransaction;
 import Extrinsic.Runtime.ClusteringConfig;
 import Extrinsic.Runtime.AgentOperations;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
+import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.Module;
@@ -469,6 +471,27 @@ namespace
                 if (kmeans != jobs.end())
                 {
                     Job = kmeans->Token;
+                    JobCorrelation = kmeans->CorrelationId;
+                    // The shared progress model finds the run by the correlation
+                    // id of its submission: queued behind the blocker, not
+                    // reported yet, so indeterminate rather than 0%.
+                    if (!Attached)
+                    {
+                        Attachment.Attach(engine.Worlds(), engine.Services());
+                        Attached = true;
+                    }
+                    Runtime::EditorWorkspaceSnapshotRequest request{};
+                    request.Hierarchy = request.Inspector = request.Selection = request.Document = false;
+                    request.SceneFile = request.FileImport = request.AssetImportQueue = false;
+                    request.RenderGraph = request.RenderRecipe = request.CameraRender = request.Visualization = false;
+                    PreparedFrame = Runtime::PrepareEditorWorkspaceSnapshotFrame(Attachment, request).has_value();
+                    if (PreparedFrame)
+                    {
+                        const auto commands = Runtime::PrepareEditorProcessingCommands(Attachment);
+                        CommandsBound = commands.IsBound();
+                        ProgressBeforeAction = Runtime::GetEditorOperationProgress(
+                            commands, Runtime::EditorRunCorrelation{Correlation.Value});
+                    }
                     if (Action == ControlledCompletionAction::Cancel)
                     {
                         CancelAccepted = engine.Jobs().Cancel(Job);
@@ -505,6 +528,7 @@ namespace
 
         void Shutdown() override
         {
+            Attachment.Detach();
             ReleaseBlocker.store(true, std::memory_order_release);
         }
 
@@ -512,6 +536,12 @@ namespace
         Runtime::KernelEventSubscription CompletionSub{};
         Runtime::CommandCorrelationId Correlation{};
         Runtime::JobToken Job{};
+        std::uint64_t JobCorrelation{0u};
+        Runtime::EditorWorkspaceAttachment Attachment{};
+        bool Attached{false};
+        bool PreparedFrame{false};
+        bool CommandsBound{false};
+        Runtime::EditorOperationProgress ProgressBeforeAction{};
         Runtime::JobServiceStats JobStats{};
         std::optional<Runtime::KMeansRunCompleted> Completion{};
         ECS::Scene::Registry* Scene{};
@@ -1011,6 +1041,7 @@ TEST(ClusteringModule, CancelledCpuWorkPublishesCanonicalCompletion)
 
     Intrinsic::Tests::RuntimeTestKernel engine(
         NullWindowHeadlessConfig(1u), std::move(app));
+    engine.EmplaceModule<Runtime::AsyncWorkModule>(); // the editor session reaches JobService through it
     engine.EmplaceModule<Runtime::ClusteringModule>();
     engine.Initialize();
     engine.Run();
@@ -1020,6 +1051,14 @@ TEST(ClusteringModule, CancelledCpuWorkPublishesCanonicalCompletion)
     EXPECT_TRUE(appPtr->ActionTaken);
     EXPECT_TRUE(appPtr->CancelAccepted);
     ASSERT_TRUE(appPtr->Job.IsValid());
+    // The run's job carries the correlation id its submission returned, which
+    // is how the shared progress model finds it without keeping a token.
+    EXPECT_EQ(appPtr->JobCorrelation, appPtr->Correlation.Value);
+    EXPECT_TRUE(appPtr->PreparedFrame);
+    EXPECT_TRUE(appPtr->CommandsBound);
+    EXPECT_NE(appPtr->ProgressBeforeAction.State, Runtime::EditorOperationState::None);
+    EXPECT_FALSE(appPtr->ProgressBeforeAction.Determinate);
+    EXPECT_EQ(appPtr->ProgressBeforeAction.Label, "Runtime.Clustering.KMeans.CPU");
     EXPECT_GE(appPtr->JobStats.CancelledJobs, 1u);
     EXPECT_GE(appPtr->JobStats.FinalizedUnpublishedJobs, 1u);
     ASSERT_TRUE(appPtr->Completion.has_value());

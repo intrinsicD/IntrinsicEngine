@@ -3091,6 +3091,15 @@ TEST(SandboxEditorSession, OperationProgressRejectsStaleEpochHandlesAndFindsServ
     EXPECT_EQ(Runtime::GetEditorOperationProgress(commands, key).State, State::Running);
     EXPECT_FLOAT_EQ(Runtime::GetEditorOperationProgress(commands, key).Normalized, 0.5f);
 
+    // Every answer is stamped with the scene epoch, which a scene replacement
+    // advances so panels can drop what they remembered.
+    const std::uint64_t epoch = Runtime::GetEditorOperationProgress(commands, key).Epoch;
+    EXPECT_NE(epoch, 0u);
+    ASSERT_TRUE(RequiredEngineService<Runtime::SceneDocumentModule>(engine).NewSceneDocument().has_value());
+    ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment, MakeNoEditorModelBuildRequest()).has_value());
+    EXPECT_GT(Runtime::GetEditorOperationProgress(Runtime::PrepareEditorProcessingCommands(attachment), key).Epoch,
+              epoch);
+
     attachment.Detach();
     attachment.Attach(engine.Worlds(), engine.Services());
     ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment, MakeNoEditorModelBuildRequest()).has_value());

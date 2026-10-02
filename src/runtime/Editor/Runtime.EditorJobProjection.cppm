@@ -93,6 +93,10 @@ export namespace Extrinsic::Runtime
         double ElapsedSeconds{0.0};
         std::string Label{};
         std::string Diagnostic{};
+        // Session scene epoch the answer belongs to (also set for `None`);
+        // it changes when the scene is replaced (new, load, close) or the
+        // workspace is reattached, so a panel can drop what it remembered.
+        std::uint64_t Epoch{0u};
     };
     // A service run's command correlation id (`CommandCorrelationId::Value`),
     // restated here so the projection does not import the command bus.

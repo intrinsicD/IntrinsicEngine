@@ -63,13 +63,13 @@ MCP progress notifications read the same model.
    - texture bake/keypoints
 
 ## Acceptance criteria
-- [ ] The read-model types live in `Runtime.EditorJobProjection.cppm`. `EditorJobCommandSurface::Progress(key)` resolves an identity or a correlation id to that run's own job, and returns `State::None` for unknown, stale-epoch or pruned keys.
+- [x] The read-model types live in `Runtime.EditorJobProjection.cppm`. `EditorJobCommandSurface::Progress(key)` resolves a job token, an identity (newest run of that output) or a correlation id to that run's own job, and returns `State::None` for unknown, stale-epoch or pruned keys.
 - [ ] K-Means and point-cloud consolidation runs resolve by correlation id, never by "oldest job".
-- [ ] A job that has not reported progress projects as indeterminate, never as 0%. The K-Means and mesh-field solver workers report progress.
-- [ ] `DrawOperationProgress` (Sandbox.PanelSupport) meets slice 2; the overlay text helper is shared with the asset import queue, with no second copy.
-- [ ] Mesh-field, UV regeneration, K-Means and registration/CPD panels use the widget.
+- [x] A job that has not reported progress projects as indeterminate, never as 0%. The K-Means and mesh-field solver workers report progress (K-Means per Lloyd iteration, implicit smoothing per chained solve; the other mesh-field operations are single-pass or synchronous and stay indeterminate).
+- [x] `DrawOperationProgress` (Sandbox.PanelSupport) meets slice 2; the overlay text helper is shared with the asset import queue, with no second copy. Panels keep the last finished projection per key in `OperationProgressMemory` (dropped on scene replacement through the session scene epoch); ICP/CPD report finished runs through their own result and phase lines.
+- [x] Mesh-field (property smoothing), UV regeneration, K-Means and registration/CPD panels use the widget.
 - [ ] The remaining method panels use the widget, or each is listed here with its owning follow-up.
-- [ ] Tests:
+- [x] Tests:
   - projection and lookup contract in `Test.SandboxEditorSessionLifecycle.cpp` (`SandboxEditorJobHarness`): queued, determinate, never-reported, failed, cancelled; own job wins over an older running one; correlation key; stale epoch.
   - ImGui widget test following `Test.SandboxProcessingPanels.cpp`: determinate, indeterminate, Cancel visibility and callback.
 - [ ] Docs: `docs/architecture/sandbox-editor-feature-boundaries.md` and the module inventory are current.
