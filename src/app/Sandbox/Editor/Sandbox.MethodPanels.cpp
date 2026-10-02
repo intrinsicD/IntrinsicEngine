@@ -1942,15 +1942,22 @@ namespace Extrinsic::Sandbox::Editor
                 }
             }
             ImGui::EndDisabled();
-            // The run's own job, found by the correlation id its submission returned.
-            DrawOperationProgress(
-                KMeans.Progress.Observe(
-                    KMeans.LastResult && KMeans.LastResult->Correlation.IsValid()
-                        ? Runtime::GetEditorOperationProgress(
-                              service.Commands, Runtime::EditorRunCorrelation{KMeans.LastResult->Correlation.Value})
-                        : Runtime::EditorOperationProgress{},
-                    std::to_string(KMeans.Entity) + "/" + KMeans.Properties.OutputLabels.Name),
-                {}, "kmeans_progress");
+            // The run's own job, found by the correlation id its submission returned, and keyed
+            // by the run's own entity and output (the selection may have moved on); shown only
+            // while that entity is selected. Always asked, so even "no run" carries the scene epoch.
+            {
+                const auto* run = KMeans.LastResult.has_value() ? &*KMeans.LastResult : nullptr;
+                const auto live = Runtime::GetEditorOperationProgress(
+                    service.Commands,
+                    Runtime::EditorRunCorrelation{run != nullptr ? run->Correlation.Value : 0u});
+                if (run != nullptr)
+                {
+                    const auto& remembered = KMeans.Progress.Observe(
+                        live, std::to_string(run->StableEntityId) + "/" + run->Properties.OutputLabels.Name);
+                    if (run->StableEntityId == model.SelectedStableId)
+                        DrawOperationProgress(remembered, {}, "kmeans_progress");
+                }
+            }
             ImGui::SeparatorText("Display output properties");
             DrawProcessingPropertyShowButton(context, model.SelectedStableId, KMeans.Properties.OutputLabels, KMeans.VisualizationDiagnostic);
             DrawProcessingPropertyShowButton(context, model.SelectedStableId, KMeans.Properties.OutputColors, KMeans.VisualizationDiagnostic);

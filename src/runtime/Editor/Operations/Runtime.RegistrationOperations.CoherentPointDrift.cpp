@@ -349,6 +349,10 @@ namespace Extrinsic::Runtime
             {
                 run.Initialized = true;
                 run.Started = run.LastIteration = now();
+                {
+                    std::scoped_lock lock{run.Mutex};
+                    run.Snapshot.RunStarted = run.Started;
+                }
                 const auto status = run.Solver.Initialize(run.TargetWorld, run.SourceWorld, run.Params);
                 if (status != CPD::Status::Success)
                 {

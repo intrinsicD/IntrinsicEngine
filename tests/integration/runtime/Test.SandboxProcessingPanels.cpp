@@ -2662,6 +2662,63 @@ TEST(SandboxProcessingPanels, KMeansAdmissionKeepsControlsVisibleAndRetriesRejec
     EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
 }
 
+// The run's progress belongs to the entity it ran on: after the selection moves to
+// another entity nothing of it shows, and it comes back with the original selection.
+TEST(SandboxProcessingPanels, KMeansProgressShowsOnlyForTheEntityItRanOn)
+{
+    PanelHarness h(Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry(), true);
+    auto& scene = h.Scene();
+    const auto a = scene.Create(), b = scene.Create();
+    PopulateSamples(scene.Raw(), a, R::GeometryElementDomain::PointCloudPoint);
+    PopulateSamples(scene.Raw(), b, R::GeometryElementDomain::PointCloudPoint);
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, a));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("pointcloud.processing.kmeans", true));
+    std::optional<R::KMeansRunCompleted> result;
+    const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+        .Id = "test.kmeans_progress_observer", .MenuPath = {"View"}, .Title = "K-Means progress observer",
+        .OpenByDefault = true,
+        .Draw = [&](bool&, const Editor::SandboxEditorContext& context) {
+            result = context.PointCloudService->Results.LastKMeansResult;
+        }});
+    int frame = 0, step = 0, phase = 0;
+    float heightWithRun = 0.0f, heightOtherEntity = 0.0f;
+    bool completed = false;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        if (++frame > 600) { ADD_FAILURE() << "K-Means progress test did not finish"; engine.RequestExit(); return; }
+        auto* window = ImGui::FindWindowByName("PointCloud / Processing / K-Means");
+        if (!window) return;
+        ImGui::SetWindowSize(window, {850, 1500});
+        ImGui::SetWindowPos(window, {0, 0});
+        ++step;
+        if (phase == 0 && step == 3) ImGui::ActivateItemByID(window->GetID("Run K-Means##KMeans"));
+        if (phase == 0 && step > 5 && result && result->Status != R::KMeansRunStatus::Queued)
+        {
+            EXPECT_TRUE(result->Succeeded()) << result->Message;
+            phase = 1; step = 0;
+        }
+        if (phase == 1 && step == 4)
+        {
+            heightWithRun = window->ContentSize.y; // "done" bar of the run on A
+            EXPECT_TRUE(h.Selection().SetSelectedEntity(scene, b));
+        }
+        if (phase == 1 && step == 8)
+        {
+            heightOtherEntity = window->ContentSize.y;
+            EXPECT_LT(heightOtherEntity, heightWithRun) << "B must not show A's run";
+            EXPECT_TRUE(h.Selection().SetSelectedEntity(scene, a));
+        }
+        if (phase == 1 && step == 12)
+        {
+            EXPECT_FLOAT_EQ(window->ContentSize.y, heightWithRun) << "A's outcome is remembered";
+            completed = true;
+            engine.RequestExit();
+        }
+    };
+    h.Engine->Run();
+    EXPECT_TRUE(completed);
+    EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
+}
+
 TEST(SandboxProcessingPanels, ConsolidationNormalsRequireExplicitSelectionAndSurvivePositionChanges)
 {
     for (const std::string normalName : {"v:normal", "directions"})
@@ -3897,6 +3954,11 @@ TEST(SandboxProcessingPanels, OperationProgressMemoryKeepsTheLastFinishedRunPerK
     EXPECT_EQ(memory.Observe(none(1u), "7/a").State, State::None) << "a run that vanished unseen has no outcome to show";
     EXPECT_EQ(memory.Observe(none(1u), "7/b").State, State::Succeeded) << "other keys are untouched";
 
+    // An unstamped answer (no runtime surface, or "no run" before a stamp) is no scene change.
+    EXPECT_EQ(memory.Observe(with(failed, 1u), "7/a").State, State::Failed);
+    EXPECT_EQ(memory.Observe(none(0u), "7/a").State, State::Failed);
+    EXPECT_EQ(memory.Observe(none(0u), "7/b").State, State::Succeeded);
+
     // A scene load or new scene changes the epoch and drops everything.
     EXPECT_EQ(memory.Observe(none(2u), "7/b").State, State::None);
     EXPECT_EQ(memory.Observe(with(done, 2u), "7/b").State, State::Succeeded);
@@ -3963,4 +4025,125 @@ TEST(SandboxProcessingPanels, OperationProgressWidgetCancelRequiresAnActiveRunAn
     h.Engine->Run();
     EXPECT_TRUE(done);
     EXPECT_TRUE(h.Shell.UnregisterEditorWindow(windowHandle));
+}
+
+namespace
+{
+    void PopulateLargeCloud(auto& raw, const auto entity, const std::size_t count, const float shift)
+    {
+        Geometry::PointCloud::Cloud cloud;
+        std::uint32_t seed = 12345u;
+        const auto next = [&seed] { seed = seed * 1664525u + 1013904223u; return float(seed >> 8) / 16777216.0f; };
+        for (std::size_t i = 0u; i < count; ++i)
+            (void)cloud.AddPoint({next() + shift, next(), next()});
+        GS::PopulateFromCloud(raw, entity, cloud);
+        raw.template emplace<G::RenderPoints>(entity);
+    }
+
+    [[nodiscard]] bool AnyActiveJob(R::Engine& engine)
+    {
+        for (const auto& job : engine.Jobs().SnapshotAll())
+            if (R::IsActiveEditorJobState(job.State)) return true;
+        return false;
+    }
+}
+
+// A run that never converges ends only through the widget's Cancel, which calls the
+// panel's existing cancel (CancelEditorRegistration).
+TEST(SandboxProcessingPanels, IcpProgressWidgetCancelStopsARunThatNeverConverges)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    using Transform = Extrinsic::ECS::Components::Transform::Component;
+    const auto source = scene.Create(), target = scene.Create();
+    PopulateLargeCloud(scene.Raw(), source, 20000u, 0.0f);
+    PopulateLargeCloud(scene.Raw(), target, 20000u, 0.2f);
+    for (const auto entity : {source, target}) scene.Raw().emplace<Transform>(entity);
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, source));
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto registration = *R::GetRegistrationConfig(config);
+    registration.SourceStableEntityId = R::SelectionController::ToStableEntityId(source);
+    registration.TargetStableEntityId = R::SelectionController::ToStableEntityId(target);
+    registration.MaxIterations = 100000u;
+    registration.ConvergenceThreshold = 0.0;
+    registration.InlierRatio = 1.0;
+    R::SetRegistrationConfig(config, registration);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.registration", true));
+    int frame = 0, step = 0, activeFrames = 0, cancelFrame = -1, holdUntil = -1;
+    bool completed = false;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        if (++frame > 3000) { ADD_FAILURE() << "ICP did not stop"; engine.RequestExit(); return; }
+        auto* window = ImGui::FindWindowByName("ICP Registration");
+        if (!window) return;
+        ImGui::SetWindowSize(window, {750, 1400});
+        ImGui::SetWindowPos(window, {0, 0});
+        ++step;
+        if (step == 3) ImGui::ActivateItemByID(window->GetID("Run ICP##ICP"));
+        if (step > 3 && AnyActiveJob(engine)) ++activeFrames;
+        if (activeFrames > 10 && holdUntil < 0) holdUntil = frame + 40;
+        // The run does not end on its own: it stays active through the hold.
+        if (holdUntil >= 0 && frame <= holdUntil) EXPECT_TRUE(AnyActiveJob(engine)) << "frame " << frame;
+        if (holdUntil >= 0 && frame > holdUntil && cancelFrame < 0) cancelFrame = frame;
+        if (cancelFrame >= 0)
+        {
+            // The button only exists while the run is active; activating it every frame is a no-op afterwards.
+            ImGui::ActivateItemByID(ImHashStr("Cancel", 0, ImHashStr("icp_progress", 0, window->ID)));
+            if (!AnyActiveJob(engine) && frame > cancelFrame + 2)
+            {
+                completed = true;
+                engine.RequestExit();
+            }
+        }
+    };
+    h.Engine->Run();
+    EXPECT_TRUE(completed) << "the 100000-iteration run only ends through Cancel";
+}
+
+TEST(SandboxProcessingPanels, CpdProgressWidgetCancelStopsARunToTheCap)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    using Transform = Extrinsic::ECS::Components::Transform::Component;
+    const auto source = scene.Create(), target = scene.Create();
+    PopulateLargeCloud(scene.Raw(), source, 4000u, 0.0f);
+    PopulateLargeCloud(scene.Raw(), target, 4000u, 0.2f);
+    for (const auto entity : {source, target}) scene.Raw().emplace<Transform>(entity);
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, source));
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto cpd = *R::GetCoherentPointDriftConfig(config);
+    cpd.SourceStableEntityId = R::SelectionController::ToStableEntityId(source);
+    cpd.TargetStableEntityId = R::SelectionController::ToStableEntityId(target);
+    cpd.MaxIterations = 10000u;
+    cpd.Tolerance = 0.0;
+    R::SetCoherentPointDriftConfig(config, cpd);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.coherent_point_drift", true));
+    int frame = 0, step = 0, activeFrames = 0, cancelFrame = -1, holdUntil = -1;
+    bool completed = false;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        if (++frame > 3000) { ADD_FAILURE() << "CPD did not stop"; engine.RequestExit(); return; }
+        auto* window = ImGui::FindWindowByName("Coherent Point Drift");
+        if (!window) return;
+        ImGui::SetWindowSize(window, {500, 1400});
+        ImGui::SetWindowPos(window, {0, 0});
+        ++step;
+        if (step == 3) ImGui::ActivateItemByID(window->GetID("Start##CPD"));
+        if (step == 6) ImGui::ActivateItemByID(window->GetID("Run to end##CPD"));
+        if (step > 6 && AnyActiveJob(engine)) ++activeFrames;
+        if (activeFrames > 10 && holdUntil < 0) holdUntil = frame + 40;
+        if (holdUntil >= 0 && frame <= holdUntil) EXPECT_TRUE(AnyActiveJob(engine)) << "frame " << frame;
+        if (holdUntil >= 0 && frame > holdUntil && cancelFrame < 0) cancelFrame = frame;
+        if (cancelFrame >= 0)
+        {
+            ImGui::ActivateItemByID(ImHashStr("Cancel", 0, ImHashStr("cpd_progress", 0, window->ID)));
+            if (!AnyActiveJob(engine) && frame > cancelFrame + 2)
+            {
+                completed = true;
+                engine.RequestExit();
+            }
+        }
+    };
+    h.Engine->Run();
+    EXPECT_TRUE(completed) << "the 10000-iteration run only ends through Cancel";
 }

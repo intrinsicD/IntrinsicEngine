@@ -353,6 +353,7 @@ namespace Extrinsic::Sandbox::Editor
             std::string LastApplied{};
             // UI-067: the live view of the last run, its preview and plots.
             Runtime::EditorRegistrationProgressHandle Progress{};
+            std::uint32_t RunMaxIterations{0u}; // iteration cap of the run in flight, captured at its start
             bool LivePreview{true}, PlotBySeconds{false}, PreviewShown{false};
             std::uint64_t PreviewRevision{0u};
         };
@@ -374,6 +375,7 @@ namespace Extrinsic::Sandbox::Editor
             Runtime::CoherentPointDriftConfig Draft{};
             std::string LastApplied{}, ConfigDiagnostic{};
             Runtime::EditorCoherentPointDriftRunHandle Run{};
+            std::uint32_t RunMaxIterations{0u}; // iteration cap of the run in flight, captured at its start
             std::string RunMessage{}, ExportMessage{};
             std::optional<Runtime::EditorCoherentPointDriftResult> LastResult{};
             bool LivePreview{true};
@@ -410,6 +412,9 @@ namespace Extrinsic::Sandbox::Editor
         // user accepts or discards it.
         Runtime::EditorPropertySmoothingTransactionHandle SmoothingTransaction{};
         OperationProgressMemory SmoothingProgress{};
+        // The last transaction's own entity and output (the selection may move on).
+        std::uint32_t SmoothingProgressEntity{0u};
+        std::string SmoothingProgressKey{};
         std::uint32_t SmoothingEntity{};
         ProcessingDraftState<Runtime::HarmonicFieldConfig, Runtime::EditorHarmonicFieldResult> Harmonic{};
         std::uint32_t HarmonicEntity{};
@@ -2892,6 +2897,7 @@ namespace Extrinsic::Sandbox::Editor
         if (runFinal || (applyTrajectory && readiness.Enabled && !live.Running))
         {
             Registration.Progress = Runtime::MakeEditorRegistrationProgress();
+            Registration.RunMaxIterations = static_cast<std::uint32_t>(config.MaxIterations); // the run's cap, not the editable draft
             ApplyProcessingExecution(Registration, config,
                 [&](const auto& value) { return Runtime::ApplyEditorRegistrationConfig(context.Registration.Commands, value); },
                 [&] {
@@ -2900,7 +2906,7 @@ namespace Extrinsic::Sandbox::Editor
                 },
                 context.Registration.ResultSinks.Registration, "Registration config was rejected.");
         }
-        DrawRegistrationProgress(live, static_cast<std::uint32_t>(config.MaxIterations));
+        DrawRegistrationProgress(live, Registration.RunMaxIterations);
 
         if (!Registration.LastResult.has_value())
         {
@@ -3193,6 +3199,7 @@ namespace Extrinsic::Sandbox::Editor
                 snapshotStale = true;
                 Runtime::EditorCoherentPointDriftResult failure;
                 state.Run = Runtime::StartEditorCoherentPointDrift(commands, config, failure);
+                state.RunMaxIterations = config.MaxIterations; // the run's cap, not the editable draft
                 state.RunMessage = state.Run ? std::string{} : failure.Message;
             }
             if (!readiness.Enabled && !readiness.DisabledReason.empty()) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
@@ -3254,11 +3261,10 @@ namespace Extrinsic::Sandbox::Editor
             // UI-067: what a running step is doing right now, and for how long.
             if (snapshot.Phase == Phase::Running)
             {
-                const double stageSeconds = snapshot.Stage.empty() ? 0.0
-                    : std::chrono::duration<double>(std::chrono::steady_clock::now() - snapshot.StageStarted).count();
+                const double elapsed = snapshot.RunStarted == std::chrono::steady_clock::time_point{} ? 0.0
+                    : std::chrono::duration<double>(std::chrono::steady_clock::now() - snapshot.RunStarted).count();
                 DrawOperationProgress(
-                    MakeIterationProgress(snapshot.Trace.size(), config.MaxIterations,
-                                          (snapshot.Trace.empty() ? 0.0 : snapshot.Trace.back().Seconds) + stageSeconds,
+                    MakeIterationProgress(snapshot.Trace.size(), state.RunMaxIterations, elapsed,
                                           "iteration " + std::to_string(snapshot.Trace.size() + 1u) +
                                               (snapshot.Stage.empty() ? std::string{} : ": " + snapshot.Stage)),
                     [&] { Runtime::CancelEditorCoherentPointDrift(state.Run); }, "cpd_progress");
@@ -3615,11 +3621,19 @@ namespace Extrinsic::Sandbox::Editor
         }
         if (!readiness.Enabled && !readiness.DisabledReason.empty()) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
         if (SmoothingTransaction) DrawSmoothingTransaction(context);
-        // Also outlives the transaction: the last outcome of this output stays until its next run.
-        DrawOperationProgress(
-            SmoothingProgress.Observe(transaction.Progress,
-                                      std::to_string(model.SelectedStableId) + "/" + config.Output.Name),
-            {}, "smoothing_progress");
+        // Also outlives the transaction: the last outcome of its output stays until its next run.
+        // Keyed by the run's own entity and output, and shown only while that entity is selected.
+        if (SmoothingTransaction)
+        {
+            SmoothingProgressEntity = transaction.StableEntityId;
+            SmoothingProgressKey = std::to_string(transaction.StableEntityId) + "/" + transaction.OutputName;
+        }
+        if (!SmoothingProgressKey.empty())
+        {
+            const auto& remembered = SmoothingProgress.Observe(transaction.Progress, SmoothingProgressKey);
+            if (SmoothingProgressEntity == model.SelectedStableId)
+                DrawOperationProgress(remembered, {}, "smoothing_progress");
+        }
         DrawProcessingPropertyShowButton(context, model.SelectedStableId, config.Output, Smoothing.VisualizationDiagnostic);
         ImGui::TextDisabled(fit ? "CPU reference; penalties use the Euclidean norm over vector channels, bounds apply per channel."
                                 : "Vectors are filtered componentwise without normalization.");

@@ -1134,7 +1134,10 @@ namespace Extrinsic::Runtime
                                                                                const EditorPropertySmoothingTransactionHandle& run)
     {
         EditorPropertySmoothingTransactionSnapshot snapshot;
-        if (!run) return snapshot;
+        // Always asked, so even "no run" carries the session scene epoch.
+        if (!run) { snapshot.Progress = GetEditorOperationProgress(commands, JobToken{}); return snapshot; }
+        snapshot.StableEntityId = run->Identity.EntityId;
+        snapshot.OutputName = run->Identity.OutputName;
         // Key by the run's own jobs, not the output: the Accept readback job
         // shares the identity and would otherwise mask the solver's fraction.
         snapshot.Progress = GetEditorOperationProgress(

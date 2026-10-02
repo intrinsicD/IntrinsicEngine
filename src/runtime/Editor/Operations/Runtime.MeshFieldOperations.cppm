@@ -206,6 +206,10 @@ export namespace Extrinsic::Runtime
         // implicit solves report a determinate fraction, everything else is
         // indeterminate Running.
         EditorOperationProgress Progress{};
+        // The run's own entity and output, for panels that key by them: the
+        // selection may have moved on since the run started.
+        std::uint32_t StableEntityId{0u};
+        std::string OutputName{};
     };
     // The run's job state; the handle keeps it alive across frames.
     struct EditorPropertySmoothingTransaction;

@@ -209,6 +209,8 @@ export namespace Extrinsic::Runtime
         // "expectation_step", ...) and when it began, for a live progress line.
         std::string Stage{};
         std::chrono::steady_clock::time_point StageStarted{};
+        // When the run's first step began (default-constructed before then).
+        std::chrono::steady_clock::time_point RunStarted{};
     };
 
     struct EditorCoherentPointDriftRun;

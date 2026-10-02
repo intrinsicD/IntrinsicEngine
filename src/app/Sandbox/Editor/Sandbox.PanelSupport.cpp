@@ -1701,7 +1701,9 @@ namespace Extrinsic::Sandbox::Editor
     const EditorOperationProgress& OperationProgressMemory::Observe(
         const EditorOperationProgress& live, const std::string& key)
     {
-        if (live.Epoch != m_Epoch)
+        // An unstamped answer (Epoch 0: no runtime surface behind the handle)
+        // says nothing about the scene and must not wipe what is remembered.
+        if (live.Epoch != 0u && live.Epoch != m_Epoch)
         {
             m_Held.clear();
             m_Epoch = live.Epoch;
