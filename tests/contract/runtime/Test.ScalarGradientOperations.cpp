@@ -178,3 +178,22 @@ TEST(ScalarGradientOperations, ReadinessReportsEveryIndependentReasonInOrder)
     ASSERT_FALSE(readiness.Reasons.empty());
     EXPECT_EQ(readiness.DisabledReason, readiness.Reasons.front().Message);
 }
+
+// RUNTIME-277 review: a cross-field rejection is one reason, not also the property checks it implies, and a
+// mesh-topology failure names no config field (the UI must not mark the positions control for it).
+TEST(ScalarGradientOperations, ReadinessDoesNotRepeatAFaultOrBlameThePositionsField)
+{
+    using C = R::ActionReadinessCode;
+    GradientHarness structural;
+    structural.Config.Output.Name = "f:deleted";
+    structural.Config.Scalar.Name = "pressure"; // missing too, but the conflicting output is the one fault reported
+    auto readiness = R::PreviewEditorScalarGradientCommand(structural.Commands(), structural.Id(), structural.Config);
+    ASSERT_EQ(readiness.Reasons.size(), 1u) << readiness.DisabledReason;
+    EXPECT_EQ(readiness.Reasons[0].Code, C::ConflictingOptions);
+    EXPECT_TRUE(readiness.Reasons[0].Field.empty());
+
+    GradientHarness polygon(true);
+    readiness = R::PreviewEditorScalarGradientCommand(polygon.Commands(), polygon.Id(), polygon.Config);
+    ASSERT_EQ(readiness.Reasons.size(), 1u);
+    EXPECT_TRUE(readiness.Reasons[0].Field.empty()) << readiness.Reasons[0].Field;
+}

@@ -262,3 +262,24 @@ TEST(LaplacianEigenbasisOperations, ReadinessReportsEveryIndependentReasonInOrde
     ASSERT_FALSE(readiness.Reasons.empty());
     EXPECT_EQ(readiness.DisabledReason, readiness.Reasons.front().Message);
 }
+
+// RUNTIME-277 review: one fault is one reason. A cross-field rejection (a duplicated output name) does not also
+// raise the output property check, and positions on a domain without rows are the "domain" reason alone.
+TEST(LaplacianEigenbasisOperations, ReadinessDoesNotRepeatAFault)
+{
+    using C = R::ActionReadinessCode;
+    Harness duplicated(D::GraphNode);
+    duplicated.Config.SignatureOutput = "eigen_0"; // also mode 0's name
+    (void)duplicated.Props(D::GraphNode).GetOrAdd<double>("eigen_0", 0.0);
+    auto readiness = R::PreviewEditorLaplacianEigenbasisCommand(duplicated.Commands(), duplicated.Id(), duplicated.Config);
+    ASSERT_EQ(readiness.Reasons.size(), 1u) << readiness.DisabledReason;
+    EXPECT_EQ(readiness.Reasons[0].Code, C::ConflictingOptions);
+
+    Harness noRows(D::GraphNode);
+    noRows.Config.Domain = D::MeshVertex;
+    noRows.Config.Positions = {D::MeshVertex, "samples", K::Vec3};
+    readiness = R::PreviewEditorLaplacianEigenbasisCommand(noRows.Commands(), noRows.Id(), noRows.Config);
+    ASSERT_EQ(readiness.Reasons.size(), 1u) << readiness.DisabledReason;
+    EXPECT_EQ(readiness.Reasons[0].Code, C::WrongDomain);
+    EXPECT_EQ(readiness.Reasons[0].Field, "domain");
+}

@@ -525,6 +525,8 @@ TEST(SandboxProcessingPanels, RunActionExplainsWhyItIsDisabledWhileAGpuRunIsPend
     const auto pending = Editor::ReadinessWhileGpuRunPending({.Enabled = true}, true);
     EXPECT_FALSE(pending.Enabled);
     EXPECT_EQ(pending.DisabledReason, Editor::kPendingGpuRunReason);
+    ASSERT_EQ(pending.Reasons.size(), 1u);
+    EXPECT_EQ(pending.Reasons[0].Code, R::ActionReadinessCode::JobActive);
     const auto refused = Editor::ReadinessWhileGpuRunPending({.Enabled = false, .DisabledReason = "Select a point cloud."}, true);
     EXPECT_EQ(refused.DisabledReason, "Select a point cloud.");
 }

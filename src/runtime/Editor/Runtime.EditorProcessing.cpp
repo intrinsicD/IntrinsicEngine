@@ -125,7 +125,6 @@ namespace Extrinsic::Runtime
         using C = ActionReadinessCode;
         switch (code)
         {
-        case C::Ok: return "ok";
         case C::WorkspaceUnavailable: return "workspace_unavailable";
         case C::MissingEntity: return "missing_entity";
         case C::WrongDomain: return "wrong_domain";

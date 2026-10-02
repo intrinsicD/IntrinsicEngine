@@ -177,6 +177,9 @@ namespace Extrinsic::Runtime
                 reasons.push_back({C::WorkspaceUnavailable, {}, "Workspace is unavailable."});
                 return {};
             }
+            // A cross-field rejection (e.g. an output naming structural storage) already explains its outputs.
+            const bool conflicting = std::ranges::any_of(reasons,
+                [](const ActionReadinessReason& reason) { return reason.Code == C::ConflictingOptions; });
             const auto open = [&](std::string_view field) { return !ReadinessNamesField(reasons, field); };
             const auto entity = EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(), id);
             if (!entity)
@@ -187,7 +190,7 @@ namespace Extrinsic::Runtime
             const auto a = BuildGeometryAvailability(context.Scene->Raw(), *entity);
             const auto* props = ResolveGeometryPropertySet(a, c.Domain);
             if (!props) reasons.push_back({C::WrongDomain, "domain", "The entity has no rows on the selected domain."});
-            else
+            else if (!conflicting)
                 for (const auto& ref : Outputs(c))
                 {
                     const std::string field = ref.Name == c.SignatureOutput ? "signature_output"
@@ -196,7 +199,8 @@ namespace Extrinsic::Runtime
                         !(ResolveGeometryProperty(a, ref, props->Size(), false).Resolved() && PG::CountMatches(*props, ref)))
                         reasons.push_back({C::IncompatibleProperty, field, "Output '" + ref.Name + "' exists with a different storage type or cardinality."});
                 }
-            if (open("positions"))
+            // Positions on the domain that has no rows are the "domain" reason already.
+            if (open("positions") && !(!props && c.Positions.Domain == c.Domain))
             {
                 const auto* positions = ResolveGeometryPropertySet(a, c.Positions.Domain);
                 if (c.Positions.Domain != c.Domain && c.Positions.Domain != GP::PrimaryPointDomain(a))

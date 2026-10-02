@@ -15,6 +15,7 @@ namespace Extrinsic::Runtime
         const std::span<const ConfigFieldSpec> fields,
         const Core::Config::EngineConfigSectionValidationResult& validation)
     {
+        if (validation.Usable()) return; // a valid config allocates nothing per frame
         const auto before = reasons.size();
         for (auto& error : ConfigDetail::CollectDeclaredFieldErrors(nlohmann::json::parse(payload, nullptr, false), fields))
             reasons.push_back({.Code = ActionReadinessCode::InvalidConfig, .Field = std::move(error.Field),

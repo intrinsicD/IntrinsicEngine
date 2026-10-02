@@ -106,6 +106,9 @@ namespace Extrinsic::Runtime
                 reasons.push_back({C::WorkspaceUnavailable, {}, "Scene is unavailable."});
                 return {};
             }
+            // A cross-field rejection already explains the property names it concerns.
+            const bool conflicting = std::ranges::any_of(reasons,
+                [](const ActionReadinessReason& reason) { return reason.Code == C::ConflictingOptions; });
             const auto open = [&](std::string_view field) { return !ReadinessNamesField(reasons, field); };
             const auto entity = EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(), id);
             if (!entity)
@@ -118,9 +121,11 @@ namespace Extrinsic::Runtime
             if (std::string diagnostic;
                 MS::ValidateMeshSoupSourceMetadata(view, diagnostic, c.Positions.Name) != EditorCommandStatus::Applied)
             {
-                reasons.push_back({C::WrongDomain, "positions", std::move(diagnostic)});
+                // Metadata and face-ring topology failures concern the mesh, not the positions control.
+                reasons.push_back({C::Unclassified, {}, std::move(diagnostic)});
                 return {};
             }
+            if (conflicting) return {};
             if (open("scalar") && DetectGeometryPropertyValueKind(view.VertexSource->Properties, c.Scalar.Name) != c.Scalar.ValueKind)
                 reasons.push_back({C::MissingProperty, "scalar", "Choose an existing scalar vertex property with matching storage type."});
             const auto& faces = view.FaceSource->Properties;
@@ -174,7 +179,7 @@ namespace Extrinsic::Runtime
         if (const auto entity = GradientTarget(context, id, c, reasons); entity)
             if (std::string diagnostic; !MS::PrepareMeshSoupFaceRings(context, *entity,
                     BuildGeometryAvailability(context.Scene->Raw(), *entity), diagnostic, c.Positions, true))
-                reasons.push_back({ActionReadinessCode::WrongDomain, "positions", std::move(diagnostic)});
+                reasons.push_back({ActionReadinessCode::Unclassified, {}, std::move(diagnostic)}); // the mesh, not the positions control
         return MakeActionReadiness(std::move(reasons));
     }
     EditorScalarGradientResult ApplyEditorScalarGradientCommand(

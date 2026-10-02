@@ -571,6 +571,12 @@ TEST(NormalEstimationConfig, RoundTripAndSharedPreviewApplyRun)
         EXPECT_EQ(action.DisabledReason, unavailable.DisabledReason) << missing;
         EXPECT_EQ(R::ResolveEditorProcessingActionReadiness(handle, {false, "method blocked"}).DisabledReason,
                   unavailable.DisabledReason) << missing;
+        // The missing lane leads and a text-only method reason follows as an Unclassified reason.
+        const auto both = R::ResolveEditorProcessingActionReadiness(handle, {false, "method blocked"});
+        ASSERT_EQ(both.Reasons.size(), 2u) << missing;
+        EXPECT_EQ(both.Reasons[0].Code, R::ActionReadinessCode::WorkspaceUnavailable) << missing;
+        EXPECT_EQ(both.Reasons[1].Code, R::ActionReadinessCode::Unclassified) << missing;
+        EXPECT_EQ(both.Reasons[1].Message, "method blocked") << missing;
         EXPECT_FALSE(R::ApplyEditorNormalEstimationConfig(handle, config).Succeeded()) << missing;
     }
     EXPECT_EQ(previews, 0u);

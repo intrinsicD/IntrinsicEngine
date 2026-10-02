@@ -76,7 +76,7 @@ export namespace Extrinsic::Runtime
     // marks a reason from a producer that only supplies text (a plain `{false, "..."}` readiness).
     enum class ActionReadinessCode : std::uint8_t
     {
-        Ok, WorkspaceUnavailable, MissingEntity, WrongDomain, MissingProperty, IncompatibleProperty,
+        WorkspaceUnavailable, MissingEntity, WrongDomain, MissingProperty, IncompatibleProperty,
         ElementCountMismatch, InvalidConfig, ConflictingOptions, DeviceUnavailable, KernelUnavailable,
         JobActive, StaleInput, PendingVerdict, Unclassified,
     };
