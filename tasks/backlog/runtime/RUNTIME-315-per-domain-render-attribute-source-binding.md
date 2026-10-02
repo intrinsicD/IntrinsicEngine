@@ -233,8 +233,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
   (canonical by default), which is the operator's "BVH follows display"
   reading for picking (the pick path has no BVH; a future cache-backed pick
   query must index the displayed positions, noted in
-  `spatial-index-consumers.md`). Camera focus still frames the canonical
-  bounds component. With every table row now drawn, the slice-3 "not drawn
+  `spatial-index-consumers.md`). With every table row now drawn, the slice-3 "not drawn
   yet" gate (`Consumed`, `AttributeBindingNotYetSupported`) is removed.
 - 2026-10-02: Slice 7 (coverage and handoff). One table-driven contract test
   binds and defaults every `RenderAttributeRules()` row on a mesh, a graph and a
@@ -251,3 +250,15 @@ python3 tools/agents/check_task_policy.py --root . --strict
   without a stale or half-published frame. Agent parity is `RUNTIME-316`, the
   panel is `UI-075`, the presentation color slots are `RUNTIME-318`, and
   processed-property persistence is `RUNTIME-319`.
+- 2026-10-02: Review findings closed. Camera focus (the `F` action, the
+  camera pose/preset command and view-capture fit) frames the displayed
+  bounds through `ResolveEntityDisplayedPositions`, the entity-level resolver
+  culling now shares; the default vector-field glyph length is measured on the
+  displayed positions. `EditorCommandHistory::AbortGroup` no longer reuses
+  revision numbers: the revision advances, and a clean rollback of a document
+  saved at the group's start moves the saved mark with it. New contract tests
+  cover displayed culling bounds on mesh (surface and both views) and graph
+  (line instance and split point lane), the pick stamp (`BuildPrimitivePickStamp`,
+  now exported) changing with the binding generation, the count-mismatch
+  fallback inside extraction, and per-element point size on the graph split
+  point lane.

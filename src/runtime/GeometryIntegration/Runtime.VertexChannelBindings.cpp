@@ -8,6 +8,8 @@ module;
 
 #include <glm/glm.hpp>
 
+#include <entt/entity/registry.hpp>
+
 module Extrinsic.Runtime.VertexChannelBindings;
 
 import Extrinsic.ECS.Components.GeometrySources;
@@ -232,6 +234,24 @@ namespace Extrinsic::Runtime
         case SourceDomain::Unknown: break;
         }
         return D::Unknown;
+    }
+
+    EntityDisplayedPositions ResolveEntityDisplayedPositions(
+        const entt::registry& registry, const entt::entity entity)
+    {
+        namespace GS = ECS::Components::GeometrySources;
+        const auto* bindings = registry.try_get<VertexChannelBindingSet>(entity);
+        if (bindings == nullptr)
+            return {};
+        const GS::ConstSourceView view = GS::BuildConstView(registry, entity);
+        if (view.VertexSource == nullptr)
+            return {};
+        return EntityDisplayedPositions{
+            .Positions = ResolveDisplayedPositions(
+                view.VertexSource->Properties,
+                DisplayedPositionDomainFor(GS::BuildSourceAvailability(view).ProvenanceDomain),
+                bindings),
+            .Vertices = &view.VertexSource->Properties};
     }
 
     VertexChannelSourceBinding* FindVertexChannelSourceBinding(

@@ -2214,12 +2214,14 @@ ApplyEditorRenderHintCommand(
             }
         }
 
-        // Default glyph length: 2% of the position bounding-box diagonal of
-        // the domain's anchor positions, so a new field is legible at any
-        // model scale. Falls back to 1 for empty or degenerate geometry.
+        // Default glyph length: 2% of the bounding-box diagonal of the
+        // domain's displayed anchor positions (RUNTIME-315: a bound Position
+        // source when it resolves), so a new field is legible at the scale it
+        // is drawn at. Falls back to 1 for empty or degenerate geometry.
         [[nodiscard]] float DefaultVectorFieldLength(
             const GeometryEntityAvailability& availability,
-            const GeometryElementDomain domain)
+            const GeometryElementDomain domain,
+            const VertexChannelBindingSet* bindings)
         {
             const GeometryElementDomain positionDomain =
                 domain == GeometryElementDomain::GraphEdge
@@ -2232,14 +2234,12 @@ ApplyEditorRenderHintCommand(
                 ResolveGeometryPropertySet(availability, positionDomain);
             if (properties == nullptr)
                 return 1.0f;
-            const auto positions =
-                properties->Get<glm::vec3>(GS::PropertyNames::kPosition);
-            if (!positions)
-                return 1.0f;
+            const DisplayedPositions positions =
+                ResolveDisplayedPositions(*properties, positionDomain, bindings);
             glm::vec3 lo{std::numeric_limits<float>::max()};
             glm::vec3 hi{-std::numeric_limits<float>::max()};
             bool any = false;
-            for (const glm::vec3& position : positions.Span())
+            for (const glm::vec3& position : positions.Values)
             {
                 if (!Geometry::Validation::IsFinite(position))
                 {
@@ -2411,7 +2411,9 @@ ApplyEditorRenderHintCommand(
             if (!command.UseLayerStyle)
             {
                 layer = GeometryVectorFieldLayerRecipe{
-                    .Length = DefaultVectorFieldLength(availability, identity.Domain),
+                    .Length = DefaultVectorFieldLength(
+                        availability, identity.Domain,
+                        raw.try_get<VertexChannelBindingSet>(entity)),
                     .Color = DefaultVectorFieldColor(after.Recipe.VectorFields.size()),
                 };
             }

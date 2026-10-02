@@ -9,6 +9,8 @@ module;
 
 #include <glm/vec3.hpp>
 
+#include <entt/entity/registry.hpp>
+
 export module Extrinsic.Runtime.VertexChannelBindings;
 
 import Extrinsic.ECS.Components.GeometrySources;
@@ -135,6 +137,18 @@ export namespace Extrinsic::Runtime
     // The vertex domain whose positions an entity of `provenance` displays.
     [[nodiscard]] GeometryElementDomain DisplayedPositionDomainFor(
         ECS::Components::GeometrySources::Domain provenance) noexcept;
+
+    // The entity-level resolution shared by every consumer that only has the
+    // registry (culling, camera focus/framing): the displayed positions of the
+    // entity's vertex source and that source's property set (for revisions).
+    // Empty when the entity has no bindings or no vertex source.
+    struct EntityDisplayedPositions
+    {
+        DisplayedPositions Positions{};
+        const Geometry::PropertySet* Vertices{nullptr};
+    };
+    [[nodiscard]] EntityDisplayedPositions ResolveEntityDisplayedPositions(
+        const entt::registry& registry, entt::entity entity);
 
     // The structural binding slot for Position/Normal/Texcoord; nullptr for
     // attributes that are not stored in `VertexChannelBindingSet`.

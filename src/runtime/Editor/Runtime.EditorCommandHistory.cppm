@@ -95,7 +95,9 @@ export namespace Extrinsic::Runtime
         // A group of one command keeps that command; an empty group records
         // nothing. Undo/Redo are refused (UnsupportedOperation) while a group
         // is open. AbortGroup undoes the open group's commands in reverse and
-        // discards them. Prefer `ScopedEditorCommandGroup`.
+        // discards them; the revision still advances (never reused), and a
+        // clean rollback of a document saved at the group's start keeps it
+        // clean. Prefer `ScopedEditorCommandGroup`.
         void BeginGroup();
         void EndGroup(std::string label);
         [[nodiscard]] EditorCommandHistoryStatus AbortGroup();

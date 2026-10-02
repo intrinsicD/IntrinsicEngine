@@ -441,14 +441,8 @@ namespace Extrinsic::Runtime
                                                             const glm::mat4& model,
                                                             Sidecar& sidecar)
         {
-            namespace GS = ECS::Components::GeometrySources;
-            const auto* bindings = registry.try_get<VertexChannelBindingSet>(entity);
-            const GS::ConstSourceView view = GS::BuildConstView(registry, entity);
-            const DisplayedPositions displayed = bindings != nullptr && view.VertexSource != nullptr
-                ? ResolveDisplayedPositions(view.VertexSource->Properties,
-                                            DisplayedPositionDomainFor(GS::BuildSourceAvailability(view).ProvenanceDomain),
-                                            bindings)
-                : DisplayedPositions{};
+            const EntityDisplayedPositions resolved = ResolveEntityDisplayedPositions(registry, entity);
+            const DisplayedPositions& displayed = resolved.Positions;
             if (!displayed.Bound || displayed.Values.empty())
             {
                 sidecar.DisplayedBoundsSource.clear();
@@ -456,7 +450,7 @@ namespace Extrinsic::Runtime
                 return ExtractBounds(registry, entity, model);
             }
             const Geometry::PropertyRevision revision =
-                view.VertexSource->Properties.FindPropertyRevision(displayed.Name).value_or(0u);
+                resolved.Vertices->FindPropertyRevision(displayed.Name).value_or(0u);
             if (revision == 0u || revision != sidecar.DisplayedBoundsRevision ||
                 sidecar.DisplayedBoundsSource != displayed.Name)
             {

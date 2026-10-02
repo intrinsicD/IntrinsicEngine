@@ -2645,6 +2645,42 @@ TEST(RuntimeRenderExtraction, NamedPointSizeAndLineWidthBindPerElementPixelBuffe
     expectUniform();
 }
 
+// RUNTIME-315: a graph drawn with both lanes splits its points onto their own
+// instance, which carries no material or overlay and is therefore skipped by
+// visualization sync; its per-element size buffer must still reach that lane.
+TEST(RuntimeRenderExtraction, GraphSplitPointLaneBindsNamedPerElementSizes)
+{
+    namespace GS = ECS::Components::GeometrySources;
+    namespace G = Graphics::Components;
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+    const auto graph = scene.Create();
+    scene.Raw().emplace<ECS::Components::Transform::WorldMatrix>(graph).Matrix = glm::mat4{1.f};
+    AttachLineGraphSources(scene, graph);
+    scene.Raw().get<GS::Vertices>(graph).Properties.GetOrAdd<float>("v:size", 1.0f).Vector() =
+        {5.0f, 6.0f, 7.0f};
+    scene.Raw().emplace<G::RenderEdges>(graph);
+    scene.Raw().emplace<G::RenderPoints>(graph).SizeSource = std::string{"v:size"};
+
+    fixture.Extract(scene);
+    auto world = fixture.Renderer->ExtractRenderWorld({});
+    fixture.Renderer->PrepareFrame(world);
+
+    const auto sidecar = fixture.Extraction.FindRenderableSidecarForTest(StableId(graph));
+    ASSERT_TRUE(sidecar.has_value());
+    ASSERT_TRUE(sidecar->HasGraphPointLaneInstance);
+    auto& gpuWorld = fixture.Renderer->GetGpuWorld();
+    EXPECT_NE(gpuWorld.GetEntityConfigForTest(sidecar->GraphPointLaneInstance).Point.PointSizeBDA, 0u);
+
+    // A uniform size returns the split lane to the scalar size.
+    scene.Raw().get<G::RenderPoints>(graph).SizeSource = 9.0f;
+    fixture.Extract(scene);
+    world = fixture.Renderer->ExtractRenderWorld({});
+    fixture.Renderer->PrepareFrame(world);
+    EXPECT_EQ(gpuWorld.GetEntityConfigForTest(sidecar->GraphPointLaneInstance).Point.PointSizeBDA, 0u);
+    EXPECT_FLOAT_EQ(gpuWorld.GetEntityConfigForTest(sidecar->GraphPointLaneInstance).Point.PointSize, 9.0f);
+}
+
 TEST(RuntimeRenderExtraction, MeshEdgeAndVertexViewLanesBindNamedWidthsAndSizes)
 {
     namespace GS = ECS::Components::GeometrySources;

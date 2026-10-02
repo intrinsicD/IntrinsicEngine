@@ -681,3 +681,34 @@ TEST(EditorCommandHistory, AbortedGroupLeavesASavedDocumentClean)
     EXPECT_FALSE(history.IsDirty());
     EXPECT_EQ(history.UndoCount(), 1u);
 }
+
+TEST(EditorCommandHistory, AbortedGroupNeverReusesRevisionNumbers)
+{
+    Runtime::EditorCommandHistory history{};
+    int value = 0;
+    ASSERT_TRUE(history.Execute(MakeValueCommand(value, 1, 0, "Base")).Succeeded());
+    history.MarkSaved("saved.json");
+    std::uint64_t groupRevision = 0u;
+    {
+        Runtime::ScopedEditorCommandGroup group{&history, "Try"};
+        groupRevision = history.Execute(MakeValueCommand(value, 2, 1, "A")).Revision;
+        EXPECT_EQ(group.Abort(), Runtime::EditorCommandHistoryStatus::Undone);
+    }
+    const std::uint64_t afterAbort = history.Snapshot().Revision;
+    EXPECT_GT(afterAbort, groupRevision);  // a revision observed in the group is never handed out again
+    EXPECT_FALSE(history.IsDirty());
+
+    const Runtime::EditorCommandHistoryResult next =
+        history.Execute(MakeValueCommand(value, 3, 1, "B"));
+    EXPECT_GT(next.Revision, afterAbort);
+    EXPECT_NE(next.Revision, groupRevision);
+    EXPECT_TRUE(next.Dirty);
+
+    // A document that was dirty when the group opened stays dirty after a clean abort.
+    {
+        Runtime::ScopedEditorCommandGroup group{&history, "Again"};
+        EXPECT_TRUE(history.Execute(MakeValueCommand(value, 4, 3, "C")).Succeeded());
+        EXPECT_EQ(group.Abort(), Runtime::EditorCommandHistoryStatus::Undone);
+    }
+    EXPECT_TRUE(history.IsDirty());
+}

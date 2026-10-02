@@ -59,35 +59,6 @@ namespace Extrinsic::Runtime
                     .count());
         }
 
-        // What a primitive pick's pixels were rendered from: topology, positions, the
-        // transform and (GRAPHICS-156) whether the entity showed uncommitted GPU positions.
-        // A stamp that changed between the request and its readback discards the pick.
-        std::vector<std::uint64_t> PrimitivePickStamp(const ECS::Scene::Registry& scene, std::uint32_t id,
-                                                      const bool uncommittedPositions)
-        {
-            auto stamp = BuildSelectionTopologyStamp(scene, id);
-            const auto entity = SelectionController::ToEntityHandle(id);
-            if (!id || !scene.IsValid(entity)) return {};
-            stamp.push_back(uncommittedPositions ? 1u : 0u);
-            const auto source = ECS::Components::GeometrySources::BuildConstView(scene.Raw(), entity);
-            // The displayed positions (RUNTIME-315) and which source they come from.
-            const auto* bindings = scene.Raw().try_get<VertexChannelBindingSet>(entity);
-            stamp.push_back(bindings != nullptr ? bindings->BindingGeneration : 0u);
-            stamp.push_back(source.VertexSource
-                ? source.VertexSource->Properties.FindPropertyRevision(ResolveDisplayedPositions(
-                      source.VertexSource->Properties,
-                      DisplayedPositionDomainFor(
-                          ECS::Components::GeometrySources::BuildSourceAvailability(source).ProvenanceDomain),
-                      bindings).Name).value_or(0)
-                : 0);
-            const auto* world = scene.Raw().try_get<ECS::Components::Transform::WorldMatrix>(entity);
-            const auto matrix = world ? world->Matrix : glm::mat4{1.f};
-            for (int column = 0; column < 4; ++column)
-                for (int row = 0; row < 4; ++row)
-                    stamp.push_back(std::bit_cast<std::uint32_t>(matrix[column][row]));
-            return stamp;
-        }
-
         constexpr int kGizmoMouseButton = 0;
         constexpr int kSelectionMouseButton = 0;
 
@@ -281,6 +252,32 @@ namespace Extrinsic::Runtime
                     renderInput.Camera.Projection);
             return context;
         }
+    }
+
+    std::vector<std::uint64_t> BuildPrimitivePickStamp(const ECS::Scene::Registry& scene, const std::uint32_t id,
+                                                       const bool uncommittedPositions)
+    {
+        auto stamp = BuildSelectionTopologyStamp(scene, id);
+        const auto entity = SelectionController::ToEntityHandle(id);
+        if (!id || !scene.IsValid(entity)) return {};
+        stamp.push_back(uncommittedPositions ? 1u : 0u);
+        const auto source = ECS::Components::GeometrySources::BuildConstView(scene.Raw(), entity);
+        // The displayed positions (RUNTIME-315) and which source they come from.
+        const auto* bindings = scene.Raw().try_get<VertexChannelBindingSet>(entity);
+        stamp.push_back(bindings != nullptr ? bindings->BindingGeneration : 0u);
+        stamp.push_back(source.VertexSource
+            ? source.VertexSource->Properties.FindPropertyRevision(ResolveDisplayedPositions(
+                  source.VertexSource->Properties,
+                  DisplayedPositionDomainFor(
+                      ECS::Components::GeometrySources::BuildSourceAvailability(source).ProvenanceDomain),
+                  bindings).Name).value_or(0)
+            : 0);
+        const auto* world = scene.Raw().try_get<ECS::Components::Transform::WorldMatrix>(entity);
+        const auto matrix = world ? world->Matrix : glm::mat4{1.f};
+        for (int column = 0; column < 4; ++column)
+            for (int row = 0; row < 4; ++row)
+                stamp.push_back(std::bit_cast<std::uint32_t>(matrix[column][row]));
+        return stamp;
     }
 
     struct SceneInteractionModule::Impl
@@ -582,7 +579,7 @@ namespace Extrinsic::Runtime
                             for (const auto entity : BoundRegistry->Raw().view<ECS::Components::GeometrySources::Vertices>())
                             {
                                 const auto id = SelectionController::ToStableEntityId(entity);
-                                stamps.emplace(id, PrimitivePickStamp(*BoundRegistry, id, ShowsUncommittedPositions(id)));
+                                stamps.emplace(id, BuildPrimitivePickStamp(*BoundRegistry, id, ShowsUncommittedPositions(id)));
                             }
                         }
                     }
@@ -691,7 +688,7 @@ namespace Extrinsic::Runtime
                         ShowsUncommittedPositions(result->StableEntityId);
                     const auto stamp = pickContext.TopologyStamps.find(result->StableEntityId);
                     if (primitiveTarget && result->Hit && stamp != pickContext.TopologyStamps.end() &&
-                        stamp->second != PrimitivePickStamp(*BoundRegistry, result->StableEntityId, uncommittedPositions))
+                        stamp->second != BuildPrimitivePickStamp(*BoundRegistry, result->StableEntityId, uncommittedPositions))
                     {
                         (void)Selection.DiscardInFlightPick(result->Sequence);
                         continue;

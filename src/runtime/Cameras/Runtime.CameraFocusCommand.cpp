@@ -4,6 +4,7 @@ module;
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <span>
 #include <string>
@@ -19,7 +20,10 @@ module Extrinsic.Runtime.CameraFocusCommand;
 
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
+import Extrinsic.ECS.Component.Culling.Local;
 import Extrinsic.ECS.Component.Culling.World;
+import Extrinsic.ECS.Component.Transform.WorldMatrix;
+import Extrinsic.ECS.System.BoundsPropagation;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.CameraSnapshots;
@@ -27,6 +31,8 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.VertexChannelBindings;
+import Geometry.AABB;
 import Geometry.Sphere;
 import Geometry.Validation;
 
@@ -45,6 +51,36 @@ namespace Extrinsic::Runtime
             // Not Geometry::Validation::IsValid(Sphere): that also rejects non-positive radii,
             // which focus floors to kMinimumFocusRadius instead.
             return Geometry::Validation::IsFinite(sphere.Center) && std::isfinite(sphere.Radius);
+        }
+
+        // RUNTIME-315: an entity drawn from a bound Position source is framed by
+        // the bounds of what is drawn (the same box culling uses), not by its
+        // canonical bounds component. nullopt when the entity displays canonical
+        // positions or has no world matrix; callers then use the component.
+        [[nodiscard]] std::optional<Geometry::Sphere> DisplayedWorldSphere(
+            const entt::registry& raw, const entt::entity entity)
+        {
+            const DisplayedPositions displayed =
+                ResolveEntityDisplayedPositions(raw, entity).Positions;
+            const auto* world =
+                raw.try_get<ECS::Components::Transform::WorldMatrix>(entity);
+            if (!displayed.Bound || displayed.Values.empty() || world == nullptr)
+                return std::nullopt;
+            glm::vec3 lo{std::numeric_limits<float>::max()};
+            glm::vec3 hi{std::numeric_limits<float>::lowest()};
+            for (const glm::vec3& p : displayed.Values)
+            {
+                lo = glm::min(lo, p);
+                hi = glm::max(hi, p);
+            }
+            ECS::Components::Culling::Local::Bounds local{};
+            local.LocalBoundingAABB = Geometry::AABB{lo, hi};
+            local.LocalBoundingSphere =
+                Geometry::Sphere{local.LocalBoundingAABB.GetCenter(), glm::length(hi - lo) * 0.5f};
+            ECS::Components::Culling::World::Bounds worldBounds{};
+            if (!ECS::Systems::BoundsPropagation::TryComputeWorldBounds(local, world->Matrix, worldBounds))
+                return std::nullopt;
+            return worldBounds.WorldBoundingSphere;
         }
     } // namespace
 
@@ -99,6 +135,11 @@ namespace Extrinsic::Runtime
         {
             if (!scene.IsValid(entity))
                 continue;
+            if (const std::optional<Geometry::Sphere> displayed = DisplayedWorldSphere(raw, entity))
+            {
+                spheres.push_back(*displayed);
+                continue;
+            }
             const auto* bounds =
                 raw.try_get<ECS::Components::Culling::World::Bounds>(entity);
             if (bounds == nullptr)

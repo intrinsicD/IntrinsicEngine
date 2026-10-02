@@ -1971,6 +1971,37 @@ TEST(MeshGeometryExtraction, BoundPositionSourceFeedsTheSurfaceAndBothPrimitiveV
     EXPECT_EQ(bound[2], fingerprint(lifted));
     EXPECT_EQ(vertices.Get<glm::vec3>("v:position").Vector(), canonical);
 
+    // The surface and both primitive views are culled by the displayed box.
+    glm::vec3 lo{std::numeric_limits<float>::max()};
+    glm::vec3 hi{std::numeric_limits<float>::lowest()};
+    for (const glm::vec3& p : lifted)
+    {
+        lo = glm::min(lo, p);
+        hi = glm::max(hi, p);
+    }
+    {
+        auto world = engine.GetRenderer().ExtractRenderWorld({});
+        engine.GetRenderer().PrepareFrame(world);
+        const auto view = extraction.FindRenderableSidecarForTest(
+            Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
+        ASSERT_TRUE(view.has_value());
+        for (const auto instance : {view->Instance, view->MeshEdgeViewInstance, view->MeshVertexViewInstance})
+        {
+            const auto bounds = engine.GetRenderer().GetGpuWorld().GetBoundsForTest(instance);
+            EXPECT_NEAR(bounds.WorldSphere.z, 0.5f * (lo.z + hi.z), 1e-5f);
+            EXPECT_NEAR(bounds.WorldAabbMax.z, hi.z, 1e-5f);
+        }
+    }
+
+    // A bound source whose count no longer matches the vertex domain (a topology
+    // change it did not follow) is never drawn: every lane falls back to canonical.
+    vertices.Get<glm::vec3>("v:lifted").Vector().pop_back();
+    Extrinsic::ECS::Components::DirtyTags::MarkVertexPositionsDirty(raw, entity);
+    EXPECT_EQ(extract(), before);
+    vertices.Get<glm::vec3>("v:lifted").Vector() = lifted;
+    Extrinsic::ECS::Components::DirtyTags::MarkVertexPositionsDirty(raw, entity);
+    EXPECT_EQ(extract(), bound);
+
     raw.remove<Extrinsic::Runtime::VertexChannelBindingSet>(entity);
     Extrinsic::ECS::Components::DirtyTags::MarkVertexPositionsDirty(raw, entity);
     EXPECT_EQ(extract(), before);

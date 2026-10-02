@@ -312,12 +312,17 @@ namespace Extrinsic::Runtime
                 status = EditorCommandHistoryStatus::UndoFailed;
         }
         m_GroupRecords.clear();
-        // A clean rollback returns the document to its state before the
-        // group, so a saved document stays clean.
-        if (status == EditorCommandHistoryStatus::Undone)
-            m_Revision = m_GroupStartRevision;
-        else
+        // Revisions stay monotonic: the aborted group's numbers were already
+        // observed (results, snapshots, revision-keyed caches), so reusing them
+        // would let a later edit alias a state that never existed. A clean
+        // rollback restores the content the group started from, so a document
+        // that was saved at the group's start is still equal to what was saved
+        // and keeps the saved mark at the new revision.
+        const bool savedAtStart = m_SavedRevision == m_GroupStartRevision;
+        if (status != EditorCommandHistoryStatus::Undone || m_Revision != m_GroupStartRevision)
             AdvanceRevision(true);
+        if (status == EditorCommandHistoryStatus::Undone && savedAtStart)
+            m_SavedRevision = m_Revision;
         return status;
     }
 

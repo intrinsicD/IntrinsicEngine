@@ -36,6 +36,14 @@ namespace Extrinsic::Runtime
         const ECS::Scene::Registry& scene, const SelectionController& selection, WorldHandle world,
         const std::function<bool(std::uint32_t stableEntityId)>& suppress = {});
 
+    // What a primitive pick's pixels were rendered from: topology, the
+    // displayed positions (RUNTIME-315: which source is bound, by binding
+    // generation, and that source's revision), the transform and (GRAPHICS-156)
+    // whether the entity showed uncommitted GPU positions. A stamp that changed
+    // between the request and its readback discards the pick. Empty for a stale id.
+    export [[nodiscard]] std::vector<std::uint64_t> BuildPrimitivePickStamp(
+        const ECS::Scene::Registry& scene, std::uint32_t stableEntityId, bool uncommittedPositions);
+
     // Optional app-composed owner for every active-world interaction record.
     // The object has app-global lifetime; its mutable cohort binds to exactly
     // one WorldHandle/Registry pair and never retains per-world history.

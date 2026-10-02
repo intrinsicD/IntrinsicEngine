@@ -288,3 +288,29 @@ TEST(PrimitiveSelection, HighlightFollowsBoundPositions)
     ASSERT_EQ(snapshot.DebugPoints.size(), 1u);
     EXPECT_EQ(snapshot.DebugPoints[0].Position, glm::vec3(1, 1, 3));
 }
+// RUNTIME-315: a pick read back after the Position binding changed was rendered
+// from other positions, so its stamp differs and the pick is discarded, even
+// when the newly bound source carries the same property revision.
+TEST(PrimitiveSelection, PickStampChangesWithThePositionBindingGeneration)
+{
+    Harness h;
+    auto& vertices = h.Scene.Raw().get<GS::Vertices>(h.Entity).Properties;
+    const auto canonical = vertices.Get<glm::vec3>("v:position").Vector();
+    vertices.GetOrAdd<glm::vec3>("v:a", glm::vec3{0.0f}).Vector() = canonical;
+    const auto unbound = R::BuildPrimitivePickStamp(h.Scene, h.Id, false);
+    ASSERT_FALSE(unbound.empty());
+    EXPECT_EQ(R::BuildPrimitivePickStamp(h.Scene, h.Id, false), unbound);
+
+    auto& bindings = h.Scene.Raw().emplace<R::VertexChannelBindingSet>(
+        h.Entity, R::VertexChannelBindingSet{
+                      .Position = {.Enabled = true,
+                                   .Property = {D::MeshVertex, "v:a", Geometry::PropertyValueKind::Vec3}},
+                      .BindingGeneration = 1u});
+    const auto bound = R::BuildPrimitivePickStamp(h.Scene, h.Id, false);
+    EXPECT_NE(bound, unbound);
+
+    bindings.BindingGeneration = 2u;  // rebound; the displayed source's revision is unchanged
+    EXPECT_NE(R::BuildPrimitivePickStamp(h.Scene, h.Id, false), bound);
+    EXPECT_NE(R::BuildPrimitivePickStamp(h.Scene, h.Id, true), R::BuildPrimitivePickStamp(h.Scene, h.Id, false));
+    EXPECT_TRUE(R::BuildPrimitivePickStamp(h.Scene, h.Id + 1000u, false).empty());
+}

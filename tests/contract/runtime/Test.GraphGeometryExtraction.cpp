@@ -1133,7 +1133,7 @@ TEST(GraphGeometryExtraction, BoundPositionSourceIsDrawnForNodesAndEdges)
     Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
-    const EntityHandle entity = MakeLineGraphRenderable(scene);
+    const EntityHandle entity = MakeLineAndPointGraphRenderable(scene);
     scene.Raw().get<gs::Vertices>(entity).Properties.GetOrAdd<glm::vec3>("v:moved", glm::vec3{0.0f}).Vector() =
         {{0.0f, 0.0f, 4.0f}, {1.0f, 0.0f, 4.0f}, {0.0f, 1.0f, 4.0f}};
     scene.Raw().emplace<Extrinsic::Runtime::VertexChannelBindingSet>(
@@ -1154,6 +1154,18 @@ TEST(GraphGeometryExtraction, BoundPositionSourceIsDrawnForNodesAndEdges)
               Extrinsic::Tests::GeometryFloat32Fingerprint(
                   {0.0f, 0.0f, 4.0f, 1.0f, 0.0f, 4.0f, 0.0f, 1.0f, 4.0f}));
     EXPECT_EQ(residency.Record.LineIndexCount, 4u);
+
+    // Both the line instance and the split point lane are culled by the
+    // displayed positions (z = 4), not the canonical ones (z = 0).
+    auto world = engine.GetRenderer().ExtractRenderWorld({});
+    engine.GetRenderer().PrepareFrame(world);
+    ASSERT_TRUE(view->HasGraphPointLaneInstance);
+    for (const auto instance : {view->Instance, view->GraphPointLaneInstance})
+    {
+        const auto bounds = engine.GetRenderer().GetGpuWorld().GetBoundsForTest(instance);
+        EXPECT_FLOAT_EQ(bounds.WorldSphere.z, 4.0f);
+        EXPECT_FLOAT_EQ(bounds.WorldAabbMin.z, 4.0f);
+    }
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();

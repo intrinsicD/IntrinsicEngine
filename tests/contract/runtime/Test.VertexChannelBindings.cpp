@@ -17,12 +17,15 @@
 
 #include "EditorFeatureTestContext.hpp"
 
+import Extrinsic.ECS.Component.Culling.World;
 import Extrinsic.ECS.Component.DirtyTags;
+import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
+import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.GeometryAvailability;
@@ -423,6 +426,49 @@ TEST(VertexChannelBindings, DisplayedPositionsFallBackToCanonicalWhenTheBoundSou
     bindings.Position.Property = {D::GraphNode, "v:offset", Kind::Vec3};  // other domain
     EXPECT_FALSE(Runtime::ResolveDisplayedPositions(properties, D::MeshVertex, &bindings).Bound);
     EXPECT_EQ(Runtime::ResolveDisplayedPositions(properties, D::MeshVertex, nullptr).Name, "v:position");
+}
+
+TEST(VertexChannelBindings, CameraFocusAndDefaultVectorFieldLengthFollowTheDisplayedPositions)
+{
+    BindingFixture f;
+    auto& raw = f.Registry.Raw();
+    const ECS::EntityHandle mesh = MakeSelectable(f.Registry, "Mesh");
+    AddTriangleMeshSource(f.Registry, mesh);  // canonical triangle near the origin
+    raw.emplace_or_replace<ECS::Components::Transform::WorldMatrix>(mesh).Matrix = glm::mat4{1.0f};
+    auto& bounds = raw.emplace_or_replace<ECS::Components::Culling::World::Bounds>(mesh);
+    bounds.WorldBoundingSphere.Center = {0.5f, 0.5f, 0.0f};
+    bounds.WorldBoundingSphere.Radius = 0.75f;
+    auto& properties = raw.get<GS::Vertices>(mesh).Properties;
+    SetProperty<glm::vec3>(properties, "v:shifted",
+                           {{0, 0, 100}, {10, 0, 100}, {0, 10, 100}});
+    SetProperty<glm::vec3>(properties, "v:flow", std::vector<glm::vec3>(3u, glm::vec3{1, 0, 0}));
+    const std::vector<ECS::EntityHandle> entities{mesh};
+
+    const auto canonical = Runtime::ComputeFocusTargetForEntities(f.Registry, entities);
+    ASSERT_TRUE(canonical.has_value());
+    EXPECT_NEAR(canonical->Center.z, 0.0f, 1e-4f);
+
+    ASSERT_EQ(f.Bind(mesh, A::Position, D::MeshVertex, "v:shifted"), Cmd::Applied);
+    // Focus, the camera pose/preset command and view capture all frame through
+    // this function: it frames what is drawn, not the canonical bounds component.
+    const auto displayed = Runtime::ComputeFocusTargetForEntities(f.Registry, entities);
+    ASSERT_TRUE(displayed.has_value());
+    EXPECT_NEAR(displayed->Center.x, 5.0f, 1e-3f);
+    EXPECT_NEAR(displayed->Center.y, 5.0f, 1e-3f);
+    EXPECT_NEAR(displayed->Center.z, 100.0f, 1e-3f);
+    EXPECT_GE(displayed->Radius, std::sqrt(50.0f) - 1e-3f);
+
+    // The default glyph length is 2% of the displayed diagonal (canonical: 0.028).
+    ASSERT_EQ(Runtime::ApplyEditorGeometryVectorFieldCommand(
+                  f.Context, Runtime::EditorGeometryVectorFieldCommand{
+                                 .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh),
+                                 .Operation = Runtime::EditorVectorFieldOperation::Add,
+                                 .Layer = {.Vector = {D::MeshVertex, "v:flow", Kind::Vec3}},
+                                 .UseLayerStyle = false}),
+              Cmd::Applied);
+    const auto& recipe = raw.get<Runtime::GeometryPresentationRecipe>(mesh);
+    ASSERT_EQ(recipe.VectorFields.size(), 1u);
+    EXPECT_NEAR(recipe.VectorFields.front().Length, 0.02f * std::sqrt(200.0f), 1e-4f);
 }
 
 TEST(VertexChannelBindings, NormalAndTexcoordBindOnVertexOrCornerDomainsThroughOneSlot)
