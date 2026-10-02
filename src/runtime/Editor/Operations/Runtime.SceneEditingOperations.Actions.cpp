@@ -21,12 +21,14 @@ import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Component.Transform;
+import Extrinsic.ECS.Component.Culling.World;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.GeometryAvailability;
@@ -511,6 +513,116 @@ ApplyEditorTransformEdit(
         context.CameraControllers->Replace(
             command.Slot,
             CreateCameraController(command.Kind, seed));
+        return EditorCommandStatus::Applied;
+    }
+
+    namespace
+    {
+        [[nodiscard]] bool IsFiniteVec3(const glm::vec3& v) noexcept
+        {
+            return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
+        }
+
+        // Resolves stable ids to live entities; false when one is stale.
+        [[nodiscard]] bool ResolveStableEntities(const entt::registry& raw,
+                                                 const std::vector<std::uint32_t>& ids,
+                                                 std::vector<ECS::EntityHandle>& out)
+        {
+            out.reserve(ids.size());
+            for (const std::uint32_t id : ids)
+            {
+                const ECS::EntityHandle entity = SelectionController::ToEntityHandle(id);
+                if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
+                    return false;
+                out.push_back(entity);
+            }
+            return true;
+        }
+    }
+
+    EditorCommandStatus ApplyEditorCameraPoseCommand(
+        const EditorSceneEditingContext& context,
+        const EditorCameraPoseCommand& command)
+    {
+        if (context.CameraControllers == nullptr)
+            return EditorCommandStatus::MissingCameraControllerRegistry;
+        ICameraController* controller = context.CameraControllers->ResolveOrNull(command.Slot);
+        if (controller == nullptr)
+            return EditorCommandStatus::MissingCameraControllerRegistry;
+        const Core::Extent2D viewport = SafeViewport(command.Viewport, context.CameraViewport);
+
+        if (command.Mode == EditorCameraPoseMode::Pose)
+        {
+            if (!IsFiniteVec3(command.Position) || !IsFiniteVec3(command.Target) ||
+                !IsFiniteVec3(command.Up))
+                return EditorCommandStatus::InvalidProcessingParameters;
+            const glm::dvec3 toTarget = glm::dvec3{command.Target} - glm::dvec3{command.Position};
+            const double distance = glm::length(toTarget);
+            if (!(distance > 1.0e-6))
+                return EditorCommandStatus::InvalidProcessingParameters;
+            const glm::vec3 forward = glm::vec3{toTarget / distance};
+            const double upLength = glm::length(glm::dvec3{command.Up});
+            if (!(upLength > 1.0e-6))
+                return EditorCommandStatus::InvalidProcessingParameters;
+            const glm::dvec3 up = glm::dvec3{command.Up} / upLength;
+            const glm::dvec3 orthogonal = up - glm::dvec3{forward} * glm::dot(up, glm::dvec3{forward});
+            const double orthogonalLength = glm::length(orthogonal);
+            if (!(orthogonalLength > 1.0e-4))
+                return EditorCommandStatus::InvalidProcessingParameters; // Up parallel to the view direction
+
+            Graphics::CameraViewInput seed = controller->GetView(viewport);
+            seed.Position = command.Position;
+            seed.Forward = forward;
+            seed.Up = glm::vec3{orthogonal / orthogonalLength};
+            seed.Valid = true;
+            controller->Seed(seed);
+            context.CameraControllers->MarkCameraTransition(command.Slot);
+            return EditorCommandStatus::Applied;
+        }
+
+        if (context.Scene == nullptr)
+            return EditorCommandStatus::MissingScene;
+        const entt::registry& raw = context.Scene->Raw();
+
+        std::vector<ECS::EntityHandle> entities;
+        std::vector<std::uint32_t> ids = command.StableEntityIds;
+        if (command.Mode == EditorCameraPoseMode::Focus && ids.empty())
+        {
+            if (context.Selection == nullptr)
+                return EditorCommandStatus::MissingSelectionController;
+            const auto selected = context.Selection->SelectedStableIds();
+            ids.assign(selected.begin(), selected.end());
+            if (ids.empty())
+                return EditorCommandStatus::NoChange;
+        }
+        if (!ids.empty())
+        {
+            if (!ResolveStableEntities(raw, ids, entities))
+                return EditorCommandStatus::StaleEntity;
+        }
+        else
+        {
+            for (const ECS::EntityHandle entity :
+                 raw.view<ECS::Components::Culling::World::Bounds>())
+                entities.push_back(entity);
+        }
+
+        const std::optional<CameraFocusTarget> target =
+            ComputeFocusTargetForEntities(*context.Scene, entities);
+        if (!target.has_value())
+            return EditorCommandStatus::NoChange;
+
+        if (command.Mode == EditorCameraPoseMode::Preset)
+        {
+            if (static_cast<std::uint8_t>(command.Preset) >
+                static_cast<std::uint8_t>(CameraViewPreset::Isometric))
+                return EditorCommandStatus::InvalidProcessingParameters;
+            ApplyCameraPreset(*context.CameraControllers, command.Slot, command.Preset, *target, viewport);
+        }
+        else if (command.Mode == EditorCameraPoseMode::Focus)
+            ApplyCameraFocus(*context.CameraControllers, command.Slot, *target);
+        else
+            return EditorCommandStatus::InvalidProcessingParameters;
         return EditorCommandStatus::Applied;
     }
 

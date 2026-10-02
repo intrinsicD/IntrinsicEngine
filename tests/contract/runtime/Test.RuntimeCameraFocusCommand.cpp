@@ -280,10 +280,20 @@ TEST(RuntimeCameraFocusCommand, PresetAxesAreOrthonormalAndLookAlongTheirAxis)
         EXPECT_NEAR(glm::length(axes.Up), 1.0f, 1e-6f);
         EXPECT_NEAR(glm::dot(axes.Forward, axes.Up), 0.0f, 1e-6f);
     }
-    EXPECT_EQ(Runtime::CameraPresetAxesFor(P::Front).Forward, glm::vec3(0, 0, -1));
-    EXPECT_EQ(Runtime::CameraPresetAxesFor(P::Right).Forward, glm::vec3(-1, 0, 0));
-    EXPECT_EQ(Runtime::CameraPresetAxesFor(P::Top).Forward, glm::vec3(0, -1, 0));
-    EXPECT_GT(Runtime::CameraPresetAxesFor(P::Isometric).Up.y, 0.0f) << "isometric keeps +Y up";
+    struct Expected { P Preset; glm::vec3 Forward; glm::vec3 Up; };
+    const float d = 1.0f / std::sqrt(3.0f);
+    const float u = std::sqrt(2.0f / 3.0f);
+    const float e = 1.0f / std::sqrt(6.0f);
+    for (const Expected& row : {
+             Expected{P::Front, {0, 0, -1}, {0, 1, 0}}, Expected{P::Back, {0, 0, 1}, {0, 1, 0}},
+             Expected{P::Left, {1, 0, 0}, {0, 1, 0}},   Expected{P::Right, {-1, 0, 0}, {0, 1, 0}},
+             Expected{P::Top, {0, -1, 0}, {0, 0, -1}},  Expected{P::Bottom, {0, 1, 0}, {0, 0, 1}},
+             Expected{P::Isometric, {-d, -d, -d}, {-e, u, -e}}})
+    {
+        const auto axes = Runtime::CameraPresetAxesFor(row.Preset);
+        EXPECT_NEAR(glm::length(axes.Forward - row.Forward), 0.0f, 1e-6f) << static_cast<int>(row.Preset);
+        EXPECT_NEAR(glm::length(axes.Up - row.Up), 0.0f, 1e-6f) << static_cast<int>(row.Preset);
+    }
 }
 
 TEST(RuntimeCameraFocusCommand, PresetSeedPlacesTheCameraTwoRadiiBehindTheTarget)

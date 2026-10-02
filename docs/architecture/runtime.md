@@ -1065,9 +1065,19 @@ registry; the generic `RuntimeInputActionServices` aggregate has no camera
 field. The action suppresses itself while Dear ImGui owns the keyboard and
 rebuilds the render camera after a successful focus so the reframed view
 reaches extraction the same frame. Without a camera module, `F` is absent
-while unrelated actions still dispatch. The per-controller framing distance
-math is unchanged and remains owned by the controllers
+while unrelated actions still dispatch. The per-controller `Focus(...)` framing
+distance math remains owned by the controllers
 (`Extrinsic.Runtime.CameraControllers`).
+
+The same module owns the named view presets (`CameraViewPreset`: front, back,
+left, right, top, bottom, isometric). `CameraPresetAxesFor` gives each preset's
+orthonormal forward/up pair, `MakeCameraPresetSeed` builds the controller seed
+(camera `2 * radius` behind the focus center along the preset forward), and
+`ApplyCameraPreset` seeds, focuses and marks the transition. View capture
+(`ViewCapturePreset`) and the editor camera pose command
+(`ApplyEditorCameraPoseCommand`, `Runtime.SceneEditingOperations`) both call it,
+so a screenshot preset and the editor View preset frame identically. Camera pose,
+preset and focus changes are view state and do not enter the undo history.
 
 Operational promotion is gated on `RHI::IDevice::IsOperational()` and renderer
 resource rebuild success. Vulkan-specific diagnostics are recorded by the Vulkan

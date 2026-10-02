@@ -14,7 +14,6 @@ module;
 #include <string_view>
 #include <vector>
 
-#include <glm/vec3.hpp>
 
 export module Extrinsic.Runtime.ViewCapture;
 

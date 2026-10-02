@@ -25,6 +25,7 @@ import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
@@ -347,6 +348,39 @@ export namespace Extrinsic::Runtime
         Core::Extent2D Viewport{};
     };
 
+    // Sets the viewport camera to an explicit pose, a named view preset, or a fit to entities.
+    // Camera changes are view state, not document edits: like
+    // EditorCameraControllerCommand they never enter the undo history.
+    //   Pose:   Position/Target/Up. Position, view direction (Target - Position) and Up are seeded
+    //           into the controller; Up is orthogonalized against the direction. Orbit controllers
+    //           keep their pivot Position + direction * |Position| (the seed convention).
+    //   Preset: looks along the preset axis and frames StableEntityIds (empty = every entity with
+    //           world bounds), 2 * radius back from the bounds center (shared with view capture).
+    //   Focus:  frames StableEntityIds, or the current selection when empty, keeping the direction.
+    // Statuses: Applied; InvalidProcessingParameters (non-finite pose, Position == Target, Up
+    // parallel to the view direction, non-finite preset/mode); MissingCameraControllerRegistry
+    // (no registry or no controller in the slot); MissingScene; MissingSelectionController (Focus
+    // with no ids and no selection controller); StaleEntity (an id names no live entity);
+    // NoChange (nothing to frame: no id bounded, empty selection, or no bounded entity).
+    enum class EditorCameraPoseMode : std::uint8_t
+    {
+        Pose,
+        Preset,
+        Focus,
+    };
+
+    struct EditorCameraPoseCommand
+    {
+        CameraControllerSlot Slot{CameraControllerSlot::Main};
+        Core::Extent2D Viewport{};
+        EditorCameraPoseMode Mode{EditorCameraPoseMode::Pose};
+        glm::vec3 Position{0.0f, 0.0f, 3.0f};
+        glm::vec3 Target{0.0f};
+        glm::vec3 Up{0.0f, 1.0f, 0.0f};
+        CameraViewPreset Preset{CameraViewPreset::Front};
+        std::vector<std::uint32_t> StableEntityIds{};
+    };
+
     struct EditorPrimitiveViewCommand
     {
         std::uint32_t StableEntityId{0u};
@@ -470,6 +504,12 @@ export namespace Extrinsic::Runtime
     EditorCommandStatus
     ApplyEditorCameraControllerCommand(const EditorSceneEditingCommands& commands,
                                        const EditorCameraControllerCommand& command);
+    EditorCommandStatus
+    ApplyEditorCameraPoseCommand(const EditorSceneEditingContext& context,
+                                 const EditorCameraPoseCommand& command);
+    EditorCommandStatus
+    ApplyEditorCameraPoseCommand(const EditorSceneEditingCommands& commands,
+                                 const EditorCameraPoseCommand& command);
     EditorCommandStatus ApplyEditorPrimitiveViewCommand(const EditorSceneEditingContext& context,
                                                         const EditorPrimitiveViewCommand& command);
     EditorCommandStatus ApplyEditorPrimitiveViewCommand(const EditorSceneEditingCommands& commands,

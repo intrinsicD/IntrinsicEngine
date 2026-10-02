@@ -57,6 +57,8 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.CameraFocusCommand;
+import Extrinsic.ECS.Component.Culling.World;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorPropertyWidgets;
 import Extrinsic.Runtime.EditorWindowRegistry;
@@ -1283,6 +1285,141 @@ TEST(SandboxEditorUi, CameraControllerCommandReplacesMainController)
                   missingRegistry,
                   Runtime::EditorCameraControllerCommand{}),
               Runtime::EditorCommandStatus::MissingCameraControllerRegistry);
+}
+namespace
+{
+    ECS::EntityHandle MakeBoundedEntity(ECS::Scene::Registry& registry, const glm::vec3 center, const float radius)
+    {
+        const ECS::EntityHandle entity = MakeSelectable(registry, "Bounded");
+        ECS::Components::Culling::World::Bounds bounds{};
+        bounds.WorldBoundingSphere.Center = center;
+        bounds.WorldBoundingSphere.Radius = radius;
+        registry.Raw().emplace_or_replace<ECS::Components::Culling::World::Bounds>(entity, bounds);
+        return entity;
+    }
+}
+
+TEST(SandboxEditorUi, CameraPoseCommandRoundTripsPoseAndRejectsInvalidInput)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::CameraControllerRegistry cameras;
+    cameras.Register(Runtime::CameraControllerSlot::Main,
+                     Runtime::CreateCameraController(Extrinsic::Core::Config::CameraControllerKind::Orbit));
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    context.CameraControllers = &cameras;
+    context.CameraViewport = Extrinsic::Core::Extent2D{640, 480};
+
+    const auto apply = [&](Runtime::EditorCameraPoseCommand command)
+    { return Runtime::ApplyEditorCameraPoseCommand(context, command); };
+    const auto view = [&]
+    { return cameras.Resolve(Runtime::CameraControllerSlot::Main).GetView(context.CameraViewport); };
+
+    ASSERT_EQ(apply({.Mode = Runtime::EditorCameraPoseMode::Pose,
+                     .Position = {10.0f, 2.0f, 5.0f}, .Target = {10.0f, 2.0f, -5.0f}, .Up = {0, 1, 0}}),
+              Runtime::EditorCommandStatus::Applied);
+    auto current = view();
+    EXPECT_NEAR(glm::length(current.Position - glm::vec3(10.0f, 2.0f, 5.0f)), 0.0f, 1e-3f);
+    EXPECT_NEAR(glm::dot(current.Forward, glm::vec3(0, 0, -1)), 1.0f, 1e-4f);
+    EXPECT_NEAR(glm::dot(current.Up, glm::vec3(0, 1, 0)), 1.0f, 1e-4f);
+
+    const auto before = view();
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    const Runtime::EditorCameraPoseCommand degenerate[] = {
+        {.Position = {nan, 0, 0}, .Target = {0, 0, 0}},
+        {.Position = {1, 1, 1}, .Target = {1, 1, 1}},                         // no direction
+        {.Position = {0, 0, 3}, .Target = {0, 0, 0}, .Up = {0, 0, 1}},        // up parallel to direction
+        {.Position = {0, 0, 3}, .Target = {0, 0, 0}, .Up = {0, 0, 0}},        // zero up
+    };
+    for (const auto& command : degenerate)
+        EXPECT_EQ(apply(command), Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_EQ(view().Position, before.Position) << "rejected poses leave the camera untouched";
+
+    context.CameraControllers = nullptr;
+    EXPECT_EQ(apply({}), Runtime::EditorCommandStatus::MissingCameraControllerRegistry);
+}
+
+TEST(SandboxEditorUi, CameraPoseCommandPresetFramesLikeTheSharedPresetSeed)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::CameraControllerRegistry cameras;
+    cameras.Register(Runtime::CameraControllerSlot::Main,
+                     Runtime::CreateCameraController(Extrinsic::Core::Config::CameraControllerKind::Orbit));
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    context.CameraControllers = &cameras;
+    context.CameraViewport = Extrinsic::Core::Extent2D{640, 480};
+
+    const ECS::EntityHandle entity = MakeBoundedEntity(registry, {100.0f, 0.0f, 0.0f}, 2.0f);
+    const std::uint32_t id = Runtime::SelectionController::ToStableEntityId(entity);
+
+    // Reference: the shared seed + focus recipe on a clone of the same starting controller.
+    auto reference = cameras.Resolve(Runtime::CameraControllerSlot::Main).Clone();
+    ASSERT_NE(reference, nullptr);
+    const Runtime::CameraFocusTarget target{{100.0f, 0.0f, 0.0f}, 2.0f};
+    reference->Seed(Runtime::MakeCameraPresetSeed(reference->GetView(context.CameraViewport),
+                                                  Runtime::CameraViewPreset::Top, target));
+    reference->Focus(target);
+
+    for (const auto& ids : {std::vector<std::uint32_t>{id}, std::vector<std::uint32_t>{}})
+    {
+        Runtime::EditorCameraPoseCommand command{.Mode = Runtime::EditorCameraPoseMode::Preset,
+                                                 .Preset = Runtime::CameraViewPreset::Top,
+                                                 .StableEntityIds = ids};
+        ASSERT_EQ(Runtime::ApplyEditorCameraPoseCommand(context, command), Runtime::EditorCommandStatus::Applied);
+        const auto got = cameras.Resolve(Runtime::CameraControllerSlot::Main).GetView(context.CameraViewport);
+        const auto want = reference->GetView(context.CameraViewport);
+        EXPECT_NEAR(glm::length(got.Position - want.Position), 0.0f, 1e-3f);
+        EXPECT_NEAR(glm::dot(got.Forward, glm::vec3(0, -1, 0)), 1.0f, 1e-4f);
+        EXPECT_NEAR(got.Position.x, 100.0f, 1e-2f) << "framing follows off-origin bounds";
+    }
+
+    Runtime::EditorCameraPoseCommand stale{.Mode = Runtime::EditorCameraPoseMode::Preset,
+                                           .StableEntityIds = {0x7fffffu}};
+    EXPECT_EQ(Runtime::ApplyEditorCameraPoseCommand(context, stale), Runtime::EditorCommandStatus::StaleEntity);
+    context.Scene = nullptr;
+    EXPECT_EQ(Runtime::ApplyEditorCameraPoseCommand(context, Runtime::EditorCameraPoseCommand{
+                  .Mode = Runtime::EditorCameraPoseMode::Preset}),
+              Runtime::EditorCommandStatus::MissingScene);
+}
+
+TEST(SandboxEditorUi, CameraPoseCommandFocusFramesIdsOrSelectionAndNoopsWhenNothingToFrame)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::CameraControllerRegistry cameras;
+    cameras.Register(Runtime::CameraControllerSlot::Main,
+                     Runtime::CreateCameraController(Extrinsic::Core::Config::CameraControllerKind::Orbit));
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    context.CameraControllers = &cameras;
+    context.CameraViewport = Extrinsic::Core::Extent2D{640, 480};
+    const auto centerX = [&]
+    {
+        const auto view = cameras.Resolve(Runtime::CameraControllerSlot::Main).GetView(context.CameraViewport);
+        return (view.Position + view.Forward * glm::dot(glm::vec3(100, 0, 0) - view.Position, view.Forward)).x;
+    };
+
+    const ECS::EntityHandle far = MakeBoundedEntity(registry, {100.0f, 0.0f, 0.0f}, 1.0f);
+    const ECS::EntityHandle unbounded = MakeSelectable(registry, "Unbounded");
+    const std::uint32_t farId = Runtime::SelectionController::ToStableEntityId(far);
+
+    // Empty ids and empty selection: nothing to frame.
+    Runtime::EditorCameraPoseCommand focus{.Mode = Runtime::EditorCameraPoseMode::Focus};
+    EXPECT_EQ(Runtime::ApplyEditorCameraPoseCommand(context, focus), Runtime::EditorCommandStatus::NoChange);
+    // An id with no bounds frames nothing.
+    focus.StableEntityIds = {Runtime::SelectionController::ToStableEntityId(unbounded)};
+    EXPECT_EQ(Runtime::ApplyEditorCameraPoseCommand(context, focus), Runtime::EditorCommandStatus::NoChange);
+
+    // Selection-driven focus lands on the off-origin entity.
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, far));
+    focus.StableEntityIds.clear();
+    ASSERT_EQ(Runtime::ApplyEditorCameraPoseCommand(context, focus), Runtime::EditorCommandStatus::Applied);
+    EXPECT_NEAR(centerX(), 100.0f, 1e-2f);
+
+    // Explicit ids work without a selection.
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, unbounded));
+    focus.StableEntityIds = {farId};
+    EXPECT_EQ(Runtime::ApplyEditorCameraPoseCommand(context, focus), Runtime::EditorCommandStatus::Applied);
 }
 TEST(SandboxEditorUi, PrimitiveViewCommandTranslatesToRenderHintComponents)
 {
