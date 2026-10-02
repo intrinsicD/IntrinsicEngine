@@ -1352,6 +1352,7 @@ namespace Extrinsic::Runtime
                 .SourceOffsetBytes = 0u,
                 .SourceRowCount = accepted.Front.Count,
                 .Stamp = accepted.Front.Stamp,
+                .SourceLease = accepted.FrontLease,
             });
         using Status = Graphics::GpuWorld::GeometryPositionCommitStatus;
         if (status != Status::Committed && status != Status::CopyPending)

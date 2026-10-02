@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -27,6 +28,10 @@ import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.Device;
+import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.TransferQueue;
 
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
@@ -73,6 +78,62 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         }
     }
 
+    // ---- the front readback primitive (GpuFront.hpp) ----
+    bool BeginGpuFrontReadback(const EditorProcessingContext& ctx, Graphics::GpuPropertyResidency& residency,
+                               const Graphics::GpuPropertyKey& key, const std::shared_ptr<GpuFrontReadback>& r)
+    {
+        const auto front = residency.HasRing(key) ? residency.Front(key) : std::nullopt;
+        if (!front || !ctx.Device || !ctx.SpatialIndices) return false;
+        r->Done = r->Failed = false;
+        r->Framed.reset();
+        r->Lease = front;
+        const auto bytes = front->Bytes;
+        r->Bytes.assign(std::size_t(bytes), std::byte{0});
+        // The recorder and the sink hold the front's lease, so the slot is neither rewritten
+        // nor freed until the bytes landed, whatever happens to the owner meanwhile; the
+        // recorder also registers the frame it records in.
+        const auto record = [r, residency = &residency, device = ctx.Device, buffer = front->Buffer,
+                             lease = front->Lease](RHI::ICommandContext& commands) -> RHI::BufferHandle {
+            if (r->Abandoned) return {};
+            residency->NoteUse(buffer, device->GetGlobalFrameNumber());
+            commands.BufferBarrier(buffer, RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite | RHI::MemoryAccess::TransferRead,
+                                   RHI::MemoryAccess::TransferRead);
+            return buffer;
+        };
+        // One readback in the property's own bytes: at once where the device can
+        // (GRAPHICS-150), otherwise with the frame.
+        const auto token = ctx.Device->SubmitComputeReadback(record, bytes,
+            RHI::ReadbackSink::Invoke([r, lease = front->Lease](std::span<const std::byte> data) {
+                if (data.size() == r->Bytes.size()) std::memcpy(r->Bytes.data(), data.data(), data.size());
+                else r->Failed = true;
+                r->Done = true;
+            }));
+        if (token.IsValid()) residency.AddCompletion(front->Buffer, token, bytes);
+        else
+        {
+            r->Framed = ctx.SpatialIndices->QueueGpuCompute(std::size_t(bytes),
+                [record](RHI::ICommandContext& commands, const SpatialGpuIndexView&) { return record(commands); });
+            residency.AddCompletion(front->Buffer, RHI::ReadbackToken{}, bytes); // counted; the captured lease covers it
+        }
+        return true;
+    }
+
+    bool PollGpuFrontReadback(GpuFrontReadback& r)
+    {
+        if (r.Framed && !r.Done)
+        {
+            if (r.Framed->State == SpatialQueryState::Ready)
+            {
+                if (r.Framed->Data.size() == r.Bytes.size()) r.Bytes = r.Framed->Data;
+                else r.Failed = true;
+                r.Done = true;
+            }
+            else if (r.Framed->State == SpatialQueryState::Failed) r.Failed = r.Done = true;
+        }
+        return r.Done;
+    }
+
+    // ---- the lifecycle ----
     bool GpuTransactionCurrent(const GpuTransactionCore& t)
     {
         if (t.Abandoned || !EditorProcessingContextWorldCurrent(t.Context)) return false;
@@ -238,6 +299,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
             FailGpuTransaction(*t, MeshSupport::QueuedJobRejectedMessage(t->JobLabel, "Accept"));
             return false;
         }
+        if (t->Hooks.Accepting) t->Hooks.Accepting();
         return true;
     }
 

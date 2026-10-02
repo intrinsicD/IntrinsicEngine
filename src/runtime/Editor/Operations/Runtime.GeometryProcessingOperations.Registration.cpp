@@ -987,8 +987,7 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
                 result.SourcePointCount = state->SourceBinding.Points.size();
                 result.TargetPointCount = state->TargetBinding.Points.size();
                 result.Error = Core::ErrorCode::InvalidState;
-                result.Message          = "ICP registration CPU job submission was rejected by the "
-                                          "runtime job lane.";
+                result.Message          = GeometryProcessingDetail::MeshSupport::QueuedJobRejectedMessage("ICP registration CPU");
                 return result;
             }
 

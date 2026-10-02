@@ -199,6 +199,8 @@ export namespace Extrinsic::Runtime
             std::uint64_t FrontAddress{}, FrontBytes{};
             std::uint32_t FrontCount{};
             std::uint64_t FrontStamp{};
+            // The front slot's residency lease; a pending render copy holds it until done.
+            std::shared_ptr<const void> FrontLease{};
         };
         enum class GpuPositionCommitStatus : std::uint8_t { Acknowledged, AcknowledgedCopyPending, NotAcknowledged };
         [[nodiscard]] GpuPositionCommitStatus CommitGpuPositions(const GpuPositionCommit& commit);

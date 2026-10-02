@@ -302,13 +302,14 @@ TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
     namespace fs = std::filesystem;
     const auto root = fs::path{INTRINSIC_SOURCE_DIR} / "src" / "runtime" / "Editor" / "Operations";
     ASSERT_TRUE(fs::exists(root)) << root;
-    constexpr std::string_view owner = "Runtime.GeometryProcessingOperations.MeshSupport.cpp";
+    // The helper's definitions and its declaring header.
+    constexpr std::array<std::string_view, 2> owners{"Runtime.GeometryProcessingOperations.MeshSupport.cpp",
+                                                     "Runtime.GeometryProcessingOperations.JobFailure.hpp"};
     // Files that own a job lifecycle the helper does not cover (keep this list short; a new
     // queued operation belongs on `QueuedJobDelivery`).
-    constexpr std::array<std::string_view, 8> handWritten{
-        // GPU Run/Accept transactions not yet on Runtime.GpuTransactionLifecycle (RUNTIME-311).
-        // Keypoints stays listed for its resident run's guarded publication sink.
-        "Runtime.GeometryProcessingOperations.GpuPositions.cpp",
+    constexpr std::array<std::string_view, 7> handWritten{
+        // The resident keypoint run guards the sink of the scalar publication it drives
+        // (the GPU Run/Accept transactions themselves are on Runtime.GpuTransactionLifecycle).
         "Runtime.GeometryProcessingOperations.Keypoints.cpp",
         // Mesh-family jobs that keep their result in a typed state struct with the shared
         // `BuildUnpublishedEditorJobFailure` wording and `ActiveOutputJobRefusal`.
@@ -321,19 +322,18 @@ TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
         "Runtime.RegistrationOperations.CoherentPointDrift.cpp",
     };
     constexpr std::string_view deliverOnceAllowed = "Runtime.RegistrationOperations.CoherentPointDrift.cpp";
-    // RUNTIME-311: Accept front readbacks belong to the shared GPU transaction lifecycle; these
-    // files still read fronts themselves (GpuPositions also defines the readback primitive).
-    constexpr std::string_view lifecycle = "Runtime.GpuTransactionLifecycle.cpp";
-    constexpr std::array<std::string_view, 1> ownFrontReadback{
-        "Runtime.GeometryProcessingOperations.GpuPositions.cpp",
-    };
-    std::size_t frontMatched = 0;
+    // RUNTIME-311: Accept front readbacks belong to the shared GPU transaction lifecycle, which
+    // defines the readback primitive its header declares.
+    constexpr std::array<std::string_view, 2> frontReadbackOwners{"Runtime.GpuTransactionLifecycle.cpp",
+                                                                  "Runtime.GeometryProcessingOperations.GpuFront.hpp"};
     std::size_t scanned = 0, matched = 0;
     bool deliverOnceMatched = false;
     for (const auto& entry : fs::directory_iterator(root))
     {
         const auto name = entry.path().filename().string();
-        if (entry.path().extension() != ".cpp" || name == owner) continue;
+        const auto extension = entry.path().extension();
+        if ((extension != ".cpp" && extension != ".hpp") ||
+            std::find(owners.begin(), owners.end(), name) != owners.end()) continue;
         std::ifstream file(entry.path());
         const std::string text{std::istreambuf_iterator<char>(file), {}};
         ++scanned;
@@ -346,6 +346,8 @@ TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
             << "the duplicate wording comes from MeshSupport::ActiveOutputJobRefusal";
         EXPECT_EQ(text.find("already has an active"), std::string::npos)
             << "the duplicate wording comes from MeshSupport::ActiveOutputJobRefusal";
+        EXPECT_EQ(text.find("job submission was rejected"), std::string::npos)
+            << "the rejected-submission wording comes from MeshSupport::QueuedJobRejectedMessage";
         // A job-lane rejection is worded by MeshSupport::QueuedJobRejectedMessage; only a
         // refused device submission (compute, query, sampling) is worded by its method.
         for (const std::string_view phrase : {"submission rejected", "submission refused"})
@@ -364,16 +366,9 @@ TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
         const bool onLifecycle = text.find("GpuTransactionCore") != std::string::npos;
         const bool handWrites = !onLifecycle && text.find("GuardEditorProcessingResult(") != std::string::npos &&
                                 text.find("FinalizeUnpublishedOnMainThread") != std::string::npos;
-        if (name != lifecycle)
-        {
-            const bool readsFronts = text.find("BeginGpuFrontReadback(") != std::string::npos;
-            const bool frontListed = std::find(ownFrontReadback.begin(), ownFrontReadback.end(), name) != ownFrontReadback.end();
-            if (readsFronts)
-                EXPECT_TRUE(frontListed) << "a GPU transaction's Accept readback belongs to Runtime.GpuTransactionLifecycle";
-            else
-                EXPECT_FALSE(frontListed) << "stale front-readback allowlist entry; remove it";
-            if (frontListed) ++frontMatched;
-        }
+        if (std::find(frontReadbackOwners.begin(), frontReadbackOwners.end(), name) == frontReadbackOwners.end())
+            EXPECT_EQ(text.find("BeginGpuFrontReadback("), std::string::npos)
+                << "a GPU transaction's Accept readback belongs to Runtime.GpuTransactionLifecycle";
         const bool listed = std::find(handWritten.begin(), handWritten.end(), name) != handWritten.end();
         if (handWrites)
             EXPECT_TRUE(listed)
@@ -384,6 +379,5 @@ TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
     }
     EXPECT_GT(scanned, 20u);
     EXPECT_EQ(matched, handWritten.size()) << "an allowlisted file is missing";
-    EXPECT_EQ(frontMatched, ownFrontReadback.size()) << "a front-readback allowlisted file is missing";
     EXPECT_TRUE(deliverOnceMatched) << "stale allowance: " << deliverOnceAllowed << " no longer keeps its own deliver-once flag";
 }

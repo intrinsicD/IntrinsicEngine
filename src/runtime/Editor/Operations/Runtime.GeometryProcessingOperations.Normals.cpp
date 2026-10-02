@@ -878,7 +878,6 @@ namespace Extrinsic::Runtime
                              .Nodes = index.NodesBDA, .LiveSlots = index.OriginalSlotsBDA, .LiveCount = index.Count}, w->PointFirst);
                     });
                 ++w->Work->Result.GpuQueryBatches;
-                if (!gpu) gpu = FailedResult("PCA normal compute submission rejected.");
                 return;
             }
             w->Workspace = ctx.SpatialIndices->LeaseGpuWorkspace<Graphics::VertexNormalsWorkspace>();
@@ -1085,6 +1084,10 @@ namespace Extrinsic::Runtime
                 .Poll = [self] { return Poll(self()); },
                 .CompleteRun = [self] { CompleteRun(self()); },
                 .CompleteAccept = [self] { CompleteAccept(self()); },
+                .Accepting = [raw] {
+                    raw->Work->Result.Status = EditorCommandStatus::Pending;
+                    raw->Work->Result.Message = "Reading the GPU normals back.";
+                },
                 .Release = [self] {
                     const auto w = self();
                     w->Input.reset();
@@ -1111,11 +1114,8 @@ namespace Extrinsic::Runtime
                 return result;
             }
             if (onComplete) w->Sink = GuardEditorProcessingResult(w->Core.Context, std::move(onComplete));
-            if (!GP::BeginGpuTransactionAccept(GP::GpuTransactionOf(w))) return w->Work->Result;
-            result.Status = EditorCommandStatus::Pending;
-            result.Message = "Reading the GPU normals back.";
-            w->Work->Result = result;
-            return result;
+            (void)GP::BeginGpuTransactionAccept(GP::GpuTransactionOf(w));
+            return w->Work->Result;
         }
         // Builds the run from the capture and queues its compute job. Null with `result` filled
         // (a rejection) when the request cannot run.

@@ -433,7 +433,6 @@ namespace Extrinsic::Runtime
                              .ScoreBase=w->Base[0].value_or(Graphics::GpuPropertyView{}),.MaskBase=w->Base[1].value_or(Graphics::GpuPropertyView{}),
                              .Nodes=index.NodesBDA,.LiveSlots=index.OriginalSlotsBDA,.LiveCount=index.Count});
                     },SpatialGpuLatency::Immediate);
-                if(!t.Gpu){Fail(w,"Outlier compute submission refused.");return true;}
             }
             return t.Gpu->State==SpatialQueryState::Ready||t.Gpu->State==SpatialQueryState::Failed;
         }

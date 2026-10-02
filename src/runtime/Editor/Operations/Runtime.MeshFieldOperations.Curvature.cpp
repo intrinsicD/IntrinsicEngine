@@ -1797,8 +1797,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                     EditorCommandStatus::GeometryProcessingFailed;
                 result.VertexSlotCount = vertexSlotCount;
                 result.Error = Core::ErrorCode::InvalidState;
-                result.Message         = "Mesh curvature CPU job submission was rejected by the "
-                                         "runtime job lane.";
+                result.Message         = GeometryProcessingDetail::MeshSupport::QueuedJobRejectedMessage("Mesh curvature CPU");
                 return result;
             }
 

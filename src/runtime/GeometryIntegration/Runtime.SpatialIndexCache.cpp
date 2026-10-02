@@ -1134,7 +1134,8 @@ namespace Extrinsic::Runtime
             {.StableEntityId = c.StableEntityId, .PositionBytes = c.PositionBytes, .RowCount = c.RowCount,
              .Revision = c.Revision,
              .Front = {.Buffer = c.Front, .Address = c.FrontAddress, .Bytes = c.FrontBytes, .Count = c.FrontCount,
-                       .Stamp = c.FrontStamp}}))
+                       .Stamp = c.FrontStamp},
+             .FrontLease = c.FrontLease}))
         {
         case Status::Acknowledged: return GpuPositionCommitStatus::Acknowledged;
         case Status::AcknowledgedCopyPending: return GpuPositionCommitStatus::AcknowledgedCopyPending;

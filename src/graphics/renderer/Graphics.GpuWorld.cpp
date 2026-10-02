@@ -153,6 +153,16 @@ namespace Extrinsic::Graphics
             // RUNTIME-293: the front was accepted; the next copy ends the preview and leaves
             // the (already patched) shadow authoritative.
             bool CommitOnCopy = false;
+            // The accepted front's lease while its copy is pending (RUNTIME-311).
+            std::shared_ptr<const void> SourceLease{};
+        };
+
+        // A front lease whose last possible copy was recorded at `Frame`: released once that
+        // frame's commands completed (the residency's reuse rule, `GetFramesInFlight`).
+        struct RetiringSourceLease
+        {
+            std::uint64_t Frame = 0;
+            std::shared_ptr<const void> Lease{};
         };
 
         struct PositionGatherPush
@@ -663,6 +673,40 @@ namespace Extrinsic::Graphics
 
         // Geometry slot -> its observed position front (GRAPHICS-156). Few entries.
         std::unordered_map<std::uint32_t, PositionPreview> PositionPreviews{};
+        std::vector<RetiringSourceLease> RetiringSourceLeases{};
+
+        // A preview that stops holding its accepted front (copied, superseded, replaced or
+        // freed) hands the lease to the retire list: a copy recorded up to this frame may
+        // still read the slot.
+        void RetireSourceLease(PositionPreview& preview)
+        {
+            if (!preview.SourceLease) return;
+            RetiringSourceLeases.push_back({Device ? Device->GetGlobalFrameNumber() : 0u, std::move(preview.SourceLease)});
+            preview.SourceLease.reset();
+        }
+        std::unordered_map<std::uint32_t, PositionPreview>::iterator ErasePreview(
+            std::unordered_map<std::uint32_t, PositionPreview>::iterator it)
+        {
+            RetireSourceLease(it->second);
+            return PositionPreviews.erase(it);
+        }
+        void ErasePreview(const std::uint32_t slot)
+        {
+            if (const auto it = PositionPreviews.find(slot); it != PositionPreviews.end()) (void)ErasePreview(it);
+        }
+        void ReleaseRetiredSourceLeases()
+        {
+            if (!Device)
+            {
+                RetiringSourceLeases.clear();
+                return;
+            }
+            const std::uint64_t now = Device->GetGlobalFrameNumber();
+            const std::uint64_t inFlight = Device->GetFramesInFlight();
+            std::erase_if(RetiringSourceLeases, [&](const RetiringSourceLease& retiring) {
+                return now >= retiring.Frame && now - retiring.Frame > inFlight;
+            });
+        }
         RHI::PipelineHandle PositionGatherPipeline{};
 
         [[nodiscard]] std::uint64_t IssueGeometryContentRevision() noexcept
@@ -1008,7 +1052,7 @@ namespace Extrinsic::Graphics
                 PositionPreview& preview = it->second;
                 if (slot >= GeometryAllocations.size() || !GeometryAllocations[slot].Live)
                 {
-                    it = PositionPreviews.erase(it);
+                    it = ErasePreview(it);
                     continue;
                 }
                 ManagedGeometryAllocation& allocation = GeometryAllocations[slot];
@@ -1081,7 +1125,7 @@ namespace Extrinsic::Graphics
                     // The accepted front is in the block now, and the shadow already holds
                     // its bytes (CommitGeometryPositions): the preview is over.
                     allocation.PositionShadowStale = false;
-                    it = PositionPreviews.erase(it);
+                    it = ErasePreview(it); // the copy just recorded holds the front until its frame completes
                     continue;
                 }
                 allocation.PositionShadowStale = true;
@@ -1246,6 +1290,9 @@ namespace Extrinsic::Graphics
         m_Impl->Device = &device;
         m_Impl->Buffers = &buffers;
         m_Impl->ReleaseGpuResources();
+        // The lost device's recorded copies are gone; pending copies keep their leases and are
+        // recorded again on the new resources.
+        m_Impl->RetiringSourceLeases.clear();
         if (!m_Impl->AllocateGpuResources())
         {
             return false;
@@ -1283,7 +1330,9 @@ namespace Extrinsic::Graphics
         }
 
         m_Impl->ReleaseGpuResources();
+        // After device idle: no recorded copy can still read a retired or pending front.
         m_Impl->PositionPreviews.clear();
+        m_Impl->RetiringSourceLeases.clear();
 
         m_Impl->InstanceStaticCpu.clear();
         m_Impl->InstanceDynamicCpu.clear();
@@ -1809,7 +1858,7 @@ namespace Extrinsic::Graphics
                 found != m_Impl->PositionPreviews.end())
             {
                 if (found->second.CommitOnCopy)
-                    m_Impl->PositionPreviews.erase(found);
+                    (void)m_Impl->ErasePreview(found);
                 else
                     found->second.Recopy = true;
             }
@@ -1863,11 +1912,12 @@ namespace Extrinsic::Graphics
         }
 
         auto& preview = m_Impl->PositionPreviews[geometry.Index];
+        m_Impl->RetireSourceLease(preview); // a new method's front replaces a pending commit copy
         preview.Source = desc.Source;
         preview.SourceOffsetBytes = desc.SourceOffsetBytes;
         preview.SourceRowCount = desc.SourceRowCount;
         preview.Stamp = desc.Stamp;
-        preview.CommitOnCopy = false; // a new method's front replaces a pending commit copy
+        preview.CommitOnCopy = false;
         if (!gather)
         {
             preview.GatherStamp = 0u;
@@ -1908,7 +1958,7 @@ namespace Extrinsic::Graphics
         {
             return;
         }
-        m_Impl->PositionPreviews.erase(geometry.Index);
+        m_Impl->ErasePreview(geometry.Index);
     }
 
     GpuWorld::GeometryPositionCommitStatus GpuWorld::CommitGeometryPositions(
@@ -1967,7 +2017,7 @@ namespace Extrinsic::Graphics
             allocation.PositionShadowStale = false;
             if (preview != m_Impl->PositionPreviews.end())
             {
-                m_Impl->PositionPreviews.erase(preview);
+                (void)m_Impl->ErasePreview(preview);
             }
             return GeometryPositionCommitStatus::Committed;
         }
@@ -1975,6 +2025,8 @@ namespace Extrinsic::Graphics
         // shows older bytes the shadow does not describe (a replay skips the range and
         // the copy fills it).
         auto& pending = m_Impl->PositionPreviews[geometry.Index];
+        m_Impl->RetireSourceLease(pending);
+        pending.SourceLease = desc.SourceLease;
         pending.Source = desc.Source;
         pending.SourceOffsetBytes = desc.SourceOffsetBytes;
         pending.SourceRowCount = desc.SourceRowCount;
@@ -2017,7 +2069,7 @@ namespace Extrinsic::Graphics
         {
             m_Impl->GeometryAllocations[geometry.Index].Live = false;
         }
-        m_Impl->PositionPreviews.erase(geometry.Index);
+        m_Impl->ErasePreview(geometry.Index);
         m_Impl->DirtyGeometryRecord[geometry.Index] = true;
         m_Impl->GeometrySlots.Free(geometry, m_Impl->FrameIndex + m_Impl->Desc.DeferredFreeFrames);
     }
@@ -2326,6 +2378,7 @@ namespace Extrinsic::Graphics
         ++m_Impl->FrameIndex;
         m_Impl->InstanceSlots.RetirePending(m_Impl->FrameIndex);
         m_Impl->GeometrySlots.RetirePending(m_Impl->FrameIndex);
+        m_Impl->ReleaseRetiredSourceLeases();
 
         if (!m_Impl->Device || !m_Impl->Initialized || !m_Impl->Device->IsOperational())
         {

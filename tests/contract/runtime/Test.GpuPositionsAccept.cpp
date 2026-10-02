@@ -517,3 +517,30 @@ TEST(GpuPositionsAccept, TerminalDeliveryReleasesCallbacksThatCaptureTheirRun)
         EXPECT_TRUE(watched.expired()) << "the run must not retain its terminal callback";
     }
 }
+
+// RUNTIME-311: on the shared lifecycle a Discard issued by a history observer while Accept
+// publishes is ignored (before: the run delivered Discarded/StaleEntity mid-publication while
+// the positions were published), and the callback fires exactly once; a second Accept with its
+// own callback while the first is under way is refused (before: Pending, replacing the sink).
+TEST(GpuPositionsAccept, ReentrantDiscardDuringAcceptStillDeliversAppliedOnce)
+{
+    Harness h;
+    R::EditorGpuPositionRunHandle run;
+    unsigned discards = 0;
+    h.Context.InvalidateWorkspaceSnapshotCache = [&] { ++discards; R::DiscardEditorGpuPositionRun(h.Commands(), run, h.Residency); };
+    run = h.Ready();
+    ASSERT_TRUE(run);
+    const auto front = h.Shifted({1.f, 2.f, 3.f});
+    std::vector<R::EditorGpuPositionAcceptResult> results;
+    unsigned second = 0;
+    ASSERT_EQ(R::AcceptEditorGpuPositionRun(h.Commands(), run, h.Residency, "Move points (GPU)",
+                  [&](auto r) { results.push_back(r); }, front).Status, R::EditorCommandStatus::Pending);
+    EXPECT_EQ(R::AcceptEditorGpuPositionRun(h.Commands(), run, h.Residency, "Move points (GPU)",
+                  [&](auto) { ++second; }, front).Status, R::EditorCommandStatus::InvalidProcessingParameters);
+    ASSERT_TRUE(h.Jobs.DrainUntilTerminal());
+    EXPECT_GT(discards, 0u) << "the publication ran its observer";
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results.front().Status, R::EditorCommandStatus::Applied) << results.front().Message;
+    EXPECT_EQ(second, 0u);
+    EXPECT_EQ(h.Rows(), front);
+}

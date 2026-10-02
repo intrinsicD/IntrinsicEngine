@@ -236,6 +236,9 @@ export namespace Extrinsic::Graphics
             std::uint64_t SourceOffsetBytes = 0;
             std::uint32_t SourceRowCount = 0;
             std::uint64_t Stamp = 0;
+            // Keeps `Source` from being rewritten or freed (a residency ring lease). A pending
+            // copy holds it until the copy's frame is complete; GpuWorld only stores it.
+            std::shared_ptr<const void> SourceLease{};
         };
 
         enum class GeometryPositionCommitStatus : std::uint8_t

@@ -1,7 +1,7 @@
-// One readback of a GPU property ring front for Accept (ADR 0030 decision 6), shared by the
-// scalar transaction and the positions Accept. Include after the EditorProcessing,
+// One readback of a GPU property ring front for Accept (ADR 0030 decision 6), the readback
+// primitive of the shared GPU transaction lifecycle. Include after the EditorProcessing,
 // GpuPropertyBinding, SpatialIndexCache and RHI.Device imports; compiled in
-// `Runtime.GeometryProcessingOperations.GpuPositions.cpp`.
+// `Runtime.GpuTransactionLifecycle.cpp`.
 #pragma once
 
 extern "C++"

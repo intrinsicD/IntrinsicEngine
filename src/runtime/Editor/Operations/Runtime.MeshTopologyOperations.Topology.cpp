@@ -2228,7 +2228,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 result.DenoiseStatus = Smooth::DenoiseStatus::InvalidParams;
                 result.Error = Core::ErrorCode::InvalidState;
                 result.Message =
-                    "Mesh denoise CPU job submission was rejected by the runtime job lane.";
+                    GeometryProcessingDetail::MeshSupport::QueuedJobRejectedMessage("Mesh denoise CPU");
                 return result;
             }
 
@@ -2302,7 +2302,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                     EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidState;
                 result.Message =
-                    "Mesh remesh CPU job submission was rejected by the runtime job lane.";
+                    GeometryProcessingDetail::MeshSupport::QueuedJobRejectedMessage("Mesh remesh CPU");
                 return result;
             }
 
@@ -2373,8 +2373,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 result.Status =
                     EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidState;
-                result.Message = "Mesh subdivide CPU job submission was rejected by the "
-                                 "runtime job lane.";
+                result.Message = GeometryProcessingDetail::MeshSupport::QueuedJobRejectedMessage("Mesh subdivide CPU");
                 return result;
             }
 
@@ -2453,8 +2452,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 result.Status =
                     EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidState;
-                result.Message = "Mesh simplify CPU job submission was rejected by the "
-                                 "runtime job lane.";
+                result.Message = GeometryProcessingDetail::MeshSupport::QueuedJobRejectedMessage("Mesh simplify CPU");
                 return result;
             }
 

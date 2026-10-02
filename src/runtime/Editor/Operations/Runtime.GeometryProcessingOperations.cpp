@@ -1584,8 +1584,7 @@ namespace Extrinsic::Runtime
                 return MakeProgressivePoissonResult(
                     EditorCommandStatus::GeometryProcessingFailed, command.Config.Channel,
                     Core::ErrorCode::InvalidState,
-                    "Progressive Poisson CPU job submission was rejected by the runtime "
-                    "job lane.");
+                    GeometryProcessingDetail::MeshSupport::QueuedJobRejectedMessage("Progressive Poisson CPU"));
             }
 
             return MakePendingProgressivePoissonCpuJobResult(

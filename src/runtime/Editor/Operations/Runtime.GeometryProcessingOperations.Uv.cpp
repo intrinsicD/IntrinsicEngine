@@ -1326,8 +1326,7 @@ using namespace GeometryProcessingDetail::MeshSupport;
             return MakeUvRegenerationResult(
                 EditorCommandStatus::GeometryProcessingFailed,
                 Geometry::UvAtlas::UvAtlasStatus::BackendFailed,
-                "UV regeneration CPU job submission was rejected by the runtime job "
-                "lane.");
+                GeometryProcessingDetail::MeshSupport::QueuedJobRejectedMessage("UV regeneration CPU"));
         }
 
         return MakePendingUvRegenerationResult(handle);

@@ -662,6 +662,7 @@ namespace Extrinsic::Runtime
             if (residency->Publish(Output(w).Key)) ++w->Previews;
             if (w->Presentation) (void)residency->Publish(PresentationRing(w).Key);
         }
+        // False without a workspace; QueueGpuCompute always returns a result (a refusal is Failed).
         bool QueueExplicit(const Work& w)
         {
             const auto& ctx = w->Core.Context;
@@ -679,13 +680,13 @@ namespace Extrinsic::Runtime
                     return filter->Record(commands, {.Values = w->Values, .Channels = std::uint32_t(w->Plan.Channels),
                         .Edges = w->Edges, .Weights = w->Weights, .Degree = w->Plan.Degree, .Fixed = w->Fixed}, w->Params, &io);
                 });
-            return gpu != nullptr;
+            return true;
         }
         // One bounded chunk per immediate submission (GRAPHICS-150); each chunk reads back only
         // the reports it is observed by. A chunk also stores the latest complete time step into
         // the ring when a write slot is held (a dropped preview otherwise); the final pass, after
         // every solve finished, stores the result.
-        bool QueueChunk(const Work& w, const bool final)
+        void QueueChunk(const Work& w, const bool final)
         {
             const auto& ctx = w->Core.Context;
             auto& gpu = w->Core.Gpu;
@@ -719,7 +720,6 @@ namespace Extrinsic::Runtime
                     }
                     return buffer;
                 }, SpatialGpuLatency::Immediate);
-            return gpu != nullptr;
         }
         // Main-thread readiness poll of the compute job: queues the device work, publishes each
         // finished preview and reports when the run reached its end (or failed / was stopped).
@@ -744,7 +744,8 @@ namespace Extrinsic::Runtime
                             .ChainStride = channelCount, .SeedsOnDevice = true,
                             .MaxIterations = f.MaxSolverIterations, .Tolerance = f.SolverTolerance}))
                         return Refuse(w, "The Vulkan solver refused the implicit system; previous output retained.");
-                    return QueueChunk(w, false) ? false : Refuse(w, kRefused);
+                    QueueChunk(w, false);
+                    return false;
                 }
                 if (!gpu || gpu->State == SpatialQueryState::Failed) return true;
                 if (gpu->State != SpatialQueryState::Ready) return false;
@@ -766,19 +767,13 @@ namespace Extrinsic::Runtime
                 {
                     // The final store needs a write slot: wait for one rather than accept a stale front.
                     if (!AcquireSlots(w)) return Defer(w);
-                    return QueueChunk(w, true) ? false : Refuse(w, kRefused);
+                    QueueChunk(w, true);
+                    return false;
                 }
-                if (w->StopRequested)
-                {
-                    w->Stopped = true;
-                    // Nothing to accept: the run ends here, not in an Accept of a missing front.
-                    if (w->Previews == 0u)
-                        Finish(w, EditorGpuTransactionPhase::Discarded, EditorCommandStatus::NoChange,
-                               "Vulkan property smoothing stopped before a preview; previous output retained.");
-                    return true;
-                }
+                if (w->StopRequested) { w->Stopped = true; return true; }
                 (void)AcquireSlots(w); // no slot: this chunk computes without a preview
-                return QueueChunk(w, false) ? false : Refuse(w, kRefused);
+                QueueChunk(w, false);
+                return false;
             }
             if (!gpu)
             {
@@ -825,9 +820,14 @@ namespace Extrinsic::Runtime
             else if (!w->Implicit) w->Result.OperatorApplications = Graphics::PropertyFilterWorkspace::DispatchCount(w->Params);
             if (w->Previews == 0u)
             {
-                Finish(w, EditorGpuTransactionPhase::Discarded, EditorCommandStatus::StaleEntity,
-                       w->Stopped ? "Vulkan property smoothing stopped before a preview; previous output retained."
-                                  : "Vulkan property smoothing published no preview; previous output retained.");
+                // Nothing to accept: a Stop before the first preview ends the run as no change
+                // (delivered from the publication, so a restart from the callback is admitted).
+                if (w->Stopped)
+                    Finish(w, EditorGpuTransactionPhase::Discarded, EditorCommandStatus::NoChange,
+                           "Vulkan property smoothing stopped before a preview; previous output retained.");
+                else
+                    Finish(w, EditorGpuTransactionPhase::Discarded, EditorCommandStatus::StaleEntity,
+                           "Vulkan property smoothing published no preview; previous output retained.");
                 return;
             }
             ReleaseWorkspaces(w);
@@ -912,6 +912,10 @@ namespace Extrinsic::Runtime
                 .Poll = [self] { return Poll(self()); },
                 .CompleteRun = [self] { CompleteRun(self()); },
                 .CompleteAccept = [self] { CompleteAccept(self()); },
+                .Accepting = [raw] {
+                    raw->Result.Status = EditorCommandStatus::Pending;
+                    raw->Result.Message = "Reading the GPU result back.";
+                },
                 .Release = [self] {
                     const auto w = self();
                     ReleaseWorkspaces(w);
@@ -944,11 +948,8 @@ namespace Extrinsic::Runtime
                 return result;
             }
             if (onComplete) w->Sink = GuardEditorProcessingResult(w->Core.Context, std::move(onComplete));
-            if (!GP::BeginGpuTransactionAccept(GP::GpuTransactionOf(w))) return w->Result;
-            result.Status = EditorCommandStatus::Pending;
-            result.Message = "Reading the GPU result back.";
-            w->Result = result;
-            return result;
+            (void)GP::BeginGpuTransactionAccept(GP::GpuTransactionOf(w));
+            return w->Result;
         }
         // Builds the run from the capture and queues its compute job. Null with `result` filled
         // (a rejection) when the request cannot run.

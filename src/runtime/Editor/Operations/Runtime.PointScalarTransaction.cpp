@@ -115,7 +115,6 @@ namespace Extrinsic::Runtime
                         return workspace->Record(cmd,w->Params,{.Positions=*w->Input,.Output=*back,
                             .Base=w->Base.value_or(Graphics::GpuPropertyView{}),.Nodes=index.NodesBDA,
                             .LiveSlots=index.OriginalSlotsBDA,.LiveCount=index.Count});},SpatialGpuLatency::Immediate);
-                if(!t.Gpu){Fail(w,"Scalar compute submission rejected.");return true;}
                 w->Result.GpuQueryBatches=1;}
             return t.Gpu->State==SpatialQueryState::Ready||t.Gpu->State==SpatialQueryState::Failed;
         }

@@ -556,8 +556,8 @@ export namespace Extrinsic::Runtime
         // bytes, the sidecar acknowledges the revision and the preview ends, so the next
         // extraction uploads nothing for the positions (`PositionCommitsAcknowledged`); the
         // caller sets no dirty tag. `AcknowledgedCopyPending`: a block did not hold the front
-        // yet and copies it once at the next culling head (the caller keeps the front's slot
-        // alive for that frame). Meshes, entities without a resident 1:1 block and blocks that
+        // yet and copies it once at the next culling head; `FrontLease` (the residency's lease
+        // of the front slot) is held until that copy's frame completed. Meshes, entities without a resident 1:1 block and blocks that
         // refuse the bytes are not acknowledged: the caller marks the positions dirty and the
         // ordinary revision-delta upload applies.
         struct AcceptedPositions
@@ -567,6 +567,7 @@ export namespace Extrinsic::Runtime
             std::uint32_t RowCount{};
             std::uint64_t Revision{};
             GpuPropertyFront Front{};
+            std::shared_ptr<const void> FrontLease{};
         };
         enum class PositionCommitStatus : std::uint8_t
         {

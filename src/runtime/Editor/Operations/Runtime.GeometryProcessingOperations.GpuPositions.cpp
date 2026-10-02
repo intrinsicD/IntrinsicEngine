@@ -1,6 +1,6 @@
-// Accept of GPU-authored positions (RUNTIME-293, ADR 0030 decision 6): the ring front readback
-// shared with the scalar transaction, the undoable positions publication, and the 1:1 render
-// commit that keeps the copied front in the block instead of uploading it again.
+// Accept of GPU-authored positions (RUNTIME-293, ADR 0030 decision 6): an accept-only
+// transaction on the shared GPU transaction lifecycle, the undoable positions publication, and
+// the 1:1 render commit that keeps the copied front in the block instead of uploading it again.
 module;
 #include <array>
 #include <cmath>
@@ -48,65 +48,12 @@ import Geometry.Properties;
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuFront.hpp"
+#include "Editor/Operations/Runtime.GpuTransactionLifecycle.hpp"
 
 extern "C++"
 {
 namespace Extrinsic::Runtime::GeometryProcessingDetail
 {
-    bool BeginGpuFrontReadback(const EditorProcessingContext& ctx, Graphics::GpuPropertyResidency& residency,
-                               const Graphics::GpuPropertyKey& key, const std::shared_ptr<GpuFrontReadback>& r)
-    {
-        const auto front = residency.HasRing(key) ? residency.Front(key) : std::nullopt;
-        if (!front || !ctx.Device || !ctx.SpatialIndices) return false;
-        r->Done = r->Failed = false;
-        r->Framed.reset();
-        r->Lease = front;
-        const auto bytes = front->Bytes;
-        r->Bytes.assign(std::size_t(bytes), std::byte{0});
-        // The recorder and the sink hold the front's lease, so the slot is neither rewritten
-        // nor freed until the bytes landed, whatever happens to the owner meanwhile; the
-        // recorder also registers the frame it records in.
-        const auto record = [r, residency = &residency, device = ctx.Device, buffer = front->Buffer,
-                             lease = front->Lease](RHI::ICommandContext& commands) -> RHI::BufferHandle {
-            if (r->Abandoned) return {};
-            residency->NoteUse(buffer, device->GetGlobalFrameNumber());
-            commands.BufferBarrier(buffer, RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite | RHI::MemoryAccess::TransferRead,
-                                   RHI::MemoryAccess::TransferRead);
-            return buffer;
-        };
-        // One readback in the property's own bytes: at once where the device can
-        // (GRAPHICS-150), otherwise with the frame.
-        const auto token = ctx.Device->SubmitComputeReadback(record, bytes,
-            RHI::ReadbackSink::Invoke([r, lease = front->Lease](std::span<const std::byte> data) {
-                if (data.size() == r->Bytes.size()) std::memcpy(r->Bytes.data(), data.data(), data.size());
-                else r->Failed = true;
-                r->Done = true;
-            }));
-        if (token.IsValid()) residency.AddCompletion(front->Buffer, token, bytes);
-        else
-        {
-            r->Framed = ctx.SpatialIndices->QueueGpuCompute(std::size_t(bytes),
-                [record](RHI::ICommandContext& commands, const SpatialGpuIndexView&) { return record(commands); });
-            residency.AddCompletion(front->Buffer, RHI::ReadbackToken{}, bytes); // counted; the captured lease covers it
-        }
-        return true;
-    }
-
-    bool PollGpuFrontReadback(GpuFrontReadback& r)
-    {
-        if (r.Framed && !r.Done)
-        {
-            if (r.Framed->State == SpatialQueryState::Ready)
-            {
-                if (r.Framed->Data.size() == r.Bytes.size()) r.Bytes = r.Framed->Data;
-                else r.Failed = true;
-                r.Done = true;
-            }
-            else if (r.Framed->State == SpatialQueryState::Failed) r.Failed = r.Done = true;
-        }
-        return r.Done;
-    }
-
     bool CapturePointPositionField(const GeometryEntityAvailability& a, GeometryPropertyRef& positions,
                                    PointPositionCapture& w, std::string& diagnostic)
     {
@@ -295,22 +242,20 @@ namespace Extrinsic::Runtime
 {
     namespace GP = GeometryProcessingDetail;
 
-    struct EditorGpuPositionRun
+    // The accept-only transaction (no Run phase): an external producer writes the ring this run
+    // acquired at Begin (ring 0 of the core, read back on Accept); Accept publishes the rows and
+    // commits the accepted front to the render block.
+    struct EditorGpuPositionRun : std::enable_shared_from_this<EditorGpuPositionRun>
     {
-        EditorProcessingContext Context{};
+        GP::GpuTransactionCore Core{};
         entt::entity Entity{entt::null};
         std::uint32_t StableEntityId{};
         GP::PointPositionCapture Capture{};
-        Graphics::GpuPropertyKey Key{};
-        std::uint64_t Ring{}; // the ring this run acquired at Begin: the only one it discards
-        std::optional<Graphics::GpuPropertyView> FirstBack{};
-        EditorJobIdentity Identity{};
-        std::shared_ptr<GP::GpuFrontReadback> Readback{};
-        // The front Accept read back (buffer and publication, leased until the commit ran):
+        // The front Accept read back (buffer, publication and lease, held until the commit ran):
         // the render commit copies from it and BindRevision binds exactly that publication.
         std::optional<Graphics::GpuPropertyView> AcceptedFront{};
         std::vector<glm::vec3> TestFront{};
-        bool Accepting{}, Done{}, Delivered{}, Abandoned{};
+        std::string HistoryLabel{};
         EditorGpuPositionAcceptResult Result{};
         std::function<void(EditorGpuPositionAcceptResult)> Sink{};
     };
@@ -319,61 +264,39 @@ namespace Extrinsic::Runtime
     {
         using Run = EditorGpuPositionRunHandle;
 
-        bool Current(const Run& w)
+        auto& Ring(const Run& w) { return w->Core.Rings[0]; }
+        void Fail(const Run& w, const EditorCommandStatus status, std::string message)
         {
-            return !w->Abandoned && GP::PointPositionFieldCurrent(w->Context, w->Entity, w->Capture);
-        }
-        void Deliver(const Run& w, EditorGpuPositionAcceptResult result)
-        {
-            w->Done = true;
-            w->Result = result;
-            if (w->Delivered) return;
-            w->Delivered = true;
-            // A terminal callback may capture this run; remove the back-reference before delivery.
-            auto sink = std::move(w->Sink);
-            if (sink) sink(std::move(result));
-        }
-        // A failed or stale Accept ends the run: nothing is published, the previous
-        // positions stay, and the ring this run acquired is released (the scalar
-        // transaction's Finish does the same).
-        void Fail(const Run& w, Graphics::GpuPropertyResidency& residency, const EditorCommandStatus status,
-                  std::string message)
-        {
-            if (w->Readback)
-            {
-                w->Readback->Abandoned = true;
-                w->Readback->Lease.reset();
-            }
-            w->AcceptedFront.reset();
-            w->FirstBack.reset();
-            (void)residency.Discard(w->Key, w->Ring);
-            Deliver(w, {.Status = status, .Message = std::move(message)});
+            GP::FinishGpuTransaction(w->Core, status == EditorCommandStatus::StaleEntity ? EditorGpuTransactionPhase::Discarded
+                                                                                         : EditorGpuTransactionPhase::Failed,
+                                     status, std::move(message));
         }
 
         // The readback landed: publish every row; for a 1:1 domain the render block keeps
         // the front, then the front becomes the canonical slot of the new revision.
-        void Complete(const Run& w, Graphics::GpuPropertyResidency& residency, const std::string& label)
+        void Complete(const Run& w)
         {
-            // A discarded run publishes nothing, whatever its readback delivered.
-            if (w->Abandoned || w->Done) return;
-            const auto& ctx = w->Context;
+            auto& t = w->Core;
+            auto& residency = *t.Residency;
+            const auto& ctx = t.Context;
+            const auto& readback = Ring(w).Readback;
             const std::size_t rows = w->Capture.BeforeValues.size();
             std::vector<glm::vec3> after(rows);
             if (!w->TestFront.empty()) after = w->TestFront;
             else
             {
-                if (w->Readback->Failed || w->Readback->Bytes.size() != rows * sizeof(glm::vec3))
+                if (!readback || readback->Failed || readback->Bytes.size() != rows * sizeof(glm::vec3))
                 {
-                    Fail(w, residency, EditorCommandStatus::GeometryProcessingFailed,
+                    Fail(w, EditorCommandStatus::GeometryProcessingFailed,
                          "The GPU position readback failed; previous positions retained.");
                     return;
                 }
-                std::memcpy(after.data(), w->Readback->Bytes.data(), rows * sizeof(glm::vec3));
+                std::memcpy(after.data(), readback->Bytes.data(), rows * sizeof(glm::vec3));
             }
             for (const auto& p : after)
                 if (!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z))
                 {
-                    Fail(w, residency, EditorCommandStatus::GeometryProcessingFailed,
+                    Fail(w, EditorCommandStatus::GeometryProcessingFailed,
                          "The GPU positions are not finite; previous positions retained.");
                     return;
                 }
@@ -381,7 +304,7 @@ namespace Extrinsic::Runtime
                 std::string why;
                 if (!GP::PointPositionBoundsValid(ctx.Scene->Raw(), w->Entity, after, w->Capture.Slots, why))
                 {
-                    Fail(w, residency, EditorCommandStatus::GeometryProcessingFailed, std::move(why));
+                    Fail(w, EditorCommandStatus::GeometryProcessingFailed, std::move(why));
                     return;
                 }
             }
@@ -392,9 +315,11 @@ namespace Extrinsic::Runtime
                 // The front the readback leased, not whatever the ring shows now: a later
                 // publication is neither committed to the block nor bound.
                 const auto& front = w->AcceptedFront;
-                if (front && w->Context.SpatialIndices && published.Revision)
+                const auto& ring = Ring(w);
+                if (front && w->Core.Context.SpatialIndices && published.Revision)
                 {
-                    const auto status = w->Context.SpatialIndices->CommitGpuPositions({
+                    // A pending block copy holds the front's lease until its frame completed.
+                    const auto status = w->Core.Context.SpatialIndices->CommitGpuPositions({
                         .StableEntityId = w->StableEntityId,
                         .PositionBytes = bytes,
                         .RowCount = front->Layout.Count,
@@ -403,24 +328,20 @@ namespace Extrinsic::Runtime
                         .FrontAddress = front->Address,
                         .FrontBytes = front->Bytes,
                         .FrontCount = front->Layout.Count,
-                        .FrontStamp = GpuPropertyObservationStamp(*front)});
-                    using Status = SpatialIndexCache::GpuPositionCommitStatus;
-                    acknowledged = status != Status::NotAcknowledged;
-                    // A pending copy reads the slot at the next culling head: hold it one
-                    // frame past now.
-                    if (status == Status::AcknowledgedCopyPending && w->Context.Device)
-                        residency.NoteUse(front->Buffer, w->Context.Device->GetGlobalFrameNumber() + 1u);
+                        .FrontStamp = GpuPropertyObservationStamp(*front),
+                        .FrontLease = front->Lease});
+                    acknowledged = status != SpatialIndexCache::GpuPositionCommitStatus::NotAcknowledged;
                 }
                 // ADR 0030 decision 6: the accepted publication is the canonical slot of the new
                 // revision. A front published after the readback is not what the CPU holds:
                 // the ring is discarded and the next GPU use uploads the revision once.
                 if (!published.Revision || !front ||
-                    !residency.BindRevision(w->Key, *published.Revision, front->Publication))
-                    (void)residency.Discard(w->Key, w->Ring); // only this run's ring, never a successor's
+                    !residency.BindRevision(ring.Key, *published.Revision, front->Publication))
+                    (void)residency.Discard(ring.Key, ring.Generation); // only this run's ring, never a successor's
                 return acknowledged;
             };
             // `bytes` spans `after`, which outlives the publication (passed by copy).
-            const auto status = GP::PublishPointPositionField(ctx, w->Entity, w->Capture, after, label, commit);
+            const auto status = GP::PublishPointPositionField(ctx, w->Entity, w->Capture, after, w->HistoryLabel, commit);
             EditorGpuPositionAcceptResult result{.Status = EditorFeatureDetail::ToEditorCommandStatus(status),
                                                  .RenderAcknowledged = acknowledged};
             if (status == EditorCommandHistoryStatus::NoChange)
@@ -431,25 +352,26 @@ namespace Extrinsic::Runtime
                 const auto watch = GP::ObserveGeometryProperty(BuildGeometryAvailability(ctx.Scene->Raw(), w->Entity),
                                                                ref.Domain, ref.Name);
                 if (!watch.Revision || !w->AcceptedFront ||
-                    !residency.BindRevision(w->Key, *watch.Revision, w->AcceptedFront->Publication))
-                    (void)residency.Discard(w->Key, w->Ring);
+                    !residency.BindRevision(Ring(w).Key, *watch.Revision, w->AcceptedFront->Publication))
+                    (void)residency.Discard(Ring(w).Key, Ring(w).Generation);
                 result.Message = "GPU positions equal the current positions.";
             }
             else if (status == EditorCommandHistoryStatus::Applied)
                 result.Message = acknowledged ? "GPU positions applied; the render block keeps the accepted front."
                                               : "GPU positions applied.";
             else
-            {
                 // Refused before the commit ran: the run ends and releases its ring.
                 result.Message = status == EditorCommandHistoryStatus::StaleEntity
                     ? "The positions changed since the run; discard the result and run again."
                     : "GPU position publication rejected by history guards.";
-                (void)residency.Discard(w->Key, w->Ring);
+            w->Result = result;
+            if (status != EditorCommandHistoryStatus::Applied && status != EditorCommandHistoryStatus::NoChange)
+            {
+                Fail(w, result.Status, std::move(result.Message));
+                return;
             }
-            // The commit ran (a pending copy is held by its frame use): release the front.
-            w->Readback.reset();
-            w->AcceptedFront.reset();
-            Deliver(w, std::move(result));
+            // The commit ran; a pending copy holds its own lease of the front.
+            GP::FinishGpuTransaction(t, EditorGpuTransactionPhase::Applied, result.Status, std::move(result.Message));
         }
     }
 
@@ -471,45 +393,65 @@ namespace Extrinsic::Runtime
             return {};
         }
         auto w = std::make_shared<EditorGpuPositionRun>();
-        w->Context = context;
         w->Entity = *entity;
         w->StableEntityId = id;
         const auto a = BuildGeometryAvailability(context.Scene->Raw(), *entity);
         if (!GP::CapturePointPositionField(a, positions, w->Capture, diagnostic)) return {};
-        w->Key = MakeGpuPropertyKey(context.World, *entity, positions);
-        if (residency.HasRing(w->Key))
+        auto& t = w->Core;
+        t.Context = context;
+        t.Residency = &residency;
+        t.Label = "GPU positions";
+        t.JobLabel = "GPU positions";
+        t.AcceptJobName = "GPU positions accept";
+        t.Identity = {.EntityId = id, .Scope = ToEditorJobScope(positions.Domain),
+                      .OutputSemantic = GeometryPresentationSlotSemantic::Displacement, .OutputName = positions.Name};
+        t.Rings[0] = {.Key = MakeGpuPropertyKey(context.World, *entity, positions), .ReadBack = true};
+        t.RingCount = 1;
+        auto& ring = t.Rings[0];
+        if (residency.HasRing(ring.Key))
         {
             diagnostic = "A GPU result for these positions awaits Accept or Discard.";
             return {};
         }
         // The run owns the ring it creates: its first write slot is acquired here (depth 2:
         // fronts are copied into a render block, ADR 0030 decision 4).
-        w->FirstBack = AcquireGpuPropertyOutput(residency, context.World, *entity, positions,
-                                                std::uint32_t(w->Capture.BeforeValues.size()), 2u);
-        if (!w->FirstBack)
+        ring.Back = AcquireGpuPropertyOutput(residency, context.World, *entity, positions,
+                                             std::uint32_t(w->Capture.BeforeValues.size()), 2u);
+        if (!ring.Back)
         {
             // Nothing this Begin created may stay behind (the residency leaves no slot-less
             // ring; a ring here would be one created by this call).
-            if (const auto created = residency.RingGeneration(w->Key); created != 0u)
-                (void)residency.Discard(w->Key, created);
+            if (const auto created = residency.RingGeneration(ring.Key); created != 0u)
+                (void)residency.Discard(ring.Key, created);
             diagnostic = "The GPU residency refused a write slot for the positions.";
             return {};
         }
-        w->Ring = residency.RingGeneration(w->Key);
-        w->Identity = {.EntityId = id, .Scope = ToEditorJobScope(positions.Domain),
-                       .OutputSemantic = GeometryPresentationSlotSemantic::Displacement, .OutputName = positions.Name};
+        ring.Generation = residency.RingGeneration(ring.Key);
+        auto* raw = w.get();
+        const auto self = [raw] { return raw->shared_from_this(); };
+        t.Hooks = {
+            .Current = [raw] { return GP::PointPositionFieldCurrent(raw->Core.Context, raw->Entity, raw->Capture); },
+            .CompleteAccept = [self] { Complete(self()); },
+            .Accepting = [raw] { raw->Result = {.Status = EditorCommandStatus::Pending, .Message = "Reading the GPU positions back."}; },
+            .Release = [raw] { raw->AcceptedFront.reset(); },
+            .Deliver = [raw](const EditorCommandStatus status, std::string message) {
+                raw->Result.Status = status;
+                raw->Result.Message = std::move(message);
+                // A terminal callback may capture this run: the sink leaves it before delivery.
+                if (auto sink = std::move(raw->Sink)) sink(raw->Result);
+            }};
+        // Accept-only: the producer's fronts wait for Accept from the start.
+        GP::ReadyGpuTransaction(t);
         return w;
     }
 
     std::optional<Graphics::GpuPropertyView> EditorGpuPositionRunFirstBack(const EditorGpuPositionRunHandle& run)
     {
         if (!run) return std::nullopt;
-        auto back = std::move(run->FirstBack);
-        run->FirstBack.reset();
-        return back;
+        return std::exchange(run->Core.Rings[0].Back, std::nullopt);
     }
 
-    Graphics::GpuPropertyKey EditorGpuPositionRunKey(const EditorGpuPositionRunHandle& run) { return run->Key; }
+    Graphics::GpuPropertyKey EditorGpuPositionRunKey(const EditorGpuPositionRunHandle& run) { return run->Core.Rings[0].Key; }
 
     std::uint32_t EditorGpuPositionRunRowCount(const EditorGpuPositionRunHandle& run)
     {
@@ -518,83 +460,47 @@ namespace Extrinsic::Runtime
 
     bool EditorGpuPositionRunCurrent(const EditorProcessingCommands&, const EditorGpuPositionRunHandle& run)
     {
-        return run && Current(run);
+        return run && GP::GpuTransactionCurrent(run->Core);
     }
 
     EditorGpuPositionAcceptResult AcceptEditorGpuPositionRun(
-        const EditorProcessingCommands&, const EditorGpuPositionRunHandle& w, Graphics::GpuPropertyResidency& residency,
+        const EditorProcessingCommands&, const EditorGpuPositionRunHandle& w, Graphics::GpuPropertyResidency&,
         std::string label, std::function<void(EditorGpuPositionAcceptResult)> onComplete,
         const std::span<const glm::vec3> frontForTest)
     {
         const auto refuse = [&](const EditorCommandStatus status, std::string message) {
             return EditorGpuPositionAcceptResult{.Status = status, .Message = std::move(message)};
         };
-        if (!w || w->Done) return refuse(EditorCommandStatus::InvalidProcessingParameters, "No GPU result waits for Accept.");
-        if (w->Accepting) return refuse(EditorCommandStatus::Pending, "Accept is already under way.");
-        if (!Current(w))
-            return refuse(EditorCommandStatus::StaleEntity, "The positions changed since the run; discard the result and run again.");
-        const auto& ctx = w->Context;
-        if (onComplete) w->Sink = GuardEditorProcessingResult(ctx, std::move(onComplete));
-        w->TestFront.assign(frontForTest.begin(), frontForTest.end());
-        if (!w->TestFront.empty() && w->TestFront.size() != w->Capture.BeforeValues.size())
+        if (!w) return refuse(EditorCommandStatus::InvalidProcessingParameters, "No GPU result waits for Accept.");
+        if (auto refused = GP::GpuTransactionAcceptRefusal(w->Core, bool(onComplete)))
+            return refuse(refused->Status, std::move(refused->Message));
+        if (!frontForTest.empty() && frontForTest.size() != w->Capture.BeforeValues.size())
             return refuse(EditorCommandStatus::InvalidProcessingParameters, "The test front must cover every row.");
-        w->AcceptedFront = residency.HasRing(w->Key) ? residency.Front(w->Key) : std::nullopt;
+        auto& t = w->Core;
+        if (onComplete) w->Sink = GuardEditorProcessingResult(t.Context, std::move(onComplete));
+        w->TestFront.assign(frontForTest.begin(), frontForTest.end());
+        t.TestFront = !w->TestFront.empty();
+        w->HistoryLabel = std::move(label);
+        auto& residency = *t.Residency;
+        w->AcceptedFront = residency.HasRing(Ring(w).Key) ? residency.Front(Ring(w).Key) : std::nullopt;
         if (!w->AcceptedFront)
         {
-            Fail(w, residency, EditorCommandStatus::GeometryProcessingFailed, "The GPU result is no longer resident; previous positions retained.");
+            Fail(w, EditorCommandStatus::GeometryProcessingFailed, "The GPU result is no longer resident; previous positions retained.");
             return w->Result;
         }
-        if (w->TestFront.empty())
-        {
-            w->Readback = std::make_shared<GP::GpuFrontReadback>();
-            if (!GP::BeginGpuFrontReadback(ctx, residency, w->Key, w->Readback))
-            {
-                Fail(w, residency, EditorCommandStatus::GeometryProcessingFailed, "The GPU result is no longer resident; previous positions retained.");
-                return w->Result;
-            }
-        }
-        w->Accepting = true;
         // The publication runs from a completion drain like every other editor result.
-        JobDesc accept{
-            .DebugName = "GPU positions accept", .Scope = ctx.World, .Kind = RuntimeTaskKinds::GeometryProcess,
-            .Work = [](const JobCancellation&) { return JobResultEnvelope::Make(true); },
-            .IsReadyToApply = [w] { return !Current(w) || !w->Readback || GP::PollGpuFrontReadback(*w->Readback); },
-            .ValidateBeforeApply = [w] { return Current(w) ? JobApplyValidation::Current : JobApplyValidation::StaleGeneration; },
-            .PublishCompletion = [w, residency = &residency, label](KernelEventBus&, const JobResultEnvelope&) {
-                Complete(w, *residency, label);
-                return w->Result.Status == EditorCommandStatus::Applied || w->Result.Status == EditorCommandStatus::NoChange;
-            },
-            .FinalizeUnpublishedOnMainThread = [w, residency = &residency] {
-                w->Abandoned = true;
-                if (w->Delivered) return;
-                Fail(w, *residency, EditorCommandStatus::StaleEntity, "GPU positions cancelled or stale; previous positions retained.");
-            }};
-        if (!ctx.JobCommands.Submit(std::move(accept), w->Identity).IsValid())
-        {
-            Fail(w, residency, EditorCommandStatus::GeometryProcessingFailed, GP::MeshSupport::QueuedJobRejectedMessage("GPU positions", "Accept"));
-            return w->Result;
-        }
-        w->Result = {.Status = EditorCommandStatus::Pending, .Message = "Reading the GPU positions back."};
+        (void)GP::BeginGpuTransactionAccept(GP::GpuTransactionOf(w));
         return w->Result;
     }
 
     void DiscardEditorGpuPositionRun(const EditorProcessingCommands&, const EditorGpuPositionRunHandle& w,
-                                     Graphics::GpuPropertyResidency& residency)
+                                     Graphics::GpuPropertyResidency&)
     {
         // Idempotent: a terminal run owns nothing any more (its ring was bound or released),
-        // so a later run's ring on the same property is never touched.
-        if (!w || w->Done) return;
-        // Nothing of this run may reach the CPU any more: a readback still in flight
+        // so a later run's ring on the same property is never touched. A readback in flight
         // records nothing (framed) or lands into a run that no longer publishes.
-        w->Abandoned = true;
-        if (w->Readback)
-        {
-            w->Readback->Abandoned = true;
-            w->Readback->Lease.reset();
-        }
-        w->AcceptedFront.reset();
-        w->FirstBack.reset();
-        (void)residency.Discard(w->Key, w->Ring); // only the ring this run acquired
-        Deliver(w, {.Status = EditorCommandStatus::StaleEntity, .Message = "GPU positions discarded; previous positions retained."});
+        if (w)
+            GP::DiscardGpuTransaction(w->Core, EditorCommandStatus::StaleEntity,
+                                      "GPU positions discarded; previous positions retained.");
     }
 }

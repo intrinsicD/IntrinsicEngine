@@ -24,15 +24,6 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
 
         void InvalidateSelectedModelCache(const EditorProcessingContext& context);
 
-        // The guard refuses a duplicate submission when the same entity+output
-        // already has a non-terminal `JobService` job. Identity stays with the
-        // editor session and is resolved through its active-output query.
-        [[nodiscard]] std::optional<EditorJobRecord> FindActiveEditorJob(
-            const EditorProcessingContext& context, const EditorJobIdentity& identity);
-
-        [[nodiscard]] std::string BuildActiveDerivedJobMessage(
-            std::string_view label, const EditorJobRecord& job);
-
         [[nodiscard]] bool SameGeometryPositions(
             const std::vector<glm::vec3>& lhs,
             const std::vector<glm::vec3>& rhs) noexcept;

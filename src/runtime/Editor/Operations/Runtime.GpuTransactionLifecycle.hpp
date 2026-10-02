@@ -44,6 +44,9 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         // Every front readback landed and the transaction is current: the typed publication,
         // which ends the transaction (Applied, or Failed/Discarded with the typed reason).
         std::function<void()> CompleteAccept{};
+        // Optional: Accept (a user's or the automatic one) was queued; the typed result may
+        // say so while the readback runs.
+        std::function<void()> Accepting{};
         // Drops the typed input views and the workspaces. Recorders capture their own workspace
         // leases (the spatial cache keeps a recorder until its readback is safe), so the run
         // returns its copies at once, also when it ends while device work is in flight.
@@ -136,7 +139,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
     // Starts Accept on a transaction `GpuTransactionAcceptRefusal` admitted: one front
     // readback per `ReadBack` ring (none for a test front), then the Accept job that joins the
     // run, publishes through `CompleteAccept` once every readback landed and finalizes once
-    // when cancelled or stale. False when it already ended (front gone, submission rejected).
+    // when cancelled or stale. False when it already ended (the front is gone, or the job lane refused the submission).
     bool BeginGpuTransactionAccept(const GpuTransactionHandle&);
     // Ends a live transaction as Discarded with the typed status and reason. Ignored once
     // terminal and while Accept's publication runs.

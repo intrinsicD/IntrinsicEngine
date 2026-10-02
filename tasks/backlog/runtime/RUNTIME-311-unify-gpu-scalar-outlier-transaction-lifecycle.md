@@ -62,7 +62,8 @@ the per-job setup/completion prologue that precedes them is
   is embedded by value in each typed transaction (rings with captured generations, readbacks,
   phase, Abandoned/Delivered/Publishing, run and accept tokens, `AcceptJobName`) with typed hooks
   (`Current`, `Poll`, `CompleteRun`, `CompleteAccept`, `Release`, `Deliver`). Slices: 1 scalar (typed
-  Start and publication mode), 2 outliers, 3 normals, 4 smoothing.
+  Start and publication mode), 2 outliers, 3 normals, 4 smoothing, 5 GPU positions (accept-only:
+  the core starts in ReadyToAccept with its ring acquired, no Run job).
 - Shared semantics, recorded as changes where a method differed before:
   - Start refusal order is: active job on the output (Pending, shared 313 wording), then no residency,
     then a ring of the output awaiting Accept/Discard (InvalidProcessingParameters, "A GPU result for
@@ -81,8 +82,6 @@ the per-job setup/completion prologue that precedes them is
   - Discard keeps its typed status (scalar/outliers NoChange, normals/smoothing/positions StaleEntity).
   - A rejected Run submission closes the transaction without calling the sink (the immediate answer
     reports it); a rejected Accept submission delivers its failure once.
-  - An automatic Accept no longer rewrites the normals result message to "Reading the GPU normals
-    back." (the user Accept still does).
   - A rejected job-lane submission (Run or Accept) is worded by `MeshSupport::QueuedJobRejectedMessage`
     with the operation's job label ("Normal estimation job submission was rejected.", "... (Accept)."),
     as are the keypoint resident start and the positions Accept; before each method had its own
@@ -96,8 +95,24 @@ the per-job setup/completion prologue that precedes them is
     until its readback is safe), so a run discarded or cancelled while device work is in flight
     returns its workspace at once. Before, `Release` kept it unless the work was Ready and nothing
     retried later, so the run held it until its handle was dropped.
-  - Smoothing: Stop before the first preview ends inside the Run's readiness poll as
-    Discarded/NoChange ("stopped before a preview"); before it ended Discarded/StaleEntity.
+  - Smoothing: Stop before the first preview ends the run, from the Run's publication, as
+    Discarded/NoChange ("stopped before a preview"); before it ended Discarded/StaleEntity. Not
+    reachable deterministically on a device (the first chunk stores a preview whenever it holds a
+    write slot), so it has no smoke; CPU contract tests cannot drive the Vulkan Run.
+  - GPU positions: Accept while one is under way with a callback is refused (before: Pending without
+    taking the callback); a Discard from a history observer during publication is ignored; the run
+    is stale once its ring is another generation or the world changed (before: positions only).
+  - GPU positions render commit: a pending block copy (`AcknowledgedCopyPending`) holds the accepted
+    front's residency lease (`GeometryPositionCommitDesc::SourceLease`) until the frame that recorded
+    the copy completed (`GetFramesInFlight`); every place a preview stops holding it (copied,
+    superseded by a CPU upload, replaced by a new preview or commit, cleared, freed) retires it, and
+    Shutdown/device-loss rebuild drop the retire list. Before, only `NoteUse(frame + 1)` protected
+    the slot, which a late culling head (minimized frames) outlived.
+  - Workspace-in-flight: no smoke asserts that a workspace is reused only after its readback; the
+    recorder-owned lease follows the spatial cache contract and the discard/stop smokes pass.
+  - Mesh-family CPU jobs (curvature, denoise, remesh, subdivide, simplify, UV, ICP, Progressive
+    Poisson) word a rejected submission through `QueuedJobRejectedMessage` ("Mesh denoise CPU job
+    submission was rejected.", before "... was rejected by the runtime job lane.").
 
 ## Acceptance criteria
 - [ ] One compiled lifecycle owns acquisition, polling, ring publication, Accept, Discard, cancellation and terminal delivery for one or N rings, including the accept-only (no Run phase) shape.

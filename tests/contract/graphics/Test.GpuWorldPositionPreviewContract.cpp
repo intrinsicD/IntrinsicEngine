@@ -11,6 +11,7 @@
 #include <span>
 #include <vector>
 
+#include <memory>
 #include <gtest/gtest.h>
 
 import Extrinsic.Graphics.GpuPropertyResidency;
@@ -602,6 +603,50 @@ TEST(GpuWorldPositionCommitContract, CommitWithoutACopiedFrontCopiesItOnceThenEn
     f.World.SubmitPendingUploadBarriers(f.Commands);
     EXPECT_EQ(f.Commands.CopyBufferRecords.size(), 3u);
     EXPECT_FALSE(f.View(geometry).PositionShadowStale);
+}
+
+// RUNTIME-311: a pending commit copy holds the accepted front's residency lease. Once the copy
+// is recorded (or the commit is superseded) the lease is retired, and it is released only after
+// the frame that may have recorded the copy completed (`GetFramesInFlight`), however late the
+// culling head runs; Shutdown drops every lease.
+TEST(GpuWorldPositionCommitContract, APendingCopyHoldsTheFrontLeaseUntilItsFrameCompleted)
+{
+    Fixture f;
+    const auto geometry = f.World.UploadGeometry(TriangleUpload());
+    const auto bytes = ShiftedPositionBytes();
+    auto lease = std::make_shared<int>(0);
+    auto commit = Commit(f, bytes, 7u);
+    commit.SourceLease = lease;
+    ASSERT_EQ(f.World.CommitGeometryPositions(geometry, commit), CommitStatus::CopyPending);
+    commit.SourceLease.reset();
+    // Minimized frames: no culling head records the copy, the lease stays held.
+    for (int frame = 0; frame < 5; ++frame) { ++f.Device.GlobalFrameNumber; f.World.SyncFrame(); }
+    EXPECT_GT(lease.use_count(), 1) << "the pending copy holds the front";
+    f.World.SubmitPendingUploadBarriers(f.Commands);
+    ASSERT_EQ(f.Commands.CopyBufferRecords.size(), 1u);
+    const auto recorded = f.Device.GlobalFrameNumber;
+    for (std::uint64_t frame = 0; frame <= f.Device.FramesInFlight; ++frame)
+    {
+        f.World.SyncFrame();
+        EXPECT_GT(lease.use_count(), 1) << "the recorded copy may still read the front at frame " << f.Device.GlobalFrameNumber;
+        ++f.Device.GlobalFrameNumber;
+    }
+    ASSERT_GT(f.Device.GlobalFrameNumber - recorded, f.Device.FramesInFlight);
+    f.World.SyncFrame();
+    EXPECT_EQ(lease.use_count(), 1) << "released once the copy's frame completed";
+
+    // Superseded before any copy: retired the same way, and Shutdown drops what is left.
+    auto second = std::make_shared<int>(0);
+    auto again = Commit(f, bytes, 9u);
+    again.SourceLease = second;
+    ASSERT_EQ(f.World.CommitGeometryPositions(geometry, again), CommitStatus::CopyPending);
+    again.SourceLease.reset();
+    ASSERT_TRUE(f.World.UpdateGeometryChannels(
+        geometry, TriangleUpload(), Graphics::GpuWorld::GeometryChannelUpdateMask{.Position = true}).Succeeded());
+    f.World.SyncFrame();
+    EXPECT_GT(second.use_count(), 1) << "retired, not yet released";
+    f.World.Shutdown();
+    EXPECT_EQ(second.use_count(), 1);
 }
 
 TEST(GpuWorldPositionCommitContract, ACpuPositionUploadSupersedesAPendingCommitCopy)
