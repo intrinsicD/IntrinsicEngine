@@ -1169,9 +1169,7 @@ namespace Extrinsic::Sandbox::Editor
                                 ImGui::TextWrapped("%s", slot.Diagnostic.c_str());
 
                             if (context != nullptr &&
-                                (slot.Semantic == GeometryPresentationSlotSemantic::Albedo ||
-                                 slot.Semantic == GeometryPresentationSlotSemantic::PointColor ||
-                                 slot.Semantic == GeometryPresentationSlotSemantic::LineColor))
+                                slot.Semantic == GeometryPresentationSlotSemantic::Albedo)
                             {
                                 glm::vec4 color = slot.UniformDefault.Vector;
                                 if (ImGui::ColorEdit4("Default color", &color.x))

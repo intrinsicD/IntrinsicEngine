@@ -818,40 +818,6 @@ void SeedAcceptanceScene(Registry& scene)
     };
 }
 
-[[nodiscard]] GeometryPresentationFixture MakeGraphGeometryPresentation()
-{
-    RT::GeometryPresentationSlotRecipe edgeColor{};
-    edgeColor.Semantic = RT::GeometryPresentationSlotSemantic::LineColor;
-    edgeColor.SourceKind = RT::GeometryPresentationSourceKind::PropertyBuffer;
-    edgeColor.Property = RT::GeometryPropertyRef{
-        .Domain = RT::GeometryElementDomain::GraphEdge,
-        .Name = "e:debug_color",
-        .ValueKind = Geometry::PropertyValueKind::Vec4,
-    };
-
-    return GeometryPresentationFixture{
-        .Recipe = RT::GeometryPresentationRecipe{
-            .Shape = RT::GeometryPresentationShape::Graph,
-            .Lanes = {
-                RT::GeometryPresentationLaneRecipe{
-                    .Lane = RT::GeometryRenderLane::Edges,
-                    .PresentationKey = "graph.lines",
-                },
-            },
-            .Presentations = {
-                RT::GeometryPresentationBindingRecipe{
-                    .Key = "graph.lines",
-                    .Kind = RT::GeometryPresentationKind::LinePresentation,
-                    .Slots = {edgeColor},
-                },
-            },
-        },
-        .RuntimeState = RT::GeometryPresentationRuntimeState{
-            .RecipeGeneration = 1u,
-        },
-    };
-}
-
 [[nodiscard]] EntityHandle SeedGeometryPresentationMeshScene(Registry& scene)
 {
     const EntityHandle mesh = MakeMesh(scene, "GeometryPresentationGpuMesh", 201u);
@@ -876,19 +842,18 @@ void SeedAcceptanceScene(Registry& scene)
     return mesh;
 }
 
-[[nodiscard]] EntityHandle SeedGeometryPresentationGraphScene(Registry& scene)
+// RUNTIME-318: graph edge colors are the visualization overlay (the retired
+// LineColor presentation slot is gone).
+[[nodiscard]] EntityHandle SeedOverlayColoredGraphScene(Registry& scene)
 {
-    const EntityHandle graph = MakeGraph(scene, "GeometryPresentationGpuGraph", 202u);
+    const EntityHandle graph = MakeGraph(scene, "OverlayColoredGpuGraph", 202u);
     auto& edges = scene.Raw().get<gs::Edges>(graph);
     edges.Properties.GetOrAdd<glm::vec4>("e:debug_color", glm::vec4{1.0f}).Vector() =
         {glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
          glm::vec4{0.0f, 1.0f, 0.0f, 1.0f}};
-    const GeometryPresentationFixture presentation =
-        MakeGraphGeometryPresentation();
-    scene.Raw().emplace<RT::GeometryPresentationRecipe>(graph, presentation.Recipe);
-    scene.Raw().emplace<RT::GeometryPresentationRuntimeState>(
-        graph,
-        presentation.RuntimeState);
+    auto& overlay = scene.Raw().emplace_or_replace<G::VisualizationConfig>(graph);
+    overlay.Source = G::VisualizationConfig::ColorSource::PerEdgeBuffer;
+    overlay.ColorBufferName = "e:debug_color";
     return graph;
 }
 
@@ -1924,7 +1889,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, GeometryPresentationReachesOperationalFra
 
     Registry& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle mesh = SeedGeometryPresentationMeshScene(scene);
-    const EntityHandle graph = SeedGeometryPresentationGraphScene(scene);
+    (void)SeedOverlayColoredGraphScene(scene);
 
     const gs::ConstSourceView initialMeshView =
         gs::BuildConstView(scene.Raw(), mesh);
@@ -1959,18 +1924,6 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, GeometryPresentationReachesOperationalFra
     ExpectSurfaceDisplacementUnsupported(readyMesh, "normal-ready");
     EXPECT_GE(readyMesh.Stats.PreviousOutputRetainedCount, 1u);
 
-    const gs::ConstSourceView graphView = gs::BuildConstView(scene.Raw(), graph);
-    const auto& graphBindings =
-        scene.Raw().get<RT::GeometryPresentationRecipe>(graph);
-    const auto& graphState =
-        scene.Raw().get<RT::GeometryPresentationRuntimeState>(graph);
-    const RT::GeometryPresentationSnapshot graphSnapshot =
-        RT::BuildGeometryPresentationSnapshot(
-            graphView,
-            graphBindings,
-            graphState);
-    EXPECT_GE(graphSnapshot.Stats.PropertyBufferReadyCount, 1u);
-
     const auto run = DriveAcceptanceAndCapture(engine);
     if (!run.DeviceOperational)
     {
@@ -1989,15 +1942,15 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, GeometryPresentationReachesOperationalFra
         << BuildPassStatusSummary(run.Stats);
 
     const auto& ex = RequiredEngineService<RT::RenderExtractionCache>(engine).GetLastStats();
-    EXPECT_GE(ex.GeometryPresentationEntityCount, 2u);
-    EXPECT_GE(ex.GeometryPresentationSlotCount,
-              readyMesh.Stats.SlotCount + graphSnapshot.Stats.SlotCount);
+    EXPECT_GE(ex.GeometryPresentationEntityCount, 1u);
+    EXPECT_GE(ex.GeometryPresentationSlotCount, readyMesh.Stats.SlotCount);
     EXPECT_GE(ex.GeometryPresentationDefaultSlotCount, readyMesh.Stats.DefaultSlotCount);
     EXPECT_GE(ex.GeometryPresentationReadyTextureSlotCount,
               readyMesh.Stats.ReadyTextureSlotCount);
     EXPECT_GE(ex.GeometryPresentationPropertyBufferReadyCount,
-              readyMesh.Stats.PropertyBufferReadyCount +
-                  graphSnapshot.Stats.PropertyBufferReadyCount);
+              readyMesh.Stats.PropertyBufferReadyCount);
+    EXPECT_GE(ex.VisualizationColorPacketCount, 1u)
+        << "The graph's edge-color overlay did not reach the operational frame.";
     EXPECT_GE(ex.GeometryPresentationUnsupportedSlotCount,
               readyMesh.Stats.UnsupportedSlotCount);
     EXPECT_GE(ex.GeometryPresentationPreviousOutputRetainedCount,

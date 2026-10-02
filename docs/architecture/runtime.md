@@ -1188,19 +1188,24 @@ before reporting an applied result. The complete ownership, staging, and
 failure contract is documented in
 [geometry property CPU/GPU coherence](property-coherence.md).
 
-Scene JSON version 2 remains backend-neutral. Version 2 makes graph halfedge
+Scene JSON version 3 remains backend-neutral. Version 2 made graph halfedge
 connectivity mandatory so a loaded graph satisfies the same
 `Vertices + Halfedges + Edges` source contract as a freshly materialized one.
+Version 3 retires the `PointColor`, `PointScalarField`, `LineColor` and
+`LineScalarField` presentation slot semantics (RUNTIME-318): point and line
+lanes are colored only by the visualization overlay (lane configs), so a
+document naming one of them, and every version 2 document, fails with
+`InvalidFormat` instead of being converted.
 The reader and writer reject non-compact graph sources, endpoint indices outside
 the vertex range, halfedge counts other than twice the edge count, endpoint/
 halfedge-pair disagreement, out-of-range next/previous handles, non-reciprocal
 next/previous links, and successor links that do not continue at the target
-vertex. Version 1 is rejected rather than upgraded by synthesizing topology. Supported
+vertex. Versions 1 and 2 are rejected rather than upgraded. Supported
 persistence is limited to current
 sandbox-authoring CPU state: metadata names, stable ids, transforms, hierarchy,
 selection eligibility, render hints, visualization configs, authored
 `GeometryPresentationRecipe` values, structural render-attribute bindings
-(`attributeBindings`, RUNTIME-315; an optional key within version 2, with
+(`attributeBindings`, RUNTIME-315; an optional key, with
 sources that do not resolve on load kept, drawn from the default and counted in
 `StaleAttributeBindings`), and mesh/graph/point-cloud `GeometrySources`. The
 next incompatible format change bumps `kSceneDocumentVersion`. The writer emits only `geometryPresentation`; the reader

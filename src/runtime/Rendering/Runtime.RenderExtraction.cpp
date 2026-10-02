@@ -1116,11 +1116,7 @@ namespace Extrinsic::Runtime
                 bindings.MetallicRoughness = slot.TextureAsset;
                 return true;
             case GeometryPresentationSlotSemantic::Displacement:
-            case GeometryPresentationSlotSemantic::PointColor:
-            case GeometryPresentationSlotSemantic::PointScalarField:
             case GeometryPresentationSlotSemantic::PointNormalOrientation:
-            case GeometryPresentationSlotSemantic::LineColor:
-            case GeometryPresentationSlotSemantic::LineScalarField:
                 return false;
             }
             return false;
@@ -1210,8 +1206,11 @@ namespace Extrinsic::Runtime
             const GeometryPresentationSlotSnapshot& slot,
             const Graphics::Components::VisualizationConfig* config)
         {
+            // Point and edge lanes are colored by the overlay alone
+            // (RUNTIME-318); only a surface scalar slot lowers to a recipe.
             if (!slot.Enabled || !slot.PropertyBufferReady || slot.Unsupported ||
-                slot.SourceKind != GeometryPresentationSourceKind::PropertyBuffer)
+                slot.SourceKind != GeometryPresentationSourceKind::PropertyBuffer ||
+                slot.Lane != GeometryRenderLane::Surface)
             {
                 return std::nullopt;
             }
@@ -1224,8 +1223,6 @@ namespace Extrinsic::Runtime
             switch (slot.Semantic)
             {
             case GeometryPresentationSlotSemantic::ScalarField:
-            case GeometryPresentationSlotSemantic::PointScalarField:
-            case GeometryPresentationSlotSemantic::LineScalarField:
             {
                 ScalarVisualizationRecipe scalar{
                     .Source = slot.Property,
@@ -1243,14 +1240,6 @@ namespace Extrinsic::Runtime
                 }
                 return VisualizationRecipe{.Data = std::move(scalar)};
             }
-            case GeometryPresentationSlotSemantic::PointColor:
-            case GeometryPresentationSlotSemantic::LineColor:
-                return VisualizationRecipe{.Data = ColorVisualizationRecipe{
-                    .Source = slot.Property,
-                    .OutputName = slot.Property.Name,
-                    .BufferSourceKey = sourceKey,
-                    .DirtyStamp = slot.SourceGeneration,
-                }};
             case GeometryPresentationSlotSemantic::Albedo:
             case GeometryPresentationSlotSemantic::Normal:
             case GeometryPresentationSlotSemantic::Roughness:
@@ -1328,7 +1317,6 @@ namespace Extrinsic::Runtime
                     continue;
 
                 const bool meshSurfaceSlot =
-                    slot.Lane == GeometryRenderLane::Surface &&
                     availability.Sources.ProvenanceDomain ==
                         ECS::Components::GeometrySources::Domain::Mesh &&
                     sidecar.MeshGeometry.IsValid();
@@ -2285,23 +2273,25 @@ namespace Extrinsic::Runtime
                         return packet.SourceBufferKey == recipe.BufferSourceKey && packet.Domain == domain;
                     });
                 };
+                const std::array<const Graphics::Components::VisualizationConfig*, 3u> overrides{
+                    ResolveVisualizationForLane(nullptr, visualizationOverrides, VisualizationLane::Surface),
+                    ResolveVisualizationForLane(nullptr, visualizationOverrides, VisualizationLane::Edges),
+                    ResolveVisualizationForLane(nullptr, visualizationOverrides, VisualizationLane::Points)};
+                // A projected surface scalar slot replaces the surface lane's
+                // config-derived recipe unless that lane is explicitly
+                // overridden; point and edge lanes always draw their overlay.
                 const std::array<
                     const Graphics::Components::VisualizationConfig*, 3u>
-                    configs{surfaceVisualization,
+                    configs{presentationRecipesProjected && overrides[0] == nullptr
+                                ? nullptr : surfaceVisualization,
                             meshDomainThisFrame &&
                                     (renderEdges == nullptr || !sidecar->MeshEdgeViewInstance.IsValid())
                                 ? nullptr : edgeVisualization,
                             meshDomainThisFrame &&
                                     (renderPoints == nullptr || !sidecar->MeshVertexViewInstance.IsValid())
                                 ? nullptr : pointVisualization};
-                const std::array<const Graphics::Components::VisualizationConfig*, 3u> overrides{
-                    ResolveVisualizationForLane(nullptr, visualizationOverrides, VisualizationLane::Surface),
-                    ResolveVisualizationForLane(nullptr, visualizationOverrides, VisualizationLane::Edges),
-                    ResolveVisualizationForLane(nullptr, visualizationOverrides, VisualizationLane::Points)};
                 for (std::size_t i = 0u; i < configs.size(); ++i)
                 {
-                    if (presentationRecipesProjected && overrides[i] == nullptr)
-                        continue;
                     const bool canonicalMeshLane = meshDomainThisFrame && i != 0u;
                     bool alreadyAppended = false;
                     for (std::size_t j = 0u; j < i; ++j)

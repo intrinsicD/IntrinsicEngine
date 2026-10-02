@@ -255,11 +255,7 @@ namespace Extrinsic::Runtime
                     }
                     break;
                 case GeometryPresentationSlotSemantic::Displacement:
-                case GeometryPresentationSlotSemantic::PointColor:
-                case GeometryPresentationSlotSemantic::PointScalarField:
                 case GeometryPresentationSlotSemantic::PointNormalOrientation:
-                case GeometryPresentationSlotSemantic::LineColor:
-                case GeometryPresentationSlotSemantic::LineScalarField:
                     break;
                 }
             }
@@ -315,11 +311,7 @@ namespace Extrinsic::Runtime
                     bindings.MetallicFromRed = true;
                     break;
                 case GeometryPresentationSlotSemantic::Displacement:
-                case GeometryPresentationSlotSemantic::PointColor:
-                case GeometryPresentationSlotSemantic::PointScalarField:
                 case GeometryPresentationSlotSemantic::PointNormalOrientation:
-                case GeometryPresentationSlotSemantic::LineColor:
-                case GeometryPresentationSlotSemantic::LineScalarField:
                     break;
                 }
             }

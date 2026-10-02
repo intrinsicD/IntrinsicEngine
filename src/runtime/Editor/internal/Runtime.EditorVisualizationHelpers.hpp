@@ -1,5 +1,5 @@
 // Shared stored and effective visualization lookup for editor commands and models.
-// Include after VisualizationEditingOperations, GeometryPresentation, VisualizationConfig and ECS.Scene.Handle;
+// Include after VisualizationEditingOperations, GeometryAvailability, VisualizationConfig and ECS.Scene.Handle;
 // provide EnTT registry declarations and <optional> in the global module fragment.
 #pragma once
 
@@ -33,10 +33,6 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
     };
     [[nodiscard]] std::optional<ColorOverlayTarget> ColorOverlayTargetFor(
         GeometryElementDomain domain) noexcept;
-    // A point/line presentation color slot (RUNTIME-318) on the same lane as
-    // the Color overlay for `domain`; empty when absent or on another lane.
-    [[nodiscard]] GeometryPresentationColorSlot FindOverlayLaneColorSlot(
-        const entt::registry& raw, ECS::EntityHandle entity, GeometryElementDomain domain);
     // Property the effective overlay of that lane colors `domain` by, if any.
     [[nodiscard]] std::optional<std::string> BoundColorOverlaySource(
         const entt::registry& raw, ECS::EntityHandle entity, GeometryElementDomain domain);

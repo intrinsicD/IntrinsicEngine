@@ -698,15 +698,11 @@ namespace {
             case GeometryPresentationSlotSemantic::PointNormalOrientation:
                 return Geometry::PropertyValueKind::Vec3;
             case GeometryPresentationSlotSemantic::Albedo:
-            case GeometryPresentationSlotSemantic::PointColor:
-            case GeometryPresentationSlotSemantic::LineColor:
                 return Geometry::PropertyValueKind::Vec4;
             case GeometryPresentationSlotSemantic::Roughness:
             case GeometryPresentationSlotSemantic::Metallic:
             case GeometryPresentationSlotSemantic::ScalarField:
             case GeometryPresentationSlotSemantic::Displacement:
-            case GeometryPresentationSlotSemantic::PointScalarField:
-            case GeometryPresentationSlotSemantic::LineScalarField:
                 return Geometry::PropertyValueKind::Float;
             }
             return std::nullopt;
@@ -720,23 +716,14 @@ namespace {
             switch (sourceDomain)
             {
             case GS::Domain::Mesh:
-                if (semantic == GeometryPresentationSlotSemantic::LineColor ||
-                    semantic == GeometryPresentationSlotSemantic::LineScalarField)
-                {
-                    return GeometryElementDomain::MeshEdge;
-                }
                 if (semantic == GeometryPresentationSlotSemantic::ScalarField)
                     return GeometryElementDomain::MeshFace;
                 if (lane == GeometryRenderLane::Edges)
                     return GeometryElementDomain::MeshEdge;
                 return GeometryElementDomain::MeshVertex;
             case GS::Domain::Graph:
-                if (lane == GeometryRenderLane::Edges ||
-                    semantic == GeometryPresentationSlotSemantic::LineColor ||
-                    semantic == GeometryPresentationSlotSemantic::LineScalarField)
-                {
+                if (lane == GeometryRenderLane::Edges)
                     return GeometryElementDomain::GraphEdge;
-                }
                 return GeometryElementDomain::GraphNode;
             case GS::Domain::PointCloud:
                 return GeometryElementDomain::PointCloudPoint;

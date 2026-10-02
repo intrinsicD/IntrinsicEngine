@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <variant>
@@ -301,7 +302,7 @@ TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesPromotedSandboxSceneDa
     const std::string document = backend.Text("scene.json");
     ASSERT_FALSE(document.empty());
     const nlohmann::json parsed = nlohmann::json::parse(document);
-    ASSERT_EQ(parsed["version"].get<std::uint32_t>(), 2u);
+    ASSERT_EQ(parsed["version"].get<std::uint32_t>(), 3u);
     ASSERT_EQ(parsed["entities"].size(), 3u);
     EXPECT_EQ(parsed["stats"]["renderHintEntities"].get<std::uint32_t>(), 3u);
     ASSERT_TRUE(parsed["entities"][0]["render"]["visualization"].is_object());
@@ -476,9 +477,16 @@ TEST(RuntimeSceneSerialization, InvalidDocumentsFailClosed)
     EXPECT_FALSE(unsupportedVersion.has_value());
     EXPECT_EQ(unsupportedVersion.error(), Core::ErrorCode::InvalidFormat);
 
+    auto previousVersion = Runtime::DeserializeSceneDocument(
+        scene,
+        R"({"version":2,"entities":[]})");
+    EXPECT_FALSE(previousVersion.has_value())
+        << "version 2 may carry retired presentation color slots (RUNTIME-318)";
+    EXPECT_EQ(previousVersion.error(), Core::ErrorCode::InvalidFormat);
+
     auto badGeometry = Runtime::DeserializeSceneDocument(
         scene,
-        R"({"version":2,"entities":[{"id":0,"geometrySources":{"domain":"Mesh"}}]})");
+        R"({"version":3,"entities":[{"id":0,"geometrySources":{"domain":"Mesh"}}]})");
     EXPECT_FALSE(badGeometry.has_value());
     EXPECT_EQ(badGeometry.error(), Core::ErrorCode::InvalidFormat);
 }
@@ -486,7 +494,7 @@ TEST(RuntimeSceneSerialization, InvalidDocumentsFailClosed)
 TEST(RuntimeSceneSerialization, MalformedGraphTopologyFailsClosed)
 {
     const nlohmann::json valid = nlohmann::json::parse(
-        R"({"version":2,"entities":[{"id":0,"geometrySources":{"domain":"Graph","nodes":{"deleted":0,"positions":[[0,0,0],[1,0,0]]},"halfedges":{"toVertex":[1,0],"next":[1,0],"prev":[1,0]},"edges":{"deleted":0,"v0":[0],"v1":[1]}}}]})");
+        R"({"version":3,"entities":[{"id":0,"geometrySources":{"domain":"Graph","nodes":{"deleted":0,"positions":[[0,0,0],[1,0,0]]},"halfedges":{"toVertex":[1,0],"next":[1,0],"prev":[1,0]},"edges":{"deleted":0,"v0":[0],"v1":[1]}}}]})");
 
     {
         ECS::Scene::Registry scene;
@@ -954,7 +962,7 @@ TEST(RuntimeSceneSerialization, PropertyDomainKeepsLegacyWireStrings)
                            Runtime::GeometryElementDomain::GraphNode),
             slotWithDomain(Runtime::GeometryPresentationSlotSemantic::Albedo,
                            Runtime::GeometryElementDomain::PointCloudPoint),
-            slotWithDomain(Runtime::GeometryPresentationSlotSemantic::LineScalarField,
+            slotWithDomain(Runtime::GeometryPresentationSlotSemantic::Displacement,
                            Runtime::GeometryElementDomain::GraphHalfedge),
         },
     });
@@ -990,6 +998,76 @@ TEST(RuntimeSceneSerialization, PropertyDomainKeepsLegacyWireStrings)
               Runtime::GeometryElementDomain::PointCloudPoint);
     EXPECT_EQ(roundTripped->Presentations.front().Slots[2].Property.Domain,
               Runtime::GeometryElementDomain::GraphHalfedge);
+}
+
+// RUNTIME-318: point and line lanes are colored by the overlay only. Their
+// lane configs round trip; a document naming a retired slot semantic fails.
+TEST(RuntimeSceneSerialization, OverlayColoredPointAndLineLanesRoundTripAndRetiredSlotsFail)
+{
+    using Source = G::VisualizationConfig::ColorSource;
+    ECS::Scene::Registry source;
+    const ECS::EntityHandle cloud = AddPointCloudEntity(source);
+    const ECS::EntityHandle graph = AddGraphEntity(source);
+    G::VisualizationLaneOverrides cloudLanes{};
+    cloudLanes.Points = G::VisualizationConfig{};
+    cloudLanes.Points->Source = Source::PerVertexBuffer;
+    cloudLanes.Points->ColorBufferName = "p:rgba";
+    source.Raw().emplace<G::VisualizationLaneOverrides>(cloud, cloudLanes);
+    G::VisualizationLaneOverrides graphLanes{};
+    graphLanes.Edges = G::VisualizationConfig{};
+    graphLanes.Edges->Source = Source::ScalarField;
+    graphLanes.Edges->ScalarFieldName = "e:heat";
+    graphLanes.Edges->ScalarDomain = G::VisualizationConfig::Domain::Edge;
+    graphLanes.Edges->Scalar.Map = Extrinsic::Graphics::Colormap::Type::Inferno;
+    graphLanes.Edges->Scalar.AutoRange = false;
+    graphLanes.Edges->Scalar.RangeMin = -1.0f;
+    graphLanes.Edges->Scalar.RangeMax = 2.0f;
+    source.Raw().emplace<G::VisualizationLaneOverrides>(graph, graphLanes);
+
+    MemoryIOBackend backend;
+    ASSERT_TRUE(Runtime::SaveSceneDocument(source, "lanes.json", backend).has_value());
+    ECS::Scene::Registry loaded;
+    ASSERT_TRUE(Runtime::LoadSceneDocument(loaded, "lanes.json", backend).has_value());
+    const auto& raw = loaded.Raw();
+    const auto* points =
+        raw.try_get<G::VisualizationLaneOverrides>(FindEntityByName(loaded, "Cloud Entity"));
+    ASSERT_NE(points, nullptr);
+    ASSERT_TRUE(points->Points.has_value());
+    EXPECT_EQ(points->Points->Source, Source::PerVertexBuffer);
+    EXPECT_EQ(points->Points->ColorBufferName, "p:rgba");
+    const auto* edges =
+        raw.try_get<G::VisualizationLaneOverrides>(FindEntityByName(loaded, "Graph Entity"));
+    ASSERT_NE(edges, nullptr);
+    ASSERT_TRUE(edges->Edges.has_value());
+    EXPECT_EQ(edges->Edges->Source, Source::ScalarField);
+    EXPECT_EQ(edges->Edges->ScalarFieldName, "e:heat");
+    EXPECT_EQ(edges->Edges->ScalarDomain, G::VisualizationConfig::Domain::Edge);
+    EXPECT_EQ(edges->Edges->Scalar.Map, Extrinsic::Graphics::Colormap::Type::Inferno);
+    EXPECT_FALSE(edges->Edges->Scalar.AutoRange);
+    EXPECT_FLOAT_EQ(edges->Edges->Scalar.RangeMin, -1.0f);
+    EXPECT_FLOAT_EQ(edges->Edges->Scalar.RangeMax, 2.0f);
+
+    ECS::Scene::Registry slotSource;
+    const ECS::EntityHandle mesh = AddMeshEntity(slotSource);
+    slotSource.Raw().emplace<Runtime::GeometryPresentationRecipe>(mesh, Runtime::GeometryPresentationRecipe{
+        .Shape = Runtime::GeometryPresentationShape::Mesh,
+        .Presentations = {{.Key = "mesh.surface",
+                           .Slots = {{.Semantic = Runtime::GeometryPresentationSlotSemantic::Displacement}}}},
+    });
+    const auto document = Runtime::SerializeSceneDocument(slotSource);
+    ASSERT_TRUE(document.has_value());
+    for (const char* retired : {"PointColor", "PointScalarField", "LineColor", "LineScalarField"})
+    {
+        SCOPED_TRACE(retired);
+        std::string text = *document;
+        const std::size_t at = text.find("\"Displacement\"");
+        ASSERT_NE(at, std::string::npos);
+        text.replace(at, std::string_view{"\"Displacement\""}.size(), std::string{"\""} + retired + "\"");
+        ECS::Scene::Registry rejected;
+        const auto result = Runtime::DeserializeSceneDocument(rejected, text);
+        ASSERT_FALSE(result.has_value());
+        EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+    }
 }
 
 TEST(RuntimeSceneSerialization, LegacyMeshSurfaceDomainLoadsAsUnknown)

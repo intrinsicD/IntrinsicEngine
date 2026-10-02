@@ -279,44 +279,25 @@ TEST(GeometryPresentation,
 }
 
 TEST(GeometryPresentation,
-     GraphPointAndLineSlotsUseCanonicalPropertyReferences)
+     GraphNodeSlotsUseCanonicalPropertyReferences)
 {
     ECS::Scene::Registry scene{};
     const ECS::EntityHandle graph = AddGraph(scene);
     const Runtime::GeometryPresentationRecipe recipe{
         .Shape = Runtime::GeometryPresentationShape::Graph,
-        .Lanes = {
-            Runtime::GeometryPresentationLaneRecipe{
-                .Lane = Runtime::GeometryRenderLane::Points,
-                .PresentationKey = "graph.points",
-            },
-            Runtime::GeometryPresentationLaneRecipe{
-                .Lane = Runtime::GeometryRenderLane::Edges,
-                .PresentationKey = "graph.edges",
-            },
-        },
-        .Presentations = {
-            Runtime::GeometryPresentationBindingRecipe{
-                .Key = "graph.points",
-                .Kind =
-                    Runtime::GeometryPresentationKind::PointPresentation,
-                .Slots = {PropertySlot(
-                    Runtime::GeometryPresentationSlotSemantic::PointColor,
-                    Runtime::GeometryElementDomain::GraphNode,
-                    "v:color",
-                    Geometry::PropertyValueKind::Vec4)},
-            },
-            Runtime::GeometryPresentationBindingRecipe{
-                .Key = "graph.edges",
-                .Kind =
-                    Runtime::GeometryPresentationKind::LinePresentation,
-                .Slots = {PropertySlot(
-                    Runtime::GeometryPresentationSlotSemantic::LineColor,
-                    Runtime::GeometryElementDomain::GraphEdge,
-                    "e:color",
-                    Geometry::PropertyValueKind::Vec4)},
-            },
-        },
+        .Lanes = {Runtime::GeometryPresentationLaneRecipe{
+            .Lane = Runtime::GeometryRenderLane::Points,
+            .PresentationKey = "graph.points",
+        }},
+        .Presentations = {Runtime::GeometryPresentationBindingRecipe{
+            .Key = "graph.points",
+            .Kind = Runtime::GeometryPresentationKind::PointPresentation,
+            .Slots = {PropertySlot(
+                Runtime::GeometryPresentationSlotSemantic::PointNormalOrientation,
+                Runtime::GeometryElementDomain::GraphNode,
+                "v:color",
+                Geometry::PropertyValueKind::Vec4)},
+        }},
     };
 
     const Runtime::GeometryPresentationSnapshot snapshot =
@@ -328,20 +309,30 @@ TEST(GeometryPresentation,
             },
             11u);
 
-    ASSERT_EQ(snapshot.Slots.size(), 2u);
-    EXPECT_EQ(snapshot.Stats.PropertyBufferReadyCount, 2u);
+    ASSERT_EQ(snapshot.Slots.size(), 1u);
+    EXPECT_EQ(snapshot.Stats.PropertyBufferReadyCount, 1u);
     EXPECT_EQ(snapshot.Slots[0].Property,
               (Runtime::GeometryPropertyRef{
                   .Domain = Runtime::GeometryElementDomain::GraphNode,
                   .Name = "v:color",
                   .ValueKind = Geometry::PropertyValueKind::Vec4,
               }));
-    EXPECT_EQ(snapshot.Slots[1].Property.Domain,
-              Runtime::GeometryElementDomain::GraphEdge);
     EXPECT_EQ(snapshot.Slots[0].PropertyResolution.ObservedSourceGeneration,
               11u);
     EXPECT_TRUE(snapshot.Slots[0].PropertyBufferReady);
-    EXPECT_TRUE(snapshot.Slots[1].PropertyBufferReady);
+}
+
+// RUNTIME-318: point/line color is the visualization overlay; size/width are
+// render-attribute bindings (RUNTIME-315). None of them is a slot semantic.
+TEST(GeometryPresentation, RetiredColorAndSizeSemanticsDoNotParse)
+{
+    for (const char* retired : {"PointColor", "PointScalarField", "LineColor",
+                                "LineScalarField", "PointSize", "LineWidth"})
+    {
+        Runtime::GeometryPresentationSlotSemantic parsed{};
+        EXPECT_FALSE(Runtime::TryParseGeometryPresentationSlotSemantic(retired, parsed))
+            << retired;
+    }
 }
 
 TEST(GeometryPresentation,
@@ -382,7 +373,7 @@ TEST(GeometryPresentation,
             .Key = "cloud.points",
             .Kind = Runtime::GeometryPresentationKind::PointPresentation,
             .Slots = {PropertySlot(
-                Runtime::GeometryPresentationSlotSemantic::PointColor,
+                Runtime::GeometryPresentationSlotSemantic::PointNormalOrientation,
                 Runtime::GeometryElementDomain::PointCloudPoint,
                 "v:color",
                 Geometry::PropertyValueKind::Vec4)},

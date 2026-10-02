@@ -29,7 +29,6 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.GeometryAvailability;
-import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.VisualizationRecipes;
 import Geometry.Properties;
@@ -82,20 +81,6 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         if (config->Source == target->BufferSource && !config->ColorBufferName.empty())
             return config->ColorBufferName;
         return std::nullopt;
-    }
-
-    GeometryPresentationColorSlot FindOverlayLaneColorSlot(
-        const entt::registry& raw, const ECS::EntityHandle entity, const GeometryElementDomain domain)
-    {
-        const auto* recipe = raw.try_get<GeometryPresentationRecipe>(entity);
-        const std::optional<ColorOverlayTarget> target = ColorOverlayTargetFor(domain);
-        if (recipe == nullptr || !target.has_value())
-            return {};
-        const GeometryPresentationColorSlot slot = FindGeometryPresentationColorSlot(*recipe, domain);
-        const EditorVisualizationTarget slotLane = slot.Lane == GeometryRenderLane::Edges
-            ? EditorVisualizationTarget::Edges
-            : EditorVisualizationTarget::Points;
-        return slot.Slot != nullptr && slotLane == target->Target ? slot : GeometryPresentationColorSlot{};
     }
 }
 }
@@ -188,15 +173,7 @@ namespace Extrinsic::Runtime
                 }
                 return std::nullopt;
             case RenderAttribute::Color:
-                if (auto overlay = EditorFeatureDetail::BoundColorOverlaySource(raw, entity, rule.Domain))
-                    return overlay;
-                if (const GeometryPresentationColorSlot slot =
-                        EditorFeatureDetail::FindOverlayLaneColorSlot(raw, entity, rule.Domain);
-                    slot.Slot != nullptr)
-                {
-                    return slot.Slot->Property.Name;
-                }
-                return std::nullopt;
+                return EditorFeatureDetail::BoundColorOverlaySource(raw, entity, rule.Domain);
             case RenderAttribute::PointSize:
                 if (const auto* points = raw.try_get<G::RenderPoints>(entity))
                 {
@@ -290,23 +267,6 @@ namespace Extrinsic::Runtime
                 if (row.UsingFallback)
                     row.Diagnostic = "'" + *bound + "' " + ResolutionReason(rule, row.Resolution) +
                                      "; drawing the default (" + row.DefaultSource + ")";
-            }
-
-            if (rule.Attribute == RenderAttribute::Color)
-            {
-                if (const auto* recipe = raw.try_get<GeometryPresentationRecipe>(*entity))
-                {
-                    if (const GeometryPresentationColorSlot slot =
-                            FindGeometryPresentationColorSlot(*recipe, rule.Domain);
-                        slot.Slot != nullptr)
-                    {
-                        const std::string note = "presentation slot " +
-                            std::string{ToString(slot.Slot->Semantic)} + " '" +
-                            slot.Slot->Property.Name + "' colors the " +
-                            std::string{ToString(slot.Lane)} + " lane (RUNTIME-318)";
-                        row.Diagnostic = row.Diagnostic.empty() ? note : row.Diagnostic + "; " + note;
-                    }
-                }
             }
 
             for (const std::string& name : properties->Properties())

@@ -184,10 +184,11 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        // Version 2 makes graph halfedge connectivity mandatory. Version 1
-        // graph documents contained only nodes and edges and cannot satisfy
-        // the unified source contract without synthesizing topology.
-        constexpr std::uint32_t kSceneDocumentVersion = 2u;
+        // Version 2 makes graph halfedge connectivity mandatory. Version 3
+        // retires the PointColor/PointScalarField/LineColor/LineScalarField
+        // presentation slot semantics (RUNTIME-318; point/line color is the
+        // visualization overlay). Older versions are rejected, not upgraded.
+        constexpr std::uint32_t kSceneDocumentVersion = 3u;
         constexpr std::uint32_t kInvalidSerializedId = 0xFFFFFFFFu;
 
         [[nodiscard]] std::uint32_t EntitySortKey(const ECS::EntityHandle entity) noexcept

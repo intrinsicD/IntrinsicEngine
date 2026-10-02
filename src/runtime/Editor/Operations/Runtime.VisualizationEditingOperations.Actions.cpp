@@ -1858,83 +1858,38 @@ ApplyEditorRenderHintCommand(
             const Geometry::PropertyValueKind kind)
         {
             const entt::registry& raw = context.Scene->Raw();
-            // A point/line presentation color slot on the same lane is a second
-            // color source until RUNTIME-318; binding or Default retires it in
-            // the same undo step so the lane ends with one source.
-            const GeometryPresentationColorSlot laneSlot =
-                EditorFeatureDetail::FindOverlayLaneColorSlot(raw, entity, command.Domain);
-            const std::optional<EditorGeometryPresentationSlotDefaultCommand> resetSlot =
-                laneSlot.Slot == nullptr
-                    ? std::nullopt
-                    : std::optional{EditorGeometryPresentationSlotDefaultCommand{
-                          .StableEntityId = command.StableEntityId,
-                          .PresentationKey = laneSlot.Presentation->Key,
-                          .Semantic = laneSlot.Slot->Semantic,
-                          .Value = laneSlot.Slot->UniformDefault,
-                          .Enabled = laneSlot.Slot->Enabled,
-                      }};
-
-            // The slot reset can only refuse a non-finite uniform value; check
-            // it first so a refusal changes nothing, with or without history.
-            if (resetSlot.has_value() && !IsFiniteDefaultValue(resetSlot->Value))
-                return EditorCommandStatus::InvalidProcessingParameters;
-
-            ScopedEditorCommandGroup group{context.CommandHistory, "Bind color"};
-            EditorCommandStatus result = EditorCommandStatus::NoChange;
-            const auto merge = [&result](const EditorCommandStatus next) {
-                const bool failed = result != EditorCommandStatus::Applied &&
-                                    result != EditorCommandStatus::NoChange;
-                if (!failed && next != EditorCommandStatus::NoChange)
-                    result = next;
-                return next == EditorCommandStatus::Applied || next == EditorCommandStatus::NoChange;
-            };
-
-            bool proceed = true;
             if (!command.PropertyName.empty())
             {
                 // The same recipe `show_property` and the processing panels
                 // use, so the overlay is the one Color mechanism (the recipe
                 // path keeps the lane's colormap, bins, isolines and baking).
-                proceed = merge(ApplyEditorVisualizationRecipeCommand(
+                return ApplyEditorVisualizationRecipeCommand(
                     context,
                     EditorVisualizationRecipeCommand{
                         .StableEntityId = command.StableEntityId,
                         .Recipe = MakeEditorPropertyVisualizationRecipe(GeometryPropertyRef{
                             .Domain = command.Domain, .Name = command.PropertyName,
                             .ValueKind = kind}),
-                    }));
+                    });
             }
-            else if (EditorFeatureDetail::BoundColorOverlaySource(raw, entity, command.Domain))
-            {
-                const EditorVisualizationTarget lane =
-                    EditorFeatureDetail::ColorOverlayTargetFor(command.Domain)->Target;
-                // Without an entity-level overlay the lane override is removed;
-                // with one, this lane is masked to the material so the overlay
-                // is neither re-inherited here nor cleared on the other lanes.
-                const bool entityOverlay = StoredVisualizationConfigForTarget(
-                                               raw, entity, EditorVisualizationTarget::Entity)
-                                               .has_value();
-                proceed = merge(ApplyEditorVisualizationConfigCommand(
-                    context,
-                    EditorVisualizationConfigCommand{
-                        .StableEntityId = command.StableEntityId,
-                        .Target = lane,
-                        .EnableConfig = entityOverlay,
-                        .Source = G::VisualizationConfig::ColorSource::Material,
-                    }));
-            }
-            if (proceed && resetSlot.has_value())
-            {
-                const EditorCommandStatus reset =
-                    ApplyEditorGeometryPresentationSlotDefaultCommand(context, *resetSlot);
-                if (!merge(reset))
-                {
-                    // All or nothing: undo the overlay step already applied.
-                    (void)group.Abort();
-                    return reset;
-                }
-            }
-            return result;
+            if (!EditorFeatureDetail::BoundColorOverlaySource(raw, entity, command.Domain))
+                return EditorCommandStatus::NoChange;
+            const EditorVisualizationTarget lane =
+                EditorFeatureDetail::ColorOverlayTargetFor(command.Domain)->Target;
+            // Without an entity-level overlay the lane override is removed;
+            // with one, this lane is masked to the material so the overlay is
+            // neither re-inherited here nor cleared on the other lanes.
+            const bool entityOverlay = StoredVisualizationConfigForTarget(
+                                           raw, entity, EditorVisualizationTarget::Entity)
+                                           .has_value();
+            return ApplyEditorVisualizationConfigCommand(
+                context,
+                EditorVisualizationConfigCommand{
+                    .StableEntityId = command.StableEntityId,
+                    .Target = lane,
+                    .EnableConfig = entityOverlay,
+                    .Source = G::VisualizationConfig::ColorSource::Material,
+                });
         }
 
         // Point size / line width bind through the lane's render hint: the
@@ -2513,11 +2468,7 @@ ApplyEditorRenderHintCommand(
             return valueKind == Geometry::PropertyValueKind::Vec4 &&
                    (raw || encoding == PropertyTextureBakeEncoding::RgbaColor);
         case GeometryPresentationSlotSemantic::Displacement:
-        case GeometryPresentationSlotSemantic::PointColor:
-        case GeometryPresentationSlotSemantic::PointScalarField:
         case GeometryPresentationSlotSemantic::PointNormalOrientation:
-        case GeometryPresentationSlotSemantic::LineColor:
-        case GeometryPresentationSlotSemantic::LineScalarField:
             return false;
         }
         return false;

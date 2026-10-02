@@ -1519,7 +1519,7 @@ namespace Extrinsic::Runtime
             const EditorJobIdentity identity{
                 .EntityId = command.StableEntityId,
                 .Scope = ToEditorJobScope(domain),
-                .OutputSemantic = GeometryPresentationSlotSemantic::PointScalarField,
+                .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField,
                 .OutputName = ProgressivePoissonOutputName(command.Config),
             };
             if (const auto active =

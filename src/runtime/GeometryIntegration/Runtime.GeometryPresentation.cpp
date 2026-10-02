@@ -85,14 +85,8 @@ namespace Extrinsic::Runtime
                  "ScalarField"},
                 {GeometryPresentationSlotSemantic::Displacement,
                  "Displacement"},
-                {GeometryPresentationSlotSemantic::PointColor, "PointColor"},
-                {GeometryPresentationSlotSemantic::PointScalarField,
-                 "PointScalarField"},
                 {GeometryPresentationSlotSemantic::PointNormalOrientation,
                  "PointNormalOrientation"},
-                {GeometryPresentationSlotSemantic::LineColor, "LineColor"},
-                {GeometryPresentationSlotSemantic::LineScalarField,
-                 "LineScalarField"},
             };
 
         constexpr std::pair<GeometryPresentationSourceKind, std::string_view>
@@ -657,40 +651,6 @@ namespace Extrinsic::Runtime
         return nullptr;
     }
 
-    GeometryPresentationColorSlot FindGeometryPresentationColorSlot(
-        const GeometryPresentationRecipe& recipe,
-        const GeometryElementDomain domain) noexcept
-    {
-        using S = GeometryPresentationSlotSemantic;
-        using D = GeometryElementDomain;
-        const bool edges = domain == D::MeshEdge || domain == D::GraphEdge;
-        const bool points = domain == D::MeshVertex || domain == D::GraphNode ||
-                            domain == D::PointCloudPoint;
-        if (!edges && !points)
-            return {};
-        const GeometryPresentationLaneRecipe* lane = FindGeometryPresentationLane(
-            recipe, edges ? GeometryRenderLane::Edges : GeometryRenderLane::Points);
-        const GeometryPresentationBindingRecipe* presentation = lane != nullptr
-            ? FindGeometryPresentationBinding(recipe, lane->PresentationKey)
-            : nullptr;
-        if (presentation == nullptr)
-            return {};
-        for (const GeometryPresentationSlotRecipe& slot : presentation->Slots)
-        {
-            const bool colorSemantic = edges
-                ? (slot.Semantic == S::LineColor || slot.Semantic == S::LineScalarField)
-                : (slot.Semantic == S::PointColor || slot.Semantic == S::PointScalarField);
-            if (colorSemantic && slot.Enabled &&
-                slot.SourceKind == GeometryPresentationSourceKind::PropertyBuffer &&
-                slot.Property.Domain == domain && slot.Property.HasName())
-            {
-                return {presentation, &slot,
-                        edges ? GeometryRenderLane::Edges : GeometryRenderLane::Points};
-            }
-        }
-        return {};
-    }
-
     GeometryPresentationSlotRecipe* FindGeometryPresentationSlot(
         GeometryPresentationBindingRecipe& presentation,
         const GeometryPresentationSlotSemantic semantic) noexcept
@@ -760,11 +720,7 @@ namespace Extrinsic::Runtime
         case GeometryPresentationSlotSemantic::ScalarField:
         case GeometryPresentationSlotSemantic::Displacement:
             return true;
-        case GeometryPresentationSlotSemantic::PointColor:
-        case GeometryPresentationSlotSemantic::PointScalarField:
         case GeometryPresentationSlotSemantic::PointNormalOrientation:
-        case GeometryPresentationSlotSemantic::LineColor:
-        case GeometryPresentationSlotSemantic::LineScalarField:
             return false;
         }
         return false;

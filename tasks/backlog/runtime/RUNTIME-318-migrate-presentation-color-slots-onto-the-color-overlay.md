@@ -94,3 +94,24 @@ python3 tools/agents/check_task_policy.py --root . --strict
   overlay's own packet (scalar mode with no buffer). The overlay therefore
   draws what the slot meant to draw; nothing that rendered correctly before
   changes.
+- 2026-10-02: Slice 2 (retire the semantics). `PointColor`,
+  `PointScalarField`, `LineColor` and `LineScalarField` leave
+  `GeometryPresentationSlotSemantic` (enum, parser, every switch); the scene
+  format is version 3 and rejects them and version 2 (`InvalidFormat`).
+  Extraction lowers only surface-lane slots, and a projected surface scalar
+  slot now suppresses only the surface lane's config-derived recipe (it used
+  to suppress the point and edge overlays too). `FindGeometryPresentationColorSlot`,
+  the attribute model's slot fallback and diagnostic, and the Color binding's
+  same-lane slot reset (with its abort path) are removed: Color bind/Default is
+  one overlay command. The Sandbox presentation panel keeps its default-color
+  control for Albedo only; the "Attribute sources" Color row and
+  `show_property` are the point/line color controls, and the agent lane
+  already used them. Progressive Poisson's job identity names `ScalarField`.
+  Tests: `RuntimeRenderExtraction.OverlayDrawsEveryFormerPresentationColorSlotLane`
+  (per lane: RGBA bytes, scalar bytes, colormap, range, domain, count on the
+  lane's GPU config), `...OnlySurfacePresentationSlotsLowerToVisualizationRecipes`,
+  `RuntimeSceneSerialization.OverlayColoredPointAndLineLanesRoundTripAndRetiredSlotsFail`,
+  `GeometryPresentation.RetiredColorAndSizeSemanticsDoNotParse`. The
+  `gpu;vulkan` smoke `RuntimeSandboxAcceptanceGpuSmoke.GeometryPresentationReachesOperationalFrame`
+  now colors its graph through the edge overlay and asserts a color packet;
+  it compiles but was not run (GPU reserved for the operator): pending.

@@ -3150,7 +3150,7 @@ TEST(SandboxEditorUi, PropertySelectorsShareExplicitAndInferredSlotRequirements)
          Domain::MeshVertex, Kind::Vec3},
         {true, Lane::Surface, Semantic::ScalarField, Domain::Unknown, Kind::Unknown,
          Domain::MeshFace, Kind::Float},
-        {true, Lane::Edges, Semantic::LineColor, Domain::Unknown, Kind::Unknown,
+        {true, Lane::Edges, Semantic::Albedo, Domain::Unknown, Kind::Unknown,
          Domain::MeshEdge, Kind::Vec4},
         {false, Lane::Surface, Semantic::Normal, Domain::Unknown, Kind::Unknown,
          Domain::Unknown, Kind::Vec3},

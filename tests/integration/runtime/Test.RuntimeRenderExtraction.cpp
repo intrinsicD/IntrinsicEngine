@@ -1683,134 +1683,108 @@ TEST(RuntimeRenderExtraction, GraphVisualizationPropertyBuffersUploadFromNodeAnd
     EXPECT_TRUE(world.Visualization.HasVisualizationPackets);
 }
 
-TEST(RuntimeRenderExtraction, GeometryPresentationPropertyBuffersProjectToVisualizationRecipes)
+// RUNTIME-318: point and edge lanes are colored by the overlay alone. A
+// property-buffer slot on those lanes is never lowered, and a surface scalar
+// slot replaces only the surface lane's config-derived recipe.
+TEST(RuntimeRenderExtraction, OnlySurfacePresentationSlotsLowerToVisualizationRecipes)
 {
     namespace GS = ECS::Components::GeometrySources;
-    using ColorSource = Graphics::Components::VisualizationConfig::ColorSource;
-    using Domain = Graphics::Components::VisualizationConfig::Domain;
+    namespace G = Graphics::Components;
+    using ColorSource = G::VisualizationConfig::ColorSource;
+    using Domain = G::VisualizationConfig::Domain;
+    using Semantic = Runtime::GeometryPresentationSlotSemantic;
 
-    RendererFixture fixture;
-    ECS::Scene::Registry scene;
-    auto& registry = scene.Raw();
-
-    const auto entity = scene.Create();
-    registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix =
-        glm::mat4{1.0f};
-    registry.emplace<Graphics::Components::RenderEdges>(entity);
-    registry.emplace<Graphics::Components::RenderPoints>(entity);
-    AttachLineGraphSources(scene, entity);
-
-    registry.get<GS::Vertices>(entity)
-        .Properties.GetOrAdd<float>("node_heat", 0.0f).Vector() =
-        {0.1f, 0.5f, 0.9f};
-    registry.get<GS::Edges>(entity)
-        .Properties.GetOrAdd<glm::vec4>(
-            "edge_color", glm::vec4{1.0f}).Vector() = {
-        {1.0f, 0.25f, 0.0f, 1.0f},
-        {0.0f, 0.5f, 1.0f, 1.0f},
+    const auto propertySlot = [](const Semantic semantic, const Runtime::GeometryElementDomain domain,
+                                 std::string name) {
+        return Runtime::GeometryPresentationSlotRecipe{
+            .Semantic = semantic,
+            .SourceKind = Runtime::GeometryPresentationSourceKind::PropertyBuffer,
+            .Property = {.Domain = domain, .Name = std::move(name),
+                         .ValueKind = Geometry::PropertyValueKind::Float},
+        };
     };
 
-    auto& config =
-        registry.emplace<Graphics::Components::VisualizationConfig>(entity);
-    config.Source = ColorSource::ScalarField;
-    config.ScalarFieldName = "node_heat";
-    config.ScalarDomain = Domain::Vertex;
-    config.Scalar.AutoRange = false;
-    config.Scalar.RangeMin = 0.0f;
-    config.Scalar.RangeMax = 1.0f;
-    config.Scalar.Map = Graphics::Colormap::Type::Inferno;
-
-    registry.emplace<Runtime::GeometryPresentationRecipe>(
-        entity,
-        Runtime::GeometryPresentationRecipe{
+    {
+        RendererFixture fixture;
+        ECS::Scene::Registry scene;
+        auto& registry = scene.Raw();
+        const auto graph = scene.Create();
+        registry.emplace<ECS::Components::Transform::WorldMatrix>(graph).Matrix = glm::mat4{1.0f};
+        registry.emplace<G::RenderEdges>(graph);
+        registry.emplace<G::RenderPoints>(graph);
+        AttachLineGraphSources(scene, graph);
+        registry.get<GS::Vertices>(graph).Properties.GetOrAdd<float>("node_heat", 0.0f).Vector() =
+            {0.1f, 0.5f, 0.9f};
+        registry.get<GS::Edges>(graph).Properties.GetOrAdd<float>("edge_heat", 0.0f).Vector() =
+            {0.2f, 0.8f};
+        auto& config = registry.emplace<G::VisualizationConfig>(graph);
+        config.Source = ColorSource::ScalarField;
+        config.ScalarFieldName = "node_heat";
+        config.ScalarDomain = Domain::Vertex;
+        registry.emplace<Runtime::GeometryPresentationRecipe>(graph, Runtime::GeometryPresentationRecipe{
             .Shape = Runtime::GeometryPresentationShape::Graph,
-            .Lanes = {
-                Runtime::GeometryPresentationLaneRecipe{
-                    .Lane = Runtime::GeometryRenderLane::Points,
-                    .PresentationKey = "graph.points",
-                },
-                Runtime::GeometryPresentationLaneRecipe{
-                    .Lane = Runtime::GeometryRenderLane::Edges,
-                    .PresentationKey = "graph.edges",
-                },
-            },
+            .Lanes = {{.Lane = Runtime::GeometryRenderLane::Points, .PresentationKey = "graph.points"},
+                      {.Lane = Runtime::GeometryRenderLane::Edges, .PresentationKey = "graph.edges"}},
             .Presentations = {
-                Runtime::GeometryPresentationBindingRecipe{
-                    .Key = "graph.points",
-                    .Kind = Runtime::GeometryPresentationKind::PointPresentation,
-                    .Slots = {Runtime::GeometryPresentationSlotRecipe{
-                        .Semantic = Runtime::GeometryPresentationSlotSemantic::PointScalarField,
-                        .SourceKind = Runtime::GeometryPresentationSourceKind::PropertyBuffer,
-                        .Property = Runtime::GeometryPropertyRef{
-                            .Domain = Runtime::GeometryElementDomain::GraphNode,
-                            .Name = "node_heat",
-                            .ValueKind = Geometry::PropertyValueKind::Float,
-                        },
-                    }},
-                },
-                Runtime::GeometryPresentationBindingRecipe{
-                    .Key = "graph.edges",
-                    .Kind = Runtime::GeometryPresentationKind::LinePresentation,
-                    .Slots = {Runtime::GeometryPresentationSlotRecipe{
-                        .Semantic = Runtime::GeometryPresentationSlotSemantic::LineColor,
-                        .SourceKind = Runtime::GeometryPresentationSourceKind::PropertyBuffer,
-                        .Property = Runtime::GeometryPropertyRef{
-                            .Domain = Runtime::GeometryElementDomain::GraphEdge,
-                            .Name = "edge_color",
-                            .ValueKind = Geometry::PropertyValueKind::Vec4,
-                        },
-                    }},
-                },
+                {.Key = "graph.points", .Kind = Runtime::GeometryPresentationKind::PointPresentation,
+                 .Slots = {propertySlot(Semantic::ScalarField, Runtime::GeometryElementDomain::GraphNode,
+                                        "node_heat")}},
+                {.Key = "graph.edges", .Kind = Runtime::GeometryPresentationKind::LinePresentation,
+                 .Slots = {propertySlot(Semantic::ScalarField, Runtime::GeometryElementDomain::GraphEdge,
+                                        "edge_heat")}},
             },
         });
 
-    const auto stats = fixture.Extract(scene);
-    const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
+        const auto stats = fixture.Extract(scene);
+        const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
+        EXPECT_EQ(stats.GeometryPresentationPropertyBufferReadyCount, 2u);
+        EXPECT_EQ(stats.VisualizationRecipePacketAppendCount, 1u);
+        ASSERT_EQ(world.Visualization.Scalars.size(), 1u);
+        EXPECT_EQ(world.Visualization.Scalars.front().SourceBufferKey,
+                  std::to_string(StableId(graph)) + ":scalar:node_heat");
+        EXPECT_TRUE(world.Visualization.Colors.empty());
+    }
+    {
+        RendererFixture fixture;
+        ECS::Scene::Registry scene;
+        auto& registry = scene.Raw();
+        const auto mesh = scene.Create();
+        registry.emplace<ECS::Components::Transform::WorldMatrix>(mesh).Matrix = glm::mat4{1.0f};
+        registry.emplace<G::RenderSurface>(mesh);
+        registry.emplace<G::RenderPoints>(mesh);
+        AttachTriangleMeshSources(scene, mesh);
+        registry.get<GS::Faces>(mesh).Properties.GetOrAdd<float>("f:heat", 0.0f).Vector() = {0.5f};
+        // An entity-level overlay: the surface slot replaces it on the
+        // surface only, the vertex view still draws it.
+        auto& config = registry.emplace<G::VisualizationConfig>(mesh);
+        config.Source = ColorSource::PerVertexBuffer;
+        config.ColorBufferName = "v:color";
+        registry.emplace<Runtime::GeometryPresentationRecipe>(mesh, Runtime::GeometryPresentationRecipe{
+            .Shape = Runtime::GeometryPresentationShape::Mesh,
+            .Lanes = {{.Lane = Runtime::GeometryRenderLane::Surface, .PresentationKey = "mesh.surface"}},
+            .Presentations = {{.Key = "mesh.surface",
+                               .Slots = {propertySlot(Semantic::ScalarField,
+                                                      Runtime::GeometryElementDomain::MeshFace, "f:heat")}}},
+        });
 
-    EXPECT_EQ(stats.GeometryPresentationEntityCount, 1u);
-    EXPECT_EQ(stats.GeometryPresentationLaneCount, 2u);
-    EXPECT_EQ(stats.GeometryPresentationSlotCount, 2u);
-    EXPECT_EQ(stats.GeometryPresentationPropertyBufferReadyCount, 2u);
-    EXPECT_EQ(stats.VisualizationRecipeEncodeCount, 2u);
-    EXPECT_EQ(stats.VisualizationRecipePacketAppendCount, 2u);
-    EXPECT_EQ(stats.VisualizationScalarPacketCount, 1u);
-    EXPECT_EQ(stats.VisualizationColorPacketCount, 1u);
-
-    ASSERT_EQ(world.Visualization.Scalars.size(), 1u)
-        << "presentation must suppress the duplicate config-derived scalar";
-    const Graphics::ScalarAttributePacket& scalar =
-        world.Visualization.Scalars.front();
-    EXPECT_EQ(scalar.Name, "node_heat");
-    EXPECT_EQ(scalar.Domain, Graphics::VisualizationAttributeDomain::Vertex);
-    EXPECT_EQ(scalar.ElementCount, 3u);
-    EXPECT_EQ(scalar.SourceBufferKey,
-              std::to_string(StableId(entity)) +
-                  ":presentation.Points:node_heat");
-    EXPECT_FLOAT_EQ(scalar.RangeMin, 0.0f);
-    EXPECT_FLOAT_EQ(scalar.RangeMax, 1.0f);
-    EXPECT_EQ(scalar.Colormap, Graphics::Colormap::Type::Inferno);
-
-    ASSERT_EQ(world.Visualization.Colors.size(), 1u);
-    const Graphics::ColorAttributePacket& color =
-        world.Visualization.Colors.front();
-    EXPECT_EQ(color.Name, "edge_color");
-    EXPECT_EQ(color.Domain, Graphics::VisualizationAttributeDomain::Edge);
-    EXPECT_EQ(color.ElementCount, 2u);
-    EXPECT_EQ(color.SourceBufferKey,
-              std::to_string(StableId(entity)) +
-                  ":presentation.Edges:edge_color");
-
-    EXPECT_EQ(world.Visualization.PropertyBufferDiagnostics.InputBufferCount, 2u);
-    EXPECT_EQ(world.Visualization.PropertyBufferDiagnostics.UploadedBufferCount, 2u);
-    EXPECT_EQ(world.Visualization.Diagnostics.InputPacketCount, 2u);
-    EXPECT_EQ(world.Visualization.Diagnostics.AcceptedPacketCount, 2u);
-    EXPECT_FALSE(world.Visualization.Diagnostics.HasErrors);
+        (void)fixture.Extract(scene);
+        const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
+        ASSERT_EQ(world.Visualization.Scalars.size(), 1u);
+        EXPECT_EQ(world.Visualization.Scalars.front().SourceBufferKey,
+                  std::to_string(StableId(mesh)) + ":presentation.Surface:f:heat");
+        ASSERT_EQ(world.Visualization.Colors.size(), 1u)
+            << "a surface slot must not suppress the point lane's overlay";
+        EXPECT_EQ(world.Visualization.Colors.front().SourceBufferKey,
+                  std::to_string(StableId(mesh)) + ":color.canonical:v:color");
+        EXPECT_EQ(world.Visualization.Colors.front().Domain, Graphics::VisualizationAttributeDomain::Vertex);
+    }
 }
 
 namespace
 {
-    // RUNTIME-318: the four former presentation color slots and the overlay
-    // that replaces them, observed on the lane's GPU entity config.
+    // RUNTIME-318: the lanes the four retired presentation color slots
+    // (PointColor, PointScalarField, LineColor, LineScalarField) colored,
+    // now authored as the overlay and observed on the lane's GPU config.
     enum class LaneColorCase : std::uint8_t { PointColor, PointScalar, LineColor, LineScalar };
 
     struct LaneColorObservation
@@ -1846,7 +1820,7 @@ namespace
         return {};
     }
 
-    [[nodiscard]] LaneColorObservation ObserveLaneColor(const LaneColorCase which, const bool viaSlot)
+    [[nodiscard]] LaneColorObservation ObserveLaneColor(const LaneColorCase which)
     {
         namespace GS = ECS::Components::GeometrySources;
         namespace G = Graphics::Components;
@@ -1860,8 +1834,6 @@ namespace
         auto& registry = scene.Raw();
         const auto entity = scene.Create();
         registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.0f};
-        const auto domain = points ? Runtime::GeometryElementDomain::PointCloudPoint
-                                   : Runtime::GeometryElementDomain::GraphEdge;
         Geometry::PropertySet* properties = nullptr;
         if (points)
         {
@@ -1883,54 +1855,21 @@ namespace
         }
 
         // The overlay `show_property` / the Color binding author.
-        const auto overlay = [&] {
-            auto& config = registry.emplace<G::VisualizationConfig>(entity);
-            if (scalar)
-            {
-                config.Source = ColorSource::ScalarField;
-                config.ScalarFieldName = "heat";
-                config.ScalarDomain = points ? VisDomain::Vertex : VisDomain::Edge;
-                config.Scalar.AutoRange = false;
-                config.Scalar.RangeMin = -1.0f;
-                config.Scalar.RangeMax = 2.0f;
-                config.Scalar.Map = Graphics::Colormap::Type::Inferno;
-            }
-            else
-            {
-                config.Source = points ? ColorSource::PerVertexBuffer : ColorSource::PerEdgeBuffer;
-                config.ColorBufferName = "rgba";
-            }
-        };
-        if (viaSlot)
+        auto& config = registry.emplace<G::VisualizationConfig>(entity);
+        if (scalar)
         {
-            using S = Runtime::GeometryPresentationSlotSemantic;
-            const S semantic = points ? (scalar ? S::PointScalarField : S::PointColor)
-                                      : (scalar ? S::LineScalarField : S::LineColor);
-            const auto lane = points ? Runtime::GeometryRenderLane::Points : Runtime::GeometryRenderLane::Edges;
-            registry.emplace<Runtime::GeometryPresentationRecipe>(entity, Runtime::GeometryPresentationRecipe{
-                .Shape = points ? Runtime::GeometryPresentationShape::PointCloud : Runtime::GeometryPresentationShape::Graph,
-                .Lanes = {{.Lane = lane, .PresentationKey = "lane"}},
-                .Presentations = {{
-                    .Key = "lane",
-                    .Kind = points ? Runtime::GeometryPresentationKind::PointPresentation
-                                   : Runtime::GeometryPresentationKind::LinePresentation,
-                    .Slots = {{
-                        .Semantic = semantic,
-                        .SourceKind = Runtime::GeometryPresentationSourceKind::PropertyBuffer,
-                        .Property = {.Domain = domain, .Name = scalar ? "heat" : "rgba",
-                                     .ValueKind = scalar ? Geometry::PropertyValueKind::Float
-                                                         : Geometry::PropertyValueKind::Vec4},
-                    }},
-                }},
-            });
-            // A scalar slot took its colormap and range from the overlay
-            // naming the same property.
-            if (scalar)
-                overlay();
+            config.Source = ColorSource::ScalarField;
+            config.ScalarFieldName = "heat";
+            config.ScalarDomain = points ? VisDomain::Vertex : VisDomain::Edge;
+            config.Scalar.AutoRange = false;
+            config.Scalar.RangeMin = -1.0f;
+            config.Scalar.RangeMax = 2.0f;
+            config.Scalar.Map = Graphics::Colormap::Type::Inferno;
         }
         else
         {
-            overlay();
+            config.Source = points ? ColorSource::PerVertexBuffer : ColorSource::PerEdgeBuffer;
+            config.ColorBufferName = "rgba";
         }
 
         LaneColorObservation observed{};
@@ -2005,26 +1944,17 @@ namespace
     }
 }
 
-// RUNTIME-318: every former point/line presentation color slot is expressed
-// by the overlay. The slot lowered the same packet the overlay encodes, but
-// its lane config never bound it (no overlay key on the sync record); the
-// overlay draws that packet on the lane.
-TEST(RuntimeRenderExtraction, PresentationColorSlotLanesDrawIdenticallyThroughTheOverlay)
+// RUNTIME-318: every lane a retired point/line presentation color slot used to
+// name draws through the overlay. Slice 1 pinned that the slot lowered the
+// same packet (name, domain, count, colormap, range) without its lane config
+// ever binding it; the overlay binds it.
+TEST(RuntimeRenderExtraction, OverlayDrawsEveryFormerPresentationColorSlotLane)
 {
     for (const LaneColorCase which : {LaneColorCase::PointColor, LaneColorCase::PointScalar,
                                       LaneColorCase::LineColor, LaneColorCase::LineScalar})
     {
         SCOPED_TRACE(static_cast<int>(which));
-        const LaneColorObservation slot = ObserveLaneColor(which, true);
-        const LaneColorObservation overlay = ObserveLaneColor(which, false);
-        ExpectOverlayDrawsLaneColor(which, overlay);
-        ASSERT_EQ(slot.Packet.has_value(), overlay.Packet.has_value());
-        EXPECT_EQ(slot.Packet->Name, overlay.Packet->Name);
-        EXPECT_EQ(slot.Packet->Domain, overlay.Packet->Domain);
-        EXPECT_EQ(slot.Packet->ElementCount, overlay.Packet->ElementCount);
-        EXPECT_FLOAT_EQ(slot.Packet->RangeMin, overlay.Packet->RangeMin);
-        EXPECT_FLOAT_EQ(slot.Packet->RangeMax, overlay.Packet->RangeMax);
-        EXPECT_EQ(slot.Packet->Colormap, overlay.Packet->Colormap);
+        ExpectOverlayDrawsLaneColor(which, ObserveLaneColor(which));
     }
 }
 

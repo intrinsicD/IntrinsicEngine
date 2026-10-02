@@ -46,13 +46,10 @@ export namespace Extrinsic::Runtime
         Metallic,
         ScalarField,
         Displacement,
-        PointColor,
-        PointScalarField,
         PointNormalOrientation,
-        LineColor,
-        LineScalarField,
-        // Per-element point size / line width are render-attribute bindings
-        // (RUNTIME-315), not presentation slots.
+        // Point/line color and per-element point size / line width are
+        // render-attribute bindings (RUNTIME-315, RUNTIME-318): the overlay
+        // and the render hints, not presentation slots.
     };
 
     enum class GeometryPresentationSourceKind : std::uint8_t
@@ -421,21 +418,6 @@ export namespace Extrinsic::Runtime
     FindGeometryPresentationSlot(
         const GeometryPresentationBindingRecipe& presentation,
         GeometryPresentationSlotSemantic semantic) noexcept;
-
-    // The enabled PropertyBuffer point/line color slot that colors `domain`:
-    // PointColor/PointScalarField on the Points lane for vertex domains,
-    // LineColor/LineScalarField on the Edges lane for edge domains. These
-    // slots are a second live color path until RUNTIME-318 moves them onto
-    // the visualization overlay; the attribute model reports them.
-    struct GeometryPresentationColorSlot
-    {
-        const GeometryPresentationBindingRecipe* Presentation{nullptr};
-        const GeometryPresentationSlotRecipe* Slot{nullptr};
-        GeometryRenderLane Lane{GeometryRenderLane::Points};
-    };
-    [[nodiscard]] GeometryPresentationColorSlot FindGeometryPresentationColorSlot(
-        const GeometryPresentationRecipe& recipe,
-        GeometryElementDomain domain) noexcept;
 
     [[nodiscard]] GeometryPresentationSlotStatus*
     FindGeometryPresentationSlotStatus(
