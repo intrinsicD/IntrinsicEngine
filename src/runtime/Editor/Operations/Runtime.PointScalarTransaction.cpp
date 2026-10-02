@@ -51,197 +51,184 @@ import Extrinsic.RHI.CommandContext;
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuFront.hpp"
 
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuScalar.hpp"
+#include "Editor/Operations/Runtime.GpuTransactionLifecycle.hpp"
 namespace Extrinsic::Runtime
 {
     namespace GP=GeometryProcessingDetail;
-    struct EditorPointScalarTransaction
+    // The typed scalar transaction on the shared Run/Accept lifecycle. Rings: the typed output
+    // (read back on Accept), the companion field (publication mode, read back) and the float
+    // presentation ring beside a non-float typed output (publication mode).
+    struct EditorPointScalarTransaction : std::enable_shared_from_this<EditorPointScalarTransaction>
     {
-        EditorProcessingContext Context{};
+        GP::GpuTransactionCore Core{};
         std::optional<EditorPointScalarPublication> Publication{};
-        Graphics::GpuPropertyKey PresentationKey{}, CompanionKey{};
-        std::uint64_t CompanionGeneration{};
-        std::optional<Graphics::GpuPropertyView> CompanionBack{};
-        std::shared_ptr<GP::GpuFrontReadback> CompanionReadback{};
-        std::uint64_t PresentationGeneration{};
         std::shared_ptr<GP::PointScalarCapture> Capture{};
         entt::entity Entity{};
         GeometryPropertyRef Positions{};
         Graphics::PointScalarGpuParams Params{};
         std::string Label{};
-        EditorJobIdentity Identity{};
-        Graphics::GpuPropertyResidency* Residency{};
-        Graphics::GpuPropertyKey Key{};
-        std::uint64_t Generation{};
-        std::optional<Graphics::GpuPropertyView> Input{},Base{},Back{};
-        std::shared_ptr<GP::GpuFrontReadback> Readback{};
+        std::optional<Graphics::GpuPropertyView> Input{},Base{};
         // Leased from the spatial cache; the recorder closure keeps it while its work may run.
         std::shared_ptr<Graphics::PointScalarWorkspace> Workspace{};
         SpatialIndexHandle Index{};
-        std::shared_ptr<SpatialGpuResult> Gpu{};
         EditorPointScalarTransactionSnapshot Result{};
-        std::uint32_t Deferrals{};
-        bool Automatic{},Abandoned{},Delivered{},TestFront{},Publishing{};
         std::function<void(EditorPointScalarTransactionSnapshot)> Sink{};
     };
     namespace
     {
         using Run=EditorPointScalarTransactionHandle;
-        bool Current(const Run& w)
-        { return !w->Abandoned && GP::EditorProcessingContextWorldCurrent(w->Context) && (!w->Publication || w->Publication->Current()) && (w->Publication || GP::PointScalarFieldCurrent(w->Context,w->Entity,*w->Capture)) && (!w->Generation||w->Residency->RingGeneration(w->Key)==w->Generation) &&
-            (!w->CompanionGeneration||w->Residency->RingGeneration(w->CompanionKey)==w->CompanionGeneration) &&
-            (!w->PresentationGeneration||w->Residency->RingGeneration(w->PresentationKey)==w->PresentationGeneration); }
-        void Release(const Run& w)
-        {
-            w->Input.reset();w->Base.reset();w->Back.reset();w->CompanionBack.reset();
-            // Only completed (or never queued) work returns the workspace early.
-            if(!w->Gpu||w->Gpu->State==SpatialQueryState::Ready)w->Workspace.reset();
-            if(w->CompanionReadback){w->CompanionReadback->Abandoned=true;w->CompanionReadback->Lease.reset();}
-            if(w->Readback){w->Readback->Abandoned=true;w->Readback->Lease.reset();}
-            if(w->Residency){
-                (void)w->Residency->Discard(w->Key,w->Generation);
-                if(w->CompanionGeneration)(void)w->Residency->Discard(w->CompanionKey,w->CompanionGeneration);
-                if(w->PresentationGeneration)(void)w->Residency->Discard(w->PresentationKey,w->PresentationGeneration);
-            }
-        }
-        void Deliver(const Run& w)
-        { if(!std::exchange(w->Delivered,true)&&w->Sink)w->Sink(w->Result); }
-        void Finish(const Run& w,EditorGpuTransactionPhase phase,EditorCommandStatus status,std::string why)
-        { Release(w);w->Result.Phase=phase;w->Result.Status=status;w->Result.Message=std::move(why);Deliver(w); }
-        void Fail(const Run& w,std::string why)
-        { Finish(w,EditorGpuTransactionPhase::Failed,EditorCommandStatus::GeometryProcessingFailed,std::move(why)); }
+        constexpr std::size_t kTyped=0,kCompanion=1,kPresentation=2;
+        auto& Typed(const Run& w){return w->Core.Rings[kTyped];}
+        bool Current(const Run& w){return GP::GpuTransactionCurrent(w->Core);}
+        void Fail(const Run& w,std::string why){GP::FailGpuTransaction(w->Core,std::move(why));}
         bool Acquire(const Run& w)
         {
-            auto& r=*w->Residency;
+            auto& r=*w->Core.Residency;const auto& ctx=w->Core.Context;
             const auto resolve=[&](const GeometryPropertyRef& ref){
                 const auto before=r.Stats().UploadBytes;
-                auto v=ResolveGpuPropertyInput(r,*w->Context.Scene,w->Context.World,w->Entity,ref);
+                auto v=ResolveGpuPropertyInput(r,*ctx.Scene,ctx.World,w->Entity,ref);
                 const auto bytes=r.Stats().UploadBytes-before;w->Result.GpuInputUploadBytes+=bytes;
                 if(v&&!bytes)++w->Result.GpuInputCacheHits;return v;};
             if(!w->Input)w->Input=resolve(w->Positions);
             if(!w->Input)return false;
             if(w->Capture->OutputWatch.Revision&&!w->Base)w->Base=resolve(w->Capture->Output);
             if(w->Capture->OutputWatch.Revision&&!w->Base)return false;
-            if(!w->Back){
-                if(!w->Generation&&r.HasRing(w->Key))return false;
-                w->Back=AcquireGpuPropertyOutput(r,w->Context.World,w->Entity,w->Capture->Output,std::uint32_t(w->Capture->SlotCount),3);
-                if(!w->Back)return false;w->Generation=r.RingGeneration(w->Key);}
-            return true;
+            // A ring another run created defers like an exhausted one.
+            return GP::AcquireGpuTransactionBack(w->Core,kTyped,w->Entity,w->Capture->Output,std::uint32_t(w->Capture->SlotCount),3)==GP::GpuRingAcquisition::Ready;
         }
         bool Poll(const Run& w)
         {
-            if(!Current(w))return true;
-            if(!w->Gpu){
-                if(!Acquire(w)){if(++w->Deferrals<600)return false;Fail(w,"Scalar residency refused an input or output slot.");return true;}
-                w->Workspace=w->Context.SpatialIndices->LeaseGpuWorkspace<Graphics::PointScalarWorkspace>();
+            auto& t=w->Core;
+            if(!t.Gpu){
+                if(!Acquire(w)){if(!GP::GpuTransactionDeferralsExhausted(t))return false;Fail(w,"Scalar residency refused an input or output slot.");return true;}
+                w->Workspace=t.Context.SpatialIndices->LeaseGpuWorkspace<Graphics::PointScalarWorkspace>();
                 if(!w->Workspace){Fail(w,"Scalar device workspace unavailable.");return true;}
-                w->Gpu=w->Context.SpatialIndices->QueueGpuCompute(w->Index,sizeof(Graphics::PointScalarGpuStats),
+                t.Gpu=t.Context.SpatialIndices->QueueGpuCompute(w->Index,sizeof(Graphics::PointScalarGpuStats),
                     [w](RHI::ICommandContext& cmd,const SpatialGpuIndexView& index)->RHI::BufferHandle{
-                        if(!Current(w)||!w->Input||!w->Back||!w->Workspace)return {};
-                        const auto frame=w->Context.Device->GetGlobalFrameNumber();
-                        w->Residency->NoteUse(w->Input->Buffer,frame);w->Residency->NoteUse(w->Back->Buffer,frame);
-                        if(w->Base)w->Residency->NoteUse(w->Base->Buffer,frame);
-                        return w->Workspace->Record(cmd,w->Params,{.Positions=*w->Input,.Output=*w->Back,
+                        const auto& back=Typed(w).Back;
+                        if(!Current(w)||!w->Input||!back||!w->Workspace)return {};
+                        const auto frame=w->Core.Context.Device->GetGlobalFrameNumber();
+                        auto& residency=*w->Core.Residency;
+                        residency.NoteUse(w->Input->Buffer,frame);residency.NoteUse(back->Buffer,frame);
+                        if(w->Base)residency.NoteUse(w->Base->Buffer,frame);
+                        return w->Workspace->Record(cmd,w->Params,{.Positions=*w->Input,.Output=*back,
                             .Base=w->Base.value_or(Graphics::GpuPropertyView{}),.Nodes=index.NodesBDA,
                             .LiveSlots=index.OriginalSlotsBDA,.LiveCount=index.Count});},SpatialGpuLatency::Immediate);
-                if(!w->Gpu){Fail(w,"Scalar compute submission rejected.");return true;}
+                if(!t.Gpu){Fail(w,"Scalar compute submission rejected.");return true;}
                 w->Result.GpuQueryBatches=1;}
-            return w->Gpu->State==SpatialQueryState::Ready||w->Gpu->State==SpatialQueryState::Failed;
+            return t.Gpu->State==SpatialQueryState::Ready||t.Gpu->State==SpatialQueryState::Failed;
+        }
+        void CompleteRun(const Run& w)
+        {
+            auto& t=w->Core;
+            if(!t.Gpu||t.Gpu->State!=SpatialQueryState::Ready||t.Gpu->Data.size()!=sizeof(Graphics::PointScalarGpuStats)){
+                Fail(w,t.Gpu?t.Gpu->Diagnostic:"Scalar compute failed.");return;}
+            std::memcpy(&w->Result.Statistics,t.Gpu->Data.data(),sizeof(Graphics::PointScalarGpuStats));
+            w->Workspace.reset();
+            if(w->Result.Statistics.Invalid){Fail(w,"Scalar numerical failure or radius candidate overflow; increase capacity or select CPU.");return;}
+            Typed(w).Back.reset();
+            if(!t.Residency->Publish(Typed(w).Key,std::array<float,2>{float(w->Result.Statistics.Minimum),float(w->Result.Statistics.Maximum)})){
+                Fail(w,"Scalar ring publication failed.");return;}
+            w->Input.reset();w->Base.reset();w->Result.Message="GPU scalar awaits Accept or Discard.";
+            GP::ReadyGpuTransaction(t);
         }
         void CompleteAccept(const Run& w)
         {
+            auto& t=w->Core;auto& residency=*t.Residency;
             if (w->Publication)
             {
-                const auto& readback = w->Readback;
+                const auto& readback = Typed(w).Readback;
+                const auto& companion = t.Rings[kCompanion].Readback;
                 const auto& output = w->Publication->Output;
                 const auto layout = MakeGpuPropertyLayout(output.ValueKind, w->Publication->Count);
                 if (!readback || readback->Failed || !layout || readback->Bytes.size() != layout->Bytes())
                 { Fail(w, "Typed scalar front readback failed."); return; }
-                if (w->Publication->Companion && (!w->CompanionReadback || w->CompanionReadback->Failed ||
-                    w->CompanionReadback->Bytes.size() != MakeGpuPropertyLayout(w->Publication->Companion->ValueKind, w->Publication->Count)->Bytes()))
+                if (w->Publication->Companion && (!companion || companion->Failed ||
+                    companion->Bytes.size() != MakeGpuPropertyLayout(w->Publication->Companion->ValueKind, w->Publication->Count)->Bytes()))
                 { Fail(w, "Companion scalar front readback failed."); return; }
                 const auto publication = readback->Lease ? readback->Lease->Publication : 0;
-                w->Result.CpuStageReadbackBytes += readback->Bytes.size() + (w->CompanionReadback ? w->CompanionReadback->Bytes.size() : 0);
-                // The publication callback may run history observers synchronously.
-                // Discard while Accept is publishing is ignored below.
-                w->Publishing = true;
-                const auto& companion = w->CompanionReadback;
+                w->Result.CpuStageReadbackBytes += readback->Bytes.size() + (companion ? companion->Bytes.size() : 0);
+                // The publication callback may run history observers synchronously (the
+                // lifecycle ignores a Discard they issue).
                 const auto status = w->Publication->Companion
                     ? w->Publication->PublishPair(readback->Bytes, companion->Bytes)
                     : w->Publication->Publish(readback->Bytes);
-                w->Publishing = false;
                 readback->Lease.reset();
                 if (status != EditorCommandStatus::Applied && status != EditorCommandStatus::NoChange)
-                { Finish(w, EditorGpuTransactionPhase::Failed, status, "Typed scalar publication rejected."); return; }
+                { GP::FinishGpuTransaction(t, EditorGpuTransactionPhase::Failed, status, "Typed scalar publication rejected."); return; }
                 if (w->Publication->Companion) {
+                    auto& ring = t.Rings[kCompanion];
                     const auto companionPublication = companion->Lease ? companion->Lease->Publication : 0;
                     companion->Lease.reset();
-                    const auto a = BuildGeometryAvailability(w->Context.Scene->Raw(), w->Entity);
+                    const auto a = BuildGeometryAvailability(t.Context.Scene->Raw(), w->Entity);
                     const auto watch = GP::ObserveGeometryProperty(a, w->Publication->Companion->Domain, w->Publication->Companion->Name);
                     const auto resolution = ResolveGeometryProperty(a, *w->Publication->Companion);
                     if (!resolution.Resolved() || resolution.ResolvedValueKind != w->Publication->Companion->ValueKind ||
-                        !watch.Revision || !w->Residency->BindRevision(w->CompanionKey, *watch.Revision, companionPublication))
-                        (void)w->Residency->Discard(w->CompanionKey, w->CompanionGeneration);
+                        !watch.Revision || !residency.BindRevision(ring.Key, *watch.Revision, companionPublication))
+                        (void)residency.Discard(ring.Key, ring.Generation);
                 }
-                const auto availability = BuildGeometryAvailability(w->Context.Scene->Raw(), w->Entity);
+                const auto availability = BuildGeometryAvailability(t.Context.Scene->Raw(), w->Entity);
                 const auto watch = GP::ObserveGeometryProperty(availability, output.Domain, output.Name);
                 const auto resolution = ResolveGeometryProperty(availability, output);
-                if (!resolution.Resolved() || resolution.ResolvedValueKind != output.ValueKind || !watch.Revision || !w->Residency->BindRevision(w->Key, *watch.Revision, publication))
-                    (void)w->Residency->Discard(w->Key, w->Generation);
-                if (w->PresentationGeneration)
+                if (!resolution.Resolved() || resolution.ResolvedValueKind != output.ValueKind || !watch.Revision || !residency.BindRevision(Typed(w).Key, *watch.Revision, publication))
+                    (void)residency.Discard(Typed(w).Key, Typed(w).Generation);
+                if (const auto& ring = t.Rings[kPresentation]; ring.Generation)
                 {
-                    if (!watch.Revision || !w->Residency->BindRevision(w->PresentationKey, *watch.Revision))
-                        (void)w->Residency->Discard(w->PresentationKey, w->PresentationGeneration);
+                    if (!watch.Revision || !residency.BindRevision(ring.Key, *watch.Revision))
+                        (void)residency.Discard(ring.Key, ring.Generation);
                 }
-                w->Result.Phase = EditorGpuTransactionPhase::Applied;
-                w->Result.Status = status;
-                w->Result.Message = "Typed scalar result accepted.";
-                Deliver(w);
+                GP::FinishGpuTransaction(t, EditorGpuTransactionPhase::Applied, status, "Typed scalar result accepted.");
                 return;
             }
             auto& capture=*w->Capture;std::uint64_t publication{};
-            if(!w->TestFront){
-                const auto& r=w->Readback;
+            if(!t.TestFront){
+                const auto& r=Typed(w).Readback;
                 if(!r||r->Failed||r->Bytes.size()!=capture.SlotCount*4){Fail(w,"Scalar front readback failed.");return;}
                 publication=r->Lease?r->Lease->Publication:0;
                 std::memcpy(capture.AfterValues.data(),r->Bytes.data(),r->Bytes.size());
                 w->Result.CpuStageReadbackBytes+=r->Bytes.size();r->Lease.reset();}
-            else if(auto front=w->Residency->Front(w->Key))publication=front->Publication;
-            w->Publishing=true;
-            const auto status=GP::PublishPointScalarField(w->Context,w->Entity,capture,w->Label);
-            w->Publishing=false;
-            w->Result.Status=EditorFeatureDetail::ToEditorCommandStatus(status);
-            if(w->Result.Status!=EditorCommandStatus::Applied){Finish(w,EditorGpuTransactionPhase::Failed,w->Result.Status,"Scalar publication rejected.");return;}
-            const auto a=BuildGeometryAvailability(w->Context.Scene->Raw(),w->Entity);
+            else if(auto front=residency.Front(Typed(w).Key))publication=front->Publication;
+            const auto status=EditorFeatureDetail::ToEditorCommandStatus(GP::PublishPointScalarField(t.Context,w->Entity,capture,w->Label));
+            if(status!=EditorCommandStatus::Applied){GP::FinishGpuTransaction(t,EditorGpuTransactionPhase::Failed,status,"Scalar publication rejected.");return;}
+            const auto a=BuildGeometryAvailability(t.Context.Scene->Raw(),w->Entity);
             const auto watch=GP::ObserveGeometryProperty(a,capture.Output.Domain,capture.Output.Name);
-            if(!watch.Revision||!w->Residency->BindRevision(w->Key,*watch.Revision,publication))
-                (void)w->Residency->Discard(w->Key,w->Generation);
-            w->Result.Phase=EditorGpuTransactionPhase::Applied;
-            w->Result.Message="Device scalar accepted; input upload: "+std::to_string(w->Result.GpuInputUploadBytes)+
-                " bytes; residency hits: "+std::to_string(w->Result.GpuInputCacheHits)+"; CPU-stage readback: "+std::to_string(w->Result.CpuStageReadbackBytes)+" bytes.";
-            Deliver(w);
+            if(!watch.Revision||!residency.BindRevision(Typed(w).Key,*watch.Revision,publication))
+                (void)residency.Discard(Typed(w).Key,Typed(w).Generation);
+            GP::FinishGpuTransaction(t,EditorGpuTransactionPhase::Applied,status,"Device scalar accepted; input upload: "+std::to_string(w->Result.GpuInputUploadBytes)+
+                " bytes; residency hits: "+std::to_string(w->Result.GpuInputCacheHits)+"; CPU-stage readback: "+std::to_string(w->Result.CpuStageReadbackBytes)+" bytes.");
         }
+        // Builds the transaction on the shared lifecycle; hooks reach it by raw pointer.
+        Run Make(const EditorProcessingContext& ctx,Graphics::GpuPropertyResidency* residency)
+        {
+            auto w=std::make_shared<EditorPointScalarTransaction>();
+            auto& t=w->Core;t.Context=ctx;t.Residency=residency;t.Label="Scalar analysis";
+            auto* raw=w.get();
+            // Hooks run while a job or caller owns the transaction; recorders take ownership.
+            const auto self=[raw]{return raw->shared_from_this();};
+            t.Hooks={
+                .Current=[raw]{return (!raw->Publication||raw->Publication->Current())&&
+                    (raw->Publication||GP::PointScalarFieldCurrent(raw->Core.Context,raw->Entity,*raw->Capture));},
+                .Poll=[self]{return Poll(self());},
+                .CompleteRun=[self]{CompleteRun(self());},
+                .CompleteAccept=[self]{CompleteAccept(self());},
+                .Release=[raw]{
+                    raw->Input.reset();raw->Base.reset();
+                    // Only completed (or never queued) work returns the workspace early.
+                    if(GP::GpuTransactionWorkReleasable(raw->Core))raw->Workspace.reset();},
+                .Deliver=[raw](EditorCommandStatus status,std::string message){
+                    raw->Result.Phase=raw->Core.Phase;raw->Result.Status=status;raw->Result.Message=std::move(message);
+                    if(auto sink=std::move(raw->Sink))sink(raw->Result);}};
+            return w;
+        }
+        EditorPointScalarTransactionSnapshot Snapshot(const Run& w)
+        { auto s=w->Result;s.Phase=w->Core.Phase;return s; }
         EditorPointScalarTransactionSnapshot Accept(const Run& w, std::function<void(EditorPointScalarTransactionSnapshot)> sink = {})
         {
-            auto result=w->Result;
-            if(result.Phase!=EditorGpuTransactionPhase::ReadyToAccept){result.Status=EditorCommandStatus::InvalidProcessingParameters;result.Message="No scalar result awaits Accept.";return result;}
-            if(!Current(w)){result.Status=EditorCommandStatus::StaleEntity;result.Message="Scalar input or output changed; discard and run again.";return result;}
-            if(sink)w->Sink=GuardEditorProcessingResult(w->Context,std::move(sink));
-            if(!w->TestFront){w->Readback=std::make_shared<GP::GpuFrontReadback>();
-                if(!GP::BeginGpuFrontReadback(w->Context,*w->Residency,w->Key,w->Readback)){Fail(w,"Scalar front is no longer resident.");return w->Result;}}
-            if(!w->TestFront && w->Publication && w->Publication->Companion) {
-                w->CompanionReadback=std::make_shared<GP::GpuFrontReadback>();
-                if(!GP::BeginGpuFrontReadback(w->Context,*w->Residency,w->CompanionKey,w->CompanionReadback))
-                {Fail(w,"Companion front is no longer resident.");return w->Result;}
-            }
-            w->Result.Phase=EditorGpuTransactionPhase::Accepting;
-            JobDesc job{.DebugName="Accept point scalar",.Scope=w->Context.World,.Kind=RuntimeTaskKinds::GeometryProcess,
-                .Work=[](const JobCancellation&){return JobResultEnvelope::Make(true);},
-                .IsReadyToApply=[w]{return !Current(w)||w->TestFront||(GP::PollGpuFrontReadback(*w->Readback) && (!w->CompanionReadback || GP::PollGpuFrontReadback(*w->CompanionReadback)));},
-                .ValidateBeforeApply=[w]{return Current(w)?JobApplyValidation::Current:JobApplyValidation::StaleGeneration;},
-                .PublishCompletion=[w](KernelEventBus&,const JobResultEnvelope&){CompleteAccept(w);return w->Result.Phase==EditorGpuTransactionPhase::Applied;},
-                .FinalizeUnpublishedOnMainThread=[w]{if(!w->Delivered)Finish(w,EditorGpuTransactionPhase::Discarded,EditorCommandStatus::StaleEntity,"Scalar Accept cancelled or stale.");}};
-            if(!w->Context.JobCommands.Submit(std::move(job),w->Identity).IsValid())Fail(w,"Scalar Accept submission rejected.");
-            return w->Result;
+            if(auto refused=GP::GpuTransactionAcceptRefusal(w->Core)){
+                auto result=Snapshot(w);result.Status=refused->Status;result.Message=std::move(refused->Message);return result;}
+            if(sink)w->Sink=GuardEditorProcessingResult(w->Core.Context,std::move(sink));
+            (void)GP::BeginGpuTransactionAccept(GP::GpuTransactionOf(w),"Accept point scalar");
+            return Snapshot(w);
         }
     }
     extern "C++" { namespace GeometryProcessingDetail
@@ -269,47 +256,34 @@ namespace Extrinsic::Runtime
             auto* residency=testResidency?testResidency:(ctx.SpatialIndices?ctx.SpatialIndices->PropertyResidency():nullptr);
             const auto refuse=[&](std::string why)->EditorPointScalarTransactionHandle {result.Status=EditorCommandStatus::InvalidProcessingParameters;result.Message=std::move(why);return {};};
             if(!residency)return refuse("Scalar analysis needs GPU property residency.");
-            auto w=std::make_shared<EditorPointScalarTransaction>();w->Context=ctx;w->Capture=std::move(capture);w->Entity=entity;
-            w->Positions=std::move(positions);w->Params=params;w->Label=std::move(label);w->Residency=residency;w->Automatic=automatic;
-            w->Sink=GuardEditorProcessingResult(ctx,std::move(sink));w->Key=MakeGpuPropertyKey(ctx.World,entity,w->Capture->Output);
-            w->Identity={.EntityId=stableId,.Scope=ToEditorJobScope(w->Capture->Output.Domain),.OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Capture->Output.Name};
-            if(residency->HasRing(w->Key))return refuse("Scalar output awaits Accept or Discard.");
+            auto w=Make(ctx,residency);auto& t=w->Core;w->Capture=std::move(capture);w->Entity=entity;
+            w->Positions=std::move(positions);w->Params=params;w->Label=std::move(label);t.AutoAccept=automatic;
+            t.Rings[kTyped]={.Key=MakeGpuPropertyKey(ctx.World,entity,w->Capture->Output),.ReadBack=true};t.RingCount=1;
+            t.Identity={.EntityId=stableId,.Scope=ToEditorJobScope(w->Capture->Output.Domain),.OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Capture->Output.Name};
+            if(residency->HasRing(Typed(w).Key))return refuse("Scalar output awaits Accept or Discard.");
             w->Result.LiveCount=w->Capture->LiveCount;
-            if(testResidency){w->Result=testResult;w->Result.LiveCount=w->Capture->LiveCount;w->Back=AcquireGpuPropertyOutput(*residency,ctx.World,entity,w->Capture->Output,std::uint32_t(w->Capture->SlotCount),3);
-                if(!w->Back)return refuse("Test scalar ring allocation failed.");w->Generation=residency->RingGeneration(w->Key);w->Back.reset();
-                if(!residency->Publish(w->Key))return refuse("Test scalar publication failed.");w->TestFront=true;w->Result.Phase=EditorGpuTransactionPhase::ReadyToAccept;result=w->Result;return w;}
-            if(auto busy=MeshSupport::ActiveOutputJobRefusal(ctx,w->Identity,jobLabel))
-            {result.Status=EditorCommandStatus::Pending;result.Message=std::move(busy->Message);return {};}
+            if(testResidency){w->Result=testResult;w->Result.LiveCount=w->Capture->LiveCount;
+                if(GP::AcquireGpuTransactionBack(t,kTyped,entity,w->Capture->Output,std::uint32_t(w->Capture->SlotCount),3)!=GpuRingAcquisition::Ready)
+                    return refuse("Test scalar ring allocation failed.");
+                Typed(w).Back.reset();
+                if(!residency->Publish(Typed(w).Key))return refuse("Test scalar publication failed.");
+                w->Sink=GuardEditorProcessingResult(ctx,std::move(sink));
+                t.TestFront=true;GP::ReadyGpuTransaction(t);result=Snapshot(w);return w;}
+            if(auto refused=GP::GpuTransactionStartRefusal(t,jobLabel)){result.Status=refused->Status;result.Message=std::move(refused->Message);return {};}
             std::shared_ptr<const SpatialIndexSnapshot> snapshot;bool reused{};std::string why;
             if(AcquirePointIndex(*ctx.SpatialIndices,ctx.World,entity,w->Positions,w->Capture->Slots,w->Capture->Points,w->Index,snapshot,reused,why)!=PointIndexState::Ready)return refuse(why);
             w->Result.IndexReused=reused;w->Result.Message="Device scalar analysis queued.";
-            JobDesc job{.DebugName="Device point scalar",.Scope=ctx.World,.Kind=RuntimeTaskKinds::GeometryProcess,
-                .Work=[](const JobCancellation&){return JobResultEnvelope::Make(true);},.IsReadyToApply=[w]{return Poll(w);},
-                .ValidateBeforeApply=[w]{return Current(w)?JobApplyValidation::Current:JobApplyValidation::StaleGeneration;},
-                .PublishCompletion=[w](KernelEventBus&,const JobResultEnvelope&){
-                    if(w->Delivered)return false;
-                    if(!w->Gpu||w->Gpu->State!=SpatialQueryState::Ready||w->Gpu->Data.size()!=sizeof(Graphics::PointScalarGpuStats)){
-                        Fail(w,w->Gpu?w->Gpu->Diagnostic:"Scalar compute failed.");return false;}
-                    std::memcpy(&w->Result.Statistics,w->Gpu->Data.data(),sizeof(Graphics::PointScalarGpuStats));
-                    w->Workspace.reset();
-                    if(w->Result.Statistics.Invalid){Fail(w,"Scalar numerical failure or radius candidate overflow; increase capacity or select CPU.");return false;}
-                    w->Back.reset();if(!w->Residency->Publish(w->Key, std::array<float, 2>{
-                        float(w->Result.Statistics.Minimum), float(w->Result.Statistics.Maximum)})){Fail(w,"Scalar ring publication failed.");return false;}
-                    w->Input.reset();w->Base.reset();w->Result.Message="GPU scalar awaits Accept or Discard.";w->Result.Phase=EditorGpuTransactionPhase::ReadyToAccept;
-                    if(w->Automatic){const auto accepted=Accept(w);if(accepted.Status!=EditorCommandStatus::Pending)Finish(w,EditorGpuTransactionPhase::Failed,accepted.Status,accepted.Message);}
-                    return !w->Delivered;},
-                .FinalizeUnpublishedOnMainThread=[w]{if(!w->Delivered)Finish(w,EditorGpuTransactionPhase::Discarded,EditorCommandStatus::StaleEntity,"Scalar run cancelled or stale.");}};
-            const auto token=ctx.JobCommands.Submit(std::move(job),w->Identity);
-            if(!token.IsValid()){w->Sink={};Fail(w,"Scalar compute submission rejected.");result=w->Result;return {};}
-            w->Identity.Run=token; // the Accept stage joins this run
-            result=w->Result;return w;
+            w->Sink=GuardEditorProcessingResult(ctx,std::move(sink));
+            if(!GP::SubmitGpuTransactionRun(GP::GpuTransactionOf(w),"Device point scalar").IsValid()){
+                result=Snapshot(w);result.Status=EditorCommandStatus::GeometryProcessingFailed;result.Message="Scalar compute submission rejected.";return {};}
+            result=Snapshot(w);return w;
         }
     }
     }
     extern "C++" void GeometryProcessingDetail::JoinPointScalarRun(
         const EditorPointScalarTransactionHandle& run, EditorJobIdentity identity)
     {
-        if (run) run->Identity = std::move(identity);
+        if (run) run->Core.Identity = std::move(identity);
     }
     EditorPointScalarTransactionHandle BeginEditorPointScalarPublication(
         const EditorProcessingCommands& commands, EditorPointScalarPublication publication,
@@ -331,54 +305,61 @@ namespace Extrinsic::Runtime
             GeometryPropertyComponentCount(publication.Companion->ValueKind)!=1 ||
             !MakeGpuPropertyLayout(publication.Companion->ValueKind, publication.Count)))
             return refuse("Invalid companion scalar output.");
-        auto w = std::make_shared<EditorPointScalarTransaction>();
-        w->Context = context; w->Residency = residency;
+        auto w = Make(context, residency);
+        auto& t = w->Core;
         w->Entity = SelectionController::ToEntityHandle(publication.EntityId);
-        w->Key = MakeGpuPropertyKey(context.World, w->Entity, publication.Output);
-        w->PresentationKey = MakeGpuPropertyKey(context.World, w->Entity, GpuPropertyPresentationRef(publication.Output));
-        if (residency->HasRing(w->Key) || residency->HasRing(w->PresentationKey))
+        t.RingCount = 3;
+        auto& typed = t.Rings[kTyped];
+        auto& presentation = t.Rings[kPresentation];
+        auto& companion = t.Rings[kCompanion];
+        typed = {.Key = MakeGpuPropertyKey(context.World, w->Entity, publication.Output), .ReadBack = true};
+        presentation.Key = MakeGpuPropertyKey(context.World, w->Entity, GpuPropertyPresentationRef(publication.Output));
+        if (residency->HasRing(typed.Key) || residency->HasRing(presentation.Key))
             return refuse("Scalar output awaits Accept or Discard.");
-        // Admission and rollback run on the runtime thread, before another owner
-        // can acquire either key. The rings own their reserved slots.
-        w->Back = AcquireGpuPropertyOutput(*residency, context.World, w->Entity, publication.Output, publication.Count, 3);
-        w->Generation = residency->RingGeneration(w->Key);
-        if (!w->Back) { Release(w); return refuse("Typed scalar output reservation failed."); }
-        if (w->PresentationKey != w->Key) {
-            const auto presentation = AcquireGpuPropertyOutput(*residency, context.World, w->Entity,
+        // Admission and rollback run on the runtime thread, before another owner can acquire
+        // either key. The rings own their reserved slots; a rollback delivers nothing.
+        const auto rollback = [&](const char* why) { t.Delivered = true; GP::FailGpuTransaction(t, {}); return refuse(why); };
+        typed.Back = AcquireGpuPropertyOutput(*residency, context.World, w->Entity, publication.Output, publication.Count, 3);
+        typed.Generation = residency->RingGeneration(typed.Key);
+        if (!typed.Back) return rollback("Typed scalar output reservation failed.");
+        if (presentation.Key != typed.Key) {
+            const auto view = AcquireGpuPropertyOutput(*residency, context.World, w->Entity,
                 GpuPropertyPresentationRef(publication.Output), publication.Count, 3);
-            w->PresentationGeneration = residency->RingGeneration(w->PresentationKey);
-            if (!presentation) { Release(w); return refuse("Scalar presentation reservation failed."); }
+            presentation.Generation = residency->RingGeneration(presentation.Key);
+            if (!view) return rollback("Scalar presentation reservation failed.");
         }
         if (publication.Companion) {
-            w->CompanionKey = MakeGpuPropertyKey(context.World, w->Entity, *publication.Companion);
-            if (residency->HasRing(w->CompanionKey)) { Release(w); return refuse("Companion output awaits Accept or Discard."); }
-            w->CompanionBack = AcquireGpuPropertyOutput(*residency, context.World, w->Entity, *publication.Companion, publication.Count, 3);
-            w->CompanionGeneration = residency->RingGeneration(w->CompanionKey);
-            if (!w->CompanionBack) { Release(w); return refuse("Companion output reservation failed."); }
+            companion = {.Key = MakeGpuPropertyKey(context.World, w->Entity, *publication.Companion), .ReadBack = true};
+            if (residency->HasRing(companion.Key)) return rollback("Companion output awaits Accept or Discard.");
+            companion.Back = AcquireGpuPropertyOutput(*residency, context.World, w->Entity, *publication.Companion, publication.Count, 3);
+            companion.Generation = residency->RingGeneration(companion.Key);
+            if (!companion.Back) return rollback("Companion output reservation failed.");
         }
         w->Publication = std::move(publication);
         w->Sink = GuardEditorProcessingResult(context, std::move(sink));
         w->Result.LiveCount = w->Publication->Count;
-        result = w->Result;
+        result = Snapshot(w);
         return w;
     }
     std::optional<EditorPointScalarBack> AcquireEditorPointScalarBack(const EditorPointScalarTransactionHandle& w)
     {
         if (!w || !w->Publication || !Current(w)) return std::nullopt;
         const auto& p = *w->Publication;
-        w->Back.reset(); // Drop the admission lease before selecting a preview back.
-        auto typed = AcquireGpuPropertyOutput(*w->Residency, w->Context.World, w->Entity, p.Output, p.Count, 3);
+        auto& t = w->Core;
+        auto& residency = *t.Residency;
+        Typed(w).Back.reset(); // Drop the admission lease before selecting a preview back.
+        auto typed = AcquireGpuPropertyOutput(residency, t.Context.World, w->Entity, p.Output, p.Count, 3);
         if (!typed) return std::nullopt;
-        w->Generation = w->Residency->RingGeneration(w->Key);
+        Typed(w).Generation = residency.RingGeneration(Typed(w).Key);
         auto presentation = p.Output.ValueKind == Geometry::PropertyValueKind::Float ? typed :
-            AcquireGpuPropertyOutput(*w->Residency, w->Context.World, w->Entity, GpuPropertyPresentationRef(p.Output), p.Count, 3);
+            AcquireGpuPropertyOutput(residency, t.Context.World, w->Entity, GpuPropertyPresentationRef(p.Output), p.Count, 3);
         if (!presentation) return std::nullopt;
         if (p.Output.ValueKind != Geometry::PropertyValueKind::Float)
-            w->PresentationGeneration = w->Residency->RingGeneration(w->PresentationKey);
+            t.Rings[kPresentation].Generation = residency.RingGeneration(t.Rings[kPresentation].Key);
         std::optional<Graphics::GpuPropertyView> companion;
         if (p.Companion) {
-            w->CompanionBack.reset();
-            companion = AcquireGpuPropertyOutput(*w->Residency, w->Context.World, w->Entity, *p.Companion, p.Count, 3);
+            t.Rings[kCompanion].Back.reset();
+            companion = AcquireGpuPropertyOutput(residency, t.Context.World, w->Entity, *p.Companion, p.Count, 3);
             if (!companion) return std::nullopt;
         }
         return EditorPointScalarBack{*typed, *presentation, companion.value_or(Graphics::GpuPropertyView{})};
@@ -386,23 +367,24 @@ namespace Extrinsic::Runtime
     bool PublishEditorPointScalarBack(const EditorPointScalarTransactionHandle& w, bool ready,
         std::optional<std::array<float, 2>> scalarRange)
     {
-        if (!w || !w->Publication || !Current(w) || !w->Residency->Publish(w->Key, scalarRange)) return false;
-        if (w->PresentationGeneration && !w->Residency->Publish(w->PresentationKey, scalarRange)) return false;
-        if (w->CompanionGeneration && !w->Residency->Publish(w->CompanionKey)) return false;
-        if (ready) w->Result.Phase = EditorGpuTransactionPhase::ReadyToAccept;
+        if (!w || !w->Publication || !Current(w)) return false;
+        auto& t = w->Core;
+        if (!t.Residency->Publish(Typed(w).Key, scalarRange)) return false;
+        if (const auto& ring = t.Rings[kPresentation]; ring.Generation && !t.Residency->Publish(ring.Key, scalarRange)) return false;
+        if (const auto& ring = t.Rings[kCompanion]; ring.Generation && !t.Residency->Publish(ring.Key)) return false;
+        if (ready) GP::ReadyGpuTransaction(t);
         return true;
     }
     EditorPointScalarTransactionSnapshot SnapshotEditorPointScalar(const EditorProcessingCommands&,const EditorPointScalarTransactionHandle& w)
     {
         if(!w)return {.Phase=EditorGpuTransactionPhase::Failed,.Status=EditorCommandStatus::InvalidProcessingParameters,.Message="No scalar transaction."};
-        auto s=w->Result;if(s.Phase==EditorGpuTransactionPhase::ReadyToAccept){s.CanAccept=Current(w);if(!s.CanAccept)s.AcceptRefusalReason="Scalar input or output changed; discard and run again.";}return s;
+        auto s=Snapshot(w);if(s.Phase==EditorGpuTransactionPhase::ReadyToAccept){s.CanAccept=Current(w);if(!s.CanAccept)s.AcceptRefusalReason="Scalar input or output changed; discard and run again.";}return s;
     }
     EditorPointScalarTransactionSnapshot AcceptEditorPointScalar(const EditorProcessingCommands&,const EditorPointScalarTransactionHandle& w,
         std::function<void(EditorPointScalarTransactionSnapshot)> sink)
     { return w?Accept(w,std::move(sink)):EditorPointScalarTransactionSnapshot{.Phase=EditorGpuTransactionPhase::Failed,.Status=EditorCommandStatus::InvalidProcessingParameters,.Message="No scalar transaction."}; }
     void DiscardEditorPointScalar(const EditorProcessingCommands&,const EditorPointScalarTransactionHandle& w)
     {
-        if(!w||w->Publishing||w->Result.Phase==EditorGpuTransactionPhase::Applied||w->Result.Phase==EditorGpuTransactionPhase::Discarded||w->Result.Phase==EditorGpuTransactionPhase::Failed)return;
-        w->Abandoned=true;Finish(w,EditorGpuTransactionPhase::Discarded,EditorCommandStatus::NoChange,"Scalar preview discarded; CPU fields retained.");
+        if(w)GP::DiscardGpuTransaction(w->Core,EditorCommandStatus::NoChange,"Scalar preview discarded; CPU fields retained.");
     }
 }

@@ -305,13 +305,13 @@ TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
     constexpr std::string_view owner = "Runtime.GeometryProcessingOperations.MeshSupport.cpp";
     // Files that own a job lifecycle the helper does not cover (keep this list short; a new
     // queued operation belongs on `QueuedJobDelivery`).
-    constexpr std::array<std::string_view, 12> handWritten{
-        // GPU Run/Accept transactions: RUNTIME-311 owns their shared lifecycle.
+    constexpr std::array<std::string_view, 11> handWritten{
+        // GPU Run/Accept transactions not yet on Runtime.GpuTransactionLifecycle (RUNTIME-311).
+        // Keypoints stays listed for its resident run's guarded publication sink.
         "Runtime.GeometryProcessingOperations.GpuPositions.cpp",
         "Runtime.GeometryProcessingOperations.Keypoints.cpp",
         "Runtime.GeometryProcessingOperations.Normals.cpp",
         "Runtime.GeometryProcessingOperations.Outliers.cpp",
-        "Runtime.PointScalarTransaction.cpp",
         "Runtime.MeshFieldOperations.Smoothing.cpp",
         // Mesh-family jobs that keep their result in a typed state struct with the shared
         // `BuildUnpublishedEditorJobFailure` wording and `ActiveOutputJobRefusal`.

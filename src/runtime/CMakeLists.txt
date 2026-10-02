@@ -158,6 +158,7 @@ target_sources(${target_name}
         Editor/Operations/Runtime.GeometryProcessingOperations.GpuPositions.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.cpp
+        Editor/Operations/Runtime.GpuTransactionLifecycle.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Bilateral.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Descriptors.cpp
