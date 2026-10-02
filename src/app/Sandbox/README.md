@@ -120,7 +120,8 @@ and method-panel action models between implementations and integration tests.
 scalar-field styling and texture-bake controls used by the inspector and domain
 appearance panels. Scalar color/range and bin/isoline drawing are separate so
 domain panels retain their baked-texture restriction. Each caller retains
-its own persistent rename draft and mutation diagnostic; bake-only constants and
+its own persistent rename draft, mutation diagnostic and the run of its last bake
+(the shared progress widget with Cancel, shown for that bake's entity); bake-only constants and
 helpers stay private to the compiled implementation.
 The bake controls use the one UV-regeneration block (`DrawSandboxUvRegenerationControls`):
 atlas parameters, submission through `Parameterization.Commands` with the
@@ -385,7 +386,8 @@ native None, Angle, Area or Both objectives, or the xatlas Angle backend.
 Resolution, chart padding, distortion limits and budgets use the shared config
 and command path. Successful generation opens `Mesh > UV Atlas Workspace`: a
 resizable scene/atlas split with a left/right toggle, UV wireframe, and one tab
-per baked texture. Tabs retain pending, failed and stale diagnostics; ready tabs
+per baked texture. A pending tab shows its bake's run (progress widget with Cancel, found by the
+tab's output); tabs retain failed and stale diagnostics; ready tabs
 show the stored values with independent coverage, range legends and shared
 pan/zoom. The atlas tab remains available while bakes complete. See the
 [method contract](../../../docs/methods/property_guided_atlas.md) for input limits

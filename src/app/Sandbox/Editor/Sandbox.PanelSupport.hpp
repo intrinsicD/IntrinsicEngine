@@ -152,6 +152,11 @@ namespace Extrinsic::Sandbox::Editor
         // whatever this one answers (queued, refused by apply, failed at once).
         void ClearNote() noexcept { m_Note.clear(); }
         [[nodiscard]] bool Watching() const noexcept { return m_Watched.has_value(); }
+        // The watched run's key, or null.
+        [[nodiscard]] const Runtime::EditorOperationRunKey* WatchedKey() const noexcept
+        {
+            return m_Watched ? &m_Watched->Key : nullptr;
+        }
         [[nodiscard]] bool WatchesOutput(std::uint32_t entity, const std::string& outputName) const;
         // From the transaction's phase each frame; Accepting/Applied read through the job as usual.
         void AwaitingAccept(const bool waiting) noexcept { m_AwaitingAccept = waiting; }
@@ -163,9 +168,10 @@ namespace Extrinsic::Sandbox::Editor
         [[nodiscard]] Runtime::EditorOperationProgress Query(
             const Runtime::EditorProcessingCommands& commands, const Runtime::EditorOutputRef* draft = nullptr) const;
         // Query + DrawLive: the one call after a panel's action button. `draft` is the panel's
-        // current (entity, output), used while nothing is watched.
+        // current (entity, output), used while nothing is watched. `onCancel` as in
+        // `DrawOperationProgress`.
         void Draw(const Runtime::EditorProcessingCommands& commands, std::uint32_t selectedEntity, const char* id,
-                  const Runtime::EditorOutputRef* draft = nullptr);
+                  const Runtime::EditorOutputRef* draft = nullptr, const std::function<void()>& onCancel = {});
         // For runs whose projection the panel supplies itself (transaction snapshots, ICP/CPD bars).
         void DrawLive(const Runtime::EditorOperationProgress& live, std::uint32_t selectedEntity,
                       const std::function<void()>& onCancel, const char* id);
@@ -447,13 +453,20 @@ namespace Extrinsic::Sandbox::Editor
 
     }
 
-    // Each drawing surface retains its own persistent rename draft and diagnostic.
+    // Each drawing surface retains its own persistent rename draft and diagnostic, and the
+    // run of the last bake it submitted (UI-073), watched by the bake's run-job token.
     struct TextureBakeMutationUiState
     {
         std::string RenameTarget{};
         std::array<char, 128> RenameBuffer{};
         std::string MutationDiagnostic{};
+        OperationRunSlot BakeRun{};
     };
+
+    // The run of the bake writing `outputName` on `entity`, from any surface (bake controls, surface
+    // appearance, an agent), with its Cancel (UI-073): the slot asks for the output's newest run.
+    void DrawTextureBakeOutputRun(OperationRunSlot& slot, const Runtime::EditorProcessingCommands& commands,
+                                  std::uint32_t entity, const std::string& outputName, const char* id);
 
     void DrawTextureBakeControls(
         const Runtime::EditorTextureBakeControlsModel& model,

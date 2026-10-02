@@ -577,6 +577,8 @@ namespace Extrinsic::Sandbox::Editor
             int UvViewSubmitFrame{-1};
             int WorkspaceDrawFrame{-100};
             std::uint64_t FrameObserver{0u};
+            // The selected texture tab's bake run, found by the tab's output (UI-073).
+            OperationRunSlot TextureBakeRun{};
         };
 
         static constexpr std::string_view kAtlasWorkspaceWindowId =
@@ -3292,10 +3294,10 @@ namespace Extrinsic::Sandbox::Editor
             {
                 if (textureTab->State == Runtime::EditorParameterizationTextureState::Stale)
                     overlay = "Stale bake of an earlier atlas; not overlaid on this layout. Re-bake to refresh.";
-                else if (textureTab->State != Runtime::EditorParameterizationTextureState::Ready)
-                    overlay = textureTab->Diagnostic.empty()
-                        ? std::string{"Bake pending."}
-                        : textureTab->Diagnostic;
+                // A pending bake's run shows as the progress widget above the canvas.
+                else if (textureTab->State != Runtime::EditorParameterizationTextureState::Ready &&
+                         textureTab->State != Runtime::EditorParameterizationTextureState::Pending)
+                    overlay = textureTab->Diagnostic;
                 else if (!uvView.GpuReady)
                     overlay = "Baked texels need the GPU UV view (Render mode: GPU shaded); "
                               "the CPU layout shows the atlas wireframe only.";
@@ -3747,6 +3749,9 @@ namespace Extrinsic::Sandbox::Editor
                                     TextureTabColormapLabel(selectedTab->Colormap),
                                     static_cast<unsigned long long>(selectedTab->Revision),
                                     TextureTabStateLabel(*selectedTab));
+                // Replaces the canvas's "pending" text.
+                DrawTextureBakeOutputRun(Parameterization.TextureBakeRun, context.Processing,
+                                         model.SelectedStableEntityId, selectedTab->Name, "##uv_texture_bake_run");
             }
             DrawParameterizationUvPane(context, std::move(model), selectedTab);
         }

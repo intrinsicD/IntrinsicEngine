@@ -19,6 +19,7 @@ module;
 #include <string_view>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <glm/vec3.hpp>
@@ -653,6 +654,19 @@ namespace Extrinsic::Sandbox::Editor
         DrawDiagnostics(bound.Diagnostics);
     }
 
+    void DrawTextureBakeOutputRun(OperationRunSlot& slot, const EditorProcessingCommands& commands,
+                                  const std::uint32_t entity, const std::string& outputName, const char* const id)
+    {
+        const EditorOutputRef output{entity, outputName};
+        slot.Draw(commands, entity, id, &output,
+                  [&commands, output]
+                  {
+                      const std::vector<EditorJobRecord> jobs = GetEditorJobs(commands);
+                      if (const auto run = FindEditorOperationRun(jobs, output))
+                          (void)CancelEditorJob(commands, run->Token);
+                  });
+    }
+
     void DrawTextureBakeControls(
         const EditorTextureBakeControlsModel& model,
         const SandboxEditorContext* context,
@@ -1047,7 +1061,7 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::BeginDisabled();
         if (ImGui::Button("Bake") && canBake)
         {
-            (void)ApplyEditorTextureBakeCommand(
+            const EditorTextureBakeCommandResult baked = ApplyEditorTextureBakeCommand(
                 context->VisualizationCommands,
                 EditorTextureBakeCommand{
                     .StableEntityId = model.SelectedStableId,
@@ -1076,12 +1090,26 @@ namespace Extrinsic::Sandbox::Editor
                     .Targets = consumers,
                     .BindGeneratedTexture = true,
                 });
+            // The run job names exactly this bake; a rejected request queued nothing.
+            if (baked.Job.IsValid())
+                mutation.BakeRun.Watch(model.SelectedStableId, baked.Job);
         }
         if (!canBake)
         {
             ImGui::EndDisabled();
             if (!model.DisabledReason.empty())
                 ImGui::TextDisabled("%s", model.DisabledReason.c_str());
+        }
+        if (context != nullptr)
+        {
+            const OperationRunSlot& slot = mutation.BakeRun;
+            mutation.BakeRun.Draw(context->Processing, model.SelectedStableId, "##texture_bake_run", nullptr,
+                                  [context, &slot]
+                                  {
+                                      const auto* key = slot.WatchedKey();
+                                      if (const auto* token = key != nullptr ? std::get_if<JobToken>(key) : nullptr)
+                                          (void)CancelEditorJob(context->Processing, *token);
+                                  });
         }
 
         ImGui::SeparatorText("Baked textures");
@@ -1793,12 +1821,12 @@ namespace Extrinsic::Sandbox::Editor
 
     void OperationRunSlot::Draw(
         const EditorProcessingCommands& commands, const std::uint32_t selectedEntity, const char* const id,
-        const EditorOutputRef* draft)
+        const EditorOutputRef* draft, const std::function<void()>& onCancel)
     {
         const bool fallback = !m_Watched && draft != nullptr;
         if (!fallback)
         {
-            DrawLive(Query(commands), selectedEntity, {}, id);
+            DrawLive(Query(commands), selectedEntity, onCancel, id);
             return;
         }
         // Nothing submitted here: a run of the draft's output started elsewhere shows as well.
@@ -1807,7 +1835,7 @@ namespace Extrinsic::Sandbox::Editor
         const EditorOperationProgress& shown = Observe(
             Query(commands, draft), DescribeRunKey(draft->EntityId, EditorOperationRunKey{*draft}));
         if (selectedEntity == draft->EntityId && !m_AwaitingAccept)
-            DrawOperationProgress(shown, {}, id);
+            DrawOperationProgress(shown, onCancel, id);
     }
 
     void OperationRunSlot::DrawLive(

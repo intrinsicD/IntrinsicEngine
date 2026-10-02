@@ -90,6 +90,7 @@ import Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Runtime.SpatialIndexCache;
 
 #include "TestImGuiFrameScope.hpp"
+#include "TextureBakeHarness.hpp"
 #include "../../../src/app/Sandbox/Editor/Sandbox.PanelSupport.hpp"
 
 namespace R = Extrinsic::Runtime;
@@ -5321,4 +5322,120 @@ TEST(SandboxProcessingPanels, DuplicateRunRefusalIsNotStoredAsThePanelsResult)
         .PanelResult = [](const Editor::SandboxEditorContext& context) -> std::optional<R::EditorCommandStatus> {
             const auto& r = context.PointAnalysis.Results.LastOutlierAnalysisResult;
             return r ? std::optional{r->Status} : std::nullopt; }});
+}
+
+// UI-073: the texture bake controls show the run of the bake they submitted, through the shared
+// widget and keyed by the bake's run job; the widget's Cancel ends that run, and the controls of
+// another entity show nothing.
+TEST(SandboxProcessingPanels, TextureBakeControlsShowTheirBakeRunOnlyForItsEntity)
+{
+    namespace TBF = Extrinsic::Tests::TextureBakeFixture;
+    TestSupport::ImGuiFrameScope gui;
+    TBF::BakeHarness harness{};
+    ASSERT_TRUE(harness.Start());
+    const auto entity = TBF::MakeSeamedQuad(harness.Scene());
+    const auto other = TBF::MakeSeamedQuad(harness.Scene());
+    // The bake binds its texture to the surface material's albedo slot.
+    R::GeometryPresentationSlotRecipe albedo{};
+    albedo.Semantic = R::GeometryPresentationSlotSemantic::Albedo;
+    albedo.SourceKind = R::GeometryPresentationSourceKind::UniformDefault;
+    albedo.UniformDefault = R::GeometryPresentationDefaultValue{
+        .Kind = Geometry::PropertyValueKind::Vec4, .Vector = glm::vec4{1.0f}};
+    harness.Scene().Raw().emplace<R::GeometryPresentationRecipe>(entity, R::GeometryPresentationRecipe{
+        .Shape = R::GeometryPresentationShape::Mesh,
+        .Lanes = {R::GeometryPresentationLaneRecipe{.Lane = R::GeometryRenderLane::Surface,
+                                                    .PresentationKey = "mesh.surface"}},
+        .Presentations = {R::GeometryPresentationBindingRecipe{
+            .Key = "mesh.surface", .Kind = R::GeometryPresentationKind::SurfaceMaterial, .Slots = {albedo}}},
+    });
+    const std::uint32_t id = R::SelectionController::ToStableEntityId(entity);
+    const std::uint32_t otherId = R::SelectionController::ToStableEntityId(other);
+
+    R::EditorWorkspaceAttachment attachment{};
+    attachment.Attach(harness.Worlds, harness.Services);
+    ASSERT_TRUE(R::PrepareEditorWorkspaceSnapshotFrame(attachment));
+    Editor::SandboxEditorContext context{};
+    context.Processing = R::PrepareEditorProcessingCommands(attachment);
+    context.VisualizationCommands = R::PrepareEditorVisualizationEditingFrame(attachment).Commands;
+
+    R::EditorTextureBakeControlsModel model{};
+    model.SelectedStableId = id;
+    model.CanBake = true;
+    model.Sources.push_back(R::EditorTextureBakeSourceRow{
+        .Name = "v:heat",
+        .BakeDomain = R::GeometryElementDomain::MeshVertex,
+        .ValueKind = Geometry::PropertyValueKind::Float,
+        .ExpectedValueKind = Geometry::PropertyValueKind::Float,
+        .ElementCount = 4u,
+        .Bakeable = true,
+    });
+    std::int32_t width = 16, height = 16, padding = 2;
+    Editor::TextureBakeUiState ui{.Width = &width, .Height = &height, .Padding = &padding};
+    Editor::TextureBakeMutationUiState mutation{};
+    ImGuiID windowId = 0;
+    const auto draw = [&]
+    {
+        gui.NextFrame();
+        ImGui::SetNextWindowPos({0, 0});
+        ImGui::SetNextWindowSize({800, 1200});
+        ImGui::Begin("Texture bake test", nullptr, ImGuiWindowFlags_NoSavedSettings);
+        windowId = ImGui::GetCurrentWindow()->ID;
+        ImGui::GetCurrentContext()->LogBuffer.clear();
+        ImGui::LogToBuffer();
+        ImGui::GetCurrentContext()->LogWindow = nullptr;
+        Editor::DrawTextureBakeControls(model, &context, &ui, mutation);
+        std::string text = ImGui::GetCurrentContext()->LogBuffer.c_str();
+        ImGui::LogFinish();
+        ImGui::End();
+        return text;
+    };
+
+    (void)draw();
+    EXPECT_FALSE(mutation.BakeRun.Watching());
+    ImGui::ActivateItemByID(ImHashStr("Bake", 0, windowId));
+    (void)draw();
+    (void)draw();
+    ASSERT_TRUE(mutation.BakeRun.Watching()) << "the Bake press scheduled a run";
+    harness.DrainJobs();
+    std::string text = draw();
+    EXPECT_NE(text.find("Texture bake 'v:heat'"), std::string::npos) << text;
+
+    model.SelectedStableId = otherId;
+    text = draw();
+    EXPECT_EQ(text.find("Texture bake 'v:heat'"), std::string::npos) << "another entity shows no run:\n" << text;
+
+    // The UV texture tab finds the same run by the output it shows, for its entity only.
+    Editor::OperationRunSlot tabRun{};
+    const auto drawTab = [&](const std::uint32_t tabEntity)
+    {
+        gui.NextFrame();
+        ImGui::Begin("Texture tab test", nullptr, ImGuiWindowFlags_NoSavedSettings);
+        ImGui::GetCurrentContext()->LogBuffer.clear();
+        ImGui::LogToBuffer();
+        ImGui::GetCurrentContext()->LogWindow = nullptr;
+        Editor::DrawTextureBakeOutputRun(tabRun, context.Processing, tabEntity, "v:heat", "##tab_run");
+        std::string tabText = ImGui::GetCurrentContext()->LogBuffer.c_str();
+        ImGui::LogFinish();
+        ImGui::End();
+        return tabText;
+    };
+    text = drawTab(id);
+    EXPECT_NE(text.find("Texture bake 'v:heat'"), std::string::npos) << text;
+    tabRun = Editor::OperationRunSlot{}; // a fresh tab of the other entity
+    text = drawTab(otherId);
+    EXPECT_EQ(text.find("Texture bake 'v:heat'"), std::string::npos) << "another entity's tab shows no run:\n" << text;
+
+    model.SelectedStableId = id;
+    (void)draw();
+    ImGui::ActivateItemByID(ImHashStr("Cancel", 0, ImHashStr("##texture_bake_run", 0, windowId)));
+    (void)draw();
+    (void)draw();
+    harness.DrainJobs();
+    text = draw();
+    EXPECT_NE(text.find("cancelled"), std::string::npos) << "the widget's Cancel ended the bake's run:\n" << text;
+    harness.RunMaintenance();
+    const auto snapshot = harness.Service->Snapshot(id);
+    ASSERT_EQ(snapshot.Textures.size(), 1u);
+    EXPECT_EQ(snapshot.Textures[0].State, R::PropertyTextureBakeOutputState::Failed);
+    attachment.Detach();
 }

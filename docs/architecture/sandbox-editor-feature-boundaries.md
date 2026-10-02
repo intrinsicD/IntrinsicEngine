@@ -68,7 +68,10 @@ queued editor jobs (RUNTIME-313), because bakes follow the edits that trigger th
 run jobs cost no completion-drain budget (`JobService::DrainCompletions`). The editor's bake command submits
 it through `EditorJobCommandSurface::Submit` under the output's identity, so the token in
 `EditorTextureBakeCommandResult::Job`, the output ref and the Jobs window all reach the
-run; it reports no fraction (one GPU pass) and reads indeterminate.
+run; it reports no fraction (one GPU pass) and reads indeterminate. The bake controls watch
+the submitted run's token in their `TextureBakeMutationUiState` slot and the UV texture tab
+asks for its output's newest run (`DrawTextureBakeOutputRun`), both with Cancel through the
+surface and shown only for the bake's entity.
 
 The surface also lists and cancels editor jobs (RUNTIME-279): `SnapshotAll()` returns
 the `EditorJobRecord` of every job submitted through `Submit` that the job service

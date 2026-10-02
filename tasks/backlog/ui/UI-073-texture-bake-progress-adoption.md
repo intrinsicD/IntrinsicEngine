@@ -62,11 +62,20 @@ replacing the "Bake pending." overlay text.
   checked within ceil(N / cap) drains. `AwaitingApplyJobs` counts every queued record whose gate
   has rejected it at least once (never-checked records stay AwaitingGate)
   (`RuntimeJobService.GateChecksAreCappedPerDrainAndRotateThroughParkedResults`).
+- Slice 2 (UI): `TextureBakeMutationUiState` carries an `OperationRunSlot`; the Bake button watches
+  the returned run-job token and the controls draw the widget with Cancel (`CancelEditorJob`) for
+  that bake's entity. The UV texture tab draws `DrawTextureBakeOutputRun` (the tab output's newest
+  run, any surface, with Cancel) above the canvas; the canvas no longer prints "Bake pending."
+  (failed and unavailable tabs keep their diagnostic). `OperationRunSlot::Draw` gained an optional
+  `onCancel`. The bake test fixture moved to `tests/support/TextureBakeHarness.hpp` so the panel
+  test drives a real bake. Test: `SandboxProcessingPanels.TextureBakeControlsShowTheirBakeRunOnlyForItsEntity`
+  (Bake press -> run shown, another entity's controls and tab show nothing, the tab finds the run,
+  the widget's Cancel ends it and fails the record).
 
 ## Acceptance criteria
 - [x] Bake jobs carry a correlation id (or an editor identity) so the progress surface resolves them; the bake worker reports progress where a fraction is known.
-- [ ] The texture bake controls and the UV texture tab draw the widget through a run slot keyed by the submitted bake, shown for its entity only.
-- [ ] An ImGui test starts a bake and sees the run, then another entity shows nothing.
+- [x] The texture bake controls and the UV texture tab draw the widget through a run slot keyed by the submitted bake, shown for its entity only.
+- [x] An ImGui test starts a bake and sees the run, then another entity shows nothing.
 
 ## Verification
 ```bash
