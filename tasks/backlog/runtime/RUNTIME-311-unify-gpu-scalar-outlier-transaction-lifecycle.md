@@ -113,6 +113,23 @@ the per-job setup/completion prologue that precedes them is
   - Mesh-family CPU jobs (curvature, denoise, remesh, subdivide, simplify, UV, ICP, Progressive
     Poisson) word a rejected submission through `QueuedJobRejectedMessage` ("Mesh denoise CPU job
     submission was rejected.", before "... was rejected by the runtime job lane.").
+- Coherent Point Drift stays a run object (deliberate exception): it has no output ring, no front
+  readback and no Accept stage; its run alternates interactive E/M steps with an optional
+  completion and a `Busy` flag, and its Vulkan E-step pump is an auxiliary job. The GPU lifecycle's
+  Run/Accept phases, ring generations and front readbacks do not apply; the RUNTIME-313 drift guard
+  keeps it on its own allowlist entry with that reason.
+- Operational evidence (Xephyr `:7`, `build/ci-vulkan`, binary run directly and checked for `[       OK ]`):
+  `RUNTIME311GpuTransactionCancel.AwaitingApplyCancelThroughTheEditorJobSurfaceKeepsThePreviousOutput`
+  (`tests/integration/graphics/Test.GpuTransactionCancelSmoke.cpp`, `gpu;vulkan`) cancels a Vulkan
+  property-smoothing transaction through the agent's `jobs_cancel` on a real
+  `EditorWorkspaceAttachment`: the chunked Run while parked in AwaitingApply, then the Accept stage
+  while its front readback keeps it parked (Accept is issued from a Maintenance hook, after the
+  frame's transfers were collected, so the next completion drain parks it; 0 retries in 3 runs).
+  Each ends once, Discarded/StaleEntity, JobState Cancelled; the previous CPU output, its revision
+  and the canonical slot are unchanged and no ring is left. On the device it also pins a duplicate
+  GPU start (Pending, no handle, no callback) and the Accept stage carrying the run's
+  `EditorJobIdentity::Run`. A mutation that keeps the ring on finalize fails it. The six transaction
+  smokes (scalar, outlier, point normals, vertex normals, smoothing x2, positions x2) pass with it.
 
 ## Acceptance criteria
 - [ ] One compiled lifecycle owns acquisition, polling, ring publication, Accept, Discard, cancellation and terminal delivery for one or N rings, including the accept-only (no Run phase) shape.

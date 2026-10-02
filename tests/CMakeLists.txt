@@ -1846,6 +1846,7 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
                 integration/graphics/Test.OutlierTransactionGpuSmoke.cpp
                 integration/graphics/Test.VertexNormalsTransactionGpuSmoke.cpp
                 integration/graphics/Test.PointNormalsTransactionGpuSmoke.cpp
+                integration/graphics/Test.GpuTransactionCancelSmoke.cpp
         DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
     )
     # METHOD-056: the Vulkan CPD scaling profile shares the METHOD-049 fixtures.
