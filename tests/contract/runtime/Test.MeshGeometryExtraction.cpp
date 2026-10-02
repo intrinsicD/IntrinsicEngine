@@ -1784,3 +1784,56 @@ TEST(MeshGeometryExtraction, ExplicitNormalBindingOverridesCornerNormalsAndTheir
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
 }
+
+// RUNTIME-315: a normal binding the mesh builder does not consume (a corner
+// source, or a vertex property that disappeared) must leave the canonical
+// corner normals drawn instead of flattening the surface to +Z.
+TEST(MeshGeometryExtraction, UnconsumedNormalBindingsKeepCanonicalCornerNormals)
+{
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
+    InitializeAssetWorkflowEngine(engine);
+
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    auto& raw = scene.Raw();
+    const EntityHandle entity = MakeQuadMeshRenderable(scene);
+    auto& halfedges = raw.get<gs::Halfedges>(entity);
+    std::vector<glm::vec3> cornerNormals(6u, glm::vec3{0.0f, 0.0f, 1.0f});
+    cornerNormals[3u] = cornerNormals[4u] = cornerNormals[5u] = glm::vec3{0.0f, 1.0f, 0.0f};
+    SetCornerNormals(halfedges, cornerNormals);
+    halfedges.Properties.GetOrAdd<glm::vec3>("h:other", glm::vec3{1.0f, 0.0f, 0.0f})
+        .Vector()
+        .assign(6u, glm::vec3{1.0f, 0.0f, 0.0f});
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    const auto extract = [&] {
+        (void)extraction.ExtractAndSubmit(
+            scene, engine.GetRenderer(),
+            &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
+        const auto view = extraction.FindRenderableSidecarForTest(
+            Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
+        Extrinsic::Graphics::GpuGeometryResidencyView residency{};
+        EXPECT_TRUE(view.has_value() &&
+                    engine.GetRenderer().GetGpuWorld().TryGetGeometryResidencyView(
+                        view->MeshGeometry, residency));
+        return residency.NormalFingerprint;
+    };
+    const std::uint64_t canonical = extract();
+    ASSERT_NE(canonical, 0u);
+
+    for (const auto& [domain, name] :
+         {std::pair{Extrinsic::Runtime::GeometryElementDomain::MeshHalfedge, "h:other"},
+          std::pair{Extrinsic::Runtime::GeometryElementDomain::MeshVertex, "v:gone"}})
+    {
+        raw.emplace_or_replace<Extrinsic::Runtime::VertexChannelBindingSet>(
+            entity, Extrinsic::Runtime::VertexChannelBindingSet{
+                        .Normal = {.Enabled = true,
+                                   .Property = {.Domain = domain, .Name = name,
+                                                .ValueKind = Geometry::PropertyValueKind::Vec3}},
+                        .BindingGeneration = 7u});
+        Extrinsic::ECS::Components::DirtyTags::MarkVertexNormalsDirty(raw, entity);
+        EXPECT_EQ(extract(), canonical) << name;
+    }
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}

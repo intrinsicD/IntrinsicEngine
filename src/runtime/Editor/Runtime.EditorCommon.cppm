@@ -29,7 +29,6 @@ export namespace Extrinsic::Runtime
         VisualizationCommandsUnavailable,
         RenderRecipeCommandsUnavailable,
         InvalidVisualizationProperty,
-        InvalidVertexChannelBinding,
         GeometryProcessingFailed,
         RenderGraphStatsUnavailable,
         EditorCommandHistoryUnavailable,
@@ -56,12 +55,13 @@ export namespace Extrinsic::Runtime
         MissingTransform,
         UnsupportedGeometryDomain,
         InvalidVisualizationProperty,
-        InvalidVertexChannelBinding,
         InvalidProcessingParameters,
         GeometryProcessingFailed,
         UnsupportedCameraPose,
         // RUNTIME-315 attribute-binding refusals, one per typed reason.
         UnsupportedRenderAttribute,
+        // Accepted by the table but not drawn yet; refused until extraction consumes it.
+        AttributeBindingNotYetSupported,
         AttributeSourceMissing,
         AttributeSourceTypeMismatch,
         AttributeSourceCountMismatch,
@@ -105,10 +105,7 @@ export namespace Extrinsic::Runtime
         std::uint32_t InspectorModelBuilds{0u};
         std::uint32_t SelectionModelBuilds{0u};
         std::uint32_t PropertyCatalogModelBuilds{0u};
-        std::uint32_t VertexChannelTargetBuilds{0u};
-        std::uint32_t VertexChannelResolverScans{0u};
-        std::uint32_t VertexChannelScratchAllocations{0u};
-        std::uint64_t VertexChannelScratchBytes{0u};
+        std::uint32_t AttributeBindingModelBuilds{0u};
         std::uint32_t GeometryPresentationModelBuilds{0u};
         std::uint32_t BoundStateModelBuilds{0u};
         std::uint32_t UvDiagnosticsModelBuilds{0u};
@@ -126,7 +123,7 @@ export namespace Extrinsic::Runtime
         std::uint64_t InspectorModelBuildTimeNs{0u};
         std::uint64_t SelectedAnalysisModelBuildTimeNs{0u};
         std::uint64_t PropertyCatalogModelBuildTimeNs{0u};
-        std::uint64_t VertexChannelValidationTimeNs{0u};
+        std::uint64_t AttributeBindingModelBuildTimeNs{0u};
         std::uint64_t UvDiagnosticsModelBuildTimeNs{0u};
         std::uint64_t TextureBakeModelBuildTimeNs{0u};
         std::uint64_t VisualizationModelBuildTimeNs{0u};

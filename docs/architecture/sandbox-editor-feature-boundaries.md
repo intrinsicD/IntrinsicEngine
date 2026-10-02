@@ -1121,7 +1121,7 @@ the removed `Runtime.SandboxEditorFacades` and
 | `SandboxEditorVisualizationConfigCommand` | `EditorVisualizationConfigCommand` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorVisualizationPropertyCommand` | `EditorVisualizationPropertyCommand` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorVisualizationRecipeCommand` | `EditorVisualizationRecipeCommand` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
-| `SandboxEditorVertexChannelBindingCommand` | `EditorVertexChannelBindingCommand` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
+| `SandboxEditorAttributeBindingCommand` | `EditorAttributeBindingCommand` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorGeometryPresentationSlotDefaultCommand` | `EditorGeometryPresentationSlotDefaultCommand` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorGeometryPresentationSlotPropertyCommand` | `EditorGeometryPresentationSlotPropertyCommand` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorTextureBakeCommand` | `EditorTextureBakeCommand` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |

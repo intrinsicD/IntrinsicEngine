@@ -574,195 +574,6 @@ namespace {
             return model;
         }
 
-        [[nodiscard]] const char* VertexChannelExpectedTypeText(
-            const VertexChannel channel) noexcept
-        {
-            switch (channel)
-            {
-            case VertexChannel::Normal:
-                return "requires vec3";
-            case VertexChannel::Color:
-                return "requires vec3 or vec4";
-            case VertexChannel::Position:
-            case VertexChannel::Texcoord:
-            case VertexChannel::Tangent:
-            case VertexChannel::Custom:
-                break;
-            }
-            return "unsupported vertex channel";
-        }
-
-        [[nodiscard]] std::string BuildVertexChannelResolverDiagnostic(
-            const AttributeBindResult& resolver)
-        {
-            std::string diagnostic =
-                std::string(DebugNameForAttributeBindStatus(resolver.Status));
-            diagnostic += " source=";
-            diagnostic += std::to_string(resolver.SourceCount);
-            diagnostic += " fallback=";
-            diagnostic += std::to_string(resolver.FallbackCount);
-            diagnostic += " nonFinite=";
-            diagnostic += std::to_string(resolver.NonFiniteCount);
-            return diagnostic;
-        }
-
-        [[nodiscard]] const VertexChannelSourceBinding*
-        FindVertexChannelBinding(
-            const VertexChannelBindingSet* bindings,
-            const VertexChannel channel) noexcept
-        {
-            if (bindings == nullptr)
-                return nullptr;
-            switch (channel)
-            {
-            case VertexChannel::Normal:
-                return &bindings->Normal;
-            case VertexChannel::Color:
-                return &bindings->Color;
-            case VertexChannel::Position:
-            case VertexChannel::Texcoord:
-            case VertexChannel::Tangent:
-            case VertexChannel::Custom:
-                break;
-            }
-            return nullptr;
-        }
-
-        [[nodiscard]] EditorVertexChannelBindingTargetModel
-        BuildVertexChannelBindingTargetModel(
-            const entt::registry& raw,
-            const ECS::EntityHandle entity,
-            const GS::ConstSourceView& view,
-            const std::vector<EditorPropertyCatalogRow>& rows,
-            const EditorPropertyCatalogDomain domain,
-            const VertexChannel channel,
-            EditorWorkspaceSnapshotStats* modelBuildStats)
-        {
-            EditorVertexChannelBindingTargetModel model{
-                .Channel = channel,
-            };
-
-            const Geometry::PropertySet* properties =
-                VertexChannelPropertySetForView(view, domain);
-            if (properties == nullptr)
-                return model;
-
-            const std::size_t expectedCount = properties->Size();
-            const auto* bindings = raw.try_get<VertexChannelBindingSet>(entity);
-            if (const VertexChannelSourceBinding* binding =
-                    FindVertexChannelBinding(bindings, channel);
-                binding != nullptr && IsVertexChannelBindingEnabled(*binding))
-            {
-                model.HasBinding = true;
-                model.Binding = *binding;
-                const std::optional<AttributeSourceType> sourceType =
-                    binding->Property.Domain ==
-                            ToGeometryElementDomain(domain)
-                        ? ToAttributeSourceType(
-                              binding->Property.ValueKind)
-                        : std::nullopt;
-                model.Resolver = sourceType.has_value()
-                    ? EvaluateVertexChannelBinding(
-                          *properties,
-                          channel,
-                          binding->Property.Name,
-                          *sourceType,
-                          expectedCount,
-                          modelBuildStats)
-                    : AttributeBindResult{
-                          .Status = AttributeBindStatus::TypeMismatch,
-                          .FullyPopulated = false,
-                      };
-                model.Diagnostic =
-                    BuildVertexChannelResolverDiagnostic(model.Resolver);
-            }
-
-            for (const EditorPropertyCatalogRow& row : rows)
-            {
-                if (row.Domain != domain || !row.Supported)
-                    continue;
-
-                EditorVertexChannelBindingOptionModel option{
-                    .PropertyName = row.Name,
-                    .Domain = row.Domain,
-                    .ValueKind = row.ValueKind,
-                    .ElementCount = row.ElementCount,
-                };
-                const std::optional<AttributeSourceType> sourceType =
-                    ToAttributeSourceType(row.ValueKind);
-                if (!sourceType.has_value())
-                {
-                    option.Resolver = AttributeBindResult{
-                        .Status = AttributeBindStatus::TypeMismatch,
-                        .FullyPopulated = false,
-                    };
-                    option.Compatible = false;
-                    option.DisabledReason =
-                        VertexChannelExpectedTypeText(channel);
-                    model.Options.push_back(std::move(option));
-                    continue;
-                }
-
-                option.SourceType = *sourceType;
-                option.Resolver = EvaluateVertexChannelBinding(
-                    *properties,
-                    channel,
-                    row.Name,
-                    *sourceType,
-                    expectedCount,
-                    modelBuildStats);
-                option.Compatible =
-                    SourceTypeAllowedForVertexChannel(channel, *sourceType) &&
-                    option.Resolver.Ok();
-                if (!option.Compatible)
-                {
-                    option.DisabledReason =
-                        !SourceTypeAllowedForVertexChannel(channel, *sourceType)
-                            ? VertexChannelExpectedTypeText(channel)
-                            : BuildVertexChannelResolverDiagnostic(
-                                  option.Resolver);
-                }
-                model.Options.push_back(std::move(option));
-            }
-            return model;
-        }
-
-        void AppendVertexChannelBindingTargets(
-            EditorPropertyCatalogModel& model,
-            const EditorFeatureBindings& context,
-            const entt::registry& raw,
-            const ECS::EntityHandle entity,
-            const GS::ConstSourceView& view)
-        {
-            const std::optional<EditorPropertyCatalogDomain> domain =
-                VertexChannelCatalogDomainForView(view);
-            if (!domain.has_value())
-                return;
-
-            if (context.ModelBuildStats != nullptr)
-            {
-                context.ModelBuildStats->VertexChannelTargetBuilds += 2u;
-            }
-            model.VertexChannelTargets.push_back(
-                BuildVertexChannelBindingTargetModel(
-                    raw,
-                    entity,
-                    view,
-                    model.Rows,
-                    *domain,
-                    VertexChannel::Normal,
-                    context.ModelBuildStats));
-            model.VertexChannelTargets.push_back(
-                BuildVertexChannelBindingTargetModel(
-                    raw,
-                    entity,
-                    view,
-                    model.Rows,
-                    *domain,
-                    VertexChannel::Color,
-                    context.ModelBuildStats));
-        }
-
         [[nodiscard]] EditorPropertyCatalogModel BuildPropertyCatalogModel(
             const EditorFeatureBindings& context,
             const entt::registry& raw,
@@ -812,7 +623,17 @@ namespace {
                         BuildPropertyBindingTargetModel(view, slot));
             }
 
-            AppendVertexChannelBindingTargets(model, context, raw, entity, view);
+            if (context.Scene != nullptr)
+            {
+                ScopedEditorStatTimer bindingTimer{
+                    context.ModelBuildStats != nullptr
+                        ? &context.ModelBuildStats->AttributeBindingModelBuildTimeNs
+                        : nullptr};
+                if (context.ModelBuildStats != nullptr)
+                    ++context.ModelBuildStats->AttributeBindingModelBuilds;
+                model.AttributeBindings =
+                    BuildEditorAttributeBindingModel(*context.Scene, model.SelectedStableId);
+            }
 
             if (!view.Valid() && model.Rows.empty())
             {

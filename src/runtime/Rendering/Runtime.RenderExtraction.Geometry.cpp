@@ -91,22 +91,11 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] bool BindingMatches(
             const VertexChannelSourceBinding& binding,
-            const GeometryElementDomain expectedDomain,
-            const bool color) noexcept
+            const GeometryElementDomain expectedDomain) noexcept
         {
-            if (!IsVertexChannelBindingEnabled(binding) ||
-                binding.Property.Domain != expectedDomain)
-            {
-                return false;
-            }
-            if (color)
-            {
-                return binding.Property.ValueKind ==
-                           Geometry::PropertyValueKind::Vec3 ||
-                    binding.Property.ValueKind ==
-                           Geometry::PropertyValueKind::Vec4;
-            }
-            return binding.Property.ValueKind == Geometry::PropertyValueKind::Vec3;
+            return IsVertexChannelBindingEnabled(binding) &&
+                   binding.Property.Domain == expectedDomain &&
+                   binding.Property.ValueKind == Geometry::PropertyValueKind::Vec3;
         }
 
         [[nodiscard]] RenderExtractionGeometrySourceRevisions
@@ -146,22 +135,16 @@ namespace Extrinsic::Runtime
             if (bindings != nullptr)
             {
                 snapshot.BindingGeneration = bindings->BindingGeneration;
-                if (BindingMatches(bindings->Normal, expectedDomain, false))
+                if (BindingMatches(bindings->Normal, expectedDomain))
                 {
                     snapshot.Normal = PropertyRevisionOf(
                         properties, bindings->Normal.Property.Name);
                 }
-                if (BindingMatches(bindings->Color, expectedDomain, true))
-                {
-                    snapshot.Color = PropertyRevisionOf(
-                        properties, bindings->Color.Property.Name);
-                }
             }
 
-            if (snapshot.Normal == 0u &&
-                meshDefaults &&
-                (bindings == nullptr ||
-                 !IsVertexChannelBindingEnabled(bindings->Normal)))
+            // A missing bound property has no revision: the builder then draws
+            // the canonical normals, so track those.
+            if (snapshot.Normal == 0u && meshDefaults)
             {
                 const auto cornerNormal = view.HalfedgeSource != nullptr
                     ? view.HalfedgeSource->Properties.Get<glm::vec3>(
@@ -183,10 +166,7 @@ namespace Extrinsic::Runtime
                         snapshot.Normal = normal.Revision();
                 }
             }
-            if (snapshot.Color == 0u &&
-                meshDefaults &&
-                (bindings == nullptr ||
-                 !IsVertexChannelBindingEnabled(bindings->Color)))
+            if (meshDefaults)
             {
                 const Geometry::ConstPropertySet constProperties{properties};
                 if (constProperties.Get<glm::vec4>("v:color").IsValid() ||

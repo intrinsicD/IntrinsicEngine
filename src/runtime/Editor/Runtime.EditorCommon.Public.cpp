@@ -19,7 +19,6 @@ DebugNameForEditorDiagnosticCode(EditorDiagnosticCode code) noexcept {
   case EditorDiagnosticCode::VisualizationCommandsUnavailable: return "VisualizationCommandsUnavailable";
   case EditorDiagnosticCode::RenderRecipeCommandsUnavailable: return "RenderRecipeCommandsUnavailable";
   case EditorDiagnosticCode::InvalidVisualizationProperty: return "InvalidVisualizationProperty";
-  case EditorDiagnosticCode::InvalidVertexChannelBinding: return "InvalidVertexChannelBinding";
   case EditorDiagnosticCode::GeometryProcessingFailed: return "GeometryProcessingFailed";
   case EditorDiagnosticCode::RenderGraphStatsUnavailable: return "RenderGraphStatsUnavailable";
   case EditorDiagnosticCode::EditorCommandHistoryUnavailable: return "EditorCommandHistoryUnavailable";
@@ -50,11 +49,11 @@ DebugNameForEditorCommandStatus(EditorCommandStatus status) noexcept {
   case EditorCommandStatus::MissingTransform: return "MissingTransform";
   case EditorCommandStatus::UnsupportedGeometryDomain: return "UnsupportedGeometryDomain";
   case EditorCommandStatus::InvalidVisualizationProperty: return "InvalidVisualizationProperty";
-  case EditorCommandStatus::InvalidVertexChannelBinding: return "InvalidVertexChannelBinding";
   case EditorCommandStatus::InvalidProcessingParameters: return "InvalidProcessingParameters";
   case EditorCommandStatus::GeometryProcessingFailed: return "GeometryProcessingFailed";
   case EditorCommandStatus::UnsupportedCameraPose: return "UnsupportedCameraPose";
   case EditorCommandStatus::UnsupportedRenderAttribute: return "UnsupportedRenderAttribute";
+  case EditorCommandStatus::AttributeBindingNotYetSupported: return "AttributeBindingNotYetSupported";
   case EditorCommandStatus::AttributeSourceMissing: return "AttributeSourceMissing";
   case EditorCommandStatus::AttributeSourceTypeMismatch: return "AttributeSourceTypeMismatch";
   case EditorCommandStatus::AttributeSourceCountMismatch: return "AttributeSourceCountMismatch";

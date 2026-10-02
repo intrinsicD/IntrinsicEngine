@@ -210,6 +210,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `RUNTIME-222` — Model-space point radius rendering (tasks/backlog/runtime/RUNTIME-222-model-space-point-radius-rendering.md)
 - unblocked: `RUNTIME-315` — Choose the source property of every render attribute, per element domain (tasks/backlog/runtime/RUNTIME-315-per-domain-render-attribute-source-binding.md)
 - blocked by `RUNTIME-315`: `RUNTIME-316` — Agent `bind_attribute` and attribute listing for UI parity (tasks/backlog/runtime/RUNTIME-316-agent-bind-attribute-tool.md)
+- blocked by `RUNTIME-315`: `RUNTIME-318` — Migrate the presentation color slots onto the Color overlay (tasks/backlog/runtime/RUNTIME-318-migrate-presentation-color-slots-onto-the-color-overlay.md)
 - unblocked: `UI-046` — Sandbox cannot export geometry at all (tasks/backlog/ui/UI-046-sandbox-geometry-export.md)
 - unblocked: `UI-047` — File paths must be hand-typed into a raw text field (tasks/backlog/ui/UI-047-file-chooser-for-import-and-scene-paths.md)
 - unblocked: `UI-048` — Editor opens empty, hides file operations under View, and never remembers layout (tasks/backlog/ui/UI-048-first-run-workspace-and-layout-persistence.md)

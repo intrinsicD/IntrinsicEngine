@@ -62,14 +62,11 @@ namespace {
         using EditorFeatureDetail::ResolveStableEntity;
         using EditorFeatureDetail::ToEditorCommandStatus;
         using EditorFeatureDetail::AppendVisualizationPropertiesForDomain;
-        using EditorFeatureDetail::EvaluateVertexChannelBinding;
         using EditorFeatureDetail::IsPropertyCatalogSupportedKind;
         using EditorFeatureDetail::PropertySetForVisualizationDomain;
         using EditorFeatureDetail::ScopedEditorStatTimer;
-        using EditorFeatureDetail::ToAttributeSourceType;
         using EditorFeatureDetail::ToGeometryElementDomain;
         using EditorFeatureDetail::VertexChannelCatalogDomainForView;
-        using EditorFeatureDetail::VertexChannelPropertySetForView;
         using EditorFeatureDetail::EditorRenderHintComponents;
         using EditorFeatureDetail::ReadRenderHintComponents;
         using EditorFeatureDetail::SameRenderHintComponents;
@@ -304,48 +301,12 @@ namespace {
                 .value_or(EditorFeatureDetail::ColorOverlayTarget{});
         }
 
-        [[nodiscard]] VertexChannelSourceBinding*
-        FindMutableVertexChannelBinding(
-            VertexChannelBindingSet& bindings,
-            const VertexChannel channel) noexcept
-        {
-            switch (channel)
-            {
-            case VertexChannel::Normal:
-                return &bindings.Normal;
-            case VertexChannel::Color:
-                return &bindings.Color;
-            case VertexChannel::Position:
-            case VertexChannel::Texcoord:
-            case VertexChannel::Tangent:
-            case VertexChannel::Custom:
-                break;
-            }
-            return nullptr;
-        }
-
         [[nodiscard]] bool AnyVertexChannelBindingEnabled(
             const VertexChannelBindingSet& bindings) noexcept
         {
             return IsVertexChannelBindingEnabled(bindings.Position) ||
                    IsVertexChannelBindingEnabled(bindings.Normal) ||
-                   IsVertexChannelBindingEnabled(bindings.Texcoord) ||
-                   IsVertexChannelBindingEnabled(bindings.Color);
-        }
-
-        [[nodiscard]] bool SameVertexChannelSourceBinding(
-            const VertexChannelSourceBinding& lhs,
-            const VertexChannelSourceBinding& rhs) noexcept
-        {
-            return lhs.Enabled == rhs.Enabled &&
-                   lhs.Property == rhs.Property;
-        }
-
-        [[nodiscard]] bool SameVertexChannelBindingSet(
-            const VertexChannelBindingSet& lhs,
-            const VertexChannelBindingSet& rhs) noexcept
-        {
-            return lhs == rhs;
+                   IsVertexChannelBindingEnabled(bindings.Texcoord);
         }
 
         [[nodiscard]] bool SameOptionalVertexChannelBindingSet(
@@ -354,8 +315,7 @@ namespace {
         {
             if (lhs.has_value() != rhs.has_value())
                 return false;
-            return !lhs.has_value() ||
-                   SameVertexChannelBindingSet(*lhs, *rhs);
+            return !lhs.has_value() || *lhs == *rhs;
         }
 
         void MarkVertexChannelDirty(entt::registry& raw,
@@ -437,7 +397,7 @@ namespace {
             const VertexChannel channel,
             const std::optional<VertexChannelBindingSet>& before,
             const std::optional<VertexChannelBindingSet>& after,
-            const std::string_view label = "Change vertex channel binding")
+            const std::string_view label)
         {
             return Internal::ExecuteUndoableEntityMutation(
                 history,
@@ -1792,131 +1752,6 @@ ApplyEditorRenderHintCommand(
         return EditorCommandStatus::Applied;
     }
 
-    EditorCommandStatus ApplyEditorVertexChannelBindingCommand(
-        const EditorVisualizationEditingContext& context,
-        const EditorVertexChannelBindingCommand& command)
-    {
-        if (context.Scene == nullptr)
-            return EditorCommandStatus::MissingScene;
-        if (command.Channel != VertexChannel::Normal &&
-            command.Channel != VertexChannel::Color)
-        {
-            return EditorCommandStatus::InvalidVertexChannelBinding;
-        }
-
-        entt::registry& raw = context.Scene->Raw();
-        const std::optional<ECS::EntityHandle> entity =
-            ResolveStableEntity(raw, command.StableEntityId);
-        if (!entity.has_value())
-            return EditorCommandStatus::StaleEntity;
-
-        const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
-        const std::optional<EditorPropertyCatalogDomain> domain =
-            VertexChannelCatalogDomainForView(view);
-        if (!domain.has_value())
-            return EditorCommandStatus::UnsupportedGeometryDomain;
-
-        const Geometry::PropertySet* properties =
-            VertexChannelPropertySetForView(view, *domain);
-        if (properties == nullptr)
-            return EditorCommandStatus::UnsupportedGeometryDomain;
-
-        const std::optional<VertexChannelBindingSet> before =
-            StoredVertexChannelBindingSet(raw, *entity);
-        VertexChannelBindingSet after = before.has_value()
-            ? *before
-            : VertexChannelBindingSet{};
-        VertexChannelSourceBinding* target =
-            FindMutableVertexChannelBinding(after, command.Channel);
-        if (target == nullptr)
-            return EditorCommandStatus::InvalidVertexChannelBinding;
-
-        if (!command.EnableBinding)
-        {
-            if (!before.has_value() ||
-                !IsVertexChannelBindingEnabled(*target))
-            {
-                return EditorCommandStatus::NoChange;
-            }
-
-            *target = {};
-            ++after.BindingGeneration;
-        }
-        else
-        {
-            if (command.PropertyName.empty())
-                return EditorCommandStatus::InvalidVertexChannelBinding;
-
-            const Geometry::PropertyValueKind valueKind =
-                DetectGeometryPropertyValueKind(
-                    *properties,
-                    command.PropertyName);
-            const std::optional<AttributeSourceType> sourceType =
-                ToAttributeSourceType(valueKind);
-            if (!sourceType.has_value())
-                return EditorCommandStatus::InvalidVertexChannelBinding;
-
-            const AttributeBindResult resolver =
-                EvaluateVertexChannelBinding(
-                    *properties,
-                    command.Channel,
-                    command.PropertyName,
-                    *sourceType,
-                    properties->Size(),
-                    context.ModelBuildStats);
-            if (!resolver.Ok())
-                return EditorCommandStatus::InvalidVertexChannelBinding;
-
-            const VertexChannelSourceBinding next{
-                .Enabled = true,
-                .Property = GeometryPropertyRef{
-                    .Domain = ToGeometryElementDomain(*domain),
-                    .Name = command.PropertyName,
-                    .ValueKind = valueKind,
-                },
-            };
-            if (before.has_value() &&
-                SameVertexChannelSourceBinding(*target, next))
-            {
-                return EditorCommandStatus::NoChange;
-            }
-
-            *target = next;
-            ++after.BindingGeneration;
-        }
-
-        if (context.CommandHistory != nullptr)
-        {
-            const EditorCommandHistoryResult result =
-                ExecuteVertexChannelBindingMutation(
-                    *context.CommandHistory,
-                    context.Scene,
-                    context.World,
-                    command.StableEntityId,
-                    command.Channel,
-                    before,
-                    AnyVertexChannelBindingEnabled(after)
-                        ? std::optional<VertexChannelBindingSet>{after}
-                        : std::nullopt);
-            return InvalidateSelectedModelCacheIfApplied(
-                context,
-                ToEditorCommandStatus(result.Status));
-        }
-
-        const EditorCommandHistoryStatus applied =
-            ApplyVertexChannelBindingSet(
-                context.Scene,
-                command.StableEntityId,
-                AnyVertexChannelBindingEnabled(after)
-                    ? std::optional<VertexChannelBindingSet>{after}
-                    : std::nullopt);
-        if (applied == EditorCommandHistoryStatus::Applied)
-            MarkVertexChannelDirty(raw, *entity, command.Channel);
-        return InvalidateSelectedModelCacheIfApplied(
-            context,
-            ToEditorCommandStatus(applied));
-    }
-
     namespace
     {
         [[nodiscard]] EditorCommandStatus ToAttributeBindingStatus(
@@ -2015,14 +1850,25 @@ ApplyEditorRenderHintCommand(
             if (!command.PropertyName.empty())
             {
                 // The same recipe `show_property` and the processing panels use,
-                // so the overlay is the one Color mechanism.
+                // so the overlay is the one Color mechanism. Rebinding swaps the
+                // source only: the lane's colormap carries over (the recipe path
+                // already keeps bins, isolines and baking).
+                VisualizationRecipe recipe = MakeEditorPropertyVisualizationRecipe(GeometryPropertyRef{
+                    .Domain = command.Domain, .Name = command.PropertyName, .ValueKind = kind});
+                if (auto* scalar = std::get_if<ScalarVisualizationRecipe>(&recipe.Data))
+                {
+                    if (const auto existing = EffectiveVisualizationConfigForTarget(
+                            context.Scene->Raw(), entity,
+                            EditorFeatureDetail::ColorOverlayTargetFor(command.Domain)->Target))
+                    {
+                        scalar->Colormap = existing->Scalar.Map;
+                    }
+                }
                 return ApplyEditorVisualizationRecipeCommand(
                     context,
                     EditorVisualizationRecipeCommand{
                         .StableEntityId = command.StableEntityId,
-                        .Recipe = MakeEditorPropertyVisualizationRecipe(GeometryPropertyRef{
-                            .Domain = command.Domain, .Name = command.PropertyName,
-                            .ValueKind = kind}),
+                        .Recipe = std::move(recipe),
                     });
             }
             const entt::registry& raw = context.Scene->Raw();
@@ -2030,14 +1876,19 @@ ApplyEditorRenderHintCommand(
                 return EditorCommandStatus::NoChange;
             const EditorVisualizationTarget lane =
                 EditorFeatureDetail::ColorOverlayTargetFor(command.Domain)->Target;
+            // Without an entity-level overlay the lane override is removed;
+            // with one, this lane is masked to the material so the overlay is
+            // neither re-inherited here nor cleared on the other lanes.
+            const bool entityOverlay =
+                StoredVisualizationConfigForTarget(raw, entity, EditorVisualizationTarget::Entity)
+                    .has_value();
             return ApplyEditorVisualizationConfigCommand(
                 context,
                 EditorVisualizationConfigCommand{
                     .StableEntityId = command.StableEntityId,
-                    .Target = StoredVisualizationConfigForTarget(raw, entity, lane).has_value()
-                        ? lane
-                        : EditorVisualizationTarget::Entity,
-                    .EnableConfig = false,
+                    .Target = lane,
+                    .EnableConfig = entityOverlay,
+                    .Source = G::VisualizationConfig::ColorSource::Material,
                 });
         }
 
@@ -2066,11 +1917,7 @@ ApplyEditorRenderHintCommand(
             if (source == nullptr)
                 return EditorCommandStatus::UnsupportedRenderAttribute;  // lane not shown
             if (!command.PropertyName.empty())
-            {
-                // Per-element sizes are not extracted yet; a bound name would
-                // stop the lane drawing (RUNTIME-315 slice 5 lands consumption).
-                return EditorCommandStatus::UnsupportedRenderAttribute;
-            }
+                return EditorCommandStatus::AttributeBindingNotYetSupported;
             if (std::holds_alternative<float>(*source))
                 return EditorCommandStatus::NoChange;
             *source = defaultSource;
@@ -2112,6 +1959,10 @@ ApplyEditorRenderHintCommand(
                 availability, command.Attribute, command.Domain, command.PropertyName);
             if (!resolution.Resolved())
                 return ToAttributeBindingStatus(resolution.Status);
+            // A valid source on a row extraction does not draw yet is refused
+            // rather than stored as a binding that silently changes nothing.
+            if (!IsRenderAttributeBindingDrawn(command.Attribute, command.Domain))
+                return EditorCommandStatus::AttributeBindingNotYetSupported;
             kind = resolution.ResolvedValueKind;
         }
 

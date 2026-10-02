@@ -1045,10 +1045,7 @@ TEST(SandboxEditorUi, HiddenPanelBuildRequestSkipsSelectedEntityModels)
     EXPECT_EQ(stats.InspectorModelBuilds, 0u);
     EXPECT_EQ(stats.SelectionModelBuilds, 0u);
     EXPECT_EQ(stats.PropertyCatalogModelBuilds, 0u);
-    EXPECT_EQ(stats.VertexChannelTargetBuilds, 0u);
-    EXPECT_EQ(stats.VertexChannelResolverScans, 0u);
-    EXPECT_EQ(stats.VertexChannelScratchAllocations, 0u);
-    EXPECT_EQ(stats.VertexChannelScratchBytes, 0u);
+    EXPECT_EQ(stats.AttributeBindingModelBuilds, 0u);
     EXPECT_EQ(stats.GeometryPresentationModelBuilds, 0u);
     EXPECT_EQ(stats.BoundStateModelBuilds, 0u);
     EXPECT_EQ(stats.UvDiagnosticsModelBuilds, 0u);
@@ -1059,7 +1056,7 @@ TEST(SandboxEditorUi, HiddenPanelBuildRequestSkipsSelectedEntityModels)
     EXPECT_EQ(stats.InspectorModelBuildTimeNs, 0u);
     EXPECT_EQ(stats.SelectedAnalysisModelBuildTimeNs, 0u);
     EXPECT_EQ(stats.PropertyCatalogModelBuildTimeNs, 0u);
-    EXPECT_EQ(stats.VertexChannelValidationTimeNs, 0u);
+    EXPECT_EQ(stats.AttributeBindingModelBuildTimeNs, 0u);
     EXPECT_EQ(stats.UvDiagnosticsModelBuildTimeNs, 0u);
     EXPECT_EQ(stats.TextureBakeModelBuildTimeNs, 0u);
     EXPECT_EQ(stats.VisualizationModelBuildTimeNs, 0u);
@@ -1091,10 +1088,7 @@ TEST(SandboxEditorUi, InspectorOnlyBuildRequestAvoidsSiblingPanelWork)
     EXPECT_EQ(stats.InspectorModelBuilds, 1u);
     EXPECT_EQ(stats.SelectionModelBuilds, 0u);
     EXPECT_EQ(stats.PropertyCatalogModelBuilds, 1u);
-    EXPECT_EQ(stats.VertexChannelTargetBuilds, 2u);
-    EXPECT_GT(stats.VertexChannelResolverScans, 0u);
-    EXPECT_GT(stats.VertexChannelScratchAllocations, 0u);
-    EXPECT_GT(stats.VertexChannelScratchBytes, 0u);
+    EXPECT_EQ(stats.AttributeBindingModelBuilds, 1u);
     EXPECT_EQ(stats.GeometryPresentationModelBuilds, 1u);
     EXPECT_EQ(stats.BoundStateModelBuilds, 1u);
     EXPECT_EQ(stats.UvDiagnosticsModelBuilds, 1u);
@@ -1106,7 +1100,7 @@ TEST(SandboxEditorUi, InspectorOnlyBuildRequestAvoidsSiblingPanelWork)
     EXPECT_GT(stats.InspectorModelBuildTimeNs, 0u);
     EXPECT_GT(stats.SelectedAnalysisModelBuildTimeNs, 0u);
     EXPECT_GT(stats.PropertyCatalogModelBuildTimeNs, 0u);
-    EXPECT_GT(stats.VertexChannelValidationTimeNs, 0u);
+    EXPECT_GT(stats.AttributeBindingModelBuildTimeNs, 0u);
     EXPECT_GT(stats.UvDiagnosticsModelBuildTimeNs, 0u);
     EXPECT_GT(stats.TextureBakeModelBuildTimeNs, 0u);
     EXPECT_EQ(stats.VisualizationModelBuildTimeNs, 0u);
@@ -1209,10 +1203,7 @@ TEST(SandboxEditorUi, SelectedModelCacheReusesInspectorAnalysis)
     EXPECT_EQ(first.ModelBuildStats.SelectedAnalysisCacheMisses, 1u);
     EXPECT_EQ(first.ModelBuildStats.SelectedAnalysisCacheHits, 0u);
     EXPECT_EQ(first.ModelBuildStats.PropertyCatalogModelBuilds, 1u);
-    EXPECT_EQ(first.ModelBuildStats.VertexChannelTargetBuilds, 2u);
-    EXPECT_GT(first.ModelBuildStats.VertexChannelResolverScans, 0u);
-    EXPECT_GT(first.ModelBuildStats.VertexChannelScratchAllocations, 0u);
-    EXPECT_GT(first.ModelBuildStats.VertexChannelScratchBytes, 0u);
+    EXPECT_EQ(first.ModelBuildStats.AttributeBindingModelBuilds, 1u);
     EXPECT_EQ(first.ModelBuildStats.GeometryPresentationModelBuilds, 1u);
     EXPECT_EQ(first.ModelBuildStats.BoundStateModelBuilds, 1u);
     EXPECT_EQ(first.ModelBuildStats.UvDiagnosticsModelBuilds, 1u);
@@ -1222,7 +1213,7 @@ TEST(SandboxEditorUi, SelectedModelCacheReusesInspectorAnalysis)
     EXPECT_GT(first.ModelBuildStats.InspectorModelBuildTimeNs, 0u);
     EXPECT_GT(first.ModelBuildStats.SelectedAnalysisModelBuildTimeNs, 0u);
     EXPECT_GT(first.ModelBuildStats.PropertyCatalogModelBuildTimeNs, 0u);
-    EXPECT_GT(first.ModelBuildStats.VertexChannelValidationTimeNs, 0u);
+    EXPECT_GT(first.ModelBuildStats.AttributeBindingModelBuildTimeNs, 0u);
     EXPECT_GT(first.ModelBuildStats.UvDiagnosticsModelBuildTimeNs, 0u);
     EXPECT_GT(first.ModelBuildStats.TextureBakeModelBuildTimeNs, 0u);
 
@@ -1236,10 +1227,7 @@ TEST(SandboxEditorUi, SelectedModelCacheReusesInspectorAnalysis)
     EXPECT_EQ(second.ModelBuildStats.SelectedAnalysisCacheMisses, 0u);
     EXPECT_EQ(second.ModelBuildStats.SelectedAnalysisCacheHits, 1u);
     EXPECT_EQ(second.ModelBuildStats.PropertyCatalogModelBuilds, 0u);
-    EXPECT_EQ(second.ModelBuildStats.VertexChannelTargetBuilds, 0u);
-    EXPECT_EQ(second.ModelBuildStats.VertexChannelResolverScans, 0u);
-    EXPECT_EQ(second.ModelBuildStats.VertexChannelScratchAllocations, 0u);
-    EXPECT_EQ(second.ModelBuildStats.VertexChannelScratchBytes, 0u);
+    EXPECT_EQ(second.ModelBuildStats.AttributeBindingModelBuilds, 0u);
     EXPECT_EQ(second.ModelBuildStats.GeometryPresentationModelBuilds, 0u);
     EXPECT_EQ(second.ModelBuildStats.BoundStateModelBuilds, 0u);
     EXPECT_EQ(second.ModelBuildStats.UvDiagnosticsModelBuilds, 0u);
@@ -1249,7 +1237,7 @@ TEST(SandboxEditorUi, SelectedModelCacheReusesInspectorAnalysis)
     EXPECT_GT(second.ModelBuildStats.InspectorModelBuildTimeNs, 0u);
     EXPECT_EQ(second.ModelBuildStats.SelectedAnalysisModelBuildTimeNs, 0u);
     EXPECT_EQ(second.ModelBuildStats.PropertyCatalogModelBuildTimeNs, 0u);
-    EXPECT_EQ(second.ModelBuildStats.VertexChannelValidationTimeNs, 0u);
+    EXPECT_EQ(second.ModelBuildStats.AttributeBindingModelBuildTimeNs, 0u);
     EXPECT_EQ(second.ModelBuildStats.UvDiagnosticsModelBuildTimeNs, 0u);
     EXPECT_EQ(second.ModelBuildStats.TextureBakeModelBuildTimeNs, 0u);
     EXPECT_EQ(second.Inspector.PropertyCatalog.Rows.size(),

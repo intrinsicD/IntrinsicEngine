@@ -158,25 +158,45 @@ export namespace Extrinsic::Runtime
         std::size_t ExpectedElementCount{0u};
         std::vector<GeometryPresentationPropertyOption> Options{};
     };
-    struct EditorVertexChannelBindingOptionModel
+    // One property offered as the source of an attribute row. Incompatible
+    // candidates stay listed with the runtime's typed reason.
+    struct EditorAttributeBindingCandidate
     {
-        std::string PropertyName{};
-        EditorPropertyCatalogDomain Domain{EditorPropertyCatalogDomain::MeshVertices};
-        Geometry::PropertyValueKind ValueKind{Geometry::PropertyValueKind::Unknown};
-        AttributeSourceType SourceType{AttributeSourceType::Vec3};
+        GeometryPropertyRef Property{};
         std::size_t ElementCount{0u};
-        AttributeBindResult Resolver{};
         bool Compatible{false};
+        GeometryPropertyResolutionStatus Reason{
+            GeometryPropertyResolutionStatus::Resolved};
         std::string DisabledReason{};
     };
-    struct EditorVertexChannelBindingTargetModel
+
+    // One (attribute, element domain) row of the entity's binding table.
+    // `Bound` means an authored non-default source; when it no longer
+    // resolves, `UsingFallback` is set and the default is drawn.
+    struct EditorAttributeBindingRow
     {
-        VertexChannel Channel{VertexChannel::Normal};
-        bool HasBinding{false};
-        VertexChannelSourceBinding Binding{};
-        AttributeBindResult Resolver{};
+        RenderAttribute Attribute{RenderAttribute::Position};
+        GeometryElementDomain Domain{GeometryElementDomain::Unknown};
+        std::string ExpectedType{};
+        std::size_t ExpectedElementCount{0u};
+        std::string DefaultSource{};
+        bool Bound{false};
+        GeometryPropertyRef Source{};
+        GeometryPropertyResolution Resolution{};
+        bool UsingFallback{false};
+        // False while rendering does not draw this binding yet (per-element
+        // point size/line width until their extraction lands): a bound name
+        // stops that lane from drawing, so the command refuses to author one.
+        bool Consumed{true};
         std::string Diagnostic{};
-        std::vector<EditorVertexChannelBindingOptionModel> Options{};
+        std::vector<EditorAttributeBindingCandidate> Candidates{};
+    };
+
+    struct EditorAttributeBindingModel
+    {
+        bool HasEntity{false};
+        std::uint32_t StableEntityId{0u};
+        std::vector<EditorAttributeBindingRow> Rows{};
     };
 
     struct EditorPropertyCatalogModel
@@ -187,7 +207,8 @@ export namespace Extrinsic::Runtime
             ECS::Components::GeometrySources::Domain::None};
         std::vector<EditorPropertyCatalogRow> Rows{};
         std::vector<EditorPropertyBindingTargetModel> BindingTargets{};
-        std::vector<EditorVertexChannelBindingTargetModel> VertexChannelTargets{};
+        // RUNTIME-315: the entity's render-attribute binding table.
+        EditorAttributeBindingModel AttributeBindings{};
         std::vector<EditorDiagnostic> Diagnostics{};
     };
 
@@ -516,13 +537,6 @@ export namespace Extrinsic::Runtime
         bool EnableRecipe{true};
         VisualizationRecipe Recipe{};
     };
-    struct EditorVertexChannelBindingCommand
-    {
-        std::uint32_t StableEntityId{0u};
-        VertexChannel Channel{VertexChannel::Normal};
-        bool EnableBinding{true};
-        std::string PropertyName{};
-    };
     // Chooses the source property of one render attribute on one element
     // domain (RUNTIME-315). An empty `PropertyName` restores the default
     // source. Structural streams, the Color overlay and the point/line pixel
@@ -614,46 +628,11 @@ export namespace Extrinsic::Runtime
         const GeometryEntityAvailability& availability,
         const GeometryPresentationRecipe* recipe);
 
-    // One property offered as the source of an attribute row. Incompatible
-    // candidates stay listed with the runtime's typed reason.
-    struct EditorAttributeBindingCandidate
-    {
-        GeometryPropertyRef Property{};
-        std::size_t ElementCount{0u};
-        bool Compatible{false};
-        GeometryPropertyResolutionStatus Reason{
-            GeometryPropertyResolutionStatus::Resolved};
-        std::string DisabledReason{};
-    };
-
-    // One (attribute, element domain) row of the entity's binding table.
-    // `Bound` means an authored non-default source; when it no longer
-    // resolves, `UsingFallback` is set and the default is drawn.
-    struct EditorAttributeBindingRow
-    {
-        RenderAttribute Attribute{RenderAttribute::Position};
-        GeometryElementDomain Domain{GeometryElementDomain::Unknown};
-        std::string ExpectedType{};
-        std::size_t ExpectedElementCount{0u};
-        std::string DefaultSource{};
-        bool Bound{false};
-        GeometryPropertyRef Source{};
-        GeometryPropertyResolution Resolution{};
-        bool UsingFallback{false};
-        // False while rendering does not draw this binding yet (per-element
-        // point size/line width until their extraction lands): a bound name
-        // stops that lane from drawing, so the command refuses to author one.
-        bool Consumed{true};
-        std::string Diagnostic{};
-        std::vector<EditorAttributeBindingCandidate> Candidates{};
-    };
-
-    struct EditorAttributeBindingModel
-    {
-        bool HasEntity{false};
-        std::uint32_t StableEntityId{0u};
-        std::vector<EditorAttributeBindingRow> Rows{};
-    };
+    // Rows whose bound source extraction draws today. Other table rows are
+    // listed but refused (`AttributeBindingNotYetSupported`) until their
+    // consumer lands (RUNTIME-315 slices 5-7).
+    [[nodiscard]] bool IsRenderAttributeBindingDrawn(
+        RenderAttribute attribute, GeometryElementDomain domain) noexcept;
 
     // Validates a candidate source for one attribute row: the runtime table's
     // domain/kind/count/finite rules, and for Color the visualization recipe
@@ -795,10 +774,6 @@ export namespace Extrinsic::Runtime
                                           const EditorVisualizationRecipeCommand& command);
 
     EditorCommandStatus
-    ApplyEditorVertexChannelBindingCommand(const EditorVisualizationEditingContext& context,
-                                           const EditorVertexChannelBindingCommand& command);
-
-    EditorCommandStatus
     ApplyEditorAttributeBindingCommand(const EditorVisualizationEditingContext& context,
                                        const EditorAttributeBindingCommand& command);
 
@@ -850,9 +825,6 @@ export namespace Extrinsic::Runtime
     // colormapped field, published as "<name>.colors".
     [[nodiscard]] VisualizationRecipe MakeEditorPropertyVisualizationRecipe(
         const GeometryPropertyRef& property, bool normalDirection = false);
-    EditorCommandStatus ApplyEditorVertexChannelBindingCommand(
-        const EditorVisualizationEditingCommands& commands,
-        const EditorVertexChannelBindingCommand& command);
     EditorCommandStatus ApplyEditorAttributeBindingCommand(
         const EditorVisualizationEditingCommands& commands,
         const EditorAttributeBindingCommand& command);

@@ -158,10 +158,19 @@ namespace Extrinsic::Runtime
         std::vector<glm::vec3> normals(vertexCount);
         std::vector<glm::vec2> texcoords(vertexCount);
 
-        const VertexChannelSourceBinding* normalOverride =
-            (channelBindings != nullptr && IsVertexChannelBindingEnabled(channelBindings->Normal))
-                ? &channelBindings->Normal
-                : nullptr;
+        // Only a resolvable vertex-domain vec3 normal binding is consumed;
+        // any other binding (stale name, wrong domain or count) is ignored so
+        // the canonical corner/vertex normals stay drawn.
+        const VertexChannelSourceBinding* normalOverride = nullptr;
+        if (channelBindings != nullptr &&
+            IsVertexChannelBindingEnabled(channelBindings->Normal) &&
+            channelBindings->Normal.Property.Domain == GeometryElementDomain::MeshVertex)
+        {
+            const auto bound = view.VertexSource->Properties.Get<glm::vec3>(
+                channelBindings->Normal.Property.Name);
+            if (bound && bound.Vector().size() == vertexCount)
+                normalOverride = &channelBindings->Normal;
+        }
         const std::optional<AttributeSourceType> normalOverrideType =
             normalOverride != nullptr &&
                     normalOverride->Property.Domain ==
@@ -196,15 +205,10 @@ namespace Extrinsic::Runtime
         (void)ResolveVec2Channel(
             view.VertexSource->Properties, texcoordBinding, vertexCountU32, texcoords);
 
+        // Canonical vertex colors (`v:color`) feed the interpolated structural
+        // color stream. A Color attribute binding is the visualization overlay
+        // and never rewrites this stream.
         const auto resolveColors = [&]() {
-            if (channelBindings != nullptr && IsVertexChannelBindingEnabled(channelBindings->Color))
-            {
-                (void)PrepareBoundVertexColors(
-                    view.VertexSource->Properties, GeometryElementDomain::MeshVertex,
-                    channelBindings->Color, vertexCount, outBuffer.PackedColors);
-                return;
-            }
-
             const std::string_view colorName{"v:color"};
             AttributeSourceType colorSourceType = AttributeSourceType::Vec4;
             if (view.VertexSource->Properties.Get<glm::vec4>(colorName))

@@ -54,16 +54,13 @@ export namespace Extrinsic::Runtime
         }
     }
 
-    // An invalid explicit color binding clears colors and returns false without
-    // fallback. Topology owners clear full buffers before channel preparation.
-    [[nodiscard]] bool PrepareBoundVertexColors(
-        const Geometry::PropertySet& properties, GeometryElementDomain domain,
-        const VertexChannelSourceBinding& binding, std::size_t vertexCount,
-        std::vector<std::uint32_t>& packedColors);
+    // Bound structural streams for graph and point-cloud vertices. An
+    // unresolved binding leaves the channel absent. Topology owners clear full
+    // buffers before channel preparation.
     void PrepareBoundVertexChannels(
         const Geometry::PropertySet& properties, GeometryElementDomain domain,
         const VertexChannelBindingSet* channelBindings, std::size_t vertexCount,
-        VertexChannelStreams& channels, std::vector<std::uint32_t>& packedColors);
+        VertexChannelStreams& channels);
 
     struct MeshVertex
     {

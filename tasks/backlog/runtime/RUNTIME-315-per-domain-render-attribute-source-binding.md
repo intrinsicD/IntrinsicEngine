@@ -134,3 +134,25 @@ python3 tools/agents/check_task_policy.py --root . --strict
   binding, the recipe path and the property-preset command; the recipe
   encoder's own `ToVisualizationDomain` maps to a different enum and module
   and stays. Value scans are memoized by property content revision.
+- 2026-10-02: Slice 3 (one Color mechanism; slice 2 review fixes). The
+  `VertexChannelBindingSet::Color` binding, `ApplyEditorVertexChannelBindingCommand`
+  and the catalog's `VertexChannelTargets` are removed; the catalog carries the
+  attribute model and the Sandbox "Attribute sources" section drives the new
+  command. Canonical `v:color` keeps feeding `PackedVertexColors` unchanged
+  (covered by `RuntimeRenderExtraction.MeshVertexColorDirtyChannelPartiallyUploadsStructuralColorStream`).
+  Correction to the slice 2 note: rows drawn today are Normal on mesh
+  vertices, graph nodes and points, and Color on every domain
+  (`IsRenderAttributeBindingDrawn`). Position, Texcoord, corner Normal,
+  PointSize and LineWidth are listed with `Consumed = false` and refused with
+  `AttributeBindingNotYetSupported` after typed validation, until slices 5-7.
+  The mesh builder now ignores a normal binding it cannot draw (wrong domain,
+  stale name or count) and keeps canonical corner/vertex normals; revisions
+  track the canonical normals in that case. Color Default masks only its lane
+  when the overlay is inherited from the entity, and a Color rebind keeps the
+  lane's colormap.
+  The `PointColor`/`LineColor`/`*ScalarField` presentation PropertyBuffer
+  slots are a second live color path (lowered to overlay recipes in
+  extraction); `RUNTIME-318` migrates them onto the overlay and UI-075 now
+  depends on it. Until then the attribute model reports such a slot as the
+  lane's Color source (slice 3b, with the retirement of the never-drawn
+  PointSize/LineWidth slot semantics).

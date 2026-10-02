@@ -172,75 +172,65 @@ void DrawPropertyBindingTargets(
   }
 }
 
-void DrawVertexChannelBindingTargets(
+// One combo per (attribute, element domain) row of the runtime binding model;
+// the runtime decides compatibility and the command validates again.
+void DrawAttributeBindings(
     const EditorPropertyCatalogModel &catalog,
     const SandboxEditorContext *context) {
-  if (catalog.VertexChannelTargets.empty())
+  const EditorAttributeBindingModel &model = catalog.AttributeBindings;
+  if (model.Rows.empty())
     return;
 
-  ImGui::SeparatorText("Vertex channels");
+  ImGui::SeparatorText("Attribute sources");
   const bool commandsAvailable =
       context != nullptr && context->SceneAvailable;
-  for (std::size_t i = 0u; i < catalog.VertexChannelTargets.size(); ++i) {
-    const EditorVertexChannelBindingTargetModel &target =
-        catalog.VertexChannelTargets[i];
+  for (std::size_t i = 0u; i < model.Rows.size(); ++i) {
+    const EditorAttributeBindingRow &row = model.Rows[i];
     ImGui::PushID(static_cast<int>(i));
-
-    const char *channelName = DebugNameForVertexChannel(target.Channel);
-    const std::string currentLabel = target.HasBinding
-                                         ? target.Binding.Property.Name
-                                         : std::string{"Default"};
-    ImGui::Text("%s", channelName);
+    ImGui::Text("%s / %s", std::string(ToString(row.Attribute)).c_str(),
+                std::string(ToString(row.Domain)).c_str());
     ImGui::SameLine();
-
+    const auto bind = [&](std::string name) {
+      if (commandsAvailable)
+        (void)ApplyEditorAttributeBindingCommand(
+            context->VisualizationCommands,
+            EditorAttributeBindingCommand{.StableEntityId = model.StableEntityId,
+                                          .Attribute = row.Attribute,
+                                          .Domain = row.Domain,
+                                          .PropertyName = std::move(name)});
+    };
+    const std::string current =
+        row.Bound ? row.Source.Name : "Default (" + row.DefaultSource + ")";
     if (!commandsAvailable)
       ImGui::BeginDisabled();
-    if (ImGui::BeginCombo("##VertexChannelBinding", currentLabel.c_str())) {
-      if (ImGui::Selectable("Default", !target.HasBinding) &&
-          commandsAvailable) {
-        (void)ApplyEditorVertexChannelBindingCommand(
-            context->VisualizationCommands, EditorVertexChannelBindingCommand{
-                          .StableEntityId = catalog.SelectedStableId,
-                          .Channel = target.Channel,
-                          .EnableBinding = false,
-                      });
-      }
-
-      for (const EditorVertexChannelBindingOptionModel &option :
-           target.Options) {
-        const bool selected =
-            target.HasBinding &&
-            target.Binding.Property.Name == option.PropertyName;
-        if (!option.Compatible)
+    if (ImGui::BeginCombo("##AttributeSource", current.c_str())) {
+      if (ImGui::Selectable("Default", !row.Bound))
+        bind({});
+      for (const EditorAttributeBindingCandidate &candidate : row.Candidates) {
+        const bool usable = candidate.Compatible && row.Consumed;
+        if (!usable)
           ImGui::BeginDisabled();
         const std::string label =
-            option.PropertyName + " (" +
-            DebugNameForGeometryPropertyValueKind(
-                option.ValueKind) +
-            ", " + std::to_string(option.ElementCount) + ")";
-        if (ImGui::Selectable(label.c_str(), selected) && option.Compatible &&
-            commandsAvailable) {
-          (void)ApplyEditorVertexChannelBindingCommand(
-              context->VisualizationCommands, EditorVertexChannelBindingCommand{
-                            .StableEntityId = catalog.SelectedStableId,
-                            .Channel = target.Channel,
-                            .EnableBinding = true,
-                            .PropertyName = option.PropertyName,
-                        });
-        }
-        if (!option.Compatible) {
+            candidate.Property.Name + " (" +
+            DebugNameForGeometryPropertyValueKind(candidate.Property.ValueKind) +
+            ", " + std::to_string(candidate.ElementCount) + ")";
+        if (ImGui::Selectable(label.c_str(),
+                              row.Bound && row.Source.Name == candidate.Property.Name) &&
+            usable)
+          bind(candidate.Property.Name);
+        if (!usable) {
           ImGui::EndDisabled();
           ImGui::SameLine();
-          ImGui::TextDisabled("%s", option.DisabledReason.c_str());
+          ImGui::TextDisabled("%s", row.Consumed ? candidate.DisabledReason.c_str()
+                                                 : "not drawn yet");
         }
       }
       ImGui::EndCombo();
     }
     if (!commandsAvailable)
       ImGui::EndDisabled();
-
-    if (target.HasBinding && !target.Diagnostic.empty())
-      ImGui::TextDisabled("%s", target.Diagnostic.c_str());
+    if (!row.Diagnostic.empty())
+      ImGui::TextDisabled("%s", row.Diagnostic.c_str());
     ImGui::PopID();
   }
 }
@@ -740,7 +730,7 @@ void DrawDomainRenderWindow(
       DrawRenderHintStatus(model.RenderHints);
       DrawBoundRenderStateRows(model.BoundState);
       DrawPropertyBindingTargets(model.PropertyCatalog);
-      DrawVertexChannelBindingTargets(model.PropertyCatalog, &context);
+      DrawAttributeBindings(model.PropertyCatalog, &context);
       if (model.Kind == EditorDomainWindowKind::Mesh) {
         static TextureBakeMutationUiState mutationState{};
         DrawTextureBakeControls(model.TextureBake, &context, textureBakeState, mutationState);

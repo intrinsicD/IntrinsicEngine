@@ -25,53 +25,12 @@ import Geometry.Properties;
 
 namespace Extrinsic::Runtime
 {
-    bool PrepareBoundVertexColors(
-        const Geometry::PropertySet& properties,
-        const GeometryElementDomain domain,
-        const VertexChannelSourceBinding& binding,
-        const std::size_t vertexCount,
-        std::vector<std::uint32_t>& packedColors)
-    {
-        packedColors.clear();
-        const std::optional<AttributeSourceType> sourceType =
-            binding.Property.Domain == domain
-                ? ToAttributeSourceType(binding.Property.ValueKind)
-                : std::nullopt;
-        if (sourceType != AttributeSourceType::Vec3 &&
-            sourceType != AttributeSourceType::Vec4)
-        {
-            return false;
-        }
-        packedColors.resize(vertexCount);
-        const VertexAttributeBinding colorBinding{
-            .Channel = VertexChannel::Color,
-            .SourceType = *sourceType,
-            .SourceProperty = std::string_view{
-                binding.Property.Name},
-            .AllowFallback = false,
-            .Normalize = false,
-            .Fallback = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f},
-        };
-        const AttributeBindResult colorResult =
-            ResolveColorChannelPackedUnorm8(
-                properties,
-                colorBinding,
-                static_cast<std::uint32_t>(vertexCount),
-                packedColors);
-        if (!colorResult.Ok())
-        {
-            packedColors.clear();
-        }
-        return colorResult.Ok();
-    }
-
     void PrepareBoundVertexChannels(
         const Geometry::PropertySet& properties,
         const GeometryElementDomain domain,
         const VertexChannelBindingSet* channelBindings,
         const std::size_t vertexCount,
-        VertexChannelStreams& channels,
-        std::vector<std::uint32_t>& packedColors)
+        VertexChannelStreams& channels)
     {
         if (channelBindings != nullptr && IsVertexChannelBindingEnabled(channelBindings->Normal))
         {
@@ -103,16 +62,6 @@ namespace Extrinsic::Runtime
                     channels,
                     VertexChannel::Normal,
                     std::span<const glm::vec3>{normals.data(), normals.size()});
-            }
-        }
-        if (channelBindings != nullptr && IsVertexChannelBindingEnabled(channelBindings->Color))
-        {
-            if (PrepareBoundVertexColors(
-                    properties, domain, channelBindings->Color, vertexCount, packedColors))
-            {
-                SetChannelPackedUnorm8(
-                    channels, VertexChannel::Color,
-                    std::span<const std::uint32_t>{packedColors});
             }
         }
     }
@@ -274,7 +223,7 @@ namespace Extrinsic::Runtime
             std::span<const glm::vec2>{texcoords.data(), texcoords.size()});
         PrepareBoundVertexChannels(
             view.VertexSource->Properties, GeometryElementDomain::GraphNode,
-            channelBindings, nodeCount, outBuffer.Channels, outBuffer.PackedColors);
+            channelBindings, nodeCount, outBuffer.Channels);
 
         const auto channelBytes = [&outBuffer](const VertexChannel channel) -> std::span<const std::byte> {
             const VertexChannelStreams::Stream* stream = outBuffer.Channels.Find(channel);

@@ -1,7 +1,7 @@
 ---
 id: UI-075
 theme: J
-depends_on: [UI-051, RUNTIME-315]
+depends_on: [UI-051, RUNTIME-315, RUNTIME-318]
 template: micro
 workflow_schema: 1
 workflow_profile: micro

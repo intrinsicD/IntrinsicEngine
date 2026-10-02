@@ -4186,12 +4186,12 @@ TEST(SandboxEditorUi, DirectMeshPostProcessDiscardsCompletionAfterBindingChange)
         MeshVertexPositions(scene, *meshEntity);
 
     const Runtime::VertexChannelBindingSet expectedBindings{
-        .Color = Runtime::VertexChannelSourceBinding{
+        .Normal = Runtime::VertexChannelSourceBinding{
             .Enabled = true,
             .Property = Runtime::GeometryPropertyRef{
                 .Domain = Runtime::GeometryElementDomain::MeshVertex,
                 .Name = "v:binding-only",
-                .ValueKind = Geometry::PropertyValueKind::Vec4,
+                .ValueKind = Geometry::PropertyValueKind::Vec3,
             },
         },
         .BindingGeneration = 17u,
@@ -4213,9 +4213,9 @@ TEST(SandboxEditorUi, DirectMeshPostProcessDiscardsCompletionAfterBindingChange)
     ASSERT_NE(finalBindings, nullptr);
     EXPECT_EQ(finalBindings->BindingGeneration,
               expectedBindings.BindingGeneration);
-    EXPECT_EQ(finalBindings->Color.Enabled, expectedBindings.Color.Enabled);
-    EXPECT_EQ(finalBindings->Color.Property,
-              expectedBindings.Color.Property);
+    EXPECT_EQ(finalBindings->Normal.Enabled, expectedBindings.Normal.Enabled);
+    EXPECT_EQ(finalBindings->Normal.Property,
+              expectedBindings.Normal.Property);
 
     Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(
         scene,

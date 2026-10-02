@@ -937,28 +937,24 @@ typed method preflight determines compatible property domains.
 
 ### Sandbox Editor Vertex Channel Bindings
 
-`RUNTIME-123` provides normal/color vertex-channel binding controls through
-`Extrinsic.Runtime.VisualizationEditingOperations`, with their copied model
-assembly included in `EditorWorkspaceSnapshots`, for mesh, graph, and
-point-cloud entities. The
-property catalog exposes one target each for `VertexChannel::Normal` and
-`VertexChannel::Color`, lists only the selected entity's structural vertex
-domain (mesh vertices, graph nodes, or point-cloud points), and evaluates each
-candidate through `VertexAttributeBinding`. Normals accept count-matched
-`glm::vec3`; colors accept count-matched `glm::vec3` or `glm::vec4` and pack
-through `ResolveColorChannelPackedUnorm8`. Resolver status, source/fallback
-counts, and non-finite repair counts remain visible in the data-only model.
-
-`ApplyEditorVertexChannelBindingCommand(...)` mutates only the runtime
-ECS descriptor `VertexChannelBindingSet`. Under `RUNTIME-201`, the complete
-optional descriptor enters the shared editor mutation transaction: undo/redo
-restore the exact binding set, each transition rejects an intervening binding
-or generation edit, and the selected normal/color dirty domain is stamped only
-after successful publication. It does not allocate renderer resources, call
-RHI upload APIs, or persist material/asset authoring state. Runtime render
-extraction reads the component and passes it to
-`PackMesh`/`PackGraph`/`PackCloud`; graphics receives only the resulting
-channel byte spans through public `GpuWorld` upload descriptors.
+`RUNTIME-315` owns render-attribute source binding. `RenderAttributeRules()`
+(`Extrinsic.Runtime.VertexChannelBindings`) is the attribute x element-domain
+table (position, normal, texcoord, color, point size, line width) with each
+row's accepted types, finiteness rule and default source.
+`BuildEditorAttributeBindingModel(...)` lists every row the selected entity's
+domains support, its current source and every candidate with its typed
+compatibility reason; the property catalog embeds it as `AttributeBindings`.
+`ApplyEditorAttributeBindingCommand(...)` is the one mutation: structural
+streams write the ECS descriptor `VertexChannelBindingSet` through the shared
+editor mutation transaction (exact undo/redo, intervening edits rejected,
+dirty domain stamped after publication); Color writes the visualization
+overlay through the same recipe path as `show_property`; point size and line
+width write the render hints' name alternative. Rows whose consumer has not
+landed are listed but refused (`AttributeBindingNotYetSupported`); see the
+task for the current set. Canonical `v:color` still feeds the structural color
+stream when no Color overlay is bound. Runtime render extraction reads the
+descriptor in its private plan builders; graphics receives only channel byte
+spans through public `GpuWorld` upload descriptors.
 
 ### Visualization UI Controls
 

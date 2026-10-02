@@ -35,7 +35,6 @@ export namespace Extrinsic::Runtime
         VertexChannelSourceBinding Position{};
         VertexChannelSourceBinding Normal{};
         VertexChannelSourceBinding Texcoord{};
-        VertexChannelSourceBinding Color{};
         std::uint64_t BindingGeneration = 1u;
 
         [[nodiscard]] friend bool operator==(

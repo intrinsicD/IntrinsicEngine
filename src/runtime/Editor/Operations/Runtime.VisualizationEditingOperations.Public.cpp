@@ -144,13 +144,6 @@ VisualizationRecipe MakeEditorPropertyVisualizationRecipe(
   return recipe;
 }
 
-EditorCommandStatus ApplyEditorVertexChannelBindingCommand(
-    const EditorVisualizationEditingCommands &commands,
-    const EditorVertexChannelBindingCommand &command) {
-  return ApplyEditorVertexChannelBindingCommand(ContextOrEmpty(commands),
-                                                command);
-}
-
 EditorCommandStatus ApplyEditorAttributeBindingCommand(
     const EditorVisualizationEditingCommands &commands,
     const EditorAttributeBindingCommand &command) {

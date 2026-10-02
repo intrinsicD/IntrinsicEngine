@@ -58,26 +58,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
     VertexChannelCatalogDomainForView(
         const ECS::Components::GeometrySources::ConstSourceView& view) noexcept;
 
-    [[nodiscard]] const Geometry::PropertySet*
-    VertexChannelPropertySetForView(
-        const ECS::Components::GeometrySources::ConstSourceView& view,
-        const EditorPropertyCatalogDomain domain) noexcept;
 
-    [[nodiscard]] std::optional<AttributeSourceType>
-    ToAttributeSourceType(
-        const Geometry::PropertyValueKind kind) noexcept;
-
-    [[nodiscard]] bool SourceTypeAllowedForVertexChannel(
-        const VertexChannel channel,
-        const AttributeSourceType type) noexcept;
-
-    [[nodiscard]] AttributeBindResult EvaluateVertexChannelBinding(
-        const Geometry::PropertySet& properties,
-        const VertexChannel channel,
-        const std::string_view propertyName,
-        const AttributeSourceType sourceType,
-        const std::size_t elementCount,
-        EditorWorkspaceSnapshotStats* modelBuildStats);
 
     [[nodiscard]] std::uint64_t EditorElapsedNs(
         const EditorModelBuildClock::time_point start) noexcept;

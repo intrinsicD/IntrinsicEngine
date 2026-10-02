@@ -176,18 +176,12 @@ namespace Extrinsic::Runtime
                 MixDirectMeshSignature(
                     signature,
                     bindings->BindingGeneration);
-                MixDirectMeshSignature(
-                    signature,
-                    bindings->Normal.Enabled ? 1u : 0u);
-                AppendDirectMeshPropertyRefSignature(
-                    signature,
-                    bindings->Normal.Property);
-                MixDirectMeshSignature(
-                    signature,
-                    bindings->Color.Enabled ? 1u : 0u);
-                AppendDirectMeshPropertyRefSignature(
-                    signature,
-                    bindings->Color.Property);
+                for (const VertexChannelSourceBinding* binding :
+                     {&bindings->Position, &bindings->Normal, &bindings->Texcoord})
+                {
+                    MixDirectMeshSignature(signature, binding->Enabled ? 1u : 0u);
+                    AppendDirectMeshPropertyRefSignature(signature, binding->Property);
+                }
             }
             else
             {

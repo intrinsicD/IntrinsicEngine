@@ -69,6 +69,7 @@ From the 2026-10-01 duplication/consistency audit; each task owns its own scope.
 
 - [RUNTIME-315 — Choose the source property of every render attribute, per element domain](RUNTIME-315-per-domain-render-attribute-source-binding.md)
 - [RUNTIME-316 — Agent `bind_attribute` and attribute listing for UI parity](RUNTIME-316-agent-bind-attribute-tool.md)
+- [RUNTIME-318 — Migrate the presentation color slots onto the Color overlay](RUNTIME-318-migrate-presentation-color-slots-onto-the-color-overlay.md)
 
 ## Compilation locality
 

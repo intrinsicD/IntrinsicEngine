@@ -206,6 +206,25 @@ namespace Extrinsic::Runtime
         }
     } // namespace
 
+    bool IsRenderAttributeBindingDrawn(
+        const RenderAttribute attribute, const GeometryElementDomain domain) noexcept
+    {
+        switch (attribute)
+        {
+        case RenderAttribute::Normal:
+            return domain == D::MeshVertex || domain == D::GraphNode ||
+                   domain == D::PointCloudPoint;
+        case RenderAttribute::Color:
+            return true;
+        case RenderAttribute::Position:
+        case RenderAttribute::Texcoord:
+        case RenderAttribute::PointSize:
+        case RenderAttribute::LineWidth:
+            break;
+        }
+        return false;
+    }
+
     GeometryPropertyResolution ResolveEditorAttributeBindingSource(
         const GeometryEntityAvailability& availability, const RenderAttribute attribute,
         const GeometryElementDomain domain, const std::string_view propertyName)
@@ -257,7 +276,7 @@ namespace Extrinsic::Runtime
                 .ExpectedType = std::string{RenderAttributeExpectedTypeText(rule)},
                 .ExpectedElementCount = properties->Size(),
                 .DefaultSource = std::string{rule.DefaultDescription},
-                .Consumed = !IsPixelSizeAttribute(rule.Attribute),
+                .Consumed = IsRenderAttributeBindingDrawn(rule.Attribute, rule.Domain),
             };
             if (const std::optional<std::string> bound = BoundSourceName(raw, *entity, rule))
             {
@@ -270,9 +289,12 @@ namespace Extrinsic::Runtime
                 row.Resolution = ResolveEditorAttributeBindingSource(
                     availability, rule.Attribute, rule.Domain, *bound);
                 row.UsingFallback = !row.Resolution.Resolved();
-                if (!row.Consumed)
+                if (!row.Consumed && IsPixelSizeAttribute(rule.Attribute))
                     row.Diagnostic = "'" + *bound + "' per-element sizes are not drawn yet; "
                                      "this lane is not rendered while it is bound";
+                else if (!row.Consumed)
+                    row.Diagnostic = "'" + *bound + "' is not drawn yet; drawing the default (" +
+                                     row.DefaultSource + ")";
                 else if (row.UsingFallback)
                     row.Diagnostic = "'" + *bound + "' " + ResolutionReason(rule, row.Resolution) +
                                      "; drawing the default (" + row.DefaultSource + ")";

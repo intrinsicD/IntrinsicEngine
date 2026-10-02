@@ -133,7 +133,7 @@ namespace Extrinsic::Runtime
             std::span<const glm::vec2>{texcoords.data(), texcoords.size()});
         PrepareBoundVertexChannels(
             view.VertexSource->Properties, GeometryElementDomain::PointCloudPoint,
-            channelBindings, pointCount, outBuffer.Channels, outBuffer.PackedColors);
+            channelBindings, pointCount, outBuffer.Channels);
 
         const auto channelBytes = [&outBuffer](const VertexChannel channel) -> std::span<const std::byte> {
             const VertexChannelStreams::Stream* stream = outBuffer.Channels.Find(channel);
