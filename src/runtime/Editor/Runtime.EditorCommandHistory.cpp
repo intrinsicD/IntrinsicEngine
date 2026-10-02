@@ -281,7 +281,8 @@ namespace Extrinsic::Runtime
 
     void EditorCommandHistory::BeginGroup()
     {
-        ++m_GroupDepth;
+        if (m_GroupDepth++ == 0u)
+            m_GroupStartRevision = m_Revision;
     }
 
     void EditorCommandHistory::EndGroup(std::string label)
@@ -309,9 +310,14 @@ namespace Extrinsic::Runtime
                 record->Undo ? record->Undo() : EditorCommandHistoryStatus::InvalidCommand;
             if (!IsSuccessfulStatus(undone))
                 status = EditorCommandHistoryStatus::UndoFailed;
-            AdvanceRevision(record->Dirtying);
         }
         m_GroupRecords.clear();
+        // A clean rollback returns the document to its state before the
+        // group, so a saved document stays clean.
+        if (status == EditorCommandHistoryStatus::Undone)
+            m_Revision = m_GroupStartRevision;
+        else
+            AdvanceRevision(true);
         return status;
     }
 

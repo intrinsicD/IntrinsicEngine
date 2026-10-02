@@ -460,6 +460,9 @@ namespace Extrinsic::Sandbox::Editor
         std::string RenameTarget{};
         std::array<char, 128> RenameBuffer{};
         std::string MutationDiagnostic{};
+        // The last refused Bake request's reason (e.g. "still loading ...
+        // retry"); cleared by the next accepted request.
+        std::string BakeDiagnostic{};
         OperationRunSlot BakeRun{};
     };
 

@@ -232,6 +232,30 @@ namespace Extrinsic::Graphics
             }
         }
 
+        // Per-element point size / line width buffers a record names, as
+        // resolved by this frame's property-buffer residency (0 = uniform).
+        [[nodiscard]] static std::pair<std::uint64_t, std::uint64_t> PixelSizeAddresses(
+            const VisualizationSyncRecord& record,
+            std::span<const VisualizationPropertyBufferAddress> propertyBufferAddresses) noexcept
+        {
+            const auto address = [&](const std::string& key, const VisualizationAttributeDomain domain) {
+                const VisualizationPropertyBufferAddress* found = FindPropertyBufferAddress(
+                    propertyBufferAddresses, key, {}, domain,
+                    [](const VisualizationValueType type) {
+                        return type == VisualizationValueType::ScalarFloat;
+                    });
+                return found != nullptr ? found->BufferBDA : std::uint64_t{0u};
+            };
+            return {
+                record.Points != nullptr
+                    ? address(record.PointSizePropertyBufferSourceKey, VisualizationAttributeDomain::Vertex)
+                    : 0u,
+                record.Edges != nullptr
+                    ? address(record.LineWidthPropertyBufferSourceKey, VisualizationAttributeDomain::Edge)
+                    : 0u,
+            };
+        }
+
         RHI::GpuEntityConfig BuildEntityConfig(
             const VisualizationSyncRecord& record,
             const Components::GpuSceneSlot&        gpuSlot,
@@ -246,23 +270,8 @@ namespace Extrinsic::Graphics
             cfg.UniformColor = {1.f, 1.f, 1.f, 1.f};
             ApplyLineRenderConfig(cfg, record.Edges);
             ApplyPointRenderConfig(cfg, record.Points);
-            const auto pixelSizeAddress = [&](const std::string& key,
-                                              const VisualizationAttributeDomain domain) {
-                const VisualizationPropertyBufferAddress* address = FindPropertyBufferAddress(
-                    propertyBufferAddresses, key, {}, domain,
-                    [](const VisualizationValueType type) {
-                        return type == VisualizationValueType::ScalarFloat;
-                    });
-                return address != nullptr ? address->BufferBDA : 0u;
-            };
-            const std::uint64_t pointSizeBda = record.Points != nullptr
-                ? pixelSizeAddress(record.PointSizePropertyBufferSourceKey,
-                                   VisualizationAttributeDomain::Vertex)
-                : 0u;
-            const std::uint64_t lineWidthBda = record.Edges != nullptr
-                ? pixelSizeAddress(record.LineWidthPropertyBufferSourceKey,
-                                   VisualizationAttributeDomain::Edge)
-                : 0u;
+            const auto [pointSizeBda, lineWidthBda] =
+                PixelSizeAddresses(record, propertyBufferAddresses);
 
             if (Device)
             {
@@ -538,17 +547,34 @@ namespace Extrinsic::Graphics
 
             const auto* visCfg = record.Visualization;
 
-            if (matInst == nullptr &&
-                (visCfg == nullptr || visCfg->Source == ColorSource::Material ||
-                 Impl::IsDefaultWhiteUniform(*visCfg)))
-            {
-                continue;
-            }
-
             const GpuInstanceHandle targetInstance =
                 record.TargetInstance.IsValid()
                     ? record.TargetInstance
                     : (gpuSlot.HasInstance() ? gpuSlot.ToInstanceHandle() : GpuInstanceHandle{});
+
+            if (matInst == nullptr &&
+                (visCfg == nullptr || visCfg->Source == ColorSource::Material ||
+                 Impl::IsDefaultWhiteUniform(*visCfg)))
+            {
+                // A lane extraction configures itself keeps that config; only
+                // a resolved per-element size/width is patched into it.
+                if (record.LaneConfig.has_value() && targetInstance.IsValid())
+                {
+                    const auto [pointSizeBda, lineWidthBda] =
+                        Impl::PixelSizeAddresses(record, propertyBufferAddresses);
+                    if (pointSizeBda != 0u || lineWidthBda != 0u)
+                    {
+                        RHI::GpuEntityConfig lane = *record.LaneConfig;
+                        if (pointSizeBda != 0u)
+                            lane.Point.PointSizeBDA = pointSizeBda;
+                        if (lineWidthBda != 0u)
+                            lane.Line.LineWidthBDA = lineWidthBda;
+                        gpuWorld.SetEntityConfig(targetInstance, lane);
+                    }
+                }
+                continue;
+            }
+
             if (targetInstance.IsValid())
             {
                 gpuWorld.SetEntityConfig(

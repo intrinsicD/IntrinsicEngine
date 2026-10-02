@@ -1091,10 +1091,14 @@ namespace Extrinsic::Sandbox::Editor
                     .Targets = consumers,
                     .BindGeneratedTexture = true,
                 });
-            // The run job names exactly this bake; a rejected request queued nothing.
+            // The run job names exactly this bake; a rejected request queued
+            // nothing and keeps its reason visible below the button.
             if (baked.Job.IsValid())
                 mutation.BakeRun.Watch(model.SelectedStableId, baked.Job);
+            mutation.BakeDiagnostic = baked.Succeeded() ? std::string{} : baked.Diagnostic;
         }
+        if (!mutation.BakeDiagnostic.empty())
+            ImGui::TextColored(ImVec4{1.0f, 0.6f, 0.2f, 1.0f}, "%s", mutation.BakeDiagnostic.c_str());
         if (!canBake)
         {
             ImGui::EndDisabled();

@@ -1,6 +1,9 @@
 module;
 
 #include <algorithm>
+#include <map>
+#include <mutex>
+#include <string>
 #include <array>
 #include <cmath>
 #include <bit>
@@ -505,27 +508,70 @@ namespace Extrinsic::Runtime
         return Geometry::PropertyValueKind::Unknown;
     }
 
+    namespace
+    {
+        [[nodiscard]] bool ScanGeometryPropertyValuesAreFinite(
+            const Geometry::PropertySet& properties,
+            const std::string_view propertyName) noexcept
+        {
+            switch (DetectGeometryPropertyValueKind(properties, propertyName))
+            {
+            case Geometry::PropertyValueKind::Float:
+                return ScalarsFinite<float>(properties, propertyName);
+            case Geometry::PropertyValueKind::Double:
+                return ScalarsFinite<double>(properties, propertyName);
+            case Geometry::PropertyValueKind::Vec2:
+                return ScalarsFinite<glm::vec2>(properties, propertyName);
+            case Geometry::PropertyValueKind::Vec3:
+                return ScalarsFinite<glm::vec3>(properties, propertyName);
+            case Geometry::PropertyValueKind::Vec4:
+                return ScalarsFinite<glm::vec4>(properties, propertyName);
+            default:
+                // Integral and boolean kinds cannot be non-finite; a missing
+                // property is reported by resolution, not by this predicate.
+                return true;
+            }
+        }
+
+        // Render extraction re-validates bound sources every frame; content
+        // revisions are process-unique per mutation, so a (revision, name,
+        // size) result is reused instead of rescanning unchanged values.
+        struct FiniteScanKey
+        {
+            Geometry::PropertyRevision Revision{0u};
+            std::size_t Size{0u};
+            std::string Name{};
+            [[nodiscard]] friend bool operator<(const FiniteScanKey& lhs, const FiniteScanKey& rhs)
+            {
+                return std::tie(lhs.Revision, lhs.Size, lhs.Name) <
+                       std::tie(rhs.Revision, rhs.Size, rhs.Name);
+            }
+        };
+        constexpr std::size_t kMaxMemoizedFiniteScans = 1024u;
+        std::mutex g_FiniteScanMutex;
+        std::map<FiniteScanKey, bool> g_FiniteScans;
+    }
+
     bool GeometryPropertyValuesAreFinite(
         const Geometry::PropertySet& properties,
         const std::string_view propertyName) noexcept
     {
-        switch (DetectGeometryPropertyValueKind(properties, propertyName))
+        const Geometry::PropertyRevision revision =
+            properties.FindPropertyRevision(propertyName).value_or(0u);
+        if (revision == 0u)
+            return ScanGeometryPropertyValuesAreFinite(properties, propertyName);
+        FiniteScanKey key{revision, properties.Size(), std::string{propertyName}};
         {
-        case Geometry::PropertyValueKind::Float:
-            return ScalarsFinite<float>(properties, propertyName);
-        case Geometry::PropertyValueKind::Double:
-            return ScalarsFinite<double>(properties, propertyName);
-        case Geometry::PropertyValueKind::Vec2:
-            return ScalarsFinite<glm::vec2>(properties, propertyName);
-        case Geometry::PropertyValueKind::Vec3:
-            return ScalarsFinite<glm::vec3>(properties, propertyName);
-        case Geometry::PropertyValueKind::Vec4:
-            return ScalarsFinite<glm::vec4>(properties, propertyName);
-        default:
-            // Integral and boolean kinds cannot be non-finite; a missing
-            // property is reported by resolution, not by this predicate.
-            return true;
+            const std::scoped_lock lock{g_FiniteScanMutex};
+            if (const auto found = g_FiniteScans.find(key); found != g_FiniteScans.end())
+                return found->second;
         }
+        const bool finite = ScanGeometryPropertyValuesAreFinite(properties, propertyName);
+        const std::scoped_lock lock{g_FiniteScanMutex};
+        if (g_FiniteScans.size() >= kMaxMemoizedFiniteScans)
+            g_FiniteScans.clear();
+        g_FiniteScans.emplace(std::move(key), finite);
+        return finite;
     }
 
     GeometryPropertyCatalogSnapshot BuildGeometryPropertyCatalogSnapshot(

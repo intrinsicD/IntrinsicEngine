@@ -4,11 +4,13 @@ module;
 #include <cstdint>
 #include <memory>
 #include <span>
+#include <optional>
 #include <string>
 
 export module Extrinsic.Graphics.VisualizationSyncSystem;
 
 import Extrinsic.RHI.Device;
+import Extrinsic.RHI.Types;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.ColormapSystem;
 import Extrinsic.Graphics.GpuWorld;
@@ -42,6 +44,11 @@ export namespace Extrinsic::Graphics
         // `GpuSceneSlot` buffer named by the render hint.
         std::string PointSizePropertyBufferSourceKey{};
         std::string LineWidthPropertyBufferSourceKey{};
+        // The config extraction already wrote for a lane that has neither a
+        // material nor an overlay (mesh primitive views, a graph's split
+        // point lane). Such a record is otherwise skipped; with a resolved
+        // size/width buffer the sync rewrites this config with its address.
+        std::optional<RHI::GpuEntityConfig> LaneConfig{};
     };
 
     class VisualizationSyncSystem

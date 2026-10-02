@@ -2625,9 +2625,60 @@ TEST(RuntimeRenderExtraction, NamedPointSizeAndLineWidthBindPerElementPixelBuffe
     EXPECT_EQ(second.UploadedBufferCount, 0u);
     EXPECT_EQ(second.ReusedBufferCount, 2u);
 
-    // A source that no longer resolves falls back to the uniform default size.
+    // Editing the bound values re-uploads that buffer only.
+    scene.Raw().get<GS::Vertices>(cloud).Properties.Get<float>("v:radius").Vector()[0] = 3.0f;
+    const auto edited = frame();
+    EXPECT_EQ(edited.UploadedBufferCount, 1u);
+    EXPECT_EQ(edited.ReusedBufferCount, 1u);
+
+    // A non-finite or missing source falls back to the uniform default size.
+    const auto expectUniform = [&] {
+        EXPECT_EQ(configOf(cloud).Point.PointSizeBDA, 0u);
+        EXPECT_FLOAT_EQ(configOf(cloud).Point.PointSize, std::get<float>(G::RenderPoints{}.SizeSource));
+    };
+    scene.Raw().get<GS::Vertices>(cloud).Properties.Get<float>("v:radius").Vector()[1] =
+        std::numeric_limits<float>::quiet_NaN();
+    (void)frame();
+    expectUniform();
     scene.Raw().get<G::RenderPoints>(cloud).SizeSource = std::string{"v:missing"};
     (void)frame();
-    EXPECT_EQ(configOf(cloud).Point.PointSizeBDA, 0u);
-    EXPECT_FLOAT_EQ(configOf(cloud).Point.PointSize, std::get<float>(G::RenderPoints{}.SizeSource));
+    expectUniform();
+}
+
+TEST(RuntimeRenderExtraction, MeshEdgeAndVertexViewLanesBindNamedWidthsAndSizes)
+{
+    namespace GS = ECS::Components::GeometrySources;
+    namespace G = Graphics::Components;
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+    const auto mesh = scene.Create();
+    scene.Raw().emplace<ECS::Components::Transform::WorldMatrix>(mesh).Matrix = glm::mat4{1.f};
+    scene.Raw().emplace<G::RenderSurface>(mesh);
+    AttachTriangleMeshSources(scene, mesh);
+    auto& edges = scene.Raw().get<GS::Edges>(mesh).Properties;
+    edges.Resize(3u);
+    edges.GetOrAdd<std::uint32_t>(std::string{ECS::Components::GeometrySources::PropertyNames::kEdgeV0}, 0u)
+        .Vector() = {0u, 1u, 2u};
+    edges.GetOrAdd<std::uint32_t>(std::string{ECS::Components::GeometrySources::PropertyNames::kEdgeV1}, 0u)
+        .Vector() = {1u, 2u, 0u};
+    edges.GetOrAdd<float>("e:width", 1.0f).Vector() = {2.0f, 3.0f, 4.0f};
+    scene.Raw().get<GS::Vertices>(mesh).Properties.GetOrAdd<float>("v:size", 1.0f).Vector() =
+        {5.0f, 6.0f, 7.0f};
+    scene.Raw().emplace<G::RenderEdges>(mesh).WidthSource = std::string{"e:width"};
+    scene.Raw().emplace<G::RenderPoints>(mesh).SizeSource = std::string{"v:size"};
+
+    fixture.Extract(scene);
+    auto world = fixture.Renderer->ExtractRenderWorld({});
+    fixture.Renderer->PrepareFrame(world);
+    fixture.Extract(scene);  // primitive views follow the resident surface
+    world = fixture.Renderer->ExtractRenderWorld({});
+    fixture.Renderer->PrepareFrame(world);
+
+    const auto sidecar = fixture.Extraction.FindRenderableSidecarForTest(StableId(mesh));
+    ASSERT_TRUE(sidecar.has_value());
+    ASSERT_TRUE(sidecar->MeshEdgeViewInstance.IsValid());
+    ASSERT_TRUE(sidecar->MeshVertexViewInstance.IsValid());
+    auto& gpuWorld = fixture.Renderer->GetGpuWorld();
+    EXPECT_NE(gpuWorld.GetEntityConfigForTest(sidecar->MeshEdgeViewInstance).Line.LineWidthBDA, 0u);
+    EXPECT_NE(gpuWorld.GetEntityConfigForTest(sidecar->MeshVertexViewInstance).Point.PointSizeBDA, 0u);
 }

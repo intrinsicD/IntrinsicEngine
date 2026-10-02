@@ -203,3 +203,14 @@ python3 tools/agents/check_task_policy.py --root . --strict
   `ScalarVisualizationRecipe::Colormap` is optional, so an explicit colormap
   always applies and an unset one keeps the lane's. The full CPU gate found an
   unrelated intermittent bake failure, filed as `BUG-233`.
+- 2026-10-02: Slice 5c (slice 5b review folds). The shared
+  `GeometryPropertyValuesAreFinite` memoizes by content revision, so a bound
+  size/width source is not rescanned every frame, and its descriptor borrows
+  the property storage (residency reuses an unchanged revision without reading
+  it). Mesh line widths bind only with explicit `e:v0`/`e:v1` rows. Lanes that
+  extraction configures itself (mesh primitive views, a graph's split point
+  lane) carry their config in the sync record so a resolved size/width is
+  patched in. A Color bind pre-validates the slot reset, so a refusal changes
+  nothing with or without history; an aborted history group restores the
+  pre-group revision (a saved document stays clean). The bake panel now shows
+  a refused bake's reason (e.g. the BUG-233 "still loading ... retry").

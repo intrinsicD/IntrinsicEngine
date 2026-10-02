@@ -1874,6 +1874,11 @@ ApplyEditorRenderHintCommand(
                           .Enabled = laneSlot.Slot->Enabled,
                       }};
 
+            // The slot reset can only refuse a non-finite uniform value; check
+            // it first so a refusal changes nothing, with or without history.
+            if (resetSlot.has_value() && !IsFiniteDefaultValue(resetSlot->Value))
+                return EditorCommandStatus::InvalidProcessingParameters;
+
             ScopedEditorCommandGroup group{context.CommandHistory, "Bind color"};
             EditorCommandStatus result = EditorCommandStatus::NoChange;
             const auto merge = [&result](const EditorCommandStatus next) {

@@ -664,3 +664,20 @@ TEST(EditorCommandHistory, OpenGroupsRefuseUndoRedoAbortRollsBackAndClearResetsT
     EXPECT_TRUE(history.Execute(MakeValueCommand(value, 6, 5, "E")).Succeeded());
     EXPECT_EQ(history.UndoCount(), 1u);  // not swallowed by a stale group
 }
+
+TEST(EditorCommandHistory, AbortedGroupLeavesASavedDocumentClean)
+{
+    Runtime::EditorCommandHistory history{};
+    int value = 0;
+    ASSERT_TRUE(history.Execute(MakeValueCommand(value, 1, 0, "Base")).Succeeded());
+    history.MarkSaved("saved.json");
+    {
+        Runtime::ScopedEditorCommandGroup group{&history, "Try"};
+        EXPECT_TRUE(history.Execute(MakeValueCommand(value, 2, 1, "A")).Succeeded());
+        EXPECT_TRUE(history.IsDirty());
+        EXPECT_EQ(group.Abort(), Runtime::EditorCommandHistoryStatus::Undone);
+    }
+    EXPECT_EQ(value, 1);
+    EXPECT_FALSE(history.IsDirty());
+    EXPECT_EQ(history.UndoCount(), 1u);
+}

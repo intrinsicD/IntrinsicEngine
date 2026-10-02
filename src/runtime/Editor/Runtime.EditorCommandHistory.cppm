@@ -137,6 +137,7 @@ export namespace Extrinsic::Runtime
         // Main-thread state: the agent scope, job completions and panels all run there.
         std::string m_LabelPrefix{};
         std::uint32_t m_GroupDepth{0u};
+        std::uint64_t m_GroupStartRevision{0u};
         std::vector<EditorCommandRecord> m_GroupRecords{};
     };
 

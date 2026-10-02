@@ -1124,6 +1124,18 @@ namespace Extrinsic::Runtime
             {
                 return {};
             }
+            // Mesh line segments follow the explicit e:v0/e:v1 rows only; a
+            // face-derived wire (no explicit edges) has no per-edge order.
+            if (domain == GeometryElementDomain::MeshEdge)
+            {
+                namespace PN = ECS::Components::GeometrySources::PropertyNames;
+                const Geometry::ConstPropertySet edges{
+                    *ResolveGeometryPropertySet(availability, domain)};
+                const auto v0 = edges.Get<std::uint32_t>(PN::kEdgeV0);
+                const auto v1 = edges.Get<std::uint32_t>(PN::kEdgeV1);
+                if (!v0.IsValid() || !v1.IsValid() || v0.Size() == 0u)
+                    return {};
+            }
             std::string key = BuildVisualizationPropertySourceKey(
                 stableId, attribute == RenderAttribute::PointSize ? "point_size" : "line_width", *name);
             if (std::ranges::any_of(batch.PropertyBuffers,
@@ -1131,10 +1143,12 @@ namespace Extrinsic::Runtime
             {
                 return key;
             }
+            // The descriptor borrows the property storage for this frame (an
+            // unchanged revision is reused without reading it); the empty
+            // payload keeps payloads parallel to descriptors.
             const Geometry::PropertySet& properties = *ResolveGeometryPropertySet(availability, domain);
             const auto values = Geometry::ConstPropertySet{properties}.Get<float>(*name);
-            auto& payload = batch.PropertyBufferPayloads.emplace_back(values.Span().size_bytes());
-            std::memcpy(payload.data(), values.Span().data(), payload.size());
+            batch.PropertyBufferPayloads.emplace_back();
             batch.PropertyBuffers.push_back(Graphics::VisualizationPropertyBufferUploadDescriptor{
                 .SourceKey = key,
                 .Domain = attribute == RenderAttribute::PointSize
@@ -1144,7 +1158,7 @@ namespace Extrinsic::Runtime
                 .ElementCount = static_cast<std::uint32_t>(values.Span().size()),
                 .StrideBytes = sizeof(float),
                 .DirtyStamp = values.Revision(),
-                .Bytes = payload,
+                .Bytes = std::as_bytes(values.Span()),
             });
             return key;
         }
@@ -2134,6 +2148,7 @@ namespace Extrinsic::Runtime
                 .ScalarPropertyBufferSourceKey = scalarKeyFor(pointVisualization),
                 .ColorPropertyBufferSourceKey = colorKeyFor(pointVisualization),
                 .PointSizePropertyBufferSourceKey = pointSizeKey,
+                .LaneConfig = BuildImmediateLaneConfig(pointVisualization, nullptr, renderPoints),
             });
         }
         if (renderEdges != nullptr && sidecar->MeshEdgeViewInstance.IsValid())
@@ -2147,6 +2162,7 @@ namespace Extrinsic::Runtime
                 .ScalarPropertyBufferSourceKey = scalarKeyFor(edgeVisualization, true),
                 .ColorPropertyBufferSourceKey = colorKeyFor(edgeVisualization, true),
                 .LineWidthPropertyBufferSourceKey = lineWidthKey,
+                .LaneConfig = BuildImmediateLaneConfig(edgeVisualization, renderEdges, nullptr),
             });
         }
         if (renderPoints != nullptr && sidecar->MeshVertexViewInstance.IsValid())
@@ -2160,6 +2176,7 @@ namespace Extrinsic::Runtime
                 .ScalarPropertyBufferSourceKey = scalarKeyFor(pointVisualization, true),
                 .ColorPropertyBufferSourceKey = colorKeyFor(pointVisualization, true),
                 .PointSizePropertyBufferSourceKey = pointSizeKey,
+                .LaneConfig = BuildImmediateLaneConfig(pointVisualization, nullptr, renderPoints),
             });
         }
         if (availabilityThisFrame.has_value())
