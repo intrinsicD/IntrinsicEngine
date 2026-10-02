@@ -1959,7 +1959,8 @@ namespace
                     if(Phase>=6)
                     {
                         EXPECT_EQ(Results.back().Status,Runtime::EditorCommandStatus::GeometryProcessingFailed);
-                        EXPECT_NE(Results.back().Message.find("submission was rejected"),std::string::npos)<<Results.back().Message;
+                        // The LBVH chain answers "... job submission was rejected (<stage>)."; the resident start "... job submission rejected."
+                        EXPECT_TRUE(Results.back().Message.find("submission")!=std::string::npos && Results.back().Message.find("rejected")!=std::string::npos)<<Results.back().Message;
                         if(Phase==7 || FullCompute){Done=true;Kernel().RequestExit();return;}
                     }
                     if(Phase==5)
@@ -2256,7 +2257,7 @@ namespace
                     if(Phase>=6)
                     {
                         EXPECT_EQ(Results.back().Status,Runtime::EditorCommandStatus::GeometryProcessingFailed);
-                        EXPECT_NE(Results.back().Message.find("submission rejected"),std::string::npos);
+                        EXPECT_NE(Results.back().Message.find("submission was rejected"),std::string::npos)<<Results.back().Message;
                         if(Phase==7){Done=true;Kernel().RequestExit();return;}
                     }
                     if(Phase==5)
