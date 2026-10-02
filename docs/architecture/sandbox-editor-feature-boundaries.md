@@ -42,10 +42,14 @@ transactions use `EditorJobCommandSurface::ReportProgress`. The agent lane's
 progress notifications read the same model. Panels draw it with the shared
 `DrawOperationProgress` in `Sandbox.PanelSupport.*`; `FormatProgressOverlay` is
 the single overlay formatter, also used by the AssetIO queue. A finished job is
-reaped a frame after it ends, so `OperationProgressMemory` keeps a panel's last
-projection per run key until that key's next run; every answer carries the session
-scene epoch (advanced by scene new/load/close and reattachment), which empties the
-memory. Cancel appears only while a run is active and the
+reaped a frame after it ends, so each panel's `OperationRunSlot` keeps the last
+projection of its current run until the next run: the key is captured when the
+command is submitted and comes back queued (with nothing watched, the draft's own
+entity and output is asked, so an agent or batch run shows too), the widget shows
+only while that run's entity is selected, a GPU result waiting for Accept reads
+"awaiting accept", and a discard is forgotten. Every answer carries the session scene
+epoch (advanced by scene new/load/close and reattachment), which empties the slot.
+Cancel appears only while a run is active and the
 panel supplies a cancel path (registration's own cancel; editor jobs after
 RUNTIME-279 adds `Cancel` to the surface).
 

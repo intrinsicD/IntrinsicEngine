@@ -1698,46 +1698,6 @@ namespace Extrinsic::Sandbox::Editor
         };
     }
 
-    const EditorOperationProgress& OperationProgressMemory::Observe(
-        const EditorOperationProgress& live, const std::string& key)
-    {
-        // An unstamped answer (Epoch 0: no runtime surface behind the handle)
-        // says nothing about the scene and must not wipe what is remembered.
-        if (live.Epoch != 0u && live.Epoch != m_Epoch)
-        {
-            Clear();
-            m_Epoch = live.Epoch;
-        }
-        const auto held = m_Held.find(key);
-        if (live.State != EditorOperationState::None)
-        {
-            if (held == m_Held.end())
-            {
-                if (m_Order.size() >= kMaxKeys)
-                {
-                    m_Held.erase(m_Order.front());
-                    m_Order.erase(m_Order.begin());
-                }
-                m_Order.push_back(key);
-            }
-            return m_Held.insert_or_assign(key, live).first->second;
-        }
-        if (held == m_Held.end())
-            return m_None;
-        if (held->second.State == EditorOperationState::Queued || held->second.State == EditorOperationState::Running)
-        {
-            Forget(key); // vanished before its outcome was seen
-            return m_None;
-        }
-        return held->second;
-    }
-
-    void OperationProgressMemory::Forget(const std::string& key)
-    {
-        m_Held.erase(key);
-        m_Order.erase(std::remove(m_Order.begin(), m_Order.end(), key), m_Order.end());
-    }
-
     namespace
     {
         [[nodiscard]] std::string DescribeRunKey(const std::uint32_t entity, const EditorOperationRunKey& key)
@@ -1755,45 +1715,89 @@ namespace Extrinsic::Sandbox::Editor
 
     void OperationRunSlot::Watch(const std::uint32_t entity, EditorOperationRunKey key)
     {
-        m_Entity = entity;
-        m_HasKey = true;
         m_AwaitingAccept = false;
-        m_MemoryKey = DescribeRunKey(entity, key);
-        m_Memory.Forget(m_MemoryKey); // the previous run of this key is over once the next is submitted
-        m_Key = std::move(key);
+        m_Watched = Watched{entity, std::move(key), {}};
+        m_Watched->Description = DescribeRunKey(entity, m_Watched->Key);
+        m_Held = {}; // the previous run is over once the next is submitted
+        m_HeldKey.clear();
+    }
+
+    bool OperationRunSlot::WatchesOutput(const std::uint32_t entity, const std::string& outputName) const
+    {
+        if (!m_Watched || m_Watched->Entity != entity) return false;
+        const auto* output = std::get_if<EditorOutputRef>(&m_Watched->Key);
+        return output != nullptr && output->OutputName == outputName;
     }
 
     void OperationRunSlot::Forget()
     {
-        m_Memory.Forget(m_MemoryKey);
+        m_Watched.reset();
+        m_Held = {};
+        m_HeldKey.clear();
         m_AwaitingAccept = false;
-        m_HasKey = false;
-        m_Entity = 0u;
     }
 
-    EditorOperationProgress OperationRunSlot::Query(const EditorProcessingCommands& commands) const
+    EditorOperationProgress OperationRunSlot::Query(
+        const EditorProcessingCommands& commands, const EditorOutputRef* draft) const
     {
         // Always asked, so even "nothing watched" carries the scene epoch.
-        return GetEditorOperationProgress(commands, m_HasKey ? m_Key : EditorOperationRunKey{EditorRunCorrelation{}});
+        if (m_Watched)
+            return GetEditorOperationProgress(commands, m_Watched->Key);
+        if (draft != nullptr)
+            return GetEditorOperationProgress(commands, *draft);
+        return GetEditorOperationProgress(commands, EditorRunCorrelation{});
+    }
+
+    const EditorOperationProgress& OperationRunSlot::Observe(const EditorOperationProgress& live, const std::string& key)
+    {
+        // An unstamped answer (Epoch 0: no runtime surface behind the handle) says nothing about
+        // the scene and must not wipe what is remembered.
+        if (live.Epoch != 0u && live.Epoch != m_Epoch)
+        {
+            m_Held = {};
+            m_HeldKey.clear();
+            m_Epoch = live.Epoch;
+        }
+        if (key != m_HeldKey)
+        {
+            m_Held = {};
+            m_HeldKey = key;
+        }
+        if (live.State != EditorOperationState::None)
+            m_Held = live;
+        else if (m_Held.State == EditorOperationState::Queued || m_Held.State == EditorOperationState::Running)
+            m_Held = {}; // vanished before its outcome was seen
+        return m_Held;
     }
 
     void OperationRunSlot::Draw(
-        const EditorProcessingCommands& commands, const std::uint32_t selectedEntity, const char* const id)
+        const EditorProcessingCommands& commands, const std::uint32_t selectedEntity, const char* const id,
+        const EditorOutputRef* draft)
     {
-        DrawLive(Query(commands), selectedEntity, {}, id);
+        const bool fallback = !m_Watched && draft != nullptr;
+        if (!fallback)
+        {
+            DrawLive(Query(commands), selectedEntity, {}, id);
+            return;
+        }
+        // Nothing submitted here: a run of the draft's output started elsewhere shows as well.
+        const EditorOperationProgress& shown = Observe(
+            Query(commands, draft), DescribeRunKey(draft->EntityId, EditorOperationRunKey{*draft}));
+        if (selectedEntity == draft->EntityId && !m_AwaitingAccept)
+            DrawOperationProgress(shown, {}, id);
     }
 
     void OperationRunSlot::DrawLive(
         const EditorOperationProgress& live, const std::uint32_t selectedEntity,
         const std::function<void()>& onCancel, const char* const id)
     {
-        if (!m_HasKey)
+        if (!m_Watched)
         {
-            (void)m_Memory.Observe(live, std::string{}); // keeps the scene epoch current
+            (void)Observe(live, std::string{}); // keeps the scene epoch current
             return;
         }
-        const EditorOperationProgress& shown = m_Memory.Observe(live, m_MemoryKey);
-        if (selectedEntity != kAnyEntity && selectedEntity != m_Entity)
+        const EditorOperationProgress& shown = Observe(live, m_Watched->Description);
+        if (selectedEntity != kAnyEntity && selectedEntity != m_Watched->Entity)
             return;
         if (m_AwaitingAccept)
         {

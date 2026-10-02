@@ -162,7 +162,9 @@ namespace Extrinsic::Runtime
             };
             if (result.Status != EditorCommandStatus::Pending || !result.Task.IsValid())
                 return {.IsError = !result.Succeeded(), .Text = Dump(describe(result))};
-            return {.Continuation = [token = result.Task, describe](const AgentOperationContext& current, AgentOperationOutcome& out) {
+            AgentOperationOutcome outcome{};
+            outcome.Progress = RunProgressProbe(result.Task);
+            outcome.Continuation = [token = result.Task, describe](const AgentOperationContext& current, AgentOperationOutcome& out) {
                 if (!PrepareSnapshot(current)) { out = Fail(kNoWorkspace); return true; }
                 const auto last = PrepareEditorSceneEditingFrame(*current.Attachment).LastSceneFileResult;
                 if (last && last->Task == token)
@@ -181,7 +183,8 @@ namespace Extrinsic::Runtime
                     return true;
                 }
                 return false;
-            }};
+            };
+            return outcome;
         }
 
         AgentOperationOutcome SaveScene(const AgentOperationContext& context, std::string_view arguments)

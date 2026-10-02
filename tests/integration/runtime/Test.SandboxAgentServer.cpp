@@ -169,14 +169,14 @@ namespace
         bool Minimized{false}; // the window minimizes on the first frame: calls are served by Idle frames
         std::function<void(R::Engine&)> EveryFrame{}; // optional main-thread hook, run on every frame
 
-        explicit AgentRig(const std::string& tag, bool withCamera = false, bool minimized = false)
+        explicit AgentRig(const std::string& tag, bool withCamera = false, bool minimized = false, unsigned workers = 1u)
             : Minimized(minimized)
         {
             SocketPath = (std::filesystem::temp_directory_path() / ("intrinsic-agent-" + tag + "-" + std::to_string(::getpid()) + ".sock")).string();
             auto sections = Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry();
             Config::EngineConfig config{};
             Config::PopulateEngineConfigSectionDefaults(config, sections);
-            config.Simulation.WorkerThreadCount = 1u;
+            config.Simulation.WorkerThreadCount = workers;
             config.ReferenceScene.Enabled = false;
             config.Camera.Enabled = withCamera;
             config.Window.Backend = Config::WindowBackend::Null;
@@ -735,6 +735,48 @@ TEST(SandboxScreenshotWindow, SavePngIsDisabledWithoutAnOperationalDevice)
     EXPECT_FALSE(capture->LastFinished().has_value()) << "a disabled Save PNG / F12 must not queue captures";
     shell.Detach();
     engine.Shutdown();
+}
+
+// RUNTIME-312 slice 8: a K-Means call (a service run) reports the progress of its own job, found
+// by the correlation id of its submission, while an older job of someone else runs beside it.
+TEST(SandboxAgentServer, KMeansProgressFollowsTheRunsOwnJob)
+{
+    AgentRig rig("kmeansprogress", false, false, 2u);
+    ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
+    const auto cloud = rig.AddCloud(300000);
+    std::atomic_bool blockerStarted{false}, release{false};
+    bool submitted = false;
+    rig.EveryFrame = [&](R::Engine& kernel) {
+        if (submitted) return;
+        submitted = true;
+        (void)kernel.Jobs().Submit({.DebugName = "agent test blocker",
+            .Work = [&](const R::JobCancellation& cancellation) {
+                cancellation.ReportProgress(0.9f);
+                blockerStarted.store(true);
+                while (!release.load() && !cancellation.IsCancelled()) std::this_thread::sleep_for(std::chrono::milliseconds(2));
+                return R::JobResultEnvelope{}; },
+            .PublishCompletion = [](R::KernelEventBus&, const R::JobResultEnvelope&) { return true; }});
+    };
+    rig.Run([&](Client& c) {
+        for (int wait = 0; wait < 500 && !blockerStarted.load(); ++wait) std::this_thread::sleep_for(std::chrono::milliseconds(4));
+        rig.Check(blockerStarted.load(), "the older job is running");
+        bool isError = true;
+        const int runId = c.Send("tools/call", {{"name", "run_kmeans"},
+            {"arguments", {{"entity", cloud}, {"domain", "PointCloudPoint"}}}, {"_meta", {{"progressToken", "km"}}}});
+        const auto reply = c.Await(runId);
+        rig.Check(reply.contains("result") && reply["result"]["isError"] == false, "run_kmeans reply: " + reply.dump());
+        bool namedItsJob = false;
+        for (const auto& note : c.Notifications)
+        {
+            const auto message = note["params"]["message"].get<std::string>();
+            rig.Check(message != "agent test blocker", "notifications follow the run, not the older job: " + note.dump());
+            namedItsJob |= message == "Runtime.Clustering.KMeans.CPU";
+        }
+        rig.Check(namedItsJob, "a notification names the K-Means job (" + std::to_string(c.Notifications.size()) + " notes)");
+        release.store(true);
+        (void)isError;
+    }, std::chrono::seconds(90));
+    release.store(true);
 }
 
 // RUNTIME-312 slice 6: keypoint, k-means and consolidation previews answer with the panels'

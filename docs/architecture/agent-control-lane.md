@@ -76,7 +76,8 @@ Nothing exists without the launch flag: no module, thread or socket.
   model (`EditorJobCommandSurface::Progress`, UI-069): a deferred operation captures its run key
   where it is known and returns it as `AgentOperationOutcome::Progress`. Editor-job commands
   (`FinishApply`) key the job they queued (the new job since the command ran); K-Means and
-  consolidation (`AwaitServiceRun`) key the correlation id their submission returned. A determinate
+  consolidation (`AwaitServiceRun`) key the correlation id their submission returned; scene save and
+  load key their job token (projected from the job service, since the session does not index it). A determinate
   run reports `progress` = percent with `total` 100; otherwise `progress` is the run's elapsed
   seconds without `total`; `message` is the run's label (the job's debug name). A call with no run
   key (a capture), or whose job is not queued yet, reports its age in seconds with message

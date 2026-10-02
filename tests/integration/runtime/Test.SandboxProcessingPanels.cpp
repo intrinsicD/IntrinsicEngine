@@ -2214,54 +2214,6 @@ TEST(SandboxProcessingPanels, TopologyAdmissionKeepsBlockedActionsVisibleAndRuns
 }
 
 
-// A queued topology edit is found by entity and the shared job-output name, and its finished
-// run stays visible.
-TEST(SandboxProcessingPanels, SubdividePanelShowsItsFinishedRun)
-{
-    PanelHarness h;
-    auto& scene = h.Scene();
-    const auto entity = scene.Create();
-    PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
-    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
-    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("mesh.processing.subdivide", true));
-    std::optional<R::EditorMeshSubdivideResult> result;
-    const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
-        .Id = "test.subdivide_progress_observer", .MenuPath = {"View"}, .Title = "Subdivide progress observer",
-        .OpenByDefault = true,
-        .Draw = [&](bool&, const Editor::SandboxEditorContext& context) {
-            result = context.MeshTopology.Results.LastMeshSubdivideResult;
-        }});
-    int frame = 0, step = 0, finishedAt = 0;
-    std::string text;
-    h.Driver->OnFrame = [&](R::Engine& engine) {
-        if (++frame > 400) { ADD_FAILURE() << "subdivide progress test did not finish"; engine.RequestExit(); return; }
-        auto* window = ImGui::FindWindowByName("Mesh / Processing / Subdivide");
-        if (!window) return;
-        ImGui::SetWindowSize(window, {900, 1500});
-        ImGui::SetWindowPos(window, {0, 0});
-        if (++step == 3) ImGui::ActivateItemByID(window->GetID("Subdivide##MeshSubdivide"));
-        if (!finishedAt && result && result->Status != R::EditorCommandStatus::Pending)
-        {
-            EXPECT_TRUE(result->Succeeded()) << result->Message;
-            finishedAt = frame;
-            ImGui::GetCurrentContext()->LogBuffer.clear();
-            ImGui::LogToBuffer();
-            ImGui::GetCurrentContext()->LogWindow = nullptr;
-        }
-        if (finishedAt && frame == finishedAt + 5)
-        {
-            text = ImGui::GetCurrentContext()->LogBuffer.c_str();
-            ImGui::LogFinish();
-            engine.RequestExit();
-        }
-    };
-    h.Engine->Run();
-    if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogFinish();
-    EXPECT_GT(finishedAt, 0);
-    EXPECT_NE(text.find("done"), std::string::npos) << text;
-    EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
-}
-
 TEST(SandboxProcessingPanels, TopologyVariantWidgetsReachCommandsAndClearLoopOnlyFeatures)
 {
     for (const bool remesh : {true, false})
@@ -4133,12 +4085,12 @@ TEST(SandboxProcessingPanels, IterationProgressIsADeterminateFractionOfTheIterat
     EXPECT_FALSE(Editor::MakeIterationProgress(3u, 0u, 0.0, "x").Determinate) << "no cap, no fraction";
 }
 
-// The runtime reaps a finished job a frame after it ends; the panel's memory
-// keeps the last projection until the next run or a scope (entity) change.
-TEST(SandboxProcessingPanels, OperationProgressMemoryKeepsTheLastFinishedRunPerKeyUntilTheSceneIsReplaced)
+// The runtime reaps a finished job a frame after it ends; the slot keeps the last projection of
+// its current key until the next run, a key change or a scene replacement.
+TEST(SandboxProcessingPanels, OperationRunSlotKeepsTheLastFinishedRunUntilTheKeyOrTheSceneChanges)
 {
     using State = R::EditorOperationState;
-    Editor::OperationProgressMemory memory;
+    Editor::OperationRunSlot slot;
     const auto with = [](R::EditorOperationProgress progress, const std::uint64_t epoch) {
         progress.Epoch = epoch;
         return progress;
@@ -4148,43 +4100,39 @@ TEST(SandboxProcessingPanels, OperationProgressMemoryKeepsTheLastFinishedRunPerK
     const R::EditorOperationProgress failed{.State = State::Failed, .Diagnostic = "diverged"};
     const R::EditorOperationProgress done{.State = State::Succeeded, .ElapsedSeconds = 2.0};
 
-    EXPECT_EQ(memory.Observe(none(1u), "7/a").State, State::None);
-    EXPECT_EQ(memory.Observe(with(running, 1u), "7/a").State, State::Running);
-    EXPECT_EQ(memory.Observe(with(failed, 1u), "7/a").State, State::Failed);
-    EXPECT_EQ(memory.Observe(none(1u), "7/a").State, State::Failed) << "the reaped job's outcome stays visible";
-    EXPECT_EQ(memory.Observe(none(1u), "7/a").Diagnostic, "diverged");
+    EXPECT_EQ(slot.Observe(none(1u), "7/a").State, State::None);
+    EXPECT_EQ(slot.Observe(with(running, 1u), "7/a").State, State::Running);
+    EXPECT_EQ(slot.Observe(with(failed, 1u), "7/a").State, State::Failed);
+    EXPECT_EQ(slot.Observe(none(1u), "7/a").State, State::Failed) << "the reaped job's outcome stays visible";
+    EXPECT_EQ(slot.Observe(none(1u), "7/a").Diagnostic, "diverged");
 
-    // Two outputs of one entity never share an outcome.
-    EXPECT_EQ(memory.Observe(none(1u), "7/b").State, State::None);
-    EXPECT_EQ(memory.Observe(with(done, 1u), "7/b").State, State::Succeeded);
-    EXPECT_EQ(memory.Observe(none(1u), "7/a").State, State::Failed);
-    EXPECT_EQ(memory.Observe(none(1u), "7/b").State, State::Succeeded);
-    EXPECT_EQ(memory.Observe(none(1u), "8/a").State, State::None) << "another entity does not inherit it";
+    // Another output (or entity) never inherits it.
+    EXPECT_EQ(slot.Observe(none(1u), "7/b").State, State::None);
+    EXPECT_EQ(slot.Observe(with(done, 1u), "7/b").State, State::Succeeded);
+    EXPECT_EQ(slot.Observe(none(1u), "7/a").State, State::None) << "a key change starts afresh";
+    EXPECT_EQ(slot.Observe(none(1u), "8/a").State, State::None);
 
-    EXPECT_EQ(memory.Observe(with(running, 1u), "7/a").State, State::Running) << "the next run replaces it";
-    EXPECT_EQ(memory.Observe(none(1u), "7/a").State, State::None) << "a run that vanished unseen has no outcome to show";
-    EXPECT_EQ(memory.Observe(none(1u), "7/b").State, State::Succeeded) << "other keys are untouched";
+    EXPECT_EQ(slot.Observe(with(running, 1u), "8/a").State, State::Running);
+    EXPECT_EQ(slot.Observe(none(1u), "8/a").State, State::None) << "a run that vanished unseen has no outcome to show";
 
     // An unstamped answer (no runtime surface, or "no run" before a stamp) is no scene change.
-    EXPECT_EQ(memory.Observe(with(failed, 1u), "7/a").State, State::Failed);
-    EXPECT_EQ(memory.Observe(none(0u), "7/a").State, State::Failed);
-    EXPECT_EQ(memory.Observe(none(0u), "7/b").State, State::Succeeded);
+    EXPECT_EQ(slot.Observe(with(failed, 1u), "8/a").State, State::Failed);
+    EXPECT_EQ(slot.Observe(none(0u), "8/a").State, State::Failed);
 
-    // A scene load or new scene changes the epoch and drops everything.
-    EXPECT_EQ(memory.Observe(none(2u), "7/b").State, State::None);
-    EXPECT_EQ(memory.Observe(with(done, 2u), "7/b").State, State::Succeeded);
-    memory.Clear();
-    EXPECT_EQ(memory.Observe(none(2u), "7/b").State, State::None);
+    // A scene load or new scene changes the epoch and drops it.
+    EXPECT_EQ(slot.Observe(none(2u), "8/a").State, State::None);
+    EXPECT_EQ(slot.Observe(with(done, 2u), "8/a").State, State::Succeeded);
 
-    // A discarded result is forgotten, and the memory stays bounded.
-    EXPECT_EQ(memory.Observe(with(done, 2u), "9/a").State, State::Succeeded);
-    memory.Forget("9/a");
-    EXPECT_EQ(memory.Observe(none(2u), "9/a").State, State::None);
-    for (std::size_t i = 0u; i < Editor::OperationProgressMemory::kMaxKeys + 4u; ++i)
-        EXPECT_EQ(memory.Observe(with(done, 2u), "k" + std::to_string(i)).State, State::Succeeded);
-    EXPECT_EQ(memory.Observe(none(2u), "k0").State, State::None) << "the oldest key was evicted";
-    EXPECT_EQ(memory.Observe(none(2u), "k" + std::to_string(Editor::OperationProgressMemory::kMaxKeys + 3u)).State,
-              State::Succeeded);
+    // Watching a new run, or forgetting a discard, drops the old outcome.
+    slot.Watch(8u, R::EditorOutputRef{8u, "a"});
+    EXPECT_EQ(slot.Observe(none(2u), "8/out:a").State, State::None);
+    EXPECT_TRUE(slot.WatchesOutput(8u, "a"));
+    EXPECT_FALSE(slot.WatchesOutput(8u, "b"));
+    EXPECT_FALSE(slot.WatchesOutput(9u, "a"));
+    EXPECT_EQ(slot.Observe(with(done, 2u), "8/out:a").State, State::Succeeded);
+    slot.Forget();
+    EXPECT_FALSE(slot.Watching());
+    EXPECT_EQ(slot.Observe(none(2u), "8/out:a").State, State::None);
 }
 
 TEST(SandboxProcessingPanels, OperationProgressWidgetCancelRequiresAnActiveRunAndAHandler)
@@ -4678,4 +4626,100 @@ TEST(SandboxProcessingPanels, OperationRunSlotCapturesTheKeyAtSubmitAndMapsTrans
     if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogFinish();
     EXPECT_TRUE(completed);
     EXPECT_TRUE(h.Shell.UnregisterEditorWindow(windowHandle));
+}
+
+namespace
+{
+    // Mesh methods through their panels, on a small grid mesh with a second mesh to select away to.
+    void ExpectMeshPanelRun(const char* windowId, const char* title, const char* runLabel,
+                            const std::function<bool(const std::optional<R::EditorCommandStatus>&)>& unused = {})
+    {
+        (void)unused;
+        PanelHarness h;
+        auto& scene = h.Scene();
+        const auto entity = scene.Create(), other = scene.Create();
+        PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+        PopulateSamples(scene.Raw(), other, R::GeometryElementDomain::MeshVertex);
+        ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+        ASSERT_TRUE(h.Shell.SetEditorWindowOpen(windowId, true));
+        const std::uint64_t jobsBefore = h.Engine->Jobs().Stats().SubmittedJobs;
+        ExpectRunShownOnlyForItsEntity(h, title, runLabel, entity, other,
+            [&] { return h.Engine->Jobs().Stats().SubmittedJobs > jobsBefore && !AnyActiveJob(*h.Engine); });
+    }
+}
+
+TEST(SandboxProcessingPanels, SubdividePanelShowsItsFinishedRunOnlyForItsEntity)
+{
+    ExpectMeshPanelRun("mesh.processing.subdivide", "Mesh / Processing / Subdivide", "Subdivide##MeshSubdivide");
+}
+
+TEST(SandboxProcessingPanels, RemeshPanelShowsItsFinishedRunOnlyForItsEntity)
+{
+    ExpectMeshPanelRun("mesh.processing.remesh", "Mesh / Processing / Remesh", "Remesh##MeshRemesh");
+}
+
+TEST(SandboxProcessingPanels, DenoisePanelShowsItsFinishedRunOnlyForItsEntity)
+{
+    ExpectMeshPanelRun("mesh.processing.denoise", "Mesh / Processing / Denoise", "Denoise##MeshDenoise");
+}
+
+// The curvature job is filed under the serialized command; the panel names its run by the same
+// text, which this pins.
+TEST(SandboxProcessingPanels, CurvaturePanelShowsItsFinishedRunOnlyForItsEntity)
+{
+    ExpectMeshPanelRun("mesh.processing.curvature", "Mesh / Processing / Curvature", "Compute##MeshCurvature");
+}
+
+// A run started elsewhere (an agent or batch call) on the output the panel's draft names shows in
+// the panel too: nothing was submitted here, so the slot asks for the draft's own output.
+TEST(SandboxProcessingPanels, ARunStartedElsewhereShowsForTheDraftsOutput)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::PointCloudPoint);
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto density = *R::GetKernelDensityConfig(config);
+    density.StableEntityId = R::SelectionController::ToStableEntityId(entity);
+    density.KNeighbors = 3;
+    density.Bandwidth = 0.5f;
+    density.Density.Name = "elsewhere_density";
+    R::SetKernelDensityConfig(config, density);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.kernel_density", true));
+    R::EditorProcessingCommands commands{};
+    const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+        .Id = "test.elsewhere_observer", .MenuPath = {"View"}, .Title = "Elsewhere observer", .OpenByDefault = true,
+        .Draw = [&](bool&, const Editor::SandboxEditorContext& context) { commands = context.PointFields.Commands; }});
+    auto& props = scene.Raw().get<GS::Vertices>(entity).Properties;
+    int frame = 0, step = 0, publishedAt = 0;
+    std::string text;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        if (++frame > 400) { ADD_FAILURE() << "elsewhere test did not finish"; engine.RequestExit(); return; }
+        auto* window = ImGui::FindWindowByName("Kernel Density");
+        if (!window || !commands.IsBound()) return;
+        ImGui::SetWindowSize(window, {700, 1000});
+        ImGui::SetWindowPos(window, {0, 0});
+        // The panel never clicks Estimate: the command comes from outside, as an agent's would.
+        if (++step == 3) EXPECT_TRUE(R::ApplyEditorKernelDensityCommand(commands, density).Status != R::EditorCommandStatus::MissingScene);
+        if (!publishedAt && std::as_const(props).Exists("elsewhere_density"))
+        {
+            publishedAt = frame;
+            ImGui::GetCurrentContext()->LogBuffer.clear();
+            ImGui::LogToBuffer();
+            ImGui::GetCurrentContext()->LogWindow = nullptr;
+        }
+        if (publishedAt && frame == publishedAt + 5)
+        {
+            text = ImGui::GetCurrentContext()->LogBuffer.c_str();
+            ImGui::LogFinish();
+            engine.RequestExit();
+        }
+    };
+    h.Engine->Run();
+    if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogFinish();
+    EXPECT_GT(publishedAt, 0);
+    EXPECT_NE(text.find("done"), std::string::npos) << text;
+    EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
 }

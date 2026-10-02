@@ -2389,14 +2389,15 @@ namespace Extrinsic::Sandbox::Editor
                 ProgressivePoisson.PendingStableEntityId = 0u;
                 ProgressivePoisson.LastConfigResult = applyConfig();
                 if (!ProgressivePoisson.LastConfigResult->Succeeded()) return;
-                ProgressivePoisson.Run.WatchOutput(
-                    command.StableEntityId, Runtime::ProgressivePoissonChannelPropertyName(command.Config));
                 Runtime::EditorProgressivePoissonResult result =
                     Runtime::ApplyEditorProgressivePoissonCommand(
                         context.PointSet.Commands,
                         command,
                         context.PointSet.ResultSinks.ProgressivePoisson);
                 ProgressivePoisson.LastResult = result;
+                ProgressivePoisson.Run.WatchOutputIfQueued(
+                    ProgressivePoisson.LastResult, command.StableEntityId,
+                    Runtime::ProgressivePoissonChannelPropertyName(command.Config));
                 if (context.PointSet.ResultSinks.ProgressivePoisson)
                 {
                     context.PointSet.ResultSinks.ProgressivePoisson(
@@ -2427,7 +2428,9 @@ namespace Extrinsic::Sandbox::Editor
                 Runtime::PreviewEditorProgressivePoissonCommand(context.PointSet.Commands, command));
             if (DrawProcessingActionButton("Run Progressive Poisson##ProgressivePoisson", readiness))
                 runSampler();
-            ProgressivePoisson.Run.Draw(context.PointSet.Commands, model.SelectedStableId, "poisson_progress");
+            const Runtime::EditorOutputRef poissonDraft{
+                command.StableEntityId, Runtime::ProgressivePoissonChannelPropertyName(command.Config)};
+            ProgressivePoisson.Run.Draw(context.PointSet.Commands, model.SelectedStableId, "poisson_progress", &poissonDraft);
 
             if (ProgressivePoisson.AutoRunPending && readiness.Enabled &&
                 ProgressivePoisson.PendingStableEntityId ==

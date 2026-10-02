@@ -46,8 +46,9 @@ export namespace Extrinsic::Runtime
         AgentOperationContinuation Continuation{};
         // For a deferred call: reads this run's own progress (UI-069 read model) where the run key
         // is known (the job the command queued, or the correlation id of its service run).
-        // `notifications/progress` follows it; empty for calls with no run key (a capture), which
-        // report only their age.
+        // `notifications/progress` follows it; empty for calls with no run key, which report only
+        // their age: view captures and `import_file` with `wait` (the asset workflow's own queue,
+        // not a job of the editor surface).
         std::function<EditorOperationProgress(const AgentOperationContext&)> Progress{};
     };
 

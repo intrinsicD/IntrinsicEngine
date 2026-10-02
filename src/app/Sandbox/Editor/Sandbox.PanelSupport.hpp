@@ -109,75 +109,70 @@ namespace Extrinsic::Sandbox::Editor
     [[nodiscard]] Runtime::EditorOperationProgress MakeIterationProgress(
         std::size_t completedIterations, std::uint32_t maxIterations, double elapsedSeconds, std::string label);
 
-    // The runtime drops a finished job a frame after it ends, so a panel keeps
-    // the last projection it saw per run `key` (a caller-built string naming
-    // the entity and output or run): a finished run stays visible until the
-    // next run of that key starts. Two keys never share an outcome, and the
-    // whole memory is dropped when the runtime's scene epoch (`live.Epoch`)
-    // changes, so nothing survives a scene load or a new scene. A run that
-    // vanishes while still active leaves no outcome to show. Entities are not
-    // tracked: stable ids are not reused within a scene, so an entry for a
-    // removed entity is never asked for again, and the memory is bounded
-    // (`kMaxKeys`, oldest key evicted) instead of pruned.
-    class OperationProgressMemory
-    {
-    public:
-        static constexpr std::size_t kMaxKeys = 16u;
-        [[nodiscard]] const Runtime::EditorOperationProgress& Observe(
-            const Runtime::EditorOperationProgress& live, const std::string& key);
-        // Drops one key's outcome (a discarded result must not read as done).
-        void Forget(const std::string& key);
-        void Clear() noexcept { m_Held.clear(); m_Order.clear(); }
-
-    private:
-        std::unordered_map<std::string, Runtime::EditorOperationProgress> m_Held{};
-        std::vector<std::string> m_Order{}; // insertion order, for eviction
-        std::uint64_t m_Epoch{0u};
-        Runtime::EditorOperationProgress m_None{};
-    };
-
-    // The one pattern of every method panel that shows its run's progress. The key of the run
-    // is captured when the run is SUBMITTED (from the command that was submitted, never from the
-    // editable draft), the widget shows only while that run's entity is selected, a finished run
-    // stays visible until its next run (`OperationProgressMemory`), a GPU transaction waiting for
-    // Accept reads "awaiting accept" instead of its finished compute job, and a discarded result
-    // is forgotten.
+    // The one pattern of every method panel that shows its run's progress. The run's key is
+    // captured when the run is SUBMITTED and QUEUED (never from the editable draft); with nothing
+    // watched, the draft's own (entity, output) is asked instead, so a run started elsewhere (an
+    // agent or batch call) on that output shows too. The widget shows only while the run's entity
+    // is selected. The runtime drops a finished job a frame after it ends, so the slot keeps the
+    // last projection of the current key until its next run; it is dropped when the scene epoch
+    // (`live.Epoch`) changes. A run that vanishes while still active leaves no outcome. A GPU
+    // transaction waiting for Accept reads "awaiting accept" instead of its finished compute job,
+    // and a discarded result is forgotten.
     class OperationRunSlot
     {
     public:
         // `DrawLive` with this entity shows regardless of the selection (a panel-global run).
         static constexpr std::uint32_t kAnyEntity = 0xFFFFFFFFu;
 
-        // Call where the command is submitted. `key` names that run: its output
-        // (`WatchOutput`), the correlation id its submission returned, or a job token.
+        // Call where the command was submitted and came back queued. `key` names that run: its
+        // output, the correlation id its submission returned, or a job token.
         void Watch(std::uint32_t entity, Runtime::EditorOperationRunKey key);
         void WatchOutput(const std::uint32_t entity, std::string outputName)
         {
             Watch(entity, Runtime::EditorOutputRef{entity, std::move(outputName)});
         }
+        // `WatchOutput` when `result` is a queued (Pending) answer of the submission; nothing else
+        // left a job to show.
+        template <class Result>
+        void WatchOutputIfQueued(const std::optional<Result>& result, const std::uint32_t entity, std::string outputName)
+        {
+            if (result.has_value() && result->Status == Runtime::EditorCommandStatus::Pending)
+                WatchOutput(entity, std::move(outputName));
+        }
+        [[nodiscard]] bool Watching() const noexcept { return m_Watched.has_value(); }
+        [[nodiscard]] bool WatchesOutput(std::uint32_t entity, const std::string& outputName) const;
         // From the transaction's phase each frame; Accepting/Applied read through the job as usual.
         void AwaitingAccept(const bool waiting) noexcept { m_AwaitingAccept = waiting; }
         // A discarded (or otherwise withdrawn) result must not read as a finished run.
         void Forget();
 
-        // The watched run's projection through the panel's commands; stamped with the scene epoch even
-        // when nothing is watched.
-        [[nodiscard]] Runtime::EditorOperationProgress Query(const Runtime::EditorProcessingCommands& commands) const;
-        // Query + DrawLive: the one call after a panel's action button.
-        void Draw(const Runtime::EditorProcessingCommands& commands, std::uint32_t selectedEntity, const char* id);
+        // The current run's projection through the panel's commands; stamped with the scene epoch
+        // even when nothing is asked.
+        [[nodiscard]] Runtime::EditorOperationProgress Query(
+            const Runtime::EditorProcessingCommands& commands, const Runtime::EditorOutputRef* draft = nullptr) const;
+        // Query + DrawLive: the one call after a panel's action button. `draft` is the panel's
+        // current (entity, output), used while nothing is watched.
+        void Draw(const Runtime::EditorProcessingCommands& commands, std::uint32_t selectedEntity, const char* id,
+                  const Runtime::EditorOutputRef* draft = nullptr);
         // For runs whose projection the panel supplies itself (transaction snapshots, ICP/CPD bars).
         void DrawLive(const Runtime::EditorOperationProgress& live, std::uint32_t selectedEntity,
                       const std::function<void()>& onCancel, const char* id);
-
-        [[nodiscard]] bool Watching() const noexcept { return m_Entity != 0u || m_HasKey; }
+        // The remembered projection for `key` after seeing `live` (exposed for tests).
+        [[nodiscard]] const Runtime::EditorOperationProgress& Observe(
+            const Runtime::EditorOperationProgress& live, const std::string& key);
 
     private:
-        std::uint32_t m_Entity{0u};
-        bool m_HasKey{false};
-        Runtime::EditorOperationRunKey m_Key{Runtime::EditorRunCorrelation{}};
-        std::string m_MemoryKey{};
+        struct Watched
+        {
+            std::uint32_t Entity{0u};
+            Runtime::EditorOperationRunKey Key{Runtime::EditorRunCorrelation{}};
+            std::string Description{};
+        };
+        std::optional<Watched> m_Watched{};
         bool m_AwaitingAccept{false};
-        OperationProgressMemory m_Memory{};
+        Runtime::EditorOperationProgress m_Held{};
+        std::string m_HeldKey{};
+        std::uint64_t m_Epoch{0u};
     };
 
     void DrawDisabledReasonTooltip(std::string_view disabledReason);

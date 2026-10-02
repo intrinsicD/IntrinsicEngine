@@ -141,8 +141,22 @@ namespace Extrinsic::Runtime::AgentDetail
     inline std::function<EditorOperationProgress(const AgentOperationContext&)> RunProgressProbe(EditorOperationRunKey key)
     {
         return [key = std::move(key)](const AgentOperationContext& current) -> EditorOperationProgress {
-            if (!PrepareSnapshot(current)) return {};
-            return GetEditorOperationProgress(PrepareEditorProcessingCommands(*current.Attachment), key);
+            // The session prepared its frame for the call that started this run; an attachment that
+            // was detached since has nothing to report.
+            if (current.Attachment == nullptr || !current.Attachment->IsAttached()) return {};
+            auto progress = GetEditorOperationProgress(PrepareEditorProcessingCommands(*current.Attachment), key);
+            // A job the session does not index (a scene file save or load) is projected from the
+            // service directly, through the same pure projection.
+            if (progress.State == EditorOperationState::None)
+                if (const auto* token = std::get_if<JobToken>(&key); token != nullptr && current.Jobs != nullptr)
+                    for (const JobSnapshot& job : current.Jobs->SnapshotAll())
+                        if (job.Token == *token)
+                            return ProjectEditorOperationProgress(EditorJobRecord{
+                                .Token = job.Token, .CorrelationId = job.CorrelationId, .Name = job.DebugName,
+                                .State = job.State, .NormalizedProgress = job.Progress.Normalized,
+                                .ProgressDeterminate = job.Progress.Determinate,
+                                .ElapsedMilliseconds = job.ElapsedMilliseconds});
+            return progress;
         };
     }
     // The jobs alive before a command runs; the job it queues is the one not in this set.
