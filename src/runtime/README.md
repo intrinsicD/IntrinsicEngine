@@ -952,7 +952,9 @@ overlay through the same recipe path as `show_property`; point size and line
 width write the render hints' name alternative. Rows whose consumer has not
 landed are listed but refused (`AttributeBindingNotYetSupported`); see the
 task for the current set. Canonical `v:color` still feeds the structural color
-stream when no Color overlay is bound. Runtime render extraction reads the
+stream when no Color overlay is bound. Structural bindings persist in scene
+documents as `attributeBindings`; a source missing on load stays authored,
+is drawn from the default and is reported in `StaleAttributeBindings`. Runtime render extraction reads the
 descriptor in its private plan builders; graphics receives only channel byte
 spans through public `GpuWorld` upload descriptors.
 

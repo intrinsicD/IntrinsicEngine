@@ -37,6 +37,7 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.MeshSurfaceTopology;
 import Extrinsic.Runtime.SceneSerialization;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Properties;
 import Geometry.Graph;
 
@@ -1200,4 +1201,84 @@ TEST(RuntimeSceneSerialization, GeneratedAtlasExtentRoundTripsAndRebindsToLoaded
     ECS::Scene::Registry rejected;
     EXPECT_FALSE(Runtime::DeserializeSceneDocument(rejected, withoutUvs.dump()).has_value())
         << "an extent needs canonical UVs to describe";
+}
+
+// RUNTIME-315: structural attribute bindings are authored scene state.
+TEST(RuntimeSceneSerialization, AttributeBindingsRoundTripAndStaleSourcesLoadAsReportedFallbacks)
+{
+    namespace RT = Runtime;
+    ECS::Scene::Registry source;
+    const ECS::EntityHandle mesh = AddMeshEntity(source);
+    source.Raw().get<GS::Vertices>(mesh).Properties.GetOrAdd<glm::vec3>(
+        std::string{PN::kNormal}, glm::vec3{0.0f, 0.0f, 1.0f});
+    source.Raw().get<GS::Vertices>(mesh).Properties.GetOrAdd<glm::vec3>(
+        "v:scratch", glm::vec3{1.0f, 0.0f, 0.0f});  // processed: not persisted
+    const RT::VertexChannelBindingSet authored{
+        .Position = {.Enabled = true,
+                     .Property = {RT::GeometryElementDomain::MeshVertex, "v:normal",
+                                  Geometry::PropertyValueKind::Vec3}},
+        .Normal = {.Enabled = true,
+                   .Property = {RT::GeometryElementDomain::MeshVertex, "v:scratch",
+                                Geometry::PropertyValueKind::Vec3}},
+        .Texcoord = {.Enabled = true,
+                     .Property = {RT::GeometryElementDomain::MeshVertex, "v:texcoord",
+                                  Geometry::PropertyValueKind::Vec2}},
+        .BindingGeneration = 9u,
+    };
+    source.Raw().emplace<RT::VertexChannelBindingSet>(mesh, authored);
+
+    MemoryIOBackend backend;
+    const auto saved = RT::SaveSceneDocument(source, "bindings.json", backend);
+    ASSERT_TRUE(saved.has_value());
+    EXPECT_EQ(saved->Stats.AttributeBindingEntities, 1u);
+    const nlohmann::json parsed = nlohmann::json::parse(backend.Text("bindings.json"));
+    const auto& bindingsJson = parsed["entities"][0]["attributeBindings"];
+    ASSERT_TRUE(bindingsJson.is_object());
+    EXPECT_EQ(bindingsJson.size(), 3u);
+    EXPECT_EQ(bindingsJson["position"]["name"], "v:normal");
+
+    ECS::Scene::Registry loaded;
+    const auto result = RT::LoadSceneDocument(loaded, "bindings.json", backend);
+    ASSERT_TRUE(result.has_value()) << static_cast<int>(result.error());
+    EXPECT_EQ(result->Stats.AttributeBindingEntities, 1u);
+    EXPECT_EQ(result->Stats.StaleAttributeBindings, 1u);  // v:scratch was not saved
+    const ECS::EntityHandle loadedMesh = FindEntityByName(loaded, "Mesh Entity");
+    ASSERT_NE(loadedMesh, ECS::InvalidEntityHandle);
+    const auto* bindings = loaded.Raw().try_get<RT::VertexChannelBindingSet>(loadedMesh);
+    ASSERT_NE(bindings, nullptr);
+    EXPECT_EQ(bindings->Position, authored.Position);
+    EXPECT_EQ(bindings->Normal, authored.Normal);  // kept as authored intent
+    EXPECT_EQ(bindings->Texcoord, authored.Texcoord);
+
+    // Saving the loaded scene reproduces the same bindings document.
+    const auto resaved = RT::SaveSceneDocument(loaded, "again.json", backend);
+    ASSERT_TRUE(resaved.has_value());
+    EXPECT_EQ(nlohmann::json::parse(backend.Text("again.json"))["entities"][0]["attributeBindings"],
+              bindingsJson);
+}
+
+TEST(RuntimeSceneSerialization, InvalidAttributeBindingsRejectTheDocument)
+{
+    ECS::Scene::Registry source;
+    const ECS::EntityHandle mesh = AddMeshEntity(source);
+    source.Raw().emplace<Runtime::VertexChannelBindingSet>(
+        mesh, Runtime::VertexChannelBindingSet{
+                  .Normal = {.Enabled = true,
+                             .Property = {Runtime::GeometryElementDomain::MeshVertex, "v:texcoord",
+                                          Geometry::PropertyValueKind::Vec2}}});
+    MemoryIOBackend backend;
+    ASSERT_TRUE(Runtime::SaveSceneDocument(source, "ok.json", backend).has_value());
+    nlohmann::json document = nlohmann::json::parse(backend.Text("ok.json"));
+
+    for (const char* key : {"color", "point_size", "bogus"})
+    {
+        nlohmann::json bad = document;
+        bad["entities"][0]["attributeBindings"] = {{key, bad["entities"][0]["attributeBindings"]["normal"]}};
+        ECS::Scene::Registry loaded;
+        EXPECT_FALSE(Runtime::DeserializeSceneDocument(loaded, bad.dump()).has_value()) << key;
+    }
+    nlohmann::json unnamed = document;
+    unnamed["entities"][0]["attributeBindings"]["normal"]["name"] = "";
+    ECS::Scene::Registry loaded;
+    EXPECT_FALSE(Runtime::DeserializeSceneDocument(loaded, unnamed.dump()).has_value());
 }

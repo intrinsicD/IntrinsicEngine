@@ -24,6 +24,7 @@ contracts: [repo.source-documentation, io.geometry-format-capabilities, geometry
 
 ## Context
 - Operator direction 2026-09-27: agent control lane and user-facing inspection capabilities, planned with Fable 5.1; attach-to-running transport; declarative schemas; integer enums.
+- Scene-document persistence of processed properties is RUNTIME-319, not this task.
 - Publication path: `CaptureGeometryScalarProperty`/`ApplyGeometryScalarProperty` inside `CommandHistory->Execute`, marking GPU dirty as other property publishers do. Paths are checked against allowed roots when invoked by an agent (ARCH-019).
 
 ## Control surfaces

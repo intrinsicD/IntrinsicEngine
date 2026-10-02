@@ -23,6 +23,7 @@ module Extrinsic.Runtime.SceneSerialization;
 
 import Extrinsic.Core.Error;
 import Extrinsic.Core.IOBackend;
+import Extrinsic.Core.Logging;
 import Extrinsic.ECS.Component.Hierarchy;
 import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Component.StableId;
@@ -45,6 +46,7 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Geometry.Graph.Fwd;
 import Geometry.Properties;
 import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.MeshSurfaceTopology;
 
 namespace Extrinsic::Runtime
@@ -1580,6 +1582,73 @@ namespace Extrinsic::Runtime
             return true;
         }
 
+        // Structural attribute bindings (RUNTIME-315), keyed by attribute.
+        [[nodiscard]] json AttributeBindingsToJson(const VertexChannelBindingSet& bindings)
+        {
+            json out = json::object();
+            for (const RenderAttribute attribute :
+                 {RenderAttribute::Position, RenderAttribute::Normal, RenderAttribute::Texcoord})
+            {
+                const VertexChannelSourceBinding* binding =
+                    FindVertexChannelSourceBinding(bindings, attribute);
+                if (binding != nullptr && IsVertexChannelBindingEnabled(*binding))
+                    out[std::string{ToString(attribute)}] = GeometryPropertyRefToJson(binding->Property);
+            }
+            return out;
+        }
+
+        // Applies after geometry so each binding is checked against the loaded
+        // properties. A source that no longer resolves stays authored (the
+        // renderer draws the default) and is counted and logged, never dropped.
+        [[nodiscard]] bool TryApplyAttributeBindingsFromJson(
+            entt::registry& raw,
+            const ECS::EntityHandle entity,
+            const json& value,
+            SceneSerializationStats& stats)
+        {
+            if (!value.is_object())
+                return false;
+            VertexChannelBindingSet bindings{};
+            for (const auto& [key, refJson] : value.items())
+            {
+                RenderAttribute attribute{};
+                if (!TryParseRenderAttribute(key, attribute))
+                    return false;
+                VertexChannelSourceBinding* binding =
+                    FindVertexChannelSourceBinding(bindings, attribute);
+                if (binding == nullptr || !TryReadGeometryPropertyRef(refJson, binding->Property) ||
+                    !binding->Property.HasName())
+                {
+                    return false;
+                }
+                binding->Enabled = true;
+            }
+            if (bindings == VertexChannelBindingSet{})
+                return true;
+
+            const GeometryEntityAvailability availability = BuildGeometryAvailability(raw, entity);
+            for (const RenderAttribute attribute :
+                 {RenderAttribute::Position, RenderAttribute::Normal, RenderAttribute::Texcoord})
+            {
+                const VertexChannelSourceBinding* binding =
+                    FindVertexChannelSourceBinding(bindings, attribute);
+                if (!IsVertexChannelBindingEnabled(*binding))
+                    continue;
+                const GeometryPropertyResolution resolution = ResolveRenderAttributeSource(
+                    availability, attribute, binding->Property.Domain, binding->Property.Name);
+                if (resolution.Resolved())
+                    continue;
+                ++stats.StaleAttributeBindings;
+                Core::Log::Warn(
+                    "[Runtime] Scene load: {} source '{}' on {} is {}; drawing the default source",
+                    ToString(attribute), binding->Property.Name,
+                    ToString(binding->Property.Domain), ToString(resolution.Status));
+            }
+            raw.emplace_or_replace<VertexChannelBindingSet>(entity, bindings);
+            ++stats.AttributeBindingEntities;
+            return true;
+        }
+
         [[nodiscard]] bool AddVertices(json& geometry,
                                        const GS::Vertices& vertices,
                                        const bool requirePositions)
@@ -2436,6 +2505,13 @@ namespace Extrinsic::Runtime
                     return Core::Err<SceneDeserializationResult>(Core::ErrorCode::InvalidFormat);
                 }
 
+                if (entityJson.contains("attributeBindings") &&
+                    !TryApplyAttributeBindingsFromJson(
+                        raw, entity, entityJson["attributeBindings"], result.Stats))
+                {
+                    return Core::Err<SceneDeserializationResult>(Core::ErrorCode::InvalidFormat);
+                }
+
                 if (entityJson.contains("parentId"))
                 {
                     std::uint32_t parentId = 0u;
@@ -2543,6 +2619,16 @@ namespace Extrinsic::Runtime
                 ++stats.GeometryPresentationEntities;
             }
 
+            if (const auto* bindings = raw.try_get<VertexChannelBindingSet>(entity))
+            {
+                json attributeBindings = AttributeBindingsToJson(*bindings);
+                if (!attributeBindings.empty())
+                {
+                    entityJson["attributeBindings"] = std::move(attributeBindings);
+                    ++stats.AttributeBindingEntities;
+                }
+            }
+
             root["entities"].push_back(std::move(entityJson));
             ++stats.Entities;
         }
@@ -2557,6 +2643,7 @@ namespace Extrinsic::Runtime
             {"pointCloudEntities", stats.PointCloudEntities},
             {"renderHintEntities", stats.RenderHintEntities},
             {"geometryPresentationEntities", stats.GeometryPresentationEntities},
+            {"attributeBindingEntities", stats.AttributeBindingEntities},
             {"unsupportedPersistenceEntities", stats.UnsupportedPersistenceEntities},
             {"unsupportedLightEntities", stats.UnsupportedLightEntities},
             {"unsupportedShadowEntities", stats.UnsupportedShadowEntities},
@@ -2602,6 +2689,7 @@ namespace Extrinsic::Runtime
             stats.GeometryPresentationEntities = statsJson.value(
                 "geometryPresentationEntities",
                 statsJson.value("progressiveRenderDataEntities", 0u));
+            stats.AttributeBindingEntities = statsJson.value("attributeBindingEntities", 0u);
             stats.UnsupportedPersistenceEntities =
                 statsJson.value("unsupportedPersistenceEntities", 0u);
             stats.UnsupportedLightEntities =

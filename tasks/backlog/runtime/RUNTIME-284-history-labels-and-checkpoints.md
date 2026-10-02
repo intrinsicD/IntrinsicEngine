@@ -19,7 +19,7 @@ contracts: [repo.source-documentation, geometry.property-coherence, runtime.edit
   checkpoints that can be restored as one undoable command.
 
 ## Non-goals
-- No scene-file checkpoints or disk writes (would need `SceneSerialization` processed-property persistence and consent).
+- No scene-file checkpoints or disk writes (would need `SceneSerialization` processed-property persistence, owned by RUNTIME-319, and consent).
 - No new undo/redo surface beyond labels: multi-step undo loops over the existing `Undo()`/`Redo()`.
 
 ## Context

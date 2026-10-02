@@ -165,3 +165,12 @@ python3 tools/agents/check_task_policy.py --root . --strict
   "Show" buttons and the Color binding behave alike. Graph/point-cloud packs
   lose their always-empty packed-color buffers; the Sandbox section shows the
   last refused binding's typed status.
+- 2026-10-02: Slice 4 (persistence). Structural bindings save as
+  `attributeBindings` (`position`/`normal`/`texcoord` property references) and
+  load after geometry; unknown or non-structural keys and unnamed sources
+  reject the document. A source that does not resolve on load stays authored,
+  is drawn from the default, counted in `StaleAttributeBindings` and logged
+  once per load. The scene format persists only canonical geometry
+  properties, so bindings to processed properties always load stale until
+  `RUNTIME-319` persists them. Color (overlay) and size/width (render hints)
+  were already serialized.

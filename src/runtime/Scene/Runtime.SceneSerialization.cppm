@@ -25,6 +25,11 @@ export namespace Extrinsic::Runtime
         std::uint32_t PointCloudEntities{0u};
         std::uint32_t RenderHintEntities{0u};
         std::uint32_t GeometryPresentationEntities{0u};
+        // RUNTIME-315: entities with authored attribute bindings, and loaded
+        // bindings whose source no longer resolves (kept as authored intent,
+        // drawn from the default source, logged as a warning).
+        std::uint32_t AttributeBindingEntities{0u};
+        std::uint32_t StaleAttributeBindings{0u};
         std::uint32_t UnsupportedPersistenceEntities{0u};
         std::uint32_t UnsupportedLightEntities{0u};
         std::uint32_t UnsupportedShadowEntities{0u};
