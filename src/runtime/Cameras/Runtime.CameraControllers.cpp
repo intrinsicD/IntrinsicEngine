@@ -485,6 +485,22 @@ namespace Extrinsic::Runtime
         m_FirstMouse = true;
     }
 
+    void FreeLookCameraController::LookAt(const glm::vec3& position, const glm::vec3& target,
+                                          const glm::vec3& up) noexcept
+    {
+        Graphics::CameraViewInput seed{};
+        seed.Position = position;
+        seed.Forward = Detail::SafeNormalized(target - position, {0.0f, 0.0f, -1.0f});
+        seed.NearPlane = m_NearPlane;
+        seed.FarPlane = m_FarPlane;
+        seed.Valid = true;
+        Seed(seed);
+        const glm::vec3 forward = Detail::ForwardFromYawPitch(m_Yaw, m_Pitch);
+        const glm::vec3 baseRight = Detail::RightFromForward(forward);
+        const glm::vec3 baseUp = Detail::UpFromForwardRight(forward, baseRight);
+        m_Roll = Detail::WrapRadians(std::atan2(-glm::dot(up, baseRight), glm::dot(up, baseUp)));
+    }
+
     void FreeLookCameraController::Update(const Platform::Input::Context& input,
                                           const double deltaSeconds) noexcept
     {
@@ -591,6 +607,13 @@ namespace Extrinsic::Runtime
                                 m_MinAltitude,
                                 m_MaxAltitude);
         m_FarPlane = Detail::FocusFarPlane(m_Altitude, radius);
+    }
+
+    void TopDownCameraController::LookAt(const glm::vec3& position, const glm::vec3& target,
+                                         const glm::vec3&) noexcept
+    {
+        m_Target = target;
+        m_Altitude = std::clamp(position.y - target.y, m_MinAltitude, m_MaxAltitude);
     }
 
     void TopDownCameraController::Update(const Platform::Input::Context& input,

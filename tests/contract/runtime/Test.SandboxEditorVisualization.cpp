@@ -1350,47 +1350,74 @@ TEST(SandboxEditorUi, CameraPoseCommandOrbitPoseKeepsTargetAsPivotAndReportsBoth
     EXPECT_NEAR(glm::length(pivot - target), 0.0f, 1e-3f) << "the orbit pivot is the requested target";
     EXPECT_NEAR(orbit->Radius(), 10.0f, 1e-3f);
 
-    // An orbit radius beyond the controller range cannot be realized: refused, camera restored.
+    // An orbit radius beyond the controller range is clamped and reported; the pivot stays Target.
     const auto far = rig.Apply({.Mode = Runtime::EditorCameraPoseMode::Pose,
                                 .Position = {0, 0, 5000.0f}, .Target = {0, 0, 0}});
-    EXPECT_EQ(far.Status, Runtime::EditorCommandStatus::UnsupportedCameraPose);
-    EXPECT_NEAR(glm::length(rig.View().Position - position), 0.0f, 1e-3f);
+    EXPECT_EQ(far.Status, Runtime::EditorCommandStatus::Applied);
+    EXPECT_TRUE(far.PositionClamped);
+    EXPECT_FALSE(far.UpIgnored);
+    const auto clamped = rig.View();
+    EXPECT_NEAR(glm::length(clamped.Position + clamped.Forward * orbit->Radius()), 0.0f, 1e-2f);
 }
 
-TEST(SandboxEditorUi, CameraPoseCommandRefusesWhatTheControllerKindCannotRepresent)
+TEST(SandboxEditorUi, CameraPoseCommandPerControllerKindPolicy)
 {
     using Kind = Extrinsic::Core::Config::CameraControllerKind;
+    const auto pointer = [](CameraRig& rig) { return &rig.Main(); };
     {
+        // Fly: position and direction exact; Up is a hint and is reported as ignored.
         CameraRig fly(Kind::Fly);
+        const auto result = fly.Apply({.Position = {3, 4, 5}, .Target = {3, 4, 0}});
+        ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Applied);
+        EXPECT_FALSE(result.UpIgnored);
+        EXPECT_NEAR(glm::length(fly.View().Position - glm::vec3(3, 4, 5)), 0.0f, 1e-4f);
+        const auto rolled = fly.Apply({.Position = {0, 0, 9}, .Target = {0, 0, 0}, .Up = {1, 0, 0}});
+        EXPECT_EQ(rolled.Status, Runtime::EditorCommandStatus::Applied);
+        EXPECT_TRUE(rolled.UpIgnored);
+        EXPECT_NEAR(glm::length(fly.View().Position - glm::vec3(0, 0, 9)), 0.0f, 1e-4f);
+        EXPECT_NEAR(glm::dot(fly.View().Forward, glm::vec3(0, 0, -1)), 1.0f, 1e-4f);
+        // Straight down is within the pitch limit tolerance (the controller stops 1 degree short).
         (void)MakeBoundedEntity(fly.Registry, {5.0f, 0.0f, 0.0f}, 1.0f);
         EXPECT_EQ(fly.Apply({.Mode = Runtime::EditorCameraPoseMode::Preset,
                              .Preset = Runtime::CameraViewPreset::Top}).Status,
-                  Runtime::EditorCommandStatus::Applied) << "looking straight down is representable";
-        // Roll-free pose works exactly.
-        ASSERT_EQ(fly.Apply({.Position = {3, 4, 5}, .Target = {3, 4, 0}}).Status, Runtime::EditorCommandStatus::Applied);
-        EXPECT_NEAR(glm::length(fly.View().Position - glm::vec3(3, 4, 5)), 0.0f, 1e-4f);
-        // A rolled up vector has no fly representation: refused, pose unchanged.
-        const auto rolled = fly.Apply({.Position = {0, 0, 9}, .Target = {0, 0, 0}, .Up = {1, 0, 0}});
-        EXPECT_EQ(rolled.Status, Runtime::EditorCommandStatus::UnsupportedCameraPose);
-        EXPECT_NEAR(glm::length(fly.View().Position - glm::vec3(3, 4, 5)), 0.0f, 1e-4f);
+                  Runtime::EditorCommandStatus::Applied);
+    }
+    {
+        // Free look derives its roll from Up, so a rolled pose is exact.
+        CameraRig look(Kind::FreeLook);
+        const auto result = look.Apply({.Position = {0, 0, 9}, .Target = {0, 0, 0}, .Up = {1, 0, 0}});
+        ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Applied);
+        EXPECT_FALSE(result.UpIgnored);
+        EXPECT_NEAR(glm::dot(look.View().Up, glm::vec3(1, 0, 0)), 1.0f, 1e-4f);
     }
     {
         CameraRig top(Kind::TopDown);
-        EXPECT_EQ(top.Apply({.Position = {0, 5, 0}, .Target = {0, 0, 0}, .Up = {0, 0, -1}}).Status,
-                  Runtime::EditorCommandStatus::Applied);
-        const auto before = top.View().Position;
-        EXPECT_EQ(top.Apply({.Position = {0, 0, 5}, .Target = {0, 0, 0}}).Status,
-                  Runtime::EditorCommandStatus::UnsupportedCameraPose)
-            << "top-down only looks along -Y";
-        EXPECT_EQ(top.View().Position, before);
-        // Presets: only Top is representable.
-        (void)MakeBoundedEntity(top.Registry, {5.0f, 0.0f, 0.0f}, 1.0f);
-        const auto sideways = top.Apply({.Mode = Runtime::EditorCameraPoseMode::Preset,
-                                         .Preset = Runtime::CameraViewPreset::Front});
+        const auto* before = pointer(top);
+        // Off-origin xz: the pivot is the target and the altitude is the height above it.
+        const auto result = top.Apply({.Position = {5, 10, 7}, .Target = {5, 0, 7}, .Up = {1, 0, 0}});
+        ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Applied);
+        EXPECT_TRUE(result.UpIgnored);
+        EXPECT_NEAR(glm::length(top.View().Position - glm::vec3(5, 10, 7)), 0.0f, 1e-4f);
+        EXPECT_EQ(pointer(top), before) << "applying never replaces the controller instance";
+
+        // A sideways direction is refused without touching the camera or marking a transition.
+        (void)top.Cameras.ConsumeCameraTransition(Runtime::CameraControllerSlot::Main);
+        const auto position = top.View().Position;
+        const auto sideways = top.Apply({.Position = {0, 0, 5}, .Target = {0, 0, 0}});
         EXPECT_EQ(sideways.Status, Runtime::EditorCommandStatus::UnsupportedCameraPose);
+        EXPECT_EQ(top.View().Position, position);
+        EXPECT_EQ(pointer(top), before);
+        EXPECT_FALSE(top.Cameras.ConsumeCameraTransition(Runtime::CameraControllerSlot::Main));
+
+        (void)MakeBoundedEntity(top.Registry, {5.0f, 0.0f, 0.0f}, 1.0f);
+        EXPECT_EQ(top.Apply({.Mode = Runtime::EditorCameraPoseMode::Preset,
+                             .Preset = Runtime::CameraViewPreset::Front}).Status,
+                  Runtime::EditorCommandStatus::UnsupportedCameraPose);
+        EXPECT_FALSE(top.Cameras.ConsumeCameraTransition(Runtime::CameraControllerSlot::Main));
         EXPECT_EQ(top.Apply({.Mode = Runtime::EditorCameraPoseMode::Preset,
                              .Preset = Runtime::CameraViewPreset::Top}).Status,
                   Runtime::EditorCommandStatus::Applied);
+        EXPECT_TRUE(top.Cameras.ConsumeCameraTransition(Runtime::CameraControllerSlot::Main));
     }
 }
 

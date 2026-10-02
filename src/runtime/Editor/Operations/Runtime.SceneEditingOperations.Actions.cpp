@@ -554,22 +554,19 @@ ApplyEditorTransformEdit(
             return length > 1.0e-4 ? glm::vec3{u / length} : glm::vec3{0.0f};
         }
 
-        // Did the controller realize the requested direction (and, when the read-back up is
-        // well-defined, the requested up)? Position is compared only when `checkPosition`.
-        [[nodiscard]] bool Realized(const EditorCameraPose& got, const glm::vec3& position,
-                                    const glm::vec3& forward, const glm::vec3& up,
-                                    const bool checkPosition) noexcept
+        [[nodiscard]] bool DirectionRealized(const EditorCameraPose& got, const glm::vec3& forward) noexcept
         {
-            if (glm::dot(glm::normalize(got.Forward), forward) < 1.0f - 4.0e-4f) // fly pitch stops 1 degree short of the pole
-                return false;
-            if (checkPosition &&
-                glm::length(got.Position - position) > 1.0e-3f * std::max(1.0f, glm::length(position)))
-                return false;
+            // 4e-4 admits the 1 degree the pitch-limited controllers stop short of the poles.
+            return glm::dot(glm::normalize(got.Forward), forward) >= 1.0f - 4.0e-4f;
+        }
+
+        [[nodiscard]] bool UpDiffers(const EditorCameraPose& got, const glm::vec3& forward, const glm::vec3& up) noexcept
+        {
             const glm::vec3 gotUp = RollFreeUp(got.Up, forward);
             const glm::vec3 wantUp = RollFreeUp(up, forward);
             if (gotUp == glm::vec3{0.0f} || wantUp == glm::vec3{0.0f})
-                return true; // looking along the up axis: roll is not observable
-            return glm::dot(gotUp, wantUp) >= 1.0f - 1.0e-4f;
+                return false; // looking along the up axis: roll is not observable
+            return glm::dot(gotUp, wantUp) < 1.0f - 1.0e-4f;
         }
     }
 
@@ -606,22 +603,28 @@ ApplyEditorTransformEdit(
         result.Previous = result.Current = PoseOf(*controller, viewport);
         CameraControllerRegistry& cameras = *context.CameraControllers;
 
-        // Applies `apply`, then refuses and restores when the controller kind cannot realize the
-        // requested view.
+        // Tries `apply` on a clone first: refuses (touching nothing) when the controller cannot look
+        // along `forward`, otherwise applies it for real and reports what was adjusted.
         const auto applyChecked = [&](const glm::vec3& position, const glm::vec3& forward, const glm::vec3& up,
                                       const bool checkPosition, auto&& apply)
         {
-            std::unique_ptr<ICameraController> saved = controller->Clone();
-            apply();
-            const EditorCameraPose now = PoseOf(*controller, viewport);
-            if (saved != nullptr && !Realized(now, position, forward, up, checkPosition))
+            const std::unique_ptr<ICameraController> trial = controller->Clone();
+            if (trial != nullptr)
             {
-                cameras.Replace(command.Slot, std::move(saved));
-                result.Status = EditorCommandStatus::UnsupportedCameraPose;
-                return;
+                apply(*trial);
+                const EditorCameraPose tried = PoseOf(*trial, viewport);
+                if (!DirectionRealized(tried, forward))
+                {
+                    result.Status = EditorCommandStatus::UnsupportedCameraPose;
+                    return;
+                }
+                result.UpIgnored = UpDiffers(tried, forward, up);
+                result.PositionClamped = checkPosition &&
+                    glm::length(tried.Position - position) > 1.0e-3f * std::max(1.0f, glm::length(position));
             }
+            apply(*controller);
             cameras.MarkCameraTransition(command.Slot);
-            result.Current = now;
+            result.Current = PoseOf(*controller, viewport);
             result.Status = EditorCommandStatus::Applied;
         };
 
@@ -647,7 +650,7 @@ ApplyEditorTransformEdit(
                 return result;
             }
             applyChecked(command.Position, forward, up, true,
-                         [&] { controller->LookAt(command.Position, command.Target, up); });
+                         [&](ICameraController& camera) { camera.LookAt(command.Position, command.Target, up); });
             return result;
         }
 
@@ -700,7 +703,7 @@ ApplyEditorTransformEdit(
         {
             const CameraPresetAxes axes = CameraPresetAxesFor(command.Preset);
             applyChecked({}, axes.Forward, axes.Up, false,
-                         [&] { ApplyCameraPreset(cameras, command.Slot, command.Preset, *target, viewport); });
+                         [&](ICameraController& camera) { SeedCameraPreset(camera, command.Preset, *target, viewport); });
         }
         else
         {

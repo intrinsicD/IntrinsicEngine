@@ -77,6 +77,13 @@ export namespace Extrinsic::Runtime
         CameraViewPreset preset,
         const CameraFocusTarget& target) noexcept;
 
+    // The seed + focus step of ApplyCameraPreset on a bare controller (no transition mark), so
+    // callers can try a preset on a clone first.
+    void SeedCameraPreset(ICameraController& controller,
+                          CameraViewPreset preset,
+                          const CameraFocusTarget& target,
+                          Core::Extent2D viewport) noexcept;
+
     // Seeds the `slot` controller with the preset, focuses `target` and marks an
     // explicit camera transition. Returns false when the slot has no controller.
     bool ApplyCameraPreset(CameraControllerRegistry& cameras,

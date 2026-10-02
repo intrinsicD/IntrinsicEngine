@@ -139,6 +139,15 @@ namespace Extrinsic::Runtime
         return seed;
     }
 
+    void SeedCameraPreset(ICameraController& controller,
+                          const CameraViewPreset preset,
+                          const CameraFocusTarget& target,
+                          const Core::Extent2D viewport) noexcept
+    {
+        controller.Seed(MakeCameraPresetSeed(controller.GetView(viewport), preset, target));
+        controller.Focus(target);
+    }
+
     bool ApplyCameraPreset(CameraControllerRegistry&  cameras,
                            const CameraControllerSlot slot,
                            const CameraViewPreset     preset,
@@ -149,8 +158,7 @@ namespace Extrinsic::Runtime
         if (controller == nullptr)
             return false;
 
-        controller->Seed(MakeCameraPresetSeed(controller->GetView(viewport), preset, target));
-        controller->Focus(target);
+        SeedCameraPreset(*controller, preset, target, viewport);
         cameras.MarkCameraTransition(slot);
         return true;
     }

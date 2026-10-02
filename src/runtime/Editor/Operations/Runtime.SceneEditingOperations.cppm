@@ -26,7 +26,6 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraFocusCommand;
-import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
@@ -358,10 +357,13 @@ export namespace Extrinsic::Runtime
     //   Preset: looks along the preset axis and frames StableEntityIds (empty = every entity with
     //           world bounds), 2 * radius back from the bounds center (shared with view capture).
     //   Focus:  frames StableEntityIds, or the current selection when empty, keeping the direction.
-    // A pose or preset the active controller kind cannot represent is refused and the camera is
-    // restored (UnsupportedCameraPose): fly/free-look have no roll (Up must be the roll-free up),
-    // top-down only looks along -Y, orbit radius is clamped to its range. The result carries the
-    // pose before and after so callers can report what was applied.
+    // What the active controller kind can represent is decided on a clone before the camera is
+    // touched. A view direction it cannot reach (top-down only looks along -Y; fly/free-look
+    // pitch stops 1 degree short of the poles) is refused (UnsupportedCameraPose) and the
+    // camera, its transition flag and its instance stay untouched. Softer limits are applied and
+    // reported in the result: UpIgnored (fly and top-down have no roll: Up is a hint),
+    // PositionClamped (orbit radius clamped to its range; the pivot stays Target). Free-look
+    // derives its roll from Up; orbit is exact. The result carries the pose before and after.
     // Statuses: Applied; InvalidProcessingParameters (non-finite pose, Position == Target, Up zero
     // or parallel to the view direction, out-of-range mode/preset); UnsupportedCameraPose;
     // MissingCameraControllerRegistry (no registry, or no controller in the slot); MissingScene;
@@ -397,6 +399,8 @@ export namespace Extrinsic::Runtime
     {
         EditorCommandStatus Status{EditorCommandStatus::NoChange};
         bool HasPose{false}; // Previous/Current are valid (a controller was resolved)
+        bool UpIgnored{false};
+        bool PositionClamped{false};
         EditorCameraPose Previous{};
         EditorCameraPose Current{};
     };

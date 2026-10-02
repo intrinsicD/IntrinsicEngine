@@ -44,9 +44,10 @@ namespace Extrinsic::Runtime
         virtual void Focus(CameraFocusTarget target) noexcept = 0;
         // Places the camera at `position` looking at `target` with `up` (all finite,
         // target != position, up not parallel to the view direction). Controllers that
-        // keep a pivot (orbit) make `target` the pivot; the default seeds position and
-        // direction and leaves what the controller cannot represent (fly/free-look roll,
-        // the top-down direction) to the caller's read-back of GetView().
+        // keep a pivot (orbit, top-down) make `target` the pivot; the default seeds
+        // position and direction only. What a kind cannot represent (fly ignores up, orbit
+        // clamps its radius, top-down only looks along -Y, pitch stops short of the poles)
+        // is left to the caller's read-back of GetView().
         virtual void LookAt(const glm::vec3& position, const glm::vec3& target, const glm::vec3& up) noexcept
         {
             Graphics::CameraViewInput seed = GetView(Core::Extent2D{1, 1});
@@ -140,6 +141,8 @@ namespace Extrinsic::Runtime
 
         void Seed(const Graphics::CameraViewInput& seed) noexcept override;
         void Focus(CameraFocusTarget target) noexcept override;
+        // Position and direction exact; roll is derived from `up`.
+        void LookAt(const glm::vec3& position, const glm::vec3& target, const glm::vec3& up) noexcept override;
         void Update(const Platform::Input::Context& input, double deltaSeconds) noexcept override;
         [[nodiscard]] Graphics::CameraViewInput GetView(Core::Extent2D viewport) const noexcept override;
         [[nodiscard]] Core::Config::CameraControllerKind Kind() const noexcept override;
@@ -171,6 +174,8 @@ namespace Extrinsic::Runtime
 
         void Seed(const Graphics::CameraViewInput& seed) noexcept override;
         void Focus(CameraFocusTarget target) noexcept override;
+        // Pivot = target, altitude = position.y - target.y (clamped); direction and up are fixed.
+        void LookAt(const glm::vec3& position, const glm::vec3& target, const glm::vec3& up) noexcept override;
         void Update(const Platform::Input::Context& input, double deltaSeconds) noexcept override;
         [[nodiscard]] Graphics::CameraViewInput GetView(Core::Extent2D viewport) const noexcept override;
         [[nodiscard]] Core::Config::CameraControllerKind Kind() const noexcept override;

@@ -29,6 +29,13 @@ or a fit-to-entity focus through one editor command.
   `set_camera` gains `pose`/`preset`/`focus` over the same command.
 - Reuse the ViewCapture preset framing math instead of duplicating it.
 
+## Decisions (2026-10-02)
+- The registry premise was stale: `EditorSceneEditingContext::CameraControllers` already carries it.
+- Preset axes and the seed recipe moved into `Runtime.CameraFocusCommand`; view capture calls them.
+- Camera pose, preset and focus changes are view state and do not enter the undo history, like `ApplyEditorCameraControllerCommand`.
+- Orbit parameters (yaw/pitch/radius) are descoped as a separate input: `Position = Target - direction * radius` with `Target`, `Up` expresses every orbit pose, and the yaw/pitch convention is controller-private. `Pose` mode keeps `Target` as the orbit pivot.
+- Per controller kind: orbit exact (radius clamped and reported), free-look exact (roll from `Up`), fly applies position and direction with `Up` as a hint, top-down only looks along -Y. Unreachable directions return `UnsupportedCameraPose` without touching the camera.
+
 ## Acceptance criteria
 - [ ] A runtime editor command in `Runtime.SceneEditingOperations` applies a pose (position/target/up or orbit parameters), a named preset, or a fit to one or more stable entity ids. It shares preset/framing code with `ViewCaptureModule`.
 - [ ] The Sandbox UI exposes the presets and "Focus selection" (View menu or Camera panel) through that command.
