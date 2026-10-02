@@ -68,8 +68,10 @@ export namespace Extrinsic::Runtime
         std::uint64_t CorrelationId{0u};
         std::string Name{};
         JobState State{JobState::Invalid};
-        EditorJobDomain RequestedJobDomain{EditorJobDomain::Cpu};
-        EditorJobDomain ResolvedJobDomain{EditorJobDomain::Cpu};
+        // Unknown (nullopt) until the submitter and its finalizer report them; no producer
+        // fills them yet (RUNTIME-317), so readers must not assume a CPU job.
+        std::optional<EditorJobDomain> RequestedJobDomain{};
+        std::optional<EditorJobDomain> ResolvedJobDomain{};
         std::vector<JobDependency> Dependencies{};
         float NormalizedProgress{0.0f};
         // False until the worker reports; "never reported" is not 0%.
@@ -188,6 +190,9 @@ export namespace Extrinsic::Runtime
         // `State::None` for an unknown, stale-epoch or pruned key.
         std::function<EditorOperationProgress(const EditorOperationRunKey&)>
             Progress{};
+        // The session scene epoch `Progress` stamps on its answers, without a job
+        // snapshot; 0 for a stale attachment.
+        std::function<std::uint64_t()> SceneEpoch{};
         // Main-thread progress report for a job whose work does not run in
         // `JobService::Work` (device-polled transactions); workers use
         // `JobCancellation::ReportProgress`. No-op for tokens this session

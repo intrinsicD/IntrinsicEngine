@@ -1,5 +1,8 @@
 // UI-060: the Jobs window over the editor job surface (harness-backed, no engine).
 #include <unordered_map>
+#include <atomic>
+#include <chrono>
+#include <thread>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -145,6 +148,7 @@ TEST(SandboxJobsWindow, ListsALongJobAndCancelsItThroughTheSurface)
 {
     TestSupport::ImGuiFrameScope frame;
     Extrinsic::Tests::EditorJobHarness harness{2u};
+    harness.SetSceneEpoch(1u);
     R::EditorProcessingContext context{};
     harness.Attach(context);
     int cancels = 0;
@@ -203,6 +207,65 @@ TEST(SandboxJobsWindow, ListsALongJobAndCancelsItThroughTheSurface)
     EXPECT_EQ(state.History.Rows()[0].State, R::JobState::Cancelled);
     EXPECT_EQ(R::ProjectEditorOperationProgress(state.History.Rows()[0]).State, R::EditorOperationState::Cancelled);
     EXPECT_FALSE(R::ResolveEditorJobCancelReadiness(commands, state.History.Rows()[0]).Enabled);
+
+    // Once the runtime reaped the job only the window remembers it; a scene replacement (new epoch on
+    // the surface) clears that memory.
+    (void)harness.Jobs().ReapCompleted();
+    draw();
+    ASSERT_EQ(state.History.Rows().size(), 1u);
+    harness.SetSceneEpoch(2u);
+    EXPECT_EQ(R::GetEditorSceneEpoch(commands), 2u);
+    draw();
+    EXPECT_TRUE(state.History.Rows().empty());
+}
+
+// The surface may list jobs in any order: rows still join oldest first, so the trim keeps the newest.
+TEST(SandboxJobsWindow, HistoryOrdersNewRowsBySubmissionWhateverTheListingOrder)
+{
+    Editor::JobsHistory history;
+    history.Observe(std::vector{Row(5u, R::JobState::Running), Row(3u, R::JobState::Running),
+                                Row(4u, R::JobState::Published)}, 1u);
+    ASSERT_EQ(history.Rows().size(), 3u);
+    EXPECT_EQ(history.Rows()[0].Token.Index, 3u);
+    EXPECT_EQ(history.Rows()[1].Token.Index, 4u);
+    EXPECT_EQ(history.Rows()[2].Token.Index, 5u);
+
+    std::vector<R::EditorJobRecord> many;
+    for (std::uint32_t i = 10u + 40u; i-- > 10u;) many.push_back(Row(i, R::JobState::Published)); // newest listed first
+    history.Observe(many, 1u);
+    const auto finished = std::ranges::count_if(history.Rows(), [](const auto& row) {
+        return !R::IsActiveEditorJobState(row.State); });
+    EXPECT_EQ(static_cast<std::size_t>(finished), Editor::JobsHistory::kFinishedLimit);
+    EXPECT_TRUE(std::ranges::none_of(history.Rows(), [](const auto& row) { return row.Token.Index == 10u; }))
+        << "the oldest finished rows are trimmed, not the first listed";
+    EXPECT_EQ(history.Rows().back().Token.Index, 49u);
+}
+
+// A helper job is cancelled on its own: its run's requested cancel neither disables nor blocks it.
+TEST(SandboxJobsWindow, AuxiliaryJobStaysCancellableAfterItsRunWasCancelled)
+{
+    Extrinsic::Tests::EditorJobHarness harness{2u};
+    R::EditorProcessingContext context{};
+    harness.Attach(context);
+    const R::EditorJobCommandSurface surface = context.JobCommands;
+    const R::EditorProcessingCommands commands = R::BindEditorProcessingCommands(std::move(context));
+    std::atomic_bool release{false};
+    const R::JobToken head = surface.Submit(LongJob("head", release), Identity("out"));
+    auto auxIdentity = Identity("out");
+    auxIdentity.Run = head;
+    auxIdentity.Auxiliary = true;
+    const R::JobToken aux = surface.Submit(LongJob("pump", release), auxIdentity);
+    ASSERT_TRUE(head.IsValid() && aux.IsValid());
+    EXPECT_EQ(surface.Cancel(head), R::EditorJobCancelStatus::Requested); // token-level, as jobs_cancel does
+    ASSERT_TRUE(R::IsEditorRunCancelRequested(commands, head));
+    const auto rows = surface.SnapshotAll();
+    const auto auxRow = std::ranges::find(rows, aux, &R::EditorJobRecord::Token);
+    ASSERT_NE(auxRow, rows.end());
+    EXPECT_TRUE(R::ResolveEditorJobCancelReadiness(commands, *auxRow).Enabled);
+    EXPECT_EQ(R::CancelEditorJobRun(commands, *auxRow), R::EditorJobCancelStatus::Requested);
+    release.store(true, std::memory_order_release);
+    ASSERT_TRUE(harness.DrainUntilTerminal());
+    EXPECT_EQ(harness.Jobs().GetState(aux), R::JobState::Cancelled);
 }
 
 // Cancelling a stage cancels its run (stages queued after it too), but never another run on the same output.
@@ -284,4 +347,8 @@ TEST(SandboxJobsWindow, BackendColumnShowsRequestedAndResolvedDomain)
     using D = R::EditorJobDomain;
     EXPECT_EQ(Editor::FormatJobBackend(D::Cpu, D::Cpu), "CPU");
     EXPECT_EQ(Editor::FormatJobBackend(D::Auto, D::GpuCompute), "Auto -> GPU compute");
+    // No producer reports domains yet (RUNTIME-317): an unknown domain is "-", never "CPU".
+    const R::EditorJobRecord live{};
+    EXPECT_EQ(Editor::FormatJobBackend(live.RequestedJobDomain, live.ResolvedJobDomain), "-");
+    EXPECT_EQ(Editor::FormatJobBackend(D::Auto, std::nullopt), "Auto -> -");
 }

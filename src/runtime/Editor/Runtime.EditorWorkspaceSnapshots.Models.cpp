@@ -1799,11 +1799,13 @@ namespace {
                 MixSignature(signature, static_cast<std::uint64_t>(job.State));
                 MixSignatureFloat(signature, job.NormalizedProgress);
                 MixSignature(signature,
-                             static_cast<std::uint64_t>(
-                                 job.RequestedJobDomain));
+                             job.RequestedJobDomain.has_value()
+                                 ? 1u + static_cast<std::uint64_t>(*job.RequestedJobDomain)
+                                 : 0u);
                 MixSignature(signature,
-                             static_cast<std::uint64_t>(
-                                 job.ResolvedJobDomain));
+                             job.ResolvedJobDomain.has_value()
+                                 ? 1u + static_cast<std::uint64_t>(*job.ResolvedJobDomain)
+                                 : 0u);
                 MixSignature(signature,
                              static_cast<std::uint64_t>(job.Identity.Scope));
                 MixSignature(signature,

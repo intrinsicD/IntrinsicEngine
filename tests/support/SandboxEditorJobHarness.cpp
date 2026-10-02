@@ -46,8 +46,12 @@ namespace Extrinsic::Tests
         commands.Progress =
             [this](const Runtime::EditorOperationRunKey& key)
         {
-            return Runtime::ResolveEditorOperationProgress(Snapshot().Entries, key);
+            Runtime::EditorOperationProgress progress =
+                Runtime::ResolveEditorOperationProgress(Snapshot().Entries, key);
+            progress.Epoch = m_SceneEpoch;
+            return progress;
         };
+        commands.SceneEpoch = [this] { return m_SceneEpoch; };
         commands.ReportProgress =
             [this](const Runtime::JobToken token, const Runtime::JobProgress progress)
         {

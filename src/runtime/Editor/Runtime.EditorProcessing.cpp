@@ -61,6 +61,11 @@ namespace Extrinsic::Runtime
         return context.JobCommands.Progress ? context.JobCommands.Progress(key)
                                             : EditorOperationProgress{};
     }
+    std::uint64_t GetEditorSceneEpoch(const EditorProcessingCommands& commands)
+    {
+        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
+        return context.JobCommands.SceneEpoch ? context.JobCommands.SceneEpoch() : 0u;
+    }
     std::vector<EditorJobRecord> GetEditorJobs(const EditorProcessingCommands& commands)
     {
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
@@ -87,7 +92,7 @@ namespace Extrinsic::Runtime
         if (!surface.Cancel)
             return {false, "Job cancel is unavailable. Open an active editor session."};
         const JobToken run = job.Identity.Run.IsValid() ? job.Identity.Run : job.Token;
-        if (surface.RunCancelRequested && surface.RunCancelRequested(run))
+        if (!job.Identity.Auxiliary && surface.RunCancelRequested && surface.RunCancelRequested(run))
             return {false, "Cancel already requested; waiting for the job to stop."};
         return {true, {}};
     }

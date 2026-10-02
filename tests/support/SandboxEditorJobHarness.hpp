@@ -2,6 +2,7 @@
 #pragma once
 
 #include <chrono>
+#include <cstdint>
 #include <unordered_map>
 #include <vector>
 
@@ -22,6 +23,9 @@ namespace Extrinsic::Tests
         [[nodiscard]] Runtime::KernelEventBus& Events() noexcept { return m_Events; }
 
         void Attach(auto& context) { AttachCommands(context.JobCommands); }
+
+        // The scene epoch `Progress` and `SceneEpoch` answer (the session bumps it on scene replacement).
+        void SetSceneEpoch(std::uint64_t epoch) noexcept { m_SceneEpoch = epoch; }
 
         [[nodiscard]] Runtime::EditorJobQueueSnapshot Snapshot() const;
         [[nodiscard]] bool DrainUntilTerminal(
@@ -47,6 +51,7 @@ namespace Extrinsic::Tests
                            Core::StrongHandleHash<Runtime::JobTokenTag>>
             m_Identities{};
         std::vector<Runtime::JobToken> m_CancelledRuns{};
+        std::uint64_t m_SceneEpoch{0u};
         // Destroy the scheduler first, while worker-reachable state is alive.
         // Callers likewise declare the harness after its scene/context.
         SchedulerScope m_Scheduler;

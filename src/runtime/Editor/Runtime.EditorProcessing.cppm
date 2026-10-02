@@ -98,6 +98,8 @@ export namespace Extrinsic::Runtime
     // `State::None` for an unbound handle or a key that resolves to no job.
     [[nodiscard]] EditorOperationProgress GetEditorOperationProgress(
         const EditorProcessingCommands&, const EditorOperationRunKey& key);
+    // `EditorJobCommandSurface::SceneEpoch`; 0 for an unbound or stale handle.
+    [[nodiscard]] std::uint64_t GetEditorSceneEpoch(const EditorProcessingCommands&);
     // Every editor-owned job (`EditorJobCommandSurface::SnapshotAll`); empty for an
     // unbound or stale handle.
     [[nodiscard]] std::vector<EditorJobRecord> GetEditorJobs(const EditorProcessingCommands&);
@@ -106,7 +108,8 @@ export namespace Extrinsic::Runtime
     // `EditorJobCommandSurface::Stats`; zeroed for an unbound or stale handle.
     [[nodiscard]] JobServiceStats GetEditorJobStats(const EditorProcessingCommands&);
     // Whether the Jobs window's Cancel applies to `job`, with the runtime's reason when it does not
-    // (already ended, not an editor job, cancel already requested, no attachment).
+    // (already ended, not an editor job, cancel already requested, no attachment). A helper job
+    // (`EditorJobIdentity::Auxiliary`) is cancelled on its own, so its run's cancel does not disable it.
     [[nodiscard]] ActionReadiness ResolveEditorJobCancelReadiness(const EditorProcessingCommands&, const EditorJobRecord& job);
     // Cancels the run `job` belongs to (its head job and every stage queued after it), as the agent's
     // `notifications/cancelled` does, so no later stage starts on a cancelled run; a helper job

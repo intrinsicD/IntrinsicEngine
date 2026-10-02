@@ -213,8 +213,10 @@ namespace Extrinsic::Sandbox::Editor
     // `CancelEditorJobRun`; a disabled Cancel shows the runtime's reason), and the collapsed job-service
     // counters. Draws content only; the caller owns the ImGui window.
     void DrawJobsWindow(const Runtime::EditorProcessingCommands& commands, JobsWindowState& state);
-    // The backend column: one word when requested and resolved agree, else "requested -> resolved".
-    [[nodiscard]] std::string FormatJobBackend(Runtime::EditorJobDomain requested, Runtime::EditorJobDomain resolved);
+    // The backend column: one word when requested and resolved agree, else "requested -> resolved";
+    // an unknown side reads "-" (no producer reports domains yet, RUNTIME-317).
+    [[nodiscard]] std::string FormatJobBackend(std::optional<Runtime::EditorJobDomain> requested,
+                                               std::optional<Runtime::EditorJobDomain> resolved);
 
     template <typename Result, typename Sink>
     void PublishCommandResult(std::optional<Result>& destination, Result result, const Sink& sink)

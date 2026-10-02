@@ -5,6 +5,7 @@ module;
 #include <algorithm>
 #include <array>
 #include <format>
+#include <iterator>
 #include <cfloat>
 #include <cctype>
 #include <cmath>
@@ -1898,12 +1899,17 @@ namespace Extrinsic::Sandbox::Editor
             m_Rows.clear();
             m_Epoch = epoch;
         }
+        std::vector<Runtime::EditorJobRecord> unseen{};
         for (const auto& record : live)
         {
             const auto known = std::ranges::find(m_Rows, record.Token, &Runtime::EditorJobRecord::Token);
             if (known != m_Rows.end()) *known = record;
-            else m_Rows.push_back(record);
+            else unseen.push_back(record);
         }
+        // Whatever order the surface lists them in, new rows join in submission order (token indices
+        // grow with submission), so "newest first" and the finished-row trim are well defined.
+        std::ranges::sort(unseen, {}, [](const Runtime::EditorJobRecord& row) { return row.Token.Index; });
+        m_Rows.insert(m_Rows.end(), std::make_move_iterator(unseen.begin()), std::make_move_iterator(unseen.end()));
         // A row no longer listed was reaped: keep it when its last seen state was final.
         std::erase_if(m_Rows, [&](const Runtime::EditorJobRecord& row) {
             const bool listed = std::ranges::any_of(live, [&](const auto& r) { return r.Token == row.Token; });
@@ -1919,10 +1925,12 @@ namespace Extrinsic::Sandbox::Editor
         }
     }
 
-    std::string FormatJobBackend(const Runtime::EditorJobDomain requested, const Runtime::EditorJobDomain resolved)
+    std::string FormatJobBackend(const std::optional<Runtime::EditorJobDomain> requested,
+                                 const std::optional<Runtime::EditorJobDomain> resolved)
     {
-        const auto name = [](const Runtime::EditorJobDomain domain) {
-            switch (domain)
+        const auto name = [](const std::optional<Runtime::EditorJobDomain> domain) {
+            if (!domain.has_value()) return "-";
+            switch (*domain)
             {
             case Runtime::EditorJobDomain::Cpu: return "CPU";
             case Runtime::EditorJobDomain::GpuCompute: return "GPU compute";
@@ -1937,9 +1945,7 @@ namespace Extrinsic::Sandbox::Editor
 
     void DrawJobsWindow(const Runtime::EditorProcessingCommands& commands, JobsWindowState& state)
     {
-        // The scene epoch rides on every progress answer, also for a key that matches nothing.
-        const std::uint64_t epoch = Runtime::GetEditorOperationProgress(commands, Runtime::JobToken{}).Epoch;
-        state.History.Observe(Runtime::GetEditorJobs(commands), epoch);
+        state.History.Observe(Runtime::GetEditorJobs(commands), Runtime::GetEditorSceneEpoch(commands));
         const auto& rows = state.History.Rows();
         const auto active = std::ranges::count_if(rows, [](const auto& row) { return Runtime::IsActiveEditorJobState(row.State); });
         ImGui::Text("%zu active, %zu recent", static_cast<std::size_t>(active), rows.size() - static_cast<std::size_t>(active));

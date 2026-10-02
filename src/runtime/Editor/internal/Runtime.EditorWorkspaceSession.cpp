@@ -264,6 +264,8 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
             for (const JobSnapshot& job : jobs.SnapshotAll())
                 if (const auto identity = identities.find(job.Token); identity != identities.end())
                     rows.push_back(ToEditorJobRecord(job, identity->second));
+            // The service keeps its jobs unordered; token indices grow with submission.
+            std::ranges::sort(rows, {}, [](const EditorJobRecord& row) { return row.Token.Index; });
             return rows;
         }
         // Every job this session can attribute to a run: the ones it submitted
@@ -723,6 +725,11 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                         ProgressForEditorRun(*m_Jobs, m_JobIdentities, key);
                     progress.Epoch = m_SceneEpoch;
                     return progress;
+                };
+            context.JobCommands.SceneEpoch =
+                [epoch = m_AttachmentEpoch, this]() -> std::uint64_t
+                {
+                    return AttachmentEpochIsActive(epoch) ? m_SceneEpoch : 0u;
                 };
             context.JobCommands.ReportProgress =
                 [epoch = m_AttachmentEpoch,
