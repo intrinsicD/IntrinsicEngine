@@ -56,6 +56,7 @@ import Geometry.Properties;
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuFront.hpp"
+#include "Editor/Operations/Runtime.GpuTransactionLifecycle.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.hpp"
 #include "Editor/Operations/Runtime.MeshFieldOperations.PropertyGraph.hpp"
 
@@ -518,9 +519,11 @@ namespace Extrinsic::Runtime
 
     // The Vulkan run's job state (ADR 0030 decision 1): the capture, the device workspaces, the
     // residency slots it reads and writes, and the transaction phase the panel drives.
-    struct EditorPropertySmoothingTransaction
+    struct EditorPropertySmoothingTransaction : std::enable_shared_from_this<EditorPropertySmoothingTransaction>
     {
-        EditorProcessingContext Context{};
+        // The shared Run/Accept lifecycle: ring 0 is the output (read back on Accept), ring 1 the
+        // float presentation ring beside a double scalar's typed ring.
+        GP::GpuTransactionCore Core{};
         PropertySmoothingDetail::SmoothingPublication Publication{};
         std::vector<double> Values{};
         S::PropertyFilterPlan Plan{};
@@ -536,35 +539,20 @@ namespace Extrinsic::Runtime
         std::shared_ptr<Graphics::SparseConjugateGradientWorkspace> Solver{};
         std::shared_ptr<Graphics::PropertyFilterWorkspace> Filter{}; // the explicit kernels, or the CG path's store
         bool FinalQueued{}; // the last chunk (reports only) is under way
-        std::shared_ptr<SpatialGpuResult> Gpu{};
         EditorPropertySmoothingResult Result{};
-        EditorJobIdentity Identity{};
-        JobToken Token{}, AcceptToken{}; // the compute job (it reports progress) and the Accept readback job
-        bool Abandoned{}, Delivered{};
         std::function<void(EditorPropertySmoothingResult)> Sink{};
-        // Residency: the output ring (and a float presentation ring beside a double scalar's
-        // typed ring), the canonical input slot while the device reads it, the front while
-        // Accept reads it back.
-        Graphics::GpuPropertyResidency* Residency{};
-        Graphics::GpuPropertyKey Key{}, PresentationKey{};
-        // The rings this run acquired (residency ring generations): the only ones it discards.
-        std::uint64_t Ring{}, PresentationRing{};
         bool Presentation{};
         std::uint32_t Count{}; // property rows
         // Input: the canonical slot the kernels gather from; Base: the output property's
-        // canonical slot when it exists (rows outside the samples keep its bytes); Back /
-        // PresentationBack: the ring write slots.
-        std::optional<Graphics::GpuPropertyView> Input{}, Base{}, Back{}, PresentationBack{};
+        // canonical slot when it exists (rows outside the samples keep its bytes).
+        std::optional<Graphics::GpuPropertyView> Input{}, Base{};
         std::vector<std::uint32_t> RestoreMask{}; // fixed or isolated working rows keep the input value
         GP::PointPropertyWatch OutputWatch{};
         std::uint64_t CpuStageBytes{}; // implicit: the CPU-assembled coupling uploaded per run (ADR 0030, 8)
-        bool StoreRecorded{}; // the queued submission writes Back
-        std::uint32_t Deferrals{}, Previews{};
-        EditorGpuTransactionPhase Phase{EditorGpuTransactionPhase::Running};
-        bool AutoAccept{}, StopRequested{}, Stopped{};
-        // Accept: the front's readback in the property's precision (it leases the front
-        // until the bytes landed), or the test seam's values.
-        std::shared_ptr<GP::GpuFrontReadback> Readback{};
+        bool StoreRecorded{}; // the queued submission writes the output back
+        std::uint32_t Previews{};
+        bool StopRequested{}, Stopped{};
+        // Accept's test seam: the front's values (no readback).
         std::optional<std::vector<double>> TestFront{};
     };
 
@@ -572,54 +560,29 @@ namespace Extrinsic::Runtime
     {
         using Work = std::shared_ptr<EditorPropertySmoothingTransaction>;
         constexpr std::uint32_t kRingDepth = 3u;   // fronts bound directly by the renderer (ADR 0030 decision 4)
-        constexpr std::uint32_t kMaxDeferrals = 600u; // frames the residency may refuse before the run fails
         constexpr const char* kRefused = "Vulkan property smoothing could not queue its device work; previous output retained.";
 
         // The captured inputs and the output are unchanged (an edit or undo of either while
         // the run computes or waits makes it stale; the publication keeps its own value guard).
-        bool Current(const Work& w)
+        bool InputsCurrent(const EditorPropertySmoothingTransaction& w)
         {
-            return !w->Abandoned && GP::GeometryPropertiesCurrent(w->Context, w->Publication.Entity, w->Publication.Watches) &&
-                   GP::GeometryPropertiesCurrent(w->Context, w->Publication.Entity, std::span{&w->OutputWatch, 1}) &&
-                   GP::EditorProcessingContextWorldCurrent(w->Context);
+            const auto& ctx = w.Core.Context;
+            return GP::GeometryPropertiesCurrent(ctx, w.Publication.Entity, w.Publication.Watches) &&
+                   GP::GeometryPropertiesCurrent(ctx, w.Publication.Entity, std::span{&w.OutputWatch, 1});
         }
-        void Deliver(const Work& w, EditorPropertySmoothingResult result)
-        {
-            w->Result = result;
-            if (w->Delivered) return;
-            w->Delivered = true;
-            if (w->Sink) w->Sink(std::move(result));
-        }
-        // The workspaces return to the cache once no queued submission can use them: nothing was
-        // queued, or the latest one (chunks are sequential) completed. Otherwise the run keeps them
-        // until its recorders are released.
+        bool Current(const Work& w) { return GP::GpuTransactionCurrent(w->Core); }
+        auto& Output(const Work& w) { return w->Core.Rings[0]; }
+        auto& PresentationRing(const Work& w) { return w->Core.Rings[1]; }
+        // Recorders own their workspace leases (the cache keeps them until the readback is
+        // safe), so the run returns its own at once.
         void ReleaseWorkspaces(const Work& w)
         {
-            if (w->Gpu && w->Gpu->State != SpatialQueryState::Ready) return;
             w->Solver.reset();
             w->Filter.reset();
         }
-        void ReleaseRings(const Work& w)
-        {
-            ReleaseWorkspaces(w);
-            w->Input.reset();
-            w->Base.reset();
-            w->Back.reset();
-            w->PresentationBack.reset();
-            if (w->Readback) w->Readback->Lease.reset();
-            if (!w->Residency) return;
-            (void)w->Residency->Discard(w->Key, w->Ring);
-            if (w->Presentation) (void)w->Residency->Discard(w->PresentationKey, w->PresentationRing);
-        }
         void Finish(const Work& w, const EditorGpuTransactionPhase phase, const EditorCommandStatus status, std::string message)
         {
-            if (w->Readback) w->Readback->Abandoned = true; // a framed readback still queued records nothing
-            ReleaseRings(w);
-            w->Phase = phase;
-            auto result = w->Result;
-            result.Status = status;
-            result.Message = std::move(message);
-            Deliver(w, std::move(result));
+            GP::FinishGpuTransaction(w->Core, phase, status, std::move(message));
         }
         Graphics::PropertyFilterResidentView View(const std::optional<Graphics::GpuPropertyView>& v)
         {
@@ -628,28 +591,30 @@ namespace Extrinsic::Runtime
         }
         Graphics::PropertyFilterResidentIo ResidentIo(const Work& w)
         {
-            return {.Input = View(w->Input), .Output = View(w->Back), .OutputBytes = w->Back ? w->Back->Bytes : 0u,
-                    .Base = View(w->Base), .Presentation = View(w->PresentationBack),
-                    .PresentationBytes = w->PresentationBack ? w->PresentationBack->Bytes : 0u,
+            const auto& back = Output(w).Back;
+            const auto& presentation = PresentationRing(w).Back;
+            return {.Input = View(w->Input), .Output = View(back), .OutputBytes = back ? back->Bytes : 0u,
+                    .Base = View(w->Base), .Presentation = View(presentation),
+                    .PresentationBytes = presentation ? presentation->Bytes : 0u,
                     .Slots = w->Publication.Slots, .RestoreMask = w->RestoreMask,
                     .Rows = std::uint32_t(w->Publication.Slots.size())};
         }
         // The frame whose commands touch the run's slots (their reuse waits for it).
         void NoteUses(const Work& w)
         {
-            if (!w->Residency || !w->Context.Device) return;
-            const auto frame = w->Context.Device->GetGlobalFrameNumber();
-            for (const auto* view : {&w->Input, &w->Base, &w->Back, &w->PresentationBack})
-                if (*view) w->Residency->NoteUse((*view)->Buffer, frame);
+            if (!w->Core.Residency || !w->Core.Context.Device) return;
+            const auto frame = w->Core.Context.Device->GetGlobalFrameNumber();
+            for (const auto* view : {&w->Input, &w->Base, &Output(w).Back, &PresentationRing(w).Back})
+                if (*view) w->Core.Residency->NoteUse((*view)->Buffer, frame);
         }
         // The slots a submission needs: the canonical input (uploaded once per revision) and a
         // write slot of the output ring(s). False while the residency defers (a refused upload
         // or an exhausted ring); the caller polls again next frame.
         bool AcquireSlots(const Work& w)
         {
-            auto& r = *w->Residency;
+            auto& r = *w->Core.Residency;
             const auto& c = w->Publication.Config;
-            const auto& ctx = w->Context;
+            const auto& ctx = w->Core.Context;
             const auto entity = w->Publication.Entity;
             if (!w->Input)
             {
@@ -664,61 +629,57 @@ namespace Extrinsic::Runtime
                 w->Base = aliased ? w->Input : ResolveGpuPropertyInput(r, *ctx.Scene, ctx.World, entity, c.Output);
                 if (!w->Base || w->Base->Layout.Count != w->Count) { w->Base.reset(); return false; }
             }
-            if (!w->Back)
-            {
-                w->Back = AcquireGpuPropertyOutput(r, ctx.World, entity, c.Output, w->Count, kRingDepth);
-                if (w->Back) w->Ring = r.RingGeneration(w->Key);
-                if (!w->Back) return false;
-            }
-            if (w->Presentation && !w->PresentationBack)
-            {
-                w->PresentationBack = AcquireGpuPropertyOutput(r, ctx.World, entity, GpuPropertyPresentationRef(c.Output), w->Count, kRingDepth);
-                if (w->PresentationBack) w->PresentationRing = r.RingGeneration(w->PresentationKey);
-                if (!w->PresentationBack) return false;
-            }
-            return true;
+            // A ring another run created defers like an exhausted one.
+            if (GP::AcquireGpuTransactionBack(w->Core, 0, entity, c.Output, w->Count, kRingDepth) != GP::GpuRingAcquisition::Ready)
+                return false;
+            return !w->Presentation ||
+                   GP::AcquireGpuTransactionBack(w->Core, 1, entity, GpuPropertyPresentationRef(c.Output), w->Count, kRingDepth) ==
+                       GP::GpuRingAcquisition::Ready;
         }
         // Ends the compute job as failed without queueing more work.
         bool Refuse(const Work& w, std::string diagnostic)
         {
             ReleaseWorkspaces(w);
-            w->Gpu = std::make_shared<SpatialGpuResult>();
-            w->Gpu->State = SpatialQueryState::Failed;
-            w->Gpu->Diagnostic = std::move(diagnostic);
+            auto& gpu = w->Core.Gpu;
+            gpu = std::make_shared<SpatialGpuResult>();
+            gpu->State = SpatialQueryState::Failed;
+            gpu->Diagnostic = std::move(diagnostic);
             return true;
         }
         bool Defer(const Work& w)
         {
-            if (++w->Deferrals < kMaxDeferrals) return false;
+            if (!GP::GpuTransactionDeferralsExhausted(w->Core)) return false;
             return Refuse(w, "The GPU property residency refused the run's input or output slot; previous output retained.");
         }
         // The submission that wrote Back has finished: its slot becomes the front the renderer shows.
         void PublishPreview(const Work& w)
         {
             const bool recorded = std::exchange(w->StoreRecorded, false);
-            w->Back.reset();
-            w->PresentationBack.reset();
-            if (!recorded || !w->Residency) return;
-            if (w->Residency->Publish(w->Key)) ++w->Previews;
-            if (w->Presentation) (void)w->Residency->Publish(w->PresentationKey);
+            Output(w).Back.reset();
+            PresentationRing(w).Back.reset();
+            auto* residency = w->Core.Residency;
+            if (!recorded || !residency) return;
+            if (residency->Publish(Output(w).Key)) ++w->Previews;
+            if (w->Presentation) (void)residency->Publish(PresentationRing(w).Key);
         }
         bool QueueExplicit(const Work& w)
         {
-            const auto& ctx = w->Context;
+            const auto& ctx = w->Core.Context;
+            auto& gpu = w->Core.Gpu;
             w->Filter = ctx.SpatialIndices->LeaseGpuWorkspace<Graphics::PropertyFilterWorkspace>();
             if (!w->Filter) return false;
             w->StoreRecorded = true;
             // The result stays on the device (the ring); the readback is one word that only
             // reports completion.
-            w->Gpu = ctx.SpatialIndices->QueueGpuCompute(sizeof(double),
-                [w](RHI::ICommandContext& commands, const SpatialGpuIndexView&) -> RHI::BufferHandle {
-                    if (w->Abandoned || !w->Filter) return {};
+            gpu = ctx.SpatialIndices->QueueGpuCompute(sizeof(double),
+                [w, filter = w->Filter](RHI::ICommandContext& commands, const SpatialGpuIndexView&) -> RHI::BufferHandle {
+                    if (w->Core.Abandoned) return {};
                     NoteUses(w);
                     const auto io = ResidentIo(w);
-                    return w->Filter->Record(commands, {.Values = w->Values, .Channels = std::uint32_t(w->Plan.Channels),
+                    return filter->Record(commands, {.Values = w->Values, .Channels = std::uint32_t(w->Plan.Channels),
                         .Edges = w->Edges, .Weights = w->Weights, .Degree = w->Plan.Degree, .Fixed = w->Fixed}, w->Params, &io);
                 });
-            return w->Gpu != nullptr;
+            return gpu != nullptr;
         }
         // One bounded chunk per immediate submission (GRAPHICS-150); each chunk reads back only
         // the reports it is observed by. A chunk also stores the latest complete time step into
@@ -726,45 +687,46 @@ namespace Extrinsic::Runtime
         // every solve finished, stores the result.
         bool QueueChunk(const Work& w, const bool final)
         {
-            const auto& ctx = w->Context;
+            const auto& ctx = w->Core.Context;
+            auto& gpu = w->Core.Gpu;
             const std::uint32_t solves = w->Publication.Config.Filter.Iterations * std::uint32_t(w->Plan.Channels);
             w->FinalQueued = final;
-            w->Gpu = ctx.SpatialIndices->QueueGpuCompute(
+            gpu = ctx.SpatialIndices->QueueGpuCompute(
                 Graphics::SparseConjugateGradientWorkspace::ReportReadbackBytes(solves),
-                [w, final](RHI::ICommandContext& commands, const SpatialGpuIndexView&) -> RHI::BufferHandle {
-                    if (w->Abandoned || !w->Solver || !w->Filter) return {};
+                [w, final, solver = w->Solver, filter = w->Filter](RHI::ICommandContext& commands, const SpatialGpuIndexView&) -> RHI::BufferHandle {
+                    if (w->Core.Abandoned) return {};
                     const auto channels = std::uint32_t(w->Plan.Channels), rows = std::uint32_t(w->Plan.Count);
-                    if (w->Solver->Chunks() == 0u)
+                    if (solver->Chunks() == 0u)
                     {
                         // The seeds (each channel's first solve starts from the input) come from
                         // the canonical slot; only the CPU-assembled coupling was uploaded.
                         NoteUses(w);
                         const auto io = ResidentIo(w);
-                        if (!w->Solver->RecordUpload(commands) ||
-                            !w->Filter->RecordLoad(commands, io, channels, w->Solver->ResultBuffer(), w->Solver->SolutionsAddress(), 1u, rows))
+                        if (!solver->RecordUpload(commands) ||
+                            !filter->RecordLoad(commands, io, channels, solver->ResultBuffer(), solver->SolutionsAddress(), 1u, rows))
                             return {};
                     }
-                    const auto buffer = final ? w->Solver->RecordFinal(commands) : w->Solver->RecordNext(commands);
+                    const auto buffer = final ? solver->RecordFinal(commands) : solver->RecordNext(commands);
                     if (!buffer.IsValid()) return {};
-                    const auto iterations = w->Solver->CompletedSolves() / channels;
-                    if (w->Back && iterations > 0u)
+                    const auto iterations = solver->CompletedSolves() / channels;
+                    if (Output(w).Back && iterations > 0u)
                     {
                         NoteUses(w);
                         const auto io = ResidentIo(w);
-                        const std::uint64_t solutions = w->Solver->SolutionsAddress() +
+                        const std::uint64_t solutions = solver->SolutionsAddress() +
                             std::uint64_t(iterations - 1u) * channels * rows * sizeof(double);
-                        w->StoreRecorded = w->Filter->RecordStore(commands, io, channels, w->Solver->ResultBuffer(), solutions, 1u, rows);
+                        w->StoreRecorded = filter->RecordStore(commands, io, channels, solver->ResultBuffer(), solutions, 1u, rows);
                     }
                     return buffer;
                 }, SpatialGpuLatency::Immediate);
-            return w->Gpu != nullptr;
+            return gpu != nullptr;
         }
         // Main-thread readiness poll of the compute job: queues the device work, publishes each
         // finished preview and reports when the run reached its end (or failed / was stopped).
         bool Poll(const Work& w)
         {
-            if (!Current(w)) return true;
-            const auto& ctx = w->Context;
+            const auto& ctx = w->Core.Context;
+            auto& gpu = w->Core.Gpu;
             if (w->Implicit)
             {
                 if (!w->Solver)
@@ -784,19 +746,19 @@ namespace Extrinsic::Runtime
                         return Refuse(w, "The Vulkan solver refused the implicit system; previous output retained.");
                     return QueueChunk(w, false) ? false : Refuse(w, kRefused);
                 }
-                if (!w->Gpu || w->Gpu->State == SpatialQueryState::Failed) return true;
-                if (w->Gpu->State != SpatialQueryState::Ready) return false;
+                if (!gpu || gpu->State == SpatialQueryState::Failed) return true;
+                if (gpu->State != SpatialQueryState::Ready) return false;
                 PublishPreview(w);
                 if (w->FinalQueued) return true;
-                w->Solver->Observe(w->Gpu->Data);
-                if (ctx.JobCommands.ReportProgress && w->Token.IsValid())
+                w->Solver->Observe(gpu->Data);
+                if (ctx.JobCommands.ReportProgress && w->Core.RunToken.IsValid())
                 {
                     // Chained solves (iterations x channels) are the one place a
                     // count is known; the explicit kernels are a single dispatch.
                     const auto total = std::max<std::uint32_t>(
                         1u, w->Publication.Config.Filter.Iterations * std::uint32_t(w->Plan.Channels));
                     ctx.JobCommands.ReportProgress(
-                        w->Token,
+                        w->Core.RunToken,
                         {.Normalized = std::min(1.0f, float(w->Solver->CompletedSolves()) / float(total)),
                          .Determinate = true});
                 }
@@ -806,26 +768,35 @@ namespace Extrinsic::Runtime
                     if (!AcquireSlots(w)) return Defer(w);
                     return QueueChunk(w, true) ? false : Refuse(w, kRefused);
                 }
-                if (w->StopRequested) { w->Stopped = true; return true; }
+                if (w->StopRequested)
+                {
+                    w->Stopped = true;
+                    // Nothing to accept: the run ends here, not in an Accept of a missing front.
+                    if (w->Previews == 0u)
+                        Finish(w, EditorGpuTransactionPhase::Discarded, EditorCommandStatus::NoChange,
+                               "Vulkan property smoothing stopped before a preview; previous output retained.");
+                    return true;
+                }
                 (void)AcquireSlots(w); // no slot: this chunk computes without a preview
                 return QueueChunk(w, false) ? false : Refuse(w, kRefused);
             }
-            if (!w->Gpu)
+            if (!gpu)
             {
                 if (!AcquireSlots(w)) return Defer(w);
                 return QueueExplicit(w) ? false : Refuse(w, kRefused);
             }
-            if (w->Gpu->State == SpatialQueryState::Ready) PublishPreview(w);
-            return w->Gpu->State == SpatialQueryState::Ready || w->Gpu->State == SpatialQueryState::Failed;
+            if (gpu->State == SpatialQueryState::Ready) PublishPreview(w);
+            return gpu->State == SpatialQueryState::Ready || gpu->State == SpatialQueryState::Failed;
         }
         // The compute job ended: the run either waits for Accept or failed.
         void CompleteRun(const Work& w)
         {
             w->Input.reset();
-            if (!w->Gpu || w->Gpu->State != SpatialQueryState::Ready)
+            const auto& gpu = w->Core.Gpu;
+            if (!gpu || gpu->State != SpatialQueryState::Ready)
             {
                 Finish(w, EditorGpuTransactionPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
-                       w->Gpu && !w->Gpu->Diagnostic.empty() ? w->Gpu->Diagnostic
+                       gpu && !gpu->Diagnostic.empty() ? gpu->Diagnostic
                        : "Vulkan property smoothing did not return a result; previous output retained.");
                 return;
             }
@@ -834,12 +805,12 @@ namespace Extrinsic::Runtime
                 // Every chained solve must converge, as on the CPU.
                 const std::size_t solves = std::size_t(w->Publication.Config.Filter.Iterations) * w->Plan.Channels;
                 bool converged = w->Solver && w->Solver->Finished() &&
-                    w->Gpu->Data.size() == Graphics::SparseConjugateGradientWorkspace::ReportReadbackBytes(std::uint32_t(solves));
+                    gpu->Data.size() == Graphics::SparseConjugateGradientWorkspace::ReportReadbackBytes(std::uint32_t(solves));
                 std::size_t applications = 0;
                 for (std::size_t k = 0; converged && k < solves; ++k)
                 {
                     Graphics::SparseCgReport report{};
-                    std::memcpy(&report, w->Gpu->Data.data() + k * sizeof(report), sizeof(report));
+                    std::memcpy(&report, gpu->Data.data() + k * sizeof(report), sizeof(report));
                     converged = report.Status == Graphics::SparseCgStatus::Converged;
                     applications += report.Iterations + 1;
                 }
@@ -860,7 +831,7 @@ namespace Extrinsic::Runtime
                 return;
             }
             ReleaseWorkspaces(w);
-            w->Phase = EditorGpuTransactionPhase::ReadyToAccept;
+            GP::ReadyGpuTransaction(w->Core);
             w->Result.Status = EditorCommandStatus::Pending;
             w->Result.Message = w->Stopped ? "Stopped; the latest preview waits for Accept or Discard."
                                            : "The GPU result waits for Accept or Discard.";
@@ -868,12 +839,14 @@ namespace Extrinsic::Runtime
         // Accept landed: the front's rows become the published property and the canonical slot.
         void CompleteAccept(const Work& w)
         {
-            const auto& ctx = w->Context;
+            const auto& ctx = w->Core.Context;
             const auto& p = w->Publication;
+            auto* residency = w->Core.Residency;
+            const auto& readback = Output(w).Readback;
             // The publication the readback leased: BindRevision binds exactly that one.
-            const std::uint64_t accepted = w->Readback && w->Readback->Lease ? w->Readback->Lease->Publication : 0u;
-            if (w->Readback) w->Readback->Lease.reset();
-            if (w->Readback && w->Readback->Failed)
+            const std::uint64_t accepted = readback && readback->Lease ? readback->Lease->Publication : 0u;
+            if (readback) readback->Lease.reset();
+            if (readback && readback->Failed)
             {
                 Finish(w, EditorGpuTransactionPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
                        "Vulkan property smoothing readback failed; previous output retained.");
@@ -886,7 +859,7 @@ namespace Extrinsic::Runtime
             {
                 const bool wide = p.Config.Output.ValueKind == K::Double;
                 const std::size_t elementBytes = wide ? sizeof(double) : sizeof(float);
-                if (!w->Readback || w->Readback->Bytes.size() != std::size_t(w->Count) * channels * elementBytes)
+                if (!readback || readback->Bytes.size() != std::size_t(w->Count) * channels * elementBytes)
                 {
                     Finish(w, EditorGpuTransactionPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
                            "Vulkan property smoothing readback has the wrong size; previous output retained.");
@@ -895,7 +868,7 @@ namespace Extrinsic::Runtime
                 for (std::size_t i = 0; i < p.Slots.size(); ++i)
                     for (std::size_t c = 0; c < channels; ++c)
                     {
-                        const std::byte* at = w->Readback->Bytes.data() + (std::size_t(p.Slots[i]) * channels + c) * elementBytes;
+                        const std::byte* at = readback->Bytes.data() + (std::size_t(p.Slots[i]) * channels + c) * elementBytes;
                         if (wide) std::memcpy(&gpuValues[i * channels + c], at, sizeof(double));
                         else { float value{}; std::memcpy(&value, at, sizeof(float)); gpuValues[i * channels + c] = value; }
                     }
@@ -907,78 +880,71 @@ namespace Extrinsic::Runtime
             const std::string summary = w->CpuStageBytes
                 ? "; CPU-assembled coupling uploaded: " + std::to_string(w->CpuStageBytes) + " bytes" : "";
             auto result = Publish(ctx, p, filtered, w->Result, summary);
+            if (!filtered.Success) result.Status = EditorCommandStatus::GeometryProcessingFailed;
+            w->Result = result;
             if (!filtered.Success || !result.Succeeded())
             {
-                ReleaseRings(w);
-                w->Phase = EditorGpuTransactionPhase::Failed;
-                if (!filtered.Success) result.Status = EditorCommandStatus::GeometryProcessingFailed;
-                Deliver(w, std::move(result));
+                Finish(w, EditorGpuTransactionPhase::Failed, result.Status, std::move(result.Message));
                 return;
             }
             // The front becomes the canonical slot of the new CPU revision (ADR 0030 decision 6).
-            if (w->Residency)
+            if (residency)
             {
                 const auto watch = GP::ObserveGeometryProperty(BuildGeometryAvailability(ctx.Scene->Raw(), p.Entity),
                                                                p.Config.Output.Domain, p.Config.Output.Name);
-                if (!watch.Revision || !w->Residency->BindRevision(w->Key, *watch.Revision, accepted))
-                    (void)w->Residency->Discard(w->Key, w->Ring);
-                if (w->Presentation) (void)w->Residency->Discard(w->PresentationKey, w->PresentationRing);
+                if (!watch.Revision || !residency->BindRevision(Output(w).Key, *watch.Revision, accepted))
+                    (void)residency->Discard(Output(w).Key, Output(w).Generation);
+                if (w->Presentation) (void)residency->Discard(PresentationRing(w).Key, PresentationRing(w).Generation);
             }
-            w->Phase = EditorGpuTransactionPhase::Applied;
-            Deliver(w, std::move(result));
+            Finish(w, EditorGpuTransactionPhase::Applied, result.Status, std::move(result.Message));
+        }
+        // Wires the typed hooks of a transaction whose core keys are set.
+        void Install(const Work& owner)
+        {
+            auto* raw = owner.get();
+            const auto self = [raw] { return raw->shared_from_this(); };
+            auto& t = raw->Core;
+            t.Label = "Vulkan property smoothing";
+            t.AcceptJobName = "Vulkan property smoothing accept";
+            t.JobLabel = "Property smoothing";
+            t.Hooks = {
+                .Current = [raw] { return InputsCurrent(*raw); },
+                .Poll = [self] { return Poll(self()); },
+                .CompleteRun = [self] { CompleteRun(self()); },
+                .CompleteAccept = [self] { CompleteAccept(self()); },
+                .Release = [self] {
+                    const auto w = self();
+                    ReleaseWorkspaces(w);
+                    w->Input.reset();
+                    w->Base.reset();
+                },
+                .Deliver = [raw](const EditorCommandStatus status, std::string message) {
+                    raw->Result.Status = status;
+                    raw->Result.Message = std::move(message);
+                    if (auto sink = std::move(raw->Sink)) sink(raw->Result);
+                }};
+        }
+        // Sets the output (and presentation) ring keys of `entity`'s output.
+        void SetRings(const Work& w, const entt::entity entity, const PropertySmoothingConfig& c)
+        {
+            auto& t = w->Core;
+            w->Presentation = c.Output.ValueKind == K::Double;
+            t.Rings[0] = {.Key = MakeGpuPropertyKey(t.Context.World, entity, c.Output), .ReadBack = true};
+            t.Rings[1] = {.Key = MakeGpuPropertyKey(t.Context.World, entity, GpuPropertyPresentationRef(c.Output))};
+            t.RingCount = w->Presentation ? 2u : 1u;
         }
         // Queues the front's readback and the job that publishes it.
         EditorPropertySmoothingResult BeginAccept(const Work& w, std::function<void(EditorPropertySmoothingResult)> onComplete)
         {
             auto result = w->Result;
-            const auto refuse = [&](const EditorCommandStatus status, std::string message) {
-                result.Status = status;
-                result.Message = std::move(message);
+            if (auto refused = GP::GpuTransactionAcceptRefusal(w->Core, bool(onComplete)))
+            {
+                result.Status = refused->Status;
+                result.Message = std::move(refused->Message);
                 return result;
-            };
-            if (w->Phase != EditorGpuTransactionPhase::ReadyToAccept)
-                return refuse(EditorCommandStatus::InvalidProcessingParameters, "No GPU result waits for Accept.");
-            if (!Current(w))
-                return refuse(EditorCommandStatus::StaleEntity, "The inputs changed since the run; discard the result and run again.");
-            const auto& ctx = w->Context;
-            if (onComplete) w->Sink = GuardEditorProcessingResult(ctx, std::move(onComplete));
-            w->Readback.reset();
-            if (!w->TestFront)
-            {
-                // One readback in the property's precision (shared with the positions Accept).
-                w->Readback = std::make_shared<GP::GpuFrontReadback>();
-                if (!w->Residency || !GP::BeginGpuFrontReadback(ctx, *w->Residency, w->Key, w->Readback))
-                {
-                    w->Readback.reset();
-                    Finish(w, EditorGpuTransactionPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
-                           "The GPU result is no longer resident; previous output retained.");
-                    return w->Result;
-                }
             }
-            w->Phase = EditorGpuTransactionPhase::Accepting;
-            // The publication runs from a completion drain like every other editor result.
-            JobDesc accept{
-                .DebugName = "Vulkan property smoothing accept", .Scope = ctx.World, .Kind = RuntimeTaskKinds::GeometryProcess,
-                .Work = [](const JobCancellation&) { return JobResultEnvelope::Make(true); },
-                .IsReadyToApply = [w] { return !Current(w) || !w->Readback || GP::PollGpuFrontReadback(*w->Readback); },
-                .ValidateBeforeApply = [w] { return Current(w) ? JobApplyValidation::Current : JobApplyValidation::StaleGeneration; },
-                .PublishCompletion = [w](KernelEventBus&, const JobResultEnvelope&) {
-                    CompleteAccept(w);
-                    return w->Phase == EditorGpuTransactionPhase::Applied;
-                },
-                .FinalizeUnpublishedOnMainThread = [w] {
-                    w->Abandoned = true;
-                    if (w->Delivered) return;
-                    Finish(w, EditorGpuTransactionPhase::Discarded, EditorCommandStatus::StaleEntity,
-                           "Vulkan property smoothing cancelled or stale; previous output retained.");
-                }};
-            w->AcceptToken = ctx.JobCommands.Submit(std::move(accept), w->Identity);
-            if (!w->AcceptToken.IsValid())
-            {
-                Finish(w, EditorGpuTransactionPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
-                       "Vulkan property smoothing accept submission rejected.");
-                return w->Result;
-            }
+            if (onComplete) w->Sink = GuardEditorProcessingResult(w->Core.Context, std::move(onComplete));
+            if (!GP::BeginGpuTransactionAccept(GP::GpuTransactionOf(w))) return w->Result;
             result.Status = EditorCommandStatus::Pending;
             result.Message = "Reading the GPU result back.";
             w->Result = result;
@@ -997,7 +963,8 @@ namespace Extrinsic::Runtime
             };
             std::string diagnostic;
             auto w = std::make_shared<EditorPropertySmoothingTransaction>();
-            w->Context = context;
+            w->Core.Context = context;
+            Install(w);
             auto& values = prepared.Values;
             const auto channels = prepared.Channels;
             auto& graph = prepared.Graph;
@@ -1046,60 +1013,28 @@ namespace Extrinsic::Runtime
             w->Values = std::move(values);
             w->Publication = std::move(prepared.Publication);
             w->OutputWatch = std::move(prepared.OutputWatch);
-            w->Identity = {.EntityId = id, .Scope = ToEditorJobScope(c.Output.Domain),
-                           .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField, .OutputName = c.Output.Name};
-            if (auto busy = GP::MeshSupport::ActiveOutputJobRefusal(context, w->Identity, "Property smoothing"))
+            auto& t = w->Core;
+            t.Identity = {.EntityId = id, .Scope = ToEditorJobScope(c.Output.Domain),
+                          .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField, .OutputName = c.Output.Name};
+            // The output ring, keyed like every other GPU user of the property (ADR 0030).
+            t.Residency = context.SpatialIndices ? context.SpatialIndices->PropertyResidency() : nullptr;
+            w->Count = std::uint32_t(prepared.Props->Size());
+            SetRings(w, prepared.Entity, c);
+            if (auto refused = GP::GpuTransactionStartRefusal(t))
             {
-                result.Status = EditorCommandStatus::Pending;
-                result.Message = std::move(busy->Message);
+                result.Status = refused->Status;
+                result.Message = std::move(refused->Message);
                 return {};
             }
-            // The output ring, keyed like every other GPU user of the property (ADR 0030).
-            w->Residency = context.SpatialIndices->PropertyResidency();
-            if (!w->Residency) return fail("Vulkan property smoothing needs the GPU property residency.");
-            w->Count = std::uint32_t(prepared.Props->Size());
-            w->Key = MakeGpuPropertyKey(context.World, prepared.Entity, c.Output);
-            w->Presentation = c.Output.ValueKind == K::Double;
-            w->PresentationKey = MakeGpuPropertyKey(context.World, prepared.Entity, GpuPropertyPresentationRef(c.Output));
-            if (w->Residency->HasRing(w->Key))
-                return fail("A GPU result for this output awaits Accept or Discard.");
-            w->AutoAccept = autoAccept;
+            t.AutoAccept = autoAccept;
             w->Sink = GuardEditorProcessingResult(context, std::move(onComplete));
             w->Result = result;
             w->Result.Status = EditorCommandStatus::Pending;
             w->Result.Message = "Vulkan property smoothing queued.";
-            JobDesc gpu{
-                .DebugName = "Vulkan property smoothing", .Scope = context.World, .Kind = RuntimeTaskKinds::GeometryProcess,
-                .Work = [](const JobCancellation&) { return JobResultEnvelope::Make(true); },
-                .IsReadyToApply = [w] { return Poll(w); },
-                .ValidateBeforeApply = [w] { return Current(w) ? JobApplyValidation::Current : JobApplyValidation::StaleGeneration; },
-                .PublishCompletion = [w](KernelEventBus&, const JobResultEnvelope&) {
-                    CompleteRun(w);
-                    if (w->Phase == EditorGpuTransactionPhase::ReadyToAccept && w->AutoAccept)
-                    {
-                        // A refused automatic Accept (e.g. stale) ends the transaction: nothing
-                        // waits for a user here.
-                        const auto accepted = BeginAccept(w, {});
-                        if (accepted.Status != EditorCommandStatus::Pending)
-                            Finish(w, accepted.Status == EditorCommandStatus::StaleEntity ? EditorGpuTransactionPhase::Discarded
-                                                                                          : EditorGpuTransactionPhase::Failed,
-                                   accepted.Status, accepted.Message);
-                    }
-                    return w->Phase != EditorGpuTransactionPhase::Failed;
-                },
-                .FinalizeUnpublishedOnMainThread = [w] {
-                    w->Abandoned = true;
-                    if (w->Delivered) return;
-                    Finish(w, EditorGpuTransactionPhase::Discarded, EditorCommandStatus::StaleEntity,
-                           "Vulkan property smoothing cancelled or stale; previous output retained.");
-                }};
-            w->Token = context.JobCommands.Submit(std::move(gpu), w->Identity);
-            w->Identity.Run = w->Token; // the Accept stage joins this run
-            if (!w->Token.IsValid())
+            if (!GP::SubmitGpuTransactionRun(GP::GpuTransactionOf(w), "Vulkan property smoothing").IsValid())
             {
-                w->Abandoned = true;
                 result.Status = EditorCommandStatus::GeometryProcessingFailed;
-                result.Message = "Vulkan property smoothing submission rejected.";
+                result.Message = GP::MeshSupport::QueuedJobRejectedMessage(t.JobLabel);
                 return {};
             }
             result = w->Result;
@@ -1138,21 +1073,22 @@ namespace Extrinsic::Runtime
         EditorPropertySmoothingTransactionSnapshot snapshot;
         // Always asked, so even "no run" carries the session scene epoch.
         if (!run) { snapshot.Progress = GetEditorOperationProgress(commands, JobToken{}); return snapshot; }
-        snapshot.StableEntityId = run->Identity.EntityId;
-        snapshot.OutputName = run->Identity.OutputName;
+        snapshot.StableEntityId = run->Core.Identity.EntityId;
+        snapshot.OutputName = run->Core.Identity.OutputName;
         // Key by the run's own jobs, not the output: the Accept readback job
         // shares the identity and would otherwise mask the solver's fraction.
         // Once Accept started, that job is the run's current (and final) one.
         snapshot.Progress = GetEditorOperationProgress(
-            commands, run->AcceptToken.IsValid() ? run->AcceptToken : run->Token);
-        snapshot.Phase = run->Phase;
+            commands, run->Core.AcceptToken.IsValid() ? run->Core.AcceptToken : run->Core.RunToken);
+        snapshot.Phase = run->Core.Phase;
         snapshot.Previews = run->Previews;
-        snapshot.DeviceWorkQueued = run->Gpu != nullptr;
+        snapshot.DeviceWorkQueued = run->Core.Gpu != nullptr;
         snapshot.Result = run->Result;
-        if (run->Phase == EditorGpuTransactionPhase::ReadyToAccept)
+        if (run->Core.Phase == EditorGpuTransactionPhase::ReadyToAccept)
         {
             snapshot.Stale = !PropertySmoothingDetail::Current(run);
-            const bool resident = run->TestFront.has_value() || (run->Residency && run->Residency->HasRing(run->Key));
+            const bool resident = run->TestFront.has_value() ||
+                                  (run->Core.Residency && run->Core.Residency->HasRing(run->Core.Rings[0].Key));
             snapshot.CanAccept = !snapshot.Stale && resident;
             if (snapshot.Stale) snapshot.AcceptDisabledReason = "The inputs changed since the run; discard the result and run again.";
             else if (!resident) snapshot.AcceptDisabledReason = "The GPU result is no longer resident; discard it.";
@@ -1176,27 +1112,11 @@ namespace Extrinsic::Runtime
 
     void DiscardEditorPropertySmoothing(const EditorProcessingCommands&, const EditorPropertySmoothingTransactionHandle& run)
     {
-        if (!run) return;
-        namespace PS = PropertySmoothingDetail;
-        switch (run->Phase)
-        {
-        case EditorGpuTransactionPhase::Applied:
-        case EditorGpuTransactionPhase::Discarded:
-        case EditorGpuTransactionPhase::Failed:
-            return;
-        case EditorGpuTransactionPhase::Running:
-        case EditorGpuTransactionPhase::Accepting:
-            // The job finalizes as cancelled on its next drain; the rings go now (freed after
-            // their completions), so observation returns to the canonical slot at once.
-            run->Abandoned = true;
-            PS::Finish(run, EditorGpuTransactionPhase::Discarded, EditorCommandStatus::StaleEntity,
-                       "Vulkan property smoothing discarded; previous output retained.");
-            return;
-        case EditorGpuTransactionPhase::ReadyToAccept:
-            PS::Finish(run, EditorGpuTransactionPhase::Discarded, EditorCommandStatus::StaleEntity,
-                       "Vulkan property smoothing discarded; previous output retained.");
-            return;
-        }
+        // A queued job finalizes as cancelled on its next drain; the rings go now (freed after
+        // their completions), so observation returns to the canonical slot at once.
+        if (run)
+            GP::DiscardGpuTransaction(run->Core, EditorCommandStatus::StaleEntity,
+                                      "Vulkan property smoothing discarded; previous output retained.");
     }
 
     EditorPropertySmoothingTransactionHandle MakeEditorPropertySmoothingTransactionForTest(
@@ -1214,7 +1134,8 @@ namespace Extrinsic::Runtime
         auto prepared = PS::Prepare(context, id, config, result, diagnostic);
         if (!prepared) return {};
         auto w = std::make_shared<EditorPropertySmoothingTransaction>();
-        w->Context = context;
+        w->Core.Context = context;
+        PS::Install(w);
         auto plan = S::PlanPropertyFilter(prepared->Values, prepared->Channels, prepared->Graph.Edges, c.Filter,
                                           prepared->Graph.BoundaryRows, prepared->Graph.Mass, diagnostic);
         if (!plan || frontValues.size() != prepared->Values.size()) return {};
@@ -1223,31 +1144,35 @@ namespace Extrinsic::Runtime
         w->Publication = std::move(prepared->Publication);
         w->OutputWatch = std::move(prepared->OutputWatch);
         w->Publication.Config = c;
-        w->Identity = {.EntityId = id, .Scope = ToEditorJobScope(c.Output.Domain),
-                       .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField, .OutputName = c.Output.Name};
+        auto& t = w->Core;
+        t.Identity = {.EntityId = id, .Scope = ToEditorJobScope(c.Output.Domain),
+                      .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField, .OutputName = c.Output.Name};
         w->Count = std::uint32_t(prepared->Props->Size());
-        w->Key = MakeGpuPropertyKey(context.World, prepared->Entity, c.Output);
-        w->Presentation = c.Output.ValueKind == K::Double;
-        w->PresentationKey = MakeGpuPropertyKey(context.World, prepared->Entity, GpuPropertyPresentationRef(c.Output));
-        w->Residency = residency;
+        PS::SetRings(w, prepared->Entity, c);
+        t.Residency = residency;
         if (residency)
         {
+            auto& output = t.Rings[0];
             if (const auto back = AcquireGpuPropertyOutput(*residency, context.World, prepared->Entity, c.Output, w->Count, PS::kRingDepth);
-                back && residency->Publish(w->Key))
+                back && residency->Publish(output.Key))
                 ++w->Previews;
-            w->Ring = residency->RingGeneration(w->Key);
+            output.Generation = residency->RingGeneration(output.Key);
             if (w->Presentation)
+            {
+                auto& presentation = t.Rings[1];
                 if (AcquireGpuPropertyOutput(*residency, context.World, prepared->Entity, GpuPropertyPresentationRef(c.Output), w->Count, PS::kRingDepth))
-                    (void)residency->Publish(w->PresentationKey);
-            if (w->Presentation) w->PresentationRing = residency->RingGeneration(w->PresentationKey);
+                    (void)residency->Publish(presentation.Key);
+                presentation.Generation = residency->RingGeneration(presentation.Key);
+            }
         }
         else ++w->Previews;
         w->TestFront = std::move(frontValues);
+        t.TestFront = true;
         w->Result = result;
         w->Result.Status = EditorCommandStatus::Pending;
         w->Result.Message = "The GPU result waits for Accept or Discard.";
         w->Result.BackendId = "vulkan_compute";
-        w->Phase = EditorGpuTransactionPhase::ReadyToAccept;
+        GP::ReadyGpuTransaction(t);
         return w;
     }
 

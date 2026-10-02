@@ -741,11 +741,10 @@ namespace Extrinsic::Runtime
 
         bool Current(const Run& w) { return GP::GpuTransactionCurrent(w->Core); }
         auto& Ring(const Run& w) { return w->Core.Rings[0]; }
-        // Only completed (or never queued) work returns its workspace early; otherwise the
-        // recorder closure that captures the run keeps it until the cache knows it is safe.
+        // Recorders own their workspace leases (the cache keeps them until the readback is
+        // safe), so the run returns its own at once.
         void ReleaseWorkspaces(const Run& w)
         {
-            if (!GP::GpuTransactionWorkReleasable(w->Core)) return;
             w->Workspace.reset();
             w->PointWorkspace.reset();
         }
@@ -866,11 +865,11 @@ namespace Extrinsic::Runtime
                 }
                 w->StoreRecorded = true;
                 gpu = ctx.SpatialIndices->QueueGpuCompute(w->Work->GpuIndex, sizeof(Graphics::PointNormalsGpuStats),
-                    [w](RHI::ICommandContext& commands, const SpatialGpuIndexView& index) -> RHI::BufferHandle {
-                        if (!Current(w) || !w->Input || !Ring(w).Back || !w->PointWorkspace) return {};
+                    [w, workspace = w->PointWorkspace](RHI::ICommandContext& commands, const SpatialGpuIndexView& index) -> RHI::BufferHandle {
+                        if (!Current(w) || !w->Input || !Ring(w).Back) return {};
                         NoteUses(w);
                         const auto& c = w->Work->Config;
-                        return w->PointWorkspace->Record(commands,
+                        return workspace->Record(commands,
                             {.K = std::max(c.KNeighbors, c.MinimumNeighbors), .MinimumNeighbors = c.MinimumNeighbors, .BatchSize = c.GpuQueryBatchSize,
                              .RadiusSearch = c.UseRadiusSearch, .Radius = c.Radius,
                              .Epsilon = c.DegenerateNormalLengthEpsilon, .CollinearRatio = c.CollinearEigenvalueRatioEpsilon,
@@ -890,14 +889,14 @@ namespace Extrinsic::Runtime
             }
             w->StoreRecorded = true;
             gpu = ctx.SpatialIndices->QueueGpuCompute(std::size_t(Graphics::VertexNormalsWorkspace::StatsReadbackBytes),
-                [w](RHI::ICommandContext& commands, const SpatialGpuIndexView&) -> RHI::BufferHandle {
+                [w, workspace = w->Workspace](RHI::ICommandContext& commands, const SpatialGpuIndexView&) -> RHI::BufferHandle {
                     const auto& back = Ring(w).Back;
-                    if (w->Core.Abandoned || !back || !w->Workspace) return {};
+                    if (w->Core.Abandoned || !back) return {};
                     NoteUses(w);
                     const Graphics::VertexNormalsResidentIo io{.Positions = View(w->Input), .Topology = View(w->Topology),
                                                                .Output = View(back), .Base = View(w->Base),
                                                                .OutputBytes = back->Bytes, .Layout = w->Layout};
-                    return w->Workspace->Record(commands, Params(w->Work->Config), io);
+                    return workspace->Record(commands, Params(w->Work->Config), io);
                 });
         }
         // Main-thread readiness poll of the compute job.
@@ -1074,6 +1073,7 @@ namespace Extrinsic::Runtime
             t.Residency = residency;
             t.Label = "Vulkan normals";
             t.AcceptJobName = "Vulkan normals accept";
+            t.JobLabel = "Normal estimation";
             t.Identity = {.EntityId = c.StableEntityId, .Scope = ToEditorJobScope(c.Output.Domain),
                           .OutputSemantic = GeometryPresentationSlotSemantic::Normal, .OutputName = c.Output.Name};
             t.Rings[0] = {.Key = MakeGpuPropertyKey(context.World, work->Entity, c.Output), .ReadBack = true};
@@ -1130,7 +1130,7 @@ namespace Extrinsic::Runtime
             };
             const auto& c = work->Config;
             auto w = Make(context, work, context.SpatialIndices ? context.SpatialIndices->PropertyResidency() : nullptr);
-            if (auto refused = GP::GpuTransactionStartRefusal(w->Core, "Normal estimation"))
+            if (auto refused = GP::GpuTransactionStartRefusal(w->Core))
                 return fail(refused->Status, std::move(refused->Message));
             if (PointNormals(*work))
             {
@@ -1147,7 +1147,7 @@ namespace Extrinsic::Runtime
             result.Message = "Vulkan normals queued.";
             work->Result = result;
             if (!GP::SubmitGpuTransactionRun(GP::GpuTransactionOf(w), "Vulkan normals").IsValid())
-                return fail(EditorCommandStatus::GeometryProcessingFailed, "Vulkan normals submission rejected.");
+                return fail(EditorCommandStatus::GeometryProcessingFailed, GP::MeshSupport::QueuedJobRejectedMessage(w->Core.JobLabel));
             return w;
         }
     } // namespace NormalTransactionDetail

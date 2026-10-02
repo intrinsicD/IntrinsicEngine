@@ -62,7 +62,7 @@ the per-job setup/completion prologue that precedes them is
   is embedded by value in each typed transaction (rings with captured generations, readbacks,
   phase, Abandoned/Delivered/Publishing, run and accept tokens, `AcceptJobName`) with typed hooks
   (`Current`, `Poll`, `CompleteRun`, `CompleteAccept`, `Release`, `Deliver`). Slices: 1 scalar (typed
-  Start and publication mode), 2 outliers, 3 normals.
+  Start and publication mode), 2 outliers, 3 normals, 4 smoothing.
 - Shared semantics, recorded as changes where a method differed before:
   - Start refusal order is: active job on the output (Pending, shared 313 wording), then no residency,
     then a ring of the output awaiting Accept/Discard (InvalidProcessingParameters, "A GPU result for
@@ -83,6 +83,21 @@ the per-job setup/completion prologue that precedes them is
     reports it); a rejected Accept submission delivers its failure once.
   - An automatic Accept no longer rewrites the normals result message to "Reading the GPU normals
     back." (the user Accept still does).
+  - A rejected job-lane submission (Run or Accept) is worded by `MeshSupport::QueuedJobRejectedMessage`
+    with the operation's job label ("Normal estimation job submission was rejected.", "... (Accept)."),
+    as are the keypoint resident start and the positions Accept; before each method had its own
+    ("Vulkan normals submission rejected.", "Scalar Accept submission rejected." ...). The drift guard
+    rejects other hand-written job "submission rejected/refused" wording in the operations.
+  - Accept of a front that is no longer resident says "previous output retained." (normals and
+    smoothing said "previous normals retained." / their own wording).
+  - Discard of a transaction waiting in ReadyToAccept now sets `Abandoned` for every method (before
+    only while Running/Accepting for normals/smoothing/positions; not at all for scalar/outliers).
+  - Workspaces: recorders capture their own workspace leases (the spatial cache keeps a recorder
+    until its readback is safe), so a run discarded or cancelled while device work is in flight
+    returns its workspace at once. Before, `Release` kept it unless the work was Ready and nothing
+    retried later, so the run held it until its handle was dropped.
+  - Smoothing: Stop before the first preview ends inside the Run's readiness poll as
+    Discarded/NoChange ("stopped before a preview"); before it ended Discarded/StaleEntity.
 
 ## Acceptance criteria
 - [ ] One compiled lifecycle owns acquisition, polling, ring publication, Accept, Discard, cancellation and terminal delivery for one or N rings, including the accept-only (no Run phase) shape.

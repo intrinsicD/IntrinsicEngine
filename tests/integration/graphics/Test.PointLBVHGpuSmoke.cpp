@@ -1959,8 +1959,7 @@ namespace
                     if(Phase>=6)
                     {
                         EXPECT_EQ(Results.back().Status,Runtime::EditorCommandStatus::GeometryProcessingFailed);
-                        // The LBVH chain answers "... job submission was rejected (<stage>)."; the resident start "... job submission rejected."
-                        EXPECT_TRUE(Results.back().Message.find("submission")!=std::string::npos && Results.back().Message.find("rejected")!=std::string::npos)<<Results.back().Message;
+                        EXPECT_NE(Results.back().Message.find("submission was rejected"),std::string::npos)<<Results.back().Message;
                         if(Phase==7 || FullCompute){Done=true;Kernel().RequestExit();return;}
                     }
                     if(Phase==5)
@@ -2528,12 +2527,12 @@ namespace
                     if(Phase==13)
                     {
                         EXPECT_EQ(SubmissionCount,1)<<Results.back().Message;EXPECT_TRUE(SubmissionTokens.empty());
-                        EXPECT_NE(Results.back().Message.find("submission rejected"),std::string::npos)<<Results.back().Message;
+                        EXPECT_NE(Results.back().Message.find("submission was rejected"),std::string::npos)<<Results.back().Message;
                         EXPECT_EQ(Results.size(),1u);EXPECT_EQ(Callbacks,0u);
                     }
                     if(Phase==14){
                         EXPECT_EQ(Results.size(),1u);EXPECT_EQ(Callbacks,1u);
-                        EXPECT_NE(Results.back().Message.find("submission rejected"),std::string::npos);
+                        EXPECT_NE(Results.back().Message.find("submission was rejected"),std::string::npos)<<Results.back().Message;
                         EXPECT_TRUE(AcceptRejected);
                         EXPECT_EQ(std::as_const(Props(8)).Get<float>("weights").Vector(),BeforeWeights);
                     }

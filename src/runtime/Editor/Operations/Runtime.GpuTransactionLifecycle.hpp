@@ -44,7 +44,9 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         // Every front readback landed and the transaction is current: the typed publication,
         // which ends the transaction (Applied, or Failed/Discarded with the typed reason).
         std::function<void()> CompleteAccept{};
-        // Drops the typed input views and, when `GpuTransactionWorkReleasable`, the workspaces.
+        // Drops the typed input views and the workspaces. Recorders capture their own workspace
+        // leases (the spatial cache keeps a recorder until its readback is safe), so the run
+        // returns its copies at once, also when it ends while device work is in flight.
         std::function<void()> Release{};
         // The one terminal delivery: the typed result takes `status`/`message` and goes to the
         // sink. Called at most once per transaction; the result is frozen afterwards.
@@ -60,8 +62,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         Graphics::GpuPropertyResidency* Residency{};
         std::array<GpuTransactionRing, 3> Rings{};
         std::size_t RingCount{};
-        // The device work of the Run job (null until queued). A workspace may be released
-        // only while this is null or Ready: otherwise a recorder may still use it.
+        // The device work of the Run job (null until queued).
         std::shared_ptr<SpatialGpuResult> Gpu{};
         EditorGpuTransactionPhase Phase{EditorGpuTransactionPhase::Running};
         std::uint32_t Deferrals{};
@@ -73,6 +74,9 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         JobToken RunToken{}, AcceptToken{};
         // Names the transaction in shared wording, e.g. "Vulkan normals".
         std::string Label{};
+        // The operation's queued-job label, as its CPU run names it: the duplicate refusal and
+        // the rejected-submission wording (`MeshSupport::QueuedJobRejectedMessage`) use it.
+        std::string JobLabel{};
         // The Accept job's debug name, the same for a user and an automatic Accept (jobs lists
         // and tests that intercept a submission name it).
         std::string AcceptJobName{};
@@ -90,7 +94,6 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
     // Not abandoned, the world current, every acquired ring still this run's generation and
     // the typed inputs current.
     [[nodiscard]] bool GpuTransactionCurrent(const GpuTransactionCore&);
-    [[nodiscard]] bool GpuTransactionWorkReleasable(const GpuTransactionCore&) noexcept;
     [[nodiscard]] bool GpuTransactionTerminal(const GpuTransactionCore&) noexcept;
 
     // A write slot of ring `index` for `ref`. Never acquires in a ring another run created:
@@ -117,13 +120,12 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         EditorCommandStatus Status{};
         std::string Message{};
     };
-    [[nodiscard]] std::optional<GpuTransactionRefusal> GpuTransactionStartRefusal(
-        const GpuTransactionCore&, std::string_view jobLabel);
+    [[nodiscard]] std::optional<GpuTransactionRefusal> GpuTransactionStartRefusal(const GpuTransactionCore&);
     // Queues the Run job. Its readiness polls `Hooks.Poll`; publication runs `CompleteRun` and,
     // for an automatic run, Accept (a refused automatic Accept ends the transaction: Discarded
     // when stale, otherwise Failed). A cancel or stale drain finalizes once. A rejected
     // submission closes the transaction without delivery (the caller reports it) and returns
-    // an invalid token.
+    // an invalid token; the answer is `MeshSupport::QueuedJobRejectedMessage(JobLabel)`.
     [[nodiscard]] JobToken SubmitGpuTransactionRun(const GpuTransactionHandle&, std::string debugName);
 
     // Why Accept cannot start now; empty when it can. An Accept under way answers a caller

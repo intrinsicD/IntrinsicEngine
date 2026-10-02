@@ -46,6 +46,7 @@ import Geometry.Properties;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuFront.hpp"
 
 extern "C++"
@@ -570,7 +571,7 @@ namespace Extrinsic::Runtime
             }};
         if (!ctx.JobCommands.Submit(std::move(accept), w->Identity).IsValid())
         {
-            Fail(w, residency, EditorCommandStatus::GeometryProcessingFailed, "GPU positions accept submission rejected.");
+            Fail(w, residency, EditorCommandStatus::GeometryProcessingFailed, GP::MeshSupport::QueuedJobRejectedMessage("GPU positions", "Accept"));
             return w->Result;
         }
         w->Result = {.Status = EditorCommandStatus::Pending, .Message = "Reading the GPU positions back."};

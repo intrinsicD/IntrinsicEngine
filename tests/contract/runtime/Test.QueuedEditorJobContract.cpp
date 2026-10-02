@@ -305,12 +305,11 @@ TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
     constexpr std::string_view owner = "Runtime.GeometryProcessingOperations.MeshSupport.cpp";
     // Files that own a job lifecycle the helper does not cover (keep this list short; a new
     // queued operation belongs on `QueuedJobDelivery`).
-    constexpr std::array<std::string_view, 9> handWritten{
+    constexpr std::array<std::string_view, 8> handWritten{
         // GPU Run/Accept transactions not yet on Runtime.GpuTransactionLifecycle (RUNTIME-311).
         // Keypoints stays listed for its resident run's guarded publication sink.
         "Runtime.GeometryProcessingOperations.GpuPositions.cpp",
         "Runtime.GeometryProcessingOperations.Keypoints.cpp",
-        "Runtime.MeshFieldOperations.Smoothing.cpp",
         // Mesh-family jobs that keep their result in a typed state struct with the shared
         // `BuildUnpublishedEditorJobFailure` wording and `ActiveOutputJobRefusal`.
         "Runtime.GeometryProcessingOperations.cpp",
@@ -325,9 +324,8 @@ TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
     // RUNTIME-311: Accept front readbacks belong to the shared GPU transaction lifecycle; these
     // files still read fronts themselves (GpuPositions also defines the readback primitive).
     constexpr std::string_view lifecycle = "Runtime.GpuTransactionLifecycle.cpp";
-    constexpr std::array<std::string_view, 2> ownFrontReadback{
+    constexpr std::array<std::string_view, 1> ownFrontReadback{
         "Runtime.GeometryProcessingOperations.GpuPositions.cpp",
-        "Runtime.MeshFieldOperations.Smoothing.cpp",
     };
     std::size_t frontMatched = 0;
     std::size_t scanned = 0, matched = 0;
@@ -348,6 +346,15 @@ TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
             << "the duplicate wording comes from MeshSupport::ActiveOutputJobRefusal";
         EXPECT_EQ(text.find("already has an active"), std::string::npos)
             << "the duplicate wording comes from MeshSupport::ActiveOutputJobRefusal";
+        // A job-lane rejection is worded by MeshSupport::QueuedJobRejectedMessage; only a
+        // refused device submission (compute, query, sampling) is worded by its method.
+        for (const std::string_view phrase : {"submission rejected", "submission refused"})
+            for (auto at = text.find(phrase); at != std::string::npos; at = text.find(phrase, at + 1))
+            {
+                const auto before = text.substr(at >= 9 ? at - 9 : 0, at >= 9 ? 9 : at);
+                const bool device = before.ends_with("compute ") || before.ends_with("query ") || before.ends_with("sampling ");
+                EXPECT_TRUE(device) << "hand-written job submission rejection near: " << text.substr(at >= 40 ? at - 40 : 0, 60);
+            }
         const bool deliverOnce = text.find("make_shared<bool>") != std::string::npos;
         if (name == deliverOnceAllowed)
             deliverOnceMatched = deliverOnce;

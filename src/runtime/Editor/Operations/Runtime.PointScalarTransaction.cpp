@@ -104,14 +104,15 @@ namespace Extrinsic::Runtime
                 w->Workspace=t.Context.SpatialIndices->LeaseGpuWorkspace<Graphics::PointScalarWorkspace>();
                 if(!w->Workspace){Fail(w,"Scalar device workspace unavailable.");return true;}
                 t.Gpu=t.Context.SpatialIndices->QueueGpuCompute(w->Index,sizeof(Graphics::PointScalarGpuStats),
-                    [w](RHI::ICommandContext& cmd,const SpatialGpuIndexView& index)->RHI::BufferHandle{
+                    // The recorder owns its workspace lease; the cache keeps it until the readback is safe.
+                    [w,workspace=w->Workspace](RHI::ICommandContext& cmd,const SpatialGpuIndexView& index)->RHI::BufferHandle{
                         const auto& back=Typed(w).Back;
-                        if(!Current(w)||!w->Input||!back||!w->Workspace)return {};
+                        if(!Current(w)||!w->Input||!back)return {};
                         const auto frame=w->Core.Context.Device->GetGlobalFrameNumber();
                         auto& residency=*w->Core.Residency;
                         residency.NoteUse(w->Input->Buffer,frame);residency.NoteUse(back->Buffer,frame);
                         if(w->Base)residency.NoteUse(w->Base->Buffer,frame);
-                        return w->Workspace->Record(cmd,w->Params,{.Positions=*w->Input,.Output=*back,
+                        return workspace->Record(cmd,w->Params,{.Positions=*w->Input,.Output=*back,
                             .Base=w->Base.value_or(Graphics::GpuPropertyView{}),.Nodes=index.NodesBDA,
                             .LiveSlots=index.OriginalSlotsBDA,.LiveCount=index.Count});},SpatialGpuLatency::Immediate);
                 if(!t.Gpu){Fail(w,"Scalar compute submission rejected.");return true;}
@@ -211,10 +212,7 @@ namespace Extrinsic::Runtime
                 .Poll=[self]{return Poll(self());},
                 .CompleteRun=[self]{CompleteRun(self());},
                 .CompleteAccept=[self]{CompleteAccept(self());},
-                .Release=[raw]{
-                    raw->Input.reset();raw->Base.reset();
-                    // Only completed (or never queued) work returns the workspace early.
-                    if(GP::GpuTransactionWorkReleasable(raw->Core))raw->Workspace.reset();},
+                .Release=[raw]{raw->Input.reset();raw->Base.reset();raw->Workspace.reset();},
                 .Deliver=[raw](EditorCommandStatus status,std::string message){
                     raw->Result.Phase=raw->Core.Phase;raw->Result.Status=status;raw->Result.Message=std::move(message);
                     if(auto sink=std::move(raw->Sink))sink(raw->Result);}};
@@ -257,7 +255,7 @@ namespace Extrinsic::Runtime
             const auto refuse=[&](std::string why)->EditorPointScalarTransactionHandle {result.Status=EditorCommandStatus::InvalidProcessingParameters;result.Message=std::move(why);return {};};
             if(!residency)return refuse("Scalar analysis needs GPU property residency.");
             auto w=Make(ctx,residency);auto& t=w->Core;w->Capture=std::move(capture);w->Entity=entity;
-            w->Positions=std::move(positions);w->Params=params;w->Label=std::move(label);t.AutoAccept=automatic;
+            w->Positions=std::move(positions);w->Params=params;w->Label=std::move(label);t.AutoAccept=automatic;t.JobLabel=std::string(jobLabel);
             t.Rings[kTyped]={.Key=MakeGpuPropertyKey(ctx.World,entity,w->Capture->Output),.ReadBack=true};t.RingCount=1;
             t.Identity={.EntityId=stableId,.Scope=ToEditorJobScope(w->Capture->Output.Domain),.OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Capture->Output.Name};
             if(residency->HasRing(Typed(w).Key))return refuse("Scalar output awaits Accept or Discard.");
@@ -269,13 +267,13 @@ namespace Extrinsic::Runtime
                 if(!residency->Publish(Typed(w).Key))return refuse("Test scalar publication failed.");
                 w->Sink=GuardEditorProcessingResult(ctx,std::move(sink));
                 t.TestFront=true;GP::ReadyGpuTransaction(t);result=Snapshot(w);return w;}
-            if(auto refused=GP::GpuTransactionStartRefusal(t,jobLabel)){result.Status=refused->Status;result.Message=std::move(refused->Message);return {};}
+            if(auto refused=GP::GpuTransactionStartRefusal(t)){result.Status=refused->Status;result.Message=std::move(refused->Message);return {};}
             std::shared_ptr<const SpatialIndexSnapshot> snapshot;bool reused{};std::string why;
             if(AcquirePointIndex(*ctx.SpatialIndices,ctx.World,entity,w->Positions,w->Capture->Slots,w->Capture->Points,w->Index,snapshot,reused,why)!=PointIndexState::Ready)return refuse(why);
             w->Result.IndexReused=reused;w->Result.Message="Device scalar analysis queued.";
             w->Sink=GuardEditorProcessingResult(ctx,std::move(sink));
             if(!GP::SubmitGpuTransactionRun(GP::GpuTransactionOf(w),"Device point scalar").IsValid()){
-                result=Snapshot(w);result.Status=EditorCommandStatus::GeometryProcessingFailed;result.Message="Scalar compute submission rejected.";return {};}
+                result=Snapshot(w);result.Status=EditorCommandStatus::GeometryProcessingFailed;result.Message=MeshSupport::QueuedJobRejectedMessage(t.JobLabel);return {};}
             result=Snapshot(w);return w;
         }
     }
@@ -335,6 +333,7 @@ namespace Extrinsic::Runtime
             companion.Generation = residency->RingGeneration(companion.Key);
             if (!companion.Back) return rollback("Companion output reservation failed.");
         }
+        t.JobLabel = publication.Label;
         w->Publication = std::move(publication);
         w->Sink = GuardEditorProcessingResult(context, std::move(sink));
         w->Result.LiveCount = w->Publication->Count;

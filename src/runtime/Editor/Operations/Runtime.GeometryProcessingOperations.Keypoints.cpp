@@ -425,7 +425,7 @@ namespace Extrinsic::Runtime
         EditorJobIdentity runIdentity{.EntityId=config.StableEntityId,.Scope=ToEditorJobScope(w->Config.Mask.Domain),.OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Config.Mask.Name};
         const auto token=context.JobCommands.Submit(std::move(job),runIdentity);
         if(!token.IsValid()) {
-            DiscardEditorPointScalar(commands,transaction);return refuse("Keypoint job submission rejected.");
+            DiscardEditorPointScalar(commands,transaction);return refuse(GeometryProcessingDetail::MeshSupport::QueuedJobRejectedMessage("Keypoint analysis"));
         }
         runIdentity.Run=token; // the publication's Accept stage joins this run
         GeometryProcessingDetail::JoinPointScalarRun(transaction,std::move(runIdentity));

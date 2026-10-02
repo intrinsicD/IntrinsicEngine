@@ -417,16 +417,17 @@ namespace Extrinsic::Runtime
                 if(!w->Workspace){Fail(w,"Outlier device workspace unavailable.");return true;}
                 w->Work->Result.GpuQueryBatches=1;
                 t.Gpu=ctx.SpatialIndices->QueueGpuCompute(w->Work->GpuIndex,sizeof(Graphics::OutlierGpuStats),
-                    [w](RHI::ICommandContext& cmd,const SpatialGpuIndexView& index)->RHI::BufferHandle{
+                    // The recorder owns its workspace lease; the cache keeps it until the readback is safe.
+                    [w,workspace=w->Workspace](RHI::ICommandContext& cmd,const SpatialGpuIndexView& index)->RHI::BufferHandle{
                         const auto& rings=w->Core.Rings;
-                        if(!Current(w)||!w->Input||!rings[0].Back||!rings[1].Back||!rings[2].Back||!w->Workspace)return {};
+                        if(!Current(w)||!w->Input||!rings[0].Back||!rings[1].Back||!rings[2].Back)return {};
                         auto& residency=*w->Core.Residency;
                         const auto frame=w->Core.Context.Device->GetGlobalFrameNumber();
                         residency.NoteUse(w->Input->Buffer,frame);
                         for(std::size_t i=0;i<3;++i)residency.NoteUse(rings[i].Back->Buffer,frame);
                         for(const auto& v:w->Base)if(v)residency.NoteUse(v->Buffer,frame);
                         const auto& c=w->Work->Config;
-                        return w->Workspace->Record(cmd,{.Method=std::uint32_t(c.Method),.K=c.KNeighbors,
+                        return workspace->Record(cmd,{.Method=std::uint32_t(c.Method),.K=c.KNeighbors,
                             .MinimumNeighbors=c.MinimumNeighbors,.Radius=c.Radius,.Multiplier=c.StdDevMultiplier,.ScoreThreshold=c.ScoreThreshold},
                             {.Positions=*w->Input,.Score=*rings[0].Back,.Mask=*rings[1].Back,.Presentation=*rings[2].Back,
                              .ScoreBase=w->Base[0].value_or(Graphics::GpuPropertyView{}),.MaskBase=w->Base[1].value_or(Graphics::GpuPropertyView{}),
@@ -483,7 +484,7 @@ namespace Extrinsic::Runtime
         Run Make(const EditorProcessingContext& context,const std::shared_ptr<OutlierWork>& work,Graphics::GpuPropertyResidency* residency)
         {
             auto w=std::make_shared<EditorOutlierTransaction>();w->Work=work;
-            auto& t=w->Core;t.Context=context;t.Residency=residency;t.Label="Outlier analysis";t.AcceptJobName="Accept outlier fields";
+            auto& t=w->Core;t.Context=context;t.Residency=residency;t.Label="Outlier analysis";t.AcceptJobName="Accept outlier fields";t.JobLabel="Outlier estimation";
             w->Refs={work->Config.Score,work->Config.Mask,GpuPropertyPresentationRef(work->Config.Mask)};
             for(std::size_t i=0;i<3;++i)t.Rings[i]={.Key=MakeGpuPropertyKey(context.World,work->Entity,w->Refs[i]),.ReadBack=i<2};
             t.RingCount=3;
@@ -497,10 +498,7 @@ namespace Extrinsic::Runtime
                 .Poll=[self]{return Poll(self());},
                 .CompleteRun=[self]{CompleteRun(self());},
                 .CompleteAccept=[self]{CompleteAccept(self());},
-                .Release=[raw]{
-                    raw->Input.reset();for(auto& v:raw->Base)v.reset();
-                    // Only completed (or never queued) work returns the workspace early.
-                    if(GP::GpuTransactionWorkReleasable(raw->Core))raw->Workspace.reset();},
+                .Release=[raw]{raw->Input.reset();for(auto& v:raw->Base)v.reset();raw->Workspace.reset();},
                 .Deliver=[raw](EditorCommandStatus status,std::string message){
                     auto& r=raw->Work->Result;r.Status=status;r.Message=std::move(message);
                     if(auto sink=std::move(raw->Sink))sink(r);}};
@@ -518,7 +516,7 @@ namespace Extrinsic::Runtime
                   std::function<void(EditorOutlierAnalysisResult)> sink,bool automatic)
         {
             auto w=Make(ctx,work,ctx.SpatialIndices?ctx.SpatialIndices->PropertyResidency():nullptr);w->Core.AutoAccept=automatic;
-            if(auto refused=GP::GpuTransactionStartRefusal(w->Core,"Outlier estimation")){
+            if(auto refused=GP::GpuTransactionStartRefusal(w->Core)){
                 result.Status=refused->Status;result.Message=std::move(refused->Message);return {};}
             std::string why;
             const auto acquired=GP::AcquirePointIndex(*ctx.SpatialIndices,ctx.World,work->Entity,work->Config.Positions,
@@ -528,7 +526,7 @@ namespace Extrinsic::Runtime
             work->Result.Message="Device outlier analysis queued.";
             w->Sink=GuardEditorProcessingResult(ctx,std::move(sink));
             if(!GP::SubmitGpuTransactionRun(GP::GpuTransactionOf(w),"Device outlier analysis").IsValid()){
-                result=work->Result;result.Status=EditorCommandStatus::GeometryProcessingFailed;result.Message="Outlier compute submission refused.";return {};}
+                result=work->Result;result.Status=EditorCommandStatus::GeometryProcessingFailed;result.Message=GP::MeshSupport::QueuedJobRejectedMessage(w->Core.JobLabel);return {};}
             result=work->Result;return w;
         }
     }

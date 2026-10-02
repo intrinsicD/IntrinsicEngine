@@ -83,11 +83,6 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         return !t.Hooks.Current || t.Hooks.Current();
     }
 
-    bool GpuTransactionWorkReleasable(const GpuTransactionCore& t) noexcept
-    {
-        return !t.Gpu || t.Gpu->State == SpatialQueryState::Ready;
-    }
-
     bool GpuTransactionTerminal(const GpuTransactionCore& t) noexcept
     {
         return t.Phase == EditorGpuTransactionPhase::Applied || t.Phase == EditorGpuTransactionPhase::Discarded ||
@@ -134,9 +129,9 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         if (!t.Delivered) t.Phase = EditorGpuTransactionPhase::ReadyToAccept;
     }
 
-    std::optional<GpuTransactionRefusal> GpuTransactionStartRefusal(const GpuTransactionCore& t, const std::string_view jobLabel)
+    std::optional<GpuTransactionRefusal> GpuTransactionStartRefusal(const GpuTransactionCore& t)
     {
-        if (auto busy = MeshSupport::ActiveOutputJobRefusal(t.Context, t.Identity, jobLabel))
+        if (auto busy = MeshSupport::ActiveOutputJobRefusal(t.Context, t.Identity, t.JobLabel))
             return GpuTransactionRefusal{EditorCommandStatus::Pending, std::move(busy->Message)};
         if (!t.Residency)
             return GpuTransactionRefusal{EditorCommandStatus::InvalidProcessingParameters, t.Label + " needs the GPU property residency."};
@@ -240,7 +235,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         t->AcceptToken = t->Context.JobCommands.Submit(std::move(accept), t->Identity);
         if (!t->AcceptToken.IsValid())
         {
-            FailGpuTransaction(*t, t->Label + " Accept submission rejected; previous output retained.");
+            FailGpuTransaction(*t, MeshSupport::QueuedJobRejectedMessage(t->JobLabel, "Accept"));
             return false;
         }
         return true;
