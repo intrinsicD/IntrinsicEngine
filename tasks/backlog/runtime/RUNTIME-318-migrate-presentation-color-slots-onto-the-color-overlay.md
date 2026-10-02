@@ -115,3 +115,8 @@ python3 tools/agents/check_task_policy.py --root . --strict
   `gpu;vulkan` smoke `RuntimeSandboxAcceptanceGpuSmoke.GeometryPresentationReachesOperationalFrame`
   now colors its graph through the edge overlay and asserts a color packet;
   it compiles but was not run (GPU reserved for the operator): pending.
+- 2026-10-02: Slice 3 (dead code). `EditorCommandHistory` command groups
+  (`BeginGroup`/`EndGroup`/`AbortGroup`, `ScopedEditorCommandGroup`) existed
+  only for the Color binding's same-lane slot reset (RUNTIME-315 slices 5-5c);
+  with that reset gone they had no caller and are removed with their tests.
+  The history interface and implementation are back to their pre-group form.

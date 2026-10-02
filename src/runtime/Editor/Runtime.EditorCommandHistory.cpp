@@ -144,9 +144,10 @@ namespace Extrinsic::Runtime
             return MakeResult(EditorCommandHistoryStatus::NoChange, command.Label);
 
         AdvanceRevision(command.Dirtying);
-        std::string label = m_Capacity == 0u && m_GroupDepth == 0u ? std::string{} : command.Label;
-        CommitApplied(std::move(command));
-        return MakeResult(EditorCommandHistoryStatus::Applied, std::move(label));
+        PushUndo(std::move(command));
+        m_RedoStack.clear();
+        return MakeResult(EditorCommandHistoryStatus::Applied,
+                          m_UndoStack.empty() ? std::string{} : m_UndoStack.back().Label);
     }
 
     EditorCommandHistoryResult EditorCommandHistory::Record(
@@ -157,15 +158,14 @@ namespace Extrinsic::Runtime
             return MakeResult(EditorCommandHistoryStatus::InvalidCommand, command.Label);
 
         AdvanceRevision(command.Dirtying);
-        std::string label = m_Capacity == 0u && m_GroupDepth == 0u ? std::string{} : command.Label;
-        CommitApplied(std::move(command));
-        return MakeResult(EditorCommandHistoryStatus::Recorded, std::move(label));
+        PushUndo(std::move(command));
+        m_RedoStack.clear();
+        return MakeResult(EditorCommandHistoryStatus::Recorded,
+                          m_UndoStack.empty() ? std::string{} : m_UndoStack.back().Label);
     }
 
     EditorCommandHistoryResult EditorCommandHistory::Undo()
     {
-        if (m_GroupDepth != 0u)
-            return MakeResult(EditorCommandHistoryStatus::UnsupportedOperation);
         if (m_UndoStack.empty())
             return MakeResult(EditorCommandHistoryStatus::EmptyUndoStack);
 
@@ -185,8 +185,6 @@ namespace Extrinsic::Runtime
 
     EditorCommandHistoryResult EditorCommandHistory::Redo()
     {
-        if (m_GroupDepth != 0u)
-            return MakeResult(EditorCommandHistoryStatus::UnsupportedOperation);
         if (m_RedoStack.empty())
             return MakeResult(EditorCommandHistoryStatus::EmptyRedoStack);
 
@@ -216,8 +214,6 @@ namespace Extrinsic::Runtime
     {
         m_UndoStack.clear();
         m_RedoStack.clear();
-        m_GroupRecords.clear();
-        m_GroupDepth = 0u;
     }
 
     void EditorCommandHistory::ResetDocument(std::string path)
@@ -277,64 +273,6 @@ namespace Extrinsic::Runtime
             .Revision = m_Revision,
             .SavedRevision = m_SavedRevision,
         };
-    }
-
-    void EditorCommandHistory::BeginGroup()
-    {
-        if (m_GroupDepth++ == 0u)
-            m_GroupStartRevision = m_Revision;
-    }
-
-    void EditorCommandHistory::EndGroup(std::string label)
-    {
-        if (m_GroupDepth == 0u || --m_GroupDepth != 0u || m_GroupRecords.empty())
-            return;
-        std::vector<EditorCommandRecord> records = std::move(m_GroupRecords);
-        m_GroupRecords.clear();
-        EditorCommandRecord grouped = records.size() == 1u
-            ? std::move(records.front())
-            : MakeCompoundEditorCommand(m_LabelPrefix + NonEmptyLabel(std::move(label)),
-                                        std::move(records));
-        PushUndo(std::move(grouped));
-        m_RedoStack.clear();
-    }
-
-    EditorCommandHistoryStatus EditorCommandHistory::AbortGroup()
-    {
-        if (m_GroupDepth == 0u)
-            return EditorCommandHistoryStatus::UnsupportedOperation;
-        EditorCommandHistoryStatus status = EditorCommandHistoryStatus::Undone;
-        for (auto record = m_GroupRecords.rbegin(); record != m_GroupRecords.rend(); ++record)
-        {
-            const EditorCommandHistoryStatus undone =
-                record->Undo ? record->Undo() : EditorCommandHistoryStatus::InvalidCommand;
-            if (!IsSuccessfulStatus(undone))
-                status = EditorCommandHistoryStatus::UndoFailed;
-        }
-        m_GroupRecords.clear();
-        // Revisions stay monotonic: the aborted group's numbers were already
-        // observed (results, snapshots, revision-keyed caches), so reusing them
-        // would let a later edit alias a state that never existed. A clean
-        // rollback restores the content the group started from, so a document
-        // that was saved at the group's start is still equal to what was saved
-        // and keeps the saved mark at the new revision.
-        const bool savedAtStart = m_SavedRevision == m_GroupStartRevision;
-        if (status != EditorCommandHistoryStatus::Undone || m_Revision != m_GroupStartRevision)
-            AdvanceRevision(true);
-        if (status == EditorCommandHistoryStatus::Undone && savedAtStart)
-            m_SavedRevision = m_Revision;
-        return status;
-    }
-
-    void EditorCommandHistory::CommitApplied(EditorCommandRecord command)
-    {
-        if (m_GroupDepth != 0u)
-        {
-            m_GroupRecords.push_back(std::move(command));
-            return;
-        }
-        PushUndo(std::move(command));
-        m_RedoStack.clear();
     }
 
     void EditorCommandHistory::PushUndo(EditorCommandRecord command)
