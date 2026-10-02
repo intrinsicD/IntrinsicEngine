@@ -1947,13 +1947,14 @@ namespace Extrinsic::Sandbox::Editor
     std::string_view ColorInterpretationComboTooltip() noexcept
     {
         return "How the selected property's values become a color.\n"
-               "Components: the vector's own components are the color. A vec3 (x, y, z) is shown as "
-               "(r, g, b) with alpha 1; a vec4 uses its fourth component as alpha. Values are used "
-               "as-is and expected in 0..1; they are not rescaled, so values outside 0..1 are not "
-               "remapped and may display clipped.\n"
-               "Normal direction: the vector is treated as a direction. It is normalized and mapped "
-               "from [-1,1] to [0,1] on each axis, so +X is red-ish, +Y green-ish and +Z blue-ish. "
-               "A zero-length vector is shown as +Z. Use it for normals and other direction vectors.";
+               "Components: vec4 is (r,g,b,a), vec3 is (r,g,b) with alpha 1, vec2 is (x,y,0) with alpha 1. "
+               "Integer and bool values show a distinct color per value, and so do floats holding whole "
+               "numbers. Other float values are not shown by this option; use the scalar colormap. "
+               "Vector components are used as-is and expected in 0..1.\n"
+               "Normal direction: only for vec3. The vector is normalized and mapped from [-1,1] to [0,1] "
+               "per axis (+X red-ish, +Y green-ish, +Z blue-ish); a zero-length vector shows as +Z. "
+               "Other property types render nothing.\n"
+               "Colors are shown lit and tone-mapped, not as an exact color readout.";
     }
 
     std::string_view ColorInterpretationOptionTooltip(const int interpretation) noexcept
@@ -1961,32 +1962,30 @@ namespace Extrinsic::Sandbox::Editor
         switch (interpretation)
         {
         case 0:
-            return "Components: use the property's components directly as color (x,y,z -> r,g,b; "
-                   "alpha 1 for vec3). Expected range is 0..1; values outside it are not remapped.";
+            return "Components: vec4 is (r,g,b,a), vec3 is (r,g,b), vec2 is (x,y,0); integers and bools "
+                   "get a distinct color per value (as do whole-number floats); other floats are not shown here, "
+                   "use the scalar colormap. "
+                   "Expected range is 0..1.";
         case 1:
-            return "Normal direction: normalize each vector and map from [-1,1] to [0,1] per axis "
-                   "(+X red-ish, +Y green-ish, +Z blue-ish). Zero-length vectors show as +Z.";
+            return "Normal direction (vec3 only): normalize each vector and map from [-1,1] to [0,1] per "
+                   "axis (+X red-ish, +Y green-ish, +Z blue-ish). Zero-length vectors show as +Z. "
+                   "Other property types render nothing.";
         default:
             return {};
         }
     }
 
-    bool DrawColorInterpretationCombo(int& interpretation, const std::string_view disabledReason)
+    bool DrawColorInterpretationCombo(int& interpretation)
     {
         constexpr std::array<const char*, 2> names{"Components", "Normal direction"};
         const int current = std::clamp(interpretation, 0, 1);
         bool changed = false;
         const bool open = ImGui::BeginCombo("Color interpretation", names[static_cast<std::size_t>(current)]);
-        if (disabledReason.empty())
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip | ImGuiHoveredFlags_AllowWhenDisabled))
         {
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip | ImGuiHoveredFlags_AllowWhenDisabled))
-            {
-                const auto text = ColorInterpretationComboTooltip();
-                ImGui::SetTooltip("%.*s", static_cast<int>(text.size()), text.data());
-            }
+            const auto text = ColorInterpretationComboTooltip();
+            ImGui::SetTooltip("%.*s", static_cast<int>(text.size()), text.data());
         }
-        else
-            DrawDisabledReasonTooltip(disabledReason);
         if (open)
         {
             for (int i = 0; i != 2; ++i)

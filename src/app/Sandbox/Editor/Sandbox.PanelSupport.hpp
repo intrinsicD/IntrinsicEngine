@@ -228,13 +228,14 @@ namespace Extrinsic::Sandbox::Editor
     void DrawDisabledReasonTooltip(std::string_view disabledReason);
 
     // UI-074: shared "Color interpretation" combo and its help text. Behavior documented here is the
-    // CPU encoder's (Runtime.VisualizationRecipes.cpp, AppendColorPacket): Components passes vec3 as
-    // (r,g,b,1) / vec4 as (r,g,b,a) unrescaled; NormalDirection normalizes (zero length -> +Z) and
+    // CPU encoder's (Runtime.VisualizationRecipes.cpp, AppendColorPacket): Components passes vec4 as
+    // (r,g,b,a), vec3 as (r,g,b,1), vec2 as (x,y,0,1) unrescaled, and integers/bools/integral floats as hashed
+    // label colors (non-integral floats are rejected there); NormalDirection normalizes (zero length -> +Z) and
     // maps n*0.5+0.5 per axis. Every domain's Appearance panel calls this one helper.
     [[nodiscard]] std::string_view ColorInterpretationComboTooltip() noexcept;
     [[nodiscard]] std::string_view ColorInterpretationOptionTooltip(int interpretation) noexcept;
     // `interpretation` is the VisualizationConfig::ColorInterpretation integer code. Returns true when changed.
-    [[nodiscard]] bool DrawColorInterpretationCombo(int& interpretation, std::string_view disabledReason = {});
+    [[nodiscard]] bool DrawColorInterpretationCombo(int& interpretation);
     [[nodiscard]] bool DrawProcessingActionButton(
         const char* label, const Runtime::ActionReadiness& readiness);
 

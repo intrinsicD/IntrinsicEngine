@@ -425,59 +425,61 @@ TEST(SandboxDomainPanels, SharedScalarControlsPreserveStylingAndEditAuthority)
     }
 }
 
-TEST(SandboxDomainPanels, ColorInterpretationTextNamesRangesClampingAndZeroLength)
+TEST(SandboxDomainPanels, ColorInterpretationTextCoversEveryOfferedPropertyType)
 {
     for (const auto text : {Editor::ColorInterpretationComboTooltip(),
                             Editor::ColorInterpretationOptionTooltip(0)})
     {
-        EXPECT_NE(text.find("0..1"), std::string_view::npos) << text;
-        EXPECT_NE(text.find("not remapped"), std::string_view::npos) << text;
+        for (const char* needle : {"vec4", "vec3", "vec2", "nteger", "0..1", "scalar colormap"})
+            EXPECT_NE(text.find(needle), std::string_view::npos) << needle << " in " << text;
     }
     for (const auto text : {Editor::ColorInterpretationComboTooltip(),
                             Editor::ColorInterpretationOptionTooltip(1)})
     {
-        EXPECT_NE(text.find("[-1,1]"), std::string_view::npos) << text;
-        EXPECT_NE(text.find("[0,1]"), std::string_view::npos) << text;
-        EXPECT_NE(text.find("+X"), std::string_view::npos) << text;
-        EXPECT_NE(text.find("+Z"), std::string_view::npos) << text;
+        for (const char* needle : {"vec3", "[-1,1]", "[0,1]", "+X", "+Z", "render nothing"})
+            EXPECT_NE(text.find(needle), std::string_view::npos) << needle << " in " << text;
     }
+    EXPECT_NE(Editor::ColorInterpretationComboTooltip().find("lit and tone-mapped"), std::string_view::npos);
+    EXPECT_EQ(Editor::ColorInterpretationComboTooltip().find("clipped"), std::string_view::npos);
     EXPECT_TRUE(Editor::ColorInterpretationOptionTooltip(2).empty());
 }
 
-TEST(SandboxDomainPanels, ColorInterpretationComboShowsTooltipWhenHoveredAndDisabledReasonOtherwise)
+TEST(SandboxDomainPanels, ColorInterpretationComboAndEntriesShowTheirTooltipText)
 {
     TestSupport::ImGuiFrameScope gui;
     ImGui::GetIO().DisplaySize = {800, 600};
     ImGui::GetStyle().HoverFlagsForTooltipMouse = ImGuiHoveredFlags_None;
-    const auto tooltipActive = [&]
+    ImGui::GetIO().ConfigInputTrickleEventQueue = false;
+    int value = 0;
+    std::string logged;
+    const auto frame = [&](const ImVec2 mouse, const bool down)
     {
-        const ImGuiContext* context = ImGui::GetCurrentContext();
-        return std::ranges::any_of(context->Windows, [](const ImGuiWindow* window)
-        {
-            return window != nullptr && window->Active && (window->Flags & ImGuiWindowFlags_Tooltip) != 0;
-        });
+        gui.NextFrame();
+        ImGui::GetIO().AddMousePosEvent(mouse.x, mouse.y);
+        ImGui::GetIO().AddMouseButtonEvent(0, down);
+        ImGui::SetNextWindowPos({0, 0});
+        ImGui::SetNextWindowSize({600, 300});
+        ImGui::Begin("Color interpretation host", nullptr, ImGuiWindowFlags_NoSavedSettings);
+        ImGui::LogToBuffer();
+        (void)Editor::DrawColorInterpretationCombo(value);
+        logged = ImGui::GetCurrentContext()->LogBuffer.c_str();
+        ImGui::LogFinish();
+        ImGui::End();
     };
-    for (const bool withReason : {false, true})
+    const ImVec2 comboPos{60.0f, 30.0f};
+    for (int i = 0; i != 4; ++i) frame(comboPos, false);
+    EXPECT_NE(logged.find(std::string{Editor::ColorInterpretationComboTooltip()}), std::string::npos) << logged;
+
+    frame(comboPos, true); // open the popup
+    frame(comboPos, false);
+    frame(comboPos, false);
+    ASSERT_TRUE(ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) << "popup did not open";
+    for (int entry = 0; entry != 2; ++entry)
     {
-        SCOPED_TRACE(withReason);
-        bool seen = false;
-        int value = 0;
-        for (int frame = 0; frame != 4; ++frame)
-        {
-            gui.NextFrame();
-            ImGui::GetIO().MousePos = {60.0f, 30.0f};
-            ImGui::SetNextWindowPos({0, 0});
-            ImGui::SetNextWindowSize({600, 300});
-            ImGui::Begin("Color interpretation host", nullptr, ImGuiWindowFlags_NoSavedSettings);
-            if (withReason) ImGui::BeginDisabled(true);
-            (void)Editor::DrawColorInterpretationCombo(
-                value, withReason ? std::string_view{"Not available."} : std::string_view{});
-            if (withReason) ImGui::EndDisabled();
-            seen = seen || tooltipActive();
-            ImGui::End();
-        }
-        EXPECT_TRUE(seen);
-        EXPECT_EQ(value, 0);
+        const ImVec2 itemPos{60.0f, 30.0f + 22.0f * static_cast<float>(entry + 1)};
+        for (int i = 0; i != 4; ++i) frame(itemPos, false);
+        EXPECT_NE(logged.find(std::string{Editor::ColorInterpretationOptionTooltip(entry)}), std::string::npos)
+            << "entry " << entry << ": " << logged;
     }
 }
 
