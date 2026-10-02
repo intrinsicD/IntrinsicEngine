@@ -37,14 +37,14 @@ namespace Extrinsic::Runtime
         }
 
         // Color goes through the visualization overlay: scalars are
-        // colormapped, vectors are component colors. Infinity is a legal
-        // scalar sentinel there, so finiteness is the overlay's concern.
+        // colormapped, vectors are component colors; its encoder decides
+        // which kinds and values are drawable.
         constexpr RenderAttributeRule ColorRow(
             const D domain, const std::string_view description) noexcept
         {
             return RenderAttributeRule{
-                .Attribute = A::Color, .Domain = domain, .AcceptsFloat = true,
-                .AcceptsVec3 = true, .AcceptsVec4 = true,
+                .Attribute = A::Color, .Domain = domain,
+                .ValidatedByVisualizationRecipe = true,
                 .DefaultDescription = description};
         }
 
@@ -140,8 +140,8 @@ namespace Extrinsic::Runtime
 
     std::string_view RenderAttributeExpectedTypeText(const RenderAttributeRule& rule) noexcept
     {
-        if (rule.AcceptsFloat && rule.AcceptsVec3 && rule.AcceptsVec4)
-            return "float, vec3 or vec4";
+        if (rule.ValidatedByVisualizationRecipe)
+            return "scalar or vector";
         if (rule.AcceptsVec3)
             return "vec3";
         if (rule.AcceptsVec2)
@@ -170,8 +170,9 @@ namespace Extrinsic::Runtime
         {
             return resolution;
         }
-        if (!RenderAttributeAcceptsValueKind(*rule, resolution.ResolvedValueKind) ||
-            IsTopologyProperty(domain, propertyName))
+        if (IsTopologyProperty(domain, propertyName) ||
+            (!rule->ValidatedByVisualizationRecipe &&
+             !RenderAttributeAcceptsValueKind(*rule, resolution.ResolvedValueKind)))
         {
             resolution.Status = GeometryPropertyResolutionStatus::ValueKindMismatch;
             return resolution;

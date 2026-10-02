@@ -32,7 +32,7 @@ export namespace Extrinsic::Graphics::Components
     //   "edges"       — uint32 edge index pairs (e0v0, e0v1, e1v0, ...)
     //   "colors"      — vec4 per-vertex or per-edge colors
     //   "scalars"     — float per-element scalar field values
-    //   "sizes"       — float per-point world-space radii
+    //   "sizes"       — float per-point screen-space sizes in pixels
     //   RenderEdges::WidthSource names — float per-edge screen-space widths
     struct BufferEntry
     {

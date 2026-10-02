@@ -60,6 +60,12 @@ export namespace Extrinsic::Runtime
         InvalidProcessingParameters,
         GeometryProcessingFailed,
         UnsupportedCameraPose,
+        // RUNTIME-315 attribute-binding refusals, one per typed reason.
+        UnsupportedRenderAttribute,
+        AttributeSourceMissing,
+        AttributeSourceTypeMismatch,
+        AttributeSourceCountMismatch,
+        AttributeSourceNonFinite,
     };
     // Phase of a GPU property transaction (ADR 0030 decisions 5-7): a method previews on the
     // device and publishes on Accept. Shared by every method that runs one (property

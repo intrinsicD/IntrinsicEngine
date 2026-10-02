@@ -281,42 +281,27 @@ namespace {
                 });
         }
 
-        [[nodiscard]] G::VisualizationConfig::Domain ToVisualizationConfigDomain(
+        [[nodiscard]] GeometryElementDomain ElementDomainOf(
             const EditorVisualizationPropertyDomain domain) noexcept
         {
             using Domain = EditorVisualizationPropertyDomain;
             switch (domain)
             {
-            case Domain::MeshEdges:
-            case Domain::GraphEdges:
-                return G::VisualizationConfig::Domain::Edge;
-            case Domain::MeshFaces:
-                return G::VisualizationConfig::Domain::Face;
-            case Domain::MeshVertices:
-            case Domain::GraphVertices:
-            case Domain::PointCloudPoints:
-                return G::VisualizationConfig::Domain::Vertex;
+            case Domain::MeshVertices: return GeometryElementDomain::MeshVertex;
+            case Domain::MeshEdges: return GeometryElementDomain::MeshEdge;
+            case Domain::MeshFaces: return GeometryElementDomain::MeshFace;
+            case Domain::GraphVertices: return GeometryElementDomain::GraphNode;
+            case Domain::GraphEdges: return GeometryElementDomain::GraphEdge;
+            case Domain::PointCloudPoints: return GeometryElementDomain::PointCloudPoint;
             }
-            return G::VisualizationConfig::Domain::Vertex;
+            return GeometryElementDomain::MeshVertex;
         }
 
-        [[nodiscard]] G::VisualizationConfig::ColorSource ToColorBufferSource(
+        [[nodiscard]] EditorFeatureDetail::ColorOverlayTarget OverlayLaneFor(
             const EditorVisualizationPropertyDomain domain) noexcept
         {
-            using Domain = EditorVisualizationPropertyDomain;
-            switch (domain)
-            {
-            case Domain::MeshEdges:
-            case Domain::GraphEdges:
-                return G::VisualizationConfig::ColorSource::PerEdgeBuffer;
-            case Domain::MeshFaces:
-                return G::VisualizationConfig::ColorSource::PerFaceBuffer;
-            case Domain::MeshVertices:
-            case Domain::GraphVertices:
-            case Domain::PointCloudPoints:
-                return G::VisualizationConfig::ColorSource::PerVertexBuffer;
-            }
-            return G::VisualizationConfig::ColorSource::PerVertexBuffer;
+            return EditorFeatureDetail::ColorOverlayTargetFor(ElementDomainOf(domain))
+                .value_or(EditorFeatureDetail::ColorOverlayTarget{});
         }
 
         [[nodiscard]] VertexChannelSourceBinding*
@@ -342,7 +327,9 @@ namespace {
         [[nodiscard]] bool AnyVertexChannelBindingEnabled(
             const VertexChannelBindingSet& bindings) noexcept
         {
-            return IsVertexChannelBindingEnabled(bindings.Normal) ||
+            return IsVertexChannelBindingEnabled(bindings.Position) ||
+                   IsVertexChannelBindingEnabled(bindings.Normal) ||
+                   IsVertexChannelBindingEnabled(bindings.Texcoord) ||
                    IsVertexChannelBindingEnabled(bindings.Color);
         }
 
@@ -358,9 +345,7 @@ namespace {
             const VertexChannelBindingSet& lhs,
             const VertexChannelBindingSet& rhs) noexcept
         {
-            return SameVertexChannelSourceBinding(lhs.Normal, rhs.Normal) &&
-                   SameVertexChannelSourceBinding(lhs.Color, rhs.Color) &&
-                   lhs.BindingGeneration == rhs.BindingGeneration;
+            return lhs == rhs;
         }
 
         [[nodiscard]] bool SameOptionalVertexChannelBindingSet(
@@ -451,11 +436,12 @@ namespace {
             const std::uint32_t stableEntityId,
             const VertexChannel channel,
             const std::optional<VertexChannelBindingSet>& before,
-            const std::optional<VertexChannelBindingSet>& after)
+            const std::optional<VertexChannelBindingSet>& after,
+            const std::string_view label = "Change vertex channel binding")
         {
             return Internal::ExecuteUndoableEntityMutation(
                 history,
-                "Change vertex channel binding",
+                std::string{label},
                 VertexChannelBindingMutationIdentity{
                     .Scene = scene,
                     .World = world,
@@ -1633,7 +1619,7 @@ ApplyEditorRenderHintCommand(
             .Target = command.Target,
             .EnableConfig = true,
             .ScalarFieldName = command.PropertyName,
-            .ScalarDomain = ToVisualizationConfigDomain(command.Domain),
+            .ScalarDomain = OverlayLaneFor(command.Domain).VisDomain,
             .ColorBufferName = command.PropertyName,
             .Interpretation = command.Interpretation,
             .ScalarAutoRange = command.ScalarAutoRange,
@@ -1680,7 +1666,7 @@ ApplyEditorRenderHintCommand(
             configCommand.IsolineCount = command.IsolineCount;
             break;
         case EditorVisualizationPropertyPreset::ColorBuffer:
-            configCommand.Source = ToColorBufferSource(command.Domain);
+            configCommand.Source = OverlayLaneFor(command.Domain).BufferSource;
             configCommand.IsolineCount = 0u;
             break;
         }
@@ -1737,35 +1723,16 @@ ApplyEditorRenderHintCommand(
                         if (!pendingResident && !EncodeVisualizationRecipe(availability, {.Data = resolved}).Succeeded())
                             return EditorCommandStatus::InvalidVisualizationProperty;
 
+                        const auto lane = EditorFeatureDetail::ColorOverlayTargetFor(resolved.Source.Domain);
+                        if (!lane)
+                            return EditorCommandStatus::UnsupportedGeometryDomain;
                         EditorVisualizationConfigCommand config{
                             .StableEntityId = command.StableEntityId,
-                            .Target = EditorVisualizationTarget::Surface,
-                            .Source = G::VisualizationConfig::ColorSource::PerVertexBuffer,
+                            .Target = lane->Target,
+                            .Source = lane->BufferSource,
+                            .ScalarDomain = lane->VisDomain,
                             .ColorBufferName = resolved.Source.Name,
                         };
-                        switch (resolved.Source.Domain)
-                        {
-                        case GeometryElementDomain::MeshVertex:
-                            break;
-                        case GeometryElementDomain::MeshFace:
-                            config.Source = G::VisualizationConfig::ColorSource::PerFaceBuffer;
-                            config.ScalarDomain = G::VisualizationConfig::Domain::Face;
-                            break;
-                        case GeometryElementDomain::MeshEdge:
-                        case GeometryElementDomain::GraphEdge:
-                            config.Target = EditorVisualizationTarget::Edges;
-                            config.Source = G::VisualizationConfig::ColorSource::PerEdgeBuffer;
-                            config.ScalarDomain = G::VisualizationConfig::Domain::Edge;
-                            break;
-                        case GeometryElementDomain::GraphNode:
-                            config.Target = EditorVisualizationTarget::Edges;
-                            break;
-                        case GeometryElementDomain::PointCloudPoint:
-                            config.Target = EditorVisualizationTarget::Points;
-                            break;
-                        default:
-                            return EditorCommandStatus::UnsupportedGeometryDomain;
-                        }
                         if (const auto existing = EffectiveVisualizationConfigForTarget(
                                 raw, entity, config.Target))
                         {
@@ -1948,6 +1915,223 @@ ApplyEditorRenderHintCommand(
         return InvalidateSelectedModelCacheIfApplied(
             context,
             ToEditorCommandStatus(applied));
+    }
+
+    namespace
+    {
+        [[nodiscard]] EditorCommandStatus ToAttributeBindingStatus(
+            const GeometryPropertyResolutionStatus status) noexcept
+        {
+            switch (status)
+            {
+            case GeometryPropertyResolutionStatus::Resolved: return EditorCommandStatus::Applied;
+            case GeometryPropertyResolutionStatus::MissingName:
+            case GeometryPropertyResolutionStatus::MissingProperty:
+                return EditorCommandStatus::AttributeSourceMissing;
+            case GeometryPropertyResolutionStatus::ValueKindMismatch:
+                return EditorCommandStatus::AttributeSourceTypeMismatch;
+            case GeometryPropertyResolutionStatus::ElementCountMismatch:
+                return EditorCommandStatus::AttributeSourceCountMismatch;
+            case GeometryPropertyResolutionStatus::NonFiniteValues:
+                return EditorCommandStatus::AttributeSourceNonFinite;
+            case GeometryPropertyResolutionStatus::UnsupportedDomain:
+                break;
+            }
+            return EditorCommandStatus::UnsupportedRenderAttribute;
+        }
+
+        [[nodiscard]] VertexChannel ToVertexChannel(const RenderAttribute attribute) noexcept
+        {
+            switch (attribute)
+            {
+            case RenderAttribute::Position: return VertexChannel::Position;
+            case RenderAttribute::Normal: return VertexChannel::Normal;
+            case RenderAttribute::Texcoord: return VertexChannel::Texcoord;
+            default: return VertexChannel::Custom;
+            }
+        }
+
+        [[nodiscard]] EditorCommandStatus CommitStructuralAttributeBinding(
+            const EditorVisualizationEditingContext& context,
+            const ECS::EntityHandle entity,
+            const EditorAttributeBindingCommand& command,
+            const Geometry::PropertyValueKind kind)
+        {
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<VertexChannelBindingSet> before =
+                StoredVertexChannelBindingSet(raw, entity);
+            VertexChannelBindingSet after = before.value_or(VertexChannelBindingSet{});
+            VertexChannelSourceBinding& target =
+                *FindVertexChannelSourceBinding(after, command.Attribute);
+            if (command.PropertyName.empty())
+            {
+                // Default only clears a binding authored on this row's domain.
+                if (!IsVertexChannelBindingEnabled(target) ||
+                    target.Property.Domain != command.Domain)
+                {
+                    return EditorCommandStatus::NoChange;
+                }
+                target = {};
+            }
+            else
+            {
+                const VertexChannelSourceBinding next{
+                    .Enabled = true,
+                    .Property = {.Domain = command.Domain, .Name = command.PropertyName,
+                                 .ValueKind = kind},
+                };
+                if (target == next)
+                    return EditorCommandStatus::NoChange;
+                target = next;
+            }
+            ++after.BindingGeneration;
+            const std::optional<VertexChannelBindingSet> stored =
+                AnyVertexChannelBindingEnabled(after)
+                    ? std::optional<VertexChannelBindingSet>{after}
+                    : std::nullopt;
+            const VertexChannel channel = ToVertexChannel(command.Attribute);
+            if (context.CommandHistory != nullptr)
+            {
+                const std::string label = "Bind " + std::string{ToString(command.Attribute)};
+                return ToEditorCommandStatus(
+                    ExecuteVertexChannelBindingMutation(
+                        *context.CommandHistory, context.Scene, context.World,
+                        command.StableEntityId, channel, before, stored, label)
+                        .Status);
+            }
+            const EditorCommandHistoryStatus applied =
+                ApplyVertexChannelBindingSet(context.Scene, command.StableEntityId, stored);
+            if (applied == EditorCommandHistoryStatus::Applied)
+                MarkVertexChannelDirty(raw, entity, channel);
+            return ToEditorCommandStatus(applied);
+        }
+
+        [[nodiscard]] EditorCommandStatus CommitColorAttributeBinding(
+            const EditorVisualizationEditingContext& context,
+            const ECS::EntityHandle entity,
+            const EditorAttributeBindingCommand& command,
+            const Geometry::PropertyValueKind kind)
+        {
+            if (!command.PropertyName.empty())
+            {
+                // The same recipe `show_property` and the processing panels use,
+                // so the overlay is the one Color mechanism.
+                return ApplyEditorVisualizationRecipeCommand(
+                    context,
+                    EditorVisualizationRecipeCommand{
+                        .StableEntityId = command.StableEntityId,
+                        .Recipe = MakeEditorPropertyVisualizationRecipe(GeometryPropertyRef{
+                            .Domain = command.Domain, .Name = command.PropertyName,
+                            .ValueKind = kind}),
+                    });
+            }
+            const entt::registry& raw = context.Scene->Raw();
+            if (!EditorFeatureDetail::BoundColorOverlaySource(raw, entity, command.Domain))
+                return EditorCommandStatus::NoChange;
+            const EditorVisualizationTarget lane =
+                EditorFeatureDetail::ColorOverlayTargetFor(command.Domain)->Target;
+            return ApplyEditorVisualizationConfigCommand(
+                context,
+                EditorVisualizationConfigCommand{
+                    .StableEntityId = command.StableEntityId,
+                    .Target = StoredVisualizationConfigForTarget(raw, entity, lane).has_value()
+                        ? lane
+                        : EditorVisualizationTarget::Entity,
+                    .EnableConfig = false,
+                });
+        }
+
+        // Point size / line width bind through the lane's render hint: the
+        // name alternative of the uniform pixel size. Default restores the
+        // component's uniform default.
+        [[nodiscard]] EditorCommandStatus CommitPixelSizeAttributeBinding(
+            const EditorVisualizationEditingContext& context,
+            const ECS::EntityHandle entity,
+            const EditorAttributeBindingCommand& command)
+        {
+            const EditorRenderHintState before = ReadRenderHintState(context.Scene->Raw(), entity);
+            EditorRenderHintState after = before;
+            std::variant<float, std::string>* source = nullptr;
+            std::variant<float, std::string> defaultSource{};
+            if (command.Attribute == RenderAttribute::PointSize && after.Components.Points)
+            {
+                source = &after.Components.Points->SizeSource;
+                defaultSource = G::RenderPoints{}.SizeSource;
+            }
+            else if (command.Attribute == RenderAttribute::LineWidth && after.Components.Edges)
+            {
+                source = &after.Components.Edges->WidthSource;
+                defaultSource = G::RenderEdges{}.WidthSource;
+            }
+            if (source == nullptr)
+                return EditorCommandStatus::UnsupportedRenderAttribute;  // lane not shown
+            if (!command.PropertyName.empty())
+            {
+                // Per-element sizes are not extracted yet; a bound name would
+                // stop the lane drawing (RUNTIME-315 slice 5 lands consumption).
+                return EditorCommandStatus::UnsupportedRenderAttribute;
+            }
+            if (std::holds_alternative<float>(*source))
+                return EditorCommandStatus::NoChange;
+            *source = defaultSource;
+            if (context.CommandHistory != nullptr)
+            {
+                return ToEditorCommandStatus(
+                    ExecuteEditorRenderHintMutation(*context.CommandHistory, context.Scene,
+                                                    context.World, command.StableEntityId,
+                                                    before, after)
+                        .Status);
+            }
+            return ToEditorCommandStatus(
+                ApplyRenderHintState(context.Scene, command.StableEntityId, after));
+        }
+    } // namespace
+
+    EditorCommandStatus ApplyEditorAttributeBindingCommand(
+        const EditorVisualizationEditingContext& context,
+        const EditorAttributeBindingCommand& command)
+    {
+        if (context.Scene == nullptr)
+            return EditorCommandStatus::MissingScene;
+        entt::registry& raw = context.Scene->Raw();
+        const std::optional<ECS::EntityHandle> entity =
+            ResolveStableEntity(raw, command.StableEntityId);
+        if (!entity.has_value())
+            return EditorCommandStatus::StaleEntity;
+
+        const GeometryEntityAvailability availability = BuildGeometryAvailability(raw, *entity);
+        if (FindRenderAttributeRule(command.Attribute, command.Domain) == nullptr ||
+            !SupportsGeometryElementDomain(availability, command.Domain))
+        {
+            return EditorCommandStatus::UnsupportedRenderAttribute;
+        }
+        Geometry::PropertyValueKind kind = Geometry::PropertyValueKind::Unknown;
+        if (!command.PropertyName.empty())
+        {
+            const GeometryPropertyResolution resolution = ResolveEditorAttributeBindingSource(
+                availability, command.Attribute, command.Domain, command.PropertyName);
+            if (!resolution.Resolved())
+                return ToAttributeBindingStatus(resolution.Status);
+            kind = resolution.ResolvedValueKind;
+        }
+
+        EditorCommandStatus status = EditorCommandStatus::NoChange;
+        switch (command.Attribute)
+        {
+        case RenderAttribute::Position:
+        case RenderAttribute::Normal:
+        case RenderAttribute::Texcoord:
+            status = CommitStructuralAttributeBinding(context, *entity, command, kind);
+            break;
+        case RenderAttribute::Color:
+            // The overlay commands invalidate the selected-model cache themselves.
+            return CommitColorAttributeBinding(context, *entity, command, kind);
+        case RenderAttribute::PointSize:
+        case RenderAttribute::LineWidth:
+            status = CommitPixelSizeAttributeBinding(context, *entity, command);
+            break;
+        }
+        return InvalidateSelectedModelCacheIfApplied(context, status);
     }
 
     EditorCommandStatus ApplyEditorGeometryPresentationSlotDefaultCommand(

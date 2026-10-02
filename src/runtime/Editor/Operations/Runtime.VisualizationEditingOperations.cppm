@@ -523,6 +523,17 @@ export namespace Extrinsic::Runtime
         bool EnableBinding{true};
         std::string PropertyName{};
     };
+    // Chooses the source property of one render attribute on one element
+    // domain (RUNTIME-315). An empty `PropertyName` restores the default
+    // source. Structural streams, the Color overlay and the point/line pixel
+    // sizes each commit as one undoable step on their owning storage.
+    struct EditorAttributeBindingCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        RenderAttribute Attribute{RenderAttribute::Position};
+        GeometryElementDomain Domain{GeometryElementDomain::Unknown};
+        std::string PropertyName{};
+    };
     struct EditorGeometryPresentationSlotDefaultCommand
     {
         std::uint32_t StableEntityId{0u};
@@ -629,6 +640,10 @@ export namespace Extrinsic::Runtime
         GeometryPropertyRef Source{};
         GeometryPropertyResolution Resolution{};
         bool UsingFallback{false};
+        // False while rendering does not draw this binding yet (per-element
+        // point size/line width until their extraction lands): a bound name
+        // stops that lane from drawing, so the command refuses to author one.
+        bool Consumed{true};
         std::string Diagnostic{};
         std::vector<EditorAttributeBindingCandidate> Candidates{};
     };
@@ -639,6 +654,13 @@ export namespace Extrinsic::Runtime
         std::uint32_t StableEntityId{0u};
         std::vector<EditorAttributeBindingRow> Rows{};
     };
+
+    // Validates a candidate source for one attribute row: the runtime table's
+    // domain/kind/count/finite rules, and for Color the visualization recipe
+    // encoder that will draw it. Results are memoized by property revision.
+    [[nodiscard]] GeometryPropertyResolution ResolveEditorAttributeBindingSource(
+        const GeometryEntityAvailability& availability, RenderAttribute attribute,
+        GeometryElementDomain domain, std::string_view propertyName);
 
     // The single attribute-binding table shared by the Appearance panel and the
     // agent lane: every table row whose element domain the entity has, its
@@ -776,6 +798,10 @@ export namespace Extrinsic::Runtime
     ApplyEditorVertexChannelBindingCommand(const EditorVisualizationEditingContext& context,
                                            const EditorVertexChannelBindingCommand& command);
 
+    EditorCommandStatus
+    ApplyEditorAttributeBindingCommand(const EditorVisualizationEditingContext& context,
+                                       const EditorAttributeBindingCommand& command);
+
     EditorCommandStatus ApplyEditorGeometryPresentationSlotDefaultCommand(
         const EditorVisualizationEditingContext& context,
         const EditorGeometryPresentationSlotDefaultCommand& command);
@@ -827,6 +853,9 @@ export namespace Extrinsic::Runtime
     EditorCommandStatus ApplyEditorVertexChannelBindingCommand(
         const EditorVisualizationEditingCommands& commands,
         const EditorVertexChannelBindingCommand& command);
+    EditorCommandStatus ApplyEditorAttributeBindingCommand(
+        const EditorVisualizationEditingCommands& commands,
+        const EditorAttributeBindingCommand& command);
     EditorCommandStatus ApplyEditorGeometryPresentationSlotDefaultCommand(
         const EditorVisualizationEditingCommands& commands,
         const EditorGeometryPresentationSlotDefaultCommand& command);

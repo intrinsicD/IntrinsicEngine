@@ -76,6 +76,9 @@ export namespace Extrinsic::Runtime
         bool AcceptsVec3{false};
         bool AcceptsVec4{false};
         bool RequireFiniteValues{false};
+        // Color: kind and value validity belong to the visualization recipe
+        // encoder that draws the overlay; the table only fixes domain/count.
+        bool ValidatedByVisualizationRecipe{false};
         // Canonical property drawn without a binding ("" when the default is
         // not a property, e.g. the material color or a uniform pixel size).
         std::string_view CanonicalProperty{};
@@ -93,7 +96,7 @@ export namespace Extrinsic::Runtime
         RenderAttribute attribute, GeometryElementDomain domain) noexcept;
     [[nodiscard]] bool RenderAttributeAcceptsValueKind(
         const RenderAttributeRule& rule, Geometry::PropertyValueKind kind) noexcept;
-    // "vec3", "float, vec3 or vec4", ...
+    // "vec3", "vec2", "float" or "scalar or vector" (recipe-validated rows).
     [[nodiscard]] std::string_view RenderAttributeExpectedTypeText(
         const RenderAttributeRule& rule) noexcept;
 
@@ -101,6 +104,8 @@ export namespace Extrinsic::Runtime
     // live geometry: UnsupportedDomain when the table has no such row or the
     // entity lacks the domain; otherwise the canonical property resolution
     // (missing, kind, element count and, when the row requires it, finiteness).
+    // Recipe-validated rows (Color) check only presence and count here; the
+    // editor completes them with the visualization recipe encoder.
     [[nodiscard]] GeometryPropertyResolution ResolveRenderAttributeSource(
         const GeometryEntityAvailability& availability,
         RenderAttribute attribute,

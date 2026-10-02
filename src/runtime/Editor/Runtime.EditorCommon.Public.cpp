@@ -54,6 +54,11 @@ DebugNameForEditorCommandStatus(EditorCommandStatus status) noexcept {
   case EditorCommandStatus::InvalidProcessingParameters: return "InvalidProcessingParameters";
   case EditorCommandStatus::GeometryProcessingFailed: return "GeometryProcessingFailed";
   case EditorCommandStatus::UnsupportedCameraPose: return "UnsupportedCameraPose";
+  case EditorCommandStatus::UnsupportedRenderAttribute: return "UnsupportedRenderAttribute";
+  case EditorCommandStatus::AttributeSourceMissing: return "AttributeSourceMissing";
+  case EditorCommandStatus::AttributeSourceTypeMismatch: return "AttributeSourceTypeMismatch";
+  case EditorCommandStatus::AttributeSourceCountMismatch: return "AttributeSourceCountMismatch";
+  case EditorCommandStatus::AttributeSourceNonFinite: return "AttributeSourceNonFinite";
   }
   return "Unknown";
 }

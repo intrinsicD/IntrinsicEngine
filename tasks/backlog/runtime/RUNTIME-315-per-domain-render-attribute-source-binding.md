@@ -108,3 +108,29 @@ python3 tools/agents/check_task_policy.py --root . --strict
   command; 4 persistence; 5 normal/texcoord/size/width consumption; 6 position
   consumption (bounds, picking, vector fields, GPU front); 7 graphs/point
   clouds/primitive views and docs.
+- 2026-10-02: Slice 1 review decisions (coordinator, on shader evidence).
+  Sizes stay pixels: `point.vert` `ResolvePointSizePx` and `line.vert` read
+  `PointSizeBDA`/`LineWidthBDA` as pixels clamped to 0.5..32; the
+  "world-space radii" note in `Graphics.Component.GpuSceneSlot.cppm` was stale
+  and is corrected; model-space radii stay `RUNTIME-222`. Color: the overlay
+  is the single Color binding. The promoted surface shaders
+  (`forward/default_debug_surface.vert`, `deferred/gbuffer.vert`) read the
+  overlay color per vertex, so it interpolates; the nearest-vertex Voronoi in
+  `surface_color_resolve.glsl` belongs to the unreferenced legacy pipeline.
+  Canonical `v:color` (unbound default through `PackedVertexColors`) is kept
+  unchanged; only the `VertexChannelBindingSet::Color` binding and its command
+  retire in slice 3 (its packed colors are read by the surface shader only,
+  never by the point/line shaders).
+- 2026-10-02: Slice 2 (command). `ApplyEditorAttributeBindingCommand` commits
+  each attribute as one undo step on its owner: structural streams through
+  the vertex-channel mutation, Color through the `show_property` recipe path
+  (its encoder is the Color validator, `ResolveEditorAttributeBindingSource`),
+  point size/line width through the render-hint mutation. Typed refusals:
+  `UnsupportedRenderAttribute`, `AttributeSource{Missing,TypeMismatch,
+  CountMismatch,NonFinite}`. Per-element pixel sizes are not extracted yet
+  (a named size stops the lane drawing), so the command refuses to author
+  them and the model marks such rows `Consumed = false` until slice 5.
+  One domain-to-overlay-lane mapping (`ColorOverlayTargetFor`) now serves the
+  binding, the recipe path and the property-preset command; the recipe
+  encoder's own `ToVisualizationDomain` maps to a different enum and module
+  and stays. Value scans are memoized by property content revision.

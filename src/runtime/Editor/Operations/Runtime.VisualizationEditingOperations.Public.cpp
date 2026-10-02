@@ -151,6 +151,12 @@ EditorCommandStatus ApplyEditorVertexChannelBindingCommand(
                                                 command);
 }
 
+EditorCommandStatus ApplyEditorAttributeBindingCommand(
+    const EditorVisualizationEditingCommands &commands,
+    const EditorAttributeBindingCommand &command) {
+  return ApplyEditorAttributeBindingCommand(ContextOrEmpty(commands), command);
+}
+
 EditorCommandStatus ApplyEditorGeometryPresentationSlotDefaultCommand(
     const EditorVisualizationEditingCommands &commands,
     const EditorGeometryPresentationSlotDefaultCommand &command) {
