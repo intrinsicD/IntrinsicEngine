@@ -26,7 +26,7 @@ contracts: [repo.source-documentation, geometry.element-domain-sources]
 ## Context
 - Operator direction 2026-09-27: agent control lane and user-facing inspection capabilities, planned with Fable 5.1; attach-to-running transport; declarative schemas; integer enums.
 - `ActionReadiness { bool Enabled; std::string DisabledReason; }` in `src/runtime/Editor/Runtime.EditorProcessing.cppm`; `ResolveEditorProcessingActionReadiness`; `Target()`-style functions (e.g. `Runtime.MeshFieldOperations.Smoothing.cpp`) return the first failing string; `DrawProcessingActionButton`/`DrawDisabledReasonTooltip` show one string.
-- Coordination: [UI-037](../../active/UI-037-linear-domain-action-readiness-tooltips.md) (active) owns readiness across all families. Land this as a small type-introducing slice that UI-037's remaining slices adopt; check UI-037's current continuation before starting and do not duplicate its cached verdicts. This task does not edit UI-037's note; the UI-037 owner records adoption there.
+- Coordination: [UI-037](../active/UI-037-linear-domain-action-readiness-tooltips.md) (active) owns readiness across all families. Land this as a small type-introducing slice that UI-037's remaining slices adopt; check UI-037's current continuation before starting and do not duplicate its cached verdicts. This task does not edit UI-037's note; the UI-037 owner records adoption there.
 - Design: `enum class ActionReadinessCode : std::uint8_t { Ok, WorkspaceUnavailable, MissingEntity, WrongDomain, MissingProperty, IncompatibleProperty, ElementCountMismatch, InvalidConfig, ConflictingOptions, DeviceUnavailable, KernelUnavailable, JobActive, StaleInput, PendingVerdict }`; `ActionReadinessReason { Code; Field /* schema key, empty = whole action */; Message; }`; `ActionReadiness` gains `std::vector<ActionReadinessReason> Reasons` and `DisabledReason` stays the first reason's message (existing `{ok, diagnostic}` aggregate initializations keep compiling); `MakeActionReadiness(std::vector<ActionReadinessReason>)` fills both.
 
 ## Slice log
@@ -46,21 +46,32 @@ contracts: [repo.source-documentation, geometry.element-domain-sources]
 - Agent/CLI: every `*_preview`/`*_run` agent operation returns `readiness.reasons[]` (code name, field, message); a disabled action is a normal result, not `isError`.
 
 ## Required changes
-- [ ] Add the code enum, reason struct, `Reasons` field, `MakeActionReadiness` and `ToString(ActionReadinessCode)`.
-- [ ] `ResolveEditorProcessingActionReadiness` prepends a `WorkspaceUnavailable` reason.
-- [ ] Mesh-field family (`Smoothing`, `Eigenbasis`, `HarmonicField`, `Gradient` owners): `Target()` collects independent reasons instead of returning early; dependent checks still short-circuit.
-- [ ] Agent operations for these families serialize the reasons.
+- [x] Add the code enum, reason struct, `Reasons` field, `MakeActionReadiness` and `ToString(ActionReadinessCode)`.
+- [x] `ResolveEditorProcessingActionReadiness` prepends a `WorkspaceUnavailable` reason.
+- [x] Mesh-field family (`Smoothing`, `Eigenbasis`, `HarmonicField`, `Gradient` owners): `Target()` collects independent reasons instead of returning early; dependent checks still short-circuit.
+- [x] Agent operations for these families serialize the reasons.
 
 ## Tests
-- [ ] `Test.PropertySmoothingOperations.cpp` (and the other adopted family tests) assert full reason lists for multi-fault configs, including `Field` keys.
-- [ ] Existing readiness tests stay green.
+- [x] `Test.PropertySmoothingOperations.cpp` (and the other adopted family tests) assert full reason lists for multi-fault configs, including `Field` keys.
+- [x] Existing readiness tests stay green.
 
 ## Docs
-- [ ] `docs/architecture/sandbox-editor-feature-boundaries.md` (readiness section) documents codes and field keys; module inventory regenerated.
+- [x] `docs/architecture/sandbox-editor-feature-boundaries.md` (readiness section) documents codes and field keys; module inventory regenerated.
 
 ## Acceptance criteria
-- [ ] Multi-fault mesh-field configs report every independent reason with correct codes and fields; `DisabledReason` equals the first reason.
-- [ ] No behavioral change for enabled actions; all existing callers compile unchanged.
+- [x] Multi-fault mesh-field configs report every independent reason with correct codes and fields; `DisabledReason` equals the first reason.
+- [x] No behavioral change for enabled actions; all existing callers compile unchanged.
+
+## Completion
+
+Commit: `c45f47926`, `6dffa4d4a`. Completed 2026-10-02 with an independent Opus review.
+- `ActionReadiness` carries structured reasons (code, field, message). `DisabledReason` stays the first message.
+- The mesh-field owners collect independent reasons, and dependent checks still short-circuit.
+- Config range faults name their `ConfigFieldSpec` field; a valid config allocates nothing.
+- Agent `preview_*` returns `reasons[]` alongside `reason`.
+- Full CPU suite green.
+- Other operation families adopt the reasons under UI-037; the UI tooltip and field markers come in UI-058.
+- Maturity: CPUContracted.
 
 ## Verification
 ```bash

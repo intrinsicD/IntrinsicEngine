@@ -8,6 +8,15 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-02 — RUNTIME-277 structured action readiness reasons
+
+Retired [RUNTIME-277](RUNTIME-277-structured-action-readiness-reasons.md).
+
+- Disabled actions now report every independent reason with a code and an optional config field. The mesh-field family adopted this first, and the agent previews expose `reasons[]`.
+- UI-058 builds the all-reasons tooltip and field markers; UI-037 owns the remaining families.
+
+Commits `c45f47926`, `6dffa4d4a`.
+
 ## 2026-10-02 — RUNTIME-319 processed-property persistence in scene files
 
 Retired [RUNTIME-319](RUNTIME-319-persist-processed-geometry-properties-in-scene-documents.md).
