@@ -1524,9 +1524,11 @@ TEST(SandboxDomainPanels, UniformPointSizeSitsOnItsRowAndYieldsToABoundSource)
 }
 
 // UI-049 layout rule: at the window's default width nothing in the sections
-// extends past the content region (a clipped label or field would widen the
-// window's content size). The mesh has a bound Color row (interpretation
-// combo) and a visible points lane with its uniform size field.
+// extends past the content region. Content inside a table cell does not widen
+// the window (EndTable caps the window's CursorMaxPos.x at the table edge), so
+// the table's own columns are checked too: a cell's submitted content may not
+// reach past its column. The mesh has a bound Color row (interpretation combo,
+// asserted submitted) and a visible points lane with its uniform size field.
 TEST(SandboxDomainPanels, AppearanceContentFitsTheDefaultWindowWidth)
 {
     namespace GS = Extrinsic::ECS::Components::GeometrySources;
@@ -1555,8 +1557,8 @@ TEST(SandboxDomainPanels, AppearanceContentFitsTheDefaultWindowWidth)
     auto* selection = engine.Services().Find<Runtime::SelectionController>();
     ASSERT_NE(selection, nullptr);
     ASSERT_TRUE(selection->SetSelectedEntity(scene, entity));
-    const auto bindings = Runtime::BuildEditorAttributeBindingModel(
-        scene, Runtime::SelectionController::ToStableEntityId(entity));
+    const auto stableId = Runtime::SelectionController::ToStableEntityId(entity);
+    const auto bindings = Runtime::BuildEditorAttributeBindingModel(scene, stableId);
     const int colorRow = RowIndexOf(bindings, Runtime::RenderAttribute::Color,
                                     Runtime::GeometryElementDomain::MeshVertex);
     ASSERT_GE(colorRow, 0);
@@ -1571,6 +1573,8 @@ TEST(SandboxDomainPanels, AppearanceContentFitsTheDefaultWindowWidth)
     int step = 0;
     float contentWidth = 0.0f;
     float innerWidth = 0.0f;
+    int tableColumns = 0;
+    std::vector<float> columnOverflow; // content max x - column max x, per column of the Vertices table
     driver->OnFrame = [&](Runtime::Engine& kernel) {
         ++frame;
         auto* window = ImGui::FindWindowByName("Appearance");
@@ -1586,8 +1590,10 @@ TEST(SandboxDomainPanels, AppearanceContentFitsTheDefaultWindowWidth)
         ImGui::SetWindowSize(window, ImVec2{window->Size.x, 1100.0f});
         if (frame % 3 != 0)
             return;
-        const ImGuiID source = RowItemId(AppearanceTableId(window, Kind::PointCloud, "Vertices"),
-                                         colorRow, "##Source");
+        const ImGuiID tableId = AppearanceTableId(window, Kind::PointCloud, "Vertices");
+        const ImGuiID source = RowItemId(tableId, colorRow, "##Source");
+        const ImGuiID interpretation =
+            RowItemId(AppearanceSectionId(window, Kind::PointCloud, "Vertices"), colorRow, "Color interpretation");
         switch (step)
         {
         case 0: ImGui::FocusWindow(window); ImGui::ActivateItemByID(source); break;
@@ -1599,19 +1605,40 @@ TEST(SandboxDomainPanels, AppearanceContentFitsTheDefaultWindowWidth)
             break;
         }
         case 2:
+        {
+            const auto bound = Runtime::BuildEditorAttributeBindingModel(scene, stableId);
+            const auto& row = bound.Rows[static_cast<std::size_t>(colorRow)];
+            EXPECT_TRUE(row.Bound && row.Source.Name == "v:tint") << "the Color bind succeeded";
+            ImGui::ActivateItemByID(interpretation);
+            break;
+        }
+        case 3:
+        {
+            EXPECT_FALSE(ImGui::GetCurrentContext()->OpenPopupStack.empty())
+                << "the bound Color row submitted its interpretation combo (activating it opened its popup)";
             contentWidth = window->ContentSize.x;
             innerWidth = window->InnerRect.GetWidth();
+            if (const ImGuiTable* table = ImGui::TableFindByID(tableId))
+            {
+                tableColumns = table->ColumnsCount;
+                for (int i = 0; i < table->ColumnsCount; ++i)
+                    columnOverflow.push_back(table->Columns[i].ContentMaxXUnfrozen - table->Columns[i].MaxX);
+            }
             kernel.RequestExit();
             break;
+        }
         default: break;
         }
         ++step;
     };
     engine.Run();
-    EXPECT_EQ(step, 3);
+    EXPECT_EQ(step, 4);
     EXPECT_GT(innerWidth, 0.0f);
     EXPECT_LE(contentWidth, innerWidth + 1.0f)
         << "something in the Appearance window is wider than its default content region";
+    ASSERT_GT(tableColumns, 0) << "the Vertices attribute table was drawn";
+    for (std::size_t i = 0; i < columnOverflow.size(); ++i)
+        EXPECT_LE(columnOverflow[i], 1.0f) << "content of column " << i << " is clipped by its cell";
     panels.Unregister();
     shell.Detach();
     engine.Shutdown();

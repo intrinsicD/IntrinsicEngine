@@ -96,3 +96,11 @@ python3 tools/agents/check_task_policy.py --root . --strict
   without scene commands. Default for size/width restores the component default (6 px / 1 px),
   not the previous uniform value: binding a name replaces the single `std::variant<float,
   std::string>` source, so the old float is not kept.
+- 2026-10-02: Layout test fix (review). `AppearanceContentFitsTheDefaultWindowWidth` could not
+  see clipping inside the table: `EndTable` caps the window's `CursorMaxPos.x` at the table edge,
+  so the window content size stayed within the inner width with the row controls in the cell.
+  The test now also asserts every column's submitted content (`ContentMaxXUnfrozen`) stays
+  within its column, that the Color bind succeeded and that the interpretation combo was
+  submitted. With the pre-fix layout restored locally (row details back in the cell, no
+  half-width item width) it fails with column 1 overflowing by 80 px; the window check alone
+  still passed.
