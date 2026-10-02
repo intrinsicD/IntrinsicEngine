@@ -8,6 +8,16 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-02 — RUNTIME-318 presentation color slots onto the overlay
+
+Retired [RUNTIME-318](RUNTIME-318-migrate-presentation-color-slots-onto-the-color-overlay.md).
+
+- PointColor/LineColor/*ScalarField presentation slots are removed. The visualization overlay is the single color mechanism, and the slot packets had never been bound on the GPU.
+- Scene format v3. The unused history-group API is removed.
+- Maturity: CPUContracted. GRAPHICS-158 owns the Vulkan readback.
+
+Commits `d5a600aa1`, `7c33f1196`, `7c85a0b78`.
+
 ## 2026-10-02 — RUNTIME-315 per-domain render attribute source binding
 
 Retired [RUNTIME-315](RUNTIME-315-per-domain-render-attribute-source-binding.md).

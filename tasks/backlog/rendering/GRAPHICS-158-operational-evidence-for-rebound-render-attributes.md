@@ -38,6 +38,7 @@ contracts: [geometry.property-coherence, geometry.element-domain-sources]
 - [ ] Rebound positions render at the displayed location with correct culling bounds and depth.
 - [ ] Bound normal/color/size/width streams are read back at the expected pixels.
 - [ ] No stale or half-published buffer is observed while a GPU method republishes a bound property.
+- [ ] (from RUNTIME-318) `RuntimeSandboxAcceptanceGpuSmoke.GeometryPresentationReachesOperationalFrame` runs under Xephyr and samples the backbuffer for the overlay-colored graph edges (red/green), not just the color-packet count.
 - [ ] Vulkan validation reports no new errors; smoke results are cited from an actually-run Xephyr session.
 
 ## Verification

@@ -7,14 +7,14 @@ workflow_schema: 1
 workflow_profile: micro
 evidence: not_applicable
 evidence_skip_reason: interactive session; evidence is the diff, tests, and CI
-maturity_target: Operational
+maturity_target: CPUContracted
 contract_schema: 1
 contracts: [geometry.element-domain-sources, geometry.property-coherence, runtime.editor-prepared-frame-locality]
 ---
 # RUNTIME-318 — Migrate the presentation color slots onto the Color overlay
 
 ## Goal
-- One Color mechanism (operator decision in [RUNTIME-315](../../done/RUNTIME-315-per-domain-render-attribute-source-binding.md#operator-decisions-2026-10-02)):
+- One Color mechanism (operator decision in [RUNTIME-315](RUNTIME-315-per-domain-render-attribute-source-binding.md#operator-decisions-2026-10-02)):
   the `PointColor`, `LineColor`, `PointScalarField` and `LineScalarField`
   `GeometryPresentationSlotRecipe` PropertyBuffer slots stop being a second,
   live way to color point and line lanes; their effect is expressed by the
@@ -68,9 +68,20 @@ contracts: [geometry.element-domain-sources, geometry.property-coherence, runtim
   the gpu smoke (run pending GPU).
 
 ## Acceptance criteria
-- [ ] No code path colors a point or line lane from a presentation slot.
-- [ ] Every previously slot-colored lane renders the same colors through the overlay (CPU extraction assertion and Vulkan readback).
-- [ ] Scene save/load round trip covers the converted lanes; the format decision is recorded.
+- [x] No code path colors a point or line lane from a presentation slot.
+- [x] Every previously slot-colored lane renders the same colors through the overlay (CPU extraction assertion; the Vulkan readback is owned by GRAPHICS-158).
+- [x] Scene save/load round trip covers the converted lanes; the format decision is recorded.
+
+## Completion
+
+Commit: `d5a600aa1`, `7c33f1196`, `7c85a0b78`. Completed 2026-10-02 with an independent Opus review.
+- The overlay is the only color path for point and line lanes. The four slot semantics, the slot fallback and the EditorCommandHistory group API are removed.
+- Scene format v3 refuses v1, v2 and retired semantics.
+- Full CPU suite green at each commit.
+- Maturity: CPUContracted.
+- Owned by [GRAPHICS-158](../backlog/rendering/GRAPHICS-158-operational-evidence-for-rebound-render-attributes.md): run `RuntimeSandboxAcceptanceGpuSmoke.GeometryPresentationReachesOperationalFrame` under Xephyr and add a backbuffer sample of the overlay edge colors.
+- Not covered on CPU: isolines and the mesh vertex/edge lanes in the identity test. The v3 refusal is a plain `InvalidFormat` without a version message.
+- Behaviour change: a surface scalar slot no longer suppresses the point and edge overlays.
 
 ## Verification
 ```bash
