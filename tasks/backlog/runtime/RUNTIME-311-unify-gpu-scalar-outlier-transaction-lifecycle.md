@@ -100,14 +100,25 @@ the per-job setup/completion prologue that precedes them is
     reachable deterministically on a device (the first chunk stores a preview whenever it holds a
     write slot), so it has no smoke; CPU contract tests cannot drive the Vulkan Run.
   - GPU positions: Accept while one is under way with a callback is refused (before: Pending without
-    taking the callback); a Discard from a history observer during publication is ignored; the run
-    is stale once its ring is another generation or the world changed (before: positions only).
+    taking the callback); a Discard from a history observer during publication is ignored.
+    `EditorGpuPositionRunCurrent` keeps its meaning (the positions read are unchanged); a ring that
+    left the residency, or was replaced by another run's ring, fails Accept as "no longer resident"
+    (GeometryProcessingFailed, delivered once) without touching the successor's ring.
   - GPU positions render commit: a pending block copy (`AcknowledgedCopyPending`) holds the accepted
     front's residency lease (`GeometryPositionCommitDesc::SourceLease`) until the frame that recorded
     the copy completed (`GetFramesInFlight`); every place a preview stops holding it (copied,
     superseded by a CPU upload, replaced by a new preview or commit, cleared, freed) retires it, and
     Shutdown/device-loss rebuild drop the retire list. Before, only `NoteUse(frame + 1)` protected
     the slot, which a late culling head (minimized frames) outlived.
+  - Shared refusal and failure wording (user visible in panels and agent replies): Accept of
+    changed inputs "The inputs changed since the run; discard the result and run again." (scalar
+    and outliers said "Scalar/Outlier input or output changed; discard and run again."), nothing
+    waiting "No GPU result waits for Accept." (scalar "No scalar result awaits Accept.", outliers
+    "No outlier result waits for Accept."), a front no longer resident at Accept "The GPU result
+    is no longer resident; previous output retained." (scalar "Scalar front is no longer resident.",
+    outliers "Outlier front is no longer resident."; positions keep their own wording for a front
+    missing before the readback). Snapshot refusal reasons keep their typed wording.
+  - Not fixed here: a failed frame submit after a recorded commit copy (BUG-232).
   - Workspace-in-flight: no smoke asserts that a workspace is reused only after its readback; the
     recorder-owned lease follows the spatial cache contract and the discard/stop smokes pass.
   - Mesh-family CPU jobs (curvature, denoise, remesh, subdivide, simplify, UV, ICP, Progressive
@@ -129,7 +140,12 @@ the per-job setup/completion prologue that precedes them is
   and the canonical slot are unchanged and no ring is left. On the device it also pins a duplicate
   GPU start (Pending, no handle, no callback) and the Accept stage carrying the run's
   `EditorJobIdentity::Run`. A mutation that keeps the ring on finalize fails it. The six transaction
-  smokes (scalar, outlier, point normals, vertex normals, smoothing x2, positions x2) pass with it.
+  smokes (scalar, outlier, point normals, vertex normals, smoothing x2, positions x2) pass with it
+  (full `IntrinsicPointLBVHGpuTests` at slice 6: 53 passed, 1 opt-in profile skipped).
+- Pending (GPU reserved by the operator after slice 6): a Vulkan rerun of the slice-7 positions
+  Accept change (missing-ring check before the Accept refusal) and of the full `gpu;vulkan` CTest
+  across all binaries after the slice-5 `GpuWorld` lease change; only `IntrinsicPointLBVHGpuTests`
+  ran on the device after slice 5.
 
 ## Acceptance criteria
 - [ ] One compiled lifecycle owns acquisition, polling, ring publication, Accept, Discard, cancellation and terminal delivery for one or N rings, including the accept-only (no Run phase) shape.

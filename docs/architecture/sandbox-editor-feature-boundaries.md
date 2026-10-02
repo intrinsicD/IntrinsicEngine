@@ -251,7 +251,19 @@ its source became stale; nothing was applied.", `Rejected` without a callback). 
 validation and publication stay in each operation, and later stages of a run carry its first job's
 token (`EditorJobIdentity::Run`). `QueuedEditorJobDriftGuard` fails when an operation source
 hand-writes the refusal, the lookup or a deliver-once flag, or the guarded-sink and finalizer
-pattern outside its short list of transaction and state-struct owners. Mesh topology, mesh fields, registration and
+pattern outside its short list of state-struct and run-object owners; it also rejects hand-written
+"job submission was rejected" wording (`QueuedJobRejectedMessage`). Two-phase GPU Run/Accept
+transactions (scalar analysis and its publication mode for keypoints and K-Means, outliers,
+normals, property smoothing, GPU positions) share one lifecycle (RUNTIME-311),
+`Runtime.GpuTransactionLifecycle.{hpp,cpp}`: each typed transaction embeds a
+`GpuTransactionCore` (up to three output rings with the generation the run acquired, Accept
+readbacks, phase, abandon/deliver/publishing flags, run and Accept tokens) and supplies hooks
+(`Current`, `Poll`, `CompleteRun`, `CompleteAccept`, `Accepting`, `Release`, `Deliver`). The core owns
+the start refusal (duplicate output, residency, pending ring), the Run job, the automatic and user
+Accept (front readbacks through `GpuFrontReadback`, an Accept stage that joins the run), Discard
+(ignored while Accept publishes), the one cancel/stale finalize and exactly-once delivery; an
+accept-only transaction (GPU positions) starts in ReadyToAccept without a Run job. Recorders own
+their workspace leases. The drift guard allows front readbacks only in the lifecycle. Mesh topology, mesh fields, registration and
 UV/parameterization each own a public family module. Workspace model assembly lives in
 `Runtime.EditorWorkspaceSnapshots.Models.cpp`. The workspace session stores its
 attachment epoch, retained results, caches and subscriptions behind its private

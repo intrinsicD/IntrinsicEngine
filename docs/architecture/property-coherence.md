@@ -205,9 +205,10 @@ that ring (`GpuPropertyResidency::RingGeneration`) and a second run cannot
 begin while a ring waits for Accept or Discard. Accept (`AcceptEditorGpuPositionRun`; batch and
 agent commands accept at once) does, in order:
 
-1. one readback of the front in float3 (`GpuFrontReadback`, shared with the
-   scalar transaction: immediate where the device can, otherwise with the
-   frame; the front stays leased until the bytes landed);
+1. one readback of the front in float3 (`GpuFrontReadback`, the readback of the
+   shared GPU transaction lifecycle, RUNTIME-311: positions are its accept-only
+   transaction; immediate where the device can, otherwise with the frame; the
+   front stays leased until the bytes landed);
 2. the undoable publication of **every row** (deleted rows included, so the
    CPU rows are byte-identical to the front) as one history entry guarded by
    the other inputs' watches and the positions' own revision; non-finite rows
@@ -228,8 +229,9 @@ agent commands accept at once) does, in order:
    the accepted publication and no newer front or rewrite followed, the commit
    is complete at once; a block that never copied it, or copied an older front,
    gets one copy front -> block at the next culling head instead of a CPU
-   upload (`CopyPending`; the slot is held one frame for it, and a CPU
-   position upload landing first supersedes the copy). No dirty tag is set.
+   upload (`CopyPending`; the pending copy holds the front's residency lease
+   until the frame that recorded it completed, however late the culling head
+   runs, and a CPU position upload landing first supersedes the copy). No dirty tag is set.
    A **mesh**, an entity without a resident 1:1 block, or a block that refuses
    the bytes is not acknowledged: the positions are marked dirty and the
    ordinary revision-delta upload applies (RUNTIME-295 routes it through the
@@ -498,7 +500,8 @@ publication-to-render-residency regression listed in the contract catalog.
 cached LBVH and writes a float scalar ring. Density/spacing use ordered double
 reductions; compact density weights use source-index-ordered double sums and
 shared double exponential evaluation. No neighborhood arrays cross to CPU.
-The three adapters share `Runtime.PointScalarTransaction` for leases, stale
+The three adapters share `Runtime.PointScalarTransaction` (on the shared GPU
+transaction lifecycle, `Runtime.GpuTransactionLifecycle`) for leases, stale
 watches, generation-safe Discard and `GpuFrontReadback` Accept into
 `PublishPointScalarField`, followed by publication-bound `BindRevision`.
 Existing deleted rows copy the resident output base; new deleted rows are zero.
@@ -517,10 +520,12 @@ publication. The scalar failure smoke restores ordinary samples after its radius
 overflow fixture, rejects `Accept point scalar`, checks ring release, then runs
 successfully again.
 
-Scalar and outlier transactions validate captured ring generations before Accept
-and job publication. A replacement ring invalidates the older transaction; its
-cleanup cannot discard the replacement. A nonempty Accept callback replaces the
-Start callback after admission succeeds, with one terminal delivery. Scalar
+Every GPU transaction (scalar, outliers, normals, smoothing, positions; RUNTIME-311)
+validates captured ring generations before Accept and job publication. A replacement
+ring invalidates the older transaction; its cleanup cannot discard the replacement.
+A nonempty Accept callback replaces the Start callback after admission succeeds, with
+one terminal delivery; a second Accept while one is under way answers Pending without
+a callback and is refused with one. Scalar
 panels omit the Start callback and fold the terminal snapshot through the same
 runtime result adapters before publishing their retained result once.
 

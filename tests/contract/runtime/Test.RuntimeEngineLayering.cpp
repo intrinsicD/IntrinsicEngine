@@ -1187,6 +1187,8 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
         + ReadFile(RepoRoot() / "src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.Topology.cpp"));
     const auto normalOperations = ReadFile(RepoRoot() /
         "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp");
+    const auto gpuTransactions = ReadFile(RepoRoot() /
+        "src/runtime/Editor/Operations/Runtime.GpuTransactionLifecycle.cpp");
     const auto clusteringModule = ReadFile(
         RepoRoot() /
         "src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp");
@@ -1232,16 +1234,18 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
         WithoutWhitespace(clusteringModule).find(
             "returnKMeansSnapshot{.Command=command,.World=world"),
         std::string::npos);
-    // Every remaining geometry factory and normal job (CPU, shared resident mesh/PCA
-    // compute and Accept) carries its owning world scope.
+    // Every remaining geometry factory and normal job carries its owning world scope; the
+    // resident compute and Accept jobs of every GPU transaction (normals included) are the
+    // shared lifecycle's (RUNTIME-311).
     EXPECT_EQ(CountOccurrences(geometryMeshOperations, "return DerivedJobDesc{"), 0u);
     EXPECT_EQ(CountOccurrences(geometryMeshOperations, "return JobDesc{"), 4u);
     EXPECT_EQ(CountOccurrences(geometryMeshOperations, ".Scope = context.World"), 4u);
     EXPECT_EQ(CountOccurrences(normalOperations, "JobDesc desc{"), 1u);
-    EXPECT_EQ(CountOccurrences(normalOperations, "JobDesc gpu{"), 1u);
-    EXPECT_EQ(CountOccurrences(normalOperations, "JobDesc accept{"), 1u);
-    EXPECT_EQ(CountOccurrences(normalOperations, ".Scope = context.World"), 2u);
-    EXPECT_EQ(CountOccurrences(normalOperations, ".Scope = ctx.World"), 1u);
+    EXPECT_EQ(CountOccurrences(normalOperations, "JobDesc "), 1u);
+    EXPECT_EQ(CountOccurrences(normalOperations, ".Scope = context.World"), 1u);
+    EXPECT_EQ(CountOccurrences(gpuTransactions, "JobDesc job{"), 1u);
+    EXPECT_EQ(CountOccurrences(gpuTransactions, "JobDesc accept{"), 1u);
+    EXPECT_EQ(CountOccurrences(gpuTransactions, ".Scope = t->Context.World"), 2u);
     EXPECT_EQ(CountOccurrences(
                   workspaceSession,
                   "desc.Scope = m_Worlds->ActiveWorld()"),

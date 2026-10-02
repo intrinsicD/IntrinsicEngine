@@ -458,9 +458,11 @@ namespace Extrinsic::Runtime
         return std::uint32_t(run->Capture.BeforeValues.size());
     }
 
+    // The positions this run read are unchanged. A ring that left the residency is not a change
+    // of the positions: Accept then fails ("no longer resident") instead.
     bool EditorGpuPositionRunCurrent(const EditorProcessingCommands&, const EditorGpuPositionRunHandle& run)
     {
-        return run && GP::GpuTransactionCurrent(run->Core);
+        return run && !run->Core.Abandoned && GP::PointPositionFieldCurrent(run->Core.Context, run->Entity, run->Capture);
     }
 
     EditorGpuPositionAcceptResult AcceptEditorGpuPositionRun(
@@ -472,6 +474,16 @@ namespace Extrinsic::Runtime
             return EditorGpuPositionAcceptResult{.Status = status, .Message = std::move(message)};
         };
         if (!w) return refuse(EditorCommandStatus::InvalidProcessingParameters, "No GPU result waits for Accept.");
+        if (auto& t = w->Core; t.Phase == EditorGpuTransactionPhase::ReadyToAccept &&
+                               t.Residency->RingGeneration(Ring(w).Key) != Ring(w).Generation)
+        {
+            // The front left the residency (discarded, or another run's ring took the key):
+            // nothing of this run can be read back. Fails as before the shared lifecycle,
+            // delivered to this Accept's callback; a successor's ring is never touched.
+            if (onComplete) w->Sink = GuardEditorProcessingResult(t.Context, std::move(onComplete));
+            Fail(w, EditorCommandStatus::GeometryProcessingFailed, "The GPU result is no longer resident; previous positions retained.");
+            return w->Result;
+        }
         if (auto refused = GP::GpuTransactionAcceptRefusal(w->Core, bool(onComplete)))
             return refuse(refused->Status, std::move(refused->Message));
         if (!frontForTest.empty() && frontForTest.size() != w->Capture.BeforeValues.size())

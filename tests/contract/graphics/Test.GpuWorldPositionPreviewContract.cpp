@@ -649,6 +649,51 @@ TEST(GpuWorldPositionCommitContract, APendingCopyHoldsTheFrontLeaseUntilItsFrame
     EXPECT_EQ(second.use_count(), 1);
 }
 
+// RUNTIME-311: a commit that replaces a pending commit, a freed geometry and a device-loss
+// rebuild each stop holding the earlier front lease: the first two retire it (released after
+// the frames in flight), the rebuild drops the retire list (the lost device's copies are gone)
+// while a still-pending copy keeps its own lease for the re-recorded copy.
+TEST(GpuWorldPositionCommitContract, ReplacedFreedAndRebuiltCommitsRetireTheirFrontLeases)
+{
+    Fixture f;
+    const auto geometry = f.World.UploadGeometry(TriangleUpload());
+    const auto bytes = ShiftedPositionBytes();
+    const auto commitWith = [&](const std::shared_ptr<int>& lease, const std::uint64_t stamp) {
+        auto commit = Commit(f, bytes, stamp);
+        commit.SourceLease = lease;
+        return f.World.CommitGeometryPositions(geometry, commit);
+    };
+    const auto settle = [&] {
+        for (std::uint64_t frame = 0; frame <= f.Device.FramesInFlight + 1u; ++frame)
+        {
+            ++f.Device.GlobalFrameNumber;
+            f.World.SyncFrame();
+        }
+    };
+    auto first = std::make_shared<int>(0), second = std::make_shared<int>(0);
+    ASSERT_EQ(commitWith(first, 3u), CommitStatus::CopyPending);
+    ASSERT_EQ(commitWith(second, 4u), CommitStatus::CopyPending) << "a later Accept replaces the pending copy";
+    EXPECT_GT(first.use_count(), 1) << "retired, not yet released";
+    EXPECT_GT(second.use_count(), 1) << "held by the pending copy";
+    settle();
+    EXPECT_EQ(first.use_count(), 1) << "the replaced copy's lease is released after the frames in flight";
+    EXPECT_GT(second.use_count(), 1);
+
+    // A device-loss rebuild drops retired leases; the pending copy keeps its own.
+    auto retired = std::make_shared<int>(0);
+    ASSERT_EQ(commitWith(retired, 5u), CommitStatus::CopyPending);
+    EXPECT_EQ(second.use_count(), 2) << "only the retire list holds the replaced lease now";
+    ASSERT_TRUE(f.World.RebuildGpuResources(f.Device, f.Buffers));
+    EXPECT_EQ(second.use_count(), 1) << "the lost device's recorded copies are gone";
+    EXPECT_GT(retired.use_count(), 1) << "the pending copy is recorded again on the new resources";
+
+    // Freeing the geometry retires the pending copy's lease.
+    f.World.FreeGeometry(geometry);
+    EXPECT_GT(retired.use_count(), 1);
+    settle();
+    EXPECT_EQ(retired.use_count(), 1);
+}
+
 TEST(GpuWorldPositionCommitContract, ACpuPositionUploadSupersedesAPendingCommitCopy)
 {
     Fixture f;

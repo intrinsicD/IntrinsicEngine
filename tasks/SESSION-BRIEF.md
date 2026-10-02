@@ -234,6 +234,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-225` — Archived tasks cannot follow links to tasks that retire later (tasks/backlog/bugs/BUG-225-archived-task-links-to-retiring-tasks.md)
 - unblocked: `BUG-228` — Vulkan smoke timeout depends on the display environment (tasks/backlog/bugs/BUG-228-desktop-display-vulkan-smoke-timeouts.md)
 - unblocked: `BUG-229` — NVIDIA shutdown retention on a nested Xephyr display (tasks/backlog/bugs/BUG-229-nvidia-xephyr-shutdown-retention.md)
+- unblocked: `BUG-232` — A failed frame submit loses an accepted position copy (tasks/backlog/bugs/BUG-232-gpuworld-commit-copy-lost-on-failed-submit.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 - unblocked: `GRAPHICS-147` — Refine shared Morton cells in the GPU point LBVH (tasks/backlog/rendering/GRAPHICS-147-gpu-lbvh-shared-cell-refinement.md)
 

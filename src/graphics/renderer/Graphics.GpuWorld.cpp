@@ -158,7 +158,8 @@ namespace Extrinsic::Graphics
         };
 
         // A front lease whose last possible copy was recorded at `Frame`: released once that
-        // frame's commands completed (the residency's reuse rule, `GetFramesInFlight`).
+        // frame's commands completed. Keep in step with the slot reuse rule of
+        // `GpuPropertyResidency` (`Impl::Complete`: now - frame > GetFramesInFlight()).
         struct RetiringSourceLease
         {
             std::uint64_t Frame = 0;
