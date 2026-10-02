@@ -8,6 +8,7 @@ module;
 
 module Extrinsic.Runtime.VertexChannelBindings;
 
+import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.GeometryAvailability;
 
 namespace Extrinsic::Runtime
@@ -16,6 +17,8 @@ namespace Extrinsic::Runtime
     {
         using D = GeometryElementDomain;
         using A = RenderAttribute;
+        constexpr std::string_view kPosition =
+            ECS::Components::GeometrySources::PropertyNames::kPosition;
 
         constexpr RenderAttributeRule Vec3Row(
             const A attribute, const D domain, const bool finite,
@@ -59,9 +62,9 @@ namespace Extrinsic::Runtime
         // Shading normals and texcoords repair non-finite elements per element
         // (+Z / zero), so only positions and pixel sizes require finite sources.
         constexpr std::array kRules{
-            Vec3Row(A::Position, D::MeshVertex, true, "v:position", "v:position"),
-            Vec3Row(A::Position, D::GraphNode, true, "v:position", "v:position"),
-            Vec3Row(A::Position, D::PointCloudPoint, true, "v:position", "v:position"),
+            Vec3Row(A::Position, D::MeshVertex, true, kPosition, kPosition),
+            Vec3Row(A::Position, D::GraphNode, true, kPosition, kPosition),
+            Vec3Row(A::Position, D::PointCloudPoint, true, kPosition, kPosition),
             Vec3Row(A::Normal, D::MeshVertex, false, "v:normal",
                     "h:normal corners, else v:normal, else +Z"),
             Vec3Row(A::Normal, D::MeshHalfedge, false, "h:normal",

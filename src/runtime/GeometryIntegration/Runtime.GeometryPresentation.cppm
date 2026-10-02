@@ -431,6 +431,7 @@ export namespace Extrinsic::Runtime
     {
         const GeometryPresentationBindingRecipe* Presentation{nullptr};
         const GeometryPresentationSlotRecipe* Slot{nullptr};
+        GeometryRenderLane Lane{GeometryRenderLane::Points};
     };
     [[nodiscard]] GeometryPresentationColorSlot FindGeometryPresentationColorSlot(
         const GeometryPresentationRecipe& recipe,

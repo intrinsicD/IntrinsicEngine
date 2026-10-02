@@ -90,6 +90,13 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] EditorCommandHistoryResult Redo();
         [[nodiscard]] EditorCommandHistoryResult MarkDirty(std::string label = {});
 
+        // Commands executed or recorded between BeginGroup and the matching
+        // EndGroup form one undo step (nesting joins the outermost group).
+        // A group of one command keeps that command; an empty group records
+        // nothing. Prefer `ScopedEditorCommandGroup`.
+        void BeginGroup();
+        void EndGroup(std::string label);
+
         void ClearHistory();
         void ResetDocument(std::string path = {});
         void MarkSaved(std::string path = {});
@@ -113,6 +120,7 @@ export namespace Extrinsic::Runtime
             EditorCommandHistoryStatus status,
             std::string label = {}) const;
         void PushUndo(EditorCommandRecord command);
+        void CommitApplied(EditorCommandRecord command);
         void TrimToCapacity();
         void AdvanceRevision(bool dirtying) noexcept;
 
@@ -125,6 +133,30 @@ export namespace Extrinsic::Runtime
         std::string m_ActivePath{};
         // Main-thread state: the agent scope, job completions and panels all run there.
         std::string m_LabelPrefix{};
+        std::uint32_t m_GroupDepth{0u};
+        std::vector<EditorCommandRecord> m_GroupRecords{};
+    };
+
+    // Groups every command issued during its lifetime into one undo step;
+    // a null history is a no-op.
+    class ScopedEditorCommandGroup
+    {
+    public:
+        ScopedEditorCommandGroup(EditorCommandHistory* history, std::string label)
+            : m_History(history), m_Label(std::move(label))
+        {
+            if (m_History != nullptr) m_History->BeginGroup();
+        }
+        ~ScopedEditorCommandGroup()
+        {
+            if (m_History != nullptr) m_History->EndGroup(std::move(m_Label));
+        }
+        ScopedEditorCommandGroup(const ScopedEditorCommandGroup&) = delete;
+        ScopedEditorCommandGroup& operator=(const ScopedEditorCommandGroup&) = delete;
+
+    private:
+        EditorCommandHistory* m_History{nullptr};
+        std::string m_Label{};
     };
 
     // Sets a history label prefix for the lifetime of the scope and restores

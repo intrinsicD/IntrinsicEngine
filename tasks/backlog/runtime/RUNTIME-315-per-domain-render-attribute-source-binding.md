@@ -174,3 +174,18 @@ python3 tools/agents/check_task_policy.py --root . --strict
   properties, so bindings to processed properties always load stale until
   `RUNTIME-319` persists them. Color (overlay) and size/width (render hints)
   were already serialized.
+- 2026-10-02: Slice 5 (shading streams; slice 3b/4 review folds).
+  `ResolveMeshShadingSources` is the one resolution of the mesh surface's
+  normal and texcoord streams (vertex binding overrides the canonical corner
+  stream, corner binding replaces it, unresolvable binding falls back);
+  the plan builder and extraction revision tracking share it, so edits to a
+  bound property re-upload without re-binding. Normal and Texcoord are now
+  drawn on every table row. Textures (authored or baked) are sampled with the
+  displayed texcoords; property bakes still rasterize the canonical UVs.
+  Review folds: a presentation color slot counts as a row's Color source only
+  on the overlay's own lane (otherwise the diagnostic names its lane); a
+  Color bind or Default retires a same-lane slot in the same undo step via
+  the new `ScopedEditorCommandGroup`; an explicit non-default scalar recipe
+  colormap is honoured; `docs/architecture/runtime.md` lists
+  `attributeBindings`. The table now uses the shared `kPosition` name (the
+  reuse drift guard caught a literal from slice 1).

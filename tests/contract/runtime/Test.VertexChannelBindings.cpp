@@ -372,21 +372,39 @@ TEST(VertexChannelBindings, RowsNotDrawnYetAreListedButRefused)
     AddTriangleMeshSource(f.Registry, mesh);
     SetProperty<glm::vec3>(f.Registry.Raw().get<GS::Vertices>(mesh).Properties, "v:offset",
                            std::vector<glm::vec3>(3u, glm::vec3{0, 0, 2}));
+
+    EXPECT_EQ(f.Bind(mesh, A::Position, D::MeshVertex, "v:offset"), Cmd::AttributeBindingNotYetSupported);
+    EXPECT_FALSE(f.Registry.Raw().all_of<Runtime::VertexChannelBindingSet>(mesh));
+    EXPECT_EQ(f.History.UndoCount(), 0u);
+    EXPECT_FALSE(f.Row(mesh, A::Position, D::MeshVertex).Consumed);
+    EXPECT_TRUE(f.Row(mesh, A::Normal, D::MeshHalfedge).Consumed);
+    EXPECT_TRUE(f.Row(mesh, A::Texcoord, D::MeshVertex).Consumed);
+    EXPECT_TRUE(f.Row(mesh, A::Color, D::MeshFace).Consumed);
+}
+
+TEST(VertexChannelBindings, NormalAndTexcoordBindOnVertexOrCornerDomainsThroughOneSlot)
+{
+    BindingFixture f;
+    const ECS::EntityHandle mesh = MakeSelectable(f.Registry, "Mesh");
+    AddTriangleMeshSource(f.Registry, mesh);
+    SetProperty<glm::vec3>(f.Registry.Raw().get<GS::Vertices>(mesh).Properties, "v:n2",
+                           std::vector<glm::vec3>(3u, glm::vec3{1, 0, 0}));
     SetProperty<glm::vec3>(f.Registry.Raw().get<GS::Halfedges>(mesh).Properties, "h:n2",
                            std::vector<glm::vec3>(6u, glm::vec3{0, 1, 0}));
     SetProperty<glm::vec2>(f.Registry.Raw().get<GS::Halfedges>(mesh).Properties, "h:uv2",
                            std::vector<glm::vec2>(6u, glm::vec2{0.25f}));
 
-    EXPECT_EQ(f.Bind(mesh, A::Position, D::MeshVertex, "v:offset"), Cmd::AttributeBindingNotYetSupported);
-    EXPECT_EQ(f.Bind(mesh, A::Normal, D::MeshHalfedge, "h:n2"), Cmd::AttributeBindingNotYetSupported);
-    EXPECT_EQ(f.Bind(mesh, A::Texcoord, D::MeshHalfedge, "h:uv2"), Cmd::AttributeBindingNotYetSupported);
-    EXPECT_EQ(f.Bind(mesh, A::Texcoord, D::MeshVertex, "v:texcoord"), Cmd::AttributeBindingNotYetSupported);
-    EXPECT_FALSE(f.Registry.Raw().all_of<Runtime::VertexChannelBindingSet>(mesh));
-    EXPECT_EQ(f.History.UndoCount(), 0u);
-    EXPECT_FALSE(f.Row(mesh, A::Position, D::MeshVertex).Consumed);
-    EXPECT_FALSE(f.Row(mesh, A::Normal, D::MeshHalfedge).Consumed);
-    EXPECT_TRUE(f.Row(mesh, A::Normal, D::MeshVertex).Consumed);
-    EXPECT_TRUE(f.Row(mesh, A::Color, D::MeshFace).Consumed);
+    ASSERT_EQ(f.Bind(mesh, A::Normal, D::MeshVertex, "v:n2"), Cmd::Applied);
+    ASSERT_EQ(f.Bind(mesh, A::Normal, D::MeshHalfedge, "h:n2"), Cmd::Applied);
+    EXPECT_FALSE(f.Row(mesh, A::Normal, D::MeshVertex).Bound);  // one normal source at a time
+    EXPECT_EQ(f.Row(mesh, A::Normal, D::MeshHalfedge).Source.Name, "h:n2");
+    EXPECT_EQ(f.Bind(mesh, A::Normal, D::MeshVertex), Cmd::NoChange);  // that row is not bound
+    f.Registry.Raw().remove<Dirty::DirtyVertexTexcoords>(mesh);
+    ASSERT_EQ(f.Bind(mesh, A::Texcoord, D::MeshHalfedge, "h:uv2"), Cmd::Applied);
+    EXPECT_EQ(f.Registry.Raw().get<Runtime::VertexChannelBindingSet>(mesh).Texcoord.Property.Domain,
+              D::MeshHalfedge);
+    EXPECT_TRUE(f.Registry.Raw().all_of<Dirty::DirtyVertexTexcoords>(mesh));
+    EXPECT_EQ(f.History.UndoCount(), 3u);
 }
 
 TEST(VertexChannelBindings, CommandRefusesMismatchesWithTypedReasons)
@@ -644,4 +662,77 @@ TEST(VertexChannelBindings, ShowPropertyAndColorBindingKeepTheLaneColormapAlike)
     EXPECT_EQ(surfaceMap(), Extrinsic::Graphics::Colormap::Type::Inferno);
     ASSERT_EQ(f.Bind(mesh, A::Color, D::MeshVertex, "v:a"), Cmd::Applied);
     EXPECT_EQ(surfaceMap(), Extrinsic::Graphics::Colormap::Type::Inferno);
+}
+
+TEST(VertexChannelBindings, ColorSlotsCountOnlyOnTheOverlayLaneAndRetireWithTheBindingInOneStep)
+{
+    BindingFixture f;
+    const auto pointColorRecipe = [](const D domain, const char* name, const Kind kind) {
+        Runtime::GeometryPresentationRecipe recipe{};
+        recipe.Lanes.push_back({.Lane = Runtime::GeometryRenderLane::Points, .PresentationKey = "points"});
+        recipe.Presentations.push_back(Runtime::GeometryPresentationBindingRecipe{
+            .Key = "points",
+            .Kind = Runtime::GeometryPresentationKind::PointPresentation,
+            .Slots = {Runtime::GeometryPresentationSlotRecipe{
+                .Semantic = Runtime::GeometryPresentationSlotSemantic::PointColor,
+                .SourceKind = Runtime::GeometryPresentationSourceKind::PropertyBuffer,
+                .Property = {domain, name, kind},
+            }},
+        });
+        return recipe;
+    };
+
+    // A mesh's vertex Color is the surface overlay; a Points-lane slot is
+    // reported as another lane's color, not as this row's source.
+    const ECS::EntityHandle mesh = MakeSelectable(f.Registry, "Mesh");
+    AddTriangleMeshSource(f.Registry, mesh);
+    SetProperty<glm::vec4>(f.Registry.Raw().get<GS::Vertices>(mesh).Properties, "v:rgba",
+                           std::vector<glm::vec4>(3u, glm::vec4{1.0f}));
+    f.Registry.Raw().emplace<Runtime::GeometryPresentationRecipe>(
+        mesh, pointColorRecipe(D::MeshVertex, "v:rgba", Kind::Vec4));
+    const auto& meshRow = f.Row(mesh, A::Color, D::MeshVertex);
+    EXPECT_FALSE(meshRow.Bound);
+    EXPECT_NE(meshRow.Diagnostic.find("Points lane"), std::string::npos) << meshRow.Diagnostic;
+    EXPECT_EQ(f.Bind(mesh, A::Color, D::MeshVertex), Cmd::NoChange);
+
+    // On a point cloud the slot shares the overlay's lane: binding replaces it
+    // and Default clears overlay and slot together, each as one undo step.
+    const ECS::EntityHandle cloud = MakeSelectable(f.Registry, "Cloud");
+    AddPointCloudSource(f.Registry, cloud, 2u);
+    SetPositions(f.Registry.Raw().get<GS::Vertices>(cloud), {{0, 0, 0}, {1, 0, 0}});
+    auto& cloudProperties = f.Registry.Raw().get<GS::Vertices>(cloud).Properties;
+    SetProperty<glm::vec4>(cloudProperties, "v:rgba", {{1, 0, 0, 1}, {0, 1, 0, 1}});
+    SetProperty<float>(cloudProperties, "v:heat", {0.0f, 1.0f});
+    f.Registry.Raw().emplace<Runtime::GeometryPresentationRecipe>(
+        cloud, pointColorRecipe(D::PointCloudPoint, "v:rgba", Kind::Vec4));
+    const auto slotKind = [&] {
+        return f.Registry.Raw().get<Runtime::GeometryPresentationRecipe>(cloud).Presentations[0].Slots[0].SourceKind;
+    };
+
+    const std::size_t before = f.History.UndoCount();
+    ASSERT_EQ(f.Bind(cloud, A::Color, D::PointCloudPoint, "v:heat"), Cmd::Applied);
+    EXPECT_EQ(f.History.UndoCount(), before + 1u);
+    EXPECT_EQ(slotKind(), Runtime::GeometryPresentationSourceKind::UniformDefault);
+    EXPECT_EQ(f.Row(cloud, A::Color, D::PointCloudPoint).Source.Name, "v:heat");
+    ASSERT_EQ(f.History.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(slotKind(), Runtime::GeometryPresentationSourceKind::PropertyBuffer);
+    EXPECT_EQ(f.Row(cloud, A::Color, D::PointCloudPoint).Source.Name, "v:rgba");
+
+    // Overlay and slot both present: one Default step clears both.
+    Runtime::EditorVisualizationConfigCommand overlay{
+        .StableEntityId = Runtime::SelectionController::ToStableEntityId(cloud),
+        .Target = Runtime::EditorVisualizationTarget::Points,
+        .Source = G::VisualizationConfig::ColorSource::ScalarField,
+        .ScalarFieldName = "v:heat",
+        .ScalarDomain = G::VisualizationConfig::Domain::Vertex,
+    };
+    ASSERT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(f.Context, overlay), Cmd::Applied);
+    const std::size_t withBoth = f.History.UndoCount();
+    ASSERT_EQ(f.Bind(cloud, A::Color, D::PointCloudPoint), Cmd::Applied);
+    EXPECT_EQ(f.History.UndoCount(), withBoth + 1u);
+    EXPECT_FALSE(f.Row(cloud, A::Color, D::PointCloudPoint).Bound);
+    EXPECT_EQ(slotKind(), Runtime::GeometryPresentationSourceKind::UniformDefault);
+    ASSERT_EQ(f.History.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(f.Row(cloud, A::Color, D::PointCloudPoint).Source.Name, "v:heat");
+    EXPECT_EQ(slotKind(), Runtime::GeometryPresentationSourceKind::PropertyBuffer);
 }

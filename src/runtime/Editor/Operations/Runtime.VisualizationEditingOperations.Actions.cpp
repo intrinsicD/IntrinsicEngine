@@ -1721,10 +1721,14 @@ ApplyEditorRenderHintCommand(
                             config.ScalarRangeMax = recipe.RangeMax;
                             // Showing another property on a lane swaps the
                             // source and keeps that lane's colormap (panel,
-                            // Color binding and show_property alike); the
-                            // recipe's colormap seeds a lane without one.
-                            if (!hadLaneConfig)
+                            // Color binding and show_property alike). An
+                            // explicit non-default recipe colormap wins; the
+                            // default one only seeds a lane without a config.
+                            if (!hadLaneConfig ||
+                                recipe.Colormap != ScalarVisualizationRecipe{}.Colormap)
+                            {
                                 config.ScalarColormap = recipe.Colormap;
+                            }
                         }
                         // Property-only display requests use the same undoable lane state as Appearance.
                         return ApplyEditorVisualizationConfigCommand(context, config);
@@ -1854,57 +1858,70 @@ ApplyEditorRenderHintCommand(
             const EditorAttributeBindingCommand& command,
             const Geometry::PropertyValueKind kind)
         {
+            const entt::registry& raw = context.Scene->Raw();
+            // A point/line presentation color slot on the same lane is a second
+            // color source until RUNTIME-318; binding or Default retires it in
+            // the same undo step so the lane ends with one source.
+            const GeometryPresentationColorSlot laneSlot =
+                EditorFeatureDetail::FindOverlayLaneColorSlot(raw, entity, command.Domain);
+            const std::optional<EditorGeometryPresentationSlotDefaultCommand> resetSlot =
+                laneSlot.Slot == nullptr
+                    ? std::nullopt
+                    : std::optional{EditorGeometryPresentationSlotDefaultCommand{
+                          .StableEntityId = command.StableEntityId,
+                          .PresentationKey = laneSlot.Presentation->Key,
+                          .Semantic = laneSlot.Slot->Semantic,
+                          .Value = laneSlot.Slot->UniformDefault,
+                          .Enabled = laneSlot.Slot->Enabled,
+                      }};
+
+            ScopedEditorCommandGroup group{context.CommandHistory, "Bind color"};
+            EditorCommandStatus result = EditorCommandStatus::NoChange;
+            const auto merge = [&result](const EditorCommandStatus next) {
+                const bool failed = result != EditorCommandStatus::Applied &&
+                                    result != EditorCommandStatus::NoChange;
+                if (!failed && next != EditorCommandStatus::NoChange)
+                    result = next;
+                return next == EditorCommandStatus::Applied || next == EditorCommandStatus::NoChange;
+            };
+
+            bool proceed = true;
             if (!command.PropertyName.empty())
             {
-                // The same recipe `show_property` and the processing panels use,
-                // so the overlay is the one Color mechanism (the recipe path
-                // keeps the lane's colormap, bins, isolines and baking).
-                VisualizationRecipe recipe = MakeEditorPropertyVisualizationRecipe(GeometryPropertyRef{
-                    .Domain = command.Domain, .Name = command.PropertyName, .ValueKind = kind});
-                return ApplyEditorVisualizationRecipeCommand(
+                // The same recipe `show_property` and the processing panels
+                // use, so the overlay is the one Color mechanism (the recipe
+                // path keeps the lane's colormap, bins, isolines and baking).
+                proceed = merge(ApplyEditorVisualizationRecipeCommand(
                     context,
                     EditorVisualizationRecipeCommand{
                         .StableEntityId = command.StableEntityId,
-                        .Recipe = std::move(recipe),
-                    });
+                        .Recipe = MakeEditorPropertyVisualizationRecipe(GeometryPropertyRef{
+                            .Domain = command.Domain, .Name = command.PropertyName,
+                            .ValueKind = kind}),
+                    }));
             }
-            const entt::registry& raw = context.Scene->Raw();
-            if (!EditorFeatureDetail::BoundColorOverlaySource(raw, entity, command.Domain))
+            else if (EditorFeatureDetail::BoundColorOverlaySource(raw, entity, command.Domain))
             {
-                // A point/line presentation color slot (RUNTIME-318) is the
-                // remaining source: Default returns it to its uniform value.
-                const auto* recipe = raw.try_get<GeometryPresentationRecipe>(entity);
-                const GeometryPresentationColorSlot slot = recipe != nullptr
-                    ? FindGeometryPresentationColorSlot(*recipe, command.Domain)
-                    : GeometryPresentationColorSlot{};
-                if (slot.Slot == nullptr)
-                    return EditorCommandStatus::NoChange;
-                return ApplyEditorGeometryPresentationSlotDefaultCommand(
+                const EditorVisualizationTarget lane =
+                    EditorFeatureDetail::ColorOverlayTargetFor(command.Domain)->Target;
+                // Without an entity-level overlay the lane override is removed;
+                // with one, this lane is masked to the material so the overlay
+                // is neither re-inherited here nor cleared on the other lanes.
+                const bool entityOverlay = StoredVisualizationConfigForTarget(
+                                               raw, entity, EditorVisualizationTarget::Entity)
+                                               .has_value();
+                proceed = merge(ApplyEditorVisualizationConfigCommand(
                     context,
-                    EditorGeometryPresentationSlotDefaultCommand{
+                    EditorVisualizationConfigCommand{
                         .StableEntityId = command.StableEntityId,
-                        .PresentationKey = slot.Presentation->Key,
-                        .Semantic = slot.Slot->Semantic,
-                        .Value = slot.Slot->UniformDefault,
-                        .Enabled = slot.Slot->Enabled,
-                    });
+                        .Target = lane,
+                        .EnableConfig = entityOverlay,
+                        .Source = G::VisualizationConfig::ColorSource::Material,
+                    }));
             }
-            const EditorVisualizationTarget lane =
-                EditorFeatureDetail::ColorOverlayTargetFor(command.Domain)->Target;
-            // Without an entity-level overlay the lane override is removed;
-            // with one, this lane is masked to the material so the overlay is
-            // neither re-inherited here nor cleared on the other lanes.
-            const bool entityOverlay =
-                StoredVisualizationConfigForTarget(raw, entity, EditorVisualizationTarget::Entity)
-                    .has_value();
-            return ApplyEditorVisualizationConfigCommand(
-                context,
-                EditorVisualizationConfigCommand{
-                    .StableEntityId = command.StableEntityId,
-                    .Target = lane,
-                    .EnableConfig = entityOverlay,
-                    .Source = G::VisualizationConfig::ColorSource::Material,
-                });
+            if (proceed && resetSlot.has_value())
+                (void)merge(ApplyEditorGeometryPresentationSlotDefaultCommand(context, *resetSlot));
+            return result;
         }
 
         // Point size / line width bind through the lane's render hint: the

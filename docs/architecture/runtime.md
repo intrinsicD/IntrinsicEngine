@@ -1199,8 +1199,11 @@ vertex. Version 1 is rejected rather than upgraded by synthesizing topology. Sup
 persistence is limited to current
 sandbox-authoring CPU state: metadata names, stable ids, transforms, hierarchy,
 selection eligibility, render hints, visualization configs, authored
-`GeometryPresentationRecipe` values, and mesh/graph/point-cloud
-`GeometrySources`. The writer emits only `geometryPresentation`; the reader
+`GeometryPresentationRecipe` values, structural render-attribute bindings
+(`attributeBindings`, RUNTIME-315; an optional key within version 2, with
+sources that do not resolve on load kept, drawn from the default and counted in
+`StaleAttributeBindings`), and mesh/graph/point-cloud `GeometrySources`. The
+next incompatible format change bumps `kSceneDocumentVersion`. The writer emits only `geometryPresentation`; the reader
 also accepts the retired `progressiveRenderData` key and creates a fresh default
 `GeometryPresentationRuntimeState`. Unsupported families such as lights,
 shadow-caster tags, collider/rigid-body descriptors, spatial-debug bindings, and

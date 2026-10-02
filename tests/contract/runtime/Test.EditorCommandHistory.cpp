@@ -597,3 +597,36 @@ TEST(EditorCommandHistory, LabelPrefixScopesNestAndRestore)
     EXPECT_EQ(record("Panel"), "Panel");
     const Extrinsic::Runtime::ScopedEditorCommandLabelPrefix none{nullptr, "ignored"};
 }
+
+TEST(EditorCommandHistory, ScopedGroupMakesOneUndoStepAndKeepsSingletonsAndEmptyGroupsIntact)
+{
+    Runtime::EditorCommandHistory history{};
+    int value = 0;
+    {
+        Runtime::ScopedEditorCommandGroup group{&history, "Both"};
+        EXPECT_TRUE(history.Execute(MakeValueCommand(value, 1, 0, "One")).Succeeded());
+        {
+            Runtime::ScopedEditorCommandGroup nested{&history, "Inner"};
+            EXPECT_TRUE(history.Execute(MakeValueCommand(value, 2, 1, "Two")).Succeeded());
+        }
+        EXPECT_EQ(history.UndoCount(), 0u);  // nothing committed while grouped
+    }
+    EXPECT_EQ(value, 2);
+    ASSERT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.Snapshot().UndoLabel, "Both");
+    EXPECT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(value, 0);
+    EXPECT_EQ(history.Redo().Status, Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_EQ(value, 2);
+
+    {
+        Runtime::ScopedEditorCommandGroup single{&history, "Ignored"};
+        EXPECT_TRUE(history.Execute(MakeValueCommand(value, 3, 2, "Three")).Succeeded());
+    }
+    EXPECT_EQ(history.UndoCount(), 2u);
+    EXPECT_EQ(history.Snapshot().UndoLabel, "Three");
+    {
+        Runtime::ScopedEditorCommandGroup empty{&history, "Empty"};
+    }
+    EXPECT_EQ(history.UndoCount(), 2u);
+}

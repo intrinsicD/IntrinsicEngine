@@ -1785,11 +1785,42 @@ TEST(MeshGeometryExtraction, ExplicitNormalBindingOverridesCornerNormalsAndTheir
     engine.Shutdown();
 }
 
-// RUNTIME-315: a normal binding the mesh builder does not consume (a corner
-// source, or a vertex property that disappeared) must leave the canonical
-// corner normals drawn instead of flattening the surface to +Z.
-TEST(MeshGeometryExtraction, UnconsumedNormalBindingsKeepCanonicalCornerNormals)
+// RUNTIME-315: shading normal/texcoord bindings on vertex or corner domains
+// feed the GPU streams; an unresolvable binding keeps the canonical streams.
+namespace
 {
+    struct ShadingFingerprints
+    {
+        std::uint64_t Normal{0u};
+        std::uint64_t Texcoord{0u};
+        std::uint32_t VertexCount{0u};
+        bool operator==(const ShadingFingerprints&) const = default;
+    };
+
+    void BindShading(Registry& scene, const EntityHandle entity,
+                     const Extrinsic::Runtime::VertexChannelSourceBinding normal,
+                     const Extrinsic::Runtime::VertexChannelSourceBinding texcoord)
+    {
+        static std::uint64_t generation = 100u;
+        scene.Raw().emplace_or_replace<Extrinsic::Runtime::VertexChannelBindingSet>(
+            entity, Extrinsic::Runtime::VertexChannelBindingSet{
+                        .Normal = normal, .Texcoord = texcoord, .BindingGeneration = ++generation});
+        Extrinsic::ECS::Components::DirtyTags::MarkVertexNormalsDirty(scene.Raw(), entity);
+        Extrinsic::ECS::Components::DirtyTags::MarkVertexTexcoordsDirty(scene.Raw(), entity);
+    }
+
+    [[nodiscard]] Extrinsic::Runtime::VertexChannelSourceBinding Bound(
+        const Extrinsic::Runtime::GeometryElementDomain domain, const char* name,
+        const Geometry::PropertyValueKind kind)
+    {
+        return {.Enabled = true, .Property = {.Domain = domain, .Name = name, .ValueKind = kind}};
+    }
+}
+
+TEST(MeshGeometryExtraction, ShadingBindingsFeedNormalAndTexcoordStreamsOnVertexAndCornerDomains)
+{
+    using Extrinsic::Runtime::GeometryElementDomain;
+    using Kind = Geometry::PropertyValueKind;
     Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
@@ -1797,12 +1828,16 @@ TEST(MeshGeometryExtraction, UnconsumedNormalBindingsKeepCanonicalCornerNormals)
     auto& raw = scene.Raw();
     const EntityHandle entity = MakeQuadMeshRenderable(scene);
     auto& halfedges = raw.get<gs::Halfedges>(entity);
+    auto& vertices = raw.get<gs::Vertices>(entity);
     std::vector<glm::vec3> cornerNormals(6u, glm::vec3{0.0f, 0.0f, 1.0f});
     cornerNormals[3u] = cornerNormals[4u] = cornerNormals[5u] = glm::vec3{0.0f, 1.0f, 0.0f};
     SetCornerNormals(halfedges, cornerNormals);
     halfedges.Properties.GetOrAdd<glm::vec3>("h:other", glm::vec3{1.0f, 0.0f, 0.0f})
-        .Vector()
-        .assign(6u, glm::vec3{1.0f, 0.0f, 0.0f});
+        .Vector().assign(6u, glm::vec3{1.0f, 0.0f, 0.0f});
+    halfedges.Properties.GetOrAdd<glm::vec2>("h:uv2", glm::vec2{0.5f}).Vector().assign(6u, glm::vec2{0.5f});
+    vertices.Properties.GetOrAdd<glm::vec3>("v:n2", glm::vec3{0.0f, 1.0f, 0.0f})
+        .Vector().assign(4u, glm::vec3{0.0f, 1.0f, 0.0f});
+    vertices.Properties.GetOrAdd<glm::vec2>("v:uv2", glm::vec2{0.25f}).Vector().assign(4u, glm::vec2{0.25f});
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto extract = [&] {
@@ -1815,24 +1850,48 @@ TEST(MeshGeometryExtraction, UnconsumedNormalBindingsKeepCanonicalCornerNormals)
         EXPECT_TRUE(view.has_value() &&
                     engine.GetRenderer().GetGpuWorld().TryGetGeometryResidencyView(
                         view->MeshGeometry, residency));
-        return residency.NormalFingerprint;
+        return ShadingFingerprints{residency.NormalFingerprint, residency.TexcoordFingerprint,
+                                   residency.VertexCount};
     };
-    const std::uint64_t canonical = extract();
-    ASSERT_NE(canonical, 0u);
+    const ShadingFingerprints canonical = extract();
+    ASSERT_NE(canonical.Normal, 0u);
 
-    for (const auto& [domain, name] :
-         {std::pair{Extrinsic::Runtime::GeometryElementDomain::MeshHalfedge, "h:other"},
-          std::pair{Extrinsic::Runtime::GeometryElementDomain::MeshVertex, "v:gone"}})
-    {
-        raw.emplace_or_replace<Extrinsic::Runtime::VertexChannelBindingSet>(
-            entity, Extrinsic::Runtime::VertexChannelBindingSet{
-                        .Normal = {.Enabled = true,
-                                   .Property = {.Domain = domain, .Name = name,
-                                                .ValueKind = Geometry::PropertyValueKind::Vec3}},
-                        .BindingGeneration = 7u});
-        Extrinsic::ECS::Components::DirtyTags::MarkVertexNormalsDirty(raw, entity);
-        EXPECT_EQ(extract(), canonical) << name;
-    }
+    // Corner normal binding: one uniform corner normal, so no seam split.
+    BindShading(scene, entity, Bound(GeometryElementDomain::MeshHalfedge, "h:other", Kind::Vec3), {});
+    ShadingFingerprints bound = extract();
+    EXPECT_EQ(bound.VertexCount, 4u);
+    EXPECT_EQ(bound.Normal, Extrinsic::Tests::GeometryFloat32Fingerprint(
+                                {1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0}));
+
+    // Editing the bound corner property re-uploads without re-binding.
+    halfedges.Properties.Get<glm::vec3>("h:other").Vector().assign(6u, glm::vec3{0.0f, 0.0f, -1.0f});
+    bound = extract();
+    EXPECT_EQ(bound.Normal, Extrinsic::Tests::GeometryFloat32Fingerprint(
+                                {0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1}));
+
+    // Vertex normal + vertex texcoord bindings override the corner streams.
+    BindShading(scene, entity, Bound(GeometryElementDomain::MeshVertex, "v:n2", Kind::Vec3),
+                Bound(GeometryElementDomain::MeshVertex, "v:uv2", Kind::Vec2));
+    bound = extract();
+    EXPECT_EQ(bound.VertexCount, 4u);
+    EXPECT_EQ(bound.Normal, Extrinsic::Tests::GeometryFloat32Fingerprint(
+                                {0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0}));
+    EXPECT_EQ(bound.Texcoord, Extrinsic::Tests::GeometryFloat32Fingerprint(
+                                  {0.25f, 0.25f, 0.25f, 0.25f, 0.25f, 0.25f, 0.25f, 0.25f}));
+
+    // Corner texcoord binding; the canonical corner normals still split the
+    // two seam vertices (v0, v2), so six GPU vertices all carry the bound UV.
+    BindShading(scene, entity, {}, Bound(GeometryElementDomain::MeshHalfedge, "h:uv2", Kind::Vec2));
+    bound = extract();
+    EXPECT_EQ(bound.VertexCount, 6u);
+    EXPECT_EQ(bound.Texcoord, Extrinsic::Tests::GeometryFloat32Fingerprint(
+                                  {0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f,
+                                   0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f}));
+
+    // Stale bindings draw the canonical streams.
+    BindShading(scene, entity, Bound(GeometryElementDomain::MeshVertex, "v:gone", Kind::Vec3),
+                Bound(GeometryElementDomain::MeshHalfedge, "h:gone", Kind::Vec2));
+    EXPECT_EQ(extract(), canonical);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();

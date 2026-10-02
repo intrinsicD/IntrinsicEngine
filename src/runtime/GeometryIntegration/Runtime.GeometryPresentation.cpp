@@ -684,7 +684,8 @@ namespace Extrinsic::Runtime
                 slot.SourceKind == GeometryPresentationSourceKind::PropertyBuffer &&
                 slot.Property.Domain == domain && slot.Property.HasName())
             {
-                return {presentation, &slot};
+                return {presentation, &slot,
+                        edges ? GeometryRenderLane::Edges : GeometryRenderLane::Points};
             }
         }
         return {};

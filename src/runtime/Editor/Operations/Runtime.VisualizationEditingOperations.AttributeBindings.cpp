@@ -83,6 +83,20 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
             return config->ColorBufferName;
         return std::nullopt;
     }
+
+    GeometryPresentationColorSlot FindOverlayLaneColorSlot(
+        const entt::registry& raw, const ECS::EntityHandle entity, const GeometryElementDomain domain)
+    {
+        const auto* recipe = raw.try_get<GeometryPresentationRecipe>(entity);
+        const std::optional<ColorOverlayTarget> target = ColorOverlayTargetFor(domain);
+        if (recipe == nullptr || !target.has_value())
+            return {};
+        const GeometryPresentationColorSlot slot = FindGeometryPresentationColorSlot(*recipe, domain);
+        const EditorVisualizationTarget slotLane = slot.Lane == GeometryRenderLane::Edges
+            ? EditorVisualizationTarget::Edges
+            : EditorVisualizationTarget::Points;
+        return slot.Slot != nullptr && slotLane == target->Target ? slot : GeometryPresentationColorSlot{};
+    }
 }
 }
 
@@ -181,14 +195,11 @@ namespace Extrinsic::Runtime
             case RenderAttribute::Color:
                 if (auto overlay = EditorFeatureDetail::BoundColorOverlaySource(raw, entity, rule.Domain))
                     return overlay;
-                if (const auto* recipe = raw.try_get<GeometryPresentationRecipe>(entity))
+                if (const GeometryPresentationColorSlot slot =
+                        EditorFeatureDetail::FindOverlayLaneColorSlot(raw, entity, rule.Domain);
+                    slot.Slot != nullptr)
                 {
-                    if (const GeometryPresentationColorSlot slot =
-                            FindGeometryPresentationColorSlot(*recipe, rule.Domain);
-                        slot.Slot != nullptr)
-                    {
-                        return slot.Slot->Property.Name;
-                    }
+                    return slot.Slot->Property.Name;
                 }
                 return std::nullopt;
             case RenderAttribute::PointSize:
@@ -224,12 +235,10 @@ namespace Extrinsic::Runtime
         switch (attribute)
         {
         case RenderAttribute::Normal:
-            return domain == D::MeshVertex || domain == D::GraphNode ||
-                   domain == D::PointCloudPoint;
-        case RenderAttribute::Color:
-            return true;
-        case RenderAttribute::Position:
         case RenderAttribute::Texcoord:
+        case RenderAttribute::Color:
+            return true;  // every table row of these attributes is drawn
+        case RenderAttribute::Position:
         case RenderAttribute::PointSize:
         case RenderAttribute::LineWidth:
             break;
@@ -322,7 +331,8 @@ namespace Extrinsic::Runtime
                     {
                         const std::string note = "presentation slot " +
                             std::string{ToString(slot.Slot->Semantic)} + " '" +
-                            slot.Slot->Property.Name + "' colors this lane (RUNTIME-318)";
+                            slot.Slot->Property.Name + "' colors the " +
+                            std::string{ToString(slot.Lane)} + " lane (RUNTIME-318)";
                         row.Diagnostic = row.Diagnostic.empty() ? note : row.Diagnostic + "; " + note;
                     }
                 }

@@ -4,6 +4,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string_view>
 #include <vector>
 
 export module Extrinsic.Runtime.GeometryPlanBuilders;
@@ -61,6 +62,23 @@ export namespace Extrinsic::Runtime
         const Geometry::PropertySet& properties, GeometryElementDomain domain,
         const VertexChannelBindingSet* channelBindings, std::size_t vertexCount,
         VertexChannelStreams& channels);
+
+    // The properties a mesh surface draws its shading streams from after
+    // structural bindings (RUNTIME-315): a bound source that does not resolve
+    // (stale name, wrong kind or count) falls back to the canonical one. A
+    // vertex-domain binding suppresses the canonical corner stream; a corner
+    // binding replaces it. Empty names mean "no such stream". Shared by the
+    // mesh plan builder and render-extraction revision tracking.
+    struct MeshShadingSources
+    {
+        std::string_view VertexNormal{};
+        std::string_view CornerNormal{};
+        std::string_view VertexTexcoord{};
+        std::string_view CornerTexcoord{};
+    };
+    [[nodiscard]] MeshShadingSources ResolveMeshShadingSources(
+        const ECS::Components::GeometrySources::ConstSourceView& view,
+        const VertexChannelBindingSet* channelBindings) noexcept;
 
     struct MeshVertex
     {

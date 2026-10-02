@@ -114,57 +114,26 @@ namespace Extrinsic::Runtime
             snapshot.VertexCount = properties.Size();
             snapshot.PositionCount = PositionCountOf(properties);
             snapshot.Position = PropertyRevisionOf(properties, kPosition);
+            if (bindings != nullptr)
+                snapshot.BindingGeneration = bindings->BindingGeneration;
             if (meshDefaults)
             {
-                // Track whichever domain owns the UVs. A corner-UV mesh can
-                // omit `v:texcoord`, so the reupload plan watches both canonical
-                // channels through the same resolution order.
-                const auto cornerTexcoord = view.HalfedgeSource != nullptr
-                    ? view.HalfedgeSource->Properties.Get<glm::vec2>(
-                          "h:texcoord")
-                    : Geometry::ConstProperty<glm::vec2>{};
-                snapshot.Texcoord =
-                    cornerTexcoord.IsValid() &&
-                        view.HalfedgeSource != nullptr &&
-                        cornerTexcoord.Vector().size() ==
-                            view.HalfedgeSource->Properties.Size()
-                    ? cornerTexcoord.Revision()
-                    : PropertyRevisionOf(properties, "v:texcoord");
+                // Track exactly the streams the mesh builder draws: bound or
+                // canonical, corner-domain when a corner stream is used (a
+                // corner-UV mesh can omit `v:texcoord`).
+                const MeshShadingSources shading = ResolveMeshShadingSources(view, bindings);
+                const auto revisionOf = [&](const std::string_view corner,
+                                            const std::string_view vertex) {
+                    return !corner.empty() && view.HalfedgeSource != nullptr
+                        ? PropertyRevisionOf(view.HalfedgeSource->Properties, corner)
+                        : PropertyRevisionOf(properties, vertex);
+                };
+                snapshot.Texcoord = revisionOf(shading.CornerTexcoord, shading.VertexTexcoord);
+                snapshot.Normal = revisionOf(shading.CornerNormal, shading.VertexNormal);
             }
-
-            if (bindings != nullptr)
+            else if (bindings != nullptr && BindingMatches(bindings->Normal, expectedDomain))
             {
-                snapshot.BindingGeneration = bindings->BindingGeneration;
-                if (BindingMatches(bindings->Normal, expectedDomain))
-                {
-                    snapshot.Normal = PropertyRevisionOf(
-                        properties, bindings->Normal.Property.Name);
-                }
-            }
-
-            // A missing bound property has no revision: the builder then draws
-            // the canonical normals, so track those.
-            if (snapshot.Normal == 0u && meshDefaults)
-            {
-                const auto cornerNormal = view.HalfedgeSource != nullptr
-                    ? view.HalfedgeSource->Properties.Get<glm::vec3>(
-                          "h:normal")
-                    : Geometry::ConstProperty<glm::vec3>{};
-                if (cornerNormal.IsValid() &&
-                    view.HalfedgeSource != nullptr &&
-                    cornerNormal.Vector().size() ==
-                        view.HalfedgeSource->Properties.Size())
-                {
-                    snapshot.Normal = cornerNormal.Revision();
-                }
-                else
-                {
-                    const auto normal =
-                        Geometry::ConstPropertySet{properties}.Get<glm::vec3>(
-                            kNormal);
-                    if (normal.IsValid())
-                        snapshot.Normal = normal.Revision();
-                }
+                snapshot.Normal = PropertyRevisionOf(properties, bindings->Normal.Property.Name);
             }
             if (meshDefaults)
             {

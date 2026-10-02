@@ -144,10 +144,9 @@ namespace Extrinsic::Runtime
             return MakeResult(EditorCommandHistoryStatus::NoChange, command.Label);
 
         AdvanceRevision(command.Dirtying);
-        PushUndo(std::move(command));
-        m_RedoStack.clear();
-        return MakeResult(EditorCommandHistoryStatus::Applied,
-                          m_UndoStack.empty() ? std::string{} : m_UndoStack.back().Label);
+        std::string label = m_Capacity == 0u && m_GroupDepth == 0u ? std::string{} : command.Label;
+        CommitApplied(std::move(command));
+        return MakeResult(EditorCommandHistoryStatus::Applied, std::move(label));
     }
 
     EditorCommandHistoryResult EditorCommandHistory::Record(
@@ -158,10 +157,9 @@ namespace Extrinsic::Runtime
             return MakeResult(EditorCommandHistoryStatus::InvalidCommand, command.Label);
 
         AdvanceRevision(command.Dirtying);
-        PushUndo(std::move(command));
-        m_RedoStack.clear();
-        return MakeResult(EditorCommandHistoryStatus::Recorded,
-                          m_UndoStack.empty() ? std::string{} : m_UndoStack.back().Label);
+        std::string label = m_Capacity == 0u && m_GroupDepth == 0u ? std::string{} : command.Label;
+        CommitApplied(std::move(command));
+        return MakeResult(EditorCommandHistoryStatus::Recorded, std::move(label));
     }
 
     EditorCommandHistoryResult EditorCommandHistory::Undo()
@@ -273,6 +271,36 @@ namespace Extrinsic::Runtime
             .Revision = m_Revision,
             .SavedRevision = m_SavedRevision,
         };
+    }
+
+    void EditorCommandHistory::BeginGroup()
+    {
+        ++m_GroupDepth;
+    }
+
+    void EditorCommandHistory::EndGroup(std::string label)
+    {
+        if (m_GroupDepth == 0u || --m_GroupDepth != 0u || m_GroupRecords.empty())
+            return;
+        std::vector<EditorCommandRecord> records = std::move(m_GroupRecords);
+        m_GroupRecords.clear();
+        EditorCommandRecord grouped = records.size() == 1u
+            ? std::move(records.front())
+            : MakeCompoundEditorCommand(m_LabelPrefix + NonEmptyLabel(std::move(label)),
+                                        std::move(records));
+        PushUndo(std::move(grouped));
+        m_RedoStack.clear();
+    }
+
+    void EditorCommandHistory::CommitApplied(EditorCommandRecord command)
+    {
+        if (m_GroupDepth != 0u)
+        {
+            m_GroupRecords.push_back(std::move(command));
+            return;
+        }
+        PushUndo(std::move(command));
+        m_RedoStack.clear();
     }
 
     void EditorCommandHistory::PushUndo(EditorCommandRecord command)

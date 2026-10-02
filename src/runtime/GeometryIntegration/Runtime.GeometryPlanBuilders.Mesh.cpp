@@ -8,6 +8,7 @@ module;
 #include <optional>
 #include <span>
 #include <string_view>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -43,6 +44,59 @@ namespace Extrinsic::Runtime
             return MeshPlanBuildResult{status, std::nullopt};
         }
 
+    }
+
+    MeshShadingSources ResolveMeshShadingSources(
+        const ECS::Components::GeometrySources::ConstSourceView& view,
+        const VertexChannelBindingSet* channelBindings) noexcept
+    {
+        const Geometry::PropertySet* vertices =
+            view.VertexSource != nullptr ? &view.VertexSource->Properties : nullptr;
+        const Geometry::PropertySet* corners =
+            view.HalfedgeSource != nullptr ? &view.HalfedgeSource->Properties : nullptr;
+        const auto resolves = [](const Geometry::PropertySet* set, const std::string_view name,
+                                 const auto tag) {
+            using T = std::remove_cvref_t<decltype(tag)>;
+            if (set == nullptr || name.empty())
+                return false;
+            const auto property = set->Get<T>(name);
+            return static_cast<bool>(property) && property.Vector().size() == set->Size();
+        };
+        // One stream: a resolvable vertex binding wins outright, a resolvable
+        // corner binding replaces the canonical corners, otherwise canonical.
+        const auto pick = [&](const VertexChannelSourceBinding* binding,
+                              const std::string_view canonicalVertex,
+                              const std::string_view canonicalCorner,
+                              std::string_view& vertex, std::string_view& corner,
+                              const auto tag) {
+            const bool enabled = binding != nullptr && IsVertexChannelBindingEnabled(*binding);
+            const std::string_view name = enabled ? std::string_view{binding->Property.Name}
+                                                  : std::string_view{};
+            if (enabled && binding->Property.Domain == GeometryElementDomain::MeshVertex &&
+                resolves(vertices, name, tag))
+            {
+                vertex = name;
+                corner = {};
+                return;
+            }
+            vertex = canonicalVertex;
+            if (enabled && binding->Property.Domain == GeometryElementDomain::MeshHalfedge &&
+                resolves(corners, name, tag))
+            {
+                corner = name;
+                return;
+            }
+            corner = resolves(corners, canonicalCorner, tag) ? canonicalCorner : std::string_view{};
+        };
+
+        MeshShadingSources sources{};
+        pick(channelBindings != nullptr ? &channelBindings->Normal : nullptr,
+             ECS::Components::GeometrySources::PropertyNames::kNormal, "h:normal",
+             sources.VertexNormal, sources.CornerNormal, glm::vec3{});
+        pick(channelBindings != nullptr ? &channelBindings->Texcoord : nullptr,
+             "v:texcoord", "h:texcoord",
+             sources.VertexTexcoord, sources.CornerTexcoord, glm::vec2{});
+        return sources;
     }
 
     const char* DebugNameForMeshPackStatus(MeshPackStatus status) noexcept
@@ -158,36 +212,13 @@ namespace Extrinsic::Runtime
         std::vector<glm::vec3> normals(vertexCount);
         std::vector<glm::vec2> texcoords(vertexCount);
 
-        // Only a resolvable vertex-domain vec3 normal binding is consumed;
-        // any other binding (stale name, wrong domain or count) is ignored so
-        // the canonical corner/vertex normals stay drawn.
-        const VertexChannelSourceBinding* normalOverride = nullptr;
-        if (channelBindings != nullptr &&
-            IsVertexChannelBindingEnabled(channelBindings->Normal) &&
-            channelBindings->Normal.Property.Domain == GeometryElementDomain::MeshVertex)
-        {
-            const auto bound = view.VertexSource->Properties.Get<glm::vec3>(
-                channelBindings->Normal.Property.Name);
-            if (bound && bound.Vector().size() == vertexCount)
-                normalOverride = &channelBindings->Normal;
-        }
-        const std::optional<AttributeSourceType> normalOverrideType =
-            normalOverride != nullptr &&
-                    normalOverride->Property.Domain ==
-                        GeometryElementDomain::MeshVertex
-                ? ToAttributeSourceType(normalOverride->Property.ValueKind)
-                : std::nullopt;
+        // Bound or canonical shading sources (RUNTIME-315); unresolvable
+        // bindings already fell back to the canonical streams.
+        const MeshShadingSources shading = ResolveMeshShadingSources(view, channelBindings);
         const VertexAttributeBinding normalBinding{
             .Channel = VertexChannel::Normal,
-            .SourceType = normalOverrideType.value_or(
-                AttributeSourceType::Vec3),
-            .SourceProperty = normalOverride != nullptr &&
-                                      normalOverrideType ==
-                                          AttributeSourceType::Vec3
-                ? std::string_view{normalOverride->Property.Name}
-                : normalOverride != nullptr
-                    ? std::string_view{}
-                : std::string_view{PropertyNames::kNormal},
+            .SourceType = AttributeSourceType::Vec3,
+            .SourceProperty = shading.VertexNormal,
             .AllowFallback = true,
             .Normalize = true,
             .Fallback = glm::vec4{0.0f, 0.0f, 1.0f, 0.0f},
@@ -195,7 +226,7 @@ namespace Extrinsic::Runtime
         const VertexAttributeBinding texcoordBinding{
             .Channel = VertexChannel::Texcoord,
             .SourceType = AttributeSourceType::Vec2,
-            .SourceProperty = std::string_view{"v:texcoord"},
+            .SourceProperty = shading.VertexTexcoord,
             .AllowFallback = true,
             .Normalize = false,
             .Fallback = glm::vec4{0.0f, 0.0f, 0.0f, 0.0f},
@@ -250,30 +281,22 @@ namespace Extrinsic::Runtime
         // The GPU path has one UV and normal per vertex, while authored seams
         // may carry several values at one mesh vertex. Duplication happens only
         // here, keyed by `(source vertex, UV, normal)`, and never mutates the
-        // authoritative mesh. An explicit normal-channel binding remains an
-        // explicit override and suppresses canonical `h:normal` resolution.
+        // authoritative mesh. A vertex-domain normal/texcoord binding is an
+        // explicit override and suppresses the canonical corner stream.
         std::vector<glm::vec3> splitPositions;
         std::size_t gpuVertexCount = vertexCount;
         std::span<const glm::vec3> positionSpan{positions.data(), positions.size()};
 
         const auto cornerUvProperty =
-            view.HalfedgeSource != nullptr
-                ? view.HalfedgeSource->Properties.Get<glm::vec2>("h:texcoord")
+            view.HalfedgeSource != nullptr && !shading.CornerTexcoord.empty()
+                ? view.HalfedgeSource->Properties.Get<glm::vec2>(shading.CornerTexcoord)
                 : Geometry::ConstProperty<glm::vec2>{};
-        const bool cornerUvsUsable =
-            static_cast<bool>(cornerUvProperty) &&
-            view.HalfedgeSource != nullptr &&
-            cornerUvProperty.Vector().size() ==
-                view.HalfedgeSource->Properties.Size();
+        const bool cornerUvsUsable = static_cast<bool>(cornerUvProperty);
         const auto cornerNormalProperty =
-            view.HalfedgeSource != nullptr && normalOverride == nullptr
-                ? view.HalfedgeSource->Properties.Get<glm::vec3>("h:normal")
+            view.HalfedgeSource != nullptr && !shading.CornerNormal.empty()
+                ? view.HalfedgeSource->Properties.Get<glm::vec3>(shading.CornerNormal)
                 : Geometry::ConstProperty<glm::vec3>{};
-        const bool cornerNormalsUsable =
-            static_cast<bool>(cornerNormalProperty) &&
-            view.HalfedgeSource != nullptr &&
-            cornerNormalProperty.Vector().size() ==
-                view.HalfedgeSource->Properties.Size();
+        const bool cornerNormalsUsable = static_cast<bool>(cornerNormalProperty);
         const bool cornerAttributesUsable =
             (cornerUvsUsable || cornerNormalsUsable) &&
             !cornerHalfedges.empty() &&

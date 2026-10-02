@@ -40,6 +40,7 @@ import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.ColormapSystem;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.GeometryAvailability;
