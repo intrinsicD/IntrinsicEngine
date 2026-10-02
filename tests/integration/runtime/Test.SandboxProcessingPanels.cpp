@@ -2766,6 +2766,58 @@ TEST(SandboxProcessingPanels, KernelDensityPanelShowsItsRunForTheOutputItWrites)
     EXPECT_NE(text.find("done"), std::string::npos) << text;
 }
 
+// Progressive Poisson names its run by the channel it writes; the finished run stays visible.
+TEST(SandboxProcessingPanels, ProgressivePoissonPanelShowsItsFinishedRun)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::PointCloudPoint);
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto poisson = *R::GetProgressivePoissonPlaygroundConfig(config);
+    poisson.AutoRunOnEdit = false;
+    R::SetProgressivePoissonPlaygroundConfig(config, poisson);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("pointcloud.processing.progressive_poisson", true));
+    std::optional<R::EditorProgressivePoissonResult> result;
+    const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+        .Id = "test.poisson_progress_observer", .MenuPath = {"View"}, .Title = "Poisson progress observer",
+        .OpenByDefault = true,
+        .Draw = [&](bool&, const Editor::SandboxEditorContext& context) {
+            result = context.PointSet.Results.LastProgressivePoissonResult;
+        }});
+    int frame = 0, step = 0, finishedAt = 0;
+    std::string text;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        if (++frame > 400) { ADD_FAILURE() << "Poisson progress test did not finish"; engine.RequestExit(); return; }
+        auto* window = ImGui::FindWindowByName("PointCloud / Processing / Progressive Poisson");
+        if (!window) return;
+        ImGui::SetWindowSize(window, {850, 1500});
+        ImGui::SetWindowPos(window, {0, 0});
+        if (++step == 3) ImGui::ActivateItemByID(window->GetID("Run Progressive Poisson##ProgressivePoisson"));
+        if (!finishedAt && result && result->Status != R::EditorCommandStatus::Pending)
+        {
+            EXPECT_TRUE(result->Succeeded()) << result->Message;
+            finishedAt = frame;
+            ImGui::GetCurrentContext()->LogBuffer.clear();
+            ImGui::LogToBuffer();
+            ImGui::GetCurrentContext()->LogWindow = nullptr;
+        }
+        if (finishedAt && frame == finishedAt + 5)
+        {
+            text = ImGui::GetCurrentContext()->LogBuffer.c_str();
+            ImGui::LogFinish();
+            engine.RequestExit();
+        }
+    };
+    h.Engine->Run();
+    if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogFinish();
+    EXPECT_GT(finishedAt, 0);
+    EXPECT_NE(text.find("done"), std::string::npos) << text;
+    EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
+}
+
 TEST(SandboxProcessingPanels, ConsolidationNormalsRequireExplicitSelectionAndSurvivePositionChanges)
 {
     for (const std::string normalName : {"v:normal", "directions"})

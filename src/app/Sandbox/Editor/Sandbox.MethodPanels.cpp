@@ -539,6 +539,7 @@ namespace Extrinsic::Sandbox::Editor
                 LastConfigApply{};
             std::optional<Runtime::PointCloudConsolidationResult>
                 LastResult{};
+            OperationProgressMemory Progress{};
         };
 
         struct ParameterizationState
@@ -1655,6 +1656,23 @@ namespace Extrinsic::Sandbox::Editor
                     if (PointCloudConsolidation.LastConfigApply->Succeeded())
                         PointCloudConsolidation.Dirty = false;
                 }
+                // The run's own job by the correlation id of its submission, keyed by the run's own
+                // entity and output, shown only while that entity is selected. Always asked, so even
+                // "no run" carries the scene epoch.
+                {
+                    const auto* run = PointCloudConsolidation.LastResult.has_value()
+                        ? &*PointCloudConsolidation.LastResult : nullptr;
+                    const auto live = Runtime::GetEditorOperationProgress(
+                        service.Commands,
+                        Runtime::EditorRunCorrelation{run != nullptr ? run->Correlation.Value : 0u});
+                    if (run != nullptr)
+                    {
+                        const auto& remembered = PointCloudConsolidation.Progress.Observe(
+                            live, std::to_string(run->StableEntityId) + "/" + run->Properties.OutputPositions.Name);
+                        if (run->StableEntityId == stableEntityId)
+                            DrawOperationProgress(remembered, {}, "consolidation_progress");
+                    }
+                }
                 if (!configAvailable)
                 {
                     ImGui::TextDisabled(
@@ -2421,6 +2439,16 @@ namespace Extrinsic::Sandbox::Editor
                 Runtime::PreviewEditorProgressivePoissonCommand(context.PointSet.Commands, command));
             if (DrawProcessingActionButton("Run Progressive Poisson##ProgressivePoisson", readiness))
                 runSampler();
+            {
+                const auto& pc = command.Config;
+                const std::string& output =
+                    pc.Channel == Runtime::ProgressivePoissonPlaygroundChannel::Rank ? pc.Rank.Name
+                    : pc.Channel == Runtime::ProgressivePoissonPlaygroundChannel::SplatRadius ? pc.SplatRadius.Name
+                    : pc.Channel == Runtime::ProgressivePoissonPlaygroundChannel::PrefixVisible ? pc.PrefixVisible.Name
+                    : pc.Level.Name;
+                DrawOutputOperationProgress(ProgressivePoisson.Progress, context.PointSet.Commands,
+                                            command.StableEntityId, output, "poisson_progress");
+            }
 
             if (ProgressivePoisson.AutoRunPending && readiness.Enabled &&
                 ProgressivePoisson.PendingStableEntityId ==

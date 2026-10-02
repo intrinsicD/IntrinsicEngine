@@ -616,6 +616,7 @@ namespace
                     });
                 if (found != jobs.end())
                 {
+                    JobCorrelation = found->CorrelationId;
                     auto position = ResolveTestPropertySet(
                         *Scene, Entity, Domain)
                         .Get<glm::vec3>(InputProperty);
@@ -650,6 +651,7 @@ namespace
         Runtime::KernelEventSubscription CompletionSubscription{};
         Runtime::CommandCorrelationId Correlation{};
         std::optional<Runtime::PointCloudConsolidationResult> Completion{};
+        std::uint64_t JobCorrelation{0u};
         std::uint32_t Ticks{0u};
         bool MissingService{false};
         bool Mutated{false};
@@ -1579,6 +1581,8 @@ TEST(PointCloudConsolidationModule, SourceMutationDropsQueuedWriteback)
         EXPECT_FALSE(appPtr->MissingService);
         EXPECT_FALSE(appPtr->TimedOut);
         EXPECT_TRUE(appPtr->Mutated);
+        // The run's job carries its submission's correlation id (what the shared progress model keys on).
+        EXPECT_EQ(appPtr->JobCorrelation, appPtr->Correlation.Value);
         ASSERT_TRUE(appPtr->Completion.has_value());
         EXPECT_EQ(appPtr->Completion->Correlation, appPtr->Correlation);
         EXPECT_EQ(appPtr->Completion->Status,
