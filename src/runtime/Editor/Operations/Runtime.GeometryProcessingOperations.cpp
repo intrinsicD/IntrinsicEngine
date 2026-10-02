@@ -118,23 +118,6 @@ namespace Extrinsic::Runtime
             return kProgressivePoissonCpuBackendDisplayName;
         }
 
-        [[nodiscard]] const char* ProgressivePoissonChannelPropertyName(
-            const ProgressivePoissonPlaygroundConfig& config) noexcept
-        {
-            switch (config.Channel)
-            {
-            case ProgressivePoissonPlaygroundChannel::Level:
-                return config.Level.Name.c_str();
-            case ProgressivePoissonPlaygroundChannel::Rank:
-                return config.Rank.Name.c_str();
-            case ProgressivePoissonPlaygroundChannel::SplatRadius:
-                return config.SplatRadius.Name.c_str();
-            case ProgressivePoissonPlaygroundChannel::PrefixVisible:
-                return config.PrefixVisible.Name.c_str();
-            }
-            return config.Level.Name.c_str();
-        }
-
         [[nodiscard]] EditorProgressivePoissonResult
         MakeProgressivePoissonResult(
             const EditorCommandStatus status,
@@ -1274,7 +1257,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] const char* ProgressivePoissonOutputName(
             const ProgressivePoissonPlaygroundConfig& config) noexcept
         {
-            return ProgressivePoissonChannelPropertyName(config);
+            return ProgressivePoissonChannelPropertyName(config).c_str();
         }
 
         [[nodiscard]] Core::ErrorCode ProgressivePoissonResultError(

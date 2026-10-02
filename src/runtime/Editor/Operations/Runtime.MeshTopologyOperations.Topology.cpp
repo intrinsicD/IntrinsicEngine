@@ -1146,13 +1146,13 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             switch (kind)
             {
             case EditorMeshCpuJobKind::Denoise:
-                return "mesh_denoise_positions";
+                return kMeshDenoiseJobOutput.data();
             case EditorMeshCpuJobKind::Remesh:
-                return "mesh_remesh_topology";
+                return kMeshRemeshJobOutput.data();
             case EditorMeshCpuJobKind::Subdivide:
-                return "mesh_subdivide_topology";
+                return kMeshSubdivideJobOutput.data();
             case EditorMeshCpuJobKind::Simplify:
-                return "mesh_simplify_topology";
+                return kMeshSimplifyJobOutput.data();
             }
             return "mesh_processing";
         }

@@ -120,8 +120,9 @@ ResolveEditorOperationProgress(const std::vector<EditorJobRecord> &records,
     else if (const auto *correlation = std::get_if<EditorRunCorrelation>(&key))
       matches = correlation->IsValid() && job.CorrelationId == correlation->Value;
     else if (const auto *output = std::get_if<EditorOutputRef>(&key))
+      // A correlation-only record has entity 0, so a real entity never matches it; the scope
+      // may legitimately be Unknown (an unresolved positions domain).
       matches = output->EntityId != 0u && !output->OutputName.empty() &&
-                job.Identity.Scope != EditorJobScope::Unknown &&
                 job.Identity.EntityId == output->EntityId &&
                 job.Identity.OutputName == output->OutputName;
     else

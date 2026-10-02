@@ -136,16 +136,49 @@ namespace Extrinsic::Sandbox::Editor
         Runtime::EditorOperationProgress m_None{};
     };
 
-    // The progress line of a method that writes `outputName` on `stableEntityId`:
-    // the newest run of that output, remembered in `memory` after it finishes.
-    // Every point-family panel is this one call after its action button.
-    void DrawOutputOperationProgress(
-        OperationProgressMemory& memory,
-        const Runtime::EditorProcessingCommands& commands,
-        std::uint32_t stableEntityId,
-        const std::string& outputName,
-        const char* id);
+    // The one pattern of every method panel that shows its run's progress. The key of the run
+    // is captured when the run is SUBMITTED (from the command that was submitted, never from the
+    // editable draft), the widget shows only while that run's entity is selected, a finished run
+    // stays visible until its next run (`OperationProgressMemory`), a GPU transaction waiting for
+    // Accept reads "awaiting accept" instead of its finished compute job, and a discarded result
+    // is forgotten.
+    class OperationRunSlot
+    {
+    public:
+        // `DrawLive` with this entity shows regardless of the selection (a panel-global run).
+        static constexpr std::uint32_t kAnyEntity = 0xFFFFFFFFu;
 
+        // Call where the command is submitted. `key` names that run: its output
+        // (`WatchOutput`), the correlation id its submission returned, or a job token.
+        void Watch(std::uint32_t entity, Runtime::EditorOperationRunKey key);
+        void WatchOutput(const std::uint32_t entity, std::string outputName)
+        {
+            Watch(entity, Runtime::EditorOutputRef{entity, std::move(outputName)});
+        }
+        // From the transaction's phase each frame; Accepting/Applied read through the job as usual.
+        void AwaitingAccept(const bool waiting) noexcept { m_AwaitingAccept = waiting; }
+        // A discarded (or otherwise withdrawn) result must not read as a finished run.
+        void Forget();
+
+        // The watched run's projection through the panel's commands; stamped with the scene epoch even
+        // when nothing is watched.
+        [[nodiscard]] Runtime::EditorOperationProgress Query(const Runtime::EditorProcessingCommands& commands) const;
+        // Query + DrawLive: the one call after a panel's action button.
+        void Draw(const Runtime::EditorProcessingCommands& commands, std::uint32_t selectedEntity, const char* id);
+        // For runs whose projection the panel supplies itself (transaction snapshots, ICP/CPD bars).
+        void DrawLive(const Runtime::EditorOperationProgress& live, std::uint32_t selectedEntity,
+                      const std::function<void()>& onCancel, const char* id);
+
+        [[nodiscard]] bool Watching() const noexcept { return m_Entity != 0u || m_HasKey; }
+
+    private:
+        std::uint32_t m_Entity{0u};
+        bool m_HasKey{false};
+        Runtime::EditorOperationRunKey m_Key{Runtime::EditorRunCorrelation{}};
+        std::string m_MemoryKey{};
+        bool m_AwaitingAccept{false};
+        OperationProgressMemory m_Memory{};
+    };
 
     void DrawDisabledReasonTooltip(std::string_view disabledReason);
     [[nodiscard]] bool DrawProcessingActionButton(
@@ -315,7 +348,7 @@ namespace Extrinsic::Sandbox::Editor
         std::optional<Result> LastResult{};
         Config Draft{};
         std::string LastApplied{}, ConfigDiagnostic{}, VisualizationDiagnostic{};
-        OperationProgressMemory Progress{};
+        OperationRunSlot Run{};
 
         bool Synchronize(const Config& active, const std::string& serialized)
         {

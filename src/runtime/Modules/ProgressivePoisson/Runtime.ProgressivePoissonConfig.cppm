@@ -61,6 +61,21 @@ export namespace Extrinsic::Runtime
 
     };
 
+    // The property the selected channel writes. The editor files its queued job
+    // under this name and the panel asks for the run by it.
+    [[nodiscard]] inline const std::string& ProgressivePoissonChannelPropertyName(
+        const ProgressivePoissonPlaygroundConfig& config) noexcept
+    {
+        switch (config.Channel)
+        {
+        case ProgressivePoissonPlaygroundChannel::Level: return config.Level.Name;
+        case ProgressivePoissonPlaygroundChannel::Rank: return config.Rank.Name;
+        case ProgressivePoissonPlaygroundChannel::SplatRadius: return config.SplatRadius.Name;
+        case ProgressivePoissonPlaygroundChannel::PrefixVisible: return config.PrefixVisible.Name;
+        }
+        return config.Level.Name;
+    }
+
     // Defined by the shared config codec translation unit, which compiles the
     // JSON dependency once for every feature family.
     extern "C++"

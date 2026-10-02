@@ -8,6 +8,7 @@ module;
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 export module Extrinsic.Runtime.MeshTopologyOperations;
 export import Extrinsic.Runtime.EditorProcessing;
@@ -20,6 +21,14 @@ import Extrinsic.Runtime.EditorWorkspaceAttachment;
 
 export namespace Extrinsic::Runtime
 {
+    // Output names the topology edits file their queued jobs under; a panel
+    // finds its run's progress by (entity, one of these) through
+    // `EditorOutputRef`.
+    inline constexpr std::string_view kMeshDenoiseJobOutput = "mesh_denoise_positions";
+    inline constexpr std::string_view kMeshRemeshJobOutput = "mesh_remesh_topology";
+    inline constexpr std::string_view kMeshSubdivideJobOutput = "mesh_subdivide_topology";
+    inline constexpr std::string_view kMeshSimplifyJobOutput = "mesh_simplify_topology";
+
     enum class EditorMeshDenoiseStage : std::uint8_t
     {
         FullBilateral,

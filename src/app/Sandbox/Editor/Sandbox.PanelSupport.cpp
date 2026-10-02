@@ -1738,20 +1738,69 @@ namespace Extrinsic::Sandbox::Editor
         m_Order.erase(std::remove(m_Order.begin(), m_Order.end(), key), m_Order.end());
     }
 
-    void DrawOutputOperationProgress(
-        OperationProgressMemory& memory,
-        const EditorProcessingCommands& commands,
-        const std::uint32_t stableEntityId,
-        const std::string& outputName,
-        const char* const id)
+    namespace
     {
-        if (stableEntityId == 0u || outputName.empty())
+        [[nodiscard]] std::string DescribeRunKey(const std::uint32_t entity, const EditorOperationRunKey& key)
+        {
+            struct Visitor
+            {
+                std::string operator()(const EditorJobIdentity& identity) const { return "id:" + identity.OutputName; }
+                std::string operator()(const EditorRunCorrelation& correlation) const { return "run:" + std::to_string(correlation.Value); }
+                std::string operator()(const JobToken token) const { return "job:" + std::to_string(token.Index); }
+                std::string operator()(const EditorOutputRef& output) const { return "out:" + output.OutputName; }
+            };
+            return std::to_string(entity) + "/" + std::visit(Visitor{}, key);
+        }
+    }
+
+    void OperationRunSlot::Watch(const std::uint32_t entity, EditorOperationRunKey key)
+    {
+        m_Entity = entity;
+        m_HasKey = true;
+        m_AwaitingAccept = false;
+        m_MemoryKey = DescribeRunKey(entity, key);
+        m_Memory.Forget(m_MemoryKey); // the previous run of this key is over once the next is submitted
+        m_Key = std::move(key);
+    }
+
+    void OperationRunSlot::Forget()
+    {
+        m_Memory.Forget(m_MemoryKey);
+        m_AwaitingAccept = false;
+        m_HasKey = false;
+        m_Entity = 0u;
+    }
+
+    EditorOperationProgress OperationRunSlot::Query(const EditorProcessingCommands& commands) const
+    {
+        // Always asked, so even "nothing watched" carries the scene epoch.
+        return GetEditorOperationProgress(commands, m_HasKey ? m_Key : EditorOperationRunKey{EditorRunCorrelation{}});
+    }
+
+    void OperationRunSlot::Draw(
+        const EditorProcessingCommands& commands, const std::uint32_t selectedEntity, const char* const id)
+    {
+        DrawLive(Query(commands), selectedEntity, {}, id);
+    }
+
+    void OperationRunSlot::DrawLive(
+        const EditorOperationProgress& live, const std::uint32_t selectedEntity,
+        const std::function<void()>& onCancel, const char* const id)
+    {
+        if (!m_HasKey)
+        {
+            (void)m_Memory.Observe(live, std::string{}); // keeps the scene epoch current
             return;
-        DrawOperationProgress(
-            memory.Observe(
-                GetEditorOperationProgress(commands, EditorOutputRef{stableEntityId, outputName}),
-                std::to_string(stableEntityId) + "/" + outputName),
-            {}, id);
+        }
+        const EditorOperationProgress& shown = m_Memory.Observe(live, m_MemoryKey);
+        if (selectedEntity != kAnyEntity && selectedEntity != m_Entity)
+            return;
+        if (m_AwaitingAccept)
+        {
+            ImGui::TextDisabled("awaiting accept");
+            return;
+        }
+        DrawOperationProgress(shown, onCancel, id);
     }
 
     void DrawOperationProgress(

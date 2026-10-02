@@ -79,6 +79,8 @@ import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.ParameterizationOperations;
 import Extrinsic.Runtime.PointCloudConsolidationTypes;
+import Extrinsic.Runtime.PointCloudConsolidationModule;
+import Extrinsic.Runtime.SpatialIndexCache;
 
 #include "../../../src/app/Sandbox/Editor/Sandbox.PanelSupport.hpp"
 
@@ -107,7 +109,7 @@ namespace
 
         explicit PanelHarness(Config::EngineConfigSectionRegistry sections =
             Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry(),
-            bool clustering = false)
+            bool clustering = false, bool consolidation = false)
         {
             Config::EngineConfig config{};
             Config::PopulateEngineConfigSectionDefaults(config, sections);
@@ -123,6 +125,11 @@ namespace
             Engine->EmplaceModule<R::SceneInteractionModule>();
             Engine->EmplaceModule<R::AsyncWorkModule>();
             if (clustering) Engine->EmplaceModule<R::ClusteringModule>();
+            if (consolidation)
+            {
+                Engine->EmplaceModule<R::SpatialIndexCache>();
+                Engine->EmplaceModule<R::PointCloudConsolidationModule>();
+            }
             Engine->EmplaceModule<R::EditorUiModule>();
             Engine->Initialize();
             Shell.Attach(Engine->Worlds(), Engine->Services());
@@ -1097,6 +1104,8 @@ TEST(SandboxProcessingPanels, ReusedExecutionPanelsRejectInvalidRequestsBeforePu
         auto& scene = h.Scene();
         const auto entity = scene.Create();
         PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::PointCloudPoint);
+        const auto other = scene.Create();
+        PopulateSamples(scene.Raw(), other, R::GeometryElementDomain::PointCloudPoint);
         ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
         const auto id = R::SelectionController::ToStableEntityId(entity);
         auto& props = scene.Raw().get<GS::Vertices>(entity).Properties;
@@ -1168,7 +1177,7 @@ TEST(SandboxProcessingPanels, ReusedExecutionPanelsRejectInvalidRequestsBeforePu
         }
         ASSERT_TRUE(h.Apply(config));
         ASSERT_TRUE(h.Shell.SetEditorWindowOpen(methods[method].Window, true));
-        int frame = 0, step = 0;
+        int frame = 0, step = 0, shownPhase = 0, shownAt = 0;
         bool completed = false;
         std::uint64_t jobsBefore = 0;
         std::string acceptedConfig;
@@ -1214,10 +1223,34 @@ TEST(SandboxProcessingPanels, ReusedExecutionPanelsRejectInvalidRequestsBeforePu
             if (method == 0)
                 EXPECT_EQ(values.Get<std::uint32_t>("configured_mask").Vector(),
                           values.Get<std::uint32_t>("reference_mask").Vector());
-            completed = true;
-            engine.RequestExit();
+            // The run is on screen, and only while its own entity is the panel's entity.
+            const auto capture = [] {
+                ImGui::GetCurrentContext()->LogBuffer.clear();
+                ImGui::LogToBuffer();
+                ImGui::GetCurrentContext()->LogWindow = nullptr;
+            };
+            const auto read = [] {
+                std::string text{ImGui::GetCurrentContext()->LogBuffer.c_str()};
+                ImGui::LogFinish();
+                return text;
+            };
+            if (shownPhase == 0) { shownPhase = 1; shownAt = frame; capture(); }
+            if (shownPhase == 1 && frame == shownAt + 5)
+            {
+                EXPECT_NE(read().find("done"), std::string::npos) << "the finished run stays visible";
+                EXPECT_TRUE(h.Selection().SetSelectedEntity(scene, other));
+                shownPhase = 2; shownAt = frame;
+            }
+            if (shownPhase == 2 && frame == shownAt + 3) capture();
+            if (shownPhase == 2 && frame == shownAt + 8)
+            {
+                EXPECT_EQ(read().find("done"), std::string::npos) << "another entity must not show this run";
+                completed = true;
+                engine.RequestExit();
+            }
         };
         h.Engine->Run();
+        if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogFinish();
         EXPECT_TRUE(completed);
     }
 }
@@ -2180,6 +2213,54 @@ TEST(SandboxProcessingPanels, TopologyAdmissionKeepsBlockedActionsVisibleAndRuns
     }
 }
 
+
+// A queued topology edit is found by entity and the shared job-output name, and its finished
+// run stays visible.
+TEST(SandboxProcessingPanels, SubdividePanelShowsItsFinishedRun)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("mesh.processing.subdivide", true));
+    std::optional<R::EditorMeshSubdivideResult> result;
+    const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+        .Id = "test.subdivide_progress_observer", .MenuPath = {"View"}, .Title = "Subdivide progress observer",
+        .OpenByDefault = true,
+        .Draw = [&](bool&, const Editor::SandboxEditorContext& context) {
+            result = context.MeshTopology.Results.LastMeshSubdivideResult;
+        }});
+    int frame = 0, step = 0, finishedAt = 0;
+    std::string text;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        if (++frame > 400) { ADD_FAILURE() << "subdivide progress test did not finish"; engine.RequestExit(); return; }
+        auto* window = ImGui::FindWindowByName("Mesh / Processing / Subdivide");
+        if (!window) return;
+        ImGui::SetWindowSize(window, {900, 1500});
+        ImGui::SetWindowPos(window, {0, 0});
+        if (++step == 3) ImGui::ActivateItemByID(window->GetID("Subdivide##MeshSubdivide"));
+        if (!finishedAt && result && result->Status != R::EditorCommandStatus::Pending)
+        {
+            EXPECT_TRUE(result->Succeeded()) << result->Message;
+            finishedAt = frame;
+            ImGui::GetCurrentContext()->LogBuffer.clear();
+            ImGui::LogToBuffer();
+            ImGui::GetCurrentContext()->LogWindow = nullptr;
+        }
+        if (finishedAt && frame == finishedAt + 5)
+        {
+            text = ImGui::GetCurrentContext()->LogBuffer.c_str();
+            ImGui::LogFinish();
+            engine.RequestExit();
+        }
+    };
+    h.Engine->Run();
+    if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogFinish();
+    EXPECT_GT(finishedAt, 0);
+    EXPECT_NE(text.find("done"), std::string::npos) << text;
+    EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
+}
 
 TEST(SandboxProcessingPanels, TopologyVariantWidgetsReachCommandsAndClearLoopOnlyFeatures)
 {
@@ -3605,8 +3686,13 @@ TEST(SandboxProcessingPanels, PropertySmoothingAcceptsOrDiscardsAPendingGpuResul
             h.Panels.InjectPropertySmoothingTransactionForTest(fresh);
             break;
         case 22:
-            // The discarded result never reads as a finished run.
-            EXPECT_EQ(finishLog().find("done"), std::string::npos);
+            {
+                // The discarded result never reads as a finished run; the waiting fresh one reads
+                // "awaiting accept", not done.
+                const std::string text = finishLog();
+                EXPECT_EQ(text.find("done"), std::string::npos);
+                EXPECT_NE(text.find("awaiting accept"), std::string::npos);
+            }
             ImGui::ActivateItemByID(window->GetID("Accept##Smoothing"));
             break;
         default:
@@ -4369,5 +4455,227 @@ TEST(SandboxProcessingPanels, DerivedJobCellsAndUvStatusLineShowTheSharedWidget)
     EXPECT_NE(text.find("failed"), std::string::npos) << text;
     // The UV status line names the run and its time, with no percentage for an indeterminate job.
     EXPECT_NE(text.find("running \xC2\xB7 UV atlas  2.5s"), std::string::npos) << text;
+    EXPECT_TRUE(h.Shell.UnregisterEditorWindow(windowHandle));
+}
+
+namespace
+{
+    // Clicks `runLabel` in window `title`, waits for `finished()`, then expects the finished run on
+    // screen; after the selection moves to `other` nothing of it may show.
+    template <class Finished>
+    void ExpectRunShownOnlyForItsEntity(PanelHarness& h, const char* title, const char* runLabel,
+                                        const auto home, const auto other, Finished finished)
+    {
+        auto& scene = h.Scene();
+        int frame = 0, step = 0, phase = 0, at = 0;
+        bool completed = false;
+        const auto capture = [] {
+            ImGui::GetCurrentContext()->LogBuffer.clear();
+            ImGui::LogToBuffer();
+            ImGui::GetCurrentContext()->LogWindow = nullptr;
+        };
+        const auto read = [] {
+            std::string text{ImGui::GetCurrentContext()->LogBuffer.c_str()};
+            ImGui::LogFinish();
+            return text;
+        };
+        h.Driver->OnFrame = [&](R::Engine& engine) {
+            if (++frame > 600) { ADD_FAILURE() << title << " did not finish"; engine.RequestExit(); return; }
+            auto* window = ImGui::FindWindowByName(title);
+            if (!window) return;
+            ImGui::SetWindowSize(window, {750, 1400});
+            ImGui::SetWindowPos(window, {0, 0});
+            if (++step == 3) ImGui::ActivateItemByID(window->GetID(runLabel));
+            // Some methods select their output; the run belongs to the entity it ran on.
+            if (phase == 0 && step > 3 && finished())
+            {
+                EXPECT_TRUE(h.Selection().SetSelectedEntity(scene, home));
+                phase = 1; at = frame; capture();
+            }
+            if (phase == 1 && frame == at + 5)
+            {
+                const std::string text = read();
+                EXPECT_NE(text.find("done"), std::string::npos) << title << ": the finished run stays visible\n" << text;
+                EXPECT_TRUE(h.Selection().SetSelectedEntity(scene, other));
+                phase = 2; at = frame;
+            }
+            if (phase == 2 && frame == at + 3) capture();
+            if (phase == 2 && frame == at + 8)
+            {
+                const std::string text = read();
+                EXPECT_EQ(text.find("done"), std::string::npos) << title << ": another entity must not show this run\n" << text;
+                completed = true;
+                engine.RequestExit();
+            }
+        };
+        h.Engine->Run();
+        if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogFinish();
+        EXPECT_TRUE(completed) << title;
+    }
+}
+
+TEST(SandboxProcessingPanels, OutlierPanelShowsItsFinishedRunOnlyForItsEntity)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    const auto entity = scene.Create(), other = scene.Create();
+    PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::PointCloudPoint);
+    PopulateSamples(scene.Raw(), other, R::GeometryElementDomain::PointCloudPoint);
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+    auto& props = scene.Raw().get<GS::Vertices>(entity).Properties;
+    props.Get<glm::vec3>("v:position")[8] = {100, 100, 100};
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto outliers = *R::GetOutlierAnalysisConfig(config);
+    outliers.StableEntityId = R::SelectionController::ToStableEntityId(entity);
+    outliers.Method = R::OutlierAnalysisMethod::Radius;
+    outliers.Radius = 1.1f;
+    outliers.MinimumNeighbors = 1;
+    R::SetOutlierAnalysisConfig(config, outliers);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.outlier_analysis", true));
+    ExpectRunShownOnlyForItsEntity(h, "Outlier Analysis", "Detect outliers", entity, other,
+        [&] { return std::as_const(props).Exists(outliers.Mask.Name); });
+}
+
+TEST(SandboxProcessingPanels, PointConstructionPanelShowsItsFinishedRunOnlyForItsEntity)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    const auto entity = scene.Create(), other = scene.Create();
+    PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::PointCloudPoint);
+    PopulateSamples(scene.Raw(), other, R::GeometryElementDomain::PointCloudPoint);
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto construction = *R::GetPointConstructionConfig(config);
+    construction.StableEntityId = R::SelectionController::ToStableEntityId(entity);
+    R::SetPointConstructionConfig(config, construction);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.point_construction", true));
+    std::optional<R::EditorPointConstructionResult> result;
+    const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+        .Id = "test.construction_progress_observer", .MenuPath = {"View"}, .Title = "Construction progress observer",
+        .OpenByDefault = true,
+        .Draw = [&](bool&, const Editor::SandboxEditorContext& context) {
+            result = context.PointConstruction.Results.LastPointConstructionResult;
+        }});
+    ExpectRunShownOnlyForItsEntity(h, "Construct from Points", "Construct", entity, other,
+        [&] { return result && result->Status != R::EditorCommandStatus::Pending; });
+    EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
+}
+
+// Consolidation names its run by the correlation id of its submission, like K-Means.
+TEST(SandboxProcessingPanels, ConsolidationPanelShowsItsFinishedRunOnlyForItsEntity)
+{
+    PanelHarness h(Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry(), false, true);
+    auto& scene = h.Scene();
+    const auto entity = scene.Create(), other = scene.Create();
+    for (const auto e : {entity, other})
+    {
+        auto& props = scene.Raw().emplace<GS::Vertices>(e).Properties;
+        props.Resize(64);
+        auto positions = props.GetOrAdd<glm::vec3>("v:position", {});
+        for (std::size_t i = 0u; i < 64u; ++i)
+            positions[i] = {float(i % 8) * 0.1f, float(i / 8) * 0.1f, 0.01f * float((i * 7u) % 5u)};
+        scene.Raw().emplace<G::RenderPoints>(e);
+    }
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("pointcloud.processing.consolidation", true));
+    std::optional<R::PointCloudConsolidationResult> result;
+    const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+        .Id = "test.consolidation_progress_observer", .MenuPath = {"View"}, .Title = "Consolidation progress observer",
+        .OpenByDefault = true,
+        .Draw = [&](bool&, const Editor::SandboxEditorContext& context) {
+            result = context.PointCloudService->Results.LastPointCloudConsolidationResult;
+        }});
+    ExpectRunShownOnlyForItsEntity(
+        h, "PointCloud / Processing / Consolidate (LOP/WLOP/CLOP/EAR)",
+        "Consolidate selected property set##PointCloudConsolidation", entity, other,
+        [&] { return result && result->Status != R::PointCloudConsolidationRunStatus::Queued; });
+    EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
+}
+
+// The slot names the run at submit (never from a later draft), maps a GPU transaction waiting
+// for Accept to "awaiting accept" instead of its finished compute job, forgets a discard, and
+// shows only for the run's entity.
+TEST(SandboxProcessingPanels, OperationRunSlotCapturesTheKeyAtSubmitAndMapsTransactionPhases)
+{
+    PanelHarness h;
+    R::EditorOperationProgress canned{};
+    std::optional<R::EditorOperationRunKey> lastKey;
+    R::EditorProcessingContext context;
+    context.JobCommands.Progress = [&](const R::EditorOperationRunKey& key) {
+        lastKey = key;
+        auto progress = canned;
+        progress.Epoch = 1u;
+        return progress;
+    };
+    const auto commands = R::BindEditorProcessingCommands(context);
+    Editor::OperationRunSlot slot;
+    std::uint32_t selected = 7u;
+    const auto windowHandle = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+        .Id = "test.run_slot", .MenuPath = {"View"}, .Title = "Run slot test", .OpenByDefault = true,
+        .Draw = [&](bool&, const Editor::SandboxEditorContext&) {
+            if (ImGui::Begin("Run slot test")) slot.Draw(commands, selected, "slot");
+            ImGui::End();
+        }});
+    struct Case { const char* Name; std::function<void()> Arrange; std::function<void(const std::string&)> Check; };
+    const R::EditorOperationProgress running{.State = R::EditorOperationState::Running, .Determinate = true,
+                                             .Normalized = 0.5f, .Label = "solve"};
+    const R::EditorOperationProgress finished{.State = R::EditorOperationState::Succeeded};
+    const std::array cases{
+        Case{"running", [&] { slot.WatchOutput(7u, "a"); canned = running; },
+             [&](const std::string& t) {
+                 EXPECT_NE(t.find("running"), std::string::npos) << t;
+                 ASSERT_TRUE(lastKey.has_value());
+                 const auto* output = std::get_if<R::EditorOutputRef>(&*lastKey);
+                 ASSERT_NE(output, nullptr);
+                 EXPECT_EQ(output->EntityId, 7u);
+                 EXPECT_EQ(output->OutputName, "a") << "the key captured at submit";
+             }},
+        Case{"awaiting accept", [&] { canned = finished; slot.AwaitingAccept(true); },
+             [&](const std::string& t) {
+                 EXPECT_NE(t.find("awaiting accept"), std::string::npos) << t;
+                 EXPECT_EQ(t.find("done"), std::string::npos) << t;
+             }},
+        Case{"accepted", [&] { slot.AwaitingAccept(false); },
+             [&](const std::string& t) { EXPECT_NE(t.find("done"), std::string::npos) << t; }},
+        Case{"another entity", [&] { selected = 8u; },
+             [&](const std::string& t) { EXPECT_EQ(t.find("done"), std::string::npos) << t; }},
+        Case{"back", [&] { selected = 7u; },
+             [&](const std::string& t) { EXPECT_NE(t.find("done"), std::string::npos) << t; }},
+        Case{"discarded", [&] { slot.Forget(); canned = {}; },
+             [&](const std::string& t) {
+                 EXPECT_EQ(t.find("done"), std::string::npos) << t;
+                 EXPECT_EQ(t.find("awaiting"), std::string::npos) << t;
+             }},
+    };
+    int frame = 0, step = 0;
+    std::size_t index = 0;
+    bool completed = false;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        if (++frame > 300) { ADD_FAILURE() << "slot test did not finish"; engine.RequestExit(); return; }
+        if (!ImGui::FindWindowByName("Run slot test")) return;
+        ++step;
+        // Each case: arrange, let two frames draw it, capture two, read.
+        const int local = step - 1 - static_cast<int>(index) * 6;
+        if (local == 0) cases[index].Arrange();
+        if (local == 2)
+        {
+            ImGui::GetCurrentContext()->LogBuffer.clear();
+            ImGui::LogToBuffer();
+            ImGui::GetCurrentContext()->LogWindow = nullptr;
+        }
+        if (local == 4)
+        {
+            const std::string text{ImGui::GetCurrentContext()->LogBuffer.c_str()};
+            ImGui::LogFinish();
+            SCOPED_TRACE(cases[index].Name);
+            cases[index].Check(text);
+            if (++index == cases.size()) { completed = true; engine.RequestExit(); }
+        }
+    };
+    h.Engine->Run();
+    if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogFinish();
+    EXPECT_TRUE(completed);
     EXPECT_TRUE(h.Shell.UnregisterEditorWindow(windowHandle));
 }

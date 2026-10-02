@@ -487,7 +487,7 @@ namespace Extrinsic::Sandbox::Editor
             Runtime::KMeansPropertyRefs Properties{};
             std::uint32_t Entity{};
             std::string VisualizationDiagnostic{};
-            OperationProgressMemory Progress{};
+            OperationRunSlot Run{};
             std::int32_t Backend{0};
             std::uint32_t ClusterCount{8u};
             std::int32_t MaxIterations{32};
@@ -539,7 +539,7 @@ namespace Extrinsic::Sandbox::Editor
                 LastConfigApply{};
             std::optional<Runtime::PointCloudConsolidationResult>
                 LastResult{};
-            OperationProgressMemory Progress{};
+            OperationRunSlot Run{};
         };
 
         struct ParameterizationState
@@ -1616,6 +1616,7 @@ namespace Extrinsic::Sandbox::Editor
                 Runtime::PointCloudConsolidationGpuObservation gpu{};
                 if (service.PointCloudConsolidation && PointCloudConsolidation.LastResult)
                     gpu = service.PointCloudConsolidation->GpuRun(PointCloudConsolidation.LastResult->Correlation);
+                PointCloudConsolidation.Run.AwaitingAccept(gpu.ReadyToAccept);
                 if (gpu.Running || gpu.ReadyToAccept || gpu.Accepting)
                 {
                     availability.Available = false;
@@ -1633,7 +1634,10 @@ namespace Extrinsic::Sandbox::Editor
                         (void)service.PointCloudConsolidation->GpuRun(gpu.Correlation, Runtime::PointCloudConsolidationGpuAction::Accept);
                     ImGui::SameLine();
                     if (ImGui::Button("Discard##PointCloudConsolidation"))
+                    {
                         (void)service.PointCloudConsolidation->GpuRun(gpu.Correlation, Runtime::PointCloudConsolidationGpuAction::Discard);
+                        PointCloudConsolidation.Run.Forget(); // a discarded result never reads as a finished run
+                    }
                 }
                 const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
                     service.Commands, {availability.Available, availability.Message});
@@ -1652,27 +1656,16 @@ namespace Extrinsic::Sandbox::Editor
                     {
                         PointCloudConsolidation.LastResult =
                             std::move(action.Submission);
+                        // The run is named by the correlation id its submission returned (none when rejected).
+                        const auto& run = *PointCloudConsolidation.LastResult;
+                        if (run.Correlation.IsValid())
+                            PointCloudConsolidation.Run.Watch(
+                                run.StableEntityId, Runtime::EditorRunCorrelation{run.Correlation.Value});
                     }
                     if (PointCloudConsolidation.LastConfigApply->Succeeded())
                         PointCloudConsolidation.Dirty = false;
                 }
-                // The run's own job by the correlation id of its submission, keyed by the run's own
-                // entity and output, shown only while that entity is selected. Always asked, so even
-                // "no run" carries the scene epoch.
-                {
-                    const auto* run = PointCloudConsolidation.LastResult.has_value()
-                        ? &*PointCloudConsolidation.LastResult : nullptr;
-                    const auto live = Runtime::GetEditorOperationProgress(
-                        service.Commands,
-                        Runtime::EditorRunCorrelation{run != nullptr ? run->Correlation.Value : 0u});
-                    if (run != nullptr)
-                    {
-                        const auto& remembered = PointCloudConsolidation.Progress.Observe(
-                            live, std::to_string(run->StableEntityId) + "/" + run->Properties.OutputPositions.Name);
-                        if (run->StableEntityId == stableEntityId)
-                            DrawOperationProgress(remembered, {}, "consolidation_progress");
-                    }
-                }
+                PointCloudConsolidation.Run.Draw(service.Commands, stableEntityId, "consolidation_progress");
                 if (!configAvailable)
                 {
                     ImGui::TextDisabled(
@@ -1754,6 +1747,9 @@ namespace Extrinsic::Sandbox::Editor
         void SetKMeansSubmission(const Runtime::KMeansRunCompleted& result)
         {
             KMeans.LastResult=result;
+            // The run is named by the correlation id its submission returned (none when rejected).
+            if(result.Correlation.IsValid())
+                KMeans.Run.Watch(result.StableEntityId, Runtime::EditorRunCorrelation{result.Correlation.Value});
             if(result.Correlation.IsValid() && result.RequestedBackend==Runtime::ClusteringBackend::VulkanCompute)
                 KMeans.ActiveGpuCorrelation=result.Correlation;
         }
@@ -1926,6 +1922,7 @@ namespace Extrinsic::Sandbox::Editor
                 const auto id = KMeans.ActiveGpuCorrelation;
                 const auto run = service.Clustering->GpuRun(id);
                 pendingGpuRun = run.Running || run.ReadyToAccept || run.Accepting;
+                KMeans.Run.AwaitingAccept(run.ReadyToAccept);
                 if (run.Running || run.ReadyToAccept || run.Accepting)
                 {
                     ImGui::TextWrapped("%s", run.Message.c_str());
@@ -1939,7 +1936,11 @@ namespace Extrinsic::Sandbox::Editor
                     ImGui::BeginDisabled(!run.CanAccept);
                     if (ImGui::Button("Accept##KMeans")) (void)service.Clustering->GpuRun(id, Runtime::KMeansGpuAction::Accept);
                     ImGui::EndDisabled(); ImGui::SameLine();
-                    if (ImGui::Button("Discard##KMeans")) (void)service.Clustering->GpuRun(id, Runtime::KMeansGpuAction::Discard);
+                    if (ImGui::Button("Discard##KMeans"))
+                    {
+                        (void)service.Clustering->GpuRun(id, Runtime::KMeansGpuAction::Discard);
+                        KMeans.Run.Forget(); // a discarded result never reads as a finished run
+                    }
                 }
             }
             const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
@@ -1960,22 +1961,7 @@ namespace Extrinsic::Sandbox::Editor
                 }
             }
             ImGui::EndDisabled();
-            // The run's own job, found by the correlation id its submission returned, and keyed
-            // by the run's own entity and output (the selection may have moved on); shown only
-            // while that entity is selected. Always asked, so even "no run" carries the scene epoch.
-            {
-                const auto* run = KMeans.LastResult.has_value() ? &*KMeans.LastResult : nullptr;
-                const auto live = Runtime::GetEditorOperationProgress(
-                    service.Commands,
-                    Runtime::EditorRunCorrelation{run != nullptr ? run->Correlation.Value : 0u});
-                if (run != nullptr)
-                {
-                    const auto& remembered = KMeans.Progress.Observe(
-                        live, std::to_string(run->StableEntityId) + "/" + run->Properties.OutputLabels.Name);
-                    if (run->StableEntityId == model.SelectedStableId)
-                        DrawOperationProgress(remembered, {}, "kmeans_progress");
-                }
-            }
+            KMeans.Run.Draw(service.Commands, model.SelectedStableId, "kmeans_progress");
             ImGui::SeparatorText("Display output properties");
             DrawProcessingPropertyShowButton(context, model.SelectedStableId, KMeans.Properties.OutputLabels, KMeans.VisualizationDiagnostic);
             DrawProcessingPropertyShowButton(context, model.SelectedStableId, KMeans.Properties.OutputColors, KMeans.VisualizationDiagnostic);
@@ -2403,6 +2389,8 @@ namespace Extrinsic::Sandbox::Editor
                 ProgressivePoisson.PendingStableEntityId = 0u;
                 ProgressivePoisson.LastConfigResult = applyConfig();
                 if (!ProgressivePoisson.LastConfigResult->Succeeded()) return;
+                ProgressivePoisson.Run.WatchOutput(
+                    command.StableEntityId, Runtime::ProgressivePoissonChannelPropertyName(command.Config));
                 Runtime::EditorProgressivePoissonResult result =
                     Runtime::ApplyEditorProgressivePoissonCommand(
                         context.PointSet.Commands,
@@ -2439,16 +2427,7 @@ namespace Extrinsic::Sandbox::Editor
                 Runtime::PreviewEditorProgressivePoissonCommand(context.PointSet.Commands, command));
             if (DrawProcessingActionButton("Run Progressive Poisson##ProgressivePoisson", readiness))
                 runSampler();
-            {
-                const auto& pc = command.Config;
-                const std::string& output =
-                    pc.Channel == Runtime::ProgressivePoissonPlaygroundChannel::Rank ? pc.Rank.Name
-                    : pc.Channel == Runtime::ProgressivePoissonPlaygroundChannel::SplatRadius ? pc.SplatRadius.Name
-                    : pc.Channel == Runtime::ProgressivePoissonPlaygroundChannel::PrefixVisible ? pc.PrefixVisible.Name
-                    : pc.Level.Name;
-                DrawOutputOperationProgress(ProgressivePoisson.Progress, context.PointSet.Commands,
-                                            command.StableEntityId, output, "poisson_progress");
-            }
+            ProgressivePoisson.Run.Draw(context.PointSet.Commands, model.SelectedStableId, "poisson_progress");
 
             if (ProgressivePoisson.AutoRunPending && readiness.Enabled &&
                 ProgressivePoisson.PendingStableEntityId ==

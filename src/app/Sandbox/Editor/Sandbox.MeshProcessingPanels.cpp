@@ -169,10 +169,13 @@ namespace Extrinsic::Sandbox::Editor
                 PublishCommandResult(state.LastResult, execute(), sink);
         }
 
-        template <typename State, typename Preview, typename Apply, typename Execute, typename Sink>
+        // `watch(draft)` names the run being submitted as {entity, output property name}; the panel's
+        // run slot captures it at submit, before the editable draft can change.
+        template <typename State, typename Preview, typename Apply, typename Execute, typename Sink,
+                  typename Watch = std::nullptr_t>
         void DrawProcessingExecution(const Runtime::EditorProcessingCommands& commands, State& state, bool changed,
             Preview preview, Apply apply, Execute execute, const Sink& sink,
-            const char* button, const char* controlsRejected, const char* executionRejected)
+            const char* button, const char* controlsRejected, const char* executionRejected, Watch watch = nullptr)
         {
             if (changed)
                 state.ConfigDiagnostic = apply(state.Draft).Succeeded() ? "" : controlsRejected;
@@ -182,16 +185,24 @@ namespace Extrinsic::Sandbox::Editor
                 commands, method);
             if (!readiness.Enabled) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
             if (DrawProcessingActionButton(button, readiness))
+            {
+                if constexpr (!std::is_null_pointer_v<Watch>)
+                {
+                    const auto [entity, output] = watch(state.Draft);
+                    state.Run.WatchOutput(entity, output);
+                }
                 ApplyProcessingExecution(state, state.Draft, apply, execute, sink, executionRejected);
+            }
         }
 
         template<class State,class Sink>
         bool DrawPointScalarTransaction(const Runtime::EditorProcessingCommands& commands,
             Runtime::EditorPointScalarTransactionHandle& run,State& state,const Sink& sink)
         {
-            if(!run)return false;
+            if(!run){state.Run.AwaitingAccept(false);return false;}
             const auto snapshot=Runtime::SnapshotEditorPointScalar(commands,run);
             const auto phase=snapshot.Phase;
+            state.Run.AwaitingAccept(phase==Runtime::EditorGpuTransactionPhase::ReadyToAccept);
             const bool active=phase==Runtime::EditorGpuTransactionPhase::Running||phase==Runtime::EditorGpuTransactionPhase::Accepting||phase==Runtime::EditorGpuTransactionPhase::ReadyToAccept;
             // External producers deliver their diagnostics through their own completion sink.
             constexpr bool scalarDiagnostics=requires { Runtime::UpdateEditorPointScalarResult(*state.LastResult,snapshot); };
@@ -210,7 +221,9 @@ namespace Extrinsic::Sandbox::Editor
                 if(ImGui::Button("Accept"))(void)Runtime::AcceptEditorPointScalar(commands,run);
                 ImGui::EndDisabled();
                 if(!snapshot.AcceptRefusalReason.empty())ImGui::TextWrapped("%s",snapshot.AcceptRefusalReason.c_str());}
-            if(ImGui::Button(phase==Runtime::EditorGpuTransactionPhase::Running?"Stop":"Discard"))Runtime::DiscardEditorPointScalar(commands,run);
+            if(ImGui::Button(phase==Runtime::EditorGpuTransactionPhase::Running?"Stop":"Discard")){
+                Runtime::DiscardEditorPointScalar(commands,run);
+                state.Run.Forget();} // a stopped or discarded run never reads as finished
             return true;
         }
 
@@ -269,6 +282,7 @@ namespace Extrinsic::Sandbox::Editor
     {
         struct DenoiseState
         {
+            OperationRunSlot Run{};
             ProcessingEntityInput Input{};
             std::optional<Runtime::EditorMeshDenoiseResult> LastResult{};
             std::int32_t Stage{0};
@@ -290,6 +304,7 @@ namespace Extrinsic::Sandbox::Editor
 
         struct RemeshState
         {
+            OperationRunSlot Run{};
             ProcessingEntityInput Input{};
             std::optional<Runtime::EditorMeshRemeshResult> LastResult{};
             std::int32_t Mode{0};
@@ -301,6 +316,7 @@ namespace Extrinsic::Sandbox::Editor
 
         struct SubdivideState
         {
+            OperationRunSlot Run{};
             ProcessingEntityInput Input{};
             std::optional<Runtime::EditorMeshSubdivideResult> LastResult{};
             std::int32_t Operator{0};
@@ -311,6 +327,7 @@ namespace Extrinsic::Sandbox::Editor
 
         struct SimplifyState
         {
+            OperationRunSlot Run{};
             ProcessingEntityInput Input{};
             std::optional<Runtime::EditorMeshSimplifyResult> LastResult{};
             std::int32_t Metric{1};
@@ -355,13 +372,14 @@ namespace Extrinsic::Sandbox::Editor
             Runtime::EditorRegistrationProgressHandle Progress{};
             std::uint32_t RunMaxIterations{0u}; // iteration cap of the run in flight, captured at its start
             std::chrono::steady_clock::time_point RunStarted{}; // when that run was started
+            OperationRunSlot Run{};
             bool LivePreview{true}, PlotBySeconds{false}, PreviewShown{false};
             std::uint64_t PreviewRevision{0u};
         };
 
         struct PointSamplingState
         {
-            OperationProgressMemory Progress{};
+            OperationRunSlot Run{};
             std::optional<std::vector<std::uint32_t>> LastSelected{};
             Runtime::PointSamplingOperationConfig Draft{};
             std::string LastApplied{}, ConfigDiagnostic{};
@@ -378,6 +396,7 @@ namespace Extrinsic::Sandbox::Editor
             std::string LastApplied{}, ConfigDiagnostic{};
             Runtime::EditorCoherentPointDriftRunHandle Run{};
             std::uint32_t RunMaxIterations{0u}; // iteration cap of the run in flight, captured at its start
+            OperationRunSlot ProgressSlot{};
             std::string RunMessage{}, ExportMessage{};
             std::optional<Runtime::EditorCoherentPointDriftResult> LastResult{};
             bool LivePreview{true};
@@ -413,10 +432,6 @@ namespace Extrinsic::Sandbox::Editor
         // The interactive Vulkan run (ADR 0030): its preview shows in the viewport until the
         // user accepts or discards it.
         Runtime::EditorPropertySmoothingTransactionHandle SmoothingTransaction{};
-        OperationProgressMemory SmoothingProgress{};
-        // The last transaction's own entity and output (the selection may move on).
-        std::uint32_t SmoothingProgressEntity{0u};
-        std::string SmoothingProgressKey{};
         std::uint32_t SmoothingEntity{};
         ProcessingDraftState<Runtime::HarmonicFieldConfig, Runtime::EditorHarmonicFieldResult> Harmonic{};
         std::uint32_t HarmonicEntity{};
@@ -918,6 +933,7 @@ namespace Extrinsic::Sandbox::Editor
             context.MeshTopology.Commands, command);
         if (DrawProcessingActionButton("Denoise##MeshDenoise", readiness))
         {
+            Denoise.Run.WatchOutput(command.StableEntityId, std::string{Runtime::kMeshDenoiseJobOutput});
             PublishCommandResult(
                 Denoise.LastResult,
                 Runtime::ApplyEditorMeshDenoiseCommand(
@@ -927,6 +943,7 @@ namespace Extrinsic::Sandbox::Editor
                 context.MeshTopology.ResultSinks.MeshDenoise);
         }
 
+        Denoise.Run.Draw(context.MeshTopology.Commands, command.StableEntityId, "denoise_progress");
         const auto& result = Denoise.LastResult;
         if (!result.has_value())
         {
@@ -1013,10 +1030,15 @@ namespace Extrinsic::Sandbox::Editor
             context.MeshFields.Commands,
             Runtime::PreviewEditorMeshCurvatureCommand(context.MeshFields.Commands, config));
         if (DrawProcessingActionButton("Compute##MeshCurvature", readiness))
+        {
+            // The job is filed under the serialized command, so the run is named by the same text.
+            Curvature.Run.WatchOutput(config.StableEntityId, Runtime::SerializeMeshCurvatureConfig(config));
             ApplyProcessingExecution(Curvature, config, apply,
                 [&] { return Runtime::ApplyEditorMeshCurvatureCommand(context.MeshFields.Commands, config,
                     context.MeshFields.ResultSinks.MeshCurvature); },
                 context.MeshFields.ResultSinks.MeshCurvature, "Curvature configuration was rejected.");
+        }
+        Curvature.Run.Draw(context.MeshFields.Commands, config.StableEntityId, "curvature_progress");
         ImGui::SeparatorText("Display output properties");
         for (const auto* output : {&config.Mean, &config.Gaussian, &config.MinPrincipal,
                                   &config.MaxPrincipal, &config.Direction1, &config.Direction2})
@@ -1569,12 +1591,14 @@ namespace Extrinsic::Sandbox::Editor
         };
         if (DrawProcessingActionButton("Remesh##MeshRemesh", preview(command)))
         {
+            Remesh.Run.WatchOutput(command.StableEntityId, std::string{Runtime::kMeshRemeshJobOutput});
             PublishCommandResult(Remesh.LastResult,
                 Runtime::ApplyEditorMeshRemeshCommand(context.MeshTopology.Commands,
                     command, context.MeshTopology.ResultSinks.MeshRemesh),
                 context.MeshTopology.ResultSinks.MeshRemesh);
         }
 
+        Remesh.Run.Draw(context.MeshTopology.Commands, command.StableEntityId, "remesh_progress");
         const auto& result = Remesh.LastResult;
         if (!result.has_value())
         {
@@ -1667,12 +1691,14 @@ namespace Extrinsic::Sandbox::Editor
         };
         if (DrawProcessingActionButton("Subdivide##MeshSubdivide", preview(command)))
         {
+            Subdivide.Run.WatchOutput(command.StableEntityId, std::string{Runtime::kMeshSubdivideJobOutput});
             PublishCommandResult(Subdivide.LastResult,
                 Runtime::ApplyEditorMeshSubdivideCommand(context.MeshTopology.Commands,
                     command, context.MeshTopology.ResultSinks.MeshSubdivide),
                 context.MeshTopology.ResultSinks.MeshSubdivide);
         }
 
+        Subdivide.Run.Draw(context.MeshTopology.Commands, command.StableEntityId, "subdivide_progress");
         const auto& result = Subdivide.LastResult;
         if (!result.has_value())
         {
@@ -1799,6 +1825,7 @@ namespace Extrinsic::Sandbox::Editor
             context.MeshTopology.Commands, command);
         if (DrawProcessingActionButton("Simplify##MeshSimplify", readiness))
         {
+            Simplify.Run.WatchOutput(command.StableEntityId, std::string{Runtime::kMeshSimplifyJobOutput});
             PublishCommandResult(
                 Simplify.LastResult,
                 Runtime::ApplyEditorMeshSimplifyCommand(
@@ -1808,6 +1835,7 @@ namespace Extrinsic::Sandbox::Editor
                 context.MeshTopology.ResultSinks.MeshSimplify);
         }
 
+        Simplify.Run.Draw(context.MeshTopology.Commands, command.StableEntityId, "simplify_progress");
         const auto& result = Simplify.LastResult;
         if (!result.has_value())
         {
@@ -2018,6 +2046,7 @@ namespace Extrinsic::Sandbox::Editor
         if (!readiness.Enabled) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
         if (DrawProcessingActionButton("Estimate normals", readiness))
         {
+            Normals.Run.WatchOutput(config.StableEntityId, config.Output.Name);
             if ((config.Backend == Runtime::NormalEstimationBackend::Vulkan || config.Backend == Runtime::NormalEstimationBackend::VulkanLBVH))
             {
                 // Interactive Vulkan runs compute on the device and publish on Accept.
@@ -2041,8 +2070,8 @@ namespace Extrinsic::Sandbox::Editor
                     [&] { return Runtime::ApplyEditorConfiguredNormalEstimation(context.Normals.Commands, context.Normals.ResultSinks.NormalEstimation); },
                     context.Normals.ResultSinks.NormalEstimation, "Normal config was rejected.");
         }
-        DrawOutputOperationProgress(Normals.Progress, context.Normals.Commands, config.StableEntityId, config.Output.Name,
-                                    "normals_progress");
+        Normals.Run.AwaitingAccept(NormalTransaction && transaction.Phase == Phase::ReadyToAccept);
+        Normals.Run.Draw(context.Normals.Commands, config.StableEntityId, "normals_progress");
         const auto outputProperty = config.Output;
         ImGui::SameLine();
         if (config.Method == Runtime::NormalEstimationMethod::MeshFaceNormals)
@@ -2178,6 +2207,7 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::BeginDisabled(outlierActive);
         if (DrawProcessingActionButton("Detect outliers", readiness))
         {
+            Outliers.Run.WatchOutput(config.StableEntityId, config.Mask.Name);
             if (analyze.Backend == Runtime::OutlierAnalysisBackend::VulkanLBVH)
             {
                 Runtime::EditorOutlierAnalysisResult result;
@@ -2190,8 +2220,8 @@ namespace Extrinsic::Sandbox::Editor
             else execute(analyze);
         }
         ImGui::EndDisabled();
-        DrawOutputOperationProgress(Outliers.Progress, context.PointAnalysis.Commands, config.StableEntityId, config.Mask.Name,
-                                    "outliers_progress");
+        Outliers.Run.AwaitingAccept(OutlierTransaction && transaction.Phase == Runtime::EditorGpuTransactionPhase::ReadyToAccept);
+        Outliers.Run.Draw(context.PointAnalysis.Commands, config.StableEntityId, "outliers_progress");
         if (outlierActive)
         {
             ImGui::TextWrapped("%s", transaction.Result.Message.c_str());
@@ -2208,6 +2238,7 @@ namespace Extrinsic::Sandbox::Editor
             if (ImGui::Button("Discard##Outliers"))
             {
                 Runtime::DiscardEditorOutlierAnalysis(context.PointAnalysis.Commands, OutlierTransaction);
+                Outliers.Run.Forget();
                 Outliers.LastResult = Runtime::SnapshotEditorOutlierAnalysis(context.PointAnalysis.Commands, OutlierTransaction).Result;
             }
             ImGui::TextWrapped("The score ring is available to the colormap; CPU fields change only on Accept.");
@@ -2307,10 +2338,10 @@ namespace Extrinsic::Sandbox::Editor
                 return Runtime::ApplyEditorConfiguredKeypointAnalysis(context.PointAnalysis.Commands, context.PointAnalysis.ResultSinks.KeypointAnalysis);
             },
             context.PointAnalysis.ResultSinks.KeypointAnalysis, "Detect keypoints",
-            "Controls were rejected by keypoint config validation.", "Keypoint config was rejected.");
+            "Controls were rejected by keypoint config validation.", "Keypoint config was rejected.",
+            [](const auto& c) { return std::pair{c.StableEntityId, c.Mask.Name}; });
         ImGui::EndDisabled();
-        DrawOutputOperationProgress(Keypoints.Progress, context.PointAnalysis.Commands, config.StableEntityId, config.Mask.Name,
-                                    "keypoints_progress");
+        Keypoints.Run.Draw(context.PointAnalysis.Commands, config.StableEntityId, "keypoints_progress");
         ImGui::TextWrapped("Detection writes a mask (1 = retained keypoint) and a score. Geometry stays in source order.");
         if(Keypoints.LastResult && Keypoints.LastResult->Status==Runtime::EditorCommandStatus::Pending)
             ImGui::TextWrapped("Detection is active. Vulkan previews the completed score; Accept publishes both CPU properties.");
@@ -2399,9 +2430,9 @@ namespace Extrinsic::Sandbox::Editor
             [&](const auto& request) { return Runtime::ApplyEditorDescriptorAnalysisConfig(context.PointAnalysis.Commands, request); },
             [&] { return Runtime::ApplyEditorConfiguredDescriptorAnalysis(context.PointAnalysis.Commands, context.PointAnalysis.ResultSinks.DescriptorAnalysis); },
             context.PointAnalysis.ResultSinks.DescriptorAnalysis, "Compute FPFH descriptors",
-            "Controls were rejected by descriptor config validation.", "Descriptor config was rejected.");
-        DrawOutputOperationProgress(Descriptors.Progress, context.PointAnalysis.Commands, config.StableEntityId,
-                                    config.Outputs[0].Name, "descriptors_progress");
+            "Controls were rejected by descriptor config validation.", "Descriptor config was rejected.",
+            [](const auto& c) { return std::pair{c.StableEntityId, c.Outputs[0].Name}; });
+        Descriptors.Run.Draw(context.PointAnalysis.Commands, config.StableEntityId, "descriptors_progress");
         ImGui::TextWrapped("Writes 33 named float histogram properties in one undoable operation. Each nonempty eleven-bin block sums to 100.");
         const bool displayBinChanged =
             ImGui::SliderInt("Display histogram bin", &Descriptors.DisplayBin, 0, 32,
@@ -2474,10 +2505,10 @@ namespace Extrinsic::Sandbox::Editor
                     DensityTransaction=Runtime::StartEditorKernelDensityTransaction(context.PointFields.Commands,config,result);return result;}
                 return Runtime::ApplyEditorConfiguredKernelDensity(context.PointFields.Commands,context.PointFields.ResultSinks.KernelDensity); },
             context.PointFields.ResultSinks.KernelDensity, "Estimate density",
-            "Controls were rejected by density config validation.", "Density config was rejected.");
+            "Controls were rejected by density config validation.", "Density config was rejected.",
+            [](const auto& c) { return std::pair{c.StableEntityId, c.Density.Name}; });
         ImGui::EndDisabled();
-        DrawOutputOperationProgress(Density.Progress, context.PointFields.Commands, config.StableEntityId, config.Density.Name,
-                                    "density_progress");
+        Density.Run.Draw(context.PointFields.Commands, config.StableEntityId, "density_progress");
         ImGui::TextWrapped("Vulkan previews density on the device. Accept publishes the scalar with Undo; Discard retains CPU rows.");
         if (ImGui::Button("Show density"))
             Density.VisualizationDiagnostic = Runtime::DebugNameForEditorCommandStatus(
@@ -2547,10 +2578,10 @@ namespace Extrinsic::Sandbox::Editor
                     WeightTransaction=Runtime::StartEditorDensityWeightTransaction(context.PointAnalysis.Commands,config,result);return result;}
                 return Runtime::ApplyEditorConfiguredDensityWeight(context.PointAnalysis.Commands,context.PointAnalysis.ResultSinks.DensityWeight); },
             context.PointAnalysis.ResultSinks.DensityWeight, "Compute compact weights",
-            "Controls were rejected by density config validation.", "Density config was rejected.");
+            "Controls were rejected by density config validation.", "Density config was rejected.",
+            [](const auto& c) { return std::pair{c.StableEntityId, c.Weights.Name}; });
         ImGui::EndDisabled();
-        DrawOutputOperationProgress(DensityWeights.Progress, context.PointAnalysis.Commands, config.StableEntityId,
-                                    config.Weights.Name, "density_weights_progress");
+        DensityWeights.Run.Draw(context.PointAnalysis.Commands, config.StableEntityId, "density_weights_progress");
         ImGui::TextWrapped("Vulkan previews compact weights using double kernel sums. Accept publishes with Undo; Discard retains CPU rows.");
         auto density=config.Weights;
         if(ImGui::Button("Show weights"))
@@ -2674,12 +2705,15 @@ namespace Extrinsic::Sandbox::Editor
         if (!action.Enabled)
             ImGui::TextWrapped("%s", action.DisabledReason.c_str());
         if (DrawProcessingActionButton("Construct", action))
+        {
+            Construction.Run.WatchOutput(readiness.Resolved.StableEntityId,
+                                         std::string("construct:") + std::string(Runtime::ToString(readiness.Resolved.Method)));
             ApplyProcessingExecution(Construction, readiness.Resolved,
                 [&](const auto& value) { return Runtime::ApplyEditorPointConstructionConfig(context.PointConstruction.Commands, value); },
                 [&] { return Runtime::ApplyEditorConfiguredPointConstruction(context.PointConstruction.Commands, context.PointConstruction.ResultSinks.PointConstruction); },
                 context.PointConstruction.ResultSinks.PointConstruction, "Construction config was rejected.");
-        DrawOutputOperationProgress(Construction.Progress, context.PointConstruction.Commands, config.StableEntityId,
-                                    std::string("construct:") + std::string(Runtime::ToString(config.Method)), "construction_progress");
+        }
+        Construction.Run.Draw(context.PointConstruction.Commands, config.StableEntityId, "construction_progress");
         if (Construction.LastResult)
         {
             const auto& result = *Construction.LastResult;
@@ -2807,9 +2841,9 @@ namespace Extrinsic::Sandbox::Editor
             [&](const auto& request) { return Runtime::ApplyEditorBilateralFilterConfig(context.PointSet.Commands, request); },
             [&] { return Runtime::ApplyEditorConfiguredBilateralFilter(context.PointSet.Commands, context.PointSet.ResultSinks.BilateralFilter); },
             context.PointSet.ResultSinks.BilateralFilter, "Filter positions",
-            "Controls were rejected by filter config validation.", "Bilateral config was rejected.");
-        DrawOutputOperationProgress(Bilateral.Progress, context.PointSet.Commands, config.StableEntityId, config.Output.Name,
-                                    "bilateral_progress");
+            "Controls were rejected by filter config validation.", "Bilateral config was rejected.",
+            [](const auto& c) { return std::pair{c.StableEntityId, c.Output.Name}; });
+        Bilateral.Run.Draw(context.PointSet.Commands, config.StableEntityId, "bilateral_progress");
         ImGui::TextWrapped("Vulkan computes neighbors; weights and position updates run on CPU. Only the final result is published. Choose the input position property as output to update the displayed geometry; Undo restores it.");
         if(Bilateral.LastResult)
         {
@@ -2917,6 +2951,7 @@ namespace Extrinsic::Sandbox::Editor
             Registration.Progress = Runtime::MakeEditorRegistrationProgress();
             Registration.RunMaxIterations = static_cast<std::uint32_t>(config.MaxIterations); // the run's cap, not the editable draft
             Registration.RunStarted = std::chrono::steady_clock::now();
+            Registration.Run.WatchOutput(config.SourceStableEntityId, "registration_transform");
             ApplyProcessingExecution(Registration, config,
                 [&](const auto& value) { return Runtime::ApplyEditorRegistrationConfig(context.Registration.Commands, value); },
                 [&] {
@@ -2984,14 +3019,17 @@ namespace Extrinsic::Sandbox::Editor
     {
         auto& state = Registration;
         if (!state.Progress) return;
+        // The run is the panel's own (not a job of the session), so the slot draws the bar the panel builds.
+        Runtime::EditorOperationProgress bar{};
+        if (live.Running)
+            bar = MakeIterationProgress(live.Trace.size(), maxIterations,
+                std::chrono::duration<double>(std::chrono::steady_clock::now() - state.RunStarted).count(),
+                "ICP iteration " + std::to_string(live.Trace.size()));
+        state.Run.DrawLive(bar, OperationRunSlot::kAnyEntity,
+                           [&] { Runtime::CancelEditorRegistration(state.Progress); }, "icp_progress");
         if (live.Running)
         {
             const auto* last = live.Trace.empty() ? nullptr : &live.Trace.back();
-            DrawOperationProgress(
-                MakeIterationProgress(live.Trace.size(), maxIterations,
-                                      std::chrono::duration<double>(std::chrono::steady_clock::now() - state.RunStarted).count(),
-                                      "ICP iteration " + std::to_string(live.Trace.size())),
-                [&] { Runtime::CancelEditorRegistration(state.Progress); }, "icp_progress");
             ImGui::TextDisabled("RMSE %.6g   inliers %llu", last ? last->RMSE : 0.0,
                                 static_cast<unsigned long long>(last ? last->InlierCount : 0u));
         }
@@ -3220,6 +3258,7 @@ namespace Extrinsic::Sandbox::Editor
                 Runtime::EditorCoherentPointDriftResult failure;
                 state.Run = Runtime::StartEditorCoherentPointDrift(commands, config, failure);
                 state.RunMaxIterations = config.MaxIterations; // the run's cap, not the editable draft
+                state.ProgressSlot.WatchOutput(config.SourceStableEntityId, "coherent_point_drift");
                 state.RunMessage = state.Run ? std::string{} : failure.Message;
             }
             if (!readiness.Enabled && !readiness.DisabledReason.empty()) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
@@ -3279,16 +3318,17 @@ namespace Extrinsic::Sandbox::Editor
             const auto& r = snapshot.Result;
             ImGui::Text("Phase: %s   backend: %s", Runtime::ToString(snapshot.Phase), r.Backend.c_str());
             // UI-067: what a running step is doing right now, and for how long.
+            Runtime::EditorOperationProgress iteration{};
             if (snapshot.Phase == Phase::Running)
             {
                 const double elapsed = snapshot.RunStarted == std::chrono::steady_clock::time_point{} ? 0.0
                     : std::chrono::duration<double>(std::chrono::steady_clock::now() - snapshot.RunStarted).count();
-                DrawOperationProgress(
-                    MakeIterationProgress(snapshot.Trace.size(), state.RunMaxIterations, elapsed,
-                                          "iteration " + std::to_string(snapshot.Trace.size() + 1u) +
-                                              (snapshot.Stage.empty() ? std::string{} : ": " + snapshot.Stage)),
-                    [&] { Runtime::CancelEditorCoherentPointDrift(state.Run); }, "cpd_progress");
+                iteration = MakeIterationProgress(snapshot.Trace.size(), state.RunMaxIterations, elapsed,
+                                                  "iteration " + std::to_string(snapshot.Trace.size() + 1u) +
+                                                      (snapshot.Stage.empty() ? std::string{} : ": " + snapshot.Stage));
             }
+            state.ProgressSlot.DrawLive(iteration, OperationRunSlot::kAnyEntity,
+                                        [&] { Runtime::CancelEditorCoherentPointDrift(state.Run); }, "cpd_progress");
             ImGui::Text("Points: %zu -> %zu   iterations: %u   stop: %s", r.SourcePointCount, r.TargetPointCount, r.Iterations,
                         r.Termination.c_str());
             ImGui::Text("sigma^2: %.4g   matched: %.1f   mean move: %.4g", r.Sigma2, r.MatchedWeight, r.MeanDisplacement);
@@ -3453,6 +3493,7 @@ namespace Extrinsic::Sandbox::Editor
         if (ImGui::Button("Discard##Normals"))
         {
             Runtime::DiscardEditorNormalEstimation(commands, NormalTransaction);
+            Normals.Run.Forget(); // a discarded result never reads as a finished run
             Normals.LastResult = Runtime::SnapshotEditorNormalEstimation(commands, NormalTransaction).Result;
         }
         ImGui::EndDisabled();
@@ -3613,12 +3654,14 @@ namespace Extrinsic::Sandbox::Editor
         // A pending GPU result blocks the next run until it is accepted or discarded.
         using Phase = Runtime::EditorGpuTransactionPhase;
         const auto transaction = Runtime::SnapshotEditorPropertySmoothing(context.MeshFields.Commands, SmoothingTransaction);
+        const bool hadTransaction = static_cast<bool>(SmoothingTransaction); // before a terminal phase retires it below
         const bool transactionPending = SmoothingTransaction && (transaction.Phase == Phase::Running ||
             transaction.Phase == Phase::ReadyToAccept || transaction.Phase == Phase::Accepting);
         if (transactionPending && readiness.Enabled)
             readiness = {.Enabled = false, .DisabledReason = "Accept or discard the pending GPU result first."};
         if (DrawProcessingActionButton("Smooth property", readiness))
         {
+            Smoothing.Run.WatchOutput(model.SelectedStableId, config.Output.Name);
             if (config.Backend == Runtime::PropertySmoothingBackend::Vulkan)
             {
                 // Interactive Vulkan runs preview on the device and publish on Accept.
@@ -3641,19 +3684,14 @@ namespace Extrinsic::Sandbox::Editor
         }
         if (!readiness.Enabled && !readiness.DisabledReason.empty()) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
         if (SmoothingTransaction) DrawSmoothingTransaction(context);
-        // Also outlives the transaction: the last outcome of its output stays until its next run.
-        // Keyed by the run's own entity and output, and shown only while that entity is selected.
-        if (SmoothingTransaction)
-        {
-            SmoothingProgressEntity = transaction.StableEntityId;
-            SmoothingProgressKey = std::to_string(transaction.StableEntityId) + "/" + transaction.OutputName;
-        }
-        if (!SmoothingProgressKey.empty())
-        {
-            const auto& remembered = SmoothingProgress.Observe(transaction.Progress, SmoothingProgressKey);
-            if (SmoothingProgressEntity == model.SelectedStableId)
-                DrawOperationProgress(remembered, {}, "smoothing_progress");
-        }
+        // The GPU transaction reports its own jobs; a CPU run is found by its output. Either way the
+        // finished run stays until the next one.
+        // A transaction not started here (or after a reload) names its own run.
+        if (transactionPending && !Smoothing.Run.Watching())
+            Smoothing.Run.WatchOutput(transaction.StableEntityId, transaction.OutputName);
+        Smoothing.Run.AwaitingAccept(hadTransaction && transaction.Phase == Phase::ReadyToAccept);
+        Smoothing.Run.DrawLive(hadTransaction ? transaction.Progress : Smoothing.Run.Query(context.MeshFields.Commands),
+                               model.SelectedStableId, {}, "smoothing_progress");
         DrawProcessingPropertyShowButton(context, model.SelectedStableId, config.Output, Smoothing.VisualizationDiagnostic);
         ImGui::TextDisabled(fit ? "CPU reference; penalties use the Euclidean norm over vector channels, bounds apply per channel."
                                 : "Vectors are filtered componentwise without normalization.");
@@ -3698,10 +3736,7 @@ namespace Extrinsic::Sandbox::Editor
         if (ImGui::Button("Discard##Smoothing"))
         {
             Runtime::DiscardEditorPropertySmoothing(commands, SmoothingTransaction);
-            // A discarded result is not a finished run: nothing may read "done" afterwards.
-            SmoothingProgress.Forget(SmoothingProgressKey);
-            SmoothingProgressKey.clear(); // also stops this frame's pre-discard snapshot from re-adding it
-            SmoothingProgressEntity = 0u;
+            Smoothing.Run.Forget(); // a discarded result is not a finished run
             Smoothing.LastResult = Runtime::SnapshotEditorPropertySmoothing(commands, SmoothingTransaction).Result;
         }
         ImGui::EndDisabled();
@@ -4414,11 +4449,12 @@ namespace Extrinsic::Sandbox::Editor
             commands, Runtime::PreviewEditorPointSamplingCommand(commands, config));
         if (DrawProcessingActionButton("Sample##Sampling", readiness))
         {
+            state.Run.WatchOutput(config.SourceStableEntityId, config.RankName);
             auto slot = state.LastResult;
             *slot = Runtime::ApplyEditorPointSamplingCommand(commands, config,
                 [slot](Runtime::EditorPointSamplingResult result) { *slot = std::move(result); });
         }
-        DrawOutputOperationProgress(state.Progress, commands, config.SourceStableEntityId, config.RankName, "sampling_progress");
+        state.Run.Draw(commands, config.SourceStableEntityId, "sampling_progress");
         if (!readiness.Enabled && !readiness.DisabledReason.empty()) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
         if (*state.LastResult)
         {
