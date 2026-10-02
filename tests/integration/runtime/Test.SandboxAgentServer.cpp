@@ -1215,7 +1215,7 @@ TEST(SandboxAgentServer, SetVisibilityAndSetCameraUseTheEditorCommands)
         rig.Check(!isError && focus["status"] == "Applied", "set_camera focus: " + focus.dump());
         rig.Check(undoCount() == historyBefore, "camera changes are not undoable");
         const auto noSelection = c.Tool("set_camera", {{"focus", true}, {"entities", Json::array()}}, &isError);
-        rig.Check(isError || noSelection["status"] == "Applied", "focus with an empty list uses the selection: " + noSelection.dump());
+        rig.Check(!isError && noSelection["status"] == "Applied", "focus with an empty list frames the current selection (the import selected the mesh): " + noSelection.dump());
         // Refusals: nothing moves.
         const auto where = c.Tool("set_camera", {{"pose", {{"position", {0.0, 0.0, 5.0}}, {"target", {0.0, 0.0, 0.0}}}}}, &isError);
         for (const Json& bad : {Json{{"pose", {{"position", {1.0, 1.0, 1.0}}, {"target", {1.0, 1.0, 1.0}}}}},
@@ -1235,6 +1235,10 @@ TEST(SandboxAgentServer, SetVisibilityAndSetCameraUseTheEditorCommands)
         }
         const auto after = c.Tool("set_camera", {{"pose", {{"position", {0.0, 0.0, 5.0}}, {"target", {0.0, 0.0, 0.0}}}}}, &isError);
         rig.Check(!isError && after["previous"]["position"] == where["current"]["position"], "refused calls left the camera where it was: " + after.dump());
+        // A fly camera has no roll: a rolled up vector is accepted but reported as ignored.
+        c.Tool("set_camera", {{"controller", "fly"}}, &isError);
+        const auto rolled = c.Tool("set_camera", {{"pose", {{"position", {0.0, 0.0, 5.0}}, {"target", {0.0, 0.0, 0.0}}, {"up", {1.0, 0.0, 0.0}}}}}, &isError);
+        rig.Check(!isError && rolled["status"] == "Applied" && rolled["up_ignored"] == true, "fly reports up_ignored for a rolled up vector: " + rolled.dump());
         // A controller that cannot look that way refuses and keeps its pose.
         c.Tool("set_camera", {{"controller", "top_down"}}, &isError);
         const auto sideways = c.Tool("set_camera", {{"pose", {{"position", {0.0, 0.0, 5.0}}, {"target", {0.0, 0.0, 0.0}}}}}, &isError);

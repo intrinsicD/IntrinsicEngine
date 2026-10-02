@@ -31,7 +31,7 @@ or a fit-to-entity focus through one editor command.
 
 ## Decisions (2026-10-02)
 - The registry premise was stale: `EditorSceneEditingContext::CameraControllers` already carries it.
-- Preset axes and the seed recipe moved into `Runtime.CameraFocusCommand`; view capture calls them.
+- Preset axes and the seed recipe moved into `Runtime.CameraControllers` (not `Runtime.CameraFocusCommand`): `Runtime.SceneEditingOperations` must stay scene-free, which the `EditorCompilationLocality.SceneRegistryBorrows` guard enforces; view capture calls them.
 - Camera pose, preset and focus changes are view state and do not enter the undo history, like `ApplyEditorCameraControllerCommand`.
 - Orbit parameters (yaw/pitch/radius) are descoped as a separate input: `Position = Target - direction * radius` with `Target`, `Up` expresses every orbit pose, and the yaw/pitch convention is controller-private. `Pose` mode keeps `Target` as the orbit pivot.
 - Per controller kind: orbit exact (radius clamped and reported), free-look exact (roll from `Up`), fly applies position and direction with `Up` as a hint, top-down only looks along -Y. Unreachable directions return `UnsupportedCameraPose` without touching the camera.

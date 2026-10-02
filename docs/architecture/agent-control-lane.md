@@ -126,7 +126,7 @@ Nothing exists without the launch flag: no module, thread or socket.
   configuration, which is not in the history). Mutating tools that edit the scene or its
   properties (`import_file`, `show_property`, `run_*`) are undoable, `undo`/`redo` operate on
   the history itself, and `select_entity` and `set_camera` change editor state (selection, the camera
-  controller), not scene data, so they are deliberately not destructive. `jobs_cancel` is not
+  controller and pose), not scene data, so they are deliberately not destructive. `jobs_cancel` is not
   destructive either: a cancelled job publishes nothing, so the scene, files and history stay as
   they were (the lost computation can be run again). New tools classify themselves with this rule.
 - `view_capture` refuses an existing `path` unless `overwrite: true` (error code `file_exists`;
