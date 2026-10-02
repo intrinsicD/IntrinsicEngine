@@ -7,7 +7,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 
 
-- [BUG-231 — ICP progress-widget cancel test hangs under CPU load](BUG-231-icp-panel-cancel-test-hangs-under-load.md): reproduced on base `be165a294`, 1 in 30 runs with every core busy.
 
 - [BUG-178 — Clang 23 crashes during an incremental module rebuild](BUG-178-clang23-incremental-module-ice.md).
 

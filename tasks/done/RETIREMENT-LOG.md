@@ -8,6 +8,17 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-02 — BUG-231 main-thread frame waits ran long editor jobs inline
+
+Retired [BUG-231](BUG-231-icp-panel-cancel-test-hangs-under-load.md).
+
+- Cause: a starved worker let `TaskGraphCompletion::Wait` on the main thread pop a queued 100000-iteration ICP job and run it inside the frame. The UI froze and cancel could not run.
+- Fix: JobService jobs now use a worker-only `Background` scheduler lane, and the RenderGraph record join help-runs its own passes instead of spinning.
+- Rule: a Background task must not block in a helped wait on another Background task.
+- Maturity: Operational. Regression tests in core, runtime and framegraph; the ICP panel test held under oversubscription; GPU acceptance smokes passed under Xephyr.
+
+Commits `37757dacd`, `959fd9396`, `25a381ec3`.
+
 ## 2026-10-02 — RUNTIME-279 editor job snapshot and cancel
 
 Retired [RUNTIME-279](RUNTIME-279-editor-job-snapshot-and-cancel.md).

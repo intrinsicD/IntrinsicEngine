@@ -68,8 +68,21 @@ instead of raising its timeout.
   `...ImportedModelSceneIsVisibleAndClickPickable` passed (`[ OK ]`) in `build/ci-vulkan` under Xephyr `:7`.
 
 ## Acceptance criteria
-- [ ] A stack (or a deterministic repro) shows where the hung frame spins.
-- [ ] The cause is fixed; the test passes 100 runs under the same oversubscription.
+- [x] A stack (or a deterministic repro) shows where the hung frame spins.
+- [x] The cause is fixed; the test passes 100 runs under the same oversubscription.
+
+## Completion
+
+Commit: `37757dacd` (diagnosis), `959fd9396` (fix), `25a381ec3` (review fixes). Completed 2026-10-02 and reviewed by an independent Opus pass.
+- JobService jobs run on a worker-only `Background` scheduler lane. Main-thread frame-graph and record waits help only non-Background work, and the RenderGraph record join help-runs its own passes instead of spinning.
+- Evidence:
+  - `CoreTaskGraphCompletionLifetime.ExternalHelpNeverRunsWorkerOnlyBackgroundTasks`
+  - `CoreTaskGraphCompletionLifetime.WaitDoesNotInlineBackgroundWorkWhileItsPassRunsOnTheWorker`
+  - `RuntimeJobService.FrameGraphWaitNeverRunsAQueuedJobOnTheWaitingThread`
+  - `RenderGraphParallelRecording.RecordJoinRunsItsPassesWhileWorkersRunBackgroundJobs`
+  - The ICP panel test passed 60/60 and 3×100 under 16 CPU hogs, on `959fd9396`. The later record-join change does not touch the job path.
+  - Three `RuntimeSandboxAcceptanceGpuSmoke` tests passed under Xephyr.
+- Maturity: Operational for the frame-loop path.
 
 ## Verification
 ```bash
