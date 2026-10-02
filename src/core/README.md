@@ -228,10 +228,24 @@ impose graph or runtime domain policy.
 External help (`TryRunOne()` and the help loop in `WaitForAll()`) never pops
 the worker-only `Background` lane, whether the caller is a worker or not. A
 waiting frame thread therefore cannot inline a long job and stall until it
-ends (`BUG-231`). This stays deadlock-free because only workers' own loops run
-`Background` tasks, `Initialize()` always starts at least one worker, and no
-helped wait may depend on a `Background` task: a waiter that skips one only
-parks on the work-progress epoch, which that task's retirement advances.
+ends (`BUG-231`). Only workers' own loops run `Background` tasks, and
+`Initialize()` always starts at least one worker.
+
+The deadlock hazard is narrow: a `Background` task that blocks in a helped
+wait on another `Background` task while every worker does the same. Nothing
+can then run the awaited tasks, because helpers skip the lane and every worker
+is blocked. Helped waits from non-`Background` code (frame-graph waits, the
+render-graph record join, `WaitForAll()` on the main thread) are safe: a waiter
+that finds only `Background` work parks on the work-progress epoch, and the
+workers drain that lane and advance the epoch as each task retires.
+`Background` tasks must therefore not wait on other `Background` tasks.
+
+Trade-off: the pool has `hardware_concurrency() - 1` workers (all hardware
+threads on machines with two or fewer, and at least one). With few workers a
+long `Background` job now delays short `Background` jobs queued behind it,
+because the main thread no longer runs them while it waits. Frame work is
+unaffected: render-graph passes and other ordinary lanes stay helpable, so a
+waiting frame thread records its own passes when every worker is busy.
 
 Task coroutine handles published to the scheduler are single-use resumption
 tokens. `Scheduler::Reschedule()` resumes a handle but must not inspect

@@ -336,3 +336,83 @@ TEST(RenderGraphParallelRecording, RecordFailureJoinsWorkersAndSkipsSubmit)
     EXPECT_TRUE(stats.UsedScheduler);
     EXPECT_EQ(stats.WorkerTaskCount, compiled.TopologicalOrder.size());
 }
+
+// BUG-231 follow-up: when every worker is inside a long worker-only Background
+// job (a runtime JobService job), the record join must record its own passes on
+// the calling thread instead of spinning until a worker frees up. The watchdog
+// ends the spinners after 2 s so the pre-fix spin surfaces as a failure, not a hang.
+TEST(RenderGraphParallelRecording, RecordJoinRunsItsPassesWhileWorkersRunBackgroundJobs)
+{
+    SchedulerScope scheduler{2u};
+    const auto workerCount = static_cast<int>(Tasks::Scheduler::GetStats().WorkerLocalDepths.size());
+    ASSERT_GT(workerCount, 0);
+
+    std::atomic<bool> releaseSpinners{false};
+    std::atomic<bool> watchdogFired{false};
+    std::atomic<int> spinnersStarted{0};
+    std::atomic<int> spinnersFinished{0};
+    for (int i = 0; i < workerCount; ++i)
+    {
+        Tasks::Scheduler::Dispatch(Tasks::DispatchPriority::Background, [&]() {
+            spinnersStarted.fetch_add(1, std::memory_order_acq_rel);
+            while (!releaseSpinners.load(std::memory_order_acquire))
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+            spinnersFinished.fetch_add(1, std::memory_order_acq_rel);
+        });
+    }
+    const auto startDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    while (spinnersStarted.load(std::memory_order_acquire) < workerCount &&
+           std::chrono::steady_clock::now() < startDeadline)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    std::thread watchdog([&]() {
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (!releaseSpinners.load(std::memory_order_acquire) && std::chrono::steady_clock::now() < deadline)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        if (!releaseSpinners.exchange(true, std::memory_order_acq_rel))
+        {
+            watchdogFired.store(true, std::memory_order_release);
+        }
+    });
+
+    const CompiledRenderGraph compiled = CompileIndependentSideEffects(4u);
+    const std::thread::id callerThread = std::this_thread::get_id();
+    std::atomic<int> callerRecords{0};
+    std::atomic<int> recordCount{0};
+    ParallelRecordStats stats{};
+    RenderGraphExecutor executor;
+    const auto result = executor.ExecuteParallelRecordJoin(
+        compiled,
+        [&](const std::uint32_t, const std::uint32_t) {
+            if (std::this_thread::get_id() == callerThread)
+            {
+                callerRecords.fetch_add(1, std::memory_order_acq_rel);
+            }
+            recordCount.fetch_add(1, std::memory_order_acq_rel);
+            return Extrinsic::Core::Ok();
+        },
+        {},
+        {},
+        &stats,
+        ParallelRecordOptions{.UseScheduler = true, .MinWorkerPassCount = 2u});
+
+    releaseSpinners.store(true, std::memory_order_release);
+    watchdog.join();
+    while (spinnersFinished.load(std::memory_order_acquire) < workerCount)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    ASSERT_EQ(spinnersStarted.load(std::memory_order_acquire), workerCount);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_TRUE(stats.UsedScheduler);
+    EXPECT_FALSE(watchdogFired.load(std::memory_order_acquire));
+    EXPECT_EQ(recordCount.load(std::memory_order_acquire), static_cast<int>(compiled.TopologicalOrder.size()));
+    EXPECT_EQ(callerRecords.load(std::memory_order_acquire), static_cast<int>(compiled.TopologicalOrder.size()));
+}

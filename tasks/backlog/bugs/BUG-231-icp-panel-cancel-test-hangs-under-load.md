@@ -53,6 +53,19 @@ instead of raising its timeout.
   `CoreTaskGraphCompletionLifetime.WaitDoesNotInlineBackgroundWorkWhileItsPassRunsOnTheWorker`, and
   `RuntimeJobService.FrameGraphWaitNeverRunsAQueuedJobOnTheWaitingThread` (each fails on the pre-fix code).
   Rule documented in `docs/architecture/task-graphs.md` and `src/core/README.md`.
+- Soak evidence for the fix (2026-10-02, 16 CPU hogs): the ICP cancel test passed 60/60 under
+  `ctest --repeat`, and 3 parallel lanes of 100 runs each finished without a hang.
+- Review follow-ups 2026-10-02: the render-graph parallel record join no longer spins with `yield()`
+  while every worker is inside a long `Background` job; it help-runs its own record tasks
+  (`TryRunOne`, then `WaitForWorkProgress`). Regression:
+  `RenderGraphParallelRecording.RecordJoinRunsItsPassesWhileWorkersRunBackgroundJobs` (fails on the
+  spinning join: the watchdog releases the workers after 2 s and they record the passes). The rule is
+  restated as "a `Background` task must not wait on another `Background` task"; helped waits from
+  other code are safe. With few workers a long job now delays short jobs queued behind it; recorded in
+  the same docs. Vulkan evidence for the production record join (fan-out enabled in
+  `Graphics.Renderer.cpp`): `RuntimeSandboxAcceptanceGpuSmoke.AcceptanceSceneReachesOperationalDefaultRecipePresent`,
+  `...ExtrinsicSandboxDefaultConfigPresentsReferenceTriangleAtFrameCenter` and
+  `...ImportedModelSceneIsVisibleAndClickPickable` passed (`[ OK ]`) in `build/ci-vulkan` under Xephyr `:7`.
 
 ## Acceptance criteria
 - [ ] A stack (or a deterministic repro) shows where the hung frame spins.

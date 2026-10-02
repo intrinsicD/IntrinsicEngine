@@ -46,11 +46,22 @@ never executes it. Long work that nothing waits on synchronously—every runtime
 `JobService` job—uses it, so a frame-graph `Wait()` on the main thread cannot
 pop a queued job and run it inside the frame (`BUG-231`). Graph passes never
 use it, so a waiter can always help-run its own graph's ready passes and any
-ordinary task they spawned. Waits stay deadlock-free: `Initialize()` starts at
-least one worker, workers' own loops drain `Background`, and a helper that
-finds only `Background` work parks on the work-progress epoch, which that
-work's retirement advances. The rule is that no helped wait may depend on a
-`Background` task.
+ordinary task they spawned; the render-graph record join likewise help-runs
+its own record tasks instead of spinning while every worker is busy.
+
+`Initialize()` starts at least one worker, and workers' own loops drain
+`Background`. The one deadlock hazard is a `Background` task that blocks in a
+helped wait on another `Background` task while every worker does the same:
+helpers skip the lane, so nothing is left to run the awaited work. Helped waits
+from non-`Background` code are safe, because a helper that finds only
+`Background` work parks on the work-progress epoch, which the workers advance
+as they retire that work. The rule is that `Background` tasks never wait on
+other `Background` tasks.
+
+The cost is on machines with few workers (`hardware_concurrency() - 1`, or all
+hardware threads when there are two or fewer, and at least one): a long
+`Background` job delays short jobs queued behind it, since the waiting main
+thread no longer runs them inline. Frame latency is what the lane protects.
 
 Each worker has one local deque per lane. The external inject path retains a
 65,536-task lock-free queue for the common `Normal` lane and uses bounded

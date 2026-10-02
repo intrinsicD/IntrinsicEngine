@@ -328,9 +328,25 @@ namespace Extrinsic::Graphics
                 });
             }
 
+            // Help run the layer instead of spinning: when every worker is busy
+            // with long worker-only Background jobs, the caller records its own
+            // passes (TryRunOne skips Background), and otherwise parks on the
+            // scheduler's work-progress epoch, which each retiring task advances.
             while (!done.IsReady())
             {
-                std::this_thread::yield();
+                const auto progress = Core::Tasks::Scheduler::ObserveWorkProgress();
+                if (done.IsReady())
+                {
+                    break;
+                }
+                if (Core::Tasks::Scheduler::TryRunOne())
+                {
+                    continue;
+                }
+                if (!Core::Tasks::Scheduler::WaitForWorkProgress(progress))
+                {
+                    std::this_thread::yield();
+                }
             }
 
             const std::uint32_t errorCode = firstError.load(std::memory_order_acquire);

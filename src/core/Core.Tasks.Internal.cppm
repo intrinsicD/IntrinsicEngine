@@ -76,9 +76,8 @@ export namespace Extrinsic::Core::Tasks
 
             std::vector<std::thread> workers;
             std::vector<WorkerState> workerStates;
-            // Preserve the common Normal lane's previous capacity while
-            // bounding the two preference lanes at 8K slots each. This is a
-            // 25% aggregate increase, not the historical threefold copy.
+            // Preserve the common Normal lane's 64K capacity while bounding
+            // the High, Low and Background lanes at 8K slots each.
             std::array<InjectLane, PriorityLaneCount> injectLanes{
                 InjectLane{HighPriorityInjectCapacity},
                 InjectLane{NormalPriorityInjectCapacity},
@@ -92,8 +91,8 @@ export namespace Extrinsic::Core::Tasks
             alignas(64) std::atomic<uint64_t> inFlightTasks{0};
             alignas(64) std::atomic<int> activeTaskCount{0};
             alignas(64) std::atomic<int> queuedTaskCount{0};
-            // Advisory counts are maintained for High and Low only. Normal
-            // is always scanned so default dispatch avoids two extra atomic
+            // Advisory counts are maintained for every lane except Normal,
+            // which is always scanned so default dispatch avoids two extra atomic
             // read-modify-writes per task.
             alignas(64) std::array<std::atomic<int>, PriorityLaneCount>
                 queuedTaskCountByLane{};
