@@ -119,6 +119,11 @@ ResolveEditorOperationProgress(const std::vector<EditorJobRecord> &records,
                 SameEditorJobOutput(job.Identity, *identity);
     else if (const auto *correlation = std::get_if<EditorRunCorrelation>(&key))
       matches = correlation->IsValid() && job.CorrelationId == correlation->Value;
+    else if (const auto *output = std::get_if<EditorOutputRef>(&key))
+      matches = output->EntityId != 0u && !output->OutputName.empty() &&
+                job.Identity.Scope != EditorJobScope::Unknown &&
+                job.Identity.EntityId == output->EntityId &&
+                job.Identity.OutputName == output->OutputName;
     else
       matches = job.Token == std::get<JobToken>(key);
     if (!matches)

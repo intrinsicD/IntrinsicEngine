@@ -2995,6 +2995,47 @@ TEST(SandboxEditorSessionLifecycle, OperationProgressSeparatesNewerRunsTokensAnd
     ASSERT_TRUE(harness.DrainUntilTerminal());
 }
 
+// The panel knows its entity and output property name, not the scope or semantic the
+// runtime filed the job under: an output ref finds the newest run writing it.
+TEST(SandboxEditorSessionLifecycle, OperationProgressFindsRunsByEntityAndOutputName)
+{
+    using State = Runtime::EditorOperationState;
+    Extrinsic::Tests::EditorJobHarness harness{2u};
+    ProgressProbeContext context;
+    harness.Attach(context);
+    const auto& commands = context.JobCommands;
+    std::atomic_bool release{false};
+
+    auto normalId = ProbeIdentity("density", 7u);
+    normalId.Scope = Runtime::EditorJobScope::PointCloudPoint;
+    normalId.OutputSemantic = Runtime::GeometryPresentationSlotSemantic::Normal; // any semantic
+    ASSERT_TRUE(commands.Submit(MakeProgressProbeJob("normal run", release, 0.3f), normalId).IsValid());
+    ASSERT_TRUE(commands.Submit(MakeProgressProbeJob("other entity", release, 0.6f), ProbeIdentity("density", 8u)).IsValid());
+    ASSERT_TRUE(WaitFor([&] {
+        return commands.Progress(Runtime::EditorOutputRef{7u, "density"}).Determinate &&
+               commands.Progress(Runtime::EditorOutputRef{8u, "density"}).Determinate;
+    }));
+
+    const auto progress = commands.Progress(Runtime::EditorOutputRef{7u, "density"});
+    EXPECT_EQ(progress.State, State::Running);
+    EXPECT_FLOAT_EQ(progress.Normalized, 0.3f);
+    EXPECT_EQ(progress.Label, "normal run");
+    EXPECT_FLOAT_EQ(commands.Progress(Runtime::EditorOutputRef{8u, "density"}).Normalized, 0.6f);
+    EXPECT_EQ(commands.Progress(Runtime::EditorOutputRef{7u, "other"}).State, State::None);
+    EXPECT_EQ(commands.Progress(Runtime::EditorOutputRef{0u, "density"}).State, State::None);
+    EXPECT_EQ(commands.Progress(Runtime::EditorOutputRef{7u, ""}).State, State::None);
+
+    // A correlation-only service job never answers an output ref.
+    Runtime::JobDesc service = MakeProgressProbeJob("service", release, 0.9f);
+    service.CorrelationId = 3u;
+    ASSERT_TRUE(harness.Jobs().Submit(std::move(service)).IsValid());
+    EXPECT_EQ(commands.Progress(Runtime::EditorOutputRef{0u, ""}).State, State::None);
+
+    release.store(true, std::memory_order_release);
+    ASSERT_TRUE(harness.DrainUntilTerminal());
+    EXPECT_EQ(commands.Progress(Runtime::EditorOutputRef{7u, "density"}).State, State::Succeeded);
+}
+
 TEST(SandboxEditorSessionLifecycle, OperationProgressReportsFailedAndCancelledRuns)
 {
     using State = Runtime::EditorOperationState;

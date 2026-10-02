@@ -105,12 +105,21 @@ export namespace Extrinsic::Runtime
         std::uint64_t Value{0u};
         [[nodiscard]] bool IsValid() const noexcept { return Value != 0u; }
     };
+    // The output a method writes, as the panel knows it from its own config:
+    // the entity and the output property name, whatever scope or semantic the
+    // runtime filed the job under. The newest run writing it answers.
+    struct EditorOutputRef
+    {
+        std::uint32_t EntityId{0u};
+        std::string OutputName{};
+    };
     // Which run a panel is watching. A `JobToken` names exactly one job (the
-    // caller captured it at submit); an `EditorJobIdentity` names an output, so
-    // the newest run of that output answers; a `CommandCorrelationId` names a
+    // caller captured it at submit); an `EditorJobIdentity` names a full output
+    // identity and an `EditorOutputRef` just the entity and output name, so the
+    // newest run of that output answers; an `EditorRunCorrelation` names a
     // service run (K-Means, consolidation) that stamped it on its job(s).
     using EditorOperationRunKey =
-        std::variant<EditorJobIdentity, EditorRunCorrelation, JobToken>;
+        std::variant<EditorJobIdentity, EditorRunCorrelation, JobToken, EditorOutputRef>;
     [[nodiscard]] EditorOperationState ToEditorOperationState(
         JobState state) noexcept;
     [[nodiscard]] EditorOperationProgress ProjectEditorOperationProgress(

@@ -361,6 +361,7 @@ namespace Extrinsic::Sandbox::Editor
 
         struct PointSamplingState
         {
+            OperationProgressMemory Progress{};
             std::optional<std::vector<std::uint32_t>> LastSelected{};
             Runtime::PointSamplingOperationConfig Draft{};
             std::string LastApplied{}, ConfigDiagnostic{};
@@ -2040,6 +2041,8 @@ namespace Extrinsic::Sandbox::Editor
                     [&] { return Runtime::ApplyEditorConfiguredNormalEstimation(context.Normals.Commands, context.Normals.ResultSinks.NormalEstimation); },
                     context.Normals.ResultSinks.NormalEstimation, "Normal config was rejected.");
         }
+        DrawOutputOperationProgress(Normals.Progress, context.Normals.Commands, config.StableEntityId, config.Output.Name,
+                                    "normals_progress");
         const auto outputProperty = config.Output;
         ImGui::SameLine();
         if (config.Method == Runtime::NormalEstimationMethod::MeshFaceNormals)
@@ -2187,6 +2190,8 @@ namespace Extrinsic::Sandbox::Editor
             else execute(analyze);
         }
         ImGui::EndDisabled();
+        DrawOutputOperationProgress(Outliers.Progress, context.PointAnalysis.Commands, config.StableEntityId, config.Mask.Name,
+                                    "outliers_progress");
         if (outlierActive)
         {
             ImGui::TextWrapped("%s", transaction.Result.Message.c_str());
@@ -2304,6 +2309,8 @@ namespace Extrinsic::Sandbox::Editor
             context.PointAnalysis.ResultSinks.KeypointAnalysis, "Detect keypoints",
             "Controls were rejected by keypoint config validation.", "Keypoint config was rejected.");
         ImGui::EndDisabled();
+        DrawOutputOperationProgress(Keypoints.Progress, context.PointAnalysis.Commands, config.StableEntityId, config.Mask.Name,
+                                    "keypoints_progress");
         ImGui::TextWrapped("Detection writes a mask (1 = retained keypoint) and a score. Geometry stays in source order.");
         if(Keypoints.LastResult && Keypoints.LastResult->Status==Runtime::EditorCommandStatus::Pending)
             ImGui::TextWrapped("Detection is active. Vulkan previews the completed score; Accept publishes both CPU properties.");
@@ -2393,6 +2400,8 @@ namespace Extrinsic::Sandbox::Editor
             [&] { return Runtime::ApplyEditorConfiguredDescriptorAnalysis(context.PointAnalysis.Commands, context.PointAnalysis.ResultSinks.DescriptorAnalysis); },
             context.PointAnalysis.ResultSinks.DescriptorAnalysis, "Compute FPFH descriptors",
             "Controls were rejected by descriptor config validation.", "Descriptor config was rejected.");
+        DrawOutputOperationProgress(Descriptors.Progress, context.PointAnalysis.Commands, config.StableEntityId,
+                                    config.Outputs[0].Name, "descriptors_progress");
         ImGui::TextWrapped("Writes 33 named float histogram properties in one undoable operation. Each nonempty eleven-bin block sums to 100.");
         const bool displayBinChanged =
             ImGui::SliderInt("Display histogram bin", &Descriptors.DisplayBin, 0, 32,
@@ -2467,6 +2476,8 @@ namespace Extrinsic::Sandbox::Editor
             context.PointFields.ResultSinks.KernelDensity, "Estimate density",
             "Controls were rejected by density config validation.", "Density config was rejected.");
         ImGui::EndDisabled();
+        DrawOutputOperationProgress(Density.Progress, context.PointFields.Commands, config.StableEntityId, config.Density.Name,
+                                    "density_progress");
         ImGui::TextWrapped("Vulkan previews density on the device. Accept publishes the scalar with Undo; Discard retains CPU rows.");
         if (ImGui::Button("Show density"))
             Density.VisualizationDiagnostic = Runtime::DebugNameForEditorCommandStatus(
@@ -2538,6 +2549,8 @@ namespace Extrinsic::Sandbox::Editor
             context.PointAnalysis.ResultSinks.DensityWeight, "Compute compact weights",
             "Controls were rejected by density config validation.", "Density config was rejected.");
         ImGui::EndDisabled();
+        DrawOutputOperationProgress(DensityWeights.Progress, context.PointAnalysis.Commands, config.StableEntityId,
+                                    config.Weights.Name, "density_weights_progress");
         ImGui::TextWrapped("Vulkan previews compact weights using double kernel sums. Accept publishes with Undo; Discard retains CPU rows.");
         auto density=config.Weights;
         if(ImGui::Button("Show weights"))
@@ -2665,6 +2678,8 @@ namespace Extrinsic::Sandbox::Editor
                 [&](const auto& value) { return Runtime::ApplyEditorPointConstructionConfig(context.PointConstruction.Commands, value); },
                 [&] { return Runtime::ApplyEditorConfiguredPointConstruction(context.PointConstruction.Commands, context.PointConstruction.ResultSinks.PointConstruction); },
                 context.PointConstruction.ResultSinks.PointConstruction, "Construction config was rejected.");
+        DrawOutputOperationProgress(Construction.Progress, context.PointConstruction.Commands, config.StableEntityId,
+                                    std::string("construct:") + std::string(Runtime::ToString(config.Method)), "construction_progress");
         if (Construction.LastResult)
         {
             const auto& result = *Construction.LastResult;
@@ -2793,6 +2808,8 @@ namespace Extrinsic::Sandbox::Editor
             [&] { return Runtime::ApplyEditorConfiguredBilateralFilter(context.PointSet.Commands, context.PointSet.ResultSinks.BilateralFilter); },
             context.PointSet.ResultSinks.BilateralFilter, "Filter positions",
             "Controls were rejected by filter config validation.", "Bilateral config was rejected.");
+        DrawOutputOperationProgress(Bilateral.Progress, context.PointSet.Commands, config.StableEntityId, config.Output.Name,
+                                    "bilateral_progress");
         ImGui::TextWrapped("Vulkan computes neighbors; weights and position updates run on CPU. Only the final result is published. Choose the input position property as output to update the displayed geometry; Undo restores it.");
         if(Bilateral.LastResult)
         {
@@ -4401,6 +4418,7 @@ namespace Extrinsic::Sandbox::Editor
             *slot = Runtime::ApplyEditorPointSamplingCommand(commands, config,
                 [slot](Runtime::EditorPointSamplingResult result) { *slot = std::move(result); });
         }
+        DrawOutputOperationProgress(state.Progress, commands, config.SourceStableEntityId, config.RankName, "sampling_progress");
         if (!readiness.Enabled && !readiness.DisabledReason.empty()) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
         if (*state.LastResult)
         {

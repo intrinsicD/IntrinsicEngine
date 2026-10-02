@@ -1738,6 +1738,22 @@ namespace Extrinsic::Sandbox::Editor
         m_Order.erase(std::remove(m_Order.begin(), m_Order.end(), key), m_Order.end());
     }
 
+    void DrawOutputOperationProgress(
+        OperationProgressMemory& memory,
+        const EditorProcessingCommands& commands,
+        const std::uint32_t stableEntityId,
+        const std::string& outputName,
+        const char* const id)
+    {
+        if (stableEntityId == 0u || outputName.empty())
+            return;
+        DrawOperationProgress(
+            memory.Observe(
+                GetEditorOperationProgress(commands, EditorOutputRef{stableEntityId, outputName}),
+                std::to_string(stableEntityId) + "/" + outputName),
+            {}, id);
+    }
+
     void DrawOperationProgress(
         const EditorOperationProgress& progress,
         const std::function<void()>& onCancel,

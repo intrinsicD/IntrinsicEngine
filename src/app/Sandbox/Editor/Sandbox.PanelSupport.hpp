@@ -136,6 +136,17 @@ namespace Extrinsic::Sandbox::Editor
         Runtime::EditorOperationProgress m_None{};
     };
 
+    // The progress line of a method that writes `outputName` on `stableEntityId`:
+    // the newest run of that output, remembered in `memory` after it finishes.
+    // Every point-family panel is this one call after its action button.
+    void DrawOutputOperationProgress(
+        OperationProgressMemory& memory,
+        const Runtime::EditorProcessingCommands& commands,
+        std::uint32_t stableEntityId,
+        const std::string& outputName,
+        const char* id);
+
+
     void DrawDisabledReasonTooltip(std::string_view disabledReason);
     [[nodiscard]] bool DrawProcessingActionButton(
         const char* label, const Runtime::ActionReadiness& readiness);
@@ -304,6 +315,7 @@ namespace Extrinsic::Sandbox::Editor
         std::optional<Result> LastResult{};
         Config Draft{};
         std::string LastApplied{}, ConfigDiagnostic{}, VisualizationDiagnostic{};
+        OperationProgressMemory Progress{};
 
         bool Synchronize(const Config& active, const std::string& serialized)
         {

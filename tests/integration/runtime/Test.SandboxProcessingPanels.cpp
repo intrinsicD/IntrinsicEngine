@@ -2719,6 +2719,53 @@ TEST(SandboxProcessingPanels, KMeansProgressShowsOnlyForTheEntityItRanOn)
     EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
 }
 
+// A point-family panel finds its run by entity and output name through the shared helper
+// and keeps the finished run visible for that output.
+TEST(SandboxProcessingPanels, KernelDensityPanelShowsItsRunForTheOutputItWrites)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::PointCloudPoint);
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto density = *R::GetKernelDensityConfig(config);
+    density.KNeighbors = 3;
+    density.Bandwidth = 0.5f;
+    density.Density.Name = "progress_density";
+    R::SetKernelDensityConfig(config, density);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.kernel_density", true));
+    auto& properties = scene.Raw().get<GS::Vertices>(entity).Properties;
+    int frame = 0, step = 0, publishedAt = 0;
+    std::string text;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        if (++frame > 400) { ADD_FAILURE() << "density progress test did not finish"; engine.RequestExit(); return; }
+        auto* window = ImGui::FindWindowByName("Kernel Density");
+        if (!window) return;
+        ImGui::SetWindowSize(window, {700, 1000});
+        ImGui::SetWindowPos(window, {0, 0});
+        if (++step == 3) ImGui::ActivateItemByID(window->GetID("Estimate density"));
+        if (!publishedAt && properties.Exists("progress_density"))
+        {
+            publishedAt = frame;
+            ImGui::GetCurrentContext()->LogBuffer.clear();
+            ImGui::LogToBuffer();
+            ImGui::GetCurrentContext()->LogWindow = nullptr;
+        }
+        if (publishedAt && frame == publishedAt + 5)
+        {
+            text = ImGui::GetCurrentContext()->LogBuffer.c_str();
+            ImGui::LogFinish();
+            engine.RequestExit();
+        }
+    };
+    h.Engine->Run();
+    if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogFinish();
+    EXPECT_GT(publishedAt, 0);
+    EXPECT_NE(text.find("done"), std::string::npos) << text;
+}
+
 TEST(SandboxProcessingPanels, ConsolidationNormalsRequireExplicitSelectionAndSurvivePositionChanges)
 {
     for (const std::string normalName : {"v:normal", "directions"})
