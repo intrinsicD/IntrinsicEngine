@@ -1288,6 +1288,10 @@ TEST(SandboxEditorUi, SelectedModelCachePartitionsAnalysisByVisibleWindow)
     EXPECT_EQ(meshStats.SelectedAnalysisCacheHits, 0u);
     EXPECT_EQ(meshStats.PropertyCatalogModelBuilds, 1u);
     EXPECT_GT(meshStats.SelectedAnalysisModelBuildTimeNs, 0u);
+    // The inspector already built this entity's attribute binding model; the
+    // domain lanes share it instead of rebuilding it per consumer.
+    EXPECT_EQ(meshStats.AttributeBindingModelBuilds, 0u);
+    EXPECT_FALSE(meshModel.PropertyCatalog.AttributeBindings.Rows.empty());
 
     Runtime::EditorWorkspaceSnapshotStats cachedMeshStats{};
     const Runtime::EditorDomainWindowModel cachedMesh =
@@ -1310,6 +1314,9 @@ TEST(SandboxEditorUi, SelectedModelCachePartitionsAnalysisByVisibleWindow)
     EXPECT_EQ(graphStats.SelectedAnalysisCacheMisses, 1u);
     EXPECT_EQ(graphStats.SelectedAnalysisCacheHits, 0u);
     EXPECT_EQ(graphStats.PropertyCatalogModelBuilds, 1u);
+    EXPECT_EQ(graphStats.AttributeBindingModelBuilds, 0u);
+    EXPECT_EQ(graphModel.PropertyCatalog.AttributeBindings.Rows.size(),
+              meshModel.PropertyCatalog.AttributeBindings.Rows.size());
 
     Runtime::EditorWorkspaceSnapshotStats cachedGraphStats{};
     const Runtime::EditorDomainWindowModel cachedGraph =
@@ -1331,6 +1338,7 @@ TEST(SandboxEditorUi, SelectedModelCachePartitionsAnalysisByVisibleWindow)
     EXPECT_EQ(pointStats.SelectedAnalysisCacheMisses, 1u);
     EXPECT_EQ(pointStats.SelectedAnalysisCacheHits, 0u);
     EXPECT_EQ(pointStats.PropertyCatalogModelBuilds, 1u);
+    EXPECT_EQ(pointStats.AttributeBindingModelBuilds, 0u);
 
     Runtime::EditorWorkspaceSnapshotStats cachedPointStats{};
     const Runtime::EditorDomainWindowModel cachedPoint =

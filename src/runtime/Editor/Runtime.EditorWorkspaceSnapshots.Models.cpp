@@ -574,10 +574,14 @@ namespace {
             return model;
         }
 
+        // `sharedAttributeBindings` is the entity's binding model another
+        // consumer already built for the same cache key; it is copied instead
+        // of rebuilt, so the three domain lanes of one entity build it once.
         [[nodiscard]] EditorPropertyCatalogModel BuildPropertyCatalogModel(
             const EditorFeatureBindings& context,
             const entt::registry& raw,
-            const ECS::EntityHandle entity)
+            const ECS::EntityHandle entity,
+            const EditorAttributeBindingModel* sharedAttributeBindings = nullptr)
         {
             ScopedEditorStatTimer timer{
                 context.ModelBuildStats != nullptr
@@ -623,7 +627,11 @@ namespace {
                         BuildPropertyBindingTargetModel(view, slot));
             }
 
-            if (context.Scene != nullptr)
+            if (sharedAttributeBindings != nullptr)
+            {
+                model.AttributeBindings = *sharedAttributeBindings;
+            }
+            else if (context.Scene != nullptr)
             {
                 ScopedEditorStatTimer bindingTimer{
                     context.ModelBuildStats != nullptr
@@ -1737,15 +1745,16 @@ namespace {
             const GS::ConstSourceView& sourceView,
             const EditorRenderHintModel& renderHints,
             const EditorGeometryDomainModel& geometry,
-            const std::uint32_t stableId)
+            const std::uint32_t stableId,
+            const EditorAttributeBindingModel* sharedAttributeBindings = nullptr)
         {
             ScopedEditorStatTimer timer{
                 context.ModelBuildStats != nullptr
                     ? &context.ModelBuildStats->SelectedAnalysisModelBuildTimeNs
                     : nullptr};
             EditorSelectedAnalysisModel model{};
-            model.PropertyCatalog =
-                BuildPropertyCatalogModel(context, raw, entity);
+            model.PropertyCatalog = BuildPropertyCatalogModel(
+                context, raw, entity, sharedAttributeBindings);
             model.GeometryPresentation =
                 BuildGeometryPresentationModel(context, raw, entity);
             model.BoundState =
@@ -1818,6 +1827,22 @@ namespace {
             }
 
             RecordSelectedAnalysisCacheMiss(context);
+            // Another consumer's valid entry for the same key (apart from the
+            // consumer) has the same attribute binding model.
+            const EditorAttributeBindingModel* shared = nullptr;
+            for (const EditorSelectedAnalysisCacheEntry& other :
+                 cache->SelectedAnalysis)
+            {
+                if (&other == entry || !other.Valid)
+                    continue;
+                EditorSelectedModelCacheKey otherKey = other.Key;
+                otherKey.SelectedAnalysisConsumer = consumer;
+                if (otherKey == key)
+                {
+                    shared = &other.Model.PropertyCatalog.AttributeBindings;
+                    break;
+                }
+            }
             EditorSelectedAnalysisModel model =
                 BuildSelectedAnalysisModelUncached(
                     context,
@@ -1826,7 +1851,8 @@ namespace {
                     sourceView,
                     renderHints,
                     geometry,
-                    stableId);
+                    stableId,
+                    shared);
             *entry = EditorSelectedAnalysisCacheEntry{
                 .Valid = true,
                 .Key = key,

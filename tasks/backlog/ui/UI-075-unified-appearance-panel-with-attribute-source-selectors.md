@@ -86,3 +86,13 @@ python3 tools/agents/check_task_policy.py --root . --strict
   (`DrawPropertyBindingTargets`; the "Vertex channels" block went with RUNTIME-315 slice 3);
   the catalog's `BindingTargets` model stays for the inspector. README Appearance prose and the
   agent-control-lane parity note (RUNTIME-316 mirrors the selectors) are updated.
+- 2026-10-02: Review fixes. Row controls moved to full-width lines under the section table (the
+  table cell clipped them); status text wraps; a test at the default 340 px width asserts the
+  window's content size stays within its inner width. Every Color row is covered (mesh V/E/F,
+  graph V/E, cloud V): an interpretation edit lands on the lane named by `OverlayTarget`
+  (graph nodes edit the Edges lane); colormap edits share the same lane model but are not
+  separately driven. The entity's attribute binding model is built once per cache key and
+  shared by the inspector and the three domain lanes. Uniform size/width fields disable
+  without scene commands. Default for size/width restores the component default (6 px / 1 px),
+  not the previous uniform value: binding a name replaces the single `std::variant<float,
+  std::string>` source, so the old float is not kept.

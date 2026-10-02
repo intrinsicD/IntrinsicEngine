@@ -6,6 +6,7 @@ module;
 
 #include <algorithm>
 #include <array>
+#include <cfloat>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -252,8 +253,14 @@ void DrawUniformEdgeWidthField(const EditorDomainWindowModel &model,
   if (!model.RenderHints.HasUniformEdgeWidth)
     return;
   float edgeWidth = model.RenderHints.UniformEdgeWidth;
-  if (ImGui::DragFloat("Edge width", &edgeWidth, 0.05f, 0.01f, 32.0f, "%.3f",
-                       ImGuiSliderFlags_AlwaysClamp)) {
+  ImGui::BeginDisabled(!context.SceneAvailable ||
+                       !model.VisualizationControlsAvailable);
+  ImGui::SetNextItemWidth(-FLT_MIN);
+  const bool changed =
+      ImGui::DragFloat("##Edge width", &edgeWidth, 0.05f, 0.01f, 32.0f,
+                       "%.3f px", ImGuiSliderFlags_AlwaysClamp);
+  ImGui::EndDisabled();
+  if (changed) {
     (void)ApplyEditorRenderHintCommand(
         context.VisualizationCommands, EditorRenderHintCommand{
                      .StableEntityId = model.SelectedStableId,
@@ -302,8 +309,14 @@ void DrawUniformPointSizeField(const EditorDomainWindowModel &model,
   if (!model.RenderHints.HasUniformPointSize)
     return;
   float pointSize = model.RenderHints.UniformPointSize;
-  if (ImGui::DragFloat("Point size", &pointSize, 0.05f, 0.01f, 32.0f, "%.3f",
-                       ImGuiSliderFlags_AlwaysClamp)) {
+  ImGui::BeginDisabled(!context.SceneAvailable ||
+                       !model.VisualizationControlsAvailable);
+  ImGui::SetNextItemWidth(-FLT_MIN);
+  const bool changed =
+      ImGui::DragFloat("##Point size", &pointSize, 0.05f, 0.01f, 32.0f,
+                       "%.3f px", ImGuiSliderFlags_AlwaysClamp);
+  ImGui::EndDisabled();
+  if (changed) {
     (void)ApplyEditorRenderHintCommand(
         context.VisualizationCommands, EditorRenderHintCommand{
                      .StableEntityId = model.SelectedStableId,
@@ -589,6 +602,8 @@ void DrawColorRowControls(const EditorDomainWindowModel &model,
   const bool available = model.VisualizationTargetAvailable &&
                          model.VisualizationControlsAvailable;
   ImGui::BeginDisabled(!available);
+  // Leave room for the right-hand labels so nothing clips at the default width.
+  ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
   if (visualization.HasConfig && static_cast<int>(visualization.Source) >= 3) {
     int interpretation = static_cast<int>(visualization.Interpretation);
     if (DrawColorInterpretationCombo(interpretation)) {
@@ -605,6 +620,7 @@ void DrawColorRowControls(const EditorDomainWindowModel &model,
     DrawScalarVisualizationControls(visualization, context,
                                     model.SelectedStableId,
                                     model.VisualizationTarget, available);
+  ImGui::PopItemWidth();
   ImGui::EndDisabled();
 }
 
@@ -690,23 +706,30 @@ void DrawAppearanceLane(const AppearanceSection &section,
                        DebugNameForEditorCommandStatus(status));
   // A bound size or width is drawn from its source (the row's selector); the
   // uniform field shows only while the row is on Default.
-  const auto rowDetails = [&](const EditorAttributeBindingRow &row) {
+  const auto rowDetails = [&](const EditorAttributeBindingRow &row,
+                              const std::string &label) {
     switch (row.Attribute) {
     case RenderAttribute::Color:
       if (row.Bound && row.OverlayTarget.has_value()) {
         if (const EditorDomainWindowModel *lane =
-                FindLaneForTarget(draw, *row.OverlayTarget))
+                FindLaneForTarget(draw, *row.OverlayTarget)) {
+          ImGui::SeparatorText(label.c_str());
           DrawColorRowControls(
               *lane, context, draw.Statuses[static_cast<std::size_t>(lane->Kind)]);
+        }
       }
       break;
     case RenderAttribute::PointSize:
-      if (!row.Bound)
+      if (!row.Bound && model.RenderHints.HasUniformPointSize) {
+        ImGui::SeparatorText(label.c_str());
         DrawUniformPointSizeField(model, context);
+      }
       break;
     case RenderAttribute::LineWidth:
-      if (!row.Bound)
+      if (!row.Bound && model.RenderHints.HasUniformEdgeWidth) {
+        ImGui::SeparatorText(label.c_str());
         DrawUniformEdgeWidthField(model, context);
+      }
       break;
     default:
       break;

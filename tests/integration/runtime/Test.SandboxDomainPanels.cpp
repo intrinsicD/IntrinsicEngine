@@ -965,13 +965,20 @@ TEST(SandboxDomainPanels, AppearanceOffersALanePerElementDomainTheEntityCarries)
 namespace
 {
     // The table of a section: window / lane kind / section title / "Attributes".
+    [[nodiscard]] ImGuiID AppearanceSectionId(const ImGuiWindow* window,
+                                              const Runtime::EditorDomainWindowKind lane,
+                                              const char* sectionTitle)
+    {
+        const int scope = static_cast<int>(lane);
+        const auto seed = ImHashData(&scope, sizeof(scope), window->ID);
+        return ImHashStr(sectionTitle, 0, seed);
+    }
+
     [[nodiscard]] ImGuiID AppearanceTableId(const ImGuiWindow* window,
                                             const Runtime::EditorDomainWindowKind lane,
                                             const char* sectionTitle)
     {
-        const int scope = static_cast<int>(lane);
-        const auto seed = ImHashData(&scope, sizeof(scope), window->ID);
-        return ImHashStr("Attributes", 0, ImHashStr(sectionTitle, 0, seed));
+        return ImHashStr("Attributes", 0, AppearanceSectionId(window, lane, sectionTitle));
     }
 
     [[nodiscard]] ImGuiID AppearanceRowComboId(const ImGuiID table, const int row)
@@ -1399,9 +1406,11 @@ TEST(SandboxDomainPanels, ColorInterpretationAppearsOnTheBoundColorRowOnly)
         ImGui::SetWindowSize(window, ImVec2{700.0f, 1100.0f});
         if (frame % 3 != 0)
             return;
-        const ImGuiID table = AppearanceTableId(window, Kind::PointCloud, "Vertices");
-        const ImGuiID source = RowItemId(table, colorRow, "##Source");
-        const ImGuiID interpretation = RowItemId(table, colorRow, "Color interpretation");
+        const ImGuiID section = AppearanceSectionId(window, Kind::PointCloud, "Vertices");
+        const ImGuiID source = RowItemId(AppearanceTableId(window, Kind::PointCloud, "Vertices"),
+                                        colorRow, "##Source");
+        // Row details are full-width lines under the table.
+        const ImGuiID interpretation = RowItemId(section, colorRow, "Color interpretation");
         switch (step)
         {
         case 0: ImGui::FocusWindow(window); ImGui::ActivateItemByID(interpretation); break;
@@ -1485,9 +1494,10 @@ TEST(SandboxDomainPanels, UniformPointSizeSitsOnItsRowAndYieldsToABoundSource)
         ImGui::SetWindowSize(window, ImVec2{700.0f, 1100.0f});
         if (frame % 3 != 0)
             return;
-        const ImGuiID table = AppearanceTableId(window, Kind::PointCloud, "Vertices");
-        const ImGuiID field = RowItemId(table, sizeRow, "Point size");
-        const ImGuiID source = RowItemId(table, sizeRow, "##Source");
+        const ImGuiID section = AppearanceSectionId(window, Kind::PointCloud, "Vertices");
+        const ImGuiID field = RowItemId(section, sizeRow, "##Point size");
+        const ImGuiID source = RowItemId(AppearanceTableId(window, Kind::PointCloud, "Vertices"),
+                                         sizeRow, "##Source");
         switch (step)
         {
         case 0: ImGui::FocusWindow(window); ImGui::ActivateItemByID(field); break;
@@ -1511,4 +1521,260 @@ TEST(SandboxDomainPanels, UniformPointSizeSitsOnItsRowAndYieldsToABoundSource)
     panels.Unregister();
     shell.Detach();
     engine.Shutdown();
+}
+
+// UI-049 layout rule: at the window's default width nothing in the sections
+// extends past the content region (a clipped label or field would widen the
+// window's content size). The mesh has a bound Color row (interpretation
+// combo) and a visible points lane with its uniform size field.
+TEST(SandboxDomainPanels, AppearanceContentFitsTheDefaultWindowWidth)
+{
+    namespace GS = Extrinsic::ECS::Components::GeometrySources;
+    namespace G = Extrinsic::Graphics::Components;
+    using Kind = Runtime::EditorDomainWindowKind;
+    auto application = std::make_unique<OneFrameApplication>();
+    auto* driver = application.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(application));
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<Runtime::EditorUiModule>();
+    engine.Initialize();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    auto& raw = scene.Raw();
+    const auto entity = scene.Create();
+    raw.emplace<Extrinsic::ECS::Components::Selection::SelectableTag>(entity);
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    const auto b = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+    const auto c = mesh.AddVertex({0.0f, 1.0f, 0.0f});
+    (void)mesh.AddTriangle(a, b, c);
+    GS::PopulateFromMesh(raw, entity, mesh);
+    (void)raw.get<GS::Vertices>(entity).Properties.GetOrAdd<glm::vec3>("v:tint", glm::vec3{0.5f});
+    raw.emplace<G::RenderPoints>(entity);
+    raw.emplace<G::RenderEdges>(entity);
+    auto* selection = engine.Services().Find<Runtime::SelectionController>();
+    ASSERT_NE(selection, nullptr);
+    ASSERT_TRUE(selection->SetSelectedEntity(scene, entity));
+    const auto bindings = Runtime::BuildEditorAttributeBindingModel(
+        scene, Runtime::SelectionController::ToStableEntityId(entity));
+    const int colorRow = RowIndexOf(bindings, Runtime::RenderAttribute::Color,
+                                    Runtime::GeometryElementDomain::MeshVertex);
+    ASSERT_GE(colorRow, 0);
+
+    Editor::EditorShell shell;
+    shell.Attach(engine.Worlds(), engine.Services());
+    Editor::DomainPanels panels;
+    panels.Register(shell);
+    ASSERT_TRUE(shell.SetEditorWindowOpen("scene.appearance", true));
+
+    int frame = 0;
+    int step = 0;
+    float contentWidth = 0.0f;
+    float innerWidth = 0.0f;
+    driver->OnFrame = [&](Runtime::Engine& kernel) {
+        ++frame;
+        auto* window = ImGui::FindWindowByName("Appearance");
+        if (frame < 3)
+            return;
+        if (window == nullptr || frame > 200)
+        {
+            ADD_FAILURE() << "automation stalled at step " << step;
+            kernel.RequestExit();
+            return;
+        }
+        // Default width (340) on purpose; only the height grows so the rows are visible.
+        ImGui::SetWindowSize(window, ImVec2{window->Size.x, 1100.0f});
+        if (frame % 3 != 0)
+            return;
+        const ImGuiID source = RowItemId(AppearanceTableId(window, Kind::PointCloud, "Vertices"),
+                                         colorRow, "##Source");
+        switch (step)
+        {
+        case 0: ImGui::FocusWindow(window); ImGui::ActivateItemByID(source); break;
+        case 1:
+        {
+            const auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+            ASSERT_FALSE(popups.empty());
+            ImGui::ActivateItemByID(popups.back().Window->GetID("v:tint (Vec3, 3)"));
+            break;
+        }
+        case 2:
+            contentWidth = window->ContentSize.x;
+            innerWidth = window->InnerRect.GetWidth();
+            kernel.RequestExit();
+            break;
+        default: break;
+        }
+        ++step;
+    };
+    engine.Run();
+    EXPECT_EQ(step, 3);
+    EXPECT_GT(innerWidth, 0.0f);
+    EXPECT_LE(contentWidth, innerWidth + 1.0f)
+        << "something in the Appearance window is wider than its default content region";
+    panels.Unregister();
+    shell.Detach();
+    engine.Shutdown();
+}
+
+// UI-075: every Color row edits the overlay of the lane the runtime names for
+// it (`OverlayTarget`), not the lane of the section it is listed in.
+namespace
+{
+    enum class ColorLane { Surface, Edges, Points };
+
+    struct ColorRowCase
+    {
+        const char* Name;
+        ProbeEntity Entity;
+        Runtime::GeometryElementDomain Domain;
+        Runtime::EditorDomainWindowKind SectionKind;
+        const char* SectionTitle;
+        ColorLane ExpectedLane;
+    };
+
+    void RunColorRowInterpretationCase(const ColorRowCase& testCase)
+    {
+        namespace GS = Extrinsic::ECS::Components::GeometrySources;
+        namespace G = Extrinsic::Graphics::Components;
+        using D = Runtime::GeometryElementDomain;
+        SCOPED_TRACE(testCase.Name);
+        auto application = std::make_unique<OneFrameApplication>();
+        auto* driver = application.get();
+        Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(application));
+        engine.EmplaceModule<Runtime::SceneInteractionModule>();
+        engine.EmplaceModule<Runtime::SceneDocumentModule>();
+        engine.EmplaceModule<Runtime::EditorUiModule>();
+        engine.Initialize();
+        auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+        auto& raw = scene.Raw();
+        const auto entity = scene.Create();
+        raw.emplace<Extrinsic::ECS::Components::Selection::SelectableTag>(entity);
+        if (testCase.Entity == ProbeEntity::Mesh)
+        {
+            Geometry::HalfedgeMesh::Mesh mesh;
+            const auto a = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+            const auto b = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+            const auto c = mesh.AddVertex({0.0f, 1.0f, 0.0f});
+            (void)mesh.AddTriangle(a, b, c);
+            GS::PopulateFromMesh(raw, entity, mesh);
+        }
+        else if (testCase.Entity == ProbeEntity::Graph)
+        {
+            Geometry::Graph::Graph graph;
+            const auto a = graph.AddVertex({0.0f, 0.0f, 0.0f});
+            const auto b = graph.AddVertex({1.0f, 0.0f, 0.0f});
+            (void)graph.AddEdge(a, b);
+            GS::PopulateFromGraph(raw, entity, graph);
+        }
+        else
+        {
+            Geometry::PointCloud::Cloud cloud;
+            (void)cloud.AddPoint({0.0f, 0.0f, 0.0f});
+            GS::PopulateFromCloud(raw, entity, cloud);
+        }
+        const glm::vec3 tint{0.5f};
+        if (testCase.Domain == D::MeshEdge || testCase.Domain == D::GraphEdge)
+            (void)raw.get<GS::Edges>(entity).Properties.GetOrAdd<glm::vec3>("x:tint", tint);
+        else if (testCase.Domain == D::MeshFace)
+            (void)raw.get<GS::Faces>(entity).Properties.GetOrAdd<glm::vec3>("x:tint", tint);
+        else
+            (void)raw.get<GS::Vertices>(entity).Properties.GetOrAdd<glm::vec3>("x:tint", tint);
+        auto* selection = engine.Services().Find<Runtime::SelectionController>();
+        ASSERT_NE(selection, nullptr);
+        ASSERT_TRUE(selection->SetSelectedEntity(scene, entity));
+        const auto bindings = Runtime::BuildEditorAttributeBindingModel(
+            scene, Runtime::SelectionController::ToStableEntityId(entity));
+        const int colorRow = RowIndexOf(bindings, Runtime::RenderAttribute::Color, testCase.Domain);
+        ASSERT_GE(colorRow, 0);
+        std::string candidate;
+        for (const auto& c : bindings.Rows[static_cast<std::size_t>(colorRow)].Candidates)
+        {
+            if (c.Property.Name == "x:tint")
+                candidate = "x:tint (Vec3, " + std::to_string(c.ElementCount) + ")";
+        }
+        ASSERT_FALSE(candidate.empty());
+
+        Editor::EditorShell shell;
+        shell.Attach(engine.Worlds(), engine.Services());
+        Editor::DomainPanels panels;
+        panels.Register(shell);
+        ASSERT_TRUE(shell.SetEditorWindowOpen("scene.appearance", true));
+
+        const auto selectInPopup = [](const std::string& item) {
+            const auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+            if (popups.empty() || popups.back().Window == nullptr)
+                return false;
+            ImGui::ActivateItemByID(popups.back().Window->GetID(item.c_str()));
+            return true;
+        };
+        const auto normalDirection = [&](const ColorLane lane) {
+            const auto* overrides = raw.try_get<G::VisualizationLaneOverrides>(entity);
+            if (overrides == nullptr)
+                return false;
+            const auto& config = lane == ColorLane::Surface ? overrides->Surface
+                : lane == ColorLane::Edges ? overrides->Edges : overrides->Points;
+            return config.has_value() &&
+                   config->Interpretation == G::VisualizationConfig::ColorInterpretation::NormalDirection;
+        };
+        int frame = 0;
+        int step = 0;
+        driver->OnFrame = [&](Runtime::Engine& kernel) {
+            ++frame;
+            auto* window = ImGui::FindWindowByName("Appearance");
+            if (frame < 3)
+                return;
+            if (window == nullptr || frame > 200)
+            {
+                ADD_FAILURE() << "automation stalled at step " << step;
+                kernel.RequestExit();
+                return;
+            }
+            ImGui::SetWindowSize(window, ImVec2{700.0f, 1400.0f});
+            if (frame % 3 != 0)
+                return;
+            const ImGuiID source = RowItemId(
+                AppearanceTableId(window, testCase.SectionKind, testCase.SectionTitle), colorRow, "##Source");
+            const ImGuiID interpretation = RowItemId(
+                AppearanceSectionId(window, testCase.SectionKind, testCase.SectionTitle),
+                colorRow, "Color interpretation");
+            switch (step)
+            {
+            case 0: ImGui::FocusWindow(window); ImGui::ActivateItemByID(source); break;
+            case 1: EXPECT_TRUE(selectInPopup(candidate)); break;
+            case 2: ImGui::ActivateItemByID(interpretation); break;
+            case 3: EXPECT_TRUE(selectInPopup("Normal direction")); break;
+            case 4:
+                for (const ColorLane lane : {ColorLane::Surface, ColorLane::Edges, ColorLane::Points})
+                {
+                    EXPECT_EQ(normalDirection(lane), lane == testCase.ExpectedLane)
+                        << "lane " << static_cast<int>(lane);
+                }
+                kernel.RequestExit();
+                break;
+            default: break;
+            }
+            ++step;
+        };
+        engine.Run();
+        EXPECT_EQ(step, 5);
+        panels.Unregister();
+        shell.Detach();
+        engine.Shutdown();
+    }
+}
+
+TEST(SandboxDomainPanels, EveryColorRowEditsTheOverlayLaneTheRuntimeNamesForIt)
+{
+    using D = Runtime::GeometryElementDomain;
+    using K = Runtime::EditorDomainWindowKind;
+    for (const ColorRowCase& testCase : {
+             ColorRowCase{"mesh vertices", ProbeEntity::Mesh, D::MeshVertex, K::PointCloud, "Vertices", ColorLane::Surface},
+             ColorRowCase{"mesh edges", ProbeEntity::Mesh, D::MeshEdge, K::Graph, "Edges", ColorLane::Edges},
+             ColorRowCase{"mesh faces", ProbeEntity::Mesh, D::MeshFace, K::Mesh, "Faces", ColorLane::Surface},
+             ColorRowCase{"graph nodes", ProbeEntity::Graph, D::GraphNode, K::PointCloud, "Vertices", ColorLane::Edges},
+             ColorRowCase{"graph edges", ProbeEntity::Graph, D::GraphEdge, K::Graph, "Edges", ColorLane::Edges},
+             ColorRowCase{"cloud points", ProbeEntity::PointCloud, D::PointCloudPoint, K::PointCloud, "Vertices",
+                          ColorLane::Points}})
+        RunColorRowInterpretationCase(testCase);
 }

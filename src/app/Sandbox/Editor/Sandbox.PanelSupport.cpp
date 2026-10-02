@@ -2261,7 +2261,7 @@ namespace Extrinsic::Sandbox::Editor
         const AppearanceElementSection section,
         const SandboxEditorContext* const context,
         AttributeSourceUiState& state,
-        const std::function<void(const Runtime::EditorAttributeBindingRow&)>& rowDetails)
+        const std::function<void(const Runtime::EditorAttributeBindingRow&, const std::string& label)>& rowDetails)
     {
         if (state.Entity != model.StableEntityId)
             state = {.Entity = model.StableEntityId};
@@ -2340,20 +2340,36 @@ namespace Extrinsic::Sandbox::Editor
                     ImGui::EndCombo();
                 }
                 ImGui::EndDisabled();
-                if (rowDetails)
-                    rowDetails(row);
 
                 ImGui::TableSetColumnIndex(2);
+                ImGui::PushTextWrapPos(0.0f); // wrap inside the cell: a diagnostic must not be clipped
                 if (row.UsingFallback)
                     ImGui::TextColored(ImVec4{1.0f, 0.6f, 0.2f, 1.0f}, "%s", AttributeRowStatus(row).c_str());
                 else
                     ImGui::TextDisabled("%s", AttributeRowStatus(row).c_str());
+                ImGui::PopTextWrapPos();
                 ImGui::PopID();
             }
             ImGui::EndTable();
         }
+        if (rowDetails)
+        {
+            for (std::size_t i = 0u; i < model.Rows.size(); ++i)
+            {
+                const Runtime::EditorAttributeBindingRow& row = model.Rows[i];
+                if (SectionOfAttributeDomain(row.Domain) != section)
+                    continue;
+                ImGui::PushID(static_cast<int>(i));
+                rowDetails(row, AttributeRowLabel(row));
+                ImGui::PopID();
+            }
+        }
         if (!state.Refusal.empty())
+        {
+            ImGui::PushTextWrapPos(0.0f);
             ImGui::TextColored(ImVec4{1.0f, 0.6f, 0.2f, 1.0f}, "%s", state.Refusal.c_str());
+            ImGui::PopTextWrapPos();
+        }
         ImGui::PopID();
     }
 
