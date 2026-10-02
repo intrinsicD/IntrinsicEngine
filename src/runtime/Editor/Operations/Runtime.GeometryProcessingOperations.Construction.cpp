@@ -85,8 +85,7 @@ namespace Extrinsic::Runtime
             std::optional<Geometry::Graph::Graph> Graph{};
             std::shared_ptr<const SpatialIndexSnapshot> Index{};
             SpatialIndexHandle GpuIndex{};
-            std::shared_ptr<SpatialNearestBatch> Batch{};
-            std::size_t NextQuery{};
+            Detail::GpuRowPages Pages{};
             std::uint32_t Width{};
             bool PreparedOk{}, QueriesComplete{}, Abandoned{};
             Clock::time_point GpuStarted{};
@@ -325,73 +324,93 @@ namespace Extrinsic::Runtime
                 r.Status = EditorCommandStatus::GeometryProcessingFailed;
                 r.Message = std::move(message);
                 w.MainFailure = std::move(r);
-                w.Batch.reset();
+                w.Pages.Batch.reset();
                 return true;
             };
             if (w.Abandoned || !Current(context, w))
                 return fail("Construction source changed or the job was cancelled.");
-            if (w.Batch)
-            {
-                if (w.Batch->State == SpatialQueryState::Failed)
-                    return fail(w.Batch->Diagnostic);
-                if (w.Batch->State != SpatialQueryState::Ready)
-                    return false;
-                w.Result.ActualBackend = "vulkan_lbvh";
-                if (w.Batch->Capacity != w.Width || w.Batch->Counts.size() != w.Queries.size() ||
-                    w.Batch->Neighbors.size() != w.Queries.size() * w.Width)
-                    return fail("Vulkan construction returned an invalid neighborhood layout.");
-                std::vector<std::uint32_t> offsets{0}, indices;
-                indices.reserve(w.Queries.size() * w.Width);
-                for (std::size_t i = 0; i < w.Queries.size(); ++i)
-                {
-                    if (w.Batch->Counts[i] != w.Width)
-                        return fail("Vulkan construction returned an incomplete neighborhood.");
-                    const auto first = indices.size();
-                    for (unsigned j = 0; j < w.Width; ++j)
-                    {
-                        const auto slot = w.Batch->Neighbors[i * w.Width + j].Index;
-                        const auto found = std::lower_bound(w.Slots.begin(), w.Slots.end(), slot);
-                        if (found == w.Slots.end() || *found != slot)
-                            return fail("Vulkan construction returned an unknown source slot.");
-                        indices.push_back(std::uint32_t(found - w.Slots.begin()));
-                    }
-                    // CPU reduction uses a stable float distance/source-ID order;
-                    // recompute it after GPU readback instead of relying on GPU arithmetic order.
-                    std::sort(indices.begin() + first, indices.end(),
-                              [&](auto a, auto b)
-                              {
-                                  const auto da = w.Queries[i] - w.Points[a],
-                                             db = w.Queries[i] - w.Points[b];
-                                  const auto aa = glm::dot(da, da), bb = glm::dot(db, db);
-                                  return aa < bb || (aa == bb && a < b);
-                              });
-                    offsets.push_back(indices.size());
-                }
-                if (!ConsumeRows(w, w.Queries, offsets, indices))
-                    return fail(w.Result.Message);
-                w.NextQuery += w.Queries.size();
-                ++w.Result.GpuQueryBatches;
-                w.Result.GpuNeighborhoodMilliseconds +=
-                    std::chrono::duration<double, std::milli>(Clock::now() - w.GpuStarted).count();
-            }
-            if (w.NextQuery == w.Result.QueryCount)
+            if (w.Result.QueryCount == 0u)
             {
                 w.QueriesComplete = true;
-                w.Batch.reset();
                 return true;
             }
-            w.Queries = Queries(w, w.NextQuery,
-                                std::min<std::size_t>(w.Config.GpuQueryBatchSize,
-                                                      w.Result.QueryCount - w.NextQuery));
-            if (!std::all_of(w.Queries.begin(), w.Queries.end(), GpuPoint))
-                return fail("Vulkan grid queries require normal-or-zero components within 1e18.");
-            // A completed batch serves every page that fits it (GRAPHICS-153).
-            w.GpuStarted = Clock::now();
-            w.Batch = context.SpatialIndices->QueueGpuKNearest(w.GpuIndex, w.Queries, w.Width, {},
-                                                               std::move(w.Batch));
-            if (!w.Batch || w.Batch->State == SpatialQueryState::Failed)
-                return fail(w.Batch ? w.Batch->Diagnostic : "Vulkan query submission rejected.");
-            return false;
+            // Batch counts and GPU time cover consumed batches, timed from each submission.
+            std::string diagnostic;
+            const auto state = Detail::AdvanceGpuRowPages(
+                w.Pages, w.Result.QueryCount, w.Config.GpuQueryBatchSize, diagnostic,
+                [&](const SpatialNearestBatch& batch, std::string& why)
+                {
+                    w.Result.ActualBackend = "vulkan_lbvh";
+                    if (batch.Capacity != w.Width || batch.Counts.size() != w.Queries.size() ||
+                        batch.Neighbors.size() != w.Queries.size() * w.Width)
+                    {
+                        why = "Vulkan construction returned an invalid neighborhood layout.";
+                        return false;
+                    }
+                    std::vector<std::uint32_t> offsets{0}, indices;
+                    indices.reserve(w.Queries.size() * w.Width);
+                    for (std::size_t i = 0; i < w.Queries.size(); ++i)
+                    {
+                        if (batch.Counts[i] != w.Width)
+                        {
+                            why = "Vulkan construction returned an incomplete neighborhood.";
+                            return false;
+                        }
+                        const auto first = indices.size();
+                        for (unsigned j = 0; j < w.Width; ++j)
+                        {
+                            const auto slot = batch.Neighbors[i * w.Width + j].Index;
+                            const auto found = std::lower_bound(w.Slots.begin(), w.Slots.end(), slot);
+                            if (found == w.Slots.end() || *found != slot)
+                            {
+                                why = "Vulkan construction returned an unknown source slot.";
+                                return false;
+                            }
+                            indices.push_back(std::uint32_t(found - w.Slots.begin()));
+                        }
+                        // CPU reduction uses a stable float distance/source-ID order;
+                        // recompute it after GPU readback instead of relying on GPU arithmetic order.
+                        std::sort(indices.begin() + first, indices.end(),
+                                  [&](auto a, auto b)
+                                  {
+                                      const auto da = w.Queries[i] - w.Points[a],
+                                                 db = w.Queries[i] - w.Points[b];
+                                      const auto aa = glm::dot(da, da), bb = glm::dot(db, db);
+                                      return aa < bb || (aa == bb && a < b);
+                                  });
+                        offsets.push_back(indices.size());
+                    }
+                    if (!ConsumeRows(w, w.Queries, offsets, indices))
+                    {
+                        why = w.Result.Message;
+                        return false;
+                    }
+                    ++w.Result.GpuQueryBatches;
+                    w.Result.GpuNeighborhoodMilliseconds +=
+                        std::chrono::duration<double, std::milli>(Clock::now() - w.GpuStarted).count();
+                    return true;
+                },
+                [&](std::size_t first, std::size_t count, std::shared_ptr<SpatialNearestBatch> reuse)
+                {
+                    w.Queries = Queries(w, first, count);
+                    if (!std::all_of(w.Queries.begin(), w.Queries.end(), GpuPoint))
+                    {
+                        auto refused = std::make_shared<SpatialNearestBatch>();
+                        refused->State = SpatialQueryState::Failed;
+                        refused->Diagnostic = "Vulkan grid queries require normal-or-zero components within 1e18.";
+                        return refused;
+                    }
+                    w.GpuStarted = Clock::now();
+                    return context.SpatialIndices->QueueGpuKNearest(w.GpuIndex, w.Queries, w.Width, {},
+                                                                     std::move(reuse));
+                });
+            if (state == Detail::RowsState::Failed)
+                return fail(std::move(diagnostic));
+            if (state == Detail::RowsState::Pending)
+                return false;
+            w.QueriesComplete = true;
+            w.Pages.Spare.reset(); // no later pass reuses the completed batch
+            return true;
         }
         void BuildOutput(ConstructionWork& w)
         {

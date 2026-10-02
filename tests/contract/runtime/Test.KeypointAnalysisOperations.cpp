@@ -604,3 +604,31 @@ TEST_F(KeypointResident, RecordPageRejectsInvalidParametersAndBudgets)
     C.GpuRadiusCapacity=0;Start();EXPECT_FALSE(Run);
     EXPECT_EQ(Initial.Status,R::EditorCommandStatus::InvalidProcessingParameters);
 }
+
+// RUNTIME-314: mask and score publish through the multi-output PublishPointScalarField as one
+// history entry; an undo after either output changed is refused and restores neither.
+TEST(KeypointAnalysis, PairedPublicationUndoIsRefusedWhenEitherOutputChanged)
+{
+    for(const bool changeMask:{false,true})
+    {
+        SCOPED_TRACE(changeMask);
+        R::WorldRegistry worlds;
+        const auto world=worlds.CreateWorld("atomic keypoint outputs");
+        auto& scene=*worlds.Get(world);
+        const auto entity=Make(scene,D::MeshVertex);
+        auto& props=PointDomainProperties(scene,entity,D::MeshVertex);
+        R::EditorCommandHistory history;
+        R::SpatialIndexCache cache(worlds);
+        const auto config=Config(entity,D::MeshVertex);
+        const R::EditorProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache};
+        ASSERT_TRUE(R::ApplyEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),config).Succeeded());
+        EXPECT_EQ(history.UndoCount(),1u);
+        const auto mask=std::as_const(props).Get<std::uint32_t>(config.Mask.Name).Vector();
+        const auto score=std::as_const(props).Get<float>(config.Score.Name).Vector();
+        if(changeMask)props.Get<std::uint32_t>(config.Mask.Name)[0]=7u;
+        else props.Get<float>(config.Score.Name)[0]=-5.f;
+        EXPECT_FALSE(history.Undo().Succeeded());
+        if(changeMask)EXPECT_EQ(std::as_const(props).Get<float>(config.Score.Name).Vector(),score);
+        else EXPECT_EQ(std::as_const(props).Get<std::uint32_t>(config.Mask.Name).Vector(),mask);
+    }
+}

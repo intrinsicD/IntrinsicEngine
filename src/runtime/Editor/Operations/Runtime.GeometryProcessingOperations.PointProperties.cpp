@@ -558,23 +558,53 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         const EditorProcessingContext& context, entt::entity entity,
         const PointScalarCapture& w, std::string label)
     {
-        using State = GeometryScalarPropertySnapshot;
-        auto before = std::make_shared<State>(w.BeforeValues);
+        const std::array output{PointScalarOutput{
+            .Output = w.Output, .Watch = w.OutputWatch, .Before = &w.BeforeValues, .After = w.AfterValues}};
+        return PublishPointScalarField(context, entity, w, output, std::move(label));
+    }
+
+    EditorCommandHistoryStatus PublishPointScalarField(
+        const EditorProcessingContext& context, entt::entity entity, const PointInputCapture& w,
+        std::span<const PointScalarOutput> outputs, std::string label)
+    {
+        using State = std::vector<GeometryScalarPropertySnapshot>;
+        auto before = std::make_shared<State>();
+        std::vector<GeometryPropertyRef> refs;
+        auto revisions = std::make_shared<std::vector<PointPropertyWatch>>();
+        for (const auto& output : outputs)
+        {
+            if (!output.Before) return EditorCommandHistoryStatus::InvalidCommand;
+            before->push_back(*output.Before);
+            refs.push_back(output.Output);
+            revisions->push_back(output.Watch);
+        }
         auto after = std::make_shared<State>(*before);
-        if (!PrepareGeometryScalarProperty(*after, w.Output.ValueKind, w.SlotCount, w.Slots, w.AfterValues))
-            return EditorCommandHistoryStatus::InvalidCommand;
-        auto revisions = std::make_shared<std::array<PointPropertyWatch, 1>>(std::array{w.OutputWatch});
-        const auto mutate = [context, entity, inputs=w.Inputs, ref=w.Output, revisions](const State& target)
+        for (std::size_t i = 0; i < outputs.size(); ++i)
+        {
+            const auto& output = outputs[i];
+            const bool prepared = output.AfterUInt.empty()
+                ? PrepareGeometryScalarProperty((*after)[i], output.Output.ValueKind, w.SlotCount, w.Slots, output.After)
+                : PrepareGeometryScalarProperty((*after)[i], output.Output.ValueKind, w.SlotCount, w.Slots, output.AfterUInt);
+            if (!prepared) return EditorCommandHistoryStatus::InvalidCommand;
+        }
+        const auto mutate = [context, entity, inputs=w.Inputs, refs=std::move(refs), revisions](const State& target)
         {
             if (!GeometryPropertiesCurrent(context, entity, inputs) ||
                 !GeometryPropertiesCurrent(context, entity, *revisions))
                 return EditorCommandHistoryStatus::StaleEntity;
-            const auto& output = revisions->front();
-            auto* props = MutableGeometryProperties(context.Scene->Raw(), entity, output.Domain);
-            if (!ApplyGeometryScalarProperty(*props, ref, target))
-                return EditorCommandHistoryStatus::InvalidCommand;
-            const auto a = BuildGeometryAvailability(context.Scene->Raw(), entity);
-            *revisions = {ObserveGeometryProperty(a, output.Domain, output.Name)};
+            auto& raw = context.Scene->Raw();
+            // Check every column before writing any, so a refused column leaves all unchanged.
+            for (std::size_t i = 0; i < refs.size(); ++i)
+            {
+                const auto* props = MutableGeometryProperties(raw, entity, refs[i].Domain);
+                if (!props || !CanApplyGeometryScalarProperty(*props, refs[i], target[i]))
+                    return EditorCommandHistoryStatus::InvalidCommand;
+            }
+            for (std::size_t i = 0; i < refs.size(); ++i)
+                (void)ApplyGeometryScalarProperty(*MutableGeometryProperties(raw, entity, refs[i].Domain), refs[i], target[i]);
+            const auto a = BuildGeometryAvailability(raw, entity);
+            for (auto& revision : *revisions)
+                revision = ObserveGeometryProperty(a, revision.Domain, revision.Name);
             // Scalar buffers follow their property revision. They do not alter
             // resident positions, topology or vertex channels.
             if (context.InvalidateWorkspaceSnapshotCache) context.InvalidateWorkspaceSnapshotCache();

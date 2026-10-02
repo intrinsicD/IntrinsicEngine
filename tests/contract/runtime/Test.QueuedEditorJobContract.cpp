@@ -5,6 +5,7 @@
 // abandoned run that revalidates as Cancelled and delivers exactly once.
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -13,6 +14,7 @@
 #include <sstream>
 #include <optional>
 #include <regex>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -290,6 +292,88 @@ TEST_F(QueuedEditorJobContract, LaterStagesOfAChainJoinTheFirstJobsRun)
             .Iterations = 1, .Backend = R::BilateralFilterBackend::VulkanLBVH}, done); });
 }
 
+// RUNTIME-314: Vulkan construction pages its kNN queries through the shared GpuRowPages cursor.
+// The mock answers each framed page with the exact neighbors, so the run publishes the CPU
+// reference graph; it counts consumed pages, reuses one completed batch for every page
+// (GRAPHICS-153) and stops at the first page that names an unknown source slot.
+TEST_F(QueuedEditorJobContract, VulkanConstructionPagesThroughTheSharedRowCursor)
+{
+    struct PackedNeighbor { std::uint32_t Index; float SquaredDistance; };
+    constexpr std::uint32_t width = 3u; // two neighbors plus the query sample itself
+    const auto samples = std::as_const(Scene.Raw().get<GS::Vertices>(Entity).Properties).Get<glm::vec3>("samples").Vector();
+    R::PointConstructionConfig config{.StableEntityId = Id, .Positions = Positions(),
+        .Method = R::PointConstructionMethod::KnnGraph, .KNeighbors = 2};
+    config.GpuQueryBatchSize = 3u;
+    auto reference = config;
+    reference.Backend = R::PointConstructionBackend::CpuReference;
+    auto synchronous = Context;
+    synchronous.JobCommands = {};
+    const auto expected = R::ApplyEditorPointConstructionCommand(R::BindEditorProcessingCommands(synchronous), reference);
+    ASSERT_TRUE(expected.Succeeded()) << expected.Message;
+    config.Backend = R::PointConstructionBackend::VulkanLBVH;
+    Jobs.Attach(Context);
+    for (const bool corruptSecondPage : {false, true})
+    {
+        SCOPED_TRACE(corruptSecondPage);
+        std::size_t nextQuery = 0u, downloads = 0u;
+        std::vector<std::size_t> pages;
+        Device.TransferQueue.BufferDownload = [&](auto, std::uint64_t bytes, auto, Extrinsic::RHI::ReadbackSink sink) {
+            if (downloads++ % 2u == 0u) // the neighbor rows precede the headers of a page
+            {
+                const auto count = bytes / (width * sizeof(PackedNeighbor));
+                std::vector<PackedNeighbor> rows;
+                for (std::size_t q = nextQuery; q < nextQuery + count; ++q)
+                {
+                    std::vector<std::uint32_t> order(samples.size());
+                    for (std::uint32_t i = 0; i < order.size(); ++i) order[i] = i;
+                    const auto distance = [&](std::uint32_t i) { const auto d = samples[i] - samples[q]; return glm::dot(d, d); };
+                    std::ranges::sort(order, [&](auto a, auto b) { return distance(a) < distance(b) || (distance(a) == distance(b) && a < b); });
+                    for (std::uint32_t j = 0; j < width; ++j) rows.push_back({order[j], distance(order[j])});
+                }
+                if (corruptSecondPage && pages.size() == 1u) rows.front().Index = 99u;
+                sink.Deliver(std::as_bytes(std::span(rows)));
+            }
+            else
+            {
+                const auto count = bytes / (2u * sizeof(std::uint32_t));
+                std::vector<std::uint32_t> headers(count * 2u, 0u);
+                for (std::size_t i = 0; i < count; ++i) headers[2u * i] = width;
+                sink.Deliver(std::as_bytes(std::span(headers)));
+                nextQuery += count;
+                pages.push_back(count);
+            }
+            return Extrinsic::RHI::ReadbackToken{downloads};
+        };
+        const auto allocations = Cache.Stats().GpuBatchAllocations;
+        std::optional<R::EditorPointConstructionResult> delivered;
+        const auto queued = R::ApplyEditorPointConstructionCommand(Commands(), config, [&](auto result) { delivered = result; });
+        ASSERT_EQ(queued.Status, R::EditorCommandStatus::Pending) << queued.Message;
+        for (int frame = 0; frame < 200 && !delivered; ++frame)
+        {
+            Jobs.Jobs().RecordGpuQueueFrameCommands(Device.CommandContext);
+            (void)Jobs.Jobs().DrainGpuQueueCompletedTransfers();
+            Device.GlobalFrameNumber += Device.FramesInFlight + 1u;
+            (void)Jobs.DrainUntilTerminal(std::chrono::milliseconds{2});
+        }
+        ASSERT_TRUE(delivered);
+        EXPECT_EQ(delivered->ActualBackend, "vulkan_lbvh");
+        if (corruptSecondPage)
+        {
+            EXPECT_EQ(delivered->Status, R::EditorCommandStatus::GeometryProcessingFailed);
+            EXPECT_EQ(delivered->Message, "Vulkan construction returned an unknown source slot.");
+            EXPECT_EQ(delivered->GpuQueryBatches, 1u) << "only the consumed first page counts";
+            EXPECT_EQ(pages, (std::vector<std::size_t>{3u, 3u}));
+            continue;
+        }
+        ASSERT_TRUE(delivered->Succeeded()) << delivered->Message;
+        EXPECT_EQ(pages, (std::vector<std::size_t>{3u, 3u, 2u}));
+        EXPECT_EQ(delivered->GpuQueryBatches, 3u);
+        EXPECT_EQ(Cache.Stats().GpuBatchAllocations - allocations, 1u) << "every page reuses the completed batch";
+        EXPECT_EQ(delivered->OutputVertexCount, expected.OutputVertexCount);
+        EXPECT_EQ(delivered->OutputEdgeCount, expected.OutputEdgeCount);
+    }
+}
+
 // Drift guard: a queued editor operation reuses the shared helper instead of hand-writing the
 // prologue/epilogue this task consolidated. Scans the operation sources (like the layering
 // tests): no hand-written "already active" refusal or duplicate wording, no direct active-job
@@ -384,8 +468,9 @@ TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
     EXPECT_TRUE(deliverOnceMatched) << "stale allowance: " << deliverOnceAllowed << " no longer keeps its own deliver-once flag";
 }
 
-// RUNTIME-314 drift guard: runtime sources reuse `Geometry::Validation::IsFinite` for glm vectors and
-// the canonical `GeometrySources::PropertyNames::kPosition` instead of re-writing them locally.
+// RUNTIME-314 drift guard: runtime sources reuse `Geometry::Validation::IsFinite` for glm vectors,
+// the canonical `GeometrySources::PropertyNames::kPosition`, the shared GPU row cursor and the
+// undoable scalar publisher instead of re-writing them locally.
 TEST(RuntimeReuseDriftGuard, RuntimeUsesTheSharedFiniteCheckAndPositionName)
 {
     namespace fs = std::filesystem;
@@ -452,9 +537,26 @@ TEST(RuntimeReuseDriftGuard, RuntimeUsesTheSharedFiniteCheckAndPositionName)
     // Member chains (`sphere.Center.x`, `a->b[i].x`) and scalar wrappers (`IsFinite(v.x) && IsFinite(v.y)`) count.
     const std::regex handWrittenFinite{
         R"((?:std::isfinite|\bIsFinite)\(([\w.\[\]>-]+)\.x\)\s*(?:&&|\|\|)\s*!?\s*(?:std::isfinite|\bIsFinite)\(\1\.y\))"};
+    // Paged kNN/radius queries advance through GpuRowPages/AdvanceGpuRowPages; these files may
+    // queue them without it.
+    constexpr std::array<std::string_view, 3> allowedUnpagedQueries{
+        "GeometryIntegration/Runtime.SpatialIndexCache.cppm", // the query API itself
+        "GeometryIntegration/Runtime.SpatialIndexCache.cpp",
+        "Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp", // own cursor, see RUNTIME-314 note
+    };
+    // Undoable scalar outputs publish through PublishPointScalarField; these files may prepare
+    // scalar snapshots and execute history themselves.
+    constexpr std::array<std::string_view, 4> allowedScalarPublishers{
+        "Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp", // the publisher
+        "Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp",        // RUNTIME-311 owns it
+        "Editor/Operations/Runtime.MeshFieldOperations.Geodesics.cpp",   // double distances with infinity sentinels
+        "Editor/Operations/Runtime.ScalarRidgeOperations.cpp",           // vertex and edge outputs, two slot sets
+    };
     std::size_t scanned = 0;
     std::size_t finiteMatched = 0;
     std::size_t positionMatched = 0;
+    std::size_t unpagedMatched = 0;
+    std::size_t publisherMatched = 0;
     for (const auto& entry : fs::recursive_directory_iterator(root))
     {
         const auto extension = entry.path().extension();
@@ -479,8 +581,29 @@ TEST(RuntimeReuseDriftGuard, RuntimeUsesTheSharedFiniteCheckAndPositionName)
         }
         else
             EXPECT_FALSE(finite) << "use Geometry::Validation::IsFinite for glm vectors";
+        const bool unpaged = (text.find("QueueGpuKNearest(") != std::string::npos ||
+                              text.find("QueueGpuRadius(") != std::string::npos) &&
+                             text.find("AdvanceGpuRowPages(") == std::string::npos;
+        if (std::find(allowedUnpagedQueries.begin(), allowedUnpagedQueries.end(), name) != allowedUnpagedQueries.end())
+        {
+            EXPECT_TRUE(unpaged) << "stale allowlist entry: the file no longer queues unpaged queries; remove it";
+            ++unpagedMatched;
+        }
+        else
+            EXPECT_FALSE(unpaged) << "page GPU kNN/radius queries through GpuRowPages/AdvanceGpuRowPages";
+        const bool publishes = text.find("PrepareGeometryScalarProperty(") != std::string::npos &&
+                               text.find("CommandHistory->Execute(") != std::string::npos;
+        if (std::find(allowedScalarPublishers.begin(), allowedScalarPublishers.end(), name) != allowedScalarPublishers.end())
+        {
+            EXPECT_TRUE(publishes) << "stale allowlist entry: the file no longer publishes scalars itself; remove it";
+            ++publisherMatched;
+        }
+        else
+            EXPECT_FALSE(publishes) << "publish undoable scalar outputs through PublishPointScalarField";
     }
     EXPECT_GT(scanned, 100u);
+    EXPECT_EQ(unpagedMatched, allowedUnpagedQueries.size()) << "an allowlisted unpaged-query file is missing";
+    EXPECT_EQ(publisherMatched, allowedScalarPublishers.size()) << "an allowlisted scalar publisher is missing";
     EXPECT_EQ(positionMatched, allowedPositionLiterals.size()) << "an allowlisted position-literal file is missing";
     EXPECT_EQ(finiteMatched, allowedFiniteChecks.size()) << "an allowlisted finite-check file is missing";
 }

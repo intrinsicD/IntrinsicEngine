@@ -141,6 +141,25 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         const EditorProcessingContext&, entt::entity, const PointScalarCapture&,
         std::string label);
 
+    // One column of a multi-output publication. `Before` is the column captured with the
+    // inputs (copied by the publication); the values are indexed by source slot like
+    // `PointScalarCapture::AfterValues`, as floats or, when `AfterUInt` is non-empty, as uint32.
+    struct PointScalarOutput
+    {
+        GeometryPropertyRef Output{};
+        PointPropertyWatch Watch{};
+        const GeometryScalarPropertySnapshot* Before{};
+        std::span<const float> After{};
+        std::span<const std::uint32_t> AfterUInt{};
+    };
+    // Multi-output form: one undoable history entry guarded by the inputs' and every output's
+    // watch. Every column is prepared before history runs and every write is checked before
+    // the first one, so no column is published alone. `InvalidCommand` reports an output whose
+    // values its storage cannot represent exactly (the single-output form delegates here).
+    [[nodiscard]] EditorCommandHistoryStatus PublishPointScalarField(
+        const EditorProcessingContext&, entt::entity, const PointInputCapture& inputs,
+        std::span<const PointScalarOutput> outputs, std::string label);
+
     // Positions analogue (RUNTIME-293, ADR 0030 decision 6): the capture copies every row's
     // value before the method runs. `after` holds every row (an accepted ring front, or the
     // capture's values with the method's rows replaced). The publication is one undoable

@@ -60,7 +60,6 @@ namespace Extrinsic::Runtime
         using D = GeometryElementDomain;
         using GeometryProcessingDetail::PointPropertyWatch;
         using GeometryProcessingDetail::ObserveGeometryProperty;
-        using GeometryProcessingDetail::MutableGeometryProperties;
         using GeometryProcessingDetail::GeometryPropertiesCurrent;
         struct KeypointWork : GeometryProcessingDetail::PointInputCapture
         {
@@ -236,37 +235,16 @@ namespace Extrinsic::Runtime
             if (w->Abandoned || !CurrentInput(context,*w))
             {r.Status=EditorCommandStatus::StaleEntity; r.Message="Keypoint input or output changed before publication."; return r;}
             if (r.Status!=EditorCommandStatus::Applied) return r;
-            struct State
-            {
-                GeometryScalarPropertySnapshot Mask{}, Score{};
-            };
-            auto before=std::make_shared<State>(State{w->BeforeMask,w->BeforeScore});
-            auto after=std::make_shared<State>(*before);
-            if (!PrepareGeometryScalarProperty(after->Mask, w->Config.Mask.ValueKind, w->SlotCount, w->Slots, w->AfterMask) ||
-                !PrepareGeometryScalarProperty(after->Score, w->Config.Score.ValueKind, w->SlotCount, w->Slots, w->AfterScore))
-            { r.Status=EditorCommandStatus::InvalidProcessingParameters; r.Message="Output values are not exactly representable in the selected scalar storage."; return r; }
-            auto revisions=std::make_shared<std::array<PointPropertyWatch,2>>(std::array{w->MaskWatch,w->ScoreWatch});
-            const auto mutate=[context,entity=w->Entity,inputs=w->Inputs,c=w->Config,revisions](const State& target)
-            {
-                if (!GeometryPropertiesCurrent(context,entity,inputs) || !GeometryPropertiesCurrent(context,entity,*revisions))
-                    return EditorCommandHistoryStatus::StaleEntity;
-                auto* props=MutableGeometryProperties(context.Scene->Raw(),entity,c.Positions.Domain);
-                if (!CanApplyGeometryScalarProperty(*props, c.Mask, target.Mask) ||
-                    !CanApplyGeometryScalarProperty(*props, c.Score, target.Score))
-                    return EditorCommandHistoryStatus::InvalidCommand;
-                (void)ApplyGeometryScalarProperty(*props, c.Mask, target.Mask);
-                (void)ApplyGeometryScalarProperty(*props, c.Score, target.Score);
-                const auto a=BuildGeometryAvailability(context.Scene->Raw(),entity);
-                *revisions={ObserveGeometryProperty(a,c.Mask.Domain,c.Mask.Name),ObserveGeometryProperty(a,c.Score.Domain,c.Score.Name)};
-                if (context.InvalidateWorkspaceSnapshotCache) context.InvalidateWorkspaceSnapshotCache();
-                return EditorCommandHistoryStatus::Applied;
-            };
-            const auto status=context.CommandHistory ? context.CommandHistory->Execute({.Label="Detect keypoints",
-                .Redo=[mutate,after]{return mutate(*after);},.Undo=[mutate,before]{return mutate(*before);}}).Status : mutate(*after);
+            const std::array outputs{
+                GeometryProcessingDetail::PointScalarOutput{.Output=w->Config.Mask,.Watch=w->MaskWatch,.Before=&w->BeforeMask,.AfterUInt=w->AfterMask},
+                GeometryProcessingDetail::PointScalarOutput{.Output=w->Config.Score,.Watch=w->ScoreWatch,.Before=&w->BeforeScore,.After=w->AfterScore}};
+            const auto status=GeometryProcessingDetail::PublishPointScalarField(context,w->Entity,*w,outputs,"Detect keypoints");
             r.Status = status == EditorCommandHistoryStatus::InvalidCommand
                 ? EditorCommandStatus::InvalidProcessingParameters
                 : EditorFeatureDetail::ToEditorCommandStatus(status);
-            if (!r.Succeeded()) r.Message="Keypoint publication rejected by history checks.";
+            if (!r.Succeeded()) r.Message = status == EditorCommandHistoryStatus::InvalidCommand
+                ? "Output values are not exactly representable in the selected scalar storage."
+                : "Keypoint publication rejected by history checks.";
             return r;
         }
     }

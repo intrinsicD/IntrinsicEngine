@@ -268,3 +268,45 @@ TEST(DescriptorAnalysis, DoubleOutputColumnsRoundTripAndPublishAsOneHistoryEntry
     ASSERT_TRUE(history.Redo().Succeeded());
     for(const auto& output:config.Outputs)EXPECT_TRUE(std::as_const(props).Get<double>(output.Name));
 }
+
+// RUNTIME-314: the 33 columns publish through the multi-output PublishPointScalarField. A column
+// whose storage cannot hold its values exactly refuses the whole publication before history runs,
+// and an undo after any one column changed is refused without restoring the others.
+TEST(DescriptorAnalysis, MultiOutputPublicationIsAtomicForPreparationAndUndoGuards)
+{
+    R::WorldRegistry worlds;
+    const auto world=worlds.CreateWorld("atomic descriptor columns");
+    auto& scene=*worlds.Get(world);
+    const auto entity=Make(scene,D::MeshVertex);
+    auto& props=PointDomainProperties(scene,entity,D::MeshVertex);
+    R::EditorCommandHistory history;
+    R::SpatialIndexCache cache(worlds);
+    const auto commands=R::BindEditorProcessingCommands(R::EditorProcessingContext{
+        .Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache});
+
+    const auto config=Config(entity,D::MeshVertex);
+    ASSERT_TRUE(R::ApplyEditorDescriptorAnalysisCommand(commands,config).Succeeded());
+    EXPECT_EQ(history.UndoCount(),1u);
+    std::array<std::vector<float>,33> published;
+    for(unsigned b=0;b<33;++b)published[b]=std::as_const(props).Get<float>(config.Outputs[b].Name).Vector();
+    // The last column holding a fractional value cannot be stored as Int32.
+    unsigned fractional=33;
+    for(unsigned b=0;b<33;++b)
+        if(std::ranges::any_of(published[b],[](float v){return v!=std::trunc(v);}))fractional=b;
+    ASSERT_LT(fractional,33u);
+    ASSERT_TRUE(history.Undo().Succeeded());
+    auto inexact=config;
+    inexact.Outputs[fractional].ValueKind=Geometry::PropertyValueKind::Int32;
+    const auto refused=R::ApplyEditorDescriptorAnalysisCommand(commands,inexact);
+    EXPECT_EQ(refused.Status,R::EditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_NE(refused.Message.find("represented exactly"),std::string::npos)<<refused.Message;
+    EXPECT_FALSE(history.CanUndo());
+    for(const auto& output:inexact.Outputs)EXPECT_FALSE(props.Exists(output.Name))<<output.Name;
+
+    ASSERT_TRUE(history.Redo().Succeeded());
+    props.Get<float>(config.Outputs[32].Name)[0]=-5.f;
+    EXPECT_FALSE(history.Undo().Succeeded());
+    for(unsigned b=0;b<32;++b)
+        EXPECT_EQ(std::as_const(props).Get<float>(config.Outputs[b].Name).Vector(),published[b])<<b;
+    EXPECT_EQ(std::as_const(props).Get<float>(config.Outputs[32].Name)[0],-5.f);
+}

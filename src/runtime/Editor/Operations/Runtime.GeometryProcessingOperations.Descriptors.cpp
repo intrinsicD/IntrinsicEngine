@@ -45,7 +45,6 @@ namespace Extrinsic::Runtime
         using D = GeometryElementDomain;
         using GeometryProcessingDetail::PointPropertyWatch;
         using GeometryProcessingDetail::ObserveGeometryProperty;
-        using GeometryProcessingDetail::MutableGeometryProperties;
         using GeometryProcessingDetail::PrimaryPointDomain;
         using GeometryProcessingDetail::GeometryPropertiesCurrent;
         struct DescriptorWork : GeometryProcessingDetail::PointNormalCapture
@@ -218,39 +217,16 @@ namespace Extrinsic::Runtime
             if (w->Abandoned || !CurrentInput(context,*w))
             {r.Status=EditorCommandStatus::StaleEntity; r.Message="Descriptor input or output changed before publication."; return r;}
             if (r.Status!=EditorCommandStatus::Applied) return r;
-            struct State
-            {
-                std::array<GeometryScalarPropertySnapshot,33> Columns{};
-            };
-            auto before=std::make_shared<State>();before->Columns=w->BeforeOutputs;
-            auto after=std::make_shared<State>(*before);
+            std::array<GeometryProcessingDetail::PointScalarOutput,33> outputs{};
             for(unsigned i=0;i<33;++i)
-                if (!PrepareGeometryScalarProperty(after->Columns[i], w->Config.Outputs[i].ValueKind,
-                    w->SlotCount, w->Slots, w->AfterOutputs[i]))
-                { r.Status=EditorCommandStatus::InvalidProcessingParameters; r.Message="Descriptor output cannot be represented exactly in the selected scalar storage."; return r; }
-            auto revisions=std::make_shared<std::array<PointPropertyWatch,33>>(w->OutputWatches);
-            const auto mutate=[context,entity=w->Entity,inputs=w->Inputs,c=w->Config,revisions](const State& target)
-            {
-                if(!GeometryPropertiesCurrent(context,entity,inputs) || !GeometryPropertiesCurrent(context,entity,*revisions))
-                    return EditorCommandHistoryStatus::StaleEntity;
-                auto* props=MutableGeometryProperties(context.Scene->Raw(),entity,c.Positions.Domain);
-                for(unsigned i=0;i<33;++i)
-                    if (!CanApplyGeometryScalarProperty(*props,c.Outputs[i],target.Columns[i]))
-                        return EditorCommandHistoryStatus::InvalidCommand;
-                for(unsigned i=0;i<33;++i)
-                {
-                    (void)ApplyGeometryScalarProperty(*props,c.Outputs[i],target.Columns[i]);
-                    (*revisions)[i].Revision=props->FindPropertyRevision(c.Outputs[i].Name);
-                }
-                if(context.InvalidateWorkspaceSnapshotCache)context.InvalidateWorkspaceSnapshotCache();
-                return EditorCommandHistoryStatus::Applied;
-            };
-            const auto status=context.CommandHistory ? context.CommandHistory->Execute({.Label="Compute FPFH descriptors",
-                .Redo=[mutate,after]{return mutate(*after);},.Undo=[mutate,before]{return mutate(*before);}}).Status : mutate(*after);
+                outputs[i]={.Output=w->Config.Outputs[i],.Watch=w->OutputWatches[i],.Before=&w->BeforeOutputs[i],.After=w->AfterOutputs[i]};
+            const auto status=GeometryProcessingDetail::PublishPointScalarField(context,w->Entity,*w,outputs,"Compute FPFH descriptors");
             r.Status = status == EditorCommandHistoryStatus::InvalidCommand
                 ? EditorCommandStatus::InvalidProcessingParameters
                 : EditorFeatureDetail::ToEditorCommandStatus(status);
-            if (!r.Succeeded()) r.Message="Descriptor publication rejected by history checks.";
+            if (!r.Succeeded()) r.Message = status == EditorCommandHistoryStatus::InvalidCommand
+                ? "Descriptor output cannot be represented exactly in the selected scalar storage."
+                : "Descriptor publication rejected by history checks.";
             return r;
         }
     }
