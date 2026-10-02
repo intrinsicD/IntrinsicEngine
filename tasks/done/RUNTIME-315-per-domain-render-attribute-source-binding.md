@@ -65,12 +65,24 @@ Design recommendation (confirm in slice 1, record in a Log entry): extend the al
 6. **Graphs and point clouds on the same table (~300 lines).** One table drives graph nodes/edges and point clouds; mesh vertices viewed as points/edges reuse the same entity binding (no per-lane copies), consistent with `UI-051`.
 
 ## Acceptance criteria
-- [ ] A finite `vec3` vertex property on a mesh, graph or point cloud can be bound as the position attribute; the rendered, culled and picked geometry follows it, canonical `v:position` is unchanged, and `Default` restores it.
-- [ ] Normal, color (`vec3`/`vec4`), texcoord (`vec2`), point size and line width (`float`) accept any compatible property on the right element domain; mismatches are refused with typed reasons.
-- [ ] Bound-property edits (including GPU method results) update the displayed attribute without re-binding (revision/`BindingGeneration` invalidation).
-- [ ] Bindings undo/redo as one step and survive scene save/load; a missing property on load degrades to the default with a visible diagnostic.
-- [ ] Position-bound picking returns canonical element ids and does not select by stale canonical positions.
-- [ ] Contract tests cover every row of the attribute x domain table; Vulkan evidence is delivered by `GRAPHICS-158`.
+- [x] A finite `vec3` vertex property on a mesh, graph or point cloud can be bound as the position attribute; the rendered, culled and picked geometry follows it, canonical `v:position` is unchanged, and `Default` restores it.
+- [x] Normal, color (`vec3`/`vec4`), texcoord (`vec2`), point size and line width (`float`) accept any compatible property on the right element domain; mismatches are refused with typed reasons.
+- [x] Bound-property edits (including GPU method results) update the displayed attribute without re-binding (revision/`BindingGeneration` invalidation).
+- [x] Bindings undo/redo as one step and survive scene save/load; a missing property on load degrades to the default with a visible diagnostic.
+- [x] Position-bound picking returns canonical element ids and does not select by stale canonical positions.
+- [x] Contract tests cover every row of the attribute x domain table; Vulkan evidence is delivered by `GRAPHICS-158`.
+
+## Completion
+
+Commit: `3e8254a0f`..`6fe918729` (plus `6ea69ffa8`, BUG-233). Completed 2026-10-02 with an independent Opus review per slice and a final acceptance review.
+- Full CPU suite 5705/5705.
+- Retired as CPUContracted. The Operational target moves to [GRAPHICS-158](../backlog/rendering/GRAPHICS-158-operational-evidence-for-rebound-render-attributes.md): Vulkan draw/cull/depth/pick readback of rebound positions, bound normal/texcoord/color streams, PointSizeBDA/LineWidthBDA, and GPU-method position-front republish.
+- Follow-ups:
+  - RUNTIME-318 moves the presentation color slots onto the overlay.
+  - RUNTIME-319 adds processed-property persistence; bindings to processed properties load stale until then.
+  - UI-075 builds the Appearance panel.
+  - RUNTIME-316 adds the agent `bind_attribute` tool.
+  - Model-space radii remain with RUNTIME-222.
 
 ## Verification
 ```bash

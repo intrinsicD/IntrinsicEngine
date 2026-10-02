@@ -20,7 +20,7 @@ contracts: [geometry.element-domain-sources]
 - No change to `show_property` semantics (scalar colormap / vector-as-color); it keeps calling the visualization recipe path.
 
 ## Context
-- Operator decisions 2026-10-02 (model unification, picking/culling follow displayed positions, canonical normals, single Color mechanism, pixel sizes) are recorded in [RUNTIME-315](../runtime/RUNTIME-315-per-domain-render-attribute-source-binding.md#operator-decisions-2026-10-02).
+- Operator decisions 2026-10-02 (model unification, picking/culling follow displayed positions, canonical normals, single Color mechanism, pixel sizes) are recorded in [RUNTIME-315](../../done/RUNTIME-315-per-domain-render-attribute-source-binding.md#operator-decisions-2026-10-02).
 - Existing tools: `show_property`, `set_visibility` (`src/runtime/Agent/Runtime.AgentOperations.Editor.cpp:695,702`); mutating calls run under `ScopedEditorCommandLabelPrefix("Agent: ")` and are undoable. `domain` arguments share one enum generated from `GeometryElementDomain`.
 - Tool schemas and descriptions are the agent's documentation; document each attribute, its type and domain rules in the schema description.
 

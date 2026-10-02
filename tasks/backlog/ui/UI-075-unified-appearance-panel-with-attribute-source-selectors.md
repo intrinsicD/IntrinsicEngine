@@ -21,7 +21,7 @@ contracts: [geometry.element-domain-sources, runtime.editor-prepared-frame-local
 - Method panels stay where they are.
 
 ## Context
-- Operator decisions 2026-10-02 (model unification, picking/culling follow displayed positions, canonical normals, single Color mechanism, pixel sizes) are recorded in [RUNTIME-315](../runtime/RUNTIME-315-per-domain-render-attribute-source-binding.md#operator-decisions-2026-10-02).
+- Operator decisions 2026-10-02 (model unification, picking/culling follow displayed positions, canonical normals, single Color mechanism, pixel sizes) are recorded in [RUNTIME-315](../../done/RUNTIME-315-per-domain-render-attribute-source-binding.md#operator-decisions-2026-10-02).
 - Today: `pointcloud.appearance`, `graph.appearance`, `mesh.appearance` are registered separately (`Sandbox.DomainPanels.cpp:996-1017`); the Mesh window also draws graph and point sections, graph draws point (`:1118-1135`), so the three windows already duplicate one another. `DrawDomainRenderWindow` (`:679`) shows a lane checkbox, render hints (point type/size, edge width, surface domain), a single "Property" dropdown that drives only color/scalar overlays (`:417`), and hides the structural channel selector and read-only slot tables under "Advanced" (`:741-743`; "Vertex channels" `:175`, "Binding targets" `:144`). Position/Normal/Texcoord/Size/Width cannot be chosen.
 - `UI-051` (capability-based domain gating) is the prerequisite; this task replaces its Appearance part with the unified window.
 - Shared helpers: `Sandbox.PanelSupport` property pickers (`:236`), `DrawDisabledReasonTooltip` (`Sandbox.PanelSupport.hpp:228`); `UI-037`/`UI-058` own the disabled-reason presentation, `UI-074` the Color interpretation tooltip text, `UI-072` shared helper adoption.

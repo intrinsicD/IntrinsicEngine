@@ -14,7 +14,7 @@ contracts: [geometry.element-domain-sources, geometry.property-coherence, runtim
 # RUNTIME-318 — Migrate the presentation color slots onto the Color overlay
 
 ## Goal
-- One Color mechanism (operator decision in [RUNTIME-315](RUNTIME-315-per-domain-render-attribute-source-binding.md#operator-decisions-2026-10-02)):
+- One Color mechanism (operator decision in [RUNTIME-315](../../done/RUNTIME-315-per-domain-render-attribute-source-binding.md#operator-decisions-2026-10-02)):
   the `PointColor`, `LineColor`, `PointScalarField` and `LineScalarField`
   `GeometryPresentationSlotRecipe` PropertyBuffer slots stop being a second,
   live way to color point and line lanes; their effect is expressed by the

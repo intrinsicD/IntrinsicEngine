@@ -8,6 +8,22 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-02 — RUNTIME-315 per-domain render attribute source binding
+
+Retired [RUNTIME-315](RUNTIME-315-per-domain-render-attribute-source-binding.md).
+
+- One rules table and one undoable command bind position, normal, texcoord, color, point size and line width to a source property on every element domain of meshes, graphs and point clouds.
+- Rebound positions drive drawing, culling, picking (ids stay canonical), highlights, vector fields and camera focus. `v:position` is never written.
+- Color is the single overlay mechanism. Sizes and widths are per-element pixels.
+- Bindings persist in scene files and load stale as a reported fallback.
+- Maturity: CPUContracted. Follow-ups:
+  - GRAPHICS-158 owns the Vulkan evidence.
+  - RUNTIME-318 owns the presentation color slots.
+  - RUNTIME-319 owns processed-property persistence.
+  - UI-075 and RUNTIME-316 own the panel and the agent tool.
+
+Commits `3e8254a0f` through `6fe918729`.
+
 ## 2026-10-02 — BUG-233 repeated scheduled texture bake flake
 
 Retired [BUG-233](BUG-233-scheduled-texture-bake-rebake-flake.md).
