@@ -1399,6 +1399,8 @@ TEST(SandboxEditorUi, CameraPoseCommandPerControllerKindPolicy)
         EXPECT_TRUE(result.UpIgnored);
         EXPECT_NEAR(glm::length(top.View().Position - glm::vec3(5, 10, 7)), 0.0f, 1e-4f);
         EXPECT_EQ(pointer(top), before) << "applying never replaces the controller instance";
+        EXPECT_NEAR(static_cast<Runtime::TopDownCameraController*>(&top.Main())->OrthographicHeight(), 20.0f, 1e-3f)
+            << "the orthographic framing follows the altitude, as Seed() does";
 
         // A sideways direction is refused without touching the camera or marking a transition.
         (void)top.Cameras.ConsumeCameraTransition(Runtime::CameraControllerSlot::Main);

@@ -323,6 +323,9 @@ export namespace Extrinsic::Runtime
         bool HasMainCameraController{false};
         Core::Config::CameraControllerKind MainCameraControllerKind{
             Core::Config::CameraControllerKind::Orbit};
+        // The current selection, for the Camera panel's View presets and Focus selection (the
+        // selection model is only built when its own window is open).
+        std::vector<std::uint32_t> SelectedStableIds{};
         bool HasPrimitiveViewEntity{false};
         std::uint32_t PrimitiveViewStableId{0u};
         EditorPrimitiveViewSettings PrimitiveView{};

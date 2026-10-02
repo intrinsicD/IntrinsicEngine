@@ -7,6 +7,7 @@ module;
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -104,6 +105,29 @@ namespace Extrinsic::Runtime
         }
 
         return ComputeFocusTargetForBoundingSpheres(spheres);
+    }
+
+    std::string_view ToString(const CameraViewPreset preset) noexcept
+    {
+        switch (preset)
+        {
+        case CameraViewPreset::Front: return "front";
+        case CameraViewPreset::Back: return "back";
+        case CameraViewPreset::Left: return "left";
+        case CameraViewPreset::Right: return "right";
+        case CameraViewPreset::Top: return "top";
+        case CameraViewPreset::Bottom: return "bottom";
+        case CameraViewPreset::Isometric: return "isometric";
+        }
+        return {};
+    }
+
+    std::optional<CameraViewPreset> ParseCameraViewPreset(const std::string_view name) noexcept
+    {
+        for (const CameraViewPreset preset : kCameraViewPresets)
+            if (ToString(preset) == name)
+                return preset;
+        return std::nullopt;
     }
 
     CameraPresetAxes CameraPresetAxesFor(const CameraViewPreset preset) noexcept

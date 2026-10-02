@@ -174,7 +174,8 @@ namespace Extrinsic::Runtime
 
         void Seed(const Graphics::CameraViewInput& seed) noexcept override;
         void Focus(CameraFocusTarget target) noexcept override;
-        // Pivot = target, altitude = position.y - target.y (clamped); direction and up are fixed.
+        // Pivot = target, altitude = position.y - target.y (clamped), orthographic height = 2 * altitude
+        // (as Seed); direction and up are fixed.
         void LookAt(const glm::vec3& position, const glm::vec3& target, const glm::vec3& up) noexcept override;
         void Update(const Platform::Input::Context& input, double deltaSeconds) noexcept override;
         [[nodiscard]] Graphics::CameraViewInput GetView(Core::Extent2D viewport) const noexcept override;

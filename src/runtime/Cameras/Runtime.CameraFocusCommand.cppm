@@ -1,9 +1,11 @@
 module;
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 
 #include <glm/glm.hpp>
 
@@ -66,6 +68,13 @@ export namespace Extrinsic::Runtime
         glm::vec3 Forward{0.0f, 0.0f, -1.0f};
         glm::vec3 Up{0.0f, 1.0f, 0.0f};
     };
+
+    inline constexpr std::array<CameraViewPreset, 7> kCameraViewPresets{
+        CameraViewPreset::Front, CameraViewPreset::Back, CameraViewPreset::Left, CameraViewPreset::Right,
+        CameraViewPreset::Top, CameraViewPreset::Bottom, CameraViewPreset::Isometric};
+    // Lower-case name ("front", ..., "isometric"); the empty view for an out-of-range value.
+    [[nodiscard]] std::string_view ToString(CameraViewPreset preset) noexcept;
+    [[nodiscard]] std::optional<CameraViewPreset> ParseCameraViewPreset(std::string_view name) noexcept;
 
     // Viewing direction and up vector of a preset (orthonormal).
     [[nodiscard]] CameraPresetAxes CameraPresetAxesFor(CameraViewPreset preset) noexcept;

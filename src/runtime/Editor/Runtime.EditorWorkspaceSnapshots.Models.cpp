@@ -2708,6 +2708,11 @@ namespace {
             EditorCameraRenderModel model{};
             model.CameraControlsAvailable = context.CameraControllers != nullptr;
             model.RenderSettingsAvailable = context.CameraControllers != nullptr;
+            if (context.Selection != nullptr)
+            {
+                const auto selected = context.Selection->SelectedStableIds();
+                model.SelectedStableIds.assign(selected.begin(), selected.end());
+            }
 
             if (context.CameraControllers != nullptr)
             {

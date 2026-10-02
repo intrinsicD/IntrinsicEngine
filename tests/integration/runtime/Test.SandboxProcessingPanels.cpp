@@ -87,6 +87,7 @@ import Extrinsic.Runtime.PointCloudConsolidationTypes;
 import Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Runtime.SpatialIndexCache;
 
+#include "TestImGuiFrameScope.hpp"
 #include "../../../src/app/Sandbox/Editor/Sandbox.PanelSupport.hpp"
 
 namespace R = Extrinsic::Runtime;
@@ -350,69 +351,98 @@ TEST(SandboxProcessingPanels, CameraPanelPresetAndFocusButtonsDriveTheMainCamera
 {
     PanelHarness harness(Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry(), false, false, true);
     auto& scene = harness.Scene();
-    const auto entity = scene.Create();
-    PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+    const auto addBounded = [&](const glm::vec3 center)
     {
+        const auto entity = scene.Create();
+        PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
         Extrinsic::ECS::Components::Culling::World::Bounds bounds{};
-        bounds.WorldBoundingSphere.Center = {100.0f, 0.0f, 0.0f};
+        bounds.WorldBoundingSphere.Center = center;
         bounds.WorldBoundingSphere.Radius = 2.0f;
         scene.Raw().emplace_or_replace<Extrinsic::ECS::Components::Culling::World::Bounds>(entity, bounds);
-    }
+        return entity;
+    };
+    const glm::vec3 centerA{100.0f, 0.0f, 0.0f}, centerB{100.0f, 30.0f, 40.0f};
+    const auto a = addBounded(centerA);
+    const auto b = addBounded(centerB);
     auto* cameras = harness.Engine->Services().Find<R::CameraControllerRegistry>();
     ASSERT_NE(cameras, nullptr);
     ASSERT_TRUE(harness.Shell.SetEditorWindowOpen("view.camera_render", true));
     const Extrinsic::Core::Extent2D extent{640, 480};
-    const auto forward = [&] { return cameras->Resolve(R::CameraControllerSlot::Main).GetView(extent).Forward; };
-    const auto position = [&] { return cameras->Resolve(R::CameraControllerSlot::Main).GetView(extent).Position; };
+    const auto view = [&] { return cameras->Resolve(R::CameraControllerSlot::Main).GetView(extent); };
+    // Distance of `point` from the camera's view axis (negative when behind the camera).
+    const auto offAxis = [&](const glm::vec3 point)
+    {
+        const auto v = view();
+        const glm::vec3 toPoint = point - v.Position;
+        return glm::dot(toPoint, v.Forward) > 0.0f ? glm::length(glm::cross(v.Forward, toPoint)) : -1.0f;
+    };
 
     int frame = 0;
-    glm::vec3 leftPosition{};
     harness.Driver->OnFrame = [&](R::Engine& engine) {
         ++frame;
         auto* window = ImGui::FindWindowByName("Camera / Render");
         if (window == nullptr)
         {
-            if (frame > 20) { ADD_FAILURE() << "camera window never drew"; engine.RequestExit(); }
+            if (frame > 40) { ADD_FAILURE() << "camera window never drew"; engine.RequestExit(); }
             return;
         }
         ImGui::SetWindowSize(window, {900, 400});
         ImGui::SetWindowPos(window, {0, 0});
         ImGui::FocusWindow(window);
         if (frame == 3)
-        {
             ImGui::ActivateItemByID(window->GetID("Top"));
-        }
         if (frame == 5)
         {
-            // Whole scene framed from above, over the off-origin bounds.
-            EXPECT_NEAR(glm::dot(forward(), glm::vec3(0, -1, 0)), 1.0f, 1e-3f);
-            EXPECT_NEAR(position().x, 100.0f, 1e-2f);
-            ImGui::ActivateItemByID(window->GetID("Left"));
+            // Nothing selected: the whole scene is framed from above (both are far from the origin).
+            EXPECT_NEAR(glm::dot(view().Forward, glm::vec3(0, -1, 0)), 1.0f, 1e-3f);
+            EXPECT_NEAR(view().Position.x, 100.0f, 1e-2f);
+            EXPECT_NEAR(view().Position.z, 20.0f, 1e-2f) << "centered between both entities";
+            EXPECT_TRUE(harness.Selection().SetSelectedEntity(scene, a));
         }
         if (frame == 7)
-        {
-            EXPECT_NEAR(glm::dot(forward(), glm::vec3(1, 0, 0)), 1.0f, 1e-3f);
-            // Focus selection is disabled without a selection: activation must not move the camera.
-            leftPosition = position();
-            ImGui::ActivateItemByID(window->GetID("Focus selection"));
-        }
-        if (frame == 8)
-        {
-            EXPECT_EQ(position(), leftPosition) << "Focus selection is disabled without a selection";
-            EXPECT_TRUE(harness.Selection().SetSelectedEntity(scene, entity));
-        }
+            ImGui::ActivateItemByID(window->GetID("Left"));
         if (frame == 9)
-            ImGui::ActivateItemByID(window->GetID("Focus selection"));
+        {
+            // Selected: the preset frames A along +X.
+            EXPECT_NEAR(glm::dot(view().Forward, glm::vec3(1, 0, 0)), 1.0f, 1e-3f);
+            EXPECT_NEAR(offAxis(centerA), 0.0f, 1e-2f);
+            EXPECT_TRUE(harness.Selection().SetSelectedEntity(scene, b));
+        }
         if (frame == 11)
         {
-            const auto view = cameras->Resolve(R::CameraControllerSlot::Main).GetView(extent);
-            EXPECT_GT(glm::dot(glm::vec3(100, 0, 0) - view.Position, view.Forward), 0.0f)
-                << "focus keeps the direction and looks at the selection";
+            EXPECT_GT(offAxis(centerB), 1.0f) << "B is off the view axis before focusing";
+            ImGui::ActivateItemByID(window->GetID("Focus selection"));
+        }
+        if (frame == 13)
+        {
+            EXPECT_NEAR(glm::dot(view().Forward, glm::vec3(1, 0, 0)), 1.0f, 1e-3f) << "focus keeps the direction";
+            EXPECT_NEAR(offAxis(centerB), 0.0f, 1e-2f) << "the selection is now on the view axis";
             engine.RequestExit();
         }
     };
     harness.Engine->Run();
-    EXPECT_GE(frame, 11);
+    EXPECT_GE(frame, 13);
+}
+
+TEST(SandboxProcessingPanels, CameraViewFocusButtonIsDisabledWithoutASelection)
+{
+    TestSupport::ImGuiFrameScope gui;
+    Editor::SandboxEditorContext context{};
+    Editor::CameraViewUiState state{};
+    const std::array<std::uint32_t, 1> selected{7u};
+    for (const bool hasSelection : {false, true})
+    {
+        gui.NextFrame();
+        ImGui::SetNextWindowPos({0, 0});
+        ImGui::SetNextWindowSize({800, 200});
+        ImGui::Begin("Camera view test", nullptr, ImGuiWindowFlags_NoSavedSettings);
+        Editor::DrawCameraViewControls(context, hasSelection ? std::span<const std::uint32_t>{selected}
+                                                             : std::span<const std::uint32_t>{},
+                                       Config::CameraControllerKind::Orbit, state);
+        const bool disabled = (ImGui::GetItemFlags() & ImGuiItemFlags_Disabled) != 0;
+        EXPECT_EQ(disabled, !hasSelection) << "the Focus selection button is the last item drawn";
+        ImGui::End();
+    }
 }
 
 TEST(SandboxProcessingPanels, ShowButtonsApplyAppearancePropertiesOnMeshGraphAndCloud)

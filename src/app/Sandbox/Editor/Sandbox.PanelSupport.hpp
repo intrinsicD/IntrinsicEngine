@@ -329,6 +329,21 @@ namespace Extrinsic::Sandbox::Editor
             std::function<void(float, float, float, float)> ClaimSceneViewport{};
         };
 
+        // Camera panel's "View" row (UI-070): the view presets frame the selection (the whole scene
+        // when nothing is selected) and "Focus selection" frames the selection, both through
+        // ApplyEditorCameraPoseCommand, the command the agent's set_camera uses. The last
+        // refusal is shown under the row and cleared when the controller kind changes. The Focus
+        // button is the last item drawn, disabled with a reason while nothing is selected.
+        struct CameraViewUiState
+        {
+            Runtime::EditorCommandStatus Status{Runtime::EditorCommandStatus::Applied};
+            std::optional<Runtime::EditorCameraControllerKind> Kind{};
+        };
+        void DrawCameraViewControls(const SandboxEditorContext& context,
+                                    std::span<const std::uint32_t> selectedStableIds,
+                                    Runtime::EditorCameraControllerKind controllerKind,
+                                    CameraViewUiState& state);
+
     }
 
     // Each drawing surface retains its own persistent rename draft and diagnostic.

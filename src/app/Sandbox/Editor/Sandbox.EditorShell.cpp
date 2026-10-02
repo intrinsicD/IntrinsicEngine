@@ -48,7 +48,6 @@ import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.SceneEditingOperations;
-import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.VisualizationRecipes;
@@ -972,6 +971,7 @@ namespace Extrinsic::Sandbox::Editor
             std::array<char, 1024>* importPathBuffer,
             std::array<char, 1024>* scenePathBuffer,
             std::array<char, 8192>* renderRecipeDraftBuffer,
+            CameraViewUiState* cameraViewState,
             EditorAssetPayloadKind* importPayloadKind,
             std::optional<EditorFileImportResult>* lastImportResult,
             std::optional<EditorSceneFileResult>* lastSceneFileResult,
@@ -1899,41 +1899,11 @@ namespace Extrinsic::Sandbox::Editor
 
                     // View presets frame the selection (or the whole scene when nothing is
                     // selected) through the same command the agent uses.
-                    static EditorCommandStatus lastViewStatus = EditorCommandStatus::Applied;
-                    ImGui::TextUnformatted("View:");
-                    struct PresetButton { const char* Label; CameraViewPreset Preset; };
-                    for (const PresetButton& entry : {PresetButton{"Front", CameraViewPreset::Front},
-                                                      PresetButton{"Back", CameraViewPreset::Back},
-                                                      PresetButton{"Left", CameraViewPreset::Left},
-                                                      PresetButton{"Right", CameraViewPreset::Right},
-                                                      PresetButton{"Top", CameraViewPreset::Top},
-                                                      PresetButton{"Bottom", CameraViewPreset::Bottom},
-                                                      PresetButton{"Isometric", CameraViewPreset::Isometric}})
-                    {
-                        ImGui::SameLine();
-                        if (ImGui::Button(entry.Label))
-                        {
-                            lastViewStatus = ApplyEditorCameraPoseCommand(
-                                context->SceneCommands,
-                                EditorCameraPoseCommand{
-                                    .Mode = EditorCameraPoseMode::Preset,
-                                    .Preset = entry.Preset,
-                                    .StableEntityIds = std::vector<std::uint32_t>(
-                                        frame.Selection.SelectedStableIds.begin(),
-                                        frame.Selection.SelectedStableIds.end()),
-                                }).Status;
-                        }
-                    }
-                    ImGui::BeginDisabled(frame.Selection.SelectedStableIds.empty());
-                    if (ImGui::Button("Focus selection"))
-                    {
-                        lastViewStatus = ApplyEditorCameraPoseCommand(
-                            context->SceneCommands,
-                            EditorCameraPoseCommand{.Mode = EditorCameraPoseMode::Focus}).Status;
-                    }
-                    ImGui::EndDisabled();
-                    if (lastViewStatus != EditorCommandStatus::Applied)
-                        ImGui::TextDisabled("View change: %s", DebugNameForEditorCommandStatus(lastViewStatus));
+                    DrawCameraViewControls(
+                        *context,
+                        frame.CameraRender.SelectedStableIds,
+                        frame.CameraRender.MainCameraControllerKind,
+                        *cameraViewState);
                 }
 
                 DrawDiagnostics(frame.CameraRender.Diagnostics);
@@ -2077,6 +2047,7 @@ namespace Extrinsic::Sandbox::Editor
             Runtime::EditorAssetPayloadKind ImportPayloadKind{
                 Runtime::EditorAssetPayloadKind::Unknown};
             std::array<char, 8192> RenderRecipeDraftBuffer{};
+            CameraViewUiState CameraViewState{};
             std::int32_t TextureBakeSourceIndex{0};
             std::int32_t TextureBakeTargetSemanticIndex{0};
             std::int32_t TextureBakeEncoderIndex{0};
@@ -2183,6 +2154,7 @@ namespace Extrinsic::Sandbox::Editor
                     &ImportPathBuffer,
                     &ScenePathBuffer,
                     &RenderRecipeDraftBuffer,
+                    &CameraViewState,
                     &ImportPayloadKind,
                     &ActivePreparedFrame->Scene.LastAssetImportResult,
                     &ActivePreparedFrame->Scene.LastSceneFileResult,

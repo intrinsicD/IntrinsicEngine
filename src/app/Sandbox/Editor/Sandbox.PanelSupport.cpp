@@ -6,6 +6,7 @@ module;
 #include <array>
 #include <format>
 #include <cfloat>
+#include <cctype>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -40,6 +41,7 @@ import Extrinsic.Runtime.EditorJobProjection;
 // `ToString(JobState)` for the queued UV-job readout.
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.VisualizationRecipes;
@@ -2002,6 +2004,51 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::EndCombo();
         }
         return changed;
+    }
+
+    void DrawCameraViewControls(const SandboxEditorContext& context,
+                                const std::span<const std::uint32_t> selectedStableIds,
+                                const Runtime::EditorCameraControllerKind controllerKind,
+                                CameraViewUiState& state)
+    {
+        using Runtime::CameraViewPreset;
+        if (state.Kind != controllerKind)
+        {
+            state.Kind = controllerKind;
+            state.Status = Runtime::EditorCommandStatus::Applied;
+        }
+        ImGui::TextUnformatted("View:");
+        for (const CameraViewPreset preset : Runtime::kCameraViewPresets)
+        {
+            ImGui::SameLine();
+            std::string label{Runtime::ToString(preset)};
+            label.front() = static_cast<char>(std::toupper(static_cast<unsigned char>(label.front())));
+            if (ImGui::Button(label.c_str()))
+            {
+                state.Status = Runtime::ApplyEditorCameraPoseCommand(
+                    context.SceneCommands,
+                    Runtime::EditorCameraPoseCommand{
+                        .Mode = Runtime::EditorCameraPoseMode::Preset,
+                        .Preset = preset,
+                        .StableEntityIds = std::vector<std::uint32_t>(selectedStableIds.begin(),
+                                                                      selectedStableIds.end()),
+                    }).Status;
+            }
+        }
+        if (state.Status != Runtime::EditorCommandStatus::Applied)
+            ImGui::TextDisabled("View change: %s", Runtime::DebugNameForEditorCommandStatus(state.Status));
+
+        const bool nothingSelected = selectedStableIds.empty();
+        ImGui::BeginDisabled(nothingSelected);
+        if (ImGui::Button("Focus selection"))
+        {
+            state.Status = Runtime::ApplyEditorCameraPoseCommand(
+                context.SceneCommands,
+                Runtime::EditorCameraPoseCommand{.Mode = Runtime::EditorCameraPoseMode::Focus}).Status;
+        }
+        ImGui::EndDisabled();
+        if (nothingSelected)
+            DrawDisabledReasonTooltip("Select an entity to focus.");
     }
 
     void DrawDisabledReasonTooltip(const std::string_view disabledReason)

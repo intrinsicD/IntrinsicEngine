@@ -614,6 +614,10 @@ namespace Extrinsic::Runtime
     {
         m_Target = target;
         m_Altitude = std::clamp(position.y - target.y, m_MinAltitude, m_MaxAltitude);
+        // Seed()'s framing: the orthographic view spans twice the altitude, so the pose frames what
+        // a perspective camera at that distance would, and the far plane still reaches the target.
+        m_OrthographicHeight = std::clamp(m_Altitude * 2.0f, m_MinOrthographicHeight, m_MaxOrthographicHeight);
+        m_FarPlane = std::max(m_FarPlane, m_Altitude * 2.0f + 1.0f);
     }
 
     void TopDownCameraController::Update(const Platform::Input::Context& input,
