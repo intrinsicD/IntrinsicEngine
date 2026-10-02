@@ -836,27 +836,10 @@ namespace Extrinsic::Runtime
             ++stats.PointCloudGeometryReleases;
         };
 
-        // Size-source policy for this slice: only a uniform screen-space size
-        // (the `float` alternative of `RenderPoints::SizeSource`) is supported.
-        // A per-point size buffer (the `std::string` alternative) requires a
-        // per-point size upload that is not implemented here, so it fails
-        // closed rather than silently rendering with a default size. The
-        // render-type enum (`Flat`/`Sphere`/`Surfel`) only selects the
-        // downstream point shader and does not affect the position-only upload,
-        // so all three are accepted by the geometry-residency bridge.
-        if (const auto* points = registry.try_get<G::RenderPoints>(entity);
-            points != nullptr
-            && std::holds_alternative<std::string>(points->SizeSource))
-        {
-            ++stats.PointCloudGeometryFailedPack;
-            // Fail-closed: release any prior residency (a resident cloud that
-            // switches to an unsupported size source stops rendering) and leave
-            // the dirty tags in place so a later frame can recover once the size
-            // source becomes supported.
-            releaseStaleResidency();
-            return false;
-        }
-
+        // A named per-point size (`RenderPoints::SizeSource` string) is a
+        // pixel-size property buffer bound by the visualization sync
+        // (RUNTIME-315); the position-only upload is the same for every size
+        // source and render type.
         const bool hadResidency = sidecar.PointCloudGeometry.IsValid();
         const auto* channelBindings =
             registry.try_get<VertexChannelBindingSet>(entity);
@@ -1019,9 +1002,7 @@ namespace Extrinsic::Runtime
             return false;
         }
 
-        if (!isEdge
-            && (points == nullptr
-                || !std::holds_alternative<float>(points->SizeSource)))
+        if (!isEdge && points == nullptr)
         {
             ++stats.MeshVertexViewFailedPack;
             ReleaseMeshPrimitiveView(

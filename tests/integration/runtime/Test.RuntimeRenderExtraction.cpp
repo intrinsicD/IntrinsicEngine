@@ -2578,3 +2578,56 @@ TEST(RuntimeRenderExtraction, PendingScalarShowRemapsSplitSurfaceAndOverridesSta
         EXPECT_FLOAT_EQ(restored.ScalarRangeMax, 4.f);
     }
 }
+
+// RUNTIME-315: a named point size / line width is uploaded as a per-element
+// float buffer and bound to the lane's config; an unresolvable source draws
+// the uniform default size.
+TEST(RuntimeRenderExtraction, NamedPointSizeAndLineWidthBindPerElementPixelBuffers)
+{
+    namespace GS = ECS::Components::GeometrySources;
+    namespace G = Graphics::Components;
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+
+    const auto cloud = scene.Create();
+    scene.Raw().emplace<ECS::Components::Transform::WorldMatrix>(cloud).Matrix = glm::mat4{1.f};
+    AttachPointCloudSources(scene, cloud);
+    scene.Raw().get<GS::Vertices>(cloud).Properties.GetOrAdd<float>("v:radius", 1.0f).Vector() =
+        {2.0f, 4.0f, 8.0f};
+    scene.Raw().emplace<G::RenderPoints>(cloud).SizeSource = std::string{"v:radius"};
+
+    const auto graph = scene.Create();
+    scene.Raw().emplace<ECS::Components::Transform::WorldMatrix>(graph).Matrix = glm::mat4{1.f};
+    AttachLineGraphSources(scene, graph);
+    scene.Raw().get<GS::Edges>(graph).Properties.GetOrAdd<float>("e:width", 1.0f).Vector() =
+        {3.0f, 5.0f};
+    scene.Raw().emplace<G::RenderEdges>(graph).WidthSource = std::string{"e:width"};
+
+    const auto configOf = [&](const entt::entity entity) {
+        const auto sidecar = fixture.Extraction.FindRenderableSidecarForTest(StableId(entity));
+        EXPECT_TRUE(sidecar.has_value());
+        return fixture.Renderer->GetGpuWorld().GetEntityConfigForTest(sidecar->Instance);
+    };
+    const auto frame = [&] {
+        fixture.Extract(scene);
+        auto world = fixture.Renderer->ExtractRenderWorld({});
+        fixture.Renderer->PrepareFrame(world);
+        return world.Visualization.PropertyBufferDiagnostics;
+    };
+
+    const auto first = frame();
+    EXPECT_EQ(first.UploadedBufferCount, 2u);
+    EXPECT_NE(configOf(cloud).Point.PointSizeBDA, 0u);
+    EXPECT_NE(configOf(graph).Line.LineWidthBDA, 0u);
+
+    // An unchanged frame reuses the resident buffers.
+    const auto second = frame();
+    EXPECT_EQ(second.UploadedBufferCount, 0u);
+    EXPECT_EQ(second.ReusedBufferCount, 2u);
+
+    // A source that no longer resolves falls back to the uniform default size.
+    scene.Raw().get<G::RenderPoints>(cloud).SizeSource = std::string{"v:missing"};
+    (void)frame();
+    EXPECT_EQ(configOf(cloud).Point.PointSizeBDA, 0u);
+    EXPECT_FLOAT_EQ(configOf(cloud).Point.PointSize, std::get<float>(G::RenderPoints{}.SizeSource));
+}

@@ -164,6 +164,8 @@ namespace Extrinsic::Runtime
 
     EditorCommandHistoryResult EditorCommandHistory::Undo()
     {
+        if (m_GroupDepth != 0u)
+            return MakeResult(EditorCommandHistoryStatus::UnsupportedOperation);
         if (m_UndoStack.empty())
             return MakeResult(EditorCommandHistoryStatus::EmptyUndoStack);
 
@@ -183,6 +185,8 @@ namespace Extrinsic::Runtime
 
     EditorCommandHistoryResult EditorCommandHistory::Redo()
     {
+        if (m_GroupDepth != 0u)
+            return MakeResult(EditorCommandHistoryStatus::UnsupportedOperation);
         if (m_RedoStack.empty())
             return MakeResult(EditorCommandHistoryStatus::EmptyRedoStack);
 
@@ -212,6 +216,8 @@ namespace Extrinsic::Runtime
     {
         m_UndoStack.clear();
         m_RedoStack.clear();
+        m_GroupRecords.clear();
+        m_GroupDepth = 0u;
     }
 
     void EditorCommandHistory::ResetDocument(std::string path)
@@ -290,6 +296,23 @@ namespace Extrinsic::Runtime
                                         std::move(records));
         PushUndo(std::move(grouped));
         m_RedoStack.clear();
+    }
+
+    EditorCommandHistoryStatus EditorCommandHistory::AbortGroup()
+    {
+        if (m_GroupDepth == 0u)
+            return EditorCommandHistoryStatus::UnsupportedOperation;
+        EditorCommandHistoryStatus status = EditorCommandHistoryStatus::Undone;
+        for (auto record = m_GroupRecords.rbegin(); record != m_GroupRecords.rend(); ++record)
+        {
+            const EditorCommandHistoryStatus undone =
+                record->Undo ? record->Undo() : EditorCommandHistoryStatus::InvalidCommand;
+            if (!IsSuccessfulStatus(undone))
+                status = EditorCommandHistoryStatus::UndoFailed;
+            AdvanceRevision(record->Dirtying);
+        }
+        m_GroupRecords.clear();
+        return status;
     }
 
     void EditorCommandHistory::CommitApplied(EditorCommandRecord command)

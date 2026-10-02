@@ -772,8 +772,8 @@ export namespace Extrinsic::Runtime
     // Property-display recipes (scalar/color/label on one element domain)
     // become the lane's overlay through ApplyEditorVisualizationConfigCommand;
     // they keep the lane's styling (bins, isolines, baking and colormap). A
-    // scalar recipe's colormap applies when it is not the default (Viridis)
-    // or when the lane has no overlay yet.
+    // scalar recipe's explicit colormap always applies; an unset one keeps
+    // the lane's colormap (Viridis for a lane without an overlay).
     EditorCommandStatus
     ApplyEditorVisualizationRecipeCommand(const EditorVisualizationEditingContext& context,
                                           const EditorVisualizationRecipeCommand& command);

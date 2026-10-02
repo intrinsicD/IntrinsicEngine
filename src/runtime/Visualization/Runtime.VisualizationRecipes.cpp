@@ -1071,7 +1071,7 @@ namespace Extrinsic::Runtime
                             .ElementCount = authored.ExternalElementCount,
                             .RangeMin = manual ? authored.RangeMin : 0.0f,
                             .RangeMax = manual ? authored.RangeMax : 1.0f,
-                            .Colormap = authored.Colormap,
+                            .Colormap = authored.Colormap.value_or(Graphics::Colormap::Type::Viridis),
                             .ScalarBufferBDA = authored.BufferBDA,
                             .SourceElementCount = authored.ExternalElementCount,
                         });
@@ -1089,7 +1089,7 @@ namespace Extrinsic::Runtime
                             .AutoRange = authored.AutoRange,
                             .RangeMin = authored.RangeMin,
                             .RangeMax = authored.RangeMax,
-                            .Colormap = authored.Colormap,
+                            .Colormap = authored.Colormap.value_or(Graphics::Colormap::Type::Viridis),
                         },
                         EncodeScalarProperty);
                 }

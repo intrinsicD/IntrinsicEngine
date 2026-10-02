@@ -1722,13 +1722,12 @@ ApplyEditorRenderHintCommand(
                             // Showing another property on a lane swaps the
                             // source and keeps that lane's colormap (panel,
                             // Color binding and show_property alike). An
-                            // explicit non-default recipe colormap wins; the
-                            // default one only seeds a lane without a config.
-                            if (!hadLaneConfig ||
-                                recipe.Colormap != ScalarVisualizationRecipe{}.Colormap)
-                            {
-                                config.ScalarColormap = recipe.Colormap;
-                            }
+                            // explicit recipe colormap wins; without one a
+                            // lane that has no config gets the default.
+                            if (recipe.Colormap.has_value())
+                                config.ScalarColormap = *recipe.Colormap;
+                            else if (!hadLaneConfig)
+                                config.ScalarColormap = Graphics::Colormap::Type::Viridis;
                         }
                         // Property-only display requests use the same undoable lane state as Appearance.
                         return ApplyEditorVisualizationConfigCommand(context, config);
@@ -1920,7 +1919,16 @@ ApplyEditorRenderHintCommand(
                     }));
             }
             if (proceed && resetSlot.has_value())
-                (void)merge(ApplyEditorGeometryPresentationSlotDefaultCommand(context, *resetSlot));
+            {
+                const EditorCommandStatus reset =
+                    ApplyEditorGeometryPresentationSlotDefaultCommand(context, *resetSlot);
+                if (!merge(reset))
+                {
+                    // All or nothing: undo the overlay step already applied.
+                    (void)group.Abort();
+                    return reset;
+                }
+            }
             return result;
         }
 
@@ -1948,11 +1956,21 @@ ApplyEditorRenderHintCommand(
             }
             if (source == nullptr)
                 return EditorCommandStatus::UnsupportedRenderAttribute;  // lane not shown
-            if (!command.PropertyName.empty())
-                return EditorCommandStatus::AttributeBindingNotYetSupported;
-            if (std::holds_alternative<float>(*source))
-                return EditorCommandStatus::NoChange;
-            *source = defaultSource;
+            if (command.PropertyName.empty())
+            {
+                if (std::holds_alternative<float>(*source))
+                    return EditorCommandStatus::NoChange;
+                *source = defaultSource;
+            }
+            else
+            {
+                if (const auto* name = std::get_if<std::string>(source);
+                    name != nullptr && *name == command.PropertyName)
+                {
+                    return EditorCommandStatus::NoChange;
+                }
+                *source = command.PropertyName;
+            }
             if (context.CommandHistory != nullptr)
             {
                 return ToEditorCommandStatus(

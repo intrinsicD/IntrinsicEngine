@@ -189,3 +189,17 @@ python3 tools/agents/check_task_policy.py --root . --strict
   colormap is honoured; `docs/architecture/runtime.md` lists
   `attributeBindings`. The table now uses the shared `kPosition` name (the
   reuse drift guard caught a literal from slice 1).
+- 2026-10-02: Slice 5b (pixel sizes; slice 5 review folds). A named
+  `RenderPoints::SizeSource` / `RenderEdges::WidthSource` no longer stops a
+  point cloud or mesh vertex view from drawing: extraction uploads the float
+  property as a visualization property buffer (`<id>:point_size:<name>` /
+  `<id>:line_width:<name>`, stamped by the property revision) and the lane's
+  `VisualizationSyncRecord` carries its key, which the visualization sync
+  resolves into `PointSizeBDA`/`LineWidthBDA`; an unresolvable source draws
+  the component's default uniform size. The command now authors named
+  sizes/widths; only Position stays refused until slice 6. Review folds:
+  history groups are cleared with the history, refuse Undo/Redo while open
+  and can be aborted (a Color bind whose slot retirement fails rolls back);
+  `ScalarVisualizationRecipe::Colormap` is optional, so an explicit colormap
+  always applies and an unset one keeps the lane's. The full CPU gate found an
+  unrelated intermittent bake failure, filed as `BUG-233`.

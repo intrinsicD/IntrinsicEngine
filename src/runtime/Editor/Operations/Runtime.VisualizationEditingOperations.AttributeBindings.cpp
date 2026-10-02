@@ -167,11 +167,6 @@ namespace Extrinsic::Runtime
         std::mutex g_SourceScanMutex;
         std::map<SourceScanKey, GeometryPropertyResolution> g_SourceScans;
 
-        [[nodiscard]] bool IsPixelSizeAttribute(const RenderAttribute attribute) noexcept
-        {
-            return attribute == RenderAttribute::PointSize || attribute == RenderAttribute::LineWidth;
-        }
-
         [[nodiscard]] std::optional<std::string> BoundSourceName(
             const entt::registry& raw, const ECS::EntityHandle entity,
             const RenderAttributeRule& rule)
@@ -237,10 +232,10 @@ namespace Extrinsic::Runtime
         case RenderAttribute::Normal:
         case RenderAttribute::Texcoord:
         case RenderAttribute::Color:
-            return true;  // every table row of these attributes is drawn
-        case RenderAttribute::Position:
         case RenderAttribute::PointSize:
         case RenderAttribute::LineWidth:
+            return true;  // every table row of these attributes is drawn
+        case RenderAttribute::Position:
             break;
         }
         return false;
@@ -310,10 +305,7 @@ namespace Extrinsic::Runtime
                 row.Resolution = ResolveEditorAttributeBindingSource(
                     availability, rule.Attribute, rule.Domain, *bound);
                 row.UsingFallback = !row.Resolution.Resolved();
-                if (!row.Consumed && IsPixelSizeAttribute(rule.Attribute))
-                    row.Diagnostic = "'" + *bound + "' per-element sizes are not drawn yet; "
-                                     "this lane is not rendered while it is bound";
-                else if (!row.Consumed)
+                if (!row.Consumed)
                     row.Diagnostic = "'" + *bound + "' is not drawn yet; drawing the default (" +
                                      row.DefaultSource + ")";
                 else if (row.UsingFallback)

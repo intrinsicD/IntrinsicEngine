@@ -630,3 +630,37 @@ TEST(EditorCommandHistory, ScopedGroupMakesOneUndoStepAndKeepsSingletonsAndEmpty
     }
     EXPECT_EQ(history.UndoCount(), 2u);
 }
+
+TEST(EditorCommandHistory, OpenGroupsRefuseUndoRedoAbortRollsBackAndClearResetsThem)
+{
+    Runtime::EditorCommandHistory history{};
+    int value = 0;
+    ASSERT_TRUE(history.Execute(MakeValueCommand(value, 1, 0, "Base")).Succeeded());
+    {
+        Runtime::ScopedEditorCommandLabelPrefix agent{&history, "Agent: "};
+        Runtime::ScopedEditorCommandGroup group{&history, "Pair"};
+        EXPECT_TRUE(history.Execute(MakeValueCommand(value, 2, 1, "A")).Succeeded());
+        EXPECT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::UnsupportedOperation);
+        EXPECT_EQ(history.Redo().Status, Runtime::EditorCommandHistoryStatus::UnsupportedOperation);
+        EXPECT_TRUE(history.Execute(MakeValueCommand(value, 3, 2, "B")).Succeeded());
+    }
+    EXPECT_EQ(history.Snapshot().UndoLabel, "Agent: Pair");
+    EXPECT_EQ(value, 3);
+
+    {
+        Runtime::ScopedEditorCommandGroup group{&history, "Rejected"};
+        EXPECT_TRUE(history.Execute(MakeValueCommand(value, 4, 3, "C")).Succeeded());
+        EXPECT_EQ(value, 4);
+        EXPECT_EQ(group.Abort(), Runtime::EditorCommandHistoryStatus::Undone);
+        EXPECT_EQ(value, 3);
+    }
+    EXPECT_EQ(history.UndoCount(), 2u);
+    EXPECT_EQ(history.Snapshot().UndoLabel, "Agent: Pair");
+
+    history.BeginGroup();
+    EXPECT_TRUE(history.Execute(MakeValueCommand(value, 5, 3, "D")).Succeeded());
+    history.ClearHistory();  // drops the open group too
+    EXPECT_EQ(history.UndoCount(), 0u);
+    EXPECT_TRUE(history.Execute(MakeValueCommand(value, 6, 5, "E")).Succeeded());
+    EXPECT_EQ(history.UndoCount(), 1u);  // not swallowed by a stale group
+}

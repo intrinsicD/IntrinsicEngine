@@ -37,6 +37,11 @@ export namespace Extrinsic::Graphics
         GpuInstanceHandle TargetInstance{};
         std::string ScalarPropertyBufferSourceKey{};
         std::string ColorPropertyBufferSourceKey{};
+        // Per-element pixel sizes (float per point / per line segment) bound
+        // as visualization property buffers; they take precedence over a
+        // `GpuSceneSlot` buffer named by the render hint.
+        std::string PointSizePropertyBufferSourceKey{};
+        std::string LineWidthPropertyBufferSourceKey{};
     };
 
     class VisualizationSyncSystem

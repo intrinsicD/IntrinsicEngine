@@ -3,6 +3,7 @@ module;
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -85,7 +86,9 @@ export namespace Extrinsic::Runtime
         bool AutoRange{true};
         float RangeMin{0.0f};
         float RangeMax{1.0f};
-        Graphics::Colormap::Type Colormap{Graphics::Colormap::Type::Viridis};
+        // Unset: encoders use Viridis, and a property-display request keeps the
+        // colormap its lane already has (RUNTIME-315).
+        std::optional<Graphics::Colormap::Type> Colormap{};
     };
 
     struct ColorVisualizationRecipe

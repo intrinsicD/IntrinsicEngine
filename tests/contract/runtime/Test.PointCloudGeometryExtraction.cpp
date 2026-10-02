@@ -572,7 +572,10 @@ TEST(PointCloudGeometryExtraction, NonFinitePositionIncrementsInvalidPointsCount
     engine.Shutdown();
 }
 
-TEST(PointCloudGeometryExtraction, PerPointSizeSourceFailsClosedAsFailedPack)
+// RUNTIME-315: a named per-point size is a pixel-size property buffer bound
+// by the visualization sync; the position upload is the same as for a
+// uniform size, so the cloud stays resident and drawn.
+TEST(PointCloudGeometryExtraction, PerPointSizeSourceUploadsLikeAUniformSize)
 {
     namespace E = Extrinsic::ECS::Components;
     namespace G = Extrinsic::Graphics::Components;
@@ -584,9 +587,6 @@ TEST(PointCloudGeometryExtraction, PerPointSizeSourceFailsClosedAsFailedPack)
     auto& raw = scene.Raw();
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
-    // A per-point size buffer (string SizeSource) is unsupported in this slice
-    // — only a uniform float point size is. The bridge fails closed rather than
-    // uploading geometry that the point pass cannot size correctly.
     auto& points = raw.emplace<G::RenderPoints>(entity);
     points.SizeSource = std::string{"v:radius"};
     AttachPointCloudSources(scene, entity);
@@ -596,18 +596,13 @@ TEST(PointCloudGeometryExtraction, PerPointSizeSourceFailsClosedAsFailedPack)
                                                     engine.GetRenderer(),
                                                     &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
-    EXPECT_EQ(stats.PointCloudGeometryUploads, 0u);
-    EXPECT_EQ(stats.PointCloudGeometryFailedPack, 1u);
-    EXPECT_EQ(stats.PointCloudGeometryMissingPositions, 0u);
-    EXPECT_EQ(stats.PointCloudGeometryInvalidPoints, 0u);
+    EXPECT_EQ(stats.PointCloudGeometryUploads, 1u);
+    EXPECT_EQ(stats.PointCloudGeometryFailedPack, 0u);
 
     const auto view = extraction.FindRenderableSidecarForTest(
         Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
-    EXPECT_FALSE(view->HasPointCloudResidency);
-
-    auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
-    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 0u);
+    EXPECT_TRUE(view->HasPointCloudResidency);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
@@ -1063,7 +1058,7 @@ TEST(PointCloudGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPrese
 // per-point size-source buffer (the `std::string` alternative) must also
 // release the stale residency, since the size-source check fails closed before
 // the reuse path.
-TEST(PointCloudGeometryExtraction, SwitchingToUnsupportedSizeSourceReleasesResidency)
+TEST(PointCloudGeometryExtraction, SwitchingToANamedSizeSourceKeepsResidency)
 {
     namespace G = Extrinsic::Graphics::Components;
 
@@ -1080,35 +1075,20 @@ TEST(PointCloudGeometryExtraction, SwitchingToUnsupportedSizeSourceReleasesResid
                                              &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.PointCloudGeometryUploads, 1u);
 
-    auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
-    ASSERT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
-
-    // Switch to a per-point size buffer. No dirty tag is needed — the
-    // size-source check runs before the reuse path.
+    // The size source is not part of the geometry: no repack, no release.
     raw.get<G::RenderPoints>(entity).SizeSource = std::string{"v:radius"};
-
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
                                         &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.PointCloudGeometryUploads, 0u);
-    EXPECT_EQ(stats.PointCloudGeometryReuseHits, 0u);
-    EXPECT_EQ(stats.PointCloudGeometryFailedPack, 1u);
-    EXPECT_EQ(stats.PointCloudGeometryReleases, 1u);
-    EXPECT_EQ(stats.PointCloudGeometryFreeRetires, 0u);
+    EXPECT_EQ(stats.PointCloudGeometryReuseHits, 1u);
+    EXPECT_EQ(stats.PointCloudGeometryFailedPack, 0u);
+    EXPECT_EQ(stats.PointCloudGeometryReleases, 0u);
 
     const auto view =
         extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
-    EXPECT_FALSE(view->HasPointCloudResidency);
-    EXPECT_FALSE(gpuWorld.GetInstanceGeometry(view->Instance).IsValid());
-    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
-
-    constexpr std::uint32_t framesInFlight = 2u;
-    DrivePointCloudDeferredRetireWindow(extraction,
-                                        engine.GetRenderer(),
-                                        /*baseFrame=*/950u,
-                                        framesInFlight);
-    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 0u);
+    EXPECT_TRUE(view->HasPointCloudResidency);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();

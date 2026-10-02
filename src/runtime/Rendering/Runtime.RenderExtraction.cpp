@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <cstring>
 #include <array>
 #include <cmath>
 #include <cstddef>
@@ -356,8 +357,11 @@ namespace Extrinsic::Runtime
             {
                 return 1.0f;
             }
+            // A named per-point source falls back to the default uniform size.
             const auto* uniform = std::get_if<float>(&points->SizeSource);
-            return uniform != nullptr ? *uniform : 1.0f;
+            return uniform != nullptr
+                ? *uniform
+                : std::get<float>(Graphics::Components::RenderPoints{}.SizeSource);
         }
 
         [[nodiscard]] RHI::GpuEntityConfig BuildImmediateLaneConfig(
@@ -1100,6 +1104,49 @@ namespace Extrinsic::Runtime
                     fallback, overrides, VisualizationLane::Points);
             }
             return fallback;
+        }
+
+        // RUNTIME-315: a named point size / line width is a per-element pixel
+        // buffer bound through the visualization property-buffer residency.
+        // A source that does not resolve (missing, wrong kind or count,
+        // non-finite) emits nothing, so the lane draws its uniform default.
+        [[nodiscard]] std::string AppendPixelSizePropertyBuffer(
+            VisualizationEncodingBatch& batch,
+            const GeometryEntityAvailability& availability,
+            const std::uint32_t stableId,
+            const RenderAttribute attribute,
+            const GeometryElementDomain domain,
+            const std::variant<float, std::string>& source)
+        {
+            const auto* name = std::get_if<std::string>(&source);
+            if (name == nullptr ||
+                !ResolveRenderAttributeSource(availability, attribute, domain, *name).Resolved())
+            {
+                return {};
+            }
+            std::string key = BuildVisualizationPropertySourceKey(
+                stableId, attribute == RenderAttribute::PointSize ? "point_size" : "line_width", *name);
+            if (std::ranges::any_of(batch.PropertyBuffers,
+                                    [&](const auto& buffer) { return buffer.SourceKey == key; }))
+            {
+                return key;
+            }
+            const Geometry::PropertySet& properties = *ResolveGeometryPropertySet(availability, domain);
+            const auto values = Geometry::ConstPropertySet{properties}.Get<float>(*name);
+            auto& payload = batch.PropertyBufferPayloads.emplace_back(values.Span().size_bytes());
+            std::memcpy(payload.data(), values.Span().data(), payload.size());
+            batch.PropertyBuffers.push_back(Graphics::VisualizationPropertyBufferUploadDescriptor{
+                .SourceKey = key,
+                .Domain = attribute == RenderAttribute::PointSize
+                    ? Graphics::VisualizationAttributeDomain::Vertex
+                    : Graphics::VisualizationAttributeDomain::Edge,
+                .ValueType = Graphics::VisualizationValueType::ScalarFloat,
+                .ElementCount = static_cast<std::uint32_t>(values.Span().size()),
+                .StrideBytes = sizeof(float),
+                .DirtyStamp = values.Revision(),
+                .Bytes = payload,
+            });
+            return key;
         }
 
         [[nodiscard]] std::optional<VisualizationRecipe>
@@ -2011,6 +2058,31 @@ namespace Extrinsic::Runtime
             ReleaseGraphPointLaneInstance(*sidecar, renderer, stats);
         }
 
+        std::string pointSizeKey{};
+        std::string lineWidthKey{};
+        if (availabilityThisFrame.has_value())
+        {
+            using SourceDomain = ECS::Components::GeometrySources::Domain;
+            const SourceDomain provenance = availabilityThisFrame->Sources.ProvenanceDomain;
+            if (renderPoints != nullptr)
+            {
+                pointSizeKey = AppendPixelSizePropertyBuffer(
+                    m_VisualizationState.Batch, *availabilityThisFrame, stableId,
+                    RenderAttribute::PointSize, PositionDomainFor(provenance),
+                    renderPoints->SizeSource);
+            }
+            if (renderEdges != nullptr)
+            {
+                lineWidthKey = AppendPixelSizePropertyBuffer(
+                    m_VisualizationState.Batch, *availabilityThisFrame, stableId,
+                    RenderAttribute::LineWidth,
+                    provenance == SourceDomain::Mesh ? GeometryElementDomain::MeshEdge
+                    : provenance == SourceDomain::Graph ? GeometryElementDomain::GraphEdge
+                                                        : GeometryElementDomain::Unknown,
+                    renderEdges->WidthSource);
+            }
+        }
+
         const Graphics::Components::VisualizationConfig* primaryVisualization =
             visualization;
         const Graphics::Components::RenderEdges* primaryEdges = renderEdges;
@@ -2048,6 +2120,8 @@ namespace Extrinsic::Runtime
             .Points = primaryPoints,
             .ScalarPropertyBufferSourceKey = scalarKeyFor(primaryVisualization),
             .ColorPropertyBufferSourceKey = colorKeyFor(primaryVisualization),
+            .PointSizePropertyBufferSourceKey = primaryPoints != nullptr ? pointSizeKey : std::string{},
+            .LineWidthPropertyBufferSourceKey = primaryEdges != nullptr ? lineWidthKey : std::string{},
         });
         if (splitGraphPointLane)
         {
@@ -2059,6 +2133,7 @@ namespace Extrinsic::Runtime
                 .TargetInstance = sidecar->GraphPointLaneInstance,
                 .ScalarPropertyBufferSourceKey = scalarKeyFor(pointVisualization),
                 .ColorPropertyBufferSourceKey = colorKeyFor(pointVisualization),
+                .PointSizePropertyBufferSourceKey = pointSizeKey,
             });
         }
         if (renderEdges != nullptr && sidecar->MeshEdgeViewInstance.IsValid())
@@ -2071,6 +2146,7 @@ namespace Extrinsic::Runtime
                 .TargetInstance = sidecar->MeshEdgeViewInstance,
                 .ScalarPropertyBufferSourceKey = scalarKeyFor(edgeVisualization, true),
                 .ColorPropertyBufferSourceKey = colorKeyFor(edgeVisualization, true),
+                .LineWidthPropertyBufferSourceKey = lineWidthKey,
             });
         }
         if (renderPoints != nullptr && sidecar->MeshVertexViewInstance.IsValid())
@@ -2083,6 +2159,7 @@ namespace Extrinsic::Runtime
                 .TargetInstance = sidecar->MeshVertexViewInstance,
                 .ScalarPropertyBufferSourceKey = scalarKeyFor(pointVisualization, true),
                 .ColorPropertyBufferSourceKey = colorKeyFor(pointVisualization, true),
+                .PointSizePropertyBufferSourceKey = pointSizeKey,
             });
         }
         if (availabilityThisFrame.has_value())

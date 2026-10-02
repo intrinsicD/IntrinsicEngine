@@ -30,6 +30,7 @@ import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.VisualizationRecipes;
 import Geometry.Properties;
 
 namespace
@@ -233,9 +234,8 @@ TEST(VertexChannelBindings, ModelListsRowsCandidatesAndCurrentSourcesForEveryEnt
     const auto* size = FindRow(model, A::PointSize, D::MeshVertex);
     ASSERT_TRUE(size->Bound);
     EXPECT_EQ(size->Source.Name, "v:temperature");
-    // Extraction does not draw per-element sizes yet: the row says so.
-    EXPECT_FALSE(size->Consumed);
-    EXPECT_NE(size->Diagnostic.find("not drawn yet"), std::string::npos);
+    EXPECT_TRUE(size->Consumed);
+    EXPECT_FALSE(size->UsingFallback);
     // A bound position is listed but not drawn until positions are consumed.
     EXPECT_FALSE(position->Consumed);
     EXPECT_NE(position->Diagnostic.find("not drawn yet"), std::string::npos);
@@ -493,21 +493,32 @@ TEST(VertexChannelBindings, ColorBindsThroughTheOverlayOnEveryLaneAndDefaultClea
     EXPECT_FALSE(nanCandidate->Compatible);
 }
 
-TEST(VertexChannelBindings, PixelSizeBindingsAreRefusedUntilDrawnAndDefaultRestoresUniform)
+TEST(VertexChannelBindings, PixelSizeBindingsWriteTheRenderHintAndDefaultRestoresUniform)
 {
     BindingFixture f;
     const ECS::EntityHandle cloud = MakeSelectable(f.Registry, "Cloud");
     AddPointCloudSource(f.Registry, cloud, 2u);
     SetPositions(f.Registry.Raw().get<GS::Vertices>(cloud), {{0, 0, 0}, {1, 0, 0}});
     SetProperty<float>(f.Registry.Raw().get<GS::Vertices>(cloud).Properties, "v:radius", {2.0f, 3.0f});
+    SetProperty<float>(f.Registry.Raw().get<GS::Vertices>(cloud).Properties, "v:nan",
+                       {std::numeric_limits<float>::quiet_NaN(), 3.0f});
+    const auto size = [&] { return f.Registry.Raw().get<G::RenderPoints>(cloud).SizeSource; };
 
-    EXPECT_EQ(f.Bind(cloud, A::PointSize, D::PointCloudPoint, "v:radius"), Cmd::AttributeBindingNotYetSupported);
+    EXPECT_EQ(f.Bind(cloud, A::PointSize, D::PointCloudPoint, "v:nan"), Cmd::AttributeSourceNonFinite);
     EXPECT_EQ(f.Bind(cloud, A::PointSize, D::PointCloudPoint), Cmd::NoChange);
-    f.Registry.Raw().get<G::RenderPoints>(cloud).SizeSource = std::string{"v:radius"};
+    ASSERT_EQ(f.Bind(cloud, A::PointSize, D::PointCloudPoint, "v:radius"), Cmd::Applied);
+    EXPECT_EQ(std::get<std::string>(size()), "v:radius");
+    EXPECT_EQ(f.Row(cloud, A::PointSize, D::PointCloudPoint).Source.Name, "v:radius");
     ASSERT_EQ(f.Bind(cloud, A::PointSize, D::PointCloudPoint), Cmd::Applied);
-    EXPECT_TRUE(std::holds_alternative<float>(f.Registry.Raw().get<G::RenderPoints>(cloud).SizeSource));
+    EXPECT_TRUE(std::holds_alternative<float>(size()));
     ASSERT_EQ(f.History.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
-    EXPECT_EQ(std::get<std::string>(f.Registry.Raw().get<G::RenderPoints>(cloud).SizeSource), "v:radius");
+    EXPECT_EQ(std::get<std::string>(size()), "v:radius");
+
+    const ECS::EntityHandle graph = MakeSelectable(f.Registry, "Graph");
+    AddGraphSource(f.Registry, graph);
+    SetProperty<float>(f.Registry.Raw().get<GS::Edges>(graph).Properties, "e:width", {1.0f, 4.0f});
+    ASSERT_EQ(f.Bind(graph, A::LineWidth, D::GraphEdge, "e:width"), Cmd::Applied);
+    EXPECT_EQ(std::get<std::string>(f.Registry.Raw().get<G::RenderEdges>(graph).WidthSource), "e:width");
 }
 
 TEST(VertexChannelBindings, ColorDefaultMasksOnlyItsLaneWhenTheOverlayIsInherited)
@@ -662,6 +673,46 @@ TEST(VertexChannelBindings, ShowPropertyAndColorBindingKeepTheLaneColormapAlike)
     EXPECT_EQ(surfaceMap(), Extrinsic::Graphics::Colormap::Type::Inferno);
     ASSERT_EQ(f.Bind(mesh, A::Color, D::MeshVertex, "v:a"), Cmd::Applied);
     EXPECT_EQ(surfaceMap(), Extrinsic::Graphics::Colormap::Type::Inferno);
+
+    // An explicit colormap, even the default one, overrides the lane's.
+    Runtime::VisualizationRecipe explicitViridis =
+        Runtime::MakeEditorPropertyVisualizationRecipe({D::MeshVertex, "v:b", Kind::Float});
+    std::get<Runtime::ScalarVisualizationRecipe>(explicitViridis.Data).Colormap =
+        Extrinsic::Graphics::Colormap::Type::Viridis;
+    ASSERT_EQ(Runtime::ApplyEditorVisualizationRecipeCommand(
+                  f.Context, Runtime::EditorVisualizationRecipeCommand{.StableEntityId = id,
+                                                                       .Recipe = explicitViridis}),
+              Cmd::Applied);
+    EXPECT_EQ(surfaceMap(), Extrinsic::Graphics::Colormap::Type::Viridis);
+}
+
+TEST(VertexChannelBindings, ColorBindingRollsBackWhenRetiringTheLaneSlotFails)
+{
+    BindingFixture f;
+    const ECS::EntityHandle cloud = MakeSelectable(f.Registry, "Cloud");
+    AddPointCloudSource(f.Registry, cloud, 2u);
+    SetPositions(f.Registry.Raw().get<GS::Vertices>(cloud), {{0, 0, 0}, {1, 0, 0}});
+    SetProperty<glm::vec4>(f.Registry.Raw().get<GS::Vertices>(cloud).Properties, "v:rgba",
+                           {{1, 0, 0, 1}, {0, 1, 0, 1}});
+    SetProperty<float>(f.Registry.Raw().get<GS::Vertices>(cloud).Properties, "v:heat", {0.0f, 1.0f});
+    Runtime::GeometryPresentationRecipe recipe{};
+    recipe.Lanes.push_back({.Lane = Runtime::GeometryRenderLane::Points, .PresentationKey = "points"});
+    Runtime::GeometryPresentationSlotRecipe slot{
+        .Semantic = Runtime::GeometryPresentationSlotSemantic::PointColor,
+        .SourceKind = Runtime::GeometryPresentationSourceKind::PropertyBuffer,
+        .Property = {D::PointCloudPoint, "v:rgba", Kind::Vec4},
+    };
+    slot.UniformDefault.Scalar = std::numeric_limits<double>::quiet_NaN();  // reset refuses this
+    recipe.Presentations.push_back({.Key = "points",
+                                    .Kind = Runtime::GeometryPresentationKind::PointPresentation,
+                                    .Slots = {slot}});
+    f.Registry.Raw().emplace<Runtime::GeometryPresentationRecipe>(cloud, recipe);
+
+    EXPECT_EQ(f.Bind(cloud, A::Color, D::PointCloudPoint, "v:heat"), Cmd::InvalidProcessingParameters);
+    EXPECT_EQ(f.History.UndoCount(), 0u);
+    EXPECT_FALSE(f.Registry.Raw().all_of<G::VisualizationLaneOverrides>(cloud) &&
+                 f.Registry.Raw().get<G::VisualizationLaneOverrides>(cloud).Points.has_value());
+    EXPECT_EQ(f.Row(cloud, A::Color, D::PointCloudPoint).Source.Name, "v:rgba");
 }
 
 TEST(VertexChannelBindings, ColorSlotsCountOnlyOnTheOverlayLaneAndRetireWithTheBindingInOneStep)

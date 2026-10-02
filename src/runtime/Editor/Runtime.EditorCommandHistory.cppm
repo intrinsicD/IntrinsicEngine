@@ -93,9 +93,12 @@ export namespace Extrinsic::Runtime
         // Commands executed or recorded between BeginGroup and the matching
         // EndGroup form one undo step (nesting joins the outermost group).
         // A group of one command keeps that command; an empty group records
-        // nothing. Prefer `ScopedEditorCommandGroup`.
+        // nothing. Undo/Redo are refused (UnsupportedOperation) while a group
+        // is open. AbortGroup undoes the open group's commands in reverse and
+        // discards them. Prefer `ScopedEditorCommandGroup`.
         void BeginGroup();
         void EndGroup(std::string label);
+        [[nodiscard]] EditorCommandHistoryStatus AbortGroup();
 
         void ClearHistory();
         void ResetDocument(std::string path = {});
@@ -150,6 +153,13 @@ export namespace Extrinsic::Runtime
         ~ScopedEditorCommandGroup()
         {
             if (m_History != nullptr) m_History->EndGroup(std::move(m_Label));
+        }
+        // Rolls back everything this group applied (all nesting levels) and
+        // records nothing; the scope still closes normally.
+        [[nodiscard]] EditorCommandHistoryStatus Abort()
+        {
+            return m_History != nullptr ? m_History->AbortGroup()
+                                        : EditorCommandHistoryStatus::UnsupportedOperation;
         }
         ScopedEditorCommandGroup(const ScopedEditorCommandGroup&) = delete;
         ScopedEditorCommandGroup& operator=(const ScopedEditorCommandGroup&) = delete;

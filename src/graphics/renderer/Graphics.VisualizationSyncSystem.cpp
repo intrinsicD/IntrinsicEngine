@@ -209,12 +209,12 @@ namespace Extrinsic::Graphics
                 return;
 
             cfg.Point.PointMode = ToPointMode(points->Type);
-            if (const auto* uniform =
-                    std::get_if<float>(&points->SizeSource);
-                uniform != nullptr)
-            {
-                cfg.Point.PointSize = *uniform;
-            }
+            // A named per-point source keeps the component's default uniform
+            // size as the fallback when its buffer is unavailable.
+            const auto* uniform = std::get_if<float>(&points->SizeSource);
+            cfg.Point.PointSize = uniform != nullptr
+                ? *uniform
+                : std::get<float>(Components::RenderPoints{}.SizeSource);
         }
 
         static void ApplyLineRenderConfig(
@@ -246,6 +246,23 @@ namespace Extrinsic::Graphics
             cfg.UniformColor = {1.f, 1.f, 1.f, 1.f};
             ApplyLineRenderConfig(cfg, record.Edges);
             ApplyPointRenderConfig(cfg, record.Points);
+            const auto pixelSizeAddress = [&](const std::string& key,
+                                              const VisualizationAttributeDomain domain) {
+                const VisualizationPropertyBufferAddress* address = FindPropertyBufferAddress(
+                    propertyBufferAddresses, key, {}, domain,
+                    [](const VisualizationValueType type) {
+                        return type == VisualizationValueType::ScalarFloat;
+                    });
+                return address != nullptr ? address->BufferBDA : 0u;
+            };
+            const std::uint64_t pointSizeBda = record.Points != nullptr
+                ? pixelSizeAddress(record.PointSizePropertyBufferSourceKey,
+                                   VisualizationAttributeDomain::Vertex)
+                : 0u;
+            const std::uint64_t lineWidthBda = record.Edges != nullptr
+                ? pixelSizeAddress(record.LineWidthPropertyBufferSourceKey,
+                                   VisualizationAttributeDomain::Edge)
+                : 0u;
 
             if (Device)
             {
@@ -259,7 +276,7 @@ namespace Extrinsic::Graphics
                 };
 
                 setBda("normals", cfg.VertexNormalBDA);
-                if (record.Points != nullptr)
+                if (record.Points != nullptr && pointSizeBda == 0u)
                 {
                     if (const auto* sizeName =
                             std::get_if<std::string>(&record.Points->SizeSource);
@@ -272,7 +289,7 @@ namespace Extrinsic::Graphics
                         setBda("sizes", cfg.Point.PointSizeBDA);
                     }
                 }
-                if (record.Edges != nullptr)
+                if (record.Edges != nullptr && lineWidthBda == 0u)
                 {
                     if (const auto* widthName =
                             std::get_if<std::string>(&record.Edges->WidthSource);
@@ -282,6 +299,11 @@ namespace Extrinsic::Graphics
                     }
                 }
             }
+
+            if (pointSizeBda != 0u)
+                cfg.Point.PointSizeBDA = pointSizeBda;
+            if (lineWidthBda != 0u)
+                cfg.Line.LineWidthBDA = lineWidthBda;
 
             if (!visCfg)
                 return cfg;

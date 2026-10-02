@@ -1840,8 +1840,9 @@ TEST(MeshGeometryExtraction, ShadingBindingsFeedNormalAndTexcoordStreamsOnVertex
     vertices.Properties.GetOrAdd<glm::vec2>("v:uv2", glm::vec2{0.25f}).Vector().assign(4u, glm::vec2{0.25f});
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
+    Extrinsic::Runtime::RuntimeRenderExtractionStats lastStats{};
     const auto extract = [&] {
-        (void)extraction.ExtractAndSubmit(
+        lastStats = extraction.ExtractAndSubmit(
             scene, engine.GetRenderer(),
             &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
         const auto view = extraction.FindRenderableSidecarForTest(
@@ -1878,6 +1879,16 @@ TEST(MeshGeometryExtraction, ShadingBindingsFeedNormalAndTexcoordStreamsOnVertex
                                 {0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0}));
     EXPECT_EQ(bound.Texcoord, Extrinsic::Tests::GeometryFloat32Fingerprint(
                                   {0.25f, 0.25f, 0.25f, 0.25f, 0.25f, 0.25f, 0.25f, 0.25f}));
+    // An unchanged frame reuses the upload; editing the bound vertex texcoord
+    // property re-uploads without re-binding.
+    (void)extract();
+    EXPECT_EQ(lastStats.MeshGeometryReuploads, 0u);
+    EXPECT_EQ(lastStats.MeshGeometryReuseHits, 1u);
+    vertices.Properties.Get<glm::vec2>("v:uv2").Vector().assign(4u, glm::vec2{0.75f});
+    bound = extract();
+    EXPECT_EQ(lastStats.MeshGeometryReuploads, 1u);
+    EXPECT_EQ(bound.Texcoord, Extrinsic::Tests::GeometryFloat32Fingerprint(
+                                  {0.75f, 0.75f, 0.75f, 0.75f, 0.75f, 0.75f, 0.75f, 0.75f}));
 
     // Corner texcoord binding; the canonical corner normals still split the
     // two seam vertices (v0, v2), so six GPU vertices all carry the bound UV.
