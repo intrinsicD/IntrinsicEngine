@@ -49,7 +49,7 @@ MCP progress notifications read the same model.
   The read model carries no `CanCancel` until that task adds `Cancel` to the job
   surface; the widget shows Cancel while a run is active and the panel supplies a
   cancel path (registration/CPD now).
-- [UI-060](../backlog/ui/UI-060-jobs-window.md) should reuse the widget and projection for its
+- [UI-060](UI-060-jobs-window.md) should reuse the widget and projection for its
   rows.
 - The agent side is RUNTIME-312 slice 8
   ([RUNTIME-312](RUNTIME-312-agent-lane-mcp-hardening-and-coverage.md)).

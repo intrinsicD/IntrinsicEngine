@@ -67,7 +67,6 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `RUNTIME-317` — Editor job records report requested/resolved backend and diagnostic (tasks/backlog/runtime/RUNTIME-317-editor-job-backend-and-diagnostic-producers.md)
 - blocked by `RUNTIME-277`: `UI-058` — All-reasons readiness tooltip and offending-control markers (tasks/backlog/ui/UI-058-all-reasons-readiness-tooltips.md)
 - blocked by `RUNTIME-278`: `UI-059` — Property Inspector window (tasks/backlog/ui/UI-059-property-inspector-window.md)
-- unblocked: `UI-060` — Jobs window (tasks/backlog/ui/UI-060-jobs-window.md)
 - blocked by `RUNTIME-280`: `UI-061` — Select-by-query controls and "use selection as mask/source" (tasks/backlog/ui/UI-061-select-by-query-controls.md)
 - blocked by `RUNTIME-283`: `UI-063` — File > Properties import/export window (tasks/backlog/ui/UI-063-properties-import-export-window.md)
 - blocked by `RUNTIME-284`: `UI-064` — History window (tasks/backlog/ui/UI-064-history-window.md)

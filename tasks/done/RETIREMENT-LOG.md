@@ -8,6 +8,15 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-02 — UI-060 Jobs window
+
+Retired [UI-060](UI-060-jobs-window.md).
+
+- View > Jobs shows running and recent editor jobs with the shared progress widget and run-level Cancel. The disabled-Cancel reasons come from the runtime.
+- Backend and diagnostic values are produced by RUNTIME-317; until then the window shows "-".
+
+Commits `006d39746`, `2f614db07`.
+
 ## 2026-10-02 — UI-071 GPU transaction controls and refusal presentation
 
 Retired [UI-071](UI-071-gpu-transaction-controls-and-refusal-presentation.md).
