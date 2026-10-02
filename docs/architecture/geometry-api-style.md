@@ -109,6 +109,12 @@ itself changes algorithm semantics, never as a shortcut for asking whether a
 property or adjacency source exists. Borrowing any mesh/graph property as a
 sample span is a view of existing data, not a conversion.
 
+Editor domain windows follow the same split. `ResolveGeometryDomainReading`
+(`Runtime.GeometryAvailability`) decides whether an entity can be read as a point
+set (Vertices), a graph (Vertices and Edges) or, exactly, a mesh; provenance
+stays visible through the reading statement but is not the eligibility test
+(`UI-051`).
+
 Runtime owns the ECS-to-method binding and must use canonical property
 references, catalogs, and geometry-source availability rather than rebuilding
 provenance switches in each method. UI actions derive readiness and domain

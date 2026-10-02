@@ -864,8 +864,8 @@ void DrawDomainSelectionWindow(const EditorDomainWindowModel& model,
     ImGui::TextWrapped("Click to replace; Shift-click to add; Ctrl-click to toggle. A background "
                        "click clears primitive selections. Vertex and edge picks on a surface use "
                        "the nearest corner or edge of the hit face.");
-    if (!model.HasSelectedEntity)
-        return;
+    if (!DomainWindowReady(model))
+        return; // the header already states the runtime's reason
     ImGui::SeparatorText("Selected elements");
     constexpr GeometryElementDomain domains[] = {
         GeometryElementDomain::MeshVertex,    GeometryElementDomain::MeshEdge,

@@ -351,6 +351,44 @@ namespace Extrinsic::Runtime
         return result;
     }
 
+    GeometryDomainReading ResolveGeometryDomainReading(
+        const GeometryEntityAvailability& availability,
+        const GS::Domain requested) noexcept
+    {
+        GeometryDomainReading reading{.Requested = requested};
+        const GS::SourceAvailability& sources = availability.Sources;
+        reading.Native = sources.ProvenanceDomain == requested;
+        if (!availability.HasGeometry())
+            return reading;
+        const auto fail = [&](const GeometryAvailabilityStatus status) noexcept
+        {
+            reading.Status = status;
+            return reading;
+        };
+        switch (requested)
+        {
+        case GS::Domain::Mesh:
+            if (sources.ProvenanceDomain != GS::Domain::Mesh)
+                return fail(GeometryAvailabilityStatus::UnsupportedProvenance);
+            break;
+        case GS::Domain::Graph:
+            if (!sources.Has(GS::SourceCapability::Vertices))
+                return fail(GeometryAvailabilityStatus::MissingPointSource);
+            if (!sources.Has(GS::SourceCapability::Edges))
+                return fail(GeometryAvailabilityStatus::MissingEdgeSource);
+            break;
+        case GS::Domain::PointCloud:
+            if (!sources.Has(GS::SourceCapability::Vertices))
+                return fail(GeometryAvailabilityStatus::MissingPointSource);
+            break;
+        default:
+            return fail(GeometryAvailabilityStatus::UnsupportedProvenance);
+        }
+        reading.Supported = true;
+        reading.Status = GeometryAvailabilityStatus::Supported;
+        return reading;
+    }
+
     bool SupportsGeometryElementDomain(
         const GeometryEntityAvailability& availability,
         const GeometryElementDomain domain) noexcept

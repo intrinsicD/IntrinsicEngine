@@ -731,3 +731,119 @@ TEST(SandboxDomainPanels, VectorFieldSectionAddsEditsAndRemovesFieldsWithoutVisi
     shell.Detach();
     engine.Shutdown();
 }
+
+// UI-051: the Properties and Selection windows of the PointCloud and Graph
+// kinds gate on the element-domain data they read, not on entity provenance.
+namespace
+{
+    enum class ProbeEntity { Mesh, Graph, PointCloud };
+
+    struct DomainWindowProbe
+    {
+        bool PropertyTable{false};
+        bool ElementDomainCombo{false};
+    };
+
+    [[nodiscard]] DomainWindowProbe ProbeDomainWindow(const ProbeEntity kind,
+                                                      const char* windowId,
+                                                      const std::string& title)
+    {
+        namespace GS = Extrinsic::ECS::Components::GeometrySources;
+        auto application = std::make_unique<OneFrameApplication>();
+        auto* driver = application.get();
+        Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(application));
+        engine.EmplaceModule<Runtime::SceneInteractionModule>();
+        engine.EmplaceModule<Runtime::EditorUiModule>();
+        engine.Initialize();
+        auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+        auto& raw = scene.Raw();
+        const auto entity = scene.Create();
+        raw.emplace<Extrinsic::ECS::Components::Selection::SelectableTag>(entity);
+        if (kind == ProbeEntity::Mesh)
+        {
+            Geometry::HalfedgeMesh::Mesh mesh;
+            const auto a = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+            const auto b = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+            const auto c = mesh.AddVertex({0.0f, 1.0f, 0.0f});
+            (void)mesh.AddTriangle(a, b, c);
+            GS::PopulateFromMesh(raw, entity, mesh);
+        }
+        else if (kind == ProbeEntity::Graph)
+        {
+            Geometry::Graph::Graph graph;
+            const auto a = graph.AddVertex({0.0f, 0.0f, 0.0f});
+            const auto b = graph.AddVertex({1.0f, 0.0f, 0.0f});
+            (void)graph.AddEdge(a, b);
+            GS::PopulateFromGraph(raw, entity, graph);
+        }
+        else
+        {
+            Geometry::PointCloud::Cloud cloud;
+            (void)cloud.AddPoint({0.0f, 0.0f, 0.0f});
+            GS::PopulateFromCloud(raw, entity, cloud);
+        }
+        auto* selection = engine.Services().Find<Runtime::SelectionController>();
+        EXPECT_NE(selection, nullptr);
+        EXPECT_TRUE(selection != nullptr && selection->SetSelectedEntity(scene, entity));
+        Editor::EditorShell shell;
+        shell.Attach(engine.Worlds(), engine.Services());
+        Editor::DomainPanels panels;
+        panels.Register(shell);
+        EXPECT_TRUE(shell.SetEditorWindowOpen(windowId, true));
+
+        DomainWindowProbe probe{};
+        int frame = 0;
+        driver->OnFrame = [&](Runtime::Engine& kernel) {
+            ++frame;
+            auto* window = ImGui::FindWindowByName(title.c_str());
+            if (frame < 4)
+                return;
+            if (window == nullptr)
+            {
+                ADD_FAILURE() << title << " did not open";
+                kernel.RequestExit();
+                return;
+            }
+            if (frame == 4)
+            {
+                probe.PropertyTable =
+                    ImGui::TableFindByID(window->GetID("PropertyCatalog")) != nullptr;
+                ImGui::FocusWindow(window);
+                ImGui::ActivateItemByID(window->GetID("Element domain"));
+            }
+            if (frame == 6)
+            {
+                probe.ElementDomainCombo = !ImGui::GetCurrentContext()->OpenPopupStack.empty();
+                kernel.RequestExit();
+            }
+        };
+        engine.Run();
+        panels.Unregister();
+        shell.Detach();
+        engine.Shutdown();
+        return probe;
+    }
+}
+
+TEST(SandboxDomainPanels, MeshSelectionIsUsableInThePointCloudAndGraphPropertiesAndSelectionWindows)
+{
+    const auto properties = [](const char* id, const char* title) {
+        return ProbeDomainWindow(ProbeEntity::Mesh, id, title);
+    };
+    EXPECT_TRUE(properties("pointcloud.properties", "PointCloud / Properties").PropertyTable);
+    EXPECT_TRUE(properties("graph.properties", "Graph / Properties").PropertyTable);
+    EXPECT_TRUE(properties("pointcloud.selection", "PointCloud / Selection").ElementDomainCombo);
+    EXPECT_TRUE(properties("graph.selection", "Graph / Selection").ElementDomainCombo);
+}
+
+TEST(SandboxDomainPanels, PointCloudIsRefusedWhereItLacksEdgesAndStillServedWhereItHasVertices)
+{
+    EXPECT_FALSE(ProbeDomainWindow(ProbeEntity::PointCloud, "graph.properties",
+                                   "Graph / Properties").PropertyTable);
+    EXPECT_FALSE(ProbeDomainWindow(ProbeEntity::PointCloud, "graph.selection",
+                                   "Graph / Selection").ElementDomainCombo);
+    EXPECT_TRUE(ProbeDomainWindow(ProbeEntity::PointCloud, "pointcloud.properties",
+                                  "PointCloud / Properties").PropertyTable);
+    EXPECT_TRUE(ProbeDomainWindow(ProbeEntity::Graph, "pointcloud.selection",
+                                  "PointCloud / Selection").ElementDomainCombo);
+}

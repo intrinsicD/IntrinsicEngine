@@ -2861,6 +2861,26 @@ BuildEditorDomainWindowModelFromBindings(
             BuildGeometryAvailability(raw, *selected);
         model.SelectedDomain = sourceView.ActiveDomain;
         model.DomainMatches = model.SelectedDomain == model.ExpectedDomain;
+        const GeometryDomainReading reading =
+            ResolveGeometryDomainReading(availability, model.ExpectedDomain);
+        model.DomainUsable = reading.Supported;
+        if (reading.Supported)
+        {
+            model.DomainReading =
+                std::string(DebugNameForEditorGeometryDomain(model.SelectedDomain));
+            switch (model.ExpectedDomain)
+            {
+            case GS::Domain::PointCloud:
+                model.DomainReading += " Vertices as a point set";
+                break;
+            case GS::Domain::Graph:
+                model.DomainReading += " Vertices and Edges as a graph";
+                break;
+            default:
+                model.DomainReading += " Vertices, Edges and Faces as a mesh";
+                break;
+            }
+        }
         model.VisualizationTargetAvailable =
             VisualizationTargetAvailableForView(
                 availability,
@@ -2889,15 +2909,28 @@ BuildEditorDomainWindowModelFromBindings(
             AppendDiagnostics(model.Diagnostics, model.Processing.Diagnostics);
         }
 
-        if (!model.DomainMatches)
+        if (!model.DomainUsable)
         {
             std::string message =
                 std::string(DebugNameForEditorDomainWindowKind(kind));
             message += " window requires ";
-            message += DebugNameForEditorGeometryDomain(model.ExpectedDomain);
-            message += "-domain selection; selected domain is ";
+            switch (model.ExpectedDomain)
+            {
+            case GS::Domain::PointCloud:
+                message += "Vertices";
+                break;
+            case GS::Domain::Graph:
+                message += "Vertices and Edges";
+                break;
+            default:
+                message += "Mesh provenance";
+                break;
+            }
+            message += "; selected domain is ";
             message += DebugNameForEditorGeometryDomain(model.SelectedDomain);
-            message += ".";
+            message += " (";
+            message += ToString(reading.Status);
+            message += ").";
             AddDiagnostic(model.Diagnostics,
                           EditorDiagnosticCode::UnsupportedGeometryDomain,
                           std::move(message));

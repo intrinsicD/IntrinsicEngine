@@ -4,6 +4,7 @@ module;
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 export module Extrinsic.Runtime.EditorWorkspaceSnapshots;
 
@@ -60,7 +61,14 @@ export namespace Extrinsic::Runtime
         std::uint32_t SelectedStableId{0u};
         ECS::Components::GeometrySources::Domain SelectedDomain{
             ECS::Components::GeometrySources::Domain::None};
+        // Exact provenance: the entity's own domain is the window's domain.
         bool DomainMatches{false};
+        // Capability: the entity carries the element-domain data this window
+        // reads (a mesh reads as a point set or a graph). Windows gate on this,
+        // not on DomainMatches. DomainReading states what is read, e.g.
+        // "Mesh Vertices as a point set"; empty when not usable.
+        bool DomainUsable{false};
+        std::string DomainReading{};
         EditorRenderHintModel RenderHints{};
         bool PrimitiveViewControlsAvailable{false};
         bool HasPrimitiveViewSettings{false};

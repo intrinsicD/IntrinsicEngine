@@ -126,6 +126,26 @@ export namespace Extrinsic::Runtime
         const GeometryEntityAvailability& availability,
         GeometryRenderLane lane) noexcept;
 
+    // How a domain-flavoured consumer (a PointCloud/Graph/Mesh window, or a
+    // per-domain section of one panel) reads an entity. Eligibility is the
+    // element-domain data the consumer needs, never the entity's provenance:
+    // a mesh's Vertices are a point set and its Vertices+Edges are a graph.
+    // Mesh stays exact because faces are semantic there. No conversion or alias
+    // entity is implied; results still publish to the originating element domain.
+    struct GeometryDomainReading
+    {
+        GeometrySources::Domain Requested{GeometrySources::Domain::None};
+        bool Supported{false};
+        // True when the entity's own provenance is the requested domain.
+        bool Native{false};
+        // Supported, or the first missing element-domain source.
+        GeometryAvailabilityStatus Status{GeometryAvailabilityStatus::NoGeometrySource};
+    };
+
+    [[nodiscard]] GeometryDomainReading ResolveGeometryDomainReading(
+        const GeometryEntityAvailability& availability,
+        GeometrySources::Domain requested) noexcept;
+
     [[nodiscard]] bool SupportsGeometryElementDomain(
         const GeometryEntityAvailability& availability,
         GeometryElementDomain domain) noexcept;

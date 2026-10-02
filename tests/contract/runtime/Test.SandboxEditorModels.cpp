@@ -2805,7 +2805,9 @@ TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudStat
     EXPECT_FALSE(graphWhileMeshSelected.DomainMatches);
     EXPECT_FALSE(graphWhileMeshSelected.Processing.HasSelectedEntity);
     EXPECT_TRUE(graphWhileMeshSelected.Processing.Entries.empty());
-    EXPECT_TRUE(HasDiagnostic(
+    // Provenance mismatch alone is no refusal: the mesh carries Vertices+Edges.
+    EXPECT_TRUE(graphWhileMeshSelected.DomainUsable);
+    EXPECT_FALSE(HasDiagnostic(
         graphWhileMeshSelected.Diagnostics,
         Runtime::EditorDiagnosticCode::UnsupportedGeometryDomain));
 
@@ -2908,6 +2910,18 @@ TEST(SandboxEditorUi, DomainVisualizationTargetsFollowLaneSourcePresence)
                                         "v:temperature"),
               nullptr);
 
+    // UI-051: provenance stays Mesh, but the PointCloud window can read the
+    // vertices as a point set and the Graph window the vertices+edges.
+    EXPECT_TRUE(meshPointModel.DomainUsable);
+    EXPECT_EQ(meshPointModel.DomainReading, "Mesh Vertices as a point set");
+    for (const auto& diagnostic : meshPointModel.Diagnostics)
+        EXPECT_NE(diagnostic.Code, Runtime::EditorDiagnosticCode::UnsupportedGeometryDomain);
+    const Runtime::EditorDomainWindowModel meshGraphModel =
+        Runtime::BuildEditorDomainWindowModel(context, Runtime::EditorDomainWindowKind::Graph);
+    EXPECT_FALSE(meshGraphModel.DomainMatches);
+    EXPECT_TRUE(meshGraphModel.DomainUsable);
+    EXPECT_EQ(meshGraphModel.DomainReading, "Mesh Vertices and Edges as a graph");
+
     const ECS::EntityHandle wireMesh = MakeSelectable(registry, "Wire Mesh");
     AddTriangleMeshSource(registry, wireMesh);
     registry.Raw().remove<GS::Edges>(wireMesh);
@@ -2925,6 +2939,12 @@ TEST(SandboxEditorUi, DomainVisualizationTargetsFollowLaneSourcePresence)
     EXPECT_FALSE(wireMeshEdgeModel.DomainMatches);
     EXPECT_TRUE(wireMeshEdgeModel.VisualizationTargetAvailable);
     EXPECT_EQ(wireMeshEdgeModel.VisualizationTarget, Target::Edges);
+
+    // Without Edges the Graph window is refused with the runtime reason.
+    EXPECT_FALSE(wireMeshEdgeModel.DomainUsable);
+    EXPECT_TRUE(wireMeshEdgeModel.DomainReading.empty());
+    EXPECT_TRUE(HasDiagnostic(wireMeshEdgeModel.Diagnostics,
+                              Runtime::EditorDiagnosticCode::UnsupportedGeometryDomain));
 
     ASSERT_TRUE(selection.SetSelectedEntity(registry, graph));
     const Runtime::EditorDomainWindowModel graphPointModel =

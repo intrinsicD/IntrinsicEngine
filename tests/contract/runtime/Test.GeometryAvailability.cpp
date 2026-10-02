@@ -243,6 +243,51 @@ TEST(RuntimeGeometryAvailability, PointCloudSupportsPointsAndRejectsSurfaceAndEd
         availability, Runtime::GeometryElementDomain::PointCloudPoint));
 }
 
+TEST(RuntimeGeometryAvailability, DomainReadingIsDecidedByElementDomainDataNotProvenance)
+{
+    using Status = Runtime::GeometryAvailabilityStatus;
+    entt::registry registry;
+    const entt::entity meshEntity = registry.create();
+    auto mesh = MakeTriangleMesh();
+    GS::PopulateFromMesh(registry, meshEntity, mesh);
+    const entt::entity graphEntity = registry.create();
+    auto graph = MakeGraph();
+    GS::PopulateFromGraph(registry, graphEntity, graph);
+    const entt::entity cloudEntity = registry.create();
+    Geometry::PointCloud::Cloud cloud;
+    (void)cloud.AddPoint({0.0f, 0.0f, 0.0f});
+    GS::PopulateFromCloud(registry, cloudEntity, cloud);
+
+    const auto read = [&](const entt::entity entity, const GS::Domain domain) {
+        return Runtime::ResolveGeometryDomainReading(
+            Runtime::BuildGeometryAvailability(registry, entity), domain);
+    };
+
+    // A mesh reads as a point set and as a graph, without being either natively.
+    for (const GS::Domain domain : {GS::Domain::PointCloud, GS::Domain::Graph})
+    {
+        const auto reading = read(meshEntity, domain);
+        EXPECT_TRUE(reading.Supported);
+        EXPECT_FALSE(reading.Native);
+        EXPECT_EQ(reading.Status, Status::Supported);
+    }
+    EXPECT_TRUE(read(meshEntity, GS::Domain::Mesh).Native);
+    EXPECT_TRUE(read(graphEntity, GS::Domain::PointCloud).Supported);
+    EXPECT_TRUE(read(graphEntity, GS::Domain::Graph).Native);
+
+    // Genuinely missing data keeps a runtime reason.
+    const auto cloudAsGraph = read(cloudEntity, GS::Domain::Graph);
+    EXPECT_FALSE(cloudAsGraph.Supported);
+    EXPECT_EQ(cloudAsGraph.Status, Status::MissingEdgeSource);
+    EXPECT_EQ(read(graphEntity, GS::Domain::Mesh).Status, Status::UnsupportedProvenance);
+    EXPECT_EQ(read(cloudEntity, GS::Domain::Mesh).Status, Status::UnsupportedProvenance);
+    EXPECT_TRUE(read(cloudEntity, GS::Domain::PointCloud).Supported);
+
+    const entt::entity empty = registry.create();
+    EXPECT_FALSE(read(empty, GS::Domain::PointCloud).Supported);
+    EXPECT_EQ(read(empty, GS::Domain::PointCloud).Status, Status::NoGeometrySource);
+}
+
 TEST(RuntimeGeometryAvailability, MeshEdgeLaneCanDeriveFromSurfaceTopologyWithoutEdges)
 {
     entt::registry registry;

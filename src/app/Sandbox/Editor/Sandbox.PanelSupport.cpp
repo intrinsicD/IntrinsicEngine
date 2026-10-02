@@ -1433,6 +1433,8 @@ namespace Extrinsic::Sandbox::Editor
                 "Selected domain: %s",
                 Runtime::DebugNameForEditorGeometryDomain(
                     model.SelectedDomain));
+            if (model.DomainUsable)
+                ImGui::Text("Reading: %s", model.DomainReading.c_str());
         }
         else
         {
@@ -1444,7 +1446,7 @@ namespace Extrinsic::Sandbox::Editor
     [[nodiscard]] bool DomainWindowReady(
         const Runtime::EditorDomainWindowModel& model) noexcept
     {
-        return model.HasSelectedEntity && model.DomainMatches;
+        return model.HasSelectedEntity && model.DomainUsable;
     }
 
     void DrawVec3(const char* label, const glm::vec3 value)

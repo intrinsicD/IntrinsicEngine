@@ -2,9 +2,11 @@
 id: UI-051
 theme: J
 depends_on: []
+template: micro
 workflow_schema: 1
-workflow_profile: standard
-evidence: required
+workflow_profile: micro
+evidence: not_applicable
+evidence_skip_reason: interactive session; evidence is the diff, tests, and CI
 owner:
 branch:
 worktree:
@@ -131,3 +133,17 @@ python3 tools/repo/check_layering.py --root src --strict
 - Using `Vertices` or container provenance as the eligibility boundary.
 - Duplicating the method-panel work owned by `RUNTIME-211/212/213` and
   `UI-041/043/044/045`.
+
+## Log
+- 2026-10-02 slice 1 — scope decision. Properties and Selection-details are
+  gated in full by `Runtime::ResolveGeometryDomainReading` (runtime owner,
+  `geometry.element-domain-sources`): PointCloud reads any Vertices, Graph reads
+  Vertices plus Edges, Mesh stays exact (faces are semantic).
+  `EditorDomainWindowModel::DomainUsable`/`DomainReading` carry the result and
+  the window header states "Reading: Mesh Vertices as a point set"; a point
+  cloud in a Graph window keeps the runtime `UnsupportedGeometryDomain` reason.
+  `DomainMatches` remains exact provenance for the Mesh/processing consumers.
+  Appearance: only the shared predicate lands. `UI-075` replaces the per-domain
+  Appearance windows with one panel and reuses the predicate to choose domain
+  sections, so no per-domain Appearance UI is built here; the Appearance
+  acceptance items stay open for `UI-075`.

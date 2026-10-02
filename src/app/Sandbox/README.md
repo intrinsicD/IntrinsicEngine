@@ -328,6 +328,17 @@ The promoted editor also exposes stable top-level ImGui menu slots for
 `PointCloud`, `Graph`, and `Mesh`. Their submenu items open selected-entity
 domain windows for render-hint status, visualization/spatial-debug controls,
 primitive-selection details, and processing-discovery affordances. These
+The PointCloud and Graph Properties and Selection windows gate on the selected
+entity's element-domain data, not its provenance (`UI-051`): the runtime-owned
+`ResolveGeometryDomainReading` lets a mesh read as a point set (Vertices) or a
+graph (Vertices and Edges), `EditorDomainWindowModel::DomainUsable` carries the
+result, and the window header states what it reads (for example "Reading: Mesh
+Vertices as a point set"). An entity that lacks the data, such as a point cloud in
+a Graph window, keeps the runtime's `UnsupportedGeometryDomain` reason. The Mesh
+windows stay exact because faces are semantic. No alias or conversion entity is
+created. Appearance still draws per-kind windows; `UI-075` replaces them and
+reuses the same predicate to choose which domain sections apply.
+
 windows are registered by the app-owned `Sandbox.Editor.DomainPanels` module
 through `Sandbox.Editor.Shell`'s contribution seam backed by
 `Runtime.EditorWindowRegistry`; runtime has no fixed Sandbox windows or
