@@ -69,3 +69,15 @@ bash tools/repo/check_ui_contract_guard.sh
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
 ```
+
+## Slice log
+- Slice 1: `DrawGpuTransactionControls(view, idSuffix)` in `Sandbox.PanelSupport.*` returns the pressed
+  `GpuTransactionRowAction` (the caller invokes its family command; no callback indirection), with
+  `ResolveGpuTransactionRowState` (the per-phase enabled rule, testable without drawing) and one counter
+  formatter. The runtime's transactions share only `EditorGpuTransactionPhase` (the typed snapshots have no
+  common shape), so each family adapts its own snapshot at its call site. Adopters: scalar and Outliers.
+  Recorded unifications: the scalar row now shows a disabled Accept while running and Discard (its old
+  "Stop" cancelled the run, as Discard does), its Accept ID is `Accept##Scalar`, and Outliers' Discard is
+  disabled once the transaction is terminal (it was never drawn then). Tests:
+  `GpuTransactionRowEnablesButtonsByPhase` (running, awaiting accept, stale, accepting, terminal),
+  `GpuTransactionCountersUseOneFormat`; the scalar panel test now clicks `Accept##Scalar`.

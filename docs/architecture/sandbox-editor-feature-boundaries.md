@@ -599,7 +599,16 @@ preflight supplies its reason. Config preview/apply share their availability
 predicate. Historical config errors are display state; each click reapplies and
 revalidates, clears a successful retry's error, and only then executes.
 `DrawProcessingActionButton` reuses `DrawDisabledReasonTooltip` immediately after
-the disabled item; neither helper validates geometry. Outlier detection/removal,
+the disabled item; neither helper validates geometry. UI-071: a refusal reason is the runtime's text and
+appears the same way everywhere: a tooltip on the disabled control, plus one inline
+line for a GPU transaction's Accept refusal. `DrawGpuTransactionControls` is the one
+Stop/Accept/Discard row of a two-phase GPU transaction: families adapt their snapshot to
+`GpuTransactionRowView` (phase, `CanAccept`, the runtime's refusal, counters), Stop is
+enabled only while the run works, Accept only when the runtime allows it, Discard while
+the transaction is live, and the buttons are `##Family`-suffixed. See also
+[UI-037](../../tasks/active/UI-037-linear-domain-action-readiness-tooltips.md) and
+[UI-058](../../tasks/backlog/ui/UI-058-all-reasons-readiness-tooltips.md), which own the
+readiness content. Outlier detection/removal,
 ICP trajectory application and construction retain their distinct request sequences. Their
 algorithm controls and statistics remain explicit; compatible Show actions use
 `ShowProcessingProperty`, while face-normal display retains its face-lane path.

@@ -2101,6 +2101,47 @@ namespace Extrinsic::Sandbox::Editor
             DrawDisabledReasonTooltip("Select an entity to focus.");
     }
 
+    GpuTransactionRowState ResolveGpuTransactionRowState(const GpuTransactionRowView& view) noexcept
+    {
+        using Phase = Runtime::EditorGpuTransactionPhase;
+        const bool live = view.Phase == Phase::Running || view.Phase == Phase::ReadyToAccept || view.Phase == Phase::Accepting;
+        return {.StopEnabled = view.HasStop && view.Phase == Phase::Running,
+                .AcceptEnabled = view.CanAccept,
+                .DiscardEnabled = live,
+                .ShowRefusal = !view.CanAccept && !view.AcceptRefusal.empty()};
+    }
+
+    std::string FormatGpuTransactionIo(const GpuTransactionIo& io)
+    {
+        std::string text = std::format("Input upload: {} bytes; residency hits: {}", io.UploadBytes, io.CacheHits);
+        if (io.CpuStageUploadBytes) text += std::format("; CPU upload: {} bytes", *io.CpuStageUploadBytes);
+        if (io.CpuReadbackBytes) text += std::format("; CPU readback: {} bytes", *io.CpuReadbackBytes);
+        return text;
+    }
+
+    GpuTransactionRowAction DrawGpuTransactionControls(const GpuTransactionRowView& view, const char* const idSuffix)
+    {
+        const auto state = ResolveGpuTransactionRowState(view);
+        const auto id = [&](const char* label) { return std::string(label) + "##" + idSuffix; };
+        GpuTransactionRowAction action = GpuTransactionRowAction::None;
+        if (view.HasStop)
+        {
+            ImGui::BeginDisabled(!state.StopEnabled);
+            if (ImGui::Button(id("Stop").c_str())) action = GpuTransactionRowAction::Stop;
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+        }
+        if (DrawProcessingActionButton(id("Accept").c_str(), {state.AcceptEnabled, std::string(view.AcceptRefusal)}))
+            action = GpuTransactionRowAction::Accept;
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!state.DiscardEnabled);
+        if (ImGui::Button(id("Discard").c_str())) action = GpuTransactionRowAction::Discard;
+        ImGui::EndDisabled();
+        if (state.ShowRefusal) ImGui::TextWrapped("%.*s", int(view.AcceptRefusal.size()), view.AcceptRefusal.data());
+        if (view.Io) ImGui::TextUnformatted(FormatGpuTransactionIo(*view.Io).c_str());
+        return action;
+    }
+
     void DrawDisabledReasonTooltip(const std::string_view disabledReason)
     {
         constexpr ImGuiHoveredFlags hoverFlags =

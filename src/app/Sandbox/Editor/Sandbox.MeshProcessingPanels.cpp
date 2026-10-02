@@ -198,17 +198,16 @@ namespace Extrinsic::Sandbox::Editor
                 }
                 run.reset();return false;}
             ImGui::TextWrapped("%s",snapshot.Message.c_str());
+            GpuTransactionRowView row{.Phase=phase,.CanAccept=snapshot.CanAccept,.AcceptRefusal=snapshot.AcceptRefusalReason};
             if constexpr(scalarDiagnostics)
-                ImGui::Text("Input upload: %llu bytes; residency hits: %llu; CPU readback: %llu bytes",
-                    static_cast<unsigned long long>(snapshot.GpuInputUploadBytes),static_cast<unsigned long long>(snapshot.GpuInputCacheHits),static_cast<unsigned long long>(snapshot.CpuStageReadbackBytes));
-            if(phase==Runtime::EditorGpuTransactionPhase::ReadyToAccept){
-                ImGui::BeginDisabled(!snapshot.CanAccept);
-                if(ImGui::Button("Accept"))(void)Runtime::AcceptEditorPointScalar(commands,run);
-                ImGui::EndDisabled();
-                if(!snapshot.AcceptRefusalReason.empty())ImGui::TextWrapped("%s",snapshot.AcceptRefusalReason.c_str());}
-            if(ImGui::Button(phase==Runtime::EditorGpuTransactionPhase::Running?"Stop":"Discard")){
+                row.Io=GpuTransactionIo{.UploadBytes=snapshot.GpuInputUploadBytes,.CacheHits=snapshot.GpuInputCacheHits,
+                                        .CpuReadbackBytes=snapshot.CpuStageReadbackBytes};
+            switch(DrawGpuTransactionControls(row,"Scalar")){
+            case GpuTransactionRowAction::Accept:(void)Runtime::AcceptEditorPointScalar(commands,run);break;
+            case GpuTransactionRowAction::Discard:
                 Runtime::DiscardEditorPointScalar(commands,run);
-                state.Run.Forget();} // a stopped or discarded run never reads as finished
+                state.Run.Forget();break; // a stopped or discarded run never reads as finished
+            default:break;}
             return true;
         }
 
@@ -2212,21 +2211,21 @@ namespace Extrinsic::Sandbox::Editor
         if (outlierActive)
         {
             ImGui::TextWrapped("%s", transaction.Result.Message.c_str());
-            ImGui::Text("Input upload: %llu bytes; residency hits: %llu",
-                static_cast<unsigned long long>(transaction.Result.GpuInputUploadBytes),
-                static_cast<unsigned long long>(transaction.Result.GpuInputCacheHits));
-            ImGui::BeginDisabled(!transaction.CanAccept);
-            if (ImGui::Button("Accept##Outliers"))
+            const GpuTransactionRowView row{.Phase=transaction.Phase,.CanAccept=transaction.CanAccept,
+                .AcceptRefusal=transaction.AcceptDisabledReason,
+                .Io=GpuTransactionIo{.UploadBytes=transaction.Result.GpuInputUploadBytes,.CacheHits=transaction.Result.GpuInputCacheHits}};
+            switch (DrawGpuTransactionControls(row, "Outliers"))
+            {
+            case GpuTransactionRowAction::Accept:
                 Outliers.LastResult = Runtime::AcceptEditorOutlierAnalysis(context.PointAnalysis.Commands, OutlierTransaction,
                     context.PointAnalysis.ResultSinks.OutlierAnalysis);
-            ImGui::EndDisabled();
-            if (!transaction.AcceptDisabledReason.empty()) ImGui::TextWrapped("%s", transaction.AcceptDisabledReason.c_str());
-            ImGui::SameLine();
-            if (ImGui::Button("Discard##Outliers"))
-            {
+                break;
+            case GpuTransactionRowAction::Discard:
                 Runtime::DiscardEditorOutlierAnalysis(context.PointAnalysis.Commands, OutlierTransaction);
                 Outliers.Run.Forget();
                 Outliers.LastResult = Runtime::SnapshotEditorOutlierAnalysis(context.PointAnalysis.Commands, OutlierTransaction).Result;
+                break;
+            default: break;
             }
             ImGui::TextWrapped("The score ring is available to the colormap; CPU fields change only on Accept.");
         }

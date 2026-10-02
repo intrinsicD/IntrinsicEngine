@@ -227,6 +227,39 @@ namespace Extrinsic::Sandbox::Editor
 
     void DrawDisabledReasonTooltip(std::string_view disabledReason);
 
+    // UI-071: the one Stop/Accept/Discard row of a two-phase GPU transaction (Run, then Accept or
+    // Discard). Families adapt their snapshot to this view; the helper owns which buttons are
+    // enabled in which phase, where an Accept refusal is shown and how the upload counters read.
+    struct GpuTransactionIo
+    {
+        std::uint64_t UploadBytes{}, CacheHits{};
+        std::optional<std::uint64_t> CpuStageUploadBytes{}, CpuReadbackBytes{}; // shown only when the family reports them
+    };
+    struct GpuTransactionRowView
+    {
+        Runtime::EditorGpuTransactionPhase Phase{Runtime::EditorGpuTransactionPhase::Running};
+        bool CanAccept{false};
+        // The runtime's answer for a result that waits but cannot be accepted (stale inputs, a
+        // run still going); empty when there is nothing to say. Never composed by the UI.
+        std::string_view AcceptRefusal{};
+        bool HasStop{false}; // the family can stop a run early and keep its preview (else Discard cancels)
+        std::optional<GpuTransactionIo> Io{};
+    };
+    enum class GpuTransactionRowAction : std::uint8_t { None, Stop, Accept, Discard };
+    struct GpuTransactionRowState
+    {
+        bool StopEnabled{}, AcceptEnabled{}, DiscardEnabled{}, ShowRefusal{};
+    };
+    // Stop runs only while the device work runs; Accept only when the runtime says so; Discard
+    // while the transaction is live (running, waiting or accepting), never once it is terminal;
+    // the refusal line shows whenever Accept is refused with a reason.
+    [[nodiscard]] GpuTransactionRowState ResolveGpuTransactionRowState(const GpuTransactionRowView& view) noexcept;
+    [[nodiscard]] std::string FormatGpuTransactionIo(const GpuTransactionIo& io);
+    // Draws [Stop] Accept Discard on one line (IDs suffixed `##idSuffix`), the Accept refusal as a
+    // tooltip on the disabled button plus one inline line, and the counters line. Returns the
+    // button pressed this frame; the caller invokes its family's command.
+    [[nodiscard]] GpuTransactionRowAction DrawGpuTransactionControls(const GpuTransactionRowView& view, const char* idSuffix);
+
     // UI-074: shared "Color interpretation" combo and its help text. Behavior documented here is the
     // CPU encoder's (Runtime.VisualizationRecipes.cpp, AppendColorPacket): Components passes vec4 as
     // (r,g,b,a), vec3 as (r,g,b,1), vec2 as (x,y,0,1) unrescaled, and integers/bools/integral floats as hashed

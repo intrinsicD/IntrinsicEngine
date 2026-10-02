@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <tuple>
 #include <format>
 #include <span>
 #include <glm/vec3.hpp>
@@ -444,6 +445,70 @@ TEST(SandboxProcessingPanels, CameraViewFocusButtonIsDisabledWithoutASelection)
         EXPECT_EQ(disabled, !hasSelection) << "the Focus selection button is the last item drawn";
         ImGui::End();
     }
+}
+
+// UI-071: the shared Stop/Accept/Discard row. Per phase, the runtime's answer decides Accept; Stop runs only while
+// the device works; Discard works while the transaction is live; a refusal reason shows once inline.
+TEST(SandboxProcessingPanels, GpuTransactionRowEnablesButtonsByPhase)
+{
+    using Phase = R::EditorGpuTransactionPhase;
+    using Action = Editor::GpuTransactionRowAction;
+    struct Case
+    {
+        const char* Name; Phase Phase; bool CanAccept; const char* Refusal; bool HasStop;
+        bool Stop, Accept, Discard, Refusal_;
+    };
+    const std::array cases{
+        Case{"running", Phase::Running, false, "Still running.", true, true, false, true, true},
+        Case{"running without stop", Phase::Running, false, "", false, false, false, true, false},
+        Case{"awaiting accept", Phase::ReadyToAccept, true, "", true, false, true, true, false},
+        Case{"stale", Phase::ReadyToAccept, false, "Inputs changed; discard this result.", true, false, false, true, true},
+        Case{"accepting", Phase::Accepting, false, "Accept is already running.", true, false, false, true, true},
+        Case{"applied", Phase::Applied, false, "", true, false, false, false, false},
+        Case{"discarded", Phase::Discarded, false, "", true, false, false, false, false},
+        Case{"failed", Phase::Failed, false, "", true, false, false, false, false},
+    };
+    TestSupport::ImGuiFrameScope gui;
+    for (const auto& test : cases)
+    {
+        SCOPED_TRACE(test.Name);
+        const Editor::GpuTransactionRowView view{.Phase = test.Phase, .CanAccept = test.CanAccept, .AcceptRefusal = test.Refusal,
+                                                 .HasStop = test.HasStop};
+        const auto state = Editor::ResolveGpuTransactionRowState(view);
+        EXPECT_EQ(state.StopEnabled, test.Stop);
+        EXPECT_EQ(state.AcceptEnabled, test.Accept);
+        EXPECT_EQ(state.DiscardEnabled, test.Discard);
+        EXPECT_EQ(state.ShowRefusal, test.Refusal_);
+        // The drawn buttons agree: a click on each reaches the caller only when enabled.
+        for (const auto [label, action, enabled] : {std::tuple{"Stop##T", Action::Stop, test.Stop},
+                                                    std::tuple{"Accept##T", Action::Accept, test.Accept},
+                                                    std::tuple{"Discard##T", Action::Discard, test.Discard}})
+        {
+            if (!test.HasStop && action == Action::Stop) continue;
+            ImGuiID id = 0;
+            const auto draw = [&] {
+                gui.NextFrame();
+                ImGui::SetNextWindowPos({0, 0});
+                ImGui::SetNextWindowSize({800, 300});
+                ImGui::Begin("Row test", nullptr, ImGuiWindowFlags_NoSavedSettings);
+                id = ImGui::GetID(label);
+                const auto drawn = Editor::DrawGpuTransactionControls(view, "T");
+                ImGui::End();
+                return drawn;
+            };
+            (void)draw();
+            ImGui::ActivateItemByID(id);
+            EXPECT_EQ(draw(), enabled ? action : Action::None) << label;
+        }
+    }
+}
+
+TEST(SandboxProcessingPanels, GpuTransactionCountersUseOneFormat)
+{
+    EXPECT_EQ(Editor::FormatGpuTransactionIo({.UploadBytes = 36, .CacheHits = 1}),
+              "Input upload: 36 bytes; residency hits: 1");
+    EXPECT_EQ(Editor::FormatGpuTransactionIo({.UploadBytes = 36, .CacheHits = 1, .CpuStageUploadBytes = 4, .CpuReadbackBytes = 12}),
+              "Input upload: 36 bytes; residency hits: 1; CPU upload: 4 bytes; CPU readback: 12 bytes");
 }
 
 TEST(SandboxProcessingPanels, ShowButtonsApplyAppearancePropertiesOnMeshGraphAndCloud)
@@ -4237,7 +4302,7 @@ TEST(SandboxProcessingPanels, ScalarTransactionTerminalResultsPersistAndDetachDi
             if(++frames>40){ADD_FAILURE()<<"scalar terminal result was not displayed";engine.RequestExit();return;}
             auto* window=ImGui::FindWindowByName(titles[method]);if(!window)return;
             ImGui::SetWindowSize(window,{800,1800});ImGui::SetWindowPos(window,{0,0});
-            if(frames==5)ImGui::ActivateItemByID(window->GetID("Accept"));
+            if(frames==5)ImGui::ActivateItemByID(window->GetID("Accept##Scalar"));
             const auto state=R::SnapshotEditorPointScalar(commands,run);
             if(state.Phase!=Phase::Applied && state.Phase!=Phase::Failed)return;
             if(!terminalFrame){terminalFrame=frames;return;}
