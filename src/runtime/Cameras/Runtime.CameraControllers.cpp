@@ -265,6 +265,18 @@ namespace Extrinsic::Runtime
         m_FirstMouse = true;
     }
 
+    void OrbitCameraController::LookAt(const glm::vec3& position, const glm::vec3& target,
+                                       const glm::vec3& up) noexcept
+    {
+        const glm::vec3 toTarget = target - position;
+        const glm::vec3 forward = Detail::SafeNormalized(toTarget, {0.0f, 0.0f, -1.0f});
+        m_Target = target;
+        m_Radius = std::clamp(glm::length(toTarget), m_MinRadius, m_MaxRadius);
+        m_Orientation = Detail::OrientationFromForwardUp(forward, up);
+        m_Yaw = Detail::YawFromForward(Detail::ForwardFromOrientation(m_Orientation));
+        m_FirstMouse = true;
+    }
+
     void OrbitCameraController::Update(const Platform::Input::Context& input,
                                        const double deltaSeconds) noexcept
     {

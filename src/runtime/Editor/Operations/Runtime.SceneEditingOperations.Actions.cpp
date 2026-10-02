@@ -523,6 +523,12 @@ ApplyEditorTransformEdit(
             return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
         }
 
+        [[nodiscard]] EditorCameraPose PoseOf(const ICameraController& controller, const Core::Extent2D viewport)
+        {
+            const Graphics::CameraViewInput view = controller.GetView(viewport);
+            return EditorCameraPose{view.Position, view.Forward, view.Up};
+        }
+
         // Resolves stable ids to live entities; false when one is stale.
         [[nodiscard]] bool ResolveStableEntities(const entt::registry& raw,
                                                  const std::vector<std::uint32_t>& ids,
@@ -538,50 +544,118 @@ ApplyEditorTransformEdit(
             }
             return true;
         }
+
+        // Up with its component along `forward` removed, normalized; zero when degenerate.
+        [[nodiscard]] glm::vec3 RollFreeUp(const glm::vec3& up, const glm::vec3& forward) noexcept
+        {
+            const glm::dvec3 f{forward};
+            glm::dvec3 u = glm::dvec3{up} - f * glm::dot(glm::dvec3{up}, f);
+            const double length = glm::length(u);
+            return length > 1.0e-4 ? glm::vec3{u / length} : glm::vec3{0.0f};
+        }
+
+        // Did the controller realize the requested direction (and, when the read-back up is
+        // well-defined, the requested up)? Position is compared only when `checkPosition`.
+        [[nodiscard]] bool Realized(const EditorCameraPose& got, const glm::vec3& position,
+                                    const glm::vec3& forward, const glm::vec3& up,
+                                    const bool checkPosition) noexcept
+        {
+            if (glm::dot(glm::normalize(got.Forward), forward) < 1.0f - 4.0e-4f) // fly pitch stops 1 degree short of the pole
+                return false;
+            if (checkPosition &&
+                glm::length(got.Position - position) > 1.0e-3f * std::max(1.0f, glm::length(position)))
+                return false;
+            const glm::vec3 gotUp = RollFreeUp(got.Up, forward);
+            const glm::vec3 wantUp = RollFreeUp(up, forward);
+            if (gotUp == glm::vec3{0.0f} || wantUp == glm::vec3{0.0f})
+                return true; // looking along the up axis: roll is not observable
+            return glm::dot(gotUp, wantUp) >= 1.0f - 1.0e-4f;
+        }
     }
 
-    EditorCommandStatus ApplyEditorCameraPoseCommand(
+    EditorCameraPoseResult ApplyEditorCameraPoseCommand(
         const EditorSceneEditingContext& context,
         const EditorCameraPoseCommand& command)
     {
+        EditorCameraPoseResult result{};
+        if (command.Mode != EditorCameraPoseMode::Pose && command.Mode != EditorCameraPoseMode::Preset &&
+            command.Mode != EditorCameraPoseMode::Focus)
+        {
+            result.Status = EditorCommandStatus::InvalidProcessingParameters;
+            return result;
+        }
+        if (command.Mode == EditorCameraPoseMode::Preset &&
+            static_cast<std::uint8_t>(command.Preset) > static_cast<std::uint8_t>(CameraViewPreset::Isometric))
+        {
+            result.Status = EditorCommandStatus::InvalidProcessingParameters;
+            return result;
+        }
         if (context.CameraControllers == nullptr)
-            return EditorCommandStatus::MissingCameraControllerRegistry;
+        {
+            result.Status = EditorCommandStatus::MissingCameraControllerRegistry;
+            return result;
+        }
         ICameraController* controller = context.CameraControllers->ResolveOrNull(command.Slot);
         if (controller == nullptr)
-            return EditorCommandStatus::MissingCameraControllerRegistry;
+        {
+            result.Status = EditorCommandStatus::MissingCameraControllerRegistry;
+            return result;
+        }
         const Core::Extent2D viewport = SafeViewport(command.Viewport, context.CameraViewport);
+        result.HasPose = true;
+        result.Previous = result.Current = PoseOf(*controller, viewport);
+        CameraControllerRegistry& cameras = *context.CameraControllers;
+
+        // Applies `apply`, then refuses and restores when the controller kind cannot realize the
+        // requested view.
+        const auto applyChecked = [&](const glm::vec3& position, const glm::vec3& forward, const glm::vec3& up,
+                                      const bool checkPosition, auto&& apply)
+        {
+            std::unique_ptr<ICameraController> saved = controller->Clone();
+            apply();
+            const EditorCameraPose now = PoseOf(*controller, viewport);
+            if (saved != nullptr && !Realized(now, position, forward, up, checkPosition))
+            {
+                cameras.Replace(command.Slot, std::move(saved));
+                result.Status = EditorCommandStatus::UnsupportedCameraPose;
+                return;
+            }
+            cameras.MarkCameraTransition(command.Slot);
+            result.Current = now;
+            result.Status = EditorCommandStatus::Applied;
+        };
 
         if (command.Mode == EditorCameraPoseMode::Pose)
         {
-            if (!IsFiniteVec3(command.Position) || !IsFiniteVec3(command.Target) ||
-                !IsFiniteVec3(command.Up))
-                return EditorCommandStatus::InvalidProcessingParameters;
+            if (!IsFiniteVec3(command.Position) || !IsFiniteVec3(command.Target) || !IsFiniteVec3(command.Up))
+            {
+                result.Status = EditorCommandStatus::InvalidProcessingParameters;
+                return result;
+            }
             const glm::dvec3 toTarget = glm::dvec3{command.Target} - glm::dvec3{command.Position};
             const double distance = glm::length(toTarget);
             if (!(distance > 1.0e-6))
-                return EditorCommandStatus::InvalidProcessingParameters;
+            {
+                result.Status = EditorCommandStatus::InvalidProcessingParameters;
+                return result;
+            }
             const glm::vec3 forward = glm::vec3{toTarget / distance};
-            const double upLength = glm::length(glm::dvec3{command.Up});
-            if (!(upLength > 1.0e-6))
-                return EditorCommandStatus::InvalidProcessingParameters;
-            const glm::dvec3 up = glm::dvec3{command.Up} / upLength;
-            const glm::dvec3 orthogonal = up - glm::dvec3{forward} * glm::dot(up, glm::dvec3{forward});
-            const double orthogonalLength = glm::length(orthogonal);
-            if (!(orthogonalLength > 1.0e-4))
-                return EditorCommandStatus::InvalidProcessingParameters; // Up parallel to the view direction
-
-            Graphics::CameraViewInput seed = controller->GetView(viewport);
-            seed.Position = command.Position;
-            seed.Forward = forward;
-            seed.Up = glm::vec3{orthogonal / orthogonalLength};
-            seed.Valid = true;
-            controller->Seed(seed);
-            context.CameraControllers->MarkCameraTransition(command.Slot);
-            return EditorCommandStatus::Applied;
+            const glm::vec3 up = RollFreeUp(command.Up, forward);
+            if (up == glm::vec3{0.0f})
+            {
+                result.Status = EditorCommandStatus::InvalidProcessingParameters; // zero or parallel up
+                return result;
+            }
+            applyChecked(command.Position, forward, up, true,
+                         [&] { controller->LookAt(command.Position, command.Target, up); });
+            return result;
         }
 
         if (context.Scene == nullptr)
-            return EditorCommandStatus::MissingScene;
+        {
+            result.Status = EditorCommandStatus::MissingScene;
+            return result;
+        }
         const entt::registry& raw = context.Scene->Raw();
 
         std::vector<ECS::EntityHandle> entities;
@@ -589,41 +663,52 @@ ApplyEditorTransformEdit(
         if (command.Mode == EditorCameraPoseMode::Focus && ids.empty())
         {
             if (context.Selection == nullptr)
-                return EditorCommandStatus::MissingSelectionController;
+            {
+                result.Status = EditorCommandStatus::MissingSelectionController;
+                return result;
+            }
             const auto selected = context.Selection->SelectedStableIds();
             ids.assign(selected.begin(), selected.end());
             if (ids.empty())
-                return EditorCommandStatus::NoChange;
+            {
+                result.Status = EditorCommandStatus::NoChange;
+                return result;
+            }
         }
         if (!ids.empty())
         {
             if (!ResolveStableEntities(raw, ids, entities))
-                return EditorCommandStatus::StaleEntity;
+            {
+                result.Status = EditorCommandStatus::StaleEntity;
+                return result;
+            }
         }
         else
         {
-            for (const ECS::EntityHandle entity :
-                 raw.view<ECS::Components::Culling::World::Bounds>())
+            for (const ECS::EntityHandle entity : raw.view<ECS::Components::Culling::World::Bounds>())
                 entities.push_back(entity);
         }
 
-        const std::optional<CameraFocusTarget> target =
-            ComputeFocusTargetForEntities(*context.Scene, entities);
+        const std::optional<CameraFocusTarget> target = ComputeFocusTargetForEntities(*context.Scene, entities);
         if (!target.has_value())
-            return EditorCommandStatus::NoChange;
+        {
+            result.Status = EditorCommandStatus::NoChange;
+            return result;
+        }
 
         if (command.Mode == EditorCameraPoseMode::Preset)
         {
-            if (static_cast<std::uint8_t>(command.Preset) >
-                static_cast<std::uint8_t>(CameraViewPreset::Isometric))
-                return EditorCommandStatus::InvalidProcessingParameters;
-            ApplyCameraPreset(*context.CameraControllers, command.Slot, command.Preset, *target, viewport);
+            const CameraPresetAxes axes = CameraPresetAxesFor(command.Preset);
+            applyChecked({}, axes.Forward, axes.Up, false,
+                         [&] { ApplyCameraPreset(cameras, command.Slot, command.Preset, *target, viewport); });
         }
-        else if (command.Mode == EditorCameraPoseMode::Focus)
-            ApplyCameraFocus(*context.CameraControllers, command.Slot, *target);
         else
-            return EditorCommandStatus::InvalidProcessingParameters;
-        return EditorCommandStatus::Applied;
+        {
+            ApplyCameraFocus(cameras, command.Slot, *target);
+            result.Current = PoseOf(*controller, viewport);
+            result.Status = EditorCommandStatus::Applied;
+        }
+        return result;
     }
 
     EditorCommandStatus

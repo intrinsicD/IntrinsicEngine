@@ -154,7 +154,7 @@ EditorCommandStatus ApplyEditorCameraControllerCommand(
   return ApplyEditorCameraControllerCommand(ContextOrEmpty(commands), command);
 }
 
-EditorCommandStatus ApplyEditorCameraPoseCommand(
+EditorCameraPoseResult ApplyEditorCameraPoseCommand(
     const EditorSceneEditingCommands &commands,
     const EditorCameraPoseCommand &command) {
   return ApplyEditorCameraPoseCommand(ContextOrEmpty(commands), command);

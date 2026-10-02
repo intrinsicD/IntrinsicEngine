@@ -53,6 +53,7 @@ DebugNameForEditorCommandStatus(EditorCommandStatus status) noexcept {
   case EditorCommandStatus::InvalidVertexChannelBinding: return "InvalidVertexChannelBinding";
   case EditorCommandStatus::InvalidProcessingParameters: return "InvalidProcessingParameters";
   case EditorCommandStatus::GeometryProcessingFailed: return "GeometryProcessingFailed";
+  case EditorCommandStatus::UnsupportedCameraPose: return "UnsupportedCameraPose";
   }
   return "Unknown";
 }

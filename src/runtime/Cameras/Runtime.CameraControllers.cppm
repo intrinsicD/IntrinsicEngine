@@ -42,6 +42,20 @@ namespace Extrinsic::Runtime
 
         virtual void Seed(const Graphics::CameraViewInput& seed) noexcept = 0;
         virtual void Focus(CameraFocusTarget target) noexcept = 0;
+        // Places the camera at `position` looking at `target` with `up` (all finite,
+        // target != position, up not parallel to the view direction). Controllers that
+        // keep a pivot (orbit) make `target` the pivot; the default seeds position and
+        // direction and leaves what the controller cannot represent (fly/free-look roll,
+        // the top-down direction) to the caller's read-back of GetView().
+        virtual void LookAt(const glm::vec3& position, const glm::vec3& target, const glm::vec3& up) noexcept
+        {
+            Graphics::CameraViewInput seed = GetView(Core::Extent2D{1, 1});
+            seed.Position = position;
+            seed.Forward = glm::normalize(target - position);
+            seed.Up = up;
+            seed.Valid = true;
+            Seed(seed);
+        }
         virtual void Update(const Platform::Input::Context& input, double deltaSeconds) noexcept = 0;
         [[nodiscard]] virtual Graphics::CameraViewInput GetView(Core::Extent2D viewport) const noexcept = 0;
         [[nodiscard]] virtual Core::Config::CameraControllerKind Kind() const noexcept = 0;
@@ -58,6 +72,8 @@ namespace Extrinsic::Runtime
 
         void Seed(const Graphics::CameraViewInput& seed) noexcept override;
         void Focus(CameraFocusTarget target) noexcept override;
+        // Pivot = target, radius = |target - position| clamped to the orbit range.
+        void LookAt(const glm::vec3& position, const glm::vec3& target, const glm::vec3& up) noexcept override;
         void Update(const Platform::Input::Context& input, double deltaSeconds) noexcept override;
         [[nodiscard]] Graphics::CameraViewInput GetView(Core::Extent2D viewport) const noexcept override;
         [[nodiscard]] Core::Config::CameraControllerKind Kind() const noexcept override;

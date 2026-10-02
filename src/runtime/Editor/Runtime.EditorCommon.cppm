@@ -59,6 +59,7 @@ export namespace Extrinsic::Runtime
         InvalidVertexChannelBinding,
         InvalidProcessingParameters,
         GeometryProcessingFailed,
+        UnsupportedCameraPose,
     };
     // Phase of a GPU property transaction (ADR 0030 decisions 5-7): a method previews on the
     // device and publishes on Accept. Shared by every method that runs one (property

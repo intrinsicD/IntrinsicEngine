@@ -26,6 +26,7 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraFocusCommand;
+import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
@@ -351,17 +352,21 @@ export namespace Extrinsic::Runtime
     // Sets the viewport camera to an explicit pose, a named view preset, or a fit to entities.
     // Camera changes are view state, not document edits: like
     // EditorCameraControllerCommand they never enter the undo history.
-    //   Pose:   Position/Target/Up. Position, view direction (Target - Position) and Up are seeded
-    //           into the controller; Up is orthogonalized against the direction. Orbit controllers
-    //           keep their pivot Position + direction * |Position| (the seed convention).
+    //   Pose:   Position/Target/Up. The controller looks from Position at Target (orbit makes
+    //           Target the pivot). Orbit parameters (yaw/pitch/radius) are not a separate mode:
+    //           Position = Target - direction * radius expresses any of them.
     //   Preset: looks along the preset axis and frames StableEntityIds (empty = every entity with
     //           world bounds), 2 * radius back from the bounds center (shared with view capture).
     //   Focus:  frames StableEntityIds, or the current selection when empty, keeping the direction.
-    // Statuses: Applied; InvalidProcessingParameters (non-finite pose, Position == Target, Up
-    // parallel to the view direction, non-finite preset/mode); MissingCameraControllerRegistry
-    // (no registry or no controller in the slot); MissingScene; MissingSelectionController (Focus
-    // with no ids and no selection controller); StaleEntity (an id names no live entity);
-    // NoChange (nothing to frame: no id bounded, empty selection, or no bounded entity).
+    // A pose or preset the active controller kind cannot represent is refused and the camera is
+    // restored (UnsupportedCameraPose): fly/free-look have no roll (Up must be the roll-free up),
+    // top-down only looks along -Y, orbit radius is clamped to its range. The result carries the
+    // pose before and after so callers can report what was applied.
+    // Statuses: Applied; InvalidProcessingParameters (non-finite pose, Position == Target, Up zero
+    // or parallel to the view direction, out-of-range mode/preset); UnsupportedCameraPose;
+    // MissingCameraControllerRegistry (no registry, or no controller in the slot); MissingScene;
+    // MissingSelectionController (Focus with no ids and no selection controller); StaleEntity (an
+    // id names no live entity); NoChange (nothing to frame: empty selection or no bounded entity).
     enum class EditorCameraPoseMode : std::uint8_t
     {
         Pose,
@@ -379,6 +384,21 @@ export namespace Extrinsic::Runtime
         glm::vec3 Up{0.0f, 1.0f, 0.0f};
         CameraViewPreset Preset{CameraViewPreset::Front};
         std::vector<std::uint32_t> StableEntityIds{};
+    };
+
+    struct EditorCameraPose
+    {
+        glm::vec3 Position{0.0f};
+        glm::vec3 Forward{0.0f, 0.0f, -1.0f};
+        glm::vec3 Up{0.0f, 1.0f, 0.0f};
+    };
+
+    struct EditorCameraPoseResult
+    {
+        EditorCommandStatus Status{EditorCommandStatus::NoChange};
+        bool HasPose{false}; // Previous/Current are valid (a controller was resolved)
+        EditorCameraPose Previous{};
+        EditorCameraPose Current{};
     };
 
     struct EditorPrimitiveViewCommand
@@ -504,10 +524,10 @@ export namespace Extrinsic::Runtime
     EditorCommandStatus
     ApplyEditorCameraControllerCommand(const EditorSceneEditingCommands& commands,
                                        const EditorCameraControllerCommand& command);
-    EditorCommandStatus
+    EditorCameraPoseResult
     ApplyEditorCameraPoseCommand(const EditorSceneEditingContext& context,
                                  const EditorCameraPoseCommand& command);
-    EditorCommandStatus
+    EditorCameraPoseResult
     ApplyEditorCameraPoseCommand(const EditorSceneEditingCommands& commands,
                                  const EditorCameraPoseCommand& command);
     EditorCommandStatus ApplyEditorPrimitiveViewCommand(const EditorSceneEditingContext& context,
