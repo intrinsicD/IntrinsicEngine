@@ -367,6 +367,7 @@ namespace Extrinsic::Tests
 
         // ---- Knobs ---------------------------------------------------------
         bool Operational            = true;
+        bool DeviceLost             = false;
         bool ShaderFloat64          = false;
         // FailNext flags clear when the corresponding allocation fails.
         bool FailNextBufferCreate   = false;
@@ -442,6 +443,7 @@ namespace Extrinsic::Tests
 
         // ---- IDevice -------------------------------------------------------
         [[nodiscard]] bool IsOperational() const noexcept override { return Operational; }
+        [[nodiscard]] bool IsDeviceLost() const noexcept override { return DeviceLost; }
         [[nodiscard]] bool SupportsShaderFloat64() const noexcept override { return ShaderFloat64; }
         std::function<RHI::ReadbackToken(std::function<RHI::BufferHandle(RHI::ICommandContext&)>,
                                         std::uint64_t, RHI::ReadbackSink)> ComputeReadback{};

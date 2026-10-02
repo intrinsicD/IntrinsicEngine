@@ -59,9 +59,13 @@ surface's `Cancel`).
 
 A property texture bake is GPU-queue work, not a CPU job, so `TextureBakeService::Bake`
 submits one run job per scheduled bake (UI-073): its work is empty and it parks until
-the bake settles, then publishes (Ready), is discarded (failed, including device loss,
-scene replacement and shutdown) or ends cancelled (rebaked, removed, or its own cancel,
-which withdraws the bake on the module's next sweep). The editor's bake command submits
+the bake settles, then publishes (Ready), is discarded (failed, including a lost device
+(`IDevice::IsDeviceLost`; a device that is only not operational for now keeps the bake
+waiting), scene replacement and shutdown) or ends cancelled (rebaked, removed, or its own
+cancel, which withdraws the bake on the module's next sweep). A rebake of an output whose
+bake is in flight replaces it (latest wins) instead of being refused as a duplicate like the
+queued editor jobs (RUNTIME-313), because bakes follow the edits that trigger them. Parked
+run jobs cost no completion-drain budget (`JobService::DrainCompletions`). The editor's bake command submits
 it through `EditorJobCommandSurface::Submit` under the output's identity, so the token in
 `EditorTextureBakeCommandResult::Job`, the output ref and the Jobs window all reach the
 run; it reports no fraction (one GPU pass) and reads indeterminate.

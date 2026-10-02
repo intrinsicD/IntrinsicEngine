@@ -132,7 +132,10 @@ namespace Extrinsic::Runtime
         // The run job does no CPU work: it parks until the bake settles, then
         // publishes (Ready), is discarded (Failed) or ends Cancelled. Its own
         // cancel abandons the bake, which the module withdraws on its next
-        // sweep; the job holds only the shared run, never the service.
+        // sweep; the job holds only the shared run, never the service. A cancel
+        // accepted after the bake settled Ready but before the next drain still
+        // ends the job Cancelled (the job service checks cancels first) while the
+        // output stays Ready: the cancel came too late to stop anything.
         [[nodiscard]] JobDesc MakeBakeRunJobDesc(
             const std::shared_ptr<BakeRun>& run,
             const std::string_view outputName,
@@ -2295,12 +2298,18 @@ namespace Extrinsic::Runtime
             const JobToken runToken = submitRunJob
                 ? submitRunJob(std::move(runJob))
                 : Context.Jobs != nullptr ? Context.Jobs->Submit(std::move(runJob)) : JobToken{};
+            // Not queue pressure: the job service refuses only while it drains
+            // for shutdown or without a scheduler, so this is reported as a
+            // recorded failure (BakeFailed), which the automatic appearance
+            // producer does not retry every frame, rather than as the
+            // transient JobSubmitFailed.
             if (!runToken.IsValid())
             {
                 return PropertyTextureBakeResult{
-                    .Status = PropertyTextureBakeStatus::JobSubmitFailed,
+                    .Status = PropertyTextureBakeStatus::BakeFailed,
                     .OutputName = prepared.OutputName,
-                    .Diagnostic = "the job service rejected the texture bake's run job",
+                    .Diagnostic = "the job service rejected the texture bake's run job "
+                                  "(it is shutting down or has no scheduler)",
                 };
             }
             BakeRunHandle runHandle{run};
@@ -2442,6 +2451,10 @@ namespace Extrinsic::Runtime
                 AdvanceGeneration(catalog.Generation);
                 return assetFailure(found->Diagnostic);
             }
+            // Latest wins: a rebake of an output with a bake in flight replaces
+            // it (the earlier run ends Cancelled) instead of being refused as a
+            // duplicate the way RUNTIME-313's queued editor jobs are. The bake
+            // must follow the property, UV and appearance edits that trigger it.
             CancelWork(entity, prepared.OutputName);
 
             PropertyTextureBakeRecord record{
@@ -3038,12 +3051,14 @@ namespace Extrinsic::Runtime
 
         // Ends work nothing waits for any more, and work that can never
         // finish: a bake whose run job was cancelled, and every bake once the
-        // device stopped being operational (no frame records or retires it).
-        // Runs from maintenance and both GPU-queue callbacks, so a cancel is
-        // honoured before the work is recorded or published.
+        // device is lost (no frame records or retires it). A device that is
+        // only not operational for now (no swapchain image yet, an unclean
+        // recipe validation) keeps its work waiting. Runs from maintenance and
+        // both GPU-queue callbacks, so a cancel is honoured before the work is
+        // recorded or published.
         void WithdrawStoppedWork()
         {
-            const bool deviceLost = Device != nullptr && !Device->IsOperational();
+            const bool deviceLost = Device != nullptr && Device->IsDeviceLost();
             for (std::size_t index = 0u; index < WorkItems.size();)
             {
                 Work& work = WorkItems[index];
@@ -3059,7 +3074,7 @@ namespace Extrinsic::Runtime
                     record->State = PropertyTextureBakeOutputState::Failed;
                     record->Diagnostic = work.Run.Abandoned()
                         ? "GPU property texture bake cancelled"
-                        : "GPU property texture bake stopped: the device is no longer operational";
+                        : "GPU property texture bake stopped: the GPU device was lost";
                 }
                 RetireWorkResources(work, work.ReadyFrame != 0u ? work.ReadyFrame : SafeReleaseFrame());
                 WorkItems.erase(WorkItems.begin() + static_cast<std::ptrdiff_t>(index));

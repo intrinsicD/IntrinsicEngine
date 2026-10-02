@@ -46,6 +46,16 @@ replacing the "Bake pending." overlay text.
   `EditorBakeRunResolvesThroughTheJobSurfaceForItsEntityOnly` (bake test harnesses now run the
   shared scheduler and provide `JobService`). Pending: the Ready path (Published) needs a
   recorded GPU frame; Vulkan evidence (`PropertyTextureBakeGpuSmoke`) is pending on a GPU host.
+- Slice 1 review fixes: (1) `JobService::DrainCompletions` no longer charges parked records to
+  the apply budget, so many parked bake runs (imports, automatic appearance bakes) never starve
+  other completions, also while minimized (`RuntimeJobService.ParkedResultsDoNotConsumeTheApplyBudget`).
+  (2) Only a lost device fails in-flight bakes: new `RHI::IDevice::IsDeviceLost` (Vulkan:
+  `VK_ERROR_DEVICE_LOST`); a device that is merely not operational (swapchain, unclean recipe
+  validation) keeps them waiting. (3) A cancel accepted after the bake settled Ready but before the
+  next drain ends the run Cancelled with a Ready output (the job service checks cancels first);
+  documented, not changed. (4) A refused run-job submission (shutdown, no scheduler) is a recorded
+  `BakeFailed`, not the transient `JobSubmitFailed`, so the appearance producer backs off instead of
+  retrying every frame. (5) Rebake is latest-wins (documented difference from RUNTIME-313).
 
 ## Acceptance criteria
 - [x] Bake jobs carry a correlation id (or an editor identity) so the progress surface resolves them; the bake worker reports progress where a fraction is known.

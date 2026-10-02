@@ -390,7 +390,9 @@ namespace Extrinsic::Runtime
 
         // Bounded main-thread apply: applies at most `maxApplyCount` results and
         // leaves the rest queued for the next drain, so a completion burst can
-        // never stall a frame. `maxApplyCount == 0` means unbounded.
+        // never stall a frame. A result its readiness gate parks costs no
+        // budget, so parked results never starve later ones (every parked
+        // gate is consulted each drain). `maxApplyCount == 0` means unbounded.
         [[nodiscard]] std::uint64_t DrainCompletions(KernelEventBus& events,
                                                      std::uint64_t maxApplyCount);
         [[nodiscard]] std::uint64_t ReapCompleted();

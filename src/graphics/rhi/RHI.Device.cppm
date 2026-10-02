@@ -183,6 +183,13 @@ namespace Extrinsic::RHI
         /// when false, so no GPU-shaped call touches a stub backend.
         [[nodiscard]] virtual bool IsOperational() const noexcept { return true; }
 
+        /// True once the backend lost its device (Vulkan: VK_ERROR_DEVICE_LOST).
+        /// Unlike `!IsOperational()`, which also covers transient states (no
+        /// swapchain image yet, an unclean recipe validation), a lost device
+        /// never completes submitted work, so owners of in-flight GPU work fail
+        /// it instead of waiting. False for backends that cannot lose a device.
+        [[nodiscard]] virtual bool IsDeviceLost() const noexcept { return false; }
+
         // GRAPHICS-033E: the renderer publishes the outcome of the most recent
         // recipe-aware render-graph validation via this setter. Backends that
         // need the bit (Vulkan, for the `BarrierValidationClean` operational

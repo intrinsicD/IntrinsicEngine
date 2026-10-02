@@ -60,6 +60,7 @@ namespace Extrinsic::Backends::Vulkan
         void WaitIdle()  override;
 
         [[nodiscard]] bool IsOperational() const noexcept override;
+        [[nodiscard]] bool IsDeviceLost() const noexcept override { return m_DeviceLost; }
 
         // GRAPHICS-033E: receive the renderer's most recent recipe-aware
         // validation outcome. Stored in `m_LatestRecipeValidationClean` and

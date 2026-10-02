@@ -985,6 +985,43 @@ TEST(RuntimeJobService, BoundedApplyLimitsWorkPerDrainWithoutStarving)
         EXPECT_EQ(seen[static_cast<std::size_t>(i)], i);
 }
 
+// Parked records cost no apply budget: more parked results than the budget never
+// hold back a completion queued behind them.
+TEST(RuntimeJobService, ParkedResultsDoNotConsumeTheApplyBudget)
+{
+    SchedulerScope scheduler{2};
+    Runtime::JobService jobs;
+    Runtime::KernelEventBus events;
+
+    std::vector<int> publishOrder;
+    constexpr std::uint64_t kBudget = 8u;
+    std::vector<Runtime::JobToken> parked;
+    for (int i = 0; i < 10; ++i)
+    {
+        Runtime::JobDesc desc = MakeCountingJob("parked." + std::to_string(i), 100 + i, publishOrder);
+        desc.IsReadyToApply = [] { return false; };
+        parked.push_back(jobs.Submit(std::move(desc)));
+        ASSERT_TRUE(parked.back().IsValid());
+    }
+    ASSERT_TRUE(WaitUntil([&] { return jobs.Stats().AwaitingGateJobs == parked.size(); }));
+    EXPECT_EQ(jobs.DrainCompletions(events, kBudget), 0u);
+    EXPECT_EQ(jobs.DrainCompletions(events, kBudget), 0u); // parked records are back at the front
+
+    const Runtime::JobToken normal = jobs.Submit(MakeCountingJob("normal", 1, publishOrder));
+    ASSERT_TRUE(normal.IsValid());
+    ASSERT_TRUE(WaitUntil([&] { return jobs.GetState(normal) == Runtime::JobState::AwaitingGate; }));
+    EXPECT_EQ(jobs.DrainCompletions(events, kBudget), 1u);
+    EXPECT_EQ(jobs.GetState(normal), Runtime::JobState::Published);
+    EXPECT_EQ(jobs.Stats().LastDrainParked, parked.size());
+    for (const Runtime::JobToken token : parked)
+        EXPECT_EQ(jobs.GetState(token), Runtime::JobState::AwaitingApply);
+    ASSERT_EQ(publishOrder.size(), 1u);
+    EXPECT_EQ(publishOrder[0], 1);
+    for (const Runtime::JobToken token : parked)
+        (void)jobs.Cancel(token);
+    (void)jobs.DrainCompletions(events);
+}
+
 TEST(RuntimeJobService, NotReadyResultsParkInsteadOfApplyingOrBlocking)
 {
     SchedulerScope scheduler{2};

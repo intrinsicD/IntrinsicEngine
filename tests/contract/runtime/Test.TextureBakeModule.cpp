@@ -1363,6 +1363,14 @@ TEST(RuntimeTextureBakeModule, ScheduledBakeIsOneRunJobThatEndsWithItsOwnBake)
     ASSERT_TRUE(removed.Succeeded()) << removed.Diagnostic;
     harness.DrainJobs();
     EXPECT_EQ(harness.Jobs.GetState(second.Job), Runtime::JobState::Cancelled);
+
+    // A job service that refuses the run (shutting down, no scheduler) is a recorded failure, not the
+    // transient queue-pressure status the automatic appearance producer retries every frame.
+    Core::Tasks::Scheduler::Shutdown();
+    const auto refused = harness.Service->Bake(HeatRequest(harness, entity, "refused"));
+    Core::Tasks::Scheduler::Initialize(1u);
+    EXPECT_EQ(refused.Status, PropertyTextureBakeStatus::BakeFailed) << refused.Diagnostic;
+    EXPECT_FALSE(refused.Job.IsValid());
 }
 
 // Cancelling the run job cancels the bake: the record fails as cancelled and
@@ -1407,13 +1415,20 @@ TEST(RuntimeTextureBakeModule, RunJobsEndOnDeviceLossSceneReplacementAndShutdown
         const auto bake = harness.Service->Bake(HeatRequest(harness, entity, "heat"));
         ASSERT_EQ(bake.Status, PropertyTextureBakeStatus::Scheduled) << bake.Diagnostic;
         harness.DrainJobs();
+        // Not operational for now (no swapchain image, an unclean recipe validation): keep waiting.
         harness.Device.Operational = false;
+        harness.RunMaintenance();
+        harness.DrainJobs();
+        EXPECT_EQ(harness.Jobs.GetState(bake.Job), Runtime::JobState::AwaitingApply);
+        EXPECT_EQ(RecordNamed(harness, entity, "heat").State, Runtime::PropertyTextureBakeOutputState::Pending);
+        harness.Device.DeviceLost = true;
         harness.RunMaintenance();
         harness.DrainJobs();
         EXPECT_EQ(harness.Jobs.GetState(bake.Job), Runtime::JobState::StaleDiscarded) << "device loss fails the run";
         const auto record = RecordNamed(harness, entity, "heat");
         EXPECT_EQ(record.State, Runtime::PropertyTextureBakeOutputState::Failed);
-        EXPECT_NE(record.Diagnostic.find("no longer operational"), std::string::npos) << record.Diagnostic;
+        EXPECT_NE(record.Diagnostic.find("device was lost"), std::string::npos) << record.Diagnostic;
+        harness.Device.DeviceLost = false;
         harness.Device.Operational = true;
     }
     {

@@ -593,30 +593,17 @@ namespace Extrinsic::Runtime
         if (!m_State)
             return 0;
 
+        // Bounded apply: at most `maxApplyCount` records are applied (published,
+        // dropped, cancelled or discarded) per drain, so a completion burst cannot
+        // stall a frame; the rest stay queued in order. A record parked by its
+        // readiness gate costs no budget, so long-parked records (a GPU bake
+        // waiting for its frame) never starve the completions behind them.
         std::vector<SharedState::CompletionRecord> batch;
         std::vector<SharedState::CompletionRecord> deferred;
+        std::vector<SharedState::CompletionRecord> remainder;
         {
             std::lock_guard lock(m_State->Mutex);
-            if (maxApplyCount == 0u ||
-                m_State->CompletionQueue.size() <= maxApplyCount)
-            {
-                batch.swap(m_State->CompletionQueue);
-            }
-            else
-            {
-                // Bounded apply: take the budget off the front and leave the
-                // remainder queued in order, so a completion burst cannot stall
-                // a frame and no record is starved.
-                const auto budget = static_cast<std::size_t>(maxApplyCount);
-                batch.assign(
-                    std::make_move_iterator(m_State->CompletionQueue.begin()),
-                    std::make_move_iterator(m_State->CompletionQueue.begin() +
-                                            static_cast<std::ptrdiff_t>(budget)));
-                m_State->CompletionQueue.erase(
-                    m_State->CompletionQueue.begin(),
-                    m_State->CompletionQueue.begin() +
-                        static_cast<std::ptrdiff_t>(budget));
-            }
+            batch.swap(m_State->CompletionQueue);
             m_State->Stats.CompletionDrains += 1;
             m_State->Stats.LastDrainFinished =
                 static_cast<std::uint64_t>(batch.size());
@@ -635,9 +622,20 @@ namespace Extrinsic::Runtime
         // one finalizer call. Collected here and queued under the epilogue lock
         // rather than locking per record.
         std::vector<std::shared_ptr<JobRecord>> unpublished;
-        for (SharedState::CompletionRecord& completion : batch)
+        std::uint64_t applied = 0;
+        for (std::size_t index = 0; index < batch.size(); ++index)
         {
+            if (maxApplyCount != 0u && applied >= maxApplyCount)
+            {
+                remainder.assign(
+                    std::make_move_iterator(batch.begin() + static_cast<std::ptrdiff_t>(index)),
+                    std::make_move_iterator(batch.end()));
+                break;
+            }
+            SharedState::CompletionRecord& completion = batch[index];
             const std::shared_ptr<JobRecord>& job = completion.Job;
+            // Every outcome below except parking applies the record.
+            ++applied;
             if (!job)
             {
                 dropped += 1;
@@ -659,6 +657,7 @@ namespace Extrinsic::Runtime
                                  std::memory_order_release);
                 deferred.push_back(std::move(completion));
                 parked += 1;
+                --applied;
                 continue;
             }
 
@@ -701,8 +700,16 @@ namespace Extrinsic::Runtime
 
         {
             std::lock_guard lock(m_State->Mutex);
-            // Parked records go back to the front so they keep their place
-            // ahead of results that finished later.
+            // Parked and unvisited records go back to the front, in their
+            // order, so they keep their place ahead of results that finished
+            // later (every parked record preceded every unvisited one).
+            if (!remainder.empty())
+            {
+                m_State->CompletionQueue.insert(
+                    m_State->CompletionQueue.begin(),
+                    std::make_move_iterator(remainder.begin()),
+                    std::make_move_iterator(remainder.end()));
+            }
             if (!deferred.empty())
             {
                 m_State->CompletionQueue.insert(
@@ -716,6 +723,7 @@ namespace Extrinsic::Runtime
             m_State->Stats.StaleDiscardedJobs += staleDiscarded;
             m_State->Stats.AwaitingApplyJobs =
                 static_cast<std::uint64_t>(deferred.size());
+            m_State->Stats.LastDrainFinished = applied + parked;
             m_State->Stats.LastDrainPublished = published;
             m_State->Stats.LastDrainDropped = dropped;
             m_State->Stats.LastDrainParked = parked;
