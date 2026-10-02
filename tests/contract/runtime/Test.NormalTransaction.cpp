@@ -18,6 +18,12 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.KernelEvents;
+import Extrinsic.RHI.Device;
+import Extrinsic.Runtime.WorldRegistry;
+import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.ServiceRegistry;
+import Extrinsic.Runtime.Module;
+import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.NormalOperations;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -507,4 +513,26 @@ TEST(NormalTransaction, PcaAdmissionAndConfigPreserveTheBackendContract)
     EXPECT_NE(readiness.DisabledReason.find("subnormal"), std::string::npos);
     h.Config.Backend = R::NormalEstimationBackend::CpuKDTree;
     EXPECT_TRUE(R::PreviewEditorNormalEstimationCommand(h.Commands(), h.Config).Enabled);
+}
+
+// RUNTIME-313: a duplicate Vulkan start answers Pending with the shared wording, like every queued job.
+TEST(NormalTransaction, DuplicateStartIsPendingWithTheSharedMessage)
+{
+    Harness h;
+    R::CommandBus commands;R::KernelEventBus events;R::WorldRegistry worlds;R::ServiceRegistry services;
+    R::SpatialIndexCache cache;
+    h.Device.ShaderFloat64 = true;
+    h.Context.Device = &h.Device;
+    h.Context.SpatialIndices = &cache;
+    services.BeginRegistration();
+    ASSERT_TRUE(services.Provide<Extrinsic::RHI::IDevice>(h.Device, "test").has_value());
+    R::EngineSetup setup{commands, events, h.Jobs.Jobs(), worlds, services, [](R::FramePhase, R::RuntimeFrameHook) {}};
+    ASSERT_TRUE(cache.OnRegister(setup).has_value());
+    h.Context.JobCommands.FindActive = [](const R::EditorJobIdentity& identity) { return std::optional{R::EditorJobRecord{.Token=R::JobToken{5,1},.Identity=identity,.State=R::JobState::Running}}; };
+    R::EditorNormalEstimationResult failure;
+    EXPECT_FALSE(R::StartEditorNormalEstimationTransaction(h.Commands(), h.Config, failure));
+    EXPECT_EQ(failure.Status, R::EditorCommandStatus::Pending);
+    EXPECT_EQ(failure.Message, "Normal estimation already has an active running job (job 5:1).");
+    R::RuntimeModuleShutdownContext shutdown{commands, events, h.Jobs.Jobs(), worlds, services};
+    cache.OnShutdown(shutdown);
 }

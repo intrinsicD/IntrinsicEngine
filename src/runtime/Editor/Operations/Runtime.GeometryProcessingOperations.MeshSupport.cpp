@@ -513,7 +513,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             return failure;
         }
 
-        std::optional<std::string> ActiveOutputJobRefusal(
+        std::optional<ActiveOutputJob> ActiveOutputJobRefusal(
             const EditorProcessingContext& context,
             const EditorJobIdentity& identity,
             const std::string_view label)
@@ -521,7 +521,8 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             const auto active = FindActiveEditorJob(context, identity);
             if (!active || !IsActiveEditorJobState(active->State))
                 return std::nullopt;
-            return BuildActiveDerivedJobMessage(label, *active);
+            return ActiveOutputJob{.Token = active->Token,
+                                   .Message = BuildActiveDerivedJobMessage(label, *active)};
         }
 
         JobApplyValidation ValidateQueuedJob(

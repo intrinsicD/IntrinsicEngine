@@ -78,11 +78,20 @@ duplicate to `result_unavailable`; the single status must keep that mapping.
 | Point construction | "A construction job for this source/method is already active." -> "Point construction already has an active ..." | "Construction cancelled or stale; no entity created." -> "Point construction was cancelled ..." | "Construction preparation/GPU/output submission rejected." -> "Point construction job submission was rejected (preparation / Vulkan neighbors)." | 2 |
 | Bilateral filter | "A bilateral filter job for this output is already active." -> "Bilateral filter already has an active ..." | "Bilateral job cancelled or source stale; previous positions retained." -> "Bilateral filter was cancelled ..." | "Bilateral job sequence submission was rejected." -> "Bilateral filter job submission was rejected (<stage debug name>)." | 3 |
 | Vulkan point sampling | new: a second run on the same rank output answers Pending "Vulkan point sampling already has an active <state> job (job i:g)." before any upload or submission, without the callback (before: no guard, two runs raced) | "Vulkan point sampling cancelled or stale; nothing was changed." -> "Vulkan point sampling was cancelled or its source became stale; nothing was applied." | "The job lane rejected the Vulkan point sampling job." -> "Vulkan point sampling job submission was rejected."; still reported through the callback once, as every immediate answer of this operation is | 3 |
-| Normal estimation (Vulkan start), keypoints resident, scalar/outlier/smoothing GPU starts | still the hand-written "... already active." strings and differing statuses; migrated in slice 4 | - | - | 4 |
+| Scalar device runs (density, radii, density weights; Vulkan start) | InvalidProcessingParameters "Scalar output job is already active." -> Pending "<method label> already has an active <state> job (job i:g)." (no handle) | - | - | 4 |
+| Keypoints resident (Vulkan compute start) | GeometryProcessingFailed "A keypoint job for this output is already active." -> Pending "Keypoint analysis already has an active ..." (no handle) | - | - | 4 |
+| Outliers (Vulkan start) | Pending "An outlier job for this output is active." -> Pending "Outlier estimation already has an active ..." | - | - | 4 |
+| Normals (Vulkan start) | Pending "A normal job for this output is already active." -> Pending "Normal estimation already has an active ..." | - | - | 4 |
+| Property smoothing (Vulkan start) | Pending "A smoothing job for this output is already active." -> Pending "Property smoothing already has an active ..." | - | - | 4 |
+| ICP, curvature, mesh denoise/remesh/subdivide/simplify, UV regeneration, progressive Poisson | unchanged wording and status; now through `ActiveOutputJobRefusal` (which also returns the active token for their pending handle) | - | - | 4 |
 
 - `jobs_list` / Jobs window: after a later stage's submission is rejected, the earlier queued stage now
   ends `cancelled` instead of `stale-discarded` (it revalidates as Cancelled), pinned by
   `QueuedEditorJobContract.RejectedLaterStageAbandonsTheQueuedStagesWithoutACallback`.
+- Panel-path rejection: no PanelHarness seam makes the engine job lane reject a submission (JobService
+  refuses only with an uninitialized scheduler or while draining); agreed with the reviewer that
+  `QueuedEditorJobContract.RejectedSubmissionAnswersOnceWithoutTheCallback` (zero callbacks for every
+  operation, so the panel's `PublishCommandResult` is the single report) is sufficient.
 - Coherent Point Drift keeps its own run object (`Busy` flag, deliver-once flag, interactive steps
   without a completion callback); it is a run-based transaction rather than a queued Apply and is
   left to the RUNTIME-311 transaction lifecycle.

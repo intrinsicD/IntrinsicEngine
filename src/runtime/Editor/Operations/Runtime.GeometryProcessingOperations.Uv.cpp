@@ -1387,12 +1387,14 @@ using namespace GeometryProcessingDetail::MeshSupport;
                     "Atlas guide must exist with its declared scalar type and complete source-domain count.");
         }
 
+        // Without a submit lane the command runs synchronously; no active job can apply.
         if (const auto active = context.JobCommands.Available()
-                ? FindActiveEditorJob(context, MakeUvRegenerationCpuJobIdentity(command.StableEntityId))
+                ? ActiveOutputJobRefusal(context, MakeUvRegenerationCpuJobIdentity(command.StableEntityId),
+                                         "UV regeneration CPU")
                 : std::nullopt)
         {
             auto pending = MakePendingUvRegenerationResult(active->Token);
-            pending.Diagnostic = BuildActiveDerivedJobMessage("UV regeneration CPU", *active);
+            pending.Diagnostic = active->Message;
             return pending;
         }
         return MakeUvRegenerationResult(

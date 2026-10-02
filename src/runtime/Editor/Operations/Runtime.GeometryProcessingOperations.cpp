@@ -80,9 +80,8 @@ namespace Extrinsic::Runtime
 
         using EditorFeatureDetail::ResolveStableEntity;
         using EditorFeatureDetail::ToEditorCommandStatus;
-        using MeshSupport::BuildActiveDerivedJobMessage;
         using MeshSupport::CollectFiniteGeometryPositions;
-        using MeshSupport::FindActiveEditorJob;
+        using MeshSupport::ActiveOutputJobRefusal;
         using MeshSupport::InvalidateSelectedModelCache;
 
         inline constexpr const char* kProgressivePoissonCpuBackendDisplayName =
@@ -1523,8 +1522,8 @@ namespace Extrinsic::Runtime
                 .OutputSemantic = GeometryPresentationSlotSemantic::PointScalarField,
                 .OutputName = ProgressivePoissonOutputName(command.Config),
             };
-            if (const std::optional<EditorJobRecord> active =
-                    FindActiveEditorJob(context, identity))
+            if (const auto active =
+                    ActiveOutputJobRefusal(context, identity, "Progressive Poisson CPU"))
             {
                 // The active job already owns the callback that will deliver
                 // this output's terminal result; a duplicate request registers
@@ -1535,9 +1534,7 @@ namespace Extrinsic::Runtime
                         active->Token,
                         inputCount,
                         state->Backend);
-                pending.Message = BuildActiveDerivedJobMessage(
-                    "Progressive Poisson CPU",
-                    *active);
+                pending.Message = active->Message;
                 return pending;
             }
 

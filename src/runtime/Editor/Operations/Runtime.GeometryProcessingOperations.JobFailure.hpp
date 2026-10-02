@@ -27,11 +27,17 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
         std::string_view staleReason = {});
 
     // Duplicate guard of a queued editor job. When `identity` already has an
-    // active job, returns the refusal ("<label> already has an active <state>
-    // job (job i:g).") that the caller answers with `EditorCommandStatus::Pending`
-    // without registering its callback: the active job keeps delivering to its
-    // own caller, and the agent lane reports such a call as `result_unavailable`.
-    [[nodiscard]] std::optional<std::string> ActiveOutputJobRefusal(
+    // active job, returns it with the refusal ("<label> already has an active
+    // <state> job (job i:g).") that the caller answers with
+    // `EditorCommandStatus::Pending` without registering its callback: the active
+    // job keeps delivering to its own caller, and the agent lane reports such a
+    // call as `result_unavailable`.
+    struct ActiveOutputJob
+    {
+        JobToken Token{};
+        std::string Message{};
+    };
+    [[nodiscard]] std::optional<ActiveOutputJob> ActiveOutputJobRefusal(
         const EditorProcessingContext& context,
         const EditorJobIdentity& identity,
         std::string_view label);

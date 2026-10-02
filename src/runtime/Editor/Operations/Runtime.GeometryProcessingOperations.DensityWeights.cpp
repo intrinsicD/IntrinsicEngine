@@ -204,7 +204,7 @@ namespace Extrinsic::Runtime
             .OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Config.Weights.Name};
         namespace MS = GeometryProcessingDetail::MeshSupport;
         if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Density weights"))
-            return report(EditorCommandStatus::Pending, std::move(*busy));
+            return report(EditorCommandStatus::Pending, std::move(busy->Message));
         const MS::QueuedJobDelivery<EditorDensityWeightResult> delivery{
             context, std::move(onComplete), report(EditorCommandStatus::Pending, "Density weights queued."), "Density weights"};
         JobDesc desc{.DebugName="Compact density weights",.Scope=context.World,.Kind=RuntimeTaskKinds::GeometryProcess,

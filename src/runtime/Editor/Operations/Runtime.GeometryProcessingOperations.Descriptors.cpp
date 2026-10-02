@@ -291,7 +291,7 @@ namespace Extrinsic::Runtime
             .OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Config.Outputs[0].Name};
         namespace MS = GeometryProcessingDetail::MeshSupport;
         if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Descriptor analysis"))
-            return report(EditorCommandStatus::Pending, std::move(*busy));
+            return report(EditorCommandStatus::Pending, std::move(busy->Message));
         // Once submitted, Result belongs to the running stage. Submission failures
         // report from the delivery's immutable snapshot while earlier stages wind down.
         const MS::QueuedJobDelivery<EditorDescriptorAnalysisResult> delivery{

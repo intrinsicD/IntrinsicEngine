@@ -293,7 +293,7 @@ namespace Extrinsic::Runtime
             if (auto busy = GPD::MeshSupport::ActiveOutputJobRefusal(context, identity, "Vulkan point sampling"))
             {
                 result.Status = EditorCommandStatus::Pending;
-                result.Message = std::move(*busy);
+                result.Message = std::move(busy->Message);
                 return result;
             }
             auto* residency = context.SpatialIndices->PropertyResidency();

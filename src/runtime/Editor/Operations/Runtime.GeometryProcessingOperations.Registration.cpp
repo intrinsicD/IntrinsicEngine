@@ -953,8 +953,8 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
 
             const EditorJobIdentity identity =
                 MakeRegistrationCpuJobIdentity(*state);
-            if (const std::optional<EditorJobRecord> active =
-                    FindActiveEditorJob(context, identity))
+            if (const auto active =
+                    ActiveOutputJobRefusal(context, identity, "ICP registration CPU"))
             {
                 // The active job already owns the callback that will deliver
                 // this output's terminal result; a duplicate request registers
@@ -966,7 +966,7 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
                         state->TargetBinding.Points.size(),
                         active->Token);
                 pending.Message =
-                    BuildActiveDerivedJobMessage("ICP registration CPU", *active);
+                    active->Message;
                 return pending;
             }
 

@@ -46,6 +46,7 @@ import Extrinsic.RHI.CommandContext;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuFront.hpp"
 
@@ -277,7 +278,8 @@ namespace Extrinsic::Runtime
             if(testResidency){w->Result=testResult;w->Result.LiveCount=w->Capture->LiveCount;w->Back=AcquireGpuPropertyOutput(*residency,ctx.World,entity,w->Capture->Output,std::uint32_t(w->Capture->SlotCount),3);
                 if(!w->Back)return refuse("Test scalar ring allocation failed.");w->Generation=residency->RingGeneration(w->Key);w->Back.reset();
                 if(!residency->Publish(w->Key))return refuse("Test scalar publication failed.");w->TestFront=true;w->Result.Phase=EditorGpuTransactionPhase::ReadyToAccept;result=w->Result;return w;}
-            if(auto active=MeshSupport::FindActiveEditorJob(ctx,w->Identity);active&&IsActiveEditorJobState(active->State))return refuse("Scalar output job is already active.");
+            if(auto busy=MeshSupport::ActiveOutputJobRefusal(ctx,w->Identity,w->Label))
+            {result.Status=EditorCommandStatus::Pending;result.Message=std::move(busy->Message);return {};}
             std::shared_ptr<const SpatialIndexSnapshot> snapshot;bool reused{};std::string why;
             if(AcquirePointIndex(*ctx.SpatialIndices,ctx.World,entity,w->Positions,w->Capture->Slots,w->Capture->Points,w->Index,snapshot,reused,why)!=PointIndexState::Ready)return refuse(why);
             w->Result.IndexReused=reused;w->Result.Message="Device scalar analysis queued.";

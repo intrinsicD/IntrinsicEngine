@@ -216,3 +216,31 @@ TEST_P(PointScalarTransaction, DestroyedWorldIsCheckedBeforeSceneAccess)
     EXPECT_EQ(R::AcceptEditorPointScalar(Commands(),run).Status,R::EditorCommandStatus::StaleEntity);
     R::DiscardEditorPointScalar(Commands(),run);
 }
+
+// RUNTIME-313: a duplicate device run answers Pending with the shared wording (before:
+// InvalidProcessingParameters), never submits and never takes the callback.
+TEST_P(PointScalarTransaction, DuplicateStartIsPendingWithTheSharedMessage)
+{
+    R::SpatialIndexCache cache;Context.SpatialIndices=&cache;Device.ShaderFloat64=true;
+    R::CommandBus commands;R::KernelEventBus events;R::WorldRegistry worlds;R::ServiceRegistry services;
+    Context.World=worlds.CreateWorld("duplicate");Context.Scene=worlds.Get(Context.World);
+    const auto entity=Intrinsic::Tests::MakePointDomainSource(*Context.Scene,R::GeometryElementDomain::PointCloudPoint);
+    (void)Intrinsic::Tests::PointDomainProperties(*Context.Scene,entity,R::GeometryElementDomain::PointCloudPoint).GetOrAdd<glm::vec3>("v:position",glm::vec3{0});
+    Density.StableEntityId=Spacing.StableEntityId=Weight.StableEntityId=R::SelectionController::ToStableEntityId(entity);
+    services.BeginRegistration();
+    ASSERT_TRUE(services.Provide<Extrinsic::RHI::IDevice>(Device,"test").has_value());
+    R::EngineSetup setup{commands,events,Jobs.Jobs(),worlds,services,[](R::FramePhase,R::RuntimeFrameHook){}};
+    ASSERT_TRUE(cache.OnRegister(setup).has_value());
+    unsigned callbacks=0,submissions=0;
+    Context.JobCommands.Submit=[&](R::JobDesc,R::EditorJobIdentity){++submissions;return R::JobToken{};};
+    Context.JobCommands.FindActive=[](const R::EditorJobIdentity& identity){
+        return std::optional{R::EditorJobRecord{.Token=R::JobToken{5,1},.Identity=identity,.State=R::JobState::Running}};};
+    const auto check=[&](const auto& result){
+        EXPECT_EQ(result.Status,R::EditorCommandStatus::Pending)<<result.Message;
+        EXPECT_NE(result.Message.find(" already has an active running job (job 5:1)."),std::string::npos)<<result.Message;};
+    if(GetParam()==0)check(R::ApplyEditorKernelDensityCommand(Commands(),Density,[&](auto){++callbacks;}));
+    else if(GetParam()==1)check(R::ApplyEditorPointSpacingCommand(Commands(),Spacing,[&](auto){++callbacks;}));
+    else check(R::ApplyEditorDensityWeightCommand(Commands(),Weight,[&](auto){++callbacks;}));
+    EXPECT_EQ(submissions,0u);EXPECT_EQ(callbacks,0u);
+    R::RuntimeModuleShutdownContext shutdown{commands,events,Jobs.Jobs(),worlds,services};cache.OnShutdown(shutdown);
+}

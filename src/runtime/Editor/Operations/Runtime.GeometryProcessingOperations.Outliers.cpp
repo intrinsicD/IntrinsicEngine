@@ -534,8 +534,8 @@ namespace Extrinsic::Runtime
             auto w=Make(ctx,work,residency);w->AutoAccept=automatic;w->Sink=GuardEditorProcessingResult(ctx,std::move(sink));
             for(const auto& key:w->Keys)if(residency->HasRing(key)){
                 result.Status=EditorCommandStatus::InvalidProcessingParameters;result.Message="An outlier output awaits Accept or Discard.";return {};}
-            if(auto active=GP::MeshSupport::FindActiveEditorJob(ctx,w->Identity);active&&IsActiveEditorJobState(active->State)){
-                result.Status=EditorCommandStatus::Pending;result.Message="An outlier job for this output is active.";return {};}
+            if(auto busy=GP::MeshSupport::ActiveOutputJobRefusal(ctx,w->Identity,"Outlier estimation")){
+                result.Status=EditorCommandStatus::Pending;result.Message=std::move(busy->Message);return {};}
             std::string why;
             const auto acquired=GP::AcquirePointIndex(*ctx.SpatialIndices,ctx.World,work->Entity,work->Config.Positions,
                 work->Slots,work->Points,work->GpuIndex,work->Index,work->Result.IndexReused,why);
@@ -669,7 +669,7 @@ namespace Extrinsic::Runtime
                                          .OutputName = w->Config.Mask.Name};
         namespace MS = GeometryProcessingDetail::MeshSupport;
         if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Outlier estimation"))
-            return report(EditorCommandStatus::Pending, std::move(*busy));
+            return report(EditorCommandStatus::Pending, std::move(busy->Message));
         auto queued = w->Result;
         queued.Message = "Outlier estimation queued.";
         const MS::QueuedJobDelivery<EditorOutlierAnalysisResult> delivery{

@@ -285,9 +285,9 @@ namespace Extrinsic::Runtime
             return refuse("Resident keypoints require the Vulkan compute backend.");
         const EditorJobIdentity identity{.EntityId=config.StableEntityId,.Scope=ToEditorJobScope(w->Config.Mask.Domain),
             .OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Config.Mask.Name};
-        if(auto active=GeometryProcessingDetail::MeshSupport::FindActiveEditorJob(context,identity);
-            active && IsActiveEditorJobState(active->State))
-            return refuse("A keypoint job for this output is already active.");
+        // A duplicate is Pending like every queued editor job; the active run keeps its callback.
+        if(auto busy=GeometryProcessingDetail::MeshSupport::ActiveOutputJobRefusal(context,identity,"Keypoint analysis"))
+        {result.Status=EditorCommandStatus::Pending;result.Message=std::move(busy->Message);return {};}
         auto scoreOutput=w->Config.Score, maskOutput=w->Config.Mask;
         scoreOutput.ValueKind=Geometry::PropertyValueKind::Float;
         maskOutput.ValueKind=Geometry::PropertyValueKind::UInt32;
@@ -466,7 +466,7 @@ namespace Extrinsic::Runtime
             .OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Config.Mask.Name};
         namespace MS = GeometryProcessingDetail::MeshSupport;
         if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Keypoint analysis"))
-            return report(EditorCommandStatus::Pending, std::move(*busy)); // the active job owns the callback
+            return report(EditorCommandStatus::Pending, std::move(busy->Message)); // the active job owns the callback
         // Once submitted, Result belongs to the running stage. Submission failures
         // report from the delivery's immutable snapshot while earlier stages wind down.
         const MS::QueuedJobDelivery<EditorKeypointAnalysisResult> delivery{

@@ -281,7 +281,7 @@ namespace Extrinsic::Runtime
                                              .OutputName = output.Name};
             const std::string label = Join({M::Noun, " estimation"});
             if (auto busy = MeshSupport::ActiveOutputJobRefusal(context, identity, label))
-                return report(EditorCommandStatus::Pending, std::move(*busy));
+                return report(EditorCommandStatus::Pending, std::move(busy->Message));
             auto queued = w->Result;
             queued.Message = label + " queued.";
             const MeshSupport::QueuedJobDelivery<typename M::Result> delivery{

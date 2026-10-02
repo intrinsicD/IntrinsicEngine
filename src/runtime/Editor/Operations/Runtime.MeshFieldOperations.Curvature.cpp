@@ -1765,8 +1765,8 @@ namespace Extrinsic::Runtime::MeshFieldDetail
 
             const EditorJobIdentity identity =
                 MakeMeshCurvatureJobIdentity(*state);
-            if (const std::optional<EditorJobRecord> active =
-                    FindActiveEditorJob(context, identity))
+            if (const auto active =
+                    ActiveOutputJobRefusal(context, identity, "Mesh curvature CPU"))
             {
                 // The active job already owns the callback that will deliver
                 // this output's terminal result; a duplicate request adds none.
@@ -1777,7 +1777,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                         vertexSlotCount,
                         active->Token);
                 pending.Message =
-                    BuildActiveDerivedJobMessage("Mesh curvature CPU", *active);
+                    active->Message;
                 return pending;
             }
 

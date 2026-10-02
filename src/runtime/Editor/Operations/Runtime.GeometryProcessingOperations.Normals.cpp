@@ -1158,8 +1158,8 @@ namespace Extrinsic::Runtime
             const auto& c = work->Config;
             const EditorJobIdentity identity{.EntityId = c.StableEntityId, .Scope = ToEditorJobScope(c.Output.Domain),
                                              .OutputSemantic = GeometryPresentationSlotSemantic::Normal, .OutputName = c.Output.Name};
-            if (auto active = Detail::MeshSupport::FindActiveEditorJob(context, identity); active && IsActiveEditorJobState(active->State))
-                return fail(EditorCommandStatus::Pending, "A normal job for this output is already active.");
+            if (auto busy = Detail::MeshSupport::ActiveOutputJobRefusal(context, identity, "Normal estimation"))
+                return fail(EditorCommandStatus::Pending, std::move(busy->Message));
             auto* residency = context.SpatialIndices ? context.SpatialIndices->PropertyResidency() : nullptr;
             if (!residency) return fail(EditorCommandStatus::InvalidProcessingParameters, "Vulkan normals need the GPU property residency.");
             auto w = std::make_shared<EditorNormalTransaction>();
@@ -1426,7 +1426,7 @@ namespace Extrinsic::Runtime
                                          .OutputName = w->Config.Output.Name};
         namespace MS = GeometryProcessingDetail::MeshSupport;
         if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Normal estimation"))
-            return report(EditorCommandStatus::Pending, std::move(*busy));
+            return report(EditorCommandStatus::Pending, std::move(busy->Message));
         auto queued = w->Result;
         queued.Message = "Normal estimation queued.";
         const MS::QueuedJobDelivery<EditorNormalEstimationResult> delivery{

@@ -567,7 +567,7 @@ namespace Extrinsic::Runtime
             .OutputName = std::string("construct:") + ToString(config.Method)};
         namespace MS = GeometryProcessingDetail::MeshSupport;
         if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Point construction"))
-            return report(EditorCommandStatus::Pending, std::move(*busy));
+            return report(EditorCommandStatus::Pending, std::move(busy->Message));
         const MS::QueuedJobDelivery<EditorPointConstructionResult> delivery{
             context, std::move(onComplete), report(EditorCommandStatus::Pending, "Point construction queued."),
             "Point construction"};

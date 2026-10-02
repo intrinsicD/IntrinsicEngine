@@ -560,13 +560,14 @@ TEST_F(KeypointResident, AutomaticAcceptPreservesCheckedConversionFailure)
     EXPECT_EQ(std::as_const(Rows()).Get<std::int32_t>(C.Score.Name)[0],77);
     EXPECT_FALSE(Rows().Exists(C.Mask.Name));EXPECT_EQ(History.UndoCount(),0u);
 }
-TEST_F(KeypointResident, DuplicateGpuRequestIsTerminalAndDoesNotStealCompletion)
+// RUNTIME-313: a GPU duplicate answers like every queued editor job (Pending, shared wording).
+TEST_F(KeypointResident, DuplicateGpuRequestIsPendingAndDoesNotStealCompletion)
 {
     Hold=true;Start();ASSERT_TRUE(Run);
     unsigned duplicates{};
     const auto duplicate=R::ApplyEditorKeypointAnalysisCommand(Commands(),C,[&](auto){++duplicates;});
-    EXPECT_EQ(duplicate.Status,R::EditorCommandStatus::GeometryProcessingFailed);
-    EXPECT_NE(duplicate.Message.find("already active"),std::string::npos);
+    EXPECT_EQ(duplicate.Status,R::EditorCommandStatus::Pending);
+    EXPECT_EQ(duplicate.Message.rfind("Keypoint analysis already has an active ",0),0u)<<duplicate.Message;
     EXPECT_EQ(duplicates,0u);
     Hold=false;ASSERT_TRUE(Until([&]{return Phase()==R::EditorGpuTransactionPhase::ReadyToAccept;}));
     R::DiscardEditorPointScalar(Commands(),Run);EXPECT_EQ(Results.size(),1u);

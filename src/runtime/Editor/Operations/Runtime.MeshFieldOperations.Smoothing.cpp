@@ -54,6 +54,7 @@ import Geometry.Properties;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuFront.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.hpp"
 #include "Editor/Operations/Runtime.MeshFieldOperations.PropertyGraph.hpp"
@@ -1047,10 +1048,10 @@ namespace Extrinsic::Runtime
             w->OutputWatch = std::move(prepared.OutputWatch);
             w->Identity = {.EntityId = id, .Scope = ToEditorJobScope(c.Output.Domain),
                            .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField, .OutputName = c.Output.Name};
-            if (auto active = GP::MeshSupport::FindActiveEditorJob(context, w->Identity); active && IsActiveEditorJobState(active->State))
+            if (auto busy = GP::MeshSupport::ActiveOutputJobRefusal(context, w->Identity, "Property smoothing"))
             {
                 result.Status = EditorCommandStatus::Pending;
-                result.Message = "A smoothing job for this output is already active.";
+                result.Message = std::move(busy->Message);
                 return {};
             }
             // The output ring, keyed like every other GPU user of the property (ADR 0030).

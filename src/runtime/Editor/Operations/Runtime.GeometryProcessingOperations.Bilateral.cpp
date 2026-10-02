@@ -337,7 +337,7 @@ namespace Extrinsic::Runtime
                                          .OutputName = w->Config.Output.Name};
         namespace MS = GeometryProcessingDetail::MeshSupport;
         if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Bilateral filter"))
-            return report(EditorCommandStatus::Pending, std::move(*busy));
+            return report(EditorCommandStatus::Pending, std::move(busy->Message));
         auto queued = w->Result;
         queued.Message = "Bilateral filtering queued.";
         const MS::QueuedJobDelivery<EditorBilateralFilterResult> delivery{

@@ -23,6 +23,7 @@ import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.Graphics.GpuPropertyResidency;
 import Extrinsic.Graphics.OutlierAnalysis;
 import Geometry.Properties;
+import Extrinsic.RHI.Device;
 namespace R=Extrinsic::Runtime;
 namespace G=Extrinsic::Graphics;
 namespace
@@ -212,4 +213,27 @@ TEST(OutlierTransaction, ReplacedRingRefusesAcceptAndDiscardPreservesReplacement
         R::DiscardEditorOutlierAnalysis(h.Commands(),run);
         EXPECT_EQ(h.Residency.RingGeneration(key),generation);
     }
+}
+
+// RUNTIME-313: a duplicate device run answers Pending with the shared wording, like every queued job.
+TEST(OutlierTransaction, DuplicateStartIsPendingWithTheSharedMessage)
+{
+    Harness h;
+    R::CommandBus commands;R::KernelEventBus events;R::WorldRegistry worlds;R::ServiceRegistry services;
+    R::SpatialIndexCache cache;
+    h.Device.ShaderFloat64 = true;
+    h.Context.SpatialIndices = &cache;
+    services.BeginRegistration();
+    ASSERT_TRUE(services.Provide<Extrinsic::RHI::IDevice>(h.Device, "test").has_value());
+    R::EngineSetup setup{commands, events, h.Jobs.Jobs(), worlds, services, [](R::FramePhase, R::RuntimeFrameHook) {}};
+    ASSERT_TRUE(cache.OnRegister(setup).has_value());
+    h.Context.JobCommands.FindActive = [](const R::EditorJobIdentity& identity) {
+        return std::optional{R::EditorJobRecord{.Token = R::JobToken{5, 1}, .Identity = identity, .State = R::JobState::Running}};
+    };
+    R::EditorOutlierAnalysisResult failure;
+    EXPECT_FALSE(R::StartEditorOutlierAnalysisTransaction(h.Commands(), h.Config, failure));
+    EXPECT_EQ(failure.Status, R::EditorCommandStatus::Pending) << failure.Message;
+    EXPECT_EQ(failure.Message, "Outlier estimation already has an active running job (job 5:1).");
+    R::RuntimeModuleShutdownContext shutdown{commands, events, h.Jobs.Jobs(), worlds, services};
+    cache.OnShutdown(shutdown);
 }

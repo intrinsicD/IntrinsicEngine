@@ -2196,8 +2196,8 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
 
             const EditorJobIdentity identity =
                 MakeMeshCpuJobIdentity(*state);
-            if (const std::optional<EditorJobRecord> active =
-                    FindActiveEditorJob(context, identity))
+            if (const auto active =
+                    ActiveOutputJobRefusal(context, identity, "Mesh denoise CPU"))
             {
                 MeshProcessingSourceResult pendingSource{};
                 pendingSource.BeforePositions = state->SnapshotPositions;
@@ -2208,7 +2208,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                         pendingSource,
                         active->Token);
                 pending.Message =
-                    BuildActiveDerivedJobMessage("Mesh denoise CPU", *active);
+                    active->Message;
                 return pending;
             }
 
@@ -2274,8 +2274,8 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
 
             const EditorJobIdentity identity =
                 MakeMeshCpuJobIdentity(*state);
-            if (const std::optional<EditorJobRecord> active =
-                    FindActiveEditorJob(context, identity))
+            if (const auto active =
+                    ActiveOutputJobRefusal(context, identity, "Mesh remesh CPU"))
             {
                 EditorMeshRemeshResult pending =
                     MakePendingMeshRemeshResult(
@@ -2283,7 +2283,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                         state->BeforeMesh,
                         active->Token);
                 pending.Message =
-                    BuildActiveDerivedJobMessage("Mesh remesh CPU", *active);
+                    active->Message;
                 return pending;
             }
 
@@ -2346,8 +2346,8 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
 
             const EditorJobIdentity identity =
                 MakeMeshCpuJobIdentity(*state);
-            if (const std::optional<EditorJobRecord> active =
-                    FindActiveEditorJob(context, identity))
+            if (const auto active =
+                    ActiveOutputJobRefusal(context, identity, "Mesh subdivide CPU"))
             {
                 EditorMeshSubdivideResult pending =
                     MakePendingMeshSubdivideResult(
@@ -2355,7 +2355,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                         state->BeforeMesh,
                         active->Token);
                 pending.Message =
-                    BuildActiveDerivedJobMessage("Mesh subdivide CPU", *active);
+                    active->Message;
                 return pending;
             }
 
@@ -2426,8 +2426,8 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
 
             const EditorJobIdentity identity =
                 MakeMeshCpuJobIdentity(*state);
-            if (const std::optional<EditorJobRecord> active =
-                    FindActiveEditorJob(context, identity))
+            if (const auto active =
+                    ActiveOutputJobRefusal(context, identity, "Mesh simplify CPU"))
             {
                 EditorMeshSimplifyResult pending =
                     MakePendingMeshSimplifyResult(
@@ -2435,7 +2435,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                         state->BeforeMesh,
                         active->Token);
                 pending.Message =
-                    BuildActiveDerivedJobMessage("Mesh simplify CPU", *active);
+                    active->Message;
                 return pending;
             }
 

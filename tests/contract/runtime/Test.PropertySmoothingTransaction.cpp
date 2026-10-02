@@ -420,3 +420,14 @@ TEST(PropertySmoothingTransaction, ShowAcceptsAPendingResidentOutputAndFallsBack
     EXPECT_EQ(R::EncodeVisualizationRecipe(availability, {.Data = fallback}).Status, R::VisualizationRecipeStatus::MissingSource)
         << "the CPU upload path reports a missing source and the lane falls back";
 }
+
+// RUNTIME-313: a duplicate Vulkan start answers Pending with the shared wording, like every queued job.
+TEST(PropertySmoothingTransaction, DuplicateStartIsPendingWithTheSharedMessage)
+{
+    AdmittedHarness h;
+    h.Context.JobCommands.FindActive = [](const R::EditorJobIdentity& identity) { return std::optional{R::EditorJobRecord{.Token=R::JobToken{5,1},.Identity=identity,.State=R::JobState::Running}}; };
+    R::EditorPropertySmoothingResult failure;
+    EXPECT_FALSE(R::StartEditorPropertySmoothing(h.Cmd(), h.Id(), h.Config, failure));
+    EXPECT_EQ(failure.Status, R::EditorCommandStatus::Pending) << failure.Message;
+    EXPECT_EQ(failure.Message, "Property smoothing already has an active running job (job 5:1).");
+}
