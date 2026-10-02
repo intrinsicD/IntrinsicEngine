@@ -389,6 +389,23 @@ namespace Extrinsic::Runtime
         return reading;
     }
 
+    bool GeometryDomainReadingIncludes(
+        const GS::Domain requested, const GeometryElementDomain element) noexcept
+    {
+        const bool vertices = element == GeometryElementDomain::MeshVertex ||
+                              element == GeometryElementDomain::GraphNode ||
+                              element == GeometryElementDomain::PointCloudPoint;
+        const bool edges = element == GeometryElementDomain::MeshEdge ||
+                           element == GeometryElementDomain::GraphEdge;
+        switch (requested)
+        {
+        case GS::Domain::PointCloud: return vertices;
+        case GS::Domain::Graph: return vertices || edges;
+        case GS::Domain::Mesh: return element != GeometryElementDomain::Unknown;
+        default: return false;
+        }
+    }
+
     bool SupportsGeometryElementDomain(
         const GeometryEntityAvailability& availability,
         const GeometryElementDomain domain) noexcept

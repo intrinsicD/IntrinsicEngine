@@ -2866,18 +2866,22 @@ BuildEditorDomainWindowModelFromBindings(
         model.DomainUsable = reading.Supported;
         if (reading.Supported)
         {
+            const bool named = model.SelectedDomain == GS::Domain::Mesh ||
+                               model.SelectedDomain == GS::Domain::Graph ||
+                               model.SelectedDomain == GS::Domain::PointCloud;
             model.DomainReading =
-                std::string(DebugNameForEditorGeometryDomain(model.SelectedDomain));
+                named ? std::string(DebugNameForEditorGeometryDomain(model.SelectedDomain)) + " "
+                      : std::string{};
             switch (model.ExpectedDomain)
             {
             case GS::Domain::PointCloud:
-                model.DomainReading += " Vertices as a point set";
+                model.DomainReading += "Vertices as a point set";
                 break;
             case GS::Domain::Graph:
-                model.DomainReading += " Vertices and Edges as a graph";
+                model.DomainReading += "Vertices and Edges as a graph";
                 break;
             default:
-                model.DomainReading += " Vertices, Edges and Faces as a mesh";
+                model.DomainReading += "Vertices, Edges and Faces as a mesh";
                 break;
             }
         }

@@ -146,6 +146,11 @@ export namespace Extrinsic::Runtime
         const GeometryEntityAvailability& availability,
         GeometrySources::Domain requested) noexcept;
 
+    // Whether `element` belongs to what `requested` reads: a point set reads
+    // vertices, a graph vertices and edges, a mesh everything.
+    [[nodiscard]] bool GeometryDomainReadingIncludes(
+        GeometrySources::Domain requested, GeometryElementDomain element) noexcept;
+
     [[nodiscard]] bool SupportsGeometryElementDomain(
         const GeometryEntityAvailability& availability,
         GeometryElementDomain domain) noexcept;

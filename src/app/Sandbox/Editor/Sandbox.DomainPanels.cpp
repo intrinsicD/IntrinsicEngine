@@ -875,6 +875,8 @@ void DrawDomainSelectionWindow(const EditorDomainWindowModel& model,
     std::vector<GeometryElementDomain> available;
     for (auto domain : domains)
     {
+        if (!GeometryDomainReadingIncludes(model.ExpectedDomain, domain))
+            continue;
         const auto selection =
             ReadEditorPrimitiveSelection(context.Processing, model.SelectedStableId, domain);
         if (selection.Status != PrimitiveSelectionStatus::UnsupportedDomain &&

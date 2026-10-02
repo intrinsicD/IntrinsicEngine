@@ -288,6 +288,24 @@ TEST(RuntimeGeometryAvailability, DomainReadingIsDecidedByElementDomainDataNotPr
     EXPECT_EQ(read(empty, GS::Domain::PointCloud).Status, Status::NoGeometrySource);
 }
 
+TEST(RuntimeGeometryAvailability, DomainReadingOffersOnlyTheElementsItReads)
+{
+    using E = Runtime::GeometryElementDomain;
+    const auto offered = [](const GS::Domain domain) {
+        std::vector<E> out;
+        for (const E e : {E::MeshVertex, E::MeshEdge, E::MeshHalfedge, E::MeshFace, E::GraphNode,
+                          E::GraphEdge, E::GraphHalfedge, E::PointCloudPoint})
+            if (Runtime::GeometryDomainReadingIncludes(domain, e))
+                out.push_back(e);
+        return out;
+    };
+    EXPECT_EQ(offered(GS::Domain::PointCloud),
+              (std::vector{E::MeshVertex, E::GraphNode, E::PointCloudPoint}));
+    EXPECT_EQ(offered(GS::Domain::Graph),
+              (std::vector{E::MeshVertex, E::MeshEdge, E::GraphNode, E::GraphEdge, E::PointCloudPoint}));
+    EXPECT_EQ(offered(GS::Domain::Mesh).size(), 8u);
+}
+
 TEST(RuntimeGeometryAvailability, MeshEdgeLaneCanDeriveFromSurfaceTopologyWithoutEdges)
 {
     entt::registry registry;

@@ -130,7 +130,9 @@ python3 tools/repo/check_layering.py --root src --strict
 ```
 
 ## Forbidden changes
-- Using `Vertices` or container provenance as the eligibility boundary.
+- Using entity provenance (or a container's presence) as the eligibility boundary;
+  eligibility is the element-domain data the window reads (Vertices for a point
+  set, Vertices and Edges for a graph).
 - Duplicating the method-panel work owned by `RUNTIME-211/212/213` and
   `UI-041/043/044/045`.
 
@@ -147,3 +149,7 @@ python3 tools/repo/check_layering.py --root src --strict
   Appearance windows with one panel and reuses the predicate to choose domain
   sections, so no per-domain Appearance UI is built here; the Appearance
   acceptance items stay open for `UI-075`.
+- Review follow-up: the Appearance parts of AC1/AC2 transfer to `UI-075`
+  (Appearance already gates on `VisualizationTargetAvailable`; UI-075 AC1 covers
+  "a mesh read as points/edges"). The Selection element-domain list is limited
+  to the reading's elements; Properties stays exhaustive.

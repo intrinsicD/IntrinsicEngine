@@ -2942,6 +2942,12 @@ TEST(SandboxEditorUi, DomainVisualizationTargetsFollowLaneSourcePresence)
 
     // Without Edges the Graph window is refused with the runtime reason.
     EXPECT_FALSE(wireMeshEdgeModel.DomainUsable);
+    {
+        // Unknown provenance is not named in the reading statement.
+        const Runtime::EditorDomainWindowModel wirePoints = Runtime::BuildEditorDomainWindowModel(
+            context, Runtime::EditorDomainWindowKind::PointCloud);
+        EXPECT_EQ(wirePoints.DomainReading, "Vertices as a point set");
+    }
     EXPECT_TRUE(wireMeshEdgeModel.DomainReading.empty());
     EXPECT_TRUE(HasDiagnostic(wireMeshEdgeModel.Diagnostics,
                               Runtime::EditorDiagnosticCode::UnsupportedGeometryDomain));
