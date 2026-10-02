@@ -698,6 +698,11 @@ TEST(SandboxAgentServer, ConnectionWindowShowsTheClientAndDisconnectsIt)
     EXPECT_TRUE(connected.load());
     EXPECT_TRUE(clicked) << "the window showed the connected client";
     EXPECT_TRUE(closed.load()) << "Disconnect agent closed the client's connection";
+    // The socket thread closes the connection before it publishes ClientConnected=false, so the
+    // client can observe the close first; wait (bounded) for the status to catch up.
+    const auto statusDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while (server->Status().ClientConnected && std::chrono::steady_clock::now() < statusDeadline)
+        std::this_thread::yield();
     EXPECT_FALSE(server->Status().ClientConnected);
     shell.Detach();
     engine.Shutdown();
