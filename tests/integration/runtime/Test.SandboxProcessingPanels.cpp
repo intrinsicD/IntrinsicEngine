@@ -4631,10 +4631,8 @@ TEST(SandboxProcessingPanels, OperationRunSlotCapturesTheKeyAtSubmitAndMapsTrans
 namespace
 {
     // Mesh methods through their panels, on a small grid mesh with a second mesh to select away to.
-    void ExpectMeshPanelRun(const char* windowId, const char* title, const char* runLabel,
-                            const std::function<bool(const std::optional<R::EditorCommandStatus>&)>& unused = {})
+    void ExpectMeshPanelRun(const char* windowId, const char* title, const char* runLabel)
     {
-        (void)unused;
         PanelHarness h;
         auto& scene = h.Scene();
         const auto entity = scene.Create(), other = scene.Create();

@@ -1781,6 +1781,8 @@ namespace Extrinsic::Sandbox::Editor
             return;
         }
         // Nothing submitted here: a run of the draft's output started elsewhere shows as well.
+        // Known limit: only before this panel's first own run and only for the draft's current
+        // key (curvature's key changes with its config); see sandbox-editor-feature-boundaries.md.
         const EditorOperationProgress& shown = Observe(
             Query(commands, draft), DescribeRunKey(draft->EntityId, EditorOperationRunKey{*draft}));
         if (selectedEntity == draft->EntityId && !m_AwaitingAccept)

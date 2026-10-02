@@ -499,11 +499,17 @@ TEST(SandboxAgentServer, ProgressAndCancelOverTheSocket)
         // Progress: the run reports with its token, then replies with the same id.
         for (int wait = 0; wait < 500 && !blockerStarted.load(); ++wait) std::this_thread::sleep_for(std::chrono::milliseconds(4));
         check(blockerStarted.load(), "the older job is running");
-        configure(150); // long enough that frames (and notifications) happen even when workers are fast and the host is loaded
-        const int runId = c.Send("tools/call", {{"name", "run_registration"}, {"arguments", {{"method", "cpd"}}},
-                                                {"_meta", {{"progressToken", "run-1"}}}});
-        const auto reply = c.Await(runId);
-        check(reply.contains("result") && reply["result"]["isError"] == false, "run_registration reply: " + reply.dump());
+        configure(400);
+        // A notification needs a frame to poll the call while its run is still going. Whether one
+        // does depends on how the host schedules the frame thread against the worker, so a call
+        // that finished unobserved is repeated (bounded); every reply is still checked.
+        for (int attempt = 0; attempt < 25 && c.Notifications.empty(); ++attempt)
+        {
+            const int runId = c.Send("tools/call", {{"name", "run_registration"}, {"arguments", {{"method", "cpd"}}},
+                                                    {"_meta", {{"progressToken", "run-1"}}}});
+            const auto reply = c.Await(runId);
+            check(reply.contains("result") && reply["result"]["isError"] == false, "run_registration reply: " + reply.dump());
+        }
         check(!c.Notifications.empty(), "at least one progress notification before the reply");
         double last = -1.0;
         bool namedItsJob = false;
@@ -760,7 +766,6 @@ TEST(SandboxAgentServer, KMeansProgressFollowsTheRunsOwnJob)
     rig.Run([&](Client& c) {
         for (int wait = 0; wait < 500 && !blockerStarted.load(); ++wait) std::this_thread::sleep_for(std::chrono::milliseconds(4));
         rig.Check(blockerStarted.load(), "the older job is running");
-        bool isError = true;
         const int runId = c.Send("tools/call", {{"name", "run_kmeans"},
             {"arguments", {{"entity", cloud}, {"domain", "PointCloudPoint"}}}, {"_meta", {{"progressToken", "km"}}}});
         const auto reply = c.Await(runId);
@@ -774,7 +779,6 @@ TEST(SandboxAgentServer, KMeansProgressFollowsTheRunsOwnJob)
         }
         rig.Check(namedItsJob, "a notification names the K-Means job (" + std::to_string(c.Notifications.size()) + " notes)");
         release.store(true);
-        (void)isError;
     }, std::chrono::seconds(90));
     release.store(true);
 }
@@ -1051,6 +1055,36 @@ TEST(SandboxAgentServer, RunOperationTakesExplicitParamsAndUndoes)
         const auto uv = c.Tool("run_operation", {{"operation", "parameterization"}, {"entity", grid}}, &isError);
         rig.Check(uv.is_object() && uv["operation"] == "parameterization", "parameterization answers: " + uv.dump());
     });
+}
+
+// RUNTIME-312 slice 8: a scene save is not indexed by the editor session, so its progress is
+// projected from the job service by the job token the call captured.
+TEST(SandboxAgentServer, SceneSaveProgressNamesTheSceneJob)
+{
+    namespace fs = std::filesystem;
+    const fs::path directory = fs::temp_directory_path() / ("intrinsic-agent-savenote-" + std::to_string(::getpid()));
+    fs::remove_all(directory);
+    fs::create_directories(directory);
+    AgentRig rig("savenote");
+    ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
+    (void)rig.AddCloud(300000); // a save that spans frames
+    rig.Run([&](Client& c) {
+        const auto path = (directory / "progress.scene").string();
+        // A save the frame thread never saw running is repeated (bounded); every reply is checked.
+        for (int attempt = 0; attempt < 25 && c.Notifications.empty(); ++attempt)
+        {
+            const int saveId = c.Send("tools/call", {{"name", "save_scene"},
+                {"arguments", {{"path", path}, {"overwrite", true}}}, {"_meta", {{"progressToken", "save-1"}}}});
+            const auto reply = c.Await(saveId);
+            rig.Check(reply.contains("result") && reply["result"]["isError"] == false, "save_scene reply: " + reply.dump());
+        }
+        rig.Check(!c.Notifications.empty(), "a progress notification before the reply");
+        bool namedSceneJob = false;
+        for (const auto& note : c.Notifications)
+            namedSceneJob |= note["params"]["message"].get<std::string>().rfind("Runtime.SceneSave.", 0) == 0;
+        rig.Check(namedSceneJob, "a notification names the scene save job (" + std::to_string(c.Notifications.size()) + " notes)");
+    }, std::chrono::seconds(90));
+    fs::remove_all(directory);
 }
 
 // RUNTIME-312 slice 7E: save_scene / load_scene inside the allowed root and import_file with wait.

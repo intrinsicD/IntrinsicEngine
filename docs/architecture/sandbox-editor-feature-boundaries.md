@@ -49,6 +49,10 @@ entity and output is asked, so an agent or batch run shows too), the widget show
 only while that run's entity is selected, a GPU result waiting for Accept reads
 "awaiting accept", and a discard is forgotten. Every answer carries the session scene
 epoch (advanced by scene new/load/close and reattachment), which empties the slot.
+Known limitation: the draft-output fallback only shows an agent (or otherwise foreign)
+run before the panel's first own run, and only for the draft's current output key, so a
+panel whose key changes with its config (mesh curvature) stops showing the run once the
+config moves. Closing this needs the slot to observe by run key instead of draft key.
 Cancel appears only while a run is active and the
 panel supplies a cancel path (registration's own cancel; editor jobs after
 RUNTIME-279 adds `Cancel` to the surface).

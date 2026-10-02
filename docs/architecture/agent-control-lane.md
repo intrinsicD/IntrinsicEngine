@@ -80,7 +80,7 @@ Nothing exists without the launch flag: no module, thread or socket.
   load key their job token (projected from the job service, since the session does not index it). A determinate
   run reports `progress` = percent with `total` 100; otherwise `progress` is the run's elapsed
   seconds without `total`; `message` is the run's label (the job's debug name). A call with no run
-  key (a capture), or whose job is not queued yet, reports its age in seconds with message
+  key (a capture, or an `import_file` wait), or whose job is not queued yet, reports its age in seconds with message
   `waiting`; no other job ever stands in for it. MCP requires `progress` to strictly increase, so
   a call keeps the unit chosen at its first notification (percent with `total`, or seconds without
   `total`; percent never exceeds 100) and a notification is skipped unless its value is larger than
