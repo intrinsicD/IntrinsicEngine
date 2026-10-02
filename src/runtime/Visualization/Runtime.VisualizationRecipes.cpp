@@ -52,6 +52,8 @@ namespace Extrinsic::Runtime
             Graphics::Components::VisualizationConfig::ColorInterpretation Interpretation{};
         };
 
+        // Kept local: this float overload also serves templated scalar sources, where
+        // Geometry::Validation::IsFinite(double) would change how a double is judged.
         [[nodiscard]] bool IsFinite(const float value) noexcept
         {
             return std::isfinite(value);

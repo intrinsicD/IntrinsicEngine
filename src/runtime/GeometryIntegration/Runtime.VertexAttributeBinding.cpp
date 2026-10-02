@@ -21,6 +21,7 @@ namespace Extrinsic::Runtime
 
         constexpr float kDegenerateLengthEpsilon = 1.0e-6f;
 
+        // Kept local: Geometry::Validation::IsFinite has no glm::vec4 overload.
         [[nodiscard]] bool IsFinite(const glm::vec4& v) noexcept
         {
             return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z) &&

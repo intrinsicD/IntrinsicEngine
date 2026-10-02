@@ -50,6 +50,11 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.ConfigPropertyT
         --check-source src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cppm
         --check-source src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cppm
         --check-source src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm
+        # RuntimeReuseDriftGuard lets only sources in this boundary keep a serialized v:position default literal.
+        --check-source src/runtime/Modules/Geodesics/Runtime.GeodesicsConfig.cppm
+        --check-source src/runtime/Modules/Geodesics/Runtime.GeodesicsConfig.cpp
+        --check-source src/runtime/Modules/PointSampling/Runtime.PointSamplingConfig.cppm
+        --check-source src/runtime/Modules/Registration/Runtime.CoherentPointDriftConfig.cppm
         --forbid-module Geometry.Properties
         --forbid-module Extrinsic.Runtime.GeometryAvailability
         --forbid-module Extrinsic.ECS.Components.GeometrySources

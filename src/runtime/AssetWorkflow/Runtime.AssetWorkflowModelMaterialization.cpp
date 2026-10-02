@@ -189,6 +189,7 @@ namespace Extrinsic::Runtime
             diagnostics->LastUvAtlasHeight = uvDiagnostics.AtlasHeight;
         }
 
+        // Kept local: Geometry::Validation::IsFinite has no glm::quat/glm::mat4 overload.
         [[nodiscard]] bool IsFinite(const glm::quat value) noexcept
         {
             return std::isfinite(value.w)

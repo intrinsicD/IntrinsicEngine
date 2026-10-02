@@ -14,6 +14,7 @@
 #include <optional>
 #include <regex>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
@@ -388,37 +389,98 @@ TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
 TEST(RuntimeReuseDriftGuard, RuntimeUsesTheSharedFiniteCheckAndPositionName)
 {
     namespace fs = std::filesystem;
-    const auto root = fs::path{INTRINSIC_SOURCE_DIR} / "src" / "runtime";
+    const auto source = fs::path{INTRINSIC_SOURCE_DIR};
+    const auto root = source / "src" / "runtime";
     ASSERT_TRUE(fs::exists(root)) << root;
-    // Hand-written component-wise finite checks that must stay, each for a type or semantics
-    // Geometry::Validation::IsFinite does not cover (no glm::vec4/quat overload; ImGui vector types).
-    constexpr std::array<std::string_view, 4> allowedFiniteChecks{
-        "Runtime.VertexAttributeBinding.cpp",          // glm::vec4 attribute rows
-        "Runtime.ImGuiAdapter.cpp",                    // ImVec2/ImVec4 clip rectangles
-        "Runtime.TextureBakeModule.cpp",               // glm::vec4 texel values
-        "Runtime.AssetWorkflowModelMaterialization.cpp", // glm::quat / glm::mat4 node transforms
+    const auto read = [](const fs::path& path) {
+        std::ifstream file(path);
+        return std::string{std::istreambuf_iterator<char>(file), {}};
     };
-    const std::regex handWrittenFinite{R"(std::isfinite\((\w+)\.x\)\s*(?:&&|\|\|)\s*!?\s*std::isfinite\(\1\.y\))"};
+    // Component-wise finite checks that must stay, each for a type or semantics
+    // Geometry::Validation::IsFinite does not cover; each site carries a one-line reason.
+    constexpr std::array<std::string_view, 6> allowedFiniteChecks{
+        "GeometryIntegration/Runtime.VertexAttributeBinding.cpp",          // glm::vec4 attribute rows
+        "ImGui/Runtime.ImGuiAdapter.cpp",                                  // ImVec2/ImVec4 clip rectangles
+        "Modules/TextureBake/Runtime.TextureBakeModule.cpp",               // glm::vec4 texel values
+        "AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cpp",     // glm::quat / glm::mat4 node transforms
+        "Visualization/Runtime.VisualizationRecipes.cpp",                  // float overload also serves templated scalars
+        "Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp", // glm::vec4 presentation default
+    };
+    // Sources that keep the serialized "v:position" default because a module boundary forbids
+    // them from importing Extrinsic.ECS.Components.GeometrySources. Every entry must be a
+    // --check-source of one of these boundary tests in tests/CMakeLists.txt.
+    constexpr std::array<std::string_view, 2> positionBoundaries{
+        "ProcessingCompilationLocality.ConfigPropertyTypes",
+        "ProcessingCompilationLocality.ConsolidationContracts",
+    };
+    constexpr std::array<std::string_view, 22> allowedPositionLiterals{
+        "GeometryIntegration/Runtime.GeometryProperty.Types.cpp",
+        "Modules/BilateralFilter/Runtime.BilateralFilterConfig.cppm",
+        "Modules/Clustering/Runtime.ClusteringTypes.cppm",
+        "Modules/Curvature/Runtime.MeshCurvatureConfig.cpp",
+        "Modules/Curvature/Runtime.MeshCurvatureConfig.cppm",
+        "Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm",
+        "Modules/DensityWeight/Runtime.DensityWeightConfig.cppm",
+        "Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cppm",
+        "Modules/Geodesics/Runtime.GeodesicsConfig.cpp",
+        "Modules/Geodesics/Runtime.GeodesicsConfig.cppm",
+        "Modules/KernelDensity/Runtime.KernelDensityConfig.cppm",
+        "Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm",
+        "Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm",
+        "Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm",
+        "Modules/Parameterization/Runtime.ParameterizationConfig.cppm",
+        "Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cppm",
+        "Modules/PointConstruction/Runtime.PointConstructionConfig.cppm",
+        "Modules/PointSampling/Runtime.PointSamplingConfig.cppm",
+        "Modules/PointSpacing/Runtime.PointSpacingConfig.cppm",
+        "Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm",
+        "Modules/Registration/Runtime.CoherentPointDriftConfig.cppm",
+        "Modules/Registration/Runtime.RegistrationConfig.cppm",
+    };
+    const std::string cmake = read(source / "tests" / "CMakeLists.txt");
+    std::string boundarySources;
+    for (const std::string_view boundary : positionBoundaries)
+    {
+        const auto begin = cmake.find("intrinsic_add_module_boundary_test(" + std::string{boundary} + "\n");
+        ASSERT_NE(begin, std::string::npos) << boundary;
+        boundarySources += cmake.substr(begin, cmake.find(")\n", begin) - begin);
+    }
+    for (const std::string_view allowed : allowedPositionLiterals)
+        EXPECT_NE(boundarySources.find("--check-source src/runtime/" + std::string{allowed} + "\n"), std::string::npos)
+            << allowed << " keeps \"v:position\" but is not inside a GeometrySources-forbidding boundary; use kPosition";
+
+    // Member chains (`sphere.Center.x`, `a->b[i].x`) and scalar wrappers (`IsFinite(v.x) && IsFinite(v.y)`) count.
+    const std::regex handWrittenFinite{
+        R"((?:std::isfinite|\bIsFinite)\(([\w.\[\]>-]+)\.x\)\s*(?:&&|\|\|)\s*!?\s*(?:std::isfinite|\bIsFinite)\(\1\.y\))"};
     std::size_t scanned = 0;
+    std::size_t finiteMatched = 0;
+    std::size_t positionMatched = 0;
     for (const auto& entry : fs::recursive_directory_iterator(root))
     {
         const auto extension = entry.path().extension();
         if (!entry.is_regular_file() || (extension != ".cpp" && extension != ".cppm" && extension != ".hpp")) continue;
-        std::ifstream file(entry.path());
-        const std::string text{std::istreambuf_iterator<char>(file), {}};
-        const auto name = entry.path().filename().string();
+        const std::string text = read(entry.path());
+        const auto name = entry.path().lexically_relative(root).generic_string();
         ++scanned;
         SCOPED_TRACE(name);
-        // Config/Types modules are forbidden from importing GeometrySources by
-        // ProcessingCompilationLocality.ConfigPropertyTypes, so their serialized default stays a literal.
-        const bool configOrTypes = name.ends_with("Config.cppm") || name.ends_with("Config.cpp") ||
-                                   name.ends_with("Types.cppm") || name.ends_with("Types.cpp");
-        if (!configOrTypes)
-            EXPECT_EQ(text.find("\"v:position\""), std::string::npos)
-                << "use GeometrySources::PropertyNames::kPosition";
-        if (std::find(allowedFiniteChecks.begin(), allowedFiniteChecks.end(), name) == allowedFiniteChecks.end())
-            EXPECT_FALSE(std::regex_search(text, handWrittenFinite))
-                << "use Geometry::Validation::IsFinite for glm vectors";
+        const bool positionLiteral = text.find("\"v:position\"") != std::string::npos;
+        if (std::find(allowedPositionLiterals.begin(), allowedPositionLiterals.end(), name) != allowedPositionLiterals.end())
+        {
+            EXPECT_TRUE(positionLiteral) << "stale allowlist entry: the file no longer keeps \"v:position\"; remove it";
+            ++positionMatched;
+        }
+        else
+            EXPECT_FALSE(positionLiteral) << "use GeometrySources::PropertyNames::kPosition";
+        const bool finite = std::regex_search(text, handWrittenFinite);
+        if (std::find(allowedFiniteChecks.begin(), allowedFiniteChecks.end(), name) != allowedFiniteChecks.end())
+        {
+            EXPECT_TRUE(finite) << "stale allowlist entry: the file no longer hand-writes a finite check; remove it";
+            ++finiteMatched;
+        }
+        else
+            EXPECT_FALSE(finite) << "use Geometry::Validation::IsFinite for glm vectors";
     }
     EXPECT_GT(scanned, 100u);
+    EXPECT_EQ(positionMatched, allowedPositionLiterals.size()) << "an allowlisted position-literal file is missing";
+    EXPECT_EQ(finiteMatched, allowedFiniteChecks.size()) << "an allowlisted finite-check file is missing";
 }

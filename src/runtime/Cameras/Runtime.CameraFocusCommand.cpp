@@ -28,6 +28,7 @@ import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.Sphere;
+import Geometry.Validation;
 
 namespace Extrinsic::Runtime
 {
@@ -41,8 +42,9 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] bool IsFiniteSphere(const Geometry::Sphere& sphere) noexcept
         {
-            return std::isfinite(sphere.Center.x) && std::isfinite(sphere.Center.y) &&
-                   std::isfinite(sphere.Center.z) && std::isfinite(sphere.Radius);
+            // Not Geometry::Validation::IsValid(Sphere): that also rejects non-positive radii,
+            // which focus floors to kMinimumFocusRadius instead.
+            return Geometry::Validation::IsFinite(sphere.Center) && std::isfinite(sphere.Radius);
         }
     } // namespace
 

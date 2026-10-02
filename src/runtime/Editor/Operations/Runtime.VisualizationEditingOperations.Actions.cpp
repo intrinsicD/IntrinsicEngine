@@ -802,6 +802,7 @@ namespace {
         [[nodiscard]] bool IsFiniteDefaultValue(
             const GeometryPresentationDefaultValue& value) noexcept
         {
+            // Component-wise on purpose: Geometry::Validation::IsFinite has no glm::vec4 overload.
             return std::isfinite(value.Vector.x) &&
                    std::isfinite(value.Vector.y) &&
                    std::isfinite(value.Vector.z) &&

@@ -9,6 +9,7 @@ module;
 module Extrinsic.Runtime.ClusteringTypes;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.ECS.Components.GeometrySources;
 namespace Extrinsic::Runtime
 {
     namespace
@@ -81,7 +82,7 @@ namespace Extrinsic::Runtime
         const auto writable = [](const GeometryPropertyRef& ref) {
             return ref.Name.find('\0') == std::string::npos &&
                    !IsTopologyProperty(ref.Domain, ref.Name) &&
-                   !(ref.Name == "v:position" &&
+                   !(ref.Name == ECS::Components::GeometrySources::PropertyNames::kPosition &&
                      (ref.Domain == GeometryElementDomain::MeshVertex ||
                       ref.Domain == GeometryElementDomain::GraphNode ||
                       ref.Domain == GeometryElementDomain::PointCloudPoint));
@@ -182,7 +183,7 @@ namespace Extrinsic::Runtime
         KMeansPropertyRefs refs{
             .InputPositions = GeometryPropertyRef{
                 .Domain = domain,
-                .Name = "v:position",
+                .Name = std::string{ECS::Components::GeometrySources::PropertyNames::kPosition},
                 .ValueKind = Geometry::PropertyValueKind::Vec3,
             },
             .OutputLabels = GeometryPropertyRef{

@@ -91,6 +91,7 @@ namespace Extrinsic::Runtime
                 : ECS::InvalidEntityHandle;
         }
 
+        // Kept local: Geometry::Validation::IsFinite has no glm::vec4 overload.
         [[nodiscard]] bool Finite(const glm::vec4 value) noexcept
         {
             return std::isfinite(value.x) &&

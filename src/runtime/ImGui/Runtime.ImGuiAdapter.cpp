@@ -248,6 +248,7 @@ namespace Extrinsic::Runtime
             const std::uint32_t pixelWidth,
             const std::uint32_t pixelHeight) noexcept
         {
+            // Component-wise on purpose: ImVec2/ImVec4 have no Geometry::Validation::IsFinite overload.
             if (pixelWidth == 0u || pixelHeight == 0u ||
                 !std::isfinite(clipRect.x) ||
                 !std::isfinite(clipRect.y) ||
