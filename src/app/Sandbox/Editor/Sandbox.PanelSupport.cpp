@@ -1713,6 +1713,14 @@ namespace Extrinsic::Sandbox::Editor
         }
     }
 
+    bool QueuedEditorJob(const EditorProcessingCommands& commands, const std::vector<EditorJobRecord>& before)
+    {
+        for (const auto& job : GetEditorJobs(commands))
+            if (std::none_of(before.begin(), before.end(), [&](const auto& old) { return old.Token == job.Token; }))
+                return true;
+        return false;
+    }
+
     void OperationRunSlot::Watch(const std::uint32_t entity, EditorOperationRunKey key)
     {
         m_AwaitingAccept = false;
@@ -1758,6 +1766,7 @@ namespace Extrinsic::Sandbox::Editor
         {
             m_Held = {};
             m_HeldKey.clear();
+            m_Note.clear(); // a refusal of the previous scene's run
             m_Epoch = live.Epoch;
         }
         if (key != m_HeldKey)

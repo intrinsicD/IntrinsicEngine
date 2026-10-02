@@ -2,6 +2,7 @@ module;
 
 #include <algorithm>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -151,20 +152,31 @@ ResolveEditorOperationProgress(const std::vector<EditorJobRecord> &records,
                          : EditorOperationProgress{};
 }
 
-EditorRunCancelCount CancelEditorRun(const EditorJobCommandSurface &surface,
-                                     const JobToken run) {
+EditorRunCancelCount CancelEditorRuns(const EditorJobCommandSurface &surface,
+                                      const std::span<const JobToken> runs) {
   EditorRunCancelCount count{};
   if (!surface.SnapshotAll || !surface.Cancel) {
     count.Unavailable = true;
     return count;
   }
-  for (const EditorJobRecord &job : surface.SnapshotAll()) {
-    if ((job.Token != run && job.Identity.Run != run) || !IsActiveEditorJobState(job.State))
-      continue;
-    switch (surface.Cancel(job.Token)) {
-    case EditorJobCancelStatus::Requested: ++count.Requested; break;
-    case EditorJobCancelStatus::Unavailable: count.Unavailable = true; break;
-    default: ++count.Refused; break;
+  const auto listed = [&](const JobToken token) {
+    return std::find(runs.begin(), runs.end(), token) != runs.end();
+  };
+  const std::vector<EditorJobRecord> jobs = surface.SnapshotAll();
+  for (const JobToken run : runs) {
+    const auto head = std::find_if(jobs.begin(), jobs.end(),
+                                   [&](const EditorJobRecord &job) { return job.Token == run; });
+    if (head != jobs.end() && head->Identity.Run.IsValid() && head->Identity.Run != run &&
+        listed(head->Identity.Run))
+      continue; // reached through the run it joined
+    for (const EditorJobRecord &job : jobs) {
+      if ((job.Token != run && job.Identity.Run != run) || !IsActiveEditorJobState(job.State))
+        continue;
+      switch (surface.Cancel(job.Token)) {
+      case EditorJobCancelStatus::Requested: ++count.Requested; break;
+      case EditorJobCancelStatus::Unavailable: count.Unavailable = true; break;
+      default: ++count.Refused; break;
+      }
     }
   }
   return count;

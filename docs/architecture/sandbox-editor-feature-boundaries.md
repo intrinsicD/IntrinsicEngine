@@ -66,8 +66,8 @@ token/identity index, answering `EditorJobCancelStatus` (`Requested`, `NotActive
 attachment epoch). Panels and the agent lane reach them through
 `GetEditorJobs(EditorProcessingCommands)` and `CancelEditorJob(EditorProcessingCommands, token)`.
 A run is named by its first job's token; later stages carry it as `EditorJobIdentity::Run`, so
-`CancelEditorRun` (`CancelEditorRunJobs` on a handle) cancels a run's stages, including ones queued
-after it started, and never another run on the same output. The session remembers the most recent
+`CancelEditorRuns` (`CancelEditorRunJobs` on a handle) cancels the stages of the listed runs, including
+ones queued after a run started, once per run by its head, and never another run on the same output. The session remembers the most recent
 runs a `Cancel` was accepted for (`RunCancelRequested`, `IsEditorRunCancelRequested`), past the jobs'
 reaping, so a requested cancel is told apart from a stage cancelled because a dependency failed
 (both end in `JobState::Cancelled`). The memory is cleared on detach, and a cancel of an auxiliary

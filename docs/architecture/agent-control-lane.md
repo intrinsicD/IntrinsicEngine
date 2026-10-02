@@ -94,7 +94,7 @@ Nothing exists without the launch flag: no module, thread or socket.
   a run is named by its first job's token, which every later stage carries as
   `EditorJobIdentity::Run`, so stages queued after the call started (a GPU Accept queued when the
   compute stage publishes) are reached too and another run on the same output never is
-  (`CancelEditorRun`). Once the call's result arrived the hook cancels nothing. Only jobs the editor
+  (`CancelEditorRuns`, which visits each run once by its head). Once the call's result arrived the hook cancels nothing. Only jobs the editor
   submitted are ever touched. The job ends `Cancelled` on a later drain without publishing
   anything (no property, no history entry) and its unpublished finalizer runs exactly once: it
   delivers the command's terminal failure, or (where a finalizer only abandons its run) releases

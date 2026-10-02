@@ -148,27 +148,6 @@ namespace Extrinsic::Sandbox::Editor
                 index, 0, static_cast<std::int32_t>(N - 1u)))];
         }
 
-        template <typename Result, typename Sink>
-        void PublishCommandResult(
-            std::optional<Result>& destination,
-            Result result,
-            const Sink& sink)
-        {
-            destination = result;
-            if (sink)
-                sink(std::move(result));
-        }
-
-        // True when an editor job exists now that was not among `before`.
-        [[nodiscard]] bool QueuedEditorJob(const Runtime::EditorProcessingCommands& commands,
-                                           const std::vector<Runtime::EditorJobRecord>& before)
-        {
-            for (const auto& job : Runtime::GetEditorJobs(commands))
-                if (std::none_of(before.begin(), before.end(), [&](const auto& old) { return old.Token == job.Token; }))
-                    return true;
-            return false;
-        }
-
         template <typename State, typename Request, typename Apply, typename Execute, typename Sink>
         void ApplyProcessingExecution(State& state, const Request& request,
             Apply apply, Execute execute, const Sink& sink, const char* rejected)
@@ -177,29 +156,6 @@ namespace Extrinsic::Sandbox::Editor
             state.ConfigDiagnostic = applied ? "" : rejected;
             if (applied)
                 PublishCommandResult(state.LastResult, execute(), sink);
-        }
-
-        // ApplyProcessingExecution for a command that may queue a job, watched as {entity, output}.
-        // Pending with no new editor job is a duplicate refusal: the output's active run (another
-        // click, an agent call) keeps its own callback. Publishing it would leave "Pending" as the
-        // panel's result for good, so the run slot follows the active run and shows the refusal.
-        template <typename State, typename Request, typename Apply, typename Execute, typename Sink>
-        void ApplyQueuedProcessingExecution(const Runtime::EditorProcessingCommands& commands, State& state,
-            const Request& request, Apply apply, Execute execute, const Sink& sink, const char* rejected,
-            const std::uint32_t entity, std::string output)
-        {
-            const bool applied = apply(request).Succeeded();
-            state.ConfigDiagnostic = applied ? "" : rejected;
-            if (!applied) return;
-            const auto before = Runtime::GetEditorJobs(commands);
-            auto result = execute();
-            if (result.Status == Runtime::EditorCommandStatus::Pending && !QueuedEditorJob(commands, before))
-            {
-                state.Run.WatchDuplicate(entity, std::move(output), result.Message);
-                return;
-            }
-            PublishCommandResult(state.LastResult, std::move(result), sink);
-            state.Run.WatchOutputIfQueued(state.LastResult, entity, std::move(output));
         }
 
         // `watch(draft)` names the run being submitted as {entity, output property name}; the panel's
@@ -2087,6 +2043,7 @@ namespace Extrinsic::Sandbox::Editor
         if (!readiness.Enabled) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
         if (DrawProcessingActionButton("Estimate normals", readiness))
         {
+            Normals.Run.ClearNote(); // an own submission replaces an earlier duplicate refusal
             if ((config.Backend == Runtime::NormalEstimationBackend::Vulkan || config.Backend == Runtime::NormalEstimationBackend::VulkanLBVH))
             {
                 // Interactive Vulkan runs compute on the device and publish on Accept.
@@ -2255,6 +2212,7 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::BeginDisabled(outlierActive);
         if (DrawProcessingActionButton("Detect outliers", readiness))
         {
+            Outliers.Run.ClearNote(); // an own submission replaces an earlier duplicate refusal
             if (analyze.Backend == Runtime::OutlierAnalysisBackend::VulkanLBVH)
             {
                 Runtime::EditorOutlierAnalysisResult result;
@@ -3727,6 +3685,7 @@ namespace Extrinsic::Sandbox::Editor
             readiness = {.Enabled = false, .DisabledReason = "Accept or discard the pending GPU result first."};
         if (DrawProcessingActionButton("Smooth property", readiness))
         {
+            Smoothing.Run.ClearNote(); // an own submission replaces an earlier duplicate refusal
             if (config.Backend == Runtime::PropertySmoothingBackend::Vulkan)
             {
                 // Interactive Vulkan runs preview on the device and publish on Accept.

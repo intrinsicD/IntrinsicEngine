@@ -4,6 +4,7 @@ module;
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -203,9 +204,11 @@ export namespace Extrinsic::Runtime
         std::uint32_t Refused{0u};   // jobs of the run that had already ended or were being cancelled
         bool Unavailable{false};     // no surface (stale attachment epoch, no job service)
     };
-    // Cancels every active job of the run named by `run` (its first job's token):
-    // that job and every job whose `EditorJobIdentity::Run` is `run`, including
-    // stages queued after the run started. Another run on the same output is
-    // never reached. Only jobs `SnapshotAll` lists, i.e. editor jobs, are reached.
-    [[nodiscard]] EditorRunCancelCount CancelEditorRun(const EditorJobCommandSurface& surface, JobToken run);
+    // Cancels every active job of the runs named by `runs` (each by its first job's
+    // token): that job and every job whose `EditorJobIdentity::Run` is it, including
+    // stages queued after the run started. A listed job that joined another listed
+    // job's run is reached through that run, so each run is cancelled once by its
+    // head. Another run on the same output is never reached. Only jobs `SnapshotAll`
+    // lists, i.e. editor jobs, are reached.
+    [[nodiscard]] EditorRunCancelCount CancelEditorRuns(const EditorJobCommandSurface& surface, std::span<const JobToken> runs);
 }

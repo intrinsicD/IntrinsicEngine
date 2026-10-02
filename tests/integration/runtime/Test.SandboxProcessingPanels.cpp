@@ -4136,6 +4136,60 @@ TEST(SandboxProcessingPanels, OperationRunSlotKeepsTheLastFinishedRunUntilTheKey
     EXPECT_EQ(slot.Observe(none(2u), "8/out:a").State, State::None);
 }
 
+// A duplicate refusal note describes one click: the next own submission (whatever it answers)
+// and a scene replacement drop it.
+TEST(SandboxProcessingPanels, DuplicateRefusalNoteEndsWithTheNextOwnSubmissionOrTheScene)
+{
+    struct Answer
+    {
+        R::EditorCommandStatus Status{};
+        std::string Message{};
+    };
+    struct State
+    {
+        std::string ConfigDiagnostic{};
+        std::optional<Answer> LastResult{};
+        Editor::OperationRunSlot Run{};
+    };
+    struct Applied
+    {
+        bool Ok{};
+        [[nodiscard]] bool Succeeded() const noexcept { return Ok; }
+    };
+    const R::EditorProcessingCommands unbound{}; // no editor jobs: a Pending answer is a duplicate
+    const std::function<void(Answer)> noSink{};
+    const auto submit = [&](State& state, const bool applies, Answer answer) {
+        Editor::ApplyQueuedProcessingExecution(unbound, state, 0,
+            [applies](int) { return Applied{applies}; }, [answer] { return answer; }, noSink, "rejected", 7u, "out");
+    };
+    const auto refused = [&](State& state) {
+        submit(state, true, {R::EditorCommandStatus::Pending, "out already has an active Running job (job 1:1)."});
+        ASSERT_FALSE(state.Run.Note().empty());
+        EXPECT_FALSE(state.LastResult.has_value()) << "a duplicate refusal is not the panel's result";
+    };
+
+    State rejected;
+    refused(rejected);
+    submit(rejected, false, {});
+    EXPECT_TRUE(rejected.Run.Note().empty()) << "a submission rejected by its apply still replaces the refusal";
+    EXPECT_EQ(rejected.ConfigDiagnostic, "rejected");
+
+    State failed;
+    refused(failed);
+    submit(failed, true, {R::EditorCommandStatus::GeometryProcessingFailed, "nothing to do"});
+    EXPECT_TRUE(failed.Run.Note().empty()) << "a synchronous failure replaces the refusal";
+    ASSERT_TRUE(failed.LastResult.has_value());
+    EXPECT_EQ(failed.LastResult->Status, R::EditorCommandStatus::GeometryProcessingFailed);
+
+    State scene;
+    (void)scene.Run.Observe({.Epoch = 1u}, std::string{}); // drawn in scene 1 before the click
+    refused(scene);
+    (void)scene.Run.Observe({.Epoch = 1u}, "7/out:out");
+    EXPECT_FALSE(scene.Run.Note().empty()) << "the refusal stays while its scene does";
+    (void)scene.Run.Observe({.Epoch = 2u}, "7/out:out");
+    EXPECT_TRUE(scene.Run.Note().empty()) << "a scene replacement drops the previous scene's refusal";
+}
+
 TEST(SandboxProcessingPanels, OperationProgressWidgetCancelRequiresAnActiveRunAndAHandler)
 {
     PanelHarness h;

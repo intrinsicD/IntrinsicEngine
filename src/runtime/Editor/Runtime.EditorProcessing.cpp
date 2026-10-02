@@ -71,9 +71,9 @@ namespace Extrinsic::Runtime
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
         return context.JobCommands.Cancel ? context.JobCommands.Cancel(token) : EditorJobCancelStatus::Unavailable;
     }
-    EditorRunCancelCount CancelEditorRunJobs(const EditorProcessingCommands& commands, const JobToken run)
+    EditorRunCancelCount CancelEditorRunJobs(const EditorProcessingCommands& commands, const std::span<const JobToken> runs)
     {
-        return CancelEditorRun(EditorProcessingCommandsAccess::Resolve(commands).JobCommands, run);
+        return CancelEditorRuns(EditorProcessingCommandsAccess::Resolve(commands).JobCommands, runs);
     }
     bool IsEditorRunCancelRequested(const EditorProcessingCommands& commands, const JobToken run)
     {

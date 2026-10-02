@@ -19,6 +19,12 @@ runtime-owned lifecycle over N output rings. Keep typed method calculation,
 statistics, and publication adapters at their existing owners.
 
 ## Context
+- RUNTIME-313 hand-offs: (1) Coherent Point Drift keeps its own run object (`Busy` flag, deliver-once
+  flag, interactive steps without a completion callback); decide whether it joins this lifecycle or
+  stays a run object, and record why. (2) Device-gated checks a headless session cannot reach: a
+  duplicate GPU start (scalar, keypoint resident, outliers, normals, smoothing) answers Pending without
+  a handle or callback, and every GPU Accept stage carries the run's `EditorJobIdentity::Run`; pin both
+  on a Vulkan host.
 - RUNTIME-279 follow-up: add a `gpu;vulkan` smoke that cancels a Run/Accept transaction parked in `AwaitingApply` through the editor job surface (`jobs_cancel`) and reads back that the previous output and ring are unchanged; RUNTIME-279 proved this path on the CPU gate only.
 RUNTIME-298 review found drift in ring-generation validation and Accept callback
 handling. Those defects are fixed there; this task owns the deferred unification.
@@ -57,6 +63,8 @@ the per-job setup/completion prologue that precedes them is
 - [ ] Start and Accept callbacks have the same replacement and exactly-once semantics across methods, including rejected submissions.
 - [ ] Scalar, outlier, normals, smoothing and GPU-positions panels retain complete typed results after terminal transitions, with statistics, backend identity and IO counters intact.
 - [ ] Existing method math, atomic multi-output publication, Undo/Redo and renderer observation behavior are preserved; all five duplicated lifecycles (including the byte-identical AutoAccept tails) are removed.
+- [ ] Coherent Point Drift's run object is either on the shared lifecycle or recorded as a deliberate exception with its reason.
+- [ ] On a Vulkan host, a duplicate GPU start answers Pending without a handle or callback, and every GPU Accept stage carries the run's `EditorJobIdentity::Run`.
 - [ ] CPU contracts and real-device scalar, outlier, normals, smoothing and GPU-positions transaction smokes pass (register a `gpu;vulkan` smoke for any of the five that lacks one before migrating it); documentation and module inventory describe the shared owner.
 
 ## Verification

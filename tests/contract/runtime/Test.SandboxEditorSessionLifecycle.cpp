@@ -82,6 +82,8 @@ import Geometry.HalfedgeMesh.Builder;
 import Geometry.Properties;
 
 #include "RuntimeTestModule.hpp"
+// Test seam: the session's own job surface, to submit an identity no headless operation queues.
+#include "../../../src/runtime/Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "SandboxEditorJobHarness.hpp"
 
 namespace Runtime = Extrinsic::Runtime;
@@ -3916,7 +3918,7 @@ TEST(SandboxEditorSessionLifecycle, EditorJobRunCancelReachesLaterStagesOfThatRu
     const Runtime::JobToken unrelated = commands.Submit(MakeProgressProbeJob("unrelated run", release), output);
     ASSERT_TRUE(second.IsValid() && unrelated.IsValid());
 
-    const auto count = Runtime::CancelEditorRun(commands, first);
+    const auto count = Runtime::CancelEditorRuns(commands, std::array{first});
     EXPECT_EQ(count.Requested, 1u);
     EXPECT_EQ(count.Refused, 0u) << "the finished first stage is not active, so it is not counted";
     EXPECT_FALSE(count.Unavailable);
@@ -3927,9 +3929,44 @@ TEST(SandboxEditorSessionLifecycle, EditorJobRunCancelReachesLaterStagesOfThatRu
     EXPECT_EQ(harness.Jobs().GetState(second), Runtime::JobState::Cancelled);
     EXPECT_EQ(harness.Jobs().GetState(first), Runtime::JobState::Published);
     EXPECT_TRUE(Runtime::IsActiveEditorJobState(harness.Jobs().GetState(unrelated))) << "another run on the same output is untouched";
-    EXPECT_TRUE(Runtime::CancelEditorRun(Runtime::EditorJobCommandSurface{}, first).Unavailable);
+    EXPECT_TRUE(Runtime::CancelEditorRuns(Runtime::EditorJobCommandSurface{}, std::array{first}).Unavailable);
     release.store(true, std::memory_order_release);
     ASSERT_TRUE(harness.DrainUntilTerminal());
+}
+
+// RUNTIME-313: a call that queued a chained run lists every stage; the agent cancel hook passes
+// them all, and each run is cancelled once by its head (a stage that joined a listed run is not
+// visited again, so nothing is counted as refused).
+TEST(SandboxEditorSessionLifecycle, EditorRunCancelVisitsEachListedRunOnceByItsHead)
+{
+    Extrinsic::Tests::EditorJobHarness harness{2u};
+    ProgressProbeContext context;
+    harness.Attach(context);
+    const auto& commands = context.JobCommands;
+    std::atomic_bool block{false}, release{false};
+    // Hold both workers so the run's stages stay queued while it is cancelled.
+    const Runtime::JobToken b1 = harness.Jobs().Submit(MakeProgressProbeJob("blocker 1", block));
+    const Runtime::JobToken b2 = harness.Jobs().Submit(MakeProgressProbeJob("blocker 2", block));
+    ASSERT_TRUE(WaitFor([&] {
+        return harness.Jobs().GetState(b1) == Runtime::JobState::Running && harness.Jobs().GetState(b2) == Runtime::JobState::Running;
+    }));
+    auto stage = ProbeIdentity("chain");
+    const Runtime::JobToken head = commands.Submit(MakeProgressProbeJob("stage 1", release), stage);
+    stage.Run = head;
+    const Runtime::JobToken second = commands.Submit(MakeProgressProbeJob("stage 2", release), stage);
+    const Runtime::JobToken third = commands.Submit(MakeProgressProbeJob("stage 3", release), stage);
+    const Runtime::JobToken other = commands.Submit(MakeProgressProbeJob("another run", release), ProbeIdentity("other"));
+    ASSERT_TRUE(head.IsValid() && second.IsValid() && third.IsValid() && other.IsValid());
+
+    const auto count = Runtime::CancelEditorRuns(commands, std::array{head, second, third, other});
+    EXPECT_EQ(count.Requested, 4u);
+    EXPECT_EQ(count.Refused, 0u) << "a stage of a listed run is cancelled once, through its head";
+    EXPECT_FALSE(count.Unavailable);
+    block.store(true, std::memory_order_release);
+    release.store(true, std::memory_order_release);
+    ASSERT_TRUE(harness.DrainUntilTerminal());
+    for (const auto token : {head, second, third, other})
+        EXPECT_EQ(harness.Jobs().GetState(token), Runtime::JobState::Cancelled);
 }
 
 // RUNTIME-313: on minimized frames the server polls calls, then handles requests, then the frame
@@ -3967,6 +4004,35 @@ TEST_F(EditorKeypointAgent, RequestedCancelSurvivesTheJobsReaping)
     ASSERT_TRUE(run.Continuation(context, out));
     EXPECT_TRUE(out.IsError) << out.Text;
     EXPECT_EQ(out.ErrorCode, "cancelled") << out.Text;
+}
+
+// RUNTIME-313: an auxiliary job (Coherent Point Drift's Vulkan E-step pump) is cancelled like any
+// editor job, but its cancel leaves its run going, so it is not remembered as a run cancel; the
+// same cancel of an ordinary job is.
+TEST_F(EditorKeypointAgent, AuxiliaryJobCancelIsNotARunCancel)
+{
+    auto& jobs = RequiredEngineService<Runtime::JobService>(Engine);
+    std::atomic_bool release{false};
+    const Runtime::JobToken foreign = jobs.Submit(MakeProgressProbeJob("foreign", release));
+    ASSERT_TRUE(WaitFor([&] { return jobs.GetState(foreign) == Runtime::JobState::Running; }));
+    const auto& surface = Runtime::EditorProcessingCommandsAccess::Resolve(Commands).JobCommands;
+    Runtime::EditorJobIdentity identity{.EntityId = Keypoints.StableEntityId, .Scope = Runtime::EditorJobScope::PointCloudPoint,
+        .OutputSemantic = Runtime::GeometryPresentationSlotSemantic::ScalarField, .OutputName = "pump"};
+    identity.Auxiliary = true;
+    const Runtime::JobToken pump = surface.Submit(MakeProgressProbeJob("pump", release), identity);
+    identity.Auxiliary = false;
+    identity.OutputName = "run";
+    const Runtime::JobToken run = surface.Submit(MakeProgressProbeJob("run", release), identity);
+    ASSERT_TRUE(pump.IsValid() && run.IsValid());
+    EXPECT_EQ(Runtime::CancelEditorJob(Commands, pump), Runtime::EditorJobCancelStatus::Requested);
+    EXPECT_EQ(Runtime::CancelEditorJob(Commands, run), Runtime::EditorJobCancelStatus::Requested);
+    EXPECT_FALSE(Runtime::IsEditorRunCancelRequested(Commands, pump)) << "the auxiliary job's run goes on";
+    EXPECT_TRUE(Runtime::IsEditorRunCancelRequested(Commands, run));
+    release.store(true, std::memory_order_release);
+    ASSERT_TRUE(WaitFor([&] {
+        (void)jobs.DrainCompletions(Engine.Events());
+        return jobs.IsComplete(pump) && jobs.IsComplete(run) && jobs.IsComplete(foreign);
+    }));
 }
 
 // RUNTIME-313: the remembered run cancels belong to one attachment; token indices restart with

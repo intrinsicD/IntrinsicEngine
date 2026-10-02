@@ -290,9 +290,10 @@ TEST_F(QueuedEditorJobContract, LaterStagesOfAChainJoinTheFirstJobsRun)
 
 // Drift guard: a queued editor operation reuses the shared helper instead of hand-writing the
 // prologue/epilogue this task consolidated. Scans the operation sources (like the layering
-// tests): no hand-written "already active" refusal, no direct active-job lookup outside its owner,
-// no ad hoc deliver-once flag, and the guarded-sink + unpublished-finalize pattern only in the
-// files listed below, each with the reason it does not use `QueuedJobDelivery`.
+// tests): no hand-written "already active" refusal or duplicate wording, no direct active-job
+// lookup or message builder outside its owner, no ad hoc deliver-once flag, and the guarded-sink +
+// unpublished-finalize pattern only in the files listed below, each with the reason it does not
+// use `QueuedJobDelivery`. A listed file that no longer matches fails too, so the list shrinks.
 #ifndef INTRINSIC_SOURCE_DIR
 #error "INTRINSIC_SOURCE_DIR must be defined for the queued-job drift guard"
 #endif
@@ -323,7 +324,8 @@ TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
         "Runtime.RegistrationOperations.CoherentPointDrift.cpp",
     };
     constexpr std::string_view deliverOnceAllowed = "Runtime.RegistrationOperations.CoherentPointDrift.cpp";
-    std::size_t scanned = 0;
+    std::size_t scanned = 0, matched = 0;
+    bool deliverOnceMatched = false;
     for (const auto& entry : fs::directory_iterator(root))
     {
         const auto name = entry.path().filename().string();
@@ -336,14 +338,26 @@ TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
             << "a duplicate refusal comes from MeshSupport::ActiveOutputJobRefusal";
         EXPECT_EQ(text.find("FindActiveEditorJob("), std::string::npos)
             << "look up an active output job through MeshSupport::ActiveOutputJobRefusal";
-        if (name != deliverOnceAllowed)
-            EXPECT_EQ(text.find("make_shared<bool>"), std::string::npos)
-                << "deliver-once state belongs to MeshSupport::QueuedJobDelivery";
+        EXPECT_EQ(text.find("BuildActiveDerivedJobMessage("), std::string::npos)
+            << "the duplicate wording comes from MeshSupport::ActiveOutputJobRefusal";
+        EXPECT_EQ(text.find("already has an active"), std::string::npos)
+            << "the duplicate wording comes from MeshSupport::ActiveOutputJobRefusal";
+        const bool deliverOnce = text.find("make_shared<bool>") != std::string::npos;
+        if (name == deliverOnceAllowed)
+            deliverOnceMatched = deliverOnce;
+        else
+            EXPECT_FALSE(deliverOnce) << "deliver-once state belongs to MeshSupport::QueuedJobDelivery";
         const bool handWrites = text.find("GuardEditorProcessingResult(") != std::string::npos &&
                                 text.find("FinalizeUnpublishedOnMainThread") != std::string::npos;
+        const bool listed = std::find(handWritten.begin(), handWritten.end(), name) != handWritten.end();
         if (handWrites)
-            EXPECT_NE(std::find(handWritten.begin(), handWritten.end(), name), handWritten.end())
+            EXPECT_TRUE(listed)
                 << "a queued operation uses MeshSupport::QueuedJobDelivery instead of a hand-written guarded sink and finalizer";
+        else
+            EXPECT_FALSE(listed) << "stale allowlist entry: the file no longer hand-writes its job lifecycle; remove it";
+        if (listed) ++matched;
     }
     EXPECT_GT(scanned, 20u);
+    EXPECT_EQ(matched, handWritten.size()) << "an allowlisted file is missing";
+    EXPECT_TRUE(deliverOnceMatched) << "stale allowance: " << deliverOnceAllowed << " no longer keeps its own deliver-once flag";
 }

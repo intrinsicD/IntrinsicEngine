@@ -198,20 +198,9 @@ namespace Extrinsic::Runtime::AgentDetail
             if (!PrepareSnapshot(current)) return "the workspace is not attached; no job was cancelled";
             if (ended()) return "the run already ended; no job was cancelled";
             const auto commands = PrepareEditorProcessingCommands(*current.Attachment);
-            // Cancel each run once, by its head: a fresh job that joined another fresh job's run is
-            // reached through that run.
-            const auto records = GetEditorJobs(commands);
-            const auto inFresh = [&](JobToken t) { return std::find(fresh.begin(), fresh.end(), t) != fresh.end(); };
-            EditorRunCancelCount total{};
-            for (const JobToken run : fresh)
-            {
-                const auto record = std::find_if(records.begin(), records.end(), [&](const EditorJobRecord& r) { return r.Token == run; });
-                if (record != records.end() && record->Identity.Run.IsValid() && inFresh(record->Identity.Run)) continue;
-                const auto count = CancelEditorRunJobs(commands, run);
-                total.Requested += count.Requested;
-                total.Refused += count.Refused;
-                total.Unavailable = total.Unavailable || count.Unavailable;
-            }
+            // Each run once, by its head: a fresh job that joined another fresh job's run is reached
+            // through that run.
+            const auto total = CancelEditorRunJobs(commands, fresh);
             if (total.Requested == 0u && total.Unavailable) return "the editor job surface is unavailable; no job was cancelled";
             if (total.Requested == 0u)
                 return "no active editor job of the run was left to cancel (" + std::to_string(total.Refused) + " already ending)";

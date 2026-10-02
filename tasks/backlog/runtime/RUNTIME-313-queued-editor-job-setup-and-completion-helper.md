@@ -128,7 +128,7 @@ duplicate to `result_unavailable`; the single status must keep that mapping.
   - Slice 7 (review of slice 5) replaces the time-window/output heuristic with a run identity:
     `EditorJobIdentity::Run` (the first job's token) on every later stage (GPU Accepts of scalar,
     keypoint publication, outliers, normals, smoothing; CPU chains of bilateral, keypoints,
-    descriptors, construction); `CancelEditorRun`/`CancelEditorRunJobs` cancel a run's stages. The
+    descriptors, construction); `CancelEditorRuns`/`CancelEditorRunJobs` cancel a run's stages. The
     per-job `EditorJobRecord::CancelRequested` is replaced by a per-run memory in the session
     (`RunCancelRequested`, last 256 runs) that survives reaping; a run is relabelled only when it
     ended `StaleEntity`. Slice 8: the memory is cleared with the job identities on detach (token
@@ -152,6 +152,19 @@ duplicate to `result_unavailable`; the single status must keep that mapping.
   GPU-transaction (RUNTIME-311), state-struct mesh-family and run-object files. Restoring the
   pre-313 `Bilateral.cpp` trips all four rules. Owner route documented in
   `docs/architecture/sandbox-editor-feature-boundaries.md`.
+
+- Review fixes (after slice 9):
+  - The panel run slot's duplicate note ends with the next own submission (also one rejected by its
+    apply or answered at once as failed; `OperationRunSlot::ClearNote` at the start of
+    `ApplyQueuedProcessingExecution`, now in `Sandbox.PanelSupport.hpp`, and of the Vulkan starts of
+    normals, outliers and smoothing) and with a scene-epoch change. Pinned by
+    `SandboxProcessingPanels.DuplicateRefusalNoteEndsWithTheNextOwnSubmissionOrTheScene`.
+  - The run de-dup of the agent cancel hook moved into `CancelEditorRuns(surface, runs)` (the single-run
+    `CancelEditorRun` is gone): `SandboxEditorSessionLifecycle.EditorRunCancelVisitsEachListedRunOnceByItsHead`
+    (no stage counted as refused) and `EditorKeypointAgent.AuxiliaryJobCancelIsNotARunCancel`.
+  - The drift guard also rejects `BuildActiveDerivedJobMessage(` and "already has an active" outside
+    `MeshSupport.cpp`, and fails on a stale allowlist entry (a listed file that no longer hand-writes its
+    lifecycle, or Coherent Point Drift without its own deliver-once flag).
 
 ## Acceptance criteria
 - [ ] One compiled helper owns the active-job check (one status, `BuildActiveDerivedJobMessage` wording), deliver-once, and unpublished finalize; the ~10 hand-written copies are removed or reduced to typed callbacks.

@@ -148,6 +148,9 @@ namespace Extrinsic::Sandbox::Editor
             m_Note = std::move(refusal);
         }
         [[nodiscard]] const std::string& Note() const noexcept { return m_Note; }
+        // Every own submission starts here: an earlier duplicate refusal no longer describes it,
+        // whatever this one answers (queued, refused by apply, failed at once).
+        void ClearNote() noexcept { m_Note.clear(); }
         [[nodiscard]] bool Watching() const noexcept { return m_Watched.has_value(); }
         [[nodiscard]] bool WatchesOutput(std::uint32_t entity, const std::string& outputName) const;
         // From the transaction's phase each frame; Accepting/Applied read through the job as usual.
@@ -184,6 +187,43 @@ namespace Extrinsic::Sandbox::Editor
         std::string m_HeldKey{};
         std::uint64_t m_Epoch{0u};
     };
+
+    template <typename Result, typename Sink>
+    void PublishCommandResult(std::optional<Result>& destination, Result result, const Sink& sink)
+    {
+        destination = result;
+        if (sink)
+            sink(std::move(result));
+    }
+
+    // True when an editor job exists now that was not among `before`.
+    [[nodiscard]] bool QueuedEditorJob(const Runtime::EditorProcessingCommands& commands,
+                                       const std::vector<Runtime::EditorJobRecord>& before);
+
+    // A panel action that may queue a job, watched as {entity, output}: applies the request, runs
+    // it and publishes the answer. Pending with no new editor job is a duplicate refusal: the
+    // output's active run (another click, an agent call) keeps its own callback. Publishing it
+    // would leave "Pending" as the panel's result for good, so the run slot follows the active run
+    // and shows the refusal. `state` provides ConfigDiagnostic, LastResult and Run.
+    template <typename State, typename Request, typename Apply, typename Execute, typename Sink>
+    void ApplyQueuedProcessingExecution(const Runtime::EditorProcessingCommands& commands, State& state,
+        const Request& request, Apply apply, Execute execute, const Sink& sink, const char* rejected,
+        const std::uint32_t entity, std::string output)
+    {
+        state.Run.ClearNote();
+        const bool applied = apply(request).Succeeded();
+        state.ConfigDiagnostic = applied ? "" : rejected;
+        if (!applied) return;
+        const auto before = Runtime::GetEditorJobs(commands);
+        auto result = execute();
+        if (result.Status == Runtime::EditorCommandStatus::Pending && !QueuedEditorJob(commands, before))
+        {
+            state.Run.WatchDuplicate(entity, std::move(output), result.Message);
+            return;
+        }
+        PublishCommandResult(state.LastResult, std::move(result), sink);
+        state.Run.WatchOutputIfQueued(state.LastResult, entity, std::move(output));
+    }
 
     void DrawDisabledReasonTooltip(std::string_view disabledReason);
     [[nodiscard]] bool DrawProcessingActionButton(
