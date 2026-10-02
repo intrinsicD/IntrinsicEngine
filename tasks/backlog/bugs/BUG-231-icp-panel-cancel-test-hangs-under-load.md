@@ -29,6 +29,22 @@ instead of raising its timeout.
   driver hook stops running. A main-thread wait that helps run tasks
   (`Core.Dag.TaskGraph` with `Scheduler::TryRunOne` / `WaitForWorkProgress`) is the first
   suspect; ptrace is restricted on the host, so no stack was captured.
+- Diagnosis 2026-10-02 (stack captured by running the test binary under gdb with 16 CPU hogs; hang on
+  run 157 of the loop, earlier run 31 by wall clock). Main thread, SIGINT at 45 s:
+  `AlignICP` <- `AlignPointClouds` <- `RunRegistrationCpuWorker` <- `MakeRegistrationCpuJobDesc` lambda <-
+  `JobService::DispatchJob` <- `LocalTask` <- `Scheduler::TryRunOne` <- `TaskGraphCompletion::Wait`
+  (Core.Dag.TaskGraph.cpp:1031). The lone scheduler worker is parked on its futex and never ran the job.
+  Cause: a frame-graph `Wait()` on the main thread help-runs any queued scheduler task. When the worker is
+  CPU-starved, the main thread pops the queued 100000-iteration ICP job and runs it inline inside the
+  frame. Cancel is only activated from the frame's `OnFrame` hook on that same thread, so the frame never
+  returns and the 3000-frame bound never fires. Product bug (any long editor job can be stolen into a frame
+  and freeze the UI for its duration); the test is correct, and no probes were left in the tree.
+  Proposed fix: JobService jobs must not be runnable by external help. Either dispatch them through a
+  worker-only lane/flag that `TryRunOne` skips for non-worker callers, or have `TaskGraphCompletion::Wait`
+  help only tasks owned by its own graph. Regression test (unit;core): block the one worker with a gate task,
+  dispatch a worker-only spinner that records its thread id, `TaskGraph::Execute()` a trivial pass on the
+  main thread; assert Execute returns and the spinner did not run on the main thread (a watchdog thread
+  cancels the spinner after 2 s so the pre-fix failure is an assertion, not a hang).
 
 ## Acceptance criteria
 - [ ] A stack (or a deterministic repro) shows where the hung frame spins.
