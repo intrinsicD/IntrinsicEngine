@@ -12,6 +12,7 @@
 #include <iterator>
 #include <sstream>
 #include <optional>
+#include <regex>
 #include <string>
 #include <vector>
 #include <glm/glm.hpp>
@@ -380,4 +381,44 @@ TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
     EXPECT_GT(scanned, 20u);
     EXPECT_EQ(matched, handWritten.size()) << "an allowlisted file is missing";
     EXPECT_TRUE(deliverOnceMatched) << "stale allowance: " << deliverOnceAllowed << " no longer keeps its own deliver-once flag";
+}
+
+// RUNTIME-314 drift guard: runtime sources reuse `Geometry::Validation::IsFinite` for glm vectors and
+// the canonical `GeometrySources::PropertyNames::kPosition` instead of re-writing them locally.
+TEST(RuntimeReuseDriftGuard, RuntimeUsesTheSharedFiniteCheckAndPositionName)
+{
+    namespace fs = std::filesystem;
+    const auto root = fs::path{INTRINSIC_SOURCE_DIR} / "src" / "runtime";
+    ASSERT_TRUE(fs::exists(root)) << root;
+    // Hand-written component-wise finite checks that must stay, each for a type or semantics
+    // Geometry::Validation::IsFinite does not cover (no glm::vec4/quat overload; ImGui vector types).
+    constexpr std::array<std::string_view, 4> allowedFiniteChecks{
+        "Runtime.VertexAttributeBinding.cpp",          // glm::vec4 attribute rows
+        "Runtime.ImGuiAdapter.cpp",                    // ImVec2/ImVec4 clip rectangles
+        "Runtime.TextureBakeModule.cpp",               // glm::vec4 texel values
+        "Runtime.AssetWorkflowModelMaterialization.cpp", // glm::quat / glm::mat4 node transforms
+    };
+    const std::regex handWrittenFinite{R"(std::isfinite\((\w+)\.x\)\s*(?:&&|\|\|)\s*!?\s*std::isfinite\(\1\.y\))"};
+    std::size_t scanned = 0;
+    for (const auto& entry : fs::recursive_directory_iterator(root))
+    {
+        const auto extension = entry.path().extension();
+        if (!entry.is_regular_file() || (extension != ".cpp" && extension != ".cppm" && extension != ".hpp")) continue;
+        std::ifstream file(entry.path());
+        const std::string text{std::istreambuf_iterator<char>(file), {}};
+        const auto name = entry.path().filename().string();
+        ++scanned;
+        SCOPED_TRACE(name);
+        // Config/Types modules are forbidden from importing GeometrySources by
+        // ProcessingCompilationLocality.ConfigPropertyTypes, so their serialized default stays a literal.
+        const bool configOrTypes = name.ends_with("Config.cppm") || name.ends_with("Config.cpp") ||
+                                   name.ends_with("Types.cppm") || name.ends_with("Types.cpp");
+        if (!configOrTypes)
+            EXPECT_EQ(text.find("\"v:position\""), std::string::npos)
+                << "use GeometrySources::PropertyNames::kPosition";
+        if (std::find(allowedFiniteChecks.begin(), allowedFiniteChecks.end(), name) == allowedFiniteChecks.end())
+            EXPECT_FALSE(std::regex_search(text, handWrittenFinite))
+                << "use Geometry::Validation::IsFinite for glm vectors";
+    }
+    EXPECT_GT(scanned, 100u);
 }

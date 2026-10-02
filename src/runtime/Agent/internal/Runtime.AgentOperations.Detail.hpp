@@ -106,7 +106,9 @@ namespace Extrinsic::Runtime::AgentDetail
     inline const std::string kPositionsProperty =
         R"("positions":{"type":"string","description":"Name of the vec3 position property."})";
     inline const std::string kPositionsDefaultProperty =
-        R"("positions":{"type":"string","default":"v:position","description":"Name of the vec3 position property."})";
+        R"("positions":{"type":"string","default":")" +
+        std::string{ECS::Components::GeometrySources::PropertyNames::kPosition} +
+        R"(","description":"Name of the vec3 position property."})";
     inline std::optional<GeometryElementDomain> ParseDomain(const std::optional<std::string>& name)
     {
         if (!name) return std::nullopt;

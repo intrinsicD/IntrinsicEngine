@@ -215,7 +215,7 @@ namespace Extrinsic::Runtime
             const auto& halfedges = view.HalfedgeSource->Properties;
             const auto& faces = view.FaceSource->Properties;
             if (vertices.Exists("v:texcoord") || halfedges.Exists("h:texcoord")) return false;
-            const auto positions = vertices.Get<glm::vec3>("v:position");
+            const auto positions = vertices.Get<glm::vec3>(GS::PropertyNames::kPosition);
             const auto v0 = edges.Get<std::uint32_t>("e:v0");
             const auto v1 = edges.Get<std::uint32_t>("e:v1");
             const auto to = halfedges.Get<std::uint32_t>("h:to_vertex");

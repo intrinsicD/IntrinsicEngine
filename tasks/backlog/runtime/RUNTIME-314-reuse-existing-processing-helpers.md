@@ -68,3 +68,8 @@ python3 tools/repo/check_layering.py --root src --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
 ```
+
+## Slice log
+- Slice 1 (`11f2fdcc9`): vec2/vec3 finite-check copies replaced by `Geometry::Validation::IsFinite`; the `FinitePosition`/`IsFiniteGeometryPosition` pair in `PointProperties.cpp` and their header declarations are gone. Deliberately kept: `Runtime.VisualizationRecipes.cpp` (its `IsFinite(float)` overload also serves templated scalar sources, and `Geometry::Validation::IsFinite(double)` would change how a `double` is judged), the `glm::vec4`/`glm::quat`/`glm::mat4` checks in `VertexAttributeBinding`, `TextureBakeModule` and `AssetWorkflowModelMaterialization` (no shared overload), and the ImGui clip-rect checks (`ImVec2`/`ImVec4`).
+- Slice 2: `"v:position"` literals replaced by `GeometrySources::PropertyNames::kPosition` outside the Config/Types modules. Those stay literal because `ProcessingCompilationLocality.ConfigPropertyTypes` forbids them from importing `Extrinsic.ECS.Components.GeometrySources`; moving the constant below that boundary is a separate decision. `RuntimeReuseDriftGuard` in `Test.QueuedEditorJobContract.cpp` prevents both patterns from coming back.
+- Items 3 and 4 (multi-output `PublishPointScalarField`, `GpuRowPages` bypasses) touch GPU publication and paging; they are owned by an Opus follow-up slice and are untouched here.

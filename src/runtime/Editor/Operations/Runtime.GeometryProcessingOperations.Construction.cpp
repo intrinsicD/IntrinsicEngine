@@ -794,7 +794,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
             }
             const auto points =
                 std::as_const(registry).get<GS::Vertices>(entity).Properties.Get<glm::vec3>(
-                    "v:position");
+                    GS::PropertyNames::kPosition);
             glm::vec3 minimum = points[0], maximum = points[0];
             for (auto p : points.Vector())
             {

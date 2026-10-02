@@ -1241,7 +1241,7 @@ namespace Extrinsic::Runtime
                 ref.Domain = *vertexDomain;
                 if (IsTopologyProperty(ref.Domain, ref.Name) ||
                     ((ref.Domain == GeometryElementDomain::MeshVertex || ref.Domain == GeometryElementDomain::GraphNode ||
-                      ref.Domain == GeometryElementDomain::PointCloudPoint) && ref.Name == "v:position") ||
+                      ref.Domain == GeometryElementDomain::PointCloudPoint) && ref.Name == GS::PropertyNames::kPosition) ||
                     (properties->Exists(ref.Name) && !ResolveGeometryProperty(availability, ref, properties->Size(), false).Resolved()))
                 {
                     result = MakeProgressivePoissonResult(EditorCommandStatus::InvalidProcessingParameters,

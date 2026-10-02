@@ -29,7 +29,7 @@ namespace Extrinsic::Runtime
             const auto source = GS::BuildConstView(scene.Raw(), entity);
             if (!source.VertexSource)
                 continue;
-            const auto positions = source.VertexSource->Properties.Get<glm::vec3>("v:position");
+            const auto positions = source.VertexSource->Properties.Get<glm::vec3>(GS::PropertyNames::kPosition);
             if (!positions)
                 continue;
             const auto* worldMatrix =

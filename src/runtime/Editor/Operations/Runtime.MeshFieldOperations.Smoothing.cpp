@@ -220,8 +220,8 @@ namespace Extrinsic::Runtime
             if (c.Input.Domain != c.Output.Domain || GeometryPropertyComponentCount(c.Input.ValueKind) != GeometryPropertyComponentCount(c.Output.ValueKind) ||
                 c.Positions.ValueKind != K::Vec3 || c.Input.Name.empty() || c.Output.Name.empty() || c.Positions.Name.empty() ||
                 IsTopologyProperty(c.Output.Domain, c.Output.Name) ||
-                (IsStructuralVertexProperty(c.Output.Name) && c.Output.Name != "v:position") ||
-                (c.Output.Name == "v:position" && (c.Output.ValueKind != K::Vec3 || c.Output.Domain != c.Positions.Domain)))
+                (IsStructuralVertexProperty(c.Output.Name) && c.Output.Name != GS::PropertyNames::kPosition) ||
+                (c.Output.Name == GS::PropertyNames::kPosition && (c.Output.ValueKind != K::Vec3 || c.Output.Domain != c.Positions.Domain)))
                 return ConfigDetail::RejectConfigSection(subject, "Output must have matching channels on the input domain and cannot replace structural storage.");
             if (c.Input.Domain != D::MeshVertex || c.Positions.Domain != D::MeshVertex)
             {
@@ -285,8 +285,8 @@ namespace Extrinsic::Runtime
             // Positions stay when they sit on the input domain or its family's vertices/nodes.
             if (c.Positions.Domain != c.Input.Domain)
             {
-                if (meshFamily && c.Positions.Domain != D::MeshVertex) c.Positions = {D::MeshVertex, "v:position", K::Vec3};
-                else if (graphFamily && c.Positions.Domain != D::GraphNode) c.Positions = {D::GraphNode, "v:position", K::Vec3};
+                if (meshFamily && c.Positions.Domain != D::MeshVertex) c.Positions = {D::MeshVertex, std::string{GS::PropertyNames::kPosition}, K::Vec3};
+                else if (graphFamily && c.Positions.Domain != D::GraphNode) c.Positions = {D::GraphNode, std::string{GS::PropertyNames::kPosition}, K::Vec3};
                 else if (c.Input.Domain == D::PointCloudPoint) c.Positions = {D::PointCloudPoint, "p:position", K::Vec3};
             }
         }
@@ -439,7 +439,7 @@ namespace Extrinsic::Runtime
                     else if (auto property = properties->Get<T>(output.Name)) properties->Remove(property);
                 }, target.Values);
                 ECS::Components::DirtyTags::MarkGpuDirty(context.Scene->Raw(), entity);
-                if (output.Name == "v:position") ECS::Components::DirtyTags::MarkVertexPositionsDirty(context.Scene->Raw(), entity);
+                if (output.Name == GS::PropertyNames::kPosition) ECS::Components::DirtyTags::MarkVertexPositionsDirty(context.Scene->Raw(), entity);
                 if (context.InvalidateWorkspaceSnapshotCache) context.InvalidateWorkspaceSnapshotCache();
                 return EditorCommandHistoryStatus::Applied;
             };

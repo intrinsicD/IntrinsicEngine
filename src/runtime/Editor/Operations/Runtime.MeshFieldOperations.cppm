@@ -12,6 +12,7 @@ module;
 #include <string_view>
 #include <vector>
 export module Extrinsic.Runtime.MeshFieldOperations;
+import Extrinsic.ECS.Components.GeometrySources;
 export import Extrinsic.Runtime.EditorProcessing;
 export import Extrinsic.Runtime.EditorCommon;
 export import Extrinsic.Runtime.MeshCurvatureConfig;
@@ -135,7 +136,7 @@ export namespace Extrinsic::Runtime
     {
         GeometryPropertyRef Input{GeometryElementDomain::MeshVertex, "v:mean_curvature", Geometry::PropertyValueKind::Double};
         GeometryPropertyRef Output{GeometryElementDomain::MeshVertex, "smoothed", Geometry::PropertyValueKind::Double};
-        GeometryPropertyRef Positions{GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3};
+        GeometryPropertyRef Positions{GeometryElementDomain::MeshVertex, std::string{ECS::Components::GeometrySources::PropertyNames::kPosition}, Geometry::PropertyValueKind::Vec3};
         Geometry::Smoothing::PropertyWeight Weight{Geometry::Smoothing::PropertyWeight::Uniform};
         Geometry::Smoothing::PropertyFilterParams Filter{};
         std::uint32_t Neighbors{12};
@@ -254,7 +255,7 @@ export namespace Extrinsic::Runtime
     {
         ModalOperator Operator{ModalOperator::GraphLaplacian};
         GeometryElementDomain Domain{GeometryElementDomain::MeshVertex};
-        GeometryPropertyRef Positions{GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3};
+        GeometryPropertyRef Positions{GeometryElementDomain::MeshVertex, std::string{ECS::Components::GeometrySources::PropertyNames::kPosition}, Geometry::PropertyValueKind::Vec3};
         Geometry::Smoothing::PropertyWeight Weight{Geometry::Smoothing::PropertyWeight::Cotangent};
         std::uint32_t Neighbors{12};
         double SpatialSigma{1.0};
@@ -308,7 +309,7 @@ export namespace Extrinsic::Runtime
         // Labels: Int32 labels; rows different from Unlabeled are seeds.
         GeometryPropertyRef Input{GeometryElementDomain::MeshVertex, "v:harmonic_constraints", Geometry::PropertyValueKind::Double};
         GeometryPropertyRef Output{GeometryElementDomain::MeshVertex, "v:harmonic_field", Geometry::PropertyValueKind::Double};
-        GeometryPropertyRef Positions{GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3};
+        GeometryPropertyRef Positions{GeometryElementDomain::MeshVertex, std::string{ECS::Components::GeometrySources::PropertyNames::kPosition}, Geometry::PropertyValueKind::Vec3};
         // Field constraints on the input domain; an empty name disables the source.
         GeometryPropertyRef HardMask{GeometryElementDomain::MeshVertex, "", Geometry::PropertyValueKind::Bool};    // true: hard row
         GeometryPropertyRef SoftWeights{GeometryElementDomain::MeshVertex, "", Geometry::PropertyValueKind::Float}; // > 0: soft row
@@ -352,7 +353,7 @@ export namespace Extrinsic::Runtime
     inline constexpr std::string_view kScalarGradientConfigSectionName = "sandbox.scalar_gradient";
     struct ScalarGradientConfig
     {
-        GeometryPropertyRef Positions{GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3};
+        GeometryPropertyRef Positions{GeometryElementDomain::MeshVertex, std::string{ECS::Components::GeometrySources::PropertyNames::kPosition}, Geometry::PropertyValueKind::Vec3};
         GeometryPropertyRef Scalar{GeometryElementDomain::MeshVertex, "v:mean_curvature", Geometry::PropertyValueKind::Double};
         GeometryPropertyRef Output{GeometryElementDomain::MeshFace, "f:scalar_gradient", Geometry::PropertyValueKind::Vec3};
     };

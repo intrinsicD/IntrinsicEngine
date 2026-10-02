@@ -69,7 +69,7 @@ namespace Extrinsic::Runtime
             if (!id || !scene.IsValid(entity)) return {};
             stamp.push_back(uncommittedPositions ? 1u : 0u);
             const auto source = ECS::Components::GeometrySources::BuildConstView(scene.Raw(), entity);
-            stamp.push_back(source.VertexSource ? source.VertexSource->Properties.FindPropertyRevision("v:position").value_or(0) : 0);
+            stamp.push_back(source.VertexSource ? source.VertexSource->Properties.FindPropertyRevision(ECS::Components::GeometrySources::PropertyNames::kPosition).value_or(0) : 0);
             const auto* world = scene.Raw().try_get<ECS::Components::Transform::WorldMatrix>(entity);
             const auto matrix = world ? world->Matrix : glm::mat4{1.f};
             for (int column = 0; column < 4; ++column)

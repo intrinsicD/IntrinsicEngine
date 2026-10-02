@@ -1530,7 +1530,7 @@ using namespace GeometryProcessingDetail::MeshSupport;
             std::string diagnostic;
             const auto entity = ResolveStableEntity(context.Scene->Raw(), command.StableEntityId);
             if (!PrepareMeshSoupFaceRings(context, *entity, BuildGeometryAvailability(view), diagnostic,
-                                          {GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3}, true))
+                                          {GeometryElementDomain::MeshVertex, std::string{ECS::Components::GeometrySources::PropertyNames::kPosition}, Geometry::PropertyValueKind::Vec3}, true))
                 return {false, "UV regeneration cannot use the selected entity: " + diagnostic};
             if (ValidateMeshVertexDeletionMaskMetadata(view, diagnostic) != EditorCommandStatus::Applied)
                 return {false, "UV regeneration: " + diagnostic};

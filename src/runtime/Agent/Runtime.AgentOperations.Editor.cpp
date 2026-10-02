@@ -24,6 +24,7 @@ module;
 
 module Extrinsic.Runtime.AgentOperations;
 
+import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Logging;

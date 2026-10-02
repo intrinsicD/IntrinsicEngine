@@ -22,6 +22,7 @@ module;
 
 module Extrinsic.Runtime.AgentOperations;
 
+import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Logging;
@@ -840,7 +841,7 @@ namespace Extrinsic::Runtime
             }
             call.Request = PointCloudConsolidationRequest{
                 .StableEntityId = *entity,
-                .Properties = MakePointCloudConsolidationPropertyRefs(*domain, String(*args, "positions").value_or("v:position")),
+                .Properties = MakePointCloudConsolidationPropertyRefs(*domain, String(*args, "positions").value_or(std::string{ECS::Components::GeometrySources::PropertyNames::kPosition})),
                 .Config = *config, .AutoAccept = true};
             if (!IsValidPointCloudConsolidationPropertyRefs(call.Request.Properties))
             {

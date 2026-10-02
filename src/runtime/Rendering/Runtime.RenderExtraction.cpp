@@ -466,7 +466,7 @@ namespace Extrinsic::Runtime
                 return std::nullopt;
             const GeometryPropertyRef positionRef{
                 .Domain = PositionDomainFor(provenance),
-                .Name = "v:position",
+                .Name = std::string{ECS::Components::GeometrySources::PropertyNames::kPosition},
                 .ValueKind = Geometry::PropertyValueKind::Vec3};
             if (positionRef.Domain == GeometryElementDomain::Unknown)
                 return std::nullopt;

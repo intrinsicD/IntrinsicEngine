@@ -129,7 +129,7 @@ namespace Extrinsic::Runtime
 
         bool Structural(const GeometryPropertyRef& ref)
         {
-            return IsTopologyProperty(ref.Domain, ref.Name) || (IsStructuralVertexProperty(ref.Name) && ref.Name != "v:position");
+            return IsTopologyProperty(ref.Domain, ref.Name) || (IsStructuralVertexProperty(ref.Name) && ref.Name != ECS::Components::GeometrySources::PropertyNames::kPosition);
         }
 
         Core::Config::EngineConfigSectionValidationResult Validate(
@@ -158,7 +158,7 @@ namespace Extrinsic::Runtime
             if (!c.Source.Name.empty() && GeometryPropertyComponentCount(c.Input.ValueKind) != GeometryPropertyComponentCount(c.Source.ValueKind))
                 return reject("The source needs the input's channel count.");
             if (Structural(c.Output) || (!c.Confidence.Name.empty() && Structural(c.Confidence)) ||
-                (c.Output.Name == "v:position" && (c.Output.ValueKind != K::Vec3 || c.Output.Domain != c.Positions.Domain)))
+                (c.Output.Name == ECS::Components::GeometrySources::PropertyNames::kPosition && (c.Output.ValueKind != K::Vec3 || c.Output.Domain != c.Positions.Domain)))
                 return reject("Outputs cannot replace structural storage.");
             const bool grounded = c.Field.Unconstrained == H::UnconstrainedPolicy::ZeroMean;
             if (labels && (!c.HardMask.Name.empty() || !c.SoftWeights.Name.empty() || c.PinBoundary || !c.Source.Name.empty()))
@@ -439,7 +439,7 @@ namespace Extrinsic::Runtime
                 }, target.Values);
             }
             ECS::Components::DirtyTags::MarkGpuDirty(context.Scene->Raw(), entity);
-            if (publications.front().Ref.Name == "v:position") ECS::Components::DirtyTags::MarkVertexPositionsDirty(context.Scene->Raw(), entity);
+            if (publications.front().Ref.Name == ECS::Components::GeometrySources::PropertyNames::kPosition) ECS::Components::DirtyTags::MarkVertexPositionsDirty(context.Scene->Raw(), entity);
             if (context.InvalidateWorkspaceSnapshotCache) context.InvalidateWorkspaceSnapshotCache();
             return EditorCommandHistoryStatus::Applied;
         };

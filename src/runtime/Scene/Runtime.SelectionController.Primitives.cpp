@@ -100,7 +100,7 @@ namespace Extrinsic::Runtime
         if (view.VertexSource && !view.VertexSource->Properties.Exists("v:deleted") &&
             !view.HalfedgeSource)
             stamp.push_back(
-                view.VertexSource->Properties.FindPropertyRevision("v:position").value_or(0));
+                view.VertexSource->Properties.FindPropertyRevision(GS::PropertyNames::kPosition).value_or(0));
         return stamp;
     }
 extern "C++"

@@ -200,7 +200,7 @@ namespace Extrinsic::Runtime
                                 "point-set PCA uses vulkan_lbvh and graph normals run on the CPU.");
                 if (!faceNormals && (c.Weighting == Weighting::AngleWeighted || c.Weighting == Weighting::AreaAngleWeighted))
                     return fail("Vulkan vertex normals support uniform, area and max weighting; the angle weightings run on the CPU.");
-                if (c.Output.Name == "v:position")
+                if (c.Output.Name == GS::PropertyNames::kPosition)
                     return fail("Vulkan vertex normals cannot write v:position (its ring would be shown as positions).");
                 if (props->Size() > Graphics::VertexNormalsMaxVertices)
                     return fail("Vulkan vertex normals support at most 2^24 vertices; use the CPU backend.");
@@ -233,7 +233,7 @@ namespace Extrinsic::Runtime
             {
                 if (c.Orientation != PN::OrientationMode::None)
                     return fail("Vulkan PCA normals support unoriented output; MST orientation requires a CPU backend.");
-                if (c.Output.Name == "v:position")
+                if (c.Output.Name == GS::PropertyNames::kPosition)
                     return fail("Vulkan PCA normals cannot write the observed position property.");
                 if (std::fpclassify(c.DegenerateNormalLengthEpsilon) == FP_SUBNORMAL ||
                     std::fpclassify(c.CollinearEigenvalueRatioEpsilon) == FP_SUBNORMAL)
