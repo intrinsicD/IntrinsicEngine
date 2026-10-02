@@ -3561,48 +3561,12 @@ TEST(SandboxEditorSession, EditorJobWaitEndsOnSceneReplacementMinimizeAndDetach)
     EXPECT_FALSE(out.IsError) << out.Text;
     EXPECT_EQ(reaped.value("finished", false), true) << out.Text;
     EXPECT_EQ(reaped.value("reaped", false), true) << out.Text;
+    EXPECT_EQ(reaped["job"]["state"], "ended") << "last seen still running; its terminal state was never observed";
 
     attachment.Detach();
     engine.Shutdown();
 }
 
-// A run's later stage (a GPU Accept queued when the compute stage publishes) shares the run's
-// output identity; cancelling the run by output at cancel time reaches it, and nothing else.
-TEST(SandboxEditorSessionLifecycle, EditorJobRunCancelReachesStagesQueuedAfterTheRunStarted)
-{
-    Extrinsic::Tests::EditorJobHarness harness{2u};
-    ProgressProbeContext context;
-    harness.Attach(context);
-    const auto& commands = context.JobCommands;
-    std::atomic_bool releaseFirst{false}, release{false};
-    const auto runId = ProbeIdentity("run");
-    const Runtime::JobToken first = commands.Submit(MakeProgressProbeJob("stage 1", releaseFirst), runId);
-    ASSERT_TRUE(first.IsValid());
-    releaseFirst.store(true, std::memory_order_release);
-    ASSERT_TRUE(WaitFor([&] {
-        (void)harness.Jobs().DrainCompletions(harness.Events());
-        return harness.Jobs().IsComplete(first);
-    }));
-    // Stage 2 is queued only now, after the run (and its first token) is known.
-    const Runtime::JobToken second = commands.Submit(MakeProgressProbeJob("stage 2", release), runId);
-    const Runtime::JobToken other = commands.Submit(MakeProgressProbeJob("other output", release), ProbeIdentity("other"));
-    ASSERT_TRUE(second.IsValid() && other.IsValid());
-
-    const auto count = Runtime::CancelEditorOutputRuns(commands, {runId});
-    EXPECT_EQ(count.Requested, 1u);
-    EXPECT_EQ(count.Refused, 0u) << "the finished first stage is not active, so it is not counted";
-    EXPECT_FALSE(count.Unavailable);
-    ASSERT_TRUE(WaitFor([&] {
-        (void)harness.Jobs().DrainCompletions(harness.Events());
-        return harness.Jobs().IsComplete(second);
-    }));
-    EXPECT_EQ(harness.Jobs().GetState(second), Runtime::JobState::Cancelled);
-    EXPECT_EQ(harness.Jobs().GetState(first), Runtime::JobState::Published);
-    EXPECT_TRUE(Runtime::IsActiveEditorJobState(harness.Jobs().GetState(other))) << "another output is untouched";
-    EXPECT_TRUE(Runtime::CancelEditorOutputRuns(Runtime::EditorJobCommandSurface{}, {runId}).Unavailable);
-    release.store(true, std::memory_order_release);
-    ASSERT_TRUE(harness.DrainUntilTerminal());
-}
 
 // RUNTIME-313: every queued point job shares one setup/completion contract
 // (`MeshSupport::QueuedJobDelivery`, `ActiveOutputJobRefusal`). A duplicate submission
@@ -3730,4 +3694,160 @@ TEST_F(EditorQueuedPointJobs, CancelledRunDeliversOnceWithTheSharedWording)
     const auto sets = Runtime::PrepareEditorPointSetFrame(Attachment).Commands;
     ExpectCancelFinalizesOnce("Bilateral filter", [&](auto done) {
         return Runtime::ApplyEditorBilateralFilterCommand(sets, Bilateral, done); });
+}
+
+// RUNTIME-313 (from RUNTIME-279): a job reaped between two polls of jobs_wait while the scene
+// was replaced answers scene_replaced, like every other answer of a replaced scene.
+TEST(SandboxEditorSession, EditorJobWaitOnAReapedJobRespectsSceneReplacement)
+{
+    Runtime::Engine engine(HeadlessConfig());
+    engine.EmplaceModule<Runtime::AsyncWorkModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.Initialize();
+    auto& jobs = RequiredEngineService<Runtime::JobService>(engine);
+    Runtime::EditorWorkspaceAttachment attachment;
+    attachment.Attach(engine.Worlds(), engine.Services());
+    ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment, MakeNoEditorModelBuildRequest()).has_value());
+    Runtime::AgentOperationRegistry registry;
+    Runtime::RegisterEditorAgentOperations(registry);
+    const Runtime::AgentOperationContext context{.Attachment = &attachment, .Jobs = &jobs};
+    std::atomic_bool never{false};
+    const Runtime::JobToken job = jobs.Submit(MakeProgressProbeJob("vanishing", never));
+    auto wait = Runtime::InvokeAgentOperation(registry, "jobs_wait", context,
+        AgentJson{{"token", TokenText(job)}, {"timeout_ms", 60000}}.dump(), false);
+    ASSERT_TRUE(wait.Continuation) << wait.Text;
+    ASSERT_TRUE(jobs.Cancel(job));
+    ASSERT_TRUE(WaitFor([&] {
+        (void)jobs.DrainCompletions(engine.Events());
+        return jobs.IsComplete(job);
+    }));
+    (void)jobs.ReapCompleted();
+    ASSERT_EQ(jobs.GetState(job), Runtime::JobState::Invalid);
+    ASSERT_TRUE(RequiredEngineService<Runtime::SceneDocumentModule>(engine).NewSceneDocument().has_value());
+    Runtime::AgentOperationOutcome out;
+    ASSERT_TRUE(wait.Continuation(context, out));
+    EXPECT_TRUE(out.IsError) << out.Text;
+    EXPECT_EQ(out.ErrorCode, "scene_replaced") << out.Text;
+    attachment.Detach();
+    engine.Shutdown();
+}
+
+// RUNTIME-313 (from RUNTIME-279): an agent call's cancel reaches only its own run. Once the run
+// delivered, a newer run on the same output (the duplicate guard admits it only then) is
+// never cancelled by the older call's cancel hook.
+TEST_F(EditorKeypointAgent, EditorJobMcpCancelNeverReachesANewerRunOnTheSameOutput)
+{
+    ASSERT_TRUE(Runtime::ApplyEditorKeypointAnalysisConfig(Commands, Keypoints).Succeeded());
+    Runtime::AgentOperationRegistry registry;
+    Runtime::RegisterEditorAgentOperations(registry);
+    auto& jobs = RequiredEngineService<Runtime::JobService>(Engine);
+    const Runtime::AgentOperationContext context{.Attachment = &Attachment, .Jobs = &jobs};
+    auto first = Runtime::InvokeAgentOperation(registry, "run_keypoint_analysis", context, "{}", false);
+    ASSERT_TRUE(first.Continuation && first.Cancel) << first.Text;
+    std::optional<Runtime::AgentOperationOutcome> answered;
+    ASSERT_TRUE(WaitFor([&] {
+        (void)jobs.DrainCompletions(Engine.Events());
+        Runtime::AgentOperationOutcome out;
+        if (first.Continuation(context, out)) answered = out;
+        return answered.has_value();
+    }));
+    EXPECT_FALSE(answered->IsError) << answered->Text;
+
+    // A non-editor job holds the only worker, so the newer run stays queued.
+    std::atomic_bool release{false};
+    const Runtime::JobToken foreign = jobs.Submit(MakeProgressProbeJob("foreign", release));
+    ASSERT_TRUE(WaitFor([&] { return jobs.GetState(foreign) == Runtime::JobState::Running; }));
+    const auto newer = Runtime::ApplyEditorKeypointAnalysisCommand(Commands, Keypoints);
+    ASSERT_EQ(newer.Status, Runtime::EditorCommandStatus::Pending) << newer.Message;
+    const auto newerJob = Runtime::FindEditorOperationRun(Runtime::GetEditorJobs(Commands),
+        Runtime::EditorOutputRef{Keypoints.StableEntityId, Keypoints.Mask.Name});
+    ASSERT_TRUE(newerJob && Runtime::IsActiveEditorJobState(newerJob->State));
+
+    const std::string said = first.Cancel(context);
+    EXPECT_NE(said.find("already ended"), std::string::npos) << said;
+    EXPECT_TRUE(Runtime::IsActiveEditorJobState(jobs.GetState(newerJob->Token))) << "the newer run is untouched";
+    release.store(true, std::memory_order_release);
+    ASSERT_TRUE(WaitFor([&] {
+        (void)jobs.DrainCompletions(Engine.Events());
+        return jobs.IsComplete(newerJob->Token) && jobs.IsComplete(foreign);
+    }));
+    EXPECT_EQ(jobs.GetState(newerJob->Token), Runtime::JobState::Published);
+}
+
+// RUNTIME-313 (from RUNTIME-279): a run is reported "cancelled" only when a cancel was requested
+// for it. An older run's cancelled job retained on the same output, or a job cancelled without
+// an editor cancel request (as a dependent of a failed stage is), keeps the run's own failure.
+TEST_F(EditorKeypointAgent, OnlyARequestedCancelRelabelsTheRunsFailure)
+{
+    ASSERT_TRUE(Runtime::ApplyEditorKeypointAnalysisConfig(Commands, Keypoints).Succeeded());
+    Runtime::AgentOperationRegistry registry;
+    Runtime::RegisterEditorAgentOperations(registry);
+    auto& jobs = RequiredEngineService<Runtime::JobService>(Engine);
+    const Runtime::AgentOperationContext context{.Attachment = &Attachment, .Jobs = &jobs};
+    std::atomic_bool release{false};
+    const Runtime::JobToken foreign = jobs.Submit(MakeProgressProbeJob("foreign", release));
+    ASSERT_TRUE(WaitFor([&] { return jobs.GetState(foreign) == Runtime::JobState::Running; }));
+    const auto finish = [&](Runtime::AgentOperationOutcome& run) {
+        std::optional<Runtime::AgentOperationOutcome> answered;
+        EXPECT_TRUE(WaitFor([&] {
+            (void)jobs.DrainCompletions(Engine.Events());
+            Runtime::AgentOperationOutcome out;
+            if (run.Continuation(context, out)) answered = out;
+            return answered.has_value();
+        }));
+        return answered.value_or(Runtime::AgentOperationOutcome{});
+    };
+
+    // An older run cancelled through the editor surface stays retained on the same output.
+    const auto older = Runtime::ApplyEditorKeypointAnalysisCommand(Commands, Keypoints);
+    ASSERT_EQ(older.Status, Runtime::EditorCommandStatus::Pending);
+    for (const auto& job : Runtime::GetEditorJobs(Commands))
+        if (Runtime::IsActiveEditorJobState(job.State))
+            EXPECT_EQ(Runtime::CancelEditorJob(Commands, job.Token), Runtime::EditorJobCancelStatus::Requested);
+    release.store(true, std::memory_order_release);
+    ASSERT_TRUE(WaitFor([&] {
+        (void)jobs.DrainCompletions(Engine.Events());
+        const auto records = Runtime::GetEditorJobs(Commands);
+        return std::none_of(records.begin(), records.end(), [](const auto& job) { return Runtime::IsActiveEditorJobState(job.State); });
+    }));
+
+    // This run fails on its own: its source changes before it publishes.
+    auto stale = Runtime::InvokeAgentOperation(registry, "run_keypoint_analysis", context, "{}", false);
+    ASSERT_TRUE(stale.Continuation) << stale.Text;
+    Properties().Get<glm::vec3>("samples")[0].x += 0.5f;
+    const auto staleAnswer = finish(stale);
+    EXPECT_TRUE(staleAnswer.IsError) << staleAnswer.Text;
+    EXPECT_NE(staleAnswer.ErrorCode, "cancelled") << staleAnswer.Text;
+
+    // A job cancelled by the job service itself (not an editor cancel request).
+    release.store(false, std::memory_order_release);
+    const Runtime::JobToken holder = jobs.Submit(MakeProgressProbeJob("holder", release));
+    ASSERT_TRUE(WaitFor([&] { return jobs.GetState(holder) == Runtime::JobState::Running; }));
+    const auto before = jobs.SnapshotAll();
+    auto unrequested = Runtime::InvokeAgentOperation(registry, "run_keypoint_analysis", context, "{}", false);
+    ASSERT_TRUE(unrequested.Continuation) << unrequested.Text;
+    for (const auto& job : jobs.SnapshotAll())
+        if (std::none_of(before.begin(), before.end(), [&](const auto& b) { return b.Token == job.Token; }))
+            EXPECT_TRUE(jobs.Cancel(job.Token));
+    release.store(true, std::memory_order_release);
+    const auto unrequestedAnswer = finish(unrequested);
+    EXPECT_TRUE(unrequestedAnswer.IsError) << unrequestedAnswer.Text;
+    EXPECT_NE(unrequestedAnswer.ErrorCode, "cancelled") << unrequestedAnswer.Text;
+
+    // A requested cancel of the call's own job is reported as cancelled.
+    release.store(false, std::memory_order_release);
+    const Runtime::JobToken holder2 = jobs.Submit(MakeProgressProbeJob("holder 2", release));
+    ASSERT_TRUE(WaitFor([&] { return jobs.GetState(holder2) == Runtime::JobState::Running; }));
+    auto requested = Runtime::InvokeAgentOperation(registry, "run_keypoint_analysis", context, "{}", false);
+    ASSERT_TRUE(requested.Continuation) << requested.Text;
+    for (const auto& job : Runtime::GetEditorJobs(Commands))
+        if (Runtime::IsActiveEditorJobState(job.State))
+            EXPECT_EQ(Runtime::CancelEditorJob(Commands, job.Token), Runtime::EditorJobCancelStatus::Requested);
+    release.store(true, std::memory_order_release);
+    const auto requestedAnswer = finish(requested);
+    EXPECT_EQ(requestedAnswer.ErrorCode, "cancelled") << requestedAnswer.Text;
+    ASSERT_TRUE(WaitFor([&] {
+        (void)jobs.DrainCompletions(Engine.Events());
+        return jobs.IsComplete(foreign) && jobs.IsComplete(holder) && jobs.IsComplete(holder2);
+    }));
 }

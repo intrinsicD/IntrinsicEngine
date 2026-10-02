@@ -104,6 +104,21 @@ duplicate to `result_unavailable`; the single status must keep that mapping.
   for setting the delivered flag in finalize: these jobs already suppressed a second delivery through
   their publisher.
 
+- Inherited RUNTIME-279 follow-ups (slice 5), user-visible in the agent lane:
+  - An agent call's cancel hook cancels only its own run (editor jobs created since the call that it
+    queued or that write its outputs) and nothing once the run delivered; it no longer cancels a newer
+    run on the same output. `CancelEditorRuns`/`CancelEditorOutputRuns`/`EditorRunCancelCount` are removed.
+  - `cancelled` relabels a run only on a requested cancel (the call's hook, or
+    `EditorJobRecord::CancelRequested` recorded by the editor surface's `Cancel`); a stage cancelled
+    by a failed dependency, or an older cancelled job on the same output, keeps the run's own failure.
+  - `jobs_wait` on a job reaped between polls answers `state: "ended"` when the last seen row was
+    still running (before: that running state), and `scene_replaced` when the scene changed meanwhile
+    (before: finished).
+  - Tests: `EditorKeypointAgent.EditorJobMcpCancelNeverReachesANewerRunOnTheSameOutput`,
+    `EditorKeypointAgent.OnlyARequestedCancelRelabelsTheRunsFailure`,
+    `SandboxEditorSession.EditorJobWaitOnAReapedJobRespectsSceneReplacement`, and the reaped-row state
+    check in `EditorJobWaitEndsOnSceneReplacementMinimizeAndDetach`; all fail on the pre-slice code.
+
 ## Acceptance criteria
 - [ ] One compiled helper owns the active-job check (one status, `BuildActiveDerivedJobMessage` wording), deliver-once, and unpublished finalize; the ~10 hand-written copies are removed or reduced to typed callbacks.
 - [ ] Every migrated operation honours `Abandoned` in validation and sets/clears the delivered flag identically; a test per drift item above fails on the old behaviour.

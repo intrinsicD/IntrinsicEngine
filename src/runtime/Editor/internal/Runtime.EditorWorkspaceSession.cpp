@@ -13,6 +13,7 @@ module;
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -164,6 +165,8 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         // frame and projected by `EditorJobCommandSurface` queries.
         std::unordered_map<JobToken, EditorJobIdentity, Core::StrongHandleHash<JobTokenTag>>
             m_JobIdentities{};
+        // The subset whose cancel `Cancel` accepted, pruned with the index.
+        std::unordered_set<JobToken, Core::StrongHandleHash<JobTokenTag>> m_CancelRequestedJobs{};
         std::shared_ptr<std::atomic_bool> m_AttachmentEpoch{};
         // Bumped on attach and whenever the scene is replaced; stamped on every
         // operation-progress answer so panels can drop remembered outcomes.
@@ -252,12 +255,16 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         }
         [[nodiscard]] std::vector<EditorJobRecord> SnapshotAllEditorJobs(
             const JobService& jobs,
-            const EditorJobIdentityIndex& identities)
+            const EditorJobIdentityIndex& identities,
+            const std::unordered_set<JobToken, Core::StrongHandleHash<JobTokenTag>>& cancelRequested)
         {
             std::vector<EditorJobRecord> rows{};
             for (const JobSnapshot& job : jobs.SnapshotAll())
                 if (const auto identity = identities.find(job.Token); identity != identities.end())
+                {
                     rows.push_back(ToEditorJobRecord(job, identity->second));
+                    rows.back().CancelRequested = cancelRequested.contains(job.Token);
+                }
             return rows;
         }
         // Every job this session can attribute to a run: the ones it submitted
@@ -628,6 +635,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         if (m_Jobs != nullptr)
         {
             PruneEditorJobIdentities(m_Jobs->SnapshotAll(), m_JobIdentities);
+            std::erase_if(m_CancelRequestedJobs, [this](const JobToken token) { return !m_JobIdentities.contains(token); });
             context.JobCommands.Submit = [epoch = m_AttachmentEpoch, history = context.CommandHistory, this](
                                              JobDesc desc, EditorJobIdentity identity) -> JobToken
             {
@@ -671,7 +679,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                 {
                     if (!AttachmentEpochIsActive(epoch) || m_Jobs == nullptr)
                         return {};
-                    return SnapshotAllEditorJobs(*m_Jobs, m_JobIdentities);
+                    return SnapshotAllEditorJobs(*m_Jobs, m_JobIdentities, m_CancelRequestedJobs);
                 };
             // Only tokens this session submitted (the identity index) reach
             // `JobService::Cancel`; asset, scene-file and service jobs never do.
@@ -682,8 +690,10 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                         return EditorJobCancelStatus::Unavailable;
                     if (!m_JobIdentities.contains(token))
                         return EditorJobCancelStatus::NotEditorJob;
-                    return m_Jobs->Cancel(token) ? EditorJobCancelStatus::Requested
-                                                 : EditorJobCancelStatus::NotActive;
+                    if (!m_Jobs->Cancel(token))
+                        return EditorJobCancelStatus::NotActive;
+                    m_CancelRequestedJobs.insert(token);
+                    return EditorJobCancelStatus::Requested;
                 };
             context.JobCommands.Progress =
                 [epoch = m_AttachmentEpoch,

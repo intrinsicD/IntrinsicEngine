@@ -556,9 +556,9 @@ namespace Extrinsic::Runtime
             const auto sceneEpoch = [](const EditorProcessingCommands& c) { return GetEditorOperationProgress(c, EditorRunCorrelation{}).Epoch; };
             const std::uint64_t epoch = sceneEpoch(commands);
             const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
-            // The last row this wait saw: a job reaped between two polls (it ended without a result to
-            // deliver, so it completed and was reaped in one frame) still ended for this wait.
-            auto seen = std::make_shared<std::optional<Json>>();
+            // The last row this wait saw and its state: a job reaped between two polls (it ended without
+            // a result to deliver, so it completed and was reaped in one frame) still ended for this wait.
+            auto seen = std::make_shared<std::optional<std::pair<Json, JobState>>>();
             // Set by `notifications/cancelled`: a cancelled wait frees its slot at the next poll.
             auto abandoned = std::make_shared<bool>(false);
             const auto step = [token, epoch, deadline, sceneEpoch, seen, abandoned](const AgentOperationContext& current)
@@ -566,24 +566,30 @@ namespace Extrinsic::Runtime
                 if (*abandoned) return Fail("The wait was cancelled.");
                 if (current.Attachment == nullptr || !current.Attachment->IsAttached() || current.Jobs == nullptr)
                     return Fail(kNoWorkspace);
+                const auto c = PrepareEditorProcessingCommands(*current.Attachment);
+                const auto sceneReplaced = [&] {
+                    return AgentOperationOutcome{.IsError = true, .Text = "The scene was replaced while waiting for job " + TokenText(token) +
+                                                 "; its result will not apply to the new scene.", .ErrorCode = "scene_replaced"};
+                };
                 const auto job = FindJob(*current.Jobs, token);
                 if (!job && seen->has_value())
                 {
-                    Json last = **seen;
+                    // Reaped since the last poll: it ended, but in a replaced scene that end is not this scene's.
+                    if (sceneEpoch(c) != epoch) return sceneReplaced();
+                    auto [last, state] = **seen;
+                    // The terminal state was not observed when the last poll saw it still running.
+                    if (IsActiveEditorJobState(state) || state == JobState::Invalid) last["state"] = "ended";
                     return Ok({{"job", std::move(last)}, {"finished", true}, {"reaped", true}, {"timed_out", false}});
                 }
                 if (!job)
                     return AgentOperationOutcome{.IsError = true, .Text = "Job " + TokenText(token) + " is not retained by the job service: "
                                                  "unknown, or it ended and was reaped. Check jobs_list and the scene.", .ErrorCode = "unknown_job"};
-                const auto c = PrepareEditorProcessingCommands(*current.Attachment);
                 const auto editor = GetEditorJobs(c);
                 const Json row = JobRow(*job, FindRecord(editor, token));
-                *seen = row;
+                *seen = std::pair{row, job->State};
                 // Complete: terminal and its unpublished finalizer (the terminal result) delivered.
                 if (current.Jobs->IsComplete(token)) return Ok({{"job", row}, {"finished", true}, {"reaped", false}, {"timed_out", false}});
-                if (sceneEpoch(c) != epoch)
-                    return AgentOperationOutcome{.IsError = true, .Text = "The scene was replaced while waiting for job " + TokenText(token) +
-                                                 "; its result will not apply to the new scene.", .ErrorCode = "scene_replaced"};
+                if (sceneEpoch(c) != epoch) return sceneReplaced();
                 if (std::chrono::steady_clock::now() >= deadline) return Ok({{"job", row}, {"finished", false}, {"reaped", false}, {"timed_out", true}});
                 return std::nullopt;
             };
@@ -731,7 +737,7 @@ namespace Extrinsic::Runtime
         add("jobs_wait", "Wait for a job",
             "Wait until a job ended (finished: true) or timeout_ms passed (timed_out: true), while frames keep running. Name the "
             "job by token, or by entity and output (the newest editor run writing that output when called). A job that ended "
-            "and was reaped between two polls answers finished with reaped: true (its last seen state). Ends with an error "
+            "and was reaped between two polls answers finished with reaped: true (its last seen terminal state, or \"ended\" when it was last seen still running; scene_replaced if the scene changed meanwhile). Ends with an error "
             "when the job is unknown or already reaped when called (unknown_job), the scene is replaced (scene_replaced), the workspace detaches or "
             "the window is minimized (viewport_not_presentable).",
             R"({"type":"object","properties":{)" + tokenProperty + "," + kEntityProperty +

@@ -67,6 +67,10 @@ export namespace Extrinsic::Runtime
         // False until the worker reports; "never reported" is not 0%.
         bool ProgressDeterminate{false};
         bool PreviousOutputRetained{false};
+        // `EditorJobCommandSurface::Cancel` accepted a cancel for this job (a
+        // panel, `jobs_cancel` or an agent call's cancel). A job cancelled only
+        // because a dependency failed keeps false. Set on `SnapshotAll` rows.
+        bool CancelRequested{false};
         std::uint64_t PayloadToken{0u};
         std::uint64_t ElapsedMilliseconds{0u};
         std::string Diagnostic{};
@@ -183,17 +187,4 @@ export namespace Extrinsic::Runtime
         }
     };
 
-    struct EditorRunCancelCount
-    {
-        std::uint32_t Requested{0u}; // cancels `Cancel` accepted
-        std::uint32_t Refused{0u};   // matching jobs that had already ended or were being cancelled
-        bool Unavailable{false};     // no surface (stale attachment epoch, no job service)
-    };
-    // Cancels every active job of `surface` that writes one of `outputs`, so a
-    // run's later stages (submitted after the run started, under the same
-    // output identity) are cancelled with it. Only jobs `SnapshotAll` lists,
-    // i.e. editor jobs, are reached.
-    [[nodiscard]] EditorRunCancelCount CancelEditorOutputRuns(
-        const EditorJobCommandSurface& surface,
-        const std::vector<EditorJobIdentity>& outputs);
 }
