@@ -503,6 +503,18 @@ TEST(SandboxProcessingPanels, GpuTransactionRowEnablesButtonsByPhase)
     }
 }
 
+// UI-071: a panel's own gating reaches the shared button as the first applicable blocker's reason.
+TEST(SandboxProcessingPanels, ReadinessUnlessBlockedReportsTheFirstBlockersReason)
+{
+    const auto open = Editor::ReadinessUnlessBlocked({{false, "never"}, {false, "never"}});
+    EXPECT_TRUE(open.Enabled);
+    EXPECT_TRUE(open.DisabledReason.empty());
+    const auto first = Editor::ReadinessUnlessBlocked({{false, "skipped"}, {true, "first"}, {true, "second"}});
+    EXPECT_FALSE(first.Enabled);
+    EXPECT_EQ(first.DisabledReason, "first");
+    EXPECT_TRUE(Editor::ReadinessUnlessBlocked({}).Enabled);
+}
+
 TEST(SandboxProcessingPanels, GpuTransactionCountersUseOneFormat)
 {
     EXPECT_EQ(Editor::FormatGpuTransactionIo({.UploadBytes = 36, .CacheHits = 1}),

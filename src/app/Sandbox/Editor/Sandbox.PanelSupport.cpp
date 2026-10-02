@@ -1884,6 +1884,13 @@ namespace Extrinsic::Sandbox::Editor
         return clicked;
     }
 
+    Runtime::ActionReadiness ReadinessUnlessBlocked(const std::initializer_list<ActionBlocker> blockers)
+    {
+        for (const auto& blocker : blockers)
+            if (blocker.Blocks) return {.Enabled = false, .DisabledReason = std::string(blocker.Reason)};
+        return {.Enabled = true, .DisabledReason = {}};
+    }
+
     std::string FormatConfigFieldHint(const Runtime::ConfigFieldSpec& field, const std::string_view defaultValue)
     {
         std::string text{field.Description};

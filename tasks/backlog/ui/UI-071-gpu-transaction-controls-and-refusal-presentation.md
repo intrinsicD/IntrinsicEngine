@@ -96,3 +96,12 @@ python3 tools/docs/check_doc_links.py --root .
   exist with a live Vulkan run, so no MP panel test can reach a running phase on the null device: the MP side is
   covered by the shared helper's per-phase test and by `SandboxEditorPresentation.GpuTransactionRowsAreDrawnByTheSharedHelper`
   (source scan: no hand-written Accept/Discard/Stop button outside CPD's Discard).
+- Slice 4: Method-panel disabled actions go through `DrawProcessingActionButton`; the panel's own gating
+  (`ReadinessUnlessBlocked`: first blocker's reason) covers consolidation Apply/Reload/Undo/Redo, K-Means
+  Apply/Reload (and Run while a GPU run is pending, with the consolidation wording), the two parameterization pin
+  buttons and UV Undo/Redo; the atlas button shows the validator's own message
+  (`ValidateParameterizationAtlasConfig`) before the runtime preview's. Existing inline notes stay. Left as
+  they are because they are not actions: the consolidation strategy combo entries ("unavailable" note) and the
+  support-radius input (disabled by the radius mode, with its note). No new reason is computed from geometry;
+  readiness content stays with UI-037/UI-058. The presentation rule is recorded in
+  `docs/architecture/sandbox-editor-feature-boundaries.md`.

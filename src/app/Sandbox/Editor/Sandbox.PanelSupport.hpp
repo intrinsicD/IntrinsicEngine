@@ -279,6 +279,16 @@ namespace Extrinsic::Sandbox::Editor
     [[nodiscard]] bool DrawColorInterpretationCombo(int& interpretation);
     [[nodiscard]] bool DrawProcessingActionButton(
         const char* label, const Runtime::ActionReadiness& readiness);
+    // UI-071: the one way a panel's own gating (config control missing, nothing to undo, a draft that does not
+    // validate) reaches `DrawProcessingActionButton`: the first blocker that applies supplies the reason the
+    // tooltip shows; none applying leaves the action enabled. Runtime readiness, where it exists, goes through
+    // `ResolveEditorProcessingActionReadiness` instead and is never restated here.
+    struct ActionBlocker
+    {
+        bool Blocks{false};
+        std::string_view Reason{};
+    };
+    [[nodiscard]] Runtime::ActionReadiness ReadinessUnlessBlocked(std::initializer_list<ActionBlocker> blockers);
 
     // UI-057: parameter controls driven by a config section's field table. Hovering a
     // control shows the field's description, accepted values and default; numeric input

@@ -1590,9 +1590,11 @@ namespace Extrinsic::Sandbox::Editor
 
                 const bool configAvailable =
                     context.ProcessingConfigCommandsAvailable;
-                ImGui::BeginDisabled(!configAvailable || !configValid);
-                if (ImGui::Button(
-                        "Apply configuration##PointCloudConsolidation"))
+                if (DrawProcessingActionButton(
+                        "Apply configuration##PointCloudConsolidation",
+                        ReadinessUnlessBlocked({
+                            {!configAvailable, "Point-cloud consolidation config control is unavailable."},
+                            {!configValid, "Draft contains an unsupported or out-of-range value."}})))
                 {
                     PointCloudConsolidation.LastConfigApply =
                         Runtime::ApplyEditorPointCloudConsolidationConfig(
@@ -1602,16 +1604,14 @@ namespace Extrinsic::Sandbox::Editor
                     if (PointCloudConsolidation.LastConfigApply->Succeeded())
                         PointCloudConsolidation.Dirty = false;
                 }
-                ImGui::EndDisabled();
                 ImGui::SameLine();
-                ImGui::BeginDisabled(!configAvailable);
-                if (ImGui::Button(
-                        "Reload active##PointCloudConsolidation"))
+                if (DrawProcessingActionButton(
+                        "Reload active##PointCloudConsolidation",
+                        ReadinessUnlessBlocked({{!configAvailable, "Point-cloud consolidation config control is unavailable."}})))
                 {
                     PointCloudConsolidation.Initialized = false;
                     PointCloudConsolidation.Dirty = false;
                 }
-                ImGui::EndDisabled();
 
                 Runtime::PointCloudConsolidationGpuObservation gpu{};
                 if (service.PointCloudConsolidation && PointCloudConsolidation.LastResult)
@@ -1698,21 +1698,21 @@ namespace Extrinsic::Sandbox::Editor
                     IsConsolidationHistoryLabel(history.UndoLabel);
                 const bool canRedo = history.CanRedo &&
                     IsConsolidationHistoryLabel(history.RedoLabel);
-                ImGui::BeginDisabled(!canUndo || !historyAvailable);
-                if (ImGui::Button(
-                        "Undo consolidation##PointCloudConsolidation"))
+                if (DrawProcessingActionButton(
+                        "Undo consolidation##PointCloudConsolidation",
+                        ReadinessUnlessBlocked({{!historyAvailable, "Document history is unavailable."},
+                                                {!canUndo, "The next undo step is not a point-cloud consolidation."}})))
                 {
                     (void)context.DocumentCommands.Undo();
                 }
-                ImGui::EndDisabled();
                 ImGui::SameLine();
-                ImGui::BeginDisabled(!canRedo || !historyAvailable);
-                if (ImGui::Button(
-                        "Redo consolidation##PointCloudConsolidation"))
+                if (DrawProcessingActionButton(
+                        "Redo consolidation##PointCloudConsolidation",
+                        ReadinessUnlessBlocked({{!historyAvailable, "Document history is unavailable."},
+                                                {!canRedo, "The next redo step is not a point-cloud consolidation."}})))
                 {
                     (void)context.DocumentCommands.Redo();
                 }
-                ImGui::EndDisabled();
 
                 if (PointCloudConsolidation.LastConfigApply.has_value() &&
                     !PointCloudConsolidation.LastConfigApply->Succeeded())
@@ -1895,8 +1895,9 @@ namespace Extrinsic::Sandbox::Editor
 
             const bool configAvailable =
                 context.ProcessingConfigCommandsAvailable;
-            ImGui::BeginDisabled(!configAvailable || !KMeans.Dirty);
-            if (ImGui::Button("Apply configuration##KMeans"))
+            if (DrawProcessingActionButton("Apply configuration##KMeans",
+                    ReadinessUnlessBlocked({{!configAvailable, "Clustering config control is unavailable."},
+                                            {!KMeans.Dirty, "The draft has no unapplied changes."}})))
             {
                 KMeans.LastConfigApply =
                     Runtime::ApplyEditorClusteringConfig(
@@ -1906,15 +1907,13 @@ namespace Extrinsic::Sandbox::Editor
                 if (KMeans.LastConfigApply->Succeeded())
                     KMeans.Dirty = false;
             }
-            ImGui::EndDisabled();
             ImGui::SameLine();
-            ImGui::BeginDisabled(!configAvailable);
-            if (ImGui::Button("Reload active##KMeans"))
+            if (DrawProcessingActionButton("Reload active##KMeans",
+                    ReadinessUnlessBlocked({{!configAvailable, "Clustering config control is unavailable."}})))
             {
                 KMeans.Dirty = false;
                 KMeans.Initialized = false;
             }
-            ImGui::EndDisabled();
 
             const bool clusteringAvailable = service.ClusteringAvailable;
             Runtime::RunKMeans request = Runtime::MakeConfiguredKMeansRequest(
@@ -1949,10 +1948,11 @@ namespace Extrinsic::Sandbox::Editor
                     }
                 }
             }
-            const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
+            auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
                 service.Commands,
                 Runtime::PreviewEditorKMeansRun(service.Commands, service.Clustering, request));
-            ImGui::BeginDisabled(pendingGpuRun);
+            if (pendingGpuRun && readiness.Enabled)
+                readiness = {.Enabled = false, .DisabledReason = "Accept or Discard the pending GPU run before starting another."};
             if (DrawProcessingActionButton("Run K-Means##KMeans", readiness))
             {
                 KMeans.LastConfigApply =
@@ -1966,7 +1966,6 @@ namespace Extrinsic::Sandbox::Editor
                     SetKMeansSubmission(Runtime::SubmitKMeansRun(service.Commands, service.Clustering, request));
                 }
             }
-            ImGui::EndDisabled();
             KMeans.Run.Draw(service.Commands, model.SelectedStableId, "kmeans_progress");
             ImGui::SeparatorText("Display output properties");
             DrawProcessingPropertyShowButton(context, model.SelectedStableId, KMeans.Properties.OutputLabels, KMeans.VisualizationDiagnostic);
@@ -2918,8 +2917,9 @@ namespace Extrinsic::Sandbox::Editor
                 Runtime::GeometryElementDomain::MeshVertex);
             if (Parameterization.Draft.Strategy == Runtime::EditorParameterizationStrategy::Lscm)
             {
-                ImGui::BeginDisabled(!selectedPins.Usable() || selectedPins.Indices.size() != 2);
-                if (ImGui::Button("Use two selected vertices as LSCM pins"))
+                if (DrawProcessingActionButton("Use two selected vertices as LSCM pins",
+                        ReadinessUnlessBlocked({{!selectedPins.Usable(), "Select mesh vertices to use as pins."},
+                                                {selectedPins.Indices.size() != 2, "Select exactly two vertices."}})))
                 {
                     auto& pins = Parameterization.Draft.Lscm;
                     pins.AutoPins = false;
@@ -2927,15 +2927,15 @@ namespace Extrinsic::Sandbox::Editor
                     pins.PinVertex1 = selectedPins.Indices[1];
                     Parameterization.Dirty = true;
                 }
-                ImGui::EndDisabled();
             }
             else if (Parameterization.Draft.Strategy ==
                          Runtime::EditorParameterizationStrategy::HarmonicCotangent ||
                      Parameterization.Draft.Strategy ==
                          Runtime::EditorParameterizationStrategy::TutteUniform)
             {
-                ImGui::BeginDisabled(!selectedPins.Usable() || selectedPins.Indices.empty());
-                if (ImGui::Button("Use selected vertices as boundary pins"))
+                if (DrawProcessingActionButton("Use selected vertices as boundary pins",
+                        ReadinessUnlessBlocked({{!selectedPins.Usable(), "Select mesh vertices to use as pins."},
+                                                {selectedPins.Indices.empty(), "Select at least one vertex."}})))
                 {
                     auto& pins = Parameterization.Draft.Harmonic;
                     pins.PinnedVertices = selectedPins.Indices;
@@ -2948,7 +2948,6 @@ namespace Extrinsic::Sandbox::Editor
                     }
                     Parameterization.Dirty = true;
                 }
-                ImGui::EndDisabled();
                 ImGui::TextWrapped("Pin UVs start from the current UV map (zero if absent); edit "
                                    "them below. The method validates boundary eligibility.");
             }
@@ -3030,25 +3029,19 @@ namespace Extrinsic::Sandbox::Editor
                 history.CanUndo && history.UndoLabel == "Parameterize mesh UVs";
             const bool canRedoUv =
                 history.CanRedo && history.RedoLabel == "Parameterize mesh UVs";
-            if (!canUndoUv)
-                ImGui::BeginDisabled();
-            if (ImGui::Button("Undo UV writeback##Parameterization") &&
+            if (DrawProcessingActionButton("Undo UV writeback##Parameterization",
+                    ReadinessUnlessBlocked({{!canUndoUv, "The next undo step is not a UV writeback."}})) &&
                 historyAvailable)
             {
                 (void)context.DocumentCommands.Undo();
             }
-            if (!canUndoUv)
-                ImGui::EndDisabled();
             ImGui::SameLine();
-            if (!canRedoUv)
-                ImGui::BeginDisabled();
-            if (ImGui::Button("Redo UV writeback##Parameterization") &&
+            if (DrawProcessingActionButton("Redo UV writeback##Parameterization",
+                    ReadinessUnlessBlocked({{!canRedoUv, "The next redo step is not a UV writeback."}})) &&
                 historyAvailable)
             {
                 (void)context.DocumentCommands.Redo();
             }
-            if (!canRedoUv)
-                ImGui::EndDisabled();
             if (history.CanUndo && !canUndoUv)
             {
                 ImGui::TextDisabled(
@@ -3433,8 +3426,7 @@ namespace Extrinsic::Sandbox::Editor
         {
             ImGui::SeparatorText("Atlas generation");
             Parameterization.Dirty |= DrawParameterizationAtlasControls(Parameterization.Draft.Atlas, catalog);
-            const bool atlasValid =
-                !Runtime::ValidateParameterizationAtlasConfig(Parameterization.Draft.Atlas).has_value();
+            const auto atlasInvalid = Runtime::ValidateParameterizationAtlasConfig(Parameterization.Draft.Atlas);
             const Runtime::EditorUvRegenerationCommand preview{
                 .StableEntityId = model.SelectedStableEntityId,
                 .ForceRegenerate = true,
@@ -3442,7 +3434,9 @@ namespace Extrinsic::Sandbox::Editor
             };
             Runtime::ActionReadiness readiness = Runtime::PreviewEditorUvRegenerationCommand(
                 context.Parameterization.Commands, preview);
-            ImGui::BeginDisabled(!atlasValid);
+            // The validator's own message is the reason; it takes priority over the runtime preview.
+            if (atlasInvalid.has_value())
+                readiness = {.Enabled = false, .DisabledReason = std::string(*atlasInvalid)};
             if (DrawProcessingActionButton("Generate atlas for selected mesh##Atlas", readiness))
             {
                 // Generation always consumes applied, validated config.
@@ -3456,7 +3450,6 @@ namespace Extrinsic::Sandbox::Editor
                     }
                 }
             }
-            ImGui::EndDisabled();
             ImGui::SameLine();
             if (ImGui::Button("Open mesh | UV workspace##Atlas") && Shell != nullptr)
                 (void)Shell->SetEditorWindowOpen(kAtlasWorkspaceWindowId, true);
