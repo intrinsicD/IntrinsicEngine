@@ -24,6 +24,7 @@ module;
 
 module Extrinsic.Runtime.VisualizationEditingOperations;
 
+import Geometry.Validation;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Error;
@@ -1229,7 +1230,7 @@ namespace {
                     {
                         if (stats != nullptr)
                             ++stats->UvDiagnosticsTexcoordElementsScanned;
-                        if (!std::isfinite(uv.x) || !std::isfinite(uv.y))
+                        if (!Geometry::Validation::IsFinite(uv))
                         {
                             model.TexcoordsFinite = false;
                             model.LastFailure =
@@ -2153,8 +2154,7 @@ ApplyEditorRenderHintCommand(
             bool any = false;
             for (const glm::vec3& position : positions.Span())
             {
-                if (!std::isfinite(position.x) || !std::isfinite(position.y) ||
-                    !std::isfinite(position.z))
+                if (!Geometry::Validation::IsFinite(position))
                 {
                     continue;
                 }

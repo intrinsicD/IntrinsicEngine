@@ -17,6 +17,8 @@ module;
 
 module Extrinsic.Runtime.CameraControllers;
 
+import Geometry.Validation;
+
 namespace Extrinsic::Runtime
 {
     namespace Detail
@@ -36,13 +38,6 @@ namespace Extrinsic::Runtime
         {
             return input.IsMouseButtonPressed(kMouseButtonRight) ||
                    input.IsMouseButtonPressed(kMouseButtonMiddle);
-        }
-
-        [[nodiscard]] bool IsFinite(const glm::vec3 value) noexcept
-        {
-            return std::isfinite(value.x) &&
-                   std::isfinite(value.y) &&
-                   std::isfinite(value.z);
         }
 
         [[nodiscard]] float WrapRadians(float value) noexcept
@@ -167,7 +162,7 @@ namespace Extrinsic::Runtime
             const glm::vec3 f = SafeNormalized(forward, {0.0f, 0.0f, -1.0f});
             glm::vec3 upCandidate = SafeNormalized(up, NonParallelUpForForward(f));
             glm::vec3 right = glm::cross(f, upCandidate);
-            if (!IsFinite(right) || glm::length(right) <= 0.000001f)
+            if (!Geometry::Validation::IsFinite(right) || glm::length(right) <= 0.000001f)
             {
                 upCandidate = NonParallelUpForForward(f);
                 right = glm::cross(f, upCandidate);
@@ -253,7 +248,7 @@ namespace Extrinsic::Runtime
 
     void OrbitCameraController::Focus(const CameraFocusTarget target) noexcept
     {
-        if (!Detail::IsFinite(target.Center))
+        if (!Geometry::Validation::IsFinite(target.Center))
             return;
 
         const float radius = Detail::SafeFocusRadius(target);
@@ -384,7 +379,7 @@ namespace Extrinsic::Runtime
 
     void FlyCameraController::Focus(const CameraFocusTarget target) noexcept
     {
-        if (!Detail::IsFinite(target.Center))
+        if (!Geometry::Validation::IsFinite(target.Center))
             return;
 
         const float radius = Detail::SafeFocusRadius(target);
@@ -475,7 +470,7 @@ namespace Extrinsic::Runtime
 
     void FreeLookCameraController::Focus(const CameraFocusTarget target) noexcept
     {
-        if (!Detail::IsFinite(target.Center))
+        if (!Geometry::Validation::IsFinite(target.Center))
             return;
 
         const float radius = Detail::SafeFocusRadius(target);
@@ -595,7 +590,7 @@ namespace Extrinsic::Runtime
 
     void TopDownCameraController::Focus(const CameraFocusTarget target) noexcept
     {
-        if (!Detail::IsFinite(target.Center))
+        if (!Geometry::Validation::IsFinite(target.Center))
             return;
 
         const float radius = Detail::SafeFocusRadius(target);

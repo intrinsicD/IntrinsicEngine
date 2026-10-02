@@ -48,7 +48,6 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
     [[nodiscard]] PointPropertyWatch ObserveGeometryProperty(const GeometryEntityAvailability&, GeometryElementDomain, std::string);
     [[nodiscard]] Geometry::PropertySet* MutableGeometryProperties(entt::registry&, entt::entity, GeometryElementDomain);
     [[nodiscard]] GeometryElementDomain PrimaryPointDomain(const GeometryEntityAvailability&);
-    [[nodiscard]] bool FinitePosition(glm::vec3);
     [[nodiscard]] bool GeometryPropertiesCurrent(const EditorProcessingContext&, entt::entity,
                                                std::span<const PointPropertyWatch>);
 

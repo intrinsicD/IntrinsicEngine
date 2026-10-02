@@ -18,6 +18,7 @@ module;
 #include <entt/entity/entity.hpp>
 #include "Modules/Clustering/Runtime.KMeansPaging.TestSupport.hpp"
 module Extrinsic.Runtime.ClusteringModule;
+import Geometry.Validation;
 import :GpuBackend;
 import Geometry.KMeans;
 import Extrinsic.Runtime.EditorProcessing;
@@ -272,7 +273,7 @@ namespace Extrinsic::Runtime
                         if(a->Page->Data.size()!=std::size_t(a->Clusters)*12){Finish(KMeansRunStatus::GeometryProcessingFailed,"K-Means centroid readback size mismatch.");return;}
                         a->Geometry.Centroids.resize(a->Clusters);std::memcpy(a->Geometry.Centroids.data(),a->Page->Data.data(),a->Page->Data.size());
                         for(const auto& centroid:a->Geometry.Centroids)
-                            if(!std::isfinite(centroid.x)||!std::isfinite(centroid.y)||!std::isfinite(centroid.z)){
+                            if(!Geometry::Validation::IsFinite(centroid)){
                                 Finish(KMeansRunStatus::GeometryProcessingFailed,"K-Means centroid readback contains non-finite values.");return;
                             }
                         a->Result.Centroids=a->Geometry.Centroids;a->Ready=true;a->Page.reset();

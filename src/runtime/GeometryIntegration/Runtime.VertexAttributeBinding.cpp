@@ -10,23 +10,16 @@ module;
 
 module Extrinsic.Runtime.VertexAttributeBinding;
 
+import Geometry.Validation;
 import Geometry.Properties;
 
 namespace Extrinsic::Runtime
 {
     namespace
     {
+        using Geometry::Validation::IsFinite;
+
         constexpr float kDegenerateLengthEpsilon = 1.0e-6f;
-
-        [[nodiscard]] bool IsFinite(const glm::vec2& v) noexcept
-        {
-            return std::isfinite(v.x) && std::isfinite(v.y);
-        }
-
-        [[nodiscard]] bool IsFinite(const glm::vec3& v) noexcept
-        {
-            return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
-        }
 
         [[nodiscard]] bool IsFinite(const glm::vec4& v) noexcept
         {

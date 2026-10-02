@@ -4,6 +4,7 @@ module;
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 module Extrinsic.Runtime.SceneInteractionModule;
+import Geometry.Validation;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.Graphics.RenderWorld;
@@ -38,7 +39,7 @@ namespace Extrinsic::Runtime
                 if (index >= positions.Size())
                     return std::nullopt;
                 const auto p = glm::vec3(transform * glm::vec4(positions[index], 1.f));
-                if (!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z))
+                if (!Geometry::Validation::IsFinite(p))
                     return std::nullopt;
                 return p;
             };

@@ -28,6 +28,7 @@ module;
 
 module Extrinsic.Runtime.MeshTopologyOperations;
 
+import Geometry.Validation;
 import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Config.Engine;
@@ -141,7 +142,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
         {
             for (const glm::vec3 value : values)
             {
-                if (!IsFiniteGeometryPosition(value))
+                if (!Geometry::Validation::IsFinite(value))
                     return false;
             }
             return true;

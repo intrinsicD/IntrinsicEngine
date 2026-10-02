@@ -23,6 +23,7 @@ module;
 
 module Extrinsic.Runtime.PointCloudConsolidationModule;
 
+import Geometry.Validation;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.EditorJobProjection;
@@ -1365,9 +1366,7 @@ namespace Extrinsic::Runtime
                     consolidated.Positions.end(),
                     [](const glm::vec3& position)
                     {
-                        return std::isfinite(position.x) &&
-                            std::isfinite(position.y) &&
-                            std::isfinite(position.z);
+                        return Geometry::Validation::IsFinite(position);
                     });
             const bool publishable =
                 consolidated.Succeeded() || publishablePreview;

@@ -24,6 +24,7 @@ module;
 
 module Extrinsic.Runtime.RenderExtraction;
 
+import Geometry.Validation;
 import :Internal;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.AssetInstance;
@@ -684,7 +685,7 @@ namespace Extrinsic::Runtime
                 {
                     for (const glm::vec2 uv : cornerTexcoords.Vector())
                     {
-                        if (!std::isfinite(uv.x) || !std::isfinite(uv.y))
+                        if (!Geometry::Validation::IsFinite(uv))
                         {
                             diagnostics.NonFinite = true;
                             return diagnostics;
@@ -704,7 +705,7 @@ namespace Extrinsic::Runtime
 
             for (const glm::vec2 uv : texcoords.Vector())
             {
-                if (!std::isfinite(uv.x) || !std::isfinite(uv.y))
+                if (!Geometry::Validation::IsFinite(uv))
                 {
                     diagnostics.NonFinite = true;
                     return diagnostics;

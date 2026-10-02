@@ -21,6 +21,7 @@ module;
 
 module Extrinsic.Runtime.RenderExtraction;
 
+import Geometry.Validation;
 import :Internal;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.VisualizationPackets;
@@ -34,6 +35,8 @@ namespace Extrinsic::Runtime
 {
     namespace
     {
+        using Geometry::Validation::IsFinite;
+
         namespace GS = ECS::Components::GeometrySources;
         namespace PN = GS::PropertyNames;
 
@@ -45,11 +48,6 @@ namespace Extrinsic::Runtime
         [[nodiscard]] std::uint64_t NextVectorFieldCacheStamp() noexcept
         {
             return g_NextVectorFieldCacheStamp.fetch_add(1u, std::memory_order_relaxed);
-        }
-
-        [[nodiscard]] bool IsFinite(const glm::vec3& value) noexcept
-        {
-            return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
         }
 
         [[nodiscard]] Graphics::VisualizationAttributeDomain ToAttributeDomain(

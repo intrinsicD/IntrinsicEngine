@@ -17,6 +17,7 @@ module;
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 module Extrinsic.Runtime.GeometryProcessingOperations;
+import Geometry.Validation;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
@@ -100,7 +101,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         out.LocalBoundingAABB.Max = maximum;
         out.LocalBoundingSphere.Center = 0.5f * (minimum + maximum);
         out.LocalBoundingSphere.Radius = 0.5f * glm::length(maximum - minimum);
-        const auto finite = [](const glm::vec3& v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z); };
+        const auto finite = [](const glm::vec3& v) { return Geometry::Validation::IsFinite(v); };
         if (!finite(out.LocalBoundingSphere.Center) || !std::isfinite(out.LocalBoundingSphere.Radius))
             return PointPositionBoundsOutcome::Failed;
         return PointPositionBoundsOutcome::Valid;
@@ -294,7 +295,7 @@ namespace Extrinsic::Runtime
                 std::memcpy(after.data(), readback->Bytes.data(), rows * sizeof(glm::vec3));
             }
             for (const auto& p : after)
-                if (!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z))
+                if (!Geometry::Validation::IsFinite(p))
                 {
                     Fail(w, EditorCommandStatus::GeometryProcessingFailed,
                          "The GPU positions are not finite; previous positions retained.");

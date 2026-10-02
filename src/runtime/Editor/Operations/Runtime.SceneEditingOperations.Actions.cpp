@@ -17,6 +17,7 @@ module;
 
 module Extrinsic.Runtime.SceneEditingOperations;
 
+import Geometry.Validation;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
@@ -518,11 +519,6 @@ ApplyEditorTransformEdit(
 
     namespace
     {
-        [[nodiscard]] bool IsFiniteVec3(const glm::vec3& v) noexcept
-        {
-            return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
-        }
-
         [[nodiscard]] EditorCameraPose PoseOf(const ICameraController& controller, const Core::Extent2D viewport)
         {
             const Graphics::CameraViewInput view = controller.GetView(viewport);
@@ -630,7 +626,7 @@ ApplyEditorTransformEdit(
 
         if (command.Mode == EditorCameraPoseMode::Pose)
         {
-            if (!IsFiniteVec3(command.Position) || !IsFiniteVec3(command.Target) || !IsFiniteVec3(command.Up))
+            if (!Geometry::Validation::IsFinite(command.Position) || !Geometry::Validation::IsFinite(command.Target) || !Geometry::Validation::IsFinite(command.Up))
             {
                 result.Status = EditorCommandStatus::InvalidProcessingParameters;
                 return result;

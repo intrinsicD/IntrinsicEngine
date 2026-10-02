@@ -13,6 +13,7 @@ module;
 
 module Extrinsic.Runtime.GeometryPlanBuilders;
 
+import Geometry.Validation;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.GeometryResidency;
@@ -24,6 +25,8 @@ namespace Extrinsic::Runtime
 {
     namespace
     {
+        using Geometry::Validation::IsFinite;
+
         constexpr const char* kEdgeViewDebugName = "Runtime.MeshEdgeView";
         constexpr const char* kVertexViewDebugName = "Runtime.MeshVertexView";
         constexpr std::uint32_t kInvalidIndex = std::numeric_limits<std::uint32_t>::max();
@@ -34,11 +37,6 @@ namespace Extrinsic::Runtime
         {
             outBuffer.Clear();
             return MeshPrimitiveViewPlanBuildResult{status, std::nullopt};
-        }
-
-        [[nodiscard]] bool IsFinite(const glm::vec3& p) noexcept
-        {
-            return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
         }
 
         enum class FaceRingOutcome : std::uint8_t

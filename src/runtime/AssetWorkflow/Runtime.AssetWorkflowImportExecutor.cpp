@@ -22,6 +22,7 @@ module;
 
 module Extrinsic.Runtime.AssetWorkflowModule;
 
+import Geometry.Validation;
 import Extrinsic.Asset.GeometryPayload;
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.ModelTexturePayload;
@@ -849,17 +850,10 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] bool IsFinitePosition(const glm::vec3& position) noexcept
-        {
-            return std::isfinite(position.x) &&
-                   std::isfinite(position.y) &&
-                   std::isfinite(position.z);
-        }
-
         void AccumulateBounds(GeometryImportBounds& bounds,
                               const glm::vec3& position) noexcept
         {
-            if (!IsFinitePosition(position))
+            if (!Geometry::Validation::IsFinite(position))
                 return;
 
             if (!bounds.Valid)

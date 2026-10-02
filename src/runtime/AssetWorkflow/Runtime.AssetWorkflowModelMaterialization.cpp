@@ -17,6 +17,7 @@ module;
 
 module Extrinsic.Runtime.AssetWorkflowModelMaterialization;
 
+import Geometry.Validation;
 import Extrinsic.Asset.EventBus;
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.ModelTexturePayload;
@@ -54,6 +55,8 @@ namespace Extrinsic::Runtime
 {
     namespace
     {
+        using Geometry::Validation::IsFinite;
+
         struct PreparedPrimitive
         {
             std::uint32_t PrimitiveIndex{Assets::kInvalidAssetModelIndex};
@@ -184,13 +187,6 @@ namespace Extrinsic::Runtime
             diagnostics->LastUvAtlasChartCount = uvDiagnostics.ChartCount;
             diagnostics->LastUvAtlasWidth = uvDiagnostics.AtlasWidth;
             diagnostics->LastUvAtlasHeight = uvDiagnostics.AtlasHeight;
-        }
-
-        [[nodiscard]] bool IsFinite(const glm::vec3 value) noexcept
-        {
-            return std::isfinite(value.x)
-                && std::isfinite(value.y)
-                && std::isfinite(value.z);
         }
 
         [[nodiscard]] bool IsFinite(const glm::quat value) noexcept

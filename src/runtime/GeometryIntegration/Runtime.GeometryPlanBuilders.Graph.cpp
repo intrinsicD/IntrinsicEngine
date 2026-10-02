@@ -13,6 +13,7 @@ module;
 
 module Extrinsic.Runtime.GeometryPlanBuilders;
 
+import Geometry.Validation;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.GeometryResidency;
@@ -118,6 +119,8 @@ namespace Extrinsic::Runtime
 
     namespace
     {
+        using Geometry::Validation::IsFinite;
+
         constexpr const char* kGraphDebugName = "Runtime.Graph";
 
         [[nodiscard]] GraphPlanBuildResult Failure(
@@ -128,10 +131,6 @@ namespace Extrinsic::Runtime
             return GraphPlanBuildResult{status, std::nullopt};
         }
 
-        [[nodiscard]] bool IsFinite(const glm::vec3& p) noexcept
-        {
-            return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
-        }
     }
 
     const char* DebugNameForGraphPackStatus(GraphPackStatus status) noexcept

@@ -23,6 +23,7 @@ module;
 
 module Extrinsic.Runtime.TextureBakeModule;
 
+import Geometry.Validation;
 import Extrinsic.Asset.Service;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Filesystem.PathResolver;
@@ -88,11 +89,6 @@ namespace Extrinsic::Runtime
                            scene.Raw().valid(entity)
                 ? entity
                 : ECS::InvalidEntityHandle;
-        }
-
-        [[nodiscard]] bool Finite(const glm::vec2 value) noexcept
-        {
-            return std::isfinite(value.x) && std::isfinite(value.y);
         }
 
         [[nodiscard]] bool Finite(const glm::vec4 value) noexcept
@@ -1421,7 +1417,7 @@ namespace Extrinsic::Runtime
             // boundary-corner slots may hold anything.
             for (const glm::vec2 uv : geometry.CornerUv)
             {
-                if (!Finite(uv))
+                if (!Geometry::Validation::IsFinite(uv))
                 {
                     return PrepareFailure(
                         PropertyTextureBakeStatus::NonFiniteTexcoord,

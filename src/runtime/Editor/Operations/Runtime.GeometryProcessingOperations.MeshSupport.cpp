@@ -23,6 +23,7 @@
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 
+import Geometry.Validation;
 import Extrinsic.Core.Error;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
@@ -955,7 +956,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             }
             for (const glm::vec2 uv : storedCorners.Vector())
             {
-                if (!std::isfinite(uv.x) || !std::isfinite(uv.y))
+                if (!Geometry::Validation::IsFinite(uv))
                     return false;
             }
 

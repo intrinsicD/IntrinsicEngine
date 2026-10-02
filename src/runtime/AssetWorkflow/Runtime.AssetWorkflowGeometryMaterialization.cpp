@@ -16,6 +16,7 @@ module;
 
 module Extrinsic.Runtime.AssetWorkflowGeometryMaterialization;
 
+import Geometry.Validation;
 import Extrinsic.Core.Error;
 import Extrinsic.Runtime.MeshSurfaceTopology;
 import Geometry.HalfedgeMesh.Utils;
@@ -26,6 +27,8 @@ import Geometry.UvAtlas;
 
 namespace Extrinsic::Runtime {
 namespace {
+using Geometry::Validation::IsFinite;
+
 constexpr const char *kPositionProperty = "v:point";
 constexpr const char *kNormalProperty = "v:normal";
 constexpr const char *kCornerNormalProperty = "h:normal";
@@ -232,15 +235,6 @@ ResolveVertexNormals(const Geometry::MeshIO::MeshIOResult &meshPayload,
   }
 
   return ComputeAreaWeightedVertexNormals(positions, faces);
-}
-
-[[nodiscard]] bool IsFinite(const glm::vec2 value) noexcept {
-  return std::isfinite(value.x) && std::isfinite(value.y);
-}
-
-[[nodiscard]] bool IsFinite(const glm::vec3 value) noexcept {
-  return std::isfinite(value.x) && std::isfinite(value.y) &&
-         std::isfinite(value.z);
 }
 
 [[nodiscard]] bool AllFinite(const std::vector<glm::vec2> &values) noexcept {

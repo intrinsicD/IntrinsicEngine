@@ -13,6 +13,7 @@ module;
 
 module Extrinsic.Runtime.GeometryPlanBuilders;
 
+import Geometry.Validation;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.GeometryResidency;
@@ -26,6 +27,8 @@ namespace Extrinsic::Runtime
 {
     namespace
     {
+        using Geometry::Validation::IsFinite;
+
         constexpr const char* kCloudDebugName = "Runtime.PointCloud";
 
         [[nodiscard]] PointCloudPlanBuildResult Failure(
@@ -34,11 +37,6 @@ namespace Extrinsic::Runtime
         {
             outBuffer.Clear();
             return PointCloudPlanBuildResult{status, std::nullopt};
-        }
-
-        [[nodiscard]] bool IsFinite(const glm::vec3& p) noexcept
-        {
-            return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
         }
 
     }

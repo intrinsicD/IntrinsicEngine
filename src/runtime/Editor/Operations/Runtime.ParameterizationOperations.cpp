@@ -26,6 +26,7 @@ module;
 
 module Extrinsic.Runtime.ParameterizationOperations;
 
+import Geometry.Validation;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Error;
@@ -74,27 +75,18 @@ namespace Extrinsic::Runtime
             std::vector<glm::vec2> CornerValues{};
         };
 
-        [[nodiscard]] bool IsFiniteUv(const glm::vec2 uv) noexcept
-        {
-            return std::isfinite(uv.x) && std::isfinite(uv.y);
-        }
-
         [[nodiscard]] bool AllFiniteUvs(
             const std::span<const glm::vec2> values) noexcept
         {
-            return std::ranges::all_of(values, IsFiniteUv);
-        }
-
-        [[nodiscard]] bool IsFinitePosition(const glm::vec3 position) noexcept
-        {
-            return std::isfinite(position.x) && std::isfinite(position.y) &&
-                   std::isfinite(position.z);
+            return std::ranges::all_of(
+                values, [](const auto value) noexcept { return Geometry::Validation::IsFinite(value); });
         }
 
         [[nodiscard]] bool AllFinitePositions(
             const std::span<const glm::vec3> values) noexcept
         {
-            return std::ranges::all_of(values, IsFinitePosition);
+            return std::ranges::all_of(
+                values, [](const auto value) noexcept { return Geometry::Validation::IsFinite(value); });
         }
 
         [[nodiscard]] std::uint64_t ComputeDiagnosticInputFingerprint(
@@ -1438,7 +1430,7 @@ namespace Extrinsic::Runtime
         const auto diagnosticIndices = cornerUvs.empty() ? surfaceIndices : std::vector<std::uint32_t>{};
         const bool uvFinite = !cornerUvs.empty()
             ? std::ranges::all_of(cornerHalfedges, [&](const std::uint32_t index)
-              { return index < cornerUvs.size() && IsFiniteUv(cornerUvs[index]); })
+              { return index < cornerUvs.size() && Geometry::Validation::IsFinite(cornerUvs[index]); })
             : !selectedUvs.empty() && AllFiniteUvs(selectedUvs);
         if (uvFinite)
         {
@@ -1471,7 +1463,7 @@ namespace Extrinsic::Runtime
                     model.UvBoundsMin = glm::min(model.UvBoundsMin, uv);
                     model.UvBoundsMax = glm::max(model.UvBoundsMax, uv);
                 }
-                model.HasFiniteUvBounds = IsFiniteUv(model.UvBoundsMin) && IsFiniteUv(model.UvBoundsMax);
+                model.HasFiniteUvBounds = Geometry::Validation::IsFinite(model.UvBoundsMin) && Geometry::Validation::IsFinite(model.UvBoundsMax);
             }
             const auto positions = view.VertexSource->Properties.Get<glm::vec3>(config.Positions.Name);
             if (cornerUvs.empty() && positions && positions.Vector().size() == view.VertexSource->Properties.Size() &&

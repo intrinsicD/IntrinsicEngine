@@ -12,6 +12,7 @@ module;
 
 module Extrinsic.Runtime.PrimitiveSelectionRefinement;
 
+import Geometry.Validation;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Scene.Registry;
@@ -721,7 +722,7 @@ namespace Extrinsic::Runtime
             return std::nullopt;
         }
         const glm::vec3 position = glm::vec3{world} / world.w;
-        if (!std::isfinite(position.x) || !std::isfinite(position.y) || !std::isfinite(position.z))
+        if (!Geometry::Validation::IsFinite(position))
         {
             return std::nullopt;
         }

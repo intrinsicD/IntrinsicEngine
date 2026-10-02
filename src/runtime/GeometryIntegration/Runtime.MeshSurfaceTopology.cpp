@@ -20,6 +20,7 @@ module;
 
 module Extrinsic.Runtime.MeshSurfaceTopology;
 
+import Geometry.Validation;
 import Extrinsic.ECS.Components.GeometrySources;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Utils;
@@ -32,6 +33,8 @@ namespace Extrinsic::Runtime
 {
     namespace
     {
+        using Geometry::Validation::IsFinite;
+
         constexpr std::uint32_t kInvalidIndex =
             std::numeric_limits<std::uint32_t>::max();
 
@@ -41,17 +44,6 @@ namespace Extrinsic::Runtime
             Skip,
             Invalid,
         };
-
-        [[nodiscard]] bool IsFinite(const glm::vec2 value) noexcept
-        {
-            return std::isfinite(value.x) && std::isfinite(value.y);
-        }
-
-        [[nodiscard]] bool IsFinite(const glm::vec3 value) noexcept
-        {
-            return std::isfinite(value.x) && std::isfinite(value.y) &&
-                std::isfinite(value.z);
-        }
 
         [[nodiscard]] glm::vec3 ResolveNormal(
             const glm::vec3 candidate,

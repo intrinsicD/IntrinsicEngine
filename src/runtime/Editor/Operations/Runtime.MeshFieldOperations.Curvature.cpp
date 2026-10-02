@@ -28,6 +28,7 @@ module;
 
 module Extrinsic.Runtime.MeshFieldOperations;
 
+import Geometry.Validation;
 import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Config.Engine;
@@ -377,7 +378,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             std::size_t count = 0u;
             for (const glm::vec3 value : values)
             {
-                if (!IsFiniteGeometryPosition(value))
+                if (!Geometry::Validation::IsFinite(value))
                     ++count;
             }
             return count;
@@ -923,7 +924,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
         {
             for (const auto face : source.Mesh.LiveFaces())
                 for (const auto vertex : source.Mesh.VerticesAroundFace(face))
-                    if (!GeometryProcessingDetail::FinitePosition(source.Mesh.Position(vertex)))
+                    if (!Geometry::Validation::IsFinite(source.Mesh.Position(vertex)))
                     {
                         diagnostic = "Segmentation requires finite positions on participating face vertices.";
                         return false;

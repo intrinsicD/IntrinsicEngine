@@ -29,6 +29,7 @@ module;
 
 module Extrinsic.Runtime.RegistrationOperations;
 
+import Geometry.Validation;
 import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Error;
 import Extrinsic.Runtime.EngineConfigControl;
@@ -233,7 +234,7 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
                     return RegistrationNormalStatus::ZeroLength;
                 }
                 const glm::vec3 normalized = world / std::sqrt(lengthSquared);
-                if (!FinitePosition(normalized))
+                if (!Geometry::Validation::IsFinite(normalized))
                 {
                     if (out) out->clear();
                     return RegistrationNormalStatus::NonFinite;

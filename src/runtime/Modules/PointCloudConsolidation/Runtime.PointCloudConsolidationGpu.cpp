@@ -24,6 +24,7 @@ module;
 
 module Extrinsic.Runtime.PointCloudConsolidationModule;
 
+import Geometry.Validation;
 import Extrinsic.Core.Filesystem.PathResolver;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.EditorProcessing;
@@ -159,9 +160,7 @@ namespace Extrinsic::Runtime
                 return SourceCount > 0u && TargetCount > 0u &&
                     CellCount > 0u && DimX > 0u && DimY > 0u &&
                     DimZ > 0u &&
-                    std::isfinite(Origin.x) &&
-                    std::isfinite(Origin.y) &&
-                    std::isfinite(Origin.z) &&
+                    Geometry::Validation::IsFinite(Origin) &&
                     std::isfinite(SupportRadius) &&
                     SupportRadius > 0.0f && ScanPlan.IsValid() &&
                     TotalBufferBytes > 0u &&
@@ -1036,7 +1035,7 @@ namespace Extrinsic::Runtime
                     }
                     std::memcpy(result.Positions.data(), a.Page->Data.data(), a.Page->Data.size());
                     if (!std::all_of(result.Positions.begin(), result.Positions.end(), [](glm::vec3 p) {
-                        return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
+                        return Geometry::Validation::IsFinite(p);
                     }))
                     {
                         FinishLop(PointCloudConsolidationRunStatus::GeometryProcessingFailed,
@@ -1790,9 +1789,7 @@ namespace Extrinsic::Runtime
                      ++index)
                 {
                     const glm::vec3 point{packed[index]};
-                    if (!std::isfinite(point.x) ||
-                        !std::isfinite(point.y) ||
-                        !std::isfinite(point.z))
+                    if (!Geometry::Validation::IsFinite(point))
                     {
                         CompleteFallback(
                             "Point-cloud consolidation Vulkan positions contain a non-finite value.");

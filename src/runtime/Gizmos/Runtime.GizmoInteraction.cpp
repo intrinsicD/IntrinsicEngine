@@ -20,6 +20,7 @@ module;
 
 module Extrinsic.Runtime.GizmoInteraction;
 
+import Geometry.Validation;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.Runtime.StableEntityLookup;
 
@@ -29,12 +30,9 @@ namespace Extrinsic::Runtime
 {
     namespace
     {
-        constexpr float kEpsilon = 1.0e-6f;
+        using Geometry::Validation::IsFinite;
 
-        [[nodiscard]] bool IsFinite(const glm::vec3 v) noexcept
-        {
-            return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
-        }
+        constexpr float kEpsilon = 1.0e-6f;
 
         // Project a world point to pixel coordinates. Returns false when the
         // point is behind the camera (clip w <= 0) or non-finite.

@@ -17,6 +17,7 @@
 #include <glm/geometric.hpp>
 #include <glm/vec3.hpp>
 #include <entt/entity/registry.hpp>
+import Geometry.Validation;
 import Extrinsic.Core.Error;
 import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.EditorCommon;
@@ -161,10 +162,6 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
                 return d;
         return D::Unknown;
     }
-    bool FinitePosition(glm::vec3 p)
-    {
-        return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
-    }
     bool GeometryPropertiesCurrent(const EditorProcessingContext& context, entt::entity entity,
                        std::span<const PointPropertyWatch> inputs)
     {
@@ -246,7 +243,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         for (std::uint32_t i = 0; i < props->Size(); ++i)
         {
             if (deleted && deleted[i / divisor]) continue;
-            w.HasNonfiniteVectors = !FinitePosition(points[i]);
+            w.HasNonfiniteVectors = !Geometry::Validation::IsFinite(points[i]);
             if (w.HasNonfiniteVectors) return fail("Live position samples must be finite.");
             w.ValidLbvh &= Geometry::PointLBVH::ValidPoint(points[i]);
             // Bit inspection remains valid when a GPU flushes subnormal floats to zero.
@@ -593,14 +590,6 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
 
 namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
 {
-        [[nodiscard]] bool IsFiniteGeometryPosition(
-            const glm::vec3& position) noexcept
-        {
-            return std::isfinite(position.x) &&
-                   std::isfinite(position.y) &&
-                   std::isfinite(position.z);
-        }
-
         [[nodiscard]] std::optional<std::vector<glm::vec3>>
         CollectFiniteGeometryPositions(
             const Geometry::PropertySet& properties,
@@ -617,7 +606,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             points.reserve(positions.Vector().size());
             for (const glm::vec3& position : positions.Vector())
             {
-                if (!IsFiniteGeometryPosition(position))
+                if (!Geometry::Validation::IsFinite(position))
                     return std::nullopt;
                 points.push_back(position);
             }
