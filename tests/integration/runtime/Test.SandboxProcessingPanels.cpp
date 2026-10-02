@@ -557,6 +557,40 @@ TEST(SandboxProcessingPanels, ShowButtonsApplyAppearancePropertiesOnMeshGraphAnd
     }
 }
 
+TEST(SandboxProcessingPanels, ShowPropertyHelperForwardsNormalDirectionAndPropertyName)
+{
+    TestSupport::ImGuiFrameScope gui;
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto entity = scene.Create();
+    PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::PointCloudPoint);
+    auto& properties = scene.Raw().get<GS::Vertices>(entity).Properties;
+    (void)properties.GetOrAdd<glm::vec3>("direction", glm::vec3{0.0f, 0.0f, 1.0f});
+    Editor::SandboxEditorContext context;
+    context.VisualizationCommands = R::BindEditorVisualizationEditingCommands({
+        .Scene = &scene, .VisualizationCommandsAvailable = true});
+    const auto stableId = R::SelectionController::ToStableEntityId(entity);
+    const R::GeometryPropertyRef property{R::GeometryElementDomain::PointCloudPoint, "direction",
+                                          Geometry::PropertyValueKind::Vec3};
+    std::string diagnostic;
+    ImGui::Begin("Show helper");
+    for (const bool normalDirection : {false, true})
+    {
+        SCOPED_TRACE(normalDirection);
+        const auto status = Editor::DrawProcessingPropertyShowButton(
+            context, stableId, property, diagnostic, "Show direction as normal", normalDirection, true);
+        ASSERT_TRUE(status.has_value());
+        EXPECT_EQ(diagnostic, R::DebugNameForEditorCommandStatus(*status));
+        const auto* overrides = scene.Raw().try_get<G::VisualizationLaneOverrides>(entity);
+        ASSERT_NE(overrides, nullptr);
+        ASSERT_TRUE(overrides->Points);
+        EXPECT_EQ(overrides->Points->ColorBufferName, "direction");
+        EXPECT_EQ(overrides->Points->Interpretation,
+                  normalDirection ? decltype(overrides->Points->Interpretation)::NormalDirection
+                                  : decltype(overrides->Points->Interpretation)::Components);
+    }
+    ImGui::End();
+}
+
 TEST(SandboxProcessingPanels, FaceOutputsDisplayWithTheirCanonicalDomain)
 {
     for (const bool normals : {true, false})
@@ -3563,6 +3597,60 @@ TEST(SandboxProcessingPanels, PropertySmoothingControlsClampToTheFieldTableAndSh
     h.Engine->Run();
     EXPECT_NE(activeNeighbors().find("\"neighbors\":1024"), std::string::npos)
         << "5000 neighbors were clamped to the declared maximum and applied: " << activeNeighbors();
+}
+
+// UI-072 slice 2: the mesh-field panels read their bounds from the runtime tables. Each case types an
+// out-of-range value into a control and expects the clamped value in the applied configuration; the old raw
+// inputs stored the typed value, the validator rejected it and the active configuration never changed.
+namespace
+{
+    struct SpecClampCase
+    {
+        const char* Window;
+        const char* Title;
+        const char* Control;
+        const char* Typed;
+        std::string_view Section;
+        const char* Expected;
+    };
+
+    void ExpectSpecClamp(const SpecClampCase& test)
+    {
+        PanelHarness h;
+        auto& scene = h.Scene();
+        const auto entity = scene.Create();
+        PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+        ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+        ASSERT_TRUE(h.Shell.SetEditorWindowOpen(test.Window, true));
+        int frames = 0;
+        h.Driver->OnFrame = [&](R::Engine& engine) {
+            ++frames;
+            auto* window = ImGui::FindWindowByName(test.Title);
+            if (window) { ImGui::SetWindowSize(window, {750, 1600}); ImGui::SetWindowPos(window, {0, 0}); ImGui::FocusWindow(window); }
+            if (window && frames >= 10 && frames < 16) EditScalarControl(window, test.Control, frames - 10, test.Typed);
+            if (frames == 20) engine.RequestExit();
+        };
+        h.Engine->Run();
+        const auto& active = h.Control().GetEngineConfigControlState().ActiveConfig;
+        const auto* stored = Config::FindEngineConfigSection(active.AppSections, test.Section);
+        ASSERT_NE(stored, nullptr);
+        EXPECT_NE(stored->PayloadJson.find(test.Expected), std::string::npos)
+            << test.Control << " typed " << test.Typed << ": " << stored->PayloadJson;
+    }
+}
+
+TEST(SandboxProcessingPanels, EigenbasisClampsToTheSpecRange)
+{
+    ExpectSpecClamp({"view.laplacian_eigenbasis", "Spectral Modes", "Eigenpairs", "9999",
+                     R::kLaplacianEigenbasisConfigSectionName, "\"count\":256"});
+    ExpectSpecClamp({"view.laplacian_eigenbasis", "Spectral Modes", "Maximum iterations##Eigenbasis", "9999999",
+                     R::kLaplacianEigenbasisConfigSectionName, "\"max_iterations\":100000"});
+}
+
+TEST(SandboxProcessingPanels, GeodesicsExpansionBudgetClampsToTheSpecRange)
+{
+    ExpectSpecClamp({"mesh.processing.geodesics", "Mesh / Geodesics / Virtual Source Propagation", "Expansion budget",
+                     "0", R::kGeodesicsConfigSectionName, "\"max_halfedge_expansions\":1,"});
 }
 
 // UI-055: the Coherent Point Drift panel drives a run through its own buttons: Start

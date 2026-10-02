@@ -245,19 +245,24 @@ namespace Extrinsic::Sandbox::Editor
     // the panel, the validator and the agent schema read the same declaration.
     [[nodiscard]] std::string FormatConfigFieldHint(const Runtime::ConfigFieldSpec& field, std::string_view defaultValue);
     void DrawConfigFieldHint(const Runtime::ConfigFieldSpec* field, std::string_view defaultValue);
+    // Hint of the field `name` on the last item, for controls the numeric/enum widgets below do not draw
+    // (property pickers, name inputs, sliders). A missing name draws nothing.
+    void DrawSpecFieldHint(std::span<const Runtime::ConfigFieldSpec> fields, std::string_view name,
+                           std::string_view defaultValue = {});
     bool DrawSpecInputDouble(const char* label, std::span<const Runtime::ConfigFieldSpec> fields, std::string_view name,
                              double& value, double defaultValue, const char* format = "%.6g");
     bool DrawSpecInputUInt(const char* label, std::span<const Runtime::ConfigFieldSpec> fields, std::string_view name,
                            std::uint32_t& value, std::uint32_t defaultValue);
     // `value` is the payload's integer code (first name = the field's Min).
+    // `visibleCount` (> 0) offers only the first names, for a mode in which later values are not selectable.
     bool DrawSpecEnumCombo(const char* label, std::span<const Runtime::ConfigFieldSpec> fields, std::string_view name,
-                           int& value, int defaultValue);
+                           int& value, int defaultValue, int visibleCount = -1);
     template <class TEnum>
     bool DrawSpecEnumCombo(const char* label, std::span<const Runtime::ConfigFieldSpec> fields, std::string_view name,
-                           TEnum& value, TEnum defaultValue)
+                           TEnum& value, TEnum defaultValue, int visibleCount = -1)
     {
         int code = static_cast<int>(value);
-        if (!DrawSpecEnumCombo(label, fields, name, code, static_cast<int>(defaultValue))) return false;
+        if (!DrawSpecEnumCombo(label, fields, name, code, static_cast<int>(defaultValue), visibleCount)) return false;
         value = static_cast<TEnum>(code);
         return true;
     }

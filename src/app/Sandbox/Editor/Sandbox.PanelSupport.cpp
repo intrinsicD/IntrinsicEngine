@@ -1906,6 +1906,12 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::EndTooltip();
     }
 
+    void DrawSpecFieldHint(const std::span<const Runtime::ConfigFieldSpec> fields, const std::string_view name,
+                           const std::string_view defaultValue)
+    {
+        DrawConfigFieldHint(Runtime::FindConfigFieldSpec(fields, name), defaultValue);
+    }
+
     bool DrawSpecInputDouble(const char* label, const std::span<const Runtime::ConfigFieldSpec> fields,
                              const std::string_view name, double& value, const double defaultValue, const char* format)
     {
@@ -1928,12 +1934,13 @@ namespace Extrinsic::Sandbox::Editor
     }
 
     bool DrawSpecEnumCombo(const char* label, const std::span<const Runtime::ConfigFieldSpec> fields,
-                           const std::string_view name, int& value, const int defaultValue)
+                           const std::string_view name, int& value, const int defaultValue, const int visibleCount)
     {
         const auto* field = Runtime::FindConfigFieldSpec(fields, name);
         if (field == nullptr || field->EnumNames.empty()) return false;
         const int first = static_cast<int>(field->Min.value_or(0.0));
-        const int count = static_cast<int>(field->EnumNames.size());
+        const int declared = static_cast<int>(field->EnumNames.size());
+        const int count = visibleCount > 0 ? std::min(visibleCount, declared) : declared;
         int index = std::clamp(value - first, 0, count - 1);
         // ImGui::Combo pushes one integer ID per item, like the panels' literal combos.
         const bool changed = ImGui::Combo(label, &index,

@@ -11,6 +11,7 @@ module;
 #include <cstddef>
 #include <cmath>
 #include <cstdint>
+#include <format>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -71,13 +72,6 @@ namespace Extrinsic::Sandbox::Editor
         constexpr std::array<Runtime::EditorMeshDenoiseStage, 1>
             kMeshDenoiseStages{{
                 Runtime::EditorMeshDenoiseStage::FullBilateral,
-            }};
-        constexpr std::array<Runtime::EditorMeshCurvatureOutput, 4>
-            kMeshCurvatureOutputs{{
-                Runtime::EditorMeshCurvatureOutput::All,
-                Runtime::EditorMeshCurvatureOutput::Mean,
-                Runtime::EditorMeshCurvatureOutput::Gaussian,
-                Runtime::EditorMeshCurvatureOutput::PrincipalDirections,
             }};
         constexpr std::array<Runtime::CurvatureSegmentationMethod, 3>
             kCurvatureSegmentationMethods{{
@@ -989,30 +983,31 @@ namespace Extrinsic::Sandbox::Editor
         if (const auto active = Runtime::GetEditorMeshCurvatureConfig(context.MeshFields.Commands))
             Curvature.Synchronize(*active, Runtime::SerializeMeshCurvatureConfig(*active));
         auto& config = Curvature.Draft;
+        const auto fields = Runtime::MeshCurvatureConfigFieldSpecs();
+        const Runtime::MeshCurvatureConfig defaults{};
         bool changed = DrawProcessingEntity("Entity##MeshCurvature", context,
             config.StableEntityId, Curvature.LastSelectedEntity, Runtime::EditorDomainWindowKind::Mesh);
         const auto& model = GetDomainWindowModel(context, Runtime::EditorDomainWindowKind::Mesh, config.StableEntityId);
         DrawProcessingCpuBackend();
         ImGui::SeparatorText("Input properties");
         changed |= DrawProcessingPropertyInput("Positions##MeshCurvature", model.PropertyCatalog, config.Positions);
+        DrawSpecFieldHint(fields, "positions");
         ImGui::SeparatorText("Output properties");
         changed |= DrawProcessingScalarOutput("Mean curvature", config.Mean);
+        DrawSpecFieldHint(fields, "mean");
         changed |= DrawProcessingScalarOutput("Gaussian curvature", config.Gaussian);
+        DrawSpecFieldHint(fields, "gaussian");
         changed |= DrawProcessingScalarOutput("Minimum principal curvature", config.MinPrincipal);
+        DrawSpecFieldHint(fields, "min_principal");
         changed |= DrawProcessingScalarOutput("Maximum principal curvature", config.MaxPrincipal);
+        DrawSpecFieldHint(fields, "max_principal");
         changed |= DrawProcessingPropertyName("First principal direction", config.Direction1.Name);
+        DrawSpecFieldHint(fields, "direction1");
         changed |= DrawProcessingPropertyName("Second principal direction", config.Direction2.Name);
-        if (ImGui::BeginCombo("Output##MeshCurvature", Runtime::DebugNameForEditorMeshCurvatureOutput(config.Output)))
-        {
-            for (const auto output : kMeshCurvatureOutputs)
-                if (ImGui::Selectable(Runtime::DebugNameForEditorMeshCurvatureOutput(output), config.Output == output))
-                {
-                    config.Output = output;
-                    changed = true;
-                }
-            ImGui::EndCombo();
-        }
-        changed |= ImGui::Checkbox("Principal directions##MeshCurvature", &config.PublishPrincipalDirections);
+        DrawSpecFieldHint(fields, "direction2");
+        changed |= DrawSpecEnumCombo("Output##MeshCurvature", fields, "output", config.Output, defaults.Output);
+        DrawSpecCheckbox("Principal directions##MeshCurvature", fields, "publish_directions",
+                         config.PublishPrincipalDirections, defaults.PublishPrincipalDirections, changed);
         const auto apply = [&](const auto& request) {
             return Runtime::ApplyEditorMeshCurvatureConfig(context.MeshFields.Commands, request);
         };
@@ -3716,7 +3711,7 @@ namespace Extrinsic::Sandbox::Editor
                 : Smoothing.LastResult->Succeeded() ? Smoothing.LastResult->BackendId.c_str() : "not run");
         if (Smoothing.LastResult) ImGui::TextWrapped("%s", Smoothing.LastResult->Message.c_str());
         if (!Smoothing.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Smoothing.ConfigDiagnostic.c_str());
-        if (!Smoothing.VisualizationDiagnostic.empty()) ImGui::TextWrapped("%s", Smoothing.VisualizationDiagnostic.c_str());
+        DrawProcessingDisplayDiagnostic(Smoothing.VisualizationDiagnostic);
         ImGui::End();
     }
 
@@ -3780,12 +3775,11 @@ namespace Extrinsic::Sandbox::Editor
         { ImGui::TextDisabled("Select a geometry entity to compute spectral modes."); ImGui::End(); return; }
         using Op = Runtime::ModalOperator;
         auto& config = Eigenbasis.Draft;
+        const auto fields = Runtime::LaplacianEigenbasisConfigFieldSpecs();
+        const Runtime::LaplacianEigenbasisConfig defaults{};
         bool changed = false;
-        int op = int(config.Operator);
-        if (ImGui::Combo("Operator##Eigenbasis", &op,
-                         "Graph Laplacian (A = D - W)\0Modified Dirichlet energy (E_D^N)\0Thin-shell vibration (discrete shells Hessian)\0"))
+        if (DrawSpecEnumCombo("Operator##Eigenbasis", fields, "operator", config.Operator, defaults.Operator))
         {
-            config.Operator = Op(op);
             if (config.Operator != Op::GraphLaplacian)
             {
                 config.Domain = config.Positions.Domain = D::MeshVertex;
@@ -3797,47 +3791,51 @@ namespace Extrinsic::Sandbox::Editor
         }
         if (config.Operator == Op::GraphLaplacian)
         {
-            int domain = int(config.Domain) - int(D::MeshVertex);
-            if (ImGui::Combo("Domain##Eigenbasis", &domain,
-                             "Mesh vertices\0Mesh edges\0Mesh halfedges\0Mesh faces\0Graph nodes\0Graph halfedges\0Graph edges\0Point cloud points\0"))
-            { config.Domain = D(domain + int(D::MeshVertex)); changed = true; }
+            changed |= DrawSpecEnumCombo("Domain##Eigenbasis", fields, "domain", config.Domain, defaults.Domain);
         }
         changed |= DrawProcessingPropertyInput("Sample positions##Eigenbasis", model.PropertyCatalog, config.Positions,
             +[](const Runtime::GeometryPropertyRef& ref) { return ref.ValueKind == Geometry::PropertyValueKind::Vec3; });
+        DrawSpecFieldHint(fields, "positions");
         if (config.Operator == Op::GraphLaplacian)
         {
-            int weight = int(config.Weight);
-            if (ImGui::Combo("Weights##Eigenbasis", &weight, "Uniform kNN\0Gaussian kNN\0Inverse-distance kNN\0Nonnegative mesh cotangent\0Uniform mesh edges\0"))
-            { config.Weight = S::PropertyWeight(weight); changed = true; }
+            changed |= DrawSpecEnumCombo("Weights##Eigenbasis", fields, "weight", config.Weight, defaults.Weight);
             if (config.Weight != S::PropertyWeight::Cotangent && config.Weight != S::PropertyWeight::MeshUniform)
             {
-                changed |= ImGui::InputScalar("Neighbors##Eigenbasis", ImGuiDataType_U32, &config.Neighbors);
-                if (config.Weight != S::PropertyWeight::Uniform) changed |= ImGui::InputDouble("Spatial sigma##Eigenbasis", &config.SpatialSigma);
+                changed |= DrawSpecInputUInt("Neighbors##Eigenbasis", fields, "neighbors", config.Neighbors, defaults.Neighbors);
+                if (config.Weight != S::PropertyWeight::Uniform)
+                    changed |= DrawSpecInputDouble("Spatial sigma##Eigenbasis", fields, "spatial_sigma", config.SpatialSigma,
+                                                   defaults.SpatialSigma);
             }
         }
         else if (config.Operator == Op::ThinShell)
         {
-            changed |= ImGui::InputDouble("Flexural weight##Eigenbasis", &config.ShellFlexural);
-            changed |= ImGui::InputDouble("Edge length weight##Eigenbasis", &config.ShellLength);
-            changed |= ImGui::InputDouble("Triangle area weight##Eigenbasis", &config.ShellArea);
+            changed |= DrawSpecInputDouble("Flexural weight##Eigenbasis", fields, "shell_flexural", config.ShellFlexural, defaults.ShellFlexural);
+            changed |= DrawSpecInputDouble("Edge length weight##Eigenbasis", fields, "shell_length", config.ShellLength, defaults.ShellLength);
+            changed |= DrawSpecInputDouble("Triangle area weight##Eigenbasis", fields, "shell_area", config.ShellArea, defaults.ShellArea);
         }
-        changed |= ImGui::Checkbox("Lumped vertex area mass (mesh vertices)", &config.LumpedMass);
-        changed |= ImGui::InputScalar("Eigenpairs", ImGuiDataType_U32, &config.Count);
+        DrawSpecCheckbox("Lumped vertex area mass (mesh vertices)", fields, "lumped_mass", config.LumpedMass, defaults.LumpedMass, changed);
+        changed |= DrawSpecInputUInt("Eigenpairs", fields, "count", config.Count, defaults.Count);
         changed |= DrawProcessingPropertyName("Output prefix##Eigenbasis", config.OutputPrefix);
-        changed |= ImGui::InputScalar("Maximum iterations##Eigenbasis", ImGuiDataType_U32, &config.MaxIterations);
-        changed |= ImGui::InputDouble("Tolerance (backward error)##Eigenbasis", &config.Tolerance, 0.0, 0.0, "%.2e");
+        DrawSpecFieldHint(fields, "output_prefix", defaults.OutputPrefix);
+        changed |= DrawSpecInputUInt("Maximum iterations##Eigenbasis", fields, "max_iterations", config.MaxIterations, defaults.MaxIterations);
+        changed |= DrawSpecInputDouble("Tolerance (backward error)##Eigenbasis", fields, "tolerance", config.Tolerance,
+                                       defaults.Tolerance, "%.2e");
         if (ImGui::TreeNode("Modal signature and distance##Eigenbasis"))
         {
-            changed |= ImGui::InputScalar("Skipped leading modes", ImGuiDataType_U32, &config.SkipModes);
+            changed |= DrawSpecInputUInt("Skipped leading modes", fields, "skip_modes", config.SkipModes, defaults.SkipModes);
             bool signature = !config.SignatureOutput.empty();
             if (ImGui::Checkbox("Publish signature S_t", &signature))
             { config.SignatureOutput = signature ? "modal_signature" : ""; changed = true; }
             if (signature)
             {
                 changed |= DrawProcessingPropertyName("Signature output##Eigenbasis", config.SignatureOutput);
+                const auto* scaleField = Runtime::FindConfigFieldSpec(fields, "signature_scale");
                 float scale = float(config.SignatureScale);
-                if (ImGui::SliderFloat("Scale (t_min .. t_max)##Eigenbasis", &scale, 0.0f, 1.0f))
+                if (ImGui::SliderFloat("Scale (t_min .. t_max)##Eigenbasis", &scale,
+                                       float(scaleField ? scaleField->Min.value_or(0.0) : 0.0),
+                                       float(scaleField ? scaleField->Max.value_or(1.0) : 1.0)))
                 { config.SignatureScale = scale; changed = true; }
+                DrawConfigFieldHint(scaleField, std::format("{}", defaults.SignatureScale));
             }
             bool distance = config.DistanceSource >= 0;
             if (ImGui::Checkbox("Publish multi-scale distance", &distance))
@@ -3845,8 +3843,11 @@ namespace Extrinsic::Sandbox::Editor
             if (distance)
             {
                 changed |= ImGui::InputScalar("Source row##Eigenbasis", ImGuiDataType_S64, &config.DistanceSource);
+                DrawSpecFieldHint(fields, "distance_source");
                 changed |= DrawProcessingPropertyName("Distance output##Eigenbasis", config.DistanceOutput);
-                changed |= ImGui::InputScalar("Log-scale samples##Eigenbasis", ImGuiDataType_U32, &config.DistanceSamples);
+                DrawSpecFieldHint(fields, "distance_output", defaults.DistanceOutput);
+                changed |= DrawSpecInputUInt("Log-scale samples##Eigenbasis", fields, "distance_samples", config.DistanceSamples,
+                                             defaults.DistanceSamples);
             }
             ImGui::TreePop();
         }
@@ -3883,7 +3884,7 @@ namespace Extrinsic::Sandbox::Editor
         }
         if (Eigenbasis.LastResult) ImGui::TextWrapped("%s", Eigenbasis.LastResult->Message.c_str());
         if (!Eigenbasis.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Eigenbasis.ConfigDiagnostic.c_str());
-        if (!Eigenbasis.VisualizationDiagnostic.empty()) ImGui::TextWrapped("%s", Eigenbasis.VisualizationDiagnostic.c_str());
+        DrawProcessingDisplayDiagnostic(Eigenbasis.VisualizationDiagnostic);
         ImGui::End();
     }
 
@@ -3901,11 +3902,11 @@ namespace Extrinsic::Sandbox::Editor
         if (!model.HasSelectedEntity || Harmonic.LastApplied.empty())
         { ImGui::TextDisabled("Select a geometry entity to solve a harmonic field."); ImGui::End(); return; }
         auto& config = Harmonic.Draft;
+        const auto fields = Runtime::HarmonicFieldConfigFieldSpecs();
+        const Runtime::HarmonicFieldConfig defaults{};
         bool changed = false;
-        int mode = int(config.Mode);
-        if (ImGui::Combo("Mode", &mode, "Interpolate values\0Propagate labels (random walker)\0"))
+        if (DrawSpecEnumCombo("Mode", fields, "mode", config.Mode, defaults.Mode))
         {
-            config.Mode = Runtime::HarmonicFieldMode(mode);
             const auto kind = config.Mode == Runtime::HarmonicFieldMode::Labels ? K::Int32 : K::Double;
             config.Input.ValueKind = config.Output.ValueKind = kind;
             if (config.Mode == Runtime::HarmonicFieldMode::Labels)
@@ -3930,9 +3931,12 @@ namespace Extrinsic::Sandbox::Editor
             config.Output.ValueKind = config.Input.ValueKind;
             changed = true;
         }
+        DrawSpecFieldHint(fields, "input");
         changed |= DrawProcessingPropertyInput("Neighborhood positions##Harmonic", model.PropertyCatalog, config.Positions,
             +[](const Runtime::GeometryPropertyRef& ref) { return ref.ValueKind == K::Vec3; });
+        DrawSpecFieldHint(fields, "positions");
         changed |= DrawProcessingPropertyName(labels ? "Output labels##Harmonic" : "Output property##Harmonic", config.Output.Name);
+        DrawSpecFieldHint(fields, "output");
         if (!labels && (config.Input.ValueKind == K::Float || config.Input.ValueKind == K::Double))
         {
             int kind = config.Output.ValueKind == K::Double ? 1 : 0;
@@ -3940,22 +3944,26 @@ namespace Extrinsic::Sandbox::Editor
             { config.Output.ValueKind = kind ? K::Double : K::Float; changed = true; }
         }
         // An optional binding is enabled by a name; disabling clears it.
-        const auto optionalProperty = [&](const char* toggle, const char* label, Runtime::GeometryPropertyRef& ref,
+        const auto optionalProperty = [&](const char* toggle, const char* label, const std::string_view field,
+                                          Runtime::GeometryPropertyRef& ref,
                                           bool (*accepts)(const Runtime::GeometryPropertyRef&), const char* defaultName) {
             bool enabled = !ref.Name.empty();
             if (ImGui::Checkbox(toggle, &enabled)) { ref.Name = enabled ? defaultName : ""; changed = true; }
+            DrawSpecFieldHint(fields, field);
             if (enabled && DrawProcessingPropertyInput(label, model.PropertyCatalog, ref, accepts)) changed = true;
             ref.Domain = config.Input.Domain;
         };
         if (labels)
         {
             changed |= ImGui::InputInt("Unlabeled value", &config.Unlabeled);
-            optionalProperty("Write confidence##Harmonic", "Confidence property##Harmonic", config.Confidence,
+            DrawSpecFieldHint(fields, "unlabeled", std::to_string(defaults.Unlabeled));
+            optionalProperty("Write confidence##Harmonic", "Confidence property##Harmonic", "confidence", config.Confidence,
                 +[](const Runtime::GeometryPropertyRef& ref) { return ref.ValueKind == K::Float || ref.ValueKind == K::Double; },
                 "harmonic_confidence");
             bool weights = !config.WeightsPrefix.empty();
             if (ImGui::Checkbox("Write per-label weights##Harmonic", &weights))
             { config.WeightsPrefix = weights ? "harmonic_weight_" : ""; changed = true; }
+            DrawSpecFieldHint(fields, "weights_prefix");
             if (weights)
             {
                 changed |= DrawProcessingPropertyName("Weight prefix##Harmonic", config.WeightsPrefix);
@@ -3965,34 +3973,30 @@ namespace Extrinsic::Sandbox::Editor
         else
         {
             ImGui::TextWrapped("Constrained rows keep (hard) or pull toward (soft) their input values; other input values are ignored.");
-            optionalProperty("Hard constraint mask##Harmonic", "Hard mask (bool)##Harmonic", config.HardMask,
+            optionalProperty("Hard constraint mask##Harmonic", "Hard mask (bool)##Harmonic", "hard_mask", config.HardMask,
                 +[](const Runtime::GeometryPropertyRef& ref) { return ref.ValueKind == K::Bool; }, "harmonic_hard");
-            optionalProperty("Soft constraint weights##Harmonic", "Soft weights##Harmonic", config.SoftWeights,
+            optionalProperty("Soft constraint weights##Harmonic", "Soft weights##Harmonic", "soft_weights", config.SoftWeights,
                 +[](const Runtime::GeometryPropertyRef& ref) { return ref.ValueKind == K::Float || ref.ValueKind == K::Double; },
                 "harmonic_weight");
-            changed |= ImGui::Checkbox("Pin mesh boundary##Harmonic", &config.PinBoundary);
-            optionalProperty("Source term (Poisson)##Harmonic", "Source density##Harmonic", config.Source, floating,
+            DrawSpecCheckbox("Pin mesh boundary##Harmonic", fields, "pin_boundary", config.PinBoundary, defaults.PinBoundary, changed);
+            optionalProperty("Source term (Poisson)##Harmonic", "Source density##Harmonic", "source", config.Source, floating,
                              "harmonic_source");
         }
-        int order = int(config.Field.Order) - 1, weight = int(config.Weight);
-        if (ImGui::Combo("Energy", &order, "Harmonic (Dirichlet)\0Biharmonic (Laplacian)\0Triharmonic\0"))
-        { config.Field.Order = H::FieldOrder(order + 1); changed = true; }
+        changed |= DrawSpecEnumCombo("Energy", fields, "order", config.Field.Order, defaults.Field.Order);
         const bool massMatters = config.Field.Order != H::FieldOrder::Harmonic || !config.Source.Name.empty();
         if (!massMatters && config.LumpedMass) { config.LumpedMass = false; changed = true; }
         if (massMatters)
-            changed |= ImGui::Checkbox("Lumped mesh area mass##Harmonic", &config.LumpedMass);
-        if (ImGui::Combo("Weights##Harmonic", &weight, "Uniform kNN\0Gaussian kNN\0Inverse-distance kNN\0Nonnegative mesh cotangent\0Uniform mesh edges\0"))
-        { config.Weight = Geometry::Smoothing::PropertyWeight(weight); changed = true; }
+            DrawSpecCheckbox("Lumped mesh area mass##Harmonic", fields, "lumped_mass", config.LumpedMass, defaults.LumpedMass, changed);
+        changed |= DrawSpecEnumCombo("Weights##Harmonic", fields, "weight", config.Weight, defaults.Weight);
         if (config.Weight != Geometry::Smoothing::PropertyWeight::Cotangent && config.Weight != Geometry::Smoothing::PropertyWeight::MeshUniform)
         {
-            changed |= ImGui::InputScalar("Neighbors##Harmonic", ImGuiDataType_U32, &config.Neighbors);
+            changed |= DrawSpecInputUInt("Neighbors##Harmonic", fields, "neighbors", config.Neighbors, defaults.Neighbors);
             if (config.Weight != Geometry::Smoothing::PropertyWeight::Uniform)
-                changed |= ImGui::InputDouble("Spatial sigma##Harmonic", &config.SpatialSigma);
+                changed |= DrawSpecInputDouble("Spatial sigma##Harmonic", fields, "spatial_sigma", config.SpatialSigma, defaults.SpatialSigma);
         }
-        int policy = int(config.Field.Unconstrained);
-        if (ImGui::Combo("Unconstrained components", &policy,
-                         labels ? "Fail\0Keep input\0" : "Fail\0Keep input\0Zero mean (pure Neumann)\0"))
-        { config.Field.Unconstrained = H::UnconstrainedPolicy(policy); changed = true; }
+        // Label propagation has no pure-Neumann problem: only Fail and Keep input are offered.
+        changed |= DrawSpecEnumCombo("Unconstrained components", fields, "unconstrained", config.Field.Unconstrained,
+                                     defaults.Field.Unconstrained, labels ? 2 : -1);
         const auto apply = [&](const auto& c) { return Runtime::ApplyEditorHarmonicFieldConfig(context.MeshFields.Commands, c); };
         if (changed)
         {
@@ -4008,7 +4012,7 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::TextDisabled("CPU reference; one sparse Cholesky factorization serves every channel.");
         if (Harmonic.LastResult) ImGui::TextWrapped("%s", Harmonic.LastResult->Message.c_str());
         if (!Harmonic.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Harmonic.ConfigDiagnostic.c_str());
-        if (!Harmonic.VisualizationDiagnostic.empty()) ImGui::TextWrapped("%s", Harmonic.VisualizationDiagnostic.c_str());
+        DrawProcessingDisplayDiagnostic(Harmonic.VisualizationDiagnostic);
         ImGui::End();
     }
 
@@ -4043,11 +4047,15 @@ namespace Extrinsic::Sandbox::Editor
         const auto vertex = +[](const Runtime::GeometryPropertyRef& ref) {
             return ref.Domain == Runtime::GeometryElementDomain::MeshVertex;
         };
+        const auto fields = Runtime::ScalarGradientConfigFieldSpecs();
         bool changed = DrawProcessingPropertyInput("Scalar property##ScalarGradient", model.PropertyCatalog,
                                                    config.Scalar, vertex, 1u);
+        DrawSpecFieldHint(fields, "scalar");
         changed |= DrawProcessingPropertyInput("Positions##ScalarGradient", model.PropertyCatalog,
                                                config.Positions, vertex, 3u);
+        DrawSpecFieldHint(fields, "positions");
         changed |= DrawProcessingPropertyName("Output face property##ScalarGradient", config.Output.Name);
+        DrawSpecFieldHint(fields, "output");
         const auto apply = [&](const auto& request) {
             return Runtime::ApplyEditorScalarGradientConfig(context.MeshFields.Commands, request);
         };
@@ -4087,7 +4095,7 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::TextDisabled("Arrow scale, color and visibility: Appearance > Vector fields.");
         if (Gradient.LastResult) ImGui::TextWrapped("%s", Gradient.LastResult->Message.c_str());
         if (!Gradient.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Gradient.ConfigDiagnostic.c_str());
-        if (!Gradient.VisualizationDiagnostic.empty()) ImGui::TextWrapped("%s", Gradient.VisualizationDiagnostic.c_str());
+        DrawProcessingDisplayDiagnostic(Gradient.VisualizationDiagnostic);
         ImGui::End();
     }
 
@@ -4137,6 +4145,8 @@ namespace Extrinsic::Sandbox::Editor
             return;
         }
         auto& config = Geodesics.Draft;
+        const auto fields = Runtime::GeodesicsConfigFieldSpecs();
+        const Runtime::GeodesicsConfig defaults{};
         bool changed = false;
         ImGui::TextWrapped(
             "Approximate surface distance from source vertices. Pick a vertex and add "
@@ -4189,6 +4199,7 @@ namespace Extrinsic::Sandbox::Editor
             config.SourceVertexProperty = sourceProperty;
             changed = true;
         }
+        DrawSpecFieldHint(fields, "source_vertex_property");
         ImGui::SameLine();
         ImGui::BeginDisabled(config.SourceVertexProperty.Name.empty());
         if (ImGui::Button("Clear##GeodesicsSourceProperty"))
@@ -4214,12 +4225,14 @@ namespace Extrinsic::Sandbox::Editor
             }
             ImGui::EndCombo();
         }
+        DrawSpecFieldHint(fields, "position_property");
         ImGui::SeparatorText("Output properties");
         changed |= DrawProcessingScalarOutput("Distance property", config.DistanceProperty);
+        DrawSpecFieldHint(fields, "distance_property");
         changed |= DrawProcessingScalarOutput("Source mask property", config.SourceMaskProperty);
-        if (ImGui::InputScalar("Expansion budget", ImGuiDataType_U32,
-                               &config.MaxHalfedgeExpansions))
-            changed = true;
+        DrawSpecFieldHint(fields, "source_mask_property");
+        changed |= DrawSpecInputUInt("Expansion budget", fields, "max_halfedge_expansions",
+                                     config.MaxHalfedgeExpansions, defaults.MaxHalfedgeExpansions);
         const auto apply = [&](const auto& request) {
             return Runtime::ApplyEditorGeodesicsConfig(context.MeshFields.Commands, request);
         };
@@ -4241,7 +4254,7 @@ namespace Extrinsic::Sandbox::Editor
         DrawProcessingPropertyShowButton(context, model.SelectedStableId,
             config.SourceMaskProperty, Geodesics.VisualizationDiagnostic);
         if (!Geodesics.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Geodesics.ConfigDiagnostic.c_str());
-        if (!Geodesics.VisualizationDiagnostic.empty()) ImGui::TextWrapped("%s", Geodesics.VisualizationDiagnostic.c_str());
+        DrawProcessingDisplayDiagnostic(Geodesics.VisualizationDiagnostic);
         if (Geodesics.LastResult)
         {
             ImGui::TextWrapped("%s", Geodesics.LastResult->Message.c_str());
@@ -4363,8 +4376,7 @@ namespace Extrinsic::Sandbox::Editor
                 if (watershed)
                     DrawProcessingPropertyShowButton(context, model.SelectedStableId,
                         command.BasinLabels, ScalarRidgesVisualizationDiagnostic);
-                if (!ScalarRidgesVisualizationDiagnostic.empty())
-                    ImGui::TextWrapped("%s", ScalarRidgesVisualizationDiagnostic.c_str());
+                DrawProcessingDisplayDiagnostic(ScalarRidgesVisualizationDiagnostic);
             }
         }
         ImGui::End();
