@@ -191,8 +191,11 @@ snapshot carries no temporary debt.
       `JobService`, withdraws it and cancels survivors during shutdown, while
       `WorldRegistry` cancels generation-qualified jobs when a world retires.
       Engine never names the concrete module and performs one bounded completion
-      drain per frame; omitted composition retains the kernel service but
-      publishes no app-registry job capability.
+      drain per frame (also while minimized): at most 8 results applied and at
+      most 32 readiness gates consulted; a result its gate parks costs no apply
+      budget, and the gate checks rotate through the parked results so each is
+      checked within ceil(parked / 32) frames. Omitted composition retains the
+      kernel service but publishes no app-registry job capability.
 - [x] SceneDocument — `RUNTIME-172`; app-composed `SceneDocumentModule`
       publishes its exact history and owns one validated active-world binding
       for path, file event/sequence, history, and optional queued scene IO.

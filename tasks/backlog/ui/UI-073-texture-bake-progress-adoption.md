@@ -56,6 +56,11 @@ replacing the "Bake pending." overlay text.
   documented, not changed. (4) A refused run-job submission (shutdown, no scheduler) is a recorded
   `BakeFailed`, not the transient `JobSubmitFailed`, so the appearance producer backs off instead of
   retrying every frame. (5) Rebake is latest-wins (documented difference from RUNTIME-313).
+- Review follow-up: readiness gates may do real work, so `DrainCompletions` takes a per-drain
+  gate-check cap (the engine passes 32 next to the apply budget of 8, in full and minimized
+  frames); unchecked gated records stay ahead of the ones just checked, so every parked record is
+  checked within ceil(N / cap) drains. `AwaitingApplyJobs` counts every parked queued record
+  (`RuntimeJobService.GateChecksAreCappedPerDrainAndRotateThroughParkedResults`).
 
 ## Acceptance criteria
 - [x] Bake jobs carry a correlation id (or an editor identity) so the progress surface resolves them; the bake worker reports progress where a fraction is known.

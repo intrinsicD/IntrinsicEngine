@@ -588,7 +588,8 @@ namespace Extrinsic::Runtime
     }
 
     std::uint64_t JobService::DrainCompletions(KernelEventBus& events,
-                                               const std::uint64_t maxApplyCount)
+                                               const std::uint64_t maxApplyCount,
+                                               const std::uint64_t maxGateChecks)
     {
         if (!m_State)
             return 0;
@@ -598,7 +599,12 @@ namespace Extrinsic::Runtime
         // stall a frame; the rest stay queued in order. A record parked by its
         // readiness gate costs no budget, so long-parked records (a GPU bake
         // waiting for its frame) never starve the completions behind them.
+        // Gates can do real work (device polls, next-chunk queries), so at most
+        // `maxGateChecks` are consulted per drain; a gated record past that cap
+        // stays parked unchecked ahead of the ones just checked, so the check
+        // rotates through every parked record (each within ceil(N / cap) drains).
         std::vector<SharedState::CompletionRecord> batch;
+        std::vector<SharedState::CompletionRecord> unchecked;
         std::vector<SharedState::CompletionRecord> deferred;
         std::vector<SharedState::CompletionRecord> remainder;
         {
@@ -623,6 +629,7 @@ namespace Extrinsic::Runtime
         // rather than locking per record.
         std::vector<std::shared_ptr<JobRecord>> unpublished;
         std::uint64_t applied = 0;
+        std::uint64_t gateChecks = 0;
         for (std::size_t index = 0; index < batch.size(); ++index)
         {
             if (maxApplyCount != 0u && applied >= maxApplyCount)
@@ -651,6 +658,14 @@ namespace Extrinsic::Runtime
             }
 
             // Readiness gate: park rather than apply, and rather than block.
+            if (job->IsReadyToApply && maxGateChecks != 0u && gateChecks >= maxGateChecks)
+            {
+                unchecked.push_back(std::move(completion));
+                --applied;
+                continue;
+            }
+            if (job->IsReadyToApply)
+                ++gateChecks;
             if (job->IsReadyToApply && !job->IsReadyToApply())
             {
                 job->State.store(JobState::AwaitingApply,
@@ -700,29 +715,29 @@ namespace Extrinsic::Runtime
 
         {
             std::lock_guard lock(m_State->Mutex);
-            // Parked and unvisited records go back to the front, in their
-            // order, so they keep their place ahead of results that finished
-            // later (every parked record preceded every unvisited one).
-            if (!remainder.empty())
-            {
-                m_State->CompletionQueue.insert(
-                    m_State->CompletionQueue.begin(),
-                    std::make_move_iterator(remainder.begin()),
-                    std::make_move_iterator(remainder.end()));
-            }
-            if (!deferred.empty())
-            {
-                m_State->CompletionQueue.insert(
-                    m_State->CompletionQueue.begin(),
-                    std::make_move_iterator(deferred.begin()),
-                    std::make_move_iterator(deferred.end()));
-            }
+            // Back to the front, ahead of results that finished later: the
+            // unchecked gated records first, then the ones just checked and
+            // parked (so the next drain checks the others first), then the
+            // records the apply budget did not reach, in order.
+            std::vector<SharedState::CompletionRecord> front;
+            front.reserve(unchecked.size() + deferred.size() + remainder.size());
+            for (auto* part : {&unchecked, &deferred, &remainder})
+                front.insert(front.end(), std::make_move_iterator(part->begin()),
+                             std::make_move_iterator(part->end()));
+            m_State->CompletionQueue.insert(
+                m_State->CompletionQueue.begin(),
+                std::make_move_iterator(front.begin()),
+                std::make_move_iterator(front.end()));
             m_State->Stats.CompletedJobs += published;
             m_State->Stats.PublishedCompletions += published;
             m_State->Stats.DroppedCompletions += dropped;
             m_State->Stats.StaleDiscardedJobs += staleDiscarded;
-            m_State->Stats.AwaitingApplyJobs =
-                static_cast<std::uint64_t>(deferred.size());
+            // Every queued record parked by its gate, whether checked this drain or not.
+            m_State->Stats.AwaitingApplyJobs = static_cast<std::uint64_t>(std::ranges::count_if(
+                m_State->CompletionQueue, [](const SharedState::CompletionRecord& record) {
+                    return record.Job &&
+                           record.Job->State.load(std::memory_order_acquire) == JobState::AwaitingApply;
+                }));
             m_State->Stats.LastDrainFinished = applied + parked;
             m_State->Stats.LastDrainPublished = published;
             m_State->Stats.LastDrainDropped = dropped;

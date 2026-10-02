@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <array>
+#include <numeric>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -1017,6 +1019,48 @@ TEST(RuntimeJobService, ParkedResultsDoNotConsumeTheApplyBudget)
         EXPECT_EQ(jobs.GetState(token), Runtime::JobState::AwaitingApply);
     ASSERT_EQ(publishOrder.size(), 1u);
     EXPECT_EQ(publishOrder[0], 1);
+    for (const Runtime::JobToken token : parked)
+        (void)jobs.Cancel(token);
+    (void)jobs.DrainCompletions(events);
+}
+
+// Gates can do real work, so a drain consults at most `maxGateChecks` of them and rotates: every
+// parked gate is checked within ceil(N / cap) drains, and a normal result still completes.
+TEST(RuntimeJobService, GateChecksAreCappedPerDrainAndRotateThroughParkedResults)
+{
+    SchedulerScope scheduler{2};
+    Runtime::JobService jobs;
+    Runtime::KernelEventBus events;
+
+    std::vector<int> publishOrder;
+    constexpr int kParked = 10;
+    constexpr std::uint64_t kCap = 3u;
+    std::array<int, kParked> checks{};
+    std::vector<Runtime::JobToken> parked;
+    for (int i = 0; i < kParked; ++i)
+    {
+        Runtime::JobDesc desc = MakeCountingJob("gated." + std::to_string(i), 100 + i, publishOrder);
+        desc.IsReadyToApply = [&checks, i] { ++checks[static_cast<std::size_t>(i)]; return false; };
+        parked.push_back(jobs.Submit(std::move(desc)));
+        ASSERT_TRUE(parked.back().IsValid());
+    }
+    ASSERT_TRUE(WaitUntil([&] { return jobs.Stats().AwaitingGateJobs == parked.size(); }));
+    const Runtime::JobToken normal = jobs.Submit(MakeCountingJob("normal", 1, publishOrder));
+    ASSERT_TRUE(WaitUntil([&] { return jobs.GetState(normal) == Runtime::JobState::AwaitingGate; }));
+
+    EXPECT_EQ(jobs.DrainCompletions(events, 8u, kCap), 1u) << "the normal result is not held back";
+    EXPECT_EQ(jobs.GetState(normal), Runtime::JobState::Published);
+    EXPECT_EQ(std::accumulate(checks.begin(), checks.end(), 0), static_cast<int>(kCap));
+    constexpr int kRounds = (kParked + static_cast<int>(kCap) - 1) / static_cast<int>(kCap);
+    for (int round = 1; round < kRounds; ++round)
+        (void)jobs.DrainCompletions(events, 8u, kCap);
+    for (int i = 0; i < kParked; ++i)
+        EXPECT_GE(checks[static_cast<std::size_t>(i)], 1) << "gate " << i << " was never checked";
+    EXPECT_EQ(std::accumulate(checks.begin(), checks.end(), 0), kRounds * static_cast<int>(kCap));
+    EXPECT_EQ(jobs.Stats().AwaitingApplyJobs, static_cast<std::uint64_t>(std::count_if(
+        parked.begin(), parked.end(), [&](const auto token) {
+            return jobs.GetState(token) == Runtime::JobState::AwaitingApply; })))
+        << "checked and unchecked parked records both count";
     for (const Runtime::JobToken token : parked)
         (void)jobs.Cancel(token);
     (void)jobs.DrainCompletions(events);

@@ -71,6 +71,9 @@ namespace Extrinsic::Runtime
     namespace
     {
         constexpr std::uint32_t kJobCompletionApplyBudgetPerFrame = 8u;
+        // Readiness gates consulted per drain (they may poll the device or queue
+        // the next GPU chunk); parked results rotate through this budget.
+        constexpr std::uint32_t kJobCompletionGateCheckBudgetPerFrame = 32u;
     }
 
     struct Engine::Impl
@@ -719,7 +722,8 @@ namespace Extrinsic::Runtime
         (void)m_Impl->m_KernelEvents.Pump();
         RunRuntimeModuleFrameHooks(FramePhase::Idle, 0.0, 0.0, editorCapture, pacing);
         (void)m_Impl->m_JobService.DrainCompletions(
-            m_Impl->m_KernelEvents, kJobCompletionApplyBudgetPerFrame);
+            m_Impl->m_KernelEvents, kJobCompletionApplyBudgetPerFrame,
+            kJobCompletionGateCheckBudgetPerFrame);
         (void)m_Impl->m_KernelEvents.Pump();
         (void)m_Impl->m_JobService.ReapCompleted();
     }
@@ -859,7 +863,8 @@ namespace Extrinsic::Runtime
         // only for survivors, so pump B owns all completion commits.
         (void)m_Impl->m_JobService.DrainCompletions(
             m_Impl->m_KernelEvents,
-            kJobCompletionApplyBudgetPerFrame);
+            kJobCompletionApplyBudgetPerFrame,
+            kJobCompletionGateCheckBudgetPerFrame);
 
         // ── Event pump B (post-sim; ARCH-008 / ADR-0024 D7) ───────────────
         // Simulation/job events reach runtime modules before UI/extraction.
