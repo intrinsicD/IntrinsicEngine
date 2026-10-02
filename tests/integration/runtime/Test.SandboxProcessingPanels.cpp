@@ -515,6 +515,40 @@ TEST(SandboxProcessingPanels, ReadinessUnlessBlockedReportsTheFirstBlockersReaso
     EXPECT_TRUE(Editor::ReadinessUnlessBlocked({}).Enabled);
 }
 
+// UI-071 review: a live GPU transaction disables Run with a reason (never a bare BeginDisabled), and a runtime
+// refusal keeps its own reason.
+TEST(SandboxProcessingPanels, RunActionExplainsWhyItIsDisabledWhileAGpuRunIsPending)
+{
+    const auto free = Editor::ReadinessWhileGpuRunPending({.Enabled = true}, false);
+    EXPECT_TRUE(free.Enabled);
+    const auto pending = Editor::ReadinessWhileGpuRunPending({.Enabled = true}, true);
+    EXPECT_FALSE(pending.Enabled);
+    EXPECT_EQ(pending.DisabledReason, Editor::kPendingGpuRunReason);
+    const auto refused = Editor::ReadinessWhileGpuRunPending({.Enabled = false, .DisabledReason = "Select a point cloud."}, true);
+    EXPECT_EQ(refused.DisabledReason, "Select a point cloud.");
+}
+
+// The CPD Step and Apply buttons take their reasons from the runtime, per phase.
+TEST(SandboxProcessingPanels, CoherentPointDriftStepAndApplyReadinessFollowThePhase)
+{
+    using Phase = R::EditorCoherentPointDriftPhase;
+    struct Case { Phase Phase; bool Step, Apply; };
+    for (const Case c : {Case{Phase::Ready, true, false}, Case{Phase::Running, false, false},
+                         Case{Phase::Paused, true, true}, Case{Phase::Finished, false, true},
+                         Case{Phase::Applied, false, false}, Case{Phase::Failed, false, false},
+                         Case{Phase::Cancelled, false, false}})
+    {
+        R::EditorCoherentPointDriftSnapshot snapshot{};
+        snapshot.Phase = c.Phase;
+        const auto step = R::ResolveEditorCoherentPointDriftStepReadiness(snapshot);
+        const auto apply = R::ResolveEditorCoherentPointDriftApplyReadiness(snapshot);
+        EXPECT_EQ(step.Enabled, c.Step) << R::ToString(c.Phase);
+        EXPECT_EQ(apply.Enabled, c.Apply) << R::ToString(c.Phase);
+        EXPECT_EQ(step.DisabledReason.empty(), c.Step) << R::ToString(c.Phase);
+        EXPECT_EQ(apply.DisabledReason.empty(), c.Apply) << R::ToString(c.Phase);
+    }
+}
+
 TEST(SandboxProcessingPanels, GpuTransactionCountersUseOneFormat)
 {
     EXPECT_EQ(Editor::FormatGpuTransactionIo({.UploadBytes = 36, .CacheHits = 1}),

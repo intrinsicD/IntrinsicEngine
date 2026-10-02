@@ -263,6 +263,10 @@ namespace Extrinsic::Sandbox::Editor
              : readyToAccept ? Runtime::EditorGpuTransactionPhase::ReadyToAccept
                              : Runtime::EditorGpuTransactionPhase::Running;
     }
+    static_assert(GpuTransactionPhaseOf(false, false) == Runtime::EditorGpuTransactionPhase::Running);
+    static_assert(GpuTransactionPhaseOf(true, false) == Runtime::EditorGpuTransactionPhase::ReadyToAccept);
+    static_assert(GpuTransactionPhaseOf(false, true) == Runtime::EditorGpuTransactionPhase::Accepting);
+    static_assert(GpuTransactionPhaseOf(true, true) == Runtime::EditorGpuTransactionPhase::Accepting, "accepting wins over ready");
     // Draws [Stop] Accept Discard on one line (IDs suffixed `##idSuffix`), the Accept refusal as a
     // tooltip on the disabled button plus one inline line, and the counters line. Returns the
     // button pressed this frame; the caller invokes its family's command.
@@ -289,6 +293,11 @@ namespace Extrinsic::Sandbox::Editor
         std::string_view Reason{};
     };
     [[nodiscard]] Runtime::ActionReadiness ReadinessUnlessBlocked(std::initializer_list<ActionBlocker> blockers);
+    // The reason every Run action shows while its own GPU transaction is live (running, waiting or accepting).
+    inline constexpr std::string_view kPendingGpuRunReason = "Accept or Discard the pending GPU run before starting another.";
+    // `readiness` unless the panel's own transaction is live: a runtime refusal keeps its reason, otherwise the
+    // action is disabled with `kPendingGpuRunReason`. Never wrap the button in a bare BeginDisabled: that hides the reason.
+    [[nodiscard]] Runtime::ActionReadiness ReadinessWhileGpuRunPending(Runtime::ActionReadiness readiness, bool pending);
 
     // UI-057: parameter controls driven by a config section's field table. Hovering a
     // control shows the field's description, accepted values and default; numeric input

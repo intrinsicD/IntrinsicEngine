@@ -218,6 +218,10 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] ActionReadiness PreviewEditorCoherentPointDriftCommand(
         const EditorProcessingCommands&, const CoherentPointDriftConfig&);
+    // Whether Step / Run to end and Apply apply to a run in `snapshot`'s phase, with the runtime's reason
+    // when they do not (the panel shows it as the disabled buttons' tooltip).
+    [[nodiscard]] ActionReadiness ResolveEditorCoherentPointDriftStepReadiness(const EditorCoherentPointDriftSnapshot&);
+    [[nodiscard]] ActionReadiness ResolveEditorCoherentPointDriftApplyReadiness(const EditorCoherentPointDriftSnapshot&);
     // Why the Vulkan E-step would run on the CPU here (empty when it can run on the device), so
     // the panel can say so before a run starts.
     [[nodiscard]] std::string CoherentPointDriftVulkanUnavailableReason(const EditorProcessingCommands&);

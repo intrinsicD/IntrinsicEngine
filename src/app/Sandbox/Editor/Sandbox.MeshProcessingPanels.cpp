@@ -158,7 +158,8 @@ namespace Extrinsic::Sandbox::Editor
                   typename Watch = std::nullptr_t>
         void DrawProcessingExecution(const Runtime::EditorProcessingCommands& commands, State& state, bool changed,
             Preview preview, Apply apply, Execute execute, const Sink& sink,
-            const char* button, const char* controlsRejected, const char* executionRejected, Watch watch = nullptr)
+            const char* button, const char* controlsRejected, const char* executionRejected, Watch watch = nullptr,
+            const bool gpuRunPending = false)
         {
             if (changed)
                 state.ConfigDiagnostic = apply(state.Draft).Succeeded() ? "" : controlsRejected;
@@ -167,7 +168,7 @@ namespace Extrinsic::Sandbox::Editor
             const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
                 commands, method);
             if (!readiness.Enabled) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
-            if (DrawProcessingActionButton(button, readiness))
+            if (DrawProcessingActionButton(button, ReadinessWhileGpuRunPending(readiness, gpuRunPending)))
             {
                 if constexpr (!std::is_null_pointer_v<Watch>)
                 {
@@ -2182,8 +2183,7 @@ namespace Extrinsic::Sandbox::Editor
                 context.PointAnalysis.ResultSinks.OutlierAnalysis(transaction.Result);
             OutlierTransaction.reset();
         }
-        ImGui::BeginDisabled(outlierActive);
-        if (DrawProcessingActionButton("Detect outliers", readiness))
+        if (DrawProcessingActionButton("Detect outliers", ReadinessWhileGpuRunPending(readiness, outlierActive)))
         {
             Outliers.Run.ClearNote(); // an own submission replaces an earlier duplicate refusal
             if (analyze.Backend == Runtime::OutlierAnalysisBackend::VulkanLBVH)
@@ -2204,7 +2204,6 @@ namespace Extrinsic::Sandbox::Editor
             }
             else execute(analyze);
         }
-        ImGui::EndDisabled();
         Outliers.Run.AwaitingAccept(OutlierTransaction && transaction.Phase == Runtime::EditorGpuTransactionPhase::ReadyToAccept);
         const Runtime::EditorOutputRef outliersDraft{config.StableEntityId, config.Mask.Name};
         Outliers.Run.Draw(context.PointAnalysis.Commands, config.StableEntityId, "outliers_progress", &outliersDraft);
@@ -2307,7 +2306,6 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::TextWrapped("Spacing, covariance, saliency and suppression run on Vulkan in bounded traversal pages. Requires shader double precision.");
         const bool keypointActive=DrawPointScalarTransaction(context.PointAnalysis.Commands,
             KeypointTransaction,Keypoints,context.PointAnalysis.ResultSinks.KeypointAnalysis);
-        ImGui::BeginDisabled(keypointActive);
         DrawProcessingExecution(context.PointAnalysis.Commands, Keypoints, changed,
             [&](const auto& request) { return Runtime::PreviewEditorKeypointAnalysisCommand(context.PointAnalysis.Commands, request); },
             [&](const auto& request) { return Runtime::ApplyEditorKeypointAnalysisConfig(context.PointAnalysis.Commands, request); },
@@ -2321,8 +2319,8 @@ namespace Extrinsic::Sandbox::Editor
             },
             context.PointAnalysis.ResultSinks.KeypointAnalysis, "Detect keypoints",
             "Controls were rejected by keypoint config validation.", "Keypoint config was rejected.",
-            [](const auto& c) { return std::pair{c.StableEntityId, c.Mask.Name}; });
-        ImGui::EndDisabled();
+            [](const auto& c) { return std::pair{c.StableEntityId, c.Mask.Name}; },
+            keypointActive);
         const Runtime::EditorOutputRef keypointsDraft{config.StableEntityId, config.Mask.Name};
         Keypoints.Run.Draw(context.PointAnalysis.Commands, config.StableEntityId, "keypoints_progress", &keypointsDraft);
         ImGui::TextWrapped("Detection writes a mask (1 = retained keypoint) and a score. Geometry stays in source order.");
@@ -2475,7 +2473,6 @@ namespace Extrinsic::Sandbox::Editor
         if(config.Backend==Runtime::KernelDensityBackend::VulkanLBVH)
             changed |= ImGui::InputScalar("GPU query batch size",ImGuiDataType_U32,&config.GpuQueryBatchSize);
         const bool scalarActive=DrawPointScalarTransaction(context.PointFields.Commands,DensityTransaction,Density,context.PointFields.ResultSinks.KernelDensity);
-        ImGui::BeginDisabled(scalarActive);
         DrawProcessingExecution(context.PointFields.Commands, Density, changed,
             [&](const auto& c) { return Runtime::PreviewEditorKernelDensityCommand(context.PointFields.Commands, c); },
             [&](const auto& c) { return Runtime::ApplyEditorKernelDensityConfig(context.PointFields.Commands, c); },
@@ -2485,8 +2482,8 @@ namespace Extrinsic::Sandbox::Editor
                 return Runtime::ApplyEditorConfiguredKernelDensity(context.PointFields.Commands,context.PointFields.ResultSinks.KernelDensity); },
             context.PointFields.ResultSinks.KernelDensity, "Estimate density",
             "Controls were rejected by density config validation.", "Density config was rejected.",
-            [](const auto& c) { return std::pair{c.StableEntityId, c.Density.Name}; });
-        ImGui::EndDisabled();
+            [](const auto& c) { return std::pair{c.StableEntityId, c.Density.Name}; },
+            scalarActive);
         const Runtime::EditorOutputRef densityDraft{config.StableEntityId, config.Density.Name};
         Density.Run.Draw(context.PointFields.Commands, config.StableEntityId, "density_progress", &densityDraft);
         ImGui::TextWrapped("Vulkan previews density on the device. Accept publishes the scalar with Undo; Discard retains CPU rows.");
@@ -2547,7 +2544,6 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::TextWrapped("Vulkan collects complete conservative radius candidates. Overflow leaves the previous output unchanged. Subnormal coordinate components are unsupported.");
         }
         const bool scalarActive=DrawPointScalarTransaction(context.PointAnalysis.Commands,WeightTransaction,DensityWeights,context.PointAnalysis.ResultSinks.DensityWeight);
-        ImGui::BeginDisabled(scalarActive);
         DrawProcessingExecution(context.PointAnalysis.Commands, DensityWeights, changed,
             [&](const auto& request) { return Runtime::PreviewEditorDensityWeightCommand(context.PointAnalysis.Commands, request); },
             [&](const auto& request) { return Runtime::ApplyEditorDensityWeightConfig(context.PointAnalysis.Commands, request); },
@@ -2557,8 +2553,8 @@ namespace Extrinsic::Sandbox::Editor
                 return Runtime::ApplyEditorConfiguredDensityWeight(context.PointAnalysis.Commands,context.PointAnalysis.ResultSinks.DensityWeight); },
             context.PointAnalysis.ResultSinks.DensityWeight, "Compute compact weights",
             "Controls were rejected by density config validation.", "Density config was rejected.",
-            [](const auto& c) { return std::pair{c.StableEntityId, c.Weights.Name}; });
-        ImGui::EndDisabled();
+            [](const auto& c) { return std::pair{c.StableEntityId, c.Weights.Name}; },
+            scalarActive);
         const Runtime::EditorOutputRef densityWeightsDraft{config.StableEntityId, config.Weights.Name};
         DensityWeights.Run.Draw(context.PointAnalysis.Commands, config.StableEntityId, "density_weights_progress", &densityWeightsDraft);
         ImGui::TextWrapped("Vulkan previews compact weights using double kernel sums. Accept publishes with Undo; Discard retains CPU rows.");
@@ -2745,7 +2741,6 @@ namespace Extrinsic::Sandbox::Editor
         if(config.Backend==Runtime::PointSpacingBackend::VulkanLBVH)
             changed |= ImGui::InputScalar("GPU query batch size",ImGuiDataType_U32,&config.GpuQueryBatchSize);
         const bool scalarActive=DrawPointScalarTransaction(context.PointFields.Commands,SpacingTransaction,Spacing,context.PointFields.ResultSinks.PointSpacing);
-        ImGui::BeginDisabled(scalarActive);
         DrawProcessingExecution(context.PointFields.Commands, Spacing, changed,
             [&](const auto& c) { return Runtime::PreviewEditorPointSpacingCommand(context.PointFields.Commands, c); },
             [&](const auto& c) { return Runtime::ApplyEditorPointSpacingConfig(context.PointFields.Commands, c); },
@@ -2755,8 +2750,8 @@ namespace Extrinsic::Sandbox::Editor
                 return Runtime::ApplyEditorConfiguredPointSpacing(context.PointFields.Commands,context.PointFields.ResultSinks.PointSpacing); },
             context.PointFields.ResultSinks.PointSpacing, "Estimate radii",
             "Controls were rejected by radii config validation.", "Spacing config was rejected.",
-            [](const auto& c) { return std::pair{c.StableEntityId, c.Radii.Name}; });
-        ImGui::EndDisabled();
+            [](const auto& c) { return std::pair{c.StableEntityId, c.Radii.Name}; },
+            scalarActive);
         const Runtime::EditorOutputRef spacingDraft{config.StableEntityId, config.Radii.Name};
         Spacing.Run.Draw(context.PointFields.Commands, config.StableEntityId, "spacing_progress", &spacingDraft);
         ImGui::TextWrapped("Vulkan previews spacing and radii on the device. Accept publishes with Undo; Discard retains CPU rows. Show radii maps values to colors; point rendering currently expects pixel sizes.");
@@ -3228,7 +3223,6 @@ namespace Extrinsic::Sandbox::Editor
         // Restart, Apply and Discard make this frame's snapshot stale; it must not redraw the preview.
         bool snapshotStale = false;
         const bool steppable = hasRun && (snapshot.Phase == Phase::Ready || snapshot.Phase == Phase::Paused);
-        const bool applicable = hasRun && (snapshot.Phase == Phase::Paused || snapshot.Phase == Phase::Finished);
         const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
             commands, Runtime::PreviewEditorCoherentPointDriftCommand(commands, config));
         if (!hasRun || !steppable)
@@ -3252,22 +3246,17 @@ namespace Extrinsic::Sandbox::Editor
                 state.RunMessage = status == Runtime::EditorCommandStatus::Pending ? std::string{}
                                                                                   : "This run takes no more steps.";
             };
-            ImGui::BeginDisabled(!steppable);
-            if (ImGui::Button("Step##CPD")) step(1u);
+            const auto stepReadiness = Runtime::ResolveEditorCoherentPointDriftStepReadiness(snapshot);
+            if (DrawProcessingActionButton("Step##CPD", stepReadiness)) step(1u);
             ImGui::SameLine();
-            if (ImGui::Button("Step 10##CPD")) step(10u);
+            if (DrawProcessingActionButton("Step 10##CPD", stepReadiness)) step(10u);
             ImGui::SameLine();
-            if (ImGui::Button("Run to end##CPD")) step(0u);
-            ImGui::EndDisabled();
-            ImGui::BeginDisabled(!applicable);
-            if (ImGui::Button("Apply##CPD"))
+            if (DrawProcessingActionButton("Run to end##CPD", stepReadiness)) step(0u);
+            if (DrawProcessingActionButton("Apply##CPD", Runtime::ResolveEditorCoherentPointDriftApplyReadiness(snapshot)))
             {
                 state.LastResult = Runtime::ApplyEditorCoherentPointDrift(commands, state.Run);
                 if (state.LastResult->Succeeded()) { ClearCoherentPointDriftPreview(); snapshotStale = true; }
             }
-            ImGui::EndDisabled();
-            if (!applicable && hasRun && snapshot.Phase != Phase::Applied)
-                DrawDisabledReasonTooltip("Apply publishes a paused or finished run.");
             ImGui::SameLine();
             if (ImGui::Button("Discard##CPD"))
             {
@@ -4046,8 +4035,8 @@ namespace Extrinsic::Sandbox::Editor
             return row.Domain == Runtime::EditorPropertyCatalogDomain::MeshFaces &&
                    row.Name == config.Output.Name && row.ValueKind == decltype(row.ValueKind)::Vec3 && row.Bindable;
         });
-        ImGui::BeginDisabled(!hasOutput);
-        if (ImGui::Button("Show Gradient Vectorfield"))
+        if (DrawProcessingActionButton("Show Gradient Vectorfield",
+                ReadinessUnlessBlocked({{!hasOutput, "Compute the gradient first; its output property does not exist yet."}})))
         {
             Runtime::EditorGeometryVectorFieldCommand command{
                 .StableEntityId = model.SelectedStableId, .Layer = {.Vector = config.Output}};
@@ -4062,7 +4051,6 @@ namespace Extrinsic::Sandbox::Editor
             const auto status = Runtime::ApplyEditorGeometryVectorFieldCommand(context.VisualizationCommands, command);
             Gradient.VisualizationDiagnostic = Runtime::DebugNameForEditorCommandStatus(status);
         }
-        ImGui::EndDisabled();
         ImGui::TextDisabled("Arrow scale, color and visibility: Appearance > Vector fields.");
         if (Gradient.LastResult) ImGui::TextWrapped("%s", Gradient.LastResult->Message.c_str());
         if (!Gradient.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Gradient.ConfigDiagnostic.c_str());

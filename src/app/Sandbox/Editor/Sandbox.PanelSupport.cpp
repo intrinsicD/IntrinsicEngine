@@ -1891,6 +1891,13 @@ namespace Extrinsic::Sandbox::Editor
         return {.Enabled = true, .DisabledReason = {}};
     }
 
+    Runtime::ActionReadiness ReadinessWhileGpuRunPending(Runtime::ActionReadiness readiness, const bool pending)
+    {
+        if (pending && readiness.Enabled)
+            return {.Enabled = false, .DisabledReason = std::string(kPendingGpuRunReason)};
+        return readiness;
+    }
+
     std::string FormatConfigFieldHint(const Runtime::ConfigFieldSpec& field, const std::string_view defaultValue)
     {
         std::string text{field.Description};

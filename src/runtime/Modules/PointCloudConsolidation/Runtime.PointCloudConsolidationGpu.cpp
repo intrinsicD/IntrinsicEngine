@@ -790,6 +790,7 @@ namespace Extrinsic::Runtime
                 .ReadyToAccept = a.Ready && !a.Discarded, .Accepting = a.Accepting,
                 .CanAccept = a.Ready && !a.Accepting && current && !a.Discarded,
                 .Message = !current ? "Positions changed or attachment ended; discard this result." :
+                    a.Accepting ? "Reading the GPU positions back." :
                     a.Ready ? (a.Stop ? "GPU LOP stopped before convergence; preview ready to Accept or Discard."
                                       : "GPU preview ready to Accept or Discard.") : "GPU LOP pages running.",
                 .Iterations = a.Iteration, .Submissions = a.Result.GpuSubmissions, .Previews = a.Result.GpuPreviews,

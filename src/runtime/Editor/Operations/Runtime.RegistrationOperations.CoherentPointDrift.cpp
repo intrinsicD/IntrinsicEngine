@@ -717,6 +717,36 @@ namespace Extrinsic::Runtime
         return VulkanEStepUnavailable(EditorProcessingCommandsAccess::Resolve(commands));
     }
 
+    ActionReadiness ResolveEditorCoherentPointDriftStepReadiness(const EditorCoherentPointDriftSnapshot& snapshot)
+    {
+        switch (snapshot.Phase)
+        {
+        case Phase::Ready:
+        case Phase::Paused: return {true, {}};
+        case Phase::Running: return {false, "A step is still running. Wait for it to finish, or Discard the run."};
+        case Phase::Finished: return {false, "The run is finished. Apply it or Discard it."};
+        case Phase::Applied: return {false, "The result was already applied. Restart to run again."};
+        case Phase::Failed:
+        case Phase::Cancelled: break;
+        }
+        return {false, "The run ended without a result. Restart it."};
+    }
+
+    ActionReadiness ResolveEditorCoherentPointDriftApplyReadiness(const EditorCoherentPointDriftSnapshot& snapshot)
+    {
+        switch (snapshot.Phase)
+        {
+        case Phase::Paused:
+        case Phase::Finished: return {true, {}};
+        case Phase::Ready: return {false, "Take at least one step before applying."};
+        case Phase::Running: return {false, "Wait for the running step to finish, or cancel it."};
+        case Phase::Applied: return {false, "The result was already applied."};
+        case Phase::Failed:
+        case Phase::Cancelled: break;
+        }
+        return {false, "The run ended without a result. Restart it."};
+    }
+
     ActionReadiness PreviewEditorCoherentPointDriftCommand(const EditorProcessingCommands& commands,
                                                            const CoherentPointDriftConfig& config)
     {

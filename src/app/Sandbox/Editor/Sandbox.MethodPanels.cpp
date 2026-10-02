@@ -1951,8 +1951,7 @@ namespace Extrinsic::Sandbox::Editor
             auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
                 service.Commands,
                 Runtime::PreviewEditorKMeansRun(service.Commands, service.Clustering, request));
-            if (pendingGpuRun && readiness.Enabled)
-                readiness = {.Enabled = false, .DisabledReason = "Accept or Discard the pending GPU run before starting another."};
+            readiness = ReadinessWhileGpuRunPending(std::move(readiness), pendingGpuRun);
             if (DrawProcessingActionButton("Run K-Means##KMeans", readiness))
             {
                 KMeans.LastConfigApply =
@@ -3030,14 +3029,16 @@ namespace Extrinsic::Sandbox::Editor
             const bool canRedoUv =
                 history.CanRedo && history.RedoLabel == "Parameterize mesh UVs";
             if (DrawProcessingActionButton("Undo UV writeback##Parameterization",
-                    ReadinessUnlessBlocked({{!canUndoUv, "The next undo step is not a UV writeback."}})) &&
+                    ReadinessUnlessBlocked({{!historyAvailable, "Document history is unavailable."},
+                                            {!canUndoUv, "The next undo step is not a UV writeback."}})) &&
                 historyAvailable)
             {
                 (void)context.DocumentCommands.Undo();
             }
             ImGui::SameLine();
             if (DrawProcessingActionButton("Redo UV writeback##Parameterization",
-                    ReadinessUnlessBlocked({{!canRedoUv, "The next redo step is not a UV writeback."}})) &&
+                    ReadinessUnlessBlocked({{!historyAvailable, "Document history is unavailable."},
+                                            {!canRedoUv, "The next redo step is not a UV writeback."}})) &&
                 historyAvailable)
             {
                 (void)context.DocumentCommands.Redo();

@@ -59,7 +59,7 @@ Discard-by-phase rule, the unique IDs and one counter format.
 - [ ] A single rule decides when Discard is enabled (by transaction phase) and where the Accept refusal reason is shown (tooltip on the disabled control plus one inline line); K-Means shows its reason.
 - [ ] Buttons use `##Family`-suffixed IDs; the upload/cache-hit counters use one format.
 - [ ] MP's disabled actions show their reasons through the shared presentation; the rule is recorded in UI-037/UI-058 or the sandbox editor boundaries doc.
-- [ ] ImGui panel tests cover enabled/disabled Accept and Discard per phase for at least one family on each side (MPP and MP); no behavior change to the runtime commands.
+- [ ] The per-phase enabled/disabled rule of Accept and Discard is covered by the shared helper's per-phase test (`GpuTransactionRowEnablesButtonsByPhase`), the call-site snapshot adapters (`GpuTransactionPhaseOf` static_asserts, panel tests on the null device) and a source scan that no hand-written row remains. MP's running phases are unreachable on the null device, so no MP panel is driven through them; no behavior change to the runtime commands.
 
 ## Verification
 ```bash
@@ -105,3 +105,4 @@ python3 tools/docs/check_doc_links.py --root .
   support-radius input (disabled by the radius mode, with its note). No new reason is computed from geometry;
   readiness content stays with UI-037/UI-058. The presentation rule is recorded in
   `docs/architecture/sandbox-editor-feature-boundaries.md`.
+- Review fixes: the consolidation observation reports the lifecycle's accepting text ("Reading the GPU positions back.") while accepting; Outliers, Keypoints, Density, Density weights and Point spacing no longer wrap their Run button in a bare `BeginDisabled` (`ReadinessWhileGpuRunPending` supplies the pending-run reason, K-Means uses it too); CPD Step/Run to end/Apply take their reasons from `ResolveEditorCoherentPointDriftStepReadiness`/`...ApplyReadiness`; Show Gradient and the UV Undo/Redo (missing history blocker) carry reasons; `GpuTransactionPhaseOf` has static_asserts.
