@@ -105,6 +105,8 @@ TEST(NormalTransaction, AcceptPublishesUndoablyThenBindsTheFrontAsTheCanonicalRe
     ASSERT_EQ(accepted.Status, R::EditorCommandStatus::Pending) << accepted.Message;
     snapshot = R::SnapshotEditorNormalEstimation(h.Commands(), run);
     EXPECT_EQ(snapshot.Phase, R::EditorGpuTransactionPhase::Accepting);
+    EXPECT_FALSE(snapshot.CanAccept);
+    EXPECT_EQ(snapshot.AcceptDisabledReason, "Accept is already under way.") << "the lifecycle's own refusal, in every phase";
     EXPECT_EQ(snapshot.Result.Status, R::EditorCommandStatus::Pending) << "\"Applied\" only after the CPU publication";
     EXPECT_FALSE(delivered);
 

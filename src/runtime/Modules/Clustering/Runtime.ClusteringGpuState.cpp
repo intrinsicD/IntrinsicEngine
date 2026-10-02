@@ -183,7 +183,7 @@ namespace Extrinsic::Runtime
             const auto scalar=SnapshotEditorPointScalar(a->Commands,a->Transaction);
             return {.Running=!a->Ready,.ReadyToAccept=a->Ready,.Accepting=a->Accepting,
                 .CanAccept=a->Ready&&!a->Accepting&&scalar.CanAccept,
-                .Message=scalar.AcceptRefusalReason.empty()?(a->Ready?"GPU labels await Accept or Discard.":"GPU K-Means pages running."):scalar.AcceptRefusalReason,
+                .Message=(!a->Ready||scalar.AcceptRefusalReason.empty())?(a->Ready?"GPU labels await Accept or Discard.":"GPU K-Means pages running."):scalar.AcceptRefusalReason,
                 .Iterations=a->Result.Iterations,.Submissions=a->Result.GpuSubmissions,.Previews=a->Result.GpuPreviews,
                 .InputUploadBytes=a->Result.GpuInputUploadBytes,.InputCacheHits=a->Result.GpuInputCacheHits,
                 .CpuStageUploadBytes=a->Result.CpuStageUploadBytes,.CpuStageReadbackBytes=a->Result.CpuStageReadbackBytes};

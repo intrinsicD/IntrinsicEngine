@@ -81,3 +81,11 @@ python3 tools/docs/check_doc_links.py --root .
   disabled once the transaction is terminal (it was never drawn then). Tests:
   `GpuTransactionRowEnablesButtonsByPhase` (running, awaiting accept, stale, accepting, terminal),
   `GpuTransactionCountersUseOneFormat`; the scalar panel test now clicks `Accept##Scalar`.
+- Slice 2: Normals and Smoothing use the row (Smoothing with Stop). The snapshots (scalar, Outliers, Normals,
+  Smoothing) now carry the lifecycle's own `GpuTransactionAcceptRefusal` text in the non-waiting phases
+  ("No GPU result waits for Accept.", "Accept is already under way."), so a disabled Accept always has a
+  runtime reason; the K-Means observation keeps its state message while running. Normals' separate residency
+  line now reports only the topology bundle (the upload bytes are in the shared counters line). Exception:
+  CPD is not a GPU two-phase transaction (its own run object and `EditorCoherentPointDriftPhase`, with
+  Step/Apply/Discard), so its row stays hand-written; only its disabled-reason presentation falls under the
+  slice-4 rule. Contract tests pin the refusal text for Running and Accepting.

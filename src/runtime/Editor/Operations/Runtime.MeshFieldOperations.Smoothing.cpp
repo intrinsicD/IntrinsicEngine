@@ -1094,6 +1094,8 @@ namespace Extrinsic::Runtime
             if (snapshot.Stale) snapshot.AcceptDisabledReason = "The inputs changed since the run; discard the result and run again.";
             else if (!resident) snapshot.AcceptDisabledReason = "The GPU result is no longer resident; discard it.";
         }
+        // Running, accepting or finished: the lifecycle's own refusal says why Accept is not available now.
+        else if (const auto refused = GeometryProcessingDetail::GpuTransactionAcceptRefusal(run->Core)) snapshot.AcceptDisabledReason = refused->Message;
         return snapshot;
     }
 

@@ -3463,32 +3463,27 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::SeparatorText("GPU result");
         ImGui::TextDisabled("State: %s%s", Runtime::ToString(transaction.Phase),
                             transaction.Phase == Phase::ReadyToAccept && transaction.Stale ? " (stale)" : "");
-        ImGui::BeginDisabled(!transaction.CanAccept);
-        if (ImGui::Button("Accept##Normals") && transaction.CanAccept)
+        const GpuTransactionRowView row{.Phase = transaction.Phase, .CanAccept = transaction.CanAccept,
+            .AcceptRefusal = transaction.AcceptDisabledReason,
+            .Io = GpuTransactionIo{.UploadBytes = transaction.Result.GpuInputUploadBytes, .CacheHits = transaction.Result.GpuInputCacheHits,
+                                   .CpuReadbackBytes = transaction.Result.CpuStageReadbackBytes}};
+        switch (DrawGpuTransactionControls(row, "Normals"))
+        {
+        case GpuTransactionRowAction::Accept:
             Normals.LastResult = Runtime::AcceptEditorNormalEstimation(commands, NormalTransaction,
                 [completion = NormalCompletion](Runtime::EditorNormalEstimationResult result) { *completion = std::move(result); });
-        ImGui::EndDisabled();
-        if (!transaction.CanAccept && !transaction.AcceptDisabledReason.empty())
-            DrawDisabledReasonTooltip(transaction.AcceptDisabledReason);
-        ImGui::SameLine();
-        ImGui::BeginDisabled(transaction.Phase == Phase::Applied || transaction.Phase == Phase::Discarded || transaction.Phase == Phase::Failed);
-        if (ImGui::Button("Discard##Normals"))
-        {
+            break;
+        case GpuTransactionRowAction::Discard:
             Runtime::DiscardEditorNormalEstimation(commands, NormalTransaction);
             Normals.Run.Forget(); // a discarded result never reads as a finished run
             Normals.LastResult = Runtime::SnapshotEditorNormalEstimation(commands, NormalTransaction).Result;
+            break;
+        default: break;
         }
-        ImGui::EndDisabled();
-        if (!transaction.AcceptDisabledReason.empty()) ImGui::TextWrapped("%s", transaction.AcceptDisabledReason.c_str());
-        else if (transaction.Phase == Phase::ReadyToAccept)
+        if (transaction.AcceptDisabledReason.empty() && transaction.Phase == Phase::ReadyToAccept)
             ImGui::TextWrapped("The device result is resident (no viewport preview); Accept publishes it (undoable), Discard keeps the CPU normals.");
-        ImGui::TextWrapped("Input uploads: %llu bytes; cache hits: %llu; CPU readback: %llu bytes",
-            static_cast<unsigned long long>(transaction.Result.GpuInputUploadBytes),
-            static_cast<unsigned long long>(transaction.Result.GpuInputCacheHits),
-            static_cast<unsigned long long>(transaction.Result.CpuStageReadbackBytes));
-        if (transaction.Result.GpuTopologyBytes || transaction.Result.GpuInputUploadBytes)
-            ImGui::TextDisabled("Residency IO: positions upload %llu bytes; topology bundle %llu bytes (%s)",
-                                static_cast<unsigned long long>(transaction.Result.GpuInputUploadBytes),
+        if (transaction.Result.GpuTopologyBytes)
+            ImGui::TextDisabled("Residency topology bundle: %llu bytes (%s)",
                                 static_cast<unsigned long long>(transaction.Result.GpuTopologyBytes),
                                 transaction.Result.GpuTopologyReused ? "resident" : "uploaded");
         if (transaction.Phase == Phase::Applied || transaction.Phase == Phase::Discarded || transaction.Phase == Phase::Failed)
@@ -3710,28 +3705,23 @@ namespace Extrinsic::Sandbox::Editor
         if (transaction.Phase != Phase::Running && transaction.Phase != Phase::Accepting)
             ImGui::TextDisabled("State: %s%s", Runtime::ToString(transaction.Phase),
                                 transaction.Phase == Phase::ReadyToAccept && transaction.Stale ? " (stale)" : "");
-        ImGui::BeginDisabled(transaction.Phase != Phase::Running);
-        if (ImGui::Button("Stop##Smoothing")) Runtime::StopEditorPropertySmoothing(SmoothingTransaction);
-        ImGui::EndDisabled();
-        ImGui::SameLine();
-        ImGui::BeginDisabled(!transaction.CanAccept);
-        if (ImGui::Button("Accept##Smoothing") && transaction.CanAccept)
+        const GpuTransactionRowView row{.Phase = transaction.Phase, .CanAccept = transaction.CanAccept,
+                                        .AcceptRefusal = transaction.AcceptDisabledReason, .HasStop = true};
+        switch (DrawGpuTransactionControls(row, "Smoothing"))
+        {
+        case GpuTransactionRowAction::Stop: Runtime::StopEditorPropertySmoothing(SmoothingTransaction); break;
+        case GpuTransactionRowAction::Accept:
             Smoothing.LastResult = Runtime::AcceptEditorPropertySmoothing(commands, SmoothingTransaction,
                 [completion = SmoothingCompletion](Runtime::EditorPropertySmoothingResult result) { *completion = std::move(result); });
-        ImGui::EndDisabled();
-        if (!transaction.CanAccept && !transaction.AcceptDisabledReason.empty())
-            DrawDisabledReasonTooltip(transaction.AcceptDisabledReason);
-        ImGui::SameLine();
-        ImGui::BeginDisabled(transaction.Phase == Phase::Applied || transaction.Phase == Phase::Discarded || transaction.Phase == Phase::Failed);
-        if (ImGui::Button("Discard##Smoothing"))
-        {
+            break;
+        case GpuTransactionRowAction::Discard:
             Runtime::DiscardEditorPropertySmoothing(commands, SmoothingTransaction);
             Smoothing.Run.Forget(); // a discarded result is not a finished run
             Smoothing.LastResult = Runtime::SnapshotEditorPropertySmoothing(commands, SmoothingTransaction).Result;
+            break;
+        default: break;
         }
-        ImGui::EndDisabled();
-        if (!transaction.AcceptDisabledReason.empty()) ImGui::TextWrapped("%s", transaction.AcceptDisabledReason.c_str());
-        else if (transaction.Phase == Phase::ReadyToAccept)
+        if (transaction.AcceptDisabledReason.empty() && transaction.Phase == Phase::ReadyToAccept)
             ImGui::TextWrapped("The viewport shows the device result; Accept publishes it (undoable), Discard keeps the CPU property.");
         if (transaction.Phase == Phase::Applied || transaction.Phase == Phase::Discarded || transaction.Phase == Phase::Failed)
         {

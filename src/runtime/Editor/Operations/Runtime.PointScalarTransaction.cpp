@@ -376,7 +376,10 @@ namespace Extrinsic::Runtime
     EditorPointScalarTransactionSnapshot SnapshotEditorPointScalar(const EditorProcessingCommands&,const EditorPointScalarTransactionHandle& w)
     {
         if(!w)return {.Phase=EditorGpuTransactionPhase::Failed,.Status=EditorCommandStatus::InvalidProcessingParameters,.Message="No scalar transaction."};
-        auto s=Snapshot(w);if(s.Phase==EditorGpuTransactionPhase::ReadyToAccept){s.CanAccept=Current(w);if(!s.CanAccept)s.AcceptRefusalReason="Scalar input or output changed; discard and run again.";}return s;
+        auto s=Snapshot(w);if(s.Phase==EditorGpuTransactionPhase::ReadyToAccept){s.CanAccept=Current(w);if(!s.CanAccept)s.AcceptRefusalReason="Scalar input or output changed; discard and run again.";}
+        // Running, accepting or finished: the lifecycle's own refusal says why Accept is not available now.
+        else if(const auto refused=GeometryProcessingDetail::GpuTransactionAcceptRefusal(w->Core))s.AcceptRefusalReason=refused->Message;
+        return s;
     }
     EditorPointScalarTransactionSnapshot AcceptEditorPointScalar(const EditorProcessingCommands&,const EditorPointScalarTransactionHandle& w,
         std::function<void(EditorPointScalarTransactionSnapshot)> sink)

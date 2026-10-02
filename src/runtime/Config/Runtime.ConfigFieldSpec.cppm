@@ -53,9 +53,9 @@ export namespace Extrinsic::Runtime
     // Human-readable accepted values, e.g. "1 to 10000", "greater than 0, at most 1",
     // "one of: Averaging, Taubin"; empty when unconstrained.
     [[nodiscard]] std::string DescribeConfigFieldRange(const ConfigFieldSpec& field);
-    // Clamps a numeric value into the declared range. An exclusive bound clamps to the nearest
-    // accepted value inside it (the next double for Float fields, one step otherwise), so a clamped
-    // input passes `AcceptsConfigFieldNumber`.
+    // Clamps a numeric value into the declared range. An exclusive integer bound clamps one step
+    // inside it; an exclusive Float bound clamps onto the bound and stays refused by
+    // `AcceptsConfigFieldNumber`, so validation reports it instead of the panel inventing a value.
     [[nodiscard]] double ClampToConfigFieldRange(const ConfigFieldSpec& field, double value) noexcept;
     // True when `value` is finite and inside the declared range, exclusive bounds included. Command
     // owners and the agent's params share this check, so a range is declared once.

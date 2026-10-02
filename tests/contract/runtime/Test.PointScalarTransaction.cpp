@@ -260,6 +260,7 @@ TEST_P(PointScalarTransaction, AcceptUnderWayIsPendingAndItsCancelDeliversOnce)
     const auto again=R::AcceptEditorPointScalar(Commands(),run);
     EXPECT_EQ(again.Status,R::EditorCommandStatus::Pending)<<again.Message;
     EXPECT_EQ(again.Phase,R::EditorGpuTransactionPhase::Accepting);
+    EXPECT_EQ(R::SnapshotEditorPointScalar(Commands(),run).AcceptRefusalReason,"Accept is already under way.");
     // A caller with its own sink is refused: the result goes to the first caller only.
     unsigned second=0;
     EXPECT_EQ(R::AcceptEditorPointScalar(Commands(),run,[&](auto){++second;}).Status,R::EditorCommandStatus::InvalidProcessingParameters);

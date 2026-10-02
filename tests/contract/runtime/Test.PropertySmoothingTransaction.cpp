@@ -121,6 +121,8 @@ TEST(PropertySmoothingTransaction, AcceptPublishesUndoablyThenBindsTheFrontAsThe
     ASSERT_EQ(accepted.Status, R::EditorCommandStatus::Pending) << accepted.Message;
     snapshot = R::SnapshotEditorPropertySmoothing(h.Commands(), run);
     EXPECT_EQ(snapshot.Phase, R::EditorGpuTransactionPhase::Accepting);
+    EXPECT_FALSE(snapshot.CanAccept);
+    EXPECT_EQ(snapshot.AcceptDisabledReason, "Accept is already under way.") << "the lifecycle's own refusal, in every phase";
     EXPECT_EQ(snapshot.Result.Status, R::EditorCommandStatus::Pending) << "\"Applied\" only after the CPU publication";
     EXPECT_FALSE(delivered);
 
@@ -343,6 +345,7 @@ TEST(PropertySmoothingTransaction, ASecondRunOnTheSameOutputWaitsForTheDecision)
     const auto next = R::StartEditorPropertySmoothing(h.Cmd(), h.Id(), h.Config, failure);
     ASSERT_TRUE(next) << failure.Message;
     EXPECT_EQ(R::SnapshotEditorPropertySmoothing(h.Cmd(), next).Phase, R::EditorGpuTransactionPhase::Running);
+    EXPECT_EQ(R::SnapshotEditorPropertySmoothing(h.Cmd(), next).AcceptDisabledReason, "No GPU result waits for Accept.");
     R::DiscardEditorPropertySmoothing(h.Cmd(), next);
     EXPECT_TRUE(h.Jobs.DrainUntilTerminal());
     EXPECT_EQ(R::SnapshotEditorPropertySmoothing(h.Cmd(), next).Phase, R::EditorGpuTransactionPhase::Discarded);

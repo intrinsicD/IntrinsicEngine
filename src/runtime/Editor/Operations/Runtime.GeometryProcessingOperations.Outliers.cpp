@@ -546,6 +546,8 @@ namespace Extrinsic::Runtime
             if(!s.CanAccept)s.AcceptDisabledReason="Outlier input or output changed; discard and run again.";
             else if(!w->Core.TestFront)for(std::size_t i=0;i<2;++i)if(!w->Core.Residency->HasRing(w->Core.Rings[i].Key)){
                 s.CanAccept=false;s.AcceptDisabledReason="The result is no longer resident.";}}
+        // Running, accepting or finished: the lifecycle's own refusal says why Accept is not available now.
+        else if(const auto refused=GeometryProcessingDetail::GpuTransactionAcceptRefusal(w->Core))s.AcceptDisabledReason=refused->Message;
         return s;
     }
     EditorOutlierAnalysisResult AcceptEditorOutlierAnalysis(const EditorProcessingCommands&,const EditorOutlierTransactionHandle& w,

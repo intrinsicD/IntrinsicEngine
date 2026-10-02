@@ -3777,24 +3777,22 @@ TEST(SandboxProcessingPanels, TopologyPanelDragsShowTheTableBounds)
     }
 }
 
-// An exclusive bound clamps onto the nearest accepted value inside it, so a clamped input is never refused.
-TEST(SandboxProcessingPanels, ConfigFieldClampStepsInsideExclusiveBounds)
+// An exclusive integer bound clamps one step inside it so a clamped input is never refused; an exclusive Float
+// bound is not nudged (no denormal stand-in), so validation still refuses it with its own diagnostic.
+TEST(SandboxProcessingPanels, ConfigFieldClampStepsInsideExclusiveIntegerBounds)
 {
     using Type = R::ConfigFieldType;
     const R::ConfigFieldSpec real{.Name = "t", .Type = Type::Float, .Min = 0.0, .Max = 1.0, .ExclusiveMin = true, .ExclusiveMax = true};
     const R::ConfigFieldSpec count{.Name = "n", .Type = Type::UInt, .Min = 0.0, .Max = 10.0, .ExclusiveMin = true, .ExclusiveMax = true};
     const R::ConfigFieldSpec closed{.Name = "c", .Type = Type::Float, .Min = 0.0, .Max = 1.0};
-    for (const double typed : {-5.0, 0.0, 0.5, 1.0, 7.0})
-    {
-        EXPECT_TRUE(R::AcceptsConfigFieldNumber(real, R::ClampToConfigFieldRange(real, typed))) << typed;
+    for (const double typed : {-5.0, 0.0, 0.5, 1.0, 7.0, 20.0})
         EXPECT_TRUE(R::AcceptsConfigFieldNumber(count, R::ClampToConfigFieldRange(count, typed))) << typed;
-    }
-    EXPECT_GT(R::ClampToConfigFieldRange(real, 0.0), 0.0);
-    EXPECT_LT(R::ClampToConfigFieldRange(real, 1.0), 1.0);
-    EXPECT_EQ(R::ClampToConfigFieldRange(real, 0.5), 0.5);
     EXPECT_EQ(R::ClampToConfigFieldRange(count, 0.0), 1.0);
     EXPECT_EQ(R::ClampToConfigFieldRange(count, 10.0), 9.0);
-    EXPECT_EQ(R::ClampToConfigFieldRange(closed, 0.0), 0.0) << "an inclusive bound stays the bound";
+    EXPECT_EQ(R::ClampToConfigFieldRange(real, 0.0), 0.0) << "a Float bound is kept so validation refuses it";
+    EXPECT_FALSE(R::AcceptsConfigFieldNumber(real, R::ClampToConfigFieldRange(real, 0.0)));
+    EXPECT_EQ(R::ClampToConfigFieldRange(real, 0.5), 0.5);
+    EXPECT_EQ(R::ClampToConfigFieldRange(closed, 0.0), 0.0);
     EXPECT_EQ(R::ClampToConfigFieldRange(closed, 2.0), 1.0);
 }
 
@@ -3958,9 +3956,24 @@ TEST(SandboxProcessingPanels, PropertySmoothingAcceptsOrDiscardsAPendingGpuResul
             break;
         case 13:
             EXPECT_TRUE(R::SnapshotEditorPropertySmoothing(commands, stale).Stale);
+            startLog();
             ImGui::ActivateItemByID(window->GetID("Accept##Smoothing"));
             break;
         case 16:
+            {
+                // The runtime's refusal reason shows once, inline (UI-071), not composed by the panel.
+                const std::string whole = finishLog();
+                const auto section = whole.find("--- GPU result");
+                ASSERT_NE(section, std::string::npos) << whole;
+                // One drawn frame: up to the next frame's section heading.
+                const auto next = whole.find("--- GPU result", section + 1);
+                const std::string text = whole.substr(section, next == std::string::npos ? next : next - section);
+                const auto reason = R::SnapshotEditorPropertySmoothing(commands, stale).AcceptDisabledReason;
+                ASSERT_FALSE(reason.empty());
+                const auto first = text.find(reason);
+                EXPECT_NE(first, std::string::npos) << text;
+                EXPECT_EQ(text.find(reason, first + 1), std::string::npos) << text;
+            }
             EXPECT_EQ(R::SnapshotEditorPropertySmoothing(commands, stale).Phase, R::EditorGpuTransactionPhase::ReadyToAccept)
                 << "a stale result cannot be accepted from the panel";
             EXPECT_FALSE(std::as_const(vertices).Exists("smooth"));
