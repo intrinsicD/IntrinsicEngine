@@ -3653,6 +3653,47 @@ TEST(SandboxProcessingPanels, GeodesicsExpansionBudgetClampsToTheSpecRange)
                      "0", R::kGeodesicsConfigSectionName, "\"max_halfedge_expansions\":1,"});
 }
 
+// UI-072 slice 3: the topology panels bound their drags by the command owners' tables. The ranges are the
+// ones the panels carried as literals, so this pins that the panel and the table cannot drift apart: an
+// out-of-range entry shows the table's bound.
+TEST(SandboxProcessingPanels, TopologyPanelDragsShowTheTableBounds)
+{
+    struct Case { const char* Window; const char* Title; const char* Control; const char* Typed; const char* Shown; };
+    const std::array cases{
+        Case{"mesh.processing.denoise", "Mesh / Processing / Denoise", "Normal iterations##MeshDenoise", "9999999", "{ 4096 } Normal iterations"},
+        Case{"mesh.processing.remesh", "Mesh / Processing / Remesh", "Iterations##MeshRemesh", "500", "{ 64 } Iterations"},
+        Case{"mesh.processing.subdivide", "Mesh / Processing / Subdivide", "Iterations##MeshSubdivide", "500", "{ 10 } Iterations"},
+        Case{"mesh.processing.simplify", "Mesh / Processing / Simplify", "Target faces##MeshSimplify", "2000000000", "{ 1000000000 } Target faces"},
+    };
+    for (const auto& test : cases)
+    {
+        SCOPED_TRACE(test.Control);
+        PanelHarness h;
+        auto& scene = h.Scene();
+        const auto entity = scene.Create();
+        PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+        ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+        ASSERT_TRUE(h.Shell.SetEditorWindowOpen(test.Window, true));
+        int frames = 0;
+        std::string drawn;
+        h.Driver->OnFrame = [&](R::Engine& engine) {
+            ++frames;
+            auto* window = ImGui::FindWindowByName(test.Title);
+            if (window) { ImGui::SetWindowSize(window, {750, 1600}); ImGui::SetWindowPos(window, {0, 0}); ImGui::FocusWindow(window); }
+            if (window && frames >= 10 && frames < 16) EditScalarControl(window, test.Control, frames - 10, test.Typed);
+            if (frames == 18) { ImGui::GetCurrentContext()->LogBuffer.clear(); ImGui::LogToBuffer(); ImGui::GetCurrentContext()->LogWindow = nullptr; }
+            if (frames == 20)
+            {
+                drawn = ImGui::GetCurrentContext()->LogBuffer.c_str();
+                ImGui::LogFinish();
+                engine.RequestExit();
+            }
+        };
+        h.Engine->Run();
+        EXPECT_NE(drawn.find(test.Shown), std::string::npos) << drawn;
+    }
+}
+
 // UI-055: the Coherent Point Drift panel drives a run through its own buttons: Start
 // captures, Step and Run to end iterate on the job service while the preview overlay
 // follows, and Apply publishes the transform. Apply and Discard drop the preview.

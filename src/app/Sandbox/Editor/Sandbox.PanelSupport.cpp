@@ -1922,6 +1922,40 @@ namespace Extrinsic::Sandbox::Editor
         return changed;
     }
 
+    bool DrawSpecDragInt(const char* label, const std::span<const Runtime::ConfigFieldSpec> fields,
+                         const std::string_view name, int& value, const int defaultValue, const float speed)
+    {
+        const auto* field = Runtime::FindConfigFieldSpec(fields, name);
+        int low = std::numeric_limits<int>::lowest(), high = std::numeric_limits<int>::max();
+        if (field != nullptr)
+        {
+            if (field->Min) low = static_cast<int>(std::max(*field->Min, double(low)));
+            if (field->Max) high = static_cast<int>(std::min(*field->Max, double(high)));
+            value = std::clamp(value, low, high);
+        }
+        const bool changed = ImGui::DragInt(label, &value, speed, low, high, "%d", ImGuiSliderFlags_AlwaysClamp);
+        DrawConfigFieldHint(field, std::to_string(defaultValue));
+        return changed;
+    }
+
+    bool DrawSpecDragDouble(const char* label, const std::span<const Runtime::ConfigFieldSpec> fields,
+                            const std::string_view name, double& value, const double defaultValue, const float speed,
+                            const char* const format)
+    {
+        const auto* field = Runtime::FindConfigFieldSpec(fields, name);
+        double low = std::numeric_limits<double>::lowest(), high = std::numeric_limits<double>::max();
+        if (field != nullptr)
+        {
+            if (field->Min) low = *field->Min;
+            if (field->Max) high = *field->Max;
+            value = Runtime::ClampToConfigFieldRange(*field, value);
+        }
+        const bool changed = ImGui::DragScalar(label, ImGuiDataType_Double, &value, speed, &low, &high, format,
+                                               ImGuiSliderFlags_AlwaysClamp);
+        DrawConfigFieldHint(field, std::format("{}", defaultValue));
+        return changed;
+    }
+
     bool DrawSpecInputUInt(const char* label, const std::span<const Runtime::ConfigFieldSpec> fields,
                            const std::string_view name, std::uint32_t& value, const std::uint32_t defaultValue)
     {

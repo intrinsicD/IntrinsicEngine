@@ -273,8 +273,8 @@ namespace Extrinsic::Sandbox::Editor
             std::int32_t Stage{0};
             std::int32_t NormalIterations{5};
             std::int32_t VertexIterations{10};
-            float SigmaSpatial{0.0f};
-            float SigmaRange{0.0f};
+            double SigmaSpatial{0.0};
+            double SigmaRange{0.0};
             bool PreserveBoundary{true};
         };
 
@@ -295,7 +295,7 @@ namespace Extrinsic::Sandbox::Editor
             std::int32_t Mode{0};
             std::int32_t SizingLaw{0};
             std::int32_t Iterations{1};
-            float TargetEdgeLength{0.0f};
+            double TargetEdgeLength{0.0};
             bool ProjectToSurface{false};
         };
 
@@ -317,12 +317,12 @@ namespace Extrinsic::Sandbox::Editor
             std::optional<Runtime::EditorMeshSimplifyResult> LastResult{};
             std::int32_t Metric{1};
             std::int32_t TargetFaces{0};
-            float MaxError{0.0f};
+            double MaxError{0.0};
             bool PreserveBoundary{true};
-            float FeatureAngleThresholdDegrees{45.0f};
-            float NormalWeight{1.0f};
-            float BoundaryWeight{1.0f};
-            float CurvatureWeight{1.0f};
+            double FeatureAngleThresholdDegrees{45.0};
+            double NormalWeight{1.0};
+            double BoundaryWeight{1.0};
+            double CurvatureWeight{1.0};
             bool PreserveSharpFeatures{true};
             bool PreserveUvSeams{true};
         };
@@ -879,28 +879,19 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::EndCombo();
         }
 
-        Denoise.NormalIterations =
-            std::clamp(Denoise.NormalIterations, 1, static_cast<int>(Runtime::kMeshDenoiseMaxIterations));
-        Denoise.VertexIterations =
-            std::clamp(Denoise.VertexIterations, 1, static_cast<int>(Runtime::kMeshDenoiseMaxIterations));
-        Denoise.SigmaSpatial =
-            std::clamp(Denoise.SigmaSpatial, 0.0f, 1.0e6f);
-        Denoise.SigmaRange =
-            std::clamp(Denoise.SigmaRange, 0.0f, 1.0e6f);
-        ImGui::DragInt(
-            "Normal iterations##MeshDenoise", &Denoise.NormalIterations,
-            1.0f, 1, static_cast<int>(Runtime::kMeshDenoiseMaxIterations));
-        ImGui::DragInt(
-            "Vertex iterations##MeshDenoise", &Denoise.VertexIterations,
-            1.0f, 1, static_cast<int>(Runtime::kMeshDenoiseMaxIterations));
-        ImGui::DragFloat(
-            "Sigma spatial##MeshDenoise", &Denoise.SigmaSpatial,
-            0.01f, 0.0f, 1.0e6f);
-        ImGui::DragFloat(
-            "Sigma range##MeshDenoise", &Denoise.SigmaRange,
-            0.01f, 0.0f, 1.0e6f);
+        const auto fields = Runtime::EditorMeshDenoiseFieldSpecs();
+        const Runtime::EditorMeshDenoiseCommand defaults{};
+        DrawSpecDragInt("Normal iterations##MeshDenoise", fields, "normal_iterations", Denoise.NormalIterations,
+                        int(defaults.NormalIterations));
+        DrawSpecDragInt("Vertex iterations##MeshDenoise", fields, "vertex_iterations", Denoise.VertexIterations,
+                        int(defaults.VertexIterations));
+        DrawSpecDragDouble("Sigma spatial##MeshDenoise", fields, "sigma_spatial", Denoise.SigmaSpatial,
+                           defaults.SigmaSpatial, 0.01f);
+        DrawSpecDragDouble("Sigma range##MeshDenoise", fields, "sigma_range", Denoise.SigmaRange,
+                           defaults.SigmaRange, 0.01f);
         ImGui::Checkbox(
             "Preserve boundary##MeshDenoise", &Denoise.PreserveBoundary);
+        DrawSpecFieldHint(fields, "preserve_boundary", defaults.PreserveBoundary ? "on" : "off");
 
         const Runtime::EditorMeshDenoiseCommand command{
             .StableEntityId = model.SelectedStableId,
@@ -909,9 +900,8 @@ namespace Extrinsic::Sandbox::Editor
                 Denoise.NormalIterations),
             .VertexIterations = static_cast<std::uint32_t>(
                 Denoise.VertexIterations),
-            .SigmaSpatial = static_cast<double>(
-                Denoise.SigmaSpatial),
-            .SigmaRange = static_cast<double>(Denoise.SigmaRange),
+            .SigmaSpatial = Denoise.SigmaSpatial,
+            .SigmaRange = Denoise.SigmaRange,
             .PreserveBoundary = Denoise.PreserveBoundary,
         };
         const auto readiness = Runtime::PreviewEditorMeshDenoiseCommand(
@@ -1515,8 +1505,8 @@ namespace Extrinsic::Sandbox::Editor
         Remesh.SizingLaw = std::clamp(
             Remesh.SizingLaw, 0,
             static_cast<std::int32_t>(kMeshRemeshSizingLaws.size() - 1u));
-        Remesh.Iterations = std::clamp(Remesh.Iterations, 1, 64);
-        Remesh.TargetEdgeLength = std::clamp(Remesh.TargetEdgeLength, 0.0f, 1.0e6f);
+        const auto fields = Runtime::EditorMeshRemeshFieldSpecs();
+        const Runtime::EditorMeshRemeshCommand defaults{};
 
         // Probe options independently of unrelated draft settings so a blocked
         // combination does not prevent choosing a supported alternative.
@@ -1540,8 +1530,9 @@ namespace Extrinsic::Sandbox::Editor
             }
             ImGui::EndCombo();
         }
-        ImGui::DragInt("Iterations##MeshRemesh", &Remesh.Iterations, 1.0f, 1, static_cast<int>(Runtime::kMeshRemeshMaxIterations));
-        ImGui::DragFloat("Target edge length##MeshRemesh", &Remesh.TargetEdgeLength, 0.01f, 0.0f, 1.0e6f);
+        DrawSpecDragInt("Iterations##MeshRemesh", fields, "iterations", Remesh.Iterations, int(defaults.Iterations));
+        DrawSpecDragDouble("Target edge length##MeshRemesh", fields, "target_edge_length", Remesh.TargetEdgeLength,
+                           defaults.TargetEdgeLength, 0.01f);
 
         const auto mode = FromIndex(kMeshRemeshModes, Remesh.Mode);
         if (ImGui::BeginCombo("Sizing law##MeshRemesh",
@@ -1575,7 +1566,7 @@ namespace Extrinsic::Sandbox::Editor
             .Mode = mode,
             .SizingLaw = FromIndex(kMeshRemeshSizingLaws, Remesh.SizingLaw),
             .Iterations = static_cast<std::uint32_t>(Remesh.Iterations),
-            .TargetEdgeLength = static_cast<double>(Remesh.TargetEdgeLength),
+            .TargetEdgeLength = Remesh.TargetEdgeLength,
             .ProjectToSurface = Remesh.ProjectToSurface,
         };
         if (DrawProcessingActionButton("Remesh##MeshRemesh", preview(command)))
@@ -1632,7 +1623,8 @@ namespace Extrinsic::Sandbox::Editor
         Subdivide.Operator = std::clamp(
             Subdivide.Operator, 0,
             static_cast<std::int32_t>(kMeshSubdivideOperators.size() - 1u));
-        Subdivide.Iterations = std::clamp(Subdivide.Iterations, 1, 10);
+        const auto fields = Runtime::EditorMeshSubdivideFieldSpecs();
+        const Runtime::EditorMeshSubdivideCommand defaults{};
         const auto preview = [&](const Runtime::EditorMeshSubdivideCommand& command) {
             return Runtime::PreviewEditorMeshSubdivideCommand(context.MeshTopology.Commands, command);
         };
@@ -1653,7 +1645,7 @@ namespace Extrinsic::Sandbox::Editor
             }
             ImGui::EndCombo();
         }
-        ImGui::DragInt("Iterations##MeshSubdivide", &Subdivide.Iterations, 1.0f, 1, static_cast<int>(Runtime::kMeshSubdivideMaxIterations));
+        DrawSpecDragInt("Iterations##MeshSubdivide", fields, "iterations", Subdivide.Iterations, int(defaults.Iterations));
         const auto op = FromIndex(kMeshSubdivideOperators, Subdivide.Operator);
         if (op != Runtime::EditorMeshSubdivideOperator::Loop)
             Subdivide.PreserveLoopFeatures = false;
@@ -1729,8 +1721,8 @@ namespace Extrinsic::Sandbox::Editor
         Simplify.Metric = std::clamp(
             Simplify.Metric, 0,
             static_cast<std::int32_t>(kMeshSimplifyMetrics.size() - 1u));
-        Simplify.TargetFaces = std::max(Simplify.TargetFaces, 0);
-        Simplify.MaxError = std::max(Simplify.MaxError, 0.0f);
+        const auto fields = Runtime::EditorMeshSimplifyFieldSpecs();
+        const Runtime::EditorMeshSimplifyCommand defaults{};
         const Runtime::EditorMeshSimplifyMetric metric =
             FromIndex(kMeshSimplifyMetrics, Simplify.Metric);
         if (ImGui::BeginCombo(
@@ -1754,14 +1746,13 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::EndCombo();
         }
 
-        ImGui::DragInt(
-            "Target faces##MeshSimplify", &Simplify.TargetFaces,
-            1.0f, 0, static_cast<int>(Runtime::kMeshSimplifyMaxTargetFaces));
-        ImGui::DragFloat(
-            "Max error (0 = unlimited)##MeshSimplify", &Simplify.MaxError,
-            0.001f, 0.0f, 1.0e30f, "%.6g");
+        DrawSpecDragInt("Target faces##MeshSimplify", fields, "target_faces", Simplify.TargetFaces,
+                        int(defaults.TargetFaces));
+        DrawSpecDragDouble("Max error (0 = unlimited)##MeshSimplify", fields, "max_error", Simplify.MaxError,
+                           defaults.MaxError, 0.001f, "%.6g");
         ImGui::Checkbox(
             "Preserve boundary##MeshSimplify", &Simplify.PreserveBoundary);
+        DrawSpecFieldHint(fields, "preserve_boundary", defaults.PreserveBoundary ? "on" : "off");
 
         const bool faQem =
             metric == Runtime::EditorMeshSimplifyMetric::FA_QEM;
@@ -1770,19 +1761,14 @@ namespace Extrinsic::Sandbox::Editor
         if (ImGui::CollapsingHeader(
                 "Feature-aware (FA-QEM) weights##MeshSimplify"))
         {
-            ImGui::DragFloat(
-                "Feature angle (deg)##MeshSimplify",
-                &Simplify.FeatureAngleThresholdDegrees,
-                0.5f, 0.0f, 180.0f, "%.1f");
-            ImGui::DragFloat(
-                "Normal weight##MeshSimplify", &Simplify.NormalWeight,
-                0.01f, 0.0f, 1000.0f, "%.3f");
-            ImGui::DragFloat(
-                "Boundary weight##MeshSimplify", &Simplify.BoundaryWeight,
-                0.01f, 0.0f, 1000.0f, "%.3f");
-            ImGui::DragFloat(
-                "Curvature weight##MeshSimplify", &Simplify.CurvatureWeight,
-                0.01f, 0.0f, 1000.0f, "%.3f");
+            DrawSpecDragDouble("Feature angle (deg)##MeshSimplify", fields, "feature_angle_threshold_degrees",
+                               Simplify.FeatureAngleThresholdDegrees, defaults.FeatureAngleThresholdDegrees, 0.5f, "%.1f");
+            DrawSpecDragDouble("Normal weight##MeshSimplify", fields, "normal_weight", Simplify.NormalWeight,
+                               defaults.NormalWeight, 0.01f);
+            DrawSpecDragDouble("Boundary weight##MeshSimplify", fields, "boundary_weight", Simplify.BoundaryWeight,
+                               defaults.BoundaryWeight, 0.01f);
+            DrawSpecDragDouble("Curvature weight##MeshSimplify", fields, "curvature_weight", Simplify.CurvatureWeight,
+                               defaults.CurvatureWeight, 0.01f);
             ImGui::Checkbox(
                 "Preserve sharp features##MeshSimplify",
                 &Simplify.PreserveSharpFeatures);
@@ -1798,16 +1784,12 @@ namespace Extrinsic::Sandbox::Editor
             .Metric = metric,
             .TargetFaces = static_cast<std::size_t>(
                 Simplify.TargetFaces),
-            .MaxError = static_cast<double>(Simplify.MaxError),
+            .MaxError = Simplify.MaxError,
             .PreserveBoundary = Simplify.PreserveBoundary,
-            .FeatureAngleThresholdDegrees = static_cast<double>(
-                Simplify.FeatureAngleThresholdDegrees),
-            .NormalWeight = static_cast<double>(
-                Simplify.NormalWeight),
-            .BoundaryWeight = static_cast<double>(
-                Simplify.BoundaryWeight),
-            .CurvatureWeight = static_cast<double>(
-                Simplify.CurvatureWeight),
+            .FeatureAngleThresholdDegrees = Simplify.FeatureAngleThresholdDegrees,
+            .NormalWeight = Simplify.NormalWeight,
+            .BoundaryWeight = Simplify.BoundaryWeight,
+            .CurvatureWeight = Simplify.CurvatureWeight,
             .PreserveSharpFeatures =
                 Simplify.PreserveSharpFeatures,
             .PreserveUvSeams = Simplify.PreserveUvSeams,

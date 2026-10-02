@@ -251,6 +251,12 @@ namespace Extrinsic::Sandbox::Editor
                            std::string_view defaultValue = {});
     bool DrawSpecInputDouble(const char* label, std::span<const Runtime::ConfigFieldSpec> fields, std::string_view name,
                              double& value, double defaultValue, const char* format = "%.6g");
+    // Drag controls whose bounds are the table's: the value is clamped to the declared closed range before
+    // drawing and the drag cannot leave it; a bound the table leaves open stays open.
+    bool DrawSpecDragInt(const char* label, std::span<const Runtime::ConfigFieldSpec> fields, std::string_view name,
+                         int& value, int defaultValue, float speed = 1.0f);
+    bool DrawSpecDragDouble(const char* label, std::span<const Runtime::ConfigFieldSpec> fields, std::string_view name,
+                            double& value, double defaultValue, float speed, const char* format = "%.3f");
     bool DrawSpecInputUInt(const char* label, std::span<const Runtime::ConfigFieldSpec> fields, std::string_view name,
                            std::uint32_t& value, std::uint32_t defaultValue);
     // `value` is the payload's integer code (first name = the field's Min).
