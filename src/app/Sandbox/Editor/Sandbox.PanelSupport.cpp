@@ -2260,7 +2260,8 @@ namespace Extrinsic::Sandbox::Editor
         const Runtime::EditorAttributeBindingModel& model,
         const AppearanceElementSection section,
         const SandboxEditorContext* const context,
-        AttributeSourceUiState& state)
+        AttributeSourceUiState& state,
+        const std::function<void(const Runtime::EditorAttributeBindingRow&)>& rowDetails)
     {
         if (state.Entity != model.StableEntityId)
             state = {.Entity = model.StableEntityId};
@@ -2287,7 +2288,8 @@ namespace Extrinsic::Sandbox::Editor
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip))
                 {
                     ImGui::SetTooltip(
-                        "Expects %s, one value per %s (%zu).\nDefault: %s.",
+                        "Expects %s, one value per %s (%zu).\nDefault: %s.\n"
+                        "A source that is missing or no longer fits falls back to the default.",
                         row.ExpectedType.c_str(),
                         std::string{ToString(row.Domain)}.c_str(),
                         row.ExpectedElementCount, row.DefaultSource.c_str());
@@ -2338,6 +2340,8 @@ namespace Extrinsic::Sandbox::Editor
                     ImGui::EndCombo();
                 }
                 ImGui::EndDisabled();
+                if (rowDetails)
+                    rowDetails(row);
 
                 ImGui::TableSetColumnIndex(2);
                 if (row.UsingFallback)

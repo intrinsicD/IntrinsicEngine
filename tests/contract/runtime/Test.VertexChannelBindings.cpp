@@ -183,6 +183,13 @@ TEST(VertexChannelBindings, ModelListsRowsCandidatesAndCurrentSourcesForEveryEnt
                             {A::Color, D::MeshEdge}, {A::Color, D::MeshFace},
                             {A::PointSize, D::MeshVertex}, {A::LineWidth, D::MeshEdge}}));
 
+    // A Color row names the lane overlay it binds; other attributes have none.
+    using Target = Runtime::EditorVisualizationTarget;
+    EXPECT_EQ(FindRow(model, A::Color, D::MeshVertex)->OverlayTarget, Target::Surface);
+    EXPECT_EQ(FindRow(model, A::Color, D::MeshFace)->OverlayTarget, Target::Surface);
+    EXPECT_EQ(FindRow(model, A::Color, D::MeshEdge)->OverlayTarget, Target::Edges);
+    EXPECT_FALSE(FindRow(model, A::Position, D::MeshVertex)->OverlayTarget.has_value());
+
     const auto* position = FindRow(model, A::Position, D::MeshVertex);
     ASSERT_NE(position, nullptr);
     EXPECT_FALSE(position->Bound);

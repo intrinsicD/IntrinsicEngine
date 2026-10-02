@@ -253,6 +253,11 @@ namespace Extrinsic::Runtime
                 .ExpectedElementCount = properties->Size(),
                 .DefaultSource = std::string{rule.DefaultDescription},
             };
+            if (rule.Attribute == RenderAttribute::Color)
+            {
+                if (const auto overlay = EditorFeatureDetail::ColorOverlayTargetFor(rule.Domain))
+                    row.OverlayTarget = overlay->Target;
+            }
             if (const std::optional<std::string> bound = BoundSourceName(raw, *entity, rule))
             {
                 row.Bound = true;

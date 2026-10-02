@@ -185,6 +185,9 @@ export namespace Extrinsic::Runtime
         GeometryPropertyResolution Resolution{};
         bool UsingFallback{false};
         std::string Diagnostic{};
+        // Color rows: the lane whose visualization overlay this row binds (the
+        // lane model that carries its interpretation and color mapping).
+        std::optional<EditorVisualizationTarget> OverlayTarget{};
         std::vector<EditorAttributeBindingCandidate> Candidates{};
     };
 

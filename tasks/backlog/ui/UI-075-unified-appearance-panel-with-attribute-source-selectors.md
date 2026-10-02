@@ -76,3 +76,9 @@ python3 tools/agents/check_task_policy.py --root . --strict
   kind, bind/refuse/Default/undo through the real combo, reason text, unavailable section.
   Not covered: a usable domain whose lane target is unavailable has no runtime reason text yet
   (no reachable case on today's provenance rules).
+- 2026-10-02: Slice 3. `EditorAttributeBindingRow::OverlayTarget` (runtime) names the lane overlay a
+  Color row binds, so the panel picks the lane model without a rule of its own. A bound Color row
+  shows the interpretation combo (`DrawColorInterpretationCombo`, UI-074 tooltips) and the Color
+  mapping block; Point size / Line width rows show the uniform pixel field only while on Default
+  (a bound row's source is its selector). The row tooltip now states the fallback. The lane
+  Settings keep the render-hint combos, the Property dropdown, uniform color and texture baking.

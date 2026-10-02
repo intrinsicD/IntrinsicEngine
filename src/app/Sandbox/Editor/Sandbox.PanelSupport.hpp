@@ -499,11 +499,14 @@ namespace Extrinsic::Sandbox::Editor
     // (attribute, element domain) of `section` with the current source, a selector (Default plus every
     // candidate; incompatible ones disabled with the runtime's reason) and the fallback status.
     // A pick goes through `ApplyEditorAttributeBindingCommand` (one undo step); nothing is cached here.
+    // `rowDetails`, when set, draws the controls that belong to a row (color interpretation, uniform
+    // size) under its selector.
     void DrawAttributeSourceTable(
         const Runtime::EditorAttributeBindingModel& model,
         AppearanceElementSection section,
         const SandboxEditorContext* context,
-        AttributeSourceUiState& state);
+        AttributeSourceUiState& state,
+        const std::function<void(const Runtime::EditorAttributeBindingRow&)>& rowDetails = {});
 
     void DrawUniformVisualizationColorEdit(
         const Runtime::EditorVisualizationConfigModel& visualization,

@@ -1316,3 +1316,199 @@ TEST(SandboxDomainPanels, AppearanceOfAMeshLackingEdgesShowsNoSectionTables)
     shell.Detach();
     engine.Shutdown();
 }
+
+// UI-075 slice 3: controls live with the attribute row they belong to.
+namespace
+{
+    [[nodiscard]] int RowIndexOf(const Runtime::EditorAttributeBindingModel& model,
+                                 const Runtime::RenderAttribute attribute,
+                                 const Runtime::GeometryElementDomain domain)
+    {
+        for (std::size_t i = 0u; i < model.Rows.size(); ++i)
+        {
+            if (model.Rows[i].Attribute == attribute && model.Rows[i].Domain == domain)
+                return static_cast<int>(i);
+        }
+        return -1;
+    }
+
+    [[nodiscard]] ImGuiID RowItemId(const ImGuiID table, const int row, const char* label)
+    {
+        return ImHashStr(label, 0, ImHashData(&row, sizeof(row), table));
+    }
+}
+
+TEST(SandboxDomainPanels, ColorInterpretationAppearsOnTheBoundColorRowOnly)
+{
+    namespace GS = Extrinsic::ECS::Components::GeometrySources;
+    using Kind = Runtime::EditorDomainWindowKind;
+    auto application = std::make_unique<OneFrameApplication>();
+    auto* driver = application.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(application));
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<Runtime::EditorUiModule>();
+    engine.Initialize();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    auto& raw = scene.Raw();
+    const auto entity = scene.Create();
+    raw.emplace<Extrinsic::ECS::Components::Selection::SelectableTag>(entity);
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    const auto b = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+    const auto c = mesh.AddVertex({0.0f, 1.0f, 0.0f});
+    (void)mesh.AddTriangle(a, b, c);
+    GS::PopulateFromMesh(raw, entity, mesh);
+    (void)raw.get<GS::Vertices>(entity).Properties.GetOrAdd<glm::vec3>("v:tint", glm::vec3{0.5f});
+    auto* selection = engine.Services().Find<Runtime::SelectionController>();
+    ASSERT_NE(selection, nullptr);
+    ASSERT_TRUE(selection->SetSelectedEntity(scene, entity));
+    const auto bindings = Runtime::BuildEditorAttributeBindingModel(
+        scene, Runtime::SelectionController::ToStableEntityId(entity));
+    const int colorRow = RowIndexOf(bindings, Runtime::RenderAttribute::Color,
+                                    Runtime::GeometryElementDomain::MeshVertex);
+    ASSERT_GE(colorRow, 0);
+
+    Editor::EditorShell shell;
+    shell.Attach(engine.Worlds(), engine.Services());
+    Editor::DomainPanels panels;
+    panels.Register(shell);
+    ASSERT_TRUE(shell.SetEditorWindowOpen("scene.appearance", true));
+
+    const auto selectInPopup = [](const std::string& item) {
+        const auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+        if (popups.empty() || popups.back().Window == nullptr)
+            return false;
+        ImGui::ActivateItemByID(popups.back().Window->GetID(item.c_str()));
+        return true;
+    };
+    const auto popupOpen = [] { return !ImGui::GetCurrentContext()->OpenPopupStack.empty(); };
+    int frame = 0;
+    int step = 0;
+    driver->OnFrame = [&](Runtime::Engine& kernel) {
+        ++frame;
+        auto* window = ImGui::FindWindowByName("Appearance");
+        if (frame < 3)
+            return;
+        if (window == nullptr || frame > 200)
+        {
+            ADD_FAILURE() << "automation stalled at step " << step;
+            kernel.RequestExit();
+            return;
+        }
+        ImGui::SetWindowSize(window, ImVec2{700.0f, 1100.0f});
+        if (frame % 3 != 0)
+            return;
+        const ImGuiID table = AppearanceTableId(window, Kind::PointCloud, "Vertices");
+        const ImGuiID source = RowItemId(table, colorRow, "##Source");
+        const ImGuiID interpretation = RowItemId(table, colorRow, "Color interpretation");
+        switch (step)
+        {
+        case 0: ImGui::FocusWindow(window); ImGui::ActivateItemByID(interpretation); break;
+        case 1:
+            EXPECT_FALSE(popupOpen()) << "no interpretation control while the row is on Default";
+            ImGui::ActivateItemByID(source);
+            break;
+        case 2: EXPECT_TRUE(selectInPopup("v:tint (Vec3, 3)")); break;
+        case 3: ImGui::ActivateItemByID(interpretation); break;
+        case 4:
+            EXPECT_TRUE(popupOpen()) << "the bound Color row owns the interpretation combo";
+            kernel.RequestExit();
+            break;
+        default: break;
+        }
+        ++step;
+    };
+    engine.Run();
+    EXPECT_EQ(step, 5);
+    panels.Unregister();
+    shell.Detach();
+    engine.Shutdown();
+}
+
+TEST(SandboxDomainPanels, UniformPointSizeSitsOnItsRowAndYieldsToABoundSource)
+{
+    namespace GS = Extrinsic::ECS::Components::GeometrySources;
+    namespace G = Extrinsic::Graphics::Components;
+    using Kind = Runtime::EditorDomainWindowKind;
+    auto application = std::make_unique<OneFrameApplication>();
+    auto* driver = application.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(application));
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<Runtime::EditorUiModule>();
+    engine.Initialize();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    auto& raw = scene.Raw();
+    const auto entity = scene.Create();
+    raw.emplace<Extrinsic::ECS::Components::Selection::SelectableTag>(entity);
+    Geometry::PointCloud::Cloud cloud;
+    (void)cloud.AddPoint({0.0f, 0.0f, 0.0f});
+    GS::PopulateFromCloud(raw, entity, cloud);
+    (void)raw.get<GS::Vertices>(entity).Properties.GetOrAdd<float>("p:radius", 2.0f);
+    raw.emplace<G::RenderPoints>(entity);
+    auto* selection = engine.Services().Find<Runtime::SelectionController>();
+    ASSERT_NE(selection, nullptr);
+    ASSERT_TRUE(selection->SetSelectedEntity(scene, entity));
+    const auto bindings = Runtime::BuildEditorAttributeBindingModel(
+        scene, Runtime::SelectionController::ToStableEntityId(entity));
+    const int sizeRow = RowIndexOf(bindings, Runtime::RenderAttribute::PointSize,
+                                   Runtime::GeometryElementDomain::PointCloudPoint);
+    ASSERT_GE(sizeRow, 0);
+
+    Editor::EditorShell shell;
+    shell.Attach(engine.Worlds(), engine.Services());
+    Editor::DomainPanels panels;
+    panels.Register(shell);
+    ASSERT_TRUE(shell.SetEditorWindowOpen("scene.appearance", true));
+
+    const auto selectInPopup = [](const std::string& item) {
+        const auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+        if (popups.empty() || popups.back().Window == nullptr)
+            return false;
+        ImGui::ActivateItemByID(popups.back().Window->GetID(item.c_str()));
+        return true;
+    };
+    int frame = 0;
+    int step = 0;
+    driver->OnFrame = [&](Runtime::Engine& kernel) {
+        ++frame;
+        auto* window = ImGui::FindWindowByName("Appearance");
+        if (frame < 3)
+            return;
+        if (window == nullptr || frame > 200)
+        {
+            ADD_FAILURE() << "automation stalled at step " << step;
+            kernel.RequestExit();
+            return;
+        }
+        ImGui::SetWindowSize(window, ImVec2{700.0f, 1100.0f});
+        if (frame % 3 != 0)
+            return;
+        const ImGuiID table = AppearanceTableId(window, Kind::PointCloud, "Vertices");
+        const ImGuiID field = RowItemId(table, sizeRow, "Point size");
+        const ImGuiID source = RowItemId(table, sizeRow, "##Source");
+        switch (step)
+        {
+        case 0: ImGui::FocusWindow(window); ImGui::ActivateItemByID(field); break;
+        case 1:
+            EXPECT_EQ(ImGui::GetActiveID(), field) << "the uniform size is edited on its row";
+            ImGui::ClearActiveID();
+            ImGui::ActivateItemByID(source);
+            break;
+        case 2: EXPECT_TRUE(selectInPopup("p:radius (Float, 1)")); break;
+        case 3: ImGui::ActivateItemByID(field); break;
+        case 4:
+            EXPECT_NE(ImGui::GetActiveID(), field) << "a bound source replaces the uniform field";
+            kernel.RequestExit();
+            break;
+        default: break;
+        }
+        ++step;
+    };
+    engine.Run();
+    EXPECT_EQ(step, 5);
+    panels.Unregister();
+    shell.Detach();
+    engine.Shutdown();
+}

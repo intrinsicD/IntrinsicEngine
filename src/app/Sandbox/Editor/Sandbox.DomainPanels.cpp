@@ -274,18 +274,23 @@ void DrawEdgeRenderHintControls(const EditorDomainWindowModel &model,
                  });
   }
 
-  if (model.RenderHints.HasUniformEdgeWidth) {
-    float edgeWidth = model.RenderHints.UniformEdgeWidth;
-    if (ImGui::DragFloat("Edge width", &edgeWidth, 0.05f, 0.01f, 32.0f,
-                         "%.3f", ImGuiSliderFlags_AlwaysClamp) &&
-        canEditRenderHints) {
-      (void)ApplyEditorRenderHintCommand(
-          context.VisualizationCommands, EditorRenderHintCommand{
-                       .StableEntityId = model.SelectedStableId,
-                       .SetUniformEdgeWidth = true,
-                       .UniformEdgeWidth = edgeWidth,
-                   });
-    }
+}
+
+// The uniform edge width, shown on the Line width row while no property is
+// bound there (a bound width is drawn from its source instead).
+void DrawUniformEdgeWidthField(const EditorDomainWindowModel &model,
+                               const SandboxEditorContext &context) {
+  if (!model.RenderHints.HasUniformEdgeWidth)
+    return;
+  float edgeWidth = model.RenderHints.UniformEdgeWidth;
+  if (ImGui::DragFloat("Edge width", &edgeWidth, 0.05f, 0.01f, 32.0f, "%.3f",
+                       ImGuiSliderFlags_AlwaysClamp)) {
+    (void)ApplyEditorRenderHintCommand(
+        context.VisualizationCommands, EditorRenderHintCommand{
+                     .StableEntityId = model.SelectedStableId,
+                     .SetUniformEdgeWidth = true,
+                     .UniformEdgeWidth = edgeWidth,
+                 });
   }
 }
 
@@ -320,18 +325,22 @@ void DrawPointRenderHintControls(const EditorDomainWindowModel &model,
                  });
   }
 
-  if (model.RenderHints.HasUniformPointSize) {
-    float pointSize = model.RenderHints.UniformPointSize;
-    if (ImGui::DragFloat("Point size", &pointSize, 0.05f, 0.01f, 32.0f,
-                         "%.3f", ImGuiSliderFlags_AlwaysClamp) &&
-        canEditRenderHints) {
-      (void)ApplyEditorRenderHintCommand(
-          context.VisualizationCommands, EditorRenderHintCommand{
-                       .StableEntityId = model.SelectedStableId,
-                       .SetUniformPointSize = true,
-                       .UniformPointSize = pointSize,
-                   });
-    }
+}
+
+// The uniform point size, shown on the Point size row while no property is bound.
+void DrawUniformPointSizeField(const EditorDomainWindowModel &model,
+                               const SandboxEditorContext &context) {
+  if (!model.RenderHints.HasUniformPointSize)
+    return;
+  float pointSize = model.RenderHints.UniformPointSize;
+  if (ImGui::DragFloat("Point size", &pointSize, 0.05f, 0.01f, 32.0f, "%.3f",
+                       ImGuiSliderFlags_AlwaysClamp)) {
+    (void)ApplyEditorRenderHintCommand(
+        context.VisualizationCommands, EditorRenderHintCommand{
+                     .StableEntityId = model.SelectedStableId,
+                     .SetUniformPointSize = true,
+                     .UniformPointSize = pointSize,
+                 });
   }
 }
 
@@ -601,6 +610,35 @@ void DrawVectorFieldSection(const EditorDomainWindowModel &model,
   ImGui::PopID();
 }
 
+// What the Color row of a bound overlay adds: how a color-buffer property is
+// read, and the colormap/range of a scalar one. Both belong to the lane overlay
+// that the row binds, so they sit with the row instead of in lane settings.
+void DrawColorRowControls(const EditorDomainWindowModel &model,
+                          const SandboxEditorContext &context,
+                          EditorCommandStatus &lastStatus) {
+  const auto &visualization = model.Visualization.Visualization;
+  const bool available = model.VisualizationTargetAvailable &&
+                         model.VisualizationControlsAvailable;
+  ImGui::BeginDisabled(!available);
+  if (visualization.HasConfig && static_cast<int>(visualization.Source) >= 3) {
+    int interpretation = static_cast<int>(visualization.Interpretation);
+    if (DrawColorInterpretationCombo(interpretation)) {
+      auto command = MakeVisualizationConfigCommandFromModel(
+          model.SelectedStableId, visualization, model.VisualizationTarget);
+      command.Interpretation =
+          static_cast<decltype(command.Interpretation)>(interpretation);
+      lastStatus = ApplyEditorVisualizationConfigCommand(
+          context.VisualizationCommands, command);
+    }
+  }
+  if (visualization.Source == kScalarFieldSource &&
+      ImGui::CollapsingHeader("Color mapping"))
+    DrawScalarVisualizationControls(visualization, context,
+                                    model.SelectedStableId,
+                                    model.VisualizationTarget, available);
+  ImGui::EndDisabled();
+}
+
 // One element-domain section of the Appearance window. `Kind` selects the
 // per-lane window model (its render hints and visualization target);
 // `ElementProbe` is the element domain the UI-051 reading predicate is asked
@@ -628,14 +666,34 @@ AppearanceSectionApplies(const AppearanceSection &section,
   return GeometryDomainReadingIncludes(entity, section.ElementProbe);
 }
 
-// One lane's visibility toggle and settings (render hints, property and
-// color controls, advanced state).
+// Everything one Appearance draw borrows; `Lanes[i]` is the model of
+// `kAppearanceSections[i]` (null when the reading predicate excludes it).
+struct AppearanceDraw {
+  std::array<const EditorDomainWindowModel *, 3> Lanes;
+  const SandboxEditorContext &Context;
+  TextureBakeUiState *TextureBake;
+  std::array<EditorCommandStatus, 3> &Statuses;
+  AttributeSourceUiState &AttributeState;
+};
+
+[[nodiscard]] const EditorDomainWindowModel *
+FindLaneForTarget(const AppearanceDraw &draw,
+                  const EditorVisualizationTarget target) {
+  for (const EditorDomainWindowModel *lane : draw.Lanes) {
+    if (lane != nullptr && lane->VisualizationTarget == target)
+      return lane;
+  }
+  return nullptr;
+}
+
+// One lane's visibility toggle, attribute table (with the controls that belong
+// to each attribute row) and settings (render hints, property, advanced state).
 void DrawAppearanceLane(const AppearanceSection &section,
                         const EditorDomainWindowModel &model,
-                        const SandboxEditorContext &context,
-                        TextureBakeUiState *textureBakeState,
-                        EditorCommandStatus &status,
-                        AttributeSourceUiState &attributeState) {
+                        const AppearanceDraw &draw) {
+  const SandboxEditorContext &context = draw.Context;
+  EditorCommandStatus &status =
+      draw.Statuses[static_cast<std::size_t>(model.Kind)];
   const bool mesh = model.Kind == EditorDomainWindowKind::Mesh;
   const bool graph = model.Kind == EditorDomainWindowKind::Graph;
   bool visible = mesh ? model.RenderHints.HasRenderSurface
@@ -661,8 +719,33 @@ void DrawAppearanceLane(const AppearanceSection &section,
       status != EditorCommandStatus::NoChange)
     ImGui::TextWrapped("Appearance change failed: %s",
                        DebugNameForEditorCommandStatus(status));
+  // A bound size or width is drawn from its source (the row's selector); the
+  // uniform field shows only while the row is on Default.
+  const auto rowDetails = [&](const EditorAttributeBindingRow &row) {
+    switch (row.Attribute) {
+    case RenderAttribute::Color:
+      if (row.Bound && row.OverlayTarget.has_value()) {
+        if (const EditorDomainWindowModel *lane =
+                FindLaneForTarget(draw, *row.OverlayTarget))
+          DrawColorRowControls(
+              *lane, context, draw.Statuses[static_cast<std::size_t>(lane->Kind)]);
+      }
+      break;
+    case RenderAttribute::PointSize:
+      if (!row.Bound)
+        DrawUniformPointSizeField(model, context);
+      break;
+    case RenderAttribute::LineWidth:
+      if (!row.Bound)
+        DrawUniformEdgeWidthField(model, context);
+      break;
+    default:
+      break;
+    }
+  };
   DrawAttributeSourceTable(model.PropertyCatalog.AttributeBindings,
-                           section.Section, &context, attributeState);
+                           section.Section, &context, draw.AttributeState,
+                           rowDetails);
   if (!visible || !ImGui::TreeNode("Settings"))
     return;
   switch (model.Kind) {
@@ -683,7 +766,7 @@ void DrawAppearanceLane(const AppearanceSection &section,
     DrawPropertyBindingTargets(model.PropertyCatalog);
     if (mesh) {
       static TextureBakeMutationUiState mutationState{};
-      DrawTextureBakeControls(model.TextureBake, &context, textureBakeState,
+      DrawTextureBakeControls(model.TextureBake, &context, draw.TextureBake,
                               mutationState);
     }
   }
@@ -696,13 +779,10 @@ void DrawAppearanceLane(const AppearanceSection &section,
 // null when the reading predicate excludes it; a section the predicate reaches
 // but the model refuses draws disabled with the runtime's reason.
 // `selected` names the entity (any lane's model carries it).
-void DrawAppearanceContent(
-    const EditorDomainWindowModel &selected,
-    const std::array<const EditorDomainWindowModel *, 3> &lanes,
-    const SandboxEditorContext &context, TextureBakeUiState *textureBakeState,
-    std::array<EditorCommandStatus, 3> &statuses,
-    AttributeSourceUiState &attributeState,
-    VectorFieldUiState &vectorFieldState) {
+void DrawAppearanceContent(const EditorDomainWindowModel &selected,
+                           const AppearanceDraw &draw,
+                           VectorFieldUiState &vectorFieldState) {
+  const SandboxEditorContext &context = draw.Context;
   if (!selected.HasSelectedEntity) {
     ImGui::TextDisabled("Select a mesh, graph, or point cloud.");
     return;
@@ -710,7 +790,7 @@ void DrawAppearanceContent(
   ImGui::TextUnformatted(selected.SelectedEntity.Name.c_str());
   bool anySection = false;
   for (std::size_t i = 0u; i < kAppearanceSections.size(); ++i) {
-    const EditorDomainWindowModel *model = lanes[i];
+    const EditorDomainWindowModel *model = draw.Lanes[i];
     if (model == nullptr)
       continue;
     anySection = true;
@@ -722,10 +802,7 @@ void DrawAppearanceContent(
                                  ImGuiTreeNodeFlags_DefaultOpen))
       continue;
     ImGui::PushID(static_cast<int>(model->Kind));
-    DrawAppearanceLane(kAppearanceSections[i], *model, context,
-                       textureBakeState,
-                       statuses[static_cast<std::size_t>(model->Kind)],
-                       attributeState);
+    DrawAppearanceLane(kAppearanceSections[i], *model, draw);
     ImGui::PopID();
   }
   if (!anySection) {
@@ -743,15 +820,6 @@ void DrawDomainVisualizationControls(const EditorDomainWindowModel &model,
                          model.VisualizationControlsAvailable;
   ImGui::BeginDisabled(!available);
   DrawVisualizationPropertyDropdown(model, context, lastStatus);
-  if (visualization.HasConfig && static_cast<int>(visualization.Source) >= 3) {
-    int interpretation = static_cast<int>(visualization.Interpretation);
-    if (DrawColorInterpretationCombo(interpretation)) {
-      auto command = MakeVisualizationConfigCommandFromModel(
-          model.SelectedStableId, visualization, model.VisualizationTarget);
-      command.Interpretation = static_cast<decltype(command.Interpretation)>(interpretation);
-      lastStatus = ApplyEditorVisualizationConfigCommand(context.VisualizationCommands, command);
-    }
-  }
   DrawUniformVisualizationColorEdit(visualization, context,
                                     model.SelectedStableId,
                                     model.VisualizationTarget, available);
@@ -784,11 +852,6 @@ void DrawDomainVisualizationControls(const EditorDomainWindowModel &model,
         ImGui::TextWrapped("%s", output->Diagnostic.c_str());
     }
   }
-  if (visualization.Source == kScalarFieldSource &&
-      ImGui::CollapsingHeader("Color mapping"))
-    DrawScalarVisualizationControls(visualization, context,
-                                    model.SelectedStableId,
-                                    model.VisualizationTarget, available);
   ImGui::EndDisabled();
 }
 
@@ -1121,8 +1184,10 @@ void DomainPanels::Impl::DrawAppearanceWindow(
         lanes[i] = &GetDomainWindowModel(context, kAppearanceSections[i].Kind);
     }
     const EditorDomainWindowModel *mesh = lanes[2];
-    DrawAppearanceContent(first, lanes, context, &textureBakeState,
-                          AppearanceStatuses, AttributeSourceState,
+    DrawAppearanceContent(first,
+                          AppearanceDraw{lanes, context, &textureBakeState,
+                                         AppearanceStatuses,
+                                         AttributeSourceState},
                           VectorFieldState);
     if (mesh != nullptr && mesh->DomainMatches &&
         ImGui::CollapsingHeader("Property distribution")) {
