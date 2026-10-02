@@ -1803,6 +1803,20 @@ TEST(RuntimeSceneSerialization, DerivedMirrorsAreSkippedAndMistypedStreamsAreCou
     EXPECT_EQ(saved->Stats.UnpersistedGeometryProperties, 1u);
 }
 
+// RUNTIME-319 follow-up: a mistyped atlas-label stream is counted too; the save never fails over a property.
+TEST(RuntimeSceneSerialization, MistypedAtlasLabelStreamIsCountedAndTheSaveSucceeds)
+{
+    ECS::Scene::Registry source;
+    const ECS::EntityHandle mesh = AddMeshEntity(source);
+    AddProcessedProperty<float>(source.Raw().get<GS::Faces>(mesh).Properties, "f:atlas_region", {1.0f});
+    MemoryIOBackend backend;
+    const auto saved = Runtime::SaveSceneDocument(source, "atlas.json", backend);
+    ASSERT_TRUE(saved.has_value());
+    EXPECT_EQ(saved->Stats.UnpersistedGeometryProperties, 1u);
+    EXPECT_FALSE(nlohmann::json::parse(backend.Text("atlas.json"))["entities"][0]["geometrySources"]["faces"]
+                     .contains("atlasRegion"));
+}
+
 TEST(RuntimeSceneSerialization, LargePropertyPayloadStaysCompactAndRoundTrips)
 {
     constexpr std::size_t kPoints = 100'000u;

@@ -1218,8 +1218,8 @@ whose type has no value kind, and a dedicated stream held under another type,
 and counts it in `SceneSerializationStats::UnpersistedGeometryProperties` with
 a warning naming the reason (`GeometryProperties` counts the persisted ones).
 Engine-derived mirrors (`v:point` on mesh, graph and point-cloud vertices,
-`f:normal`) are skipped silently: they are regenerated, and a saved copy
-would go stale. Restored properties
+`f:normal`) are not stored and not recreated on load: no runtime consumer reads
+them, and a saved copy would go stale. Restored properties
 are new storages with fresh content revisions, so renderer and residency
 caches observe them as new content.
 The reader and writer reject non-compact graph sources, endpoint indices outside

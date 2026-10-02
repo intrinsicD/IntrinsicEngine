@@ -49,7 +49,7 @@ contracts: [geometry.element-domain-sources, geometry.property-coherence]
   property resolves after reload (`StaleAttributeBindings == 0`).
 
 ## Acceptance criteria
-- [ ] Every non-topology typed property survives save/load bit-exactly on all eight element domains.
+- [ ] Every non-topology, non-derived typed property survives save/load bit-exactly on all eight element domains.
 - [ ] Malformed or oversized property tables reject the document without partial mutation.
 - [ ] RUNTIME-315 bindings to processed properties resolve after reload.
 
@@ -67,8 +67,9 @@ python3 tools/agents/check_task_policy.py --root . --strict
   - Scope: every typed property on all eight element domains except topology
     (`IsTopologyProperty`) and the streams a section already writes (positions,
     normals, texcoords, corner normals/texcoords, atlas labels). Nothing else is
-    excluded. Caches such as a graph's `v:point` mirror are ordinary CPU
-    properties, so a reload keeps them exactly. GPU-only ring fronts are not
+    excluded, except engine-derived mirrors (`v:point`, `f:normal`;
+    `IsEngineDerivedProperty`): they are not saved and not recreated on load,
+    because no runtime consumer reads `v:point` and a saved copy goes stale. GPU-only ring fronts are not
     `PropertySet` entries and never reach the writer. No property-backed
     selection masks exist (selection is ECS state).
   - Value kinds: bool, int32, uint32, uint64, float, double, vec2/3/4. Strings

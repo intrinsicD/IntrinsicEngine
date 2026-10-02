@@ -2212,7 +2212,12 @@ namespace Extrinsic::Runtime
             {
                 if (!faces.Properties.Exists(propertyName)) continue;
                 const auto property = faces.Properties.Get<std::uint32_t>(propertyName);
-                if (!property || property.Vector().size() != faces.Properties.Size()) return false;
+                if (!property)
+                {
+                    CountMistypedStream(faces.Properties, propertyName, "UInt32", stats);
+                    continue;
+                }
+                if (property.Vector().size() != faces.Properties.Size()) return false;
                 out[key] = UIntArrayToJson(property.Vector());
             }
             AddElementProperties(out, GeometryElementDomain::MeshFace, faces.Properties,
