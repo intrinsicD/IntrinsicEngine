@@ -1959,7 +1959,7 @@ namespace
                     if(Phase>=6)
                     {
                         EXPECT_EQ(Results.back().Status,Runtime::EditorCommandStatus::GeometryProcessingFailed);
-                        EXPECT_NE(Results.back().Message.find("submission rejected"),std::string::npos);
+                        EXPECT_NE(Results.back().Message.find("submission was rejected"),std::string::npos)<<Results.back().Message;
                         if(Phase==7 || FullCompute){Done=true;Kernel().RequestExit();return;}
                     }
                     if(Phase==5)
