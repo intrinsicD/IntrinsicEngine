@@ -145,6 +145,14 @@ duplicate to `result_unavailable`; the single status must keep that mapping.
     `SandboxEditorSession.EditorJobWaitOnAReapedJobRespectsSceneReplacement`, and the reaped-row state
     check in `EditorJobWaitEndsOnSceneReplacementMinimizeAndDetach`; all fail on the pre-slice code.
 
+- Drift guard (slice 9): `QueuedEditorJobDriftGuard.OperationsUseTheSharedQueuedJobHelper` scans
+  `src/runtime/Editor/Operations/*.cpp`: no "already active" string, no `FindActiveEditorJob(` outside
+  `MeshSupport.cpp`, no `make_shared<bool>` (except Coherent Point Drift's run object), and the
+  `GuardEditorProcessingResult` + `FinalizeUnpublishedOnMainThread` pattern only in a listed set of
+  GPU-transaction (RUNTIME-311), state-struct mesh-family and run-object files. Restoring the
+  pre-313 `Bilateral.cpp` trips all four rules. Owner route documented in
+  `docs/architecture/sandbox-editor-feature-boundaries.md`.
+
 ## Acceptance criteria
 - [ ] One compiled helper owns the active-job check (one status, `BuildActiveDerivedJobMessage` wording), deliver-once, and unpublished finalize; the ~10 hand-written copies are removed or reduced to typed callbacks.
 - [ ] Every migrated operation honours `Abandoned` in validation and sets/clears the delivered flag identically; a test per drift item above fails on the old behaviour.

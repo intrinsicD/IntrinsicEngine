@@ -3,8 +3,14 @@
 // checked per operation through a scripted job lane: duplicate refusal before any
 // submission, a rejected submission answered once without the callback, and an
 // abandoned run that revalidates as Cancelled and delivers exactly once.
+#include <algorithm>
+#include <array>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <functional>
+#include <iterator>
+#include <sstream>
 #include <optional>
 #include <string>
 #include <vector>
@@ -280,4 +286,64 @@ TEST_F(QueuedEditorJobContract, LaterStagesOfAChainJoinTheFirstJobsRun)
         return R::ApplyEditorBilateralFilterCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
             .Normals = Normals(), .Output = Ref("filtered", Geometry::PropertyValueKind::Vec3), .KNeighbors = 2,
             .Iterations = 1, .Backend = R::BilateralFilterBackend::VulkanLBVH}, done); });
+}
+
+// Drift guard: a queued editor operation reuses the shared helper instead of hand-writing the
+// prologue/epilogue this task consolidated. Scans the operation sources (like the layering
+// tests): no hand-written "already active" refusal, no direct active-job lookup outside its owner,
+// no ad hoc deliver-once flag, and the guarded-sink + unpublished-finalize pattern only in the
+// files listed below, each with the reason it does not use `QueuedJobDelivery`.
+#ifndef INTRINSIC_SOURCE_DIR
+#error "INTRINSIC_SOURCE_DIR must be defined for the queued-job drift guard"
+#endif
+TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
+{
+    namespace fs = std::filesystem;
+    const auto root = fs::path{INTRINSIC_SOURCE_DIR} / "src" / "runtime" / "Editor" / "Operations";
+    ASSERT_TRUE(fs::exists(root)) << root;
+    constexpr std::string_view owner = "Runtime.GeometryProcessingOperations.MeshSupport.cpp";
+    // Files that own a job lifecycle the helper does not cover (keep this list short; a new
+    // queued operation belongs on `QueuedJobDelivery`).
+    constexpr std::array<std::string_view, 12> handWritten{
+        // GPU Run/Accept transactions: RUNTIME-311 owns their shared lifecycle.
+        "Runtime.GeometryProcessingOperations.GpuPositions.cpp",
+        "Runtime.GeometryProcessingOperations.Keypoints.cpp",
+        "Runtime.GeometryProcessingOperations.Normals.cpp",
+        "Runtime.GeometryProcessingOperations.Outliers.cpp",
+        "Runtime.PointScalarTransaction.cpp",
+        "Runtime.MeshFieldOperations.Smoothing.cpp",
+        // Mesh-family jobs that keep their result in a typed state struct with the shared
+        // `BuildUnpublishedEditorJobFailure` wording and `ActiveOutputJobRefusal`.
+        "Runtime.GeometryProcessingOperations.cpp",
+        "Runtime.GeometryProcessingOperations.Registration.cpp",
+        "Runtime.GeometryProcessingOperations.Uv.cpp",
+        "Runtime.MeshFieldOperations.Curvature.cpp",
+        "Runtime.MeshTopologyOperations.Topology.cpp",
+        // A run object with interactive steps (Busy flag, optional completion).
+        "Runtime.RegistrationOperations.CoherentPointDrift.cpp",
+    };
+    constexpr std::string_view deliverOnceAllowed = "Runtime.RegistrationOperations.CoherentPointDrift.cpp";
+    std::size_t scanned = 0;
+    for (const auto& entry : fs::directory_iterator(root))
+    {
+        const auto name = entry.path().filename().string();
+        if (entry.path().extension() != ".cpp" || name == owner) continue;
+        std::ifstream file(entry.path());
+        const std::string text{std::istreambuf_iterator<char>(file), {}};
+        ++scanned;
+        SCOPED_TRACE(name);
+        EXPECT_EQ(text.find("already active"), std::string::npos)
+            << "a duplicate refusal comes from MeshSupport::ActiveOutputJobRefusal";
+        EXPECT_EQ(text.find("FindActiveEditorJob("), std::string::npos)
+            << "look up an active output job through MeshSupport::ActiveOutputJobRefusal";
+        if (name != deliverOnceAllowed)
+            EXPECT_EQ(text.find("make_shared<bool>"), std::string::npos)
+                << "deliver-once state belongs to MeshSupport::QueuedJobDelivery";
+        const bool handWrites = text.find("GuardEditorProcessingResult(") != std::string::npos &&
+                                text.find("FinalizeUnpublishedOnMainThread") != std::string::npos;
+        if (handWrites)
+            EXPECT_NE(std::find(handWritten.begin(), handWritten.end(), name), handWritten.end())
+                << "a queued operation uses MeshSupport::QueuedJobDelivery instead of a hand-written guarded sink and finalizer";
+    }
+    EXPECT_GT(scanned, 20u);
 }

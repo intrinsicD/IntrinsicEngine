@@ -1391,6 +1391,8 @@ if(TARGET ExtrinsicRuntime)
             support/SandboxEditorJobHarness.cpp
         DEPS ExtrinsicRuntime IntrinsicProgressivePoissonReference imgui_core_lib nlohmann_json::nlohmann_json
     )
+    # Test.QueuedEditorJobContract.cpp scans the editor operation sources (RUNTIME-313 drift guard).
+    target_compile_definitions(RuntimeContractTestObjs PRIVATE INTRINSIC_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 
     intrinsic_resolve_test_sources(_runtime_contract_slow_test_sources
         SEARCH_DIRS contract/runtime

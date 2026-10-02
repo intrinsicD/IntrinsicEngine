@@ -240,7 +240,18 @@ invalidation, finite-position collection, numeric position comparison, job-handl
 messages and result error normalization — are declared
 in `PointFields.hpp` instead, which `MeshSupport.hpp` includes. That keeps point-set
 families and registration off the by-value halfedge-mesh and mesh-soup snapshots
-in the mesh header. Mesh topology, mesh fields, registration and
+in the mesh header. Queued editor jobs share one setup/completion contract (RUNTIME-313),
+declared in `Runtime.GeometryProcessingOperations.JobFailure.hpp` and compiled in
+`MeshSupport.cpp`: `ActiveOutputJobRefusal` answers a duplicate output with `Pending` and
+"<label> already has an active <state> job (job i:g)." (the active job keeps its callback, and
+the agent lane reports such a call as `result_unavailable`); `ValidateQueuedJob` revalidates an
+abandoned run as `Cancelled`; `QueuedJobDelivery<Result>` delivers a queued run's result exactly
+once (`Publish`, `Finalize`/`FinalizeAfterWorker`/`FinalizeFrom` with "<label> was cancelled or
+its source became stale; nothing was applied.", `Rejected` without a callback). Typed work, input
+validation and publication stay in each operation, and later stages of a run carry its first job's
+token (`EditorJobIdentity::Run`). `QueuedEditorJobDriftGuard` fails when an operation source
+hand-writes the refusal, the lookup or a deliver-once flag, or the guarded-sink and finalizer
+pattern outside its short list of transaction and state-struct owners. Mesh topology, mesh fields, registration and
 UV/parameterization each own a public family module. Workspace model assembly lives in
 `Runtime.EditorWorkspaceSnapshots.Models.cpp`. The workspace session stores its
 attachment epoch, retained results, caches and subscriptions behind its private
