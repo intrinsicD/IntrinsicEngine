@@ -89,3 +89,10 @@ python3 tools/docs/check_doc_links.py --root .
   CPD is not a GPU two-phase transaction (its own run object and `EditorCoherentPointDriftPhase`, with
   Step/Apply/Discard), so its row stays hand-written; only its disabled-reason presentation falls under the
   slice-4 rule. Contract tests pin the refusal text for Running and Accepting.
+- Slice 3: point-cloud consolidation and K-Means use the row (both with Stop). The observation's state message is
+  the Accept reason while Accept is refused (K-Means now shows it; consolidation already used it as its tooltip)
+  and the state line otherwise, so it is never drawn twice; counters use the shared format (K-Means keeps its
+  CPU stage upload/readback fields, consolidation shows upload and hits only). The GPU run observations only
+  exist with a live Vulkan run, so no MP panel test can reach a running phase on the null device: the MP side is
+  covered by the shared helper's per-phase test and by `SandboxEditorPresentation.GpuTransactionRowsAreDrawnByTheSharedHelper`
+  (source scan: no hand-written Accept/Discard/Stop button outside CPD's Discard).

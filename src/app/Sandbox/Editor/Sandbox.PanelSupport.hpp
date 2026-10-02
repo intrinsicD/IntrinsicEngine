@@ -255,6 +255,14 @@ namespace Extrinsic::Sandbox::Editor
     // the refusal line shows whenever Accept is refused with a reason.
     [[nodiscard]] GpuTransactionRowState ResolveGpuTransactionRowState(const GpuTransactionRowView& view) noexcept;
     [[nodiscard]] std::string FormatGpuTransactionIo(const GpuTransactionIo& io);
+    // For observations that report flags instead of a phase (K-Means, point-cloud consolidation).
+    [[nodiscard]] constexpr Runtime::EditorGpuTransactionPhase GpuTransactionPhaseOf(
+        const bool readyToAccept, const bool accepting) noexcept
+    {
+        return accepting ? Runtime::EditorGpuTransactionPhase::Accepting
+             : readyToAccept ? Runtime::EditorGpuTransactionPhase::ReadyToAccept
+                             : Runtime::EditorGpuTransactionPhase::Running;
+    }
     // Draws [Stop] Accept Discard on one line (IDs suffixed `##idSuffix`), the Accept refusal as a
     // tooltip on the disabled button plus one inline line, and the counters line. Returns the
     // button pressed this frame; the caller invokes its family's command.

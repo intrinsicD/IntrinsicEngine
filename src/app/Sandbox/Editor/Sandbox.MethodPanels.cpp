@@ -1621,22 +1621,26 @@ namespace Extrinsic::Sandbox::Editor
                 {
                     availability.Available = false;
                     availability.Message = "Accept or Discard the pending GPU run before starting another.";
-                    ImGui::TextWrapped("%s", gpu.Message.c_str());
-                    ImGui::Text("Iterations: %u, submissions: %u, previews: %u; input: %llu bytes / %llu hits",
-                        gpu.Iterations, gpu.Submissions, gpu.Previews,
-                        (unsigned long long)gpu.InputUploadBytes, (unsigned long long)gpu.InputCacheHits);
-                    ImGui::BeginDisabled(!gpu.Running);
-                    if (ImGui::Button("Stop##PointCloudConsolidation"))
-                        (void)service.PointCloudConsolidation->GpuRun(gpu.Correlation, Runtime::PointCloudConsolidationGpuAction::Stop);
-                    ImGui::EndDisabled();
-                    ImGui::SameLine();
-                    if (DrawProcessingActionButton("Accept##PointCloudConsolidation", {gpu.CanAccept, gpu.Message}))
-                        (void)service.PointCloudConsolidation->GpuRun(gpu.Correlation, Runtime::PointCloudConsolidationGpuAction::Accept);
-                    ImGui::SameLine();
-                    if (ImGui::Button("Discard##PointCloudConsolidation"))
+                    // While Accept is refused the message is the row's reason; otherwise it is the state line.
+                    if (gpu.CanAccept) ImGui::TextWrapped("%s", gpu.Message.c_str());
+                    ImGui::Text("Iterations: %u, submissions: %u, previews: %u", gpu.Iterations, gpu.Submissions, gpu.Previews);
+                    const GpuTransactionRowView row{.Phase = GpuTransactionPhaseOf(gpu.ReadyToAccept, gpu.Accepting),
+                        .CanAccept = gpu.CanAccept, .AcceptRefusal = gpu.CanAccept ? std::string_view{} : std::string_view{gpu.Message},
+                        .HasStop = true,
+                        .Io = GpuTransactionIo{.UploadBytes = gpu.InputUploadBytes, .CacheHits = gpu.InputCacheHits}};
+                    switch (DrawGpuTransactionControls(row, "PointCloudConsolidation"))
                     {
+                    case GpuTransactionRowAction::Stop:
+                        (void)service.PointCloudConsolidation->GpuRun(gpu.Correlation, Runtime::PointCloudConsolidationGpuAction::Stop);
+                        break;
+                    case GpuTransactionRowAction::Accept:
+                        (void)service.PointCloudConsolidation->GpuRun(gpu.Correlation, Runtime::PointCloudConsolidationGpuAction::Accept);
+                        break;
+                    case GpuTransactionRowAction::Discard:
                         (void)service.PointCloudConsolidation->GpuRun(gpu.Correlation, Runtime::PointCloudConsolidationGpuAction::Discard);
                         PointCloudConsolidation.Run.Forget(); // a discarded result never reads as a finished run
+                        break;
+                    default: break;
                     }
                 }
                 const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
@@ -1925,21 +1929,23 @@ namespace Extrinsic::Sandbox::Editor
                 KMeans.Run.AwaitingAccept(run.ReadyToAccept);
                 if (run.Running || run.ReadyToAccept || run.Accepting)
                 {
-                    ImGui::TextWrapped("%s", run.Message.c_str());
+                    // While Accept is refused the message is the row's reason; otherwise it is the state line.
+                    if (run.CanAccept) ImGui::TextWrapped("%s", run.Message.c_str());
                     ImGui::Text("Iterations: %u  submissions: %u  previews: %u", run.Iterations, run.Submissions, run.Previews);
-                    ImGui::Text("Input: %llu bytes / %llu hits; CPU stages: %llu up / %llu down",
-                        (unsigned long long)run.InputUploadBytes, (unsigned long long)run.InputCacheHits,
-                        (unsigned long long)run.CpuStageUploadBytes, (unsigned long long)run.CpuStageReadbackBytes);
-                    ImGui::BeginDisabled(!run.Running);
-                    if (ImGui::Button("Stop##KMeans")) (void)service.Clustering->GpuRun(id, Runtime::KMeansGpuAction::Stop);
-                    ImGui::EndDisabled(); ImGui::SameLine();
-                    ImGui::BeginDisabled(!run.CanAccept);
-                    if (ImGui::Button("Accept##KMeans")) (void)service.Clustering->GpuRun(id, Runtime::KMeansGpuAction::Accept);
-                    ImGui::EndDisabled(); ImGui::SameLine();
-                    if (ImGui::Button("Discard##KMeans"))
+                    const GpuTransactionRowView row{.Phase = GpuTransactionPhaseOf(run.ReadyToAccept, run.Accepting),
+                        .CanAccept = run.CanAccept, .AcceptRefusal = run.CanAccept ? std::string_view{} : std::string_view{run.Message},
+                        .HasStop = true,
+                        .Io = GpuTransactionIo{.UploadBytes = run.InputUploadBytes, .CacheHits = run.InputCacheHits,
+                            .CpuStageUploadBytes = run.CpuStageUploadBytes, .CpuReadbackBytes = run.CpuStageReadbackBytes}};
+                    switch (DrawGpuTransactionControls(row, "KMeans"))
                     {
+                    case GpuTransactionRowAction::Stop: (void)service.Clustering->GpuRun(id, Runtime::KMeansGpuAction::Stop); break;
+                    case GpuTransactionRowAction::Accept: (void)service.Clustering->GpuRun(id, Runtime::KMeansGpuAction::Accept); break;
+                    case GpuTransactionRowAction::Discard:
                         (void)service.Clustering->GpuRun(id, Runtime::KMeansGpuAction::Discard);
                         KMeans.Run.Forget(); // a discarded result never reads as a finished run
+                        break;
+                    default: break;
                     }
                 }
             }

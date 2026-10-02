@@ -2214,3 +2214,33 @@ TEST(SandboxEditorPresentation, ProcessingActionButtonBlocksDisabledClicksAndEmi
     ASSERT_TRUE(Runtime::GetEditorNormalEstimationConfig(commands));
     EXPECT_EQ(Runtime::GetEditorNormalEstimationConfig(commands)->KNeighbors, 12u);
 }
+
+// UI-071: no panel hand-writes a GPU transaction's Stop/Accept/Discard row; they all go through
+// `DrawGpuTransactionControls`. Coherent Point Drift's Discard belongs to its own stepped run (it is
+// not a GPU two-phase transaction), so that one literal is the only exception.
+TEST(SandboxEditorPresentation, GpuTransactionRowsAreDrawnByTheSharedHelper)
+{
+    std::size_t helperUses = 0;
+    for (const char* file : {"Sandbox.MeshProcessingPanels.cpp", "Sandbox.MethodPanels.cpp", "Sandbox.DomainPanels.cpp",
+                             "Sandbox.EditorShell.cpp"})
+    {
+        std::string source = ReadRepositoryTextFile(std::filesystem::path{"src/app/Sandbox/Editor"} / file);
+        ASSERT_FALSE(source.empty()) << file;
+        for (std::size_t at = source.find("DrawGpuTransactionControls("); at != std::string::npos;
+             at = source.find("DrawGpuTransactionControls(", at + 1))
+            ++helperUses;
+        for (const std::string_view label : {"Accept", "Discard", "Stop"})
+        {
+            const std::string needle = "Button(\"" + std::string{label};
+            std::size_t at = 0;
+            while ((at = source.find(needle, at)) != std::string::npos)
+            {
+                const auto end = source.find('"', at + needle.size());
+                const std::string literal = source.substr(at, end - at + 1);
+                EXPECT_EQ(literal, "Button(\"Discard##CPD\"") << file << " hand-writes " << literal;
+                at += needle.size();
+            }
+        }
+    }
+    EXPECT_GE(helperUses, 6u) << "scalar, Outliers, Normals, Smoothing, consolidation and K-Means draw the shared row";
+}
