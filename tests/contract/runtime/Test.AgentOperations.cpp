@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <span>
 #include <string>
@@ -78,7 +79,7 @@ TEST(AgentOperations, EditorOperationsHaveUniqueNamesAndValidSchemas)
         EXPECT_FALSE(spec.Description.empty());
         const bool reader = spec.Name.starts_with("scene_") || spec.Name.starts_with("entity_") || spec.Name == "history" ||
                             spec.Name.starts_with("config_sections") || spec.Name == "config_schema" || spec.Name == "config_get" || spec.Name == "config_preview" ||
-                            spec.Name == "jobs" || spec.Name == "log" || spec.Name.starts_with("preview_");
+                            spec.Name == "jobs_list" || spec.Name == "jobs_wait" || spec.Name == "log" || spec.Name.starts_with("preview_");
         EXPECT_EQ(spec.ReadOnly, reader) << "read-only flag follows the naming convention";
     }
     // Without an engine every operation answers without crashing: history and log report
@@ -983,4 +984,83 @@ TEST(AgentOperations, Base64MatchesTheRfcVectors)
     EXPECT_EQ(encode("foob"), "Zm9vYg==");
     EXPECT_EQ(encode("fooba"), "Zm9vYmE=");
     EXPECT_EQ(encode("foobar"), "Zm9vYmFy");
+}
+
+// RUNTIME-279: notifications/cancelled runs the call's Cancel hook (its editor jobs) exactly once;
+// the tombstone still holds its slot until the continuation ends. A call without a hook (a
+// service run, a capture, a wait) only loses its reply.
+TEST(AgentOperations, CancelNotificationCancelsTheCallsJobsOnceAndKeepsTheTombstone)
+{
+    auto finish = std::make_shared<bool>(false);
+    auto cancels = std::make_shared<int>(0);
+    R::AgentOperationRegistry registry;
+    const auto deferred = [finish](std::function<void(const R::AgentOperationContext&)> cancel) {
+        return [finish, cancel](const R::AgentOperationContext&, std::string_view) {
+            R::AgentOperationOutcome outcome{};
+            outcome.Continuation = [finish](const R::AgentOperationContext&, R::AgentOperationOutcome& out) {
+                if (!*finish) return false;
+                out = R::AgentOperationOutcome{.Text = "{}"};
+                return true;
+            };
+            outcome.Cancel = cancel;
+            return outcome;
+        };
+    };
+    ASSERT_TRUE(registry.Register({.Name = "queues_job", .Title = "Queues a job", .ReadOnly = false,
+                                   .Invoke = deferred([cancels](const R::AgentOperationContext&) { ++*cancels; })}));
+    ASSERT_TRUE(registry.Register({.Name = "service_run", .Title = "Service run", .ReadOnly = false, .Invoke = deferred({})}));
+    R::AgentProtocol protocol{registry, false};
+    const R::AgentOperationContext context{};
+    const auto call = [&](const char* name, int id) {
+        return protocol.Handle(Json{{"jsonrpc", "2.0"}, {"id", id}, {"method", "tools/call"}, {"params", {{"name", name}}}}.dump(), context);
+    };
+    const auto cancel = [&](int id) {
+        return protocol.Handle(Json{{"jsonrpc", "2.0"}, {"method", "notifications/cancelled"}, {"params", {{"requestId", id}}}}.dump(),
+                               context);
+    };
+    ASSERT_FALSE(call("queues_job", 1).has_value());
+    ASSERT_FALSE(call("service_run", 2).has_value());
+    EXPECT_EQ(*cancels, 0) << "nothing is cancelled before the notification";
+    EXPECT_FALSE(cancel(1).has_value());
+    EXPECT_EQ(*cancels, 1) << "the call's jobs are cancelled";
+    EXPECT_FALSE(cancel(1).has_value());
+    EXPECT_EQ(*cancels, 1) << "a repeated notification cancels nothing more";
+    EXPECT_FALSE(cancel(2).has_value());
+    EXPECT_EQ(*cancels, 1);
+    EXPECT_EQ(protocol.PendingCount(), 2u) << "both tombstones hold their slots";
+    EXPECT_TRUE(protocol.PollPending(context).empty());
+    *finish = true;
+    EXPECT_TRUE(protocol.PollPending(context).empty()) << "finished tombstones are dropped without a reply";
+    EXPECT_EQ(protocol.PendingCount(), 0u);
+}
+
+// The job tools: list and wait are read-only, cancel mutates editor state but no scene data or
+// file (not destructive); a wait needs presented frames, so a minimize ends it.
+TEST(AgentOperations, JobToolsClassifyAndValidateTheirArguments)
+{
+    R::AgentOperationRegistry registry;
+    R::RegisterEditorAgentOperations(registry);
+    EXPECT_EQ(registry.Find("jobs"), nullptr) << "jobs_list replaced it";
+    const auto* list = registry.Find("jobs_list");
+    const auto* wait = registry.Find("jobs_wait");
+    const auto* cancel = registry.Find("jobs_cancel");
+    ASSERT_TRUE(list && wait && cancel);
+    EXPECT_TRUE(list->ReadOnly && !list->Destructive && !list->NeedsPresentedFrame);
+    EXPECT_TRUE(wait->ReadOnly && !wait->Destructive && wait->NeedsPresentedFrame);
+    EXPECT_TRUE(!cancel->ReadOnly && !cancel->Destructive && !cancel->NeedsPresentedFrame);
+    const auto schema = Json::parse(wait->InputSchemaJson);
+    EXPECT_EQ(schema["properties"]["timeout_ms"]["maximum"], 60000);
+
+    const R::AgentOperationContext empty{};
+    const auto code = [&](const char* name, const char* arguments) {
+        return R::InvokeAgentOperation(registry, name, empty, arguments, false).ErrorCode;
+    };
+    EXPECT_EQ(code("jobs_wait", R"({"token":"1:0","timeout_ms":60001})"), "invalid_params");
+    EXPECT_EQ(code("jobs_wait", R"({"token":"1:0","timeout_ms":-1})"), "invalid_params");
+    EXPECT_EQ(code("jobs_wait", R"({"token":"1:0","entity":1,"output":"x"})"), "invalid_params");
+    EXPECT_EQ(code("jobs_wait", "{}"), "invalid_params");
+    EXPECT_EQ(code("jobs_cancel", R"({"token":"x"})"), "invalid_params");
+    EXPECT_EQ(code("jobs_cancel", R"({"token":"1"})"), "invalid_params");
+    EXPECT_TRUE(R::InvokeAgentOperation(registry, "jobs_cancel", empty, R"({"token":"1:0"})", true).IsError)
+        << "a read-only session cannot cancel";
 }

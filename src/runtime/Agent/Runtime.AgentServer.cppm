@@ -72,14 +72,15 @@ export namespace Extrinsic::Runtime
         std::string m_ClientName{};
         std::string m_NegotiatedVersion{kAgentProtocolVersion};
         // `notifications/cancelled` turns the entry into a reply-less tombstone that still counts
-        // against kMaxPendingCalls until its continuation completes (then it is dropped silently);
-        // the editor job keeps running until RUNTIME-279 offers a cancel path.
+        // against kMaxPendingCalls until its continuation completes (then it is dropped silently),
+        // and cancels the call's editor jobs through its `Cancel` hook (RUNTIME-279) when it has one.
         enum class ProgressUnit : std::uint8_t { Unset, Percent, Seconds };
         struct PendingCall
         {
             std::string Id{};                // dumped JSON-RPC id
             AgentOperationContinuation Continue{};
             std::function<EditorOperationProgress(const AgentOperationContext&)> Progress{}; // the run's own projection
+            std::function<void(const AgentOperationContext&)> Cancel{}; // cancels the call's editor jobs
             std::string ProgressToken{};     // dumped JSON token; empty when the call sent none
             std::chrono::steady_clock::time_point Started{};
             std::chrono::steady_clock::time_point LastEmit{};

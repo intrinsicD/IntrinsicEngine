@@ -116,10 +116,14 @@ namespace Extrinsic::Runtime
                 const auto it = std::find_if(m_Pending.begin(), m_Pending.end(), [&](const PendingCall& call) { return call.Id == wanted; });
                 if (it != m_Pending.end() && !it->Cancelled)
                 {
-                    // Tombstone: no reply or progress, but the slot stays taken until the continuation ends.
+                    // Tombstone: no reply or progress, but the slot stays taken until the continuation ends,
+                    // which a cancelled job's terminal delivery (or a service run's completion) brings about.
                     it->Cancelled = true;
                     it->ProgressToken.clear();
-                    Core::Log::Info("[AgentServer] request {} cancelled; the editor job continues (RUNTIME-279)", wanted);
+                    const bool cancelsJob = static_cast<bool>(it->Cancel);
+                    if (cancelsJob) std::exchange(it->Cancel, {})(context);
+                    Core::Log::Info("[AgentServer] request {} cancelled{}", wanted,
+                                    cancelsJob ? "; its editor jobs are cancelled" : "; it queued no editor job to cancel");
                 }
             }
             return std::nullopt;
@@ -180,7 +184,8 @@ namespace Extrinsic::Runtime
             {
                 // A read-only tool without side effects that defers at the cap is refused after it ran.
                 if (atCap) return Dump(ErrorResponse(id, -32000, "too many pending calls"));
-                PendingCall call{.Id = Dump(id), .Continue = std::move(outcome.Continuation), .Progress = std::move(outcome.Progress)};
+                PendingCall call{.Id = Dump(id), .Continue = std::move(outcome.Continuation), .Progress = std::move(outcome.Progress),
+                                 .Cancel = std::move(outcome.Cancel)};
                 call.NeedsPresentedFrame = spec->NeedsPresentedFrame;
                 if (const auto meta = params.find("_meta"); meta != params.end() && meta->is_object())
                     if (const auto token = meta->find("progressToken"); token != meta->end() && (token->is_string() || token->is_number_integer()))

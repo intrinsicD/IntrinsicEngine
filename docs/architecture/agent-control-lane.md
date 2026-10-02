@@ -51,7 +51,8 @@ minimized. GPU work only progresses on presented frames, so tools that may dispa
 on a minimized frame with the error code `viewport_not_presentable`: `view_screenshot`,
 `view_capture`, `run_operation`, `run_mesh_operation`, `run_registration`, `run_point_sampling`,
 `run_keypoint_analysis`, `run_kmeans` and `run_point_cloud_consolidation`
-(`AgentOperationSpec::NeedsPresentedFrame`; any new tool that may dispatch GPU work sets it). A call of those
+(`AgentOperationSpec::NeedsPresentedFrame`; any new tool that may dispatch GPU work sets it).
+`jobs_wait` sets it too, so no wait outlives a minimize (the job it watches may be GPU work). A call of those
 tools that is already waiting when the window minimizes is answered with the same code instead of
 occupying a slot; its editor job or capture is not cancelled and can still finish after the
 window is restored (a capture may then still write its file, so check the path or pass
@@ -87,12 +88,19 @@ Nothing exists without the launch flag: no module, thread or socket.
   the previous one. The panels draw the same model with the shared widget, so an agent run shows in
   the Sandbox panels too.
 - Cancellation: `notifications/cancelled {requestId}` (JSON-typed comparison: `1` is not `"1"`)
-  stops the reply and the progress of that call, but the entry stays as a tombstone that counts
-  against the 16-call cap until its continuation completes, then it is dropped silently, so
-  call-and-cancel cannot grow the queue. One or two progress notifications already queued may
-  still arrive after the cancel (allowed by the specification). The editor job itself keeps
-  running and its result still lands (undoable) until RUNTIME-279 gives the agent path a job
-  cancel.
+  stops the reply and the progress of that call and cancels the editor jobs the call queued
+  (`AgentOperationOutcome::Cancel`, RUNTIME-279): an editor-job command (`FinishApply`) cancels
+  every job it queued, through `EditorJobCommandSurface::Cancel`, so only jobs the editor
+  submitted are ever touched. The job ends `Cancelled` on a later drain without publishing
+  anything (no property, no history entry) and its unpublished finalizer runs exactly once: it
+  delivers the command's terminal failure, or (where a finalizer only abandons its run) releases
+  the callback, which ends the call as `result_unavailable`. The entry stays as a tombstone that counts against the 16-call
+  cap until its continuation completes (that delivery ends it), then it is dropped silently, so
+  call-and-cancel cannot grow the queue. Calls with no editor job keep running to their end:
+  K-Means and consolidation runs (their jobs belong to the services, not the editor surface),
+  scene save/load, imports, captures and `jobs_wait` (bounded by its timeout). One or two
+  progress notifications already queued may still arrive after the cancel (allowed by the
+  specification).
 - Tool results are the existing JSON text content plus, when the negotiated version is
   `2025-06-18` or newer, `structuredContent`: the JSON object the tool returned, or
   `{"error":{"code","message"}}` for errors that carry a machine-readable `ErrorCode`
@@ -106,8 +114,9 @@ Nothing exists without the launch flag: no module, thread or socket.
   configuration, which is not in the history). Mutating tools that edit the scene or its
   properties (`import_file`, `show_property`, `run_*`) are undoable, `undo`/`redo` operate on
   the history itself, and `select_entity` and `set_camera` change editor state (selection, the camera
-  controller), not scene data, so they are deliberately not destructive. New tools classify
-  themselves with this rule.
+  controller), not scene data, so they are deliberately not destructive. `jobs_cancel` is not
+  destructive either: a cancelled job publishes nothing, so the scene, files and history stay as
+  they were (the lost computation can be run again). New tools classify themselves with this rule.
 - `view_capture` refuses an existing `path` unless `overwrite: true` (error code `file_exists`;
   a dangling symlink counts as occupied). The capture write repeats the check atomically
   with a hard link to a uniquely named temporary file, so a file created between the call and the
@@ -125,17 +134,35 @@ Nothing exists without the launch flag: no module, thread or socket.
   k-means and consolidation run commands, and the panels' Show recipe
   (`MakeEditorPropertyVisualizationRecipe`). There is no generic scene or property write.
 - Naming. Read-only (`readOnlyHint`): `scene_entities`, `entity_properties`, `config_sections`,
-  `config_schema`, `config_get`, `config_preview`, `history`, `jobs`, `log`,
+  `config_schema`, `config_get`, `config_preview`, `history`, `jobs_list`, `jobs_wait`, `log`,
   `preview_registration`, `preview_point_sampling`, `preview_keypoint_analysis`, `preview_kmeans`,
   `preview_point_cloud_consolidation`, `preview_operation`, `preview_mesh_operation` and
   `view_screenshot`. State-changing: `select_entity`, `import_file`, `show_property`,
-  `config_apply`, `save_scene`, `load_scene`, `set_visibility`, `set_camera`, `undo`, `redo`,
+  `config_apply`, `save_scene`, `load_scene`, `set_visibility`, `set_camera`, `undo`, `redo`, `jobs_cancel`,
   `run_operation`,
   `run_mesh_operation`, `run_registration` (ICP
   or Coherent Point Drift from their config sections; the reply waits for the job),
   `run_point_sampling` (the `sandbox.point_sampling` section), `run_keypoint_analysis`,
   `run_kmeans` and `run_point_cloud_consolidation`. `view_capture` writes a PNG inside the
   allowed roots.
+- Jobs (RUNTIME-279). `jobs_list` lists every job the job service retains with its token
+  (`"<index>:<generation>"`), state, progress and elapsed time; a job the editor submitted through
+  `EditorJobCommandSurface::Submit` also names its `editor` output (entity, output property) and
+  `cancellable: true` while active. Those rows, and only those, are what `jobs_cancel {token}`
+  accepts (it calls `EditorJobCommandSurface::Cancel`): asset decode and imports, scene files and
+  K-Means and consolidation runs (service jobs found by correlation id) answer `not_editor_job`,
+  an ended job `job_not_active`. A cancel on a queued or running job, or one parked for apply,
+  never publishes: the job service checks the cancel flag before every apply, so a GPU result is
+  discarded by its job's finalizer instead of half accepted. `jobs_wait {token | entity + output,
+  timeout_ms ≤ 60000 (default 30000)}` is read-only and never blocks the main thread: it answers at
+  once or returns a continuation the server polls each frame, and ends when the job completed
+  (terminal and its result delivered: `finished: true`), at the deadline (`timed_out: true`), or
+  with an error when the job is unknown or was reaped (`unknown_job`), the scene was replaced
+  (`scene_replaced`, from the session scene epoch), the workspace detached or the window
+  minimized (`viewport_not_presentable`). A job is reaped one frame after it completed, so a
+  wait read after that answers `unknown_job`. By entity and output it waits for the newest editor run
+  writing that output when called; later runs are not followed. Several waits on one job are
+  independent.
 - Appearance and camera. `set_visibility` shows or hides a lane of an entity (`lane`: surface, edges or
   points, default the entity's primary one: mesh surface, graph edges, point-cloud points)
   through `ApplyEditorRenderHintCommand` exactly as the appearance panel's checkboxes do (one

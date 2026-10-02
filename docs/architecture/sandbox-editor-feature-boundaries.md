@@ -54,8 +54,20 @@ run before the panel's first own run, and only for the draft's current output ke
 panel whose key changes with its config (mesh curvature) stops showing the run once the
 config moves. Closing this needs the slot to observe by run key instead of draft key.
 Cancel appears only while a run is active and the
-panel supplies a cancel path (registration's own cancel; editor jobs after
-RUNTIME-279 adds `Cancel` to the surface).
+panel supplies a cancel path (registration's own cancel; editor jobs through the
+surface's `Cancel`).
+
+The surface also lists and cancels editor jobs (RUNTIME-279): `SnapshotAll()` returns
+the `EditorJobRecord` of every job submitted through `Submit` that the job service
+still retains (ordered by token; correlation-only service jobs are not listed), and
+`Cancel(JobToken)` calls `JobService::Cancel` only for a token in the session's
+token/identity index, answering `EditorJobCancelStatus` (`Requested`, `NotActive`,
+`NotEditorJob` for unknown, reaped and non-editor tokens, `Unavailable` for a stale
+attachment epoch). Panels and the agent lane reach them through
+`GetEditorJobs(EditorProcessingCommands)` and `CancelEditorJob(EditorProcessingCommands, token)`.
+K-Means and consolidation jobs belong to their services, so neither the surface nor
+the agent's `jobs_cancel` cancels them. `FindEditorOperationRun(records, key)` is the
+record `ResolveEditorOperationProgress` projects.
 
 Property-binding targets and presentation slots own vectors of the canonical
 `GeometryPresentationPropertyOption` from `Runtime.GeometryPresentation.cppm`.

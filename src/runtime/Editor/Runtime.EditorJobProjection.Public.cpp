@@ -1,5 +1,6 @@
 module;
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -102,9 +103,9 @@ EditorOperationProgress ProjectEditorOperationProgress(const EditorJobRecord &jo
   return progress;
 }
 
-EditorOperationProgress
-ResolveEditorOperationProgress(const std::vector<EditorJobRecord> &records,
-                               const EditorOperationRunKey &key) {
+std::optional<EditorJobRecord>
+FindEditorOperationRun(const std::vector<EditorJobRecord> &records,
+                       const EditorOperationRunKey &key) {
   const EditorJobRecord *active = nullptr;
   const EditorJobRecord *terminal = nullptr;
   // Tokens grow with submission, so the higher index is the newer run.
@@ -136,7 +137,26 @@ ResolveEditorOperationProgress(const std::vector<EditorJobRecord> &records,
     }
   }
   const EditorJobRecord *picked = active != nullptr ? active : terminal;
-  return picked != nullptr ? ProjectEditorOperationProgress(*picked)
-                           : EditorOperationProgress{};
+  if (picked == nullptr)
+    return std::nullopt;
+  return *picked;
+}
+
+EditorOperationProgress
+ResolveEditorOperationProgress(const std::vector<EditorJobRecord> &records,
+                               const EditorOperationRunKey &key) {
+  const std::optional<EditorJobRecord> run = FindEditorOperationRun(records, key);
+  return run.has_value() ? ProjectEditorOperationProgress(*run)
+                         : EditorOperationProgress{};
+}
+
+std::string_view ToString(const EditorJobCancelStatus status) noexcept {
+  switch (status) {
+  case EditorJobCancelStatus::Requested: return "requested";
+  case EditorJobCancelStatus::NotActive: return "not_active";
+  case EditorJobCancelStatus::NotEditorJob: return "not_editor_job";
+  case EditorJobCancelStatus::Unavailable: return "unavailable";
+  }
+  return "unavailable";
 }
 } // namespace Extrinsic::Runtime

@@ -5,6 +5,8 @@ module;
 
 #include <algorithm>
 #include <array>
+#include <charconv>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -13,6 +15,7 @@ module;
 #include <optional>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 #include <glm/glm.hpp>
@@ -447,16 +450,167 @@ namespace Extrinsic::Runtime
             return {.IsError = !applied.Succeeded(), .Text = Dump(out)};
         }
 
-        // ---- jobs and log ----------------------------------------------------------------
-        AgentOperationOutcome Jobs(const AgentOperationContext& context, std::string_view)
+        // ---- jobs (RUNTIME-279) and log -----------------------------------------------------
+        // A job token as the job tools print and accept it: "<index>:<generation>".
+        std::string TokenText(const JobToken token)
+        {
+            return std::to_string(token.Index) + ":" + std::to_string(token.Generation);
+        }
+        std::optional<JobToken> ParseToken(const std::string& text)
+        {
+            const auto colon = text.find(':');
+            if (colon == std::string::npos) return std::nullopt;
+            const auto number = [](std::string_view digits) -> std::optional<std::uint32_t> {
+                std::uint32_t value = 0;
+                const auto [end, error] = std::from_chars(digits.data(), digits.data() + digits.size(), value);
+                if (digits.empty() || error != std::errc{} || end != digits.data() + digits.size()) return std::nullopt;
+                return value;
+            };
+            const auto index = number(std::string_view(text).substr(0, colon));
+            const auto generation = number(std::string_view(text).substr(colon + 1));
+            if (!index || !generation) return std::nullopt;
+            const JobToken token{*index, *generation};
+            return token.IsValid() ? std::optional{token} : std::nullopt;
+        }
+        // One row per job the service retains. `editor` (the output it writes) and `cancellable`
+        // only for jobs the editor queued through its job surface: exactly the ones jobs_cancel accepts.
+        Json JobRow(const JobSnapshot& job, const EditorJobRecord* editor)
+        {
+            Json row{{"token", TokenText(job.Token)}, {"name", job.DebugName}, {"state", std::string(ToString(job.State))},
+                     {"progress", job.Progress.Determinate ? Json(job.Progress.Normalized) : Json(nullptr)},
+                     {"elapsed_ms", job.ElapsedMilliseconds},
+                     {"editor", editor != nullptr ? Json{{"entity", editor->Identity.EntityId}, {"output", editor->Identity.OutputName}}
+                                                  : Json(nullptr)},
+                     {"cancellable", editor != nullptr && IsActiveEditorJobState(job.State)}};
+            if (job.CorrelationId != 0u) row["correlation_id"] = job.CorrelationId;
+            return row;
+        }
+        const EditorJobRecord* FindRecord(const std::vector<EditorJobRecord>& records, const JobToken token)
+        {
+            const auto it = std::find_if(records.begin(), records.end(), [token](const EditorJobRecord& r) { return r.Token == token; });
+            return it != records.end() ? &*it : nullptr;
+        }
+        std::optional<JobSnapshot> FindJob(const JobService& jobs, const JobToken token)
+        {
+            for (auto& job : jobs.SnapshotAll())
+                if (job.Token == token) return std::move(job);
+            return std::nullopt;
+        }
+
+        AgentOperationOutcome JobsList(const AgentOperationContext& context, std::string_view)
         {
             if (context.Jobs == nullptr) return Fail("The job service is unavailable.");
+            // Without an attached workspace every row is listed, none as an editor job.
+            const auto editor = PrepareSnapshot(context) ? GetEditorJobs(PrepareEditorProcessingCommands(*context.Attachment))
+                                                         : std::vector<EditorJobRecord>{};
             Json jobs = Json::array();
-            for (const auto& job : context.Jobs->SnapshotAll())
-                jobs.push_back({{"name", job.DebugName}, {"state", std::string(ToString(job.State))},
-                                {"progress", job.Progress.Determinate ? Json(job.Progress.Normalized) : Json(nullptr)},
-                                {"elapsed_ms", job.ElapsedMilliseconds}});
+            for (const auto& job : context.Jobs->SnapshotAll()) jobs.push_back(JobRow(job, FindRecord(editor, job.Token)));
             return Ok({{"jobs", jobs}});
+        }
+
+        // Waits on frames, never on the main thread: an immediate answer, or a continuation that the
+        // server polls once per frame until the job completed (its terminal result delivered), the
+        // deadline passed, the scene was replaced or the workspace detached. The tool needs a
+        // presented frame, so a minimized window ends it too (`viewport_not_presentable`).
+        AgentOperationOutcome JobsWait(const AgentOperationContext& context, std::string_view arguments)
+        {
+            const auto args = ParseObject(arguments);
+            if (!args) return Fail("Pass {\"token\": \"<from jobs_list>\"} or {\"entity\": <id>, \"output\": \"<name>\"}.");
+            const auto invalid = [](std::string message) {
+                return AgentOperationOutcome{.IsError = true, .Text = std::move(message), .ErrorCode = "invalid_params"};
+            };
+            const bool byToken = args->contains("token");
+            const bool byOutput = args->contains("entity") || args->contains("output");
+            if (byToken == byOutput) return invalid("Pass either token, or entity and output.");
+            std::uint32_t timeoutMs = 30000u;
+            if (args->contains("timeout_ms"))
+            {
+                const auto value = UInt(*args, "timeout_ms");
+                if (!value || *value > 60000u) return invalid("timeout_ms must be an integer from 0 to 60000.");
+                timeoutMs = *value;
+            }
+            if (context.Jobs == nullptr) return Fail("The job service is unavailable.");
+            if (!PrepareSnapshot(context)) return Fail(kNoWorkspace);
+            const auto commands = PrepareEditorProcessingCommands(*context.Attachment);
+            JobToken token{};
+            if (byToken)
+            {
+                const auto text = String(*args, "token");
+                const auto parsed = text ? ParseToken(*text) : std::nullopt;
+                if (!parsed) return invalid("token must look like \"3:1\" (from jobs_list).");
+                token = *parsed;
+            }
+            else
+            {
+                const auto entity = UInt(*args, "entity");
+                const auto output = String(*args, "output");
+                if (!entity || !output) return invalid("Pass entity (an integer) together with output (a property name).");
+                // The newest run writing that output when the call is made; a later run is not followed.
+                const auto run = FindEditorOperationRun(GetEditorJobs(commands), EditorOutputRef{*entity, *output});
+                if (!run)
+                    return {.IsError = true, .Text = "No editor job writes '" + *output + "' of entity " + std::to_string(*entity) + ".",
+                            .ErrorCode = "unknown_job"};
+                token = run->Token;
+            }
+            // Every answer of the session carries its scene epoch, which a scene new/load/close advances.
+            const auto sceneEpoch = [](const EditorProcessingCommands& c) { return GetEditorOperationProgress(c, EditorRunCorrelation{}).Epoch; };
+            const std::uint64_t epoch = sceneEpoch(commands);
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
+            const auto step = [token, epoch, deadline, sceneEpoch](const AgentOperationContext& current) -> std::optional<AgentOperationOutcome> {
+                if (current.Attachment == nullptr || !current.Attachment->IsAttached() || current.Jobs == nullptr)
+                    return Fail(kNoWorkspace);
+                const auto job = FindJob(*current.Jobs, token);
+                if (!job)
+                    return AgentOperationOutcome{.IsError = true, .Text = "Job " + TokenText(token) + " is not retained by the job service: "
+                                                 "unknown, or it ended and was reaped. Check jobs_list and the scene.", .ErrorCode = "unknown_job"};
+                const auto c = PrepareEditorProcessingCommands(*current.Attachment);
+                const auto editor = GetEditorJobs(c);
+                const Json row = JobRow(*job, FindRecord(editor, token));
+                // Complete: terminal and its unpublished finalizer (the terminal result) delivered.
+                if (current.Jobs->IsComplete(token)) return Ok({{"job", row}, {"finished", true}, {"timed_out", false}});
+                if (sceneEpoch(c) != epoch)
+                    return AgentOperationOutcome{.IsError = true, .Text = "The scene was replaced while waiting for job " + TokenText(token) +
+                                                 "; its result will not apply to the new scene.", .ErrorCode = "scene_replaced"};
+                if (std::chrono::steady_clock::now() >= deadline) return Ok({{"job", row}, {"finished", false}, {"timed_out", true}});
+                return std::nullopt;
+            };
+            if (auto immediate = step(context)) return std::move(*immediate);
+            AgentOperationOutcome outcome{};
+            outcome.Progress = RunProgressProbe(token);
+            outcome.Continuation = [step](const AgentOperationContext& current, AgentOperationOutcome& out) {
+                auto answer = step(current);
+                if (!answer) return false;
+                out = std::move(*answer);
+                return true;
+            };
+            return outcome;
+        }
+
+        AgentOperationOutcome JobsCancel(const AgentOperationContext& context, std::string_view arguments)
+        {
+            const auto args = ParseObject(arguments);
+            const auto text = args ? String(*args, "token") : std::nullopt;
+            const auto token = text ? ParseToken(*text) : std::nullopt;
+            if (!token)
+                return {.IsError = true, .Text = "Pass {\"token\": \"<from jobs_list>\"}, e.g. \"3:1\".", .ErrorCode = "invalid_params"};
+            if (!PrepareSnapshot(context)) return Fail(kNoWorkspace);
+            const auto status = CancelEditorJob(PrepareEditorProcessingCommands(*context.Attachment), *token);
+            switch (status)
+            {
+            case EditorJobCancelStatus::Requested:
+                return Ok({{"token", *text}, {"status", std::string(ToString(status))},
+                           {"message", "Cancel requested: the job ends cancelled on a later frame and publishes nothing; "
+                                       "jobs_wait reports when it ended."}});
+            case EditorJobCancelStatus::NotActive:
+                return {.IsError = true, .Text = "Job " + *text + " already ended or is already being cancelled.", .ErrorCode = "job_not_active"};
+            case EditorJobCancelStatus::NotEditorJob:
+                return {.IsError = true,
+                        .Text = "Job " + *text + " is not an editor job (or no longer retained). Only rows of jobs_list with "
+                                "\"cancellable\": true can be cancelled; asset imports, scene files, k-means and consolidation runs cannot.",
+                        .ErrorCode = "not_editor_job"};
+            case EditorJobCancelStatus::Unavailable: break;
+            }
+            return Fail(kNoWorkspace);
         }
 
         AgentOperationOutcome Log(const AgentOperationContext&, std::string_view arguments)
@@ -553,7 +707,23 @@ namespace Extrinsic::Runtime
             "The payload follows the section's schema from config_schema or config_get.",
             Schema("{" + kSectionProperty + "," + kPayloadProperty + "}", R"(["section","payload"])"), false, ConfigApply,
             true); // engine config is not part of the undo history
-        add("jobs", "Jobs", "Background jobs with state, progress and elapsed time.", none, true, Jobs);
+        add("jobs_list", "Jobs",
+            "Background jobs with token, state, progress and elapsed time; editor jobs also name the entity and output they "
+            "write and whether jobs_cancel accepts them (cancellable).", none, true, JobsList);
+        const std::string tokenProperty = R"("token":{"type":"string","pattern":"^[0-9]+:[0-9]+$","description":"Job token from jobs_list, e.g. 3:1."})";
+        add("jobs_wait", "Wait for a job",
+            "Wait until a job ended (finished: true) or timeout_ms passed (timed_out: true), while frames keep running. Name the "
+            "job by token, or by entity and output (the newest editor run writing that output when called). Ends with an error "
+            "when the job is unknown or reaped (unknown_job), the scene is replaced (scene_replaced), the workspace detaches or "
+            "the window is minimized (viewport_not_presentable).",
+            R"({"type":"object","properties":{)" + tokenProperty + "," + kEntityProperty +
+                R"(,"output":{"type":"string","description":"Output property name the editor job writes."},"timeout_ms":{"type":"integer","minimum":0,"maximum":60000,"default":30000}},"oneOf":[{"required":["token"]},{"required":["entity","output"]}],"additionalProperties":false})",
+            true, JobsWait, false, true);
+        add("jobs_cancel", "Cancel a job",
+            "Cancel an editor job (a jobs_list row with cancellable: true). It ends cancelled on a later frame and publishes "
+            "nothing, so the scene and the undo history stay as they are; asset imports, scene files, k-means and consolidation "
+            "runs cannot be cancelled.",
+            Schema("{" + tokenProperty + "}", R"(["token"])"), false, JobsCancel);
         add("log", "Engine log",
             "Recent engine log entries (warnings, errors, Vulkan validation messages).",
             Schema(R"({"limit":{"type":"integer","minimum":1,"maximum":1000,"default":100},"min_level":{"type":"string","enum":["debug","info","warning","error"],"default":"info"}})"),

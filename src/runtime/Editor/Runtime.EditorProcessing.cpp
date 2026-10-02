@@ -61,6 +61,16 @@ namespace Extrinsic::Runtime
         return context.JobCommands.Progress ? context.JobCommands.Progress(key)
                                             : EditorOperationProgress{};
     }
+    std::vector<EditorJobRecord> GetEditorJobs(const EditorProcessingCommands& commands)
+    {
+        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
+        return context.JobCommands.SnapshotAll ? context.JobCommands.SnapshotAll() : std::vector<EditorJobRecord>{};
+    }
+    EditorJobCancelStatus CancelEditorJob(const EditorProcessingCommands& commands, const JobToken token)
+    {
+        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
+        return context.JobCommands.Cancel ? context.JobCommands.Cancel(token) : EditorJobCancelStatus::Unavailable;
+    }
     bool AreEditorProcessingConfigCommandsAvailable(
         const EditorProcessingCommands& commands) noexcept
     {

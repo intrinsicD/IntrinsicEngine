@@ -5,6 +5,7 @@ module;
 #include <functional>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -132,6 +133,27 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] EditorOperationProgress ResolveEditorOperationProgress(
         const std::vector<EditorJobRecord>& records,
         const EditorOperationRunKey& key);
+    // The record `ResolveEditorOperationProgress` projects: the job a key names
+    // among `records`, or nullopt.
+    [[nodiscard]] std::optional<EditorJobRecord> FindEditorOperationRun(
+        const std::vector<EditorJobRecord>& records,
+        const EditorOperationRunKey& key);
+
+    // Answer of `EditorJobCommandSurface::Cancel`.
+    enum class EditorJobCancelStatus : std::uint8_t
+    {
+        // `JobService::Cancel` accepted it; the job ends `Cancelled` on a later
+        // drain and its unpublished finalizer delivers the terminal result once.
+        Requested,
+        // An editor job that already ended or whose cancel was already requested.
+        NotActive,
+        // Unknown or reaped token, or a job the editor did not submit through
+        // `Submit` (asset decode, scene files, K-Means and consolidation runs).
+        NotEditorJob,
+        // Detached attachment (stale epoch) or no job service.
+        Unavailable,
+    };
+    [[nodiscard]] std::string_view ToString(EditorJobCancelStatus status) noexcept;
 
     struct EditorJobCommandSurface
     {
@@ -141,6 +163,11 @@ export namespace Extrinsic::Runtime
             FindActive{};
         std::function<std::vector<EditorJobRecord>(std::uint32_t)>
             SnapshotEntity{};
+        // Every job submitted through `Submit` that the service still retains,
+        // ordered by token; exactly the jobs `Cancel` accepts.
+        std::function<std::vector<EditorJobRecord>()> SnapshotAll{};
+        // Cancels a job submitted through `Submit`; never any other job.
+        std::function<EditorJobCancelStatus(JobToken)> Cancel{};
         // `State::None` for an unknown, stale-epoch or pruned key.
         std::function<EditorOperationProgress(const EditorOperationRunKey&)>
             Progress{};

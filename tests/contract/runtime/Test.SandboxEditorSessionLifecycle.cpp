@@ -23,8 +23,10 @@
 #include <entt/entity/entity.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <gtest/gtest.h>
+#include <nlohmann/json.hpp>
 
 import Extrinsic.Runtime.AgentOperations;
+import Extrinsic.Runtime.AgentServer;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.NormalOperations;
@@ -3156,5 +3158,370 @@ TEST(SandboxEditorSession, OperationProgressRejectsStaleEpochHandlesAndFindsServ
                State::Succeeded;
     }));
     attachment.Detach();
+    engine.Shutdown();
+}
+
+// RUNTIME-279: `SnapshotAll` lists exactly the jobs submitted through the surface
+// and `Cancel` reaches only those. A cancelled job publishes nothing and its
+// unpublished finalizer (the terminal result) runs exactly once, whether it was
+// waiting for a dependency or already running.
+TEST(SandboxEditorSessionLifecycle, EditorJobSurfaceSnapshotsAndCancelsOnlyItsOwnJobs)
+{
+    Extrinsic::Tests::EditorJobHarness harness{2u};
+    ProgressProbeContext context;
+    harness.Attach(context);
+    const auto& commands = context.JobCommands;
+    std::atomic_bool release{false};
+    std::atomic_int published{0};
+    std::atomic_int finalized{0};
+    const auto counted = [&](std::string name) {
+        Runtime::JobDesc desc = MakeProgressProbeJob(std::move(name), release);
+        desc.PublishCompletion = [&published](Runtime::KernelEventBus&, const Runtime::JobResultEnvelope&) {
+            ++published;
+            return true;
+        };
+        desc.FinalizeUnpublishedOnMainThread = [&finalized] { ++finalized; };
+        return desc;
+    };
+
+    const auto runningId = ProbeIdentity("running");
+    const Runtime::JobToken running = commands.Submit(counted("running"), runningId);
+    Runtime::JobDesc waiting = counted("waiting");
+    waiting.DependsOn.push_back({.Job = running, .Reason = "test"});
+    const Runtime::JobToken dependent = commands.Submit(std::move(waiting), ProbeIdentity("waiting", 8u));
+    Runtime::JobDesc service = counted("service");
+    service.CorrelationId = 4u;
+    const Runtime::JobToken foreign = harness.Jobs().Submit(std::move(service));
+    ASSERT_TRUE(running.IsValid() && dependent.IsValid() && foreign.IsValid());
+
+    // Snapshot: the two editor jobs with their identities, never the service job.
+    const auto rows = commands.SnapshotAll();
+    ASSERT_EQ(rows.size(), 2u);
+    EXPECT_EQ(rows[0].Token, running);
+    EXPECT_EQ(rows[0].Identity.OutputName, "running");
+    EXPECT_EQ(rows[0].Name, "running");
+    EXPECT_EQ(rows[1].Token, dependent);
+    EXPECT_EQ(rows[1].Identity.EntityId, 8u);
+    EXPECT_EQ(rows[1].State, Runtime::JobState::AwaitingDependencies);
+    ASSERT_TRUE(WaitFor([&] {
+        return harness.Jobs().GetState(running) == Runtime::JobState::Running &&
+               harness.Jobs().GetState(foreign) == Runtime::JobState::Running;
+    }));
+
+    // Refusals: foreign and unknown tokens are never cancelled.
+    EXPECT_EQ(commands.Cancel(foreign), Runtime::EditorJobCancelStatus::NotEditorJob);
+    EXPECT_EQ(commands.Cancel(Runtime::JobToken{}), Runtime::EditorJobCancelStatus::NotEditorJob);
+    EXPECT_EQ(harness.Jobs().GetState(foreign), Runtime::JobState::Running);
+
+    // Cancel the dependency-blocked job, then the running one; a repeat is not active.
+    EXPECT_EQ(commands.Cancel(dependent), Runtime::EditorJobCancelStatus::Requested);
+    EXPECT_EQ(commands.Cancel(running), Runtime::EditorJobCancelStatus::Requested);
+    EXPECT_EQ(commands.Cancel(running), Runtime::EditorJobCancelStatus::NotActive);
+    // The running worker observes the flag and stops without being released.
+    ASSERT_TRUE(WaitFor([&] {
+        (void)harness.Jobs().DrainCompletions(harness.Events());
+        return harness.Jobs().IsComplete(running) && harness.Jobs().IsComplete(dependent);
+    }));
+    EXPECT_EQ(harness.Jobs().GetState(running), Runtime::JobState::Cancelled);
+    EXPECT_EQ(harness.Jobs().GetState(dependent), Runtime::JobState::Cancelled);
+    EXPECT_EQ(commands.Progress(runningId).State, Runtime::EditorOperationState::Cancelled);
+    EXPECT_EQ(finalized.load(), 2) << "each cancelled job delivers its terminal result once";
+    EXPECT_EQ(published.load(), 0) << "a cancelled job never publishes";
+    EXPECT_EQ(commands.Cancel(dependent), Runtime::EditorJobCancelStatus::NotActive);
+
+    release.store(true, std::memory_order_release);
+    ASSERT_TRUE(harness.DrainUntilTerminal());
+    EXPECT_EQ(published.load(), 1) << "only the service job published";
+    EXPECT_EQ(finalized.load(), 2) << "no second delivery for the cancelled jobs";
+}
+
+// The live workspace session: a real editor command's job is listed and
+// cancelled through the prepared handle; its callback fires once with a
+// failure and its output is never written. A foreign job is refused, and a
+// handle (or a token) of an earlier attachment reaches nothing.
+TEST(SandboxEditorSession, EditorJobCancelReachesOnlyThisAttachmentsEditorJobs)
+{
+    Runtime::Engine engine(HeadlessConfig());
+    engine.EmplaceModule<Runtime::AsyncWorkModule>();
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.Initialize();
+    auto& jobs = RequiredEngineService<Runtime::JobService>(engine);
+    auto& scene = *engine.Worlds().Get(engine.Worlds().ActiveWorld());
+    const auto entity = scene.Create();
+    auto& points = scene.Raw().emplace<GS::Vertices>(entity).Properties;
+    points.Resize(4);
+    points.GetOrAdd<glm::vec3>("samples").Vector() = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}};
+    Runtime::KernelDensityConfig density{};
+    density.StableEntityId = Runtime::SelectionController::ToStableEntityId(entity);
+    density.Positions = {Runtime::GeometryElementDomain::PointCloudPoint, "samples", Geometry::PropertyValueKind::Vec3};
+    density.Density = {density.Positions.Domain, "density", Geometry::PropertyValueKind::Float};
+
+    Runtime::EditorWorkspaceAttachment attachment;
+    attachment.Attach(engine.Worlds(), engine.Services());
+    const auto prepare = [&] {
+        EXPECT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment, MakeNoEditorModelBuildRequest()).has_value());
+        return Runtime::PrepareEditorPointFieldFrame(attachment).Commands;
+    };
+    auto fields = prepare();
+    // Input readiness settles through the command drain before the command queues a job.
+    (void)Runtime::PreviewEditorKernelDensityCommand(fields, density);
+    engine.Commands().Drain(scene);
+    fields = prepare();
+    ASSERT_TRUE(Runtime::PreviewEditorKernelDensityCommand(fields, density).Enabled);
+
+    // A foreign job holds the only worker, so the editor job stays queued behind it.
+    std::atomic_bool release{false};
+    const Runtime::JobToken foreign = jobs.Submit(MakeProgressProbeJob("foreign", release));
+    ASSERT_TRUE(WaitFor([&] { return jobs.GetState(foreign) == Runtime::JobState::Running; }));
+    int delivered = 0;
+    bool succeeded = true;
+    const auto applied = Runtime::ApplyEditorKernelDensityCommand(fields, density, [&](Runtime::EditorKernelDensityResult result) {
+        ++delivered;
+        succeeded = result.Succeeded();
+    });
+    ASSERT_EQ(applied.Status, Runtime::EditorCommandStatus::Pending) << applied.Message;
+
+    const auto rows = Runtime::GetEditorJobs(fields);
+    ASSERT_EQ(rows.size(), 1u) << "the foreign job is not an editor job";
+    const Runtime::JobToken own = rows.front().Token;
+    EXPECT_EQ(rows.front().Identity.EntityId, density.StableEntityId);
+    EXPECT_EQ(rows.front().Identity.OutputName, "density");
+    EXPECT_TRUE(Runtime::IsActiveEditorJobState(rows.front().State));
+
+    EXPECT_EQ(Runtime::CancelEditorJob(fields, foreign), Runtime::EditorJobCancelStatus::NotEditorJob);
+    EXPECT_EQ(jobs.GetState(foreign), Runtime::JobState::Running);
+    EXPECT_EQ(Runtime::CancelEditorJob(fields, own), Runtime::EditorJobCancelStatus::Requested);
+    EXPECT_EQ(Runtime::CancelEditorJob(fields, own), Runtime::EditorJobCancelStatus::NotActive);
+
+    release.store(true, std::memory_order_release);
+    ASSERT_TRUE(WaitFor([&] {
+        (void)jobs.DrainCompletions(engine.Events());
+        return jobs.IsComplete(own) && jobs.IsComplete(foreign);
+    }));
+    EXPECT_EQ(jobs.GetState(own), Runtime::JobState::Cancelled);
+    EXPECT_EQ(delivered, 1) << "the cancelled command's callback fires exactly once";
+    EXPECT_FALSE(succeeded);
+    EXPECT_FALSE(points.Exists("density")) << "a cancelled job publishes nothing";
+    (void)jobs.DrainCompletions(engine.Events());
+    EXPECT_EQ(delivered, 1);
+
+    // Stale epoch: the old handle reads and cancels nothing; the new session
+    // does not know the old session's tokens.
+    attachment.Detach();
+    EXPECT_TRUE(Runtime::GetEditorJobs(fields).empty());
+    EXPECT_EQ(Runtime::CancelEditorJob(fields, own), Runtime::EditorJobCancelStatus::Unavailable);
+    attachment.Attach(engine.Worlds(), engine.Services());
+    const auto current = prepare();
+    std::atomic_bool releaseLater{false};
+    const Runtime::JobToken stillForeign = jobs.Submit(MakeProgressProbeJob("old session", releaseLater));
+    EXPECT_EQ(Runtime::CancelEditorJob(fields, stillForeign), Runtime::EditorJobCancelStatus::Unavailable);
+    EXPECT_EQ(Runtime::CancelEditorJob(current, stillForeign), Runtime::EditorJobCancelStatus::NotEditorJob);
+    EXPECT_EQ(Runtime::CancelEditorJob(current, own), Runtime::EditorJobCancelStatus::NotEditorJob);
+    releaseLater.store(true, std::memory_order_release);
+    ASSERT_TRUE(WaitFor([&] {
+        (void)jobs.DrainCompletions(engine.Events());
+        return jobs.IsComplete(stillForeign);
+    }));
+    attachment.Detach();
+    engine.Shutdown();
+}
+
+// RUNTIME-279: the agent job tools and MCP cancellation over a live workspace
+// session, without a frame loop: no completion drain runs unless the test runs
+// it, so a queued job can neither publish nor be reaped behind the test's back.
+namespace
+{
+    using AgentJson = nlohmann::json;
+    [[nodiscard]] AgentJson AgentResult(const Runtime::AgentOperationOutcome& outcome)
+    {
+        AgentJson parsed = AgentJson::parse(outcome.Text, nullptr, false);
+        return parsed.is_object() ? parsed : AgentJson::object();
+    }
+    [[nodiscard]] std::string TokenText(const Runtime::JobToken token)
+    {
+        return std::to_string(token.Index) + ":" + std::to_string(token.Generation);
+    }
+    [[nodiscard]] std::string ToolCall(const int id, const char* name, const AgentJson& arguments)
+    {
+        return AgentJson{{"jsonrpc", "2.0"}, {"id", id}, {"method", "tools/call"},
+                         {"params", {{"name", name}, {"arguments", arguments}}}}.dump();
+    }
+}
+
+TEST_F(EditorKeypointAgent, EditorJobToolsListWaitAndCancelThroughTheSurface)
+{
+    ASSERT_TRUE(Runtime::ApplyEditorKeypointAnalysisConfig(Commands, Keypoints).Succeeded());
+    Runtime::AgentOperationRegistry registry;
+    Runtime::RegisterEditorAgentOperations(registry);
+    auto& jobs = RequiredEngineService<Runtime::JobService>(Engine);
+    const Runtime::AgentOperationContext context{.Attachment = &Attachment, .Jobs = &jobs};
+    const auto invoke = [&](const char* name, const AgentJson& arguments) {
+        return Runtime::InvokeAgentOperation(registry, name, context, arguments.dump(), false);
+    };
+
+    // A non-editor job holds the only worker, so the run's job stays queued.
+    std::atomic_bool release{false};
+    const Runtime::JobToken foreign = jobs.Submit(MakeProgressProbeJob("foreign", release));
+    ASSERT_TRUE(WaitFor([&] { return jobs.GetState(foreign) == Runtime::JobState::Running; }));
+    auto run = invoke("run_keypoint_analysis", AgentJson::object());
+    ASSERT_TRUE(run.Continuation) << run.Text;
+
+    AgentJson listed = AgentResult(invoke("jobs_list", AgentJson::object()));
+    AgentJson foreignRow, editorRow;
+    for (const auto& row : listed["jobs"])
+        (row["editor"].is_null() ? foreignRow : editorRow) = row;
+    EXPECT_EQ(foreignRow["token"], TokenText(foreign));
+    EXPECT_EQ(foreignRow["cancellable"], false);
+    ASSERT_TRUE(editorRow.is_object()) << listed.dump();
+    EXPECT_EQ(editorRow["editor"]["entity"], Keypoints.StableEntityId);
+    EXPECT_EQ(editorRow["cancellable"], true);
+    EXPECT_EQ(editorRow["state"], "queued");
+    const std::string token = editorRow["token"].get<std::string>();
+
+    // A non-editor job is refused and keeps running.
+    EXPECT_EQ(invoke("jobs_cancel", {{"token", TokenText(foreign)}}).ErrorCode, "not_editor_job");
+    EXPECT_EQ(jobs.GetState(foreign), Runtime::JobState::Running);
+
+    // Timeouts: immediate, and two concurrent waits on the same job that each end on their own.
+    AgentJson immediate = AgentResult(invoke("jobs_wait", {{"token", TokenText(foreign)}, {"timeout_ms", 0}}));
+    EXPECT_EQ(immediate["timed_out"], true);
+    EXPECT_EQ(immediate["finished"], false);
+    std::vector<Runtime::AgentOperationOutcome> waits;
+    waits.push_back(invoke("jobs_wait", {{"token", TokenText(foreign)}, {"timeout_ms", 1}}));
+    waits.push_back(invoke("jobs_wait", {{"token", TokenText(foreign)}, {"timeout_ms", 1}}));
+    std::this_thread::sleep_for(std::chrono::milliseconds{2}); // only guarantees the deadline has passed
+    for (auto& wait : waits)
+    {
+        Runtime::AgentOperationOutcome out = wait;
+        if (wait.Continuation) { out = {}; ASSERT_TRUE(wait.Continuation(context, out)); }
+        EXPECT_EQ(AgentResult(out)["timed_out"], true) << out.Text;
+    }
+
+    // By output: the newest run writing it is the queued one.
+    AgentJson byOutput = AgentResult(invoke("jobs_wait", {{"entity", Keypoints.StableEntityId},
+        {"output", editorRow["editor"]["output"]}, {"timeout_ms", 0}}));
+    EXPECT_EQ(byOutput["job"]["token"], token) << byOutput.dump();
+    EXPECT_EQ(invoke("jobs_wait", {{"entity", Keypoints.StableEntityId}, {"output", "absent"}}).ErrorCode, "unknown_job");
+
+    auto waitForRun = invoke("jobs_wait", {{"token", token}, {"timeout_ms", 60000}});
+    ASSERT_TRUE(waitForRun.Continuation);
+    AgentJson cancelled = AgentResult(invoke("jobs_cancel", {{"token", token}}));
+    EXPECT_EQ(cancelled["status"], "requested") << cancelled.dump();
+    EXPECT_EQ(invoke("jobs_cancel", {{"token", token}}).ErrorCode, "job_not_active");
+
+    release.store(true, std::memory_order_release);
+    std::optional<Runtime::AgentOperationOutcome> waited, ran;
+    ASSERT_TRUE(WaitFor([&] {
+        (void)jobs.DrainCompletions(Engine.Events());
+        Runtime::AgentOperationOutcome out;
+        if (!waited && waitForRun.Continuation(context, out)) waited = out;
+        if (!ran && run.Continuation(context, out)) ran = out;
+        return waited && ran;
+    }));
+    AgentJson finished = AgentResult(*waited);
+    EXPECT_EQ(finished["finished"], true) << waited->Text;
+    EXPECT_EQ(finished["job"]["state"], "cancelled");
+    EXPECT_TRUE(ran->IsError) << "the cancelled run answers once, as not applied: " << ran->Text;
+    EXPECT_FALSE(Properties().Exists(Keypoints.Mask.Name)) << "a cancelled run publishes nothing";
+    EXPECT_FALSE(Properties().Exists(Keypoints.Score.Name));
+
+    // A completed job answers at once; once reaped it is unknown.
+    EXPECT_EQ(AgentResult(invoke("jobs_wait", {{"token", TokenText(foreign)}}))["job"]["state"], "published");
+    (void)jobs.ReapCompleted();
+    EXPECT_EQ(invoke("jobs_wait", {{"token", TokenText(foreign)}}).ErrorCode, "unknown_job");
+}
+
+// notifications/cancelled for a pending run cancels its editor job through the
+// surface: the job ends cancelled, publishes nothing, the call never answers
+// and its tombstone is dropped once the job's terminal result was delivered.
+TEST_F(EditorKeypointAgent, EditorJobMcpCancelCancelsTheCallsJob)
+{
+    ASSERT_TRUE(Runtime::ApplyEditorKeypointAnalysisConfig(Commands, Keypoints).Succeeded());
+    Runtime::AgentOperationRegistry registry;
+    Runtime::RegisterEditorAgentOperations(registry);
+    auto& jobs = RequiredEngineService<Runtime::JobService>(Engine);
+    const Runtime::AgentOperationContext context{.Attachment = &Attachment, .Jobs = &jobs};
+    Runtime::AgentProtocol protocol{registry, false};
+
+    std::atomic_bool release{false};
+    const Runtime::JobToken foreign = jobs.Submit(MakeProgressProbeJob("foreign", release));
+    ASSERT_TRUE(WaitFor([&] { return jobs.GetState(foreign) == Runtime::JobState::Running; }));
+    ASSERT_FALSE(protocol.Handle(ToolCall(7, "run_keypoint_analysis", AgentJson::object()), context).has_value());
+    ASSERT_EQ(protocol.PendingCount(), 1u);
+    Runtime::JobToken own{};
+    for (const auto& job : jobs.SnapshotAll())
+        if (job.Token != foreign) own = job.Token;
+    ASSERT_TRUE(own.IsValid()) << "the run queued its job";
+
+    ASSERT_FALSE(protocol.Handle(AgentJson{{"jsonrpc", "2.0"}, {"method", "notifications/cancelled"},
+                                           {"params", {{"requestId", 7}}}}.dump(), context).has_value());
+    EXPECT_EQ(protocol.PendingCount(), 1u) << "the tombstone holds its slot";
+    EXPECT_FALSE(jobs.Cancel(own)) << "the notification already requested the cancel";
+    EXPECT_EQ(jobs.GetState(foreign), Runtime::JobState::Running) << "a non-editor job is never touched";
+
+    release.store(true, std::memory_order_release);
+    std::vector<std::string> replies;
+    ASSERT_TRUE(WaitFor([&] {
+        (void)jobs.DrainCompletions(Engine.Events());
+        for (auto& line : protocol.PollPending(context)) replies.push_back(std::move(line));
+        return protocol.PendingCount() == 0u && jobs.IsComplete(own) && jobs.IsComplete(foreign);
+    }));
+    EXPECT_TRUE(replies.empty()) << replies.front();
+    EXPECT_EQ(jobs.GetState(own), Runtime::JobState::Cancelled);
+    EXPECT_FALSE(Properties().Exists(Keypoints.Mask.Name)) << "a cancelled run publishes nothing";
+}
+
+// A wait ends when the scene is replaced, when the window minimizes (refused
+// while minimized, a pending one answered) and when the workspace detaches.
+TEST(SandboxEditorSession, EditorJobWaitEndsOnSceneReplacementMinimizeAndDetach)
+{
+    Runtime::Engine engine(HeadlessConfig());
+    engine.EmplaceModule<Runtime::AsyncWorkModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.Initialize();
+    auto& jobs = RequiredEngineService<Runtime::JobService>(engine);
+    Runtime::EditorWorkspaceAttachment attachment;
+    attachment.Attach(engine.Worlds(), engine.Services());
+    ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment, MakeNoEditorModelBuildRequest()).has_value());
+    Runtime::AgentOperationRegistry registry;
+    Runtime::RegisterEditorAgentOperations(registry);
+    const Runtime::AgentOperationContext context{.Attachment = &attachment, .Jobs = &jobs};
+    std::atomic_bool release{false};
+    const Runtime::JobToken job = jobs.Submit(MakeProgressProbeJob("long", release));
+    ASSERT_TRUE(job.IsValid());
+    const std::string arguments = AgentJson{{"token", TokenText(job)}, {"timeout_ms", 60000}}.dump();
+
+    auto replaced = Runtime::InvokeAgentOperation(registry, "jobs_wait", context, arguments, false);
+    ASSERT_TRUE(replaced.Continuation) << replaced.Text;
+    Runtime::AgentOperationOutcome out;
+    EXPECT_FALSE(replaced.Continuation(context, out));
+    ASSERT_TRUE(RequiredEngineService<Runtime::SceneDocumentModule>(engine).NewSceneDocument().has_value());
+    ASSERT_TRUE(replaced.Continuation(context, out));
+    EXPECT_EQ(out.ErrorCode, "scene_replaced") << out.Text;
+
+    Runtime::AgentProtocol protocol{registry, false};
+    const Runtime::AgentOperationContext minimized{.Attachment = &attachment, .Jobs = &jobs, .ViewportPresentable = false};
+    const auto refused = protocol.Handle(ToolCall(1, "jobs_wait", AgentJson::parse(arguments)), minimized);
+    ASSERT_TRUE(refused.has_value());
+    EXPECT_EQ(AgentJson::parse(*refused)["result"]["structuredContent"]["error"]["code"], "viewport_not_presentable");
+    ASSERT_FALSE(protocol.Handle(ToolCall(2, "jobs_wait", AgentJson::parse(arguments)), context).has_value());
+    const auto answered = protocol.PollPending(minimized);
+    ASSERT_EQ(answered.size(), 1u);
+    EXPECT_EQ(AgentJson::parse(answered.front())["result"]["structuredContent"]["error"]["code"], "viewport_not_presentable");
+    EXPECT_EQ(protocol.PendingCount(), 0u);
+
+    auto detached = Runtime::InvokeAgentOperation(registry, "jobs_wait", context, arguments, false);
+    ASSERT_TRUE(detached.Continuation) << detached.Text;
+    attachment.Detach();
+    ASSERT_TRUE(detached.Continuation(context, out));
+    EXPECT_TRUE(out.IsError);
+    EXPECT_NE(out.Text.find("not attached"), std::string::npos) << out.Text;
+
+    release.store(true, std::memory_order_release);
+    ASSERT_TRUE(WaitFor([&] {
+        (void)jobs.DrainCompletions(engine.Events());
+        return jobs.IsComplete(job);
+    }));
     engine.Shutdown();
 }

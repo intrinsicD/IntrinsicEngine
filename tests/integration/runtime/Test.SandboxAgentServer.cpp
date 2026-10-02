@@ -546,7 +546,7 @@ TEST(SandboxAgentServer, ProgressAndCancelOverTheSocket)
         bool idle = false;
         while (!idle && std::chrono::steady_clock::now() < deadline)
         {
-            const auto jobs = c.Tool("jobs");
+            const auto jobs = c.Tool("jobs_list");
             idle = true;
             for (const auto& job : jobs.value("jobs", Json::array()))
             {
@@ -1271,4 +1271,75 @@ TEST(SandboxAgentServer, SetCameraReportsUnavailableControls)
         const auto result = c.Tool("set_camera", {{"controller", "fly"}}, &isError);
         rig.Check(isError && result.dump().find("unavailable") != std::string::npos, "camera controls unavailable: " + result.dump());
     });
+}
+
+// RUNTIME-279: the job tools over the socket. A non-editor blocker job that ends only when the
+// client lets go makes every state the client asserts reachable by construction, never by timing.
+// (Cancelling editor jobs, by jobs_cancel or notifications/cancelled, is covered deterministically
+// without a frame loop in Test.SandboxEditorSessionLifecycle.cpp: a running engine may execute a
+// queued job inline on the main thread, so no wall-clock-free socket test can hold one queued.)
+TEST(SandboxAgentServer, JobToolsListWaitAndRefuseNonEditorJobs)
+{
+    AgentRig rig("jobtools");
+    ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
+    std::atomic_bool started{false}, release{false};
+    bool submitted = false;
+    rig.EveryFrame = [&](R::Engine& kernel) {
+        if (submitted) return;
+        submitted = true;
+        (void)kernel.Jobs().Submit({.DebugName = "agent test blocker",
+            .Work = [&](const R::JobCancellation& cancellation) {
+                started.store(true);
+                const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30); // never hang the suite
+                while (!release.load() && !cancellation.IsCancelled() && std::chrono::steady_clock::now() < deadline)
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                return R::JobResultEnvelope::Make(true); },
+            .PublishCompletion = [](R::KernelEventBus&, const R::JobResultEnvelope&) { return true; }});
+    };
+    // Never-throwing accessors (the build has no exceptions).
+    const auto text = [](const Json& object, const char* key) {
+        return object.is_object() && object.contains(key) && object[key].is_string() ? object[key].get<std::string>() : std::string{};
+    };
+    const auto structured = [](const Json& response) {
+        if (!response.is_object() || !response.contains("result") || !response["result"].is_object()) return Json::object();
+        const auto& result = response["result"];
+        return result.contains("structuredContent") && result["structuredContent"].is_object() ? result["structuredContent"] : Json::object();
+    };
+    const auto errorCode = [&](const Json& response) {
+        const auto content = structured(response);
+        return content.contains("error") ? text(content["error"], "code") : std::string{};
+    };
+    const auto call = [](Client& c, const std::string& name, Json arguments) {
+        return c.Request("tools/call", {{"name", name}, {"arguments", std::move(arguments)}});
+    };
+    rig.Run([&](Client& c) {
+        for (int wait = 0; wait < 2500 && !started.load(); ++wait) std::this_thread::sleep_for(std::chrono::milliseconds(4));
+        rig.Check(started.load(), "the blocker runs");
+        Json blocker;
+        const auto list = c.Tool("jobs_list");
+        if (list.is_object() && list.contains("jobs"))
+            for (const auto& row : list["jobs"])
+                if (row.is_object() && row.contains("name") && row["name"] == "agent test blocker") blocker = row;
+        rig.Check(blocker.is_object() && blocker["editor"].is_null() && blocker["cancellable"] == false &&
+                  blocker["state"] == "running", "blocker row: " + blocker.dump());
+        const std::string token = text(blocker, "token");
+        const auto refused = call(c, "jobs_cancel", {{"token", token}});
+        rig.Check(errorCode(refused) == "not_editor_job", "a non-editor job is refused: " + refused.dump());
+        auto timedOut = structured(call(c, "jobs_wait", {{"token", token}, {"timeout_ms", 30}}));
+        rig.Check(timedOut["timed_out"] == true && timedOut["finished"] == false && timedOut["job"]["state"] == "running",
+                  "the wait times out while the blocker runs: " + timedOut.dump());
+        rig.Check(errorCode(call(c, "jobs_wait", {{"token", "4000000:7"}})) == "unknown_job", "unknown token");
+        rig.Check(errorCode(call(c, "jobs_wait", {{"token", token}, {"timeout_ms", 60001}})) == "invalid_params", "timeout above 60 s");
+        // A pending wait answers once the job completed. Requests are served in order, so the ping's
+        // reply proves the wait is pending before the release (a job ended and reaped before the wait
+        // is even read is unknown_job, as asserted above).
+        const int waitId = c.Send("tools/call", {{"name", "jobs_wait"}, {"arguments", {{"token", token}, {"timeout_ms", 60000}}}});
+        rig.Check(c.Request("ping").contains("result"), "ping after the wait");
+        rig.Check(!c.Early.contains(waitId), "the wait is pending while the blocker runs");
+        release.store(true);
+        auto finished = structured(c.Await(waitId));
+        rig.Check(finished["finished"] == true && finished["timed_out"] == false && finished["job"]["state"] == "published",
+                  "the wait ends with the job: " + finished.dump());
+    });
+    release.store(true);
 }

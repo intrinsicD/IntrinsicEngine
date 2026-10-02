@@ -53,6 +53,22 @@ namespace Extrinsic::Tests
             if (m_Identities.contains(token))
                 m_Jobs.ReportProgress(token, progress);
         };
+        // Same contract as the workspace session: submitted-with-identity jobs only.
+        commands.SnapshotAll = [this]
+        {
+            std::vector<Runtime::EditorJobRecord> rows{};
+            for (Runtime::EditorJobRecord& job : Snapshot().Entries)
+                if (m_Identities.contains(job.Token))
+                    rows.push_back(std::move(job));
+            return rows;
+        };
+        commands.Cancel = [this](const Runtime::JobToken token)
+        {
+            if (!m_Identities.contains(token))
+                return Runtime::EditorJobCancelStatus::NotEditorJob;
+            return m_Jobs.Cancel(token) ? Runtime::EditorJobCancelStatus::Requested
+                                        : Runtime::EditorJobCancelStatus::NotActive;
+        };
         commands.SnapshotEntity =
             [this](const std::uint32_t stableEntityId)
         {

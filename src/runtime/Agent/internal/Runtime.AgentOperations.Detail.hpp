@@ -2,7 +2,7 @@
 // argument access, outcome builders, schema fragments, readiness and asynchronous
 // completion. Private to the Extrinsic.Runtime.AgentOperations implementation units: include it
 // after the module declaration and the imports, with a global module fragment that provides
-// <cstdint>, <functional>, <memory>, <optional>, <string>, <string_view>, <utility>, <vector>
+// <algorithm>, <cstdint>, <functional>, <memory>, <optional>, <string>, <string_view>, <utility>, <vector>
 // and <nlohmann/json.hpp>.
 #pragma once
 extern "C++"
@@ -167,17 +167,33 @@ namespace Extrinsic::Runtime::AgentDetail
             for (const auto& job : context.Jobs->SnapshotAll()) tokens.push_back(job.Token);
         return tokens;
     }
-    // Probe for the newest job queued since `before` (nothing queued, nothing to watch).
-    inline std::function<EditorOperationProgress(const AgentOperationContext&)> ProbeForNewJob(
-        const AgentOperationContext& context, const std::vector<JobToken>& before)
+    // The jobs queued since `before`, oldest first. A command runs synchronously on the main
+    // thread, so every one of them belongs to it (a chained run queues several).
+    inline std::vector<JobToken> NewJobTokens(const AgentOperationContext& context, const std::vector<JobToken>& before)
     {
-        if (!context.Jobs) return {};
-        JobToken newest{};
-        for (const auto& job : context.Jobs->SnapshotAll())
-            if (std::find(before.begin(), before.end(), job.Token) == before.end() &&
-                (!newest.IsValid() || job.Token.Index > newest.Index))
-                newest = job.Token;
-        return newest.IsValid() ? RunProgressProbe(newest) : std::function<EditorOperationProgress(const AgentOperationContext&)>{};
+        std::vector<JobToken> fresh;
+        if (context.Jobs)
+            for (const auto& job : context.Jobs->SnapshotAll())
+                if (std::find(before.begin(), before.end(), job.Token) == before.end()) fresh.push_back(job.Token);
+        std::sort(fresh.begin(), fresh.end(), [](JobToken a, JobToken b) { return a.Index < b.Index; });
+        return fresh;
+    }
+    // Probe for the newest of them (nothing queued, nothing to watch).
+    inline std::function<EditorOperationProgress(const AgentOperationContext&)> ProbeForNewestJob(const std::vector<JobToken>& fresh)
+    {
+        return fresh.empty() ? std::function<EditorOperationProgress(const AgentOperationContext&)>{} : RunProgressProbe(fresh.back());
+    }
+    // `notifications/cancelled` for a call that queued `tokens`: cancels them through the editor job
+    // surface (RUNTIME-279), which refuses every job the editor did not submit and every token of an
+    // earlier attachment. Nothing queued, nothing to cancel.
+    inline std::function<void(const AgentOperationContext&)> CancelThroughEditorSurface(std::vector<JobToken> tokens)
+    {
+        if (tokens.empty()) return {};
+        return [tokens = std::move(tokens)](const AgentOperationContext& current) {
+            if (current.Attachment == nullptr || !current.Attachment->IsAttached()) return;
+            const auto commands = PrepareEditorProcessingCommands(*current.Attachment);
+            for (const JobToken token : tokens) (void)CancelEditorJob(commands, token);
+        };
     }
 
     // ---- asynchronous completion -------------------------------------------------------
@@ -205,7 +221,11 @@ namespace Extrinsic::Runtime::AgentDetail
             return {.IsError = true, .Text = (immediate.Message.empty() ? std::string{} : immediate.Message + " ") + kResultUnavailable,
                     .ErrorCode = "result_unavailable"};
         AgentOperationOutcome outcome{};
-        outcome.Progress = ProbeForNewJob(context, before);
+        auto fresh = NewJobTokens(context, before);
+        outcome.Progress = ProbeForNewestJob(fresh);
+        // A cancelled job's finalizer delivers its terminal result (or releases the callback), so the
+        // continuation below still ends and frees the call's tombstone.
+        outcome.Cancel = CancelThroughEditorSurface(std::move(fresh));
         outcome.Continuation = [done, describe, orphaned](const AgentOperationContext& current, AgentOperationOutcome& out) {
             if (!current.Attachment || !current.Attachment->IsAttached()) { out = Fail(kNoWorkspace); return true; }
             if (done->has_value())

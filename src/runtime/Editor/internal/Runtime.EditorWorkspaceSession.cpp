@@ -250,6 +250,16 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
             }
             return rows;
         }
+        [[nodiscard]] std::vector<EditorJobRecord> SnapshotAllEditorJobs(
+            const JobService& jobs,
+            const EditorJobIdentityIndex& identities)
+        {
+            std::vector<EditorJobRecord> rows{};
+            for (const JobSnapshot& job : jobs.SnapshotAll())
+                if (const auto identity = identities.find(job.Token); identity != identities.end())
+                    rows.push_back(ToEditorJobRecord(job, identity->second));
+            return rows;
+        }
         // Every job this session can attribute to a run: the ones it submitted
         // with an identity, and service runs stamped with a correlation id.
         [[nodiscard]] EditorOperationProgress
@@ -612,8 +622,8 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         m_ResultBindings.ParameterizationUvViewCommands = &m_ParameterizationUvViewCommands;
         context.SelectedModelCache = &m_SelectedModelCache;
         // The editor owns domain identity while `JobService` owns lifecycle.
-        // Keep the token/identity index bounded, then expose only submit, active
-        // output lookup, and per-entity queue projection. Every callback checks
+        // Keep the token/identity index bounded, then expose submit, active
+        // output lookup, queue projections and cancel of those same jobs. Every callback checks
         // the attachment epoch before reaching session-owned state.
         if (m_Jobs != nullptr)
         {
@@ -655,6 +665,25 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                         *m_Jobs,
                         m_JobIdentities,
                         stableEntityId);
+                };
+            context.JobCommands.SnapshotAll =
+                [epoch = m_AttachmentEpoch, this]() -> std::vector<EditorJobRecord>
+                {
+                    if (!AttachmentEpochIsActive(epoch) || m_Jobs == nullptr)
+                        return {};
+                    return SnapshotAllEditorJobs(*m_Jobs, m_JobIdentities);
+                };
+            // Only tokens this session submitted (the identity index) reach
+            // `JobService::Cancel`; asset, scene-file and service jobs never do.
+            context.JobCommands.Cancel =
+                [epoch = m_AttachmentEpoch, this](const JobToken token) -> EditorJobCancelStatus
+                {
+                    if (!AttachmentEpochIsActive(epoch) || m_Jobs == nullptr)
+                        return EditorJobCancelStatus::Unavailable;
+                    if (!m_JobIdentities.contains(token))
+                        return EditorJobCancelStatus::NotEditorJob;
+                    return m_Jobs->Cancel(token) ? EditorJobCancelStatus::Requested
+                                                 : EditorJobCancelStatus::NotActive;
                 };
             context.JobCommands.Progress =
                 [epoch = m_AttachmentEpoch,

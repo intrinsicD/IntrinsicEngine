@@ -4,6 +4,7 @@ module;
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 export module Extrinsic.Runtime.EditorProcessing;
 export import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Core.Config.EngineLoad;
@@ -96,6 +97,11 @@ export namespace Extrinsic::Runtime
     // `State::None` for an unbound handle or a key that resolves to no job.
     [[nodiscard]] EditorOperationProgress GetEditorOperationProgress(
         const EditorProcessingCommands&, const EditorOperationRunKey& key);
+    // Every editor-owned job (`EditorJobCommandSurface::SnapshotAll`); empty for an
+    // unbound or stale handle.
+    [[nodiscard]] std::vector<EditorJobRecord> GetEditorJobs(const EditorProcessingCommands&);
+    // `EditorJobCommandSurface::Cancel`; `Unavailable` for an unbound or stale handle.
+    [[nodiscard]] EditorJobCancelStatus CancelEditorJob(const EditorProcessingCommands&, JobToken token);
     // True when an attached handle can preview and hot-apply an engine config
     // document. Every family's `ApplyEditor*Config` needs exactly this, so panels
     // gate their controls on it instead of discovering the rejection.
