@@ -1946,15 +1946,14 @@ namespace Extrinsic::Sandbox::Editor
 
     std::string_view ColorInterpretationComboTooltip() noexcept
     {
-        return "How the selected property's values become a color.\n"
-               "Components: vec4 is (r,g,b,a), vec3 is (r,g,b) with alpha 1, vec2 is (x,y,0) with alpha 1. "
-               "Integer and bool values show a distinct color per value, and so do floats holding whole "
-               "numbers. Other float values are not shown by this option; use the scalar colormap. "
-               "Vector components are used as-is and expected in 0..1.\n"
-               "Normal direction: only for vec3. The vector is normalized and mapped from [-1,1] to [0,1] "
-               "per axis (+X red-ish, +Y green-ish, +Z blue-ish); a zero-length vector shows as +Z. "
-               "Other property types render nothing.\n"
-               "Colors are shown lit and tone-mapped, not as an exact color readout.";
+        return "How the property becomes a color.\n"
+               "Components: the values are the color - vec3/vec4 = RGB(A) expected in 0..1 (other values "
+               "are not rescaled), vec2 = RG. Whole numbers from 0 to 4294967295 and bools get one "
+               "distinct color per value; a negative, fractional or larger value hides the property - "
+               "use the colormap for those.\n"
+               "Normal direction (vec3 only): the direction is the color (+X red, +Y green, +Z blue); "
+               "zero-length shows as +Z.\n"
+               "Shown lit and tone-mapped, so not an exact color readout.";
     }
 
     std::string_view ColorInterpretationOptionTooltip(const int interpretation) noexcept
@@ -1962,14 +1961,13 @@ namespace Extrinsic::Sandbox::Editor
         switch (interpretation)
         {
         case 0:
-            return "Components: vec4 is (r,g,b,a), vec3 is (r,g,b), vec2 is (x,y,0); integers and bools "
-                   "get a distinct color per value (as do whole-number floats); other floats are not shown here, "
-                   "use the scalar colormap. "
-                   "Expected range is 0..1.";
+            return "Components: the values are the color - vec3/vec4 = RGB(A) expected in 0..1 (other "
+                   "values are not rescaled), vec2 = RG. Whole numbers from 0 to 4294967295 and bools "
+                   "get one distinct color per value; a negative, fractional or larger value hides the "
+                   "property - use the colormap for those.";
         case 1:
-            return "Normal direction (vec3 only): normalize each vector and map from [-1,1] to [0,1] per "
-                   "axis (+X red-ish, +Y green-ish, +Z blue-ish). Zero-length vectors show as +Z. "
-                   "Other property types render nothing.";
+            return "Normal direction (vec3 only): the direction is the color (+X red, +Y green, +Z blue); "
+                   "zero-length shows as +Z. Other property types render nothing.";
         default:
             return {};
         }

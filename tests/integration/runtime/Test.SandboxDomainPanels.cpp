@@ -427,20 +427,19 @@ TEST(SandboxDomainPanels, SharedScalarControlsPreserveStylingAndEditAuthority)
 
 TEST(SandboxDomainPanels, ColorInterpretationTextCoversEveryOfferedPropertyType)
 {
-    for (const auto text : {Editor::ColorInterpretationComboTooltip(),
-                            Editor::ColorInterpretationOptionTooltip(0)})
-    {
-        for (const char* needle : {"vec4", "vec3", "vec2", "nteger", "0..1", "scalar colormap"})
-            EXPECT_NE(text.find(needle), std::string_view::npos) << needle << " in " << text;
-    }
-    for (const auto text : {Editor::ColorInterpretationComboTooltip(),
-                            Editor::ColorInterpretationOptionTooltip(1)})
-    {
-        for (const char* needle : {"vec3", "[-1,1]", "[0,1]", "+X", "+Z", "render nothing"})
-            EXPECT_NE(text.find(needle), std::string_view::npos) << needle << " in " << text;
-    }
-    EXPECT_NE(Editor::ColorInterpretationComboTooltip().find("lit and tone-mapped"), std::string_view::npos);
-    EXPECT_EQ(Editor::ColorInterpretationComboTooltip().find("clipped"), std::string_view::npos);
+    EXPECT_EQ(Editor::ColorInterpretationComboTooltip(),
+              "How the property becomes a color.\n"
+              "Components: the values are the color - vec3/vec4 = RGB(A) expected in 0..1 (other values "
+              "are not rescaled), vec2 = RG. Whole numbers from 0 to 4294967295 and bools get one "
+              "distinct color per value; a negative, fractional or larger value hides the property - "
+              "use the colormap for those.\n"
+              "Normal direction (vec3 only): the direction is the color (+X red, +Y green, +Z blue); "
+              "zero-length shows as +Z.\n"
+              "Shown lit and tone-mapped, so not an exact color readout.");
+    for (const char* needle : {"vec3/vec4 = RGB(A)", "vec2 = RG", "bools", "negative, fractional"})
+        EXPECT_NE(Editor::ColorInterpretationOptionTooltip(0).find(needle), std::string_view::npos) << needle;
+    for (const char* needle : {"vec3 only", "+X red", "+Z", "render nothing"})
+        EXPECT_NE(Editor::ColorInterpretationOptionTooltip(1).find(needle), std::string_view::npos) << needle;
     EXPECT_TRUE(Editor::ColorInterpretationOptionTooltip(2).empty());
 }
 
