@@ -259,8 +259,17 @@ TEST(CoreTasks, ParkedWorkerDispatchHandshakeMakesRepeatedProgress)
     Scheduler::WaitForAll();
     const auto stats = Scheduler::GetStats();
     EXPECT_EQ(completed.load(std::memory_order_acquire), iterationCount);
-    EXPECT_EQ(stats.WorkerWakeNotifications,
-              wakeNotificationsBefore + static_cast<std::uint64_t>(iterationCount));
+    // Dispatch bumps workSignal and then samples the parked count. A worker
+    // that is entering its futex wait can observe the bumped signal and leave
+    // without a notification, so a dispatch preempted between those two steps
+    // sees zero parked workers and legitimately skips the notify. The exact
+    // count is therefore not an invariant; progress is (checked above and by
+    // the completion wait). Require only that notifications are never
+    // over-counted and that the parked-worker path was exercised.
+    const auto notifications =
+        stats.WorkerWakeNotifications - wakeNotificationsBefore;
+    EXPECT_LE(notifications, static_cast<std::uint64_t>(iterationCount));
+    EXPECT_GT(notifications, 0u);
     EXPECT_LE(stats.ParkedWorkers, 1u);
     Scheduler::Shutdown();
 }
