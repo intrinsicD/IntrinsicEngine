@@ -22,9 +22,9 @@ contracts: [geometry.element-domain-sources, runtime.editor-prepared-frame-local
 
 ## Context
 - Operator decisions 2026-10-02 (model unification, picking/culling follow displayed positions, canonical normals, single Color mechanism, pixel sizes) are recorded in [RUNTIME-315](../../done/RUNTIME-315-per-domain-render-attribute-source-binding.md#operator-decisions-2026-10-02).
-- Today: `pointcloud.appearance`, `graph.appearance`, `mesh.appearance` are registered separately (`Sandbox.DomainPanels.cpp:996-1017`); the Mesh window also draws graph and point sections, graph draws point (`:1118-1135`), so the three windows already duplicate one another. `DrawDomainRenderWindow` (`:679`) shows a lane checkbox, render hints (point type/size, edge width, surface domain), a single "Property" dropdown that drives only color/scalar overlays (`:417`), and hides the structural channel selector and read-only slot tables under "Advanced" (`:741-743`; "Vertex channels" `:175`, "Binding targets" `:144`). Position/Normal/Texcoord/Size/Width cannot be chosen.
+- Before this task: `pointcloud.appearance`, `graph.appearance` and `mesh.appearance` were registered separately and each drew the others' sections; the attribute table sat under Advanced as "Attribute sources", with the structural channel selector ("Vertex channels") and read-only "Binding targets" beside it. Current state is in the Log.
 - `UI-051` (capability-based domain gating) is the prerequisite; this task replaces its Appearance part with the unified window.
-- Shared helpers: `Sandbox.PanelSupport` property pickers (`:236`), `DrawDisabledReasonTooltip` (`Sandbox.PanelSupport.hpp:228`); `UI-037`/`UI-058` own the disabled-reason presentation, `UI-074` the Color interpretation tooltip text, `UI-072` shared helper adoption.
+- Shared helpers: `Sandbox.PanelSupport` property pickers, `DrawDisabledReasonTooltip`, `DrawAttributeSourceTable`; `UI-037`/`UI-058` own the disabled-reason presentation, `UI-074` the Color interpretation tooltip text, `UI-072` shared helper adoption.
 
 ## Control surfaces
 - UI: one `Appearance` window; selection-driven; calls `ApplyEditorAttributeBindingCommand` from `RUNTIME-315`.
@@ -61,3 +61,18 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --timeout 
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+## Log
+- 2026-10-02: Slice 1. `scene.appearance` (`View > Appearance`) replaces the three per-kind
+  windows. `kAppearanceSections` maps Vertices/Edges/Faces to the PointCloud/Graph/Mesh lane
+  models; a section is built only where `GeometryDomainReadingIncludes(entity provenance, probe
+  element)` holds, and a section the predicate reaches but the model refuses is drawn disabled with
+  the model's diagnostics. Lane visibility, settings, the Property dropdown and Advanced moved
+  into the sections unchanged.
+- 2026-10-02: Slice 2. `DrawAttributeSourceTable` (PanelSupport) draws one table per section from
+  `EditorAttributeBindingModel` (attribute, selector with Default plus candidates, status/fallback);
+  a pick calls `ApplyEditorAttributeBindingCommand`; incompatible candidates are disabled with the
+  runtime's reason. The old Advanced "Attribute sources" block is gone. Tests: tables per entity
+  kind, bind/refuse/Default/undo through the real combo, reason text, unavailable section.
+  Not covered: a usable domain whose lane target is unavailable has no runtime reason text yet
+  (no reachable case on today's provenance rules).

@@ -46,6 +46,7 @@ import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.VisualizationRecipes;
 import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.TextureBakeModule;
@@ -2195,6 +2196,161 @@ namespace Extrinsic::Sandbox::Editor
         default:
             return {};
         }
+    }
+
+    namespace
+    {
+        [[nodiscard]] AppearanceElementSection SectionOfAttributeDomain(
+            const Runtime::GeometryElementDomain domain) noexcept
+        {
+            using D = Runtime::GeometryElementDomain;
+            switch (domain)
+            {
+            case D::MeshEdge:
+            case D::GraphEdge: return AppearanceElementSection::Edges;
+            case D::MeshFace: return AppearanceElementSection::Faces;
+            default: return AppearanceElementSection::Vertices; // vertices, nodes, points, corners
+            }
+        }
+
+        [[nodiscard]] std::string AttributeRowLabel(const Runtime::EditorAttributeBindingRow& row)
+        {
+            using A = Runtime::RenderAttribute;
+            std::string label;
+            switch (row.Attribute)
+            {
+            case A::Position: label = "Position"; break;
+            case A::Normal: label = "Normal"; break;
+            case A::Texcoord: label = "Texcoord"; break;
+            case A::Color: label = "Color"; break;
+            case A::PointSize: label = "Point size"; break;
+            case A::LineWidth: label = "Line width"; break;
+            }
+            if (row.Domain == Runtime::GeometryElementDomain::MeshHalfedge)
+                label += " (corners)";
+            return label;
+        }
+
+        [[nodiscard]] std::string AttributeRowStatus(const Runtime::EditorAttributeBindingRow& row)
+        {
+            if (!row.Bound)
+                return "default: " + row.DefaultSource;
+            if (row.UsingFallback)
+                return row.Diagnostic;
+            return std::string{"bound ("} +
+                   Runtime::DebugNameForGeometryPropertyValueKind(row.Source.ValueKind) + ", " +
+                   std::to_string(row.Resolution.ElementCount) + ")";
+        }
+    } // namespace
+
+    void DrawUnavailableAppearanceSection(
+        const char* const title, const Runtime::EditorDomainWindowModel& model)
+    {
+        ImGui::BeginDisabled();
+        ImGui::CollapsingHeader(
+            title, ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet);
+        ImGui::EndDisabled();
+        if (model.Diagnostics.empty())
+            ImGui::TextDisabled("Not available for this entity.");
+        else
+            DrawDiagnostics(model.Diagnostics);
+    }
+
+    void DrawAttributeSourceTable(
+        const Runtime::EditorAttributeBindingModel& model,
+        const AppearanceElementSection section,
+        const SandboxEditorContext* const context,
+        AttributeSourceUiState& state)
+    {
+        if (state.Entity != model.StableEntityId)
+            state = {.Entity = model.StableEntityId};
+        const bool commandsAvailable = context != nullptr && context->SceneAvailable;
+        constexpr std::array<const char*, 3> sectionIds{"Vertices", "Edges", "Faces"};
+        ImGui::PushID(sectionIds[static_cast<std::size_t>(section)]);
+        constexpr ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+                                          ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingStretchProp;
+        if (ImGui::BeginTable("Attributes", 3, flags))
+        {
+            ImGui::TableSetupColumn("Attribute");
+            ImGui::TableSetupColumn("Source");
+            ImGui::TableSetupColumn("Status");
+            ImGui::TableHeadersRow();
+            for (std::size_t i = 0u; i < model.Rows.size(); ++i)
+            {
+                const Runtime::EditorAttributeBindingRow& row = model.Rows[i];
+                if (SectionOfAttributeDomain(row.Domain) != section)
+                    continue;
+                ImGui::PushID(static_cast<int>(i));
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::TextUnformatted(AttributeRowLabel(row).c_str());
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip))
+                {
+                    ImGui::SetTooltip(
+                        "Expects %s, one value per %s (%zu).\nDefault: %s.",
+                        row.ExpectedType.c_str(),
+                        std::string{ToString(row.Domain)}.c_str(),
+                        row.ExpectedElementCount, row.DefaultSource.c_str());
+                }
+
+                ImGui::TableSetColumnIndex(1);
+                const auto bind = [&](std::string name) {
+                    if (!commandsAvailable)
+                        return;
+                    const std::string label = name.empty() ? std::string{"Default"} : name;
+                    const Runtime::EditorCommandStatus status = Runtime::ApplyEditorAttributeBindingCommand(
+                        context->VisualizationCommands,
+                        Runtime::EditorAttributeBindingCommand{.StableEntityId = model.StableEntityId,
+                                                               .Attribute = row.Attribute,
+                                                               .Domain = row.Domain,
+                                                               .PropertyName = std::move(name)});
+                    state.Refusal =
+                        status == Runtime::EditorCommandStatus::Applied ||
+                                status == Runtime::EditorCommandStatus::NoChange
+                            ? std::string{}
+                            : AttributeRowLabel(row) + " <- " + label + ": " +
+                                  Runtime::DebugNameForEditorCommandStatus(status);
+                };
+                ImGui::BeginDisabled(!commandsAvailable);
+                ImGui::SetNextItemWidth(-FLT_MIN);
+                if (ImGui::BeginCombo("##Source", row.Bound ? row.Source.Name.c_str() : "Default"))
+                {
+                    if (ImGui::Selectable("Default", !row.Bound))
+                        bind({});
+                    for (const Runtime::EditorAttributeBindingCandidate& candidate : row.Candidates)
+                    {
+                        const std::string label =
+                            candidate.Property.Name + " (" +
+                            Runtime::DebugNameForGeometryPropertyValueKind(candidate.Property.ValueKind) +
+                            ", " + std::to_string(candidate.ElementCount) + ")";
+                        const bool selected = row.Bound && row.Source.Name == candidate.Property.Name;
+                        if (ImGui::Selectable(
+                                label.c_str(), selected,
+                                candidate.Compatible ? 0 : ImGuiSelectableFlags_Disabled))
+                            bind(candidate.Property.Name);
+                        if (!candidate.Compatible)
+                        {
+                            DrawDisabledReasonTooltip(candidate.DisabledReason);
+                            ImGui::SameLine();
+                            ImGui::TextDisabled("%s", candidate.DisabledReason.c_str());
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                ImGui::EndDisabled();
+
+                ImGui::TableSetColumnIndex(2);
+                if (row.UsingFallback)
+                    ImGui::TextColored(ImVec4{1.0f, 0.6f, 0.2f, 1.0f}, "%s", AttributeRowStatus(row).c_str());
+                else
+                    ImGui::TextDisabled("%s", AttributeRowStatus(row).c_str());
+                ImGui::PopID();
+            }
+            ImGui::EndTable();
+        }
+        if (!state.Refusal.empty())
+            ImGui::TextColored(ImVec4{1.0f, 0.6f, 0.2f, 1.0f}, "%s", state.Refusal.c_str());
+        ImGui::PopID();
     }
 
     bool DrawColorInterpretationCombo(int& interpretation)

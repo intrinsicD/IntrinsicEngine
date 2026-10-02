@@ -172,85 +172,6 @@ void DrawPropertyBindingTargets(
   }
 }
 
-// One combo per (attribute, element domain) row of the runtime binding model;
-// the runtime decides compatibility and the command validates again.
-void DrawAttributeBindings(
-    const EditorPropertyCatalogModel &catalog,
-    const SandboxEditorContext *context) {
-  const EditorAttributeBindingModel &model = catalog.AttributeBindings;
-  if (model.Rows.empty())
-    return;
-
-  ImGui::SeparatorText("Attribute sources");
-  const bool commandsAvailable =
-      context != nullptr && context->SceneAvailable;
-  // The last refusal stays visible until the next accepted change.
-  static struct {
-    std::uint32_t Entity{0u};
-    std::string Message{};
-  } refusal{};
-  if (refusal.Entity != model.StableEntityId)
-    refusal = {};
-  for (std::size_t i = 0u; i < model.Rows.size(); ++i) {
-    const EditorAttributeBindingRow &row = model.Rows[i];
-    ImGui::PushID(static_cast<int>(i));
-    ImGui::Text("%s / %s", std::string(ToString(row.Attribute)).c_str(),
-                std::string(ToString(row.Domain)).c_str());
-    ImGui::SameLine();
-    const auto bind = [&](std::string name) {
-      if (!commandsAvailable)
-        return;
-      const std::string label = name.empty() ? std::string{"Default"} : name;
-      const EditorCommandStatus status = ApplyEditorAttributeBindingCommand(
-          context->VisualizationCommands,
-          EditorAttributeBindingCommand{.StableEntityId = model.StableEntityId,
-                                        .Attribute = row.Attribute,
-                                        .Domain = row.Domain,
-                                        .PropertyName = std::move(name)});
-      refusal.Entity = model.StableEntityId;
-      refusal.Message =
-          status == EditorCommandStatus::Applied || status == EditorCommandStatus::NoChange
-              ? std::string{}
-              : std::string(ToString(row.Attribute)) + " <- " + label + ": " +
-                    DebugNameForEditorCommandStatus(status);
-    };
-    const std::string current =
-        row.Bound ? row.Source.Name : "Default (" + row.DefaultSource + ")";
-    if (!commandsAvailable)
-      ImGui::BeginDisabled();
-    if (ImGui::BeginCombo("##AttributeSource", current.c_str())) {
-      if (ImGui::Selectable("Default", !row.Bound))
-        bind({});
-      for (const EditorAttributeBindingCandidate &candidate : row.Candidates) {
-        const bool usable = candidate.Compatible;
-        if (!usable)
-          ImGui::BeginDisabled();
-        const std::string label =
-            candidate.Property.Name + " (" +
-            DebugNameForGeometryPropertyValueKind(candidate.Property.ValueKind) +
-            ", " + std::to_string(candidate.ElementCount) + ")";
-        if (ImGui::Selectable(label.c_str(),
-                              row.Bound && row.Source.Name == candidate.Property.Name) &&
-            usable)
-          bind(candidate.Property.Name);
-        if (!usable) {
-          ImGui::EndDisabled();
-          ImGui::SameLine();
-          ImGui::TextDisabled("%s", candidate.DisabledReason.c_str());
-        }
-      }
-      ImGui::EndCombo();
-    }
-    if (!commandsAvailable)
-      ImGui::EndDisabled();
-    if (!row.Diagnostic.empty())
-      ImGui::TextDisabled("%s", row.Diagnostic.c_str());
-    ImGui::PopID();
-  }
-  if (!refusal.Message.empty())
-    ImGui::TextColored(ImVec4{1.0f, 0.6f, 0.2f, 1.0f}, "%s", refusal.Message.c_str());
-}
-
 // Properties is an exhaustive explorer: internal, connectivity, and generated
 // rows remain visible, with unsupported actions diagnosed rather than hidden.
 // Render, binding, and bake controls belong to Appearance.
@@ -689,15 +610,16 @@ struct AppearanceSection {
   const char *LaneLabel;
   EditorDomainWindowKind Kind;
   GeometryElementDomain ElementProbe;
+  AppearanceElementSection Section;
 };
 
 inline constexpr std::array<AppearanceSection, 3> kAppearanceSections{{
     {"Vertices", "Points", EditorDomainWindowKind::PointCloud,
-     GeometryElementDomain::PointCloudPoint},
+     GeometryElementDomain::PointCloudPoint, AppearanceElementSection::Vertices},
     {"Edges", "Edges", EditorDomainWindowKind::Graph,
-     GeometryElementDomain::GraphEdge},
+     GeometryElementDomain::GraphEdge, AppearanceElementSection::Edges},
     {"Faces", "Surface", EditorDomainWindowKind::Mesh,
-     GeometryElementDomain::MeshFace},
+     GeometryElementDomain::MeshFace, AppearanceElementSection::Faces},
 }};
 
 [[nodiscard]] bool
@@ -712,7 +634,8 @@ void DrawAppearanceLane(const AppearanceSection &section,
                         const EditorDomainWindowModel &model,
                         const SandboxEditorContext &context,
                         TextureBakeUiState *textureBakeState,
-                        EditorCommandStatus &status) {
+                        EditorCommandStatus &status,
+                        AttributeSourceUiState &attributeState) {
   const bool mesh = model.Kind == EditorDomainWindowKind::Mesh;
   const bool graph = model.Kind == EditorDomainWindowKind::Graph;
   bool visible = mesh ? model.RenderHints.HasRenderSurface
@@ -738,6 +661,8 @@ void DrawAppearanceLane(const AppearanceSection &section,
       status != EditorCommandStatus::NoChange)
     ImGui::TextWrapped("Appearance change failed: %s",
                        DebugNameForEditorCommandStatus(status));
+  DrawAttributeSourceTable(model.PropertyCatalog.AttributeBindings,
+                           section.Section, &context, attributeState);
   if (!visible || !ImGui::TreeNode("Settings"))
     return;
   switch (model.Kind) {
@@ -766,36 +691,47 @@ void DrawAppearanceLane(const AppearanceSection &section,
 }
 
 // The one Appearance window: a section per element domain the selected entity
-// carries (UI-051 reading predicate), then the entity-level attribute sources
-// and vector fields. `lanes[i]` is the model of `kAppearanceSections[i]`, or
-// null when the section does not apply.
+// carries (UI-051 reading predicate), each with its attribute source table,
+// then the entity-level vector fields. `lanes[i]` is the model of `kAppearanceSections[i]`, or
+// null when the reading predicate excludes it; a section the predicate reaches
+// but the model refuses draws disabled with the runtime's reason.
+// `selected` names the entity (any lane's model carries it).
 void DrawAppearanceContent(
+    const EditorDomainWindowModel &selected,
     const std::array<const EditorDomainWindowModel *, 3> &lanes,
     const SandboxEditorContext &context, TextureBakeUiState *textureBakeState,
     std::array<EditorCommandStatus, 3> &statuses,
+    AttributeSourceUiState &attributeState,
     VectorFieldUiState &vectorFieldState) {
-  const EditorDomainWindowModel &selected = *lanes.front();
   if (!selected.HasSelectedEntity) {
     ImGui::TextDisabled("Select a mesh, graph, or point cloud.");
     return;
   }
   ImGui::TextUnformatted(selected.SelectedEntity.Name.c_str());
+  bool anySection = false;
   for (std::size_t i = 0u; i < kAppearanceSections.size(); ++i) {
     const EditorDomainWindowModel *model = lanes[i];
-    if (model == nullptr || !model->DomainUsable ||
-        !DomainAppearanceReady(*model))
+    if (model == nullptr)
       continue;
+    anySection = true;
+    if (!model->DomainUsable || !DomainAppearanceReady(*model)) {
+      DrawUnavailableAppearanceSection(kAppearanceSections[i].Title, *model);
+      continue;
+    }
     if (!ImGui::CollapsingHeader(kAppearanceSections[i].Title,
                                  ImGuiTreeNodeFlags_DefaultOpen))
       continue;
     ImGui::PushID(static_cast<int>(model->Kind));
     DrawAppearanceLane(kAppearanceSections[i], *model, context,
                        textureBakeState,
-                       statuses[static_cast<std::size_t>(model->Kind)]);
+                       statuses[static_cast<std::size_t>(model->Kind)],
+                       attributeState);
     ImGui::PopID();
   }
-  if (ImGui::CollapsingHeader("Attribute sources"))
-    DrawAttributeBindings(selected.PropertyCatalog, &context);
+  if (!anySection) {
+    ImGui::TextDisabled("No element domain to show for this entity.");
+    DrawDiagnostics(selected.Diagnostics);
+  }
   DrawVectorFieldSection(selected, context, vectorFieldState);
 }
 
@@ -985,6 +921,7 @@ void DrawDomainSelectionWindow(const EditorDomainWindowModel& model,
 
 struct DomainPanels::Impl {
   VectorFieldUiState VectorFieldState{};
+  AttributeSourceUiState AttributeSourceState{};
   std::array<EditorCommandStatus, 3> AppearanceStatuses{
       EditorCommandStatus::NoChange, EditorCommandStatus::NoChange,
       EditorCommandStatus::NoChange};
@@ -1168,27 +1105,25 @@ void DomainPanels::Impl::DrawAppearanceWindow(
 
   ImGui::SetNextWindowSize(ImVec2(340.0f, 300.0f), ImGuiCond_FirstUseEver);
   if (ImGui::Begin("Appearance", &open)) {
-    // The first section's model names the selection; the other lanes are
-    // built only where the entity's element domains reach them.
-    std::array<const EditorDomainWindowModel *, 3> lanes{};
-    lanes[0] = &GetDomainWindowModel(context, kAppearanceSections[0].Kind);
-    const EditorDomainWindowModel &first = *lanes[0];
+    // The first lane's model names the selection; each section's model is
+    // built only where the entity's reading reaches it.
+    const EditorDomainWindowModel &first =
+        GetDomainWindowModel(context, kAppearanceSections[0].Kind);
     if (AppearanceEntity != first.SelectedStableId) {
       AppearanceStatuses.fill(EditorCommandStatus::NoChange);
       VectorFieldState.LastStatus = EditorCommandStatus::NoChange;
       AppearanceEntity = first.SelectedStableId;
     }
-    const EditorDomainWindowModel *mesh = nullptr;
-    if (first.HasSelectedEntity) {
-      for (std::size_t i = 1u; i < kAppearanceSections.size(); ++i) {
-        if (AppearanceSectionApplies(kAppearanceSections[i],
-                                     first.SelectedDomain))
-          lanes[i] = &GetDomainWindowModel(context, kAppearanceSections[i].Kind);
-      }
-      mesh = lanes[2];
+    std::array<const EditorDomainWindowModel *, 3> lanes{};
+    for (std::size_t i = 0u; i < kAppearanceSections.size(); ++i) {
+      if (first.HasSelectedEntity &&
+          AppearanceSectionApplies(kAppearanceSections[i], first.SelectedDomain))
+        lanes[i] = &GetDomainWindowModel(context, kAppearanceSections[i].Kind);
     }
-    DrawAppearanceContent(lanes, context, &textureBakeState,
-                          AppearanceStatuses, VectorFieldState);
+    const EditorDomainWindowModel *mesh = lanes[2];
+    DrawAppearanceContent(first, lanes, context, &textureBakeState,
+                          AppearanceStatuses, AttributeSourceState,
+                          VectorFieldState);
     if (mesh != nullptr && mesh->DomainMatches &&
         ImGui::CollapsingHeader("Property distribution")) {
       const auto properties =

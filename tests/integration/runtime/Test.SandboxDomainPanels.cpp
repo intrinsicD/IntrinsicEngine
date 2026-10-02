@@ -56,6 +56,9 @@ import Geometry.PointCloud;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.SceneDocumentModule;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.SceneEditingOperations;
@@ -956,4 +959,360 @@ TEST(SandboxDomainPanels, AppearanceOffersALanePerElementDomainTheEntityCarries)
     EXPECT_TRUE(points.Points);
     EXPECT_FALSE(points.Edges);
     EXPECT_FALSE(points.Surface);
+}
+
+// UI-075 slice 2: the attribute tables render the runtime binding model.
+namespace
+{
+    // The table of a section: window / lane kind / section title / "Attributes".
+    [[nodiscard]] ImGuiID AppearanceTableId(const ImGuiWindow* window,
+                                            const Runtime::EditorDomainWindowKind lane,
+                                            const char* sectionTitle)
+    {
+        const int scope = static_cast<int>(lane);
+        const auto seed = ImHashData(&scope, sizeof(scope), window->ID);
+        return ImHashStr("Attributes", 0, ImHashStr(sectionTitle, 0, seed));
+    }
+
+    [[nodiscard]] ImGuiID AppearanceRowComboId(const ImGuiID table, const int row)
+    {
+        return ImHashStr("##Source", 0, ImHashData(&row, sizeof(row), table));
+    }
+
+    struct SectionTables
+    {
+        bool Vertices{false};
+        bool Edges{false};
+        bool Faces{false};
+    };
+
+    [[nodiscard]] SectionTables ProbeAppearanceTables(const ProbeEntity kind)
+    {
+        namespace GS = Extrinsic::ECS::Components::GeometrySources;
+        using Kind = Runtime::EditorDomainWindowKind;
+        auto application = std::make_unique<OneFrameApplication>();
+        auto* driver = application.get();
+        Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(application));
+        engine.EmplaceModule<Runtime::SceneInteractionModule>();
+        engine.EmplaceModule<Runtime::EditorUiModule>();
+        engine.Initialize();
+        auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+        auto& raw = scene.Raw();
+        const auto entity = scene.Create();
+        raw.emplace<Extrinsic::ECS::Components::Selection::SelectableTag>(entity);
+        if (kind == ProbeEntity::Mesh)
+        {
+            Geometry::HalfedgeMesh::Mesh mesh;
+            const auto a = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+            const auto b = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+            const auto c = mesh.AddVertex({0.0f, 1.0f, 0.0f});
+            (void)mesh.AddTriangle(a, b, c);
+            GS::PopulateFromMesh(raw, entity, mesh);
+        }
+        else if (kind == ProbeEntity::Graph)
+        {
+            Geometry::Graph::Graph graph;
+            const auto a = graph.AddVertex({0.0f, 0.0f, 0.0f});
+            const auto b = graph.AddVertex({1.0f, 0.0f, 0.0f});
+            (void)graph.AddEdge(a, b);
+            GS::PopulateFromGraph(raw, entity, graph);
+        }
+        else
+        {
+            Geometry::PointCloud::Cloud cloud;
+            (void)cloud.AddPoint({0.0f, 0.0f, 0.0f});
+            GS::PopulateFromCloud(raw, entity, cloud);
+        }
+        auto* selection = engine.Services().Find<Runtime::SelectionController>();
+        EXPECT_TRUE(selection != nullptr && selection->SetSelectedEntity(scene, entity));
+        Editor::EditorShell shell;
+        shell.Attach(engine.Worlds(), engine.Services());
+        Editor::DomainPanels panels;
+        panels.Register(shell);
+        EXPECT_TRUE(shell.SetEditorWindowOpen("scene.appearance", true));
+
+        SectionTables tables{};
+        int frame = 0;
+        driver->OnFrame = [&](Runtime::Engine& kernel) {
+            if (++frame < 4)
+                return;
+            auto* window = ImGui::FindWindowByName("Appearance");
+            if (window == nullptr)
+            {
+                ADD_FAILURE() << "Appearance did not open";
+                kernel.RequestExit();
+                return;
+            }
+            tables.Vertices = ImGui::TableFindByID(
+                AppearanceTableId(window, Kind::PointCloud, "Vertices")) != nullptr;
+            tables.Edges = ImGui::TableFindByID(
+                AppearanceTableId(window, Kind::Graph, "Edges")) != nullptr;
+            tables.Faces = ImGui::TableFindByID(
+                AppearanceTableId(window, Kind::Mesh, "Faces")) != nullptr;
+            kernel.RequestExit();
+        };
+        engine.Run();
+        panels.Unregister();
+        shell.Detach();
+        engine.Shutdown();
+        return tables;
+    }
+}
+
+TEST(SandboxDomainPanels, AppearanceShowsAnAttributeTablePerApplicableElementDomain)
+{
+    const SectionTables mesh = ProbeAppearanceTables(ProbeEntity::Mesh);
+    EXPECT_TRUE(mesh.Vertices && mesh.Edges && mesh.Faces);
+    const SectionTables graph = ProbeAppearanceTables(ProbeEntity::Graph);
+    EXPECT_TRUE(graph.Vertices && graph.Edges);
+    EXPECT_FALSE(graph.Faces);
+    const SectionTables points = ProbeAppearanceTables(ProbeEntity::PointCloud);
+    EXPECT_TRUE(points.Vertices);
+    EXPECT_FALSE(points.Edges);
+    EXPECT_FALSE(points.Faces);
+}
+
+// Choosing a candidate binds it as one undo step, an incompatible candidate
+// is refused, and Default restores the canonical source.
+TEST(SandboxDomainPanels, AttributeSelectorBindsOneUndoStepRefusesIncompatibleAndDefaultRestores)
+{
+    namespace GS = Extrinsic::ECS::Components::GeometrySources;
+    using Kind = Runtime::EditorDomainWindowKind;
+    auto application = std::make_unique<OneFrameApplication>();
+    auto* driver = application.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(application));
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
+    engine.EmplaceModule<Runtime::EditorUiModule>();
+    engine.Initialize();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    auto& raw = scene.Raw();
+    const auto entity = scene.Create();
+    raw.emplace<Extrinsic::ECS::Components::Selection::SelectableTag>(entity);
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    const auto b = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+    const auto c = mesh.AddVertex({0.0f, 1.0f, 0.0f});
+    (void)mesh.AddTriangle(a, b, c);
+    GS::PopulateFromMesh(raw, entity, mesh);
+    (void)raw.get<GS::Vertices>(entity).Properties.GetOrAdd<glm::vec3>("v:offset", glm::vec3{0.0f, 0.0f, 1.0f});
+    (void)raw.get<GS::Vertices>(entity).Properties.GetOrAdd<glm::vec2>("v:pair", glm::vec2{0.0f});
+    auto* selection = engine.Services().Find<Runtime::SelectionController>();
+    ASSERT_NE(selection, nullptr);
+    ASSERT_TRUE(selection->SetSelectedEntity(scene, entity));
+    auto* history = engine.Services().Find<Runtime::EditorCommandHistory>();
+    ASSERT_NE(history, nullptr);
+
+    Editor::EditorShell shell;
+    shell.Attach(engine.Worlds(), engine.Services());
+    Editor::DomainPanels panels;
+    panels.Register(shell);
+    ASSERT_TRUE(shell.SetEditorWindowOpen("scene.appearance", true));
+
+    const auto positionSource = [&]() -> std::string {
+        const auto* bindings = raw.try_get<Runtime::VertexChannelBindingSet>(entity);
+        return bindings != nullptr && Runtime::IsVertexChannelBindingEnabled(bindings->Position)
+            ? bindings->Position.Property.Name : std::string{};
+    };
+    const auto label = [](const char* name, const Geometry::PropertyValueKind kind) {
+        return std::string{name} + " (" + Runtime::DebugNameForGeometryPropertyValueKind(kind) + ", 3)";
+    };
+    const auto selectInPopup = [](const std::string& item) {
+        const auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+        if (popups.empty() || popups.back().Window == nullptr)
+            return false;
+        ImGui::ActivateItemByID(popups.back().Window->GetID(item.c_str()));
+        return true;
+    };
+
+    int frame = 0;
+    int step = 0;
+    const std::size_t undoBefore = history->UndoCount();
+    driver->OnFrame = [&](Runtime::Engine& kernel) {
+        ++frame;
+        auto* window = ImGui::FindWindowByName("Appearance");
+        if (frame < 3)
+            return;
+        if (window == nullptr || frame > 200)
+        {
+            ADD_FAILURE() << "automation stalled at step " << step;
+            kernel.RequestExit();
+            return;
+        }
+        ImGui::SetWindowSize(window, ImVec2{700.0f, 1100.0f});
+        if (frame % 3 != 0)
+            return;
+        // Row 0 of the Vertices table is Position on the mesh vertices.
+        const ImGuiID combo = AppearanceRowComboId(AppearanceTableId(window, Kind::PointCloud, "Vertices"), 0);
+        switch (step)
+        {
+        case 0: ImGui::FocusWindow(window); ImGui::ActivateItemByID(combo); break;
+        case 1: EXPECT_TRUE(selectInPopup(label("v:offset", Geometry::PropertyValueKind::Vec3))); break;
+        case 2:
+            EXPECT_EQ(positionSource(), "v:offset");
+            EXPECT_EQ(history->UndoCount(), undoBefore + 1u) << "a bind is one undo step";
+            ImGui::ActivateItemByID(combo);
+            break;
+        case 3: EXPECT_TRUE(selectInPopup(label("v:pair", Geometry::PropertyValueKind::Vec2))); break;
+        case 4:
+            EXPECT_EQ(positionSource(), "v:offset") << "an incompatible candidate must not bind";
+            EXPECT_EQ(history->UndoCount(), undoBefore + 1u);
+            ImGui::ActivateItemByID(combo);
+            break;
+        case 5: EXPECT_TRUE(selectInPopup("Default")); break;
+        case 6:
+            EXPECT_EQ(positionSource(), "");
+            EXPECT_EQ(history->UndoCount(), undoBefore + 2u);
+            EXPECT_EQ(history->Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+            break;
+        case 7:
+            EXPECT_EQ(positionSource(), "v:offset") << "Default is undoable";
+            kernel.RequestExit();
+            break;
+        default: break;
+        }
+        ++step;
+    };
+    engine.Run();
+    EXPECT_EQ(step, 8);
+    panels.Unregister();
+    shell.Detach();
+    engine.Shutdown();
+}
+
+// The selector lists every candidate and shows the runtime's reason beside an
+// incompatible one; the panel adds no rule of its own.
+TEST(SandboxDomainPanels, AttributeSelectorShowsTheRuntimeReasonOfAnIncompatibleCandidate)
+{
+    TestSupport::ImGuiFrameScope gui;
+    ImGui::GetIO().DisplaySize = {800, 600};
+    ImGui::GetIO().ConfigInputTrickleEventQueue = false;
+    Runtime::EditorAttributeBindingModel model{};
+    model.HasEntity = true;
+    model.StableEntityId = 7u;
+    Runtime::EditorAttributeBindingRow row{};
+    row.Attribute = Runtime::RenderAttribute::Position;
+    row.Domain = Runtime::GeometryElementDomain::MeshVertex;
+    row.ExpectedType = "vec3";
+    row.ExpectedElementCount = 3u;
+    row.DefaultSource = "v:position";
+    row.Candidates.push_back({.Property = {.Domain = row.Domain, .Name = "v:offset",
+                                           .ValueKind = Geometry::PropertyValueKind::Vec3},
+                              .ElementCount = 3u, .Compatible = true});
+    row.Candidates.push_back({.Property = {.Domain = row.Domain, .Name = "v:pair",
+                                           .ValueKind = Geometry::PropertyValueKind::Vec2},
+                              .ElementCount = 3u, .Compatible = false,
+                              .DisabledReason = "requires vec3"});
+    model.Rows.push_back(std::move(row));
+
+    Editor::SandboxEditorContext context{};
+    context.SceneAvailable = true;
+    Editor::AttributeSourceUiState state{};
+    std::string logged;
+    const auto frame = [&](const ImVec2 mouse, const bool down) {
+        gui.NextFrame();
+        ImGui::GetIO().AddMousePosEvent(mouse.x, mouse.y);
+        ImGui::GetIO().AddMouseButtonEvent(0, down);
+        ImGui::SetNextWindowPos({0, 0});
+        ImGui::SetNextWindowSize({700, 300});
+        ImGui::Begin("Attribute host", nullptr, ImGuiWindowFlags_NoSavedSettings);
+        ImGui::LogToBuffer();
+        Editor::DrawAttributeSourceTable(model, Editor::AppearanceElementSection::Vertices, &context, state);
+        logged = ImGui::GetCurrentContext()->LogBuffer.c_str();
+        ImGui::LogFinish();
+        ImGui::End();
+    };
+    // Open the combo: it sits in the table's second column.
+    const ImVec2 comboPos{300.0f, 62.0f};
+    for (int i = 0; i != 3; ++i) frame(comboPos, false);
+    EXPECT_NE(logged.find("Position"), std::string::npos) << logged;
+    EXPECT_NE(logged.find("default: v:position"), std::string::npos) << logged;
+    frame(comboPos, true);
+    frame(comboPos, false);
+    frame(comboPos, false);
+    ASSERT_TRUE(ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) << "popup did not open";
+    EXPECT_NE(logged.find("v:offset"), std::string::npos) << logged;
+    EXPECT_NE(logged.find("v:pair"), std::string::npos) << logged;
+    EXPECT_NE(logged.find("requires vec3"), std::string::npos) << logged;
+}
+
+// A section the reading reaches but the runtime refuses is drawn disabled
+// with the runtime's own diagnostic instead of disappearing.
+TEST(SandboxDomainPanels, UnavailableAppearanceSectionStatesTheRuntimeReason)
+{
+    TestSupport::ImGuiFrameScope gui;
+    ImGui::GetIO().DisplaySize = {800, 600};
+    Runtime::EditorDomainWindowModel model{};
+    model.Diagnostics.push_back(Runtime::EditorDiagnostic{
+        .Code = Runtime::EditorDiagnosticCode::UnsupportedGeometryDomain,
+        .Message = "Graph window requires Vertices and Edges; selected domain is Mesh."});
+    std::string withReason;
+    std::string withoutReason;
+    gui.NextFrame();
+    ImGui::Begin("Unavailable host", nullptr, ImGuiWindowFlags_NoSavedSettings);
+    ImGui::LogToBuffer();
+    Editor::DrawUnavailableAppearanceSection("Edges", model);
+    withReason = ImGui::GetCurrentContext()->LogBuffer.c_str();
+    ImGui::LogFinish();
+    model.Diagnostics.clear();
+    ImGui::LogToBuffer();
+    Editor::DrawUnavailableAppearanceSection("Edges", model);
+    withoutReason = ImGui::GetCurrentContext()->LogBuffer.c_str();
+    ImGui::LogFinish();
+    ImGui::End();
+    EXPECT_NE(withReason.find("Edges"), std::string::npos) << withReason;
+    EXPECT_NE(withReason.find("UnsupportedGeometryDomain"), std::string::npos) << withReason;
+    EXPECT_NE(withReason.find("requires Vertices and Edges"), std::string::npos) << withReason;
+    EXPECT_NE(withoutReason.find("Not available"), std::string::npos) << withoutReason;
+}
+
+// An entity whose sources do not form a mesh, graph or point cloud (a mesh
+// without Edges) has no element-domain reading: no section, no table.
+TEST(SandboxDomainPanels, AppearanceOfAMeshLackingEdgesShowsNoSectionTables)
+{
+    namespace GS = Extrinsic::ECS::Components::GeometrySources;
+    using Kind = Runtime::EditorDomainWindowKind;
+    auto application = std::make_unique<OneFrameApplication>();
+    auto* driver = application.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(application));
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
+    engine.EmplaceModule<Runtime::EditorUiModule>();
+    engine.Initialize();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    auto& raw = scene.Raw();
+    const auto entity = scene.Create();
+    raw.emplace<Extrinsic::ECS::Components::Selection::SelectableTag>(entity);
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    const auto b = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+    const auto c = mesh.AddVertex({0.0f, 1.0f, 0.0f});
+    (void)mesh.AddTriangle(a, b, c);
+    GS::PopulateFromMesh(raw, entity, mesh);
+    raw.remove<GS::Edges>(entity);
+    auto* selection = engine.Services().Find<Runtime::SelectionController>();
+    ASSERT_NE(selection, nullptr);
+    ASSERT_TRUE(selection->SetSelectedEntity(scene, entity));
+    Editor::EditorShell shell;
+    shell.Attach(engine.Worlds(), engine.Services());
+    Editor::DomainPanels panels;
+    panels.Register(shell);
+    ASSERT_TRUE(shell.SetEditorWindowOpen("scene.appearance", true));
+    int frame = 0;
+    bool anyTable = true;
+    driver->OnFrame = [&](Runtime::Engine& kernel) {
+        if (++frame < 4)
+            return;
+        auto* window = ImGui::FindWindowByName("Appearance");
+        ASSERT_NE(window, nullptr);
+        anyTable =
+            ImGui::TableFindByID(AppearanceTableId(window, Kind::PointCloud, "Vertices")) != nullptr ||
+            ImGui::TableFindByID(AppearanceTableId(window, Kind::Graph, "Edges")) != nullptr ||
+            ImGui::TableFindByID(AppearanceTableId(window, Kind::Mesh, "Faces")) != nullptr;
+        kernel.RequestExit();
+    };
+    engine.Run();
+    EXPECT_FALSE(anyTable);
+    panels.Unregister();
+    shell.Detach();
+    engine.Shutdown();
 }

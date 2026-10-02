@@ -479,6 +479,32 @@ namespace Extrinsic::Sandbox::Editor
         TextureBakeUiState* state,
         TextureBakeMutationUiState& mutation);
 
+    // UI-075: the element-domain sections of the Appearance window. Which sections an
+    // entity shows is the runtime's reading predicate; the table only renders rows.
+    enum class AppearanceElementSection : std::uint8_t { Vertices, Edges, Faces };
+
+    // The last refused binding stays visible until the next accepted change on the same entity.
+    struct AttributeSourceUiState
+    {
+        std::uint32_t Entity{0u};
+        std::string Refusal{};
+    };
+
+    // A section the entity's reading reaches but the runtime refuses to present: a disabled header with the
+    // model's diagnostics (the runtime's reason) so the section never disappears silently.
+    void DrawUnavailableAppearanceSection(
+        const char* title, const Runtime::EditorDomainWindowModel& model);
+
+    // One section's attribute table, rendered from the runtime binding model: a row per
+    // (attribute, element domain) of `section` with the current source, a selector (Default plus every
+    // candidate; incompatible ones disabled with the runtime's reason) and the fallback status.
+    // A pick goes through `ApplyEditorAttributeBindingCommand` (one undo step); nothing is cached here.
+    void DrawAttributeSourceTable(
+        const Runtime::EditorAttributeBindingModel& model,
+        AppearanceElementSection section,
+        const SandboxEditorContext* context,
+        AttributeSourceUiState& state);
+
     void DrawUniformVisualizationColorEdit(
         const Runtime::EditorVisualizationConfigModel& visualization,
         const SandboxEditorContext& context,
