@@ -5421,6 +5421,20 @@ TEST(SandboxProcessingPanels, TextureBakeControlsShowTheirBakeRunOnlyForItsEntit
     };
     text = drawTab(id);
     EXPECT_NE(text.find("Texture bake 'v:heat'"), std::string::npos) << text;
+    // A Pending output whose bake the runtime started itself (no editor run) finds nothing, so the
+    // tab keeps its "Bake pending." text.
+    const auto appearance = harness.Service->Bake(TBF::HeatRequest(harness, entity, "appearance.color"));
+    ASSERT_EQ(appearance.Status, R::PropertyTextureBakeStatus::Scheduled) << appearance.Diagnostic;
+    harness.DrainJobs();
+    {
+        Editor::OperationRunSlot appearanceRun{};
+        gui.NextFrame();
+        ImGui::Begin("Texture tab test", nullptr, ImGuiWindowFlags_NoSavedSettings);
+        EXPECT_FALSE(Editor::DrawTextureBakeOutputRun(appearanceRun, context.Processing, id, "appearance.color",
+                                                      "##appearance_run"));
+        EXPECT_TRUE(Editor::DrawTextureBakeOutputRun(tabRun, context.Processing, id, "v:heat", "##tab_run"));
+        ImGui::End();
+    }
     tabRun = Editor::OperationRunSlot{}; // a fresh tab of the other entity
     text = drawTab(otherId);
     EXPECT_EQ(text.find("Texture bake 'v:heat'"), std::string::npos) << "another entity's tab shows no run:\n" << text;
@@ -5435,7 +5449,8 @@ TEST(SandboxProcessingPanels, TextureBakeControlsShowTheirBakeRunOnlyForItsEntit
     EXPECT_NE(text.find("cancelled"), std::string::npos) << "the widget's Cancel ended the bake's run:\n" << text;
     harness.RunMaintenance();
     const auto snapshot = harness.Service->Snapshot(id);
-    ASSERT_EQ(snapshot.Textures.size(), 1u);
-    EXPECT_EQ(snapshot.Textures[0].State, R::PropertyTextureBakeOutputState::Failed);
+    const auto heat = std::ranges::find(snapshot.Textures, std::string{"v:heat"}, &R::PropertyTextureBakeRecord::OutputName);
+    ASSERT_NE(heat, snapshot.Textures.end());
+    EXPECT_EQ(heat->State, R::PropertyTextureBakeOutputState::Failed);
     attachment.Detach();
 }

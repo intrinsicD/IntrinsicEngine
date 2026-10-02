@@ -654,17 +654,18 @@ namespace Extrinsic::Sandbox::Editor
         DrawDiagnostics(bound.Diagnostics);
     }
 
-    void DrawTextureBakeOutputRun(OperationRunSlot& slot, const EditorProcessingCommands& commands,
+    bool DrawTextureBakeOutputRun(OperationRunSlot& slot, const EditorProcessingCommands& commands,
                                   const std::uint32_t entity, const std::string& outputName, const char* const id)
     {
         const EditorOutputRef output{entity, outputName};
-        slot.Draw(commands, entity, id, &output,
-                  [&commands, output]
-                  {
-                      const std::vector<EditorJobRecord> jobs = GetEditorJobs(commands);
-                      if (const auto run = FindEditorOperationRun(jobs, output))
-                          (void)CancelEditorJob(commands, run->Token);
-                  });
+        // Run-level cancel, as the Jobs window does.
+        return slot.Draw(commands, entity, id, &output,
+                         [&commands, output]
+                         {
+                             const std::vector<EditorJobRecord> jobs = GetEditorJobs(commands);
+                             if (const auto run = FindEditorOperationRun(jobs, output))
+                                 (void)CancelEditorJobRun(commands, *run);
+                         });
     }
 
     void DrawTextureBakeControls(
@@ -1106,9 +1107,15 @@ namespace Extrinsic::Sandbox::Editor
             mutation.BakeRun.Draw(context->Processing, model.SelectedStableId, "##texture_bake_run", nullptr,
                                   [context, &slot]
                                   {
+                                      // Run-level cancel, as the Jobs window does.
                                       const auto* key = slot.WatchedKey();
-                                      if (const auto* token = key != nullptr ? std::get_if<JobToken>(key) : nullptr)
-                                          (void)CancelEditorJob(context->Processing, *token);
+                                      const auto* token = key != nullptr ? std::get_if<JobToken>(key) : nullptr;
+                                      if (token == nullptr)
+                                          return;
+                                      const std::vector<EditorJobRecord> jobs = GetEditorJobs(context->Processing);
+                                      const auto run = std::ranges::find(jobs, *token, &EditorJobRecord::Token);
+                                      if (run != jobs.end())
+                                          (void)CancelEditorJobRun(context->Processing, *run);
                                   });
         }
 
@@ -1819,7 +1826,7 @@ namespace Extrinsic::Sandbox::Editor
         return m_Held;
     }
 
-    void OperationRunSlot::Draw(
+    bool OperationRunSlot::Draw(
         const EditorProcessingCommands& commands, const std::uint32_t selectedEntity, const char* const id,
         const EditorOutputRef* draft, const std::function<void()>& onCancel)
     {
@@ -1827,15 +1834,18 @@ namespace Extrinsic::Sandbox::Editor
         if (!fallback)
         {
             DrawLive(Query(commands), selectedEntity, onCancel, id);
-            return;
+            return m_Watched && (selectedEntity == kAnyEntity || selectedEntity == m_Watched->Entity) &&
+                   m_Held.State != EditorOperationState::None;
         }
         // Nothing submitted here: a run of the draft's output started elsewhere shows as well.
         // Known limit: only before this panel's first own run and only for the draft's current
         // key (curvature's key changes with its config); see sandbox-editor-feature-boundaries.md.
         const EditorOperationProgress& shown = Observe(
             Query(commands, draft), DescribeRunKey(draft->EntityId, EditorOperationRunKey{*draft}));
-        if (selectedEntity == draft->EntityId && !m_AwaitingAccept)
-            DrawOperationProgress(shown, onCancel, id);
+        if (selectedEntity != draft->EntityId || m_AwaitingAccept)
+            return false;
+        DrawOperationProgress(shown, onCancel, id);
+        return shown.State != EditorOperationState::None;
     }
 
     void OperationRunSlot::DrawLive(

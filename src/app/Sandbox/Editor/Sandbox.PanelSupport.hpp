@@ -169,8 +169,8 @@ namespace Extrinsic::Sandbox::Editor
             const Runtime::EditorProcessingCommands& commands, const Runtime::EditorOutputRef* draft = nullptr) const;
         // Query + DrawLive: the one call after a panel's action button. `draft` is the panel's
         // current (entity, output), used while nothing is watched. `onCancel` as in
-        // `DrawOperationProgress`.
-        void Draw(const Runtime::EditorProcessingCommands& commands, std::uint32_t selectedEntity, const char* id,
+        // `DrawOperationProgress`. True when a run was shown.
+        bool Draw(const Runtime::EditorProcessingCommands& commands, std::uint32_t selectedEntity, const char* id,
                   const Runtime::EditorOutputRef* draft = nullptr, const std::function<void()>& onCancel = {});
         // For runs whose projection the panel supplies itself (transaction snapshots, ICP/CPD bars).
         void DrawLive(const Runtime::EditorOperationProgress& live, std::uint32_t selectedEntity,
@@ -463,9 +463,11 @@ namespace Extrinsic::Sandbox::Editor
         OperationRunSlot BakeRun{};
     };
 
-    // The run of the bake writing `outputName` on `entity`, from any surface (bake controls, surface
-    // appearance, an agent), with its Cancel (UI-073): the slot asks for the output's newest run.
-    void DrawTextureBakeOutputRun(OperationRunSlot& slot, const Runtime::EditorProcessingCommands& commands,
+    // The run of the bake writing `outputName` on `entity` that the editor job surface knows (one
+    // submitted through the editor's bake command), with a Cancel of that run (UI-073): the slot asks
+    // for the output's newest run. Bakes the runtime starts itself (surface appearance, asset import)
+    // carry no editor identity and are not found. True when a run was shown.
+    bool DrawTextureBakeOutputRun(OperationRunSlot& slot, const Runtime::EditorProcessingCommands& commands,
                                   std::uint32_t entity, const std::string& outputName, const char* id);
 
     void DrawTextureBakeControls(

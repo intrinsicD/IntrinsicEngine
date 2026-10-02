@@ -3183,7 +3183,8 @@ namespace Extrinsic::Sandbox::Editor
         void DrawParameterizationUvPane(
             const SandboxEditorContext& context,
             Runtime::EditorParameterizationViewModel model,
-            const std::optional<Runtime::EditorParameterizationTextureTab>& textureTab)
+            const std::optional<Runtime::EditorParameterizationTextureTab>& textureTab,
+            const bool bakeRunShown = false)
         {
             ParameterizationState::UvNavigation& navigation =
                 Parameterization.Navigation[model.SelectedStableEntityId];
@@ -3294,9 +3295,14 @@ namespace Extrinsic::Sandbox::Editor
             {
                 if (textureTab->State == Runtime::EditorParameterizationTextureState::Stale)
                     overlay = "Stale bake of an earlier atlas; not overlaid on this layout. Re-bake to refresh.";
-                // A pending bake's run shows as the progress widget above the canvas.
-                else if (textureTab->State != Runtime::EditorParameterizationTextureState::Ready &&
-                         textureTab->State != Runtime::EditorParameterizationTextureState::Pending)
+                // A pending bake's run shows as the progress widget above the canvas; a bake with no
+                // editor run (surface appearance, asset import) keeps the short text.
+                else if (textureTab->State == Runtime::EditorParameterizationTextureState::Pending)
+                {
+                    if (!bakeRunShown)
+                        overlay = "Bake pending.";
+                }
+                else if (textureTab->State != Runtime::EditorParameterizationTextureState::Ready)
                     overlay = textureTab->Diagnostic;
                 else if (!uvView.GpuReady)
                     overlay = "Baked texels need the GPU UV view (Render mode: GPU shaded); "
@@ -3738,6 +3744,7 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::EndTabBar();
             }
             ImGui::PopID();
+            bool bakeRunShown = false;
             if (selectedTab.has_value())
             {
                 // Display transform only: stored texels keep raw values.
@@ -3749,11 +3756,12 @@ namespace Extrinsic::Sandbox::Editor
                                     TextureTabColormapLabel(selectedTab->Colormap),
                                     static_cast<unsigned long long>(selectedTab->Revision),
                                     TextureTabStateLabel(*selectedTab));
-                // Replaces the canvas's "pending" text.
-                DrawTextureBakeOutputRun(Parameterization.TextureBakeRun, context.Processing,
-                                         model.SelectedStableEntityId, selectedTab->Name, "##uv_texture_bake_run");
+                // Replaces the canvas's "pending" text when the run is found.
+                bakeRunShown = DrawTextureBakeOutputRun(Parameterization.TextureBakeRun, context.Processing,
+                                                        model.SelectedStableEntityId, selectedTab->Name,
+                                                        "##uv_texture_bake_run");
             }
-            DrawParameterizationUvPane(context, std::move(model), selectedTab);
+            DrawParameterizationUvPane(context, std::move(model), selectedTab, bakeRunShown);
         }
 
         void DrawParameterizationWindow(
