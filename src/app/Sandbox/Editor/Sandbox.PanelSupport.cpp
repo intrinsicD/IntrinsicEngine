@@ -41,7 +41,7 @@ import Extrinsic.Runtime.EditorJobProjection;
 // `ToString(JobState)` for the queued UV-job readout.
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.SceneEditingOperations;
-import Extrinsic.Runtime.CameraFocusCommand;
+import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.VisualizationRecipes;

@@ -1069,11 +1069,11 @@ while unrelated actions still dispatch. The per-controller `Focus(...)` framing
 distance math remains owned by the controllers
 (`Extrinsic.Runtime.CameraControllers`).
 
-The same module owns the named view presets (`CameraViewPreset`: front, back,
+`Extrinsic.Runtime.CameraControllers` owns the named view presets (`CameraViewPreset`: front, back,
 left, right, top, bottom, isometric). `CameraPresetAxesFor` gives each preset's
 orthonormal forward/up pair, `MakeCameraPresetSeed` builds the controller seed
 (camera `2 * radius` behind the focus center along the preset forward), and
-`ApplyCameraPreset` seeds, focuses and marks the transition. View capture
+`ApplyCameraPreset` seeds, focuses and marks the transition. They live there, not in the focus command, so `Runtime.SceneEditingOperations` can use them without importing the scene registry. View capture
 (`ViewCapturePreset`) and the editor camera pose command
 (`ApplyEditorCameraPoseCommand`, `Runtime.SceneEditingOperations`) both call it,
 so a screenshot preset and the editor View preset frame identically. Camera pose,

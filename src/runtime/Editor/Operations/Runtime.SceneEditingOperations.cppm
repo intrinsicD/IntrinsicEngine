@@ -25,7 +25,6 @@ import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
-import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;

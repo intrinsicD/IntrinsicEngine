@@ -7,6 +7,7 @@ module;
 #include <memory>
 #include <numbers>
 #include <optional>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -795,5 +796,85 @@ namespace Extrinsic::Runtime
                 return entry.Controller.get();
         }
         return nullptr;
+    }
+
+    std::string_view ToString(const CameraViewPreset preset) noexcept
+    {
+        switch (preset)
+        {
+        case CameraViewPreset::Front: return "front";
+        case CameraViewPreset::Back: return "back";
+        case CameraViewPreset::Left: return "left";
+        case CameraViewPreset::Right: return "right";
+        case CameraViewPreset::Top: return "top";
+        case CameraViewPreset::Bottom: return "bottom";
+        case CameraViewPreset::Isometric: return "isometric";
+        }
+        return {};
+    }
+
+    std::optional<CameraViewPreset> ParseCameraViewPreset(const std::string_view name) noexcept
+    {
+        for (const CameraViewPreset preset : kCameraViewPresets)
+            if (ToString(preset) == name)
+                return preset;
+        return std::nullopt;
+    }
+
+    CameraPresetAxes CameraPresetAxesFor(const CameraViewPreset preset) noexcept
+    {
+        switch (preset)
+        {
+        case CameraViewPreset::Front: return {{0, 0, -1}, {0, 1, 0}};
+        case CameraViewPreset::Back: return {{0, 0, 1}, {0, 1, 0}};
+        case CameraViewPreset::Left: return {{1, 0, 0}, {0, 1, 0}};
+        case CameraViewPreset::Right: return {{-1, 0, 0}, {0, 1, 0}};
+        case CameraViewPreset::Top: return {{0, -1, 0}, {0, 0, -1}};
+        case CameraViewPreset::Bottom: return {{0, 1, 0}, {0, 0, 1}};
+        case CameraViewPreset::Isometric:
+        {
+            const glm::vec3 forward = glm::normalize(glm::vec3{-1, -1, -1});
+            const glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3{0, 1, 0}));
+            return {forward, glm::cross(right, forward)};
+        }
+        }
+        return {};
+    }
+
+    Graphics::CameraViewInput MakeCameraPresetSeed(const Graphics::CameraViewInput& current,
+                                                   const CameraViewPreset preset,
+                                                   const CameraFocusTarget& target) noexcept
+    {
+        const CameraPresetAxes axes = CameraPresetAxesFor(preset);
+        Graphics::CameraViewInput seed = current;
+        seed.Forward = axes.Forward;
+        seed.Up = axes.Up;
+        seed.Position = target.Center - axes.Forward * (2.0f * target.Radius);
+        seed.Valid = true;
+        return seed;
+    }
+
+    void SeedCameraPreset(ICameraController& controller,
+                          const CameraViewPreset preset,
+                          const CameraFocusTarget& target,
+                          const Core::Extent2D viewport) noexcept
+    {
+        controller.Seed(MakeCameraPresetSeed(controller.GetView(viewport), preset, target));
+        controller.Focus(target);
+    }
+
+    bool ApplyCameraPreset(CameraControllerRegistry&  cameras,
+                           const CameraControllerSlot slot,
+                           const CameraViewPreset     preset,
+                           const CameraFocusTarget&   target,
+                           const Core::Extent2D       viewport) noexcept
+    {
+        ICameraController* controller = cameras.ResolveOrNull(slot);
+        if (controller == nullptr)
+            return false;
+
+        SeedCameraPreset(*controller, preset, target, viewport);
+        cameras.MarkCameraTransition(slot);
+        return true;
     }
 }

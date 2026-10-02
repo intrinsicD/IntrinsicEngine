@@ -2,7 +2,9 @@ module;
 
 #include <cstdint>
 #include <memory>
+#include <array>
 #include <optional>
+#include <string_view>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -236,4 +238,56 @@ namespace Extrinsic::Runtime
         WorldHandle m_BoundWorld{};
         std::optional<Graphics::CameraViewInput> m_WorldSeed{};
     };
+
+    // Named view directions shared by the editor camera command and screenshot
+    // capture (+Y up; Top/Bottom use -Z/+Z up). Each looks along a world axis or
+    // the (-1,-1,-1) isometric diagonal.
+    export enum class CameraViewPreset : std::uint8_t
+    {
+        Front = 0, // looking along -Z
+        Back,      // +Z
+        Left,      // +X
+        Right,     // -X
+        Top,       // -Y
+        Bottom,    // +Y
+        Isometric,
+    };
+
+    export struct CameraPresetAxes
+    {
+        glm::vec3 Forward{0.0f, 0.0f, -1.0f};
+        glm::vec3 Up{0.0f, 1.0f, 0.0f};
+    };
+
+    export inline constexpr std::array<CameraViewPreset, 7> kCameraViewPresets{
+        CameraViewPreset::Front, CameraViewPreset::Back, CameraViewPreset::Left, CameraViewPreset::Right,
+        CameraViewPreset::Top, CameraViewPreset::Bottom, CameraViewPreset::Isometric};
+    // Lower-case name ("front", ..., "isometric"); the empty view for an out-of-range value.
+    export [[nodiscard]] std::string_view ToString(CameraViewPreset preset) noexcept;
+    export [[nodiscard]] std::optional<CameraViewPreset> ParseCameraViewPreset(std::string_view name) noexcept;
+
+    // Viewing direction and up vector of a preset (orthonormal).
+    export [[nodiscard]] CameraPresetAxes CameraPresetAxesFor(CameraViewPreset preset) noexcept;
+
+    // The controller seed that looks along the preset at `target`: current view
+    // with Forward/Up replaced and Position = Center - Forward * 2 * Radius.
+    export [[nodiscard]] Graphics::CameraViewInput MakeCameraPresetSeed(
+        const Graphics::CameraViewInput& current,
+        CameraViewPreset preset,
+        const CameraFocusTarget& target) noexcept;
+
+    // The seed + focus step of ApplyCameraPreset on a bare controller (no transition mark), so
+    // callers can try a preset on a clone first.
+    export void SeedCameraPreset(ICameraController& controller,
+                          CameraViewPreset preset,
+                          const CameraFocusTarget& target,
+                          Core::Extent2D viewport) noexcept;
+
+    // Seeds the `slot` controller with the preset, focuses `target` and marks an
+    // explicit camera transition. Returns false when the slot has no controller.
+    export bool ApplyCameraPreset(CameraControllerRegistry& cameras,
+                           CameraControllerSlot slot,
+                           CameraViewPreset preset,
+                           const CameraFocusTarget& target,
+                           Core::Extent2D viewport) noexcept;
 }
