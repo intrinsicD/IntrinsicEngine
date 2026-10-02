@@ -139,6 +139,15 @@ namespace Extrinsic::Sandbox::Editor
             if (result.has_value() && result->Status == Runtime::EditorCommandStatus::Pending)
                 WatchOutput(entity, std::move(outputName));
         }
+        // A submission refused as a duplicate (Pending, nothing queued: the output's active run, maybe
+        // another caller's, keeps its own callback). Follows that run and shows `refusal` with its
+        // progress; never a result of this panel (RUNTIME-313).
+        void WatchDuplicate(std::uint32_t entity, std::string outputName, std::string refusal)
+        {
+            WatchOutput(entity, std::move(outputName));
+            m_Note = std::move(refusal);
+        }
+        [[nodiscard]] const std::string& Note() const noexcept { return m_Note; }
         [[nodiscard]] bool Watching() const noexcept { return m_Watched.has_value(); }
         [[nodiscard]] bool WatchesOutput(std::uint32_t entity, const std::string& outputName) const;
         // From the transaction's phase each frame; Accepting/Applied read through the job as usual.
@@ -169,6 +178,7 @@ namespace Extrinsic::Sandbox::Editor
             std::string Description{};
         };
         std::optional<Watched> m_Watched{};
+        std::string m_Note{};
         bool m_AwaitingAccept{false};
         Runtime::EditorOperationProgress m_Held{};
         std::string m_HeldKey{};
@@ -343,9 +353,6 @@ namespace Extrinsic::Sandbox::Editor
         std::optional<Result> LastResult{};
         Config Draft{};
         std::string LastApplied{}, ConfigDiagnostic{}, VisualizationDiagnostic{};
-        // A duplicate submission's refusal ("... already has an active ... job"), shown until the
-        // next submission; never stored as `LastResult` (RUNTIME-313).
-        std::string DuplicateNote{};
         OperationRunSlot Run{};
 
         bool Synchronize(const Config& active, const std::string& serialized)

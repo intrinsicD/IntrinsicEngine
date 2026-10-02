@@ -3968,3 +3968,30 @@ TEST_F(EditorKeypointAgent, RequestedCancelSurvivesTheJobsReaping)
     EXPECT_TRUE(out.IsError) << out.Text;
     EXPECT_EQ(out.ErrorCode, "cancelled") << out.Text;
 }
+
+// RUNTIME-313: the remembered run cancels belong to one attachment; token indices restart with
+// the next attachment's job service, so a re-attached session forgets them.
+TEST_F(EditorKeypointAgent, ReattachForgetsRememberedRunCancels)
+{
+    ASSERT_TRUE(Runtime::ApplyEditorKeypointAnalysisConfig(Commands, Keypoints).Succeeded());
+    auto& jobs = RequiredEngineService<Runtime::JobService>(Engine);
+    std::atomic_bool release{false};
+    const Runtime::JobToken foreign = jobs.Submit(MakeProgressProbeJob("foreign", release));
+    ASSERT_TRUE(WaitFor([&] { return jobs.GetState(foreign) == Runtime::JobState::Running; }));
+    ASSERT_EQ(Runtime::ApplyEditorKeypointAnalysisCommand(Commands, Keypoints).Status, Runtime::EditorCommandStatus::Pending);
+    Runtime::JobToken own{};
+    for (const auto& job : Runtime::GetEditorJobs(Commands))
+        if (Runtime::IsActiveEditorJobState(job.State)) own = job.Token;
+    ASSERT_TRUE(own.IsValid());
+    ASSERT_EQ(Runtime::CancelEditorJob(Commands, own), Runtime::EditorJobCancelStatus::Requested);
+    EXPECT_TRUE(Runtime::IsEditorRunCancelRequested(Commands, own));
+    release.store(true, std::memory_order_release);
+    ASSERT_TRUE(WaitFor([&] {
+        (void)jobs.DrainCompletions(Engine.Events());
+        return jobs.IsComplete(own) && jobs.IsComplete(foreign);
+    }));
+    Attachment.Detach();
+    Attachment.Attach(Engine.Worlds(), Engine.Services());
+    PrepareFrame();
+    EXPECT_FALSE(Runtime::IsEditorRunCancelRequested(Commands, own));
+}

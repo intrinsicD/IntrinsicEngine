@@ -88,14 +88,17 @@ duplicate to `result_unavailable`; the single status must keep that mapping.
 - `jobs_list` / Jobs window: after a later stage's submission is rejected, the earlier queued stage now
   ends `cancelled` instead of `stale-discarded` (it revalidates as Cancelled), pinned by
   `QueuedEditorJobContract.RejectedLaterStageAbandonsTheQueuedStagesWithoutACallback`.
-- Panels (slice 6): a duplicate refusal (Pending, nothing queued) is shown as a note under the action
-  and the run slot follows the active run; it is no longer stored as the panel's last result, which
-  read "Pending" for good when another caller (an agent) owned the active run. Covers every
-  `DrawProcessingExecution` panel and the Vulkan starts of normals, outliers and smoothing; the
-  keypoint "Detection is active" line now follows the resident transaction. Pinned by
-  `SandboxProcessingPanels.DuplicateRunRefusalIsNotStoredAsThePanelsResult`. Panels that call
-  `ApplyProcessingExecution` directly for CPU runs (normals, outliers, construction, registration,
-  smoothing, eigenbasis, harmonic, curvature, segmentation) still publish a CPU duplicate's Pending answer.
+- Panels (slices 6, 8): a duplicate refusal (Pending, nothing queued) is shown by the run slot
+  (`OperationRunSlot::WatchDuplicate`), which follows the active run; it is no longer stored as the
+  panel's last result, which read "Pending" for good when another caller (an agent) owned the active
+  run. One helper, `ApplyQueuedProcessingExecution`, serves every queued panel action: the
+  `DrawProcessingExecution` panels and the direct CPU actions of curvature, normals, outliers,
+  construction, registration and smoothing; the Vulkan starts of normals, outliers and smoothing use
+  `WatchDuplicate` for a Pending start without a handle. The keypoint "Detection is active" line
+  follows the resident transaction. Pinned by `SandboxProcessingPanels.DuplicateRunRefusalIsNotStoredAsThePanelsResult`
+  (kernel density through `DrawProcessingExecution`, outliers through the direct path). Synchronous
+  actions (segmentation, eigenbasis, harmonic, gradient, geodesics) never answer Pending and keep
+  `ApplyProcessingExecution`.
 - Agent lane: `EditorKeypointAgent.AgentDuplicateOfAGuardedRunEndsAsResultUnavailable` (point
   sampling's guard). Device-gated GPU starts are refused before their guard in a headless session;
   their Pending-without-callback duplicate answer is pinned by the `DuplicateStartIsPending*` tests.
@@ -128,7 +131,10 @@ duplicate to `result_unavailable`; the single status must keep that mapping.
     descriptors, construction); `CancelEditorRun`/`CancelEditorRunJobs` cancel a run's stages. The
     per-job `EditorJobRecord::CancelRequested` is replaced by a per-run memory in the session
     (`RunCancelRequested`, last 256 runs) that survives reaping; a run is relabelled only when it
-    ended `StaleEntity`. Tests: `EditorJobRunCancelReachesLaterStagesOfThatRunOnly` (harness port of the
+    ended `StaleEntity`. Slice 8: the memory is cleared with the job identities on detach (token
+    indices restart), a cancel of an auxiliary job (`EditorJobIdentity::Auxiliary`, Coherent Point
+    Drift's Vulkan E-step pump, whose cancel only moves the E-steps to the CPU) is not a run cancel,
+    and the agent's cancel hook visits each run once by its head. Tests: `EditorJobRunCancelReachesLaterStagesOfThatRunOnly` (harness port of the
     deleted later-stage test) and `EditorKeypointAgent.RequestedCancelSurvivesTheJobsReaping` (fails
     on slice 5).
   - `jobs_wait` on a job reaped between polls answers `state: "ended"` when the last seen row was

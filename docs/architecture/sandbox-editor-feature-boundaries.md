@@ -70,7 +70,10 @@ A run is named by its first job's token; later stages carry it as `EditorJobIden
 after it started, and never another run on the same output. The session remembers the most recent
 runs a `Cancel` was accepted for (`RunCancelRequested`, `IsEditorRunCancelRequested`), past the jobs'
 reaping, so a requested cancel is told apart from a stage cancelled because a dependency failed
-(both end in `JobState::Cancelled`).
+(both end in `JobState::Cancelled`). The memory is cleared on detach, and a cancel of an auxiliary
+job (`EditorJobIdentity::Auxiliary`, such as Coherent Point Drift's Vulkan E-step pump) is not a
+run cancel. Panels answer a duplicate refusal through `OperationRunSlot::WatchDuplicate`: the slot
+follows the output's active run and shows the refusal, and the panel's last result is untouched.
 K-Means and consolidation jobs belong to their services, so neither the surface nor
 the agent's `jobs_cancel` cancels them. `FindEditorOperationRun(records, key)` is the
 record `ResolveEditorOperationProgress` projects.

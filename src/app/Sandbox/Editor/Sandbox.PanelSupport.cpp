@@ -1716,6 +1716,7 @@ namespace Extrinsic::Sandbox::Editor
     void OperationRunSlot::Watch(const std::uint32_t entity, EditorOperationRunKey key)
     {
         m_AwaitingAccept = false;
+        m_Note.clear();
         m_Watched = Watched{entity, std::move(key), {}};
         m_Watched->Description = DescribeRunKey(entity, m_Watched->Key);
         m_Held = {}; // the previous run is over once the next is submitted
@@ -1732,6 +1733,7 @@ namespace Extrinsic::Sandbox::Editor
     void OperationRunSlot::Forget()
     {
         m_Watched.reset();
+        m_Note.clear();
         m_Held = {};
         m_HeldKey.clear();
         m_AwaitingAccept = false;
@@ -1801,6 +1803,8 @@ namespace Extrinsic::Sandbox::Editor
         const EditorOperationProgress& shown = Observe(live, m_Watched->Description);
         if (selectedEntity != kAnyEntity && selectedEntity != m_Watched->Entity)
             return;
+        if (!m_Note.empty())
+            ImGui::TextWrapped("%s", m_Note.c_str());
         if (m_AwaitingAccept)
         {
             ImGui::TextDisabled("awaiting accept");

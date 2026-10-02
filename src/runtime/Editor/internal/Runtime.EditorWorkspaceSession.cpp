@@ -692,7 +692,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                     if (!m_Jobs->Cancel(token))
                         return EditorJobCancelStatus::NotActive;
                     const JobToken run = identity->second.Run.IsValid() ? identity->second.Run : token;
-                    if (std::find(m_CancelledRuns.begin(), m_CancelledRuns.end(), run) == m_CancelledRuns.end())
+                    if (!identity->second.Auxiliary && std::find(m_CancelledRuns.begin(), m_CancelledRuns.end(), run) == m_CancelledRuns.end())
                     {
                         m_CancelledRuns.push_back(run);
                         if (m_CancelledRuns.size() > kCancelledRunMemory) m_CancelledRuns.pop_front();
@@ -1068,6 +1068,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         m_PointCloudServiceResultSinks = {};
         m_ParameterizationUvViewCommands = {};
         m_JobIdentities.clear();
+        m_CancelledRuns.clear(); // token indices restart with a new job service
         m_RenderRecipeContext = {};
         m_RenderRecipeState = {};
         m_RenderArtifactRegistry = {};

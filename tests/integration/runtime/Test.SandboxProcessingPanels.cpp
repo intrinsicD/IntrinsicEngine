@@ -4730,81 +4730,137 @@ TEST(SandboxProcessingPanels, ARunStartedElsewhereShowsForTheDraftsOutput)
 }
 
 // RUNTIME-313: clicking while another caller's run (here an agent-style command) is active on the
-// same output is refused as a duplicate. The refusal is shown as a note and the panel follows the
+// same output is refused as a duplicate. The refusal is shown with the run slot, which follows the
 // active run; it is never stored as the panel's result, which would read "Pending" for good
-// because the active run delivers to its own caller.
+// because the active run delivers to its own caller. One case per panel path: the shared
+// DrawProcessingExecution (kernel density) and a direct queued execution (outliers).
+namespace
+{
+    struct DuplicateCase
+    {
+        const char* WindowId;
+        const char* Title;
+        const char* Button;
+        const char* Output;
+        // Applies the panel's config; returns the command an agent would send for the same output.
+        std::function<std::function<R::EditorCommandStatus(const R::EditorProcessingCommands&, std::function<void()>)>(
+            PanelHarness&, std::uint32_t)> Configure;
+        std::function<R::EditorProcessingCommands(const Editor::SandboxEditorContext&)> Commands;
+        std::function<std::optional<R::EditorCommandStatus>(const Editor::SandboxEditorContext&)> PanelResult;
+    };
+
+    void ExpectDuplicateRefusalIsNotThePanelsResult(const DuplicateCase& c)
+    {
+        SCOPED_TRACE(c.Title);
+        PanelHarness h;
+        auto& scene = h.Scene();
+        const auto entity = scene.Create();
+        PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::PointCloudPoint);
+        ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+        const auto elsewhereCommand = c.Configure(h, R::SelectionController::ToStableEntityId(entity));
+        ASSERT_TRUE(h.Shell.SetEditorWindowOpen(c.WindowId, true));
+        R::EditorProcessingCommands commands{};
+        std::optional<R::EditorCommandStatus> panelResult;
+        const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+            .Id = "test.duplicate_observer", .MenuPath = {"View"}, .Title = "Duplicate observer", .OpenByDefault = true,
+            .Draw = [&](bool&, const Editor::SandboxEditorContext& context) {
+                commands = c.Commands(context);
+                panelResult = c.PanelResult(context);
+            }});
+        auto& props = scene.Raw().get<GS::Vertices>(entity).Properties;
+        std::atomic_bool release{false};
+        bool delivered = false;
+        int frame = 0, step = 0, deliveredAt = 0;
+        std::string text;
+        h.Driver->OnFrame = [&](R::Engine& engine) {
+            if (++frame > 400) { ADD_FAILURE() << "duplicate test did not finish"; engine.RequestExit(); return; }
+            auto* window = ImGui::FindWindowByName(c.Title);
+            if (!window || !commands.IsBound()) return;
+            ImGui::SetWindowSize(window, {700, 1400});
+            ImGui::SetWindowPos(window, {0, 0});
+            ++step;
+            if (step == 2)
+            {
+                // Hold the only worker so the elsewhere run stays queued while the panel clicks.
+                (void)engine.Jobs().Submit(R::JobDesc{.DebugName = "blocker",
+                    .Work = [&](const R::JobCancellation&) {
+                        while (!release.load(std::memory_order_acquire)) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                        return R::JobResultEnvelope::Make(true); },
+                    .PublishCompletion = [](R::KernelEventBus&, const R::JobResultEnvelope&) { return true; }});
+                EXPECT_EQ(elsewhereCommand(commands, [&] { delivered = true; }), R::EditorCommandStatus::Pending);
+            }
+            if (step == 3)
+            {
+                ImGui::GetCurrentContext()->LogBuffer.clear();
+                ImGui::LogToBuffer();
+                ImGui::GetCurrentContext()->LogWindow = nullptr;
+                ImGui::ActivateItemByID(window->GetID(c.Button));
+            }
+            if (step == 8)
+            {
+                text = ImGui::GetCurrentContext()->LogBuffer.c_str();
+                ImGui::LogFinish();
+                EXPECT_FALSE(panelResult.has_value()) << "the refusal is not the panel's result";
+                release.store(true, std::memory_order_release);
+            }
+            if (step > 8 && !deliveredAt && delivered) deliveredAt = frame;
+            if (deliveredAt && frame == deliveredAt + 5) engine.RequestExit();
+        };
+        h.Engine->Run();
+        if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogFinish();
+        release.store(true, std::memory_order_release);
+        EXPECT_TRUE(delivered);
+        EXPECT_TRUE(std::as_const(props).Exists(c.Output));
+        EXPECT_NE(text.find("already has an active"), std::string::npos) << text;
+        EXPECT_FALSE(panelResult == R::EditorCommandStatus::Pending)
+            << "the panel never reads Pending after the active run delivered elsewhere";
+        EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
+    }
+}
+
 TEST(SandboxProcessingPanels, DuplicateRunRefusalIsNotStoredAsThePanelsResult)
 {
-    PanelHarness h;
-    auto& scene = h.Scene();
-    const auto entity = scene.Create();
-    PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::PointCloudPoint);
-    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
-    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
-    auto density = *R::GetKernelDensityConfig(config);
-    density.StableEntityId = R::SelectionController::ToStableEntityId(entity);
-    density.KNeighbors = 3;
-    density.Bandwidth = 0.5f;
-    density.Density.Name = "duplicate_density";
-    R::SetKernelDensityConfig(config, density);
-    ASSERT_TRUE(h.Apply(config));
-    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.kernel_density", true));
-    R::EditorProcessingCommands commands{};
-    std::optional<R::EditorKernelDensityResult> panelResult;
-    const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
-        .Id = "test.duplicate_observer", .MenuPath = {"View"}, .Title = "Duplicate observer", .OpenByDefault = true,
-        .Draw = [&](bool&, const Editor::SandboxEditorContext& context) {
-            commands = context.PointFields.Commands;
-            panelResult = context.PointFields.Results.LastKernelDensityResult;
-        }});
-    auto& props = scene.Raw().get<GS::Vertices>(entity).Properties;
-    std::atomic_bool release{false};
-    std::optional<R::EditorKernelDensityResult> elsewhere;
-    int frame = 0, step = 0, publishedAt = 0;
-    std::string text;
-    h.Driver->OnFrame = [&](R::Engine& engine) {
-        if (++frame > 400) { ADD_FAILURE() << "duplicate test did not finish"; engine.RequestExit(); return; }
-        auto* window = ImGui::FindWindowByName("Kernel Density");
-        if (!window || !commands.IsBound()) return;
-        ImGui::SetWindowSize(window, {700, 1000});
-        ImGui::SetWindowPos(window, {0, 0});
-        ++step;
-        if (step == 2)
-        {
-            // Hold the only worker so the elsewhere run stays queued while the panel clicks.
-            (void)engine.Jobs().Submit(R::JobDesc{.DebugName = "blocker",
-                .Work = [&](const R::JobCancellation&) {
-                    while (!release.load(std::memory_order_acquire)) std::this_thread::sleep_for(std::chrono::milliseconds(1));
-                    return R::JobResultEnvelope::Make(true); },
-                .PublishCompletion = [](R::KernelEventBus&, const R::JobResultEnvelope&) { return true; }});
-            EXPECT_EQ(R::ApplyEditorKernelDensityCommand(commands, density,
-                [&](R::EditorKernelDensityResult r) { elsewhere = std::move(r); }).Status, R::EditorCommandStatus::Pending);
-        }
-        if (step == 3)
-        {
-            ImGui::GetCurrentContext()->LogBuffer.clear();
-            ImGui::LogToBuffer();
-            ImGui::GetCurrentContext()->LogWindow = nullptr;
-            ImGui::ActivateItemByID(window->GetID("Estimate density"));
-        }
-        if (step == 8)
-        {
-            text = ImGui::GetCurrentContext()->LogBuffer.c_str();
-            ImGui::LogFinish();
-            EXPECT_FALSE(panelResult.has_value()) << "the refusal is not the panel's result";
-            release.store(true, std::memory_order_release);
-        }
-        if (step > 8 && !publishedAt && elsewhere) publishedAt = frame;
-        if (publishedAt && frame == publishedAt + 5) engine.RequestExit();
-    };
-    h.Engine->Run();
-    if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogFinish();
-    release.store(true, std::memory_order_release);
-    ASSERT_TRUE(elsewhere.has_value());
-    EXPECT_TRUE(elsewhere->Succeeded()) << elsewhere->Message;
-    EXPECT_TRUE(std::as_const(props).Exists("duplicate_density"));
-    EXPECT_NE(text.find("already has an active"), std::string::npos) << text;
-    EXPECT_FALSE(panelResult.has_value() && panelResult->Status == R::EditorCommandStatus::Pending)
-        << "the panel never reads Pending after the active run delivered elsewhere";
-    EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
+    ExpectDuplicateRefusalIsNotThePanelsResult({
+        .WindowId = "view.kernel_density", .Title = "Kernel Density", .Button = "Estimate density",
+        .Output = "duplicate_density",
+        .Configure = [](PanelHarness& h, const std::uint32_t id) {
+            auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+            auto density = *R::GetKernelDensityConfig(config);
+            density.StableEntityId = id;
+            density.KNeighbors = 3;
+            density.Bandwidth = 0.5f;
+            density.Density.Name = "duplicate_density";
+            R::SetKernelDensityConfig(config, density);
+            EXPECT_TRUE(h.Apply(config));
+            return std::function<R::EditorCommandStatus(const R::EditorProcessingCommands&, std::function<void()>)>(
+                [density](const R::EditorProcessingCommands& commands, std::function<void()> done) {
+                    return R::ApplyEditorKernelDensityCommand(commands, density,
+                        [done](R::EditorKernelDensityResult) { done(); }).Status; });
+        },
+        .Commands = [](const Editor::SandboxEditorContext& context) { return context.PointFields.Commands; },
+        .PanelResult = [](const Editor::SandboxEditorContext& context) -> std::optional<R::EditorCommandStatus> {
+            const auto& r = context.PointFields.Results.LastKernelDensityResult;
+            return r ? std::optional{r->Status} : std::nullopt; }});
+    ExpectDuplicateRefusalIsNotThePanelsResult({
+        .WindowId = "view.outlier_analysis", .Title = "Outlier Analysis", .Button = "Detect outliers",
+        .Output = "duplicate_outliers",
+        .Configure = [](PanelHarness& h, const std::uint32_t id) {
+            auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+            auto outliers = *R::GetOutlierAnalysisConfig(config);
+            outliers.StableEntityId = id;
+            outliers.Method = R::OutlierAnalysisMethod::Radius;
+            outliers.Radius = 1.1f;
+            outliers.MinimumNeighbors = 1;
+            outliers.Mask.Name = "duplicate_outliers";
+            R::SetOutlierAnalysisConfig(config, outliers);
+            EXPECT_TRUE(h.Apply(config));
+            return std::function<R::EditorCommandStatus(const R::EditorProcessingCommands&, std::function<void()>)>(
+                [outliers](const R::EditorProcessingCommands& commands, std::function<void()> done) {
+                    return R::ApplyEditorOutlierAnalysisCommand(commands, outliers,
+                        [done](R::EditorOutlierAnalysisResult) { done(); }).Status; });
+        },
+        .Commands = [](const Editor::SandboxEditorContext& context) { return context.PointAnalysis.Commands; },
+        .PanelResult = [](const Editor::SandboxEditorContext& context) -> std::optional<R::EditorCommandStatus> {
+            const auto& r = context.PointAnalysis.Results.LastOutlierAnalysisResult;
+            return r ? std::optional{r->Status} : std::nullopt; }});
 }

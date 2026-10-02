@@ -58,6 +58,7 @@ namespace
         std::uint32_t Id{};
         R::EditorProcessingContext Context{};
         std::vector<R::JobDesc> Queued;
+        std::vector<R::EditorJobIdentity> Identities; // of every accepted submission, in order
         // Submissions accepted before the lane rejects (a later stage of a multi-stage run).
         std::size_t AcceptSubmissions{~std::size_t{0}};
         std::optional<R::EditorJobRecord> Active;
@@ -85,9 +86,10 @@ namespace
             Context.World = World;
             Context.Device = &Device;
             Context.SpatialIndices = &Cache;
-            Context.JobCommands.Submit = [this](R::JobDesc desc, R::EditorJobIdentity) {
+            Context.JobCommands.Submit = [this](R::JobDesc desc, R::EditorJobIdentity identity) {
                 if (Queued.size() >= AcceptSubmissions) return R::JobToken{};
                 Queued.push_back(std::move(desc));
+                Identities.push_back(std::move(identity));
                 return R::JobToken{static_cast<std::uint32_t>(Queued.size()), 1u};
             };
             Context.JobCommands.FindActive = [this](const R::EditorJobIdentity& identity) {
@@ -224,6 +226,42 @@ TEST_F(QueuedEditorJobContract, RejectedLaterStageAbandonsTheQueuedStagesWithout
         EXPECT_EQ(Queued.front().ValidateBeforeApply(), R::JobApplyValidation::Cancelled);
         Queued.front().FinalizeUnpublishedOnMainThread();
         EXPECT_EQ(calls, 0u);
+    };
+    check("Keypoint analysis", [&](auto done) {
+        return R::ApplyEditorKeypointAnalysisCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
+            .Mask = Ref("keypoints", Geometry::PropertyValueKind::UInt32),
+            .Score = Ref("saliency", Geometry::PropertyValueKind::Float), .MinimumNeighbors = 1,
+            .Backend = R::KeypointAnalysisBackend::VulkanLBVH}, done); });
+    check("Descriptor analysis", [&](auto done) {
+        return R::ApplyEditorDescriptorAnalysisCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
+            .Normals = Normals(), .Outputs = R::MakeDescriptorOutputProperties(D::PointCloudPoint, "descriptor"),
+            .Backend = R::DescriptorAnalysisBackend::VulkanLBVH}, done); });
+    check("Point construction", [&](auto done) {
+        return R::ApplyEditorPointConstructionCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
+            .Method = R::PointConstructionMethod::KnnGraph, .KNeighbors = 2,
+            .Backend = R::PointConstructionBackend::VulkanLBVH}, done); });
+    check("Bilateral filter", [&](auto done) {
+        return R::ApplyEditorBilateralFilterCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
+            .Normals = Normals(), .Output = Ref("filtered", Geometry::PropertyValueKind::Vec3), .KNeighbors = 2,
+            .Iterations = 1, .Backend = R::BilateralFilterBackend::VulkanLBVH}, done); });
+}
+
+// Every later stage of a chain carries the run's first job token as EditorJobIdentity::Run, so a
+// run's cancel reaches it and never another run on the same output.
+TEST_F(QueuedEditorJobContract, LaterStagesOfAChainJoinTheFirstJobsRun)
+{
+    const auto commands = Commands();
+    const auto check = [&](const std::string& label, auto apply) {
+        SCOPED_TRACE(label);
+        Queued.clear();
+        Identities.clear();
+        const auto result = apply([](auto) {});
+        ASSERT_EQ(result.Status, R::EditorCommandStatus::Pending) << result.Message;
+        ASSERT_GE(Identities.size(), 2u) << "a chain";
+        EXPECT_FALSE(Identities.front().Run.IsValid()) << "the first job names its run by its own token";
+        for (std::size_t i = 1; i < Identities.size(); ++i)
+            EXPECT_EQ(Identities[i].Run, (R::JobToken{1u, 1u})) << "stage " << i;
+        Queued.front().FinalizeUnpublishedOnMainThread();
     };
     check("Keypoint analysis", [&](auto done) {
         return R::ApplyEditorKeypointAnalysisCommand(commands, {.StableEntityId = Id, .Positions = Positions(),

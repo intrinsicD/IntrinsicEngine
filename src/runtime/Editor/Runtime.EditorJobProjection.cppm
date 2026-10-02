@@ -42,6 +42,9 @@ export namespace Extrinsic::Runtime
         // stage (a GPU Accept, the next stage of a chain). Invalid on a run's first job, which
         // names its run by its own token. Not part of the output (`SameEditorJobOutput`).
         JobToken Run{};
+        // A helper job whose cancel leaves its run going (Coherent Point Drift's Vulkan E-step
+        // pump falls back to the CPU), so cancelling it is not a cancel of the run.
+        bool Auxiliary{false};
     };
     [[nodiscard]] bool SameEditorJobOutput(
         const EditorJobIdentity& lhs,

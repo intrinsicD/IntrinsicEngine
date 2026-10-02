@@ -677,6 +677,7 @@ namespace Extrinsic::Runtime
                 };
                 auto identity = Identity(*run);
                 identity.OutputName = "coherent_point_drift.vulkan_e_step";
+                identity.Auxiliary = true; // cancelling the pump only moves the E-steps to the CPU
                 if (!context.JobCommands.Submit(std::move(pump), std::move(identity)).IsValid())
                     run->GpuEStep->Close("The job lane rejected the Vulkan E-step pump; the run continues on the CPU.");
             }

@@ -179,6 +179,29 @@ namespace Extrinsic::Sandbox::Editor
                 PublishCommandResult(state.LastResult, execute(), sink);
         }
 
+        // ApplyProcessingExecution for a command that may queue a job, watched as {entity, output}.
+        // Pending with no new editor job is a duplicate refusal: the output's active run (another
+        // click, an agent call) keeps its own callback. Publishing it would leave "Pending" as the
+        // panel's result for good, so the run slot follows the active run and shows the refusal.
+        template <typename State, typename Request, typename Apply, typename Execute, typename Sink>
+        void ApplyQueuedProcessingExecution(const Runtime::EditorProcessingCommands& commands, State& state,
+            const Request& request, Apply apply, Execute execute, const Sink& sink, const char* rejected,
+            const std::uint32_t entity, std::string output)
+        {
+            const bool applied = apply(request).Succeeded();
+            state.ConfigDiagnostic = applied ? "" : rejected;
+            if (!applied) return;
+            const auto before = Runtime::GetEditorJobs(commands);
+            auto result = execute();
+            if (result.Status == Runtime::EditorCommandStatus::Pending && !QueuedEditorJob(commands, before))
+            {
+                state.Run.WatchDuplicate(entity, std::move(output), result.Message);
+                return;
+            }
+            PublishCommandResult(state.LastResult, std::move(result), sink);
+            state.Run.WatchOutputIfQueued(state.LastResult, entity, std::move(output));
+        }
+
         // `watch(draft)` names the run being submitted as {entity, output property name}; the panel's
         // run slot captures it at submit, before the editable draft can change.
         template <typename State, typename Preview, typename Apply, typename Execute, typename Sink,
@@ -196,34 +219,15 @@ namespace Extrinsic::Sandbox::Editor
             if (!readiness.Enabled) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
             if (DrawProcessingActionButton(button, readiness))
             {
-                std::pair<std::uint32_t, std::string> submitted{};
                 if constexpr (!std::is_null_pointer_v<Watch>)
-                    submitted = watch(state.Draft); // named before the run, from what is submitted
-                state.DuplicateNote.clear();
-                const auto before = Runtime::GetEditorJobs(commands);
-                const bool applied = apply(state.Draft).Succeeded();
-                state.ConfigDiagnostic = applied ? "" : executionRejected;
-                if (applied)
                 {
-                    auto result = execute();
-                    // Pending with no new editor job: the output's active run (another click, an
-                    // agent call) refused it and keeps its own callback. Publishing it would leave
-                    // "Pending" behind for good, so note it and follow the active run instead.
-                    if (result.Status == Runtime::EditorCommandStatus::Pending && !QueuedEditorJob(commands, before))
-                    {
-                        state.DuplicateNote = result.Message;
-                        if constexpr (!std::is_null_pointer_v<Watch>)
-                            state.Run.WatchOutput(submitted.first, submitted.second);
-                    }
-                    else
-                    {
-                        PublishCommandResult(state.LastResult, std::move(result), sink);
-                        if constexpr (!std::is_null_pointer_v<Watch>)
-                            state.Run.WatchOutputIfQueued(state.LastResult, submitted.first, submitted.second);
-                    }
+                    auto [entity, output] = watch(state.Draft); // named before the run, from what is submitted
+                    ApplyQueuedProcessingExecution(commands, state, state.Draft, apply, execute, sink, executionRejected,
+                                                   entity, std::move(output));
                 }
+                else
+                    ApplyProcessingExecution(state, state.Draft, apply, execute, sink, executionRejected);
             }
-            if (!state.DuplicateNote.empty()) ImGui::TextWrapped("%s", state.DuplicateNote.c_str());
         }
 
         template<class State,class Sink>
@@ -1063,14 +1067,13 @@ namespace Extrinsic::Sandbox::Editor
             Runtime::PreviewEditorMeshCurvatureCommand(context.MeshFields.Commands, config));
         if (DrawProcessingActionButton("Compute##MeshCurvature", readiness))
         {
-            ApplyProcessingExecution(Curvature, config, apply,
-                [&] { return Runtime::ApplyEditorMeshCurvatureCommand(context.MeshFields.Commands, config,
-                    context.MeshFields.ResultSinks.MeshCurvature); },
-                context.MeshFields.ResultSinks.MeshCurvature, "Curvature configuration was rejected.");
             // The job is filed under the serialized command (its identity is the dedupe key), so the
             // run is named by the same text; `Curvature.RunShowsItsOwnProgress` pins the match.
-            Curvature.Run.WatchOutputIfQueued(Curvature.LastResult, config.StableEntityId,
-                                              Runtime::SerializeMeshCurvatureConfig(config));
+            ApplyQueuedProcessingExecution(context.MeshFields.Commands, Curvature, config, apply,
+                [&] { return Runtime::ApplyEditorMeshCurvatureCommand(context.MeshFields.Commands, config,
+                    context.MeshFields.ResultSinks.MeshCurvature); },
+                context.MeshFields.ResultSinks.MeshCurvature, "Curvature configuration was rejected.",
+                config.StableEntityId, Runtime::SerializeMeshCurvatureConfig(config));
         }
         const Runtime::EditorOutputRef curvatureDraft{config.StableEntityId, Runtime::SerializeMeshCurvatureConfig(config)};
         Curvature.Run.Draw(context.MeshFields.Commands, config.StableEntityId, "curvature_progress", &curvatureDraft);
@@ -2094,13 +2097,9 @@ namespace Extrinsic::Sandbox::Editor
                     NormalTransaction.reset(); // a finished transaction is retired before the new one
                     Runtime::EditorNormalEstimationResult failure;
                     NormalTransaction = Runtime::StartEditorNormalEstimationTransaction(context.Normals.Commands, config, failure);
-                    Normals.DuplicateNote.clear();
                     // A Pending refusal without a handle: the output's active run keeps its callback.
                     if (!NormalTransaction && failure.Status == Runtime::EditorCommandStatus::Pending)
-                    {
-                        Normals.DuplicateNote = failure.Message;
-                        Normals.Run.WatchOutput(config.StableEntityId, config.Output.Name);
-                    }
+                        Normals.Run.WatchDuplicate(config.StableEntityId, config.Output.Name, failure.Message);
                     else
                     {
                         Normals.LastResult = NormalTransaction
@@ -2108,20 +2107,19 @@ namespace Extrinsic::Sandbox::Editor
                         // A refused start leaves no handle; the sink keeps its result on screen.
                         if (!NormalTransaction && context.Normals.ResultSinks.NormalEstimation)
                             context.Normals.ResultSinks.NormalEstimation(failure);
+                        Normals.Run.WatchOutputIfQueued(Normals.LastResult, config.StableEntityId, config.Output.Name);
                     }
                 }
             }
             else
-                ApplyProcessingExecution(Normals, config,
+                ApplyQueuedProcessingExecution(context.Normals.Commands, Normals, config,
                     [&](const auto& request) { return Runtime::ApplyEditorNormalEstimationConfig(context.Normals.Commands, request); },
                     [&] { return Runtime::ApplyEditorConfiguredNormalEstimation(context.Normals.Commands, context.Normals.ResultSinks.NormalEstimation); },
-                    context.Normals.ResultSinks.NormalEstimation, "Normal config was rejected.");
-            Normals.Run.WatchOutputIfQueued(Normals.LastResult, config.StableEntityId, config.Output.Name);
+                    context.Normals.ResultSinks.NormalEstimation, "Normal config was rejected.", config.StableEntityId, config.Output.Name);
         }
         Normals.Run.AwaitingAccept(NormalTransaction && transaction.Phase == Phase::ReadyToAccept);
         const Runtime::EditorOutputRef normalsDraft{config.StableEntityId, config.Output.Name};
         Normals.Run.Draw(context.Normals.Commands, config.StableEntityId, "normals_progress", &normalsDraft);
-        if (!Normals.DuplicateNote.empty()) ImGui::TextWrapped("%s", Normals.DuplicateNote.c_str());
         const auto outputProperty = config.Output;
         ImGui::SameLine();
         if (config.Method == Runtime::NormalEstimationMethod::MeshFaceNormals)
@@ -2239,10 +2237,10 @@ namespace Extrinsic::Sandbox::Editor
             context.PointAnalysis.Commands, preview);
         if (!readiness.Enabled) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
         const auto execute = [&](const Runtime::OutlierAnalysisConfig& request) {
-            ApplyProcessingExecution(Outliers, request,
+            ApplyQueuedProcessingExecution(context.PointAnalysis.Commands, Outliers, request,
                 [&](const auto& value) { return Runtime::ApplyEditorOutlierAnalysisConfig(context.PointAnalysis.Commands, value); },
                 [&] { return Runtime::ApplyEditorConfiguredOutlierAnalysis(context.PointAnalysis.Commands, context.PointAnalysis.ResultSinks.OutlierAnalysis); },
-                context.PointAnalysis.ResultSinks.OutlierAnalysis, "Outlier config was rejected.");
+                context.PointAnalysis.ResultSinks.OutlierAnalysis, "Outlier config was rejected.", request.StableEntityId, request.Mask.Name);
         };
         const auto transaction = Runtime::SnapshotEditorOutlierAnalysis(context.PointAnalysis.Commands, OutlierTransaction);
         const bool outlierActive = OutlierTransaction && (transaction.Phase == Runtime::EditorGpuTransactionPhase::Running ||
@@ -2261,29 +2259,24 @@ namespace Extrinsic::Sandbox::Editor
             {
                 Runtime::EditorOutlierAnalysisResult result;
                 OutlierTransaction = Runtime::StartEditorOutlierAnalysisTransaction(context.PointAnalysis.Commands, analyze, result);
-                Outliers.DuplicateNote.clear();
                 // A Pending refusal without a handle: the output's active run keeps its callback.
                 if (!OutlierTransaction && result.Status == Runtime::EditorCommandStatus::Pending)
-                {
-                    Outliers.DuplicateNote = result.Message;
-                    Outliers.Run.WatchOutput(config.StableEntityId, config.Mask.Name);
-                }
+                    Outliers.Run.WatchDuplicate(config.StableEntityId, config.Mask.Name, result.Message);
                 else
                 {
                     Outliers.LastResult = result;
                     // A refused start leaves no handle; the sink keeps its result on screen.
                     if (!OutlierTransaction && context.PointAnalysis.ResultSinks.OutlierAnalysis)
                         context.PointAnalysis.ResultSinks.OutlierAnalysis(result);
+                    Outliers.Run.WatchOutputIfQueued(Outliers.LastResult, config.StableEntityId, config.Mask.Name);
                 }
             }
             else execute(analyze);
-            Outliers.Run.WatchOutputIfQueued(Outliers.LastResult, config.StableEntityId, config.Mask.Name);
         }
         ImGui::EndDisabled();
         Outliers.Run.AwaitingAccept(OutlierTransaction && transaction.Phase == Runtime::EditorGpuTransactionPhase::ReadyToAccept);
         const Runtime::EditorOutputRef outliersDraft{config.StableEntityId, config.Mask.Name};
         Outliers.Run.Draw(context.PointAnalysis.Commands, config.StableEntityId, "outliers_progress", &outliersDraft);
-        if (!Outliers.DuplicateNote.empty()) ImGui::TextWrapped("%s", Outliers.DuplicateNote.c_str());
         if (outlierActive)
         {
             ImGui::TextWrapped("%s", transaction.Result.Message.c_str());
@@ -2772,12 +2765,11 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::TextWrapped("%s", action.DisabledReason.c_str());
         if (DrawProcessingActionButton("Construct", action))
         {
-            ApplyProcessingExecution(Construction, readiness.Resolved,
+            ApplyQueuedProcessingExecution(context.PointConstruction.Commands, Construction, readiness.Resolved,
                 [&](const auto& value) { return Runtime::ApplyEditorPointConstructionConfig(context.PointConstruction.Commands, value); },
                 [&] { return Runtime::ApplyEditorConfiguredPointConstruction(context.PointConstruction.Commands, context.PointConstruction.ResultSinks.PointConstruction); },
-                context.PointConstruction.ResultSinks.PointConstruction, "Construction config was rejected.");
-            Construction.Run.WatchOutputIfQueued(Construction.LastResult, readiness.Resolved.StableEntityId,
-                std::string("construct:") + std::string(Runtime::ToString(readiness.Resolved.Method)));
+                context.PointConstruction.ResultSinks.PointConstruction, "Construction config was rejected.",
+                readiness.Resolved.StableEntityId, std::string("construct:") + std::string(Runtime::ToString(readiness.Resolved.Method)));
         }
         const Runtime::EditorOutputRef constructionDraft{
             config.StableEntityId, std::string("construct:") + std::string(Runtime::ToString(config.Method))};
@@ -3025,13 +3017,14 @@ namespace Extrinsic::Sandbox::Editor
             Registration.RunMaxIterations = static_cast<std::uint32_t>(config.MaxIterations); // the run's cap, not the editable draft
             Registration.RunStarted = std::chrono::steady_clock::now();
             Registration.Run.WatchOutput(config.SourceStableEntityId, "registration_transform");
-            ApplyProcessingExecution(Registration, config,
+            ApplyQueuedProcessingExecution(context.Registration.Commands, Registration, config,
                 [&](const auto& value) { return Runtime::ApplyEditorRegistrationConfig(context.Registration.Commands, value); },
                 [&] {
                     return Runtime::ApplyEditorConfiguredRegistrationCommand(context.Registration.Commands,
                         context.Registration.ResultSinks.Registration, Registration.Progress);
                 },
-                context.Registration.ResultSinks.Registration, "Registration config was rejected.");
+                context.Registration.ResultSinks.Registration, "Registration config was rejected.",
+                config.SourceStableEntityId, "registration_transform");
         }
         DrawRegistrationProgress(live, Registration.RunMaxIterations);
 
@@ -3744,27 +3737,25 @@ namespace Extrinsic::Sandbox::Editor
                     SmoothingTransaction.reset();
                     Runtime::EditorPropertySmoothingResult failure;
                     SmoothingTransaction = Runtime::StartEditorPropertySmoothing(context.MeshFields.Commands, model.SelectedStableId, config, failure);
-                    Smoothing.DuplicateNote.clear();
                     // A Pending refusal without a handle: the output's active run keeps its callback.
                     if (!SmoothingTransaction && failure.Status == Runtime::EditorCommandStatus::Pending)
-                    {
-                        Smoothing.DuplicateNote = failure.Message;
-                        Smoothing.Run.WatchOutput(model.SelectedStableId, config.Output.Name);
-                    }
+                        Smoothing.Run.WatchDuplicate(model.SelectedStableId, config.Output.Name, failure.Message);
                     else
+                    {
                         Smoothing.LastResult = SmoothingTransaction
                             ? Runtime::SnapshotEditorPropertySmoothing(context.MeshFields.Commands, SmoothingTransaction).Result : failure;
+                        Smoothing.Run.WatchOutputIfQueued(Smoothing.LastResult, model.SelectedStableId, config.Output.Name);
+                    }
                 }
             }
             else
-                ApplyProcessingExecution(Smoothing, config, apply,
+                ApplyQueuedProcessingExecution(context.MeshFields.Commands, Smoothing, config, apply,
                     [&] { return Runtime::ApplyEditorPropertySmoothingCommand(context.MeshFields.Commands, model.SelectedStableId, config,
                               [completion = SmoothingCompletion](Runtime::EditorPropertySmoothingResult result) { *completion = std::move(result); }); },
-                    std::function<void(Runtime::EditorPropertySmoothingResult)>{}, "Smoothing configuration was rejected.");
-            Smoothing.Run.WatchOutputIfQueued(Smoothing.LastResult, model.SelectedStableId, config.Output.Name);
+                    std::function<void(Runtime::EditorPropertySmoothingResult)>{}, "Smoothing configuration was rejected.",
+                    model.SelectedStableId, config.Output.Name);
         }
         if (!readiness.Enabled && !readiness.DisabledReason.empty()) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
-        if (!Smoothing.DuplicateNote.empty()) ImGui::TextWrapped("%s", Smoothing.DuplicateNote.c_str());
         if (SmoothingTransaction) DrawSmoothingTransaction(context);
         // The GPU transaction reports its own jobs; a CPU run is found by its output. Either way the
         // finished run stays until the next one.
