@@ -72,17 +72,19 @@ Nothing exists without the launch flag: no module, thread or socket.
   answers the newest, `2025-06-18`; the client then decides whether to continue.
 - Progress: a `tools/call` with `_meta.progressToken` (string or integer) that defers its reply
   gets `notifications/progress` lines, at most one per 250 ms (`AgentServerOptions::ProgressInterval`),
-  until the reply. The source is `JobService::SnapshotAll()`: the oldest Queued or Running job
-  stands in for the call. A determinate job reports `progress` = percent with `total` 100;
-  otherwise `progress` is the job's elapsed seconds without `total`; `message` is the job's
-  debug name. With no active job, `progress` is the call's age in seconds and `message` is
-  `waiting`. MCP requires `progress` to strictly increase, so a call keeps the unit chosen at its
-  first notification (percent with `total`, or seconds without `total`; percent never exceeds
-  100) and a notification is skipped unless its value is larger than the previous one. The
-  oldest-job pick is a heuristic: several concurrent jobs make it ambiguous, and a cancelled job
-  that is still running keeps feeding it. Exact per-call job tokens are future work tied to
-  [RUNTIME-279](../../tasks/backlog/runtime/RUNTIME-279-editor-job-snapshot-and-cancel.md) and
-  the shared progress widget ([UI-069](../../tasks/backlog/ui/UI-069-shared-operation-progress-widget.md)).
+  until the reply. The source is the call's own run, read through the shared operation-progress
+  model (`EditorJobCommandSurface::Progress`, UI-069): a deferred operation captures its run key
+  where it is known and returns it as `AgentOperationOutcome::Progress`. Editor-job commands
+  (`FinishApply`) key the job they queued (the new job since the command ran); K-Means and
+  consolidation (`AwaitServiceRun`) key the correlation id their submission returned. A determinate
+  run reports `progress` = percent with `total` 100; otherwise `progress` is the run's elapsed
+  seconds without `total`; `message` is the run's label (the job's debug name). A call with no run
+  key (a capture), or whose job is not queued yet, reports its age in seconds with message
+  `waiting`; no other job ever stands in for it. MCP requires `progress` to strictly increase, so
+  a call keeps the unit chosen at its first notification (percent with `total`, or seconds without
+  `total`; percent never exceeds 100) and a notification is skipped unless its value is larger than
+  the previous one. The panels draw the same model with the shared widget, so an agent run shows in
+  the Sandbox panels too.
 - Cancellation: `notifications/cancelled {requestId}` (JSON-typed comparison: `1` is not `"1"`)
   stops the reply and the progress of that call, but the entry stays as a tombstone that counts
   against the 16-call cap until its continuation completes, then it is dropped silently, so

@@ -18,7 +18,7 @@ Show every running and recent editor job with progress and a Cancel button.
 
 ## Context
 - Operator direction 2026-09-27: agent control lane and user-facing inspection capabilities, planned with Fable 5.1; attach-to-running transport; declarative schemas; integer enums.
-- Data and cancel from `EditorJobCommandSurface::SnapshotAll/Cancel` (RUNTIME-279); reuse the AssetIO queue progress text style in `Sandbox.EditorShell.cpp`; `ToString(JobState)`.
+- Data and cancel from `EditorJobCommandSurface::SnapshotAll/Cancel` (RUNTIME-279); draw each row's progress with the shared `DrawOperationProgress` / `FormatProgressOverlay` in `Sandbox.PanelSupport.*` and the `EditorOperationProgress` projection (UI-069; `ResolveEditorOperationProgress` over the same `EditorJobRecord` rows); `ToString(JobState)`.
 
 ## Control surfaces
 - Config: N/A.

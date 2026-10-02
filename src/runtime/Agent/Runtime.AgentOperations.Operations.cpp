@@ -119,7 +119,7 @@ namespace Extrinsic::Runtime
                                                         {{"operation", name}}));
                             return Ok(ReadinessJson(commands, preview(commands, *config), {{"operation", name}}));
                         }
-                        return FinishApply<Result>([&](auto onComplete) { return apply(commands, std::move(onComplete)); },
+                        return FinishApply<Result>(call.Context, [&](auto onComplete) { return apply(commands, std::move(onComplete)); },
                                                    [name](const Result& r) { return OperationResultJson(name, ResultJson(r)); });
                     }};
         }
@@ -140,7 +140,7 @@ namespace Extrinsic::Runtime
                             if (!readiness) return NoReadinessCheck(name);
                             return Ok(ReadinessJson(commands, *readiness, {{"operation", name}}));
                         }
-                        return FinishApply<Result>([&](auto onComplete) { return apply(commands, entity, std::move(onComplete)); },
+                        return FinishApply<Result>(call.Context, [&](auto onComplete) { return apply(commands, entity, std::move(onComplete)); },
                                                    [name](const Result& r) { return OperationResultJson(name, ResultJson(r)); });
                     }};
         }
@@ -346,7 +346,7 @@ namespace Extrinsic::Runtime
                         if (!readiness) return NoReadinessCheck(name);
                         return Ok(ReadinessJson(commands, *readiness, {{"operation", name}}));
                     }
-                    return FinishApply<Result>([&](auto onComplete) { return apply(commands, command, std::move(onComplete)); },
+                    return FinishApply<Result>(call.Context, [&](auto onComplete) { return apply(commands, command, std::move(onComplete)); },
                                                [name, describe](const Result& r) { return OperationResultJson(name, describe(r)); });
                 }};
             op.Params = ParamsText(specs);
@@ -700,6 +700,7 @@ namespace Extrinsic::Runtime
             if (preview) return Ok(ReadinessJson(commands, PreviewEditorPointSamplingCommand(commands, *config)));
             // A Vulkan run is queued and answers once it has published or failed.
             return FinishApply<EditorPointSamplingResult>(
+                context,
                 [&](auto onComplete) { return ApplyEditorPointSamplingCommand(commands, *config, std::move(onComplete)); },
                 [](const EditorPointSamplingResult& r) {
                     return Json{{"status", DebugNameForEditorCommandStatus(r.Status)}, {"succeeded", r.Succeeded()},
@@ -718,6 +719,7 @@ namespace Extrinsic::Runtime
             if (!PrepareSnapshot(context)) return Fail(kNoWorkspace); // prepares the session frame the feature frames read
             const auto commands = PrepareEditorPointAnalysisFrame(*context.Attachment).Commands;
             return FinishApply<EditorKeypointAnalysisResult>(
+                context,
                 [&](auto onComplete) { return ApplyEditorConfiguredKeypointAnalysis(commands, std::move(onComplete)); },
                 [](const EditorKeypointAnalysisResult& r) {
                     return Json{{"status", DebugNameForEditorCommandStatus(r.Status)}, {"succeeded", r.Succeeded()},
@@ -906,7 +908,7 @@ namespace Extrinsic::Runtime
                     return Ok(ReadinessJson(commands, PreviewEditorRegistrationCommand(commands, *config), {{"method", "icp"}}));
                 }
                 return FinishApply<EditorRegistrationResult>(
-                    [&](auto onComplete) { return ApplyEditorConfiguredRegistrationCommand(commands, std::move(onComplete)); },
+                    context, [&](auto onComplete) { return ApplyEditorConfiguredRegistrationCommand(commands, std::move(onComplete)); },
                     &RegistrationJson);
             }
             const auto config = GetEditorCoherentPointDriftConfig(commands);
@@ -918,7 +920,7 @@ namespace Extrinsic::Runtime
                 return Ok(ReadinessJson(commands, PreviewEditorCoherentPointDriftCommand(commands, *config), {{"method", "cpd"}}));
             }
             return FinishApply<EditorCoherentPointDriftResult>(
-                [&](auto onComplete) { return ApplyEditorConfiguredCoherentPointDrift(commands, std::move(onComplete)); },
+                context, [&](auto onComplete) { return ApplyEditorConfiguredCoherentPointDrift(commands, std::move(onComplete)); },
                 &CoherentPointDriftJson);
         }
     }

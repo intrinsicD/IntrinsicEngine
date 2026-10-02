@@ -169,7 +169,7 @@ the editor operations the Sandbox UI already offers.
 - [x] Slice 5: progress notifications arrive for a long continuation tool with a progress token; cancellation drops the pending reply (the job itself keeps running: cancelling it waits for RUNTIME-279, documented in `agent-control-lane.md`).
 - [x] Slice 6: keypoint, k-means and consolidation have `preview_*` tools and one shared argument convention recorded in this note.
 - [x] Slice 7: every command of finding 9 is reachable through an agent tool with undo coverage where it edits the scene; `run_mesh_operation` keeps working. (Camera pose is the one exception: no editor command exists, so `set_camera` covers the controller kind; owned by UI-070.)
-- [ ] Slice 8: `notifications/progress` for a deferred call comes from that run's own job via UI-069's `EditorJobCommandSurface::Progress(key)`; the oldest-job heuristic in `Runtime.AgentServer.cpp` is removed; a two-concurrent-jobs test proves it.
+- [x] Slice 8: `notifications/progress` for a deferred call comes from that run's own job via UI-069's `EditorJobCommandSurface::Progress(key)` (`AgentOperationOutcome::Progress`, set by `FinishApply` from the newly queued job and by `AwaitServiceRun` from the correlation id); the oldest-job heuristic in `Runtime.AgentServer.cpp` is removed, a call without a run key reports only its age; `AgentOperations.ProgressFollowsTheCallsOwnJobNotTheOldestOne` and the socket test `SandboxAgentServer.ProgressAndCancelOverTheSocket` (older 90% job beside the CPD run) prove it.
 - [x] `agent-control-lane.md`, `tools/agents/README.md` and the module inventory are current after every slice.
 
 ## Verification

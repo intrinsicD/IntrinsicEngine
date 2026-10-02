@@ -9,6 +9,7 @@ module;
 #include <array>
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -19,6 +20,7 @@ module;
 export module Extrinsic.Runtime.AgentServer;
 
 export import Extrinsic.Runtime.AgentOperations;
+import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.ModuleLifecycle;
 
@@ -46,12 +48,12 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] std::optional<std::string> Handle(std::string_view message, const AgentOperationContext& context);
         // Replies for deferred tool calls that finished this frame, plus `notifications/progress`
         // lines for pending calls that sent a `_meta.progressToken` (at most one per interval).
-        // Progress follows the oldest queued or running editor job (determinate: percent of 100
-        // with total; otherwise elapsed seconds without total), or the call's own age with message
-        // "waiting" when there is none. The unit is fixed at a call's first notification and a
-        // notification is sent only when its value exceeds the previous one. The pick is ambiguous
-        // with several concurrent jobs, and a cancelled job still counts, until per-call job
-        // tokens exist (RUNTIME-279, UI-069).
+        // Progress follows the call's own run (`AgentOperationOutcome::Progress`: determinate is
+        // percent of 100 with total; otherwise the run's elapsed seconds without total, message the
+        // run's label), or the call's own age with message "waiting" for a call with no run key
+        // (a capture) or no job yet. The unit is fixed at a call's first notification and a
+        // notification is sent only when its value exceeds the previous one. Concurrent jobs of
+        // other calls never show.
         [[nodiscard]] std::vector<std::string> PollPending(const AgentOperationContext& context);
         [[nodiscard]] std::size_t PendingCount() const noexcept { return m_Pending.size(); }
         // While this many deferred calls wait, state-changing tools/call requests are refused with
@@ -77,6 +79,7 @@ export namespace Extrinsic::Runtime
         {
             std::string Id{};                // dumped JSON-RPC id
             AgentOperationContinuation Continue{};
+            std::function<EditorOperationProgress(const AgentOperationContext&)> Progress{}; // the run's own projection
             std::string ProgressToken{};     // dumped JSON token; empty when the call sent none
             std::chrono::steady_clock::time_point Started{};
             std::chrono::steady_clock::time_point LastEmit{};

@@ -350,15 +350,27 @@ TEST(AgentOperations, LateContinuationStillRepliesAfterManyPollRounds)
 
 namespace
 {
-    R::AgentOperationRegistry NeverFinishingRegistry(std::shared_ptr<int> alive)
+    // A call that never finishes; `probe` (when given) is the run's own progress, as an operation
+    // that knows its run key would set it.
+    R::AgentOperationRegistry NeverFinishingRegistry(
+        std::shared_ptr<int> alive,
+        std::function<R::EditorOperationProgress(const R::AgentOperationContext&)> probe = {})
     {
         R::AgentOperationRegistry registry;
         EXPECT_TRUE(registry.Register({.Name = "forever", .Title = "Forever", .ReadOnly = true,
-            .Invoke = [alive](const R::AgentOperationContext&, std::string_view) {
+            .Invoke = [alive, probe](const R::AgentOperationContext&, std::string_view) {
                 R::AgentOperationOutcome outcome{};
                 outcome.Continuation = [alive](const R::AgentOperationContext&, R::AgentOperationOutcome&) { return false; };
+                outcome.Progress = probe;
                 return outcome; }}));
         return registry;
+    }
+    // The projection of one job as the read model would give it.
+    R::EditorOperationProgress ProjectJob(R::JobService& jobs, const R::JobToken token, std::string label)
+    {
+        const auto progress = jobs.GetProgress(token);
+        return {.State = R::EditorOperationState::Running, .Determinate = progress.Determinate,
+                .Normalized = progress.Normalized, .Label = std::move(label)};
     }
     Json ForeverCall(const Json& id, const Json& meta = Json::object())
     {
@@ -489,7 +501,8 @@ TEST(AgentOperations, ProgressPercentModeCapsAndSkipsIndeterminateJobs)
             return R::JobResultEnvelope{}; },
         .PublishCompletion = [](R::KernelEventBus&, const R::JobResultEnvelope&) { return true; }});
     ASSERT_TRUE(token.IsValid());
-    auto registry = NeverFinishingRegistry(std::make_shared<int>(0));
+    auto registry = NeverFinishingRegistry(std::make_shared<int>(0),
+        [&jobs, token](const R::AgentOperationContext&) { return ProjectJob(jobs, token, "long job"); });
     R::AgentProtocol protocol{registry, false};
     protocol.SetProgressInterval(std::chrono::milliseconds(0));
     const R::AgentOperationContext context{.Jobs = &jobs};
@@ -510,6 +523,58 @@ TEST(AgentOperations, ProgressPercentModeCapsAndSkipsIndeterminateJobs)
     EXPECT_DOUBLE_EQ((*next(0.5f, true))["progress"].get<double>(), 50.0) << "a determinate job resumes";
     EXPECT_DOUBLE_EQ((*next(3.0f, true))["progress"].get<double>(), 100.0) << "capped at total";
     EXPECT_FALSE(next(3.0f, true).has_value());
+    release.store(true);
+    jobs.CancelAndDrain();
+    Extrinsic::Core::Tasks::Scheduler::WaitForAll();
+    Extrinsic::Core::Tasks::Scheduler::Shutdown();
+}
+
+// RUNTIME-312 slice 8: with two jobs running, the notifications follow the call's own run, not
+// the oldest job; a call with no run key reports only its age as "waiting".
+TEST(AgentOperations, ProgressFollowsTheCallsOwnJobNotTheOldestOne)
+{
+    if (Extrinsic::Core::Tasks::Scheduler::IsInitialized()) Extrinsic::Core::Tasks::Scheduler::Shutdown();
+    Extrinsic::Core::Tasks::Scheduler::Initialize(2);
+    R::JobService jobs;
+    std::atomic_bool release{false};
+    const auto submit = [&](const char* name) {
+        return jobs.Submit({.DebugName = name,
+            .Work = [&release](const R::JobCancellation&) {
+                while (!release.load()) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                return R::JobResultEnvelope{}; },
+            .PublishCompletion = [](R::KernelEventBus&, const R::JobResultEnvelope&) { return true; }});
+    };
+    const auto older = submit("older job");
+    ASSERT_TRUE(older.IsValid());
+    std::this_thread::sleep_for(std::chrono::milliseconds(5)); // the older job is also the longer-running one
+    const auto own = submit("this call's job");
+    ASSERT_TRUE(own.IsValid());
+    jobs.ReportProgress(older, {0.9f, true});
+    jobs.ReportProgress(own, {0.2f, true});
+
+    auto registry = NeverFinishingRegistry(std::make_shared<int>(0),
+        [&jobs, own](const R::AgentOperationContext&) { return ProjectJob(jobs, own, "this call's job"); });
+    R::AgentProtocol protocol{registry, false};
+    protocol.SetProgressInterval(std::chrono::milliseconds(0));
+    const R::AgentOperationContext context{.Jobs = &jobs};
+    ASSERT_FALSE(protocol.Handle(ForeverCall("own", {{"progressToken", "t"}}).dump(), context).has_value());
+    const auto lines = protocol.PollPending(context);
+    ASSERT_EQ(lines.size(), 1u);
+    const Json note = Json::parse(lines.front())["params"];
+    EXPECT_NEAR(note["progress"].get<double>(), 20.0, 1e-4) << "the call's own job, not the older one's 90%";
+    EXPECT_EQ(note["message"], "this call's job");
+
+    // No run key: the oldest running job must not stand in for it.
+    auto keyless = NeverFinishingRegistry(std::make_shared<int>(0));
+    R::AgentProtocol other{keyless, false};
+    other.SetProgressInterval(std::chrono::milliseconds(0));
+    ASSERT_FALSE(other.Handle(ForeverCall("keyless", {{"progressToken", "k"}}).dump(), context).has_value());
+    const auto waiting = other.PollPending(context);
+    ASSERT_EQ(waiting.size(), 1u);
+    const Json waitingNote = Json::parse(waiting.front())["params"];
+    EXPECT_EQ(waitingNote["message"], "waiting");
+    EXPECT_FALSE(waitingNote.contains("total"));
+
     release.store(true);
     jobs.CancelAndDrain();
     Extrinsic::Core::Tasks::Scheduler::WaitForAll();

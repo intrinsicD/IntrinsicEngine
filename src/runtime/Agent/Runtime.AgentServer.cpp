@@ -180,7 +180,7 @@ namespace Extrinsic::Runtime
             {
                 // A read-only tool without side effects that defers at the cap is refused after it ran.
                 if (atCap) return Dump(ErrorResponse(id, -32000, "too many pending calls"));
-                PendingCall call{.Id = Dump(id), .Continue = std::move(outcome.Continuation)};
+                PendingCall call{.Id = Dump(id), .Continue = std::move(outcome.Continuation), .Progress = std::move(outcome.Progress)};
                 call.NeedsPresentedFrame = spec->NeedsPresentedFrame;
                 if (const auto meta = params.find("_meta"); meta != params.end() && meta->is_object())
                     if (const auto token = meta->find("progressToken"); token != meta->end() && (token->is_string() || token->is_number_integer()))
@@ -224,31 +224,26 @@ namespace Extrinsic::Runtime
             if (!it->ProgressToken.empty() && now - it->LastEmit >= m_ProgressInterval)
             {
                 it->LastEmit = now;
-                // The oldest queued or running job stands in for the call (see PollPending in the header).
-                const JobSnapshot* oldest = nullptr;
-                std::vector<JobSnapshot> jobs;
-                if (context.Jobs) jobs = context.Jobs->SnapshotAll();
-                for (const auto& job : jobs)
-                    if ((job.State == JobState::Queued || job.State == JobState::Running) &&
-                        (!oldest || job.ElapsedMilliseconds > oldest->ElapsedMilliseconds))
-                        oldest = &job;
+                // The call's own run, by the key its operation captured; none means "waiting".
+                EditorOperationProgress run{};
+                if (it->Progress) run = it->Progress(context);
+                const bool known = run.State != EditorOperationState::None;
                 // One unit per call, chosen at its first notification, so the value only ever grows.
-                const bool determinate = oldest && oldest->Progress.Determinate;
+                const bool determinate = known && run.Determinate;
                 if (it->Unit == ProgressUnit::Unset) it->Unit = determinate ? ProgressUnit::Percent : ProgressUnit::Seconds;
                 double progress = 0.0;
                 if (it->Unit == ProgressUnit::Percent)
                 {
-                    if (!determinate) { ++it; continue; } // the job changed; wait for a determinate one
-                    progress = std::min(static_cast<double>(oldest->Progress.Normalized) * 100.0, 100.0);
+                    if (!determinate) { ++it; continue; } // the run is not reporting; wait for a determinate value
+                    progress = std::min(static_cast<double>(run.Normalized) * 100.0, 100.0);
                 }
                 else
-                    progress = oldest ? static_cast<double>(oldest->ElapsedMilliseconds) / 1000.0
-                                      : std::chrono::duration<double>(now - it->Started).count();
+                    progress = known ? run.ElapsedSeconds : std::chrono::duration<double>(now - it->Started).count();
                 if (progress <= it->LastProgress) { ++it; continue; }
                 it->LastProgress = progress;
                 Json params{{"progressToken", Json::parse(it->ProgressToken, nullptr, false)}, {"progress", progress}};
                 if (it->Unit == ProgressUnit::Percent) params["total"] = 100.0;
-                params["message"] = oldest ? oldest->DebugName : std::string{"waiting"};
+                params["message"] = known && !run.Label.empty() ? run.Label : std::string{"waiting"};
                 replies.push_back(Dump(Json{{"jsonrpc", "2.0"}, {"method", "notifications/progress"}, {"params", std::move(params)}}));
             }
             ++it;

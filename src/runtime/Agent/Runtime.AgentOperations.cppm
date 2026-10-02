@@ -17,6 +17,7 @@ export module Extrinsic.Runtime.AgentOperations;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.ViewCapture;
 
@@ -43,6 +44,11 @@ export namespace Extrinsic::Runtime
         std::vector<AgentImage> Images{};
         // Set by operations that finish on a later frame (captures); the reply waits for it.
         AgentOperationContinuation Continuation{};
+        // For a deferred call: reads this run's own progress (UI-069 read model) where the run key
+        // is known (the job the command queued, or the correlation id of its service run).
+        // `notifications/progress` follows it; empty for calls with no run key (a capture), which
+        // report only their age.
+        std::function<EditorOperationProgress(const AgentOperationContext&)> Progress{};
     };
 
     // Borrowed engine services for one call on the main thread; any may be null.

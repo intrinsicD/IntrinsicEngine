@@ -36,6 +36,8 @@ import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.SceneDocumentModule;
@@ -435,7 +437,7 @@ TEST(SandboxAgentServer, ProgressAndCancelOverTheSocket)
     auto sections = Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry();
     Config::EngineConfig config{};
     Config::PopulateEngineConfigSectionDefaults(config, sections);
-    config.Simulation.WorkerThreadCount = 1u;
+    config.Simulation.WorkerThreadCount = 2u; // room for an older background job next to the CPD run
     config.ReferenceScene.Enabled = false;
     config.Camera.Enabled = false;
     config.Window.Backend = Config::WindowBackend::Null;
@@ -468,6 +470,9 @@ TEST(SandboxAgentServer, ProgressAndCancelOverTheSocket)
     const auto targetId = makeCloud(0.05f);
 
     std::atomic_bool done{false};
+    // An older running job that reports 90%: the heuristic this replaced would have followed it.
+    std::atomic_bool blockerStarted{false}, releaseBlocker{false};
+    bool blockerSubmitted = false;
     std::vector<std::string> failures;
     const auto check = [&](bool ok, std::string what) { if (!ok) failures.push_back(std::move(what)); };
     std::thread client([&] {
@@ -492,6 +497,8 @@ TEST(SandboxAgentServer, ProgressAndCancelOverTheSocket)
         };
 
         // Progress: the run reports with its token, then replies with the same id.
+        for (int wait = 0; wait < 500 && !blockerStarted.load(); ++wait) std::this_thread::sleep_for(std::chrono::milliseconds(4));
+        check(blockerStarted.load(), "the older job is running");
         configure(40);
         const int runId = c.Send("tools/call", {{"name", "run_registration"}, {"arguments", {{"method", "cpd"}}},
                                                 {"_meta", {{"progressToken", "run-1"}}}});
@@ -499,15 +506,21 @@ TEST(SandboxAgentServer, ProgressAndCancelOverTheSocket)
         check(reply.contains("result") && reply["result"]["isError"] == false, "run_registration reply: " + reply.dump());
         check(!c.Notifications.empty(), "at least one progress notification before the reply");
         double last = -1.0;
+        bool namedItsJob = false;
         for (const auto& note : c.Notifications)
         {
+            namedItsJob |= note["params"]["message"] != "waiting";
             check(note["method"] == "notifications/progress" && note["params"]["progressToken"] == "run-1", "note shape: " + note.dump());
             check(note["params"]["progress"].get<double>() > last, "progress strictly increases");
             check(!note["params"].contains("total") || note["params"]["progress"].get<double>() <= note["params"]["total"].get<double>(),
                   "progress stays within total: " + note.dump());
             last = note["params"]["progress"].get<double>();
+            check(note["params"]["message"] != "agent test blocker" && !note["params"].contains("total"),
+                  "notifications follow the call's own run, not the older 90% job: " + note.dump());
         }
+        check(namedItsJob, "a notification names the call's own job");
         c.Notifications.clear();
+        releaseBlocker.store(true); // the cancel section below waits for every job to end
 
         // No token, no notifications.
         configure(10);
@@ -548,6 +561,17 @@ TEST(SandboxAgentServer, ProgressAndCancelOverTheSocket)
     });
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(60);
     frames->OnFrame = [&](R::Engine& kernel) {
+        if (!blockerSubmitted)
+        {
+            blockerSubmitted = true;
+            (void)kernel.Jobs().Submit({.DebugName = "agent test blocker",
+                .Work = [&](const R::JobCancellation& cancellation) {
+                    cancellation.ReportProgress(0.9f);
+                    blockerStarted.store(true);
+                    while (!releaseBlocker.load() && !done.load() && !cancellation.IsCancelled()) std::this_thread::sleep_for(std::chrono::milliseconds(2));
+                    return R::JobResultEnvelope{}; },
+                .PublishCompletion = [](R::KernelEventBus&, const R::JobResultEnvelope&) { return true; }});
+        }
         if (done.load() || std::chrono::steady_clock::now() > deadline) kernel.RequestExit();
     };
     engine.Run();

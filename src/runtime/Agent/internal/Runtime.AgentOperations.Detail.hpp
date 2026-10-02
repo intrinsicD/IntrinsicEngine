@@ -135,6 +135,37 @@ namespace Extrinsic::Runtime::AgentDetail
         return extra;
     }
 
+    // ---- progress of a deferred call -----------------------------------------------------
+    // The call's own run, for `notifications/progress`: reads the UI-069 read model through the
+    // session's processing commands, never "the oldest job".
+    inline std::function<EditorOperationProgress(const AgentOperationContext&)> RunProgressProbe(EditorOperationRunKey key)
+    {
+        return [key = std::move(key)](const AgentOperationContext& current) -> EditorOperationProgress {
+            if (!PrepareSnapshot(current)) return {};
+            return GetEditorOperationProgress(PrepareEditorProcessingCommands(*current.Attachment), key);
+        };
+    }
+    // The jobs alive before a command runs; the job it queues is the one not in this set.
+    inline std::vector<JobToken> LiveJobTokens(const AgentOperationContext& context)
+    {
+        std::vector<JobToken> tokens;
+        if (context.Jobs)
+            for (const auto& job : context.Jobs->SnapshotAll()) tokens.push_back(job.Token);
+        return tokens;
+    }
+    // Probe for the newest job queued since `before` (nothing queued, nothing to watch).
+    inline std::function<EditorOperationProgress(const AgentOperationContext&)> ProbeForNewJob(
+        const AgentOperationContext& context, const std::vector<JobToken>& before)
+    {
+        if (!context.Jobs) return {};
+        JobToken newest{};
+        for (const auto& job : context.Jobs->SnapshotAll())
+            if (std::find(before.begin(), before.end(), job.Token) == before.end() &&
+                (!newest.IsValid() || job.Token.Index > newest.Index))
+                newest = job.Token;
+        return newest.IsValid() ? RunProgressProbe(newest) : std::function<EditorOperationProgress(const AgentOperationContext&)>{};
+    }
+
     // ---- asynchronous completion -------------------------------------------------------
     // Runs `apply(onComplete)` (an Editor Apply* command whose callback fires for a newly
     // queued job) and answers with its immediate result or, for Pending, a continuation
@@ -144,9 +175,10 @@ namespace Extrinsic::Runtime::AgentDetail
         "No result will be delivered to this call: an identical job was already running, or the workspace was "
         "re-attached while it ran. Check jobs and the scene.";
     template <class Result, class Apply, class Describe>
-    inline AgentOperationOutcome FinishApply(Apply apply, Describe describe)
+    inline AgentOperationOutcome FinishApply(const AgentOperationContext& context, Apply apply, Describe describe)
     {
         auto done = std::make_shared<std::optional<Result>>();
+        const auto before = LiveJobTokens(context);
         const auto immediate = apply([done](Result result) { *done = std::move(result); });
         if (immediate.Status != EditorCommandStatus::Pending)
             return {.IsError = !immediate.Succeeded(), .Text = Dump(describe(immediate))};
@@ -158,7 +190,9 @@ namespace Extrinsic::Runtime::AgentDetail
         if (orphaned(done))
             return {.IsError = true, .Text = (immediate.Message.empty() ? std::string{} : immediate.Message + " ") + kResultUnavailable,
                     .ErrorCode = "result_unavailable"};
-        return {.Continuation = [done, describe, orphaned](const AgentOperationContext& current, AgentOperationOutcome& out) {
+        AgentOperationOutcome outcome{};
+        outcome.Progress = ProbeForNewJob(context, before);
+        outcome.Continuation = [done, describe, orphaned](const AgentOperationContext& current, AgentOperationOutcome& out) {
             if (!current.Attachment || !current.Attachment->IsAttached()) { out = Fail(kNoWorkspace); return true; }
             if (done->has_value())
             {
@@ -167,12 +201,13 @@ namespace Extrinsic::Runtime::AgentDetail
             }
             if (orphaned(done)) { out = {.IsError = true, .Text = kResultUnavailable, .ErrorCode = "result_unavailable"}; return true; }
             return false;
-        }};
+        };
+        return outcome;
     }
     template <class Result, class Apply>
-    inline AgentOperationOutcome FinishApply(Apply apply)
+    inline AgentOperationOutcome FinishApply(const AgentOperationContext& context, Apply apply)
     {
-        return FinishApply<Result>(std::move(apply), [](const Result& result) { return ResultJson(result); });
+        return FinishApply<Result>(context, std::move(apply), [](const Result& result) { return ResultJson(result); });
     }
 
     // Same contract for runs reported through a service's completion event (k-means,
@@ -209,13 +244,17 @@ namespace Extrinsic::Runtime::AgentDetail
         const ServiceSubmission submitted = submit();
         run->Correlation = submitted.Correlation;
         if (!submitted.Queued) { run->Release(); return Fail(submitted.Message); }
-        return {.Continuation = [run, describe](const AgentOperationContext& current, AgentOperationOutcome& out) {
+        AgentOperationOutcome outcome{};
+        // The service stamped the submission's correlation id on its job(s).
+        outcome.Progress = RunProgressProbe(EditorRunCorrelation{submitted.Correlation.Value});
+        outcome.Continuation = [run, describe](const AgentOperationContext& current, AgentOperationOutcome& out) {
             if (!current.Attachment || !current.Attachment->IsAttached()) { run->Release(); out = Fail(kNoWorkspace); return true; }
             if (!run->Completed) return false;
             run->Release();
             out = {.IsError = !run->Completed->Succeeded(), .Text = Dump(describe(*run->Completed))};
             return true;
-        }};
+        };
+        return outcome;
     }
 
     inline std::string Schema(std::string properties, std::string required = "[]")
