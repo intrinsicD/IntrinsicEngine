@@ -59,7 +59,8 @@ replacing the "Bake pending." overlay text.
 - Review follow-up: readiness gates may do real work, so `DrainCompletions` takes a per-drain
   gate-check cap (the engine passes 32 next to the apply budget of 8, in full and minimized
   frames); unchecked gated records stay ahead of the ones just checked, so every parked record is
-  checked within ceil(N / cap) drains. `AwaitingApplyJobs` counts every parked queued record
+  checked within ceil(N / cap) drains. `AwaitingApplyJobs` counts every queued record whose gate
+  has rejected it at least once (never-checked records stay AwaitingGate)
   (`RuntimeJobService.GateChecksAreCappedPerDrainAndRotateThroughParkedResults`).
 
 ## Acceptance criteria

@@ -732,7 +732,8 @@ namespace Extrinsic::Runtime
             m_State->Stats.PublishedCompletions += published;
             m_State->Stats.DroppedCompletions += dropped;
             m_State->Stats.StaleDiscardedJobs += staleDiscarded;
-            // Every queued record parked by its gate, whether checked this drain or not.
+            // Every queued record whose gate has rejected it at least once (this
+            // drain or earlier); a record never checked yet is still AwaitingGate.
             m_State->Stats.AwaitingApplyJobs = static_cast<std::uint64_t>(std::ranges::count_if(
                 m_State->CompletionQueue, [](const SharedState::CompletionRecord& record) {
                     return record.Job &&

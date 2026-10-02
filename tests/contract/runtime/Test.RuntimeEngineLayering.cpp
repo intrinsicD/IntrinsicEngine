@@ -258,6 +258,12 @@ TEST(RuntimeEngineLayering, RunFrameAppliesJobCompletionsWithBoundedBudget)
               1u);
     EXPECT_NE(runFrame.find("kJobCompletionApplyBudgetPerFrame"),
               std::string::npos);
+    // Readiness gates have their own per-drain budget (UI-073 review follow-up).
+    EXPECT_NE(content.find(
+                  "constexpr std::uint32_t kJobCompletionGateCheckBudgetPerFrame = 32u;"),
+              std::string::npos);
+    EXPECT_NE(runFrame.find("kJobCompletionGateCheckBudgetPerFrame"),
+              std::string::npos);
 }
 
 TEST(RuntimeEngineLayering, MinimizedFrameWorkKeepsTheFrameOrderAndExcludesTheFullFrame)
@@ -270,6 +276,7 @@ TEST(RuntimeEngineLayering, MinimizedFrameWorkKeepsTheFrameOrderAndExcludesTheFu
     // minimized path, so a frame never drains completions twice.
     EXPECT_EQ(CountOccurrences(minimized, "m_Impl->m_JobService.DrainCompletions("), 1u);
     EXPECT_NE(minimized.find("kJobCompletionApplyBudgetPerFrame"), std::string::npos);
+    EXPECT_NE(minimized.find("kJobCompletionGateCheckBudgetPerFrame"), std::string::npos);
     const auto drain = minimized.find("m_Impl->m_CommandBus.Drain(");
     const auto pumpA = minimized.find("m_Impl->m_KernelEvents.Pump()", drain);
     const auto hooks = minimized.find("RunRuntimeModuleFrameHooks(FramePhase::Idle", pumpA);
