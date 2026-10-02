@@ -287,7 +287,7 @@ register through `EditorShell::RegisterEditorWindow(...)` with stable ids and
 structured menu paths, then remove the returned handle through
 `UnregisterEditorWindow(...)`; closed windows receive no draw callback, and
 global hide preserves their individual open states. All Sandbox windows are
-app-owned registry contributions. Mesh / Appearance forwards the workspace's
+app-owned registry contributions. Appearance forwards the workspace's
 callback-scoped borrowed selected-mesh vertex-property view to the
 runtime-owned generic scalar-property widget and never retains the view.
 Callbacks receive the app-owned, frame-local `SandboxEditorContext` without
@@ -904,9 +904,10 @@ invisible, and the panel renders both.
 
 ### Sandbox Editor Appearance
 
-`Mesh / Appearance` groups face/surface, edge, and vertex controls for the
-selected mesh. `Graph / Appearance` groups edges and vertices, and
-`PointCloud / Appearance` exposes the vertex/point controls. Each group has a
+The one `Appearance` window (`View` menu, `scene.appearance`) has a Vertices,
+Edges and Faces section for the element domains the selected entity carries
+(`GeometryDomainReadingIncludes`): a mesh all three, a graph vertices and edges,
+a point cloud vertices. Each section has a
 property dropdown with material/default, uniform color, and compatible scalar
 or RGB/RGBA color properties. The surface source domain selects either the vertex
 or face property set; changing it clears the previous property selection with

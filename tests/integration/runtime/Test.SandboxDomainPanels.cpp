@@ -131,7 +131,7 @@ namespace
     }
 }
 
-TEST(SandboxDomainPanels, RegistersTheNineAppOwnedWindowsWithStableMenuMetadata)
+TEST(SandboxDomainPanels, RegistersTheSevenAppOwnedWindowsWithStableMenuMetadata)
 {
     struct ExpectedWindow
     {
@@ -139,14 +139,12 @@ TEST(SandboxDomainPanels, RegistersTheNineAppOwnedWindowsWithStableMenuMetadata)
         std::vector<std::string> MenuPath;
         std::string_view Title;
     };
-    const std::array<ExpectedWindow, 9> expected{{
-        {"pointcloud.appearance", {"PointCloud"}, "Appearance"},
+    const std::array<ExpectedWindow, 7> expected{{
+        {"scene.appearance", {"View"}, "Appearance"},
         {"pointcloud.properties", {"PointCloud"}, "Properties"},
         {"pointcloud.selection", {"PointCloud"}, "Selection"},
-        {"graph.appearance", {"Graph"}, "Appearance"},
         {"graph.properties", {"Graph"}, "Properties"},
         {"graph.selection", {"Graph"}, "Selection"},
-        {"mesh.appearance", {"Mesh"}, "Appearance"},
         {"mesh.properties", {"Mesh"}, "Properties"},
         {"mesh.selection", {"Mesh"}, "Selection"},
     }};
@@ -157,6 +155,10 @@ TEST(SandboxDomainPanels, RegistersTheNineAppOwnedWindowsWithStableMenuMetadata)
 
     const auto menu = harness.Shell.BuildEditorWindowMenuModel();
     ASSERT_EQ(menu.size(), expected.size() + 11u);
+    // UI-075: one Appearance window replaces the three per-kind ones.
+    for (const std::string_view retired :
+         {"pointcloud.appearance", "graph.appearance", "mesh.appearance"})
+        EXPECT_EQ(FindWindow(menu, retired), nullptr) << retired;
     for (const ExpectedWindow& expectedWindow : expected)
     {
         const Runtime::EditorWindowMenuEntry* entry =
@@ -176,20 +178,20 @@ TEST(SandboxDomainPanels, RegistrationIsIdempotentAndLifetimeUnregistersEveryWin
     {
         Editor::DomainPanels panels;
         panels.Register(first.Shell);
-        ASSERT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 20u);
+        ASSERT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 18u);
 
         panels.Register(first.Shell);
-        EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 20u);
+        EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 18u);
 
         panels.Register(second.Shell);
         EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 11u);
-        EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 20u);
+        EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 18u);
 
         panels.Unregister();
         EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 11u);
 
         panels.Register(second.Shell);
-        ASSERT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 20u);
+        ASSERT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 18u);
     }
 
     EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 11u);
@@ -217,7 +219,7 @@ TEST(SandboxDomainPanels, OpenSameDomainWindowsShareOneModelBuildPerFrame)
     Editor::DomainPanels panels;
     panels.Register(harness.Shell);
     for (const std::string_view id :
-         {"pointcloud.appearance",
+         {"scene.appearance",
           "pointcloud.properties",
           "pointcloud.selection"})
     {
@@ -532,14 +534,12 @@ TEST(SandboxDomainPanels, AppearanceCheckboxesCanEnableAndReenableEverySupported
         shell.Attach(engine.Worlds(), engine.Services());
         Editor::DomainPanels panels;
         panels.Register(shell);
-        const char* windowId = kind == Kind::Mesh ? "mesh.appearance"
-            : kind == Kind::Graph ? "graph.appearance" : "pointcloud.appearance";
-        ASSERT_TRUE(shell.SetEditorWindowOpen(windowId, true));
-        const std::string title = std::string(Runtime::DebugNameForEditorDomainWindowKind(kind)) +
-                                  " / Appearance";
+        ASSERT_TRUE(shell.SetEditorWindowOpen("scene.appearance", true));
+        const std::string title = "Appearance";
+        // Sections follow the entity's element domains: Vertices, Edges, Faces.
         const std::vector<Kind> lanes = kind == Kind::Mesh
-            ? std::vector{Kind::Mesh, Kind::Graph, Kind::PointCloud}
-            : kind == Kind::Graph ? std::vector{Kind::Graph, Kind::PointCloud}
+            ? std::vector{Kind::PointCloud, Kind::Graph, Kind::Mesh}
+            : kind == Kind::Graph ? std::vector{Kind::PointCloud, Kind::Graph}
                                   : std::vector{Kind::PointCloud};
         int frame = 0;
         std::size_t checked = 0;
@@ -656,8 +656,8 @@ TEST(SandboxDomainPanels, VectorFieldSectionAddsEditsAndRemovesFieldsWithoutVisi
     shell.Attach(engine.Worlds(), engine.Services());
     Editor::DomainPanels panels;
     panels.Register(shell);
-    ASSERT_TRUE(shell.SetEditorWindowOpen("mesh.appearance", true));
-    const std::string title = "Mesh / Appearance";
+    ASSERT_TRUE(shell.SetEditorWindowOpen("scene.appearance", true));
+    const std::string title = "Appearance";
 
     const auto layer = [&]() -> const Runtime::GeometryVectorFieldLayerRecipe* {
         const auto* recipe = raw.try_get<Runtime::GeometryPresentationRecipe>(entity);
@@ -846,4 +846,114 @@ TEST(SandboxDomainPanels, PointCloudIsRefusedWhereItLacksEdgesAndStillServedWher
                                   "PointCloud / Properties").PropertyTable);
     EXPECT_TRUE(ProbeDomainWindow(ProbeEntity::Graph, "pointcloud.selection",
                                   "PointCloud / Selection").ElementDomainCombo);
+}
+
+// UI-075: the one Appearance window offers a lane per element domain the
+// entity carries (UI-051 reading predicate), whatever the entity's provenance.
+namespace
+{
+    struct LaneToggles
+    {
+        bool Surface{false};
+        bool Edges{false};
+        bool Points{false};
+    };
+
+    [[nodiscard]] LaneToggles ToggleEveryAppearanceLane(const ProbeEntity kind)
+    {
+        namespace GS = Extrinsic::ECS::Components::GeometrySources;
+        namespace G = Extrinsic::Graphics::Components;
+        using Kind = Runtime::EditorDomainWindowKind;
+        auto application = std::make_unique<OneFrameApplication>();
+        auto* driver = application.get();
+        Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(application));
+        engine.EmplaceModule<Runtime::SceneInteractionModule>();
+        engine.EmplaceModule<Runtime::EditorUiModule>();
+        engine.Initialize();
+        auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+        auto& raw = scene.Raw();
+        const auto entity = scene.Create();
+        raw.emplace<Extrinsic::ECS::Components::Selection::SelectableTag>(entity);
+        if (kind == ProbeEntity::Mesh)
+        {
+            Geometry::HalfedgeMesh::Mesh mesh;
+            const auto a = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+            const auto b = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+            const auto c = mesh.AddVertex({0.0f, 1.0f, 0.0f});
+            (void)mesh.AddTriangle(a, b, c);
+            GS::PopulateFromMesh(raw, entity, mesh);
+        }
+        else if (kind == ProbeEntity::Graph)
+        {
+            Geometry::Graph::Graph graph;
+            const auto a = graph.AddVertex({0.0f, 0.0f, 0.0f});
+            const auto b = graph.AddVertex({1.0f, 0.0f, 0.0f});
+            (void)graph.AddEdge(a, b);
+            GS::PopulateFromGraph(raw, entity, graph);
+        }
+        else
+        {
+            Geometry::PointCloud::Cloud cloud;
+            (void)cloud.AddPoint({0.0f, 0.0f, 0.0f});
+            GS::PopulateFromCloud(raw, entity, cloud);
+        }
+        auto* selection = engine.Services().Find<Runtime::SelectionController>();
+        EXPECT_TRUE(selection != nullptr && selection->SetSelectedEntity(scene, entity));
+        Editor::EditorShell shell;
+        shell.Attach(engine.Worlds(), engine.Services());
+        Editor::DomainPanels panels;
+        panels.Register(shell);
+        EXPECT_TRUE(shell.SetEditorWindowOpen("scene.appearance", true));
+
+        int frame = 0;
+        driver->OnFrame = [&](Runtime::Engine& kernel) {
+            ++frame;
+            auto* window = ImGui::FindWindowByName("Appearance");
+            if (frame < 4)
+                return;
+            if (window == nullptr)
+            {
+                ADD_FAILURE() << "Appearance did not open";
+                kernel.RequestExit();
+                return;
+            }
+            ImGui::SetWindowSize(window, ImVec2{600.0f, 900.0f});
+            // One activation at a time; each lands on the next frame.
+            constexpr std::array lanes{std::pair{Kind::PointCloud, "Points"},
+                                       std::pair{Kind::Graph, "Edges"},
+                                       std::pair{Kind::Mesh, "Surface"}};
+            const int step = frame - 4;
+            if (step >= 0 && step % 3 == 0 && step / 3 < 3)
+            {
+                const auto [lane, label] = lanes[static_cast<std::size_t>(step / 3)];
+                const int scope = static_cast<int>(lane);
+                const auto seed = ImHashData(&scope, sizeof(scope), window->ID);
+                ImGui::FocusWindow(window);
+                ImGui::ActivateItemByID(ImHashStr(label, 0, seed));
+            }
+            if (step == 11)
+                kernel.RequestExit();
+        };
+        engine.Run();
+        const LaneToggles toggles{raw.all_of<G::RenderSurface>(entity),
+                                  raw.all_of<G::RenderEdges>(entity),
+                                  raw.all_of<G::RenderPoints>(entity)};
+        panels.Unregister();
+        shell.Detach();
+        engine.Shutdown();
+        return toggles;
+    }
+}
+
+TEST(SandboxDomainPanels, AppearanceOffersALanePerElementDomainTheEntityCarries)
+{
+    const LaneToggles mesh = ToggleEveryAppearanceLane(ProbeEntity::Mesh);
+    EXPECT_TRUE(mesh.Points && mesh.Edges && mesh.Surface);
+    const LaneToggles graph = ToggleEveryAppearanceLane(ProbeEntity::Graph);
+    EXPECT_TRUE(graph.Points && graph.Edges);
+    EXPECT_FALSE(graph.Surface);
+    const LaneToggles points = ToggleEveryAppearanceLane(ProbeEntity::PointCloud);
+    EXPECT_TRUE(points.Points);
+    EXPECT_FALSE(points.Edges);
+    EXPECT_FALSE(points.Surface);
 }

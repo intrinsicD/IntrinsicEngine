@@ -242,16 +242,17 @@ existing properties independently of method readiness. Consolidation provides
 Show buttons for its position and normal outputs. Boolean masks and UV vectors
 use the shared Appearance color encoder. METHOD-040 hides unused GMM controls and reports its own
 boundary/cleanup diagnostics. It remains experimental and exposes no cut or
-UV-atlas action. Appearance groups surface, edge, and vertex property dropdowns
-for a selected mesh. Surface properties can use the shared UV texture-bake
+UV-atlas action. The single `View > Appearance` window (`UI-075`) has a
+Vertices, Edges and Faces section for the element domains the selected entity
+carries, each with its lane visibility, settings and property dropdown. Surface properties can use the shared UV texture-bake
 command; advanced binding and bake controls are collapsed. Its entity-level
 **Vector fields** section (independent of which lanes are visible) chooses an
 element domain, then a vec3 property, and draws it as arrows; each field has
 visibility, normalized/raw length, width, color, depth test and sampling
 controls and a close button, all through the undoable
 `ApplyEditorGeometryVectorFieldCommand` that Geometry Visualization's
-`Vector field` action also uses. Fields are saved with the scene. `Sandbox.Editor.DomainPanels` registers the existing Appearance,
-Properties, and Selection windows for Mesh, Graph, and PointCloud. It owns their menu paths, lazy per-frame model
+`Vector field` action also uses. Fields are saved with the scene. `Sandbox.Editor.DomainPanels` registers the one Appearance window and the Properties and Selection
+windows for Mesh, Graph, and PointCloud. It owns their menu paths, lazy per-frame model
 cache, texture-bake and property-widget draft state, and
 result presentation. K-Means and Progressive Poisson command/config/result
 implementations compile in a private runtime operation unit; all other feature
@@ -345,8 +346,9 @@ result, and the window header states what it reads (for example "Reading: Mesh
 Vertices as a point set"). The Selection element-domain list is limited to the elements of the reading (point set: vertices; graph: vertices and edges); Properties stays exhaustive. An entity that lacks the data, such as a point cloud in
 a Graph window, keeps the runtime's `UnsupportedGeometryDomain` reason. The Mesh
 windows stay exact because faces are semantic. No alias or conversion entity is
-created. Appearance still draws per-kind windows; `UI-075` replaces them and
-reuses the same predicate to choose which domain sections apply.
+created. The one Appearance window (`UI-075`) reuses the same predicate
+(`GeometryDomainReadingIncludes`) to choose its sections: a mesh shows Vertices,
+Edges and Faces, a graph Vertices and Edges, a point cloud Vertices.
 
 `Mesh`, `Graph`, and `PointCloud` each expose a stable `Processing >
 Consolidate (LOP/WLOP/CLOP/EAR)` entry. All three open the same panel path and

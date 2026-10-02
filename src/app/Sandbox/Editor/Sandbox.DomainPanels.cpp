@@ -680,81 +680,122 @@ void DrawVectorFieldSection(const EditorDomainWindowModel &model,
   ImGui::PopID();
 }
 
-// Appearance owns render hints and state, visualization controls, property and
-// attribute bindings, vector fields, and texture baking.
-void DrawDomainRenderWindow(
-    const std::span<const EditorDomainWindowModel *const> models,
+// One element-domain section of the Appearance window. `Kind` selects the
+// per-lane window model (its render hints and visualization target);
+// `ElementProbe` is the element domain the UI-051 reading predicate is asked
+// about, so a section shows exactly where the entity carries that data.
+struct AppearanceSection {
+  const char *Title;
+  const char *LaneLabel;
+  EditorDomainWindowKind Kind;
+  GeometryElementDomain ElementProbe;
+};
+
+inline constexpr std::array<AppearanceSection, 3> kAppearanceSections{{
+    {"Vertices", "Points", EditorDomainWindowKind::PointCloud,
+     GeometryElementDomain::PointCloudPoint},
+    {"Edges", "Edges", EditorDomainWindowKind::Graph,
+     GeometryElementDomain::GraphEdge},
+    {"Faces", "Surface", EditorDomainWindowKind::Mesh,
+     GeometryElementDomain::MeshFace},
+}};
+
+[[nodiscard]] bool
+AppearanceSectionApplies(const AppearanceSection &section,
+                         const decltype(EditorDomainWindowModel{}.SelectedDomain) entity) {
+  return GeometryDomainReadingIncludes(entity, section.ElementProbe);
+}
+
+// One lane's visibility toggle and settings (render hints, property and
+// color controls, advanced state).
+void DrawAppearanceLane(const AppearanceSection &section,
+                        const EditorDomainWindowModel &model,
+                        const SandboxEditorContext &context,
+                        TextureBakeUiState *textureBakeState,
+                        EditorCommandStatus &status) {
+  const bool mesh = model.Kind == EditorDomainWindowKind::Mesh;
+  const bool graph = model.Kind == EditorDomainWindowKind::Graph;
+  bool visible = mesh ? model.RenderHints.HasRenderSurface
+                      : graph ? model.RenderHints.HasRenderEdges
+                              : model.RenderHints.HasRenderPoints;
+  if (ImGui::Checkbox(section.LaneLabel, &visible)) {
+    status = ApplyEditorRenderHintCommand(
+        context.VisualizationCommands,
+        EditorRenderHintCommand{
+            .StableEntityId = model.SelectedStableId,
+            .SetSurface = mesh,
+            .EnableSurface = visible,
+            .SurfaceDomain = model.RenderHints.SurfaceDomainValue,
+            .SetEdges = graph,
+            .EnableEdges = visible,
+            .EdgeDomain = model.RenderHints.EdgeDomainValue,
+            .SetPoints = !mesh && !graph,
+            .EnablePoints = visible,
+            .PointType = model.RenderHints.PointRenderTypeValue,
+        });
+  }
+  if (status != EditorCommandStatus::Applied &&
+      status != EditorCommandStatus::NoChange)
+    ImGui::TextWrapped("Appearance change failed: %s",
+                       DebugNameForEditorCommandStatus(status));
+  if (!visible || !ImGui::TreeNode("Settings"))
+    return;
+  switch (model.Kind) {
+  case EditorDomainWindowKind::Mesh:
+    DrawMeshRenderHintControls(model, context, true);
+    break;
+  case EditorDomainWindowKind::Graph:
+    DrawGraphRenderHintControls(model, context, true);
+    break;
+  case EditorDomainWindowKind::PointCloud:
+    DrawPointRenderHintControls(model, context, true);
+    break;
+  }
+  DrawDomainVisualizationControls(model, context, status);
+  if (ImGui::CollapsingHeader("Advanced")) {
+    DrawRenderHintStatus(model.RenderHints);
+    DrawBoundRenderStateRows(model.BoundState);
+    DrawPropertyBindingTargets(model.PropertyCatalog);
+    if (mesh) {
+      static TextureBakeMutationUiState mutationState{};
+      DrawTextureBakeControls(model.TextureBake, &context, textureBakeState,
+                              mutationState);
+    }
+  }
+  ImGui::TreePop();
+}
+
+// The one Appearance window: a section per element domain the selected entity
+// carries (UI-051 reading predicate), then the entity-level attribute sources
+// and vector fields. `lanes[i]` is the model of `kAppearanceSections[i]`, or
+// null when the section does not apply.
+void DrawAppearanceContent(
+    const std::array<const EditorDomainWindowModel *, 3> &lanes,
     const SandboxEditorContext &context, TextureBakeUiState *textureBakeState,
     std::array<EditorCommandStatus, 3> &statuses,
     VectorFieldUiState &vectorFieldState) {
-  const auto &selected = *models.front();
+  const EditorDomainWindowModel &selected = *lanes.front();
   if (!selected.HasSelectedEntity) {
     ImGui::TextDisabled("Select a mesh, graph, or point cloud.");
     return;
   }
   ImGui::TextUnformatted(selected.SelectedEntity.Name.c_str());
-  for (const auto *current : models) {
-    const auto &model = *current;
-    const bool available = DomainAppearanceReady(model);
-    if (!available)
+  for (std::size_t i = 0u; i < kAppearanceSections.size(); ++i) {
+    const EditorDomainWindowModel *model = lanes[i];
+    if (model == nullptr || !model->DomainUsable ||
+        !DomainAppearanceReady(*model))
       continue;
-    ImGui::PushID(static_cast<int>(model.Kind));
-    auto &status = statuses[static_cast<std::size_t>(model.Kind)];
-    const bool mesh = model.Kind == EditorDomainWindowKind::Mesh;
-    const bool graph = model.Kind == EditorDomainWindowKind::Graph;
-    const char *label = mesh ? "Surface" : graph ? "Edges" : "Points";
-    bool visible = mesh ? model.RenderHints.HasRenderSurface
-                        : graph ? model.RenderHints.HasRenderEdges
-                                : model.RenderHints.HasRenderPoints;
-    if (ImGui::Checkbox(label, &visible)) {
-      status = ApplyEditorRenderHintCommand(
-          context.VisualizationCommands,
-          EditorRenderHintCommand{
-              .StableEntityId = model.SelectedStableId,
-              .SetSurface = mesh,
-              .EnableSurface = visible,
-              .SurfaceDomain = model.RenderHints.SurfaceDomainValue,
-              .SetEdges = graph,
-              .EnableEdges = visible,
-              .EdgeDomain = model.RenderHints.EdgeDomainValue,
-              .SetPoints = !mesh && !graph,
-              .EnablePoints = visible,
-              .PointType = model.RenderHints.PointRenderTypeValue,
-          });
-    }
-    if (status != EditorCommandStatus::Applied &&
-        status != EditorCommandStatus::NoChange)
-      ImGui::TextWrapped("Appearance change failed: %s",
-                         DebugNameForEditorCommandStatus(status));
-    if (!visible || !ImGui::TreeNode("Settings")) {
-      ImGui::PopID();
+    if (!ImGui::CollapsingHeader(kAppearanceSections[i].Title,
+                                 ImGuiTreeNodeFlags_DefaultOpen))
       continue;
-    }
-    switch (model.Kind) {
-    case EditorDomainWindowKind::Mesh:
-      DrawMeshRenderHintControls(model, context, available);
-      break;
-    case EditorDomainWindowKind::Graph:
-      DrawGraphRenderHintControls(model, context, available);
-      break;
-    case EditorDomainWindowKind::PointCloud:
-      DrawPointRenderHintControls(model, context, available);
-      break;
-    }
-    DrawDomainVisualizationControls(model, context, status);
-    if (ImGui::CollapsingHeader("Advanced")) {
-      DrawRenderHintStatus(model.RenderHints);
-      DrawBoundRenderStateRows(model.BoundState);
-      DrawPropertyBindingTargets(model.PropertyCatalog);
-      DrawAttributeBindings(model.PropertyCatalog, &context);
-      if (model.Kind == EditorDomainWindowKind::Mesh) {
-        static TextureBakeMutationUiState mutationState{};
-        DrawTextureBakeControls(model.TextureBake, &context, textureBakeState, mutationState);
-      }
-    }
-    ImGui::TreePop();
+    ImGui::PushID(static_cast<int>(model->Kind));
+    DrawAppearanceLane(kAppearanceSections[i], *model, context,
+                       textureBakeState,
+                       statuses[static_cast<std::size_t>(model->Kind)]);
     ImGui::PopID();
   }
+  if (ImGui::CollapsingHeader("Attribute sources"))
+    DrawAttributeBindings(selected.PropertyCatalog, &context);
   DrawVectorFieldSection(selected, context, vectorFieldState);
 }
 
@@ -953,7 +994,6 @@ struct DomainPanels::Impl {
   std::string SelectionMessage{};
 
   enum class Section : std::uint8_t {
-    Appearance,
     Properties,
     Selection,
   };
@@ -995,15 +1035,15 @@ struct DomainPanels::Impl {
   void DrawWindow(bool &open, const SandboxEditorContext &context,
                   Runtime::EditorDomainWindowKind kind, Section section,
                   const char *title);
+  void RegisterAppearanceWindow();
+  void DrawAppearanceWindow(bool &open, const SandboxEditorContext &context);
 };
 
 void DomainPanels::Impl::Register(EditorShell &editorShell) {
   Unregister();
   Shell = &editorShell;
 
-  RegisterWindow("pointcloud.appearance", {"PointCloud"}, "Appearance",
-                 Runtime::EditorDomainWindowKind::PointCloud,
-                 Section::Appearance);
+  RegisterAppearanceWindow();
   RegisterWindow("pointcloud.properties", {"PointCloud"}, "Properties",
                  Runtime::EditorDomainWindowKind::PointCloud,
                  Section::Properties);
@@ -1012,9 +1052,6 @@ void DomainPanels::Impl::Register(EditorShell &editorShell) {
                  Section::Selection);
 
 
-  RegisterWindow("graph.appearance", {"Graph"}, "Appearance",
-                 Runtime::EditorDomainWindowKind::Graph,
-                 Section::Appearance);
   RegisterWindow("graph.properties", {"Graph"}, "Properties",
                  Runtime::EditorDomainWindowKind::Graph,
                  Section::Properties);
@@ -1022,9 +1059,6 @@ void DomainPanels::Impl::Register(EditorShell &editorShell) {
                  Runtime::EditorDomainWindowKind::Graph,
                  Section::Selection);
 
-  RegisterWindow("mesh.appearance", {"Mesh"}, "Appearance",
-                 Runtime::EditorDomainWindowKind::Mesh,
-                 Section::Appearance);
   RegisterWindow("mesh.properties", {"Mesh"}, "Properties",
                  Runtime::EditorDomainWindowKind::Mesh,
                  Section::Properties);
@@ -1096,14 +1130,24 @@ DomainPanels::Impl::GetDomainWindowModel(
   return *model;
 }
 
-void DomainPanels::Impl::DrawWindow(
-    bool &open, const SandboxEditorContext &context,
-    const Runtime::EditorDomainWindowKind kind, const Section section,
-    const char *title) {
+void DomainPanels::Impl::RegisterAppearanceWindow() {
+  Handles.push_back(Shell->RegisterEditorWindow(EditorWindowDescriptor{
+      .Id = "scene.appearance",
+      .MenuPath = {"View"},
+      .Title = "Appearance",
+      .OpenByDefault = false,
+      .Draw = [this](bool &open, const SandboxEditorContext &context) {
+        DrawAppearanceWindow(open, context);
+      },
+      .OpenStateChanged = [this](bool) { ResetModelCache(); },
+  }));
+}
 
+void DomainPanels::Impl::DrawAppearanceWindow(
+    bool &open, const SandboxEditorContext &context) {
   if (context.Parameterization.Results.LastUvRegenerationResult.has_value())
-    LastUvRegenerationResult = *context.Parameterization.Results.LastUvRegenerationResult;
-
+    LastUvRegenerationResult =
+        *context.Parameterization.Results.LastUvRegenerationResult;
 
   TextureBakeUiState textureBakeState{
       .LastUvRegenerationResult = &LastUvRegenerationResult,
@@ -1123,38 +1167,50 @@ void DomainPanels::Impl::DrawWindow(
   };
 
   ImGui::SetNextWindowSize(ImVec2(340.0f, 300.0f), ImGuiCond_FirstUseEver);
+  if (ImGui::Begin("Appearance", &open)) {
+    // The first section's model names the selection; the other lanes are
+    // built only where the entity's element domains reach them.
+    std::array<const EditorDomainWindowModel *, 3> lanes{};
+    lanes[0] = &GetDomainWindowModel(context, kAppearanceSections[0].Kind);
+    const EditorDomainWindowModel &first = *lanes[0];
+    if (AppearanceEntity != first.SelectedStableId) {
+      AppearanceStatuses.fill(EditorCommandStatus::NoChange);
+      VectorFieldState.LastStatus = EditorCommandStatus::NoChange;
+      AppearanceEntity = first.SelectedStableId;
+    }
+    const EditorDomainWindowModel *mesh = nullptr;
+    if (first.HasSelectedEntity) {
+      for (std::size_t i = 1u; i < kAppearanceSections.size(); ++i) {
+        if (AppearanceSectionApplies(kAppearanceSections[i],
+                                     first.SelectedDomain))
+          lanes[i] = &GetDomainWindowModel(context, kAppearanceSections[i].Kind);
+      }
+      mesh = lanes[2];
+    }
+    DrawAppearanceContent(lanes, context, &textureBakeState,
+                          AppearanceStatuses, VectorFieldState);
+    if (mesh != nullptr && mesh->DomainMatches &&
+        ImGui::CollapsingHeader("Property distribution")) {
+      const auto properties =
+          Runtime::ResolveEditorSelectedMeshVertexProperties(context.Processing);
+      if (properties) {
+        (void)Runtime::DrawEditorScalarPropertyPlotWidget(
+            "mesh.appearance.properties", properties, MeshPropertyPlotState);
+      }
+    }
+  }
+  ImGui::End();
+}
+
+void DomainPanels::Impl::DrawWindow(
+    bool &open, const SandboxEditorContext &context,
+    const Runtime::EditorDomainWindowKind kind, const Section section,
+    const char *title) {
+  ImGui::SetNextWindowSize(ImVec2(340.0f, 300.0f), ImGuiCond_FirstUseEver);
   if (ImGui::Begin(title, &open)) {
     const Runtime::EditorDomainWindowModel &model =
         GetDomainWindowModel(context, kind);
     switch (section) {
-    case Section::Appearance: {
-      if (AppearanceEntity != model.SelectedStableId) {
-        AppearanceStatuses.fill(EditorCommandStatus::NoChange);
-        VectorFieldState.LastStatus = EditorCommandStatus::NoChange;
-        AppearanceEntity = model.SelectedStableId;
-      }
-      std::array<const EditorDomainWindowModel *, 3> appearanceModels{&model};
-      std::size_t count = 1;
-      if (kind == EditorDomainWindowKind::Mesh && model.HasSelectedEntity)
-        appearanceModels[count++] =
-            &GetDomainWindowModel(context, EditorDomainWindowKind::Graph);
-      if (kind != EditorDomainWindowKind::PointCloud && model.HasSelectedEntity)
-        appearanceModels[count++] =
-            &GetDomainWindowModel(context, EditorDomainWindowKind::PointCloud);
-      DrawDomainRenderWindow({appearanceModels.data(), count}, context,
-                             &textureBakeState, AppearanceStatuses,
-                             VectorFieldState);
-    }
-      if (kind == Runtime::EditorDomainWindowKind::Mesh &&
-          model.DomainMatches && ImGui::CollapsingHeader("Property distribution")) {
-        const auto properties =
-            Runtime::ResolveEditorSelectedMeshVertexProperties(context.Processing);
-        if (properties) {
-          (void)Runtime::DrawEditorScalarPropertyPlotWidget(
-              "mesh.appearance.properties", properties, MeshPropertyPlotState);
-        }
-      }
-      break;
     case Section::Properties:
       DrawDomainPropertyWindow(model);
       break;

@@ -690,8 +690,9 @@ models, command validation/execution, undo/history integration, derived-job
 submission, stale-result rejection, and result sinks; the application owns the
 stable registrations, menu paths, lazy per-frame domain-model cache, widget
 state, and result presentation.
-`Extrinsic.Sandbox.Editor.DomainPanels` owns nine domain windows:
-Appearance, Properties, and Selection for PointCloud, Graph, and Mesh. It preserves their stable ids, menu
+`Extrinsic.Sandbox.Editor.DomainPanels` owns seven windows: one
+Appearance window (`scene.appearance`, `View` menu; Vertices, Edges and Faces sections chosen by the
+element-domain reading predicate, `UI-075`) and Properties and Selection for PointCloud, Graph, and Mesh. It preserves their stable ids, menu
 paths, titles, closed defaults, controls, per-frame lazy model cache, and
 immediate/asynchronous result publication. Runtime retains the exported domain
 models, callback-scoped borrowed property view, command/job execution,
