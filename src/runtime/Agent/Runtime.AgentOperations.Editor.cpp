@@ -227,35 +227,6 @@ namespace Extrinsic::Runtime
             return FinishSceneFile(ApplyEditorSceneLoadCommand(scene.Commands, EditorSceneFileCommand{.Path = *resolved}), *resolved);
         }
 
-        AgentOperationOutcome ShowProperty(const AgentOperationContext& context, std::string_view arguments)
-        {
-            const auto args = ParseObject(arguments);
-            const auto entity = args ? UInt(*args, "entity") : std::nullopt;
-            const auto name = args ? String(*args, "name") : std::nullopt;
-            if (!entity || !name) return Fail("Pass {\"entity\": <stable id>, \"name\": <property>, \"domain\": <optional domain>}.");
-            const auto domainName = args ? String(*args, "domain") : std::nullopt;
-            const auto domain = ParseDomain(domainName);
-            if (domainName && !domain) return Fail(UnknownDomainMessage(*domainName));
-            const bool normalDirection = args && args->contains("normal_direction") && (*args)["normal_direction"].is_boolean() &&
-                                         (*args)["normal_direction"].get<bool>();
-            const auto prepared = PrepareSnapshot(context);
-            if (!prepared) return Fail(kNoWorkspace);
-            const auto inspector = BuildEditorInspectorModel(prepared->SnapshotQueries, nullptr, *entity);
-            if (!inspector.HasEntity) return Fail("No entity with id " + std::to_string(*entity) + ".");
-            const auto row = std::ranges::find_if(inspector.PropertyCatalog.Rows, [&](const EditorPropertyCatalogRow& r) {
-                return r.Name == *name && !r.Internal && (!domain || r.Descriptor.Domain == *domain);
-            });
-            if (row == inspector.PropertyCatalog.Rows.end())
-                return Fail("Entity " + std::to_string(*entity) + " has no property '" + *name + "'" +
-                            (domain ? " on " + *domainName : std::string{}) + "; see entity_properties.");
-            const auto visualization = PrepareEditorVisualizationEditingFrame(*context.Attachment);
-            const auto status = ApplyEditorVisualizationRecipeCommand(visualization.Commands,
-                {.StableEntityId = *entity, .Recipe = MakeEditorPropertyVisualizationRecipe(row->Descriptor, normalDirection)});
-            const bool ok = status == EditorCommandStatus::Applied || status == EditorCommandStatus::NoChange;
-            return {.IsError = !ok, .Text = Dump({{"status", DebugNameForEditorCommandStatus(status)}, {"entity", *entity},
-                                                   {"domain", std::string(ToString(row->Descriptor.Domain))}, {"name", row->Name}})};
-        }
-
         // Shows or hides one base lane like the appearance panel's checkboxes: Surface (mesh), Edges (graph) and
         // Points (point cloud) are offered per entity wherever its appearance target exists. Without `lane` it is the
         // entity's primary one: surface for meshes, edges for graphs, points for point clouds.
@@ -396,14 +367,19 @@ namespace Extrinsic::Runtime
         }
 
         // The entity's binding table through the prepared snapshot (the inspector carries the same
-        // model as the Appearance panel); nullopt when the entity is unknown.
-        std::optional<EditorAttributeBindingModel> AttributeBindingModel(const AgentOperationContext& context, std::uint32_t entity)
+        // model as the Appearance panel). `HasEntity` is false for an unknown entity; an entity without
+        // geometry has no rows.
+        struct AttributeBindingLookup
+        {
+            bool HasEntity{false};
+            EditorAttributeBindingModel Model{};
+        };
+        AttributeBindingLookup AttributeBindingModel(const AgentOperationContext& context, std::uint32_t entity)
         {
             const auto prepared = PrepareSnapshot(context);
-            if (!prepared) return std::nullopt;
+            if (!prepared) return {};
             auto inspector = BuildEditorInspectorModel(prepared->SnapshotQueries, nullptr, entity);
-            if (!inspector.HasEntity || !inspector.PropertyCatalog.AttributeBindings.HasEntity) return std::nullopt;
-            return std::move(inspector.PropertyCatalog.AttributeBindings);
+            return {.HasEntity = inspector.HasEntity, .Model = std::move(inspector.PropertyCatalog.AttributeBindings)};
         }
         AgentOperationOutcome UnknownEntity(std::uint32_t entity)
         {
@@ -423,8 +399,13 @@ namespace Extrinsic::Runtime
             const auto attribute = ParseAttribute(attributeName);
             if (args->contains("attribute") && !attribute) return InvalidParams("Unknown attribute '" + attributeName.value_or("") + "'.");
             if (!PrepareSnapshot(context)) return Fail(kNoWorkspace);
-            const auto model = AttributeBindingModel(context, *entity);
-            if (!model) return UnknownEntity(*entity);
+            const auto lookup = AttributeBindingModel(context, *entity);
+            if (!lookup.HasEntity) return UnknownEntity(*entity);
+            if (lookup.Model.Rows.empty())
+                return {.IsError = true,
+                        .Text = "Entity " + std::to_string(*entity) + " has no geometry element domain with render attributes.",
+                        .ErrorCode = ErrorCodeFor(EditorCommandStatus::UnsupportedGeometryDomain)};
+            const auto* model = &lookup.Model;
             // Grouped by element domain in the table's order of first appearance.
             Json domains = Json::array();
             for (const EditorAttributeBindingRow& row : model->Rows)
@@ -470,10 +451,9 @@ namespace Extrinsic::Runtime
         {
             const auto visualization = PrepareEditorVisualizationEditingFrame(*context.Attachment);
             const EditorCommandStatus status = ApplyEditorAttributeBindingCommand(visualization.Commands, command);
-            const auto model = AttributeBindingModel(context, command.StableEntityId);
+            const auto lookup = AttributeBindingModel(context, command.StableEntityId);
             const EditorAttributeBindingRow* row = nullptr;
-            if (model)
-                for (const EditorAttributeBindingRow& r : model->Rows)
+            for (const EditorAttributeBindingRow& r : lookup.Model.Rows)
                     if (r.Attribute == command.Attribute && r.Domain == command.Domain) row = &r;
             if (status != EditorCommandStatus::Applied && status != EditorCommandStatus::NoChange)
                 return {.IsError = true, .Text = BindingRefusal(status, command, row), .ErrorCode = ErrorCodeFor(status)};
@@ -508,6 +488,46 @@ namespace Extrinsic::Runtime
                                                                        .Domain = *domain, .PropertyName = property.value_or("")},
                                          Json{{"entity", *entity}, {"attribute", *attributeName}, {"domain", *domainName},
                                               {"property", property ? Json(*property) : Json(nullptr)}, {"default", restoreDefault}});
+        }
+
+        AgentOperationOutcome ShowProperty(const AgentOperationContext& context, std::string_view arguments)
+        {
+            const auto args = ParseObject(arguments);
+            const auto entity = args ? UInt(*args, "entity") : std::nullopt;
+            const auto name = args ? String(*args, "name") : std::nullopt;
+            if (!entity || !name) return Fail("Pass {\"entity\": <stable id>, \"name\": <property>, \"domain\": <optional domain>}.");
+            const auto domainName = args ? String(*args, "domain") : std::nullopt;
+            const auto domain = ParseDomain(domainName);
+            if (domainName && !domain) return Fail(UnknownDomainMessage(*domainName));
+            const bool normalDirection = args && args->contains("normal_direction") && (*args)["normal_direction"].is_boolean() &&
+                                         (*args)["normal_direction"].get<bool>();
+            const auto prepared = PrepareSnapshot(context);
+            if (!prepared) return Fail(kNoWorkspace);
+            const auto inspector = BuildEditorInspectorModel(prepared->SnapshotQueries, nullptr, *entity);
+            if (!inspector.HasEntity) return Fail("No entity with id " + std::to_string(*entity) + ".");
+            const auto row = std::ranges::find_if(inspector.PropertyCatalog.Rows, [&](const EditorPropertyCatalogRow& r) {
+                return r.Name == *name && !r.Internal && (!domain || r.Descriptor.Domain == *domain);
+            });
+            if (row == inspector.PropertyCatalog.Rows.end())
+                return Fail("Entity " + std::to_string(*entity) + " has no property '" + *name + "'" +
+                            (domain ? " on " + *domainName : std::string{}) + "; see entity_properties.");
+            Json reply{{"entity", *entity}, {"domain", std::string(ToString(row->Descriptor.Domain))}, {"name", row->Name}};
+            // One Color mechanism: showing a property is binding it as the Color source of its domain
+            // (bind_attribute color), the same command and overlay as the Appearance panel's selector.
+            if (!normalDirection)
+                return ApplyAttributeBinding(context,
+                                             EditorAttributeBindingCommand{.StableEntityId = *entity, .Attribute = RenderAttribute::Color,
+                                                                           .Domain = row->Descriptor.Domain, .PropertyName = row->Name},
+                                             std::move(reply));
+            // Normal directions are a display recipe of a vector, not a source binding; they write the
+            // same overlay through the recipe command the Color binding itself uses.
+            const auto visualization = PrepareEditorVisualizationEditingFrame(*context.Attachment);
+            const auto status = ApplyEditorVisualizationRecipeCommand(visualization.Commands,
+                {.StableEntityId = *entity, .Recipe = MakeEditorPropertyVisualizationRecipe(row->Descriptor, true)});
+            const bool ok = status == EditorCommandStatus::Applied || status == EditorCommandStatus::NoChange;
+            reply["status"] = DebugNameForEditorCommandStatus(status);
+            if (!ok) return {.IsError = true, .Text = Dump(reply), .ErrorCode = ErrorCodeFor(status)};
+            return Ok(reply);
         }
 
         Json PoseJson(const EditorCameraPose& pose)
@@ -1010,7 +1030,10 @@ namespace Extrinsic::Runtime
             false, LoadScene, true);
         add("show_property", "Show property",
             "Color an entity by a property in the viewport, like a panel's Show button: scalars through the colormap, vectors "
-            "as component colors (or normal directions).",
+            "as component colors (or normal directions). This is bind_attribute color on the property's domain (the one Color "
+            "mechanism, the lane's visualization overlay): the last call wins and attribute_bindings shows it as the Color "
+            "source; bind_attribute color with default: true clears it. normal_direction draws a vec3 as normal directions "
+            "on the same overlay. Refusals carry the snake-case command status as error code; the reply carries the row.",
             Schema("{" + kEntityProperty + R"(,"name":{"type":"string"},)" + DomainProperty("Optional: restrict to one element domain.") +
                        R"(,"normal_direction":{"type":"boolean","default":false}})",
                    R"(["entity","name"])"),

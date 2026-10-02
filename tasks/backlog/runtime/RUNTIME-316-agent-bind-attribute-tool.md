@@ -17,7 +17,7 @@ contracts: [geometry.element-domain-sources]
 
 ## Non-goals
 - No raw ECS/property writes; no new transport (the agent-lane exclusions stand).
-- No change to `show_property` semantics (scalar colormap / vector-as-color); it keeps calling the visualization recipe path.
+- No change to `show_property` semantics (scalar colormap / vector-as-color, the lane overlay). Amended 2026-10-02 (slice 3): it now delegates to the Color binding (`ApplyEditorAttributeBindingCommand`, which draws through the same visualization recipe path) instead of calling the recipe command itself; `normal_direction` keeps the recipe command.
 
 ## Context
 - Operator decisions 2026-10-02 (model unification, picking/culling follow displayed positions, canonical normals, single Color mechanism, pixel sizes) are recorded in [RUNTIME-315](../../done/RUNTIME-315-per-domain-render-attribute-source-binding.md#operator-decisions-2026-10-02).
@@ -66,3 +66,20 @@ python3 tools/agents/check_task_policy.py --root . --strict
   `SandboxAgentServer.BindAttributeRebindsRefusesAndRestoresTheDefault` (bind, type/missing/domain/
   entity refusals, default, NoChange, undo, pixel size after showing the points lane, canonical
   `v:position` untouched).
+- 2026-10-02: Slice 3 (`show_property` interplay). No parallel path: `show_property` without
+  `normal_direction` delegates to the `bind_attribute` color path (`ApplyEditorAttributeBindingCommand`,
+  whose Color branch already ran the same recipe command), so the semantics stay the overlay's (the
+  task's non-goal holds) and there is no precedence to diagnose: the last call wins and both are
+  visible as the row's Color source. Gains: the binding's validation, typed error codes and the
+  reply's `row`. `normal_direction` stays on the recipe command (a display recipe, not a source).
+  Test: `SandboxAgentServer.ShowPropertyIsTheColorBinding`.
+  Coordinator review folds: the Color rows of `RenderAttributeRules()` are exactly the domains the
+  overlay can draw (`ColorOverlayTargetFor`: mesh vertex/edge/face, graph node/edge, point-cloud
+  point); the recipe command refused halfedge properties too (`UnsupportedGeometryDomain`, no
+  overlay lane), so delegation refuses nothing that was shown before, only with a typed code
+  (`unsupported_render_attribute`). Remaining difference: the recipe command shows a scalar that is
+  only resident on the GPU (awaiting Accept) without CPU validation; the agent could not name such a
+  property before either (`show_property` resolves names through the CPU property catalog).
+  `attribute_bindings` answers `unsupported_geometry_domain` for an entity without geometry.
+  Tests: `SandboxAgentServer.BindAttributeCoversEveryAttributeAndItsDefault` (table-driven over the
+  six attributes with `default`, one `Agent: ` step each, halfedge refusal, entity without geometry).

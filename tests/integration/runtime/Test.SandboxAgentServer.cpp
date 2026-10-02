@@ -1529,3 +1529,124 @@ TEST(SandboxAgentServer, BindAttributeRebindsRefusesAndRestoresTheDefault)
     });
     EXPECT_TRUE(canonicalUnchanged) << "canonical positions are never written";
 }
+
+// RUNTIME-316: show_property is the Color binding (one mechanism, the lane overlay): it and
+// bind_attribute color see and replace each other's choice, and refusals carry typed codes.
+TEST(SandboxAgentServer, ShowPropertyIsTheColorBinding)
+{
+    AgentRig rig("attrcolor");
+    ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
+    const auto mesh = rig.AddGrid();
+    {
+        auto& vertices = rig.Scene().Raw().get<GS::Vertices>(R::SelectionController::ToEntityHandle(mesh)).Properties;
+        auto offset = vertices.GetOrAdd<glm::vec3>("offset");
+        auto bad = vertices.GetOrAdd<float>("bad", 1.0f);
+        for (std::size_t i = 0; i < vertices.Size(); ++i) offset[i] = glm::vec3(float(i), 0.0f, 1.0f);
+        bad[3] = std::nanf("");
+    }
+    rig.Run([&](Client& c) {
+        bool isError = true;
+        const auto colorSource = [&] {
+            const auto listing = c.Tool("attribute_bindings", {{"entity", mesh}, {"attribute", "color"}, {"domain", "MeshVertex"}});
+            return listing["domains"][0]["attributes"][0]["source"];
+        };
+        const auto bindColor = [&](Json source) {
+            Json arguments{{"entity", mesh}, {"attribute", "color"}, {"domain", "MeshVertex"}};
+            arguments.update(source);
+            return c.Tool("bind_attribute", arguments, &isError);
+        };
+        const auto shown = c.Tool("show_property", {{"entity", mesh}, {"name", "height"}}, &isError);
+        rig.Check(!isError && shown["status"] == "Applied" && shown["row"]["source"] == "height", "show_property binds Color: " + shown.dump());
+        rig.Check(c.Tool("history")["undo_label"].get<std::string>().starts_with("Agent: "), "agent history label");
+        rig.Check(colorSource() == "height", "attribute_bindings reports show_property's choice as the Color source");
+        const auto same = bindColor({{"property", "height"}});
+        rig.Check(!isError && same["status"] == "NoChange", "binding the shown property changes nothing: " + same.dump());
+        const auto rebound = bindColor({{"property", "offset"}});
+        rig.Check(!isError && rebound["status"] == "Applied" && colorSource() == "offset", "bind_attribute replaces it: " + rebound.dump());
+        const auto shownAgain = c.Tool("show_property", {{"entity", mesh}, {"name", "height"}}, &isError);
+        rig.Check(!isError && shownAgain["status"] == "Applied" && colorSource() == "height", "the last call wins: " + shownAgain.dump());
+
+        const auto refused = c.Request("tools/call", {{"name", "show_property"}, {"arguments", {{"entity", mesh}, {"name", "bad"}}}});
+        rig.Check(refused["result"]["isError"] == true &&
+                      refused["result"]["structuredContent"]["error"]["code"] == "attribute_source_non_finite",
+                  "show_property refuses with the binding's typed code: " + refused.dump());
+        rig.Check(colorSource() == "height", "a refusal keeps the Color source");
+
+        const auto cleared = bindColor({{"default", true}});
+        rig.Check(!isError && cleared["status"] == "Applied" && colorSource().is_null(), "default clears the shown property: " + cleared.dump());
+        const auto normals = c.Tool("show_property", {{"entity", mesh}, {"name", "offset"}, {"normal_direction", true}}, &isError);
+        rig.Check(!isError && normals["status"] == "Applied", "normal directions draw on the same overlay: " + normals.dump());
+    });
+}
+
+// RUNTIME-316: every attribute of the runtime table binds and restores its default through the
+// socket on a mesh, each as one "Agent: " undo step; halfedge properties have no Color row (the
+// overlay draws no halfedge lane, so show_property never showed them) and an entity without
+// geometry is refused with its own code.
+TEST(SandboxAgentServer, BindAttributeCoversEveryAttributeAndItsDefault)
+{
+    AgentRig rig("attrall");
+    ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
+    const auto mesh = rig.AddGrid();
+    const auto bare = R::SelectionController::ToStableEntityId(rig.Scene().Create());
+    {
+        auto& raw = rig.Scene().Raw();
+        const auto handle = R::SelectionController::ToEntityHandle(mesh);
+        auto& vertices = raw.get<GS::Vertices>(handle).Properties;
+        auto offset = vertices.GetOrAdd<glm::vec3>("offset");
+        auto uv = vertices.GetOrAdd<glm::vec2>("uv2", glm::vec2(0.5f));
+        (void)vertices.GetOrAdd<float>("radius", 3.0f);
+        for (std::size_t i = 0; i < vertices.Size(); ++i) offset[i] = glm::vec3(float(i), 0.0f, 1.0f);
+        (void)uv;
+        auto& edges = raw.get<GS::Edges>(handle).Properties;
+        (void)edges.GetOrAdd<float>("ewidth", 2.0f);
+        auto& halfedges = raw.get<GS::Halfedges>(handle).Properties;
+        (void)halfedges.GetOrAdd<float>("hscalar", 1.0f);
+    }
+    struct Case { const char* Attribute; const char* Domain; const char* Property; };
+    const Case cases[] = {
+        {"position", "MeshVertex", "offset"}, {"normal", "MeshVertex", "offset"}, {"texcoord", "MeshVertex", "uv2"},
+        {"color", "MeshVertex", "height"},    {"point_size", "MeshVertex", "radius"}, {"line_width", "MeshEdge", "ewidth"},
+    };
+    rig.Run([&](Client& c) {
+        bool isError = true;
+        // Point sizes and line widths are drawn by the mesh's points and edges lanes.
+        for (const char* lane : {"points", "edges"})
+        {
+            c.Tool("set_visibility", {{"entity", mesh}, {"visible", true}, {"lane", lane}}, &isError);
+            rig.Check(!isError, std::string("show the ") + lane + " lane");
+        }
+        std::vector<std::string> covered;
+        for (const Case& test : cases)
+        {
+            const std::string what = std::string(test.Attribute) + " on " + test.Domain;
+            const int before = c.Tool("history")["undo_count"].get<int>();
+            const auto bound = c.Tool("bind_attribute", {{"entity", mesh}, {"attribute", test.Attribute}, {"domain", test.Domain},
+                                                         {"property", test.Property}}, &isError);
+            rig.Check(!isError && bound["status"] == "Applied" && bound["row"]["source"] == test.Property &&
+                          bound["row"]["using_fallback"] == false,
+                      what + " binds: " + bound.dump());
+            const auto history = c.Tool("history");
+            rig.Check(history["undo_count"] == before + 1 && history["undo_label"].get<std::string>().starts_with("Agent: "),
+                      what + " is one agent undo step: " + history.dump());
+            const auto restored = c.Tool("bind_attribute", {{"entity", mesh}, {"attribute", test.Attribute}, {"domain", test.Domain},
+                                                            {"default", true}}, &isError);
+            rig.Check(!isError && restored["status"] == "Applied" && restored["row"]["bound"] == false,
+                      what + " default restores the canonical source: " + restored.dump());
+            covered.push_back(test.Attribute);
+        }
+        // The cases cover the schema's attribute enum, which the runtime table generates.
+        const auto tools = c.Request("tools/list")["result"]["tools"];
+        for (const auto& tool : tools)
+            if (tool["name"] == "bind_attribute")
+                rig.Check(tool["inputSchema"]["properties"]["attribute"]["enum"] == Json(covered),
+                          "every attribute is covered: " + tool["inputSchema"].dump());
+
+        const auto halfedge = c.Request("tools/call", {{"name", "show_property"}, {"arguments", {{"entity", mesh}, {"name", "hscalar"}}}});
+        rig.Check(halfedge["result"]["structuredContent"]["error"]["code"] == "unsupported_render_attribute",
+                  "the overlay has no halfedge lane: " + halfedge.dump());
+        const auto noGeometry = c.Request("tools/call", {{"name", "attribute_bindings"}, {"arguments", {{"entity", bare}}}});
+        rig.Check(noGeometry["result"]["structuredContent"]["error"]["code"] == "unsupported_geometry_domain",
+                  "an entity without geometry has its own code: " + noGeometry.dump());
+    });
+}

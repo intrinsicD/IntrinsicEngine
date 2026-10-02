@@ -189,7 +189,8 @@ Nothing exists without the launch flag: no module, thread or socket.
   domain: per row the expected type and count, what Default draws (`default`, `canonical_property`), the current
   source (`bound`, `source`, its resolution `status`, `using_fallback` and a `diagnostic` when an authored source no
   longer resolves), the overlay `lane` of Color rows, the compatible `candidates` and the `incompatible` properties
-  with their typed status and reason. Its `attribute` enum and the row documentation in its description are
+  with their typed status and reason (an unknown entity answers `stale_entity`, one without geometry
+  `unsupported_geometry_domain`). Its `attribute` enum and the row documentation in its description are
   generated from `RenderAttributeRules()`. `bind_attribute {entity, attribute, domain}` with exactly one of
   `property` or `default: true` runs the panel's `ApplyEditorAttributeBindingCommand` (one undoable step on the
   attribute's owner: structural stream, Color overlay or point/line render hint; canonical data is never
@@ -197,7 +198,13 @@ Nothing exists without the launch flag: no module, thread or socket.
   code (`unsupported_render_attribute`, `attribute_source_missing`, `attribute_source_type_mismatch`,
   `attribute_source_count_mismatch`, `attribute_source_non_finite`, `stale_entity`; `ErrorCodeFor`) and the
   candidate's reason from the model; malformed arguments end with `invalid_params`. Point sizes and line widths
-  need the lane that draws them shown (`set_visibility`). `set_camera` takes exactly one of: `controller` (orbit, fly, free look, top down;
+  need the lane that draws them shown (`set_visibility`). `show_property` is the Color binding: without
+  `normal_direction` it runs the same `bind_attribute` color path on the property's domain (one Color mechanism,
+  the lane's visualization overlay, as decided in RUNTIME-315), so the last of the two calls wins, `attribute_bindings`
+  reports either one as the Color source, `bind_attribute` color `default: true` clears both, and its refusals carry
+  the same codes; `normal_direction: true` writes the same overlay through the recipe command the Color binding
+  itself uses (normal directions are a display recipe, not a source binding). Halfedge properties have no Color row
+  because the overlay has no halfedge lane. `set_camera` takes exactly one of: `controller` (orbit, fly, free look, top down;
   `ApplyEditorCameraControllerCommand`, like the Camera panel's buttons), `pose` (`position`,
   `target`, optional `up`), `preset` (front, back, left, right, top, bottom, isometric; frames
   `entities`, or everything with world bounds) or `focus: true` (frames `entities`, or the
