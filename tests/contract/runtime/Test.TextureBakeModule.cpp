@@ -16,6 +16,7 @@ import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Error;
+import Extrinsic.Core.Tasks;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
@@ -29,6 +30,7 @@ import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
 import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.FramePacingDiagnostics;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.ParameterizationOperations;
@@ -134,6 +136,24 @@ namespace
     // operational mock device, so requests run the real validation and
     // scheduling path. GPU recording needs a renderer frame and is covered by
     // the gpu;vulkan smoke.
+    // Scheduled bakes submit a run job, which runs on the shared scheduler.
+    struct BakeSchedulerScope
+    {
+        BakeSchedulerScope()
+        {
+            if (Core::Tasks::Scheduler::IsInitialized())
+                Core::Tasks::Scheduler::Shutdown();
+            Core::Tasks::Scheduler::Initialize(1u);
+        }
+        ~BakeSchedulerScope()
+        {
+            Core::Tasks::Scheduler::WaitForAll();
+            Core::Tasks::Scheduler::Shutdown();
+        }
+        BakeSchedulerScope(const BakeSchedulerScope&) = delete;
+        BakeSchedulerScope& operator=(const BakeSchedulerScope&) = delete;
+    };
+
     struct BakeHarness
     {
         BakeHarness()
@@ -170,6 +190,8 @@ namespace
         {
             Services.BeginRegistration();
             if (!Services.Provide<RHI::IDevice>(Device, "Test.Device").has_value() ||
+                // AsyncWorkModule's service in the engine; the editor session's job surface reads it.
+                !Services.Provide<Runtime::JobService>(Jobs, "Test.Jobs").has_value() ||
                 !Services.Provide<Graphics::IRenderer>(*Renderer, "Test.Renderer").has_value() ||
                 !Services.Provide<Runtime::RenderExtractionCache>(Extraction, "Test.Extraction").has_value())
             {
@@ -227,6 +249,14 @@ namespace
             return *Services.Find<Extrinsic::Assets::AssetService>();
         }
 
+        // Lets the run jobs' (empty) work finish, then drains completions on
+        // this, the main, thread as the engine frame does.
+        void DrainJobs()
+        {
+            Core::Tasks::Scheduler::WaitForAll();
+            (void)Jobs.DrainCompletions(Events);
+        }
+
         // Runs the modules' maintenance phase as one engine frame would.
         void RunMaintenance()
         {
@@ -247,6 +277,8 @@ namespace
                 hook(context);
         }
 
+        // First member: outlives the job service and everything a job reaches.
+        BakeSchedulerScope Scheduler{};
         Extrinsic::Tests::MockDevice Device{};
         std::unique_ptr<Graphics::IRenderer> Renderer{};
         Runtime::RenderExtractionCache Extraction{};
@@ -1279,4 +1311,190 @@ TEST(RuntimeTextureBakeModule, FailedGeneratedAssetIsAPermanentLoadFailureUntilR
     const auto rebaked = harness.Service->Bake(HeatRequest(harness, entity, "heat"));
     ASSERT_EQ(rebaked.Status, PropertyTextureBakeStatus::Scheduled) << rebaked.Diagnostic;
     EXPECT_NE(RecordNamed(harness, entity, "heat").Texture, first.Texture);
+}
+
+// UI-073: a scheduled bake is one run job that its progress readers and its
+// cancel reach. It waits (Running, indeterminate) for the GPU work and ends
+// exactly once, with the bake; a request rejected before scheduling submits
+// nothing.
+TEST(RuntimeTextureBakeModule, ScheduledBakeIsOneRunJobThatEndsWithItsOwnBake)
+{
+    BakeHarness harness{};
+    ASSERT_TRUE(harness.Start());
+    const ECS::EntityHandle entity = MakeSeamedQuad(harness.Scene());
+    const std::uint64_t submittedBefore = harness.Jobs.Stats().SubmittedJobs;
+
+    auto missing = HeatRequest(harness, entity, "missing");
+    missing.Source.Name = "v:absent";
+    const auto rejected = harness.Service->Bake(missing);
+    EXPECT_FALSE(rejected.Succeeded());
+    EXPECT_FALSE(rejected.Job.IsValid());
+    EXPECT_EQ(harness.Jobs.Stats().SubmittedJobs, submittedBefore) << "a rejected request submits no run job";
+
+    const auto first = harness.Service->Bake(HeatRequest(harness, entity, "heat"));
+    ASSERT_EQ(first.Status, PropertyTextureBakeStatus::Scheduled) << first.Diagnostic;
+    ASSERT_TRUE(first.Job.IsValid());
+    harness.DrainJobs();
+    EXPECT_EQ(harness.Jobs.GetState(first.Job), Runtime::JobState::AwaitingApply)
+        << "the run waits for the GPU work without blocking a worker";
+    EXPECT_FALSE(harness.Jobs.GetProgress(first.Job).Determinate) << "one GPU pass: no fraction to report";
+    harness.DrainJobs();
+    EXPECT_EQ(harness.Jobs.GetState(first.Job), Runtime::JobState::AwaitingApply);
+
+    // Supplying the submitter hands the run to the caller's job surface.
+    int submitted = 0;
+    const auto second = harness.Service->Bake(
+        HeatRequest(harness, entity, "heat"),
+        [&](Runtime::JobDesc desc)
+        {
+            ++submitted;
+            return harness.Jobs.Submit(std::move(desc));
+        });
+    ASSERT_EQ(second.Status, PropertyTextureBakeStatus::Scheduled) << second.Diagnostic;
+    EXPECT_EQ(submitted, 1);
+    ASSERT_TRUE(second.Job.IsValid());
+    EXPECT_NE(second.Job, first.Job);
+    harness.DrainJobs();
+    EXPECT_EQ(harness.Jobs.GetState(first.Job), Runtime::JobState::Cancelled)
+        << "a rebake of the same output replaces (cancels) the earlier run";
+    EXPECT_EQ(harness.Jobs.GetState(second.Job), Runtime::JobState::AwaitingApply);
+
+    const auto removed = harness.Service->Remove(Runtime::StableEntityLookup::ToRenderId(entity), "heat");
+    ASSERT_TRUE(removed.Succeeded()) << removed.Diagnostic;
+    harness.DrainJobs();
+    EXPECT_EQ(harness.Jobs.GetState(second.Job), Runtime::JobState::Cancelled);
+}
+
+// Cancelling the run job cancels the bake: the record fails as cancelled and
+// the work is withdrawn on the next sweep. The run ends once.
+TEST(RuntimeTextureBakeModule, CancellingTheRunJobWithdrawsTheBakeOnce)
+{
+    BakeHarness harness{};
+    ASSERT_TRUE(harness.Start());
+    const ECS::EntityHandle entity = MakeSeamedQuad(harness.Scene());
+    const auto other = harness.Service->Bake(HeatRequest(harness, entity, "kept"));
+    const auto bake = harness.Service->Bake(HeatRequest(harness, entity, "heat"));
+    ASSERT_EQ(bake.Status, PropertyTextureBakeStatus::Scheduled) << bake.Diagnostic;
+    ASSERT_EQ(other.Status, PropertyTextureBakeStatus::Scheduled) << other.Diagnostic;
+    harness.DrainJobs();
+
+    const std::uint64_t cancelledBefore = harness.Jobs.Stats().CancelledJobs;
+    ASSERT_TRUE(harness.Jobs.Cancel(bake.Job));
+    harness.DrainJobs();
+    EXPECT_EQ(harness.Jobs.GetState(bake.Job), Runtime::JobState::Cancelled);
+    harness.RunMaintenance();
+    const auto record = RecordNamed(harness, entity, "heat");
+    EXPECT_EQ(record.State, Runtime::PropertyTextureBakeOutputState::Failed);
+    EXPECT_NE(record.Diagnostic.find("cancelled"), std::string::npos) << record.Diagnostic;
+    EXPECT_EQ(RecordNamed(harness, entity, "kept").State, Runtime::PropertyTextureBakeOutputState::Pending);
+    EXPECT_EQ(harness.Jobs.GetState(other.Job), Runtime::JobState::AwaitingApply) << "only the cancelled run ends";
+
+    // A later removal of the cancelled output does not end the run a second time.
+    ASSERT_TRUE(harness.Service->Remove(Runtime::StableEntityLookup::ToRenderId(entity), "heat").Succeeded());
+    harness.DrainJobs();
+    EXPECT_EQ(harness.Jobs.GetState(bake.Job), Runtime::JobState::Cancelled);
+    EXPECT_EQ(harness.Jobs.Stats().CancelledJobs, cancelledBefore + 1u);
+}
+
+// No run waits for work that can no longer finish: device loss, scene
+// replacement and shutdown each end every run.
+TEST(RuntimeTextureBakeModule, RunJobsEndOnDeviceLossSceneReplacementAndShutdown)
+{
+    {
+        BakeHarness harness{};
+        ASSERT_TRUE(harness.Start());
+        const ECS::EntityHandle entity = MakeSeamedQuad(harness.Scene());
+        const auto bake = harness.Service->Bake(HeatRequest(harness, entity, "heat"));
+        ASSERT_EQ(bake.Status, PropertyTextureBakeStatus::Scheduled) << bake.Diagnostic;
+        harness.DrainJobs();
+        harness.Device.Operational = false;
+        harness.RunMaintenance();
+        harness.DrainJobs();
+        EXPECT_EQ(harness.Jobs.GetState(bake.Job), Runtime::JobState::StaleDiscarded) << "device loss fails the run";
+        const auto record = RecordNamed(harness, entity, "heat");
+        EXPECT_EQ(record.State, Runtime::PropertyTextureBakeOutputState::Failed);
+        EXPECT_NE(record.Diagnostic.find("no longer operational"), std::string::npos) << record.Diagnostic;
+        harness.Device.Operational = true;
+    }
+    {
+        BakeHarness harness{};
+        ASSERT_TRUE(harness.Start());
+        const ECS::EntityHandle entity = MakeSeamedQuad(harness.Scene());
+        const auto bake = harness.Service->Bake(HeatRequest(harness, entity, "heat"));
+        ASSERT_EQ(bake.Status, PropertyTextureBakeStatus::Scheduled) << bake.Diagnostic;
+        harness.DrainJobs();
+        ASSERT_TRUE(harness.Document.NewSceneDocument().has_value());
+        harness.DrainJobs();
+        EXPECT_EQ(harness.Jobs.GetState(bake.Job), Runtime::JobState::StaleDiscarded)
+            << "replacing the scene detaches the bake and fails its run";
+    }
+    {
+        BakeHarness harness{};
+        ASSERT_TRUE(harness.Start());
+        const ECS::EntityHandle entity = MakeSeamedQuad(harness.Scene());
+        const auto bake = harness.Service->Bake(HeatRequest(harness, entity, "heat"));
+        ASSERT_EQ(bake.Status, PropertyTextureBakeStatus::Scheduled) << bake.Diagnostic;
+        harness.DrainJobs();
+        harness.Stop();
+        harness.DrainJobs();
+        EXPECT_EQ(harness.Jobs.GetState(bake.Job), Runtime::JobState::StaleDiscarded) << "shutdown fails the run";
+    }
+}
+
+// The editor's bake command submits the run through the session's job
+// surface, so the shared progress read model finds it by token or by the
+// output it writes, only for its own entity, and its cancel ends the bake.
+TEST(RuntimeTextureBakeModule, EditorBakeRunResolvesThroughTheJobSurfaceForItsEntityOnly)
+{
+    BakeHarness harness{};
+    ASSERT_TRUE(harness.Start());
+    const ECS::EntityHandle entity = MakeSeamedQuad(harness.Scene());
+    const ECS::EntityHandle otherEntity = MakeSeamedQuad(harness.Scene());
+    const std::uint32_t id = Runtime::StableEntityLookup::ToRenderId(entity);
+    const std::uint32_t otherId = Runtime::StableEntityLookup::ToRenderId(otherEntity);
+    Runtime::EditorWorkspaceAttachment attachment{};
+    attachment.Attach(harness.Worlds, harness.Services);
+    ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment));
+    const auto visualization = Runtime::PrepareEditorVisualizationEditingFrame(attachment).Commands;
+    const auto processing = Runtime::PrepareEditorProcessingCommands(attachment);
+
+    const auto result = Runtime::ApplyEditorTextureBakeCommand(
+        visualization,
+        Runtime::EditorTextureBakeCommand{
+            .StableEntityId = id,
+            .SourceDomain = GeometryElementDomain::MeshVertex,
+            .PropertyName = "v:heat",
+            .Width = 16u,
+            .Height = 16u,
+            .PaddingTexels = 2u,
+            .OutputName = "heat",
+            .BindGeneratedTexture = false,
+        });
+    ASSERT_TRUE(result.Scheduled) << result.Diagnostic;
+    ASSERT_TRUE(result.Job.IsValid());
+    harness.DrainJobs();
+
+    const auto byToken = Runtime::GetEditorOperationProgress(processing, result.Job);
+    EXPECT_EQ(byToken.State, Runtime::EditorOperationState::Running);
+    EXPECT_FALSE(byToken.Determinate);
+    const auto byOutput = Runtime::GetEditorOperationProgress(
+        processing, Runtime::EditorOutputRef{.EntityId = id, .OutputName = "heat"});
+    EXPECT_EQ(byOutput.State, Runtime::EditorOperationState::Running);
+    EXPECT_EQ(Runtime::GetEditorOperationProgress(
+                  processing, Runtime::EditorOutputRef{.EntityId = otherId, .OutputName = "heat"})
+                  .State,
+              Runtime::EditorOperationState::None);
+    const auto jobs = Runtime::GetEditorJobs(processing);
+    const auto row = std::ranges::find(jobs, result.Job, &Runtime::EditorJobRecord::Token);
+    ASSERT_NE(row, jobs.end()) << "the Jobs window lists the bake";
+    EXPECT_EQ(row->Identity.EntityId, id);
+    EXPECT_EQ(row->Identity.OutputName, "heat");
+
+    EXPECT_EQ(Runtime::CancelEditorJob(processing, result.Job), Runtime::EditorJobCancelStatus::Requested);
+    harness.DrainJobs();
+    EXPECT_EQ(Runtime::GetEditorOperationProgress(processing, result.Job).State,
+              Runtime::EditorOperationState::Cancelled);
+    harness.RunMaintenance();
+    EXPECT_EQ(RecordNamed(harness, entity, "heat").State, Runtime::PropertyTextureBakeOutputState::Failed);
+    attachment.Detach();
 }

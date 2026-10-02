@@ -2640,8 +2640,22 @@ ApplyEditorTextureBakeCommand(
         request.Storage = storage;
         request.EncodingColormap = command.EncodingColormap;
 
+        // The bake's run job goes through the editor job surface, so panels,
+        // the Jobs window and the agent lane find it by token or output and
+        // can cancel it; without a surface the service submits it itself.
+        TextureBakeService::RunJobSubmitter submitRunJob{};
+        if (context.JobCommands.Submit)
+        {
+            submitRunJob = [submit = context.JobCommands.Submit,
+                            identity = EditorJobIdentity{
+                                .EntityId = command.StableEntityId,
+                                .Scope = ToEditorJobScope(command.SourceDomain),
+                                .OutputSemantic = command.TargetSemantic,
+                                .OutputName = request.OutputName,
+                            }](JobDesc desc) { return submit(std::move(desc), identity); };
+        }
         const PropertyTextureBakeResult bake =
-            context.TextureBake->Bake(request);
+            context.TextureBake->Bake(request, std::move(submitRunJob));
         std::optional<PropertyTextureBakeRecord> scheduledOutput{};
         if (bake.Succeeded())
         {

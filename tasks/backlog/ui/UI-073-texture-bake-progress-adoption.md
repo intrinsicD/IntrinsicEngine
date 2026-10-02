@@ -24,8 +24,31 @@ replacing the "Bake pending." overlay text.
 - Left out of UI-069 slice 4 for that reason; the other method panels are
   adopted or synchronous (see the UI-069 note).
 
+- Correction (2026-10-02): the module did not submit to `JobService` at all; a bake is
+  GPU-queue participant work and `PropertyTextureBakeResult::Job` was never set.
+
+## Implementation log
+- Slice 1 (runtime): every scheduled bake submits one run job (`MakeBakeRunJobDesc`, empty
+  work, parked by `IsReadyToApply` until the shared `BakeRun` settles). The queued work owns
+  the run through `BakeRunHandle`, which settles Failed on any path that drops the work
+  (stale target, detach/scene replacement, shutdown, recording failure); Ready settles on
+  publication, a rebake or removal settles Cancelled. The run job's own cancel marks the run
+  abandoned and `WithdrawStoppedWork` (maintenance and both GPU-queue callbacks) withdraws the
+  work, failing the record as cancelled; the same sweep fails all work once the device is no
+  longer operational. The job is submitted after every side-effect-free rejection, so a
+  rejected or retried request submits nothing. `TextureBakeService::Bake` takes an optional
+  `RunJobSubmitter`; `ApplyEditorTextureBakeCommand` passes `EditorJobCommandSurface::Submit`
+  with `EditorJobIdentity{entity, source scope, target semantic, output}`. No fraction is known
+  (one GPU pass), so the run reads indeterminate. A failed run projects as `stale_discarded`
+  until RUNTIME-317 carries diagnostics. Agent parity: the agent lane has no bake tool; its
+  `jobs_*` tools see the run like any editor job. Tests: `RuntimeTextureBakeModule.ScheduledBakeIsOneRunJobThatEndsWithItsOwnBake`,
+  `CancellingTheRunJobWithdrawsTheBakeOnce`, `RunJobsEndOnDeviceLossSceneReplacementAndShutdown`,
+  `EditorBakeRunResolvesThroughTheJobSurfaceForItsEntityOnly` (bake test harnesses now run the
+  shared scheduler and provide `JobService`). Pending: the Ready path (Published) needs a
+  recorded GPU frame; Vulkan evidence (`PropertyTextureBakeGpuSmoke`) is pending on a GPU host.
+
 ## Acceptance criteria
-- [ ] Bake jobs carry a correlation id (or an editor identity) so the progress surface resolves them; the bake worker reports progress where a fraction is known.
+- [x] Bake jobs carry a correlation id (or an editor identity) so the progress surface resolves them; the bake worker reports progress where a fraction is known.
 - [ ] The texture bake controls and the UV texture tab draw the widget through a run slot keyed by the submitted bake, shown for its entity only.
 - [ ] An ImGui test starts a bake and sees the run, then another entity shows nothing.
 

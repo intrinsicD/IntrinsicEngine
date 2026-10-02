@@ -70,6 +70,100 @@ namespace Extrinsic::Runtime
         constexpr std::size_t kMaxRetainedPropertyBakeSourceBytes =
             64u * 1024u * 1024u;
 
+        // How one scheduled bake ended, as its run job reads it. Written and
+        // read on the main thread only (bake frame callbacks, maintenance and
+        // job drains); the first settlement wins, so the run job ends once.
+        struct BakeRun
+        {
+            enum class Outcome : std::uint8_t
+            {
+                Pending,
+                Ready,
+                Failed,
+                Cancelled,
+            };
+            Outcome State{Outcome::Pending};
+            // The run job ended first (cancelled, or dropped at shutdown); the
+            // next sweep withdraws the work it was tracking.
+            bool Abandoned{false};
+
+            void Settle(const Outcome outcome) noexcept
+            {
+                if (State == Outcome::Pending)
+                    State = outcome;
+            }
+        };
+
+        // Owner of a queued bake's run. Every path that drops the work
+        // without settling it (stale target, detach, shutdown, recording or
+        // publication failure) settles it Failed here, so no run job waits
+        // for work that no longer exists.
+        class BakeRunHandle
+        {
+        public:
+            BakeRunHandle() = default;
+            explicit BakeRunHandle(std::shared_ptr<BakeRun> run) noexcept : m_Run(std::move(run)) {}
+            BakeRunHandle(BakeRunHandle&& other) noexcept : m_Run(std::move(other.m_Run)) {}
+            BakeRunHandle& operator=(BakeRunHandle&& other) noexcept
+            {
+                if (this != &other)
+                {
+                    SettleFailed();
+                    m_Run = std::move(other.m_Run);
+                }
+                return *this;
+            }
+            BakeRunHandle(const BakeRunHandle&) = delete;
+            BakeRunHandle& operator=(const BakeRunHandle&) = delete;
+            ~BakeRunHandle() { SettleFailed(); }
+
+            void Settle(const BakeRun::Outcome outcome) noexcept
+            {
+                if (m_Run)
+                    m_Run->Settle(outcome);
+            }
+            [[nodiscard]] bool Abandoned() const noexcept { return m_Run && m_Run->Abandoned; }
+
+        private:
+            void SettleFailed() noexcept { Settle(BakeRun::Outcome::Failed); }
+            std::shared_ptr<BakeRun> m_Run{};
+        };
+
+        // The run job does no CPU work: it parks until the bake settles, then
+        // publishes (Ready), is discarded (Failed) or ends Cancelled. Its own
+        // cancel abandons the bake, which the module withdraws on its next
+        // sweep; the job holds only the shared run, never the service.
+        [[nodiscard]] JobDesc MakeBakeRunJobDesc(
+            const std::shared_ptr<BakeRun>& run,
+            const std::string_view outputName,
+            const WorldHandle world)
+        {
+            JobDesc desc{};
+            desc.DebugName = "Texture bake '" + std::string{outputName} + "'";
+            desc.Scope = world;
+            desc.Work = [](const JobCancellation&) { return JobResultEnvelope::Make(true); };
+            desc.IsReadyToApply = [run] { return run->State != BakeRun::Outcome::Pending; };
+            desc.ValidateBeforeApply = [run]
+            {
+                switch (run->State)
+                {
+                case BakeRun::Outcome::Ready: return JobApplyValidation::Current;
+                case BakeRun::Outcome::Cancelled: return JobApplyValidation::Cancelled;
+                default: return JobApplyValidation::StaleGeneration;
+                }
+            };
+            desc.PublishCompletion = [](KernelEventBus&, const JobResultEnvelope&) { return true; };
+            desc.FinalizeUnpublishedOnMainThread = [run]
+            {
+                if (run->State == BakeRun::Outcome::Pending)
+                {
+                    run->Abandoned = true;
+                    run->Settle(BakeRun::Outcome::Cancelled);
+                }
+            };
+            return desc;
+        }
+
         [[nodiscard]] PropertyTextureBakeResult UnavailableBakeResult()
         {
             return PropertyTextureBakeResult{
@@ -1023,6 +1117,7 @@ namespace Extrinsic::Runtime
             std::uint64_t CacheGeneration{0u};
             std::uint64_t CoverageCacheGeneration{0u};
             std::uint64_t ReadyFrame{0u};
+            BakeRunHandle Run{};
         };
 
         struct PipelineEntry
@@ -1930,6 +2025,8 @@ namespace Extrinsic::Runtime
                     ++index;
                     continue;
                 }
+                // Replaced by a newer bake of this output, or removed.
+                work.Run.Settle(BakeRun::Outcome::Cancelled);
                 FailGpuTextures(work);
                 RetireWorkResources(
                     work,
@@ -2108,7 +2205,8 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] PropertyTextureBakeResult Schedule(
-            const PropertyTextureBakeRequest& request)
+            const PropertyTextureBakeRequest& request,
+            const TextureBakeService::RunJobSubmitter& submitRunJob)
         {
             if (std::optional<PropertyTextureBakeResult> rejected =
                     RejectBeforePreparation(request))
@@ -2189,6 +2287,38 @@ namespace Extrinsic::Runtime
                         "existing generated texture is owned by another bake record",
                 };
             }
+            // Every rejection that needs no side effect is behind us: the run
+            // job is submitted before any asset is created or reloaded, and a
+            // later failure ends it as failed.
+            auto run = std::make_shared<BakeRun>();
+            JobDesc runJob = MakeBakeRunJobDesc(run, prepared.OutputName, Context.World);
+            const JobToken runToken = submitRunJob
+                ? submitRunJob(std::move(runJob))
+                : Context.Jobs != nullptr ? Context.Jobs->Submit(std::move(runJob)) : JobToken{};
+            if (!runToken.IsValid())
+            {
+                return PropertyTextureBakeResult{
+                    .Status = PropertyTextureBakeStatus::JobSubmitFailed,
+                    .OutputName = prepared.OutputName,
+                    .Diagnostic = "the job service rejected the texture bake's run job",
+                };
+            }
+            BakeRunHandle runHandle{run};
+            PropertyTextureBakeResult scheduled = ScheduleSubmitted(
+                request, std::move(prepared), entity, catalog, found, replacing, std::move(runHandle));
+            scheduled.Job = runToken;
+            return scheduled;
+        }
+
+        [[nodiscard]] PropertyTextureBakeResult ScheduleSubmitted(
+            const PropertyTextureBakeRequest& request,
+            PreparedPropertyBake prepared,
+            const ECS::EntityHandle entity,
+            PropertyTextureBakeOutputs& catalog,
+            std::vector<PropertyTextureBakeRecord>::iterator found,
+            const bool replacing,
+            BakeRunHandle run)
+        {
             std::uint64_t serial = NextAssetSerial++;
             if (serial == 0u)
                 serial = NextAssetSerial++;
@@ -2378,6 +2508,7 @@ namespace Extrinsic::Runtime
                 .Prepared = std::move(prepared),
                 .Width = record.Width,
                 .Height = record.Height,
+                .Run = std::move(run),
             });
 
             return PropertyTextureBakeResult{
@@ -2481,6 +2612,7 @@ namespace Extrinsic::Runtime
 
         void RecordFrameCommands(RHI::ICommandContext& commandContext)
         {
+            WithdrawStoppedWork();
             if (!Available())
                 return;
 
@@ -2744,6 +2876,7 @@ namespace Extrinsic::Runtime
         {
             if (Device == nullptr || GpuAssets == nullptr)
                 return;
+            WithdrawStoppedWork();
             DrainRetiredResources();
             for (std::size_t index = 0u; index < WorkItems.size();)
             {
@@ -2809,6 +2942,7 @@ namespace Extrinsic::Runtime
                     record->State = PropertyTextureBakeOutputState::Ready;
                     record->Diagnostic = "GPU property texture bake ready";
                     RefreshFreshness(work.Entity, *record);
+                    work.Run.Settle(BakeRun::Outcome::Ready);
                 }
                 else if (current)
                 {
@@ -2899,6 +3033,36 @@ namespace Extrinsic::Runtime
                     if (record.Freshness != before)
                         AdvanceGeneration(catalog.Generation);
                 }
+            }
+        }
+
+        // Ends work nothing waits for any more, and work that can never
+        // finish: a bake whose run job was cancelled, and every bake once the
+        // device stopped being operational (no frame records or retires it).
+        // Runs from maintenance and both GPU-queue callbacks, so a cancel is
+        // honoured before the work is recorded or published.
+        void WithdrawStoppedWork()
+        {
+            const bool deviceLost = Device != nullptr && !Device->IsOperational();
+            for (std::size_t index = 0u; index < WorkItems.size();)
+            {
+                Work& work = WorkItems[index];
+                if (!deviceLost && !work.Run.Abandoned())
+                {
+                    ++index;
+                    continue;
+                }
+                FailGpuTextures(work);
+                if (PropertyTextureBakeRecord* record = FindRecord(work.Entity, work.OutputName);
+                    record != nullptr && record->Generation == work.RecordGeneration)
+                {
+                    record->State = PropertyTextureBakeOutputState::Failed;
+                    record->Diagnostic = work.Run.Abandoned()
+                        ? "GPU property texture bake cancelled"
+                        : "GPU property texture bake stopped: the device is no longer operational";
+                }
+                RetireWorkResources(work, work.ReadyFrame != 0u ? work.ReadyFrame : SafeReleaseFrame());
+                WorkItems.erase(WorkItems.begin() + static_cast<std::ptrdiff_t>(index));
             }
         }
 
@@ -3148,7 +3312,8 @@ namespace Extrinsic::Runtime
     }
 
     PropertyTextureBakeResult TextureBakeService::Bake(
-        const PropertyTextureBakeRequest& request)
+        const PropertyTextureBakeRequest& request,
+        RunJobSubmitter submitRunJob)
     {
         if (!m_Impl)
             return UnavailableBakeResult();
@@ -3160,7 +3325,7 @@ namespace Extrinsic::Runtime
                 ++m_Impl->Stats->BakeRequestsRejected;
             return UnavailableBakeResult();
         }
-        PropertyTextureBakeResult result = m_Impl->Schedule(request);
+        PropertyTextureBakeResult result = m_Impl->Schedule(request, submitRunJob);
         if (m_Impl->Stats != nullptr)
         {
             if (result.Succeeded())
@@ -3744,6 +3909,7 @@ namespace Extrinsic::Runtime
                 {
                     if (const auto state = weakState.lock())
                     {
+                        state->Service.m_Impl->WithdrawStoppedWork();
                         if (state->ValidateBinding())
                         {
                             state->Service.m_Impl->RefreshAllFreshness();

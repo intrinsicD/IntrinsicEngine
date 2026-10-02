@@ -170,6 +170,10 @@ namespace Extrinsic::Runtime
         PropertyTextureBakeOutputState State{
             PropertyTextureBakeOutputState::Pending};
         Assets::AssetId GeneratedTexture{};
+        // The scheduled bake's run job: queued until its GPU work is
+        // recorded, Published once the output is Ready, StaleDiscarded when
+        // it fails, Cancelled when it is cancelled or replaced. Invalid
+        // unless `Status` is Scheduled (or the bake failed after scheduling).
         JobToken Job{};
         std::uint64_t Generation{0u};
         std::uint64_t SourceGeneration{0u};
@@ -372,9 +376,18 @@ namespace Extrinsic::Runtime
         TextureBakeService(const TextureBakeService&) = delete;
         TextureBakeService& operator=(const TextureBakeService&) = delete;
 
+        // Submits one bake's run job: its progress and cancel handle. The
+        // editor passes its job surface so the run carries an editor
+        // identity; empty submits it straight to `JobService`.
+        using RunJobSubmitter = std::function<JobToken(JobDesc)>;
+
         [[nodiscard]] bool Available() const noexcept;
+        // A request that passes validation is scheduled together with one run
+        // job (see `PropertyTextureBakeResult::Job`); one that fails earlier
+        // submits nothing. Cancelling the run job cancels the bake.
         [[nodiscard]] PropertyTextureBakeResult Bake(
-            const PropertyTextureBakeRequest& request);
+            const PropertyTextureBakeRequest& request,
+            RunJobSubmitter submitRunJob = {});
         [[nodiscard]] TextureBakeModuleStats Stats() const noexcept;
         // Test seam: replaces the 64 MiB retained source-snapshot budget.
         void SetSourceSnapshotBudgetForTest(std::size_t bytes) noexcept;

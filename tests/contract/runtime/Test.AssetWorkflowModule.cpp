@@ -1012,6 +1012,8 @@ TEST(AssetWorkflowModule,
 TEST(AssetWorkflowModule,
     CallerOwnedBakeReconciliationIsAtomicAndPreservesUnrelatedChannels)
 {
+    // A scheduled bake submits its run job to the shared scheduler.
+    SchedulerScope scheduler;
     DirectHarness harness;
     ASSERT_TRUE(harness.Start().has_value());
 
@@ -1457,6 +1459,8 @@ TEST(AssetWorkflowModule,
 TEST(AssetWorkflowModule,
      DocumentAndWorldReplacementRebindBeforeSceneUse)
 {
+    // A scheduled bake submits its run job to the shared scheduler.
+    SchedulerScope scheduler;
     DirectHarness harness;
     ASSERT_TRUE(harness.Start().has_value());
     harness.Initialized = true;
@@ -2127,6 +2131,8 @@ TEST(AssetWorkflowModule,
 TEST(AssetWorkflowModule,
      BakeParticipantRegistersOncePerBootAndCleansBeforeOwnedState)
 {
+    // A scheduled bake submits its run job to the shared scheduler.
+    SchedulerScope scheduler;
     DirectHarness harness;
     Runtime::AssetWorkflowModule* persistentPipeline =
         nullptr;

@@ -57,6 +57,15 @@ Cancel appears only while a run is active and the
 panel supplies a cancel path (registration's own cancel; editor jobs through the
 surface's `Cancel`).
 
+A property texture bake is GPU-queue work, not a CPU job, so `TextureBakeService::Bake`
+submits one run job per scheduled bake (UI-073): its work is empty and it parks until
+the bake settles, then publishes (Ready), is discarded (failed, including device loss,
+scene replacement and shutdown) or ends cancelled (rebaked, removed, or its own cancel,
+which withdraws the bake on the module's next sweep). The editor's bake command submits
+it through `EditorJobCommandSurface::Submit` under the output's identity, so the token in
+`EditorTextureBakeCommandResult::Job`, the output ref and the Jobs window all reach the
+run; it reports no fraction (one GPU pass) and reads indeterminate.
+
 The surface also lists and cancels editor jobs (RUNTIME-279): `SnapshotAll()` returns
 the `EditorJobRecord` of every job submitted through `Submit` that the job service
 still retains (ordered by token; correlation-only service jobs are not listed), and

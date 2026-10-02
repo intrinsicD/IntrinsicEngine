@@ -631,7 +631,9 @@ export namespace Extrinsic::Runtime
         EditorCommandStatus Status{EditorCommandStatus::NoChange};
         PropertyTextureBakeStatus BakeStatus{PropertyTextureBakeStatus::Success};
         Assets::AssetId GeneratedTexture{};
-        // The selected-mesh bake runs on `JobService`.
+        // The bake's run job (`PropertyTextureBakeResult::Job`), submitted
+        // through `EditorJobCommandSurface::Submit` under the output's identity
+        // when the context has a job surface.
         JobToken Job{};
         bool Scheduled{false};
         bool BoundGeneratedTexture{false};
