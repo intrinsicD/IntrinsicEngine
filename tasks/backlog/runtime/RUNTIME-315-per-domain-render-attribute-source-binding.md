@@ -40,6 +40,13 @@ Positions are not bindable (answer to "can the renderer use another vec3 as posi
 
 Contract review: `geometry.element-domain-sources` (property-name-independent binding, per-domain eligibility, same-domain publication), `geometry.property-coherence` (a bound property's CPU revision must invalidate/upload, GPU residency observes), `runtime.editor-prepared-frame-locality` (visualization editing helpers/command declarations). `graphics.recipe-slot-lookup` is about render-graph recipe slots, not presentation slots; not applicable.
 
+## Operator decisions (2026-10-02)
+- **Model:** unify the existing mechanisms (`VertexChannelBindingSet` + `GeometryPresentationSlotRecipe`) behind one binding command. The VisualizationConfig overlay maps onto it. No parallel new model.
+- **Rebound positions:** picking, culling bounds, BVH/spatial queries and vector-field anchors follow the displayed (bound) positions.
+- **Shading normals:** stay canonical (`v:normal`) or the explicitly bound normal property. They are not recomputed from rebound positions.
+- **Color:** one mechanism only. `show_property` and the panel's Property selection become the Color binding, so there is no precedence conflict.
+- **Size/width:** bind in pixels in this task. Model-space units remain owned by RUNTIME-222. (Default chosen; the operator was not asked.)
+
 ## Control surfaces
 - Config: none new; bindings are authored scene state, saved/loaded with the scene (recipe JSON).
 - UI: `UI-075` (unified Appearance panel) is the paired UI; it must call the same command (UI-parity rule, `docs/architecture/agent-control-lane.md`).

@@ -20,6 +20,7 @@ contracts: [geometry.property-coherence, geometry.element-domain-sources]
 - No `Vk*` types outside the RHI; no new binding model (`RUNTIME-315`); no material texture sources (`GRAPHICS-105`).
 
 ## Context
+- Operator decisions 2026-10-02 (model unification, picking/culling follow displayed positions, canonical normals, single Color mechanism, pixel sizes) are recorded in [RUNTIME-315](../runtime/RUNTIME-315-per-domain-render-attribute-source-binding.md#operator-decisions-2026-10-02).
 - The renderer-side upload is already name-agnostic (`GeometryUploadDesc::PositionBytes`, `NormalBytes`, `PackedVertexColors`, `GpuEntityPointConfig::PointSizeBDA`, `src/graphics/rhi/RHI.Types.cppm:185`); the open graphics questions are the position preview/ring front (`Graphics.GpuWorld.*`, GRAPHICS-156: keyed to the canonical position property today), entity local bounds for culling when the packed positions change, and point/line shaders reading size/width from a bound buffer. Existing Sandbox GPU readback smokes live in `tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp`.
 - Slice 1 starts with an audit; if the graphics layer needs no change, record that and ship only the evidence slices.
 
