@@ -549,6 +549,14 @@ TEST(SandboxProcessingPanels, CoherentPointDriftStepAndApplyReadinessFollowThePh
     }
 }
 
+// UI-060: View > Jobs is a registered window of the shell.
+TEST(SandboxProcessingPanels, JobsWindowIsRegisteredUnderView)
+{
+    PanelHarness h;
+    EXPECT_TRUE(h.Shell.SetEditorWindowOpen("view.jobs", true));
+    EXPECT_TRUE(h.Shell.SetEditorWindowOpen("view.jobs", false));
+}
+
 TEST(SandboxProcessingPanels, GpuTransactionCountersUseOneFormat)
 {
     EXPECT_EQ(Editor::FormatGpuTransactionIo({.UploadBytes = 36, .CacheHits = 1}),

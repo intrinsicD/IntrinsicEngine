@@ -2034,6 +2034,7 @@ namespace Extrinsic::Sandbox::Editor
             double UserCaptureNoticeUntil{0.0};
             std::string UserCaptureNotice{};
             int ScreenshotRegionIndex{0};
+            JobsWindowState JobsState{};
             int ScreenshotPresetIndex{0};
             bool ScreenshotLegend{false};
             Runtime::EditorUiFrameContributionHandle FrameContribution{};
@@ -2298,6 +2299,21 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::End();
             }
 
+            void RegisterJobsWindow()
+            {
+                (void)RegisterEditorWindow(EditorWindowDescriptor{
+                    .Id = "view.jobs",
+                    .MenuPath = {"View"},
+                    .Title = "Jobs",
+                    .Draw = [this](bool& open, const SandboxEditorContext& context)
+                    {
+                        if (ImGui::Begin("Jobs", &open))
+                            DrawJobsWindow(context.Processing, JobsState);
+                        ImGui::End();
+                    },
+                });
+            }
+
             void RegisterScreenshotWindow()
             {
                 (void)RegisterEditorWindow(EditorWindowDescriptor{
@@ -2407,6 +2423,7 @@ namespace Extrinsic::Sandbox::Editor
                 Interaction = services.Find<Runtime::SceneInteractionModule>();
                 if (ViewCapture != nullptr)
                     RegisterScreenshotWindow();
+                RegisterJobsWindow();
                 Attachment.Attach(worlds, services);
                 if (!Attachment.IsAttached())
                 {

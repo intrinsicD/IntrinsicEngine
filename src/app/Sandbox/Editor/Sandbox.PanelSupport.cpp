@@ -1891,6 +1891,114 @@ namespace Extrinsic::Sandbox::Editor
         return {.Enabled = true, .DisabledReason = {}};
     }
 
+    void JobsHistory::Observe(const std::span<const Runtime::EditorJobRecord> live, const std::uint64_t epoch)
+    {
+        if (epoch != m_Epoch)
+        {
+            m_Rows.clear();
+            m_Epoch = epoch;
+        }
+        for (const auto& record : live)
+        {
+            const auto known = std::ranges::find(m_Rows, record.Token, &Runtime::EditorJobRecord::Token);
+            if (known != m_Rows.end()) *known = record;
+            else m_Rows.push_back(record);
+        }
+        // A row no longer listed was reaped: keep it when its last seen state was final.
+        std::erase_if(m_Rows, [&](const Runtime::EditorJobRecord& row) {
+            const bool listed = std::ranges::any_of(live, [&](const auto& r) { return r.Token == row.Token; });
+            return !listed && Runtime::IsActiveEditorJobState(row.State);
+        });
+        std::size_t finished = std::ranges::count_if(
+            m_Rows, [](const auto& row) { return !Runtime::IsActiveEditorJobState(row.State); });
+        for (auto it = m_Rows.begin(); finished > kFinishedLimit && it != m_Rows.end();)
+        {
+            if (Runtime::IsActiveEditorJobState(it->State)) { ++it; continue; }
+            it = m_Rows.erase(it);
+            --finished;
+        }
+    }
+
+    std::string FormatJobBackend(const Runtime::EditorJobDomain requested, const Runtime::EditorJobDomain resolved)
+    {
+        const auto name = [](const Runtime::EditorJobDomain domain) {
+            switch (domain)
+            {
+            case Runtime::EditorJobDomain::Cpu: return "CPU";
+            case Runtime::EditorJobDomain::GpuCompute: return "GPU compute";
+            case Runtime::EditorJobDomain::GpuGraphics: return "GPU graphics";
+            case Runtime::EditorJobDomain::Auto: return "Auto";
+            }
+            return "?";
+        };
+        return requested == resolved ? std::string{name(resolved)}
+                                     : std::string{name(requested)} + " -> " + name(resolved);
+    }
+
+    void DrawJobsWindow(const Runtime::EditorProcessingCommands& commands, JobsWindowState& state)
+    {
+        // The scene epoch rides on every progress answer, also for a key that matches nothing.
+        const std::uint64_t epoch = Runtime::GetEditorOperationProgress(commands, Runtime::JobToken{}).Epoch;
+        state.History.Observe(Runtime::GetEditorJobs(commands), epoch);
+        const auto& rows = state.History.Rows();
+        const auto active = std::ranges::count_if(rows, [](const auto& row) { return Runtime::IsActiveEditorJobState(row.State); });
+        ImGui::Text("%zu active, %zu recent", static_cast<std::size_t>(active), rows.size() - static_cast<std::size_t>(active));
+        if (rows.empty())
+            ImGui::TextDisabled("No editor jobs yet.");
+        else if (ImGui::BeginTable("##jobs_table", 9,
+                     ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
+                         ImGuiTableFlags_SizingStretchProp))
+        {
+            for (const char* column : {"Job", "Entity", "Output", "State", "Progress", "Elapsed", "Backend", "Diagnostic", ""})
+                ImGui::TableSetupColumn(column);
+            ImGui::TableHeadersRow();
+            for (auto it = rows.rbegin(); it != rows.rend(); ++it) // newest first
+            {
+                const Runtime::EditorJobRecord& row = *it;
+                const std::string key = std::to_string(row.Token.Index) + "." + std::to_string(row.Token.Generation);
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn(); ImGui::TextUnformatted(row.Name.c_str());
+                ImGui::TableNextColumn(); ImGui::Text("#%u", row.Identity.EntityId);
+                ImGui::TableNextColumn(); ImGui::TextUnformatted(row.Identity.OutputName.c_str());
+                ImGui::TableNextColumn();
+                const std::string_view stateName = Runtime::ToString(row.State);
+                ImGui::TextUnformatted(stateName.data(), stateName.data() + stateName.size());
+                ImGui::TableNextColumn();
+                DrawOperationProgress(Runtime::ProjectEditorOperationProgress(row), {}, ("job_progress" + key).c_str());
+                ImGui::TableNextColumn(); ImGui::Text("%.1f s", static_cast<double>(row.ElapsedMilliseconds) / 1000.0);
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(FormatJobBackend(row.RequestedJobDomain, row.ResolvedJobDomain).c_str());
+                ImGui::TableNextColumn();
+                if (row.Diagnostic.empty()) ImGui::TextDisabled("-");
+                else ImGui::TextWrapped("%s", row.Diagnostic.c_str());
+                ImGui::TableNextColumn();
+                if (Runtime::IsActiveEditorJobState(row.State) &&
+                    DrawProcessingActionButton(("Cancel##job" + key).c_str(),
+                                               Runtime::ResolveEditorJobCancelReadiness(commands, row)))
+                {
+                    const auto status = Runtime::CancelEditorJobRun(commands, row);
+                    state.CancelNote = status == Runtime::EditorJobCancelStatus::Requested
+                        ? std::string{} : "Cancel refused: " + std::string{Runtime::ToString(status)};
+                }
+            }
+            ImGui::EndTable();
+        }
+        if (!state.CancelNote.empty()) ImGui::TextWrapped("%s", state.CancelNote.c_str());
+        if (ImGui::CollapsingHeader("Job service counters"))
+        {
+            const Runtime::JobServiceStats stats = Runtime::GetEditorJobStats(commands);
+            ImGui::TextDisabled("All jobs of the service, not only editor jobs.");
+            ImGui::Text("Submitted %llu  rejected %llu  in flight %llu (queued %llu, running %llu, awaiting gate %llu)",
+                        (unsigned long long)stats.SubmittedJobs, (unsigned long long)stats.RejectedJobs,
+                        (unsigned long long)stats.InFlightJobs, (unsigned long long)stats.QueuedJobs,
+                        (unsigned long long)stats.RunningJobs, (unsigned long long)stats.AwaitingGateJobs);
+            ImGui::Text("Completed %llu  published %llu  dropped %llu  cancelled %llu  stale discarded %llu  reaped %llu",
+                        (unsigned long long)stats.CompletedJobs, (unsigned long long)stats.PublishedCompletions,
+                        (unsigned long long)stats.DroppedCompletions, (unsigned long long)stats.CancelledJobs,
+                        (unsigned long long)stats.StaleDiscardedJobs, (unsigned long long)stats.ReapedJobs);
+        }
+    }
+
     Runtime::ActionReadiness ReadinessWhileGpuRunPending(Runtime::ActionReadiness readiness, const bool pending)
     {
         if (pending && readiness.Enabled)

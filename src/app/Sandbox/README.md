@@ -548,6 +548,13 @@ and shows the folder and the last result; a short notice names the saved file. A
 writing a file (read-only), `view_capture` saves inside the allowed roots. On the
 Null backend the controls are disabled with the reason.
 
+## Jobs
+
+**View > Jobs** lists the running and recent editor jobs (name, entity, output, state, progress bar,
+elapsed, requested/resolved backend, diagnostic), newest first, with a **Cancel** on every active row
+that cancels the job's whole run; a disabled Cancel explains why on hover. A collapsed header shows the
+job-service counters. K-Means and consolidation runs are stopped from their own panels.
+
 ## Frame-Pacing Diagnostics
 
 `UI-030` adds an explicit bounded capture mode to `ExtrinsicSandbox`:

@@ -427,7 +427,7 @@ TEST(SandboxEditorPresentation, DefaultDrawStartsWithOnlyMenuBarVisible)
 
     EXPECT_TRUE(ImGuiWindowExists("##MainMenuBar"));
     const auto menu = shell.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), 97u);
+    ASSERT_EQ(menu.size(), 98u);
     for (const Runtime::EditorWindowMenuEntry& entry : menu)
     {
         EXPECT_FALSE(entry.Open) << entry.Id;
@@ -546,7 +546,7 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
     RegisterAllAppPanels(shell, methodPanels, meshProcessingPanels, domainPanels);
 
     const auto menu = shell.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), expected.size() + 10u);
+    ASSERT_EQ(menu.size(), expected.size() + 11u);
     for (const ExpectedWindow& expectedWindow : expected)
     {
         const Runtime::EditorWindowMenuEntry* entry =
@@ -1678,7 +1678,7 @@ TEST(SandboxEditorPresentation, EditorShellStartsWithOnlyBuiltinWindows)
     Editor::EditorShell shell;
     shell.Attach(engine.Worlds(), engine.Services());
     const auto menu = shell.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), 10u);
+    ASSERT_EQ(menu.size(), 11u);
     for (const std::string_view id :
          {"sandbox.shell",
           "scene.hierarchy",
@@ -1689,7 +1689,8 @@ TEST(SandboxEditorPresentation, EditorShellStartsWithOnlyBuiltinWindows)
           "view.frame_graph",
           "view.render_recipes",
           "view.camera_render",
-          "view.geometry_visualization"})
+          "view.geometry_visualization",
+          "view.jobs"})
     {
         EXPECT_NE(FindWindow(menu, id), nullptr) << id;
     }
@@ -1757,7 +1758,7 @@ TEST(SandboxEditorPresentation, ExternalWindowContributionNeedsNoLegacySwitchEnt
     ASSERT_TRUE(handle.IsValid());
 
     const auto menu = shell.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), 11u);
+    ASSERT_EQ(menu.size(), 12u);
     const Runtime::EditorWindowMenuEntry* contributed =
         FindWindow(menu, "graph.analysis.curvature");
     ASSERT_NE(contributed, nullptr);
@@ -1766,7 +1767,7 @@ TEST(SandboxEditorPresentation, ExternalWindowContributionNeedsNoLegacySwitchEnt
     EXPECT_EQ(drawCalls, 0);
 
     EXPECT_TRUE(shell.UnregisterEditorWindow(handle));
-    EXPECT_EQ(shell.BuildEditorWindowMenuModel().size(), 10u);
+    EXPECT_EQ(shell.BuildEditorWindowMenuModel().size(), 11u);
     shell.Detach();
     engine.Shutdown();
 }

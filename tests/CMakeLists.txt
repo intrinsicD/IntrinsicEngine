@@ -1423,6 +1423,7 @@ if(TARGET ExtrinsicSandboxEditor)
             Test.SandboxCurvatureSegmentationPanel.cpp
             Test.SandboxDescriptorAnalysisPanel.cpp
             Test.SandboxProcessingPanels.cpp
+            Test.SandboxJobsWindow.cpp
             Test.SandboxAgentServer.cpp
             Test.EngineConfigSectionSchemas.cpp
             Test.SandboxParameterizationPanel.cpp
@@ -1431,6 +1432,7 @@ if(TARGET ExtrinsicSandboxEditor)
     intrinsic_test_object_lib(SandboxEditorIntegrationTestObjs
         SOURCES
             ${_sandbox_editor_integration_test_sources}
+            support/SandboxEditorJobHarness.cpp
         DEPS ExtrinsicSandboxEditor ExtrinsicRuntime imgui_core_lib
     )
 endif()

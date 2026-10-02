@@ -182,6 +182,9 @@ export namespace Extrinsic::Runtime
         // polling after the run ended can still tell a requested cancel from a
         // stage cancelled because an earlier one failed.
         std::function<bool(JobToken)> RunCancelRequested{};
+        // Counters of the whole job service (asset, scene-file and service jobs included),
+        // for the Jobs window's diagnostics; unbound for a stale attachment.
+        std::function<JobServiceStats()> Stats{};
         // `State::None` for an unknown, stale-epoch or pruned key.
         std::function<EditorOperationProgress(const EditorOperationRunKey&)>
             Progress{};

@@ -3,6 +3,7 @@
 
 #include <chrono>
 #include <unordered_map>
+#include <vector>
 
 import Extrinsic.Core.StrongHandle;
 import Extrinsic.Runtime.JobService;
@@ -45,6 +46,7 @@ namespace Extrinsic::Tests
                            Runtime::EditorJobIdentity,
                            Core::StrongHandleHash<Runtime::JobTokenTag>>
             m_Identities{};
+        std::vector<Runtime::JobToken> m_CancelledRuns{};
         // Destroy the scheduler first, while worker-reachable state is alive.
         // Callers likewise declare the harness after its scene/context.
         SchedulerScope m_Scheduler;

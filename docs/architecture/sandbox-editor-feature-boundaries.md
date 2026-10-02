@@ -72,7 +72,17 @@ runs a `Cancel` was accepted for (`RunCancelRequested`, `IsEditorRunCancelReques
 reaping, so a requested cancel is told apart from a stage cancelled because a dependency failed
 (both end in `JobState::Cancelled`). The memory is cleared on detach, and a cancel of an auxiliary
 job (`EditorJobIdentity::Auxiliary`, such as Coherent Point Drift's Vulkan E-step pump) is not a
-run cancel. Panels answer a duplicate refusal through `OperationRunSlot::WatchDuplicate`: the slot
+run cancel. **View > Jobs** (`view.jobs`, UI-060; `DrawJobsWindow` in `Sandbox.PanelSupport.*`, registered by the shell) lists
+`GetEditorJobs` rows newest first (job, entity, output, state, the shared `DrawOperationProgress` bar, elapsed,
+requested/resolved backend, diagnostic) and keeps the last 32 finished rows itself (`JobsHistory`), since the runtime
+reaps a job a frame after it ends; it drops them with the scene epoch. Each active row has a Cancel that calls
+`CancelEditorJobRun`: it cancels the row's whole run like `notifications/cancelled` (a stage cancelled alone would leave
+later stages to run), except an auxiliary helper job, which cancels only itself. A disabled Cancel shows
+`ResolveEditorJobCancelReadiness`'s reason (already ended, not an editor job, cancel already requested, no attachment).
+Job-service counters (`GetEditorJobStats`, whole service) sit in a collapsed header. K-Means and consolidation runs are not
+listed (not editor-identity jobs); the backend columns show what the job record carries (`EditorJobDomain`, CPU until a
+producer fills them).
+Panels answer a duplicate refusal through `OperationRunSlot::WatchDuplicate`: the slot
 follows the output's active run and shows the refusal, and the panel's last result is untouched.
 K-Means and consolidation jobs belong to their services, so neither the surface nor
 the agent's `jobs_cancel` cancels them. `FindEditorOperationRun(records, key)` is the

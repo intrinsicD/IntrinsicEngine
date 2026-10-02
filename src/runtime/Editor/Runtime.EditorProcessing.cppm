@@ -103,6 +103,16 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::vector<EditorJobRecord> GetEditorJobs(const EditorProcessingCommands&);
     // `EditorJobCommandSurface::Cancel`; `Unavailable` for an unbound or stale handle.
     [[nodiscard]] EditorJobCancelStatus CancelEditorJob(const EditorProcessingCommands&, JobToken token);
+    // `EditorJobCommandSurface::Stats`; zeroed for an unbound or stale handle.
+    [[nodiscard]] JobServiceStats GetEditorJobStats(const EditorProcessingCommands&);
+    // Whether the Jobs window's Cancel applies to `job`, with the runtime's reason when it does not
+    // (already ended, not an editor job, cancel already requested, no attachment).
+    [[nodiscard]] ActionReadiness ResolveEditorJobCancelReadiness(const EditorProcessingCommands&, const EditorJobRecord& job);
+    // Cancels the run `job` belongs to (its head job and every stage queued after it), as the agent's
+    // `notifications/cancelled` does, so no later stage starts on a cancelled run; a helper job
+    // (`EditorJobIdentity::Auxiliary`) cancels only itself because its run goes on. `Requested` when at
+    // least one job accepted the cancel.
+    [[nodiscard]] EditorJobCancelStatus CancelEditorJobRun(const EditorProcessingCommands&, const EditorJobRecord& job);
     // `CancelEditorRuns` over the handle's surface; `Unavailable` for an unbound or stale handle.
     [[nodiscard]] EditorRunCancelCount CancelEditorRunJobs(const EditorProcessingCommands&, std::span<const JobToken> runs);
     // `EditorJobCommandSurface::RunCancelRequested`; false for an unbound or stale handle.

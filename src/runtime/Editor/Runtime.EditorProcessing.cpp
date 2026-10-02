@@ -71,6 +71,35 @@ namespace Extrinsic::Runtime
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
         return context.JobCommands.Cancel ? context.JobCommands.Cancel(token) : EditorJobCancelStatus::Unavailable;
     }
+    JobServiceStats GetEditorJobStats(const EditorProcessingCommands& commands)
+    {
+        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
+        return context.JobCommands.Stats ? context.JobCommands.Stats() : JobServiceStats{};
+    }
+    ActionReadiness ResolveEditorJobCancelReadiness(const EditorProcessingCommands& commands, const EditorJobRecord& job)
+    {
+        const auto& surface = EditorProcessingCommandsAccess::Resolve(commands).JobCommands;
+        if (!IsActiveEditorJobState(job.State))
+            return {false, "The job already ended."};
+        const bool serviceRun = job.CorrelationId != 0u && job.Identity.EntityId == 0u && job.Identity.OutputName.empty();
+        if (serviceRun)
+            return {false, "Not an editor job: K-Means and consolidation runs are stopped from their own panels."};
+        if (!surface.Cancel)
+            return {false, "Job cancel is unavailable. Open an active editor session."};
+        const JobToken run = job.Identity.Run.IsValid() ? job.Identity.Run : job.Token;
+        if (surface.RunCancelRequested && surface.RunCancelRequested(run))
+            return {false, "Cancel already requested; waiting for the job to stop."};
+        return {true, {}};
+    }
+    EditorJobCancelStatus CancelEditorJobRun(const EditorProcessingCommands& commands, const EditorJobRecord& job)
+    {
+        if (job.Identity.Auxiliary)
+            return CancelEditorJob(commands, job.Token);
+        const JobToken run = job.Identity.Run.IsValid() ? job.Identity.Run : job.Token;
+        const EditorRunCancelCount count = CancelEditorRunJobs(commands, std::span<const JobToken>{&run, 1u});
+        if (count.Unavailable) return EditorJobCancelStatus::Unavailable;
+        return count.Requested > 0u ? EditorJobCancelStatus::Requested : EditorJobCancelStatus::NotActive;
+    }
     EditorRunCancelCount CancelEditorRunJobs(const EditorProcessingCommands& commands, const std::span<const JobToken> runs)
     {
         return CancelEditorRuns(EditorProcessingCommandsAccess::Resolve(commands).JobCommands, runs);

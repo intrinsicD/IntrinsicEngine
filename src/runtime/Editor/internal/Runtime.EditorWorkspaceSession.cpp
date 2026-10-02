@@ -699,6 +699,13 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                     }
                     return EditorJobCancelStatus::Requested;
                 };
+            context.JobCommands.Stats =
+                [epoch = m_AttachmentEpoch, this]() -> JobServiceStats
+                {
+                    if (!AttachmentEpochIsActive(epoch) || m_Jobs == nullptr)
+                        return {};
+                    return m_Jobs->Stats();
+                };
             context.JobCommands.RunCancelRequested =
                 [epoch = m_AttachmentEpoch, this](const JobToken run)
                 {

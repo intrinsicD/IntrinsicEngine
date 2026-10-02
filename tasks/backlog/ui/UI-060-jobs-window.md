@@ -30,6 +30,13 @@ Show every running and recent editor job with progress and a Cancel button.
 - [ ] ImGui test drives a long editor job (`SandboxEditorJobHarness`), sees the row, presses Cancel and observes the cancelled state.
 - [ ] `docs/architecture/sandbox-editor-feature-boundaries.md` window list updated.
 
+## Implementation notes (2026-10-02, for review)
+- Cancel semantics (decision): a row's Cancel cancels the row's run (`CancelEditorJobRun` over `CancelEditorRuns`, head = `Identity.Run` or the token), like `notifications/cancelled`, so later stages never start on a cancelled run; the agent's `jobs_cancel` stays token-level. An auxiliary helper job cancels only itself.
+- Runtime additions: `EditorJobCommandSurface::Stats` (epoch-guarded `JobService::Stats`), `GetEditorJobStats`, `ResolveEditorJobCancelReadiness` (reasons: ended, not an editor job, already requested, unavailable), `CancelEditorJobRun`.
+- The runtime reaps finished jobs, so `JobsHistory` keeps the last 32 finished rows and clears on the scene epoch.
+- Known gap: the session fills no `Requested/ResolvedJobDomain` or `Diagnostic` on `EditorJobRecord` yet, so the backend column reads CPU and the diagnostic column is empty for live rows until producers set them.
+- Tests: `Test.SandboxJobsWindow.cpp` (`SandboxJobsWindow.*`, harness-backed ImGui drive: row, Cancel press, disabled reason, cancelled state; run cancel; history/epoch) and `SandboxProcessingPanels.JobsWindowIsRegisteredUnderView`.
+
 ## Verification
 ```bash
 cmake --build --preset ci --target IntrinsicTests

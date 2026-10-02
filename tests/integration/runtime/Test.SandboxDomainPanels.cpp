@@ -156,7 +156,7 @@ TEST(SandboxDomainPanels, RegistersTheNineAppOwnedWindowsWithStableMenuMetadata)
     panels.Register(harness.Shell);
 
     const auto menu = harness.Shell.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), expected.size() + 10u);
+    ASSERT_EQ(menu.size(), expected.size() + 11u);
     for (const ExpectedWindow& expectedWindow : expected)
     {
         const Runtime::EditorWindowMenuEntry* entry =
@@ -176,24 +176,24 @@ TEST(SandboxDomainPanels, RegistrationIsIdempotentAndLifetimeUnregistersEveryWin
     {
         Editor::DomainPanels panels;
         panels.Register(first.Shell);
-        ASSERT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 19u);
+        ASSERT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 20u);
 
         panels.Register(first.Shell);
-        EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 19u);
+        EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 20u);
 
         panels.Register(second.Shell);
-        EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 10u);
-        EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 19u);
+        EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 11u);
+        EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 20u);
 
         panels.Unregister();
-        EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 10u);
+        EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 11u);
 
         panels.Register(second.Shell);
-        ASSERT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 19u);
+        ASSERT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 20u);
     }
 
-    EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 10u);
-    EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 10u);
+    EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 11u);
+    EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 11u);
 }
 
 TEST(SandboxDomainPanels, ClosedRegisteredWindowsBuildNoDomainModels)

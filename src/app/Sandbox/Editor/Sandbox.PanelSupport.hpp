@@ -188,6 +188,34 @@ namespace Extrinsic::Sandbox::Editor
         std::uint64_t m_Epoch{0u};
     };
 
+    // UI-060: the Jobs window's memory. The runtime drops a finished job a frame after it ends, so the
+    // window keeps the last `kFinishedLimit` finished rows it saw; a job that vanished while still
+    // active leaves no row (its outcome was never seen). Everything is dropped when the scene epoch
+    // changes (scene new/load/close, workspace reattach).
+    class JobsHistory
+    {
+    public:
+        static constexpr std::size_t kFinishedLimit = 32u;
+        void Observe(std::span<const Runtime::EditorJobRecord> live, std::uint64_t epoch);
+        // Submission order, oldest first.
+        [[nodiscard]] const std::vector<Runtime::EditorJobRecord>& Rows() const noexcept { return m_Rows; }
+    private:
+        std::vector<Runtime::EditorJobRecord> m_Rows{};
+        std::uint64_t m_Epoch{0u};
+    };
+    struct JobsWindowState
+    {
+        JobsHistory History{};
+        // The last Cancel press whose answer was not `Requested`, shown under the table.
+        std::string CancelNote{};
+    };
+    // The table of running and recent editor jobs with a Cancel per active row (the whole run, see
+    // `CancelEditorJobRun`; a disabled Cancel shows the runtime's reason), and the collapsed job-service
+    // counters. Draws content only; the caller owns the ImGui window.
+    void DrawJobsWindow(const Runtime::EditorProcessingCommands& commands, JobsWindowState& state);
+    // The backend column: one word when requested and resolved agree, else "requested -> resolved".
+    [[nodiscard]] std::string FormatJobBackend(Runtime::EditorJobDomain requested, Runtime::EditorJobDomain resolved);
+
     template <typename Result, typename Sink>
     void PublishCommandResult(std::optional<Result>& destination, Result result, const Sink& sink)
     {

@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdint>
 #include <optional>
 #include <thread>
@@ -62,12 +63,21 @@ namespace Extrinsic::Tests
                     rows.push_back(std::move(job));
             return rows;
         };
+        commands.Stats = [this] { return m_Jobs.Stats(); };
         commands.Cancel = [this](const Runtime::JobToken token)
         {
             if (!m_Identities.contains(token))
                 return Runtime::EditorJobCancelStatus::NotEditorJob;
-            return m_Jobs.Cancel(token) ? Runtime::EditorJobCancelStatus::Requested
-                                        : Runtime::EditorJobCancelStatus::NotActive;
+            if (!m_Jobs.Cancel(token))
+                return Runtime::EditorJobCancelStatus::NotActive;
+            const Runtime::EditorJobIdentity& identity = m_Identities.at(token);
+            if (!identity.Auxiliary)
+                m_CancelledRuns.push_back(identity.Run.IsValid() ? identity.Run : token);
+            return Runtime::EditorJobCancelStatus::Requested;
+        };
+        commands.RunCancelRequested = [this](const Runtime::JobToken run)
+        {
+            return std::find(m_CancelledRuns.begin(), m_CancelledRuns.end(), run) != m_CancelledRuns.end();
         };
         commands.SnapshotEntity =
             [this](const std::uint32_t stableEntityId)
