@@ -39,7 +39,7 @@ Inconsistencies today:
   in MP, which has 17 `BeginDisabled` blocks and no `DrawDisabledReasonTooltip` call.
 
 Coordination, do not duplicate:
-- [UI-069](UI-069-shared-operation-progress-widget.md) owns the shared progress read model and
+- [UI-069](../../done/UI-069-shared-operation-progress-widget.md) owns the shared progress read model and
   widget; this row sits next to it and must reuse its phase/progress data once it lands.
 - [UI-037](../../active/UI-037-linear-domain-action-readiness-tooltips.md) and
   [UI-058](UI-058-all-reasons-readiness-tooltips.md) own readiness content and the all-reasons

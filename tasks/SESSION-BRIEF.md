@@ -75,11 +75,10 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `RUNTIME-284`: `UI-064` — History window (tasks/backlog/ui/UI-064-history-window.md)
 - blocked by `RUNTIME-285`: `UI-065` — Diagnostics / Log window (tasks/backlog/ui/UI-065-diagnostics-log-window.md)
 - blocked by `RUNTIME-286`: `UI-066` — Mesh Health window (tasks/backlog/ui/UI-066-mesh-health-window.md)
-- unblocked: `UI-069` — Shared operation progress read model and panel widget (tasks/backlog/ui/UI-069-shared-operation-progress-widget.md)
 - unblocked: `UI-070` — Camera pose command, view presets and Focus selection (tasks/backlog/ui/UI-070-camera-pose-command-and-controls.md)
 - unblocked: `UI-071` — One Stop/Accept/Discard row and one disabled-reason presentation (tasks/backlog/ui/UI-071-gpu-transaction-controls-and-refusal-presentation.md)
 - unblocked: `UI-072` — Adopt the shared panel helpers (Show buttons, spec-driven widgets) (tasks/backlog/ui/UI-072-adopt-shared-panel-support-helpers.md)
-- blocked by `UI-069`: `UI-073` — Texture bake panels use the shared operation progress widget (tasks/backlog/ui/UI-073-texture-bake-progress-adoption.md)
+- unblocked: `UI-073` — Texture bake panels use the shared operation progress widget (tasks/backlog/ui/UI-073-texture-bake-progress-adoption.md)
 
 ## Theme G — Active bugs
 

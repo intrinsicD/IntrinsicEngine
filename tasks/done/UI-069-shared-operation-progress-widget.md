@@ -12,6 +12,16 @@ contracts: [runtime.editor-prepared-frame-locality, repo.source-documentation]
 ---
 # UI-069 — Shared operation progress read model and panel widget
 
+## Completion — 2026-10-02
+Commit: `b7350b6e5` (last of `cbb8a0c7e`, `1301ce3f3`, `f62dc80e8`, `7bc2a13b7`, `cd6beb59b`, `3f7f25b66`,
+`b7350b6e5` and the review-fix commits between them). One read model
+(`EditorOperationProgress`, `EditorJobCommandSurface::Progress(key)` over a job token, an
+output identity or ref, or a correlation id), one widget and one per-panel pattern
+(`OperationRunSlot`). The agent lane reads the same model (RUNTIME-312 slice 8).
+Panel coverage and exceptions are listed under the acceptance criteria; texture bake moved
+to [UI-073](../backlog/ui/UI-073-texture-bake-progress-adoption.md). CPU/null and ImGui
+tests only: no live Vulkan check. CPUContracted.
+
 ## Goal
 Every Sandbox method panel shows the progress of its own running operation through
 one shared widget. The widget reads one runtime read model, and the agent lane's
@@ -35,14 +45,14 @@ MCP progress notifications read the same model.
   - GPU transactions expose only a phase.
 - Owner: `Runtime.EditorJobProjection.cppm`, which already holds
   `EditorJobRecord`. No new service or registry.
-- Cancel stays with [RUNTIME-279](../runtime/RUNTIME-279-editor-job-snapshot-and-cancel.md).
+- Cancel stays with [RUNTIME-279](../backlog/runtime/RUNTIME-279-editor-job-snapshot-and-cancel.md).
   The read model carries no `CanCancel` until that task adds `Cancel` to the job
   surface; the widget shows Cancel while a run is active and the panel supplies a
   cancel path (registration/CPD now).
-- [UI-060](UI-060-jobs-window.md) should reuse the widget and projection for its
+- [UI-060](../backlog/ui/UI-060-jobs-window.md) should reuse the widget and projection for its
   rows.
 - The agent side is RUNTIME-312 slice 8
-  ([RUNTIME-312](../runtime/RUNTIME-312-agent-lane-mcp-hardening-and-coverage.md)).
+  ([RUNTIME-312](../backlog/runtime/RUNTIME-312-agent-lane-mcp-hardening-and-coverage.md)).
 
 ## Slice plan
 1. **Read model.**
@@ -71,11 +81,11 @@ MCP progress notifications read the same model.
 - [x] The remaining method panels use the widget (through `OperationRunSlot`: the run key is captured at submit, shown for its entity only, a GPU transaction waiting for Accept reads "awaiting accept", Discard forgets), or are listed here:
   - Adopted: normals, outliers, keypoints, descriptors, kernel density, density weights, bilateral filter, point construction, Progressive Poisson, consolidation, K-Means, mesh denoise/remesh/subdivide/simplify, mesh curvature, property smoothing, UV regeneration, ICP, CPD.
   - Synchronous, no job to show: curvature segmentation, geodesics, scalar gradient, harmonic field, Laplacian eigenbasis, scalar ridges, and CPU point sampling (its Vulkan path is a job under the same output key). Point spacing is adopted (its Vulkan transaction is a job). Mesh simplify is adopted with the same code as its siblings but has no panel test of its own (its target-face edit needs a long ImGui script); awaiting-accept is tested through the injected smoothing transaction (no seam exists for a real GPU transaction on the null device).
-  - Left to [UI-073](UI-073-texture-bake-progress-adoption.md): texture bake panels, whose module jobs carry neither identity nor correlation id yet.
+  - Left to [UI-073](../backlog/ui/UI-073-texture-bake-progress-adoption.md): texture bake panels, whose module jobs carry neither identity nor correlation id yet.
 - [x] Tests:
   - projection and lookup contract in `Test.SandboxEditorSessionLifecycle.cpp` (`SandboxEditorJobHarness`): `OperationProgressProjectsQueuedRunningNeverReportedAndOwnJob`, `OperationProgressReportsFailedAndCancelledRuns`, `OperationProgressSeparatesNewerRunsTokensAndCorrelationOnlyJobs`, `OperationProgressResolvesCorrelationKeysToTheRunsOwnJob`, and the real-session `OperationProgressRejectsStaleEpochHandlesAndFindsServiceRunsByCorrelation` (stale epoch, scene epoch). `Test.RuntimeJobService.cpp` covers never-reported and worker reports; `Test.ClusteringModule.cpp` the K-Means run's correlation id and its queued projection; `Test_PointCloud.cpp` (`PointCloud_KMeans`) the iteration observer.
   - ImGui tests in `Test.SandboxProcessingPanels.cpp`: `OperationProgressViewFollowsTheReadModel`, `OperationRunSlotKeepsTheLastFinishedRunUntilTheKeyOrTheSceneChanges`, `OperationProgressWidgetCancelRequiresAnActiveRunAndAHandler` (determinate, indeterminate, None, Cancel visibility and callback), `IterationProgressIsADeterminateFractionOfTheIterationCap`, `KMeansProgressShowsOnlyForTheEntityItRanOn`, `IcpProgressWidgetCancelStopsARunThatNeverConverges` (asserts the cancelled result), `CpdProgressWidgetCancelStopsARunToTheCap` (asserts the Cancelled phase), `DerivedJobCellsAndUvStatusLineShowTheSharedWidget`, and `PropertySmoothingAcceptsOrDiscardsAPendingGpuResult` (accepted run stays "done", discarded one does not, a waiting result reads "awaiting accept"). Slice 4: `OperationRunSlotCapturesTheKeyAtSubmitAndMapsTransactionPhases`, `ReusedExecutionPanelsRejectInvalidRequestsBeforePublishing` (keypoints, descriptors, weights, bilateral, normals: run shown, hidden for another entity), `OutlierPanelShowsItsFinishedRunOnlyForItsEntity`, `PointConstructionPanelShowsItsFinishedRunOnlyForItsEntity`, `KernelDensityPanelShowsItsRunForTheOutputItWrites`, `ProgressivePoissonPanelShowsItsFinishedRun`, `ConsolidationPanelShowsItsFinishedRunOnlyForItsEntity`, `SubdividePanelShowsItsFinishedRunOnlyForItsEntity`, `RemeshPanel...`, `DenoisePanel...`, `CurvaturePanel...` (pins the serialized-command key), and `ARunStartedElsewhereShowsForTheDraftsOutput` (the agent-run fallback); `OperationProgressFindsRunsByEntityAndOutputName` (session lookup).
-- [ ] Docs: `docs/architecture/sandbox-editor-feature-boundaries.md` and the module inventory are current.
+- [x] Docs: `docs/architecture/sandbox-editor-feature-boundaries.md`, `agent-control-lane.md` and the module inventory are current.
 
 ## Verification
 ```bash

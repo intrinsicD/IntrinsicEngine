@@ -14,7 +14,7 @@ contracts: [runtime.editor-prepared-frame-locality, repo.source-documentation]
 
 ## Goal
 The texture bake panels show their run's progress through `OperationRunSlot`
-and `DrawOperationProgress` ([UI-069](UI-069-shared-operation-progress-widget.md)),
+and `DrawOperationProgress` ([UI-069](../../done/UI-069-shared-operation-progress-widget.md)),
 replacing the "Bake pending." overlay text.
 
 ## Context

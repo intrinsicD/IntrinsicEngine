@@ -499,7 +499,7 @@ TEST(SandboxAgentServer, ProgressAndCancelOverTheSocket)
         // Progress: the run reports with its token, then replies with the same id.
         for (int wait = 0; wait < 500 && !blockerStarted.load(); ++wait) std::this_thread::sleep_for(std::chrono::milliseconds(4));
         check(blockerStarted.load(), "the older job is running");
-        configure(40);
+        configure(150); // long enough that frames (and notifications) happen even when workers are fast and the host is loaded
         const int runId = c.Send("tools/call", {{"name", "run_registration"}, {"arguments", {{"method", "cpd"}}},
                                                 {"_meta", {{"progressToken", "run-1"}}}});
         const auto reply = c.Await(runId);

@@ -8,6 +8,23 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-02 — UI-069 shared operation progress read model and panel widget
+
+Retired [UI-069](UI-069-shared-operation-progress-widget.md). No production job ever
+called `ReportProgress`, so jobs read as determinate 0% until they finished and panels showed
+ad-hoc text. `JobProgress` now defaults to indeterminate and workers report through
+`JobCancellation::ReportProgress` (K-Means per iteration, implicit smoothing per solve).
+`EditorJobCommandSurface::Progress(key)` resolves a job token, an output identity or ref, or a
+service run's correlation id (stamped on its jobs) to that run's own job; the shared
+`DrawOperationProgress` and `FormatProgressOverlay` replace the ad-hoc readouts, and each
+panel's `OperationRunSlot` captures the run at submit, shows it only for its entity, keeps the
+finished outcome until the next run, reads a GPU result waiting for Accept as "awaiting
+accept" and forgets a discard. Point-family, mesh topology and curvature, consolidation,
+Progressive Poisson, K-Means, smoothing, UV, ICP and CPD panels adopt it; synchronous methods
+have nothing to show and texture bake is left to UI-073. The agent lane's progress
+notifications read the same model (RUNTIME-312 slice 8). CPU/null and ImGui tests only.
+Commits `cbb8a0c7e` through `b7350b6e5`.
+
 ## 2026-10-02 — BUG-230 topology edits drop user properties
 
 Retired [BUG-230](BUG-230-topology-edits-drop-user-properties.md). Simplify,
