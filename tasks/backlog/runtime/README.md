@@ -66,7 +66,6 @@ From the 2026-10-01 duplication/consistency audit; each task owns its own scope.
 
 ## Appearance attribute binding
 
-- [RUNTIME-319 — Persist processed geometry properties in scene documents](RUNTIME-319-persist-processed-geometry-properties-in-scene-documents.md)
 
 ## Compilation locality
 

@@ -49,9 +49,19 @@ contracts: [geometry.element-domain-sources, geometry.property-coherence]
   property resolves after reload (`StaleAttributeBindings == 0`).
 
 ## Acceptance criteria
-- [ ] Every non-topology, non-derived typed property survives save/load bit-exactly on all eight element domains.
-- [ ] Malformed or oversized property tables reject the document without partial mutation.
-- [ ] RUNTIME-315 bindings to processed properties resolve after reload.
+- [x] Every non-topology, non-derived typed property survives save/load bit-exactly on all eight element domains.
+- [x] Malformed or oversized property tables reject the document without partial mutation.
+- [x] RUNTIME-315 bindings to processed properties resolve after reload.
+
+## Completion
+
+Commit: `066f631a8`, `a188a7cfe`, `12ecbdbe5`. Completed 2026-10-02 with an adversarial Opus review and a verification pass.
+- Scene v4 persists every non-topology, non-derived typed property on all element domains as strict base64. The round trip is bit-exact.
+- Malformed tables reject the whole document without mutating the scene. Canonical names must keep their kind.
+- Derived mirrors (`v:point`, `f:normal`) are excluded on save. Unsaveable or mistyped streams are counted and logged, and never fail the save.
+- Bindings to processed properties resolve after reload.
+- Full CPU suite 5742/5742.
+- Maturity: CPUContracted.
 
 ## Verification
 ```bash

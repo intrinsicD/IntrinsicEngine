@@ -65,7 +65,6 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `CORE-011`: `RUNTIME-285` — Diagnostics stream (log cursor, device status, operation records) (tasks/backlog/runtime/RUNTIME-285-diagnostics-stream.md)
 - blocked by `GEOM-110`: `RUNTIME-286` — Mesh health report (tasks/backlog/runtime/RUNTIME-286-mesh-health-report.md)
 - unblocked: `RUNTIME-314` — Reuse existing runtime helpers instead of local copies (tasks/backlog/runtime/RUNTIME-314-reuse-existing-processing-helpers.md)
-- unblocked: `RUNTIME-319` — Persist processed geometry properties in scene documents (tasks/backlog/runtime/RUNTIME-319-persist-processed-geometry-properties-in-scene-documents.md)
 - blocked by `RUNTIME-277`: `UI-058` — All-reasons readiness tooltip and offending-control markers (tasks/backlog/ui/UI-058-all-reasons-readiness-tooltips.md)
 - blocked by `RUNTIME-278`: `UI-059` — Property Inspector window (tasks/backlog/ui/UI-059-property-inspector-window.md)
 - blocked by `RUNTIME-280`: `UI-061` — Select-by-query controls and "use selection as mask/source" (tasks/backlog/ui/UI-061-select-by-query-controls.md)

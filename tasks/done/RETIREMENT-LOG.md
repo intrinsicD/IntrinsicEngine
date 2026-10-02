@@ -8,6 +8,15 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-02 — RUNTIME-319 processed-property persistence in scene files
+
+Retired [RUNTIME-319](RUNTIME-319-persist-processed-geometry-properties-in-scene-documents.md).
+
+- Scene format v4 persists typed processed and custom properties per element domain, bit-exact and fail-closed on load. Engine-derived mirrors are excluded.
+- Attribute bindings, overlays and recipes that reference such properties now resolve after reload.
+
+Commits `066f631a8`, `a188a7cfe`, `12ecbdbe5`.
+
 ## 2026-10-02 — RUNTIME-317 editor job backend and diagnostic producers
 
 Retired [RUNTIME-317](RUNTIME-317-editor-job-backend-and-diagnostic-producers.md).
