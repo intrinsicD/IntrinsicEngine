@@ -1929,8 +1929,9 @@ namespace Extrinsic::Sandbox::Editor
         int low = std::numeric_limits<int>::lowest(), high = std::numeric_limits<int>::max();
         if (field != nullptr)
         {
-            if (field->Min) low = static_cast<int>(std::max(*field->Min, double(low)));
-            if (field->Max) high = static_cast<int>(std::min(*field->Max, double(high)));
+            // The drag range is the accepted interval: exclusive bounds step inside it.
+            if (field->Min) low = static_cast<int>(Runtime::ClampToConfigFieldRange(*field, double(low)));
+            if (field->Max) high = static_cast<int>(Runtime::ClampToConfigFieldRange(*field, double(high)));
             value = std::clamp(value, low, high);
         }
         const bool changed = ImGui::DragInt(label, &value, speed, low, high, "%d", ImGuiSliderFlags_AlwaysClamp);
@@ -1946,8 +1947,9 @@ namespace Extrinsic::Sandbox::Editor
         double low = std::numeric_limits<double>::lowest(), high = std::numeric_limits<double>::max();
         if (field != nullptr)
         {
-            if (field->Min) low = *field->Min;
-            if (field->Max) high = *field->Max;
+            // The drag range is the accepted interval: exclusive bounds step inside it.
+            if (field->Min) low = Runtime::ClampToConfigFieldRange(*field, low);
+            if (field->Max) high = Runtime::ClampToConfigFieldRange(*field, high);
             value = Runtime::ClampToConfigFieldRange(*field, value);
         }
         const bool changed = ImGui::DragScalar(label, ImGuiDataType_Double, &value, speed, &low, &high, format,

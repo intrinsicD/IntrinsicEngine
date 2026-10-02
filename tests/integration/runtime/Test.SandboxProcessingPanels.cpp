@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <format>
 #include <span>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
@@ -3658,12 +3659,24 @@ TEST(SandboxProcessingPanels, GeodesicsExpansionBudgetClampsToTheSpecRange)
 // out-of-range entry shows the table's bound.
 TEST(SandboxProcessingPanels, TopologyPanelDragsShowTheTableBounds)
 {
-    struct Case { const char* Window; const char* Title; const char* Control; const char* Typed; const char* Shown; };
+    // Each case types a value far past the table's upper bound; the drag must show that bound, read from the
+    // table (not a literal here), in the control's own format.
+    struct Case
+    {
+        const char* Window; const char* Title; const char* Control; const char* Label; const char* Typed;
+        std::span<const R::ConfigFieldSpec> Fields; const char* Field; bool Real;
+    };
     const std::array cases{
-        Case{"mesh.processing.denoise", "Mesh / Processing / Denoise", "Normal iterations##MeshDenoise", "9999999", "{ 4096 } Normal iterations"},
-        Case{"mesh.processing.remesh", "Mesh / Processing / Remesh", "Iterations##MeshRemesh", "500", "{ 64 } Iterations"},
-        Case{"mesh.processing.subdivide", "Mesh / Processing / Subdivide", "Iterations##MeshSubdivide", "500", "{ 10 } Iterations"},
-        Case{"mesh.processing.simplify", "Mesh / Processing / Simplify", "Target faces##MeshSimplify", "2000000000", "{ 1000000000 } Target faces"},
+        Case{"mesh.processing.denoise", "Mesh / Processing / Denoise", "Normal iterations##MeshDenoise", "Normal iterations", "9999999",
+             R::EditorMeshDenoiseFieldSpecs(), "normal_iterations", false},
+        Case{"mesh.processing.denoise", "Mesh / Processing / Denoise", "Sigma spatial##MeshDenoise", "Sigma spatial", "99999999",
+             R::EditorMeshDenoiseFieldSpecs(), "sigma_spatial", true},
+        Case{"mesh.processing.remesh", "Mesh / Processing / Remesh", "Iterations##MeshRemesh", "Iterations", "500",
+             R::EditorMeshRemeshFieldSpecs(), "iterations", false},
+        Case{"mesh.processing.subdivide", "Mesh / Processing / Subdivide", "Iterations##MeshSubdivide", "Iterations", "500",
+             R::EditorMeshSubdivideFieldSpecs(), "iterations", false},
+        Case{"mesh.processing.simplify", "Mesh / Processing / Simplify", "Target faces##MeshSimplify", "Target faces", "2000000000",
+             R::EditorMeshSimplifyFieldSpecs(), "target_faces", false},
     };
     for (const auto& test : cases)
     {
@@ -3690,8 +3703,34 @@ TEST(SandboxProcessingPanels, TopologyPanelDragsShowTheTableBounds)
             }
         };
         h.Engine->Run();
-        EXPECT_NE(drawn.find(test.Shown), std::string::npos) << drawn;
+        const auto* field = R::FindConfigFieldSpec(test.Fields, test.Field);
+        ASSERT_NE(field, nullptr);
+        ASSERT_TRUE(field->Max.has_value());
+        const std::string shown = "{ " + (test.Real ? std::format("{:.3f}", *field->Max) : std::to_string(static_cast<long long>(*field->Max))) +
+                                  " } " + test.Label;
+        EXPECT_NE(drawn.find(shown), std::string::npos) << shown << " in " << drawn;
     }
+}
+
+// An exclusive bound clamps onto the nearest accepted value inside it, so a clamped input is never refused.
+TEST(SandboxProcessingPanels, ConfigFieldClampStepsInsideExclusiveBounds)
+{
+    using Type = R::ConfigFieldType;
+    const R::ConfigFieldSpec real{.Name = "t", .Type = Type::Float, .Min = 0.0, .Max = 1.0, .ExclusiveMin = true, .ExclusiveMax = true};
+    const R::ConfigFieldSpec count{.Name = "n", .Type = Type::UInt, .Min = 0.0, .Max = 10.0, .ExclusiveMin = true, .ExclusiveMax = true};
+    const R::ConfigFieldSpec closed{.Name = "c", .Type = Type::Float, .Min = 0.0, .Max = 1.0};
+    for (const double typed : {-5.0, 0.0, 0.5, 1.0, 7.0})
+    {
+        EXPECT_TRUE(R::AcceptsConfigFieldNumber(real, R::ClampToConfigFieldRange(real, typed))) << typed;
+        EXPECT_TRUE(R::AcceptsConfigFieldNumber(count, R::ClampToConfigFieldRange(count, typed))) << typed;
+    }
+    EXPECT_GT(R::ClampToConfigFieldRange(real, 0.0), 0.0);
+    EXPECT_LT(R::ClampToConfigFieldRange(real, 1.0), 1.0);
+    EXPECT_EQ(R::ClampToConfigFieldRange(real, 0.5), 0.5);
+    EXPECT_EQ(R::ClampToConfigFieldRange(count, 0.0), 1.0);
+    EXPECT_EQ(R::ClampToConfigFieldRange(count, 10.0), 9.0);
+    EXPECT_EQ(R::ClampToConfigFieldRange(closed, 0.0), 0.0) << "an inclusive bound stays the bound";
+    EXPECT_EQ(R::ClampToConfigFieldRange(closed, 2.0), 1.0);
 }
 
 // UI-055: the Coherent Point Drift panel drives a run through its own buttons: Start

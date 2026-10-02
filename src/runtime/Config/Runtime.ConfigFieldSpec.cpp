@@ -1,6 +1,8 @@
 module;
 
 #include <algorithm>
+#include <cmath>
+#include <limits>
 #include <format>
 #include <optional>
 #include <span>
@@ -52,8 +54,21 @@ namespace Extrinsic::Runtime
 
     double ClampToConfigFieldRange(const ConfigFieldSpec& field, double value) noexcept
     {
-        if (field.Min) value = std::max(value, *field.Min);
-        if (field.Max) value = std::min(value, *field.Max);
+        // An exclusive bound clamps to the nearest accepted value inside it: one step for integer
+        // fields, the next representable double for Float ones.
+        const bool real = field.Type == ConfigFieldType::Float;
+        if (field.Min)
+        {
+            const double inside = !field.ExclusiveMin ? *field.Min
+                : real ? std::nextafter(*field.Min, std::numeric_limits<double>::infinity()) : *field.Min + 1.0;
+            value = std::max(value, inside);
+        }
+        if (field.Max)
+        {
+            const double inside = !field.ExclusiveMax ? *field.Max
+                : real ? std::nextafter(*field.Max, -std::numeric_limits<double>::infinity()) : *field.Max - 1.0;
+            value = std::min(value, inside);
+        }
         return value;
     }
 }

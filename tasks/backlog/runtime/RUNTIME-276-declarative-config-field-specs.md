@@ -61,7 +61,7 @@ Remaining: slices B and C.
 ## Required changes
 - [x] `ConfigDetail::BuildSectionSchemaJson(title, description, fields)` and `ConfigDetail::ValidateDeclaredFields(doc, merged, fields, subject)` in `Runtime.FeatureConfigCodecs.Detail.cpp`; `FindConfigFieldSpec` public accessor.
 - [x] Slice A — mesh-field family (smoothing, harmonic field, Laplacian eigenbasis, scalar gradient, geodesics, mesh curvature): tables, generated `SchemaJson`, `Validate` reduced to table check + cross-field rules.
-- [ ] Slice B — point families (normal estimation, outlier analysis, kernel density, point spacing, bilateral filter, keypoints, descriptors, density weight, point construction, registration).
+- [ ] Slice B — point families (normal estimation, outlier analysis, kernel density, point spacing, bilateral filter, keypoints, descriptors, density weight, point construction, registration), including the backend display labels so the Sandbox panels' remaining hard-coded backend combos read them from the owner (UI-072 slice 4).
 - [ ] Slice C — remaining sections (clustering, curvature segmentation, progressive Poisson, parameterization, point-cloud consolidation, physics module, selection).
 - [ ] Registrations in `src/app/Sandbox/Sandbox.ConfigSections.cpp` set `SchemaJson` from the owners.
 
