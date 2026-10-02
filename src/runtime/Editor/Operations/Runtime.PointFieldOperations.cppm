@@ -80,6 +80,8 @@ export namespace Extrinsic::Runtime
     // additional callback. Configured Apply follows the same delivery contract.
     // Fold complete transaction diagnostics into the method result retained by the caller.
     void UpdateEditorPointScalarResult(EditorKernelDensityResult&, const EditorPointScalarTransactionSnapshot&);
+    // Start*Transaction: null handle with the reason in the result when refused; an active job on
+    // the same output answers Pending with the shared "already has an active" message.
     [[nodiscard]] EditorPointScalarTransactionHandle StartEditorKernelDensityTransaction(
         const EditorProcessingCommands&,const KernelDensityConfig&,EditorKernelDensityResult&,
         std::function<void(EditorKernelDensityResult)> onComplete={});

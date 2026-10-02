@@ -87,7 +87,8 @@ export namespace Extrinsic::Runtime
     using EditorNormalTransactionHandle = std::shared_ptr<EditorNormalTransaction>;
     // Validates and captures like the command, then queues the device run. Null with `failure`
     // filled when the request is rejected (an unsupported method/mode, CPU backend, missing device or
-    // residency, or a result for the same output still waiting for Accept or Discard).
+    // residency, or a result for the same output still waiting for Accept or Discard). An active
+    // job on the same output answers Pending with the shared "already has an active" message.
     [[nodiscard]] EditorNormalTransactionHandle StartEditorNormalEstimationTransaction(
         const EditorProcessingCommands&, const NormalEstimationConfig&, EditorNormalEstimationResult& failure);
     [[nodiscard]] EditorNormalTransactionSnapshot SnapshotEditorNormalEstimation(

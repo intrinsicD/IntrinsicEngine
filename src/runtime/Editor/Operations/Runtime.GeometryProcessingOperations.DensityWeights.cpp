@@ -151,7 +151,7 @@ namespace Extrinsic::Runtime
             EditorDensityWeightResult& result,std::function<void(EditorDensityWeightResult)> sink,bool automatic,Graphics::GpuPropertyResidency* test=nullptr, const EditorPointScalarTransactionSnapshot& diagnostics = {})
         {
             EditorPointScalarTransactionSnapshot state;
-            auto run=Detail::StartPointScalarGpu(ctx,w,w->Entity,w->Config.StableEntityId,w->Config.Positions,Params(w->Config,w->Result.QueryRadius),"Estimate density weights",state,
+            auto run=Detail::StartPointScalarGpu(ctx,w,w->Entity,w->Config.StableEntityId,w->Config.Positions,Params(w->Config,w->Result.QueryRadius),"Estimate density weights","Density weights",state,
                 [w,sink=std::move(sink)](EditorPointScalarTransactionSnapshot s){FoldGpu(w->Result,s);if(sink)sink(w->Result);},automatic,test,diagnostics);
             FoldGpu(w->Result,state);result=w->Result;return run;
         }

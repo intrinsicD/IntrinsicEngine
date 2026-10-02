@@ -77,8 +77,8 @@ duplicate to `result_unavailable`; the single status must keep that mapping.
 | Keypoint analysis (CPU) | "A keypoint job ..." -> "Keypoint analysis already has an active ..." | "Keypoint job cancelled or stale; previous outputs retained." -> "Keypoint analysis was cancelled ..." | as descriptors, label "Keypoint analysis" | 2 |
 | Point construction | "A construction job for this source/method is already active." -> "Point construction already has an active ..." | "Construction cancelled or stale; no entity created." -> "Point construction was cancelled ..." | "Construction preparation/GPU/output submission rejected." -> "Point construction job submission was rejected (preparation / Vulkan neighbors)." | 2 |
 | Bilateral filter | "A bilateral filter job for this output is already active." -> "Bilateral filter already has an active ..." | "Bilateral job cancelled or source stale; previous positions retained." -> "Bilateral filter was cancelled ..." | "Bilateral job sequence submission was rejected." -> "Bilateral filter job submission was rejected (<stage debug name>)." | 3 |
-| Vulkan point sampling | new: a second run on the same rank output answers Pending "Vulkan point sampling already has an active <state> job (job i:g)." before any upload or submission, without the callback (before: no guard, two runs raced) | "Vulkan point sampling cancelled or stale; nothing was changed." -> "Vulkan point sampling was cancelled or its source became stale; nothing was applied." | "The job lane rejected the Vulkan point sampling job." -> "Vulkan point sampling job submission was rejected."; still reported through the callback once, as every immediate answer of this operation is | 3 |
-| Scalar device runs (density, radii, density weights; Vulkan start) | InvalidProcessingParameters "Scalar output job is already active." -> Pending "<method label> already has an active <state> job (job i:g)." (no handle) | - | - | 4 |
+| Point sampling | new: while a Vulkan run writes the rank output, a property-output request of either backend answers Pending "Point sampling already has an active <state> job (job i:g)." before any upload or submission, without the callback (before: no guard, runs raced); point-cloud output creates a new entity per run and is never refused (slice 6) | "Vulkan point sampling cancelled or stale; nothing was changed." -> "Vulkan point sampling was cancelled or its source became stale; nothing was applied." | "The job lane rejected the Vulkan point sampling job." -> "Vulkan point sampling job submission was rejected."; still reported through the callback once, as every immediate answer of this operation is | 3 |
+| Scalar device runs (density, radii, density weights; Vulkan start) | InvalidProcessingParameters "Scalar output job is already active." -> Pending "<Density estimation / Radii estimation / Density weights> already has an active <state> job (job i:g)." (no handle; the CPU run's label since slice 6) | - | - | 4 |
 | Keypoints resident (Vulkan compute start) | GeometryProcessingFailed "A keypoint job for this output is already active." -> Pending "Keypoint analysis already has an active ..." (no handle) | - | - | 4 |
 | Outliers (Vulkan start) | Pending "An outlier job for this output is active." -> Pending "Outlier estimation already has an active ..." | - | - | 4 |
 | Normals (Vulkan start) | Pending "A normal job for this output is already active." -> Pending "Normal estimation already has an active ..." | - | - | 4 |
@@ -88,6 +88,17 @@ duplicate to `result_unavailable`; the single status must keep that mapping.
 - `jobs_list` / Jobs window: after a later stage's submission is rejected, the earlier queued stage now
   ends `cancelled` instead of `stale-discarded` (it revalidates as Cancelled), pinned by
   `QueuedEditorJobContract.RejectedLaterStageAbandonsTheQueuedStagesWithoutACallback`.
+- Panels (slice 6): a duplicate refusal (Pending, nothing queued) is shown as a note under the action
+  and the run slot follows the active run; it is no longer stored as the panel's last result, which
+  read "Pending" for good when another caller (an agent) owned the active run. Covers every
+  `DrawProcessingExecution` panel and the Vulkan starts of normals, outliers and smoothing; the
+  keypoint "Detection is active" line now follows the resident transaction. Pinned by
+  `SandboxProcessingPanels.DuplicateRunRefusalIsNotStoredAsThePanelsResult`. Panels that call
+  `ApplyProcessingExecution` directly for CPU runs (normals, outliers, construction, registration,
+  smoothing, eigenbasis, harmonic, curvature, segmentation) still publish a CPU duplicate's Pending answer.
+- Agent lane: `EditorKeypointAgent.AgentDuplicateOfAGuardedRunEndsAsResultUnavailable` (point
+  sampling's guard). Device-gated GPU starts are refused before their guard in a headless session;
+  their Pending-without-callback duplicate answer is pinned by the `DuplicateStartIsPending*` tests.
 - Panel-path rejection: no PanelHarness seam makes the engine job lane reject a submission (JobService
   refuses only with an uninitialized scheduler or while draining); agreed with the reviewer that
   `QueuedEditorJobContract.RejectedSubmissionAnswersOnceWithoutTheCallback` (zero callbacks for every

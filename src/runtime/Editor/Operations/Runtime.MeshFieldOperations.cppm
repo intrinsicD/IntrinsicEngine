@@ -216,7 +216,8 @@ export namespace Extrinsic::Runtime
     using EditorPropertySmoothingTransactionHandle = std::shared_ptr<EditorPropertySmoothingTransaction>;
     // Validates and captures like the command, then queues the device run. Null with `failure`
     // filled when the request is rejected (including while a result for the same output awaits
-    // Accept or Discard). Vulkan backend only.
+    // Accept or Discard). An active job on the same output answers Pending with the shared
+    // "already has an active" message. Vulkan backend only.
     [[nodiscard]] EditorPropertySmoothingTransactionHandle StartEditorPropertySmoothing(
         const EditorProcessingCommands&, std::uint32_t stableEntityId, const PropertySmoothingConfig&,
         EditorPropertySmoothingResult& failure);

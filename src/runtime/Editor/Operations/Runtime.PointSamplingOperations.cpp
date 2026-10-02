@@ -276,6 +276,22 @@ namespace Extrinsic::Runtime
                     ? "No job lane or spatial compute service; sampling ran on the CPU."
                     : PointSamplingGpuUnsupportedReason(params, captured->World.size(), count, context.Device);
             }
+            // The Vulkan run's job is named by the rank output it writes on the source.
+            const EditorJobIdentity identity{.EntityId = config.SourceStableEntityId,
+                                             .Scope = ToEditorJobScope(config.Positions.Domain),
+                                             .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField,
+                                             .OutputName = config.RankName};
+            // Property output: any run (CPU or Vulkan) would overwrite the rank and selection an active
+            // Vulkan run publishes, so a duplicate is refused like every queued editor job (Pending,
+            // the active run keeps its callback). A point-cloud output creates a new entity per run
+            // and conflicts with nothing.
+            if (config.Output != PointSamplingOutput::PointCloud && context.JobCommands.Available())
+                if (auto busy = GPD::MeshSupport::ActiveOutputJobRefusal(context, identity, "Point sampling"))
+                {
+                    result.Status = EditorCommandStatus::Pending;
+                    result.Message = std::move(busy->Message);
+                    return result;
+                }
             if (config.Backend == PointSamplingBackend::Cpu || !result.BackendDiagnostic.empty())
             {
                 const auto start = std::chrono::steady_clock::now();
@@ -285,17 +301,6 @@ namespace Extrinsic::Runtime
             }
 
             // Vulkan: bounded framed chunks, the prefix checked against the CPU before publishing.
-            const EditorJobIdentity identity{.EntityId = config.SourceStableEntityId,
-                                             .Scope = ToEditorJobScope(config.Positions.Domain),
-                                             .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField,
-                                             .OutputName = config.RankName};
-            // A duplicate leaves the active run's callback alone, like every queued editor job.
-            if (auto busy = GPD::MeshSupport::ActiveOutputJobRefusal(context, identity, "Vulkan point sampling"))
-            {
-                result.Status = EditorCommandStatus::Pending;
-                result.Message = std::move(busy->Message);
-                return result;
-            }
             auto* residency = context.SpatialIndices->PropertyResidency();
             if (!residency) return finish(Failure(EditorCommandStatus::GeometryProcessingFailed, "GPU property residency unavailable."));
             const auto before = residency->Stats();

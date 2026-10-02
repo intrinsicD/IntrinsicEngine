@@ -343,6 +343,9 @@ namespace Extrinsic::Sandbox::Editor
         std::optional<Result> LastResult{};
         Config Draft{};
         std::string LastApplied{}, ConfigDiagnostic{}, VisualizationDiagnostic{};
+        // A duplicate submission's refusal ("... already has an active ... job"), shown until the
+        // next submission; never stored as `LastResult` (RUNTIME-313).
+        std::string DuplicateNote{};
         OperationRunSlot Run{};
 
         bool Synchronize(const Config& active, const std::string& serialized)

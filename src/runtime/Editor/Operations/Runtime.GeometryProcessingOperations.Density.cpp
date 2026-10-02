@@ -229,7 +229,7 @@ namespace Extrinsic::Runtime
             typename M::Result& result,std::function<void(typename M::Result)> sink,bool automatic,Graphics::GpuPropertyResidency* test=nullptr, const EditorPointScalarTransactionSnapshot& diagnostics = {})
         {
             EditorPointScalarTransactionSnapshot state;
-            auto run=StartPointScalarGpu(ctx,w,w->Entity,w->Config.StableEntityId,w->Config.Positions,M::Params(w->Config),std::string(M::History),state,
+            auto run=StartPointScalarGpu(ctx,w,w->Entity,w->Config.StableEntityId,w->Config.Positions,M::Params(w->Config),std::string(M::History),Join({M::Noun, " estimation"}),state,
                 [w,sink=std::move(sink)](EditorPointScalarTransactionSnapshot s){FoldGpu<M>(w->Result,s);if(sink)sink(w->Result);},automatic,test,diagnostics);
             FoldGpu<M>(w->Result,state);result=w->Result;return run;
         }

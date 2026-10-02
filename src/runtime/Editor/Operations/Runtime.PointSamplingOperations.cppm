@@ -38,7 +38,9 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] ActionReadiness PreviewEditorPointSamplingCommand(const EditorProcessingCommands&,
                                                                     const PointSamplingOperationConfig&);
     // CPU runs return the final result. A Vulkan run with a job lane and device returns Pending
-    // and delivers the final result to `onComplete` (also called for immediate results).
+    // and delivers the final result to `onComplete` (also called for immediate results). While a
+    // Vulkan run writes the same rank output, a property-output request (either backend) answers
+    // Pending "Point sampling already has an active ... job" without calling `onComplete`.
     [[nodiscard]] EditorPointSamplingResult ApplyEditorPointSamplingCommand(
         const EditorProcessingCommands&, const PointSamplingOperationConfig&,
         std::function<void(EditorPointSamplingResult)> onComplete = {});

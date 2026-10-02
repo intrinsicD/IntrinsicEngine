@@ -37,6 +37,8 @@ import Extrinsic.Runtime.MeshTopologyOperations;
 import Extrinsic.Runtime.ScalarRidgeOperations;
 import Extrinsic.Runtime.PointFieldOperations;
 import Extrinsic.Runtime.PointAnalysisOperations;
+import Extrinsic.Runtime.PointSamplingConfig;
+import Extrinsic.Runtime.PointSamplingOperations;
 import Extrinsic.Runtime.PointSetOperations;
 import Extrinsic.Runtime.PointConstructionOperations;
 import Extrinsic.Runtime.PointCloudServiceOperations;
@@ -2745,6 +2747,7 @@ namespace
         {
             Runtime::RuntimeEngineConfigSectionRegistry sections;
             ASSERT_TRUE(sections.Register(Runtime::MakeKeypointAnalysisConfigSectionRegistration()));
+            ASSERT_TRUE(sections.Register(Runtime::MakePointSamplingConfigSectionRegistration()));
             Engine.EmplaceModule<Runtime::EngineConfigControl>(std::move(sections));
             EditorPointReadiness::SetUp();
         }
@@ -3849,5 +3852,41 @@ TEST_F(EditorKeypointAgent, OnlyARequestedCancelRelabelsTheRunsFailure)
     ASSERT_TRUE(WaitFor([&] {
         (void)jobs.DrainCompletions(Engine.Events());
         return jobs.IsComplete(foreign) && jobs.IsComplete(holder) && jobs.IsComplete(holder2);
+    }));
+}
+
+// RUNTIME-313: a duplicate of a guarded run reaches the agent as every duplicate does: Pending
+// without a callback, so the call ends as result_unavailable with the shared message. Point
+// sampling's guard covers its Vulkan runs and, for a property output, its CPU runs; GPU starts
+// that need an operational device (keypoints resident, scalar, outliers, normals, smoothing) are
+// refused before their guard in a headless session, and their Pending-without-callback answer is
+// pinned by their own DuplicateStartIsPending / DuplicateGpuRequest tests.
+TEST_F(EditorKeypointAgent, AgentDuplicateOfAGuardedRunEndsAsResultUnavailable)
+{
+    ASSERT_TRUE(Runtime::ApplyEditorKeypointAnalysisConfig(Commands, Keypoints).Succeeded());
+    auto& jobs = RequiredEngineService<Runtime::JobService>(Engine);
+    std::atomic_bool release{false};
+    const Runtime::JobToken foreign = jobs.Submit(MakeProgressProbeJob("foreign", release));
+    ASSERT_TRUE(WaitFor([&] { return jobs.GetState(foreign) == Runtime::JobState::Running; }));
+    // A queued run holds the output the sampling request names as its rank.
+    ASSERT_EQ(Runtime::ApplyEditorKeypointAnalysisCommand(Commands, Keypoints).Status, Runtime::EditorCommandStatus::Pending);
+    const Runtime::PointSamplingOperationConfig sampling{.SourceStableEntityId = Keypoints.StableEntityId,
+        .Positions = Keypoints.Positions, .Count = 2u, .Backend = Runtime::PointSamplingBackend::Vulkan,
+        .RankName = Keypoints.Mask.Name};
+    ASSERT_TRUE(Runtime::ApplyEditorPointSamplingConfig(Commands, sampling).Succeeded());
+    Runtime::AgentOperationRegistry registry;
+    Runtime::RegisterEditorAgentOperations(registry);
+    const Runtime::AgentOperationContext context{.Attachment = &Attachment, .Jobs = &jobs};
+    const auto duplicate = Runtime::InvokeAgentOperation(registry, "run_point_sampling", context, "{}", false);
+    EXPECT_TRUE(duplicate.IsError) << duplicate.Text;
+    EXPECT_FALSE(duplicate.Continuation);
+    EXPECT_EQ(duplicate.ErrorCode, "result_unavailable") << duplicate.Text;
+    EXPECT_NE(duplicate.Text.find("Point sampling already has an active"), std::string::npos) << duplicate.Text;
+    release.store(true, std::memory_order_release);
+    ASSERT_TRUE(WaitFor([&] {
+        (void)jobs.DrainCompletions(Engine.Events());
+        const auto records = Runtime::GetEditorJobs(Commands);
+        return jobs.IsComplete(foreign) &&
+               std::none_of(records.begin(), records.end(), [](const auto& job) { return Runtime::IsActiveEditorJobState(job.State); });
     }));
 }

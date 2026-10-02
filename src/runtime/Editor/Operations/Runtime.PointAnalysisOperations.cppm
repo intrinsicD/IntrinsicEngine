@@ -50,6 +50,9 @@ export namespace Extrinsic::Runtime
         std::string AcceptDisabledReason{};
         EditorOutlierAnalysisResult Result{};
     };
+    // Null with `failure` filled when refused; an active job on the same output answers Pending
+    // with the shared "already has an active" message (the same holds for the keypoint and
+    // density-weight Start*Transaction below).
     [[nodiscard]] EditorOutlierTransactionHandle StartEditorOutlierAnalysisTransaction(
         const EditorProcessingCommands&, const OutlierAnalysisConfig&, EditorOutlierAnalysisResult& failure);
     [[nodiscard]] EditorOutlierTransactionSnapshot SnapshotEditorOutlierAnalysis(

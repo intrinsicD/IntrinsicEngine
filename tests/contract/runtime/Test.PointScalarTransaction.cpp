@@ -235,9 +235,11 @@ TEST_P(PointScalarTransaction, DuplicateStartIsPendingWithTheSharedMessage)
     Context.JobCommands.Submit=[&](R::JobDesc,R::EditorJobIdentity){++submissions;return R::JobToken{};};
     Context.JobCommands.FindActive=[](const R::EditorJobIdentity& identity){
         return std::optional{R::EditorJobRecord{.Token=R::JobToken{5,1},.Identity=identity,.State=R::JobState::Running}};};
+    // The same label as the CPU run of each operation.
+    const std::string label=GetParam()==0?"Density estimation":GetParam()==1?"Radii estimation":"Density weights";
     const auto check=[&](const auto& result){
         EXPECT_EQ(result.Status,R::EditorCommandStatus::Pending)<<result.Message;
-        EXPECT_NE(result.Message.find(" already has an active running job (job 5:1)."),std::string::npos)<<result.Message;};
+        EXPECT_EQ(result.Message,label+" already has an active running job (job 5:1).");};
     if(GetParam()==0)check(R::ApplyEditorKernelDensityCommand(Commands(),Density,[&](auto){++callbacks;}));
     else if(GetParam()==1)check(R::ApplyEditorPointSpacingCommand(Commands(),Spacing,[&](auto){++callbacks;}));
     else check(R::ApplyEditorDensityWeightCommand(Commands(),Weight,[&](auto){++callbacks;}));

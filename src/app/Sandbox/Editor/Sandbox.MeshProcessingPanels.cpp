@@ -159,6 +159,16 @@ namespace Extrinsic::Sandbox::Editor
                 sink(std::move(result));
         }
 
+        // True when an editor job exists now that was not among `before`.
+        [[nodiscard]] bool QueuedEditorJob(const Runtime::EditorProcessingCommands& commands,
+                                           const std::vector<Runtime::EditorJobRecord>& before)
+        {
+            for (const auto& job : Runtime::GetEditorJobs(commands))
+                if (std::none_of(before.begin(), before.end(), [&](const auto& old) { return old.Token == job.Token; }))
+                    return true;
+            return false;
+        }
+
         template <typename State, typename Request, typename Apply, typename Execute, typename Sink>
         void ApplyProcessingExecution(State& state, const Request& request,
             Apply apply, Execute execute, const Sink& sink, const char* rejected)
@@ -189,10 +199,31 @@ namespace Extrinsic::Sandbox::Editor
                 std::pair<std::uint32_t, std::string> submitted{};
                 if constexpr (!std::is_null_pointer_v<Watch>)
                     submitted = watch(state.Draft); // named before the run, from what is submitted
-                ApplyProcessingExecution(state, state.Draft, apply, execute, sink, executionRejected);
-                if constexpr (!std::is_null_pointer_v<Watch>)
-                    state.Run.WatchOutputIfQueued(state.LastResult, submitted.first, submitted.second);
+                state.DuplicateNote.clear();
+                const auto before = Runtime::GetEditorJobs(commands);
+                const bool applied = apply(state.Draft).Succeeded();
+                state.ConfigDiagnostic = applied ? "" : executionRejected;
+                if (applied)
+                {
+                    auto result = execute();
+                    // Pending with no new editor job: the output's active run (another click, an
+                    // agent call) refused it and keeps its own callback. Publishing it would leave
+                    // "Pending" behind for good, so note it and follow the active run instead.
+                    if (result.Status == Runtime::EditorCommandStatus::Pending && !QueuedEditorJob(commands, before))
+                    {
+                        state.DuplicateNote = result.Message;
+                        if constexpr (!std::is_null_pointer_v<Watch>)
+                            state.Run.WatchOutput(submitted.first, submitted.second);
+                    }
+                    else
+                    {
+                        PublishCommandResult(state.LastResult, std::move(result), sink);
+                        if constexpr (!std::is_null_pointer_v<Watch>)
+                            state.Run.WatchOutputIfQueued(state.LastResult, submitted.first, submitted.second);
+                    }
+                }
             }
+            if (!state.DuplicateNote.empty()) ImGui::TextWrapped("%s", state.DuplicateNote.c_str());
         }
 
         template<class State,class Sink>
@@ -2063,11 +2094,21 @@ namespace Extrinsic::Sandbox::Editor
                     NormalTransaction.reset(); // a finished transaction is retired before the new one
                     Runtime::EditorNormalEstimationResult failure;
                     NormalTransaction = Runtime::StartEditorNormalEstimationTransaction(context.Normals.Commands, config, failure);
-                    Normals.LastResult = NormalTransaction
-                        ? Runtime::SnapshotEditorNormalEstimation(context.Normals.Commands, NormalTransaction).Result : failure;
-                    // A refused start leaves no handle; the sink keeps its result on screen.
-                    if (!NormalTransaction && context.Normals.ResultSinks.NormalEstimation)
-                        context.Normals.ResultSinks.NormalEstimation(failure);
+                    Normals.DuplicateNote.clear();
+                    // A Pending refusal without a handle: the output's active run keeps its callback.
+                    if (!NormalTransaction && failure.Status == Runtime::EditorCommandStatus::Pending)
+                    {
+                        Normals.DuplicateNote = failure.Message;
+                        Normals.Run.WatchOutput(config.StableEntityId, config.Output.Name);
+                    }
+                    else
+                    {
+                        Normals.LastResult = NormalTransaction
+                            ? Runtime::SnapshotEditorNormalEstimation(context.Normals.Commands, NormalTransaction).Result : failure;
+                        // A refused start leaves no handle; the sink keeps its result on screen.
+                        if (!NormalTransaction && context.Normals.ResultSinks.NormalEstimation)
+                            context.Normals.ResultSinks.NormalEstimation(failure);
+                    }
                 }
             }
             else
@@ -2080,6 +2121,7 @@ namespace Extrinsic::Sandbox::Editor
         Normals.Run.AwaitingAccept(NormalTransaction && transaction.Phase == Phase::ReadyToAccept);
         const Runtime::EditorOutputRef normalsDraft{config.StableEntityId, config.Output.Name};
         Normals.Run.Draw(context.Normals.Commands, config.StableEntityId, "normals_progress", &normalsDraft);
+        if (!Normals.DuplicateNote.empty()) ImGui::TextWrapped("%s", Normals.DuplicateNote.c_str());
         const auto outputProperty = config.Output;
         ImGui::SameLine();
         if (config.Method == Runtime::NormalEstimationMethod::MeshFaceNormals)
@@ -2219,10 +2261,20 @@ namespace Extrinsic::Sandbox::Editor
             {
                 Runtime::EditorOutlierAnalysisResult result;
                 OutlierTransaction = Runtime::StartEditorOutlierAnalysisTransaction(context.PointAnalysis.Commands, analyze, result);
-                Outliers.LastResult = result;
-                // A refused start leaves no handle; the sink keeps its result on screen.
-                if (!OutlierTransaction && context.PointAnalysis.ResultSinks.OutlierAnalysis)
-                    context.PointAnalysis.ResultSinks.OutlierAnalysis(result);
+                Outliers.DuplicateNote.clear();
+                // A Pending refusal without a handle: the output's active run keeps its callback.
+                if (!OutlierTransaction && result.Status == Runtime::EditorCommandStatus::Pending)
+                {
+                    Outliers.DuplicateNote = result.Message;
+                    Outliers.Run.WatchOutput(config.StableEntityId, config.Mask.Name);
+                }
+                else
+                {
+                    Outliers.LastResult = result;
+                    // A refused start leaves no handle; the sink keeps its result on screen.
+                    if (!OutlierTransaction && context.PointAnalysis.ResultSinks.OutlierAnalysis)
+                        context.PointAnalysis.ResultSinks.OutlierAnalysis(result);
+                }
             }
             else execute(analyze);
             Outliers.Run.WatchOutputIfQueued(Outliers.LastResult, config.StableEntityId, config.Mask.Name);
@@ -2231,6 +2283,7 @@ namespace Extrinsic::Sandbox::Editor
         Outliers.Run.AwaitingAccept(OutlierTransaction && transaction.Phase == Runtime::EditorGpuTransactionPhase::ReadyToAccept);
         const Runtime::EditorOutputRef outliersDraft{config.StableEntityId, config.Mask.Name};
         Outliers.Run.Draw(context.PointAnalysis.Commands, config.StableEntityId, "outliers_progress", &outliersDraft);
+        if (!Outliers.DuplicateNote.empty()) ImGui::TextWrapped("%s", Outliers.DuplicateNote.c_str());
         if (outlierActive)
         {
             ImGui::TextWrapped("%s", transaction.Result.Message.c_str());
@@ -2353,7 +2406,7 @@ namespace Extrinsic::Sandbox::Editor
         const Runtime::EditorOutputRef keypointsDraft{config.StableEntityId, config.Mask.Name};
         Keypoints.Run.Draw(context.PointAnalysis.Commands, config.StableEntityId, "keypoints_progress", &keypointsDraft);
         ImGui::TextWrapped("Detection writes a mask (1 = retained keypoint) and a score. Geometry stays in source order.");
-        if(Keypoints.LastResult && Keypoints.LastResult->Status==Runtime::EditorCommandStatus::Pending)
+        if(KeypointTransaction)
             ImGui::TextWrapped("Detection is active. Vulkan previews the completed score; Accept publishes both CPU properties.");
         auto mask=config.Mask,
              score=config.Score;
@@ -3691,8 +3744,16 @@ namespace Extrinsic::Sandbox::Editor
                     SmoothingTransaction.reset();
                     Runtime::EditorPropertySmoothingResult failure;
                     SmoothingTransaction = Runtime::StartEditorPropertySmoothing(context.MeshFields.Commands, model.SelectedStableId, config, failure);
-                    Smoothing.LastResult = SmoothingTransaction
-                        ? Runtime::SnapshotEditorPropertySmoothing(context.MeshFields.Commands, SmoothingTransaction).Result : failure;
+                    Smoothing.DuplicateNote.clear();
+                    // A Pending refusal without a handle: the output's active run keeps its callback.
+                    if (!SmoothingTransaction && failure.Status == Runtime::EditorCommandStatus::Pending)
+                    {
+                        Smoothing.DuplicateNote = failure.Message;
+                        Smoothing.Run.WatchOutput(model.SelectedStableId, config.Output.Name);
+                    }
+                    else
+                        Smoothing.LastResult = SmoothingTransaction
+                            ? Runtime::SnapshotEditorPropertySmoothing(context.MeshFields.Commands, SmoothingTransaction).Result : failure;
                 }
             }
             else
@@ -3703,6 +3764,7 @@ namespace Extrinsic::Sandbox::Editor
             Smoothing.Run.WatchOutputIfQueued(Smoothing.LastResult, model.SelectedStableId, config.Output.Name);
         }
         if (!readiness.Enabled && !readiness.DisabledReason.empty()) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
+        if (!Smoothing.DuplicateNote.empty()) ImGui::TextWrapped("%s", Smoothing.DuplicateNote.c_str());
         if (SmoothingTransaction) DrawSmoothingTransaction(context);
         // The GPU transaction reports its own jobs; a CPU run is found by its output. Either way the
         // finished run stays until the next one.

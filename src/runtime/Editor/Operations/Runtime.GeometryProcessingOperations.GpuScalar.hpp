@@ -8,6 +8,8 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
     [[nodiscard]] EditorPointScalarTransactionHandle StartPointScalarGpu(
         const EditorProcessingContext&,std::shared_ptr<PointScalarCapture>,entt::entity,std::uint32_t stableId,
         GeometryPropertyRef positions,const Graphics::PointScalarGpuParams&,std::string label,
+        // The operation's queued-job label, as its CPU run names it in a duplicate refusal.
+        std::string_view jobLabel,
         EditorPointScalarTransactionSnapshot&,std::function<void(EditorPointScalarTransactionSnapshot)>,bool automatic,
         Graphics::GpuPropertyResidency* testResidency=nullptr,
         const EditorPointScalarTransactionSnapshot& testResult = {});

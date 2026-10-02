@@ -302,10 +302,23 @@ TEST_F(ResidentPointSampling, DuplicateOutputIsRefusedAndCancelUsesTheSharedWord
     };
     const auto duplicate = Start();
     EXPECT_EQ(duplicate.Status, R::EditorCommandStatus::Pending);
-    EXPECT_EQ(duplicate.Message, "Vulkan point sampling already has an active awaiting-apply job (job 7:2).");
+    EXPECT_EQ(duplicate.Message, "Point sampling already has an active awaiting-apply job (job 7:2).");
     EXPECT_FALSE(Queued);
     EXPECT_EQ(duplicate.GpuInputUploadBytes, 0u) << "refused before acquiring device input";
     EXPECT_EQ(Calls, 0u);
+    // A CPU run would overwrite the same rank output too.
+    Config.Backend = R::PointSamplingBackend::Cpu;
+    const auto cpuDuplicate = Start();
+    EXPECT_EQ(cpuDuplicate.Status, R::EditorCommandStatus::Pending);
+    EXPECT_FALSE(Rows().Exists(Config.RankName));
+    EXPECT_EQ(Calls, 0u);
+    // A point-cloud output creates a new entity per run: nothing to refuse.
+    Config.Output = R::PointSamplingOutput::PointCloud;
+    EXPECT_TRUE(Start().Succeeded());
+    EXPECT_EQ(Calls, 1u);
+    Config.Output = R::PointSamplingOutput::Properties;
+    Config.Backend = R::PointSamplingBackend::Vulkan;
+    Calls = 0u;
     S.Context.JobCommands.FindActive = {};
     ASSERT_EQ(Start().Status, R::EditorCommandStatus::Pending);
     ASSERT_TRUE(Queued);

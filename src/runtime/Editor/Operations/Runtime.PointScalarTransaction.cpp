@@ -264,7 +264,7 @@ namespace Extrinsic::Runtime
         }
         EditorPointScalarTransactionHandle StartPointScalarGpu(const EditorProcessingContext& ctx,std::shared_ptr<PointScalarCapture> capture,
             entt::entity entity,std::uint32_t stableId,GeometryPropertyRef positions,const Graphics::PointScalarGpuParams& params,std::string label,
-            EditorPointScalarTransactionSnapshot& result,std::function<void(EditorPointScalarTransactionSnapshot)> sink,bool automatic,Graphics::GpuPropertyResidency* testResidency, const EditorPointScalarTransactionSnapshot& testResult)
+            std::string_view jobLabel,EditorPointScalarTransactionSnapshot& result,std::function<void(EditorPointScalarTransactionSnapshot)> sink,bool automatic,Graphics::GpuPropertyResidency* testResidency, const EditorPointScalarTransactionSnapshot& testResult)
         {
             auto* residency=testResidency?testResidency:(ctx.SpatialIndices?ctx.SpatialIndices->PropertyResidency():nullptr);
             const auto refuse=[&](std::string why)->EditorPointScalarTransactionHandle {result.Status=EditorCommandStatus::InvalidProcessingParameters;result.Message=std::move(why);return {};};
@@ -278,7 +278,7 @@ namespace Extrinsic::Runtime
             if(testResidency){w->Result=testResult;w->Result.LiveCount=w->Capture->LiveCount;w->Back=AcquireGpuPropertyOutput(*residency,ctx.World,entity,w->Capture->Output,std::uint32_t(w->Capture->SlotCount),3);
                 if(!w->Back)return refuse("Test scalar ring allocation failed.");w->Generation=residency->RingGeneration(w->Key);w->Back.reset();
                 if(!residency->Publish(w->Key))return refuse("Test scalar publication failed.");w->TestFront=true;w->Result.Phase=EditorGpuTransactionPhase::ReadyToAccept;result=w->Result;return w;}
-            if(auto busy=MeshSupport::ActiveOutputJobRefusal(ctx,w->Identity,w->Label))
+            if(auto busy=MeshSupport::ActiveOutputJobRefusal(ctx,w->Identity,jobLabel))
             {result.Status=EditorCommandStatus::Pending;result.Message=std::move(busy->Message);return {};}
             std::shared_ptr<const SpatialIndexSnapshot> snapshot;bool reused{};std::string why;
             if(AcquirePointIndex(*ctx.SpatialIndices,ctx.World,entity,w->Positions,w->Capture->Slots,w->Capture->Points,w->Index,snapshot,reused,why)!=PointIndexState::Ready)return refuse(why);
