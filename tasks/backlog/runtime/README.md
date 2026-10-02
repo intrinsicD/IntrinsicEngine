@@ -67,7 +67,6 @@ From the 2026-10-01 duplication/consistency audit; each task owns its own scope.
 
 ## Appearance attribute binding
 
-- [RUNTIME-316 — Agent `bind_attribute` and attribute listing for UI parity](RUNTIME-316-agent-bind-attribute-tool.md)
 - [RUNTIME-319 — Persist processed geometry properties in scene documents](RUNTIME-319-persist-processed-geometry-properties-in-scene-documents.md)
 
 ## Compilation locality

@@ -8,6 +8,16 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-02 — RUNTIME-316 agent attribute-binding tools
+
+Retired [RUNTIME-316](RUNTIME-316-agent-bind-attribute-tool.md).
+
+- Agent tools `attribute_bindings` and `bind_attribute` mirror the Appearance panel's source selectors through the same model and command, with one "Agent: " undo step per call.
+- `show_property` now uses the single Color binding.
+- Maturity: CPUContracted.
+
+Commits `869fae492`, `0744d8c9a`, `a4842bd06`.
+
 ## 2026-10-02 — UI-051 domain-agnostic domain windows
 
 Retired [UI-051](UI-051-domain-agnostic-appearance-properties-selection-windows.md).

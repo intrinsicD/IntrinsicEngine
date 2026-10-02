@@ -20,7 +20,7 @@ contracts: [geometry.element-domain-sources]
 - No change to `show_property` semantics (scalar colormap / vector-as-color, the lane overlay). Amended 2026-10-02 (slice 3): it now delegates to the Color binding (`ApplyEditorAttributeBindingCommand`, which draws through the same visualization recipe path) instead of calling the recipe command itself; `normal_direction` keeps the recipe command.
 
 ## Context
-- Operator decisions 2026-10-02 (model unification, picking/culling follow displayed positions, canonical normals, single Color mechanism, pixel sizes) are recorded in [RUNTIME-315](../../done/RUNTIME-315-per-domain-render-attribute-source-binding.md#operator-decisions-2026-10-02).
+- Operator decisions 2026-10-02 (model unification, picking/culling follow displayed positions, canonical normals, single Color mechanism, pixel sizes) are recorded in [RUNTIME-315](RUNTIME-315-per-domain-render-attribute-source-binding.md#operator-decisions-2026-10-02).
 - Existing tools: `show_property`, `set_visibility` (`src/runtime/Agent/Runtime.AgentOperations.Editor.cpp:695,702`); mutating calls run under `ScopedEditorCommandLabelPrefix("Agent: ")` and are undoable. `domain` arguments share one enum generated from `GeometryElementDomain`.
 - Tool schemas and descriptions are the agent's documentation; document each attribute, its type and domain rules in the schema description.
 
@@ -35,10 +35,20 @@ contracts: [geometry.element-domain-sources]
 3. **`show_property` interplay (~150 lines).** Document and test that `show_property` and `bind_attribute` Color do not fight (which authority wins; a visible diagnostic when both are set).
 
 ## Acceptance criteria
-- [ ] `attribute_bindings` lists every attribute on every domain the entity has, with compatibility reasons.
-- [ ] `bind_attribute` rebinds position/normal/color/texcoord/size/width, refuses incompatible properties with a typed reason, and `default` restores the canonical source.
-- [ ] Each call is one undoable step labeled `Agent: ...`.
-- [ ] Tool schema conformance and agent-lane docs updated.
+- [x] `attribute_bindings` lists every attribute on every domain the entity has, with compatibility reasons.
+- [x] `bind_attribute` rebinds position/normal/color/texcoord/size/width, refuses incompatible properties with a typed reason, and `default` restores the canonical source.
+- [x] Each call is one undoable step labeled `Agent: ...`.
+- [x] Tool schema conformance and agent-lane docs updated.
+
+## Completion
+
+Commit: `869fae492`, `0744d8c9a`, `a4842bd06`. Completed 2026-10-02 with an independent Opus review and a final acceptance check.
+- Full CPU suite 5721/5721.
+- `attribute_bindings` and `bind_attribute` use the panel's binding model and command, with typed error codes. Each call is one "Agent: " undo step.
+- `show_property` without `normal_direction` delegates to the Color binding.
+- Maturity: CPUContracted. Socket tests run against a real engine with the Null window.
+- Graph and point-cloud listings are not exercised over the socket.
+- A GPU-only scalar waiting for Accept cannot be shown through the agent, as before.
 
 ## Verification
 ```bash
