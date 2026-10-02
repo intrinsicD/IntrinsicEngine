@@ -26,6 +26,16 @@ using RUNTIME-277's structured readiness, starting with the Smooth Property pane
   - the sandbox-editor-feature-boundaries "panel's own gating" wording names only Method panels, but MPP now uses `kPendingGpuRunReason` too;
   - the CPD Apply Running reason says "cancel it", but the panel offers Discard.
 
+## Slice log
+- Slice 1 (RUNTIME-277 is not done, so no structured `Reasons` exist yet): the three handed-over MPP controls
+  (Segmentation Show buttons, Geodesics "Use selected vertices as sources", "Clear source property") now show a
+  reason through `DrawProcessingActionButton` (Show buttons via a trailing readiness argument of
+  `DrawProcessingPropertyShowButton`); the boundaries doc covers MPP's own gating; the CPD running reason says
+  Discard; a source scan rejects bare-`BeginDisabled` buttons in MPP and MP. Still open and blocked on
+  RUNTIME-277: the all-reasons tooltip, `DrawReadinessFieldMarker`, Smooth Property field markers and the
+  multi-fault panel test. Left for later: EditorShell and PanelSupport still have bare-`BeginDisabled` buttons
+  (Undo/Redo, New scene, Bake, Disconnect agent, scene draft buttons, screenshot controls) outside the scan.
+
 ## Control surfaces
 - Config: N/A.
 - UI: action tooltip lists all reasons; `DrawReadinessFieldMarker(readiness, "<field>")` next to a control.

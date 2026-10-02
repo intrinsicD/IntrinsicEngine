@@ -1374,10 +1374,12 @@ namespace Extrinsic::Sandbox::Editor
             }, std::function<void(Runtime::EditorCurvatureSegmentationResult)>{}, rejected);
         }
         ImGui::SeparatorText("Display output properties");
-        ImGui::BeginDisabled(!DomainWindowReady(model));
+        const auto displayReadiness = ReadinessUnlessBlocked({
+            {!model.HasSelectedEntity, "Select a mesh entity."},
+            {!model.DomainUsable, "The selected entity has no mesh data to display."}});
         for (const auto* output : {&config.Components, &config.Regions, &config.RegionColors, &config.Boundaries, &config.BoundaryColors, &config.HardFeatures, &config.FeatureConfidence, &config.BoundaryRoles, &config.FeatureColors})
-            DrawProcessingPropertyShowButton(context, model.SelectedStableId, *output, Segmentation.VisualizationDiagnostic);
-        ImGui::EndDisabled();
+            DrawProcessingPropertyShowButton(context, model.SelectedStableId, *output, Segmentation.VisualizationDiagnostic,
+                                             nullptr, false, false, displayReadiness);
         DrawProcessingDisplayDiagnostic(Segmentation.VisualizationDiagnostic);
 
         if (!Segmentation.ConfigDiagnostic.empty())
@@ -4117,13 +4119,13 @@ namespace Extrinsic::Sandbox::Editor
         }
         const auto selected = Runtime::ReadEditorPrimitiveSelection(
             context.Processing, model.SelectedStableId, Runtime::GeometryElementDomain::MeshVertex);
-        ImGui::BeginDisabled(!selected.Usable() || selected.Indices.empty());
-        if (ImGui::Button("Use selected vertices as sources"))
+        if (DrawProcessingActionButton("Use selected vertices as sources",
+                ReadinessUnlessBlocked({{!selected.Usable(), selected.Message},
+                                        {selected.Indices.empty(), "Select mesh vertices first."}})))
         {
             config.SourceVertices = selected.Indices;
             changed = true;
         }
-        ImGui::EndDisabled();
         ImGui::TextDisabled("Select vertices in Mesh / Selection, then copy them here.");
         ImGui::InputInt("Source vertex", &GeodesicsSourceVertex);
         if (ImGui::Button("Add source") && GeodesicsSourceVertex >= 0)
@@ -4160,13 +4162,12 @@ namespace Extrinsic::Sandbox::Editor
         }
         DrawSpecFieldHint(fields, "source_vertex_property");
         ImGui::SameLine();
-        ImGui::BeginDisabled(config.SourceVertexProperty.Name.empty());
-        if (ImGui::Button("Clear##GeodesicsSourceProperty"))
+        if (DrawProcessingActionButton("Clear##GeodesicsSourceProperty",
+                ReadinessUnlessBlocked({{config.SourceVertexProperty.Name.empty(), "No source property is set."}})))
         {
             config.SourceVertexProperty.Name.clear();
             changed = true;
         }
-        ImGui::EndDisabled();
         ImGui::TextDisabled("Nonzero values (e.g. v:feature from Scalar Ridges) add sources.");
         if (ImGui::BeginCombo("Position property", config.PositionProperty.Name.c_str()))
         {

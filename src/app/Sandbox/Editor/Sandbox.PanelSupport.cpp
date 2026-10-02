@@ -276,11 +276,12 @@ namespace Extrinsic::Sandbox::Editor
 
     std::optional<Runtime::EditorCommandStatus> DrawProcessingPropertyShowButton(
         const SandboxEditorContext& context, const std::uint32_t entity, const Runtime::GeometryPropertyRef& property,
-        std::string& diagnostic, const char* const label, const bool normalDirection, const bool forceShow)
+        std::string& diagnostic, const char* const label, const bool normalDirection, const bool forceShow,
+        const Runtime::ActionReadiness& readiness)
     {
         const std::string defaultLabel = "Show " + property.Name;
-        const bool clicked = ImGui::Button(label != nullptr ? label : defaultLabel.c_str());
-        if (!clicked && !forceShow) return std::nullopt;
+        const bool clicked = DrawProcessingActionButton(label != nullptr ? label : defaultLabel.c_str(), readiness);
+        if (!clicked && !(forceShow && readiness.Enabled)) return std::nullopt;
         const auto status = ShowProcessingProperty(context, entity, property, normalDirection);
         diagnostic = Runtime::DebugNameForEditorCommandStatus(status);
         return status;

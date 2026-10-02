@@ -2243,3 +2243,29 @@ TEST(SandboxEditorPresentation, GpuTransactionRowsAreDrawnByTheSharedHelper)
     }
     EXPECT_GE(helperUses, 6u) << "scalar, Outliers, Normals, Smoothing, consolidation and K-Means draw the shared row";
 }
+
+// UI-058: in the processing panels an action button is never left in a bare `BeginDisabled`: a disabled action
+// goes through `DrawProcessingActionButton` (or is followed by `DrawDisabledReasonTooltip`), so its reason shows.
+// Source scan; the other Sandbox files predate the rule and are tracked in UI-058.
+TEST(SandboxEditorPresentation, ProcessingPanelActionButtonsNeverSitInABareBeginDisabled)
+{
+    for (const char* file : {"Sandbox.MeshProcessingPanels.cpp", "Sandbox.MethodPanels.cpp"})
+    {
+        const std::string source = ReadRepositoryTextFile(std::filesystem::path{"src/app/Sandbox/Editor"} / file);
+        ASSERT_FALSE(source.empty()) << file;
+        const std::string_view begin = "ImGui::BeginDisabled(", end = "ImGui::EndDisabled()";
+        for (std::size_t at = source.find(begin); at != std::string::npos; at = source.find(begin, at + 1))
+        {
+            const std::size_t close = source.find(end, at);
+            ASSERT_NE(close, std::string::npos) << file;
+            const std::string block = source.substr(at, close - at);
+            const bool hasButton = block.find("ImGui::Button(") != std::string::npos ||
+                                   block.find("ImGui::SmallButton(") != std::string::npos ||
+                                   block.find("DrawProcessingPropertyShowButton(") != std::string::npos;
+            const bool hasReason = source.substr(at, close - at + 700).find("DrawDisabledReasonTooltip") != std::string::npos;
+            const auto line = std::count(source.begin(), source.begin() + static_cast<std::ptrdiff_t>(at), '\n') + 1;
+            EXPECT_FALSE(hasButton && !hasReason)
+                << file << ":" << line << " draws a button in a bare BeginDisabled; use DrawProcessingActionButton";
+        }
+    }
+}

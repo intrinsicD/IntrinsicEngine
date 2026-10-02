@@ -614,10 +614,13 @@ namespace Extrinsic::Sandbox::Editor
         bool normalDirection = false);
     // Show-property button: label defaults to "Show <property name>". `forceShow` applies the recipe without a
     // click (a follow-the-selector panel); the result is the applied status, empty when nothing was requested.
-    // The status name lands in `diagnostic`; render it with DrawProcessingDisplayDiagnostic.
+    // The status name lands in `diagnostic`; render it with DrawProcessingDisplayDiagnostic. A disabled `readiness`
+    // (the panel's own gating, e.g. via `ReadinessUnlessBlocked`) draws the button disabled with its reason as a
+    // tooltip and neither clicks nor forces a show.
     std::optional<Runtime::EditorCommandStatus> DrawProcessingPropertyShowButton(
         const SandboxEditorContext& context, std::uint32_t entity, const Runtime::GeometryPropertyRef& property,
-        std::string& diagnostic, const char* label = nullptr, bool normalDirection = false, bool forceShow = false);
+        std::string& diagnostic, const char* label = nullptr, bool normalDirection = false, bool forceShow = false,
+        const Runtime::ActionReadiness& readiness = {.Enabled = true, .DisabledReason = {}});
     void DrawProcessingDisplayDiagnostic(const std::string& diagnostic, const char* prefix = "Display");
 
     // Dismissal clears both the panel result and the session slot that

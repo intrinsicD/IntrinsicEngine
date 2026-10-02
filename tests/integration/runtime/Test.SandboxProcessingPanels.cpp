@@ -546,6 +546,9 @@ TEST(SandboxProcessingPanels, CoherentPointDriftStepAndApplyReadinessFollowThePh
         EXPECT_EQ(step.Enabled, c.Step) << R::ToString(c.Phase);
         EXPECT_EQ(apply.Enabled, c.Apply) << R::ToString(c.Phase);
         EXPECT_EQ(step.DisabledReason.empty(), c.Step) << R::ToString(c.Phase);
+        // The panel offers Discard (it cancels a running step), never a "Cancel" button.
+        if (c.Phase == Phase::Running)
+            EXPECT_NE(apply.DisabledReason.find("Discard"), std::string::npos) << apply.DisabledReason;
         EXPECT_EQ(apply.DisabledReason.empty(), c.Apply) << R::ToString(c.Phase);
     }
 }
@@ -710,6 +713,50 @@ TEST(SandboxProcessingPanels, ShowPropertyHelperForwardsNormalDirectionAndProper
                                   : decltype(overrides->Points->Interpretation)::Components);
     }
     ImGui::End();
+}
+
+// UI-058: a Show button disabled by its panel's own gating is drawn disabled, shows the reason on hover and never
+// applies the recipe, not even when the panel follows a selector (`forceShow`).
+TEST(SandboxProcessingPanels, ShowPropertyButtonShowsItsDisabledReasonAndDoesNotApply)
+{
+    TestSupport::ImGuiFrameScope gui;
+    ImGui::GetStyle().HoverFlagsForTooltipMouse = ImGuiHoveredFlags_None;
+    ImGui::GetIO().ConfigInputTrickleEventQueue = false;
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto entity = scene.Create();
+    PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::PointCloudPoint);
+    Editor::SandboxEditorContext context;
+    context.VisualizationCommands = R::BindEditorVisualizationEditingCommands({
+        .Scene = &scene, .VisualizationCommandsAvailable = true});
+    const auto stableId = R::SelectionController::ToStableEntityId(entity);
+    const R::GeometryPropertyRef property{R::GeometryElementDomain::PointCloudPoint, "v:position",
+                                          Geometry::PropertyValueKind::Vec3};
+    std::string diagnostic, logged;
+    bool disabled = false;
+    std::optional<R::EditorCommandStatus> status{};
+    const auto frame = [&](const R::ActionReadiness& readiness)
+    {
+        gui.NextFrame();
+        ImGui::GetIO().AddMousePosEvent(40.0f, 30.0f);
+        ImGui::SetNextWindowPos({0, 0});
+        ImGui::SetNextWindowSize({400, 200});
+        ImGui::Begin("Show gate", nullptr, ImGuiWindowFlags_NoSavedSettings);
+        ImGui::LogToBuffer();
+        status = Editor::DrawProcessingPropertyShowButton(context, stableId, property, diagnostic, "Show it",
+                                                          false, true, readiness);
+        disabled = (ImGui::GetItemFlags() & ImGuiItemFlags_Disabled) != 0;
+        logged = ImGui::GetCurrentContext()->LogBuffer.c_str();
+        ImGui::LogFinish();
+        ImGui::End();
+    };
+    const R::ActionReadiness blocked{.Enabled = false, .DisabledReason = "Select a mesh entity."};
+    for (int i = 0; i != 4; ++i) frame(blocked);
+    EXPECT_TRUE(disabled);
+    EXPECT_FALSE(status.has_value()) << "a blocked button must not force-show";
+    EXPECT_NE(logged.find(blocked.DisabledReason), std::string::npos) << logged;
+    frame({.Enabled = true, .DisabledReason = {}});
+    EXPECT_FALSE(disabled);
+    EXPECT_TRUE(status.has_value());
 }
 
 TEST(SandboxProcessingPanels, FaceOutputsDisplayWithTheirCanonicalDomain)

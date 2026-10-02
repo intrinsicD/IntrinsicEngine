@@ -642,10 +642,12 @@ enabled only while the run works, Accept only when the runtime allows it, Discar
 the transaction is live, and the buttons are `##Family`-suffixed. See also
 [UI-037](../../tasks/active/UI-037-linear-domain-action-readiness-tooltips.md) and
 [UI-058](../../tasks/backlog/ui/UI-058-all-reasons-readiness-tooltips.md), which own the
-readiness content. Method-panel actions disabled by
+readiness content. Method- and mesh-processing-panel actions disabled by
 the panel's own gating (a missing config control, nothing to undo, a draft that does not
-validate) draw through `DrawProcessingActionButton` with `ReadinessUnlessBlocked`, so they
-show the same tooltip; a combo entry or an input disabled by another control's value keeps
+validate, no selection to copy, a live GPU run: `ReadinessWhileGpuRunPending` with
+`kPendingGpuRunReason`) draw through `DrawProcessingActionButton` with `ReadinessUnlessBlocked`, so they
+show the same tooltip (Show-property buttons take the same readiness as a trailing argument; a
+source-scan test rejects an action button in a bare `BeginDisabled` in those two files); a combo entry or an input disabled by another control's value keeps
 its inline note. Outlier detection/removal,
 ICP trajectory application and construction retain their distinct request sequences. Their
 algorithm controls and statistics remain explicit; compatible Show actions use

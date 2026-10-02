@@ -741,7 +741,7 @@ namespace Extrinsic::Runtime
         case Phase::Paused:
         case Phase::Finished: return {true, {}};
         case Phase::Ready: return {false, "Take at least one step before applying."};
-        case Phase::Running: return {false, "Wait for the running step to finish, or cancel it."};
+        case Phase::Running: return {false, "Wait for the running step to finish, or Discard the run."};
         case Phase::Applied: return {false, "The result was already applied."};
         case Phase::Failed:
         case Phase::Cancelled: break;
@@ -817,7 +817,7 @@ namespace Extrinsic::Runtime
     {
         if (!run) return {.Status = EditorCommandStatus::InvalidProcessingParameters, .Message = "No Coherent Point Drift run."};
         if (run->Busy.load())
-            return Failure(run->Config, EditorCommandStatus::Pending, "Wait for the running step to finish, or cancel it.");
+            return Failure(run->Config, EditorCommandStatus::Pending, "Wait for the running step to finish, or Discard the run.");
         return Publish(EditorProcessingCommandsAccess::Resolve(commands), *run);
     }
 
