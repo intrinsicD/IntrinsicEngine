@@ -1149,7 +1149,13 @@ TEST(AssetWorkflowModule,
         default: FAIL() << "unexpected scalar kind";
         }
         albedoRequest.Source.ValueKind = kind;
-        ASSERT_TRUE(baker->Bake(albedoRequest).Succeeded());
+        // BUG-233: the previous bake's generated assets reload on the
+        // scheduler worker, and a re-bake is refused (by contract) until
+        // they are Ready; let those loads finish as a frame would.
+        Core::Tasks::Scheduler::WaitForAll();
+        const auto rebake = baker->Bake(albedoRequest);
+        ASSERT_TRUE(rebake.Succeeded())
+            << Runtime::DebugNameForPropertyTextureBakeStatus(rebake.Status) << ": " << rebake.Diagnostic;
         outputs.Records[0].State = Runtime::PropertyTextureBakeOutputState::Ready;
         pipeline->RunFrameMaintenance();
 

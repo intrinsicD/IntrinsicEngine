@@ -46,3 +46,24 @@ ctest --test-dir build/ci -R 'AssetWorkflowModule|TextureBakeModule' --repeat un
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+## Log
+- 2026-10-02: Root cause. Before UI-073 slice 1 these bake tests ran without a
+  task scheduler, so `AssetService` decoded generated textures inline and every
+  asset was settled when `Bake` returned. UI-073 added a one-worker scheduler
+  (`SchedulerScope`, `BakeSchedulerScope`) for the bakes' run jobs; generated
+  asset (re)loads then run on that worker too, and the tests raced it: a
+  re-bake hit the documented refusal "generated property texture assets are
+  still loading from the previous bake; retry once they are ready"
+  (`PropertyTextureBakeStatus::JobSubmitFailed`), and `ForceReady` forced a
+  state the worker was changing concurrently. The product refusal is intended;
+  the defect was in the tests. Fix: the tests settle the worker before
+  re-baking or forcing generated-asset states
+  (`Core::Tasks::Scheduler::WaitForAll()` in the AssetWorkflowModule re-bake
+  loop and in `ForceReady`); the new deterministic test
+  `RuntimeTextureBakeModule.RebakeWhileTheGeneratedAssetsReloadIsRefusedUntilTheyAreReady`
+  blocks the worker to pin the contract. Evidence: before the fix,
+  `ctest -R 'AssetWorkflowModule|TextureBakeModule' --repeat until-fail:200 -j16`
+  failed (AssetWorkflowModule re-bake at line 1152 and two
+  RuntimeTextureBakeModule `ForceReady`/re-bake assertions); after it, 200
+  repetitions of all 52 tests passed under the same load.

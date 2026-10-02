@@ -1,3 +1,6 @@
+#include <atomic>
+#include <chrono>
+#include <thread>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -146,8 +149,12 @@ namespace
         return *overrides.Surface;
     }
 
+    // BUG-233: generated assets load on the scheduler worker the bake's run
+    // job needs; let in-flight loads finish before reading or forcing a state,
+    // or the worker's own transition races the forced one.
     void ForceReady(Extrinsic::Assets::AssetService& assets, const Extrinsic::Assets::AssetId asset)
     {
+        Core::Tasks::Scheduler::WaitForAll();
         const auto meta = assets.GetMeta(asset);
         ASSERT_TRUE(meta.has_value());
         if (meta->state != Extrinsic::Assets::AssetState::Ready)
@@ -1258,4 +1265,48 @@ TEST(RuntimeTextureBakeModule, EditorBakeRunResolvesThroughTheJobSurfaceForItsEn
     harness.RunMaintenance();
     EXPECT_EQ(RecordNamed(harness, entity, "heat").State, Runtime::PropertyTextureBakeOutputState::Failed);
     attachment.Detach();
+}
+
+// BUG-233: generated assets reload on the scheduler worker that also runs the
+// bakes' run jobs. A re-bake issued while that reload is still in flight is
+// refused by contract ("still loading ... retry"), and accepted once the
+// loads settled. Tests that touch generated-asset states therefore settle the
+// worker first (ForceReady).
+TEST(RuntimeTextureBakeModule, RebakeWhileTheGeneratedAssetsReloadIsRefusedUntilTheyAreReady)
+{
+    BakeHarness harness{};
+    ASSERT_TRUE(harness.Start());
+    const auto entity = MakeSeamedQuad(harness.Scene());
+    auto& assets = harness.Assets();
+    ASSERT_EQ(harness.Service->Bake(HeatRequest(harness, entity, "heat")).Status,
+              PropertyTextureBakeStatus::Scheduled);
+    const auto first = RecordNamed(harness, entity, "heat");
+    ForceReady(assets, first.Texture);
+    ForceReady(assets, first.CoverageTexture);
+
+    std::atomic_bool workerBusy{false};
+    std::atomic_bool releaseWorker{false};
+    Core::Tasks::Scheduler::Dispatch([&] {
+        workerBusy.store(true, std::memory_order_release);
+        while (!releaseWorker.load(std::memory_order_acquire))
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
+    });
+    while (!workerBusy.load(std::memory_order_acquire))
+        std::this_thread::sleep_for(std::chrono::milliseconds{1});
+
+    auto request = HeatRequest(harness, entity, "heat");
+    request.PaddingTexels = 3u;
+    const auto reloading = harness.Service->Bake(request);
+    ASSERT_EQ(reloading.Status, PropertyTextureBakeStatus::Scheduled) << reloading.Diagnostic;
+    request.PaddingTexels = 4u;
+    const auto busy = harness.Service->Bake(request);
+    EXPECT_EQ(busy.Status, PropertyTextureBakeStatus::JobSubmitFailed) << busy.Diagnostic;
+    EXPECT_NE(busy.Diagnostic.find("still loading"), std::string::npos) << busy.Diagnostic;
+
+    releaseWorker.store(true, std::memory_order_release);
+    ForceReady(assets, first.Texture);  // settles the reload first
+    ForceReady(assets, first.CoverageTexture);
+    const auto settled = harness.Service->Bake(request);
+    EXPECT_EQ(settled.Status, PropertyTextureBakeStatus::Scheduled) << settled.Diagnostic;
+    EXPECT_EQ(RecordNamed(harness, entity, "heat").PaddingTexels, 4u);
 }
