@@ -353,6 +353,10 @@ namespace Extrinsic::Sandbox::Editor
         std::string_view Field{};
     };
     [[nodiscard]] Runtime::ActionReadiness ReadinessUnlessBlocked(std::initializer_list<ActionBlocker> blockers);
+    // Why a render-recipe draft action (Validate, Preview, Activate Preview, Cancel) is unavailable in the model's
+    // terms: Validate/Preview need a non-empty draft document, Activate Preview needs a usable preview, anything
+    // else follows the draft state named by `draftState`.
+    [[nodiscard]] std::string RenderRecipeDraftBlockedReason(std::string_view action, std::string_view draftState);
     // The reason every Run action shows while its own GPU transaction is live (running, waiting or accepting).
     inline constexpr std::string_view kPendingGpuRunReason = "Accept or Discard the pending GPU run before starting another.";
     // `readiness` unless the panel's own transaction is live: a runtime refusal keeps its reason, otherwise the

@@ -685,15 +685,15 @@ namespace Extrinsic::Sandbox::Editor
             };
 
             // Panel-own gating: the recipe model reports which draft actions are possible (`Can*`), not why not,
-            // so the reason names the draft state it follows from.
+            // so the reason is derived per action; the state blocker applies only while the commands exist.
             const auto recipeActionReadiness = [&](const bool stateAllows, const char* const action)
             {
-                const std::string stateReason = std::string(action) + " is not available while the draft is " +
-                    DebugNameForEditorRenderRecipeDraftState(model.DraftState) + ".";
+                const std::string stateReason = RenderRecipeDraftBlockedReason(
+                    action, DebugNameForEditorRenderRecipeDraftState(model.DraftState));
                 return ReadinessUnlessBlocked({
                     {!commandsAvailable, "Render recipe commands are unavailable.",
                      ReadinessCode::WorkspaceUnavailable},
-                    {!stateAllows, stateReason, ReadinessCode::StaleInput}});
+                    {commandsAvailable && !stateAllows, stateReason, ReadinessCode::StaleInput}});
             };
 
             if (DrawProcessingActionButton("Update Draft", recipeActionReadiness(true, "Update Draft")))
@@ -932,7 +932,7 @@ namespace Extrinsic::Sandbox::Editor
                                 });
                         }
                         ImGui::TableSetColumnIndex(6);
-                        // The recipe runtime's row says why this artifact cannot be applyed; the
+                        // The recipe runtime's row says why this artifact cannot be applied; the
                         // panel adds only the command surfaces it is itself missing.
                         if (DrawProcessingActionButton(
                                 "Apply",
@@ -942,7 +942,7 @@ namespace Extrinsic::Sandbox::Editor
                                      ReadinessCode::WorkspaceUnavailable},
                                     {!artifact.CanApply,
                                      artifact.DisabledReason.empty()
-                                         ? std::string_view{"The artifact cannot be applyed in its current state."}
+                                         ? std::string_view{"The artifact cannot be applied in its current state."}
                                          : std::string_view{artifact.DisabledReason}}})))
                         {
                             (void)ApplyEditorRenderRecipeCommand(

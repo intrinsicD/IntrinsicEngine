@@ -525,6 +525,19 @@ TEST(SandboxProcessingPanels, ReadinessUnlessBlockedKeepsEveryBlockerWithItsCode
     EXPECT_TRUE(Editor::ReadinessUnlessBlocked({}).Enabled);
 }
 
+// UI-058: each render-recipe draft action names its own cause, not the draft state it does not depend on.
+TEST(SandboxProcessingPanels, RenderRecipeDraftBlockedReasonsNameTheActualCause)
+{
+    EXPECT_EQ(Editor::RenderRecipeDraftBlockedReason("Validate", "Canceled"),
+              "Validate needs draft JSON; the draft document is empty.");
+    EXPECT_EQ(Editor::RenderRecipeDraftBlockedReason("Preview", "Canceled"),
+              "Preview needs draft JSON; the draft document is empty.");
+    EXPECT_EQ(Editor::RenderRecipeDraftBlockedReason("Activate Preview", "Canceled"),
+              "Activate Preview needs a usable preview; Preview the draft first.");
+    EXPECT_EQ(Editor::RenderRecipeDraftBlockedReason("Cancel", "Canceled"),
+              "Cancel is not available while the draft is Canceled.");
+}
+
 // UI-058: the button tooltip lists every reason, one per line, field-tagged where the reason names a field; the
 // field marker draws only for a field some reason names, and its tooltip carries just that field's reasons.
 TEST(SandboxProcessingPanels, ReasonsTooltipListsEveryReasonAndFieldMarkersFollowTheirField)

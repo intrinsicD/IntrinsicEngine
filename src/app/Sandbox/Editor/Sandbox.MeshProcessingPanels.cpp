@@ -3664,7 +3664,7 @@ namespace Extrinsic::Sandbox::Editor
                     std::function<void(Runtime::EditorPropertySmoothingResult)>{}, "Smoothing configuration was rejected.",
                     model.SelectedStableId, config.Output.Name);
         }
-        if (!readiness.Enabled && !readiness.DisabledReason.empty()) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
+        if (!readiness.Enabled) { const std::string reasons = FormatActionReadinessReasons(readiness); if (!reasons.empty()) ImGui::TextWrapped("%s", reasons.c_str()); }
         if (SmoothingTransaction) DrawSmoothingTransaction(context);
         // The GPU transaction reports its own jobs; a CPU run is found by its output. Either way the
         // finished run stays until the next one.

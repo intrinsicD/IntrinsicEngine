@@ -1950,8 +1950,19 @@ namespace Extrinsic::Sandbox::Editor
         const std::string text = FormatActionReadinessReasons(readiness);
         if (text.empty()) return;
         ImGui::BeginTooltip();
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 28.0f);
         ImGui::TextUnformatted(text.c_str());
+        ImGui::PopTextWrapPos();
         ImGui::EndTooltip();
+    }
+
+    std::string RenderRecipeDraftBlockedReason(const std::string_view action, const std::string_view draftState)
+    {
+        if (action == "Validate" || action == "Preview")
+            return std::string(action) + " needs draft JSON; the draft document is empty.";
+        if (action == "Activate Preview")
+            return "Activate Preview needs a usable preview; Preview the draft first.";
+        return std::string(action) + " is not available while the draft is " + std::string(draftState) + ".";
     }
 
     bool DrawProcessingActionButton(const char* const label, const ActionReadiness& readiness)
@@ -1979,7 +1990,9 @@ namespace Extrinsic::Sandbox::Editor
         if (ImGui::IsItemHovered(kReasonHoverFlags))
         {
             ImGui::BeginTooltip();
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 28.0f);
             ImGui::TextUnformatted(text.c_str());
+            ImGui::PopTextWrapPos();
             ImGui::EndTooltip();
         }
         return true;
