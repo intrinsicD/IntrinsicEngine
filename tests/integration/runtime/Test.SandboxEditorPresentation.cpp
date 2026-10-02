@@ -2244,27 +2244,42 @@ TEST(SandboxEditorPresentation, GpuTransactionRowsAreDrawnByTheSharedHelper)
     EXPECT_GE(helperUses, 6u) << "scalar, Outliers, Normals, Smoothing, consolidation and K-Means draw the shared row";
 }
 
-// UI-058: in the processing panels an action button is never left in a bare `BeginDisabled`: a disabled action
-// goes through `DrawProcessingActionButton` (or is followed by `DrawDisabledReasonTooltip`), so its reason shows.
-// Source scan; the other Sandbox files predate the rule and are tracked in UI-058.
-TEST(SandboxEditorPresentation, ProcessingPanelActionButtonsNeverSitInABareBeginDisabled)
+// UI-058: an action button is never left in a bare `BeginDisabled`: a disabled button goes through
+// `DrawProcessingActionButton` (the runtime's or the panel's reasons as a tooltip), or each button in the disabled
+// group is followed by `DrawDisabledReasonTooltip`. Source scan over the panel files; nested groups count once.
+TEST(SandboxEditorPresentation, ActionButtonsNeverSitInABareBeginDisabled)
 {
-    for (const char* file : {"Sandbox.MeshProcessingPanels.cpp", "Sandbox.MethodPanels.cpp"})
+    for (const char* file : {"Sandbox.MeshProcessingPanels.cpp", "Sandbox.MethodPanels.cpp",
+                             "Sandbox.EditorShell.cpp", "Sandbox.PanelSupport.cpp"})
     {
         const std::string source = ReadRepositoryTextFile(std::filesystem::path{"src/app/Sandbox/Editor"} / file);
         ASSERT_FALSE(source.empty()) << file;
         const std::string_view begin = "ImGui::BeginDisabled(", end = "ImGui::EndDisabled()";
+        const auto count = [](const std::string_view text, const std::initializer_list<std::string_view> needles) {
+            std::size_t n = 0;
+            for (const auto needle : needles)
+                for (std::size_t at = text.find(needle); at != std::string_view::npos; at = text.find(needle, at + 1)) ++n;
+            return n;
+        };
         for (std::size_t at = source.find(begin); at != std::string::npos; at = source.find(begin, at + 1))
         {
-            const std::size_t close = source.find(end, at);
-            ASSERT_NE(close, std::string::npos) << file;
-            const std::string block = source.substr(at, close - at);
-            const bool hasButton = block.find("ImGui::Button(") != std::string::npos ||
-                                   block.find("ImGui::SmallButton(") != std::string::npos ||
-                                   block.find("DrawProcessingPropertyShowButton(") != std::string::npos;
-            const bool hasReason = source.substr(at, close - at + 700).find("DrawDisabledReasonTooltip") != std::string::npos;
+            // The matching EndDisabled: nested Begin/End pairs inside the group are skipped.
+            std::size_t close = at + begin.size();
+            for (int depth = 1; depth > 0;)
+            {
+                const std::size_t nextEnd = source.find(end, close), nextBegin = source.find(begin, close);
+                ASSERT_NE(nextEnd, std::string::npos) << file;
+                if (nextBegin != std::string::npos && nextBegin < nextEnd) { ++depth; close = nextBegin + begin.size(); }
+                else { --depth; close = nextEnd + end.size(); }
+            }
+            const std::size_t nextGroup = source.find(begin, close);
+            const std::size_t tailEnd = std::min({source.size(), close + 700, nextGroup == std::string::npos ? source.size() : nextGroup});
+            const std::string_view block{source.data() + at, close - at};
+            const std::string_view withTail{source.data() + at, tailEnd - at};
+            const auto buttons = count(block, {"ImGui::Button(", "ImGui::SmallButton(", "DrawProcessingPropertyShowButton("});
+            const auto reasons = count(withTail, {"DrawDisabledReasonTooltip(", "DrawReadinessReasonsTooltip("});
             const auto line = std::count(source.begin(), source.begin() + static_cast<std::ptrdiff_t>(at), '\n') + 1;
-            EXPECT_FALSE(hasButton && !hasReason)
+            EXPECT_GE(reasons, buttons)
                 << file << ":" << line << " draws a button in a bare BeginDisabled; use DrawProcessingActionButton";
         }
     }

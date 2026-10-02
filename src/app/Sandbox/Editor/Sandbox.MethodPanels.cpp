@@ -1595,8 +1595,8 @@ namespace Extrinsic::Sandbox::Editor
                 if (DrawProcessingActionButton(
                         "Apply configuration##PointCloudConsolidation",
                         ReadinessUnlessBlocked({
-                            {!configAvailable, "Point-cloud consolidation config control is unavailable."},
-                            {!configValid, "Draft contains an unsupported or out-of-range value."}})))
+                            {!configAvailable, "Point-cloud consolidation config control is unavailable.", ReadinessCode::WorkspaceUnavailable},
+                            {configAvailable && !configValid, "Draft contains an unsupported or out-of-range value.", ReadinessCode::InvalidConfig}})))
                 {
                     PointCloudConsolidation.LastConfigApply =
                         Runtime::ApplyEditorPointCloudConsolidationConfig(
@@ -1609,7 +1609,7 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::SameLine();
                 if (DrawProcessingActionButton(
                         "Reload active##PointCloudConsolidation",
-                        ReadinessUnlessBlocked({{!configAvailable, "Point-cloud consolidation config control is unavailable."}})))
+                        ReadinessUnlessBlocked({{!configAvailable, "Point-cloud consolidation config control is unavailable.", ReadinessCode::WorkspaceUnavailable}})))
                 {
                     PointCloudConsolidation.Initialized = false;
                     PointCloudConsolidation.Dirty = false;
@@ -1702,16 +1702,16 @@ namespace Extrinsic::Sandbox::Editor
                     IsConsolidationHistoryLabel(history.RedoLabel);
                 if (DrawProcessingActionButton(
                         "Undo consolidation##PointCloudConsolidation",
-                        ReadinessUnlessBlocked({{!historyAvailable, "Document history is unavailable."},
-                                                {!canUndo, "The next undo step is not a point-cloud consolidation."}})))
+                        ReadinessUnlessBlocked({{!historyAvailable, "Document history is unavailable.", ReadinessCode::WorkspaceUnavailable},
+                                                {historyAvailable && !canUndo, "The next undo step is not a point-cloud consolidation."}})))
                 {
                     (void)context.DocumentCommands.Undo();
                 }
                 ImGui::SameLine();
                 if (DrawProcessingActionButton(
                         "Redo consolidation##PointCloudConsolidation",
-                        ReadinessUnlessBlocked({{!historyAvailable, "Document history is unavailable."},
-                                                {!canRedo, "The next redo step is not a point-cloud consolidation."}})))
+                        ReadinessUnlessBlocked({{!historyAvailable, "Document history is unavailable.", ReadinessCode::WorkspaceUnavailable},
+                                                {historyAvailable && !canRedo, "The next redo step is not a point-cloud consolidation."}})))
                 {
                     (void)context.DocumentCommands.Redo();
                 }
@@ -1898,8 +1898,8 @@ namespace Extrinsic::Sandbox::Editor
             const bool configAvailable =
                 context.ProcessingConfigCommandsAvailable;
             if (DrawProcessingActionButton("Apply configuration##KMeans",
-                    ReadinessUnlessBlocked({{!configAvailable, "Clustering config control is unavailable."},
-                                            {!KMeans.Dirty, "The draft has no unapplied changes."}})))
+                    ReadinessUnlessBlocked({{!configAvailable, "Clustering config control is unavailable.", ReadinessCode::WorkspaceUnavailable},
+                                            {configAvailable && !KMeans.Dirty, "The draft has no unapplied changes."}})))
             {
                 KMeans.LastConfigApply =
                     Runtime::ApplyEditorClusteringConfig(
@@ -1911,7 +1911,7 @@ namespace Extrinsic::Sandbox::Editor
             }
             ImGui::SameLine();
             if (DrawProcessingActionButton("Reload active##KMeans",
-                    ReadinessUnlessBlocked({{!configAvailable, "Clustering config control is unavailable."}})))
+                    ReadinessUnlessBlocked({{!configAvailable, "Clustering config control is unavailable.", ReadinessCode::WorkspaceUnavailable}})))
             {
                 KMeans.Dirty = false;
                 KMeans.Initialized = false;
@@ -2919,8 +2919,8 @@ namespace Extrinsic::Sandbox::Editor
             if (Parameterization.Draft.Strategy == Runtime::EditorParameterizationStrategy::Lscm)
             {
                 if (DrawProcessingActionButton("Use two selected vertices as LSCM pins",
-                        ReadinessUnlessBlocked({{!selectedPins.Usable(), "Select mesh vertices to use as pins."},
-                                                {selectedPins.Indices.size() != 2, "Select exactly two vertices."}})))
+                        ReadinessUnlessBlocked({{!selectedPins.Usable(), "Select mesh vertices to use as pins.", ReadinessCode::MissingEntity},
+                                                {selectedPins.Usable() && selectedPins.Indices.size() != 2, "Select exactly two vertices."}})))
                 {
                     auto& pins = Parameterization.Draft.Lscm;
                     pins.AutoPins = false;
@@ -2935,8 +2935,8 @@ namespace Extrinsic::Sandbox::Editor
                          Runtime::EditorParameterizationStrategy::TutteUniform)
             {
                 if (DrawProcessingActionButton("Use selected vertices as boundary pins",
-                        ReadinessUnlessBlocked({{!selectedPins.Usable(), "Select mesh vertices to use as pins."},
-                                                {selectedPins.Indices.empty(), "Select at least one vertex."}})))
+                        ReadinessUnlessBlocked({{!selectedPins.Usable(), "Select mesh vertices to use as pins.", ReadinessCode::MissingEntity},
+                                                {selectedPins.Usable() && selectedPins.Indices.empty(), "Select at least one vertex."}})))
                 {
                     auto& pins = Parameterization.Draft.Harmonic;
                     pins.PinnedVertices = selectedPins.Indices;
@@ -3031,16 +3031,16 @@ namespace Extrinsic::Sandbox::Editor
             const bool canRedoUv =
                 history.CanRedo && history.RedoLabel == "Parameterize mesh UVs";
             if (DrawProcessingActionButton("Undo UV writeback##Parameterization",
-                    ReadinessUnlessBlocked({{!historyAvailable, "Document history is unavailable."},
-                                            {!canUndoUv, "The next undo step is not a UV writeback."}})) &&
+                    ReadinessUnlessBlocked({{!historyAvailable, "Document history is unavailable.", ReadinessCode::WorkspaceUnavailable},
+                                            {historyAvailable && !canUndoUv, "The next undo step is not a UV writeback."}})) &&
                 historyAvailable)
             {
                 (void)context.DocumentCommands.Undo();
             }
             ImGui::SameLine();
             if (DrawProcessingActionButton("Redo UV writeback##Parameterization",
-                    ReadinessUnlessBlocked({{!historyAvailable, "Document history is unavailable."},
-                                            {!canRedoUv, "The next redo step is not a UV writeback."}})) &&
+                    ReadinessUnlessBlocked({{!historyAvailable, "Document history is unavailable.", ReadinessCode::WorkspaceUnavailable},
+                                            {historyAvailable && !canRedoUv, "The next redo step is not a UV writeback."}})) &&
                 historyAvailable)
             {
                 (void)context.DocumentCommands.Redo();

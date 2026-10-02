@@ -317,16 +317,40 @@ namespace Extrinsic::Sandbox::Editor
     [[nodiscard]] std::string_view ColorInterpretationOptionTooltip(int interpretation) noexcept;
     // `interpretation` is the VisualizationConfig::ColorInterpretation integer code. Returns true when changed.
     [[nodiscard]] bool DrawColorInterpretationCombo(int& interpretation);
+    // UI-058: every reason of a disabled readiness, one per line, `[field] message` where the reason names a config
+    // field; empty when enabled and nothing has a message.
+    [[nodiscard]] std::string FormatActionReadinessReasons(const Runtime::ActionReadiness& readiness);
+    // Tooltip of FormatActionReadinessReasons for the last item while it is hovered (also when disabled).
+    void DrawReadinessReasonsTooltip(const Runtime::ActionReadiness& readiness);
+    // Draws the button disabled when `readiness` says so; the tooltip lists every reason.
     [[nodiscard]] bool DrawProcessingActionButton(
         const char* label, const Runtime::ActionReadiness& readiness);
+    // UI-058: after a config control, a "(!)" marker with a tooltip of the reasons whose `Field` equals `field`.
+    // Draws nothing (returns false) when no reason names the field.
+    bool DrawReadinessFieldMarker(const Runtime::ActionReadiness& readiness, std::string_view field);
+    // While alive, every `DrawConfigFieldHint` (so every DrawSpec* control and `DrawSpecFieldHint`) also draws
+    // `DrawReadinessFieldMarker(readiness, <its field>)`. `readiness` must outlive the scope.
+    class ReadinessMarkerScope
+    {
+    public:
+        explicit ReadinessMarkerScope(const Runtime::ActionReadiness& readiness) noexcept;
+        ~ReadinessMarkerScope();
+        ReadinessMarkerScope(const ReadinessMarkerScope&) = delete;
+        ReadinessMarkerScope& operator=(const ReadinessMarkerScope&) = delete;
+    private:
+        const Runtime::ActionReadiness* m_Previous;
+    };
     // UI-071: the one way a panel's own gating (config control missing, nothing to undo, a draft that does not
-    // validate) reaches `DrawProcessingActionButton`: the first blocker that applies supplies the reason the
-    // tooltip shows; none applying leaves the action enabled. Runtime readiness, where it exists, goes through
-    // `ResolveEditorProcessingActionReadiness` instead and is never restated here.
+    // validate) reaches `DrawProcessingActionButton`: every blocker that applies is a reason (in order, with its
+    // code and optional config field); none applying leaves the action enabled. Runtime readiness, where it
+    // exists, goes through `ResolveEditorProcessingActionReadiness` instead and is never restated here.
+    using ReadinessCode = Runtime::ActionReadinessCode;
     struct ActionBlocker
     {
         bool Blocks{false};
         std::string_view Reason{};
+        Runtime::ActionReadinessCode Code{Runtime::ActionReadinessCode::Unclassified};
+        std::string_view Field{};
     };
     [[nodiscard]] Runtime::ActionReadiness ReadinessUnlessBlocked(std::initializer_list<ActionBlocker> blockers);
     // The reason every Run action shows while its own GPU transaction is live (running, waiting or accepting).

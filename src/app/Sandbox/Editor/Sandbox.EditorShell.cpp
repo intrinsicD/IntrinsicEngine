@@ -442,6 +442,9 @@ namespace Extrinsic::Sandbox::Editor
             return captureTicket;
         }
 
+        // Panel-own gating of the visualization preset buttons: the caller passes whether the selection can be edited.
+        constexpr std::string_view kVisualizationEditUnavailable = "Visualization editing is unavailable for this selection.";
+
         void DrawVisualizationPropertyPresets(
             const std::vector<EditorVisualizationPropertyInfo>& properties,
             const EditorVisualizationConfigModel& visualization,
@@ -488,7 +491,10 @@ namespace Extrinsic::Sandbox::Editor
                 bool wroteButton = false;
                 if (property.ScalarPresetAvailable)
                 {
-                    if (ImGui::SmallButton("Scalar") && canEditVisualization)
+                    const bool scalarClicked = ImGui::SmallButton("Scalar");
+                    if (!canEditVisualization)
+                        DrawDisabledReasonTooltip(kVisualizationEditUnavailable);
+                    if (scalarClicked && canEditVisualization)
                     {
                         (void)ApplyEditorVisualizationPropertyCommand(
                             context.VisualizationCommands,
@@ -511,7 +517,10 @@ namespace Extrinsic::Sandbox::Editor
                 {
                     if (wroteButton)
                         ImGui::SameLine();
-                    if (ImGui::SmallButton("Isolines") && canEditVisualization)
+                    const bool isolinesClicked = ImGui::SmallButton("Isolines");
+                    if (!canEditVisualization)
+                        DrawDisabledReasonTooltip(kVisualizationEditUnavailable);
+                    if (isolinesClicked && canEditVisualization)
                     {
                         (void)ApplyEditorVisualizationPropertyCommand(
                             context.VisualizationCommands,
@@ -535,8 +544,10 @@ namespace Extrinsic::Sandbox::Editor
                 {
                     if (wroteButton)
                         ImGui::SameLine();
-                    if (ImGui::SmallButton("Color buffer") &&
-                        canEditVisualization)
+                    const bool colorbufferClicked = ImGui::SmallButton("Color buffer");
+                    if (!canEditVisualization)
+                        DrawDisabledReasonTooltip(kVisualizationEditUnavailable);
+                    if (colorbufferClicked && canEditVisualization)
                     {
                         (void)ApplyEditorVisualizationPropertyCommand(
                             context.VisualizationCommands,
@@ -555,7 +566,10 @@ namespace Extrinsic::Sandbox::Editor
                 {
                     if (wroteButton)
                         ImGui::SameLine();
-                    if (ImGui::SmallButton("Vector field") && canEditVisualization)
+                    const bool vectorfieldClicked = ImGui::SmallButton("Vector field");
+                    if (!canEditVisualization)
+                        DrawDisabledReasonTooltip(kVisualizationEditUnavailable);
+                    if (vectorfieldClicked && canEditVisualization)
                     {
                         (void)ApplyEditorGeometryVectorFieldCommand(
                             context.VisualizationCommands,
@@ -670,10 +684,19 @@ namespace Extrinsic::Sandbox::Editor
                     : std::string{};
             };
 
-            if (!commandsAvailable)
-                ImGui::BeginDisabled();
+            // Panel-own gating: the recipe model reports which draft actions are possible (`Can*`), not why not,
+            // so the reason names the draft state it follows from.
+            const auto recipeActionReadiness = [&](const bool stateAllows, const char* const action)
+            {
+                const std::string stateReason = std::string(action) + " is not available while the draft is " +
+                    DebugNameForEditorRenderRecipeDraftState(model.DraftState) + ".";
+                return ReadinessUnlessBlocked({
+                    {!commandsAvailable, "Render recipe commands are unavailable.",
+                     ReadinessCode::WorkspaceUnavailable},
+                    {!stateAllows, stateReason, ReadinessCode::StaleInput}});
+            };
 
-            if (ImGui::Button("Update Draft"))
+            if (DrawProcessingActionButton("Update Draft", recipeActionReadiness(true, "Update Draft")))
             {
                 (void)ApplyEditorRenderRecipeCommand(
                     context->RenderRecipeCommands,
@@ -684,7 +707,7 @@ namespace Extrinsic::Sandbox::Editor
                     });
             }
             ImGui::SameLine();
-            if (ImGui::Button("Debounce"))
+            if (DrawProcessingActionButton("Debounce", recipeActionReadiness(true, "Debounce")))
             {
                 (void)ApplyEditorRenderRecipeCommand(
                     context->RenderRecipeCommands,
@@ -696,9 +719,7 @@ namespace Extrinsic::Sandbox::Editor
                     });
             }
             ImGui::SameLine();
-            if (!model.CanValidate)
-                ImGui::BeginDisabled();
-            if (ImGui::Button("Validate"))
+            if (DrawProcessingActionButton("Validate", recipeActionReadiness(model.CanValidate, "Validate")))
             {
                 (void)ApplyEditorRenderRecipeCommand(
                     context->RenderRecipeCommands,
@@ -708,13 +729,9 @@ namespace Extrinsic::Sandbox::Editor
                         .SourceId = "sandbox-editor",
                     });
             }
-            if (!model.CanValidate)
-                ImGui::EndDisabled();
 
             ImGui::SameLine();
-            if (!model.CanPreview)
-                ImGui::BeginDisabled();
-            if (ImGui::Button("Preview"))
+            if (DrawProcessingActionButton("Preview", recipeActionReadiness(model.CanPreview, "Preview")))
             {
                 (void)ApplyEditorRenderRecipeCommand(
                     context->RenderRecipeCommands,
@@ -724,13 +741,9 @@ namespace Extrinsic::Sandbox::Editor
                         .SourceId = "sandbox-editor",
                     });
             }
-            if (!model.CanPreview)
-                ImGui::EndDisabled();
 
             ImGui::SameLine();
-            if (!model.CanActivate)
-                ImGui::BeginDisabled();
-            if (ImGui::Button("Activate Preview"))
+            if (DrawProcessingActionButton("Activate Preview", recipeActionReadiness(model.CanActivate, "Activate Preview")))
             {
                 (void)ApplyEditorRenderRecipeCommand(
                     context->RenderRecipeCommands,
@@ -738,13 +751,9 @@ namespace Extrinsic::Sandbox::Editor
                         .Kind = EditorRenderRecipeCommandKind::ActivatePreview,
                     });
             }
-            if (!model.CanActivate)
-                ImGui::EndDisabled();
 
             ImGui::SameLine();
-            if (!model.CanCancel)
-                ImGui::BeginDisabled();
-            if (ImGui::Button("Cancel"))
+            if (DrawProcessingActionButton("Cancel", recipeActionReadiness(model.CanCancel, "Cancel")))
             {
                 (void)ApplyEditorRenderRecipeCommand(
                     context->RenderRecipeCommands,
@@ -752,11 +761,6 @@ namespace Extrinsic::Sandbox::Editor
                         .Kind = EditorRenderRecipeCommandKind::CancelDraft,
                     });
             }
-            if (!model.CanCancel)
-                ImGui::EndDisabled();
-
-            if (!commandsAvailable)
-                ImGui::EndDisabled();
 
             constexpr ImGuiTableFlags tableFlags =
                 ImGuiTableFlags_Borders |
@@ -906,13 +910,18 @@ namespace Extrinsic::Sandbox::Editor
                         ImGui::TableSetColumnIndex(4);
                         ImGui::TextUnformatted(artifact.PayloadUri.c_str());
                         ImGui::TableSetColumnIndex(5);
-                        const bool publishAvailable =
-                            commandsAvailable &&
-                            context->RenderArtifactCommandsAvailable &&
-                            artifact.CanPublish;
-                        if (!publishAvailable)
-                            ImGui::BeginDisabled();
-                        if (ImGui::Button("Publish"))
+                        // The recipe runtime's row says why this artifact cannot be published; the
+                        // panel adds only the command surfaces it is itself missing.
+                        if (DrawProcessingActionButton(
+                                "Publish",
+                                ReadinessUnlessBlocked({
+                                    {!commandsAvailable || !context->RenderArtifactCommandsAvailable,
+                                     "Render artifact commands are unavailable.",
+                                     ReadinessCode::WorkspaceUnavailable},
+                                    {!artifact.CanPublish,
+                                     artifact.DisabledReason.empty()
+                                         ? std::string_view{"The artifact cannot be published in its current state."}
+                                         : std::string_view{artifact.DisabledReason}}})))
                         {
                             (void)ApplyEditorRenderRecipeCommand(
                                 context->RenderRecipeCommands,
@@ -922,16 +931,19 @@ namespace Extrinsic::Sandbox::Editor
                                     .Provenance = "sandbox-editor",
                                 });
                         }
-                        if (!publishAvailable)
-                            ImGui::EndDisabled();
                         ImGui::TableSetColumnIndex(6);
-                        const bool applyAvailable =
-                            commandsAvailable &&
-                            context->RenderArtifactCommandsAvailable &&
-                            artifact.CanApply;
-                        if (!applyAvailable)
-                            ImGui::BeginDisabled();
-                        if (ImGui::Button("Apply"))
+                        // The recipe runtime's row says why this artifact cannot be applyed; the
+                        // panel adds only the command surfaces it is itself missing.
+                        if (DrawProcessingActionButton(
+                                "Apply",
+                                ReadinessUnlessBlocked({
+                                    {!commandsAvailable || !context->RenderArtifactCommandsAvailable,
+                                     "Render artifact commands are unavailable.",
+                                     ReadinessCode::WorkspaceUnavailable},
+                                    {!artifact.CanApply,
+                                     artifact.DisabledReason.empty()
+                                         ? std::string_view{"The artifact cannot be applyed in its current state."}
+                                         : std::string_view{artifact.DisabledReason}}})))
                         {
                             (void)ApplyEditorRenderRecipeCommand(
                                 context->RenderRecipeCommands,
@@ -942,8 +954,6 @@ namespace Extrinsic::Sandbox::Editor
                                     .ProjectTarget = "sandbox-render-recipe-artifact",
                                 });
                         }
-                        if (!applyAvailable)
-                            ImGui::EndDisabled();
                         ImGui::PopID();
                     }
                     ImGui::EndTable();
@@ -1325,19 +1335,24 @@ namespace Extrinsic::Sandbox::Editor
                 const bool historyControlsAvailable =
                     context != nullptr &&
                     context->DocumentCommands.Available();
-                if (!historyControlsAvailable || !frame.Document.CanUndo)
-                    ImGui::BeginDisabled();
-                if (ImGui::Button("Undo") && historyControlsAvailable)
+                // The runtime's history answers both: availability and whether a step exists.
+                if (DrawProcessingActionButton(
+                        "Undo",
+                        ReadinessUnlessBlocked({
+                            {!historyControlsAvailable, "Document history is unavailable.",
+                             ReadinessCode::WorkspaceUnavailable},
+                            {historyControlsAvailable && !frame.Document.CanUndo, "Nothing to undo."}})) &&
+                    historyControlsAvailable)
                     (void)context->DocumentCommands.Undo();
-                if (!historyControlsAvailable || !frame.Document.CanUndo)
-                    ImGui::EndDisabled();
                 ImGui::SameLine();
-                if (!historyControlsAvailable || !frame.Document.CanRedo)
-                    ImGui::BeginDisabled();
-                if (ImGui::Button("Redo") && historyControlsAvailable)
+                if (DrawProcessingActionButton(
+                        "Redo",
+                        ReadinessUnlessBlocked({
+                            {!historyControlsAvailable, "Document history is unavailable.",
+                             ReadinessCode::WorkspaceUnavailable},
+                            {historyControlsAvailable && !frame.Document.CanRedo, "Nothing to redo."}})) &&
+                    historyControlsAvailable)
                     (void)context->DocumentCommands.Redo();
-                if (!historyControlsAvailable || !frame.Document.CanRedo)
-                    ImGui::EndDisabled();
                 if (!frame.Document.UndoLabel.empty())
                     ImGui::Text("Undo next: %s", frame.Document.UndoLabel.c_str());
                 if (!frame.Document.RedoLabel.empty())
@@ -1346,34 +1361,25 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::Separator();
                 ImGui::TextWrapped("%s",
                                     frame.SceneFile.FileDialogBoundaryText.c_str());
-                if (!frame.SceneFile.LifecycleEnabled ||
-                    context == nullptr ||
-                    lastSceneFileResult == nullptr)
-                {
-                    ImGui::BeginDisabled();
-                }
-                if (ImGui::Button("New scene") &&
-                    frame.SceneFile.LifecycleEnabled &&
-                    context != nullptr &&
-                    lastSceneFileResult != nullptr)
+                const bool sceneSurfaceBound = context != nullptr && lastSceneFileResult != nullptr;
+                // Runtime: lifecycle commands wired; panel-own: the shell bound its context and result slot.
+                const auto lifecycleReadiness = ReadinessUnlessBlocked({
+                    {!frame.SceneFile.LifecycleEnabled, "Scene lifecycle commands are unavailable.",
+                     ReadinessCode::WorkspaceUnavailable},
+                    {!sceneSurfaceBound, "The scene command surface is not bound to this window.",
+                     ReadinessCode::WorkspaceUnavailable}});
+                if (DrawProcessingActionButton("New scene", lifecycleReadiness) &&
+                    frame.SceneFile.LifecycleEnabled && sceneSurfaceBound)
                 {
                     *lastSceneFileResult =
                         ApplyEditorNewSceneCommand(context->SceneCommands);
                 }
                 ImGui::SameLine();
-                if (ImGui::Button("Close scene") &&
-                    frame.SceneFile.LifecycleEnabled &&
-                    context != nullptr &&
-                    lastSceneFileResult != nullptr)
+                if (DrawProcessingActionButton("Close scene", lifecycleReadiness) &&
+                    frame.SceneFile.LifecycleEnabled && sceneSurfaceBound)
                 {
                     *lastSceneFileResult =
                         ApplyEditorCloseSceneCommand(context->SceneCommands);
-                }
-                if (!frame.SceneFile.LifecycleEnabled ||
-                    context == nullptr ||
-                    lastSceneFileResult == nullptr)
-                {
-                    ImGui::EndDisabled();
                 }
 
                 const bool sceneControlsAvailable =
@@ -1382,19 +1388,29 @@ namespace Extrinsic::Sandbox::Editor
                     context != nullptr &&
                     scenePathBuffer != nullptr &&
                     lastSceneFileResult != nullptr;
-                if (!sceneControlsAvailable)
-                    ImGui::BeginDisabled();
+                const auto sceneFileReadiness = ReadinessUnlessBlocked({
+                    {!frame.SceneFile.CanSave, "Saving scenes is unavailable.",
+                     ReadinessCode::WorkspaceUnavailable},
+                    {!frame.SceneFile.CanOpen, "Opening scenes is unavailable.",
+                     ReadinessCode::WorkspaceUnavailable},
+                    {context == nullptr || lastSceneFileResult == nullptr,
+                     "The scene command surface is not bound to this window.",
+                     ReadinessCode::WorkspaceUnavailable},
+                    {scenePathBuffer == nullptr, "Scene path input is not bound.",
+                     ReadinessCode::MissingProperty}});
                 if (scenePathBuffer != nullptr)
                 {
+                    ImGui::BeginDisabled(!sceneControlsAvailable);
                     ImGui::InputText("Scene path",
                                      scenePathBuffer->data(),
                                      scenePathBuffer->size());
+                    ImGui::EndDisabled();
                 }
                 else
                 {
                     ImGui::TextDisabled("Scene path input is not bound.");
                 }
-                if (ImGui::Button("Save / Save As") && sceneControlsAvailable)
+                if (DrawProcessingActionButton("Save / Save As", sceneFileReadiness) && sceneControlsAvailable)
                 {
                     *lastSceneFileResult = ApplyEditorSceneSaveCommand(
                         context->SceneCommands,
@@ -1403,7 +1419,7 @@ namespace Extrinsic::Sandbox::Editor
                         });
                 }
                 ImGui::SameLine();
-                if (ImGui::Button("Open path") && sceneControlsAvailable)
+                if (DrawProcessingActionButton("Open path", sceneFileReadiness) && sceneControlsAvailable)
                 {
                     *lastSceneFileResult = ApplyEditorSceneLoadCommand(
                         context->SceneCommands,
@@ -1411,8 +1427,6 @@ namespace Extrinsic::Sandbox::Editor
                             .Path = std::string(scenePathBuffer->data()),
                         });
                 }
-                if (!sceneControlsAvailable)
-                    ImGui::EndDisabled();
                 ImGui::TextWrapped("%s", frame.SceneFile.StatusText.c_str());
                 const EditorSceneFileResult* result =
                     lastSceneFileResult != nullptr && lastSceneFileResult->has_value()
@@ -2253,9 +2267,10 @@ namespace Extrinsic::Sandbox::Editor
                             for (const auto& root : status.AllowedRoots) ImGui::BulletText("%s", root.c_str());
                             ImGui::TreePop();
                         }
-                        ImGui::BeginDisabled(!status.ClientConnected);
-                        if (ImGui::Button("Disconnect agent")) agent.DisconnectClient();
-                        ImGui::EndDisabled();
+                        // Runtime: the agent server's status says whether a client is connected.
+                        if (DrawProcessingActionButton("Disconnect agent", ReadinessUnlessBlocked({
+                                {!status.ClientConnected, "No agent client is connected.", ReadinessCode::MissingEntity}})))
+                            agent.DisconnectClient();
                         ImGui::End();
                     },
                 });
@@ -2336,8 +2351,12 @@ namespace Extrinsic::Sandbox::Editor
                         ImGui::Checkbox("Colormap legend (selected entity)", &ScreenshotLegend);
                         if (ScreenshotLegend && selectedId == 0u)
                             ImGui::TextDisabled("Select the entity whose scalar coloring the legend shows.");
-                        ImGui::BeginDisabled(unavailable.has_value() || (ScreenshotLegend && selectedId == 0u));
-                        if (ImGui::Button("Save PNG"))
+                        // Runtime: the capture module's own refusal; panel-own: a legend needs the entity it colors.
+                        const std::string captureUnavailable = unavailable.value_or(std::string{});
+                        if (DrawProcessingActionButton("Save PNG", ReadinessUnlessBlocked({
+                                {unavailable.has_value(), captureUnavailable, ReadinessCode::DeviceUnavailable},
+                                {ScreenshotLegend && selectedId == 0u,
+                                 "Select the entity whose scalar coloring the legend shows.", ReadinessCode::MissingEntity}})))
                         {
                             const auto preset = static_cast<Runtime::ViewCapturePreset>(ScreenshotPresetIndex);
                             UserCaptureTicket = ViewCapture->Request({
@@ -2347,7 +2366,6 @@ namespace Extrinsic::Sandbox::Editor
                                 .FitEntity = preset == Runtime::ViewCapturePreset::Current ? 0u : selectedId,
                                 .LegendEntity = ScreenshotLegend ? selectedId : 0u});
                         }
-                        ImGui::EndDisabled();
                         ImGui::SameLine();
                         ImGui::TextDisabled("F12 saves the viewport from anywhere.");
                         if (unavailable.has_value())

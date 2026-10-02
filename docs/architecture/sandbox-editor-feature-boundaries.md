@@ -653,8 +653,15 @@ construction's resolved-request button use `ActionReadiness` from existing
 preflight supplies its reason. Config preview/apply share their availability
 predicate. Historical config errors are display state; each click reapplies and
 revalidates, clears a successful retry's error, and only then executes.
-`DrawProcessingActionButton` reuses `DrawDisabledReasonTooltip` immediately after
-the disabled item; neither helper validates geometry. UI-071: a refusal reason is the runtime's text and
+`DrawProcessingActionButton` draws the disabled item and a tooltip listing every
+reason of the `ActionReadiness` (`FormatActionReadinessReasons`: one line per reason,
+`[field] message` where the reason names a config field); neither helper validates geometry.
+UI-058: inside a `ReadinessMarkerScope`, every config-field widget (`DrawConfigFieldHint`) also draws
+`DrawReadinessFieldMarker`, a "(!)" with a tooltip of the reasons naming that field; Smooth Property
+opens the scope with the runtime's preview verdict. EditorShell and PanelSupport buttons take their
+reasons from the runtime where it knows them (document history, scene file/lifecycle, render
+artifact rows, texture bake, agent connection, screenshot capture) and otherwise from documented
+panel-own gating (render-recipe draft state, GPU transaction phase); the source scan covers all four panel files. UI-071: a refusal reason is the runtime's text and
 appears the same way everywhere: a tooltip on the disabled control, plus one inline
 line for a GPU transaction's Accept refusal. `DrawGpuTransactionControls` is the one
 Stop/Accept/Discard row of a two-phase GPU transaction: families adapt their snapshot to
@@ -668,7 +675,7 @@ the panel's own gating (a missing config control, nothing to undo, a draft that 
 validate, no selection to copy, a live GPU run: `ReadinessWhileGpuRunPending` with
 `kPendingGpuRunReason`) draw through `DrawProcessingActionButton` with `ReadinessUnlessBlocked`, so they
 show the same tooltip (Show-property buttons take the same readiness as a trailing argument; a
-source-scan test rejects an action button in a bare `BeginDisabled` in those two files); a combo entry or an input disabled by another control's value keeps
+source-scan test rejects an action button in a bare `BeginDisabled` in the panel files); a combo entry or an input disabled by another control's value keeps
 its inline note. Outlier detection/removal,
 ICP trajectory application and construction retain their distinct request sequences. Their
 algorithm controls and statistics remain explicit; compatible Show actions use

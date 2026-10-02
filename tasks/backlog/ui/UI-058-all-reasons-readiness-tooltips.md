@@ -35,6 +35,16 @@ using RUNTIME-277's structured readiness, starting with the Smooth Property pane
   RUNTIME-277: the all-reasons tooltip, `DrawReadinessFieldMarker`, Smooth Property field markers and the
   multi-fault panel test. Left for later: EditorShell and PanelSupport still have bare-`BeginDisabled` buttons
   (Undo/Redo, New scene, Bake, Disconnect agent, scene draft buttons, screenshot controls) outside the scan.
+- Slice 2: `DrawProcessingActionButton` lists every reason (`FormatActionReadinessReasons`);
+  `ReadinessUnlessBlocked` keeps every applicable blocker with its code and field;
+  `DrawReadinessFieldMarker` plus `ReadinessMarkerScope` (hooked into `DrawConfigFieldHint`) mark the
+  fields reasons name, adopted by Smooth Property, whose button now also goes through
+  `ResolveEditorProcessingActionReadiness` and `ReadinessWhileGpuRunPending`; the EditorShell and
+  PanelSupport buttons (Undo/Redo, scene lifecycle/save/open, render-recipe draft actions, artifact
+  Publish/Apply, Bake, visualization presets, GPU Stop/Discard, Disconnect agent, Save PNG) give a
+  runtime-sourced or documented panel-own reason, and the bare-`BeginDisabled` scan covers those files.
+  Tests: multi-fault Smooth Property panel test, tooltip/marker ImGui test, `ReadinessUnlessBlocked` test.
+  Other panels' fields are not yet marked (the scope is one line per panel).
 
 ## Control surfaces
 - Config: N/A.

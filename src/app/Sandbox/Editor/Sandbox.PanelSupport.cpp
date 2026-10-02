@@ -1060,9 +1060,16 @@ namespace Extrinsic::Sandbox::Editor
             context != nullptr &&
             selectedSource != nullptr &&
             targetsCompatible(consumers);
-        if (!canBake)
-            ImGui::BeginDisabled();
-        if (ImGui::Button("Bake") && canBake)
+        // Runtime: the bake command's own refusal; panel-own: the draft's source and targets.
+        if (DrawProcessingActionButton("Bake", ReadinessUnlessBlocked({
+                {!model.CanBake, model.DisabledReason.empty() ? std::string_view{"Baking is unavailable."}
+                                                              : std::string_view{model.DisabledReason},
+                 ReadinessCode::WorkspaceUnavailable},
+                {context == nullptr, "Visualization commands are unavailable.", ReadinessCode::WorkspaceUnavailable},
+                {selectedSource == nullptr, "Choose a source property to bake.", ReadinessCode::MissingProperty},
+                {selectedSource != nullptr && !targetsCompatible(consumers),
+                 "A selected target cannot hold the source property.", ReadinessCode::IncompatibleProperty}})) &&
+            canBake)
         {
             const EditorTextureBakeCommandResult baked = ApplyEditorTextureBakeCommand(
                 context->VisualizationCommands,
@@ -1101,12 +1108,8 @@ namespace Extrinsic::Sandbox::Editor
         }
         if (!mutation.BakeDiagnostic.empty())
             ImGui::TextColored(ImVec4{1.0f, 0.6f, 0.2f, 1.0f}, "%s", mutation.BakeDiagnostic.c_str());
-        if (!canBake)
-        {
-            ImGui::EndDisabled();
-            if (!model.DisabledReason.empty())
-                ImGui::TextDisabled("%s", model.DisabledReason.c_str());
-        }
+        if (!canBake && !model.DisabledReason.empty())
+            ImGui::TextDisabled("%s", model.DisabledReason.c_str());
         if (context != nullptr)
         {
             const OperationRunSlot& slot = mutation.BakeRun;
@@ -1921,21 +1924,78 @@ namespace Extrinsic::Sandbox::Editor
         return ImGui::SmallButton(label);
     }
 
+    namespace
+    {
+        // The scope's readiness; the config-field widgets mark a field it names (see ReadinessMarkerScope).
+        const ActionReadiness* g_markerReadiness = nullptr;
+        constexpr ImGuiHoveredFlags kReasonHoverFlags = ImGuiHoveredFlags_ForTooltip | ImGuiHoveredFlags_AllowWhenDisabled;
+    }
+
+    std::string FormatActionReadinessReasons(const ActionReadiness& readiness)
+    {
+        std::string text;
+        for (const auto& reason : Runtime::ActionReadinessReasons(readiness))
+        {
+            if (reason.Message.empty()) continue;
+            if (!text.empty()) text += '\n';
+            if (!reason.Field.empty()) text += "[" + reason.Field + "] ";
+            text += reason.Message;
+        }
+        return text;
+    }
+
+    void DrawReadinessReasonsTooltip(const ActionReadiness& readiness)
+    {
+        if (readiness.Enabled || !ImGui::IsItemHovered(kReasonHoverFlags)) return;
+        const std::string text = FormatActionReadinessReasons(readiness);
+        if (text.empty()) return;
+        ImGui::BeginTooltip();
+        ImGui::TextUnformatted(text.c_str());
+        ImGui::EndTooltip();
+    }
+
     bool DrawProcessingActionButton(const char* const label, const ActionReadiness& readiness)
     {
         ImGui::BeginDisabled(!readiness.Enabled);
         const bool clicked = ImGui::Button(label);
         ImGui::EndDisabled();
-        if (!readiness.Enabled)
-            DrawDisabledReasonTooltip(readiness.DisabledReason);
+        DrawReadinessReasonsTooltip(readiness);
         return clicked;
     }
 
+    bool DrawReadinessFieldMarker(const ActionReadiness& readiness, const std::string_view field)
+    {
+        if (readiness.Enabled || field.empty()) return false;
+        std::string text;
+        for (const auto& reason : Runtime::ActionReadinessReasons(readiness))
+        {
+            if (reason.Field != field || reason.Message.empty()) continue;
+            if (!text.empty()) text += '\n';
+            text += reason.Message;
+        }
+        if (text.empty()) return false;
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.15f, 1.0f), "(!)");
+        if (ImGui::IsItemHovered(kReasonHoverFlags))
+        {
+            ImGui::BeginTooltip();
+            ImGui::TextUnformatted(text.c_str());
+            ImGui::EndTooltip();
+        }
+        return true;
+    }
+
+    ReadinessMarkerScope::ReadinessMarkerScope(const ActionReadiness& readiness) noexcept
+        : m_Previous(g_markerReadiness) { g_markerReadiness = &readiness; }
+    ReadinessMarkerScope::~ReadinessMarkerScope() { g_markerReadiness = m_Previous; }
+
     Runtime::ActionReadiness ReadinessUnlessBlocked(const std::initializer_list<ActionBlocker> blockers)
     {
+        std::vector<Runtime::ActionReadinessReason> reasons;
         for (const auto& blocker : blockers)
-            if (blocker.Blocks) return {.Enabled = false, .DisabledReason = std::string(blocker.Reason)};
-        return {.Enabled = true, .DisabledReason = {}};
+            if (blocker.Blocks)
+                reasons.push_back({.Code = blocker.Code, .Field = std::string(blocker.Field), .Message = std::string(blocker.Reason)});
+        return Runtime::MakeActionReadiness(std::move(reasons));
     }
 
     void JobsHistory::Observe(const std::span<const Runtime::EditorJobRecord> live, const std::uint64_t epoch)
@@ -2071,14 +2131,17 @@ namespace Extrinsic::Sandbox::Editor
 
     void DrawConfigFieldHint(const Runtime::ConfigFieldSpec* field, const std::string_view defaultValue)
     {
-        if (field == nullptr || !ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip | ImGuiHoveredFlags_AllowWhenDisabled))
-            return;
-        const std::string text = FormatConfigFieldHint(*field, defaultValue);
-        ImGui::BeginTooltip();
-        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 28.0f);
-        ImGui::TextUnformatted(text.c_str());
-        ImGui::PopTextWrapPos();
-        ImGui::EndTooltip();
+        if (field == nullptr) return;
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip | ImGuiHoveredFlags_AllowWhenDisabled))
+        {
+            const std::string text = FormatConfigFieldHint(*field, defaultValue);
+            ImGui::BeginTooltip();
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 28.0f);
+            ImGui::TextUnformatted(text.c_str());
+            ImGui::PopTextWrapPos();
+            ImGui::EndTooltip();
+        }
+        if (g_markerReadiness != nullptr) (void)DrawReadinessFieldMarker(*g_markerReadiness, field->Name);
     }
 
     void DrawSpecFieldHint(const std::span<const Runtime::ConfigFieldSpec> fields, const std::string_view name,
@@ -2476,17 +2539,19 @@ namespace Extrinsic::Sandbox::Editor
         GpuTransactionRowAction action = GpuTransactionRowAction::None;
         if (view.HasStop)
         {
-            ImGui::BeginDisabled(!state.StopEnabled);
-            if (ImGui::Button(id("Stop").c_str())) action = GpuTransactionRowAction::Stop;
-            ImGui::EndDisabled();
+            if (DrawProcessingActionButton(id("Stop").c_str(), ReadinessUnlessBlocked({
+                    {!state.StopEnabled, "Stop applies only while the GPU run is still running.",
+                     ReadinessCode::StaleInput}})))
+                action = GpuTransactionRowAction::Stop;
             ImGui::SameLine();
         }
         if (DrawProcessingActionButton(id("Accept").c_str(), {state.AcceptEnabled, std::string(view.AcceptRefusal)}))
             action = GpuTransactionRowAction::Accept;
         ImGui::SameLine();
-        ImGui::BeginDisabled(!state.DiscardEnabled);
-        if (ImGui::Button(id("Discard").c_str())) action = GpuTransactionRowAction::Discard;
-        ImGui::EndDisabled();
+        if (DrawProcessingActionButton(id("Discard").c_str(), ReadinessUnlessBlocked({
+                {!state.DiscardEnabled, "There is no pending GPU run or result to discard.",
+                 ReadinessCode::StaleInput}})))
+            action = GpuTransactionRowAction::Discard;
         if (state.ShowRefusal) ImGui::TextWrapped("%.*s", int(view.AcceptRefusal.size()), view.AcceptRefusal.data());
         if (view.Io) ImGui::TextUnformatted(FormatGpuTransactionIo(*view.Io).c_str());
         return action;

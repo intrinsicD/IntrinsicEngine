@@ -504,16 +504,76 @@ TEST(SandboxProcessingPanels, GpuTransactionRowEnablesButtonsByPhase)
     }
 }
 
-// UI-071: a panel's own gating reaches the shared button as the first applicable blocker's reason.
-TEST(SandboxProcessingPanels, ReadinessUnlessBlockedReportsTheFirstBlockersReason)
+// UI-071 / UI-058: a panel's own gating reaches the shared button as every applicable blocker, in order, each with
+// its code and optional field; `DisabledReason` stays the first.
+TEST(SandboxProcessingPanels, ReadinessUnlessBlockedKeepsEveryBlockerWithItsCode)
 {
+    using C = R::ActionReadinessCode;
     const auto open = Editor::ReadinessUnlessBlocked({{false, "never"}, {false, "never"}});
     EXPECT_TRUE(open.Enabled);
     EXPECT_TRUE(open.DisabledReason.empty());
-    const auto first = Editor::ReadinessUnlessBlocked({{false, "skipped"}, {true, "first"}, {true, "second"}});
-    EXPECT_FALSE(first.Enabled);
-    EXPECT_EQ(first.DisabledReason, "first");
+    EXPECT_TRUE(open.Reasons.empty());
+    const auto blocked = Editor::ReadinessUnlessBlocked({{false, "skipped"}, {true, "first", C::MissingEntity},
+                                                         {true, "second", C::InvalidConfig, "lambda"}, {true, "third"}});
+    EXPECT_FALSE(blocked.Enabled);
+    EXPECT_EQ(blocked.DisabledReason, "first");
+    ASSERT_EQ(blocked.Reasons.size(), 3u);
+    EXPECT_EQ(blocked.Reasons[0].Code, C::MissingEntity);
+    EXPECT_EQ(blocked.Reasons[1].Code, C::InvalidConfig);
+    EXPECT_EQ(blocked.Reasons[1].Field, "lambda");
+    EXPECT_EQ(blocked.Reasons[2].Code, C::Unclassified);
     EXPECT_TRUE(Editor::ReadinessUnlessBlocked({}).Enabled);
+}
+
+// UI-058: the button tooltip lists every reason, one per line, field-tagged where the reason names a field; the
+// field marker draws only for a field some reason names, and its tooltip carries just that field's reasons.
+TEST(SandboxProcessingPanels, ReasonsTooltipListsEveryReasonAndFieldMarkersFollowTheirField)
+{
+    const R::ActionReadiness multi = R::MakeActionReadiness({
+        {R::ActionReadinessCode::InvalidConfig, "lambda", "lambda must be greater than 0."},
+        {R::ActionReadinessCode::MissingProperty, "input", "Choose an existing property."},
+        {R::ActionReadinessCode::DeviceUnavailable, {}, "No device."}});
+    EXPECT_EQ(Editor::FormatActionReadinessReasons(multi),
+              "[lambda] lambda must be greater than 0.\n[input] Choose an existing property.\nNo device.");
+    EXPECT_EQ(Editor::FormatActionReadinessReasons(R::MakeActionReadiness({})), "");
+    // A text-only producer shows its one reason untagged.
+    EXPECT_EQ(Editor::FormatActionReadinessReasons({.Enabled = false, .DisabledReason = "Select a mesh."}), "Select a mesh.");
+
+    TestSupport::ImGuiFrameScope gui;
+    ImGui::GetStyle().HoverFlagsForTooltipMouse = ImGuiHoveredFlags_None;
+    ImGui::GetIO().ConfigInputTrickleEventQueue = false;
+    std::string logged;
+    bool markedLambda = false, markedInput = false, markedOutput = false;
+    const auto frame = [&] {
+        gui.NextFrame();
+        ImGui::GetIO().AddMousePosEvent(20.0f, 36.0f);
+        ImGui::SetNextWindowPos({0, 0});
+        ImGui::SetNextWindowSize({400, 200});
+        ImGui::Begin("Reasons", nullptr, ImGuiWindowFlags_NoSavedSettings);
+        ImGui::LogToBuffer();
+        (void)Editor::DrawProcessingActionButton("Run", multi);
+        ImGui::NewLine();
+        ImGui::TextUnformatted("lambda field");
+        markedLambda = Editor::DrawReadinessFieldMarker(multi, "lambda");
+        ImGui::NewLine();
+        ImGui::TextUnformatted("input field");
+        markedInput = Editor::DrawReadinessFieldMarker(multi, "input");
+        ImGui::NewLine();
+        ImGui::TextUnformatted("output field");
+        markedOutput = Editor::DrawReadinessFieldMarker(multi, "output");
+        logged = ImGui::GetCurrentContext()->LogBuffer.c_str();
+        ImGui::LogFinish();
+        ImGui::End();
+    };
+    for (int i = 0; i != 4; ++i) frame();
+    EXPECT_NE(logged.find("[lambda] lambda must be greater than 0."), std::string::npos) << logged;
+    EXPECT_NE(logged.find("[input] Choose an existing property."), std::string::npos) << logged;
+    EXPECT_NE(logged.find("No device."), std::string::npos) << logged;
+    EXPECT_TRUE(markedLambda);
+    EXPECT_TRUE(markedInput);
+    EXPECT_FALSE(markedOutput);
+    const auto markers = [&] { std::size_t n = 0; for (auto at = logged.find("(!)"); at != std::string::npos; at = logged.find("(!)", at + 1)) ++n; return n; };
+    EXPECT_EQ(markers(), 2u) << logged;
 }
 
 // UI-071 review: a live GPU transaction disables Run with a reason (never a bare BeginDisabled), and a runtime
@@ -3769,6 +3829,63 @@ TEST(SandboxProcessingPanels, PropertySmoothingControlsClampToTheFieldTableAndSh
     h.Engine->Run();
     EXPECT_NE(activeNeighbors().find("\"neighbors\":1024"), std::string::npos)
         << "5000 neighbors were clamped to the declared maximum and applied: " << activeNeighbors();
+}
+
+// UI-058: a Smooth Property draft with two faults (an out-of-range Lambda and an input property that does not
+// exist) disables the button; the field markers sit on exactly those two controls, and the button's tooltip lists
+// both reasons, each tagged with its field.
+TEST(SandboxProcessingPanels, PropertySmoothingMultiFaultDraftMarksFieldsAndListsEveryReason)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0, 0, 0}), b = mesh.AddVertex({1, 0, 0}), c = mesh.AddVertex({0, 1, 0});
+    ASSERT_TRUE(mesh.AddTriangle(a, b, c));
+    GS::PopulateFromMesh(scene.Raw(), entity, mesh); // no v:mean_curvature: the default input is missing
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.property_smoothing", true));
+    ImGui::GetStyle().HoverFlagsForTooltipMouse = ImGuiHoveredFlags_None;
+    ImGui::GetIO().ConfigInputTrickleEventQueue = false;
+    const auto capture = [] {
+        ImGui::GetCurrentContext()->LogBuffer.clear();
+        ImGui::LogToBuffer();
+        ImGui::GetCurrentContext()->LogWindow = nullptr;
+    };
+    const auto read = [] {
+        std::string text{ImGui::GetCurrentContext()->LogBuffer.c_str()};
+        ImGui::LogFinish();
+        return text;
+    };
+    std::string markersText, tooltipText;
+    int frames = 0;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        ++frames;
+        auto* window = ImGui::FindWindowByName("Smooth Property");
+        if (window) { ImGui::SetWindowSize(window, {750, 1200}); ImGui::SetWindowPos(window, {0, 0}); ImGui::FocusWindow(window); }
+        if (window && frames >= 10 && frames < 16) EditScalarControl(window, "Lambda", frames - 10, "0");
+        if (frames == 24) { ImGui::GetIO().AddMousePosEvent(900.0f, 900.0f); capture(); }
+        if (frames == 29) { markersText = read(); }
+        // Sweep the pointer down the button column; the log keeps every tooltip drawn on the way.
+        if (frames == 30) capture();
+        if (frames >= 30 && frames < 270) ImGui::GetIO().AddMousePosEvent(40.0f, 4.0f * float(frames - 30));
+        if (frames == 272) { tooltipText = read(); engine.RequestExit(); }
+    };
+    h.Engine->Run();
+    if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogFinish();
+    const auto count = [](const std::string& text, std::string_view needle) {
+        std::size_t n = 0;
+        for (auto at = text.find(needle); at != std::string::npos; at = text.find(needle, at + 1)) ++n;
+        return n;
+    };
+    // Over the captured frames every marker sits on the Input property or Lambda control, and on nothing else.
+    const auto onInput = count(markersText, "Input property (!)"), onLambda = count(markersText, "Lambda (!)");
+    EXPECT_GT(onInput, 0u) << markersText;
+    EXPECT_EQ(onInput, onLambda) << markersText;
+    EXPECT_EQ(count(markersText, "(!)"), onInput + onLambda) << markersText;
+    EXPECT_NE(tooltipText.find("[lambda]"), std::string::npos) << tooltipText;
+    EXPECT_NE(tooltipText.find("[input]"), std::string::npos) << tooltipText;
+    EXPECT_NE(tooltipText.find("Choose an existing floating scalar or vector property."), std::string::npos) << tooltipText;
 }
 
 // UI-072 slice 2: the mesh-field panels read their bounds from the runtime tables. Each case types an

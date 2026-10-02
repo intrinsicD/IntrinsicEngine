@@ -1375,8 +1375,8 @@ namespace Extrinsic::Sandbox::Editor
         }
         ImGui::SeparatorText("Display output properties");
         const auto displayReadiness = ReadinessUnlessBlocked({
-            {!model.HasSelectedEntity, "Select a mesh entity."},
-            {!model.DomainUsable, "The selected entity has no mesh data to display."}});
+            {!model.HasSelectedEntity, "Select a mesh entity.", ReadinessCode::MissingEntity},
+            {model.HasSelectedEntity && !model.DomainUsable, "The selected entity has no mesh data to display."}});
         for (const auto* output : {&config.Components, &config.Regions, &config.RegionColors, &config.Boundaries, &config.BoundaryColors, &config.HardFeatures, &config.FeatureConfidence, &config.BoundaryRoles, &config.FeatureColors})
             DrawProcessingPropertyShowButton(context, model.SelectedStableId, *output, Segmentation.VisualizationDiagnostic,
                                              nullptr, false, false, displayReadiness);
@@ -3555,6 +3555,13 @@ namespace Extrinsic::Sandbox::Editor
         { ImGui::TextDisabled("Select a geometry entity to smooth a property."); ImGui::End(); return; }
         auto& config = Smoothing.Draft;
         const auto before = config;
+        // The runtime's verdict on the draft as shown: the fields it names get a marker while their controls draw.
+        const auto previewReadiness = [&] {
+            return Runtime::ResolveEditorProcessingActionReadiness(context.MeshFields.Commands,
+                Runtime::PreviewEditorPropertySmoothingCommand(context.MeshFields.Commands, model.SelectedStableId, config));
+        };
+        auto readiness = previewReadiness();
+        const ReadinessMarkerScope markers{readiness};
         const auto smoothable = +[](const Runtime::GeometryPropertyRef& ref) {
             using K = Geometry::PropertyValueKind;
             return ref.ValueKind == K::Float || ref.ValueKind == K::Double || ref.ValueKind == K::Vec2 ||
@@ -3618,15 +3625,14 @@ namespace Extrinsic::Sandbox::Editor
             Smoothing.LastResult.reset();
             Smoothing.ConfigDiagnostic = apply(config).Succeeded() ? "" : "Smoothing configuration was rejected.";
         }
-        auto readiness = Runtime::PreviewEditorPropertySmoothingCommand(context.MeshFields.Commands, model.SelectedStableId, config);
+        if (changed) readiness = previewReadiness();
         // A pending GPU result blocks the next run until it is accepted or discarded.
         using Phase = Runtime::EditorGpuTransactionPhase;
         const auto transaction = Runtime::SnapshotEditorPropertySmoothing(context.MeshFields.Commands, SmoothingTransaction);
         const bool hadTransaction = static_cast<bool>(SmoothingTransaction); // before a terminal phase retires it below
         const bool transactionPending = SmoothingTransaction && (transaction.Phase == Phase::Running ||
             transaction.Phase == Phase::ReadyToAccept || transaction.Phase == Phase::Accepting);
-        if (transactionPending && readiness.Enabled)
-            readiness = {.Enabled = false, .DisabledReason = "Accept or discard the pending GPU result first."};
+        readiness = ReadinessWhileGpuRunPending(std::move(readiness), transactionPending);
         if (DrawProcessingActionButton("Smooth property", readiness))
         {
             Smoothing.Run.ClearNote(); // an own submission replaces an earlier duplicate refusal
@@ -4038,7 +4044,7 @@ namespace Extrinsic::Sandbox::Editor
                    row.Name == config.Output.Name && row.ValueKind == decltype(row.ValueKind)::Vec3 && row.Bindable;
         });
         if (DrawProcessingActionButton("Show Gradient Vectorfield",
-                ReadinessUnlessBlocked({{!hasOutput, "Compute the gradient first; its output property does not exist yet."}})))
+                ReadinessUnlessBlocked({{!hasOutput, "Compute the gradient first; its output property does not exist yet.", ReadinessCode::MissingProperty}})))
         {
             Runtime::EditorGeometryVectorFieldCommand command{
                 .StableEntityId = model.SelectedStableId, .Layer = {.Vector = config.Output}};
@@ -4120,8 +4126,8 @@ namespace Extrinsic::Sandbox::Editor
         const auto selected = Runtime::ReadEditorPrimitiveSelection(
             context.Processing, model.SelectedStableId, Runtime::GeometryElementDomain::MeshVertex);
         if (DrawProcessingActionButton("Use selected vertices as sources",
-                ReadinessUnlessBlocked({{!selected.Usable(), selected.Message},
-                                        {selected.Indices.empty(), "Select mesh vertices first."}})))
+                ReadinessUnlessBlocked({{!selected.Usable(), selected.Message, ReadinessCode::MissingEntity},
+                                        {selected.Usable() && selected.Indices.empty(), "Select mesh vertices first."}})))
         {
             config.SourceVertices = selected.Indices;
             changed = true;
@@ -4163,7 +4169,7 @@ namespace Extrinsic::Sandbox::Editor
         DrawSpecFieldHint(fields, "source_vertex_property");
         ImGui::SameLine();
         if (DrawProcessingActionButton("Clear##GeodesicsSourceProperty",
-                ReadinessUnlessBlocked({{config.SourceVertexProperty.Name.empty(), "No source property is set."}})))
+                ReadinessUnlessBlocked({{config.SourceVertexProperty.Name.empty(), "No source property is set.", ReadinessCode::MissingProperty}})))
         {
             config.SourceVertexProperty.Name.clear();
             changed = true;
