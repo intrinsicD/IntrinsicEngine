@@ -47,3 +47,13 @@ cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -R 'AgentOperations|SandboxAgentServer' --timeout 120
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+## Log
+- 2026-10-02: Slice 1 (`attribute_bindings`). Read-only tool over the inspector's
+  `PropertyCatalog.AttributeBindings` (the panel's `BuildEditorAttributeBindingModel`, through
+  `PrepareSnapshot`), grouped by element domain, optional `domain`/`attribute` filters. The
+  `attribute` enum and the per-row documentation in the description are generated from
+  `RenderAttributeRules()`; `domain` shares the `GeometryElementDomain` enum. Unknown entities
+  answer `stale_entity` (snake case of the command status, `ErrorCodeFor` in `Detail.hpp`), bad
+  arguments `invalid_params`. Tests: `AgentOperations.AttributeBindingToolsFollowTheRuntimeTable`,
+  `SandboxAgentServer.AttributeBindingsListThePanelsSourceTable`.

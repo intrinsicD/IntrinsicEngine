@@ -21,6 +21,7 @@ import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.MeshTopologyOperations;
 import Extrinsic.Runtime.ScalarRidgeOperations;
 import Extrinsic.Runtime.GeometryProperty.Types;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Core.Tasks;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
@@ -79,7 +80,8 @@ TEST(AgentOperations, EditorOperationsHaveUniqueNamesAndValidSchemas)
         EXPECT_FALSE(spec.Description.empty());
         const bool reader = spec.Name.starts_with("scene_") || spec.Name.starts_with("entity_") || spec.Name == "history" ||
                             spec.Name.starts_with("config_sections") || spec.Name == "config_schema" || spec.Name == "config_get" || spec.Name == "config_preview" ||
-                            spec.Name == "jobs_list" || spec.Name == "jobs_wait" || spec.Name == "log" || spec.Name.starts_with("preview_");
+                            spec.Name == "jobs_list" || spec.Name == "jobs_wait" || spec.Name == "log" || spec.Name.starts_with("preview_") ||
+                            spec.Name == "attribute_bindings";
         EXPECT_EQ(spec.ReadOnly, reader) << "read-only flag follows the naming convention";
     }
     // Without an engine every operation answers without crashing: history and log report
@@ -754,6 +756,43 @@ TEST(AgentOperations, EditorOperationsShareTheDomainEnum)
     const auto badShow = R::InvokeAgentOperation(registry, "show_property", context,
                                                  R"({"entity":1,"name":"x","domain":"Bogus"})", false);
     EXPECT_NE(badShow.Text.find("Unknown domain 'Bogus'"), std::string::npos) << badShow.Text;
+}
+
+// RUNTIME-316: the attribute tools take their attribute enum and row documentation from the
+// runtime table (RenderAttributeRules), and refuse malformed arguments with invalid_params.
+TEST(AgentOperations, AttributeBindingToolsFollowTheRuntimeTable)
+{
+    R::AgentOperationRegistry registry;
+    R::RegisterEditorAgentOperations(registry);
+    Json attributes = Json::array();
+    for (const R::RenderAttributeRule& rule : R::RenderAttributeRules())
+        if (std::ranges::find(attributes, Json(std::string(R::ToString(rule.Attribute)))) == attributes.end())
+            attributes.push_back(std::string(R::ToString(rule.Attribute)));
+    ASSERT_EQ(attributes.size(), 6u);
+    const auto* listing = registry.Find("attribute_bindings");
+    ASSERT_NE(listing, nullptr);
+    EXPECT_TRUE(listing->ReadOnly);
+    EXPECT_FALSE(listing->Destructive);
+    EXPECT_FALSE(listing->NeedsPresentedFrame);
+    const auto schema = Json::parse(listing->InputSchemaJson);
+    EXPECT_EQ(schema["properties"]["attribute"]["enum"], attributes);
+    EXPECT_EQ(schema["required"], Json::array({"entity"}));
+    for (const R::RenderAttributeRule& rule : R::RenderAttributeRules())
+    {
+        const std::string row = std::string(R::ToString(rule.Domain)) + " [default: " + std::string(rule.DefaultDescription) + "]";
+        EXPECT_NE(listing->Description.find(row), std::string::npos) << "the description documents " << row;
+    }
+
+    const R::AgentOperationContext empty{};
+    for (const char* arguments : {R"({})", R"({"entity":1,"attribute":"radius"})", R"({"entity":1,"domain":"Bogus"})"})
+    {
+        const auto refused = R::InvokeAgentOperation(registry, "attribute_bindings", empty, arguments, false);
+        EXPECT_TRUE(refused.IsError) << arguments;
+        EXPECT_EQ(refused.ErrorCode, "invalid_params") << arguments;
+    }
+    const auto detached = R::InvokeAgentOperation(registry, "attribute_bindings", empty, R"({"entity":1})", false);
+    EXPECT_TRUE(detached.IsError);
+    EXPECT_NE(detached.Text.find("not attached"), std::string::npos) << detached.Text;
 }
 
 // A job queued during an agent call publishes on a later frame, after the call's label scope

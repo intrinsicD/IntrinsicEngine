@@ -45,6 +45,8 @@ import Extrinsic.Runtime.ClusteringConfig;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.VertexChannelBindings;
+import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.GeometryProperty.Types;
 import Geometry.Properties.Types;
 
@@ -298,6 +300,146 @@ namespace Extrinsic::Runtime
             }
             return Fail("Entity " + std::to_string(*entity) + " has no " + (laneName ? *laneName : std::string("mesh, graph or point-cloud")) +
                         " appearance to show or hide.");
+        }
+
+        // ---- render-attribute bindings (RUNTIME-316) -------------------------------------------
+        // The attribute enum and its documentation come from the runtime table
+        // (RenderAttributeRules), in table order, so the schema cannot drift from the command.
+        const std::vector<RenderAttribute>& TableAttributes()
+        {
+            static const std::vector<RenderAttribute> attributes = [] {
+                std::vector<RenderAttribute> out;
+                for (const RenderAttributeRule& rule : RenderAttributeRules())
+                    if (std::ranges::find(out, rule.Attribute) == out.end()) out.push_back(rule.Attribute);
+                return out;
+            }();
+            return attributes;
+        }
+        std::string AttributeProperty()
+        {
+            std::string names;
+            for (const RenderAttribute attribute : TableAttributes())
+                names += std::string(names.empty() ? "" : ",") + "\"" + std::string(ToString(attribute)) + "\"";
+            return R"("attribute":{"type":"string","enum":[)" + names + R"(],"description":"Render attribute (shader input) whose source property is chosen."})";
+        }
+        // One line per attribute: its accepted type, then each element domain with what Default draws there.
+        std::string AttributeTableText()
+        {
+            std::string text;
+            for (const RenderAttribute attribute : TableAttributes())
+            {
+                std::string line;
+                for (const RenderAttributeRule& rule : RenderAttributeRules())
+                {
+                    if (rule.Attribute != attribute) continue;
+                    if (line.empty())
+                        line = std::string(ToString(attribute)) + " (" + std::string(RenderAttributeExpectedTypeText(rule)) +
+                               (rule.RequireFiniteValues ? ", all finite" : "") + "):";
+                    line += " " + std::string(ToString(rule.Domain)) + " [default: " + std::string(rule.DefaultDescription) + "]";
+                }
+                text += line + ". ";
+            }
+            return text;
+        }
+        std::optional<RenderAttribute> ParseAttribute(const std::optional<std::string>& name)
+        {
+            RenderAttribute attribute{};
+            if (!name || !TryParseRenderAttribute(*name, attribute)) return std::nullopt;
+            return attribute;
+        }
+        AgentOperationOutcome InvalidParams(std::string message)
+        {
+            return {.IsError = true, .Text = std::move(message), .ErrorCode = "invalid_params"};
+        }
+
+        // One row of the binding model the Appearance panel draws (BuildEditorAttributeBindingModel).
+        Json AttributeRowJson(const EditorAttributeBindingRow& row)
+        {
+            const RenderAttributeRule* rule = FindRenderAttributeRule(row.Attribute, row.Domain);
+            Json compatible = Json::array();
+            Json incompatible = Json::array();
+            for (const EditorAttributeBindingCandidate& candidate : row.Candidates)
+            {
+                Json entry{{"name", candidate.Property.Name}, {"kind", KindName(candidate.Property.ValueKind)},
+                           {"count", candidate.ElementCount}};
+                if (candidate.Compatible)
+                {
+                    compatible.push_back(std::move(entry));
+                    continue;
+                }
+                entry["status"] = std::string(ToString(candidate.Reason));
+                entry["reason"] = candidate.DisabledReason;
+                incompatible.push_back(std::move(entry));
+            }
+            Json out{{"attribute", std::string(ToString(row.Attribute))},
+                     {"domain", std::string(ToString(row.Domain))},
+                     {"expected_type", row.ExpectedType},
+                     {"expected_count", row.ExpectedElementCount},
+                     {"default", row.DefaultSource},
+                     {"canonical_property", rule != nullptr && !rule->CanonicalProperty.empty()
+                                                ? Json(std::string(rule->CanonicalProperty)) : Json(nullptr)},
+                     {"bound", row.Bound},
+                     {"source", row.Bound ? Json(row.Source.Name) : Json(nullptr)},
+                     {"using_fallback", row.UsingFallback},
+                     {"candidates", std::move(compatible)},
+                     {"incompatible", std::move(incompatible)}};
+            if (row.Bound) out["status"] = std::string(ToString(row.Resolution.Status));
+            if (!row.Diagnostic.empty()) out["diagnostic"] = row.Diagnostic;
+            // Color rows: the lane whose overlay they write, named like set_visibility's lanes.
+            if (row.OverlayTarget)
+            {
+                std::string lane = DebugNameForEditorVisualizationTarget(*row.OverlayTarget);
+                std::ranges::transform(lane, lane.begin(), [](char c) { return c >= 'A' && c <= 'Z' ? char(c - 'A' + 'a') : c; });
+                out["lane"] = std::move(lane);
+            }
+            return out;
+        }
+
+        // The entity's binding table through the prepared snapshot (the inspector carries the same
+        // model as the Appearance panel); nullopt when the entity is unknown.
+        std::optional<EditorAttributeBindingModel> AttributeBindingModel(const AgentOperationContext& context, std::uint32_t entity)
+        {
+            const auto prepared = PrepareSnapshot(context);
+            if (!prepared) return std::nullopt;
+            auto inspector = BuildEditorInspectorModel(prepared->SnapshotQueries, nullptr, entity);
+            if (!inspector.HasEntity || !inspector.PropertyCatalog.AttributeBindings.HasEntity) return std::nullopt;
+            return std::move(inspector.PropertyCatalog.AttributeBindings);
+        }
+        AgentOperationOutcome UnknownEntity(std::uint32_t entity)
+        {
+            return {.IsError = true, .Text = "No entity with id " + std::to_string(entity) + ".",
+                    .ErrorCode = ErrorCodeFor(EditorCommandStatus::StaleEntity)};
+        }
+
+        AgentOperationOutcome AttributeBindings(const AgentOperationContext& context, std::string_view arguments)
+        {
+            const auto args = ParseObject(arguments);
+            const auto entity = args ? UInt(*args, "entity") : std::nullopt;
+            if (!entity) return InvalidParams("Pass {\"entity\": <stable id>, \"domain\": <optional>, \"attribute\": <optional>}.");
+            const auto domainName = String(*args, "domain");
+            const auto domain = ParseDomain(domainName);
+            if (args->contains("domain") && !domain) return InvalidParams(UnknownDomainMessage(domainName.value_or("")));
+            const auto attributeName = String(*args, "attribute");
+            const auto attribute = ParseAttribute(attributeName);
+            if (args->contains("attribute") && !attribute) return InvalidParams("Unknown attribute '" + attributeName.value_or("") + "'.");
+            if (!PrepareSnapshot(context)) return Fail(kNoWorkspace);
+            const auto model = AttributeBindingModel(context, *entity);
+            if (!model) return UnknownEntity(*entity);
+            // Grouped by element domain in the table's order of first appearance.
+            Json domains = Json::array();
+            for (const EditorAttributeBindingRow& row : model->Rows)
+            {
+                if ((domain && row.Domain != *domain) || (attribute && row.Attribute != *attribute)) continue;
+                const std::string name{ToString(row.Domain)};
+                auto group = std::ranges::find_if(domains, [&](const Json& g) { return g["domain"] == name; });
+                if (group == domains.end())
+                {
+                    domains.push_back({{"domain", name}, {"count", row.ExpectedElementCount}, {"attributes", Json::array()}});
+                    group = domains.end() - 1;
+                }
+                (*group)["attributes"].push_back(AttributeRowJson(row));
+            }
+            return Ok({{"entity", *entity}, {"domains", std::move(domains)}});
         }
 
         Json PoseJson(const EditorCameraPose& pose)
@@ -805,6 +947,15 @@ namespace Extrinsic::Runtime
                        R"(,"normal_direction":{"type":"boolean","default":false}})",
                    R"(["entity","name"])"),
             false, ShowProperty);
+        add("attribute_bindings", "Render attribute sources",
+            "List, per element domain of an entity, every render attribute row of the Appearance panel's source "
+            "selectors: the current source (bound, source, status; using_fallback with a diagnostic when an authored source no "
+            "longer resolves and the default is drawn), what Default draws (default, canonical_property), the compatible "
+            "candidate properties and the incompatible ones with their typed status and reason. Optional domain and attribute "
+            "narrow the listing. Rows: " + AttributeTableText(),
+            Schema("{" + kEntityProperty + "," + DomainProperty("Optional: only this element domain.") + "," + AttributeProperty() + "}",
+                   R"(["entity"])"),
+            true, AttributeBindings);
         add("set_visibility", "Set visibility",
             "Show or hide a lane of an entity like the appearance panel's Surface / Edges / Points checkboxes; by default the "
             "primary lane (the surface of a mesh, the edges of a graph, the points of a point cloud). One undoable step.",

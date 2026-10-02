@@ -121,6 +121,20 @@ namespace Extrinsic::Runtime::AgentDetail
         return "Unknown domain '" + name + "'; valid: [" + DomainNames() + "].";
     }
 
+    // Machine-readable error code of a refused editor command: its status name in snake case
+    // (AttributeSourceTypeMismatch -> attribute_source_type_mismatch), so every status has one.
+    inline std::string ErrorCodeFor(const EditorCommandStatus status)
+    {
+        std::string code;
+        for (const char* c = DebugNameForEditorCommandStatus(status); *c != '\0'; ++c)
+        {
+            const bool upper = *c >= 'A' && *c <= 'Z';
+            if (upper && !code.empty()) code += '_';
+            code += upper ? char(*c - 'A' + 'a') : *c;
+        }
+        return code;
+    }
+
     template <class Result>
     inline Json ResultJson(const Result& result)
     {

@@ -1390,3 +1390,61 @@ TEST(SandboxAgentServer, JobToolsListWaitAndRefuseNonEditorJobs)
     });
     release.store(true);
 }
+
+// RUNTIME-316: the Appearance panel's render-attribute source table over the socket
+// (attribute_bindings is the panel's BuildEditorAttributeBindingModel).
+TEST(SandboxAgentServer, AttributeBindingsListThePanelsSourceTable)
+{
+    AgentRig rig("attrlist");
+    ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
+    const auto mesh = rig.AddGrid();
+    {
+        auto& vertices = rig.Scene().Raw().get<GS::Vertices>(R::SelectionController::ToEntityHandle(mesh)).Properties;
+        auto offset = vertices.GetOrAdd<glm::vec3>("offset");
+        for (std::size_t i = 0; i < vertices.Size(); ++i) offset[i] = glm::vec3(float(i), 0.0f, 1.0f);
+    }
+    rig.Run([&](Client& c) {
+        bool isError = true;
+        const auto listing = c.Tool("attribute_bindings", {{"entity", mesh}}, &isError);
+        rig.Check(!isError, "attribute_bindings: " + listing.dump());
+        if (isError) return;
+        const auto findRow = [&](const Json& result, const std::string& domain, const std::string& attribute) -> Json {
+            for (const auto& group : result["domains"])
+                if (group["domain"] == domain)
+                    for (const auto& row : group["attributes"])
+                        if (row["attribute"] == attribute) return row;
+            return Json{};
+        };
+        const auto named = [](const Json& list, const std::string& name) {
+            for (const auto& entry : list)
+                if (entry["name"] == name) return entry;
+            return Json{};
+        };
+        std::vector<std::string> domains;
+        for (const auto& group : listing["domains"]) domains.push_back(group["domain"].get<std::string>());
+        rig.Check(std::ranges::find(domains, "MeshVertex") != domains.end() && std::ranges::find(domains, "MeshFace") != domains.end(),
+                  "the mesh's element domains are listed: " + listing.dump());
+        const Json position = findRow(listing, "MeshVertex", "position");
+        rig.Check(position.is_object() && position["bound"] == false && position["source"].is_null() &&
+                      position["canonical_property"] == "v:position" && position["expected_type"] == "vec3" &&
+                      position["expected_count"] == 36,
+                  "position row with its canonical default: " + position.dump());
+        rig.Check(named(position["candidates"], "offset")["kind"] == "vec3", "offset is a compatible position source: " + position.dump());
+        const Json heightAsPosition = named(position["incompatible"], "height");
+        rig.Check(heightAsPosition["status"] == "ValueKindMismatch" && heightAsPosition["reason"] == "requires vec3",
+                  "height is refused as a position with its reason: " + position.dump());
+        const Json color = findRow(listing, "MeshVertex", "color");
+        rig.Check(color["lane"] == "surface" && named(color["candidates"], "height").is_object(),
+                  "a vertex scalar can color the surface overlay: " + color.dump());
+        rig.Check(findRow(listing, "MeshFace", "position").is_null(), "no position row on faces");
+
+        const auto onlyColor = c.Tool("attribute_bindings", {{"entity", mesh}, {"attribute", "color"}, {"domain", "MeshFace"}}, &isError);
+        rig.Check(!isError && onlyColor["domains"].size() == 1u && onlyColor["domains"][0]["attributes"].size() == 1u &&
+                      onlyColor["domains"][0]["attributes"][0]["attribute"] == "color",
+                  "domain and attribute narrow the listing: " + onlyColor.dump());
+
+        const auto unknown = c.Request("tools/call", {{"name", "attribute_bindings"}, {"arguments", {{"entity", 999999}}}});
+        rig.Check(unknown["result"]["isError"] == true && unknown["result"]["structuredContent"]["error"]["code"] == "stale_entity",
+                  "an unknown entity is a typed error: " + unknown.dump());
+    });
+}

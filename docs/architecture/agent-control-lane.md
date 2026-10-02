@@ -145,7 +145,7 @@ Nothing exists without the launch flag: no module, thread or socket.
   registration `Preview*/Apply*` commands, the point-cloud point-sampling, keypoint,
   k-means and consolidation run commands, and the panels' Show recipe
   (`MakeEditorPropertyVisualizationRecipe`). There is no generic scene or property write.
-- Naming. Read-only (`readOnlyHint`): `scene_entities`, `entity_properties`, `config_sections`,
+- Naming. Read-only (`readOnlyHint`): `scene_entities`, `entity_properties`, `attribute_bindings`, `config_sections`,
   `config_schema`, `config_get`, `config_preview`, `history`, `jobs_list`, `jobs_wait`, `log`,
   `preview_registration`, `preview_point_sampling`, `preview_keypoint_analysis`, `preview_kmeans`,
   `preview_point_cloud_consolidation`, `preview_operation`, `preview_mesh_operation` and
@@ -183,8 +183,14 @@ Nothing exists without the launch flag: no module, thread or socket.
   points, default the entity's primary one: mesh surface, graph edges, point-cloud points)
   through `ApplyEditorRenderHintCommand` exactly as the appearance panel's checkboxes do (one
   undoable step). The unified Appearance panel's per-attribute source selectors (Position, Normal, Texcoord,
-  Color, Point size, Line width per element domain) call `ApplyEditorAttributeBindingCommand`; the agent
-  mirror (`attribute_bindings`, `bind_attribute`) is owned by `RUNTIME-316`. `set_camera` takes exactly one of: `controller` (orbit, fly, free look, top down;
+  Color, Point size, Line width per element domain) call `ApplyEditorAttributeBindingCommand`.
+  `attribute_bindings {entity, domain?, attribute?}` lists the same table the panel draws
+  (`BuildEditorAttributeBindingModel`, read through the prepared snapshot's inspector model), grouped by element
+  domain: per row the expected type and count, what Default draws (`default`, `canonical_property`), the current
+  source (`bound`, `source`, its resolution `status`, `using_fallback` and a `diagnostic` when an authored source no
+  longer resolves), the overlay `lane` of Color rows, the compatible `candidates` and the `incompatible` properties
+  with their typed status and reason. Its `attribute` enum and the row documentation in its description are
+  generated from `RenderAttributeRules()`. `bind_attribute` is owned by `RUNTIME-316`. `set_camera` takes exactly one of: `controller` (orbit, fly, free look, top down;
   `ApplyEditorCameraControllerCommand`, like the Camera panel's buttons), `pose` (`position`,
   `target`, optional `up`), `preset` (front, back, left, right, top, bottom, isometric; frames
   `entities`, or everything with world bounds) or `focus: true` (frames `entities`, or the
