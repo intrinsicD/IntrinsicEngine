@@ -287,7 +287,7 @@ namespace Extrinsic::Runtime
                               "Descriptor index does not match the selected samples.");
         }
         if(!context.JobCommands.Available()){Compute(*w);return Publish(context,w);}
-        const EditorJobIdentity identity{.EntityId=config.StableEntityId,.Scope=ToEditorJobScope(w->Config.Outputs[0].Domain),
+        EditorJobIdentity identity{.EntityId=config.StableEntityId,.Scope=ToEditorJobScope(w->Config.Outputs[0].Domain),
             .OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Config.Outputs[0].Name};
         namespace MS = GeometryProcessingDetail::MeshSupport;
         if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Descriptor analysis"))
@@ -313,6 +313,7 @@ namespace Extrinsic::Runtime
                 {if(w->Result.Status==EditorCommandStatus::GeometryProcessingFailed){w->MainFailure=w->Result;return false;}return true;},
                 .FinalizeUnpublishedOnMainThread=[w]{w->Abandoned=true;}};
             const auto scale=context.JobCommands.Submit(std::move(prepare),identity);
+            identity.Run=scale; // later stages join the run
             if(!scale.IsValid())return delivery.Rejected("scale");
             JobDesc gpu{
                 .DebugName="Descriptor radius support (Vulkan)",.Scope=context.World,.Kind=RuntimeTaskKinds::GeometryProcess,

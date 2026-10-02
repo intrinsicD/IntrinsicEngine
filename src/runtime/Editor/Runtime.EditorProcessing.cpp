@@ -71,6 +71,15 @@ namespace Extrinsic::Runtime
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
         return context.JobCommands.Cancel ? context.JobCommands.Cancel(token) : EditorJobCancelStatus::Unavailable;
     }
+    EditorRunCancelCount CancelEditorRunJobs(const EditorProcessingCommands& commands, const JobToken run)
+    {
+        return CancelEditorRun(EditorProcessingCommandsAccess::Resolve(commands).JobCommands, run);
+    }
+    bool IsEditorRunCancelRequested(const EditorProcessingCommands& commands, const JobToken run)
+    {
+        const auto& surface = EditorProcessingCommandsAccess::Resolve(commands).JobCommands;
+        return surface.RunCancelRequested && surface.RunCancelRequested(run);
+    }
     bool AreEditorProcessingConfigCommandsAvailable(
         const EditorProcessingCommands& commands) noexcept
     {

@@ -22,6 +22,7 @@ module Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Graphics.PointScalarAnalysis;
 import Extrinsic.Graphics.PointKeypoints;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
@@ -47,6 +48,7 @@ import Extrinsic.Runtime.JobService;
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuScalar.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 
 namespace Extrinsic::Runtime
@@ -420,9 +422,13 @@ namespace Extrinsic::Runtime
             .Abandon=[commands,w,transaction] {
                 if(!w->Abandoned) {w->Result.Status=EditorCommandStatus::StaleEntity;w->Result.Message="Keypoint job stopped, detached or stale.";DiscardEditorPointScalar(commands,transaction);}
             }});
-        if(!context.JobCommands.Submit(std::move(job),EditorJobIdentity{.EntityId=config.StableEntityId,.Scope=ToEditorJobScope(w->Config.Mask.Domain),.OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Config.Mask.Name}).IsValid()) {
+        EditorJobIdentity runIdentity{.EntityId=config.StableEntityId,.Scope=ToEditorJobScope(w->Config.Mask.Domain),.OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Config.Mask.Name};
+        const auto token=context.JobCommands.Submit(std::move(job),runIdentity);
+        if(!token.IsValid()) {
             DiscardEditorPointScalar(commands,transaction);return refuse("Keypoint job submission rejected.");
         }
+        runIdentity.Run=token; // the publication's Accept stage joins this run
+        GeometryProcessingDetail::JoinPointScalarRun(transaction,std::move(runIdentity));
         w->Admitted=true;result=w->Result;return transaction;
     }
     ActionReadiness PreviewEditorKeypointAnalysisCommand(
@@ -462,7 +468,7 @@ namespace Extrinsic::Runtime
                               "Keypoint index does not match the selected samples.");
         }
         if(!context.JobCommands.Available()){Compute(*w);return Publish(context,w);}
-        const EditorJobIdentity identity{.EntityId=config.StableEntityId,.Scope=ToEditorJobScope(w->Config.Mask.Domain),
+        EditorJobIdentity identity{.EntityId=config.StableEntityId,.Scope=ToEditorJobScope(w->Config.Mask.Domain),
             .OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Config.Mask.Name};
         namespace MS = GeometryProcessingDetail::MeshSupport;
         if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Keypoint analysis"))
@@ -488,6 +494,7 @@ namespace Extrinsic::Runtime
                 {if(w->Result.Status==EditorCommandStatus::GeometryProcessingFailed){w->MainFailure=w->Result;return false;}return true;},
                 .FinalizeUnpublishedOnMainThread=[w]{w->Abandoned=true;}};
             const auto scale=context.JobCommands.Submit(std::move(prepare),identity);
+            identity.Run=scale; // later stages join the run
             if(!scale.IsValid())return delivery.Rejected("scale");
             JobDesc gpu{
                 .DebugName="Keypoint radius support (Vulkan)",.Scope=context.World,.Kind=RuntimeTaskKinds::GeometryProcess,

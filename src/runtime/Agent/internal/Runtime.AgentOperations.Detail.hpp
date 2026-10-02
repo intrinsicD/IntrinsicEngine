@@ -183,77 +183,46 @@ namespace Extrinsic::Runtime::AgentDetail
     {
         return fresh.empty() ? std::function<EditorOperationProgress(const AgentOperationContext&)>{} : RunProgressProbe(fresh.back());
     }
-    // The outputs the editor jobs among `fresh` write: the run's identity, which its later stages
-    // (a GPU Accept queued when the compute stage publishes) share.
-    inline std::vector<EditorJobIdentity> RunOutputs(const AgentOperationContext& context, const std::vector<JobToken>& fresh)
-    {
-        std::vector<EditorJobIdentity> outputs;
-        if (fresh.empty() || context.Attachment == nullptr || !context.Attachment->IsAttached()) return outputs;
-        for (const auto& job : GetEditorJobs(PrepareEditorProcessingCommands(*context.Attachment)))
-            if (std::find(fresh.begin(), fresh.end(), job.Token) != fresh.end() &&
-                std::none_of(outputs.begin(), outputs.end(), [&](const EditorJobIdentity& o) { return SameEditorJobOutput(o, job.Identity); }))
-                outputs.push_back(job.Identity);
-        return outputs;
-    }
-    // A job of the call's own run: an editor job created since the call (`before` holds the jobs
-    // alive when it started) that the call queued (`fresh`) or that writes the run's outputs, i.e.
-    // a later stage such as a GPU Accept queued when the compute stage publishes. A newer run on
-    // the same output can only start after this one delivered (the duplicate guard refuses it
-    // while one is active), and an older one is in `before`.
-    inline bool IsOwnRunJob(const EditorJobRecord& job, const std::vector<JobToken>& before,
-                            const std::vector<JobToken>& fresh, const std::vector<EditorJobIdentity>& outputs)
-    {
-        if (std::find(before.begin(), before.end(), job.Token) != before.end()) return false;
-        return std::find(fresh.begin(), fresh.end(), job.Token) != fresh.end() ||
-               std::any_of(outputs.begin(), outputs.end(), [&](const EditorJobIdentity& o) { return SameEditorJobOutput(o, job.Identity); });
-    }
-    // `notifications/cancelled` for a run: cancels, at cancel time, the run's own active jobs
-    // through the editor job surface (which refuses every job the editor did not submit and
-    // every job of an earlier attachment). Once the run delivered (`ended`) nothing is cancelled,
-    // so a newer run on the same output is never reached. Sets `requested` when a cancel was
-    // accepted. Nothing queued, no hook.
+    // `notifications/cancelled` for a run: cancels, at cancel time, the active jobs of the runs the
+    // call queued (`fresh`: each run is named by its first job's token, which later stages carry as
+    // `EditorJobIdentity::Run`, so a GPU Accept queued on publish is reached and another run on the
+    // same output never is) through the editor job surface, which refuses every job the editor did
+    // not submit and every job of an earlier attachment. Once the call's result arrived (`ended`)
+    // nothing is cancelled. Sets `requested` when a cancel was accepted. Nothing queued, no hook.
     inline std::function<std::string(const AgentOperationContext&)> CancelRunThroughEditorSurface(
-        std::vector<JobToken> before, std::vector<JobToken> fresh, std::vector<EditorJobIdentity> outputs,
-        std::function<bool()> ended, std::shared_ptr<bool> requested)
+        std::vector<JobToken> fresh, std::function<bool()> ended, std::shared_ptr<bool> requested)
     {
         if (fresh.empty()) return {};
-        return [before = std::move(before), fresh = std::move(fresh), outputs = std::move(outputs), ended = std::move(ended),
-                requested = std::move(requested)](const AgentOperationContext& current) -> std::string {
+        return [fresh = std::move(fresh), ended = std::move(ended), requested = std::move(requested)](
+                   const AgentOperationContext& current) -> std::string {
             if (!PrepareSnapshot(current)) return "the workspace is not attached; no job was cancelled";
             if (ended()) return "the run already ended; no job was cancelled";
             const auto commands = PrepareEditorProcessingCommands(*current.Attachment);
-            std::uint32_t accepted = 0u, refused = 0u;
-            bool unavailable = false;
-            for (const auto& job : GetEditorJobs(commands))
+            EditorRunCancelCount total{};
+            for (const JobToken run : fresh)
             {
-                if (!IsActiveEditorJobState(job.State) || !IsOwnRunJob(job, before, fresh, outputs)) continue;
-                switch (CancelEditorJob(commands, job.Token))
-                {
-                case EditorJobCancelStatus::Requested: ++accepted; break;
-                case EditorJobCancelStatus::Unavailable: unavailable = true; break;
-                default: ++refused; break;
-                }
+                const auto count = CancelEditorRunJobs(commands, run);
+                total.Requested += count.Requested;
+                total.Refused += count.Refused;
+                total.Unavailable = total.Unavailable || count.Unavailable;
             }
-            if (accepted == 0u && unavailable) return "the editor job surface is unavailable; no job was cancelled";
-            if (accepted == 0u)
-                return "no active editor job of the run was left to cancel (" + std::to_string(refused) + " already ending)";
+            if (total.Requested == 0u && total.Unavailable) return "the editor job surface is unavailable; no job was cancelled";
+            if (total.Requested == 0u)
+                return "no active editor job of the run was left to cancel (" + std::to_string(total.Refused) + " already ending)";
             *requested = true;
-            return std::to_string(accepted) + " editor job(s) of the run cancelled";
+            return std::to_string(total.Requested) + " editor job(s) of the run cancelled";
         };
     }
-    // True when the run ended because a cancel was requested for it: through this call's own
-    // cancel hook, or for one of its jobs through the editor surface (jobs_cancel, a panel's
-    // cancel). A stage cancelled only because an earlier stage failed is not a requested cancel,
-    // so that failure keeps its own report.
-    inline bool RunWasCancelled(const AgentOperationContext& current, const std::vector<JobToken>& before,
-                                const std::vector<JobToken>& fresh, const std::vector<EditorJobIdentity>& outputs,
-                                const bool requestedByCall)
+    // True when a cancel was requested for the call's run: by its own hook, or through the editor
+    // surface (jobs_cancel) for any of its jobs, remembered by the surface past the jobs' reaping.
+    // A stage cancelled only because an earlier stage failed is not a requested cancel.
+    inline bool RunCancelRequested(const AgentOperationContext& current, const std::vector<JobToken>& fresh,
+                                   const bool requestedByCall)
     {
         if (requestedByCall) return true;
         if (current.Attachment == nullptr || !current.Attachment->IsAttached()) return false;
-        for (const auto& job : GetEditorJobs(PrepareEditorProcessingCommands(*current.Attachment)))
-            if (job.CancelRequested && IsOwnRunJob(job, before, fresh, outputs)) return true;
-        return false;
+        const auto commands = PrepareEditorProcessingCommands(*current.Attachment);
+        return std::any_of(fresh.begin(), fresh.end(), [&](JobToken run) { return IsEditorRunCancelRequested(commands, run); });
     }
 
     // ---- asynchronous completion -------------------------------------------------------
@@ -282,27 +251,28 @@ namespace Extrinsic::Runtime::AgentDetail
                     .ErrorCode = "result_unavailable"};
         AgentOperationOutcome outcome{};
         auto fresh = NewJobTokens(context, before);
-        auto outputs = RunOutputs(context, fresh);
         auto requested = std::make_shared<bool>(false);
         outcome.Progress = ProbeForNewestJob(fresh);
         // A cancelled job's finalizer delivers its terminal result (or releases the callback), so the
         // continuation below still ends and frees the call's tombstone.
-        outcome.Cancel = CancelRunThroughEditorSurface(before, fresh, outputs,
-            [done, orphaned] { return done->has_value() || orphaned(done); }, requested);
-        outcome.Continuation = [done, describe, orphaned, requested, before, fresh = std::move(fresh), outputs = std::move(outputs)](
+        outcome.Cancel = CancelRunThroughEditorSurface(fresh, [done, orphaned] { return done->has_value() || orphaned(done); },
+                                                       requested);
+        outcome.Continuation = [done, describe, orphaned, requested, fresh = std::move(fresh)](
                                    const AgentOperationContext& current, AgentOperationOutcome& out) {
             if (!current.Attachment || !current.Attachment->IsAttached()) { out = Fail(kNoWorkspace); return true; }
             if (done->has_value())
             {
                 out = {.IsError = !(*done)->Succeeded(), .Text = Dump(describe(**done))};
-                // Cancelled runs report the stale/not-applied status of their command; say why.
-                if (out.IsError && RunWasCancelled(current, before, fresh, outputs, *requested))
+                // A cancelled run reports the stale/not-applied status of its command; say why. A run
+                // that failed on its own (any other failure) keeps that report despite a cancel.
+                if (out.IsError && (*done)->Status == EditorCommandStatus::StaleEntity &&
+                    RunCancelRequested(current, fresh, *requested))
                     out = {.IsError = true, .Text = "The run was cancelled; nothing was applied. " + out.Text, .ErrorCode = "cancelled"};
                 return true;
             }
             if (orphaned(done))
             {
-                out = RunWasCancelled(current, before, fresh, outputs, *requested)
+                out = RunCancelRequested(current, fresh, *requested)
                     ? AgentOperationOutcome{.IsError = true, .Text = "The run was cancelled; nothing was applied.", .ErrorCode = "cancelled"}
                     : AgentOperationOutcome{.IsError = true, .Text = kResultUnavailable, .ErrorCode = "result_unavailable"};
                 return true;

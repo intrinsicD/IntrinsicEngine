@@ -560,7 +560,7 @@ namespace Extrinsic::Runtime
             BuildOutput(*w);
             return Publish(context, w);
         }
-        const EditorJobIdentity identity{
+        EditorJobIdentity identity{
             .EntityId = config.StableEntityId,
             .Scope = ToEditorJobScope(w->Config.Positions.Domain),
             .OutputSemantic = GeometryPresentationSlotSemantic::Displacement,
@@ -617,6 +617,7 @@ namespace Extrinsic::Runtime
                             },
                             .FinalizeUnpublishedOnMainThread = [w] { w->Abandoned = true; }};
             const auto prepared = context.JobCommands.Submit(std::move(prepare), identity);
+            identity.Run = prepared; // later stages join the run
             if (!prepared.IsValid())
                 return delivery.Rejected("preparation");
             JobDesc gpu{.DebugName = "Construction neighbors (Vulkan)",

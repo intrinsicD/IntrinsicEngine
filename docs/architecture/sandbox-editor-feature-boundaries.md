@@ -65,9 +65,12 @@ token/identity index, answering `EditorJobCancelStatus` (`Requested`, `NotActive
 `NotEditorJob` for unknown, reaped and non-editor tokens, `Unavailable` for a stale
 attachment epoch). Panels and the agent lane reach them through
 `GetEditorJobs(EditorProcessingCommands)` and `CancelEditorJob(EditorProcessingCommands, token)`.
-The session records each token whose cancel `Cancel` accepted; `SnapshotAll` rows carry it as
-`EditorJobRecord::CancelRequested`, so a job cancelled on request is told apart from one cancelled
-because a dependency failed (both end in `JobState::Cancelled`).
+A run is named by its first job's token; later stages carry it as `EditorJobIdentity::Run`, so
+`CancelEditorRun` (`CancelEditorRunJobs` on a handle) cancels a run's stages, including ones queued
+after it started, and never another run on the same output. The session remembers the most recent
+runs a `Cancel` was accepted for (`RunCancelRequested`, `IsEditorRunCancelRequested`), past the jobs'
+reaping, so a requested cancel is told apart from a stage cancelled because a dependency failed
+(both end in `JobState::Cancelled`).
 K-Means and consolidation jobs belong to their services, so neither the surface nor
 the agent's `jobs_cancel` cancels them. `FindEditorOperationRun(records, key)` is the
 record `ResolveEditorOperationProgress` projects.

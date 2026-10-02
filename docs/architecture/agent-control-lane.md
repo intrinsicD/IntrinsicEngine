@@ -90,12 +90,12 @@ Nothing exists without the launch flag: no module, thread or socket.
 - Cancellation: `notifications/cancelled {requestId}` (JSON-typed comparison: `1` is not `"1"`)
   stops the reply and the progress of that call and runs its `AgentOperationOutcome::Cancel` hook
   (RUNTIME-279), whose result the server logs. An editor-job command (`FinishApply`) cancels, at cancel time and
-  through `EditorJobCommandSurface::Cancel`, the active jobs of its own run: editor jobs created
-  since the call that it queued or that write its outputs, so stages queued after the call started
-  (a GPU Accept queued when the compute stage publishes) are reached too (RUNTIME-313). Jobs alive
-  before the call are never touched, and once the run delivered its result the hook cancels nothing,
-  so a newer run on the same output (which the duplicate guard admits only then) is never reached.
-  Only jobs the editor submitted are ever touched. The job ends `Cancelled` on a later drain without publishing
+  through `EditorJobCommandSurface::Cancel`, the active jobs of the runs it queued (RUNTIME-313):
+  a run is named by its first job's token, which every later stage carries as
+  `EditorJobIdentity::Run`, so stages queued after the call started (a GPU Accept queued when the
+  compute stage publishes) are reached too and another run on the same output never is
+  (`CancelEditorRun`). Once the call's result arrived the hook cancels nothing. Only jobs the editor
+  submitted are ever touched. The job ends `Cancelled` on a later drain without publishing
   anything (no property, no history entry) and its unpublished finalizer runs exactly once: it
   delivers the command's terminal failure, or (where a finalizer only abandons its run) releases
   the callback, which ends the call as `result_unavailable`. The entry stays as a tombstone that counts against the 16-call
@@ -104,10 +104,13 @@ Nothing exists without the launch flag: no module, thread or socket.
   ends the wait; the job is not affected). Calls with no editor job keep running to their end:
   K-Means and consolidation runs (their jobs belong to the services, not the editor surface),
   scene save/load, imports and captures. A run whose job was cancelled some other way
-  (`jobs_cancel`, a panel's Cancel) answers with the error code `cancelled`. Only a requested cancel
-  relabels a run: the call's own hook, or an editor cancel request recorded on one of the run's
-  jobs (`EditorJobRecord::CancelRequested`). A stage cancelled because an earlier stage failed, or an
-  older run's cancelled job retained on the same output, leaves the run's own failure as its answer. One or two
+  (`jobs_cancel`, or any other caller of the editor surface's `Cancel`; the panels do not cancel
+  through it yet) answers with the error code `cancelled`. Only a requested cancel relabels a run,
+  and only when the run ended not applied (`StaleEntity`): the call's own hook, or a cancel the
+  surface accepted for one of the run's jobs, which it remembers per run past the jobs' reaping
+  (`RunCancelRequested`; minimized frames drain and reap before the call's next poll). A stage
+  cancelled because an earlier stage failed, or an older run's cancelled job on the same output,
+  leaves the run's own failure as its answer. One or two
   progress notifications already queued may still arrive after the cancel (allowed by the
   specification).
 - Tool results are the existing JSON text content plus, when the negotiated version is

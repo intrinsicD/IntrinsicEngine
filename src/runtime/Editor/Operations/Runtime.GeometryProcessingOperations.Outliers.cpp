@@ -559,7 +559,9 @@ namespace Extrinsic::Runtime
                     if(w->AutoAccept){const auto accepted=Accept(w,{});if(accepted.Status!=EditorCommandStatus::Pending)Finish(w,EditorGpuTransactionPhase::Failed,accepted.Status,accepted.Message);}
                     return !w->Delivered;},
                 .FinalizeUnpublishedOnMainThread=[w]{if(!w->Delivered)Finish(w,EditorGpuTransactionPhase::Discarded,EditorCommandStatus::StaleEntity,"Outlier run cancelled or stale.");}};
-            if(!ctx.JobCommands.Submit(std::move(job),w->Identity).IsValid()){w->Sink={};Fail(w,"Outlier compute submission refused.");result=work->Result;return {};}
+            const auto token=ctx.JobCommands.Submit(std::move(job),w->Identity);
+            if(!token.IsValid()){w->Sink={};Fail(w,"Outlier compute submission refused.");result=work->Result;return {};}
+            w->Identity.Run=token; // the Accept stage joins this run
             result=work->Result;return w;
         }
     }

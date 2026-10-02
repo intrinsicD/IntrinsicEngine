@@ -38,6 +38,10 @@ export namespace Extrinsic::Runtime
         EditorJobScope Scope{EditorJobScope::Unknown};
         GeometryPresentationSlotSemantic OutputSemantic{GeometryPresentationSlotSemantic::Albedo};
         std::string OutputName{};
+        // The run this job belongs to: the token of the run's first job, carried by every later
+        // stage (a GPU Accept, the next stage of a chain). Invalid on a run's first job, which
+        // names its run by its own token. Not part of the output (`SameEditorJobOutput`).
+        JobToken Run{};
     };
     [[nodiscard]] bool SameEditorJobOutput(
         const EditorJobIdentity& lhs,
@@ -67,10 +71,6 @@ export namespace Extrinsic::Runtime
         // False until the worker reports; "never reported" is not 0%.
         bool ProgressDeterminate{false};
         bool PreviousOutputRetained{false};
-        // `EditorJobCommandSurface::Cancel` accepted a cancel for this job (a
-        // panel, `jobs_cancel` or an agent call's cancel). A job cancelled only
-        // because a dependency failed keeps false. Set on `SnapshotAll` rows.
-        bool CancelRequested{false};
         std::uint64_t PayloadToken{0u};
         std::uint64_t ElapsedMilliseconds{0u};
         std::string Diagnostic{};
@@ -172,6 +172,12 @@ export namespace Extrinsic::Runtime
         std::function<std::vector<EditorJobRecord>()> SnapshotAll{};
         // Cancels a job submitted through `Submit`; never any other job.
         std::function<EditorJobCancelStatus(JobToken)> Cancel{};
+        // True when `Cancel` accepted a cancel for a job of the run named by its
+        // first job's token (`EditorJobIdentity::Run`, or the job's own token).
+        // Remembered past the job's reaping for the most recent runs, so a caller
+        // polling after the run ended can still tell a requested cancel from a
+        // stage cancelled because an earlier one failed.
+        std::function<bool(JobToken)> RunCancelRequested{};
         // `State::None` for an unknown, stale-epoch or pruned key.
         std::function<EditorOperationProgress(const EditorOperationRunKey&)>
             Progress{};
@@ -187,4 +193,16 @@ export namespace Extrinsic::Runtime
         }
     };
 
+
+    struct EditorRunCancelCount
+    {
+        std::uint32_t Requested{0u}; // cancels `Cancel` accepted
+        std::uint32_t Refused{0u};   // jobs of the run that had already ended or were being cancelled
+        bool Unavailable{false};     // no surface (stale attachment epoch, no job service)
+    };
+    // Cancels every active job of the run named by `run` (its first job's token):
+    // that job and every job whose `EditorJobIdentity::Run` is `run`, including
+    // stages queued after the run started. Another run on the same output is
+    // never reached. Only jobs `SnapshotAll` lists, i.e. editor jobs, are reached.
+    [[nodiscard]] EditorRunCancelCount CancelEditorRun(const EditorJobCommandSurface& surface, JobToken run);
 }

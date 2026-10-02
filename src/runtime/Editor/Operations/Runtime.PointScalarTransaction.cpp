@@ -299,10 +299,17 @@ namespace Extrinsic::Runtime
                     if(w->Automatic){const auto accepted=Accept(w);if(accepted.Status!=EditorCommandStatus::Pending)Finish(w,EditorGpuTransactionPhase::Failed,accepted.Status,accepted.Message);}
                     return !w->Delivered;},
                 .FinalizeUnpublishedOnMainThread=[w]{if(!w->Delivered)Finish(w,EditorGpuTransactionPhase::Discarded,EditorCommandStatus::StaleEntity,"Scalar run cancelled or stale.");}};
-            if(!ctx.JobCommands.Submit(std::move(job),w->Identity).IsValid()){w->Sink={};Fail(w,"Scalar compute submission rejected.");result=w->Result;return {};}
+            const auto token=ctx.JobCommands.Submit(std::move(job),w->Identity);
+            if(!token.IsValid()){w->Sink={};Fail(w,"Scalar compute submission rejected.");result=w->Result;return {};}
+            w->Identity.Run=token; // the Accept stage joins this run
             result=w->Result;return w;
         }
     }
+    }
+    extern "C++" void GeometryProcessingDetail::JoinPointScalarRun(
+        const EditorPointScalarTransactionHandle& run, EditorJobIdentity identity)
+    {
+        if (run) run->Identity = std::move(identity);
     }
     EditorPointScalarTransactionHandle BeginEditorPointScalarPublication(
         const EditorProcessingCommands& commands, EditorPointScalarPublication publication,

@@ -151,6 +151,25 @@ ResolveEditorOperationProgress(const std::vector<EditorJobRecord> &records,
                          : EditorOperationProgress{};
 }
 
+EditorRunCancelCount CancelEditorRun(const EditorJobCommandSurface &surface,
+                                     const JobToken run) {
+  EditorRunCancelCount count{};
+  if (!surface.SnapshotAll || !surface.Cancel) {
+    count.Unavailable = true;
+    return count;
+  }
+  for (const EditorJobRecord &job : surface.SnapshotAll()) {
+    if ((job.Token != run && job.Identity.Run != run) || !IsActiveEditorJobState(job.State))
+      continue;
+    switch (surface.Cancel(job.Token)) {
+    case EditorJobCancelStatus::Requested: ++count.Requested; break;
+    case EditorJobCancelStatus::Unavailable: count.Unavailable = true; break;
+    default: ++count.Refused; break;
+    }
+  }
+  return count;
+}
+
 std::string_view ToString(const EditorJobCancelStatus status) noexcept {
   switch (status) {
   case EditorJobCancelStatus::Requested: return "requested";

@@ -122,6 +122,15 @@ duplicate to `result_unavailable`; the single status must keep that mapping.
   - `cancelled` relabels a run only on a requested cancel (the call's hook, or
     `EditorJobRecord::CancelRequested` recorded by the editor surface's `Cancel`); a stage cancelled
     by a failed dependency, or an older cancelled job on the same output, keeps the run's own failure.
+  - Slice 7 (review of slice 5) replaces the time-window/output heuristic with a run identity:
+    `EditorJobIdentity::Run` (the first job's token) on every later stage (GPU Accepts of scalar,
+    keypoint publication, outliers, normals, smoothing; CPU chains of bilateral, keypoints,
+    descriptors, construction); `CancelEditorRun`/`CancelEditorRunJobs` cancel a run's stages. The
+    per-job `EditorJobRecord::CancelRequested` is replaced by a per-run memory in the session
+    (`RunCancelRequested`, last 256 runs) that survives reaping; a run is relabelled only when it
+    ended `StaleEntity`. Tests: `EditorJobRunCancelReachesLaterStagesOfThatRunOnly` (harness port of the
+    deleted later-stage test) and `EditorKeypointAgent.RequestedCancelSurvivesTheJobsReaping` (fails
+    on slice 5).
   - `jobs_wait` on a job reaped between polls answers `state: "ended"` when the last seen row was
     still running (before: that running state), and `scene_replaced` when the scene changed meanwhile
     (before: finished).

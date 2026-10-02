@@ -331,7 +331,7 @@ namespace Extrinsic::Runtime
             Compute(*w);
             return Publish(context, w);
         }
-        const EditorJobIdentity identity{.EntityId = config.StableEntityId,
+        EditorJobIdentity identity{.EntityId = config.StableEntityId,
                                          .Scope = ToEditorJobScope(w->Config.Output.Domain),
                                          .OutputSemantic = GeometryPresentationSlotSemantic::Displacement,
                                          .OutputName = w->Config.Output.Name};
@@ -355,6 +355,7 @@ namespace Extrinsic::Runtime
             std::string stage=desc.DebugName;
             previous=context.JobCommands.Submit(std::move(desc),identity);
             if(!previous.IsValid())rejectedStage=std::move(stage);
+            else if(!identity.Run.IsValid())identity.Run=previous; // later stages join the run
             return previous.IsValid();
         };
         bool submitted=true;

@@ -1094,6 +1094,7 @@ namespace Extrinsic::Runtime
                            "Vulkan property smoothing cancelled or stale; previous output retained.");
                 }};
             w->Token = context.JobCommands.Submit(std::move(gpu), w->Identity);
+            w->Identity.Run = w->Token; // the Accept stage joins this run
             if (!w->Token.IsValid())
             {
                 w->Abandoned = true;

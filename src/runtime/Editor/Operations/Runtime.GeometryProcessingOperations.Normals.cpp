@@ -1211,11 +1211,13 @@ namespace Extrinsic::Runtime
                     Finish(w, EditorGpuTransactionPhase::Discarded, EditorCommandStatus::StaleEntity,
                            "Vulkan normals cancelled or stale; previous normals retained.");
                 }};
-            if (!context.JobCommands.Submit(std::move(gpu), w->Identity).IsValid())
+            const JobToken token = context.JobCommands.Submit(std::move(gpu), w->Identity);
+            if (!token.IsValid())
             {
                 w->Abandoned = true;
                 return fail(EditorCommandStatus::GeometryProcessingFailed, "Vulkan normals submission rejected.");
             }
+            w->Identity.Run = token; // the Accept stage joins this run
             return w;
         }
     } // namespace NormalTransactionDetail

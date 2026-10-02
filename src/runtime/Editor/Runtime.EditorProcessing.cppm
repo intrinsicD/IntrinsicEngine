@@ -102,6 +102,10 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::vector<EditorJobRecord> GetEditorJobs(const EditorProcessingCommands&);
     // `EditorJobCommandSurface::Cancel`; `Unavailable` for an unbound or stale handle.
     [[nodiscard]] EditorJobCancelStatus CancelEditorJob(const EditorProcessingCommands&, JobToken token);
+    // `CancelEditorRun` over the handle's surface; `Unavailable` for an unbound or stale handle.
+    [[nodiscard]] EditorRunCancelCount CancelEditorRunJobs(const EditorProcessingCommands&, JobToken run);
+    // `EditorJobCommandSurface::RunCancelRequested`; false for an unbound or stale handle.
+    [[nodiscard]] bool IsEditorRunCancelRequested(const EditorProcessingCommands&, JobToken run);
     // True when an attached handle can preview and hot-apply an engine config
     // document. Every family's `ApplyEditor*Config` needs exactly this, so panels
     // gate their controls on it instead of discovering the rejection.
