@@ -1472,9 +1472,9 @@ TEST(RuntimeSceneSerialization, ProcessedPropertiesRoundTripBitExactlyOnEveryEle
     MemoryIOBackend backend;
     const auto saved = Runtime::SaveSceneDocument(source, "properties.json", backend);
     ASSERT_TRUE(saved.has_value()) << static_cast<int>(saved.error());
-    // 14 authored above plus the graph's own `v:point` storage, which
-    // PopulateFromGraph copies next to `v:position`; topology rows are skipped.
-    EXPECT_EQ(saved->Stats.GeometryProperties, 15u);
+    // The graph's own `v:point` storage (PopulateFromGraph mirrors `v:position`
+    // into it) is engine-derived and skipped, as are topology rows.
+    EXPECT_EQ(saved->Stats.GeometryProperties, 14u);
     EXPECT_EQ(saved->Stats.UnpersistedGeometryProperties, 0u)
         << "topology (graph h:connectivity) is skipped silently, not counted";
 
@@ -1489,7 +1489,7 @@ TEST(RuntimeSceneSerialization, ProcessedPropertiesRoundTripBitExactlyOnEveryEle
     ECS::Scene::Registry loaded;
     const auto result = Runtime::LoadSceneDocument(loaded, "properties.json", backend);
     ASSERT_TRUE(result.has_value()) << static_cast<int>(result.error());
-    EXPECT_EQ(result->Stats.GeometryProperties, 15u);
+    EXPECT_EQ(result->Stats.GeometryProperties, 14u);
 
     const auto& lraw = loaded.Raw();
     const ECS::EntityHandle lmesh = FindEntityByName(loaded, "Mesh Entity");
@@ -1615,6 +1615,192 @@ TEST(RuntimeSceneSerialization, MalformedPropertyTablesRejectTheDocumentWithoutM
         EXPECT_EQ(FindEntityByName(scene, "Existing"), existing) << label << ": the scene was mutated";
         EXPECT_EQ(FindEntityByName(scene, "Mesh Entity"), ECS::InvalidEntityHandle) << label;
     }
+}
+
+namespace
+{
+    // One scene with a typed property in every element domain, so a case can corrupt exactly one table.
+    struct PropertyTableFixture
+    {
+        std::string Text{};
+        nlohmann::json Document{};
+    };
+
+    PropertyTableFixture SavePropertyTableScene()
+    {
+        ECS::Scene::Registry source;
+        const ECS::EntityHandle mesh = AddMeshEntity(source);
+        const ECS::EntityHandle graph = AddGraphEntity(source);
+        const ECS::EntityHandle cloud = AddPointCloudEntity(source);
+        auto& raw = source.Raw();
+        AddProcessedProperty<float>(raw.get<GS::Vertices>(mesh).Properties, "v:a", {1.0f, 2.0f, 3.0f});
+        AddProcessedProperty<float>(raw.get<GS::Edges>(mesh).Properties, "e:a", {1.0f, 2.0f, 3.0f});
+        AddProcessedProperty<float>(raw.get<GS::Halfedges>(mesh).Properties, "h:a",
+                                    {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f});
+        AddProcessedProperty<float>(raw.get<GS::Faces>(mesh).Properties, "f:a", {1.0f});
+        AddProcessedProperty<float>(raw.get<GS::Vertices>(graph).Properties, "v:a", {1.0f, 2.0f, 3.0f});
+        AddProcessedProperty<float>(raw.get<GS::Edges>(graph).Properties, "e:a", {1.0f, 2.0f});
+        AddProcessedProperty<float>(raw.get<GS::Halfedges>(graph).Properties, "h:a", {1.0f, 2.0f, 3.0f, 4.0f});
+        AddProcessedProperty<float>(raw.get<GS::Vertices>(cloud).Properties, "v:a", {1.0f, 2.0f});
+        PropertyTableFixture out{};
+        const auto text = Runtime::SerializeSceneDocument(source);
+        EXPECT_TRUE(text.has_value());
+        out.Text = text.value_or(std::string{});
+        out.Document = nlohmann::json::parse(out.Text);
+        return out;
+    }
+
+    nlohmann::json& FirstPropertyEntry(nlohmann::json& document, const std::size_t entity, const char* section)
+    {
+        return document["entities"][entity]["geometrySources"][section]["properties"][0];
+    }
+}
+
+// RUNTIME-319 review: every domain's table rejects the same malformed entries (mesh vertices are covered above).
+TEST(RuntimeSceneSerialization, EveryDomainsPropertyTableRejectsMalformedPayloads)
+{
+    const PropertyTableFixture valid = SavePropertyTableScene();
+    {
+        ECS::Scene::Registry scene;
+        ASSERT_TRUE(Runtime::DeserializeSceneDocument(scene, valid.Text).has_value());
+    }
+    struct Table { std::size_t Entity; const char* Section; const char* Label; };
+    const auto bytes = [](const std::size_t count)
+    {
+        return Core::Base64::Encode(std::vector<std::uint8_t>(count, 0u));
+    };
+    for (const Table table : {Table{0, "edges", "mesh edges"}, Table{0, "halfedges", "mesh halfedges"},
+                              Table{0, "faces", "mesh faces"}, Table{1, "nodes", "graph nodes"},
+                              Table{1, "edges", "graph edges"}, Table{1, "halfedges", "graph halfedges"},
+                              Table{2, "vertices", "point cloud"}})
+    {
+        const std::string tableLabel = table.Label;
+        const nlohmann::json& entry = valid.Document["entities"][table.Entity]["geometrySources"][table.Section]["properties"][0];
+        const std::size_t payloadBytes = Core::Base64::DecodedSize(entry["data"].get_ref<const std::string&>()).value();
+
+        std::vector<std::pair<std::string, std::function<void(nlohmann::json&)>>> cases;
+        cases.emplace_back("payload not a multiple of four", [&](nlohmann::json& d)
+                           { FirstPropertyEntry(d, table.Entity, table.Section)["data"] = bytes(payloadBytes - 1u); });
+        cases.emplace_back("payload one element short", [&](nlohmann::json& d)
+                           { FirstPropertyEntry(d, table.Entity, table.Section)["data"] = bytes(payloadBytes - 4u); });
+        cases.emplace_back("payload one element long", [&](nlohmann::json& d)
+                           { FirstPropertyEntry(d, table.Entity, table.Section)["data"] = bytes(payloadBytes + 4u); });
+        cases.emplace_back("padding in the middle", [&](nlohmann::json& d)
+                           { FirstPropertyEntry(d, table.Entity, table.Section)["data"] = "AAAA=AAA"; });
+        cases.emplace_back("NaN payload", [&](nlohmann::json& d)
+                           {
+                               std::vector<float> values(payloadBytes / 4u, std::numeric_limits<float>::quiet_NaN());
+                               FirstPropertyEntry(d, table.Entity, table.Section)["data"] = Core::Base64::Encode(
+                                   std::span<const std::uint8_t>(reinterpret_cast<const std::uint8_t*>(values.data()), payloadBytes));
+                           });
+        cases.emplace_back("duplicate entry", [&](nlohmann::json& d)
+                           {
+                               auto& list = d["entities"][table.Entity]["geometrySources"][table.Section]["properties"];
+                               list.push_back(list[0]);
+                           });
+        cases.emplace_back("unknown kind", [&](nlohmann::json& d)
+                           { FirstPropertyEntry(d, table.Entity, table.Section)["kind"] = "Quat"; });
+        cases.emplace_back("kind does not match the size", [&](nlohmann::json& d)
+                           { FirstPropertyEntry(d, table.Entity, table.Section)["kind"] = "Vec4"; });
+        cases.emplace_back("not an object", [&](nlohmann::json& d)
+                           { FirstPropertyEntry(d, table.Entity, table.Section) = "x"; });
+
+        for (const auto& [label, mutate] : cases)
+        {
+            nlohmann::json document = valid.Document;
+            mutate(document);
+            ECS::Scene::Registry scene;
+            const ECS::EntityHandle existing = ECS::Scene::CreateDefault(scene, "Existing");
+            const auto result = Runtime::DeserializeSceneDocument(scene, document.dump());
+            EXPECT_FALSE(result.has_value()) << tableLabel << ": " << label;
+            EXPECT_EQ(FindEntityByName(scene, "Existing"), existing) << tableLabel << ": " << label;
+            EXPECT_EQ(FindEntityByName(scene, "Mesh Entity"), ECS::InvalidEntityHandle) << tableLabel << ": " << label;
+        }
+    }
+}
+
+// RUNTIME-319 review: a name the engine reserves cannot be smuggled in through a table under another kind or as
+// a second copy of a dedicated stream.
+TEST(RuntimeSceneSerialization, CanonicalNamesKeepTheirKindAndDedicatedNamesCannotCollide)
+{
+    const PropertyTableFixture valid = SavePropertyTableScene();
+    struct Case { std::size_t Entity; const char* Section; const char* Name; const char* Kind; const char* Label; };
+    const auto elementPayload = [&](const std::size_t entity, const char* section, const std::size_t elementBytes)
+    {
+        const auto& entry = valid.Document["entities"][entity]["geometrySources"][section]["properties"][0];
+        const std::size_t count = Core::Base64::DecodedSize(entry["data"].get_ref<const std::string&>()).value() / 4u;
+        return Core::Base64::Encode(std::vector<std::uint8_t>(count * elementBytes, 0u));
+    };
+    for (const Case c : {
+             // Engine-derived/mirrored names loaded with a foreign kind would break later typed GetOrAdd calls.
+             Case{1, "nodes", "v:point", "Bool", "v:point as Bool"},
+             Case{1, "nodes", "v:point", "ScalarFloat", "v:point as float"},
+             Case{0, "faces", "f:normal", "Bool", "f:normal as Bool"},
+             Case{0, "faces", "f:normal", "ScalarFloat", "f:normal as float"},
+             Case{0, "vertices", "v:texcoord", "Vec3", "v:texcoord as Vec3"},
+             Case{0, "faces", "f:atlas_region", "ScalarFloat", "f:atlas_region as float"},
+             // Dedicated streams have their own array; a table copy collides with it.
+             Case{0, "vertices", "v:position", "Vec3", "v:position in the table"},
+             Case{0, "vertices", "v:normal", "Vec3", "v:normal in the table"},
+             Case{0, "halfedges", "h:normal", "Vec3", "h:normal in the table"},
+             Case{0, "halfedges", "h:to_vertex", "UInt32", "topology name"}})
+    {
+        nlohmann::json document = valid.Document;
+        auto& list = document["entities"][c.Entity]["geometrySources"][c.Section]["properties"];
+        const std::string kind = c.Kind;
+        const std::size_t elementBytes = kind == "Bool" ? 1u : kind == "Vec3" ? 12u : 4u;
+        list.push_back({{"name", c.Name}, {"kind", kind}, {"data", elementPayload(c.Entity, c.Section, elementBytes)}});
+        ECS::Scene::Registry scene;
+        EXPECT_FALSE(Runtime::DeserializeSceneDocument(scene, document.dump()).has_value()) << c.Label;
+    }
+
+    // The canonical kind itself still loads (a derived `v:point` mirror is data the engine accepts back).
+    nlohmann::json accepted = valid.Document;
+    accepted["entities"][1]["geometrySources"]["nodes"]["properties"].push_back(
+        {{"name", "v:point"}, {"kind", "Vec3"}, {"data", elementPayload(1, "nodes", 12u)}});
+    ECS::Scene::Registry scene;
+    EXPECT_TRUE(Runtime::DeserializeSceneDocument(scene, accepted.dump()).has_value());
+}
+
+// RUNTIME-319 review: derived mirrors are not persisted (a stale copy would outlive the source), and a dedicated
+// stream held under the wrong type is counted instead of vanishing.
+TEST(RuntimeSceneSerialization, DerivedMirrorsAreSkippedAndMistypedStreamsAreCounted)
+{
+    ECS::Scene::Registry source;
+    const ECS::EntityHandle mesh = AddMeshEntity(source);
+    const ECS::EntityHandle graph = AddGraphEntity(source);
+    const ECS::EntityHandle cloud = AddPointCloudEntity(source);
+    auto& raw = source.Raw();
+
+    // Stale mirrors: change the position after PopulateFromGraph copied it into `v:point`.
+    ASSERT_TRUE(raw.get<GS::Vertices>(graph).Properties.Exists("v:point"));
+    AddProcessedProperty<glm::vec3>(raw.get<GS::Vertices>(mesh).Properties, "v:point",
+                                    {{9.0f, 9.0f, 9.0f}, {9.0f, 9.0f, 9.0f}, {9.0f, 9.0f, 9.0f}});
+    AddProcessedProperty<glm::vec3>(raw.get<GS::Faces>(mesh).Properties, "f:normal", {{0.0f, 0.0f, 1.0f}});
+    // A dedicated stream name held as another type is lost on save, so it is counted.
+    AddProcessedProperty<glm::vec3>(raw.get<GS::Vertices>(cloud).Properties, "v:texcoord",
+                                    {{0.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 1.0f}});
+
+    MemoryIOBackend backend;
+    const auto saved = Runtime::SaveSceneDocument(source, "derived.json", backend);
+    ASSERT_TRUE(saved.has_value());
+    const nlohmann::json parsed = nlohmann::json::parse(backend.Text("derived.json"));
+    const auto names = [&](const std::size_t entity, const char* section)
+    {
+        std::vector<std::string> out;
+        const auto& geometry = parsed["entities"][entity]["geometrySources"][section];
+        if (geometry.contains("properties"))
+            for (const auto& entry : geometry["properties"]) out.push_back(entry["name"]);
+        return out;
+    };
+    EXPECT_TRUE(names(0, "vertices").empty()) << "mesh v:point is a mirror";
+    EXPECT_TRUE(names(0, "faces").empty()) << "f:normal is recomputed";
+    EXPECT_TRUE(names(1, "nodes").empty()) << "graph v:point mirrors v:position";
+    EXPECT_TRUE(names(2, "vertices").empty());
+    EXPECT_FALSE(parsed["entities"][2]["geometrySources"]["vertices"].contains("texcoords"));
+
+    // Only the mistyped dedicated stream is reported as lost; derived mirrors are not "lost" data.
+    EXPECT_EQ(saved->Stats.UnpersistedGeometryProperties, 1u);
 }
 
 TEST(RuntimeSceneSerialization, LargePropertyPayloadStaysCompactAndRoundTrips)

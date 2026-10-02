@@ -501,15 +501,36 @@ namespace Extrinsic::Runtime
             return property.IsValid() ? &property.Vector() : nullptr;
         }
 
+        // A dedicated stream that exists under another value type is not
+        // written (the table skips dedicated names too): count and log it so
+        // the save never drops it silently. A required stream fails instead.
+        void CountMistypedStream(const Geometry::PropertySet& properties,
+                                 const std::string_view propertyName,
+                                 const char* const expected,
+                                 SceneSerializationStats& stats)
+        {
+            if (!properties.Exists(propertyName))
+                return;
+            ++stats.UnpersistedGeometryProperties;
+            Core::Log::Warn(
+                "[Runtime] Scene save: property '{}' is not persisted: it names a dedicated {} stream but holds another value type",
+                propertyName, expected);
+        }
+
         [[nodiscard]] bool AddVec2Property(json& object,
                                            const char* key,
                                            const Geometry::PropertySet& properties,
                                            const std::string_view propertyName,
-                                           const bool required)
+                                           const bool required,
+                                           SceneSerializationStats& stats)
         {
             const std::vector<glm::vec2>* values = FindVec2Property(properties, propertyName);
             if (values == nullptr)
+            {
+                if (!required)
+                    CountMistypedStream(properties, propertyName, "Vec2", stats);
                 return !required;
+            }
             object[key] = Vec2ArrayToJson(*values);
             return true;
         }
@@ -518,11 +539,16 @@ namespace Extrinsic::Runtime
                                            const char* key,
                                            const Geometry::PropertySet& properties,
                                            const std::string_view propertyName,
-                                           const bool required)
+                                           const bool required,
+                                           SceneSerializationStats& stats)
         {
             const std::vector<glm::vec3>* values = FindVec3Property(properties, propertyName);
             if (values == nullptr)
+            {
+                if (!required)
+                    CountMistypedStream(properties, propertyName, "Vec3", stats);
                 return !required;
+            }
             object[key] = Vec3ArrayToJson(*values);
             return true;
         }
@@ -1729,15 +1755,21 @@ namespace Extrinsic::Runtime
             return std::is_same_v<T, bool> ? 1u : sizeof(T);
         }
 
-        // Nullopt when the property holds a NaN (or cannot be read as T).
+        enum class EncodeFailure : std::uint8_t { None, Unreadable, HoldsNaN };
+
+        // Nullopt when the property cannot be read as T or holds a NaN; `failure` says which.
         template <class T>
         [[nodiscard]] std::optional<std::string> EncodePropertyPayload(
             const Geometry::PropertySet& properties,
-            const std::string_view name)
+            const std::string_view name,
+            EncodeFailure& failure)
         {
             const Geometry::ConstProperty<T> property = properties.Get<T>(name);
             if (!property.IsValid())
+            {
+                failure = EncodeFailure::Unreadable;
                 return std::nullopt;
+            }
             const std::vector<T>& values = property.Vector();
             if constexpr (std::is_same_v<T, bool>)
             {
@@ -1752,11 +1784,49 @@ namespace Extrinsic::Runtime
                 for (const T& value : values)
                 {
                     if (ContainsNaN(value))
+                    {
+                        failure = EncodeFailure::HoldsNaN;
                         return std::nullopt;
+                    }
                 }
                 return Core::Base64::Encode(std::span<const std::uint8_t>(
                     reinterpret_cast<const std::uint8_t*>(values.data()), values.size() * sizeof(T)));
             }
+        }
+
+        // Names the engine derives or mirrors from other state (`v:point` mirrors `v:position`,
+        // `f:normal` is recomputed from the faces). They are not authored data: saving them would
+        // persist a stale copy, so the writer skips them without counting them as lost.
+        [[nodiscard]] bool IsEngineDerivedProperty(const GeometryElementDomain domain,
+                                                   const std::string_view name) noexcept
+        {
+            switch (domain)
+            {
+            case GeometryElementDomain::MeshVertex:
+            case GeometryElementDomain::GraphNode:
+            case GeometryElementDomain::PointCloudPoint:
+                return name == "v:point";
+            case GeometryElementDomain::MeshFace:
+                return name == "f:normal";
+            default:
+                return false;
+            }
+        }
+
+        // The value kind the engine's typed accessors expect under a canonical or derived name; a
+        // property loaded under one of these names with another kind would break their GetOrAdd.
+        [[nodiscard]] std::optional<Geometry::PropertyValueKind> CanonicalKindOfName(
+            const std::string_view name) noexcept
+        {
+            using K = Geometry::PropertyValueKind;
+            struct Entry { std::string_view Name; K Kind; };
+            static constexpr std::array<Entry, 9> kEntries{{
+                {PN::kPosition, K::Vec3}, {PN::kNormal, K::Vec3}, {"v:point", K::Vec3},
+                {"v:texcoord", K::Vec2}, {"h:texcoord", K::Vec2}, {"h:normal", K::Vec3},
+                {"f:normal", K::Vec3}, {"f:atlas_region", K::UInt32}, {"f:atlas_chart", K::UInt32}}};
+            for (const Entry& entry : kEntries)
+                if (entry.Name == name) return entry.Kind;
+            return std::nullopt;
         }
 
         void AddElementProperties(json& section,
@@ -1772,14 +1842,16 @@ namespace Extrinsic::Runtime
             for (const Geometry::PropertyDescriptor& descriptor : descriptors)
             {
                 if (IsTopologyProperty(domain, descriptor.Name) ||
+                    IsEngineDerivedProperty(domain, descriptor.Name) ||
                     std::find(dedicated.begin(), dedicated.end(), descriptor.Name) != dedicated.end())
                 {
                     continue;
                 }
                 std::optional<std::string> payload{};
+                EncodeFailure failure = EncodeFailure::None;
                 (void)VisitPropertyValueType(descriptor.ValueKind, [&]<class T>()
                 {
-                    payload = EncodePropertyPayload<T>(properties, descriptor.Name);
+                    payload = EncodePropertyPayload<T>(properties, descriptor.Name, failure);
                     return true;
                 });
                 if (!payload.has_value())
@@ -1790,7 +1862,9 @@ namespace Extrinsic::Runtime
                         ToString(domain), descriptor.Name,
                         DebugNameForGeometryPropertyValueKind(descriptor.ValueKind),
                         descriptor.ValueKind == Geometry::PropertyValueKind::Unknown
-                            ? "its type has no value kind" : "it holds NaN values");
+                            ? "its type has no value kind"
+                            : failure == EncodeFailure::HoldsNaN ? "it holds NaN values"
+                                                                 : "its storage could not be read as that type");
                     continue;
                 }
                 table.push_back(json{
@@ -1876,6 +1950,8 @@ namespace Extrinsic::Runtime
                 {
                     return false;
                 }
+                if (const auto canonical = CanonicalKindOfName(name); canonical.has_value() && *canonical != kind)
+                    return false;
                 const std::string& data = entry["data"].get_ref<const std::string&>();
                 const bool applied = VisitPropertyValueType(kind, [&]<class T>()
                 {
@@ -1908,17 +1984,17 @@ namespace Extrinsic::Runtime
             json out = json::object();
             out["deleted"] = vertices.NumDeleted;
             if (!AddVec3Property(out, "positions", vertices.Properties,
-                                 PN::kPosition, requirePositions))
+                                 PN::kPosition, requirePositions, stats))
             {
                 return false;
             }
             if (!AddVec3Property(out, "normals", vertices.Properties,
-                                 PN::kNormal, false))
+                                 PN::kNormal, false, stats))
             {
                 return false;
             }
             if (!AddVec2Property(out, "texcoords", vertices.Properties,
-                                 "v:texcoord", false))
+                                 "v:texcoord", false, stats))
             {
                 return false;
             }
@@ -1933,12 +2009,12 @@ namespace Extrinsic::Runtime
             json out = json::object();
             out["deleted"] = nodes.NumDeleted;
             if (!AddVec3Property(out, "positions", nodes.Properties,
-                                 PN::kPosition, true))
+                                 PN::kPosition, true, stats))
             {
                 return false;
             }
             if (!AddVec3Property(out, "normals", nodes.Properties,
-                                 PN::kNormal, false))
+                                 PN::kNormal, false, stats))
             {
                 return false;
             }
@@ -1981,12 +2057,12 @@ namespace Extrinsic::Runtime
             // A seam-carrying mesh keeps UVs on the corner domain and can omit
             // `v:texcoord`, so scene round-trips persist this channel too.
             if (!AddVec2Property(out, "texcoords", halfedges.Properties,
-                                 "h:texcoord", false))
+                                 "h:texcoord", false, stats))
             {
                 return false;
             }
             if (!AddVec3Property(out, "normals", halfedges.Properties,
-                                 "h:normal", false))
+                                 "h:normal", false, stats))
             {
                 return false;
             }

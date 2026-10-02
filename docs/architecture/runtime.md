@@ -1210,10 +1210,16 @@ bit-exact, including infinity and signed zero, at about 1.33x the raw size,
 inline with no sidecar or compression. The element count is the section's own,
 and the payload size must match it before decoding. The reader rejects the
 whole document on a malformed, duplicate, reserved, wrongly sized,
-unknown-kind or NaN-carrying entry. The writer never fails a save over a
-property: it skips one holding NaN, or one whose type has no value kind, and
-counts it in `SceneSerializationStats::UnpersistedGeometryProperties` with a
-warning (`GeometryProperties` counts the persisted ones). Restored properties
+unknown-kind or NaN-carrying entry, and an entry whose name is a canonical or
+derived engine name (`v:position`, `v:normal`, `v:point`, `v:texcoord`,
+`h:texcoord`, `h:normal`, `f:normal`, the atlas labels) under any other kind.
+The writer never fails a save over a property: it skips one holding NaN, one
+whose type has no value kind, and a dedicated stream held under another type,
+and counts it in `SceneSerializationStats::UnpersistedGeometryProperties` with
+a warning naming the reason (`GeometryProperties` counts the persisted ones).
+Engine-derived mirrors (`v:point` on mesh, graph and point-cloud vertices,
+`f:normal`) are skipped silently: they are regenerated, and a saved copy
+would go stale. Restored properties
 are new storages with fresh content revisions, so renderer and residency
 caches observe them as new content.
 The reader and writer reject non-compact graph sources, endpoint indices outside
