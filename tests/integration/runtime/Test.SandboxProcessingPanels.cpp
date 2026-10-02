@@ -1240,7 +1240,7 @@ TEST(SandboxProcessingPanels, MeshOperationUsesChosenEntityWithoutChangingSceneS
     ASSERT_TRUE(h.Shell.SetEditorWindowOpen("mesh.processing.subdivide", true));
     int step = 0, frames = 0;
     h.Driver->OnFrame = [&](R::Engine& engine) {
-        if (++frames > 30) { ADD_FAILURE() << "Subdivision UI did not complete"; engine.RequestExit(); return; }
+        if (++frames > 400) { ADD_FAILURE() << "Subdivision UI did not complete"; engine.RequestExit(); return; }
         auto* window = ImGui::FindWindowByName("Mesh / Processing / Subdivide");
         if (!window) return;
         ImGui::SetWindowSize(window, {750, 1200});
@@ -1259,14 +1259,16 @@ TEST(SandboxProcessingPanels, MeshOperationUsesChosenEntityWithoutChangingSceneS
             }
         }
         if (step == 8) ImGui::ActivateItemByID(window->GetID("Subdivide##MeshSubdivide"));
-        if (++step != 12) return;
+        // The subdivision runs on the worker scheduler; wait for its result instead of
+        // assuming it lands a fixed number of frames after the click.
+        if (++step < 12 || scene.Raw().get<GS::Faces>(target).Properties.Size() != 32u) return;
         EXPECT_EQ(scene.Raw().get<GS::Faces>(selected).Properties.Size(), 8u);
         EXPECT_EQ(scene.Raw().get<GS::Faces>(target).Properties.Size(), 32u);
         EXPECT_EQ(h.Selection().SelectedStableIds().front(), R::SelectionController::ToStableEntityId(selected));
         engine.RequestExit();
     };
     h.Engine->Run();
-    EXPECT_EQ(step, 12);
+    EXPECT_GE(step, 12);
 }
 
 TEST(SandboxProcessingPanels, SharedScalarPanelsRunConfiguredOutputAndShowWithoutRecomputing)
