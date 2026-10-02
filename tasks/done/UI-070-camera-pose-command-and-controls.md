@@ -37,10 +37,23 @@ or a fit-to-entity focus through one editor command.
 - Per controller kind: orbit exact (radius clamped and reported), free-look exact (roll from `Up`), fly applies position and direction with `Up` as a hint, top-down only looks along -Y. Unreachable directions return `UnsupportedCameraPose` without touching the camera.
 
 ## Acceptance criteria
-- [ ] A runtime editor command in `Runtime.SceneEditingOperations` applies a pose (position/target/up or orbit parameters), a named preset, or a fit to one or more stable entity ids. It shares preset/framing code with `ViewCaptureModule`.
-- [ ] The Sandbox UI exposes the presets and "Focus selection" (View menu or Camera panel) through that command.
-- [ ] The agent `set_camera` accepts `pose`, `preset` and `focus` over the same command, and the lane doc Naming/Limitations are updated.
-- [ ] Tests: command contract (pose round-trip, preset framing equals the ViewCapture framing, focus on off-origin bounds); ImGui action test; agent test.
+- [x] A runtime editor command in `Runtime.SceneEditingOperations` applies a pose (position/target/up or orbit parameters), a named preset, or a fit to one or more stable entity ids. It shares preset/framing code with `ViewCaptureModule`.
+- [x] The Sandbox UI exposes the presets and "Focus selection" (View menu or Camera panel) through that command.
+- [x] The agent `set_camera` accepts `pose`, `preset` and `focus` over the same command, and the lane doc Naming/Limitations are updated.
+- [x] Tests: command contract (pose round-trip, preset framing equals the ViewCapture framing, focus on off-origin bounds); ImGui action test; agent test.
+
+## Completion
+
+Commit: `dfc9eb513`, `2bb02637d`, `3057c6fa2`, `2fd7dc359`, `d19869be1`, `0cff0f14f`, `77b990b7c`, `e9930ca1b`, `bf9a4c991`. Completed 2026-10-02 with an independent Opus review per slice and a final acceptance review.
+- Full CPU suite 5640/5640.
+- Evidence:
+  - `CameraPoseCommandPresetFramesLikeTheSharedPresetSeed`
+  - `CameraPanelPresetAndFocusButtonsDriveTheMainCamera`
+  - `CameraViewFocusButtonIsDisabledWithoutASelection`
+  - the `set_camera` agent tests, including `up_ignored`
+- Camera changes are not in undo history, following the `ApplyEditorCameraControllerCommand` precedent.
+- Yaw/pitch/radius are descoped because position/target/up covers them.
+- Maturity: CPUContracted. The visual/GPU check is owned by [UI-076](../backlog/ui/UI-076-camera-preset-visual-smoke.md).
 
 ## Verification
 ```bash

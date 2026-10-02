@@ -21,7 +21,7 @@ covers the editor commands of finding 9 through `run_operation`/`preview_operati
 `wait`. Evidence is the socket integration tests (`SandboxAgentServer.*`, real engine, Null window),
 `AgentOperations.*` and `Test.McpBridge.py`; no live Vulkan Sandbox session. CPUContracted.
 Remaining work is owned elsewhere: job cancel by [RUNTIME-279](RUNTIME-279-editor-job-snapshot-and-cancel.md),
-camera pose/preset/focus by [UI-070](../backlog/ui/UI-070-camera-pose-command-and-controls.md), texture bake progress by
+camera pose/preset/focus by [UI-070](UI-070-camera-pose-command-and-controls.md), texture bake progress by
 [UI-073](../backlog/ui/UI-073-texture-bake-progress-adoption.md). Known limitation: a panel's draft-output fallback shows
 agent runs only before its first own run and only for the current draft key
 (`sandbox-editor-feature-boundaries.md`).
@@ -155,7 +155,7 @@ the editor operations the Sandbox UI already offers.
    (`ApplyEditorCameraControllerCommand`). No editor command sets a camera pose, preset or
    focus (the viewport camera is driven by input, and the screenshot presets live in
    `ViewCaptureModule`), and the constraint above makes a missing UI action a prerequisite, not
-   part of this task. Follow-up [UI-070](../backlog/ui/UI-070-camera-pose-command-and-controls.md): an editor camera-pose
+   part of this task. Follow-up [UI-070](UI-070-camera-pose-command-and-controls.md): an editor camera-pose
    command with a UI action (for example Camera panel fields plus Focus selection) in
    `Runtime.SceneEditingOperations`, then `set_camera` gains `pose`/`preset`/`focus` over it.
 

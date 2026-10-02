@@ -18,6 +18,7 @@ its dependencies, conditional gates, scope and verification.
 - [UI-071 — One Stop/Accept/Discard row and one disabled-reason presentation](UI-071-gpu-transaction-controls-and-refusal-presentation.md)
 - [UI-072 — Adopt the shared panel helpers (Show buttons, spec-driven widgets)](UI-072-adopt-shared-panel-support-helpers.md)
 - [UI-075 — One Appearance panel for all domains with per-attribute source selectors](UI-075-unified-appearance-panel-with-attribute-source-selectors.md)
+- [UI-076 — Camera preset and focus visual smoke](UI-076-camera-preset-visual-smoke.md)
 
 ## Agent lane and inspection windows
 
@@ -27,7 +28,6 @@ Each window uses the same runtime functions as agent operations.
 - [UI-059 — Property Inspector window](UI-059-property-inspector-window.md)
 - [UI-060 — Jobs window](UI-060-jobs-window.md)
 - [UI-073 — Texture bake panels use the shared progress widget](UI-073-texture-bake-progress-adoption.md)
-- [UI-070 — Camera pose command, view presets and Focus selection](UI-070-camera-pose-command-and-controls.md)
 - [UI-061 — Select-by-query controls and "use selection as mask/source"](UI-061-select-by-query-controls.md)
 - [UI-063 — File > Properties import/export window](UI-063-properties-import-export-window.md)
 - [UI-064 — History window](UI-064-history-window.md)

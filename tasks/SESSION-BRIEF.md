@@ -72,7 +72,6 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `RUNTIME-284`: `UI-064` — History window (tasks/backlog/ui/UI-064-history-window.md)
 - blocked by `RUNTIME-285`: `UI-065` — Diagnostics / Log window (tasks/backlog/ui/UI-065-diagnostics-log-window.md)
 - blocked by `RUNTIME-286`: `UI-066` — Mesh Health window (tasks/backlog/ui/UI-066-mesh-health-window.md)
-- unblocked: `UI-070` — Camera pose command, view presets and Focus selection (tasks/backlog/ui/UI-070-camera-pose-command-and-controls.md)
 - unblocked: `UI-071` — One Stop/Accept/Discard row and one disabled-reason presentation (tasks/backlog/ui/UI-071-gpu-transaction-controls-and-refusal-presentation.md)
 - unblocked: `UI-072` — Adopt the shared panel helpers (Show buttons, spec-driven widgets) (tasks/backlog/ui/UI-072-adopt-shared-panel-support-helpers.md)
 - unblocked: `UI-073` — Texture bake panels use the shared operation progress widget (tasks/backlog/ui/UI-073-texture-bake-progress-adoption.md)
@@ -219,6 +218,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `UI-049` — Editor panels are sized so that labels clip and results are hidden (tasks/backlog/ui/UI-049-editor-panel-sizing-and-readability.md)
 - unblocked: `UI-051` — A mesh does not pass as a graph or a point cloud in the domain windows (tasks/backlog/ui/UI-051-domain-agnostic-appearance-properties-selection-windows.md)
 - blocked by `UI-051`: `UI-075` — One Appearance panel for all domains with per-attribute source selectors (tasks/backlog/ui/UI-075-unified-appearance-panel-with-attribute-source-selectors.md)
+- unblocked: `UI-076` — Camera preset and focus visual smoke (tasks/backlog/ui/UI-076-camera-preset-visual-smoke.md)
 
 ## Unthemed
 

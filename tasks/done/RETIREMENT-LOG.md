@@ -8,6 +8,22 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-02 — UI-070 camera pose command, view presets and Focus selection
+
+Retired [UI-070](UI-070-camera-pose-command-and-controls.md).
+
+- `ApplyEditorCameraPoseCommand` applies a pose, a named preset or a focus on stable entities. Presets are shared with ViewCapture through `Runtime.CameraControllers`.
+- Behaviour per controller kind:
+  - Orbit keeps the target as pivot.
+  - Free-look derives roll from Up.
+  - Fly and top-down report `up_ignored`.
+  - An unrepresentable view returns `UnsupportedCameraPose` and leaves the camera untouched.
+- The Camera/Render panel has the seven preset buttons and Focus selection. Focus also works with the Selection window closed.
+- The agent `set_camera` uses the same command.
+- Maturity: CPUContracted. The visual GPU smoke is owned by UI-076.
+
+Commits `dfc9eb513` through `bf9a4c991`.
+
 ## 2026-10-02 — UI-074 color interpretation tooltips
 
 Retired [UI-074](UI-074-color-interpretation-tooltips.md).
