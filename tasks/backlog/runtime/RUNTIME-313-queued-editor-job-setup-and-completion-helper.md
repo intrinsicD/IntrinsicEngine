@@ -61,6 +61,24 @@ duplicate to `result_unavailable`; the single status must keep that mapping.
   - Cancelling by output identity also cancels a newer run on the same output; key the cancel to the call's own run.
   - `RunWasCancelled` can relabel a real failure when an older cancelled job on that output is retained.
   - A reaped `jobs_wait` answer can carry a non-terminal `state` and skips the scene-epoch check.
+## Implementation log
+- Shared owner: `MeshSupport::ActiveOutputJobRefusal`, `ValidateQueuedJob`, `QueuedJobDelivery<Result>`
+  (deliver-once; `Publish`, `Finalize`/`FinalizeFrom`, `Rejected`) declared in
+  `Runtime.GeometryProcessingOperations.JobFailure.hpp`, non-template parts compiled in `...MeshSupport.cpp`.
+- User-visible status/message changes (one row per migrated operation):
+
+| Operation (label) | Duplicate submission | Cancelled/stale finalize | Rejected submission | Slice |
+|---|---|---|---|---|
+| Outlier estimation | "An outlier job for this output is already active." -> "Outlier estimation already has an active <state> job (job i:g)." (Pending, unchanged) | "Outlier job was cancelled or its source became stale; previous output retained." -> "Outlier estimation was cancelled or its source became stale; nothing was applied." (StaleEntity) | "Outlier job submission was rejected." -> "Outlier estimation job submission was rejected."; now also delivered once through the callback | 1 |
+| Normal estimation (CPU) | same pattern, label "Normal estimation" | same pattern | same pattern | 1 |
+| Density / Radii estimation | "A density/radii job ..." -> "<Density/Radii> estimation already has an active ..." | "<Noun> job was cancelled ..." -> "<Noun> estimation was cancelled ..." | "<Noun> job submission ..." -> "<Noun> estimation job submission ..." | 1 |
+
+- Validation: Outliers, Density/Radii and Normals now answer `Cancelled` for an abandoned run instead of
+  ignoring the flag. Not observable for these single-stage jobs (the flag is set only by their own
+  finalizer, after which nothing revalidates); it unifies the rule for multi-stage runs. The same holds
+  for setting the delivered flag in finalize: these jobs already suppressed a second delivery through
+  their publisher.
+
 ## Acceptance criteria
 - [ ] One compiled helper owns the active-job check (one status, `BuildActiveDerivedJobMessage` wording), deliver-once, and unpublished finalize; the ~10 hand-written copies are removed or reduced to typed callbacks.
 - [ ] Every migrated operation honours `Abandoned` in validation and sets/clears the delivered flag identically; a test per drift item above fails on the old behaviour.

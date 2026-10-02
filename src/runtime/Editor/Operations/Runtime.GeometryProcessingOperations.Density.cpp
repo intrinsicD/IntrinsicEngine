@@ -33,6 +33,7 @@ import Extrinsic.Core.Config.EngineLoad;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuScalar.hpp"
 
@@ -278,60 +279,37 @@ namespace Extrinsic::Runtime
                                              .Scope = ToEditorJobScope(output.Domain),
                                              .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField,
                                              .OutputName = output.Name};
-            if (auto active = MeshSupport::FindActiveEditorJob(context, identity);
-                active && IsActiveEditorJobState(active->State))
-                return report(EditorCommandStatus::Pending,
-                              Join({"A ", M::Lower, " job for this output is already active."}));
-            auto sink = GuardEditorProcessingResult(context, std::move(onComplete));
-            auto delivered = std::make_shared<bool>(false);
-            auto pending = w->Result;
-            pending.Status = EditorCommandStatus::Pending;
-            pending.Message = Join({M::Noun, " estimation queued."});
+            const std::string label = Join({M::Noun, " estimation"});
+            if (auto busy = MeshSupport::ActiveOutputJobRefusal(context, identity, label))
+                return report(EditorCommandStatus::Pending, std::move(*busy));
+            auto queued = w->Result;
+            queued.Message = label + " queued.";
+            const MeshSupport::QueuedJobDelivery<typename M::Result> delivery{
+                context, std::move(onComplete), std::move(queued), label};
             JobDesc desc{
-                .DebugName = Join({M::Noun, " estimation"}),
+                .DebugName = label,
                 .Scope = context.World,
                 .Kind = RuntimeTaskKinds::GeometryProcess,
                 .Work = [w](const JobCancellation &) -> JobResultEnvelope {
                     Compute(*w);
                     return JobResultEnvelope::Make(true);
                 },
-                .ValidateBeforeApply =
-                    [context, w] {
-                        return PointScalarFieldCurrent(context, w->Entity, *w) ? JobApplyValidation::Current
-                                                                               : JobApplyValidation::StaleGeneration;
-                    },
-                .PublishCompletion =
-                    [context, w, sink, delivered](KernelEventBus &, const JobResultEnvelope &) {
-                        auto result = Publish(context, w);
-                        *delivered = true;
-                        if (sink)
-                            sink(result);
-                        return result.Succeeded();
-                    },
-                .FinalizeUnpublishedOnMainThread =
-                    [sink, delivered, w, pending]() mutable {
-                        w->Abandoned = true;
-                        if (sink && !*delivered)
-                        {
-                            if (w->Result.Status == EditorCommandStatus::GeometryProcessingFailed)
-                                pending = w->Result;
-                            else
-                            {
-                                pending.Status = EditorCommandStatus::StaleEntity;
-                                pending.Message = Join({M::Noun,
-                                    " job was cancelled or its source became stale; previous output retained."});
-                            }
-                            sink(std::move(pending));
-                        }
-                    }};
-            const auto token = context.JobCommands.Submit(std::move(desc), identity);
-            if (!token.IsValid())
+                .ValidateBeforeApply = [context, w] {
+                    return MeshSupport::ValidateQueuedJob(w->Abandoned, PointScalarFieldCurrent(context, w->Entity, *w));
+                },
+                .PublishCompletion = [context, w, delivery](KernelEventBus &, const JobResultEnvelope &) {
+                    return delivery.Publish(Publish(context, w));
+                },
+                .FinalizeUnpublishedOnMainThread = [w, delivery] {
+                    w->Abandoned = true;
+                    delivery.Finalize(w->Result.Status == EditorCommandStatus::GeometryProcessingFailed ? &w->Result : nullptr);
+                }};
+            if (!context.JobCommands.Submit(std::move(desc), identity).IsValid())
             {
                 w->Abandoned = true;
-                pending.Status = EditorCommandStatus::GeometryProcessingFailed;
-                pending.Message = Join({M::Noun, " job submission was rejected."});
+                return delivery.Rejected();
             }
-            return pending;
+            return delivery.Pending();
         }
         template <class M>
         typename M::Result ApplyConfigured(const EditorProcessingCommands& commands,

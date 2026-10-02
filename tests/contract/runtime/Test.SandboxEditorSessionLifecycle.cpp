@@ -3603,3 +3603,105 @@ TEST(SandboxEditorSessionLifecycle, EditorJobRunCancelReachesStagesQueuedAfterTh
     release.store(true, std::memory_order_release);
     ASSERT_TRUE(harness.DrainUntilTerminal());
 }
+
+// RUNTIME-313: every queued point job shares one setup/completion contract
+// (`MeshSupport::QueuedJobDelivery`, `ActiveOutputJobRefusal`). A duplicate submission
+// answers Pending with the shared "already has an active" wording and never takes the
+// callback; a cancelled run delivers exactly once, StaleEntity, with the shared wording.
+namespace
+{
+    class EditorQueuedPointJobs : public EditorPointReadiness
+    {
+    protected:
+        bool DrainJobsUntil(const std::function<bool()>& done)
+        {
+            auto& jobs = RequiredEngineService<Runtime::JobService>(Engine);
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+            while (!done())
+            {
+                if (std::chrono::steady_clock::now() > deadline) return false;
+                (void)jobs.DrainCompletions(Engine.Events());
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+            return true;
+        }
+        void DrainAllJobs()
+        {
+            ASSERT_TRUE(DrainJobsUntil([&] {
+                const auto records = Runtime::GetEditorJobs(Commands);
+                return std::none_of(records.begin(), records.end(), [](const Runtime::EditorJobRecord& job) {
+                    return Runtime::IsActiveEditorJobState(job.State);
+                });
+            }));
+        }
+        template <class Apply>
+        void ExpectDuplicateRefused(const std::string& label, Apply apply)
+        {
+            SCOPED_TRACE(label);
+            unsigned firstCalls{0u}, duplicateCalls{0u};
+            const auto first = apply([&](auto) { ++firstCalls; });
+            ASSERT_EQ(first.Status, Runtime::EditorCommandStatus::Pending) << first.Message;
+            const auto duplicate = apply([&](auto) { ++duplicateCalls; });
+            EXPECT_EQ(duplicate.Status, Runtime::EditorCommandStatus::Pending);
+            EXPECT_EQ(duplicate.Message.rfind(label + " already has an active ", 0), 0u) << duplicate.Message;
+            EXPECT_NE(duplicate.Message.find("(job "), std::string::npos) << duplicate.Message;
+            ASSERT_TRUE(DrainJobsUntil([&] { return firstCalls != 0u; }));
+            DrainAllJobs();
+            EXPECT_EQ(firstCalls, 1u);
+            EXPECT_EQ(duplicateCalls, 0u) << "the active job keeps the callback";
+        }
+        template <class Apply>
+        void ExpectCancelFinalizesOnce(const std::string& label, Apply apply)
+        {
+            SCOPED_TRACE(label);
+            unsigned calls{0u};
+            Runtime::EditorCommandStatus status{};
+            std::string message;
+            const auto queued = apply([&](auto result) {
+                ++calls;
+                status = result.Status;
+                message = result.Message;
+            });
+            ASSERT_EQ(queued.Status, Runtime::EditorCommandStatus::Pending) << queued.Message;
+            unsigned cancelled{0u};
+            for (const auto& job : Runtime::GetEditorJobs(Commands))
+                if (Runtime::IsActiveEditorJobState(job.State) &&
+                    Runtime::CancelEditorJob(Commands, job.Token) == Runtime::EditorJobCancelStatus::Requested)
+                    ++cancelled;
+            ASSERT_GT(cancelled, 0u);
+            ASSERT_TRUE(DrainJobsUntil([&] { return calls != 0u; }));
+            DrainAllJobs();
+            EXPECT_EQ(calls, 1u);
+            EXPECT_EQ(status, Runtime::EditorCommandStatus::StaleEntity);
+            EXPECT_EQ(message, label + " was cancelled or its source became stale; nothing was applied.");
+        }
+    };
+}
+
+TEST_F(EditorQueuedPointJobs, DuplicateSubmissionAnswersPendingWithTheSharedMessage)
+{
+    const auto fields = Runtime::PrepareEditorPointFieldFrame(Attachment).Commands;
+    const auto normals = Runtime::PrepareEditorNormalFrame(Attachment).Commands;
+    ExpectDuplicateRefused("Outlier estimation", [&](auto done) {
+        return Runtime::ApplyEditorOutlierAnalysisCommand(Commands, Outliers, done); });
+    ExpectDuplicateRefused("Normal estimation", [&](auto done) {
+        return Runtime::ApplyEditorNormalEstimationCommand(normals, Normals, done); });
+    ExpectDuplicateRefused("Density estimation", [&](auto done) {
+        return Runtime::ApplyEditorKernelDensityCommand(fields, Density, done); });
+    ExpectDuplicateRefused("Radii estimation", [&](auto done) {
+        return Runtime::ApplyEditorPointSpacingCommand(fields, Spacing, done); });
+}
+
+TEST_F(EditorQueuedPointJobs, CancelledRunDeliversOnceWithTheSharedWording)
+{
+    const auto fields = Runtime::PrepareEditorPointFieldFrame(Attachment).Commands;
+    const auto normals = Runtime::PrepareEditorNormalFrame(Attachment).Commands;
+    ExpectCancelFinalizesOnce("Outlier estimation", [&](auto done) {
+        return Runtime::ApplyEditorOutlierAnalysisCommand(Commands, Outliers, done); });
+    ExpectCancelFinalizesOnce("Normal estimation", [&](auto done) {
+        return Runtime::ApplyEditorNormalEstimationCommand(normals, Normals, done); });
+    ExpectCancelFinalizesOnce("Density estimation", [&](auto done) {
+        return Runtime::ApplyEditorKernelDensityCommand(fields, Density, done); });
+    ExpectCancelFinalizesOnce("Radii estimation", [&](auto done) {
+        return Runtime::ApplyEditorPointSpacingCommand(fields, Spacing, done); });
+}

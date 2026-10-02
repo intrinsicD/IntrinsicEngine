@@ -53,6 +53,7 @@ import Extrinsic.RHI.TransferQueue;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuFront.hpp"
@@ -1423,15 +1424,13 @@ namespace Extrinsic::Runtime
                                          .Scope = ToEditorJobScope(w->Config.Output.Domain),
                                          .OutputSemantic = GeometryPresentationSlotSemantic::Normal,
                                          .OutputName = w->Config.Output.Name};
-        if (auto active = GeometryProcessingDetail::MeshSupport::FindActiveEditorJob(context, identity);
-            active && IsActiveEditorJobState(active->State))
-            return report(EditorCommandStatus::Pending,
-                          "A normal job for this output is already active.");
-        auto sink = GuardEditorProcessingResult(context, std::move(onComplete));
-        auto delivered = std::make_shared<bool>(false);
-        auto pending = w->Result;
-        pending.Status = EditorCommandStatus::Pending;
-        pending.Message = "Normal estimation queued.";
+        namespace MS = GeometryProcessingDetail::MeshSupport;
+        if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Normal estimation"))
+            return report(EditorCommandStatus::Pending, std::move(*busy));
+        auto queued = w->Result;
+        queued.Message = "Normal estimation queued.";
+        const MS::QueuedJobDelivery<EditorNormalEstimationResult> delivery{
+            context, std::move(onComplete), std::move(queued), "Normal estimation"};
         JobDesc desc{
             .DebugName = "Normal estimation",
             .Scope = context.World,
@@ -1440,42 +1439,22 @@ namespace Extrinsic::Runtime
                 ComputeNormals(*w);
                 return JobResultEnvelope::Make(true);
             },
-            .ValidateBeforeApply =
-                [context, w] {
-                    return CurrentNormalInput(context, *w, true) ? JobApplyValidation::Current
-                                                                 : JobApplyValidation::StaleGeneration;
-                },
-            .PublishCompletion =
-                [context, w, sink, delivered](KernelEventBus &, const JobResultEnvelope &) {
-                    auto result = PublishNormals(context, w);
-                    *delivered = true;
-                    if (sink)
-                        sink(result);
-                    return result.Succeeded();
-                },
-            .FinalizeUnpublishedOnMainThread =
-                [sink, delivered, w, pending]() mutable {
-                    w->Abandoned = true;
-                    if (sink && !*delivered)
-                    {
-                        if (w->Result.Status == EditorCommandStatus::GeometryProcessingFailed)
-                            pending = w->Result;
-                        else
-                        {
-                            pending.Status = EditorCommandStatus::StaleEntity;
-                            pending.Message = "Normal job was cancelled or its source became stale; previous output retained.";
-                        }
-                        sink(std::move(pending));
-                    }
-                }};
-        const auto token = context.JobCommands.Submit(std::move(desc), identity);
-        if (!token.IsValid())
+            .ValidateBeforeApply = [context, w] {
+                return MS::ValidateQueuedJob(w->Abandoned, CurrentNormalInput(context, *w, true));
+            },
+            .PublishCompletion = [context, w, delivery](KernelEventBus &, const JobResultEnvelope &) {
+                return delivery.Publish(PublishNormals(context, w));
+            },
+            .FinalizeUnpublishedOnMainThread = [w, delivery] {
+                w->Abandoned = true;
+                delivery.Finalize(w->Result.Status == EditorCommandStatus::GeometryProcessingFailed ? &w->Result : nullptr);
+            }};
+        if (!context.JobCommands.Submit(std::move(desc), identity).IsValid())
         {
             w->Abandoned = true;
-            pending.Status = EditorCommandStatus::GeometryProcessingFailed;
-            pending.Message = "Normal job submission was rejected.";
+            return delivery.Rejected();
         }
-        return pending;
+        return delivery.Pending();
     }
     EditorNormalEstimationResult ApplyEditorConfiguredNormalEstimation(
         const EditorProcessingCommands &commands, std::function<void(EditorNormalEstimationResult)> onComplete)

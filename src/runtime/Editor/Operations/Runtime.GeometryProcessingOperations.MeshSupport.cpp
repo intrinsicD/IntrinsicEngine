@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -510,6 +511,48 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             }
             failure.Message += ".";
             return failure;
+        }
+
+        std::optional<std::string> ActiveOutputJobRefusal(
+            const EditorProcessingContext& context,
+            const EditorJobIdentity& identity,
+            const std::string_view label)
+        {
+            const auto active = FindActiveEditorJob(context, identity);
+            if (!active || !IsActiveEditorJobState(active->State))
+                return std::nullopt;
+            return BuildActiveDerivedJobMessage(label, *active);
+        }
+
+        JobApplyValidation ValidateQueuedJob(
+            const bool abandoned, const bool inputsCurrent) noexcept
+        {
+            if (abandoned)
+                return JobApplyValidation::Cancelled;
+            return inputsCurrent ? JobApplyValidation::Current
+                                 : JobApplyValidation::StaleGeneration;
+        }
+
+        std::string QueuedJobUnpublishedMessage(const std::string_view label)
+        {
+            std::string message{label};
+            message += " was cancelled or its source became stale; nothing was applied.";
+            return message;
+        }
+
+        std::string QueuedJobRejectedMessage(
+            const std::string_view label, const std::string_view stage)
+        {
+            std::string message{label};
+            message += " job submission was rejected";
+            if (!stage.empty())
+            {
+                message += " (";
+                message += stage;
+                message += ")";
+            }
+            message += ".";
+            return message;
         }
 
         JobApplyValidation ValidateMeshCpuJobSource(

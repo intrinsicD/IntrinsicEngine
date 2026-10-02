@@ -1,6 +1,9 @@
-// Terminal failure status and diagnostics shared by queued editor methods.
-// Include after EditorCommon, Core.Error and JobService imports; the including
-// global module fragment supplies string and string_view.
+// Terminal failure status and diagnostics shared by queued editor methods, and
+// the one setup/completion contract every queued editor job uses: duplicate-output
+// refusal, revalidation of abandoned runs and deliver-once completion.
+// Include after EditorCommon, Core.Error, JobService and EditorJobProjection
+// imports; queued-job users also include `Runtime.EditorProcessingAccess.hpp`.
+// The including unit supplies functional, memory, optional, string and string_view.
 #pragma once
 
 extern "C++"
@@ -23,5 +26,111 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
         std::string_view detail = {},
         std::string_view staleReason = {});
 
+    // Duplicate guard of a queued editor job. When `identity` already has an
+    // active job, returns the refusal ("<label> already has an active <state>
+    // job (job i:g).") that the caller answers with `EditorCommandStatus::Pending`
+    // without registering its callback: the active job keeps delivering to its
+    // own caller, and the agent lane reports such a call as `result_unavailable`.
+    [[nodiscard]] std::optional<std::string> ActiveOutputJobRefusal(
+        const EditorProcessingContext& context,
+        const EditorJobIdentity& identity,
+        std::string_view label);
+
+    // Revalidation of one stage of a queued job on the main thread. An
+    // abandoned run (cancelled, or an earlier stage finalized) answers
+    // Cancelled; otherwise the caller's typed input check decides.
+    [[nodiscard]] JobApplyValidation ValidateQueuedJob(
+        bool abandoned, bool inputsCurrent) noexcept;
+
+    // "<label> was cancelled or its source became stale; nothing was applied."
+    [[nodiscard]] std::string QueuedJobUnpublishedMessage(std::string_view label);
+    // "<label> job submission was rejected." (or "... rejected (<stage>).")
+    [[nodiscard]] std::string QueuedJobRejectedMessage(
+        std::string_view label, std::string_view stage = {});
+
+    // Deliver-once completion of a queued editor job. Copies share one state,
+    // so every stage of a multi-stage run captures the same delivery. The
+    // callback is guarded against a detached attachment and fires at most once
+    // per delivery: from `Publish`, `Finalize` or `Rejected`, whichever comes
+    // first. Main thread only, like the JobService callbacks that call it.
+    template <class Result>
+    class QueuedJobDelivery
+    {
+    public:
+        QueuedJobDelivery(const EditorProcessingContext& context,
+                          std::function<void(Result)> onComplete,
+                          Result pending,
+                          std::string label)
+            : m_State(std::make_shared<State>(State{
+                  .Sink = GuardEditorProcessingResult(context, std::move(onComplete)),
+                  .Pending = std::move(pending),
+                  .Label = std::move(label)}))
+        {
+            m_State->Pending.Status = EditorCommandStatus::Pending;
+        }
+
+        // The immediate answer of a queued submission.
+        [[nodiscard]] const Result& Pending() const noexcept { return m_State->Pending; }
+
+        // `PublishCompletion`: delivers the published result; its success is the
+        // job's publication verdict (a failed one still runs `Finalize`, which
+        // then delivers nothing more).
+        bool Publish(Result result) const
+        {
+            const bool succeeded = result.Succeeded();
+            Deliver(std::move(result));
+            return succeeded;
+        }
+
+        // `FinalizeUnpublishedOnMainThread`: a worker failure (`failure`) is
+        // delivered as it is; otherwise the pending snapshot, or the caller's
+        // `latest` progress, ends as StaleEntity with the shared wording.
+        void Finalize(const Result* failure = nullptr) const
+        {
+            if (failure != nullptr)
+            {
+                Deliver(*failure);
+                return;
+            }
+            FinalizeFrom(m_State->Pending);
+        }
+        void FinalizeFrom(Result latest) const
+        {
+            latest.Status = EditorCommandStatus::StaleEntity;
+            latest.Message = QueuedJobUnpublishedMessage(m_State->Label);
+            Deliver(std::move(latest));
+        }
+
+        // A rejected submission: the failure is both the immediate answer and
+        // the one delivery, so a later stage's finalizer delivers nothing.
+        [[nodiscard]] Result Rejected(std::string_view stage = {}) const
+        {
+            auto result = m_State->Pending;
+            result.Status = EditorCommandStatus::GeometryProcessingFailed;
+            result.Message = QueuedJobRejectedMessage(m_State->Label, stage);
+            Deliver(result);
+            return result;
+        }
+
+    private:
+        struct State
+        {
+            std::function<void(Result)> Sink{};
+            Result Pending{};
+            std::string Label{};
+            bool Delivered{false};
+        };
+
+        void Deliver(Result result) const
+        {
+            if (m_State->Delivered)
+                return;
+            m_State->Delivered = true;
+            if (m_State->Sink)
+                m_State->Sink(std::move(result));
+        }
+
+        std::shared_ptr<State> m_State;
+    };
 }
 }

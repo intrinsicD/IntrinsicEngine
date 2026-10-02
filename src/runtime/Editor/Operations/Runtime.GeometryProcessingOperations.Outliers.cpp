@@ -46,6 +46,7 @@ import Extrinsic.RHI.CommandContext;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuFront.hpp"
 
@@ -666,15 +667,13 @@ namespace Extrinsic::Runtime
                                          .Scope = ToEditorJobScope(w->Config.Mask.Domain),
                                          .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField,
                                          .OutputName = w->Config.Mask.Name};
-        if (auto active = GeometryProcessingDetail::MeshSupport::FindActiveEditorJob(context, identity);
-            active && IsActiveEditorJobState(active->State))
-            return report(EditorCommandStatus::Pending,
-                          "An outlier job for this output is already active.");
-        auto sink = GuardEditorProcessingResult(context, std::move(onComplete));
-        auto delivered = std::make_shared<bool>(false);
-        auto pending = w->Result;
-        pending.Status = EditorCommandStatus::Pending;
-        pending.Message = "Outlier estimation queued.";
+        namespace MS = GeometryProcessingDetail::MeshSupport;
+        if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Outlier estimation"))
+            return report(EditorCommandStatus::Pending, std::move(*busy));
+        auto queued = w->Result;
+        queued.Message = "Outlier estimation queued.";
+        const MS::QueuedJobDelivery<EditorOutlierAnalysisResult> delivery{
+            context, std::move(onComplete), std::move(queued), "Outlier estimation"};
         JobDesc desc{
             .DebugName = "Outlier estimation",
             .Scope = context.World,
@@ -683,42 +682,20 @@ namespace Extrinsic::Runtime
                 Compute(*w);
                 return JobResultEnvelope::Make(true);
             },
-            .ValidateBeforeApply =
-                [context, w] {
-                    return CurrentInput(context, *w) ? JobApplyValidation::Current
-                                                                 : JobApplyValidation::StaleGeneration;
-                },
-            .PublishCompletion =
-                [context, w, sink, delivered](KernelEventBus &, const JobResultEnvelope &) {
-                    auto result = Publish(context, w);
-                    *delivered = true;
-                    if (sink)
-                        sink(result);
-                    return result.Succeeded();
-                },
-            .FinalizeUnpublishedOnMainThread =
-                [sink, delivered, w, pending]() mutable {
-                    w->Abandoned = true;
-                    if (sink && !*delivered)
-                    {
-                        if (w->Result.Status == EditorCommandStatus::GeometryProcessingFailed)
-                            pending = w->Result;
-                        else
-                        {
-                            pending.Status = EditorCommandStatus::StaleEntity;
-                            pending.Message = "Outlier job was cancelled or its source became stale; previous output retained.";
-                        }
-                        sink(std::move(pending));
-                    }
-                }};
-        const auto token = context.JobCommands.Submit(std::move(desc), identity);
-        if (!token.IsValid())
+            .ValidateBeforeApply = [context, w] { return MS::ValidateQueuedJob(w->Abandoned, CurrentInput(context, *w)); },
+            .PublishCompletion = [context, w, delivery](KernelEventBus &, const JobResultEnvelope &) {
+                return delivery.Publish(Publish(context, w));
+            },
+            .FinalizeUnpublishedOnMainThread = [w, delivery] {
+                w->Abandoned = true;
+                delivery.Finalize(w->Result.Status == EditorCommandStatus::GeometryProcessingFailed ? &w->Result : nullptr);
+            }};
+        if (!context.JobCommands.Submit(std::move(desc), identity).IsValid())
         {
             w->Abandoned = true;
-            pending.Status = EditorCommandStatus::GeometryProcessingFailed;
-            pending.Message = "Outlier job submission was rejected.";
+            return delivery.Rejected();
         }
-        return pending;
+        return delivery.Pending();
     }
     EditorOutlierAnalysisResult ApplyEditorConfiguredOutlierAnalysis(
         const EditorProcessingCommands& commands, std::function<void(EditorOutlierAnalysisResult)> onComplete)
