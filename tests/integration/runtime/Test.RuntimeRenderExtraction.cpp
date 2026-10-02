@@ -4,6 +4,7 @@
 #include <cstring>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -1804,6 +1805,227 @@ TEST(RuntimeRenderExtraction, GeometryPresentationPropertyBuffersProjectToVisual
     EXPECT_EQ(world.Visualization.Diagnostics.InputPacketCount, 2u);
     EXPECT_EQ(world.Visualization.Diagnostics.AcceptedPacketCount, 2u);
     EXPECT_FALSE(world.Visualization.Diagnostics.HasErrors);
+}
+
+namespace
+{
+    // RUNTIME-318: the four former presentation color slots and the overlay
+    // that replaces them, observed on the lane's GPU entity config.
+    enum class LaneColorCase : std::uint8_t { PointColor, PointScalar, LineColor, LineScalar };
+
+    struct LaneColorObservation
+    {
+        RHI::GpuEntityConfig Config{};
+        std::vector<std::byte> ColorBytes{};
+        std::vector<std::byte> ScalarBytes{};
+        // The lane's one color/scalar packet (range/colormap unused for colors).
+        struct PacketSummary
+        {
+            std::string Name{};
+            Graphics::VisualizationAttributeDomain Domain{};
+            std::uint32_t ElementCount{0u};
+            float RangeMin{0.0f};
+            float RangeMax{0.0f};
+            Graphics::Colormap::Type Colormap{};
+        };
+        std::optional<PacketSummary> Packet{};
+    };
+
+    [[nodiscard]] std::vector<std::byte> UploadedBytesAt(
+        const Tests::MockDevice& device, const std::uint64_t address)
+    {
+        constexpr std::uint64_t kMockBufferAddressBase = 0x1'0000'0000ull;
+        if (address < kMockBufferAddressBase)
+            return {};
+        const auto handle = static_cast<std::uint32_t>((address - kMockBufferAddressBase) / 0x1000ull);
+        for (auto it = device.BufferWrites.rbegin(); it != device.BufferWrites.rend(); ++it)
+        {
+            if (it->Handle.Index == handle && it->Offset == 0u)
+                return {it->Data.begin(), it->Data.end()};
+        }
+        return {};
+    }
+
+    [[nodiscard]] LaneColorObservation ObserveLaneColor(const LaneColorCase which, const bool viaSlot)
+    {
+        namespace GS = ECS::Components::GeometrySources;
+        namespace G = Graphics::Components;
+        using ColorSource = G::VisualizationConfig::ColorSource;
+        using VisDomain = G::VisualizationConfig::Domain;
+        const bool points = which == LaneColorCase::PointColor || which == LaneColorCase::PointScalar;
+        const bool scalar = which == LaneColorCase::PointScalar || which == LaneColorCase::LineScalar;
+
+        RendererFixture fixture;
+        ECS::Scene::Registry scene;
+        auto& registry = scene.Raw();
+        const auto entity = scene.Create();
+        registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.0f};
+        const auto domain = points ? Runtime::GeometryElementDomain::PointCloudPoint
+                                   : Runtime::GeometryElementDomain::GraphEdge;
+        Geometry::PropertySet* properties = nullptr;
+        if (points)
+        {
+            registry.emplace<G::RenderPoints>(entity);
+            AttachPointCloudSources(scene, entity);
+            properties = &registry.get<GS::Vertices>(entity).Properties;
+            properties->GetOrAdd<float>("heat", 0.0f).Vector() = {0.1f, 0.5f, 0.9f};
+            properties->GetOrAdd<glm::vec4>("rgba", glm::vec4{1.0f}).Vector() = {
+                {1.0f, 0.25f, 0.0f, 1.0f}, {0.0f, 0.5f, 1.0f, 1.0f}, {0.2f, 0.4f, 0.6f, 0.8f}};
+        }
+        else
+        {
+            registry.emplace<G::RenderEdges>(entity);
+            AttachLineGraphSources(scene, entity);
+            properties = &registry.get<GS::Edges>(entity).Properties;
+            properties->GetOrAdd<float>("heat", 0.0f).Vector() = {0.2f, 0.8f};
+            properties->GetOrAdd<glm::vec4>("rgba", glm::vec4{1.0f}).Vector() = {
+                {1.0f, 0.25f, 0.0f, 1.0f}, {0.0f, 0.5f, 1.0f, 1.0f}};
+        }
+
+        // The overlay `show_property` / the Color binding author.
+        const auto overlay = [&] {
+            auto& config = registry.emplace<G::VisualizationConfig>(entity);
+            if (scalar)
+            {
+                config.Source = ColorSource::ScalarField;
+                config.ScalarFieldName = "heat";
+                config.ScalarDomain = points ? VisDomain::Vertex : VisDomain::Edge;
+                config.Scalar.AutoRange = false;
+                config.Scalar.RangeMin = -1.0f;
+                config.Scalar.RangeMax = 2.0f;
+                config.Scalar.Map = Graphics::Colormap::Type::Inferno;
+            }
+            else
+            {
+                config.Source = points ? ColorSource::PerVertexBuffer : ColorSource::PerEdgeBuffer;
+                config.ColorBufferName = "rgba";
+            }
+        };
+        if (viaSlot)
+        {
+            using S = Runtime::GeometryPresentationSlotSemantic;
+            const S semantic = points ? (scalar ? S::PointScalarField : S::PointColor)
+                                      : (scalar ? S::LineScalarField : S::LineColor);
+            const auto lane = points ? Runtime::GeometryRenderLane::Points : Runtime::GeometryRenderLane::Edges;
+            registry.emplace<Runtime::GeometryPresentationRecipe>(entity, Runtime::GeometryPresentationRecipe{
+                .Shape = points ? Runtime::GeometryPresentationShape::PointCloud : Runtime::GeometryPresentationShape::Graph,
+                .Lanes = {{.Lane = lane, .PresentationKey = "lane"}},
+                .Presentations = {{
+                    .Key = "lane",
+                    .Kind = points ? Runtime::GeometryPresentationKind::PointPresentation
+                                   : Runtime::GeometryPresentationKind::LinePresentation,
+                    .Slots = {{
+                        .Semantic = semantic,
+                        .SourceKind = Runtime::GeometryPresentationSourceKind::PropertyBuffer,
+                        .Property = {.Domain = domain, .Name = scalar ? "heat" : "rgba",
+                                     .ValueKind = scalar ? Geometry::PropertyValueKind::Float
+                                                         : Geometry::PropertyValueKind::Vec4},
+                    }},
+                }},
+            });
+            // A scalar slot took its colormap and range from the overlay
+            // naming the same property.
+            if (scalar)
+                overlay();
+        }
+        else
+        {
+            overlay();
+        }
+
+        LaneColorObservation observed{};
+        for (int frame = 0; frame < 2; ++frame)
+        {
+            (void)fixture.Extract(scene);
+            auto world = fixture.Renderer->ExtractRenderWorld({});
+            fixture.Renderer->PrepareFrame(world);
+            observed.Packet.reset();
+            if (world.Visualization.Colors.size() + world.Visualization.Scalars.size() != 1u)
+                continue;
+            if (!world.Visualization.Colors.empty())
+            {
+                const auto& c = world.Visualization.Colors.front();
+                observed.Packet = LaneColorObservation::PacketSummary{
+                    .Name = c.Name, .Domain = c.Domain, .ElementCount = c.ElementCount};
+            }
+            else
+            {
+                const auto& c = world.Visualization.Scalars.front();
+                observed.Packet = LaneColorObservation::PacketSummary{
+                    .Name = c.Name, .Domain = c.Domain, .ElementCount = c.ElementCount,
+                    .RangeMin = c.RangeMin, .RangeMax = c.RangeMax, .Colormap = c.Colormap};
+            }
+        }
+        const auto sidecar = fixture.Extraction.FindRenderableSidecarForTest(StableId(entity));
+        if (!sidecar.has_value())
+            return observed;
+        observed.Config = fixture.Renderer->GetGpuWorld().GetEntityConfigForTest(sidecar->Instance);
+        observed.ColorBytes = UploadedBytesAt(fixture.Device, observed.Config.ColorBDA);
+        observed.ScalarBytes = UploadedBytesAt(fixture.Device, observed.Config.ScalarBDA);
+        return observed;
+    }
+
+    // The lane draws the property itself: per-element RGBA or the scalar with
+    // the authored colormap and range, on the lane's element domain.
+    void ExpectOverlayDrawsLaneColor(const LaneColorCase which, const LaneColorObservation& observed)
+    {
+        constexpr std::uint32_t kModeScalarField = 2u;
+        constexpr std::uint32_t kModePerElementRgba = 3u;
+        const bool points = which == LaneColorCase::PointColor || which == LaneColorCase::PointScalar;
+        const bool scalar = which == LaneColorCase::PointScalar || which == LaneColorCase::LineScalar;
+        const std::uint32_t count = points ? 3u : 2u;
+        ASSERT_TRUE(observed.Packet.has_value());
+        EXPECT_EQ(observed.Packet->ElementCount, count);
+        EXPECT_EQ(observed.Packet->Domain, points ? Graphics::VisualizationAttributeDomain::Vertex
+                                                  : Graphics::VisualizationAttributeDomain::Edge);
+        EXPECT_EQ(observed.Config.ElementCount, count);
+        EXPECT_EQ(observed.Config.VisDomain, points ? 0u : 2u);
+        if (scalar)
+        {
+            EXPECT_EQ(observed.Packet->Name, "heat");
+            EXPECT_EQ(observed.Packet->Colormap, Graphics::Colormap::Type::Inferno);
+            EXPECT_EQ(observed.Config.ColorSourceMode, kModeScalarField);
+            EXPECT_FLOAT_EQ(observed.Config.ScalarRangeMin, -1.0f);
+            EXPECT_FLOAT_EQ(observed.Config.ScalarRangeMax, 2.0f);
+            const std::vector<float> expected = points ? std::vector<float>{0.1f, 0.5f, 0.9f}
+                                                       : std::vector<float>{0.2f, 0.8f};
+            ASSERT_EQ(observed.ScalarBytes.size(), expected.size() * sizeof(float));
+            EXPECT_EQ(std::memcmp(observed.ScalarBytes.data(), expected.data(), observed.ScalarBytes.size()), 0);
+        }
+        else
+        {
+            EXPECT_EQ(observed.Packet->Name, "rgba");
+            EXPECT_EQ(observed.Config.ColorSourceMode, kModePerElementRgba);
+            std::vector<glm::vec4> expected{{1.0f, 0.25f, 0.0f, 1.0f}, {0.0f, 0.5f, 1.0f, 1.0f}};
+            if (points)
+                expected.push_back({0.2f, 0.4f, 0.6f, 0.8f});
+            ASSERT_EQ(observed.ColorBytes.size(), expected.size() * sizeof(glm::vec4));
+            EXPECT_EQ(std::memcmp(observed.ColorBytes.data(), expected.data(), observed.ColorBytes.size()), 0);
+        }
+    }
+}
+
+// RUNTIME-318: every former point/line presentation color slot is expressed
+// by the overlay. The slot lowered the same packet the overlay encodes, but
+// its lane config never bound it (no overlay key on the sync record); the
+// overlay draws that packet on the lane.
+TEST(RuntimeRenderExtraction, PresentationColorSlotLanesDrawIdenticallyThroughTheOverlay)
+{
+    for (const LaneColorCase which : {LaneColorCase::PointColor, LaneColorCase::PointScalar,
+                                      LaneColorCase::LineColor, LaneColorCase::LineScalar})
+    {
+        SCOPED_TRACE(static_cast<int>(which));
+        const LaneColorObservation slot = ObserveLaneColor(which, true);
+        const LaneColorObservation overlay = ObserveLaneColor(which, false);
+        ExpectOverlayDrawsLaneColor(which, overlay);
+        ASSERT_EQ(slot.Packet.has_value(), overlay.Packet.has_value());
+        EXPECT_EQ(slot.Packet->Name, overlay.Packet->Name);
+        EXPECT_EQ(slot.Packet->Domain, overlay.Packet->Domain);
+        EXPECT_EQ(slot.Packet->ElementCount, overlay.Packet->ElementCount);
+        EXPECT_FLOAT_EQ(slot.Packet->RangeMin, overlay.Packet->RangeMin);
+        EXPECT_FLOAT_EQ(slot.Packet->RangeMax, overlay.Packet->RangeMax);
+        EXPECT_EQ(slot.Packet->Colormap, overlay.Packet->Colormap);
+    }
 }
 
 TEST(RuntimeRenderExtraction, MeshVertexColorDirtyChannelPartiallyUploadsStructuralColorStream)

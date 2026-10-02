@@ -50,6 +50,10 @@ contracts: [geometry.element-domain-sources, geometry.property-coherence, runtim
   that decision here before implementing (scenes that carry the slots either
   load with the slot converted to the equivalent overlay or fail with a typed
   diagnostic).
+- Format decision (2026-10-02, AGENTS.md §5 default, no compatibility reader):
+  scenes that carry a retired slot semantic fail to load with
+  `Core::ErrorCode::InvalidFormat`; `kSceneDocumentVersion` advances to 3, so
+  every version 2 document is rejected the same way. No converter.
 
 ## Maturity
 - `Operational`: CPU contract tests plus the edited `gpu;vulkan` smoke actually
@@ -78,3 +82,15 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+## Log
+- 2026-10-02: Slice 1 (identity evidence). `RuntimeRenderExtraction.PresentationColorSlotLanesDrawIdenticallyThroughTheOverlay`
+  authors each former slot (PointColor, PointScalarField, LineColor,
+  LineScalarField; point cloud and graph edges) and its overlay equivalent.
+  Both encode the same packet (name, domain, count, colormap, range), but only
+  the overlay reaches the lane's GPU entity config: the slot packet's
+  `presentation.<Lane>` key is not on the lane's sync record, so a color slot
+  left the lane on its material color and a scalar slot suppressed the
+  overlay's own packet (scalar mode with no buffer). The overlay therefore
+  draws what the slot meant to draw; nothing that rendered correctly before
+  changes.
