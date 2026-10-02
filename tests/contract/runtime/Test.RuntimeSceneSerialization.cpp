@@ -953,7 +953,7 @@ TEST(RuntimeSceneSerialization, PropertyDomainKeepsLegacyWireStrings)
                            Runtime::GeometryElementDomain::GraphNode),
             slotWithDomain(Runtime::GeometryPresentationSlotSemantic::Albedo,
                            Runtime::GeometryElementDomain::PointCloudPoint),
-            slotWithDomain(Runtime::GeometryPresentationSlotSemantic::LineWidth,
+            slotWithDomain(Runtime::GeometryPresentationSlotSemantic::LineScalarField,
                            Runtime::GeometryElementDomain::GraphHalfedge),
         },
     });

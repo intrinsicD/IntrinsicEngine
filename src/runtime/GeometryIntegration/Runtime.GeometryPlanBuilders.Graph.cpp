@@ -102,7 +102,6 @@ namespace Extrinsic::Runtime
     {
         VertexBytes.clear();
         Channels = {};
-        PackedColors.clear();
         LineIndices.clear();
     }
 
@@ -236,7 +235,6 @@ namespace Extrinsic::Runtime
         desc.PositionBytes = channelBytes(VertexChannel::Position);
         desc.TexcoordBytes = channelBytes(VertexChannel::Texcoord);
         desc.NormalBytes = channelBytes(VertexChannel::Normal);
-        desc.PackedVertexColors = std::span<const std::uint32_t>{outBuffer.PackedColors};
         desc.SurfaceIndices = {};
         desc.LineIndices = wantLines
             ? std::span<const std::uint32_t>{outBuffer.LineIndices}

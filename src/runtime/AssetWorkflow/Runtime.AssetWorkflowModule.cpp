@@ -257,11 +257,9 @@ namespace Extrinsic::Runtime
                 case GeometryPresentationSlotSemantic::Displacement:
                 case GeometryPresentationSlotSemantic::PointColor:
                 case GeometryPresentationSlotSemantic::PointScalarField:
-                case GeometryPresentationSlotSemantic::PointSize:
                 case GeometryPresentationSlotSemantic::PointNormalOrientation:
                 case GeometryPresentationSlotSemantic::LineColor:
                 case GeometryPresentationSlotSemantic::LineScalarField:
-                case GeometryPresentationSlotSemantic::LineWidth:
                     break;
                 }
             }
@@ -319,11 +317,9 @@ namespace Extrinsic::Runtime
                 case GeometryPresentationSlotSemantic::Displacement:
                 case GeometryPresentationSlotSemantic::PointColor:
                 case GeometryPresentationSlotSemantic::PointScalarField:
-                case GeometryPresentationSlotSemantic::PointSize:
                 case GeometryPresentationSlotSemantic::PointNormalOrientation:
                 case GeometryPresentationSlotSemantic::LineColor:
                 case GeometryPresentationSlotSemantic::LineScalarField:
-                case GeometryPresentationSlotSemantic::LineWidth:
                     break;
                 }
             }

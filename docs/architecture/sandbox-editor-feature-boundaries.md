@@ -1026,8 +1026,9 @@ the removed `Runtime.SandboxEditorFacades` and
 | `SandboxEditorPropertyValuePreview` | `EditorPropertyValuePreview` | `Runtime.EditorWorkspaceSnapshots.cppm` | feature-owned runtime contract |
 | `SandboxEditorPropertyCatalogRow` | `EditorPropertyCatalogRow` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorPropertyBindingTargetModel` | `EditorPropertyBindingTargetModel` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
-| `SandboxEditorVertexChannelBindingOptionModel` | `EditorVertexChannelBindingOptionModel` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
-| `SandboxEditorVertexChannelBindingTargetModel` | `EditorVertexChannelBindingTargetModel` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
+| `SandboxEditorAttributeBindingCandidate` | `EditorAttributeBindingCandidate` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
+| `SandboxEditorAttributeBindingRow` | `EditorAttributeBindingRow` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
+| `SandboxEditorAttributeBindingModel` | `EditorAttributeBindingModel` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorPropertyCatalogModel` | `EditorPropertyCatalogModel` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorGeometryPresentationSlotModel` | `EditorGeometryPresentationSlotModel` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorJobScope` | `EditorJobScope` | `Runtime.EditorJobProjection.cppm` | feature-owned runtime contract |

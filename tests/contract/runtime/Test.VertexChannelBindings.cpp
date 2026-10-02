@@ -26,6 +26,7 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.GeometryAvailability;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.VisualizationEditingOperations;
@@ -566,4 +567,81 @@ TEST(VertexChannelBindings, RebindingColorKeepsOverlayStylingAndUndoRedoRestores
     EXPECT_TRUE(same(surface(), before));
     ASSERT_EQ(f.History.Redo().Status, Runtime::EditorCommandHistoryStatus::Redone);
     EXPECT_TRUE(same(surface(), bound));
+}
+
+TEST(VertexChannelBindings, PresentationColorSlotIsReportedAsTheLaneColorSourceAndDefaultResetsIt)
+{
+    BindingFixture f;
+    const ECS::EntityHandle cloud = MakeSelectable(f.Registry, "Cloud");
+    AddPointCloudSource(f.Registry, cloud, 2u);
+    SetPositions(f.Registry.Raw().get<GS::Vertices>(cloud), {{0, 0, 0}, {1, 0, 0}});
+    SetProperty<glm::vec4>(f.Registry.Raw().get<GS::Vertices>(cloud).Properties, "v:rgba",
+                           {{1, 0, 0, 1}, {0, 1, 0, 1}});
+    Runtime::GeometryPresentationRecipe recipe{};
+    recipe.Shape = Runtime::GeometryPresentationShape::PointCloud;
+    recipe.Lanes.push_back({.Lane = Runtime::GeometryRenderLane::Points, .PresentationKey = "cloud.points"});
+    recipe.Presentations.push_back(Runtime::GeometryPresentationBindingRecipe{
+        .Key = "cloud.points",
+        .Kind = Runtime::GeometryPresentationKind::PointPresentation,
+        .Slots = {Runtime::GeometryPresentationSlotRecipe{
+            .Semantic = Runtime::GeometryPresentationSlotSemantic::PointColor,
+            .SourceKind = Runtime::GeometryPresentationSourceKind::PropertyBuffer,
+            .Property = {D::PointCloudPoint, "v:rgba", Kind::Vec4},
+        }},
+    });
+    f.Registry.Raw().emplace<Runtime::GeometryPresentationRecipe>(cloud, recipe);
+
+    const auto& row = f.Row(cloud, A::Color, D::PointCloudPoint);
+    ASSERT_TRUE(row.Bound);
+    EXPECT_EQ(row.Source.Name, "v:rgba");
+    EXPECT_NE(row.Diagnostic.find("RUNTIME-318"), std::string::npos);
+
+    ASSERT_EQ(f.Bind(cloud, A::Color, D::PointCloudPoint), Cmd::Applied);  // Default
+    EXPECT_FALSE(f.Row(cloud, A::Color, D::PointCloudPoint).Bound);
+    EXPECT_EQ(f.Registry.Raw().get<Runtime::GeometryPresentationRecipe>(cloud).Presentations[0].Slots[0].SourceKind,
+              Runtime::GeometryPresentationSourceKind::UniformDefault);
+    ASSERT_EQ(f.History.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(f.Row(cloud, A::Color, D::PointCloudPoint).Source.Name, "v:rgba");
+
+    // Size/width are bindings, no longer presentation slot semantics.
+    Runtime::GeometryPresentationSlotSemantic parsed{};
+    EXPECT_FALSE(Runtime::TryParseGeometryPresentationSlotSemantic("PointSize", parsed));
+    EXPECT_FALSE(Runtime::TryParseGeometryPresentationSlotSemantic("LineWidth", parsed));
+}
+
+TEST(VertexChannelBindings, ShowPropertyAndColorBindingKeepTheLaneColormapAlike)
+{
+    BindingFixture f;
+    const ECS::EntityHandle mesh = MakeSelectable(f.Registry, "Mesh");
+    AddTriangleMeshSource(f.Registry, mesh);
+    auto& vertices = f.Registry.Raw().get<GS::Vertices>(mesh).Properties;
+    SetProperty<float>(vertices, "v:a", {0.0f, 0.5f, 1.0f});
+    SetProperty<float>(vertices, "v:b", {1.0f, 0.5f, 0.0f});
+    const auto id = Runtime::SelectionController::ToStableEntityId(mesh);
+    const auto surfaceMap = [&] {
+        return f.Registry.Raw().get<G::VisualizationLaneOverrides>(mesh).Surface->Scalar.Map;
+    };
+    const auto showProperty = [&](const char* name) {
+        return Runtime::ApplyEditorVisualizationRecipeCommand(
+            f.Context, Runtime::EditorVisualizationRecipeCommand{
+                           .StableEntityId = id,
+                           .Recipe = Runtime::MakeEditorPropertyVisualizationRecipe(
+                               {D::MeshVertex, name, Kind::Float})});
+    };
+
+    ASSERT_EQ(showProperty("v:a"), Cmd::Applied);  // seeds the lane with the recipe colormap
+    EXPECT_EQ(surfaceMap(), Extrinsic::Graphics::Colormap::Type::Viridis);
+    Runtime::EditorVisualizationConfigCommand styled{
+        .StableEntityId = id,
+        .Target = Runtime::EditorVisualizationTarget::Surface,
+        .Source = G::VisualizationConfig::ColorSource::ScalarField,
+        .ScalarFieldName = "v:a",
+        .ScalarDomain = G::VisualizationConfig::Domain::Vertex,
+        .ScalarColormap = Extrinsic::Graphics::Colormap::Type::Inferno,
+    };
+    ASSERT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(f.Context, styled), Cmd::Applied);
+    ASSERT_EQ(showProperty("v:b"), Cmd::Applied);
+    EXPECT_EQ(surfaceMap(), Extrinsic::Graphics::Colormap::Type::Inferno);
+    ASSERT_EQ(f.Bind(mesh, A::Color, D::MeshVertex, "v:a"), Cmd::Applied);
+    EXPECT_EQ(surfaceMap(), Extrinsic::Graphics::Colormap::Type::Inferno);
 }

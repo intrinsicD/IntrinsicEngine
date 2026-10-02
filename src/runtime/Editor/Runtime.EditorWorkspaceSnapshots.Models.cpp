@@ -706,9 +706,7 @@ namespace {
             case GeometryPresentationSlotSemantic::ScalarField:
             case GeometryPresentationSlotSemantic::Displacement:
             case GeometryPresentationSlotSemantic::PointScalarField:
-            case GeometryPresentationSlotSemantic::PointSize:
             case GeometryPresentationSlotSemantic::LineScalarField:
-            case GeometryPresentationSlotSemantic::LineWidth:
                 return Geometry::PropertyValueKind::Float;
             }
             return std::nullopt;
@@ -723,8 +721,7 @@ namespace {
             {
             case GS::Domain::Mesh:
                 if (semantic == GeometryPresentationSlotSemantic::LineColor ||
-                    semantic == GeometryPresentationSlotSemantic::LineScalarField ||
-                    semantic == GeometryPresentationSlotSemantic::LineWidth)
+                    semantic == GeometryPresentationSlotSemantic::LineScalarField)
                 {
                     return GeometryElementDomain::MeshEdge;
                 }
@@ -736,8 +733,7 @@ namespace {
             case GS::Domain::Graph:
                 if (lane == GeometryRenderLane::Edges ||
                     semantic == GeometryPresentationSlotSemantic::LineColor ||
-                    semantic == GeometryPresentationSlotSemantic::LineScalarField ||
-                    semantic == GeometryPresentationSlotSemantic::LineWidth)
+                    semantic == GeometryPresentationSlotSemantic::LineScalarField)
                 {
                     return GeometryElementDomain::GraphEdge;
                 }

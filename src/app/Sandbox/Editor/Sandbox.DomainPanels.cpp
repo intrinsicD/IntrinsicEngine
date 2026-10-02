@@ -184,6 +184,13 @@ void DrawAttributeBindings(
   ImGui::SeparatorText("Attribute sources");
   const bool commandsAvailable =
       context != nullptr && context->SceneAvailable;
+  // The last refusal stays visible until the next accepted change.
+  static struct {
+    std::uint32_t Entity{0u};
+    std::string Message{};
+  } refusal{};
+  if (refusal.Entity != model.StableEntityId)
+    refusal = {};
   for (std::size_t i = 0u; i < model.Rows.size(); ++i) {
     const EditorAttributeBindingRow &row = model.Rows[i];
     ImGui::PushID(static_cast<int>(i));
@@ -191,13 +198,21 @@ void DrawAttributeBindings(
                 std::string(ToString(row.Domain)).c_str());
     ImGui::SameLine();
     const auto bind = [&](std::string name) {
-      if (commandsAvailable)
-        (void)ApplyEditorAttributeBindingCommand(
-            context->VisualizationCommands,
-            EditorAttributeBindingCommand{.StableEntityId = model.StableEntityId,
-                                          .Attribute = row.Attribute,
-                                          .Domain = row.Domain,
-                                          .PropertyName = std::move(name)});
+      if (!commandsAvailable)
+        return;
+      const std::string label = name.empty() ? std::string{"Default"} : name;
+      const EditorCommandStatus status = ApplyEditorAttributeBindingCommand(
+          context->VisualizationCommands,
+          EditorAttributeBindingCommand{.StableEntityId = model.StableEntityId,
+                                        .Attribute = row.Attribute,
+                                        .Domain = row.Domain,
+                                        .PropertyName = std::move(name)});
+      refusal.Entity = model.StableEntityId;
+      refusal.Message =
+          status == EditorCommandStatus::Applied || status == EditorCommandStatus::NoChange
+              ? std::string{}
+              : std::string(ToString(row.Attribute)) + " <- " + label + ": " +
+                    DebugNameForEditorCommandStatus(status);
     };
     const std::string current =
         row.Bound ? row.Source.Name : "Default (" + row.DefaultSource + ")";
@@ -233,6 +248,8 @@ void DrawAttributeBindings(
       ImGui::TextDisabled("%s", row.Diagnostic.c_str());
     ImGui::PopID();
   }
+  if (!refusal.Message.empty())
+    ImGui::TextColored(ImVec4{1.0f, 0.6f, 0.2f, 1.0f}, "%s", refusal.Message.c_str());
 }
 
 // Properties is an exhaustive explorer: internal, connectivity, and generated

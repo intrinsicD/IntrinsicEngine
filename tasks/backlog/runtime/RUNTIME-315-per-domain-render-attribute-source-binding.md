@@ -156,3 +156,12 @@ python3 tools/agents/check_task_policy.py --root . --strict
   depends on it. Until then the attribute model reports such a slot as the
   lane's Color source (slice 3b, with the retirement of the never-drawn
   PointSize/LineWidth slot semantics).
+- 2026-10-02: Slice 3b. `PointSize`/`LineWidth` leave
+  `GeometryPresentationSlotSemantic` (never drawn; size/width are attribute
+  bindings). `FindGeometryPresentationColorSlot` reports a point/line color
+  slot as the lane's Color source (row diagnostic names RUNTIME-318) and Color
+  Default resets it to its uniform value. Property display keeps the lane's
+  colormap in the recipe path itself, so `show_property`, the processing
+  "Show" buttons and the Color binding behave alike. Graph/point-cloud packs
+  lose their always-empty packed-color buffers; the Sandbox section shows the
+  last refused binding's typed status.

@@ -1693,8 +1693,10 @@ ApplyEditorRenderHintCommand(
                             .ScalarDomain = lane->VisDomain,
                             .ColorBufferName = resolved.Source.Name,
                         };
-                        if (const auto existing = EffectiveVisualizationConfigForTarget(
-                                raw, entity, config.Target))
+                        const auto existing = EffectiveVisualizationConfigForTarget(
+                            raw, entity, config.Target);
+                        const bool hadLaneConfig = existing.has_value();
+                        if (existing)
                         {
                             config.UseBakedTexture = existing->UseBakedTexture;
                             config.ScalarColormap = existing->Scalar.Map;
@@ -1717,7 +1719,12 @@ ApplyEditorRenderHintCommand(
                             config.ScalarAutoRange = recipe.AutoRange;
                             config.ScalarRangeMin = recipe.RangeMin;
                             config.ScalarRangeMax = recipe.RangeMax;
-                            config.ScalarColormap = recipe.Colormap;
+                            // Showing another property on a lane swaps the
+                            // source and keeps that lane's colormap (panel,
+                            // Color binding and show_property alike); the
+                            // recipe's colormap seeds a lane without one.
+                            if (!hadLaneConfig)
+                                config.ScalarColormap = recipe.Colormap;
                         }
                         // Property-only display requests use the same undoable lane state as Appearance.
                         return ApplyEditorVisualizationConfigCommand(context, config);
@@ -1850,20 +1857,10 @@ ApplyEditorRenderHintCommand(
             if (!command.PropertyName.empty())
             {
                 // The same recipe `show_property` and the processing panels use,
-                // so the overlay is the one Color mechanism. Rebinding swaps the
-                // source only: the lane's colormap carries over (the recipe path
-                // already keeps bins, isolines and baking).
+                // so the overlay is the one Color mechanism (the recipe path
+                // keeps the lane's colormap, bins, isolines and baking).
                 VisualizationRecipe recipe = MakeEditorPropertyVisualizationRecipe(GeometryPropertyRef{
                     .Domain = command.Domain, .Name = command.PropertyName, .ValueKind = kind});
-                if (auto* scalar = std::get_if<ScalarVisualizationRecipe>(&recipe.Data))
-                {
-                    if (const auto existing = EffectiveVisualizationConfigForTarget(
-                            context.Scene->Raw(), entity,
-                            EditorFeatureDetail::ColorOverlayTargetFor(command.Domain)->Target))
-                    {
-                        scalar->Colormap = existing->Scalar.Map;
-                    }
-                }
                 return ApplyEditorVisualizationRecipeCommand(
                     context,
                     EditorVisualizationRecipeCommand{
@@ -1873,7 +1870,25 @@ ApplyEditorRenderHintCommand(
             }
             const entt::registry& raw = context.Scene->Raw();
             if (!EditorFeatureDetail::BoundColorOverlaySource(raw, entity, command.Domain))
-                return EditorCommandStatus::NoChange;
+            {
+                // A point/line presentation color slot (RUNTIME-318) is the
+                // remaining source: Default returns it to its uniform value.
+                const auto* recipe = raw.try_get<GeometryPresentationRecipe>(entity);
+                const GeometryPresentationColorSlot slot = recipe != nullptr
+                    ? FindGeometryPresentationColorSlot(*recipe, command.Domain)
+                    : GeometryPresentationColorSlot{};
+                if (slot.Slot == nullptr)
+                    return EditorCommandStatus::NoChange;
+                return ApplyEditorGeometryPresentationSlotDefaultCommand(
+                    context,
+                    EditorGeometryPresentationSlotDefaultCommand{
+                        .StableEntityId = command.StableEntityId,
+                        .PresentationKey = slot.Presentation->Key,
+                        .Semantic = slot.Slot->Semantic,
+                        .Value = slot.Slot->UniformDefault,
+                        .Enabled = slot.Slot->Enabled,
+                    });
+            }
             const EditorVisualizationTarget lane =
                 EditorFeatureDetail::ColorOverlayTargetFor(command.Domain)->Target;
             // Without an entity-level overlay the lane override is removed;
@@ -2462,11 +2477,9 @@ ApplyEditorRenderHintCommand(
         case GeometryPresentationSlotSemantic::Displacement:
         case GeometryPresentationSlotSemantic::PointColor:
         case GeometryPresentationSlotSemantic::PointScalarField:
-        case GeometryPresentationSlotSemantic::PointSize:
         case GeometryPresentationSlotSemantic::PointNormalOrientation:
         case GeometryPresentationSlotSemantic::LineColor:
         case GeometryPresentationSlotSemantic::LineScalarField:
-        case GeometryPresentationSlotSemantic::LineWidth:
             return false;
         }
         return false;

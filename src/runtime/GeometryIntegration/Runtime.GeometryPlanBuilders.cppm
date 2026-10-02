@@ -140,7 +140,6 @@ export namespace Extrinsic::Runtime
     {
         std::vector<std::byte> VertexBytes{};
         VertexChannelStreams Channels{};
-        std::vector<std::uint32_t> PackedColors{};
         std::vector<std::uint32_t> LineIndices{};
 
         void Clear() noexcept;
@@ -195,7 +194,6 @@ export namespace Extrinsic::Runtime
     {
         std::vector<std::byte> VertexBytes{};
         VertexChannelStreams Channels{};
-        std::vector<std::uint32_t> PackedColors{};
 
         void Clear() noexcept;
     };

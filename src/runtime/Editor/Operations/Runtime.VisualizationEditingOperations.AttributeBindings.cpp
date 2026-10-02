@@ -29,6 +29,7 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.GeometryAvailability;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.VisualizationRecipes;
 import Geometry.Properties;
@@ -178,7 +179,18 @@ namespace Extrinsic::Runtime
                 }
                 return std::nullopt;
             case RenderAttribute::Color:
-                return EditorFeatureDetail::BoundColorOverlaySource(raw, entity, rule.Domain);
+                if (auto overlay = EditorFeatureDetail::BoundColorOverlaySource(raw, entity, rule.Domain))
+                    return overlay;
+                if (const auto* recipe = raw.try_get<GeometryPresentationRecipe>(entity))
+                {
+                    if (const GeometryPresentationColorSlot slot =
+                            FindGeometryPresentationColorSlot(*recipe, rule.Domain);
+                        slot.Slot != nullptr)
+                    {
+                        return slot.Slot->Property.Name;
+                    }
+                }
+                return std::nullopt;
             case RenderAttribute::PointSize:
                 if (const auto* points = raw.try_get<G::RenderPoints>(entity))
                 {
@@ -298,6 +310,22 @@ namespace Extrinsic::Runtime
                 else if (row.UsingFallback)
                     row.Diagnostic = "'" + *bound + "' " + ResolutionReason(rule, row.Resolution) +
                                      "; drawing the default (" + row.DefaultSource + ")";
+            }
+
+            if (rule.Attribute == RenderAttribute::Color)
+            {
+                if (const auto* recipe = raw.try_get<GeometryPresentationRecipe>(*entity))
+                {
+                    if (const GeometryPresentationColorSlot slot =
+                            FindGeometryPresentationColorSlot(*recipe, rule.Domain);
+                        slot.Slot != nullptr)
+                    {
+                        const std::string note = "presentation slot " +
+                            std::string{ToString(slot.Slot->Semantic)} + " '" +
+                            slot.Slot->Property.Name + "' colors this lane (RUNTIME-318)";
+                        row.Diagnostic = row.Diagnostic.empty() ? note : row.Diagnostic + "; " + note;
+                    }
+                }
             }
 
             for (const std::string& name : properties->Properties())

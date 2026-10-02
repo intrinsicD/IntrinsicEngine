@@ -1073,11 +1073,9 @@ namespace Extrinsic::Runtime
             case GeometryPresentationSlotSemantic::Displacement:
             case GeometryPresentationSlotSemantic::PointColor:
             case GeometryPresentationSlotSemantic::PointScalarField:
-            case GeometryPresentationSlotSemantic::PointSize:
             case GeometryPresentationSlotSemantic::PointNormalOrientation:
             case GeometryPresentationSlotSemantic::LineColor:
             case GeometryPresentationSlotSemantic::LineScalarField:
-            case GeometryPresentationSlotSemantic::LineWidth:
                 return false;
             }
             return false;
@@ -1156,9 +1154,7 @@ namespace Extrinsic::Runtime
             case GeometryPresentationSlotSemantic::Roughness:
             case GeometryPresentationSlotSemantic::Metallic:
             case GeometryPresentationSlotSemantic::Displacement:
-            case GeometryPresentationSlotSemantic::PointSize:
             case GeometryPresentationSlotSemantic::PointNormalOrientation:
-            case GeometryPresentationSlotSemantic::LineWidth:
                 return std::nullopt;
             }
             return std::nullopt;
