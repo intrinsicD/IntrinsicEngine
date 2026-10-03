@@ -47,13 +47,11 @@ and their paired UI or method work are recorded there, not here.
 ## Agent control lane and inspection operations
 
 - [RUNTIME-276 — Declarative `ConfigFieldSpec` tables, schema generation and conformance test](RUNTIME-276-declarative-config-field-specs.md)
-- [RUNTIME-278 — Property inspection operations (stats, compare, values)](RUNTIME-278-property-inspection-operations.md)
 - [RUNTIME-280 — Selection-by-query operations and mask publication](RUNTIME-280-selection-query-operations.md)
 - [RUNTIME-281 — Deterministic view capture command](RUNTIME-281-deterministic-view-capture-command.md)
 - [RUNTIME-282 — Headless batch CLI](RUNTIME-282-headless-batch-cli.md)
 - [RUNTIME-283 — Property import/export operations](RUNTIME-283-property-import-export-operations.md)
 - [RUNTIME-284 — History label listing and entity-property checkpoints](RUNTIME-284-history-labels-and-checkpoints.md)
-- [RUNTIME-285 — Diagnostics stream (log cursor, device status, operation records)](RUNTIME-285-diagnostics-stream.md)
 - [RUNTIME-286 — Mesh health report](RUNTIME-286-mesh-health-report.md)
 
 ## Consolidation of duplicated runtime mechanisms

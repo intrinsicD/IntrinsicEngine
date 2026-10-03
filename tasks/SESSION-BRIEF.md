@@ -8,6 +8,8 @@ picking backlog work; theme priorities and rationale live in
 
 ## Active tasks
 
+- `CORE-011` — `LogEntry` sequence, timestamp and category with `TakeSnapshotSince` (tasks/active/CORE-011-log-entry-cursor-stream.md)
+- `GEOM-109` — `Geometry.Properties.Statistics`: statistics, histogram and comparison (tasks/active/GEOM-109-property-statistics-and-comparison.md)
 - `GEOM-111` — Unified progressive point sampling (`Geometry.PointSampling`) (tasks/active/GEOM-111-unified-progressive-point-sampling.md)
 - `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/active/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
 - `GRAPHICS-153` — GPU methods reuse resident buffers; CPU<->GPU IO only at start and end (tasks/active/GRAPHICS-153-gpu-buffer-reuse-and-minimal-io.md)
@@ -16,10 +18,14 @@ picking backlog work; theme priorities and rationale live in
 - `METHOD-044` — Feature-aware patches and distortion-aware atlas merging (tasks/active/METHOD-044-feature-aware-atlas-merge-experiment.md)
 - `METHOD-045` — Preserve baseline regions while constructing UV charts (tasks/active/METHOD-045-baseline-preserving-atlas-cuts.md)
 - `RUNTIME-274` — Point-cloud subsampling editor workflow (tasks/active/RUNTIME-274-point-cloud-subsampling-workflow.md)
+- `RUNTIME-278` — Property inspection operations (stats, compare, values) (tasks/active/RUNTIME-278-property-inspection-operations.md)
+- `RUNTIME-285` — Diagnostics stream (log cursor, device status, operation records) (tasks/active/RUNTIME-285-diagnostics-stream.md)
 - `RUNTIME-289` — Selectable point sampling wherever points are chosen (tasks/active/RUNTIME-289-selectable-point-sampling-in-consumers.md)
 - `RUNTIME-294` — Migrate every GPU method to the property residency (tasks/active/RUNTIME-294-migrate-gpu-methods-to-property-residency.md)
 - `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/active/UI-037-linear-domain-action-readiness-tooltips.md)
 - `UI-053` — Curvature-extremum engine overlay (tasks/active/UI-053-curvature-extremum-engine-overlay.md)
+- `UI-059` — Property Inspector window (tasks/active/UI-059-property-inspector-window.md)
+- `UI-065` — Diagnostics / Log window (tasks/active/UI-065-diagnostics-log-window.md)
 
 ## Theme B — Rendering modernization
 
@@ -45,30 +51,24 @@ picking backlog work; theme priorities and rationale live in
 
 - unblocked: `ASSETIO-010` — Async model companion preflight (tasks/backlog/assets/ASSETIO-010-async-model-companion-preflight.md)
 - blocked by `ASSETIO-010`: `ASSETIO-011` — Semantic Sandbox File / Import workflow matrix (tasks/backlog/assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md)
-- unblocked: `CORE-011` — `LogEntry` sequence, timestamp and category with `TakeSnapshotSince` (tasks/backlog/architecture/CORE-011-log-entry-cursor-stream.md)
 - unblocked: `GEOIO-005` — PLY arbitrary property attributes and CSV/NPY property-table IO (tasks/backlog/geometry/GEOIO-005-property-attributes-and-table-io.md)
 - unblocked: `GEOM-078` — Intrinsic surface-sample point cloud with contiguous face ranges (tasks/backlog/geometry/GEOM-078-intrinsic-surface-sample-point-cloud.md)
-- unblocked: `GEOM-109` — `Geometry.Properties.Statistics`: statistics, histogram and comparison (tasks/backlog/geometry/GEOM-109-property-statistics-and-comparison.md)
 - unblocked: `GEOM-110` — Connected components and per-component topology/genus (tasks/backlog/geometry/GEOM-110-connected-components-and-topology.md)
 - unblocked: `GEOM-115` — Make 13 halfedge-mesh module names match their file stems (tasks/backlog/geometry/GEOM-115-halfedge-module-names-match-file-stems.md)
 - unblocked: `GRAPHICS-159` — Texture bake run job and device-loss evidence on Vulkan (tasks/backlog/rendering/GRAPHICS-159-texture-bake-run-and-device-loss-gpu-evidence.md)
 - blocked by `GRAPHICS-105`: `LEGACY-043` — Retire stale multi-descriptor-set shader sources (tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `RUNTIME-276` — Declarative `ConfigFieldSpec` tables, schema generation and conformance test (tasks/backlog/runtime/RUNTIME-276-declarative-config-field-specs.md)
-- blocked by `GEOM-109`: `RUNTIME-278` — Property inspection operations (stats, compare, values) (tasks/backlog/runtime/RUNTIME-278-property-inspection-operations.md)
 - blocked by `GEOM-110`: `RUNTIME-280` — Selection-by-query operations and mask publication (tasks/backlog/runtime/RUNTIME-280-selection-query-operations.md)
 - blocked by `GRAPHICS-109`: `RUNTIME-281` — Deterministic view capture command (tasks/backlog/runtime/RUNTIME-281-deterministic-view-capture-command.md)
 - blocked by `UI-046`: `RUNTIME-282` — Headless batch CLI (tasks/backlog/runtime/RUNTIME-282-headless-batch-cli.md)
 - blocked by `GEOIO-005`: `RUNTIME-283` — Property import/export operations (tasks/backlog/runtime/RUNTIME-283-property-import-export-operations.md)
 - unblocked: `RUNTIME-284` — History label listing and entity-property checkpoints (tasks/backlog/runtime/RUNTIME-284-history-labels-and-checkpoints.md)
-- blocked by `CORE-011`: `RUNTIME-285` — Diagnostics stream (log cursor, device status, operation records) (tasks/backlog/runtime/RUNTIME-285-diagnostics-stream.md)
 - blocked by `GEOM-110`: `RUNTIME-286` — Mesh health report (tasks/backlog/runtime/RUNTIME-286-mesh-health-report.md)
 - unblocked: `RUNTIME-314` — Reuse existing runtime helpers instead of local copies (tasks/backlog/runtime/RUNTIME-314-reuse-existing-processing-helpers.md)
-- blocked by `RUNTIME-278`: `UI-059` — Property Inspector window (tasks/backlog/ui/UI-059-property-inspector-window.md)
 - blocked by `RUNTIME-280`: `UI-061` — Select-by-query controls and "use selection as mask/source" (tasks/backlog/ui/UI-061-select-by-query-controls.md)
 - blocked by `RUNTIME-283`: `UI-063` — File > Properties import/export window (tasks/backlog/ui/UI-063-properties-import-export-window.md)
 - blocked by `RUNTIME-284`: `UI-064` — History window (tasks/backlog/ui/UI-064-history-window.md)
-- blocked by `RUNTIME-285`: `UI-065` — Diagnostics / Log window (tasks/backlog/ui/UI-065-diagnostics-log-window.md)
 - blocked by `RUNTIME-286`: `UI-066` — Mesh Health window (tasks/backlog/ui/UI-066-mesh-health-window.md)
 - unblocked: `UI-077` — Readiness field markers in every config panel (tasks/backlog/ui/UI-077-readiness-field-markers-in-all-panels.md)
 

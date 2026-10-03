@@ -371,9 +371,9 @@ Structured readiness:
 [RUNTIME-277](../../tasks/done/RUNTIME-277-structured-action-readiness-reasons.md),
 [UI-058](../../tasks/done/UI-058-all-reasons-readiness-tooltips.md).
 Capability/UI pairs:
-property inspection ([GEOM-109](../../tasks/backlog/geometry/GEOM-109-property-statistics-and-comparison.md),
-[RUNTIME-278](../../tasks/backlog/runtime/RUNTIME-278-property-inspection-operations.md),
-[UI-059](../../tasks/backlog/ui/UI-059-property-inspector-window.md)),
+property inspection ([GEOM-109](../../tasks/active/GEOM-109-property-statistics-and-comparison.md),
+[RUNTIME-278](../../tasks/active/RUNTIME-278-property-inspection-operations.md),
+[UI-059](../../tasks/active/UI-059-property-inspector-window.md)),
 jobs ([RUNTIME-279](../../tasks/done/RUNTIME-279-editor-job-snapshot-and-cancel.md),
 [UI-060](../../tasks/done/UI-060-jobs-window.md)),
 selection queries ([RUNTIME-280](../../tasks/backlog/runtime/RUNTIME-280-selection-query-operations.md),
@@ -386,9 +386,9 @@ property IO ([GEOIO-005](../../tasks/backlog/geometry/GEOIO-005-property-attribu
 [UI-063](../../tasks/backlog/ui/UI-063-properties-import-export-window.md)),
 history and checkpoints ([RUNTIME-284](../../tasks/backlog/runtime/RUNTIME-284-history-labels-and-checkpoints.md),
 [UI-064](../../tasks/backlog/ui/UI-064-history-window.md)),
-diagnostics ([CORE-011](../../tasks/backlog/architecture/CORE-011-log-entry-cursor-stream.md),
-[RUNTIME-285](../../tasks/backlog/runtime/RUNTIME-285-diagnostics-stream.md),
-[UI-065](../../tasks/backlog/ui/UI-065-diagnostics-log-window.md)),
+diagnostics ([CORE-011](../../tasks/active/CORE-011-log-entry-cursor-stream.md),
+[RUNTIME-285](../../tasks/active/RUNTIME-285-diagnostics-stream.md),
+[UI-065](../../tasks/active/UI-065-diagnostics-log-window.md)),
 mesh health ([GEOM-110](../../tasks/backlog/geometry/GEOM-110-connected-components-and-topology.md),
 [RUNTIME-286](../../tasks/backlog/runtime/RUNTIME-286-mesh-health-report.md),
 [UI-066](../../tasks/backlog/ui/UI-066-mesh-health-window.md)).

@@ -18,6 +18,7 @@ Make the core log ring readable as a cursor stream so the Diagnostics window
 new entries, filtered by level and category.
 
 ## Context
+- Operator direction 2026-10-03: finish the larger MCP inspection and diagnostics gaps, establish tasks first, delegate with appropriate effort, then obtain Claude review. This direction takes precedence over automatic Framework24 work selection.
 - Operator direction 2026-09-27: agent control lane and user-facing inspection capabilities, planned with Fable 5.1; attach-to-running transport; declarative schemas; integer enums.
 - `src/core/Core.Logging.cppm`: ring buffer of 2048 `LogEntry{Level, Message}`, `GetSequenceNumber()`, `TakeSnapshot()`, `ClearEntries()`; nothing in `src/app`/`src/runtime` reads it. Vulkan validation messages already flow through it (`Backends.Vulkan.Device.cpp` `[VulkanDevice::Bootstrap] validation: …`).
 - Category = leading `[Tag]` of the message when present (existing call-site convention).
@@ -46,3 +47,12 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
 ## Forbidden changes
 - Rewriting call sites to a new logging API; changing log output formatting.
+
+## Execution plan (2026-10-03)
+- Interactive micro lane; one writing agent per isolated worktree. Root integrates and owns the shared `build/ci` verification tree.
+- Geometry statistics and cursor/diagnostics ownership use `xhigh` effort (numerics and concurrency); runtime inspection uses `high` (domain resolution and bounded queries). UI and MCP integration are coordinated by the root agent.
+- Reuse existing property/domain resolution, logger ring, operation registry, EditorShell and panel widgets; plain records and free functions. No new telemetry framework or generic property-write API.
+- Dependencies determine integration order. UI/runtime paths land together before their MCP counterparts are reported complete.
+- Completion requires the named behavior tests, combined verification and a read-only Claude review of a fixed diff.
+
+The final combined CPU gate is justified by the widely imported `Core.Logging` interface; run focused logging tests first, then the full CPU selector once after integration. Sanitizer and live Vulkan evidence remain separate.

@@ -27,7 +27,6 @@ its dependencies, conditional gates, scope and verification.
 
 ## Agent lane and inspection kernels
 
-- [GEOM-109 — `Geometry.Properties.Statistics`: statistics, histogram and comparison](GEOM-109-property-statistics-and-comparison.md)
 - [GEOM-110 — Connected components and per-component topology/genus](GEOM-110-connected-components-and-topology.md)
 - [GEOIO-005 — PLY arbitrary property attributes and CSV/NPY property-table IO](GEOIO-005-property-attributes-and-table-io.md)
 

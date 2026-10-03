@@ -22,11 +22,9 @@ its dependencies, conditional gates, scope and verification.
 
 Each window uses the same runtime functions as agent operations.
 
-- [UI-059 — Property Inspector window](UI-059-property-inspector-window.md)
 - [UI-061 — Select-by-query controls and "use selection as mask/source"](UI-061-select-by-query-controls.md)
 - [UI-063 — File > Properties import/export window](UI-063-properties-import-export-window.md)
 - [UI-064 — History window](UI-064-history-window.md)
-- [UI-065 — Diagnostics / Log window](UI-065-diagnostics-log-window.md)
 - [UI-066 — Mesh Health window](UI-066-mesh-health-window.md)
 
 Completed and superseded work is recorded in the
