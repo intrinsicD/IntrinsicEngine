@@ -8,6 +8,16 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-03 — REVIEW-005 and REVIEW-006 merged into REVIEW-007
+
+Retired [REVIEW-005](REVIEW-005-ponytail-overengineering-audit-triage.md) and [REVIEW-006](REVIEW-006-ponytail-candidate-triage-and-human-decisions.md) as superseded planning notes.
+
+- Claude and Codex had each run a Ponytail over-engineering audit on `0ebb2f450` and opened a parallel triage note. At the operator's request both were merged into [REVIEW-007](../backlog/architecture/REVIEW-007-ponytail-audit-triage.md).
+- REVIEW-007 takes the process, authorization limits, decomposition rules and dossier format from REVIEW-006 and the full 123-row inventory from REVIEW-005. The 9 Codex-only groups were added and overlapping findings unified into single rows.
+- No candidate was reviewed and no code changed; all open work belongs to REVIEW-007.
+
+Commit reference: the commit that introduces REVIEW-007.
+
 ## 2026-10-02 — UI-058 all-reasons readiness tooltips
 
 Retired [UI-058](UI-058-all-reasons-readiness-tooltips.md).
