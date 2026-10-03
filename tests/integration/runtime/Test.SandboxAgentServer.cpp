@@ -8,6 +8,8 @@
 #include <fstream>
 #include <functional>
 #include <map>
+#include <limits>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <thread>
@@ -1674,5 +1676,170 @@ TEST(SandboxAgentServer, BindAttributeCoversEveryAttributeAndItsDefault)
         const auto noGeometry = c.Request("tools/call", {{"name", "attribute_bindings"}, {"arguments", {{"entity", bare}}}});
         rig.Check(noGeometry["result"]["structuredContent"]["error"]["code"] == "unsupported_geometry_domain",
                   "an entity without geometry has its own code: " + noGeometry.dump());
+    });
+}
+
+
+TEST(SandboxAgentServer, PropertyInspectionReadsFaceStatisticsComparisonAndCatalogWithoutHistory)
+{
+    AgentRig rig{"property-faces"};
+    const auto mesh = rig.AddGrid();
+    auto& faces = rig.Scene().Raw().get<GS::Faces>(R::SelectionController::ToEntityHandle(mesh)).Properties;
+    auto input = faces.GetOrAdd<double>("inspection_input", 2.0);
+    auto output = faces.GetOrAdd<float>("inspection_output", 3.0f);
+    input[0] = 0;
+    output[0] = 1;
+    input[49] = 100;
+    output[49] = -100;
+    faces.GetOrAdd<bool>("f:deleted")[49] = true;
+    rig.Run([&](Client& c) {
+        const auto history = c.Tool("history");
+        bool error = true;
+        const auto catalog = c.Tool("property_list", {{"entity", mesh}}, &error);
+        rig.Check(!error && catalog.contains("properties"), "face catalog: " + catalog.dump());
+        bool found = false;
+        for (const auto& row : catalog.value("properties", Json::array()))
+            if (row["domain"] == "MeshFace" && row["name"] == "inspection_input")
+                found = row["kind"] == "double" && row["count"] == 50;
+        rig.Check(found, "catalog preserves face identity and kind: " + catalog.dump());
+        const auto statistics = c.Tool("property_stats", {{"entity", mesh}, {"domain", "MeshFace"},
+            {"name", "inspection_input"}, {"bins", 2}}, &error);
+        rig.Check(!error && statistics["row_count"] == 50 && statistics["count"] == 49 &&
+            statistics["deleted_count"] == 1 && statistics["finite_count"] == 49,
+            "face accounting excludes deletion: " + statistics.dump());
+        if (statistics.contains("components") && statistics["components"].size() == 1)
+        {
+            const auto& scalar = statistics["components"][0];
+            rig.Check(std::abs(scalar["mean"].get<double>() - 96.0 / 49.0) < 1e-12 &&
+                scalar["histogram"]["counts"] == Json::array({1, 48}) && scalar["histogram"]["edges"].size() == 3,
+                "face mean and shared histogram: " + scalar.dump());
+        }
+        else rig.Check(false, "missing scalar component: " + statistics.dump());
+        const auto comparison = c.Tool("property_compare", {{"entity", mesh},
+            {"a", {{"domain", "MeshFace"}, {"name", "inspection_input"}}},
+            {"b", {{"domain", "MeshFace"}, {"name", "inspection_output"}}}}, &error);
+        rig.Check(!error && comparison["comparable_rows"] == 49 && comparison["deleted_count"] == 1 &&
+            comparison["identical_rows"] == 0 && comparison["max_abs_error"] == 1.0 &&
+            comparison["mean_abs_error"] == 1.0 && comparison["rms_error"] == 1.0 && comparison["max_error_row"] == 0,
+            "mixed numeric kinds preserve same-face correspondence: " + comparison.dump());
+        rig.Check(c.Tool("history") == history, "inspection leaves document revision and history unchanged");
+    });
+}
+
+TEST(SandboxAgentServer, PropertyValuesPreserveExactAndNonfiniteCellsWhileMinimized)
+{
+    AgentRig rig{"property-values", false, true};
+    const auto cloud = rig.AddCloud(4);
+    auto& points = rig.Scene().Raw().get<GS::Vertices>(R::SelectionController::ToEntityHandle(cloud)).Properties;
+    auto labels = points.GetOrAdd<std::uint64_t>("labels");
+    labels[0] = 9007199254740993ull;
+    labels[1] = std::numeric_limits<std::uint64_t>::max();
+    points.GetOrAdd<bool>("v:deleted")[1] = true;
+    points.GetOrAdd<glm::vec3>("special")[0] = {std::numeric_limits<float>::quiet_NaN(),
+        std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity()};
+    rig.Run([&](Client& c) {
+        const auto tools = c.Request("tools/list")["result"]["tools"];
+        std::size_t readers = 0;
+        for (const auto& tool : tools)
+        {
+            const auto name = tool["name"].get<std::string>();
+            if (name != "property_list" && name != "property_stats" && name != "property_compare" && name != "property_values") continue;
+            ++readers;
+            rig.Check(tool["annotations"]["readOnlyHint"] == true && tool["annotations"]["destructiveHint"] == false,
+                "inspection tool is read-only: " + tool.dump());
+            if (name == "property_values")
+                rig.Check(tool["inputSchema"]["properties"]["limit"]["maximum"] == 65536 &&
+                    tool["inputSchema"]["properties"]["offset"]["minimum"] == 0,
+                    "paging schema bounds: " + tool.dump());
+            if (name == "property_stats")
+                rig.Check(tool["inputSchema"]["properties"]["bins"]["maximum"] == 256,
+                    "histogram schema bound: " + tool.dump());
+        }
+        rig.Check(readers == 4, "all four inspection tools are advertised");
+        bool error = true;
+        const Json args{{"entity", cloud}, {"domain", "PointCloudPoint"}, {"name", "labels"}, {"offset", 0}, {"limit", 2}};
+        const auto page = c.Tool("property_values", args, &error);
+        rig.Check(!error && page["total_count"] == 4 && page["offset"] == 0 && page["has_more"] == true && page["rows"].size() == 2,
+            "bounded page served without a viewport: " + page.dump());
+        if (page.contains("rows") && page["rows"].size() == 2)
+            rig.Check(page["rows"][0]["values"] == Json::array({"9007199254740993"}) &&
+                page["rows"][1]["values"] == Json::array({"18446744073709551615"}) &&
+                page["rows"][0]["index"] == 0 && page["rows"][1]["index"] == 1 &&
+                page["rows"][0]["deleted"] == false && page["rows"][1]["deleted"] == true,
+                "uint64 cells remain exact and deleted slots retain indices: " + page.dump());
+        auto specialArgs = args;
+        specialArgs["name"] = "special";
+        specialArgs["limit"] = 1;
+        const auto special = c.Tool("property_values", specialArgs, &error);
+        rig.Check(!error && special["rows"].size() == 1 &&
+            special["rows"][0]["values"] == Json::array({"NaN", "+Infinity", "-Infinity"}),
+            "vector special values are explicit strings: " + special.dump());
+        auto pastEnd = args;
+        pastEnd["offset"] = std::numeric_limits<std::uint64_t>::max();
+        const auto empty = c.Tool("property_values", pastEnd, &error);
+        rig.Check(!error && empty["rows"].empty() && empty["has_more"] == false,
+            "huge offset is a successful empty page without overflow: " + empty.dump());
+    });
+}
+
+TEST(SandboxAgentServer, PropertyInspectionRejectsInvalidArgumentsAndUnavailableProperties)
+{
+    AgentRig rig{"property-invalid"};
+    const auto cloud = rig.AddCloud(3);
+    rig.Run([&](Client& c) {
+        const Json valid{{"entity", cloud}, {"domain", "PointCloudPoint"}, {"name", "v:position"}};
+        bool controlError = true;
+        const auto control = c.Tool("property_stats", valid, &controlError);
+        rig.Check(!controlError && control.is_object() && control.value("row_count", 0u) == 3u &&
+            control.value("finite_count", 0u) == 3u && control.contains("components") && control["components"].size() == 3u,
+            "positive control resolves the attached point source: " + control.dump());
+        const auto hasDiagnostic = [](const Json& reply, const char* code) {
+            if (!reply.is_object() || !reply.contains("diagnostics") || !reply["diagnostics"].is_array()) return false;
+            for (const auto& diagnostic : reply["diagnostics"])
+                if (diagnostic.is_object() && diagnostic.value("code", "") == code) return true;
+            return false;
+        };
+        const auto rejected = [&](const char* tool, const Json& args, const char* reason, const char* diagnostic = nullptr) {
+            bool error = false;
+            const auto reply = c.Tool(tool, args, &error);
+            rig.Check(error && (!diagnostic || hasDiagnostic(reply, diagnostic)), std::string(reason) + ": " + reply.dump());
+        };
+        for (const Json value : {Json(0), Json(65537), Json(-1), Json(1.5), Json("2")})
+        {
+            auto args = valid;
+            args["limit"] = value;
+            rejected("property_values", args, "invalid limit");
+        }
+        for (const Json value : {Json(-1), Json(0.5), Json("0")})
+        {
+            auto args = valid;
+            args["offset"] = value;
+            rejected("property_values", args, "invalid offset");
+        }
+        auto args = valid;
+        args["domain"] = "not_a_domain";
+        rejected("property_stats", args, "unknown domain");
+        args["domain"] = "MeshFace";
+        rejected("property_stats", args, "absent face domain", "UnsupportedGeometryDomain");
+        args = valid;
+        args["name"] = "missing";
+        rejected("property_values", args, "missing property", "InvalidVisualizationProperty");
+        bool statisticsError = false;
+        const auto missingStats = c.Tool("property_stats", args, &statisticsError);
+        rig.Check(statisticsError && hasDiagnostic(missingStats, "InvalidVisualizationProperty") && missingStats["status"].is_null(),
+            "missing-property statistics must report their diagnostic and no computed status: " + missingStats.dump());
+        const auto missingCompare = c.Tool("property_compare", {{"entity", cloud},
+            {"a", {{"domain", "PointCloudPoint"}, {"name", "missing"}}},
+            {"b", {{"domain", "PointCloudPoint"}, {"name", "v:position"}}}}, &statisticsError);
+        rig.Check(statisticsError && hasDiagnostic(missingCompare, "InvalidVisualizationProperty") && missingCompare["status"].is_null(),
+            "missing-property comparison must report its diagnostic and no computed status: " + missingCompare.dump());
+        args = valid;
+        args["bins"] = 257;
+        rejected("property_stats", args, "excessive bins");
+        for (const auto* name : {"property_list", "property_stats", "property_compare", "property_values"})
+            rejected(name, Json::object(), "missing required arguments");
+        rejected("property_compare", {{"entity", cloud}, {"a", {{"domain", "PointCloudPoint"}, {"name", "v:position"}}}},
+            "comparison requires both references");
+        rejected("property_list", {{"entity", 999999}}, "stale entity", "NoSelectedEntity");
     });
 }

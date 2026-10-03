@@ -66,7 +66,11 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.ParameterizationConfig;
 import Extrinsic.Runtime.PointCloudConsolidationTypes;
 
+import Extrinsic.Runtime.PropertyInspectionOperations;
+import Extrinsic.Runtime.GeometryAvailability;
+import Extrinsic.Runtime.GeometryProperty.Types;
 #include "../../../src/app/Sandbox/Editor/Sandbox.PanelSupport.hpp"
+#include "../../../src/app/Sandbox/Editor/Sandbox.PropertyInspectorPanel.hpp"
 
 namespace Core = Extrinsic::Core;
 namespace Runtime = Extrinsic::Runtime;
@@ -134,7 +138,7 @@ namespace
     }
 }
 
-TEST(SandboxDomainPanels, RegistersTheSevenAppOwnedWindowsWithStableMenuMetadata)
+TEST(SandboxDomainPanels, RegistersTheEightAppOwnedWindowsWithStableMenuMetadata)
 {
     struct ExpectedWindow
     {
@@ -142,8 +146,9 @@ TEST(SandboxDomainPanels, RegistersTheSevenAppOwnedWindowsWithStableMenuMetadata
         std::vector<std::string> MenuPath;
         std::string_view Title;
     };
-    const std::array<ExpectedWindow, 7> expected{{
+    const std::array<ExpectedWindow, 8> expected{{
         {"scene.appearance", {"View"}, "Appearance"},
+        {"view.property_inspector", {"View"}, "Property Inspector"},
         {"pointcloud.properties", {"PointCloud"}, "Properties"},
         {"pointcloud.selection", {"PointCloud"}, "Selection"},
         {"graph.properties", {"Graph"}, "Properties"},
@@ -157,7 +162,7 @@ TEST(SandboxDomainPanels, RegistersTheSevenAppOwnedWindowsWithStableMenuMetadata
     panels.Register(harness.Shell);
 
     const auto menu = harness.Shell.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), expected.size() + 11u);
+    ASSERT_EQ(menu.size(), expected.size() + 12u);
     // UI-075: one Appearance window replaces the three per-kind ones.
     for (const std::string_view retired :
          {"pointcloud.appearance", "graph.appearance", "mesh.appearance"})
@@ -181,24 +186,24 @@ TEST(SandboxDomainPanels, RegistrationIsIdempotentAndLifetimeUnregistersEveryWin
     {
         Editor::DomainPanels panels;
         panels.Register(first.Shell);
-        ASSERT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 18u);
+        ASSERT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 20u);
 
         panels.Register(first.Shell);
-        EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 18u);
+        EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 20u);
 
         panels.Register(second.Shell);
-        EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 11u);
-        EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 18u);
+        EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 12u);
+        EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 20u);
 
         panels.Unregister();
-        EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 11u);
+        EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 12u);
 
         panels.Register(second.Shell);
-        ASSERT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 18u);
+        ASSERT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 20u);
     }
 
-    EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 11u);
-    EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 11u);
+    EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 12u);
+    EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 12u);
 }
 
 TEST(SandboxDomainPanels, ClosedRegisteredWindowsBuildNoDomainModels)
@@ -1804,4 +1809,143 @@ TEST(SandboxDomainPanels, EveryColorRowEditsTheOverlayLaneTheRuntimeNamesForIt)
              ColorRowCase{"cloud points", ProbeEntity::PointCloud, D::PointCloudPoint, K::PointCloud, "Vertices",
                           ColorLane::Points}})
         RunColorRowInterpretationCase(testCase);
+}
+
+TEST(SandboxPropertyInspector, FaceStatisticsComparisonValuesAndShowUseSharedQueries)
+{
+    namespace GS = Extrinsic::ECS::Components::GeometrySources;
+    namespace G = Extrinsic::Graphics::Components;
+    TestSupport::ImGuiFrameScope gui;
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto entity = scene.Create();
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0, 0, 0});
+    const auto b = mesh.AddVertex({1, 0, 0});
+    const auto c = mesh.AddVertex({1, 1, 0});
+    const auto d = mesh.AddVertex({0, 1, 0});
+    (void)mesh.AddTriangle(a, b, c);
+    (void)mesh.AddTriangle(a, c, d);
+    GS::PopulateFromMesh(scene.Raw(), entity, mesh);
+    auto& properties = scene.Raw().get<GS::Faces>(entity).Properties;
+    properties.GetOrAdd<float>("f:inspect").Vector() = {2, 4};
+    properties.GetOrAdd<float>("f:compare").Vector() = {3, 5};
+    Runtime::EditorCommandHistory history;
+    Editor::SandboxEditorContext context;
+    context.Processing = Runtime::BindEditorProcessingCommands({.Scene = &scene, .CommandHistory = &history});
+    context.VisualizationCommands = Runtime::BindEditorVisualizationEditingCommands({
+        .Scene = &scene, .CommandHistory = &history, .VisualizationCommandsAvailable = true});
+    Editor::PropertyInspectorUiState state;
+    state.Entity = Runtime::SelectionController::ToStableEntityId(entity);
+    state.PreviousSelection = std::vector<std::uint32_t>{};
+    state.Property = {Runtime::GeometryElementDomain::MeshFace, "f:inspect", Geometry::PropertyValueKind::Float};
+    state.CompareWith = {Runtime::GeometryElementDomain::MeshFace, "f:compare", Geometry::PropertyValueKind::Float};
+    state.Compare = true; state.ShowValues = true;
+    const auto expected = Runtime::GetEditorPropertyStatistics(context.Processing, state.Entity, state.Property);
+    ASSERT_TRUE(expected.Success);
+    const auto frame = [&](bool show) {
+        gui.NextFrame();
+        ImGui::SetNextWindowPos({0, 0}); ImGui::SetNextWindowSize({800, 600});
+        ImGui::Begin("Inspector test", nullptr, ImGuiWindowFlags_NoSavedSettings);
+        if (show) ImGui::ActivateItemByID(ImGui::GetID("Show"));
+        ImGui::LogToBuffer();
+        Editor::DrawPropertyInspectorContents(context, state);
+        const std::string logged = ImGui::GetCurrentContext()->LogBuffer.c_str();
+        ImGui::LogFinish(); ImGui::End();
+        return logged;
+    };
+    (void)frame(false);
+    const auto text = frame(false);
+    EXPECT_NE(text.find("Rows: 2   Included: 2   Deleted: 0"), std::string::npos) << text;
+    EXPECT_NE(text.find("Max error: 1   Mean error: 1   RMS error: 1"), std::string::npos) << text;
+    ASSERT_TRUE(state.Statistics.Success);
+    EXPECT_DOUBLE_EQ(state.Statistics.Statistics.Components[0].Mean, expected.Statistics.Components[0].Mean);
+    EXPECT_EQ(state.Values.Rows.size(), 2u);
+    EXPECT_EQ(history.UndoCount(), 0u);
+    (void)frame(true); (void)frame(false);
+    const auto* lanes = scene.Raw().try_get<G::VisualizationLaneOverrides>(entity);
+    ASSERT_NE(lanes, nullptr);
+    ASSERT_TRUE(lanes->Surface.has_value());
+    EXPECT_EQ(lanes->Surface->ScalarFieldName, "f:inspect");
+    EXPECT_EQ(history.UndoCount(), 1u);
+    // Later property edits invalidate the copied panel model even without changing selection.
+    properties.GetOrAdd<float>("f:inspect")[0] = 6;
+    (void)frame(false);
+    EXPECT_DOUBLE_EQ(state.Statistics.Statistics.Components[0].Mean, 5.0);
+    state.Property = state.CompareWith;
+    (void)frame(false);
+    EXPECT_TRUE(state.DisplayDiagnostic.empty());
+}
+
+TEST(SandboxPropertyInspector, ScalarOnlyEntityAndRemovedPropertyFailWithoutStaleResults)
+{
+    namespace GS = Extrinsic::ECS::Components::GeometrySources;
+    TestSupport::ImGuiFrameScope gui;
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto entity = scene.Create();
+    auto& properties = scene.Raw().emplace<GS::Vertices>(entity).Properties;
+    properties.Resize(2);
+    properties.GetOrAdd<std::uint64_t>("ids").Vector() = {9007199254740993ULL, 18446744073709551615ULL};
+    Editor::SandboxEditorContext context;
+    context.Processing = Runtime::BindEditorProcessingCommands({.Scene = &scene});
+    Editor::PropertyInspectorUiState state;
+    state.Entity = Runtime::SelectionController::ToStableEntityId(entity);
+    state.PreviousSelection = std::vector<std::uint32_t>{};
+    state.Property = {Runtime::GeometryElementDomain::PointCloudPoint, "ids", Geometry::PropertyValueKind::UInt64};
+    state.ShowValues = true;
+    const auto frame = [&] {
+        gui.NextFrame();
+        ImGui::Begin("Scalar inspector", nullptr, ImGuiWindowFlags_NoSavedSettings);
+        ImGui::LogToBuffer();
+        Editor::DrawPropertyInspectorContents(context, state);
+        const std::string text = ImGui::GetCurrentContext()->LogBuffer.c_str();
+        ImGui::LogFinish(); ImGui::End();
+        return text;
+    };
+    const auto text = frame();
+    ASSERT_TRUE(state.Statistics.Success) << text;
+    EXPECT_NE(text.find("9007199254740993"), std::string::npos) << text;
+    EXPECT_NE(text.find("18446744073709551615"), std::string::npos) << text;
+    auto ids = properties.Get<std::uint64_t>("ids");
+    properties.Remove(ids);
+    (void)frame();
+    EXPECT_FALSE(state.Valid);
+    EXPECT_TRUE(state.Statistics.Statistics.Components.empty());
+    scene.Destroy(entity);
+    const auto missing = frame();
+    EXPECT_FALSE(state.Valid);
+    EXPECT_EQ(missing.find("9007199254740993"), std::string::npos);
+}
+
+TEST(SandboxPropertyInspector, EmptySelectionPromptsAndGraphDefaultsToSupportedProperty)
+{
+    namespace GS = Extrinsic::ECS::Components::GeometrySources;
+    TestSupport::ImGuiFrameScope gui;
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto entity = scene.Create();
+    Geometry::Graph::Graph graph;
+    const auto a = graph.AddVertex({0, 0, 0});
+    const auto b = graph.AddVertex({1, 0, 0});
+    (void)graph.AddEdge(a, b);
+    GS::PopulateFromGraph(scene.Raw(), entity, graph);
+    Editor::SandboxEditorContext context;
+    context.Processing = Runtime::BindEditorProcessingCommands({.Scene = &scene});
+    Editor::PropertyInspectorUiState state;
+    state.PreviousSelection = std::vector<std::uint32_t>{};
+    const auto frame = [&] {
+        gui.NextFrame();
+        ImGui::Begin("Default inspector", nullptr, ImGuiWindowFlags_NoSavedSettings);
+        ImGui::LogToBuffer();
+        Editor::DrawPropertyInspectorContents(context, state);
+        const std::string text = ImGui::GetCurrentContext()->LogBuffer.c_str();
+        ImGui::LogFinish(); ImGui::End();
+        return text;
+    };
+    const auto empty = frame();
+    EXPECT_NE(empty.find("Choose an entity"), std::string::npos) << empty;
+    EXPECT_EQ(empty.find("does not exist"), std::string::npos) << empty;
+    state.Entity = Runtime::SelectionController::ToStableEntityId(entity);
+    const auto selected = frame();
+    EXPECT_TRUE(state.Statistics.Success) << selected;
+    EXPECT_NE(state.Property.ValueKind, Geometry::PropertyValueKind::Unknown);
+    EXPECT_EQ(selected.find("Unsupported property kind"), std::string::npos) << selected;
 }

@@ -39,7 +39,7 @@ new entries, filtered by level and category.
 ```bash
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
-ctest --test-dir build/ci --output-on-failure -R 'CoreLogging|Logging' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+ctest --test-dir build/ci --output-on-failure -R '^LogRingBuffer\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
 python3 tools/agents/check_task_policy.py --root . --strict
@@ -55,4 +55,4 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Dependencies determine integration order. UI/runtime paths land together before their MCP counterparts are reported complete.
 - Completion requires the named behavior tests, combined verification and a read-only Claude review of a fixed diff.
 
-The final combined CPU gate is justified by the widely imported `Core.Logging` interface; run focused logging tests first, then the full CPU selector once after integration. Sanitizer and live Vulkan evidence remain separate.
+The final combined CPU gate is justified by the widely imported `Core.Logging` and `Core.Telemetry` interfaces; run focused logging tests first, then the full CPU selector once after integration. Sanitizer and live Vulkan evidence remain separate.

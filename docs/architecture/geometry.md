@@ -213,6 +213,23 @@ reinterpreted as contiguous scalar storage. `LiveElementRange` is the shared
 handle iteration helper behind mesh, graph, point-cloud, and const domain-view
 live-element accessors.
 
+`Geometry.Properties.Statistics` provides read-only statistics and row comparisons
+for every canonical numeric property kind on any element domain. Scalar and vector
+component summaries include finite/NaN/infinity/zero counts, population standard
+deviation, RMS, and optional histograms bounded to 256 bins. Vectors also have
+magnitude summaries; a row containing a NaN is classified before infinity, while
+each component keeps its own accounting. Empty and fully non-finite inputs have
+explicit statuses and zero-valued unavailable summaries.
+
+`ResolvePropertyDeletionMasks` validates bool properties ending in `:deleted` and
+returns borrowed masks; their union determines excluded rows. Comparisons exclude
+rows deleted in either source and require matching row counts and component shapes.
+Scalar kinds can differ; integer subtraction precedes floating conversion so nearby
+64-bit integers remain distinguishable. Vector error is Euclidean distance per row.
+Reported summaries and histogram coordinates are rounded to double; unrepresentable
+errors return `NumericOverflow`. Histogram bins are left-closed/right-open except
+the final maximum, and constant ranges place all finite samples in the first bin.
+
 ### Algorithm backend seams
 
 `Geometry.KMeans` is the canonical geometry exemplar for the

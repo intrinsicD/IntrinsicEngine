@@ -186,8 +186,8 @@ Nothing exists without the launch flag: no module, thread or socket.
   registration `Preview*/Apply*` commands, the point-cloud point-sampling, keypoint,
   k-means and consolidation run commands, and the panels' Show recipe
   (`MakeEditorPropertyVisualizationRecipe`). There is no generic scene or property write.
-- Naming. Read-only (`readOnlyHint`): `scene_entities`, `entity_properties`, `attribute_bindings`, `config_sections`,
-  `config_schema`, `config_get`, `config_preview`, `history`, `jobs_list`, `jobs_wait`, `log`,
+- Naming. Read-only (`readOnlyHint`): `scene_entities`, `entity_properties`, `property_list`, `property_stats`, `property_compare`, `property_values`, `attribute_bindings`, `config_sections`,
+  `config_schema`, `config_get`, `config_preview`, `history`, `jobs_list`, `jobs_wait`, `log`, `diagnostics_read`, `device_status`,
   `preview_registration`, `preview_point_sampling`, `preview_keypoint_analysis`, `preview_kmeans`,
   `preview_point_cloud_consolidation`, `preview_operation`, `preview_mesh_operation` and
   `view_screenshot`. State-changing: `select_entity`, `import_file`, `show_property`,
@@ -361,6 +361,32 @@ Nothing exists without the launch flag: no module, thread or socket.
 - UI parity: a capability a user can use is built as a Sandbox feature first;
   its tool calls the same runtime function.
 
+## Property inspection
+
+The Property Inspector under View and the read-only `property_*` operations use
+`Runtime.PropertyInspectionOperations`. `property_list {entity}` lists every
+canonical domain, name, kind, row count and generation. Use its domain/name pair
+with `property_stats {entity, domain, name, bins}` (0 disables bins, maximum 256)
+and `property_values {entity, domain, name, offset, limit}` (1–65,536 rows).
+
+Statistics exclude deleted rows and distinguish finite, NaN, infinity and zero
+counts. Vectors report components and magnitude; summaries are rounded to double.
+Value pages use storage indices, retain deleted flags, preserve UInt64 as decimal
+strings and spell floating special values `NaN`, `+Infinity`, `-Infinity`.
+`property_compare {entity, a: {domain, name}, b: {domain, name}}` preserves row
+correspondence within one domain, ignores deleted/nonfinite pairs, and reports
+scalar absolute error or vector Euclidean distance. Shape, cardinality and
+numeric-overflow failures are explicit diagnostics. Queries do not alter history
+or property contents. The Inspector's Show action uses the existing visualization
+recipe command, independently of these read-only queries.
+
+`property_stats` and `property_compare` report `status` as an integer: 0 Ok,
+1 Empty, 2 NoFiniteValues, 3 PropertyNotFound, 4 UnsupportedKind,
+5 InvalidParameters, 6 InvalidDeletionMask, 7 RowCountMismatch, 8 KindMismatch,
+9 NumericOverflow. Empty and NoFiniteValues are successful query outcomes;
+statistics without finite samples use null summaries. A refusal before geometry
+resolution (such as a missing entity/domain) has null status and a diagnostic code.
+
 ## Planned capability tasks
 
 Schemas from declarative config field tables:
@@ -404,3 +430,36 @@ Protocol hardening and editor-operation coverage are recorded in
 - Imports are asynchronous (`Pending`): pass `wait: true`, or poll `scene_entities` for the result.
 - Unix-domain sockets only; Windows builds report `Unsupported`.
 - A Sandbox killed by a signal leaves its socket file; the next start replaces it.
+
+## Diagnostics readers
+
+`diagnostics_read` and `device_status` share `Runtime.DiagnosticsStream` with the
+Sandbox Diagnostics / Log window. Log cursors are exclusive and remain monotonic
+through Clear. `diagnostics_read` accepts `since_cursor`, `limit` (1–1000), exact
+`categories`, and integer `levels` (0 Info, 1 Warning, 2 Error, 3 Debug). Omitted
+levels select all; an empty level array selects none. Empty categories select all.
+The returned cursor advances across filtered entries without consuming an
+unreturned match. `dropped` counts unread entries no longer retained, including
+Clear; `cleared_through` lets cached readers discard cleared entries. If an input
+cursor exceeds this process's newest sequence (for example after a restart), the
+read restarts from zero and returns `cursor_reset: true`; consumers discard their
+previous cached entries. Normal paging returns `cursor_reset: false`. This detects
+a cursor ahead of the new process, not every restart with a smaller prior cursor.
+Log timestamps are Unix epoch nanoseconds and categories are the first leading `[Tag]`.
+
+Device status reports startup requested/actual backend and fallback, current
+`IDevice::IsOperational()`, and the selected Vulkan backend's validation-enabled
+state and error count. A selected Vulkan device that fails its operational gate
+still reports actual backend Vulkan; a real Null fallback reports Null. This is
+an observation surface; it does not toggle validation or device selection.
+
+The Engine-owned stream retains the latest 256 agent/CLI invocation records.
+Deferred calls update their original record when completed; releasing an unfinished
+continuation marks it abandoned. Evicted records stay evicted. Records include
+source (0 Editor, 1 AgentCli), status (0 pending, 1 succeeded, 2 failed, 3 abandoned),
+wall microseconds, tracked allocation-byte delta, and backend metadata when the
+operation result supplies it. Allocation deltas are process-wide interval counts;
+concurrent/deferred operations can overlap. `diagnostics_read`, `device_status`,
+and `log` do not record their own polling. Existing panel actions are not swept
+into this history; the initial instrumentation point is the shared agent/CLI
+invocation boundary.

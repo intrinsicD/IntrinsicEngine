@@ -1,5 +1,9 @@
 module;
 
+#include <chrono>
+#include <cstdint>
+#include <memory>
+#include <nlohmann/json.hpp>
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -9,8 +13,58 @@ module;
 
 module Extrinsic.Runtime.AgentOperations;
 
+import Extrinsic.Core.Telemetry;
+import Extrinsic.Runtime.DiagnosticsStream;
+
 namespace Extrinsic::Runtime
 {
+    namespace
+    {
+        struct InvocationRecord
+        {
+            EditorDiagnosticsStream& Stream;
+            EditorOperationRecord Record;
+            std::chrono::steady_clock::time_point Started{std::chrono::steady_clock::now()};
+            std::uint64_t AllocationStart{Core::Telemetry::Alloc::SnapshotCumulativeBytes()};
+            std::uint64_t Sequence{};
+            bool Finished{false};
+
+            void Finish(const DiagnosticOperationStatus status, const std::string_view text = {})
+            {
+                if (Finished) return;
+                Finished = true;
+                Record.Status = status;
+                Record.WallTimeUs = static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(
+                    std::chrono::steady_clock::now() - Started).count());
+                const auto bytes = Core::Telemetry::Alloc::SnapshotCumulativeBytes();
+                Record.AllocationDeltaBytes = bytes >= AllocationStart ? bytes - AllocationStart : 0;
+                // Property pages contain values only; parsing their potentially large JSON
+                // again cannot discover backend metadata and would block the main thread.
+                const auto result = Record.Name == "property_values" ? nlohmann::json{} :
+                    nlohmann::json::parse(text, nullptr, false);
+                if (result.is_object())
+                {
+                    auto field = [&result](const char* name) -> std::string {
+                        const auto it = result.find(name);
+                        if (it == result.end() || it->is_null()) return {};
+                        return it->is_string() ? it->get<std::string>() : it->is_number_integer() ? it->dump() : std::string{};
+                    };
+                    Record.RequestedBackend = field("requested_backend");
+                    Record.ActualBackend = field("actual_backend");
+                    if (Record.ActualBackend.empty()) Record.ActualBackend = field("backend");
+                    Record.BackendFallbackReason = field("backend_fallback_reason");
+                    if (Record.BackendFallbackReason.empty()) Record.BackendFallbackReason = field("fallback_reason");
+                    const auto fallback = result.find("fell_back_to_cpu");
+                    if (Record.BackendFallbackReason.empty() && fallback != result.end() && fallback->is_boolean() && fallback->get<bool>())
+                        Record.BackendFallbackReason = field("backend_diagnostic");
+                }
+                Stream.UpdateOperation(Sequence, std::move(Record));
+            }
+
+            ~InvocationRecord() { Finish(DiagnosticOperationStatus::Abandoned); }
+        };
+    }
+
     bool AgentOperationRegistry::Register(AgentOperationSpec spec)
     {
         if (spec.Name.empty() || !spec.Invoke || Find(spec.Name) != nullptr) return false;
@@ -29,17 +83,40 @@ namespace Extrinsic::Runtime
                                                const AgentOperationContext& context, const std::string_view argumentsJson,
                                                const bool readOnlySession)
     {
-        const auto* spec = registry.Find(name);
-        if (spec == nullptr) return {.IsError = true, .Text = "Unknown operation '" + std::string(name) + "'."};
-        if (readOnlySession && !spec->ReadOnly)
-            return {.IsError = true,
-                    .Text = "'" + spec->Name + "' changes the scene or files, but the Sandbox agent lane is read-only (--agent-readonly)."};
-        if (spec->NeedsPresentedFrame && !context.ViewportPresentable)
-            return {.IsError = true,
-                    .Text = "'" + spec->Name + "' needs a presented frame, but the Sandbox window is minimized; restore it and retry.",
-                    .ErrorCode = "viewport_not_presentable"};
-        const ScopedEditorCommandLabelPrefix prefix{context.History, "Agent: "};
-        return spec->Invoke(context, argumentsJson.empty() ? std::string_view{"{}"} : argumentsJson);
+        // Observation must not fill the bounded history with the observer's own polling.
+        const bool observe = context.Diagnostics && name != "diagnostics_read" && name != "device_status" && name != "log";
+        std::shared_ptr<InvocationRecord> record;
+        if (observe)
+        {
+            record = std::make_shared<InvocationRecord>(*context.Diagnostics,
+                EditorOperationRecord{.Name = std::string(name), .Source = context.Source});
+            record->Sequence = context.Diagnostics->AppendOperation(record->Record);
+        }
+        auto invoke = [&]() -> AgentOperationOutcome {
+            const auto* spec = registry.Find(name);
+            if (spec == nullptr) return {.IsError = true, .Text = "Unknown operation '" + std::string(name) + "'."};
+            if (readOnlySession && !spec->ReadOnly)
+                return {.IsError = true,
+                        .Text = "'" + spec->Name + "' changes the scene or files, but the Sandbox agent lane is read-only (--agent-readonly)."};
+            if (spec->NeedsPresentedFrame && !context.ViewportPresentable)
+                return {.IsError = true,
+                        .Text = "'" + spec->Name + "' needs a presented frame, but the Sandbox window is minimized; restore it and retry.",
+                        .ErrorCode = "viewport_not_presentable"};
+            const ScopedEditorCommandLabelPrefix prefix{context.History, "Agent: "};
+            return spec->Invoke(context, argumentsJson.empty() ? std::string_view{"{}"} : argumentsJson);
+        };
+        auto outcome = invoke();
+        if (!record) return outcome;
+        if (!outcome.Continuation)
+            record->Finish(outcome.IsError ? DiagnosticOperationStatus::Failed : DiagnosticOperationStatus::Succeeded, outcome.Text);
+        else
+            outcome.Continuation = [record, continuation = std::move(outcome.Continuation)](
+                const AgentOperationContext& current, AgentOperationOutcome& completed) {
+                if (!continuation(current, completed)) return false;
+                record->Finish(completed.IsError ? DiagnosticOperationStatus::Failed : DiagnosticOperationStatus::Succeeded, completed.Text);
+                return true;
+            };
+        return outcome;
     }
 
     std::optional<std::string> ResolveAgentPath(const AgentOperationContext& context, const std::string_view path)

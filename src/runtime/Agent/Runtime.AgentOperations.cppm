@@ -14,6 +14,7 @@ module;
 
 export module Extrinsic.Runtime.AgentOperations;
 
+import Extrinsic.Runtime.DiagnosticsStream;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -72,6 +73,8 @@ export namespace Extrinsic::Runtime
         // False on minimized frames: nothing is rendered, so GPU work and captures cannot
         // progress. Tools that need a presented frame fail with "viewport_not_presentable".
         bool ViewportPresentable{true};
+        EditorDiagnosticsStream* Diagnostics{nullptr};
+        DiagnosticOperationSource Source{DiagnosticOperationSource::AgentCli};
     };
 
     using AgentOperationInvoker =

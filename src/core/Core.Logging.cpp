@@ -1,5 +1,8 @@
 module;
 
+#include <algorithm>
+#include <chrono>
+#include <span>
 #include <array>
 #include <atomic>
 #include <cstddef>
@@ -34,6 +37,7 @@ namespace Extrinsic::Core::Log
     static LogRingBuffer      s_Ring;
     static std::mutex         s_LogMutex;
     static std::atomic<uint64_t> s_Sequence{0};
+    static std::uint64_t s_ClearedThrough{0};
 
     struct AsyncConsoleSink
     {
@@ -129,8 +133,18 @@ namespace Extrinsic::Core::Log
         std::lock_guard lock(s_LogMutex);
         LogEntry pendingEntry{
             .Lvl = level,
-            .Message = std::string(msg)
+            .Message = std::string(msg),
+            .Sequence = s_Sequence.load(std::memory_order_relaxed) + 1,
+            .TimestampNs = static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count()),
         };
+
+        if (msg.starts_with('['))
+        {
+            const auto end = msg.find(']');
+            if (end != std::string_view::npos && end > 1)
+                pendingEntry.Category = msg.substr(1, end - 1);
+        }
 
         // Append to ring buffer
         auto& entry = s_Ring.Entries[s_Ring.WritePos % kLogCapacity];
@@ -186,6 +200,36 @@ namespace Extrinsic::Core::Log
         return snap;
     }
 
+    CursorSnapshot TakeSnapshotSince(const std::uint64_t sequence, const std::size_t maxEntries,
+                                     const LevelMask levels, const std::span<const std::string> categories)
+    {
+        std::lock_guard lock(s_LogMutex);
+        const auto newest = s_Sequence.load(std::memory_order_relaxed);
+        const bool reset = sequence > newest;
+        const auto cursor = reset ? std::uint64_t{0} : sequence;
+        CursorSnapshot result{.NextCursor = cursor, .ClearedThrough = s_ClearedThrough, .CursorReset = reset};
+        if (maxEntries == 0) return result;
+        const auto retainedStart = newest - s_Ring.Count;
+        if (cursor < retainedStart)
+        {
+            result.Dropped = retainedStart - cursor;
+            result.NextCursor = retainedStart;
+        }
+        result.Entries.reserve(std::min(maxEntries, s_Ring.Count));
+        const auto oldest = s_Ring.WritePos - s_Ring.Count;
+        for (std::size_t i = oldest; i < s_Ring.WritePos; ++i)
+        {
+            const auto& entry = s_Ring.Entries[i % kLogCapacity];
+            if (entry.Sequence <= cursor) continue;
+            const bool matches = (levels & Mask(entry.Lvl)) != 0 &&
+                (categories.empty() || std::ranges::find(categories, entry.Category) != categories.end());
+            if (matches && result.Entries.size() == maxEntries) break;
+            result.NextCursor = entry.Sequence;
+            if (matches) result.Entries.push_back(entry);
+        }
+        return result;
+    }
+
     std::size_t GetEntryCount()
     {
         std::lock_guard lock(s_LogMutex);
@@ -195,6 +239,7 @@ namespace Extrinsic::Core::Log
     void ClearEntries()
     {
         std::lock_guard lock(s_LogMutex);
+        s_ClearedThrough = s_Sequence.load(std::memory_order_relaxed);
         s_Ring.WritePos = 0;
         s_Ring.Count    = 0;
         // Sequence counter is NOT reset — preserves monotonicity for UI

@@ -1,3 +1,4 @@
+// Scalar property selection and copied statistics plots shared by editor windows.
 module;
 #include <span>
 
@@ -9,6 +10,7 @@ module;
 export module Extrinsic.Runtime.EditorPropertyWidgets;
 
 import Geometry.Properties;
+import Geometry.Properties.Statistics;
 
 export namespace Extrinsic::Runtime
 {
@@ -25,7 +27,7 @@ export namespace Extrinsic::Runtime
         std::string SelectedProperty{};
         Geometry::PropertyValueKind SelectedValueKind{
             Geometry::PropertyValueKind::Unknown};
-        std::vector<double> FiniteSamples{};
+        Geometry::PropertyNumericStatistics Statistics{};
         std::size_t SourceSampleCount{0u};
         std::size_t FilteredNonFiniteSampleCount{0u};
         bool HasFiniteRange{false};
@@ -45,7 +47,7 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] EditorScalarPropertyPlotModel
     BuildEditorScalarPropertyPlotModel(
         const Geometry::ConstPropertySet& properties,
-        std::string_view selectedProperty = {});
+        std::string_view selectedProperty = {}, std::size_t bins = 32);
 
     // Draws a scalar-property selector plus an ImPlot histogram. ImGui and
     // ImPlot types remain private to the implementation unit.
@@ -53,6 +55,9 @@ export namespace Extrinsic::Runtime
         std::string_view widgetId,
         const Geometry::ConstPropertySet& properties,
         EditorPropertyPlotWidgetState& state);
+
+    void DrawEditorPropertyHistogramWidget(
+        std::string_view widgetId, const Geometry::PropertyNumericStatistics& statistics);
 
     // Draws an ImPlot bar chart of a spectrum (e.g. Laplacian eigenvalues) and a slider that
     // selects one index; returns true when the selection changed.

@@ -23,6 +23,8 @@ module;
 
 module Extrinsic.Runtime.AgentServer;
 
+import Extrinsic.Runtime.DiagnosticsStream;
+
 import Extrinsic.Core.Logging;
 import Extrinsic.Platform.LocalSocket;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
@@ -365,6 +367,7 @@ namespace Extrinsic::Runtime
                 .AllowedRoots = Options.AllowedRoots,
                 .FrameIndex = frame.FrameIndex,
                 .ViewportPresentable = presentable,
+                .Diagnostics = frame.Services.Find<EditorDiagnosticsStream>(),
             };
             {
                 // Deferred replies belong to the client that asked; a reconnect drops them.

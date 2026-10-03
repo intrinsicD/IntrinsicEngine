@@ -375,5 +375,7 @@ namespace Extrinsic::Runtime
 {
     // Registers the point, registration and configured-operation tools (Operations.cpp).
     void RegisterProcessingAgentOperations(AgentOperationRegistry& registry);
+    void RegisterPropertyInspectionAgentOperations(AgentOperationRegistry& registry);
+    void RegisterDiagnosticsAgentOperations(AgentOperationRegistry& registry);
 }
 }

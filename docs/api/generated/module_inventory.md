@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 11 |
 | `core` | 42 |
 | `ecs` | 27 |
-| `geometry` | 132 |
+| `geometry` | 133 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 81 |
@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 6 |
-| `runtime` | 110 |
+| `runtime` | 112 |
 
 ## Modules
 
@@ -212,6 +212,7 @@ Root scanned: `src`
 | `Geometry.PointLBVH` | `src/geometry/Geometry.PointLBVH.cppm` | `geometry` |
 | `Geometry.PointSampling` | `src/geometry/Geometry.PointSampling.cppm` | `geometry` |
 | `Geometry.Primitives` | `src/geometry/Geometry.Primitives.cppm` | `geometry` |
+| `Geometry.Properties.Statistics` | `src/geometry/Geometry.Properties.Statistics.cppm` | `geometry` |
 | `Geometry.Properties.Types` | `src/geometry/Geometry.Properties.Types.cppm` | `geometry` |
 | `Geometry.Properties` | `src/geometry/Geometry.Properties.cppm` | `geometry` |
 | `Geometry.Quadric` | `src/geometry/Geometry.Quadric.cppm` | `geometry` |
@@ -400,11 +401,13 @@ Root scanned: `src`
 | `Extrinsic.Runtime.PointSamplingOperations` | `src/runtime/Editor/Operations/Runtime.PointSamplingOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointScalarTransaction` | `src/runtime/Editor/Operations/Runtime.PointScalarTransaction.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointSetOperations` | `src/runtime/Editor/Operations/Runtime.PointSetOperations.cppm` | `runtime` |
+| `Extrinsic.Runtime.PropertyInspectionOperations` | `src/runtime/Editor/Operations/Runtime.PropertyInspectionOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.RegistrationOperations` | `src/runtime/Editor/Operations/Runtime.RegistrationOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderRecipeEditingOperations` | `src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.ScalarRidgeOperations` | `src/runtime/Editor/Operations/Runtime.ScalarRidgeOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.SceneEditingOperations` | `src/runtime/Editor/Operations/Runtime.SceneEditingOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationEditingOperations` | `src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.cppm` | `runtime` |
+| `Extrinsic.Runtime.DiagnosticsStream` | `src/runtime/Editor/Runtime.DiagnosticsStream.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorCommandHistory` | `src/runtime/Editor/Runtime.EditorCommandHistory.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorCommon` | `src/runtime/Editor/Runtime.EditorCommon.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorJobProjection` | `src/runtime/Editor/Runtime.EditorJobProjection.cppm` | `runtime` |
@@ -483,4 +486,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **456**
+Total modules: **459**

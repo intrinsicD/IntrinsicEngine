@@ -46,6 +46,7 @@ import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.DeviceBootstrap;
+import Extrinsic.Runtime.DiagnosticsStream;
 import Extrinsic.Runtime.FramePacingDiagnostics;
 import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.JobService;
@@ -111,6 +112,7 @@ namespace Extrinsic::Runtime
         CommandBus m_CommandBus{};
         KernelEventBus m_KernelEvents{};
         JobService m_JobService{};
+        EditorDiagnosticsStream m_Diagnostics{};
         ServiceRegistry m_ServiceRegistry{};
         WorldRegistry m_WorldRegistry{};
         ECS::Scene::Registry* m_Scene{};
@@ -253,6 +255,9 @@ namespace Extrinsic::Runtime
                 std::terminate();
             }
         };
+        m_Impl->m_Diagnostics.AttachDevice(m_Impl->m_Config.Render, *m_Impl->m_Device);
+        requireProvide(m_Impl->m_ServiceRegistry.Provide<EditorDiagnosticsStream>(
+                           m_Impl->m_Diagnostics, "Engine"), "EditorDiagnosticsStream");
         requireProvide(m_Impl->m_ServiceRegistry.Provide<RenderExtractionCache>(
                            m_Impl->m_RenderExtractionCache, "Engine"),
                        "RenderExtractionCache");
@@ -459,6 +464,7 @@ namespace Extrinsic::Runtime
         // borrowed records before control returns to the remaining kernel
         // teardown so no post-shutdown lookup can observe a dangling service.
         m_Impl->m_ServiceRegistry.Reset();
+        m_Impl->m_Diagnostics.DetachDevice();
     }
 
     void Engine::RefreshActiveWorldScenePointer() noexcept

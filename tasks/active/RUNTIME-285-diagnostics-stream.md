@@ -23,7 +23,7 @@ contracts: [repo.source-documentation, runtime.render-diagnostics-locality]
 ## Context
 - Operator direction 2026-10-03: finish the larger MCP inspection and diagnostics gaps, establish tasks first, delegate with appropriate effort, then obtain Claude review. This direction takes precedence over automatic Framework24 work selection.
 - Operator direction 2026-09-27: agent control lane and user-facing inspection capabilities, planned with Fable 5.1; attach-to-running transport; declarative schemas; integer enums.
-- Sources: `Core::Log` cursor stream (CORE-011); `Runtime.DeviceBootstrap.cppm` `RuntimeDeviceSelection{UsePromotedVulkanDevice, FallsBackToNullDevice}`; device diagnostics snapshot field `VulkanValidationErrorCount`; per-operation `RequestedBackend`/`ActualBackend`/`BackendFallbackReason` on results; `Core::Telemetry` (`Alloc::SnapshotBytes`); `RenderGraphFrameStats` fallback counters.
+- Sources: `Core::Log` cursor stream (CORE-011); `Runtime.DeviceBootstrap.cppm` `RuntimeDeviceSelection{UsePromotedVulkanDevice, FallsBackToNullDevice}`; device diagnostics snapshot field `VulkanValidationErrorCount`; per-operation `RequestedBackend`/`ActualBackend`/`BackendFallbackReason` on results; `Core::Telemetry` (`Alloc::SnapshotCumulativeBytes`, preserved across frame resets); `RenderGraphFrameStats` fallback counters.
 - Operation records are appended by `Runtime.AgentOperations` invocation (agent and batch lanes) and by the family apply results where cheap; start with agent/batch lanes.
 
 ## Control surfaces
@@ -47,8 +47,8 @@ contracts: [repo.source-documentation, runtime.render-diagnostics-locality]
 
 ## Verification
 ```bash
-cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicRuntimeGraphicsCpuTests IntrinsicCoreWrapperUnitTests
-ctest --test-dir build/ci --output-on-failure --timeout 60 -R '^(DiagnosticsStream|RuntimeDeviceSelection|AgentOperations|Logging)\.'
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicRuntimeGraphicsCpuTests IntrinsicCoreTests
+ctest --test-dir build/ci --output-on-failure --timeout 60 -R '^(DiagnosticsStream|RuntimeDeviceSelection|AgentOperations|LogRingBuffer)\.'
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/check_test_layout.py --root . --strict
 python3 tools/agents/check_task_policy.py --root . --strict

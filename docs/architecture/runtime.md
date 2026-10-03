@@ -1295,3 +1295,16 @@ ICP uses the existing editor command/job owner with the shared spatial-index cac
 FPFH histogram analysis uses the shared [descriptor config, spatial queries and property publication](descriptor-analysis.md) on compatible position/normal domains.
 
 [Compact density weights](density-weights.md) use the same geometry operations and spatial cache. Private radius-row pagination is shared with keypoints and descriptors; numerical reductions and guarded publication stay with each method.
+
+## Editor diagnostics stream
+
+`Extrinsic.Runtime.DiagnosticsStream` projects the core log cursor into runtime
+records consumed by the Sandbox and agent operations. Engine provides one
+`EditorDiagnosticsStream` through `ServiceRegistry`, freezes its device bootstrap
+configuration at attachment, and detaches its borrowed device during shutdown.
+Live readiness remains `IDevice::IsOperational()`; Vulkan diagnostics supply only
+validation observations. The service and its bounded 256-operation history are
+main-thread owned, while the core logger retains its existing mutex for concurrent
+writers and snapshot copies. There is no new logging API or validation toggle.
+The [agent control lane](agent-control-lane.md#diagnostics-readers) defines cursor,
+filter, drop, operation-lifetime, and allocation-counter semantics.

@@ -47,7 +47,7 @@ contracts: [repo.source-documentation, geometry.element-domain-sources]
 ## Verification
 ```bash
 cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests
-ctest --test-dir build/ci --output-on-failure --timeout 60 -R '^(SandboxPropertyInspector|SandboxProcessingPanels|DomainPanels|PropertyInspection)\.'
+ctest --test-dir build/ci --output-on-failure --timeout 60 -R '^(SandboxPropertyInspector|SandboxProcessingPanels|SandboxDomainPanels|SandboxEditorPresentation|PropertyInspection)\.'
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/check_test_layout.py --root . --strict
 python3 tools/agents/check_task_policy.py --root . --strict
@@ -63,3 +63,7 @@ python3 tools/docs/check_doc_links.py --root . --strict
 - Reuse existing property/domain resolution, logger ring, operation registry, EditorShell and panel widgets; plain records and free functions. No new telemetry framework or generic property-write API.
 - Dependencies determine integration order. UI/runtime paths land together before their MCP counterparts are reported complete.
 - Completion requires the named behavior tests, combined verification and a read-only Claude review of a fixed diff.
+
+## Implementation decisions
+- Reuse `BuildProcessingInputWorkspace`, `SynchronizeProcessingEntity`, the new complete property catalog, histogram widget and `DrawProcessingPropertyShowButton`. `DrawProcessingEntity` cannot be used unchanged because it filters out scalar-only entities via the vec3 point-input catalog.
+- Display snapshots belong to app UI state and refresh on scene epoch, source/property generations and query parameters; runtime queries retain no inspection cache. This avoids rescanning unchanged large properties every frame.

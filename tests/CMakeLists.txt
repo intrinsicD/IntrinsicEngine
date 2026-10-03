@@ -1278,6 +1278,7 @@ if(TARGET ExtrinsicRuntime)
         Test.AssetWorkflowModule.cpp
         Test.AsyncWorkModule.cpp
         Test.EditorCommandHistory.cpp
+        Test.PropertyInspectionOperations.cpp
         Test.EditorPropertyWidgets.cpp
         Test.EditorUiHost.cpp
         Test.EditorWindowRegistry.cpp
@@ -1301,6 +1302,7 @@ if(TARGET ExtrinsicRuntime)
         Test.PropertySmoothingOperations.cpp
         Test.PropertySmoothingWorkflows.cpp
         Test.AgentOperations.cpp
+        Test.DiagnosticsStream.cpp
         Test.ViewCapture.cpp
         Test.LaplacianEigenbasisOperations.cpp
         Test.HarmonicFieldOperations.cpp
@@ -1425,6 +1427,7 @@ if(TARGET ExtrinsicSandboxEditor)
             Test.SandboxDescriptorAnalysisPanel.cpp
             Test.SandboxProcessingPanels.cpp
             Test.SandboxJobsWindow.cpp
+            Test.SandboxDiagnostics.cpp
             Test.SandboxAgentServer.cpp
             Test.EngineConfigSectionSchemas.cpp
             Test.SandboxParameterizationPanel.cpp
@@ -1529,6 +1532,7 @@ set(_geometry_test_files
     Test_RuntimeGraphKNN.cpp
     Test.GraphQueries.cpp
     Test.GeometryProperties.cpp
+    Test.GeometryPropertyStatistics.cpp
     Test_KDTree.cpp
     Test.PointLBVH.cpp
     Test_Octree.cpp

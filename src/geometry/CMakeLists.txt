@@ -103,6 +103,7 @@ target_sources(${target_name}
         Geometry.Primitives.cppm
         Geometry.Properties.Types.cppm
         Geometry.Properties.cppm
+        Geometry.Properties.Statistics.cppm
         Geometry.Quadric.cppm
         Geometry.Queries.cppm
         Geometry.Ray.cppm
@@ -222,6 +223,7 @@ target_sources(${target_name}
         Geometry.PointCloud.Utils.cpp
         Geometry.PointCloud.cpp
         Geometry.Properties.cpp
+        Geometry.Properties.Statistics.cpp
         Geometry.Quadric.cpp
         Geometry.Queries.cpp
         Geometry.Raycast.cpp

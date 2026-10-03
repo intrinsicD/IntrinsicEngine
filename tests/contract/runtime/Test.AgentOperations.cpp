@@ -81,7 +81,8 @@ TEST(AgentOperations, EditorOperationsHaveUniqueNamesAndValidSchemas)
         const bool reader = spec.Name.starts_with("scene_") || spec.Name.starts_with("entity_") || spec.Name == "history" ||
                             spec.Name.starts_with("config_sections") || spec.Name == "config_schema" || spec.Name == "config_get" || spec.Name == "config_preview" ||
                             spec.Name == "jobs_list" || spec.Name == "jobs_wait" || spec.Name == "log" || spec.Name.starts_with("preview_") ||
-                            spec.Name == "attribute_bindings";
+                            spec.Name == "attribute_bindings" || spec.Name.starts_with("property_") ||
+                            spec.Name == "diagnostics_read" || spec.Name == "device_status";
         EXPECT_EQ(spec.ReadOnly, reader) << "read-only flag follows the naming convention";
     }
     // Without an engine every operation answers without crashing: history and log report
@@ -90,7 +91,7 @@ TEST(AgentOperations, EditorOperationsHaveUniqueNamesAndValidSchemas)
     for (const auto& spec : registry.Entries())
     {
         const auto outcome = R::InvokeAgentOperation(registry, spec.Name, empty, "{}", false);
-        EXPECT_EQ(outcome.IsError, spec.Name != "history" && spec.Name != "log") << spec.Name << ": " << outcome.Text;
+        EXPECT_EQ(outcome.IsError, spec.Name != "history" && spec.Name != "log" && spec.Name != "diagnostics_read" && spec.Name != "device_status") << spec.Name << ": " << outcome.Text;
     }
 }
 

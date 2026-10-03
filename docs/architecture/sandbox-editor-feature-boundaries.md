@@ -758,6 +758,23 @@ for that detail, typed result data and exactly-once delivery flag. UV keeps its
 separate atlas rejection status. The point-field header does not require the
 editor command-status module for these declarations.
 
+`Runtime.PropertyInspectionOperations` exposes copied property catalogs, statistics,
+comparisons and bounded value pages through attachment-checked processing commands.
+It resolves every canonical element domain through `BuildGeometryAvailability` and
+`ResolveGeometryPropertySet`; queries create no history entry or document revision.
+Comparisons require the same domain and preserve original row correspondence.
+Pages include deleted storage slots with flags, cap requests at 65,536 rows, encode
+uint64 values as decimal strings and floating special values as explicit strings.
+The app-owned `view.property_inspector` window adds an entity/domain/property
+chooser, component/magnitude histogram, comparison and 64-row value pages. Its
+copied display results refresh when the scene epoch, source/property generations
+or query inputs change; Refresh forces a new read. The entity chooser uses the
+complete property catalog so scalar-only sources remain eligible. Show uses the
+shared visualization command and does not rewrite property values.
+Statistics and comparison share `Geometry.Properties.Statistics`, including deletion
+mask validation. `Runtime.EditorPropertyWidgets` uses the same statistics for the
+Appearance histogram and exposes a precomputed histogram widget for inspection panels.
+
 Inspector and domain appearance panels share compiled uniform-color,
 scalar color/range and bin/isoline controls in `Sandbox.PanelSupport.cpp`.
 The callers own source visibility and the domain-only baked-texture restriction;
@@ -1214,3 +1231,18 @@ Accept (the undoable publication) and Discard; a stale result disables Accept
 with the reason, and the next run waits for that decision. See the
 [property smoothing contract](../methods/property-smoothing.md) for input/output
 bindings, Laplacian semantics, derived sample positions and limits.
+
+## Diagnostics / Log window
+
+**View > Diagnostics / Log** (`view.diagnostics`) is registered by EditorShell and
+drawn in app-private `Sandbox.DiagnosticsPanel.cpp`. It uses only the runtime
+`DiagnosticsStream` surface: level toggles, exact category filter, auto-scroll,
+Clear, a device-status header, and a recent-operation table. Each window owns its
+log cursor and a bounded 2048-entry visible cache; changing filters reloads the
+retained ring after the window's own most recent Clear boundary, so intentionally
+cleared entries do not reappear as dropped-log warnings. Runtime Clear invalidates
+cached entries without resetting sequence numbers. A runtime cursor-reset marker
+also discards cached entries and the window's prior Clear boundary. Clear reaches the shared runtime log-clear function. Device
+status is observational and no core logging or Vulkan module is imported by app
+code. `Test.SandboxDiagnostics.cpp` covers registration, filters, Clear, subsequent
+entries and the Null-fallback header.

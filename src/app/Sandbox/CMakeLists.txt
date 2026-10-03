@@ -16,7 +16,11 @@ if(INTRINSIC_BUILD_SANDBOX OR INTRINSIC_BUILD_TESTS)
             Editor/Sandbox.PanelSupport.hpp
             Editor/Sandbox.PointCloudConsolidationPanel.hpp
             Editor/Sandbox.EditorShell.cpp
+            Editor/Sandbox.DiagnosticsPanel.cpp
+            Editor/Sandbox.DiagnosticsPanel.hpp
             Editor/Sandbox.DomainPanels.cpp
+            Editor/Sandbox.PropertyInspectorPanel.cpp
+            Editor/Sandbox.PropertyInspectorPanel.hpp
             Editor/Sandbox.MethodPanels.cpp
             Editor/Sandbox.MeshProcessingPanels.cpp
             Sandbox.ConfigSections.cpp

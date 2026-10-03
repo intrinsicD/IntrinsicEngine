@@ -5,6 +5,7 @@ module;
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <numeric>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -16,73 +17,6 @@ module Extrinsic.Runtime.EditorPropertyWidgets;
 
 namespace Extrinsic::Runtime
 {
-    namespace
-    {
-        template <typename T>
-        void AppendSamples(
-            const Geometry::ConstPropertySet& properties,
-            const std::string_view name,
-            EditorScalarPropertyPlotModel& model)
-        {
-            const Geometry::ConstProperty<T> property = properties.Get<T>(name);
-            if (!property)
-                return;
-
-            model.SourceSampleCount = property.Vector().size();
-            model.FiniteSamples.reserve(model.SourceSampleCount);
-            for (const auto value : property.Vector())
-            {
-                const double sample = static_cast<double>(value);
-                if (std::isfinite(sample))
-                    model.FiniteSamples.push_back(sample);
-                else
-                    ++model.FilteredNonFiniteSampleCount;
-            }
-        }
-
-        void PopulateSelectedSamples(
-            const Geometry::ConstPropertySet& properties,
-            EditorScalarPropertyPlotModel& model)
-        {
-            using Kind = Geometry::PropertyValueKind;
-            switch (model.SelectedValueKind)
-            {
-            case Kind::Bool:
-                AppendSamples<bool>(properties, model.SelectedProperty, model);
-                break;
-            case Kind::Int32:
-                AppendSamples<std::int32_t>(properties, model.SelectedProperty, model);
-                break;
-            case Kind::UInt32:
-                AppendSamples<std::uint32_t>(properties, model.SelectedProperty, model);
-                break;
-            case Kind::UInt64:
-                AppendSamples<std::uint64_t>(properties, model.SelectedProperty, model);
-                break;
-            case Kind::Float:
-                AppendSamples<float>(properties, model.SelectedProperty, model);
-                break;
-            case Kind::Double:
-                AppendSamples<double>(properties, model.SelectedProperty, model);
-                break;
-            case Kind::Unknown:
-            case Kind::Vec2:
-            case Kind::Vec3:
-            case Kind::Vec4:
-                return;
-            }
-
-            if (model.FiniteSamples.empty())
-                return;
-
-            const auto [minimum, maximum] = std::minmax_element(
-                model.FiniteSamples.begin(), model.FiniteSamples.end());
-            model.HasFiniteRange = true;
-            model.Minimum = *minimum;
-            model.Maximum = *maximum;
-        }
-    }
-
     bool IsEditorScalarPropertyKind(
         const Geometry::PropertyValueKind kind) noexcept
     {
@@ -107,7 +41,7 @@ namespace Extrinsic::Runtime
 
     EditorScalarPropertyPlotModel BuildEditorScalarPropertyPlotModel(
         const Geometry::ConstPropertySet& properties,
-        const std::string_view selectedProperty)
+        const std::string_view selectedProperty, const std::size_t bins)
     {
         EditorScalarPropertyPlotModel model{};
         for (const Geometry::PropertyDescriptor& descriptor :
@@ -137,7 +71,17 @@ namespace Extrinsic::Runtime
 
         model.SelectedProperty = selected->Name;
         model.SelectedValueKind = selected->ValueKind;
-        PopulateSelectedSamples(properties, model);
+        const auto statistics = Geometry::ComputePropertyStatistics(
+            properties, model.SelectedProperty, {.Bins = bins});
+        model.SourceSampleCount = statistics.Count;
+        model.FilteredNonFiniteSampleCount = statistics.NaNCount + statistics.InfCount;
+        if (!statistics.Components.empty())
+        {
+            model.Statistics = statistics.Components.front();
+            model.HasFiniteRange = model.Statistics.FiniteCount != 0;
+            model.Minimum = model.Statistics.Min;
+            model.Maximum = model.Statistics.Max;
+        }
         return model;
     }
 
@@ -151,8 +95,9 @@ namespace Extrinsic::Runtime
         else
             ImGui::PushID(widgetId.data(), widgetId.data() + widgetId.size());
 
-        EditorScalarPropertyPlotModel model =
-            BuildEditorScalarPropertyPlotModel(properties, state.SelectedProperty);
+        state.HistogramBins = std::clamp(state.HistogramBins, 1, 256);
+        EditorScalarPropertyPlotModel model = BuildEditorScalarPropertyPlotModel(
+            properties, state.SelectedProperty, static_cast<std::size_t>(state.HistogramBins));
         bool selectionChanged = false;
         if (state.SelectedProperty != model.SelectedProperty)
         {
@@ -183,16 +128,15 @@ namespace Extrinsic::Runtime
             ImGui::EndCombo();
         }
 
-        if (selectionChanged)
+        const bool binsChanged = ImGui::SliderInt("Bins", &state.HistogramBins, 1, 256);
+        if (selectionChanged || binsChanged)
         {
             model = BuildEditorScalarPropertyPlotModel(
                 properties,
-                state.SelectedProperty);
+                state.SelectedProperty, static_cast<std::size_t>(state.HistogramBins));
         }
 
-        state.HistogramBins = std::clamp(state.HistogramBins, 1, 256);
-        ImGui::SliderInt("Bins", &state.HistogramBins, 1, 256);
-        ImGui::Text("Samples: %zu", model.FiniteSamples.size());
+        ImGui::Text("Samples: %zu", model.Statistics.FiniteCount);
         if (model.FilteredNonFiniteSampleCount > 0u)
         {
             ImGui::SameLine();
@@ -201,22 +145,36 @@ namespace Extrinsic::Runtime
                 model.FilteredNonFiniteSampleCount);
         }
 
-        if (!model.FiniteSamples.empty() &&
-            ImPlot::BeginPlot("##PropertyHistogram", ImVec2(-1.0f, 240.0f)))
-        {
-            const std::size_t boundedCount = std::min(
-                model.FiniteSamples.size(),
-                static_cast<std::size_t>(std::numeric_limits<int>::max()));
-            ImPlot::PlotHistogram(
-                model.SelectedProperty.c_str(),
-                model.FiniteSamples.data(),
-                static_cast<int>(boundedCount),
-                state.HistogramBins);
-            ImPlot::EndPlot();
-        }
+        DrawEditorPropertyHistogramWidget("PropertyHistogram", model.Statistics);
 
         ImGui::PopID();
         return selectionChanged;
+    }
+
+    void DrawEditorPropertyHistogramWidget(
+        const std::string_view widgetId, const Geometry::PropertyNumericStatistics& statistics)
+    {
+        const auto& histogram = statistics.Histogram;
+        if (histogram.Counts.empty() || histogram.Edges.size() != histogram.Counts.size() + 1)
+            return;
+        ImGui::PushID(widgetId.data(), widgetId.data() + widgetId.size());
+        if (ImPlot::BeginPlot("##Histogram", ImVec2(-1.0f, 240.0f)))
+        {
+            ImPlot::SetupAxes("value", "count", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+            std::vector<double> centers(histogram.Counts.size()), counts(histogram.Counts.size());
+            for (std::size_t i = 0; i < counts.size(); ++i)
+            {
+                centers[i] = std::midpoint(histogram.Edges[i], histogram.Edges[i + 1]);
+                counts[i] = static_cast<double>(histogram.Counts[i]);
+            }
+            // Long-double subtraction avoids overflow for finite opposite endpoints.
+            const auto span = static_cast<long double>(histogram.Edges.back()) - histogram.Edges.front();
+            const double width = span > 0 ? static_cast<double>(std::min(
+                span / counts.size(), static_cast<long double>(std::numeric_limits<double>::max()))) : 1.0;
+            ImPlot::PlotBars("samples", centers.data(), counts.data(), static_cast<int>(counts.size()), width);
+            ImPlot::EndPlot();
+        }
+        ImGui::PopID();
     }
 
     bool DrawEditorSpectrumBarWidget(std::string_view widgetId, std::span<const double> values, int& selected)

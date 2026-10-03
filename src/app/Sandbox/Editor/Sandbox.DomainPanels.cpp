@@ -53,7 +53,9 @@ import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.MeshTopologyOperations;
 import Extrinsic.Runtime.ParameterizationOperations;
 
+import Extrinsic.Runtime.PropertyInspectionOperations;
 #include "Sandbox.PanelSupport.hpp"
+#include "Sandbox.PropertyInspectorPanel.hpp"
 
 namespace Extrinsic::Sandbox::Editor {
 namespace {
@@ -974,6 +976,7 @@ void DrawDomainSelectionWindow(const EditorDomainWindowModel& model,
 } // namespace
 
 struct DomainPanels::Impl {
+  PropertyInspectorUiState PropertyInspector{};
   VectorFieldUiState VectorFieldState{};
   AttributeSourceUiState AttributeSourceState{};
   std::array<EditorCommandStatus, 3> AppearanceStatuses{
@@ -1035,6 +1038,11 @@ void DomainPanels::Impl::Register(EditorShell &editorShell) {
   Shell = &editorShell;
 
   RegisterAppearanceWindow();
+  Handles.push_back(Shell->RegisterEditorWindow(EditorWindowDescriptor{
+      .Id = "view.property_inspector", .MenuPath = {"View"}, .Title = "Property Inspector", .OpenByDefault = false,
+      .Draw = [this](bool& open, const SandboxEditorContext& context) {
+          DrawPropertyInspectorWindow(open, context, PropertyInspector);
+      }}));
   RegisterWindow("pointcloud.properties", {"PointCloud"}, "Properties",
                  Runtime::EditorDomainWindowKind::PointCloud,
                  Section::Properties);
@@ -1069,6 +1077,7 @@ void DomainPanels::Impl::Unregister() {
   LastUvRegenerationResult.reset();
   LastUvExtentAdoption.reset();
   MeshPropertyPlotState.SelectedProperty.clear();
+  PropertyInspector = {};
 }
 
 void DomainPanels::Impl::RegisterWindow(

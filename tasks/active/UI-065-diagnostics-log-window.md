@@ -34,7 +34,7 @@ a recent-operations table.
 ## Verification
 ```bash
 cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests
-ctest --test-dir build/ci --output-on-failure --timeout 60 -R '^(SandboxDiagnostics|DiagnosticsWindow|DiagnosticsStream)\.'
+ctest --test-dir build/ci --output-on-failure --timeout 60 -R '^(SandboxDiagnostics|DiagnosticsStream)\.'
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/check_test_layout.py --root . --strict
 python3 tools/agents/check_task_policy.py --root . --strict

@@ -24,6 +24,8 @@ module;
 
 module Extrinsic.Sandbox.Editor.Shell;
 
+import Extrinsic.Runtime.DiagnosticsStream;
+
 
 import Extrinsic.Runtime.PointFieldOperations;
 import Extrinsic.Runtime.PointAnalysisOperations;
@@ -60,6 +62,7 @@ import Extrinsic.Runtime.ParameterizationConfig;
 import Extrinsic.Runtime.PointCloudConsolidationTypes;
 
 #include "Sandbox.PanelSupport.hpp"
+#include "Sandbox.DiagnosticsPanel.hpp"
 
 namespace Extrinsic::Sandbox::Editor
 {
@@ -2055,6 +2058,8 @@ namespace Extrinsic::Sandbox::Editor
             std::vector<std::pair<std::uint64_t, std::function<void(const SandboxEditorContext&)>>>
                 FrameObservers{};
             std::uint64_t NextFrameObserverId{1u};
+            DiagnosticsPanelState DiagnosticsState{};
+            Runtime::EditorDiagnosticsStream* Diagnostics{nullptr};
             std::array<char, 1024> ImportPathBuffer{};
             std::array<char, 1024> ScenePathBuffer{};
             Runtime::EditorAssetPayloadKind ImportPayloadKind{
@@ -2312,6 +2317,22 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::End();
             }
 
+            void RegisterDiagnosticsWindow()
+            {
+                (void)RegisterEditorWindow(EditorWindowDescriptor{
+                    .Id = "view.diagnostics",
+                    .MenuPath = {"View"},
+                    .Title = "Diagnostics / Log",
+                    .Draw = [this](bool& open, const SandboxEditorContext&)
+                    {
+                        ImGui::SetNextWindowSize(ImVec2(900, 650), ImGuiCond_FirstUseEver);
+                        if (ImGui::Begin("Diagnostics / Log", &open))
+                            DrawDiagnosticsPanel(Diagnostics, DiagnosticsState);
+                        ImGui::End();
+                    },
+                });
+            }
+
             void RegisterJobsWindow()
             {
                 (void)RegisterEditorWindow(EditorWindowDescriptor{
@@ -2440,6 +2461,8 @@ namespace Extrinsic::Sandbox::Editor
                 if (ViewCapture != nullptr)
                     RegisterScreenshotWindow();
                 RegisterJobsWindow();
+                Diagnostics = services.Find<Runtime::EditorDiagnosticsStream>();
+                RegisterDiagnosticsWindow();
                 Attachment.Attach(worlds, services);
                 if (!Attachment.IsAttached())
                 {
@@ -2469,6 +2492,8 @@ namespace Extrinsic::Sandbox::Editor
                 UnregisterAllWindows();
                 Host = nullptr;
                 ViewCapture = nullptr;
+                Diagnostics = nullptr;
+                DiagnosticsState = {};
                 Selection = nullptr;
                 Interaction = nullptr;
                 UserCaptureTicket = 0u;

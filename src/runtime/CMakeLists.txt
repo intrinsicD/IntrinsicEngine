@@ -12,6 +12,7 @@ target_sources(${target_name}
         AssetWorkflow/Runtime.AssetWorkflowModule.cppm
         AssetWorkflow/Runtime.AssetIngestStateMachine.cppm
         Kernel/Runtime.CommandBus.cppm
+        Editor/Runtime.DiagnosticsStream.cppm
         Kernel/Runtime.DeviceBootstrap.cppm
         Kernel/Runtime.JobService.cppm
         Modules/Clustering/Runtime.ClusteringModule.cppm
@@ -48,6 +49,7 @@ target_sources(${target_name}
         Editor/Runtime.EditorCommon.cppm
         Editor/Runtime.EditorProcessing.cppm
         Editor/Operations/Runtime.PointScalarTransaction.cppm
+        Editor/Operations/Runtime.PropertyInspectionOperations.cppm
         Editor/Operations/Runtime.PointFieldOperations.cppm
         Editor/Operations/Runtime.PointAnalysisOperations.cppm
         Editor/Operations/Runtime.PointSetOperations.cppm
@@ -138,6 +140,8 @@ target_sources(${target_name}
         AssetWorkflow/Runtime.AssetWorkflowRecipePolicies.cpp
         AssetWorkflow/Runtime.AssetWorkflowTextureResidency.cpp
         Kernel/Runtime.CommandBus.cpp
+        Editor/Runtime.DiagnosticsStream.cpp
+        Agent/Runtime.AgentOperations.Diagnostics.cpp
         Kernel/Runtime.DeviceBootstrap.cpp
         Kernel/Runtime.JobService.cpp
         Modules/Clustering/Runtime.ClusteringModule.cpp
@@ -206,6 +210,7 @@ target_sources(${target_name}
         Editor/internal/Runtime.EditorWorkspaceSession.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.cpp
     Editor/Runtime.EditorProcessing.cpp
+    Editor/Operations/Runtime.PropertyInspectionOperations.cpp
     Editor/Operations/Runtime.PointFieldOperations.cpp
     Editor/Operations/Runtime.PointAnalysisOperations.cpp
         Editor/Operations/Runtime.PointCloudServiceOperations.cpp
@@ -251,6 +256,7 @@ target_sources(${target_name}
         Config/Runtime.ConfigFieldSpec.cpp
         Agent/Runtime.AgentOperations.cpp
         Agent/Runtime.AgentOperations.Editor.cpp
+        Agent/Runtime.AgentOperations.PropertyInspection.cpp
         Agent/Runtime.AgentOperations.Operations.cpp
         Agent/internal/Runtime.AgentOperations.Detail.hpp
         Agent/Runtime.AgentOperations.Capture.cpp

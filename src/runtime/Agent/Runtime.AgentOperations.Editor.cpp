@@ -1144,5 +1144,7 @@ namespace Extrinsic::Runtime
             Schema(R"({"limit":{"type":"integer","minimum":1,"maximum":1000,"default":100},"min_level":{"type":"string","enum":["debug","info","warning","error"],"default":"info"}})"),
             true, Log);
         RegisterProcessingAgentOperations(registry);
+        RegisterPropertyInspectionAgentOperations(registry);
+        RegisterDiagnosticsAgentOperations(registry);
     }
 }

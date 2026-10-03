@@ -22,7 +22,7 @@ TEST(EditorPropertyWidgets, EmptySourceProducesAnEmptySafeModel)
 
     EXPECT_TRUE(model.Options.empty());
     EXPECT_TRUE(model.SelectedProperty.empty());
-    EXPECT_TRUE(model.FiniteSamples.empty());
+    EXPECT_EQ(model.Statistics.FiniteCount, 0u);
     EXPECT_EQ(model.SourceSampleCount, 0u);
     EXPECT_EQ(model.FilteredNonFiniteSampleCount, 0u);
     EXPECT_FALSE(model.HasFiniteRange);
@@ -45,7 +45,7 @@ TEST(EditorPropertyWidgets, SelectorExcludesVectorProperties)
     ASSERT_EQ(model.Options.size(), 1u);
     EXPECT_EQ(model.Options.front().Name, "v:label");
     EXPECT_EQ(model.SelectedProperty, "v:label");
-    EXPECT_EQ(model.FiniteSamples.size(), 3u);
+    EXPECT_EQ(model.Statistics.FiniteCount, 3u);
 }
 
 TEST(EditorPropertyWidgets, PlotModelFiltersNonFiniteSamplesAndReportsRange)
@@ -70,8 +70,23 @@ TEST(EditorPropertyWidgets, PlotModelFiltersNonFiniteSamplesAndReportsRange)
     EXPECT_EQ(model.SelectedProperty, "v:quality");
     EXPECT_EQ(model.SourceSampleCount, 5u);
     EXPECT_EQ(model.FilteredNonFiniteSampleCount, 2u);
-    EXPECT_EQ(model.FiniteSamples, (std::vector<double>{1.0, 3.0, -2.0}));
+    EXPECT_EQ(model.Statistics.FiniteCount, 3u);
+    EXPECT_DOUBLE_EQ(model.Statistics.Mean, 2.0 / 3.0);
     ASSERT_TRUE(model.HasFiniteRange);
     EXPECT_DOUBLE_EQ(model.Minimum, -2.0);
     EXPECT_DOUBLE_EQ(model.Maximum, 3.0);
+}
+
+TEST(EditorPropertyWidgets, HistogramUsesSharedStatisticsAndExcludesDeletedRows)
+{
+    Geometry::PropertySet properties;
+    properties.Resize(4);
+    properties.Add<double>("scalar").Vector() = {0, 2, 4, 100};
+    properties.Add<bool>("v:deleted")[3] = true;
+    const auto model = Runtime::BuildEditorScalarPropertyPlotModel(
+        Geometry::ConstPropertySet{properties}, "scalar", 2);
+    EXPECT_EQ(model.SourceSampleCount, 3u);
+    EXPECT_EQ(model.Statistics.FiniteCount, 3u);
+    EXPECT_DOUBLE_EQ(model.Maximum, 4);
+    EXPECT_EQ(model.Statistics.Histogram.Counts, (std::vector<std::size_t>{1, 2}));
 }

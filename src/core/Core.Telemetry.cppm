@@ -1,3 +1,4 @@
+// Engine timing, memory and allocation observations shared without higher-layer dependencies.
 module;
 
 #include <array>
@@ -31,15 +32,16 @@ import Extrinsic.Core.Hash;
 export namespace Extrinsic::Core::Telemetry
 {
     // -----------------------------------------------------------------------
-    // Allocation telemetry (absorbs former Memory:Telemetry partition)
-    // Allocators call RecordAlloc() on every allocation. Main thread reads via
-    // Snapshot() once per frame into FrameStats::AllocBytes / AllocCount.
+    // Allocators call RecordAlloc() on every tracked allocation. FrameStats uses
+    // resettable byte/count snapshots; intervals spanning frames use cumulative bytes.
     // -----------------------------------------------------------------------
     namespace Alloc
     {
         void     RecordAlloc(std::size_t bytes) noexcept;
         [[nodiscard]] uint64_t SnapshotBytes()  noexcept;
         [[nodiscard]] uint64_t SnapshotCount()  noexcept;
+        // Monotonic process total; Reset() only clears the frame snapshots above.
+        [[nodiscard]] uint64_t SnapshotCumulativeBytes() noexcept;
         void     Reset()                        noexcept;
     }
 

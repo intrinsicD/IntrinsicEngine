@@ -20,18 +20,21 @@ namespace Extrinsic::Core::Telemetry
     {
         std::atomic<uint64_t> g_AllocBytes{0};
         std::atomic<uint64_t> g_AllocCount{0};
+        std::atomic<uint64_t> g_CumulativeAllocBytes{0};
     }
 
     namespace Alloc
     {
         void RecordAlloc(std::size_t bytes) noexcept
         {
+            g_CumulativeAllocBytes.fetch_add(bytes, std::memory_order_relaxed);
             g_AllocBytes.fetch_add(bytes, std::memory_order_relaxed);
             g_AllocCount.fetch_add(1, std::memory_order_relaxed);
         }
 
         uint64_t SnapshotBytes() noexcept { return g_AllocBytes.load(std::memory_order_relaxed); }
         uint64_t SnapshotCount() noexcept { return g_AllocCount.load(std::memory_order_relaxed); }
+        uint64_t SnapshotCumulativeBytes() noexcept { return g_CumulativeAllocBytes.load(std::memory_order_relaxed); }
 
         void Reset() noexcept
         {
