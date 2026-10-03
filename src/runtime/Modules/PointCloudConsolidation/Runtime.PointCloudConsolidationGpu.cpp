@@ -1914,4 +1914,8 @@ namespace Extrinsic::Runtime
         return m_Impl != nullptr && (!m_Impl->RetiredResources.empty() || m_Impl->Completed.has_value() ||
             (m_Impl->Active && (!m_Impl->Active->Ready || m_Impl->Active->Accepting)));
     }
+    bool PointCloudConsolidationGpuState::HasPendingRun() const noexcept
+    {
+        return m_Impl && m_Impl->HasBusyState();
+    }
 }

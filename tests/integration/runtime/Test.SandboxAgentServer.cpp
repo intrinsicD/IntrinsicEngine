@@ -263,6 +263,27 @@ namespace
     };
 }
 
+TEST(SandboxAgentServer, ContenderIsRefusedWithoutDisruptingTheOwner)
+{
+    AgentRig rig{"contender"};
+    rig.Run([&](Client& owner) {
+        Client contender;
+        rig.Check(P::ConnectLocalSocket(rig.SocketPath, contender.Connection) == P::LocalSocketStatus::Ok, "contender connect");
+        const Json refused = contender.ReadLine(100);
+        rig.Check(refused.is_object() && refused.contains("error") && refused["error"]["code"] == -32001,
+                  "contender receives an immediate occupied reply");
+        rig.Check(owner.Request("ping").contains("result"), "owner still answers");
+        owner.Connection.Close();
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (rig.Server->Status().ClientConnected && std::chrono::steady_clock::now() < deadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        rig.Check(!rig.Server->Status().ClientConnected, "released owner is observed");
+        Client successor;
+        rig.Check(P::ConnectLocalSocket(rig.SocketPath, successor.Connection) == P::LocalSocketStatus::Ok, "successor connect");
+        rig.Check(successor.Request("initialize").contains("result"), "successor acquires released engine");
+    });
+}
+
 TEST(SandboxAgentServer, ClientRunsSmoothingThroughTheSocketAndUndoesIt)
 {
     const auto socketPath = (std::filesystem::temp_directory_path() /

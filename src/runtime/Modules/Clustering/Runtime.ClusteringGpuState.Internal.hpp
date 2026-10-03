@@ -58,6 +58,7 @@ namespace Extrinsic::Runtime
         void DrainCompletedTransfers();
         [[nodiscard]] std::optional<ClusteringGpuResult> ConsumeCompleted();
         [[nodiscard]] bool HasInFlightWork() const noexcept;
+        [[nodiscard]] std::string ReadinessDiagnostic(const RunKMeans&, const EditorProcessingContext&) const;
 
     private:
         struct Impl;

@@ -2777,6 +2777,7 @@ namespace Extrinsic::Runtime
         m_Service.m_GpuRun = [this](CommandCorrelationId correlation, PointCloudConsolidationGpuAction action) {
             return m_GpuState ? m_GpuState->GpuRun(correlation, action) : PointCloudConsolidationGpuObservation{};
         };
+        m_Service.m_GpuBusy = [this] { return m_GpuState && m_GpuState->HasPendingRun(); };
         setup.RegisterCommandHandler<PointCloudConsolidationRequest>(
             [this](
                 CommandContext& context,
@@ -2823,6 +2824,8 @@ namespace Extrinsic::Runtime
             context.Events.Unsubscribe(m_JobCompletedSubscription);
         m_JobCompletedSubscription = {};
         m_Service.Bind(nullptr, nullptr, nullptr);
+        m_Service.m_GpuRun = {};
+        m_Service.m_GpuBusy = {};
         m_Readiness.reset();
         m_Events = nullptr;
         m_Jobs = nullptr;

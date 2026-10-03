@@ -20,11 +20,40 @@ import Extrinsic.Runtime.EngineConfigControl;
 // Named only so the shared job declarations in the point-field header resolve.
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
+import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.GpuPropertyBinding;
+import Extrinsic.Runtime.SelectionController;
 import Geometry.Properties;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
+#include "Editor/internal/Runtime.EditorPendingGpuOutput.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 namespace Extrinsic::Runtime
 {
+    extern "C++" ActionReadiness GeometryProcessingDetail::PendingGpuOutputReadiness(
+        const EditorProcessingContext& context, const std::uint32_t stableId,
+        const std::span<const GeometryPropertyRef> outputs)
+    {
+        const auto* residency = context.SpatialIndices ? context.SpatialIndices->PropertyResidency() : nullptr;
+        if (!residency) return {true, {}};
+        const auto entity = SelectionController::ToEntityHandle(stableId);
+        for (const auto& output : outputs)
+        {
+            auto key = MakeGpuPropertyKey(context.World, entity, output);
+            // A logical output stays reserved across storage changes. GPU producers may use
+            // float/uint32 rings while Accept converts into another CPU property type.
+            using K = Geometry::PropertyValueKind;
+            for (const auto kind : {K::Bool, K::Int32, K::UInt32, K::UInt64, K::Float, K::Double, K::Vec2, K::Vec3, K::Vec4})
+            {
+                key.ValueKind = static_cast<std::uint32_t>(kind);
+                if (residency->HasRing(key))
+                    return MakeActionReadiness({{.Code = ActionReadinessCode::JobActive, .Field = {},
+                        .Message = "A GPU run owns output '" + output.Name +
+                            "'. Wait for it, then Accept or Discard its preview before starting another run."}});
+            }
+        }
+        return {true, {}};
+    }
+
     namespace
     {
         bool CanApplyProcessingConfig(const EditorProcessingContext& context) noexcept

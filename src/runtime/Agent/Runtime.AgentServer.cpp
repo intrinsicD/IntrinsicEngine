@@ -301,6 +301,16 @@ namespace Extrinsic::Runtime
                     DisconnectRequested = false;
                     continue;
                 }
+                // Keep one scene writer, but refuse contenders immediately rather than leaving
+                // their MCP initialize waiting in the listener backlog until a timeout.
+                Platform::LocalSocketConnection contender;
+                if (Listener.Accept(contender, 0) == Platform::LocalSocketStatus::Ok)
+                {
+                    (void)contender.SendAll(Dump(ErrorResponse(nullptr, -32001,
+                        "Another client owns the Sandbox connection. Release it with sandbox_disconnect "
+                        "or View > Agent Connection, then retry.")) + "\n", 20);
+                    contender.Close();
+                }
                 {
                     std::unique_lock lock{Mutex};
                     if (DisconnectRequested) { DisconnectRequested = false; lock.unlock(); dropClient(); continue; }

@@ -1122,6 +1122,9 @@ namespace Extrinsic::Runtime
         m_Service.m_GpuRun = [this](CommandCorrelationId id, KMeansGpuAction action) {
             return m_GpuState ? m_GpuState->GpuRun(id,action) : KMeansGpuObservation{};
         };
+        m_Service.m_GpuReadinessDiagnostic = [this](const RunKMeans& request, const EditorProcessingContext& context) {
+            return m_GpuState ? m_GpuState->ReadinessDiagnostic(request, context) : std::string{};
+        };
 
         if (Core::Result provided =
                 setup.Services().Provide<ClusteringService>(
@@ -1224,6 +1227,7 @@ namespace Extrinsic::Runtime
     void ClusteringModule::OnShutdown(RuntimeModuleShutdownContext& context)
     {
         m_Service.m_GpuRun = {};
+        m_Service.m_GpuReadinessDiagnostic = {};
         if (m_Jobs != nullptr && m_Device != nullptr &&
             m_GpuParticipant.IsValid())
         {

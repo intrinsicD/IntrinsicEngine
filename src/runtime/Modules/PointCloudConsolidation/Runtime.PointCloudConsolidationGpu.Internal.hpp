@@ -114,6 +114,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] std::optional<PointCloudConsolidationGpuResult>
         ConsumeCompleted();
         [[nodiscard]] bool HasInFlightWork() const noexcept;
+        [[nodiscard]] bool HasPendingRun() const noexcept;
 
     private:
         struct Impl;

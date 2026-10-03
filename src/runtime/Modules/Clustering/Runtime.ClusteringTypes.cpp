@@ -77,6 +77,9 @@ namespace Extrinsic::Runtime
     KMeansGpuObservation ClusteringService::GpuRun(CommandCorrelationId id, KMeansGpuAction action)
     { return m_GpuRun ? m_GpuRun(id, action) : KMeansGpuObservation{}; }
 
+    std::string ClusteringService::GpuReadinessDiagnostic(const Runtime::RunKMeans& request, const EditorProcessingContext& context) const
+    { return m_GpuReadinessDiagnostic ? m_GpuReadinessDiagnostic(request, context) : std::string{}; }
+
     bool IsValidKMeansPropertyBindings(const KMeansPropertyRefs& properties) noexcept
     {
         const auto writable = [](const GeometryPropertyRef& ref) {
@@ -94,7 +97,7 @@ namespace Extrinsic::Runtime
     }
 
     std::optional<KMeansRunCompleted> ValidateKMeansRequest(
-        const entt::registry* registry, const RunKMeans& command)
+        const entt::registry* registry, const Runtime::RunKMeans& command)
     {
         const auto reject = [&](KMeansRunStatus status, Core::ErrorCode error, const char* message)
         {

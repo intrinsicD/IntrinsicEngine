@@ -24,6 +24,14 @@ Edit canonical `docs/agent/*` sources, then run
 `references/` mirrors. Read `tasks/SESSION-BRIEF.md` and `tasks/backlog/README.md`
 only when selecting backlog work.
 
+For tasks involving a running Sandbox's scene, properties, processing, jobs or
+viewport, use the `intrinsic-sandbox` MCP tools when available. Start with
+`sandbox_status` and read [the agent control lane](docs/architecture/agent-control-lane.md#using-it)
+for connection, inspection and mutation rules. MCP registration is client-specific:
+`.codex/config.toml` configures Codex, `.mcp.json` configures Claude Code. Reading
+this file does not register a server or start the Sandbox. Report unavailable or
+occupied connections; do not silently replace live inspection with assumptions.
+
 For tool execution, follow the workflow's
 [output and wait procedure](docs/agent/prompt/prompt.md#tool-output-and-waits):
 bound routine results, preserve full evidence, batch independent reads, and wait

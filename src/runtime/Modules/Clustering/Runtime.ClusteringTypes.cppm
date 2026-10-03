@@ -143,7 +143,7 @@ export namespace Extrinsic::Runtime
     // Execution still checks finite values and captures exact publication state.
     // Dispatch fills world/correlation; an admission rejection has neither.
     [[nodiscard]] std::optional<KMeansRunCompleted> ValidateKMeansRequest(
-        const entt::registry*, const RunKMeans&);
+        const entt::registry*, const Runtime::RunKMeans&);
 
     struct ClusterLabelsChanged
     {
@@ -172,7 +172,7 @@ export namespace Extrinsic::Runtime
 
     // Only the lifecycle owner may bind the service. C++ linkage lets its
     // definition stay in the lifecycle module without importing that module here.
-    extern "C++" { class ClusteringModule; }
+    extern "C++" { class ClusteringModule; struct EditorProcessingContext; }
 
     class ClusteringService
     {
@@ -192,6 +192,8 @@ export namespace Extrinsic::Runtime
 
         [[nodiscard]] ClusteringModuleStats Stats() const noexcept;
         [[nodiscard]] KMeansGpuObservation GpuRun(CommandCorrelationId, KMeansGpuAction = KMeansGpuAction::Observe);
+        // Read-only admission reason shared with GPU submission; empty preserves CPU fallback paths.
+        [[nodiscard]] std::string GpuReadinessDiagnostic(const Runtime::RunKMeans&, const EditorProcessingContext&) const;
 
     private:
         friend class ClusteringModule;
@@ -201,6 +203,7 @@ export namespace Extrinsic::Runtime
                   const ClusteringModuleStats* stats) noexcept;
 
         std::function<KMeansGpuObservation(CommandCorrelationId, KMeansGpuAction)> m_GpuRun{};
+        std::function<std::string(const Runtime::RunKMeans&, const EditorProcessingContext&)> m_GpuReadinessDiagnostic{};
         CommandBus* m_Commands{};
         KernelEventBus* m_Events{};
         const ClusteringModuleStats* m_Stats{};

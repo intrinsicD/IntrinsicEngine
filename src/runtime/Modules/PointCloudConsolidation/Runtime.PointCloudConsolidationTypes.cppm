@@ -202,6 +202,8 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] PointCloudConsolidationGpuObservation GpuRun(
             CommandCorrelationId correlation, PointCloudConsolidationGpuAction action = PointCloudConsolidationGpuAction::Observe);
         [[nodiscard]] PointCloudConsolidationModuleStats Stats() const noexcept;
+        // Includes results awaiting Accept/Discard, excludes retired resources that allow CPU fallback.
+        [[nodiscard]] bool GpuBusy() const;
 
     private:
         friend class PointCloudConsolidationModule;
@@ -214,6 +216,7 @@ export namespace Extrinsic::Runtime
                 WorldHandle, const PointCloudConsolidationRequest&)> prepare = {}) noexcept;
 
         std::function<PointCloudConsolidationGpuObservation(CommandCorrelationId, PointCloudConsolidationGpuAction)> m_GpuRun{};
+        std::function<bool()> m_GpuBusy{};
         std::function<PointCloudConsolidationAvailability(
             WorldHandle, const PointCloudConsolidationRequest&)> m_PrepareAvailability{};
         CommandBus* m_Commands{};

@@ -1533,6 +1533,18 @@ TEST_F(ClusteringModuleResident, ResidentInputWaitsForCompletionAndRepeatRunUplo
     Hold=false;Held->Deliver(HeldData);Held.reset();
     ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
     EXPECT_EQ(Observation().Iterations,4u);EXPECT_EQ(Observation().Previews,2u);
+    Runtime::EditorProcessingContext previewContext{.Scene = &Scene(), .World = World, .SpatialIndices = &Cache};
+    const auto previewCommands = Runtime::BindEditorProcessingCommands(previewContext);
+    const auto blocked = Runtime::PreviewEditorKMeansRun(previewCommands, Service, Request);
+    EXPECT_FALSE(blocked.Enabled);
+    EXPECT_NE(blocked.DisabledReason.find("Accept or Discard"), std::string::npos);
+    EXPECT_EQ(Runtime::SubmitKMeansRun(previewCommands, Service, Request).Message, blocked.DisabledReason);
+    auto otherOutput = Request;
+    otherOutput.Properties.OutputLabels.Name = "other_labels";
+    otherOutput.Properties.OutputColors.Name = "other_colors";
+    otherOutput.Properties.OutputScalarLabels.reset();
+    EXPECT_FALSE(Service->GpuReadinessDiagnostic(Request, previewContext).empty());
+    EXPECT_EQ(Runtime::PreviewEditorKMeansRun(previewCommands, Service, otherOutput).DisabledReason, blocked.DisabledReason);
     // One submission per iteration (the interval preview shares iteration 3's)
     // plus the terminal preview, which also reads the centroids back.
     EXPECT_EQ(Observation().Submissions,5u);
@@ -1540,6 +1552,8 @@ TEST_F(ClusteringModuleResident, ResidentInputWaitsForCompletionAndRepeatRunUplo
     EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
     (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Discard);
     ASSERT_TRUE(Until([&]{return Results.size()==1;}));
+    EXPECT_TRUE(Runtime::PreviewEditorKMeansRun(previewCommands, Service, Request).Enabled);
+    EXPECT_TRUE(Service->GpuReadinessDiagnostic(Request, previewContext).empty());
     EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
     Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
     EXPECT_EQ(Observation().InputUploadBytes,0u);EXPECT_GT(Observation().InputCacheHits,0u);

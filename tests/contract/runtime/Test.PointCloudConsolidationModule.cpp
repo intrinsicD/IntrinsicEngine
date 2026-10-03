@@ -24,6 +24,7 @@
 
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.AgentOperations;
+import Extrinsic.Runtime.PointCloudServiceOperations;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
 import Extrinsic.Runtime.EngineConfigControl;
@@ -2187,6 +2188,16 @@ TEST_F(ResidentLop, ResidentInputCompletionPagesPreviewCadenceAndDiscardReuse)
     CompleteDiagnostics();
     ASSERT_TRUE(Until([&] { return Observation().ReadyToAccept; }));
     EXPECT_EQ(Observation().Previews, 2u);
+    Runtime::EditorProcessingContext previewContext{.Scene = &Scene(), .World = World, .SpatialIndices = &Cache};
+    const auto previewCommands = Runtime::BindEditorProcessingCommands(previewContext);
+    const auto blocked = Runtime::PrepareEditorPointCloudConsolidationAvailability(previewCommands, Service, Request);
+    EXPECT_FALSE(blocked.Available);
+    EXPECT_NE(blocked.Message.find("Accept or Discard"), std::string::npos);
+    EXPECT_EQ(Runtime::SubmitEditorPointCloudConsolidation(previewCommands, Service, Request).Message, blocked.Message);
+    auto otherOutput = Request;
+    otherOutput.Properties.OutputPositions.Name = "other_positions";
+    EXPECT_TRUE(Service->GpuBusy());
+    EXPECT_EQ(Runtime::PrepareEditorPointCloudConsolidationAvailability(previewCommands, Service, otherOutput).Message, blocked.Message);
     ASSERT_TRUE(Until([&] { return Observation().ReadyToAccept; }));
     EXPECT_TRUE(Observation().CanAccept);
     EXPECT_TRUE(Results.empty());
@@ -2197,6 +2208,38 @@ TEST_F(ResidentLop, ResidentInputCompletionPagesPreviewCadenceAndDiscardReuse)
     ASSERT_TRUE(Until([&] { return Observation().Submissions > 0u; }));
     EXPECT_EQ(Observation().InputUploadBytes, 0u);
     EXPECT_EQ(Observation().InputCacheHits, 1u);
+}
+
+TEST_F(ResidentLop, PendingLopKeepsUnrelatedWlopCpuFallbackAvailable)
+{
+    Start();
+    ASSERT_TRUE(Until([&] { return DiagnosticSink.has_value(); }));
+    CompleteDiagnostics();
+    ASSERT_TRUE(Until([&] { return Observation().ReadyToAccept; }));
+    auto fallback = Request;
+    const auto independentEntity = Scene().Create();
+    auto& independentVertices = Scene().Raw().emplace<GS::Vertices>(independentEntity);
+    independentVertices.Properties.Resize(Before.size());
+    independentVertices.Properties.GetOrAdd<glm::vec3>("v:position").Vector() = Before;
+    fallback.StableEntityId = Runtime::SelectionController::ToStableEntityId(independentEntity);
+    fallback.Config.Strategy = Runtime::PointCloudConsolidationStrategy::Wlop;
+    fallback.Config.WlopAnisotropic = false;
+    fallback.Properties.OutputPositions.Name = "wlop_positions";
+    Runtime::EditorProcessingContext context{.Scene = &Scene(), .World = World, .SpatialIndices = &Cache};
+    const auto commands = Runtime::BindEditorProcessingCommands(context);
+    Runtime::PointCloudConsolidationAvailability available;
+    ASSERT_TRUE(Until([&] {
+        available = Runtime::PrepareEditorPointCloudConsolidationAvailability(commands, Service, fallback);
+        return available.Available;
+    })) << available.Message;
+    const auto queued = Runtime::SubmitEditorPointCloudConsolidation(commands, Service, fallback);
+    ASSERT_EQ(queued.Status, Runtime::PointCloudConsolidationRunStatus::Queued) << queued.Message;
+    ASSERT_TRUE(Until([&] { return !Results.empty(); }));
+    EXPECT_EQ(Results.back().Correlation, queued.Correlation);
+    EXPECT_TRUE(Results.back().Succeeded()) << Results.back().Message;
+    EXPECT_EQ(Results.back().RequestedBackend, Runtime::PointCloudConsolidationBackend::VulkanCompute);
+    EXPECT_EQ(Results.back().ActualBackend, Runtime::PointCloudConsolidationBackend::CpuReference);
+    EXPECT_TRUE(Observation().ReadyToAccept);
 }
 
 TEST_F(ResidentLop, PreviewCopiesOnlyAtIntervalAndTerminalBoundaries)

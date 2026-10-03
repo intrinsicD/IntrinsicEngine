@@ -72,6 +72,7 @@ Load only the procedure whose scope applies. The names below resolve under
 | Unexplained SEGV/ASan/vtable/ICE failure, especially after `.cppm` module changes | `intrinsicengine-stale-build-triage` |
 | Getting a layer-cake map of an unfamiliar file before editing | read `tools/agents/skills/intrinsicengine-zoom-out/SKILL.md` directly (user-invoked slash skill, not model-invocable) |
 | Drawing a layer, module-neighbourhood, change-impact, composition, sequence, or data-flow architecture diagram | `intrinsicengine-draw-architecture` |
+| Inspecting or controlling a running Sandbox (scene, properties, processing, jobs, viewport) | Use `intrinsic-sandbox` MCP, starting with `sandbox_status`; read `docs/architecture/agent-control-lane.md` §"Using it". Report missing/occupied connections; source-only work does not require a running Sandbox. |
 | Navigating module deps, change impact, or paper→method→code links | Knowledge-graph discovery aid (below) |
 | Compacting a long session into a handoff doc for the next agent | `intrinsicengine-handoff` |
 

@@ -448,6 +448,28 @@ TEST_F(KeypointResident, ResidentPagingPreviewAcceptAtomicHistoryAndRepeatZeroUp
     ASSERT_TRUE(Until([&]{return Phase()==R::EditorGpuTransactionPhase::ReadyToAccept;}));
     EXPECT_EQ(Device.CreatePipelineCount, pipelines);
 }
+TEST_F(KeypointResident, SharedPreviewRefusesAnUnacceptedGpuResult)
+{
+    C.Mask.ValueKind = Geometry::PropertyValueKind::Int32;
+    C.Score.ValueKind = Geometry::PropertyValueKind::Double;
+    (void)Rows().GetOrAdd<std::int32_t>(C.Mask.Name, 77);
+    (void)Rows().GetOrAdd<double>(C.Score.Name, 77);
+    ASSERT_TRUE(R::PreviewEditorKeypointAnalysisCommand(Commands(), C).Enabled);
+    Start();
+    ASSERT_TRUE(Run) << Initial.Message;
+    ASSERT_TRUE(Until([&] { return Phase() == R::EditorGpuTransactionPhase::ReadyToAccept; }));
+    const auto blocked = R::PreviewEditorKeypointAnalysisCommand(Commands(), C);
+    EXPECT_FALSE(blocked.Enabled);
+    EXPECT_NE(blocked.DisabledReason.find("Accept or Discard"), std::string::npos);
+    auto cpu = C;
+    cpu.Backend = R::KeypointAnalysisBackend::CpuKDTree;
+    const auto refused = R::ApplyEditorKeypointAnalysisCommand(Commands(), cpu);
+    EXPECT_FALSE(refused.Succeeded());
+    EXPECT_NE(refused.Message.find("Accept or Discard"), std::string::npos);
+    EXPECT_EQ(std::as_const(Rows()).Get<double>(C.Score.Name)[0], 77);
+    R::DiscardEditorPointScalar(Commands(), Run);
+    EXPECT_TRUE(R::PreviewEditorKeypointAnalysisCommand(Commands(), C).Enabled);
+}
 TEST_F(KeypointResident, CompletionGatesPreviewAndDiscardKeepsResourcesUntilIdle)
 {
     Hold=true;Start();ASSERT_TRUE(Run);

@@ -17,10 +17,12 @@ One single-threaded `selectors` loop serves both ends, so calls are concurrent:
 Short internal requests (upstream initialize, tools/list, ping) block for up to 10 s; client input
 is buffered meanwhile.
 
-The bridge starts even when no Sandbox runs: it then offers only `sandbox_status`. After the client
-sent notifications/initialized it probes the socket every --probe-interval seconds and sends
+The bridge starts without acquiring the engine and offers connection tools plus `sandbox_tools`/`sandbox_call` for clients that cache tool lists.
+After an explicit sandbox_status and notifications/initialized it probes an unavailable socket
+every --probe-interval seconds and sends
 notifications/tools/list_changed once the Sandbox's tools become available (or disappear).
 Protocol versions 2025-06-18, 2025-03-26 and 2024-11-05 are negotiated. Standard library only.
+A busy refusal or explicit disconnect pauses reconnect until sandbox_status is called again.
 """
 
 from __future__ import annotations
@@ -46,6 +48,30 @@ STATUS_TOOL = {
     "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
     "annotations": {"readOnlyHint": True, "openWorldHint": False},
 }
+DISCONNECT_TOOL = {
+    "name": "sandbox_disconnect",
+    "title": "Release Sandbox connection",
+    "description": (
+        "Release this client's connection so another agent can use the Sandbox. Refuses while "
+        "tool calls are pending. Automatic reconnect stays paused until sandbox_status is called; "
+        "timed-out or cancelled operations may still finish in the engine."),
+    "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+    "annotations": {"readOnlyHint": False, "destructiveHint": False, "openWorldHint": False},
+}
+CATALOG_TOOL = {
+    "name": "sandbox_tools", "title": "Sandbox tool catalog",
+    "description": "List the running Sandbox's operation names and descriptions. Pass name to read one operation's full input schema. Use with sandbox_call if your client does not refresh dynamically added tools; call sandbox_status first.",
+    "inputSchema": {"type": "object", "properties": {"name": {"type": "string"}}, "additionalProperties": False},
+    "annotations": {"readOnlyHint": True, "openWorldHint": False},
+}
+CALL_TOOL = {
+    "name": "sandbox_call", "title": "Call a registered Sandbox operation",
+    "description": "Call an engine operation from sandbox_tools by name and arguments. Uses the same validated registry and read-only policy as named tools. May change the scene or files; inspect the operation's schema and annotations first. This also works in clients that cache the startup tool list.",
+    "inputSchema": {"type": "object", "properties": {"name": {"type": "string"}, "arguments": {"type": "object"}},
+                    "required": ["name"], "additionalProperties": False},
+    "annotations": {"readOnlyHint": False, "destructiveHint": True, "openWorldHint": False},
+}
+LOCAL_TOOLS = [STATUS_TOOL, DISCONNECT_TOOL, CATALOG_TOOL, CALL_TOOL]
 
 
 def default_socket_path() -> str:
@@ -89,6 +115,9 @@ class Bridge:
         self.next_probe = 0.0
         self.unresponsive = False     # the last ping probe timed out
         self.running = True
+        self.released = False
+        self.busy = False
+        self.connection_requested = False
 
     # -- client side ------------------------------------------------------------------------------
 
@@ -117,8 +146,14 @@ class Bridge:
             if self.unresponsive:
                 status["warning"] = "connected but not answering ping; it may be busy"
             return json.dumps(status)
+        hint = ("Connection released. Call sandbox_status to reconnect." if self.released else
+                "Another client owns the Sandbox. Ask it to call sandbox_disconnect, or use View > Agent Connection "
+                "to disconnect it, then call sandbox_status." if self.busy else
+                "Call sandbox_status to acquire the Sandbox connection." if not self.connection_requested else
+                "Start the Sandbox with --agent-socket, then call sandbox_status again.")
         return json.dumps({"connected": False, "socket": self.path, "error": self.last_error,
-                           "hint": "Start the Sandbox with --agent-socket, then call sandbox_status again."})
+                           "code": "released" if self.released else "agent_busy" if self.busy else "unavailable",
+                           "hint": hint})
 
     @staticmethod
     def error_result(client_id, text: str) -> dict:
@@ -128,8 +163,11 @@ class Bridge:
     # -- upstream connection ----------------------------------------------------------------------
 
     def connect(self) -> bool:
+        if self.released or self.busy or not self.connection_requested:
+            return False
         if self.sock is not None:
             return True
+        self.busy = False
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         try:
             sock.settimeout(INTERNAL_TIMEOUT)
@@ -200,6 +238,11 @@ class Bridge:
             return None
         if not isinstance(message, dict):
             return None
+        error = message.get("error")
+        if message.get("id") is None and isinstance(error, dict) and error.get("code") == -32001:
+            self.busy = True
+            self.close(error.get("message", "Another client owns the Sandbox connection."))
+            return None
         if "id" not in message:
             self.write(message)  # e.g. notifications/progress, forwarded verbatim
             return None
@@ -263,6 +306,7 @@ class Bridge:
 
     def forward_call(self, message: dict) -> dict | None:
         """Forwards a tools/call; returns an immediate reply only on failure."""
+        self.connection_requested = True
         client_id, params = message["id"], message.get("params", {})
         for _ in range(2):
             if not self.connect():
@@ -292,18 +336,21 @@ class Bridge:
             return None
         result = lambda value: {"jsonrpc": "2.0", "id": message_id, "result": value}
         if method == "initialize":
-            self.connect()
             requested = params.get("protocolVersion")
             return result({
                 "protocolVersion": requested if requested in SUPPORTED_VERSIONS else LATEST_VERSION,
                 "capabilities": {"tools": {"listChanged": True}},
                 "serverInfo": {"name": "intrinsic-sandbox-bridge", "version": "0.2.0"},
                 "instructions": "Tools of the running IntrinsicEngine Sandbox, reached through its --agent-socket. "
-                                "Call sandbox_status if they are missing."})
+                                "Start with sandbox_status, then scene_entities and entity_properties. If named engine tools "
+                                "are unavailable, use sandbox_tools to inspect their schemas and sandbox_call to call them. Inspect "
+                                "config_get and config_preview before authorized config_apply; use preview_* before run_*. "
+                                "After a timeout inspect jobs_list and the scene before retrying a mutation. Release "
+                                "the connection with sandbox_disconnect when finished so another agent can connect."})
         if method == "ping":
             return result({})
         if method == "tools/list":
-            tools = [STATUS_TOOL]
+            tools = list(LOCAL_TOOLS)
             listed = False
             if self.connect():
                 reply = self.request_sync("tools/list")
@@ -314,8 +361,45 @@ class Bridge:
             self.tools_generation = self.generation
             return result({"tools": tools})
         if method == "tools/call":
+            if params.get("name") in (CATALOG_TOOL["name"], CALL_TOOL["name"]):
+                args = params.get("arguments", {})
+                if not isinstance(args, dict) or ("name" in args and not isinstance(args["name"], str)):
+                    return self.error_result(message_id, "Pass an object with an optional string name.")
+                if params["name"] == CALL_TOOL["name"]:
+                    if not args.get("name") or not isinstance(args.get("arguments", {}), dict):
+                        return self.error_result(message_id, "Pass {name: <operation>, arguments: <object>} from sandbox_tools.")
+                    forwarded = {"name": args["name"], "arguments": args.get("arguments", {})}
+                    if "_meta" in params:
+                        forwarded["_meta"] = params["_meta"]
+                    return self.forward_call({**message, "params": forwarded})
+                self.connection_requested = True
+                if not self.connect():
+                    return self.error_result(message_id, self.status_text())
+                reply = self.request_sync("tools/list")
+                self.notify_tools_changed_if_needed()
+                if reply is None or "result" not in reply:
+                    return self.error_result(message_id, "The Sandbox did not return its tool catalog. " + self.status_text())
+                entries = reply["result"].get("tools", [])
+                if "name" in args:
+                    entries = [tool for tool in entries if tool["name"] == args["name"]]
+                    if not entries:
+                        return self.error_result(message_id, "Unknown Sandbox operation: " + args["name"])
+                else:
+                    entries = [{key: tool[key] for key in ("name", "title", "description", "annotations") if key in tool}
+                               for tool in entries]
+                return result({"content": [{"type": "text", "text": json.dumps({"tools": entries})}], "isError": False})
             if params.get("name") == STATUS_TOOL["name"]:
+                self.released = False
+                self.busy = False
+                self.connection_requested = True
                 self.probe()
+                self.notify_tools_changed_if_needed()
+                return result({"content": [{"type": "text", "text": self.status_text()}], "isError": False})
+            if params.get("name") == DISCONNECT_TOOL["name"]:
+                if self.pending:
+                    return self.error_result(message_id, "Tool calls are pending; wait for their replies before releasing the connection.")
+                self.released = True
+                self.close("Connection released by this client.")
                 self.notify_tools_changed_if_needed()
                 return result({"content": [{"type": "text", "text": self.status_text()}], "isError": False})
             return self.forward_call(message)
@@ -362,10 +446,11 @@ class Bridge:
                 self.abandon(server_id)
                 self.write(self.error_result(
                     client_id, f"No reply within {self.timeout:g} s. The call is still running in the Sandbox "
-                               "and may complete; poll `jobs` or `scene_entities` for its effect."))
+                               "and may complete; poll `jobs_list` or `scene_entities` for its effect."))
 
     def probe_if_due(self, now: float) -> None:
-        if self.connected or not self.client_initialized or now < self.next_probe:
+        if (not self.connection_requested or self.released or self.busy or self.connected
+                or not self.client_initialized or now < self.next_probe):
             return
         self.next_probe = now + self.probe_interval
         if self.connect():
@@ -373,7 +458,7 @@ class Bridge:
 
     def next_timeout(self, now: float) -> float | None:
         deadlines = [deadline for _, deadline in self.pending.values()]
-        if not self.connected and self.client_initialized:
+        if self.connection_requested and not self.released and not self.busy and not self.connected and self.client_initialized:
             deadlines.append(self.next_probe)
         return max(0.0, min(deadlines) - now) if deadlines else None
 

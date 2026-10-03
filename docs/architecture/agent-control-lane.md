@@ -12,10 +12,19 @@ local-only.
    `$XDG_RUNTIME_DIR/intrinsic-sandbox.sock`, else `/tmp/intrinsic-sandbox-<uid>.sock`).
    `--agent-readonly` exposes only read-only tools; `--agent-root <dir>`
    (repeatable, default: the working directory) bounds file arguments.
-2. The MCP client launches `tools/agents/mcp_bridge.py` (`.mcp.json` entry
-   `intrinsic-sandbox`). The bridge starts even without a Sandbox, offers
-   `sandbox_status`, probes the socket while the Sandbox is away (after
-   `notifications/initialized`) and announces the Sandbox's tools with
+2. The MCP client launches `tools/agents/mcp_bridge.py`: the repository's
+   `.codex/config.toml` registers `intrinsic-sandbox` for Codex (trusted project),
+   and `.mcp.json` registers it for Claude Code. Both launch commands resolve the
+   current Git root, including worktrees and starts from a subdirectory. Restart
+   or refresh the client's MCP connections after changing registration; in Codex,
+   `codex mcp get intrinsic-sandbox --json` checks the effective configuration.
+   Registration does not launch the engine. The bridge starts even without a Sandbox, offers
+   `sandbox_status`, `sandbox_disconnect`, `sandbox_tools` and `sandbox_call`. Loading a client or listing its tools
+   does not acquire the engine: begin with `sandbox_status` to request a connection.
+   An explicit `sandbox_tools`, `sandbox_call` or named engine-tool call can also
+   acquire it; after a busy refusal or release, only `sandbox_status` resumes it.
+   After that request and `notifications/initialized`, the bridge probes the
+   socket while the Sandbox is away and announces the Sandbox's tools with
    `notifications/tools/list_changed`. It is a single-threaded `selectors` loop:
    tool calls run concurrently with per-call timeouts (the call keeps running in
    the Sandbox), `ping` is answered locally, progress notifications are
@@ -23,6 +32,38 @@ local-only.
    2025-06-18, 2025-03-26 and 2024-11-05 are negotiated.
 3. **View > Agent Connection** in the Sandbox shows the socket, the connected
    client, the mode, allowed roots and call count, and disconnects the agent.
+
+Use these tools for tasks involving the live scene or viewport. Begin with
+`sandbox_status`, then inspect `scene_entities`, `entity_properties`,
+`attribute_bindings` and `config_get` as appropriate. Use `config_preview` before
+an authorized `config_apply`, and the corresponding `preview_*` before `run_*`.
+Check results through the returned outcome, `jobs_list`/`jobs_wait`, scene queries
+and captures. A timeout does not cancel a command: inspect its effect before
+retrying. Report missing tools or a disconnected engine explicitly. Ordinary
+source editing does not require a live connection.
+
+Clients that cache the initial tool list can use the always-visible
+`sandbox_tools` to list operation summaries, then pass `{"name":"scene_entities"}`
+to read an operation's full schema. `sandbox_call` accepts
+`{"name":"scene_entities","arguments":{}}` and forwards through the same engine
+registry, validation and read-only policy. It preserves progress, cancellation
+and per-call deadlines. Its annotation is conservatively mutating because the
+selected operation may write; inspect the operation's own annotations first.
+Client permission rules for individual named tools do not restrict the same
+operations through `sandbox_call`; restrict this generic tool too when configuring
+such rules. The engine's `--agent-readonly` policy applies to both entry points.
+
+One client owns the connection at a time. A contender receives an immediate
+`agent_busy` status through the bridge, with instructions for releasing the
+owner; it cannot evict the active client. A busy refusal pauses retries until
+another explicit `sandbox_status`, so an idle contender cannot take a released
+engine in the background. When finished, call
+`sandbox_disconnect`. This refuses while replies are pending and pauses that
+bridge's automatic reconnect, including reconnects from `tools/list` or stale
+tool calls. Calling `sandbox_status` explicitly resumes connection attempts.
+Operations whose calls already timed out or were cancelled may still finish in
+the engine after release. Prefer the bridge's release tool for a handoff:
+disconnecting from the UI alone leaves the old bridge's automatic reconnect enabled.
 
 ## Ownership
 
@@ -295,9 +336,16 @@ Nothing exists without the launch flag: no module, thread or socket.
   (`invalid_config`, `missing_property`, ...; `unclassified` from a producer that reports text
   only), `field` the config key to change (empty for the whole action) and `reason` stays the
   first message. An enabled action answers an empty array; a preview without a readiness check
-  answers `enabled: null` with an empty array. Known gaps: the panels also disable their run
-  button while the panel's own GPU run (k-means, consolidation, keypoint transaction) awaits
-  Accept, state the agent cannot see because the correlation is held by the panel; and
+  answers `enabled: null` with an empty array. K-means, consolidation and keypoint
+  readiness also inspect the existing GPU output rings: a run or unaccepted result
+  owning a requested output blocks a new run with an Accept/Discard explanation,
+  including GPU rings using a different scalar type from the CPU property.
+  This query is shared with the UI and requires no panel-owned correlation id.
+  K-means and Vulkan LOP consolidation also check the service's single GPU slot,
+  so an existing run blocks even a different target/output. Consolidation requests
+  eligible for CPU fallback (such as isotropic WLOP) keep that path available
+  when they do not write an owned output.
+  Known limitation:
   `preview_point_cloud_consolidation` asks the consolidation service for the availability of
   the previewed request, which can evict the panel's two-entry readiness cache entry (the panel
   recomputes it on its next frame).
@@ -344,7 +392,7 @@ diagnostics ([CORE-011](../../tasks/backlog/architecture/CORE-011-log-entry-curs
 mesh health ([GEOM-110](../../tasks/backlog/geometry/GEOM-110-connected-components-and-topology.md),
 [RUNTIME-286](../../tasks/backlog/runtime/RUNTIME-286-mesh-health-report.md),
 [UI-066](../../tasks/backlog/ui/UI-066-mesh-health-window.md)).
-Planned: lane hardening (the remaining protocol conformance) and the remaining operation tools in
+Protocol hardening and editor-operation coverage are recorded in
 [RUNTIME-312](../../tasks/done/RUNTIME-312-agent-lane-mcp-hardening-and-coverage.md).
 
 ## Limitations

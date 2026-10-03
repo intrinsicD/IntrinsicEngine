@@ -26,8 +26,9 @@ class FakeSandbox:
     meanwhile); `accepts` counts connections; `received` records every message the bridge sent.
     """
 
-    def __init__(self, path: str) -> None:
+    def __init__(self, path: str, *, busy=False) -> None:
         self.path = path
+        self.busy = busy
         self.server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.server.bind(path)
         self.server.listen(4)
@@ -62,6 +63,11 @@ class FakeSandbox:
                 pass
 
     def serve(self, connection) -> None:
+        if self.busy:
+            self.reply(connection, {"jsonrpc": "2.0", "id": None,
+                                    "error": {"code": -32001, "message": "Another client owns the Sandbox."}})
+            connection.close()
+            return
         with connection.makefile("r") as reader:
             for line in reader:
                 message = json.loads(line)
@@ -181,9 +187,11 @@ class BridgeProcess:
     def wait_list_changed(self, timeout=WAIT):
         return self.wait(lambda message: message == LIST_CHANGED, timeout)
 
-    def start(self, version="2025-06-18"):
+    def start(self, version="2025-06-18", *, acquire=True):
         reply = self.request("initialize", {"protocolVersion": version})
         self.send({"jsonrpc": "2.0", "method": "notifications/initialized"})
+        if acquire:
+            self.call("sandbox_status")
         return reply
 
     def stop(self) -> None:
@@ -222,8 +230,8 @@ class McpBridgeTests(unittest.TestCase):
             sandbox.close()
         self.directory.cleanup()
 
-    def sandbox(self) -> FakeSandbox:
-        sandbox = FakeSandbox(self.path)
+    def sandbox(self, **kwargs) -> FakeSandbox:
+        sandbox = FakeSandbox(self.path, **kwargs)
         self.sandboxes.append(sandbox)
         return sandbox
 
@@ -236,7 +244,7 @@ class McpBridgeTests(unittest.TestCase):
         bridge = self.bridge(probe_interval=60)  # no background probe: sandbox_status connects
         init = bridge.start()
         self.assertTrue(init["result"]["capabilities"]["tools"]["listChanged"])
-        self.assertEqual(tool_names(bridge.request("tools/list")), ["sandbox_status"])
+        self.assertEqual(tool_names(bridge.request("tools/list")), ["sandbox_status", "sandbox_disconnect", "sandbox_tools", "sandbox_call"])
         failed = bridge.call("scene_entities")
         self.assertTrue(failed["result"]["isError"])
         self.assertIn("--agent-socket", result_text(failed))
@@ -245,7 +253,7 @@ class McpBridgeTests(unittest.TestCase):
         status = bridge.call("sandbox_status")
         self.assertTrue(json.loads(result_text(status))["connected"])
         bridge.wait_list_changed()
-        self.assertEqual(tool_names(bridge.request("tools/list")), ["sandbox_status", "scene_entities", "slow_tool"])
+        self.assertEqual(tool_names(bridge.request("tools/list")), ["sandbox_status", "sandbox_disconnect", "sandbox_tools", "sandbox_call", "scene_entities", "slow_tool"])
         reply = bridge.call("scene_entities", {"x": 1}, message_id="client-7")
         self.assertEqual(reply["id"], "client-7", "the client's id is restored")
         self.assertEqual(json.loads(result_text(reply))["arguments"], {"x": 1})
@@ -255,7 +263,7 @@ class McpBridgeTests(unittest.TestCase):
         sandbox = self.sandbox()
         bridge = self.bridge(probe_interval=60)
         bridge.start()
-        self.assertEqual(len(bridge.request("tools/list")["result"]["tools"]), 3)
+        self.assertEqual(len(bridge.request("tools/list")["result"]["tools"]), 6)
         sandbox.stop()
         bridge.wait_list_changed()  # the loop notices the closed connection by itself
         lost = bridge.call("scene_entities")
@@ -398,10 +406,10 @@ class McpBridgeTests(unittest.TestCase):
     def test_later_started_sandbox_announced_via_list_changed(self):
         bridge = self.bridge(probe_interval=0.05)
         bridge.start()
-        self.assertEqual(tool_names(bridge.request("tools/list")), ["sandbox_status"])
+        self.assertEqual(tool_names(bridge.request("tools/list")), ["sandbox_status", "sandbox_disconnect", "sandbox_tools", "sandbox_call"])
         self.sandbox()
         bridge.wait_list_changed()  # no sandbox_status call: the probe found the Sandbox
-        self.assertEqual(tool_names(bridge.request("tools/list")), ["sandbox_status", "scene_entities", "slow_tool"])
+        self.assertEqual(tool_names(bridge.request("tools/list")), ["sandbox_status", "sandbox_disconnect", "sandbox_tools", "sandbox_call", "scene_entities", "slow_tool"])
 
     def test_protocol_version_negotiation(self):
         sandbox = self.sandbox()
@@ -410,9 +418,98 @@ class McpBridgeTests(unittest.TestCase):
             bridge = self.bridge()
             self.assertEqual(bridge.request("initialize", {"protocolVersion": requested})["result"]["protocolVersion"],
                              expected)
+            bridge.call("sandbox_status")
         upstream = [m for m in sandbox.received if m.get("method") == "initialize"]
         self.assertTrue(upstream)
         self.assertTrue(all(m["params"]["protocolVersion"] == "2025-06-18" for m in upstream))
+
+    def test_releasing_connection_pauses_reconnect_until_status(self):
+        sandbox, bridge = self.connected_bridge(probe_interval=0.01)
+        released = bridge.call("sandbox_disconnect")
+        self.assertFalse(released["result"]["isError"])
+        self.assertEqual(json.loads(result_text(released))["code"], "released")
+        bridge.wait_list_changed()
+        self.assertEqual(tool_names(bridge.request("tools/list")), ["sandbox_status", "sandbox_disconnect", "sandbox_tools", "sandbox_call"])
+        self.assertTrue(bridge.call("scene_entities")["result"]["isError"])
+        self.assertEqual(sandbox.accepts, 1, "listing and stale calls must not reacquire the released engine")
+        self.assertTrue(json.loads(result_text(bridge.call("sandbox_status")))["connected"])
+        bridge.wait_list_changed()
+        self.assertFalse(bridge.call("scene_entities")["result"]["isError"])
+        self.assertEqual(sandbox.accepts, 2)
+
+    def test_disconnect_refuses_pending_calls(self):
+        sandbox, bridge = self.connected_bridge()
+        call_id = bridge.post("tools/call", {"name": "slow_tool"})
+        self.assertIsNotNone(sandbox.wait_received(lambda m: m.get("params", {}).get("name") == "slow_tool"))
+        self.assertTrue(bridge.call("sandbox_disconnect")["result"]["isError"])
+        sandbox.release.set()
+        self.assertEqual(result_text(bridge.reply_to(call_id)), "slow done")
+        self.assertFalse(bridge.call("sandbox_disconnect")["result"]["isError"])
+
+    def test_busy_connection_has_actionable_status_and_can_recover(self):
+        sandbox = self.sandbox(busy=True)
+        bridge = self.bridge(probe_interval=0.01)
+        bridge.start()
+        status = json.loads(result_text(bridge.call("sandbox_status")))
+        self.assertFalse(status["connected"])
+        self.assertEqual(status["code"], "agent_busy")
+        self.assertIn("sandbox_disconnect", status["hint"])
+        accepts = sandbox.accepts
+        sandbox.busy = False
+        time.sleep(0.06)  # several probe intervals must pass without taking the newly free engine
+        self.assertEqual(tool_names(bridge.request("tools/list")), ["sandbox_status", "sandbox_disconnect", "sandbox_tools", "sandbox_call"])
+        self.assertEqual(sandbox.accepts, accepts)
+        self.assertTrue(json.loads(result_text(bridge.call("sandbox_status")))["connected"])
+
+    def test_cached_startup_tools_can_inspect_and_call_later_operations(self):
+        bridge = self.bridge(probe_interval=60)
+        bridge.start(acquire=False)
+        initial = bridge.request("tools/list")["result"]["tools"]
+        self.assertIn("sandbox_call", [tool["name"] for tool in initial])
+        self.assertTrue(next(tool for tool in initial if tool["name"] == "sandbox_call")["annotations"]["destructiveHint"])
+        self.sandbox()
+        bridge.call("sandbox_status")
+        # Do not reload tools/list: a client may keep only its initial tool definitions.
+        catalog = json.loads(result_text(bridge.call("sandbox_tools")))["tools"]
+        self.assertEqual([tool["name"] for tool in catalog], ["scene_entities", "slow_tool"])
+        self.assertNotIn("inputSchema", catalog[0])
+        schema = json.loads(result_text(bridge.call("sandbox_tools", {"name": "scene_entities"})))["tools"]
+        self.assertEqual(schema[0]["inputSchema"], {"type": "object"})
+        forwarded = bridge.request("tools/call", {"name": "sandbox_call", "arguments": {
+            "name": "scene_entities", "arguments": {"page": 2}}, "_meta": {"progressToken": "catalog-call"}})
+        self.assertEqual(json.loads(result_text(forwarded)), {"name": "scene_entities", "arguments": {"page": 2},
+                                                              "_meta": {"progressToken": "catalog-call"}})
+        self.assertTrue(bridge.call("sandbox_tools", {"name": "missing"})["result"]["isError"])
+        bridge.call("sandbox_disconnect")
+        self.assertTrue(bridge.call("sandbox_tools")["result"]["isError"])
+        self.assertTrue(bridge.call("sandbox_call", {"name": "scene_entities"})["result"]["isError"])
+
+    def test_catalog_call_uses_existing_cancellation_and_pending_call_guards(self):
+        sandbox, bridge = self.connected_bridge()
+        call_id = bridge.post("tools/call", {"name": "sandbox_call", "arguments": {"name": "slow_tool"}})
+        upstream = sandbox.wait_received(lambda m: m.get("params", {}).get("name") == "slow_tool")
+        self.assertIsNotNone(upstream)
+        self.assertTrue(bridge.call("sandbox_disconnect")["result"]["isError"])
+        bridge.send({"jsonrpc": "2.0", "method": "notifications/cancelled", "params": {"requestId": call_id}})
+        cancelled = sandbox.wait_received(lambda m: m.get("method") == "notifications/cancelled")
+        self.assertEqual(cancelled["params"]["requestId"], upstream["id"])
+        sandbox.release.set()
+        self.assertTrue(sandbox.slow_replied.wait(WAIT))
+        self.assertFalse(bridge.call("sandbox_call", {"name": "scene_entities"})["result"]["isError"])
+        self.assertEqual([m for m in bridge.log if m.get("id") == call_id], [])
+        for args in ({}, {"name": 1}, {"name": "scene_entities", "arguments": []}):
+            self.assertTrue(bridge.call("sandbox_call", args)["result"]["isError"])
+
+    def test_loading_an_idle_client_does_not_acquire_the_engine(self):
+        sandbox = self.sandbox()
+        bridge = self.bridge(probe_interval=0.01)
+        bridge.start(acquire=False)
+        self.assertEqual(tool_names(bridge.request("tools/list")), ["sandbox_status", "sandbox_disconnect", "sandbox_tools", "sandbox_call"])
+        time.sleep(0.06)
+        self.assertEqual(bridge.request("ping")["result"], {})
+        self.assertEqual(sandbox.accepts, 0)
+        self.assertTrue(json.loads(result_text(bridge.call("sandbox_status")))["connected"])
+        self.assertEqual(sandbox.accepts, 1)
 
 
 if __name__ == "__main__":

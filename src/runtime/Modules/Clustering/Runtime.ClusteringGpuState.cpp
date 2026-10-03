@@ -78,15 +78,24 @@ namespace Extrinsic::Runtime
             DiscardEditorPointScalar(a->Commands,a->Transaction);
             Completed=ClusteringGpuResult{.Published=std::move(a->Result)};
         }
+        std::string ReadinessDiagnostic(const RunKMeans& request, const EditorProcessingContext& context) const
+        {
+            if (Active || Completed) return "A K-Means result awaits completion or Accept or Discard.";
+            // These requests fall back before retained resources matter in Start.
+            if (!Device.IsOperational() || !Device.SupportsShaderFloat64() || !context.SpatialIndices ||
+                !context.SpatialIndices->GpuQueriesAvailable() || !context.SpatialIndices->PropertyResidency() ||
+                request.Properties.OutputLabels.ValueKind != Geometry::PropertyValueKind::UInt32) return {};
+            if (!Retired.empty()) return "A failed recording retains GPU resources until device shutdown.";
+            return {};
+        }
         ClusteringGpuSubmission Start(KMeansSnapshot& snapshot,const EditorProcessingContext& context,
             std::function<bool()> current,std::function<EditorCommandStatus(const Geometry::KMeans::KMeansResult&)> publish)
         {
-            if(Active||Completed)return {.Refused=true,.Diagnostic="A K-Means result awaits completion or Accept/Discard."};
+            if (auto reason = ReadinessDiagnostic(snapshot.Command, context); !reason.empty()) return {.Refused = true, .Diagnostic = std::move(reason)};
             if(!Device.IsOperational()||!Device.SupportsShaderFloat64()||!context.SpatialIndices||!context.SpatialIndices->GpuQueriesAvailable()||
                 !context.SpatialIndices->PropertyResidency())return {.Diagnostic="K-Means requires an operational float64 device and SpatialIndexCache residency."};
             if(snapshot.Command.Properties.OutputLabels.ValueKind!=Geometry::PropertyValueKind::UInt32)
                 return {.Diagnostic="GPU K-Means requires UInt32 label storage; the CPU reference preserves the configured scalar type."};
-            if(!Retired.empty())return {.Refused=true,.Diagnostic="A failed recording retains GPU resources until device shutdown."};
             if(snapshot.Points.empty()||snapshot.Points.size()>std::numeric_limits<std::uint32_t>::max()||
                 snapshot.SlotCount>std::numeric_limits<std::uint32_t>::max())return {.Refused=true,.Diagnostic="K-Means row count is not representable by the device."};
             auto a=std::make_shared<Operation>();a->Context=context;a->Commands=BindEditorProcessingCommands(context);
@@ -325,4 +334,6 @@ namespace Extrinsic::Runtime
     void ClusteringGpuState::DrainCompletedTransfers(){m_Impl->Advance();}
     std::optional<ClusteringGpuResult> ClusteringGpuState::ConsumeCompleted(){return std::exchange(m_Impl->Completed,std::nullopt);}
     bool ClusteringGpuState::HasInFlightWork()const noexcept{return bool(m_Impl->Active)||bool(m_Impl->Completed)||!m_Impl->Retired.empty();}
+    std::string ClusteringGpuState::ReadinessDiagnostic(const RunKMeans& request, const EditorProcessingContext& context) const
+    { return m_Impl->ReadinessDiagnostic(request, context); }
 }

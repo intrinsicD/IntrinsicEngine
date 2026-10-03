@@ -8,9 +8,10 @@
       ]
     },
     "intrinsic-sandbox": {
-      "command": "python3",
+      "command": "bash",
       "args": [
-        "tools/agents/mcp_bridge.py"
+        "-c",
+        "repo_root=$(git rev-parse --show-toplevel) || exit; exec python3 \"$repo_root/tools/agents/mcp_bridge.py\""
       ]
     }
   }

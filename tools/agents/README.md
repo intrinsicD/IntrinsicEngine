@@ -54,21 +54,36 @@ Agent workflow and task policy tooling.
 ## MCP bridge
 
 `mcp_bridge.py` connects an MCP client (the `intrinsic-sandbox` entry in
-`.mcp.json`) to a Sandbox started with `--agent-socket`; stdlib only. See
+`.mcp.json` for Claude Code or `.codex/config.toml` for Codex) to a Sandbox started
+with `--agent-socket`; stdlib only. The launch commands resolve the current Git
+root, so starts from subdirectories and worktrees use their own bridge. See
 [the agent control lane](../../docs/architecture/agent-control-lane.md), which holds the tool catalog.
 The bridge is one single-threaded `selectors` loop, so calls are concurrent: `tools/call`
 is forwarded under a fresh `bridge-N` id (params and `_meta.progressToken` untouched),
 Sandbox notifications such as `notifications/progress` are forwarded verbatim and `ping`
 is answered at once. `--timeout` (default 120 s) is per call: on expiry the client gets an
-error result saying the call may still be running in the Sandbox (poll `jobs` or
+error result saying the call may still be running in the Sandbox (poll `jobs_list` or
 `scene_entities`), the connection stays open and a late reply is dropped.
 `notifications/cancelled` drops the pending call and is forwarded to the Sandbox; if the
 Sandbox exits, pending calls fail with an error result. While the Sandbox is away and the
-client has sent `notifications/initialized`, the bridge probes the socket every
+client has requested a connection with `sandbox_status` and sent `notifications/initialized`, the bridge probes the socket every
 `--probe-interval` seconds (default 2) and announces the Sandbox's (possibly changed) tools
 with `notifications/tools/list_changed`; `sandbox_status` forces a probe. A call whose send
 failed is retried once on a new connection. MCP versions 2025-06-18, 2025-03-26 and
-2024-11-05 are negotiated. Clients that cache tool schemas still see new tools only after
-they re-read the list.
+2024-11-05 are negotiated. Clients that cache tool schemas can use the always-visible
+`sandbox_tools` (summaries, or a full schema with `{"name":"scene_entities"}`) and
+`sandbox_call` (`{"name":"scene_entities","arguments":{}}`). Calls use the same engine
+registry, validation, read-only policy, progress, cancellation and deadline handling.
+Inspect the selected operation's schema and annotations before calling it; the generic
+call tool is conservatively annotated as mutating.
+Client permission rules for named tools do not cover the same operation through
+`sandbox_call`; restrict the generic tool too when using such rules. Engine read-only
+mode still applies to every operation.
+Loading the bridge or listing tools does not acquire the engine; `sandbox_status`
+requests the connection, as does an explicit catalog or engine call. After release or
+a busy refusal, only `sandbox_status` resumes acquisition. The engine admits one client; a contender gets an actionable
+`agent_busy` status and pauses retries until the next explicit `sandbox_status`.
+`sandbox_disconnect` releases the connection and pauses automatic reconnect until
+`sandbox_status` is called. It refuses while tool replies are pending; already
+timed-out or cancelled operations can still finish after release.
 Regression cases: `tests/regression/tooling/Test.McpBridge.py`.
-

@@ -501,6 +501,17 @@ When code, structure, or policy changes:
 
 ## Task execution workflow
 
+For work on a running Sandbox's scene, properties, processing, jobs or viewport,
+use the `intrinsic-sandbox` MCP tools, beginning with `sandbox_status`. See
+[the agent control lane](../architecture/agent-control-lane.md#using-it) for
+client registration, connection ownership and inspection/command sequencing.
+Report unavailable or occupied connections instead of assuming the live state.
+Source-only work does not require a running Sandbox. Release the connection with
+`sandbox_disconnect` when finished; do not retry a timed-out mutation before
+checking its job or scene result. The client's MCP configuration and an engine
+started with `--agent-socket` are prerequisites; reading agent instructions
+alone does not supply either.
+
 Sessions follow the pair workflow defined in `docs/agent/prompt/prompt.md`:
 the agent operates in one of three postures — Pair (default observant
 copilot), Delegate (bounded hand-off), Advisor (direction, method selection,

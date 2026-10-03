@@ -44,6 +44,7 @@ import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.JobService;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
+#include "Editor/internal/Runtime.EditorPendingGpuOutput.hpp"
 #include "Editor/internal/Runtime.EditorFramedGpuJob.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
@@ -109,6 +110,11 @@ namespace Extrinsic::Runtime
             if (c.Mask.Domain == D::Unknown) c.Mask.Domain = c.Positions.Domain;
             if (c.Score.Domain == D::Unknown) c.Score.Domain = c.Positions.Domain;
             const std::array outputs{c.Mask, c.Score};
+            if (purpose == CapturePurpose::Readiness)
+            {
+                const auto pending = GeometryProcessingDetail::PendingGpuOutputReadiness(context, c.StableEntityId, outputs);
+                if (!pending.Enabled) return fail(pending.DisabledReason);
+            }
             if (!GeometryProcessingDetail::ValidatePointOutputs(a, c.Positions, outputs,
                                                                  "Keypoint", diagnostic)) return {};
             const auto* props = ResolveGeometryPropertySet(a, c.Positions.Domain);
@@ -436,6 +442,9 @@ namespace Extrinsic::Runtime
             result.Status=status;result.Message=std::move(message);return result;
         };
         if(!w)return report(EditorCommandStatus::InvalidProcessingParameters,diagnostic);
+        const std::array outputs{w->Config.Mask, w->Config.Score};
+        const auto pending = GeometryProcessingDetail::PendingGpuOutputReadiness(context, config.StableEntityId, outputs);
+        if (!pending.Enabled) return report(EditorCommandStatus::InvalidProcessingParameters, pending.DisabledReason);
         if(w->Config.Backend!=KeypointAnalysisBackend::CpuKDTree)
         {
             const auto indexState = GeometryProcessingDetail::AcquirePointIndex(

@@ -179,6 +179,9 @@ namespace Extrinsic::Runtime
         return m_GpuRun ? m_GpuRun(correlation, action) : PointCloudConsolidationGpuObservation{};
     }
 
+    bool PointCloudConsolidationService::GpuBusy() const
+    { return m_GpuBusy && m_GpuBusy(); }
+
     void PointCloudConsolidationService::Bind(
         CommandBus* commands,
         KernelEventBus* events,

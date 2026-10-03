@@ -1,4 +1,6 @@
 module;
+#include <span>
+#include <vector>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -16,6 +18,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.EngineConfigControl;
 
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
+#include "Editor/internal/Runtime.EditorPendingGpuOutput.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -43,7 +46,12 @@ namespace Extrinsic::Runtime
         if (const auto rejected = ValidateKMeansRequest(
                 context.Scene ? &context.Scene->Raw() : nullptr, command))
             return {false, rejected->Message};
-        return {true, {}};
+        if (command.Backend == ClusteringBackend::VulkanCompute)
+            if (const auto diagnostic = clustering->GpuReadinessDiagnostic(command, context); !diagnostic.empty())
+                return MakeActionReadiness({{.Code = ActionReadinessCode::JobActive, .Field = {}, .Message = diagnostic}});
+        std::vector<GeometryPropertyRef> outputs{command.Properties.OutputLabels, command.Properties.OutputColors};
+        if (command.Properties.OutputScalarLabels) outputs.push_back(*command.Properties.OutputScalarLabels);
+        return GeometryProcessingDetail::PendingGpuOutputReadiness(context, command.StableEntityId, outputs);
     }
 
     KMeansRunCompleted SubmitKMeansRun(
@@ -70,6 +78,13 @@ namespace Extrinsic::Runtime
         {
             rejected->World = context.World;
             return std::move(*rejected);
+        }
+        const auto readiness = PreviewEditorKMeansRun(commands, clustering, command);
+        if (!readiness.Enabled)
+        {
+            result.Status = KMeansRunStatus::InvalidProcessingParameters;
+            result.Message = readiness.DisabledReason;
+            return result;
         }
         auto request = command;
         request.AttachmentActive = context.AttachmentActive;
@@ -100,6 +115,24 @@ namespace Extrinsic::Runtime
         if (!IsEditorPointCloudConsolidationAvailable(commands, consolidation))
             return result;
 
+        if (request.Config.Backend == PointCloudConsolidationBackend::VulkanCompute &&
+            request.Config.Strategy == PointCloudConsolidationStrategy::Lop && consolidation->GpuBusy())
+        {
+            result.Status = PointCloudConsolidationRunStatus::InvalidProcessingParameters;
+            result.Message = "A consolidation GPU run awaits completion or Accept or Discard.";
+            return result;
+        }
+
+        std::vector<GeometryPropertyRef> outputs{request.Properties.OutputPositions};
+        if (request.Properties.OutputNormals) outputs.push_back(*request.Properties.OutputNormals);
+        const auto readiness = GeometryProcessingDetail::PendingGpuOutputReadiness(context, request.StableEntityId, outputs);
+        if (!readiness.Enabled)
+        {
+            result.Status = PointCloudConsolidationRunStatus::InvalidProcessingParameters;
+            result.Message = readiness.DisabledReason;
+            return result;
+        }
+
         request.AttachmentActive = context.AttachmentActive;
         if (context.CommandHistory != nullptr && request.AutoAccept) request.LabelPrefix = context.CommandHistory->LabelPrefix();
         result.Correlation = consolidation->Run(std::move(request));
@@ -129,6 +162,15 @@ namespace Extrinsic::Runtime
             return {.Error = Core::ErrorCode::InvalidState,
                 .Message = "Point-set consolidation service is unavailable."};
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
+        if (request.Config.Backend == PointCloudConsolidationBackend::VulkanCompute &&
+            request.Config.Strategy == PointCloudConsolidationStrategy::Lop && consolidation->GpuBusy())
+            return {.Error = Core::ErrorCode::InvalidState,
+                .Message = "A consolidation GPU run awaits completion or Accept or Discard."};
+        std::vector<GeometryPropertyRef> outputs{request.Properties.OutputPositions};
+        if (request.Properties.OutputNormals) outputs.push_back(*request.Properties.OutputNormals);
+        const auto readiness = GeometryProcessingDetail::PendingGpuOutputReadiness(context, request.StableEntityId, outputs);
+        if (!readiness.Enabled)
+            return {.Error = Core::ErrorCode::InvalidState, .Message = readiness.DisabledReason};
         return consolidation->PrepareAvailability(context.World, request);
     }
 
