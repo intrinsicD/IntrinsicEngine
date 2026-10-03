@@ -12,6 +12,26 @@ contracts: [repo.source-documentation, runtime.render-diagnostics-locality]
 ---
 # UI-065 — Diagnostics / Log window
 
+## Completion — 2026-10-03
+
+Implementation commit: `1606d469e`; tasks activated before implementation in `51f49207d`.
+
+View Diagnostics / Log uses the runtime stream for filtered log pages, device state and operation history. Tests exercise registration, exact filters, Clear followed by filter changes, cursor reset and auto-scroll without a presented Vulkan frame.
+
+Verification: `ci` configure and `IntrinsicTests` build succeeded; final full CPU
+run selected 5,808 tests: 5,807 passed, zero failed, one GLFW/LSan lifecycle test
+skipped. The focused inspection/diagnostics suites passed 184/184; supplemental
+locality/runtime/socket suites passed 84/84; Python MCP bridge passed 21/21.
+Strict layering, test layout, task policy and documentation links passed;
+source-documentation scan found zero objective errors. Module inventory refreshed.
+
+Review: Claude Opus 5.5 (`xhigh`) approved the corrected fixed diff
+`a729e0f1e80d3bb9d1817bdfcf70e36c2bb2324435009a14d271ff30fade8fe3`.
+Its findings and the follow-up numerical/allocation issues were corrected and
+verified. The full gate also exposed pre-existing BUG-234, fixed and separately
+approved before the successful full rerun. CPU evidence does not substitute for
+separate sanitizer or live Vulkan gates.
+
 ## Goal
 Give users an in-editor log with level/category filters, a device-status header and
 a recent-operations table.
@@ -27,9 +47,9 @@ a recent-operations table.
 - Agent/CLI: `diagnostics_read`/`device_status` (RUNTIME-285).
 
 ## Acceptance criteria
-- [ ] Window registered; filters and auto-scroll work; the window keeps its own cursor.
-- [ ] ImGui test: emit tagged log lines, filter by category, clear, and see new entries afterwards; Null device status shown.
-- [ ] `docs/architecture/sandbox-editor-feature-boundaries.md` window list updated.
+- [x] Window registered; filters and auto-scroll work; the window keeps its own cursor.
+- [x] ImGui test: emit tagged log lines, filter by category, clear, and see new entries afterwards; Null device status shown.
+- [x] `docs/architecture/sandbox-editor-feature-boundaries.md` window list updated.
 
 ## Verification
 ```bash

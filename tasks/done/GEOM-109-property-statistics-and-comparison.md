@@ -12,6 +12,26 @@ contracts: [repo.source-documentation, geometry.element-domain-sources]
 ---
 # GEOM-109 — `Geometry.Properties.Statistics`: statistics, histogram and comparison
 
+## Completion — 2026-10-03
+
+Implementation commit: `1606d469e`; tasks activated before implementation in `51f49207d`.
+
+Shared scalar/vector statistics, deleted/nonfinite accounting, bounded histograms and checked row comparisons are implemented in Geometry.Properties.Statistics. Integer differences precede floating conversion; nonfinite accumulation fails explicitly.
+
+Verification: `ci` configure and `IntrinsicTests` build succeeded; final full CPU
+run selected 5,808 tests: 5,807 passed, zero failed, one GLFW/LSan lifecycle test
+skipped. The focused inspection/diagnostics suites passed 184/184; supplemental
+locality/runtime/socket suites passed 84/84; Python MCP bridge passed 21/21.
+Strict layering, test layout, task policy and documentation links passed;
+source-documentation scan found zero objective errors. Module inventory refreshed.
+
+Review: Claude Opus 5.5 (`xhigh`) approved the corrected fixed diff
+`a729e0f1e80d3bb9d1817bdfcf70e36c2bb2324435009a14d271ff30fade8fe3`.
+Its findings and the follow-up numerical/allocation issues were corrected and
+verified. The full gate also exposed pre-existing BUG-234, fixed and separately
+approved before the successful full rerun. CPU evidence does not substitute for
+separate sanitizer or live Vulkan gates.
+
 ## Goal
 Provide pure geometry-layer statistics and comparison over any typed property of
 any element domain, for the Property Inspector (UI-059) and agent inspection
@@ -29,8 +49,8 @@ any element domain, for the Property Inspector (UI-059) and agent inspection
 - Agent/CLI: via RUNTIME-278 `property_stats` / `property_compare`.
 
 ## Acceptance criteria
-- [ ] Module with purpose synopsis; scalar (float/double/int/uint/bool) and `glm::vec2/3/4` kinds; deleted rows excluded when a `*:deleted` property exists; empty/all-non-finite inputs return defined results.
-- [ ] Unit tests in `tests/unit/geometry` (`Test.GeometryPropertyStatistics.cpp`): exact values on small fixtures, NaN/Inf counts, histogram bin edges, vector components and magnitude, comparison of identical/offset/different-kind properties, row-count mismatch diagnostic.
+- [x] Module with purpose synopsis; scalar (float/double/int/uint/bool) and `glm::vec2/3/4` kinds; deleted rows excluded when a `*:deleted` property exists; empty/all-non-finite inputs return defined results.
+- [x] Unit tests in `tests/unit/geometry` (`Test.GeometryPropertyStatistics.cpp`): exact values on small fixtures, NaN/Inf counts, histogram bin edges, vector components and magnitude, comparison of identical/offset/different-kind properties, row-count mismatch diagnostic.
 
 ## Verification
 ```bash

@@ -5,8 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [BUG-234 — Generic processing imports SelectionController](BUG-234-editor-processing-selection-controller-dependency.md):
-  the full CPU compilation-locality gate fails on the existing readiness helper; reuse the canonical stable-ID conversion directly.
 
 
 - [BUG-232 — A failed frame submit loses an accepted position copy](BUG-232-gpuworld-commit-copy-lost-on-failed-submit.md):
@@ -48,6 +46,9 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-10-03: [BUG-234 — Generic processing imports SelectionController](../../done/BUG-234-editor-processing-selection-controller-dependency.md).
+  Generic readiness reuses StableEntityLookup directly; the unchanged compilation-locality gate and full CPU rerun pass.
 
 - Closed 2026-09-28: [BUG-227 — Scene image flips vertically with the number of fullscreen passes](../../done/BUG-227-scene-image-vertical-flip-parity.md).
   Camera projections stopped double-flipping Y and fullscreen blits preserve orientation; a GPU smoke pins apex-up

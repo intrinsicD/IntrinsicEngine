@@ -12,6 +12,26 @@ contracts: [repo.source-documentation]
 ---
 # CORE-011 — `LogEntry` sequence, timestamp and category with `TakeSnapshotSince`
 
+## Completion — 2026-10-03
+
+Implementation commit: `1606d469e`; tasks activated before implementation in `51f49207d`.
+
+The existing bounded logger now exposes exclusive sequence cursors, timestamps, leading-tag categories, filters, dropped counts and Clear boundaries. Ahead-of-process cursors recover explicitly; mutex ownership and existing logging output are preserved.
+
+Verification: `ci` configure and `IntrinsicTests` build succeeded; final full CPU
+run selected 5,808 tests: 5,807 passed, zero failed, one GLFW/LSan lifecycle test
+skipped. The focused inspection/diagnostics suites passed 184/184; supplemental
+locality/runtime/socket suites passed 84/84; Python MCP bridge passed 21/21.
+Strict layering, test layout, task policy and documentation links passed;
+source-documentation scan found zero objective errors. Module inventory refreshed.
+
+Review: Claude Opus 5.5 (`xhigh`) approved the corrected fixed diff
+`a729e0f1e80d3bb9d1817bdfcf70e36c2bb2324435009a14d271ff30fade8fe3`.
+Its findings and the follow-up numerical/allocation issues were corrected and
+verified. The full gate also exposed pre-existing BUG-234, fixed and separately
+approved before the successful full rerun. CPU evidence does not substitute for
+separate sanitizer or live Vulkan gates.
+
 ## Goal
 Make the core log ring readable as a cursor stream so the Diagnostics window
 (UI-065) and the `diagnostics_read` agent operation (RUNTIME-285) can read only
@@ -31,9 +51,9 @@ new entries, filtered by level and category.
 - Agent/CLI: consumed by `diagnostics_read` (RUNTIME-285).
 
 ## Acceptance criteria
-- [ ] `LogEntry` gains `std::uint64_t Sequence`, `std::uint64_t TimestampNs`, `std::string Category`; `TakeSnapshot()` unchanged in behavior.
-- [ ] `TakeSnapshotSince(std::uint64_t sequence, std::size_t maxEntries, level mask)` returns entries after the cursor, the next cursor and a `Dropped` count when the ring wrapped past the cursor; `ClearEntries()` does not reset the sequence.
-- [ ] `tests/unit/core` test covers cursor semantics, wraparound/dropped count, level filter, category parsing and clear.
+- [x] `LogEntry` gains `std::uint64_t Sequence`, `std::uint64_t TimestampNs`, `std::string Category`; `TakeSnapshot()` unchanged in behavior.
+- [x] `TakeSnapshotSince(std::uint64_t sequence, std::size_t maxEntries, level mask)` returns entries after the cursor, the next cursor and a `Dropped` count when the ring wrapped past the cursor; `ClearEntries()` does not reset the sequence.
+- [x] `tests/unit/core` test covers cursor semantics, wraparound/dropped count, level filter, category parsing and clear.
 
 ## Verification
 ```bash

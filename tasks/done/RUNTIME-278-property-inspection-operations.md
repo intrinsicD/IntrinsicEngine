@@ -12,6 +12,26 @@ contracts: [repo.source-documentation, geometry.element-domain-sources]
 ---
 # RUNTIME-278 — Property inspection operations (stats, compare, values)
 
+## Completion — 2026-10-03
+
+Implementation commit: `1606d469e`; tasks activated before implementation in `51f49207d`.
+
+Canonical-domain catalog/statistics/comparison/value queries and property_list, property_stats, property_compare, property_values share the same runtime path. Bounded storage-index pages preserve exact UInt64 and nonfinite cells. Socket tests cover initial scene preparation, minimized operation, precise refusals and unchanged history.
+
+Verification: `ci` configure and `IntrinsicTests` build succeeded; final full CPU
+run selected 5,808 tests: 5,807 passed, zero failed, one GLFW/LSan lifecycle test
+skipped. The focused inspection/diagnostics suites passed 184/184; supplemental
+locality/runtime/socket suites passed 84/84; Python MCP bridge passed 21/21.
+Strict layering, test layout, task policy and documentation links passed;
+source-documentation scan found zero objective errors. Module inventory refreshed.
+
+Review: Claude Opus 5.5 (`xhigh`) approved the corrected fixed diff
+`a729e0f1e80d3bb9d1817bdfcf70e36c2bb2324435009a14d271ff30fade8fe3`.
+Its findings and the follow-up numerical/allocation issues were corrected and
+verified. The full gate also exposed pre-existing BUG-234, fixed and separately
+approved before the successful full rerun. CPU evidence does not substitute for
+separate sanitizer or live Vulkan gates.
+
 ## Goal
 - Provide read-only editor queries for statistics, comparison and paged values of any
   typed property on any element domain of an entity, shared by the Property
@@ -32,20 +52,20 @@ contracts: [repo.source-documentation, geometry.element-domain-sources]
 - Agent/CLI: read-only `property_list {entity}`, `property_stats {entity, domain, name, bins}`, `property_compare {entity, a, b}`, `property_values {entity, domain, name, offset, limit ≤ 65536}` registered in `Runtime.AgentOperations`.
 
 ## Required changes
-- [ ] `Runtime.PropertyInspectionOperations.cppm` + implementation: `GetEditorPropertyStatistics(commands, entity, GeometryPropertyRef, bins)`, `CompareEditorProperties(commands, entity, refA, refB)`, `ReadEditorPropertyValues(commands, entity, ref, offset, limit)` returning typed results with `EditorDiagnostic` on failure.
-- [ ] `BuildEditorScalarPropertyPlotModel` reuses GEOM-109 (private min/max loop removed).
-- [ ] Agent operations registered with input schemas and row bounds.
+- [x] `Runtime.PropertyInspectionOperations.cppm` + implementation: `GetEditorPropertyStatistics(commands, entity, GeometryPropertyRef, bins)`, `CompareEditorProperties(commands, entity, refA, refB)`, `ReadEditorPropertyValues(commands, entity, ref, offset, limit)` returning typed results with `EditorDiagnostic` on failure.
+- [x] `BuildEditorScalarPropertyPlotModel` reuses GEOM-109 (private min/max loop removed).
+- [x] Agent operations registered with input schemas and row bounds.
 
 ## Tests
-- [ ] `tests/contract/runtime/Test.PropertyInspectionOperations.cpp` on `EditorFeatureTestContext`: vertex, face, edge and point-cloud properties; compare smoothing output vs input; paging bounds; missing entity/property diagnostics; no history revision change.
+- [x] `tests/contract/runtime/Test.PropertyInspectionOperations.cpp` on `EditorFeatureTestContext`: vertex, face, edge and point-cloud properties; compare smoothing output vs input; paging bounds; missing entity/property diagnostics; no history revision change.
 
 ## Docs
-- [ ] `docs/architecture/sandbox-editor-feature-boundaries.md` lists the inspection queries; module inventory regenerated.
+- [x] `docs/architecture/sandbox-editor-feature-boundaries.md` lists the inspection queries; module inventory regenerated.
 
 ## Acceptance criteria
-- [ ] Statistics/compare/values work for every canonical element domain via the shared resolution path.
-- [ ] Queries are side-effect free (document revision and history unchanged).
-- [ ] Agent operations return the same data as the runtime functions.
+- [x] Statistics/compare/values work for every canonical element domain via the shared resolution path.
+- [x] Queries are side-effect free (document revision and history unchanged).
+- [x] Agent operations return the same data as the runtime functions.
 
 ## Verification
 ```bash

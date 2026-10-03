@@ -12,6 +12,16 @@ contracts: [runtime.processing-compilation-locality]
 ---
 # BUG-234 — Generic editor processing imports the selection controller
 
+## Completion — 2026-10-03
+
+Implementation commit: `da4a926c5`. Generic processing now imports and calls
+`StableEntityLookup::ToEntityHandle` directly, exactly preserving the former
+SelectionController inline delegation. The compiler dependency gate is unchanged.
+Claude Opus 5.5 approved the two-line correction; all 84 affected tests passed.
+The final combined CPU rerun passed 5,807 tests with zero failures and one
+GLFW/LSan skip out of 5,808 selected tests. This supersedes the initial failure
+recorded below; no gate or assertion was weakened.
+
 ## Goal
 Restore the existing generic processing compilation boundary without changing GPU-output readiness behavior.
 
@@ -21,9 +31,9 @@ Restore the existing generic processing compilation boundary without changing GP
 - Reuse: `SelectionController::ToEntityHandle` delegates directly to the canonical `StableEntityLookup::ToEntityHandle`. Import that owner and call it directly; preserve its background sentinel and render-ID offset.
 
 ## Acceptance criteria
-- [ ] Generic processing no longer depends on `Runtime.SelectionController`; the existing compiler dependency gate passes unchanged.
-- [ ] GPU-output readiness uses the canonical stable/render-ID conversion with unchanged behavior.
-- [ ] Affected runtime build/tests and the combined CPU gate pass; Claude reviews the bounded fix.
+- [x] Generic processing no longer depends on `Runtime.SelectionController`; the existing compiler dependency gate passes unchanged.
+- [x] GPU-output readiness uses the canonical stable/render-ID conversion with unchanged behavior.
+- [x] Affected runtime build/tests and the combined CPU gate pass; Claude reviews the bounded fix.
 
 ## Verification
 ```bash
