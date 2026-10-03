@@ -22,7 +22,7 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.GpuPropertyBinding;
-import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.Properties;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorPendingGpuOutput.hpp"
@@ -35,7 +35,7 @@ namespace Extrinsic::Runtime
     {
         const auto* residency = context.SpatialIndices ? context.SpatialIndices->PropertyResidency() : nullptr;
         if (!residency) return {true, {}};
-        const auto entity = SelectionController::ToEntityHandle(stableId);
+        const auto entity = StableEntityLookup::ToEntityHandle(stableId);
         for (const auto& output : outputs)
         {
             auto key = MakeGpuPropertyKey(context.World, entity, output);

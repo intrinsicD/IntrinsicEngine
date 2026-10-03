@@ -5,6 +5,9 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [BUG-234 — Generic processing imports SelectionController](BUG-234-editor-processing-selection-controller-dependency.md):
+  the full CPU compilation-locality gate fails on the existing readiness helper; reuse the canonical stable-ID conversion directly.
+
 
 - [BUG-232 — A failed frame submit loses an accepted position copy](BUG-232-gpuworld-commit-copy-lost-on-failed-submit.md):
   a `CommitOnCopy` preview is erased once its copy is recorded; a submit failure leaves the block
