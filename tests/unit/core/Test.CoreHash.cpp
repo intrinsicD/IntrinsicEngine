@@ -323,34 +323,6 @@ TEST(CoreHash, StringID_SpecialCharacters)
     EXPECT_NE(a, c);
 }
 
-// -----------------------------------------------------------------------------
-// U64Hash Tests
-// -----------------------------------------------------------------------------
-
-TEST(CoreHash, U64Hash_Basic)
-{
-    U64Hash hasher;
-
-    (void)hasher(0ull);
-    size_t h2 = hasher(1ull);
-    size_t h3 = hasher(std::numeric_limits<uint64_t>::max());
-
-    // All should produce valid hashes (potentially different)
-    // Zero may or may not hash to zero depending on impl
-    EXPECT_NE(h2, h3);
-}
-
-TEST(CoreHash, U64Hash_InUnorderedMap)
-{
-    std::unordered_map<uint64_t, std::string, U64Hash> map;
-
-    map[0x1234567890ABCDEFull] = "ResourceA";
-    map[0xFEDCBA0987654321ull] = "ResourceB";
-
-    EXPECT_EQ(map[0x1234567890ABCDEFull], "ResourceA");
-    EXPECT_EQ(map.size(), 2u);
-}
-
 TEST(CoreHash, TypeName_NamesTheTypeForDiagnostics)
 {
     using Extrinsic::Core::TypeName;

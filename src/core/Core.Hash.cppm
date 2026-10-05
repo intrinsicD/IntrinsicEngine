@@ -84,11 +84,6 @@ namespace Extrinsic::Core::Hash
     {
         return {std::string_view(str, len)};
     }
-
-    export struct U64Hash
-    {
-        size_t operator()(uint64_t v) const { return std::hash<uint64_t>{}(v); }
-    };
 }
 
 // -----------------------------------------------------------------------
