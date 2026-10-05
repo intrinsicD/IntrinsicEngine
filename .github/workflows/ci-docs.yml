@@ -139,7 +139,6 @@ jobs:
         run: |
           python3 tests/regression/tooling/Test.CiTiming.py
           python3 tests/regression/tooling/Test.TestTiming.py
-          python3 tests/regression/tooling/Test.TestCohortParity.py
           python3 tests/regression/tooling/Test.SanitizerPresets.py
           python3 tests/regression/tooling/Test.ClangToolchainSelection.py
           python3 tests/regression/tooling/Test.VulkanShutdownLsanPrerequisites.py

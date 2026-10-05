@@ -1766,6 +1766,25 @@ class SourceCoverageTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("lost_regions=0 lost_branch_arms=0", result.stdout)
 
+    def test_test_cohort_transition_rejects_unsorted_manifest(self) -> None:
+        baseline, candidate, manifest = self._transition_fixture(
+            "unsorted-cohort-manifest"
+        )
+        transition = _load_json(manifest)
+        transition["moved_to_slow"] = ["Zulu.Stress", "Alpha.Stress"]
+        manifest.write_text(
+            json.dumps(transition, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        result = self._compare_transition(
+            baseline,
+            candidate,
+            manifest,
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("moved_to_slow must be sorted", result.stdout)
+
     def test_test_cohort_transition_rejects_undeclared_population_change(
         self,
     ) -> None:

@@ -366,8 +366,8 @@ Source-coverage refactor parity uses `IntrinsicCpuCoverageTests`, not the fast
 aggregate alone. That coverage aggregate selects the fast CPU cohort plus this
 ordinary-slow correctness cohort while continuing to exclude benchmark, SLO,
 GPU/Vulkan, and quarantined ownership. This keeps every moved heavy case in the
-candidate coverage population; `tools/ci/slow_test_cohort.json` declares the
-only permitted additions, the retained fast sentinels.
+candidate coverage population; with `--test-cohort-transition`, the supplied
+manifest declares the only permitted additions, the retained fast sentinels.
 
 Slow-cohort classification does not own timeout defects. GoogleTest PRE_TEST
 enumeration remains independently owned by

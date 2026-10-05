@@ -42,8 +42,8 @@ CI helper scripts and workflow validation tools.
   Claim-grade workflow collection and transition comparison require one test
   producer at a time so unrelated process scheduling cannot create artificial
   branch/region drift between otherwise identical product builds.
-- `test_cohort_manifest.py`: parses the strict shared fast-to-slow transition
-  manifest consumed by timing and source-coverage parity.
+- `test_cohort_manifest.py`: parses the strict fast-to-slow transition
+  manifest consumed by source-coverage parity.
 - `validate_gate_timing_baseline.py`: validates the CI-003 historical gate-latency baseline and statistics payloads. Exercised by `tests/regression/tooling/Test.CiTiming.py`; see `benchmarks/ci/README.md`.
 - `ccache_ci.py`: launches and validates the retained CI ccache policy, emits dependency-local semantic module sidecars from actual module compiler invocations plus CMake scanner metadata, and exports ccache statistics. Part of the CI-007 `pr-fast.yml` policy.
 - `ccache_module_invalidation_probe.py`: exercises ccache reuse across hermetic C++23 module-input changes, proving interface, directory/target definition, target-option, and GMF-header edits invalidate importers while unchanged rebuilds still hit. Part of the retained CI-007 `pr-fast.yml` policy.
@@ -79,13 +79,6 @@ CI helper scripts and workflow validation tools.
   grouped wrappers it removes stale GoogleTest XML before each sample, requires
   every configured report, and archives the per-producer XML beside the CTest
   JUnit and log.
-- `test_cohort_parity.py`: compares protocol-complete baseline CPU and PR-fast
-  reports with candidate CPU, PR-fast, and ordinary-slow reports plus the
-  scheduled slow JUnit. It fails closed on undeclared removals/additions,
-  duplicate or overlapping cases, label drift beyond adding `slow`, mismatched
-  hosted-run identities, non-passing samples, or a moved case absent, skipped,
-  failed, or duplicated in scheduled coverage. The declared transition lives
-  in `slow_test_cohort.json`.
 - `run_repo_hygiene_checks.sh`: warning-mode wrapper running the canonical
   `check_root_hygiene.py` policy check once, followed by `check_doc_links.py`.
   Local convenience; not wired into a workflow.
@@ -137,10 +130,11 @@ CI helper scripts and workflow validation tools.
   python3 tools/ci/compare_source_coverage.py \
     --baseline /path/to/baseline/coverage.json \
     --candidate /path/to/candidate/coverage.json \
-    --test-cohort-transition tools/ci/slow_test_cohort.json
+    --test-cohort-transition /path/to/transition.json
   ```
 
-  Each `coverage.json` must remain beside its bound `test-inventory.json`.
+  The transition manifest is supplied per comparison and declares the moved
+  cases and the permitted fast-sentinel additions. Each `coverage.json` must remain beside its bound `test-inventory.json`.
   Both reports must use `cpu-coverage`, whose
   `IntrinsicCpuCoverageTests` aggregate excludes benchmark, SLO, GPU/Vulkan,
   and quarantined ownership but includes ordinary `slow` correctness.
@@ -170,27 +164,6 @@ CI helper scripts and workflow validation tools.
   per-case duration/status data, a selection digest, and host/load diagnostics.
   It retains those artifacts and exits nonzero if selection drifts or any
   measured CTest sample fails.
-
-- Verify the declared fast-to-slow transition and exact scheduled execution
-  with:
-
-  ```bash
-  python3 tools/ci/test_cohort_parity.py \
-    --manifest tools/ci/slow_test_cohort.json \
-    --baseline-cpu /path/to/baseline/cpu/report.json \
-    --baseline-pr-fast /path/to/baseline/pr-fast/report.json \
-    --candidate-cpu /path/to/candidate/cpu/report.json \
-    --candidate-pr-fast /path/to/candidate/pr-fast/report.json \
-    --candidate-slow /path/to/candidate/cpu-slow/report.json \
-    --scheduled-slow-junit /path/to/candidate/cpu-slow.junit.xml
-  ```
-
-  The baseline CPU and PR-fast inputs must share one SHA; the three candidate
-  reports must share another SHA; and all reports must share the same hosted
-  runner protocol. The comparator requires at least five successful samples,
-  exact declared fast removals and sentinel additions in both CPU and PR-fast,
-  an ordinary-slow population equal to the declared moved cases, no fast/slow
-  overlap, and passing moved cases in the scheduled JUnit.
 
 - Capture and compare unsanitized, ASan, and UBSan CPU selections with:
 

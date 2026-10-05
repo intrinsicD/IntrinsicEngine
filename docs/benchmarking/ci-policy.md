@@ -615,8 +615,11 @@ python3 tools/ci/run_source_coverage.py \
 python3 tools/ci/compare_source_coverage.py \
   --baseline <baseline>/coverage.json \
   --candidate build/ci-coverage-cpu/coverage/coverage.json \
-  --test-cohort-transition tools/ci/slow_test_cohort.json
+  --test-cohort-transition /path/to/transition.json
 ```
+
+The transition manifest is supplied per comparison (moved cases plus
+permitted fast-sentinel additions).
 
 The output directory must be absent or empty so stale raw profiles cannot enter
 a new result. A claim-grade full baseline names the hosted workflow run and
