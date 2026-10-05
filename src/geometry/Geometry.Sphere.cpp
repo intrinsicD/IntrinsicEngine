@@ -14,6 +14,7 @@ module;
 
 module Geometry.Sphere;
 
+import Geometry.Validation;
 import Geometry.LinearSolver;
 
 namespace Geometry
@@ -73,11 +74,6 @@ namespace Geometry
 
 namespace SphereFitDetail
     {
-        [[nodiscard]] bool IsFinite(const glm::vec3& v)
-        {
-            return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
-        }
-
         [[nodiscard]] std::optional<Sphere> FinalizeSphere(
             const glm::dvec3& center,
             double radius,
@@ -261,11 +257,6 @@ namespace SphereFitDetail
             return center / static_cast<double>(points.size());
         }
 
-        [[nodiscard]] bool IsFinite(const glm::dvec3& v)
-        {
-            return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
-        }
-
         [[nodiscard]] double MeanDistance(std::span<const glm::dvec3> points, const glm::dvec3& center)
         {
             double radius = 0.0;
@@ -318,7 +309,7 @@ namespace SphereFitDetail
             }
 
             const glm::dvec3 centroid = Centroid(points);
-            if (!IsFinite(centroid) || !HasNonCoincidentExtent(points, centroid, params))
+            if (!Geometry::Validation::IsFinite(centroid) || !HasNonCoincidentExtent(points, centroid, params))
             {
                 return std::nullopt;
             }
@@ -357,7 +348,7 @@ namespace SphereFitDetail
                 meanUnitDirection /= static_cast<double>(points.size());
 
                 const glm::dvec3 nextCenter = centroid + radius * meanUnitDirection;
-                if (!IsFinite(nextCenter))
+                if (!Geometry::Validation::IsFinite(nextCenter))
                 {
                     return std::nullopt;
                 }
@@ -397,7 +388,7 @@ namespace SphereFitDetail
 
         for (const glm::vec3& p : points)
         {
-            if (!SphereFitDetail::IsFinite(p))
+            if (!Geometry::Validation::IsFinite(p))
             {
                 hasNonFiniteSample = true;
                 continue;

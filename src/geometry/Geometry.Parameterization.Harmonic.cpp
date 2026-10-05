@@ -14,6 +14,7 @@ module;
 
 module Geometry.Parameterization.Harmonic;
 
+import Geometry.Validation;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Utils;
 import Geometry.Parameterization.Diagnostics;
@@ -25,11 +26,6 @@ namespace Geometry::Parameterization
     namespace
     {
         using Geometry::HalfedgeMesh::Mesh;
-
-        [[nodiscard]] bool IsFinite2(glm::vec2 v) noexcept
-        {
-            return std::isfinite(v.x) && std::isfinite(v.y);
-        }
 
         // Cotangent of the angle at apex X of triangle (X, Y, Z).
         [[nodiscard]] double CotAtApex(glm::dvec3 x, glm::dvec3 y, glm::dvec3 z) noexcept
@@ -236,7 +232,7 @@ namespace Geometry::Parameterization
             {
                 return fail(HarmonicStatus::InvalidPins);
             }
-            if (!IsFinite2(params.PinnedUVs[i]))
+            if (!Geometry::Validation::IsFinite(params.PinnedUVs[i]))
             {
                 return fail(HarmonicStatus::NonFiniteBoundaryUV);
             }

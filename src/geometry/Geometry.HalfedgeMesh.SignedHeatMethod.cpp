@@ -12,6 +12,7 @@ module;
 
 module Geometry.SignedHeatMethod;
 
+import Geometry.Validation;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Geometry.DEC;
@@ -39,11 +40,6 @@ namespace Geometry::SignedHeatMethod
             std::size_t InvalidHalfedgeCount{0};
             std::size_t DegenerateVertexCount{0};
         };
-
-        [[nodiscard]] bool IsFinite(const glm::dvec3& value) noexcept
-        {
-            return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
-        }
 
         [[nodiscard]] glm::dvec3 ToDVec3(const glm::vec3& value) noexcept
         {
@@ -73,7 +69,7 @@ namespace Geometry::SignedHeatMethod
                 if (MeshUtils::TryGetTriangleFaceView(mesh, FaceHandle{static_cast<PropertyIndex>(fi)}, tri))
                 {
                     const glm::dvec3 areaVector = MeshUtils::FaceAreaVector(mesh, tri.Face);
-                    if (glm::length(areaVector) > kEpsilon && IsFinite(areaVector))
+                    if (glm::length(areaVector) > kEpsilon && Geometry::Validation::IsFinite(areaVector))
                     {
                         return true;
                     }
@@ -131,14 +127,14 @@ namespace Geometry::SignedHeatMethod
             const glm::dvec3 pTo = ToDVec3(mesh.Position(mesh.ToVertex(h)));
             const glm::dvec3 tangent = pTo - pFrom;
             const double tangentLength = glm::length(tangent);
-            if (!(tangentLength > kEpsilon) || !IsFinite(tangent))
+            if (!(tangentLength > kEpsilon) || !Geometry::Validation::IsFinite(tangent))
             {
                 return glm::dvec3(0.0);
             }
 
             const glm::dvec3 areaVector = MeshUtils::FaceAreaVector(mesh, face);
             const double normalLength = glm::length(areaVector);
-            if (!(normalLength > kEpsilon) || !IsFinite(areaVector))
+            if (!(normalLength > kEpsilon) || !Geometry::Validation::IsFinite(areaVector))
             {
                 return glm::dvec3(0.0);
             }
@@ -146,7 +142,7 @@ namespace Geometry::SignedHeatMethod
             const glm::dvec3 faceNormal = areaVector / normalLength;
             const glm::dvec3 curveNormal = glm::cross(faceNormal, tangent / tangentLength);
             const double curveNormalLength = glm::length(curveNormal);
-            if (!(curveNormalLength > kEpsilon) || !IsFinite(curveNormal))
+            if (!(curveNormalLength > kEpsilon) || !Geometry::Validation::IsFinite(curveNormal))
             {
                 return glm::dvec3(0.0);
             }
@@ -184,7 +180,7 @@ namespace Geometry::SignedHeatMethod
                 const glm::dvec3 pTo = ToDVec3(mesh.Position(to));
                 const double edgeLength = glm::length(pTo - pFrom);
                 const glm::dvec3 normal = BoundaryNormalForHalfedge(mesh, h);
-                if (!(edgeLength > kEpsilon) || !(glm::length(normal) > kEpsilon) || !IsFinite(normal))
+                if (!(edgeLength > kEpsilon) || !(glm::length(normal) > kEpsilon) || !Geometry::Validation::IsFinite(normal))
                 {
                     ++source.InvalidHalfedgeCount;
                     continue;
@@ -258,7 +254,7 @@ namespace Geometry::SignedHeatMethod
 
                 const glm::dvec3 areaVector = MeshUtils::FaceAreaVector(mesh, tri.Face);
                 const double normalLength = glm::length(areaVector);
-                if (!(normalLength > kEpsilon) || !IsFinite(areaVector) || !IsFinite(v))
+                if (!(normalLength > kEpsilon) || !Geometry::Validation::IsFinite(areaVector) || !Geometry::Validation::IsFinite(v))
                 {
                     continue;
                 }
@@ -266,7 +262,7 @@ namespace Geometry::SignedHeatMethod
                 v -= glm::dot(v, normal) * normal;
 
                 const double length = glm::length(v);
-                if (!(length > kEpsilon) || !IsFinite(v))
+                if (!(length > kEpsilon) || !Geometry::Validation::IsFinite(v))
                 {
                     continue;
                 }
@@ -331,7 +327,7 @@ namespace Geometry::SignedHeatMethod
                     mesh,
                     FaceHandle{static_cast<PropertyIndex>(fi)},
                     phi);
-                if (IsFinite(grad))
+                if (Geometry::Validation::IsFinite(grad))
                 {
                     alignment += glm::dot(grad, field[fi].Direction);
                 }

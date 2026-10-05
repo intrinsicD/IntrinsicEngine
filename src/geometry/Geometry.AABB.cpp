@@ -12,24 +12,21 @@ module;
 
 module Geometry.AABB;
 
+import Geometry.Validation;
+
 namespace Geometry
 {
     namespace
     {
-        [[nodiscard]] bool IsFinite(const glm::vec3& value)
-        {
-            return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
-        }
-
         [[nodiscard]] bool IsUsable(const AABB& box)
         {
-            return box.IsValid() && IsFinite(box.Min) && IsFinite(box.Max);
+            return box.IsValid() && Geometry::Validation::IsFinite(box.Min) && Geometry::Validation::IsFinite(box.Max);
         }
 
         [[nodiscard]] glm::vec3 SafeCenter(const AABB& box)
         {
             const glm::vec3 center = box.GetCenter();
-            return IsFinite(center) ? center : glm::vec3{0.0f};
+            return Geometry::Validation::IsFinite(center) ? center : glm::vec3{0.0f};
         }
     }
 

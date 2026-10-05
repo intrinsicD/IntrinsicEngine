@@ -1,4 +1,8 @@
+// Finite, normalization, and shape-validity checks plus sanitizers for geometry primitives.
+// The five IsFinite overloads are inline so geometry hot loops can reuse them instead of local copies.
 module;
+
+#include <cmath>
 
 #include <glm/glm.hpp>
 
@@ -11,11 +15,30 @@ export namespace Geometry::Validation
     constexpr float EPSILON = 1e-6f;
     constexpr float EPSILON_SQ = EPSILON * EPSILON;
 
-    [[nodiscard]] bool IsFinite(float v) noexcept;
-    [[nodiscard]] bool IsFinite(double v) noexcept;
-    [[nodiscard]] bool IsFinite(const glm::vec2& v) noexcept;
-    [[nodiscard]] bool IsFinite(const glm::vec3& v) noexcept;
-    [[nodiscard]] bool IsFinite(const glm::dvec3& v) noexcept;
+    [[nodiscard]] inline bool IsFinite(float v) noexcept
+    {
+        return std::isfinite(v);
+    }
+
+    [[nodiscard]] inline bool IsFinite(double v) noexcept
+    {
+        return std::isfinite(v);
+    }
+
+    [[nodiscard]] inline bool IsFinite(const glm::vec2& v) noexcept
+    {
+        return std::isfinite(v.x) && std::isfinite(v.y);
+    }
+
+    [[nodiscard]] inline bool IsFinite(const glm::vec3& v) noexcept
+    {
+        return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
+    }
+
+    [[nodiscard]] inline bool IsFinite(const glm::dvec3& v) noexcept
+    {
+        return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
+    }
 
     [[nodiscard]] bool IsNormalized(const glm::vec3& v, float tolerance = 1e-4f);
     [[nodiscard]] bool IsZero(const glm::vec3& v, float epsilon = EPSILON);

@@ -17,6 +17,7 @@ module;
 
 module Geometry.Graph.IO;
 
+import Geometry.Validation;
 import Geometry.Graph;
 import Geometry.Properties;
 import Extrinsic.Core.Error;
@@ -62,11 +63,6 @@ namespace Geometry::GraphIO
         [[nodiscard]] Extrinsic::Core::Expected<GraphIOResult> InvalidGraphFormat()
         {
             return Extrinsic::Core::Err<GraphIOResult>(Extrinsic::Core::ErrorCode::InvalidFormat);
-        }
-
-        [[nodiscard]] bool IsFinite(const glm::vec3& value)
-        {
-            return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
         }
 
         void ApplyPathInfo(GraphIOResult& result, std::string_view path)
@@ -132,7 +128,7 @@ namespace Geometry::GraphIO
                     if (x && y && z)
                     {
                         position = glm::vec3(*x, *y, *z);
-                        if (!IsFinite(position))
+                        if (!Geometry::Validation::IsFinite(position))
                         {
                             return InvalidGraphFormat();
                         }
@@ -341,7 +337,7 @@ namespace Geometry::GraphIO
                 continue;
             }
             const glm::vec3 p = source.VertexPosition(v);
-            if (!IsFinite(p))
+            if (!Geometry::Validation::IsFinite(p))
             {
                 return GraphIOWriteStatus::FileWriteError;
             }

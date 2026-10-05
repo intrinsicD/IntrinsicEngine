@@ -19,6 +19,7 @@ module;
 
 module Geometry.PointCloud.Utils;
 
+import Geometry.Validation;
 import Geometry.AABB;
 import Geometry.Octree;
 import Geometry.Sampling;
@@ -30,11 +31,6 @@ namespace Geometry::PointCloud
 {
     namespace
     {
-        [[nodiscard]] bool IsFinite(const glm::vec3& value)
-        {
-            return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
-        }
-
         double DistanceSquared(glm::vec3 a, glm::vec3 b)
         {
             const glm::dvec3 d = glm::dvec3(a) - glm::dvec3(b);
@@ -128,13 +124,13 @@ namespace Geometry::PointCloud
             glm::dvec3 sum{0};
             for (const auto p : points)
             {
-                if (!IsFinite(p)) return std::nullopt;
+                if (!Geometry::Validation::IsFinite(p)) return std::nullopt;
                 low = glm::min(low, p); high = glm::max(high, p); sum += glm::dvec3(p);
             }
             stats.BoundingBox = AABB{low, high};
             stats.BoundingBoxDiagonal = std::sqrt(DistanceSquared(high,low));
             stats.Centroid = sum / double(points.size());
-            if (!IsFinite(stats.Centroid) || !std::isfinite(stats.BoundingBoxDiagonal)) return std::nullopt;
+            if (!Geometry::Validation::IsFinite(stats.Centroid) || !std::isfinite(stats.BoundingBoxDiagonal)) return std::nullopt;
             return stats;
         }
         std::size_t SpacingSamples(std::size_t count, const StatisticsParams& params)
@@ -501,7 +497,7 @@ namespace Geometry::PointCloud
         {
             return positions.size() >= 2 && positions.size() == normals.size() &&
                 std::isfinite(params.SpatialSigma) && std::isfinite(params.NormalSigma) &&
-                std::ranges::all_of(positions, IsFinite) && std::ranges::all_of(normals, IsFinite);
+                std::ranges::all_of(positions, [](const glm::vec3& v) { return Geometry::Validation::IsFinite(v); }) && std::ranges::all_of(normals, [](const glm::vec3& v) { return Geometry::Validation::IsFinite(v); });
         }
         template<class Query>
         std::optional<BilateralFilterOutput> BilateralStepWithQueries(
@@ -549,7 +545,7 @@ namespace Geometry::PointCloud
                 if (!std::isfinite(weights) || !std::isfinite(signedDistances)) return std::nullopt;
                 const float displacement = weights > 1e-12f ? signedDistances / weights : 0.f;
                 output.Positions[i] = points[i] + normal * displacement;
-                if (!IsFinite(output.Positions[i])) return std::nullopt;
+                if (!Geometry::Validation::IsFinite(output.Positions[i])) return std::nullopt;
                 displacementSum += std::abs(displacement);
                 output.Diagnostics.MaxDisplacement = std::max(output.Diagnostics.MaxDisplacement, std::abs(displacement));
             }
@@ -623,7 +619,7 @@ namespace Geometry::PointCloud
             {
                 std::vector<glm::vec3> finite;
                 for (std::size_t i = 0; i < positions.size(); ++i)
-                    if (IsFinite(positions[i]))
+                    if (Geometry::Validation::IsFinite(positions[i]))
                     {
                         Source.push_back(i);
                         finite.push_back(positions[i]);
@@ -646,7 +642,7 @@ namespace Geometry::PointCloud
             std::span<const glm::vec3> points, const OutlierEstimationParams& params, Query query)
         {
             if (points.size() < 2 || !std::isfinite(params.ScoreThreshold) || params.ScoreThreshold < 0 ||
-                !std::ranges::all_of(points, IsFinite)) return std::nullopt;
+                !std::ranges::all_of(points, [](const glm::vec3& v) { return Geometry::Validation::IsFinite(v); })) return std::nullopt;
             const auto width = OutlierCandidateWidth(points.size(), params.KNeighbors);
             std::vector<double> means(points.size());
             for (std::size_t i = 0; i < points.size(); ++i)
@@ -682,7 +678,7 @@ namespace Geometry::PointCloud
     std::optional<OutlierEstimationResult> EstimateOutlierProbability(
         std::span<const glm::vec3> positions, const OutlierEstimationParams& params)
     {
-        if (positions.size() < 2 || !std::ranges::all_of(positions, IsFinite)) return std::nullopt;
+        if (positions.size() < 2 || !std::ranges::all_of(positions, [](const glm::vec3& v) { return Geometry::Validation::IsFinite(v); })) return std::nullopt;
         Octree tree;
         Octree::SplitPolicy policy{}; policy.SplitPoint = Octree::SplitPoint::Center; policy.TightChildren = true;
         if (!tree.BuildFromPoints(positions, policy, 32, 10)) return std::nullopt;
@@ -760,7 +756,7 @@ namespace Geometry::PointCloud
 
         for (std::size_t i = 0; i < n; ++i)
         {
-            if (!IsFinite(positions[i]))
+            if (!Geometry::Validation::IsFinite(positions[i]))
             {
                 meanDist[i] = std::numeric_limits<float>::quiet_NaN();
                 ++result.NonFiniteCount;
@@ -840,7 +836,7 @@ namespace Geometry::PointCloud
         std::vector<std::size_t> hits;
         for (std::size_t i=0;i<positions.size();++i)
         {
-            if (!IsFinite(positions[i]))
+            if (!Geometry::Validation::IsFinite(positions[i]))
             {
                 result.Mask.push_back(1);result.Scores.push_back(std::numeric_limits<float>::quiet_NaN());
                 ++result.NonFiniteCount;++result.RejectedCount;continue;
@@ -1160,7 +1156,7 @@ namespace Geometry::PointCloud
 
         for (const VertexHandle point : cloud.LivePoints())
         {
-            if (!IsFinite(cloud.Position(point)))
+            if (!Geometry::Validation::IsFinite(cloud.Position(point)))
             {
                 result.Status = GaussianNoiseStatus::NonFinitePosition;
                 return result;

@@ -16,6 +16,7 @@ module;
 
 module Geometry.UvAtlas.Validation;
 
+import Geometry.Validation;
 import Geometry.AABB;
 import Geometry.BVH;
 import Geometry.MeshSoup;
@@ -27,15 +28,6 @@ constexpr double kRelativeDegenerateEpsilon = 1.0e-12;
 // Relative slack for float round-off on bounds that are met exactly by
 // construction (for example an isometric single triangle at bound 1).
 constexpr double kLimitTolerance = 1.0e-6;
-
-[[nodiscard]] bool IsFinite(const glm::vec2 value) noexcept {
-  return std::isfinite(value.x) && std::isfinite(value.y);
-}
-
-[[nodiscard]] bool IsFinite(const glm::vec3 value) noexcept {
-  return std::isfinite(value.x) && std::isfinite(value.y) &&
-         std::isfinite(value.z);
-}
 
 // True when a pixel center (i + 0.5, j + 0.5) inside the width x height
 // image lies strictly inside the positively oriented pixel-space triangle.
@@ -229,7 +221,7 @@ int ExactUvOrientation(const glm::vec2 a, const glm::vec2 b,
 
 bool IsDegenerateAtlasTriangle(const glm::vec3 p0, const glm::vec3 p1,
                                const glm::vec3 p2) noexcept {
-  if (!IsFinite(p0) || !IsFinite(p1) || !IsFinite(p2)) {
+  if (!Geometry::Validation::IsFinite(p0) || !Geometry::Validation::IsFinite(p1) || !Geometry::Validation::IsFinite(p2)) {
     return true;
   }
   const glm::dvec3 a{p0};
@@ -300,7 +292,7 @@ FindUvTriangleOverlaps(const std::span<const glm::vec2> corners,
     const glm::vec2 a = corners[3u * t];
     const glm::vec2 b = corners[3u * t + 1u];
     const glm::vec2 c = corners[3u * t + 2u];
-    if (!IsFinite(a) || !IsFinite(b) || !IsFinite(c) ||
+    if (!Geometry::Validation::IsFinite(a) || !Geometry::Validation::IsFinite(b) || !Geometry::Validation::IsFinite(c) ||
         ExactUvOrientation(a, b, c) <= 0) {
       // Unusable triangles get an empty point box far from any query.
       bounds[t].Min = bounds[t].Max = glm::vec3{0.0f, 0.0f, 1.0f};
@@ -410,7 +402,7 @@ ValidateUvAtlasCorners(const UvAtlasValidationInput &input,
     bool uvValid = true;
     for (std::size_t corner = 0u; corner < 3u; ++corner) {
       const glm::vec2 uv = input.CornerUvs[3u * f + corner];
-      if (!IsFinite(uv)) {
+      if (!Geometry::Validation::IsFinite(uv)) {
         ++report.NonFiniteUvCount;
         uvValid = false;
       } else if (uv.x < 0.0f || uv.y < 0.0f || uv.x > 1.0f || uv.y > 1.0f) {

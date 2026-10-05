@@ -17,17 +17,13 @@ module;
 
 module Geometry.KMeans;
 
+import Geometry.Validation;
 import Geometry.KDTree;
 
 namespace Geometry::KMeans
 {
     namespace
     {
-        [[nodiscard]] bool IsFiniteVec3(const glm::vec3& v) noexcept
-        {
-            return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
-        }
-
         [[nodiscard]] float SquaredDistance(const glm::vec3& a, const glm::vec3& b)
         {
             const glm::vec3 d = a - b;
@@ -164,7 +160,7 @@ namespace Geometry::KMeans
             seeds.reserve(k);
             for (const glm::vec3& centroid : initialCentroids)
             {
-                if (!IsFiniteVec3(centroid))
+                if (!Geometry::Validation::IsFinite(centroid))
                     continue;
                 seeds.push_back(centroid);
                 if (seeds.size() == k)
@@ -189,7 +185,7 @@ namespace Geometry::KMeans
             std::span<const glm::vec3> centroids,
             CpuScratch* cpuScratch)
         {
-            if (centroids.empty() || !IsFiniteVec3(point))
+            if (centroids.empty() || !Geometry::Validation::IsFinite(point))
                 return std::nullopt;
 
             if (cpuScratch != nullptr && !cpuScratch->CentroidTree.Nodes().empty())
@@ -365,7 +361,7 @@ namespace Geometry::KMeans
         for (std::size_t i = 0; i < points.size(); ++i)
         {
             const uint32_t label = labels[i];
-            if (label >= clusterCount || !IsFiniteVec3(points[i]))
+            if (label >= clusterCount || !Geometry::Validation::IsFinite(points[i]))
                 continue;
 
             centroids[label] += points[i];
@@ -385,7 +381,7 @@ namespace Geometry::KMeans
         const glm::vec3& point,
         std::span<const glm::vec3> centroids) noexcept
     {
-        if (centroids.empty() || !IsFiniteVec3(point))
+        if (centroids.empty() || !Geometry::Validation::IsFinite(point))
             return std::nullopt;
 
         std::optional<uint32_t> bestCluster;
@@ -393,7 +389,7 @@ namespace Geometry::KMeans
 
         for (uint32_t c = 0; c < static_cast<uint32_t>(centroids.size()); ++c)
         {
-            if (!IsFiniteVec3(centroids[c]))
+            if (!Geometry::Validation::IsFinite(centroids[c]))
                 continue;
 
             const float d = SquaredDistance(point, centroids[c]);

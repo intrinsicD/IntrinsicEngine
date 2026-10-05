@@ -14,6 +14,7 @@ module;
 
 module Geometry.SupportRadius;
 
+import Geometry.Validation;
 import Geometry.KDTree;
 import Geometry.PointCloud.Kernels;
 import Geometry.Statistics;
@@ -22,12 +23,6 @@ namespace Geometry::SupportRadius
 {
     namespace
     {
-        [[nodiscard]] bool IsFinite(const glm::vec3 value) noexcept
-        {
-            return std::isfinite(value.x) && std::isfinite(value.y) &&
-                   std::isfinite(value.z);
-        }
-
         [[nodiscard]] double SquaredDistance(
             const glm::vec3 lhs,
             const glm::vec3 rhs) noexcept
@@ -183,7 +178,7 @@ namespace Geometry::SupportRadius
         }
         if (std::ranges::any_of(points, [](const glm::vec3 point)
             {
-                return !IsFinite(point);
+                return !Geometry::Validation::IsFinite(point);
             }))
         {
             result.State = Status::NonFiniteInput;

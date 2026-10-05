@@ -19,6 +19,7 @@ module;
 
 module Geometry.HalfedgeMesh.Segmentation;
 
+import Geometry.Validation;
 import Geometry.Curvature;
 import Geometry.GaussianMixture;
 import Geometry.HalfedgeMesh;
@@ -88,12 +89,7 @@ namespace Geometry::Segmentation
             Gmm::FitResult Fit{};
         };
 
-        [[nodiscard]] bool IsFinite(const glm::vec3& value) noexcept
-        {
-            return std::isfinite(value.x) &&
-                   std::isfinite(value.y) &&
-                   std::isfinite(value.z);
-        }
+        using Geometry::Validation::IsFinite;
 
         [[nodiscard]] bool IsFinite(
             const glm::dvec3& value,

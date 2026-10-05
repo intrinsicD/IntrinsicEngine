@@ -18,6 +18,7 @@ module;
 
 module Geometry.PointCloud.Consolidation;
 
+import Geometry.Validation;
 import Geometry.GaussianMixture;
 import Geometry.KDTree;
 import Geometry.PointCloud;
@@ -96,19 +97,7 @@ namespace Geometry::PointCloud::Consolidation
         inline constexpr ClopGaussianTerm kClopInitializationTerm{
             1.0, 0.1767766952966369}; // sqrt(1/32)
 
-        [[nodiscard]] bool IsFinite(const glm::vec3 value) noexcept
-        {
-            return std::isfinite(value.x) &&
-                   std::isfinite(value.y) &&
-                   std::isfinite(value.z);
-        }
-
-        [[nodiscard]] bool IsFinite(const glm::dvec3 value) noexcept
-        {
-            return std::isfinite(value.x) &&
-                   std::isfinite(value.y) &&
-                   std::isfinite(value.z);
-        }
+        using Geometry::Validation::IsFinite;
 
         [[nodiscard]] bool IsFinite(const glm::dmat3& value) noexcept
         {

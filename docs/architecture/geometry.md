@@ -5,7 +5,12 @@
 ## Responsibilities
 
 - Deterministic geometric kernels and data transformations.
-- Robust handling of degenerate/non-ideal input cases.
+- Robust handling of degenerate/non-ideal input cases. The five
+  `Geometry::Validation::IsFinite` overloads (`float`, `double`, `vec2`,
+  `vec3`, `dvec3`) are inline in the `Geometry.Validation` interface; geometry
+  implementation units import `Geometry.Validation` for these finite checks
+  instead of keeping local copies. Local helpers remain only for other shapes
+  (spans, matrices, `vec4`, quaternions, `dvec2`, triangles, partial channels).
 - Integration seams for method packages and benchmark harnesses.
 
 ## Dependencies

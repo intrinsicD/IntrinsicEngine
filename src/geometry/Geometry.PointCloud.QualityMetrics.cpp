@@ -15,6 +15,7 @@ module;
 
 module Geometry.PointCloud.QualityMetrics;
 
+import Geometry.Validation;
 import Geometry.PointCloud;
 
 namespace Geometry::PointCloud::QualityMetrics
@@ -22,13 +23,6 @@ namespace Geometry::PointCloud::QualityMetrics
     namespace
     {
         constexpr double kEpsilon = 1.0e-12;
-
-        [[nodiscard]] bool IsFinite(const glm::vec3& p) noexcept
-        {
-            return std::isfinite(static_cast<double>(p.x))
-                && std::isfinite(static_cast<double>(p.y))
-                && std::isfinite(static_cast<double>(p.z));
-        }
 
         [[nodiscard]] double Distance(const glm::vec3& a, const glm::vec3& b) noexcept
         {
@@ -55,7 +49,7 @@ namespace Geometry::PointCloud::QualityMetrics
             info.InputPointCount = points.size();
             for (const glm::vec3& point : points)
             {
-                if (!IsFinite(point))
+                if (!Geometry::Validation::IsFinite(point))
                 {
                     ++info.NonFinitePointCount;
                 }
@@ -470,7 +464,7 @@ namespace Geometry::PointCloud::QualityMetrics
         result.Info.ReferencePointCount = reference.size();
         for (const glm::vec3& point : reference)
         {
-            if (!IsFinite(point))
+            if (!Geometry::Validation::IsFinite(point))
             {
                 ++result.Info.NonFinitePointCount;
             }

@@ -12,6 +12,7 @@ module;
 
 module Geometry.HtexPatch;
 
+import Geometry.Validation;
 import Extrinsic.Core.Telemetry;
 import Geometry.HalfedgeMesh;
 import Geometry.Properties;
@@ -156,23 +157,18 @@ namespace Geometry::HtexPatch
             return EvaluateTrianglePoint(*tri, localUV);
         }
 
-        [[nodiscard]] bool IsFiniteVec3(const glm::vec3& value) noexcept
-        {
-            return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
-        }
-
         [[nodiscard]] std::optional<std::uint32_t> ClassifyPointToNearestCentroid(
             const glm::vec3& point,
             std::span<const glm::vec3> centroids) noexcept
         {
-            if (!IsFiniteVec3(point) || centroids.empty())
+            if (!Geometry::Validation::IsFinite(point) || centroids.empty())
                 return std::nullopt;
 
             std::optional<std::uint32_t> bestCluster;
             float bestDistance = 0.0f;
             for (std::uint32_t c = 0; c < static_cast<std::uint32_t>(centroids.size()); ++c)
             {
-                if (!IsFiniteVec3(centroids[c]))
+                if (!Geometry::Validation::IsFinite(centroids[c]))
                     continue;
 
                 const glm::vec3 delta = point - centroids[c];

@@ -10,14 +10,10 @@ module;
 
 module Geometry.PCA;
 
+import Geometry.Validation;
 
 namespace Geometry::PCADetail
 {
-    bool IsFinite(const glm::vec3& value)
-    {
-        return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
-    }
-
     // GLSL twin: pcaAtan in pca_eigen_double.glsl.
     // Range reduction bounds atan's alternating series by tan(pi/16).
     double Atan(double x)
@@ -254,7 +250,7 @@ namespace Geometry
         std::size_t count = 0;
         for (const glm::vec3& point : points)
         {
-            if (!PCADetail::IsFinite(point))
+            if (!Geometry::Validation::IsFinite(point))
             {
                 continue;
             }
@@ -287,7 +283,7 @@ namespace Geometry
         double c22 = 0.0;
         for (const glm::vec3& point : points)
         {
-            if (!PCADetail::IsFinite(point))
+            if (!Geometry::Validation::IsFinite(point))
             {
                 continue;
             }

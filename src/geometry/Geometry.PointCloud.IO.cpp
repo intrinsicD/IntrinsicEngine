@@ -23,6 +23,7 @@ module;
 
 module Geometry.PointCloud.IO;
 
+import Geometry.Validation;
 import Geometry.PointCloud;
 import Geometry.Properties;
 import Extrinsic.Core.Error;
@@ -65,20 +66,12 @@ namespace Geometry::PointCloudIO
             return value > 1.0f ? std::clamp(value / 255.0f, 0.0f, 1.0f) : std::clamp(value, 0.0f, 1.0f);
         }
 
-        [[nodiscard]] bool IsFinite(const glm::vec3& value)
-        {
-            return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
-        }
+        using Geometry::Validation::IsFinite;
 
         [[nodiscard]] bool IsFinite(const glm::vec4& value)
         {
             return std::isfinite(value.x) && std::isfinite(value.y) &&
                    std::isfinite(value.z) && std::isfinite(value.w);
-        }
-
-        [[nodiscard]] bool IsFinite(float value)
-        {
-            return std::isfinite(value);
         }
 
         template <typename T>

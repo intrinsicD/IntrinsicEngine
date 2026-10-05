@@ -12,6 +12,7 @@ module;
 
 module Geometry.HalfedgeMesh.Analysis;
 
+import Geometry.Validation;
 import Extrinsic.Core.Logging;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Utils;
@@ -22,11 +23,6 @@ namespace Geometry::MeshAnalysis
     namespace
     {
         constexpr double kRadToDeg = 180.0 / std::numbers::pi;
-
-        [[nodiscard]] bool IsFiniteVec3(const glm::vec3& p) noexcept
-        {
-            return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
-        }
 
         template <class HandleT, class MaskPropertyT, class BoolPropertyT>
         void ResetDomain(MaskPropertyT& mask, BoolPropertyT& problem, std::size_t count)
@@ -199,7 +195,7 @@ namespace Geometry::MeshAnalysis
             const glm::vec3 p = mesh.Position(v);
             bool problem = false;
 
-            if (!IsFiniteVec3(p))
+            if (!Geometry::Validation::IsFinite(p))
             {
                 MarkIssue(v, kVertexIssueNonFinitePosition, result.VertexIssueMask, result.ProblemVertex);
                 ++result.NonFiniteVertexCount;
@@ -255,7 +251,7 @@ namespace Geometry::MeshAnalysis
                 a.IsValid() && b.IsValid() &&
                 mesh.IsValid(a) && mesh.IsValid(b) &&
                 !mesh.IsDeleted(a) && !mesh.IsDeleted(b) &&
-                IsFiniteVec3(mesh.Position(a)) && IsFiniteVec3(mesh.Position(b));
+                Geometry::Validation::IsFinite(mesh.Position(a)) && Geometry::Validation::IsFinite(mesh.Position(b));
 
             if (!hasFiniteEndpoints)
             {
@@ -294,7 +290,7 @@ namespace Geometry::MeshAnalysis
 
             if (h0.IsValid() && mesh.IsValid(h0) && !mesh.IsDeleted(h0))
             {
-                if (!IsFiniteVec3(mesh.Position(mesh.FromVertex(h0))) || !IsFiniteVec3(mesh.Position(mesh.ToVertex(h0))))
+                if (!Geometry::Validation::IsFinite(mesh.Position(mesh.FromVertex(h0))) || !Geometry::Validation::IsFinite(mesh.Position(mesh.ToVertex(h0))))
                 {
                     MarkIssue(h0, kHalfedgeIssueNonFiniteGeometry, result.HalfedgeIssueMask, result.ProblemHalfedge);
                     problem = true;
@@ -303,7 +299,7 @@ namespace Geometry::MeshAnalysis
 
             if (h1.IsValid() && mesh.IsValid(h1) && !mesh.IsDeleted(h1))
             {
-                if (!IsFiniteVec3(mesh.Position(mesh.FromVertex(h1))) || !IsFiniteVec3(mesh.Position(mesh.ToVertex(h1))))
+                if (!Geometry::Validation::IsFinite(mesh.Position(mesh.FromVertex(h1))) || !Geometry::Validation::IsFinite(mesh.Position(mesh.ToVertex(h1))))
                 {
                     MarkIssue(h1, kHalfedgeIssueNonFiniteGeometry, result.HalfedgeIssueMask, result.ProblemHalfedge);
                     problem = true;
@@ -346,7 +342,7 @@ namespace Geometry::MeshAnalysis
             }
 
             const bool hasFiniteGeometry =
-                IsFiniteVec3(tri.P0) && IsFiniteVec3(tri.P1) && IsFiniteVec3(tri.P2);
+                Geometry::Validation::IsFinite(tri.P0) && Geometry::Validation::IsFinite(tri.P1) && Geometry::Validation::IsFinite(tri.P2);
             if (!hasFiniteGeometry)
             {
                 MarkIssue(f, kFaceIssueNonFiniteGeometry, result.FaceIssueMask, result.ProblemFace);

@@ -24,6 +24,7 @@ module;
 
 module Geometry.HalfedgeMesh.Segmentation.Patches;
 
+import Geometry.Validation;
 import Geometry.GaussianMixture;
 import Geometry.HalfedgeMesh;
 import Geometry.Properties;
@@ -127,11 +128,7 @@ namespace Geometry::Segmentation
                 .count();
         }
 
-        [[nodiscard]] bool IsFinite(const glm::vec3 value) noexcept
-        {
-            return std::isfinite(value.x) && std::isfinite(value.y) &&
-                   std::isfinite(value.z);
-        }
+        using Geometry::Validation::IsFinite;
 
         [[nodiscard]] bool IsFinite(const glm::dvec2 value) noexcept
         {

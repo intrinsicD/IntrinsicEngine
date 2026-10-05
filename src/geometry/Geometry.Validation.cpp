@@ -13,34 +13,7 @@ module Geometry.Validation;
 
 namespace Geometry::Validation
 {
-    // --- Scalar Validation ---
-
-    bool IsFinite(float v) noexcept
-    {
-        return std::isfinite(v);
-    }
-
-    bool IsFinite(double v) noexcept
-    {
-        return std::isfinite(v);
-    }
-
     // --- Vector Validation ---
-
-    bool IsFinite(const glm::vec2& v) noexcept
-    {
-        return std::isfinite(v.x) && std::isfinite(v.y);
-    }
-
-    bool IsFinite(const glm::vec3& v) noexcept
-    {
-        return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
-    }
-
-    bool IsFinite(const glm::dvec3& v) noexcept
-    {
-        return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
-    }
 
     bool IsNormalized(const glm::vec3& v, float tolerance)
     {

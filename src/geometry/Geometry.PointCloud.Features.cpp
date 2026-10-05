@@ -20,6 +20,7 @@ module;
 
 module Geometry.PointCloud.Features;
 
+import Geometry.Validation;
 import Geometry.PointCloud;
 import Geometry.KDTree;
 import Geometry.PCA;
@@ -31,11 +32,6 @@ namespace Geometry::PointCloud::Features
     {
         constexpr std::uint32_t kFpfhBins = 11;
         constexpr std::uint32_t kFpfhDimension = 3 * kFpfhBins; // 33
-
-        [[nodiscard]] bool IsFiniteVec(glm::vec3 v) noexcept
-        {
-            return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
-        }
 
         // Deterministic 64-bit SplitMix-style step; no std::random.
         [[nodiscard]] std::uint64_t NextRandom(std::uint64_t& state) noexcept
@@ -57,7 +53,7 @@ namespace Geometry::PointCloud::Features
             for (std::size_t i = 0; i < positions.size(); ++i)
             {
                 const VertexHandle v{static_cast<PropertyIndex>(i)};
-                if (!cloud.IsDeleted(v) && IsFiniteVec(positions[i]))
+                if (!cloud.IsDeleted(v) && Geometry::Validation::IsFinite(positions[i]))
                 {
                     live[i] = 1u;
                 }
@@ -203,7 +199,7 @@ namespace Geometry::PointCloud::Features
         bool ValidKeypointInput(std::span<const glm::vec3> points, const KeypointParams& p)
         {
             return points.size()>=2 && points.size()<=std::numeric_limits<std::uint32_t>::max() &&
-                p.MinNeighbors<points.size() && std::ranges::all_of(points,IsFiniteVec) &&
+                p.MinNeighbors<points.size() && std::ranges::all_of(points,[](const glm::vec3& v) { return Geometry::Validation::IsFinite(v); }) &&
                 std::isfinite(p.SalientRadius) && std::isfinite(p.NonMaxRadius) &&
                 std::isfinite(p.Gamma21) && p.Gamma21>=0 && p.Gamma21<=1 &&
                 std::isfinite(p.Gamma32) && p.Gamma32>=0 && p.Gamma32<=1;
@@ -249,7 +245,7 @@ namespace Geometry::PointCloud::Features
                 // publication of ToPCA; the full ISS weighted scatter differs.
                 const auto pca=Geometry::ToPCA(local);
                 if(!pca.Valid)return std::nullopt;
-                if(!IsFiniteVec(pca.Eigenvalues))return std::nullopt;
+                if(!Geometry::Validation::IsFinite(pca.Eigenvalues))return std::nullopt;
                 std::array<double,3> eigen{pca.Eigenvalues.x,pca.Eigenvalues.y,pca.Eigenvalues.z};
                 std::sort(eigen.begin(),eigen.end(),std::greater<double>());
                 // Analytic eigensolvers can leave tiny positive residuals on a
@@ -280,7 +276,7 @@ namespace Geometry::PointCloud::Features
     std::optional<float> EstimateSpacing(std::span<const glm::vec3> positions)
     {
         if(positions.size()<2 || positions.size()>std::numeric_limits<std::uint32_t>::max() ||
-            !std::ranges::all_of(positions,IsFiniteVec))return std::nullopt;
+            !std::ranges::all_of(positions,[](const glm::vec3& v) { return Geometry::Validation::IsFinite(v); }))return std::nullopt;
         KDTree tree;
         if(!tree.BuildFromPoints(positions))return std::nullopt;
         std::vector<std::uint32_t> neighbors;
@@ -376,13 +372,13 @@ namespace Geometry::PointCloud::Features
         bool ValidDescriptorNormals(std::span<const glm::vec3> positions, std::span<const glm::vec3> normals)
         {
             return positions.size()==normals.size() && std::ranges::all_of(normals,[](glm::vec3 n)
-                {return IsFiniteVec(n) && glm::dot(glm::dvec3(n),glm::dvec3(n))>0;});
+                {return Geometry::Validation::IsFinite(n) && glm::dot(glm::dvec3(n),glm::dvec3(n))>0;});
         }
         bool ValidDescriptorScale(std::span<const glm::vec3> positions,const DescriptorParams& p,const DescriptorScale& s)
         {
             const float radius=s.FeatureRadius;
             return positions.size()>=2 && positions.size()<=std::numeric_limits<std::uint32_t>::max() &&
-                std::ranges::all_of(positions,IsFiniteVec) && p.Kind==DescriptorKind::FPFH && std::isfinite(p.FeatureRadius) &&
+                std::ranges::all_of(positions,[](const glm::vec3& v) { return Geometry::Validation::IsFinite(v); }) && p.Kind==DescriptorKind::FPFH && std::isfinite(p.FeatureRadius) &&
                 std::isfinite(s.MeanSpacing) && s.MeanSpacing>0 && std::isfinite(radius) && radius>0 &&
                 std::isfinite(radius*radius) && radius*radius>0 && radius==(p.FeatureRadius>0?p.FeatureRadius:5.f*s.MeanSpacing);
         }
@@ -684,7 +680,7 @@ namespace Geometry::PointCloud::Features
             }
             const glm::vec3 s = sourcePoints[c.SourceRow];
             const glm::vec3 t = targetPoints[c.TargetRow];
-            if (!IsFiniteVec(s) || !IsFiniteVec(t))
+            if (!Geometry::Validation::IsFinite(s) || !Geometry::Validation::IsFinite(t))
             {
                 result.Status = CoarseAlignmentStatus::DegenerateInput;
                 return result;

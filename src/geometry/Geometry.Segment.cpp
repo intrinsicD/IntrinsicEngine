@@ -12,6 +12,7 @@ module;
 
 module Geometry.Segment;
 
+import Geometry.Validation;
 import Geometry.PCA;
 
 namespace Geometry
@@ -70,11 +71,6 @@ namespace Geometry
 
     Segment ToSegment(std::span<const glm::vec3> points)
     {
-        const auto isFinite = [](const glm::vec3& point)
-        {
-            return std::isfinite(point.x) && std::isfinite(point.y) && std::isfinite(point.z);
-        };
-
         Segment segment{};
 
         glm::vec3 firstFinite{0.0f};
@@ -82,7 +78,7 @@ namespace Geometry
         std::size_t finiteCount = 0;
         for (const glm::vec3& point : points)
         {
-            if (!isFinite(point))
+            if (!Geometry::Validation::IsFinite(point))
             {
                 continue;
             }
@@ -119,7 +115,7 @@ namespace Geometry
         float maxProjection = -std::numeric_limits<float>::max();
         for (const glm::vec3& point : points)
         {
-            if (!isFinite(point))
+            if (!Geometry::Validation::IsFinite(point))
             {
                 continue;
             }

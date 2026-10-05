@@ -11,6 +11,7 @@ module;
 
 module Geometry.HalfedgeMesh.Vertices.Normals;
 
+import Geometry.Validation;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 
@@ -26,20 +27,6 @@ namespace Geometry::HalfedgeMesh::VertexNormals
             glm::dvec3 Position{0.0};
         };
 
-        [[nodiscard]] bool IsFinite(const glm::vec3 value) noexcept
-        {
-            return std::isfinite(value.x)
-                && std::isfinite(value.y)
-                && std::isfinite(value.z);
-        }
-
-        [[nodiscard]] bool IsFinite(const glm::dvec3 value) noexcept
-        {
-            return std::isfinite(value.x)
-                && std::isfinite(value.y)
-                && std::isfinite(value.z);
-        }
-
         [[nodiscard]] double DotLengthSq(const glm::dvec3 value) noexcept
         {
             return glm::dot(value, value);
@@ -49,7 +36,7 @@ namespace Geometry::HalfedgeMesh::VertexNormals
                                Result& result,
                                glm::vec3& out) noexcept
         {
-            if (IsFinite(params.FallbackNormal))
+            if (Geometry::Validation::IsFinite(params.FallbackNormal))
             {
                 const double lenSq = static_cast<double>(glm::dot(params.FallbackNormal, params.FallbackNormal));
                 if (std::isfinite(lenSq)
@@ -163,7 +150,7 @@ namespace Geometry::HalfedgeMesh::VertexNormals
             std::size_t count = 0;
             return WalkFaceCorners(mesh, face, params.SkipDeleted, result, count, [&](const VertexHandle vertex) {
                 const glm::vec3 position = mesh.Position(vertex);
-                if (!IsFinite(position))
+                if (!Geometry::Validation::IsFinite(position))
                 {
                     ++result.NonFiniteFaceCount;
                     return false;
@@ -374,7 +361,7 @@ namespace Geometry::HalfedgeMesh::VertexNormals
 
             const glm::dvec3 areaVector = ComputeAreaVector(corners);
             const double areaVectorLength = glm::length(areaVector);
-            if (!IsFinite(areaVector) || !std::isfinite(areaVectorLength))
+            if (!Geometry::Validation::IsFinite(areaVector) || !std::isfinite(areaVectorLength))
             {
                 ++result.NonFiniteFaceCount;
                 continue;
@@ -404,7 +391,7 @@ namespace Geometry::HalfedgeMesh::VertexNormals
                                                                    areaVector,
                                                                    epsilon,
                                                                    result);
-                if (!IsFinite(contribution) || DotLengthSq(contribution) <= epsilon * epsilon)
+                if (!Geometry::Validation::IsFinite(contribution) || DotLengthSq(contribution) <= epsilon * epsilon)
                 {
                     continue;
                 }
@@ -424,7 +411,7 @@ namespace Geometry::HalfedgeMesh::VertexNormals
 
             const glm::dvec3 accumulated = accumulators[vertexIndex];
             const double length = glm::length(accumulated);
-            if (IsFinite(accumulated) && std::isfinite(length) && length > epsilon)
+            if (Geometry::Validation::IsFinite(accumulated) && std::isfinite(length) && length > epsilon)
             {
                 result.Normals[vertex] = glm::vec3(accumulated / length);
                 ++result.ValidNormalVertexCount;

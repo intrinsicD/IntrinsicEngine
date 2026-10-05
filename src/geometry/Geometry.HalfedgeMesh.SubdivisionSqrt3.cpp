@@ -13,6 +13,7 @@ module;
 
 module Geometry.HalfedgeMesh.SubdivisionSqrt3;
 
+import Geometry.Validation;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Utils;
 
@@ -20,11 +21,6 @@ namespace Geometry::SubdivisionSqrt3
 {
     namespace
     {
-        [[nodiscard]] bool IsFinite(const glm::vec3& p)
-        {
-            return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
-        }
-
         [[nodiscard]] bool ValidateTriangleMesh(const HalfedgeMesh::Mesh& mesh)
         {
             if (mesh.IsEmpty() || mesh.FaceCount() == 0) return false;
@@ -32,7 +28,7 @@ namespace Geometry::SubdivisionSqrt3
             {
                 const VertexHandle v{static_cast<PropertyIndex>(vi)};
                 if (mesh.IsDeleted(v)) continue;
-                if (!IsFinite(mesh.Position(v))) return false;
+                if (!Geometry::Validation::IsFinite(mesh.Position(v))) return false;
             }
             for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
             {

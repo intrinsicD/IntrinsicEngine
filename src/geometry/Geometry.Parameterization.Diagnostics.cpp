@@ -11,6 +11,7 @@ module;
 
 module Geometry.Parameterization.Diagnostics;
 
+import Geometry.Validation;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Utils;
@@ -19,16 +20,6 @@ namespace Geometry::Parameterization
 {
     namespace
     {
-        [[nodiscard]] bool IsFinite(const glm::vec2 value) noexcept
-        {
-            return std::isfinite(value.x) && std::isfinite(value.y);
-        }
-
-        [[nodiscard]] bool IsFinite(const glm::vec3 value) noexcept
-        {
-            return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
-        }
-
         [[nodiscard]] double SignedAreaUv(const glm::vec2 a, const glm::vec2 b, const glm::vec2 c) noexcept
         {
             return 0.5 * static_cast<double>(
@@ -191,7 +182,7 @@ namespace Geometry::Parameterization
                 continue;
             }
 
-            if (!IsFinite(tri.P0) || !IsFinite(tri.P1) || !IsFinite(tri.P2))
+            if (!Geometry::Validation::IsFinite(tri.P0) || !Geometry::Validation::IsFinite(tri.P1) || !Geometry::Validation::IsFinite(tri.P2))
             {
                 ++diagnostics.NonFinitePositionFaceCount;
                 ++diagnostics.SkippedFaceCount;
@@ -201,7 +192,7 @@ namespace Geometry::Parameterization
             const glm::vec2 uv0 = uvs[tri.V0.Index];
             const glm::vec2 uv1 = uvs[tri.V1.Index];
             const glm::vec2 uv2 = uvs[tri.V2.Index];
-            if (!IsFinite(uv0) || !IsFinite(uv1) || !IsFinite(uv2))
+            if (!Geometry::Validation::IsFinite(uv0) || !Geometry::Validation::IsFinite(uv1) || !Geometry::Validation::IsFinite(uv2))
             {
                 ++diagnostics.NonFiniteUvFaceCount;
                 ++diagnostics.SkippedFaceCount;
@@ -338,7 +329,7 @@ namespace Geometry::Parameterization
                     ++diagnostics.SkippedBoundaryEdgeCount;
                     continue;
                 }
-                if (!IsFinite(mesh.Position(v0)) || !IsFinite(mesh.Position(v1)) || !IsFinite(uvs[v0.Index]) || !IsFinite(uvs[v1.Index]))
+                if (!Geometry::Validation::IsFinite(mesh.Position(v0)) || !Geometry::Validation::IsFinite(mesh.Position(v1)) || !Geometry::Validation::IsFinite(uvs[v0.Index]) || !Geometry::Validation::IsFinite(uvs[v1.Index]))
                 {
                     ++diagnostics.SkippedBoundaryEdgeCount;
                     continue;

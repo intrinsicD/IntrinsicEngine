@@ -19,6 +19,8 @@ module;
 #include <glm/geometric.hpp>
 
 module Geometry.HalfedgeMesh.Utils;
+
+import Geometry.Validation;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Geometry.MeshClosestFace;
@@ -35,14 +37,9 @@ namespace Geometry::MeshUtils
         // accumulated into geometric quantities, or they poison downstream
         // curvature/mass computations. Callers treat a non-finite corner as a
         // degenerate face and return the zero sentinel.
-        [[nodiscard]] bool IsFinite(const glm::dvec3& p) noexcept
-        {
-            return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
-        }
-
         [[nodiscard]] glm::vec3 ToPublicVec3(const glm::dvec3& value) noexcept
         {
-            if (!IsFinite(value))
+            if (!Geometry::Validation::IsFinite(value))
             {
                 return glm::vec3(0.0f);
             }
@@ -682,7 +679,7 @@ namespace Geometry::MeshUtils
         for (const VertexHandle v : mesh.VerticesAroundFace(f))
         {
             const glm::dvec3 p(mesh.Position(v));
-            if (!IsFinite(p))
+            if (!Geometry::Validation::IsFinite(p))
             {
                 return glm::dvec3(0.0); // fail closed on non-finite corner positions
             }
@@ -741,7 +738,7 @@ namespace Geometry::MeshUtils
         for (const VertexHandle v : mesh.VerticesAroundFace(f))
         {
             const glm::dvec3 p(mesh.Position(v));
-            if (!IsFinite(p))
+            if (!Geometry::Validation::IsFinite(p))
             {
                 return 0.0; // fail closed on non-finite corner positions
             }
@@ -820,7 +817,7 @@ namespace Geometry::MeshUtils
         for (const VertexHandle v : mesh.VerticesAroundFace(f))
         {
             const glm::dvec3 p(mesh.Position(v));
-            if (!IsFinite(p))
+            if (!Geometry::Validation::IsFinite(p))
             {
                 return glm::dvec3(0.0); // fail closed on non-finite corner positions
             }
@@ -929,9 +926,9 @@ namespace Geometry::MeshUtils
         const double ub = vertexValues[tri.V1.Index];
         const double uc = vertexValues[tri.V2.Index];
         if (!std::isfinite(ua) || !std::isfinite(ub) || !std::isfinite(uc)
-            || !IsFinite(glm::dvec3(tri.P0))
-            || !IsFinite(glm::dvec3(tri.P1))
-            || !IsFinite(glm::dvec3(tri.P2)))
+            || !Geometry::Validation::IsFinite(glm::dvec3(tri.P0))
+            || !Geometry::Validation::IsFinite(glm::dvec3(tri.P1))
+            || !Geometry::Validation::IsFinite(glm::dvec3(tri.P2)))
         {
             return glm::dvec3(0.0);
         }
@@ -955,7 +952,7 @@ namespace Geometry::MeshUtils
             ua * glm::cross(normal, ea) +
             ub * glm::cross(normal, eb) +
             uc * glm::cross(normal, ec));
-        if (!IsFinite(gradient))
+        if (!Geometry::Validation::IsFinite(gradient))
         {
             return glm::dvec3(0.0);
         }
@@ -1023,7 +1020,7 @@ namespace Geometry::MeshUtils
             }
 
             const glm::vec3 position = mesh.Position(to);
-            if (IsFinite(glm::dvec3(position)))
+            if (Geometry::Validation::IsFinite(glm::dvec3(position)))
             {
                 neighbours.push_back(position);
             }
@@ -1044,7 +1041,7 @@ namespace Geometry::MeshUtils
         {
             const glm::dvec3 v(vector);
             const double lenSq = glm::dot(v, v);
-            return IsFinite(v) && std::isfinite(lenSq) && lenSq > 1.0e-20;
+            return Geometry::Validation::IsFinite(v) && std::isfinite(lenSq) && lenSq > 1.0e-20;
         };
 
         if (hasFiniteBasisVector(result.Eigenvectors[0])
@@ -1061,7 +1058,7 @@ namespace Geometry::MeshUtils
         }
 
         const double normalLength = glm::length(normal);
-        if (!IsFinite(normal) || !std::isfinite(normalLength) || normalLength <= 1.0e-12)
+        if (!Geometry::Validation::IsFinite(normal) || !std::isfinite(normalLength) || normalLength <= 1.0e-12)
         {
             return invalid;
         }
@@ -1267,7 +1264,7 @@ namespace Geometry::MeshUtils
             const glm::dvec3 pa(mesh.Position(va));
             const glm::dvec3 pb(mesh.Position(vb));
             const glm::dvec3 pc(mesh.Position(vc));
-            if (!IsFinite(pa) || !IsFinite(pb) || !IsFinite(pc))
+            if (!Geometry::Validation::IsFinite(pa) || !Geometry::Validation::IsFinite(pb) || !Geometry::Validation::IsFinite(pc))
                 continue;
 
             const glm::dvec3 eAB = pb - pa;

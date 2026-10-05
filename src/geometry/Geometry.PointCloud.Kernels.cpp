@@ -15,6 +15,7 @@ module;
 
 module Geometry.PointCloud.Kernels;
 
+import Geometry.Validation;
 import Geometry.AABB;
 import Geometry.KDTree;
 
@@ -23,14 +24,6 @@ namespace Geometry::PointCloud::Kernels
 {
     namespace
     {
-        [[nodiscard]] bool IsFinite(
-            const glm::vec3 value) noexcept
-        {
-            return std::isfinite(value.x) &&
-                   std::isfinite(value.y) &&
-                   std::isfinite(value.z);
-        }
-
         [[nodiscard]] bool IsValid(
             const KernelType kernel) noexcept
         {
@@ -111,7 +104,7 @@ namespace Geometry::PointCloud::Kernels
                 result.Status = DensityWeightStatus::ResourceLimit;
                 return result;
             }
-            if (!std::ranges::all_of(points, IsFinite))
+            if (!std::ranges::all_of(points, [](const glm::vec3& v) { return Geometry::Validation::IsFinite(v); }))
             {
                 result.Status = DensityWeightStatus::NonFiniteInput;
                 return result;
@@ -344,7 +337,7 @@ namespace Geometry::PointCloud::Kernels
         const glm::vec3 direction,
         const double supportRadius) noexcept
     {
-        if (!IsFinite(offset) || !IsFinite(direction) ||
+        if (!Geometry::Validation::IsFinite(offset) || !Geometry::Validation::IsFinite(direction) ||
             !std::isfinite(supportRadius) || !(supportRadius > 0.0))
         {
             return std::nullopt;

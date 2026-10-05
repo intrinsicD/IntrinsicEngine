@@ -14,6 +14,7 @@ module;
 
 module Geometry.Mesh.SurfaceSampling;
 
+import Geometry.Validation;
 import Geometry.HalfedgeMesh.Utils;
 import Geometry.Properties;
 
@@ -35,14 +36,9 @@ namespace Geometry::Mesh::SurfaceSampling
             double CumulativeArea{0.0};
         };
 
-        [[nodiscard]] bool IsFinite(glm::vec3 v) noexcept
-        {
-            return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
-        }
-
         [[nodiscard]] glm::vec3 SafeUnitNormal(glm::vec3 n) noexcept
         {
-            if (!IsFinite(n))
+            if (!Geometry::Validation::IsFinite(n))
             {
                 return {0.0f, 1.0f, 0.0f};
             }
@@ -68,7 +64,7 @@ namespace Geometry::Mesh::SurfaceSampling
             {
                 return false;
             }
-            return IsFinite(normals[v.Index]);
+            return Geometry::Validation::IsFinite(normals[v.Index]);
         }
 
         [[nodiscard]] bool HasTriangleNormals(const ConstProperty<glm::vec3>& normals,
@@ -105,7 +101,7 @@ namespace Geometry::Mesh::SurfaceSampling
                     continue;
                 }
 
-                if (!IsFinite(view.P0) || !IsFinite(view.P1) || !IsFinite(view.P2))
+                if (!Geometry::Validation::IsFinite(view.P0) || !Geometry::Validation::IsFinite(view.P1) || !Geometry::Validation::IsFinite(view.P2))
                 {
                     ++diagnostics.RejectedNonFiniteTriangleCount;
                     continue;

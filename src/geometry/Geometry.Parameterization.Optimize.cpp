@@ -16,6 +16,7 @@ module;
 
 module Geometry.Parameterization.Optimize;
 
+import Geometry.Validation;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Utils;
 import Geometry.Linalg;
@@ -26,19 +27,11 @@ namespace Geometry::Parameterization
 {
     namespace
     {
-        [[nodiscard]] bool IsFinite(const double value) noexcept
-        {
-            return std::isfinite(value);
-        }
+        using Geometry::Validation::IsFinite;
 
         [[nodiscard]] bool IsFinite(const glm::dvec2 value) noexcept
         {
             return IsFinite(value.x) && IsFinite(value.y);
-        }
-
-        [[nodiscard]] bool IsFinite(const glm::dvec3 value) noexcept
-        {
-            return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
         }
 
         [[nodiscard]] double Element(

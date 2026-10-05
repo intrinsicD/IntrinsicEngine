@@ -13,6 +13,7 @@ module;
 
 module Geometry.Graph.Vertex.Normals;
 
+import Geometry.Validation;
 import Geometry.Graph;
 import Geometry.PCA;
 import Geometry.Properties;
@@ -29,18 +30,11 @@ namespace Geometry::Graph::VertexNormals
             VertexHandle B{};
         };
 
-        [[nodiscard]] bool IsFinite(const glm::vec3 value) noexcept
-        {
-            return std::isfinite(value.x)
-                && std::isfinite(value.y)
-                && std::isfinite(value.z);
-        }
-
         void NormalizeFallback(const Params& params,
                                Diagnostics& diagnostics,
                                glm::vec3& out) noexcept
         {
-            if (IsFinite(params.FallbackNormal))
+            if (Geometry::Validation::IsFinite(params.FallbackNormal))
             {
                 const double lenSq = static_cast<double>(glm::dot(params.FallbackNormal, params.FallbackNormal));
                 const double epsilon = params.DegenerateNormalLengthEpsilon > 0.0
@@ -164,7 +158,7 @@ namespace Geometry::Graph::VertexNormals
                 return false;
             }
             normal *= static_cast<float>(1.0 / std::sqrt(lenSq));
-            return IsFinite(normal);
+            return Geometry::Validation::IsFinite(normal);
         }
     } // namespace
 
@@ -264,7 +258,7 @@ namespace Geometry::Graph::VertexNormals
             }
 
             const glm::vec3 center = positions[vertexIndex];
-            if (!IsFinite(center))
+            if (!Geometry::Validation::IsFinite(center))
             {
                 ++result.Diagnostics.NonFinitePositionCount;
                 ++result.Diagnostics.FallbackVertexCount;
@@ -299,7 +293,7 @@ namespace Geometry::Graph::VertexNormals
                 }
 
                 const glm::vec3 neighborPosition = positions[neighborIndex];
-                if (!IsFinite(neighborPosition))
+                if (!Geometry::Validation::IsFinite(neighborPosition))
                 {
                     ++result.Diagnostics.NonFinitePositionCount;
                     continue;

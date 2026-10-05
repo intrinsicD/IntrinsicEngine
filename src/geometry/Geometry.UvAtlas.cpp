@@ -22,6 +22,7 @@ module;
 
 module Geometry.UvAtlas;
 
+import Geometry.Validation;
 import Geometry.Properties;
 import Geometry.MeshSoup;
 import Geometry.HalfedgeMesh;
@@ -51,18 +52,9 @@ constexpr double kChartLimitMargin = 1.0e-3;
 // Packing keeps chart boxes strictly inside [0, 1 - margin]^2.
 constexpr double kPackMargin = 1.0e-6;
 
-[[nodiscard]] bool IsFinite(const glm::vec2 value) noexcept {
-  return std::isfinite(value.x) && std::isfinite(value.y);
-}
-
-[[nodiscard]] bool IsFinite(const glm::vec3 value) noexcept {
-  return std::isfinite(value.x) && std::isfinite(value.y) &&
-         std::isfinite(value.z);
-}
-
 [[nodiscard]] bool AllUvsFinite(const std::span<const glm::vec2> uvs) noexcept {
   return std::all_of(uvs.begin(), uvs.end(),
-                     [](const glm::vec2 uv) { return IsFinite(uv); });
+                     [](const glm::vec2 uv) { return Geometry::Validation::IsFinite(uv); });
 }
 
 [[nodiscard]] bool CancelRequested(const UvAtlasOptions &options) noexcept {
@@ -2224,7 +2216,7 @@ UvAtlasDiagnostics ValidateUvAtlasInput(const UvAtlasInput &input) {
   }
 
   for (const glm::vec3 position : input.Positions) {
-    if (!IsFinite(position)) {
+    if (!Geometry::Validation::IsFinite(position)) {
       ++diagnostics.NonFinitePositionCount;
     }
   }
@@ -2241,7 +2233,7 @@ UvAtlasDiagnostics ValidateUvAtlasInput(const UvAtlasInput &input) {
       if (index >= input.Positions.size()) {
         ++diagnostics.OutOfRangeIndexCount;
         faceOutOfRange = true;
-      } else if (!IsFinite(input.Positions[index])) {
+      } else if (!Geometry::Validation::IsFinite(input.Positions[index])) {
         faceNonFinite = true;
       }
     }
@@ -2282,7 +2274,7 @@ UvAtlasDiagnostics ValidateAuthoredUvs(const UvAtlasInput &input) {
   }
 
   for (const glm::vec2 uv : input.AuthoredTexcoords) {
-    if (!IsFinite(uv)) {
+    if (!Geometry::Validation::IsFinite(uv)) {
       ++diagnostics.NonFiniteAuthoredUvCount;
     }
   }

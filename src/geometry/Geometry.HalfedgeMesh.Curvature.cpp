@@ -16,6 +16,7 @@ module;
 
 module Geometry.Curvature;
 
+import Geometry.Validation;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Utils;
@@ -58,13 +59,6 @@ namespace Geometry::Curvature
             double MinimumTriangleQuality{0.0};
         };
 
-        [[nodiscard]] bool IsFinite(const glm::dvec3& value) noexcept
-        {
-            return std::isfinite(value.x)
-                && std::isfinite(value.y)
-                && std::isfinite(value.z);
-        }
-
         [[nodiscard]] glm::dvec3 GeometricVertexNormal(
             const HalfedgeMesh::Mesh& mesh,
             const VertexHandle vertex) noexcept
@@ -73,7 +67,7 @@ namespace Geometry::Curvature
             for (const FaceHandle face : mesh.FacesAroundVertex(vertex))
                 normal += FaceAreaVector(mesh, face);
             const double length = glm::length(normal);
-            if (!IsFinite(normal) || !std::isfinite(length)
+            if (!Geometry::Validation::IsFinite(normal) || !std::isfinite(length)
                 || length <= std::numeric_limits<double>::min())
                 return glm::dvec3{0.0};
             return normal / length;
@@ -139,7 +133,7 @@ namespace Geometry::Curvature
                     const glm::dvec3 q(mesh.Position(
                         mesh.ToVertex(halfedge)));
                     const glm::dvec3 r(mesh.Position(mesh.ToVertex(next)));
-                    if (!IsFinite(p) || !IsFinite(q) || !IsFinite(r))
+                    if (!Geometry::Validation::IsFinite(p) || !Geometry::Validation::IsFinite(q) || !Geometry::Validation::IsFinite(r))
                         continue;
 
                     const glm::dvec3 pq = q - p;
@@ -232,8 +226,8 @@ namespace Geometry::Curvature
                     glm::dot(e01, e01),
                     glm::dot(e02, e02),
                     glm::dot(e12, e12)});
-                bool reliable = IsFinite(p0) && IsFinite(p1) && IsFinite(p2)
-                    && IsFinite(twiceAreaVector)
+                bool reliable = Geometry::Validation::IsFinite(p0) && Geometry::Validation::IsFinite(p1) && Geometry::Validation::IsFinite(p2)
+                    && Geometry::Validation::IsFinite(twiceAreaVector)
                     && std::isfinite(twiceArea)
                     && std::isfinite(maximumEdgeSquared)
                     && twiceArea > std::numeric_limits<double>::min()
@@ -298,7 +292,7 @@ namespace Geometry::Curvature
                     glm::dvec3(mesh.Position(mesh.FromVertex(halfedge0)))
                     - glm::dvec3(mesh.Position(mesh.ToVertex(halfedge0)));
                 const double length = glm::length(direction);
-                if (!IsFinite(direction) || !std::isfinite(length)
+                if (!Geometry::Validation::IsFinite(direction) || !std::isfinite(length)
                     || length <= std::numeric_limits<double>::min())
                 {
                     continue;
@@ -397,8 +391,8 @@ namespace Geometry::Curvature
                     minimumDirection[0],
                     minimumDirection[1],
                     minimumDirection[2]};
-                out[i].DirectionValid = IsFinite(out[i].Dir1)
-                    && IsFinite(out[i].Dir2);
+                out[i].DirectionValid = Geometry::Validation::IsFinite(out[i].Dir1)
+                    && Geometry::Validation::IsFinite(out[i].Dir2);
             }
 
             if (computation.DegenerateFaceCount > 0u
@@ -620,7 +614,7 @@ namespace Geometry::Curvature
 
             const glm::dvec3 normal = GeometricVertexNormal(mesh, vertex);
             const double normalLength = glm::length(normal);
-            if (IsFinite(normal) && std::isfinite(normalLength)
+            if (Geometry::Validation::IsFinite(normal) && std::isfinite(normalLength)
                 && normalLength > std::numeric_limits<double>::min())
                 result.MeanCurvatureNormalProperty[vertex] = glm::vec3(-mean * normal / normalLength);
         }

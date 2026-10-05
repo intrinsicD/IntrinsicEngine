@@ -18,6 +18,7 @@ module;
 
 module Geometry.HalfedgeMesh.Segmentation.Features;
 
+import Geometry.Validation;
 import Geometry.Curvature;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Features;
@@ -69,21 +70,11 @@ namespace Geometry::Segmentation
                 .count();
         }
 
-        [[nodiscard]] bool IsFinite(const glm::vec3 value) noexcept
-        {
-            return std::isfinite(value.x) && std::isfinite(value.y) &&
-                   std::isfinite(value.z);
-        }
+        using Geometry::Validation::IsFinite;
 
         [[nodiscard]] bool IsFinite(const glm::dvec2 value) noexcept
         {
             return std::isfinite(value.x) && std::isfinite(value.y);
-        }
-
-        [[nodiscard]] bool IsFinite(const glm::dvec3 value) noexcept
-        {
-            return std::isfinite(value.x) && std::isfinite(value.y) &&
-                   std::isfinite(value.z);
         }
 
         [[nodiscard]] bool IsValidParams(

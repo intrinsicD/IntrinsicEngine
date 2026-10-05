@@ -17,6 +17,7 @@ module;
 
 module Geometry.Smoothing;
 
+import Geometry.Validation;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Geometry.DEC;
@@ -34,16 +35,6 @@ namespace Geometry::Smoothing
 
     namespace
     {
-        [[nodiscard]] bool IsFiniteVec(const glm::dvec3 v) noexcept
-        {
-            return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
-        }
-
-        [[nodiscard]] bool IsFiniteVec(const glm::vec3 v) noexcept
-        {
-            return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
-        }
-
         [[nodiscard]] double ResolveEpsilon(const BilateralDenoiseParams& params) noexcept
         {
             // Non-finite or non-positive epsilon falls back to the default; the
@@ -123,7 +114,7 @@ namespace Geometry::Smoothing
                 {
                     continue;
                 }
-                if (!IsFiniteVec(mesh.Position(v)))
+                if (!Geometry::Validation::IsFinite(mesh.Position(v)))
                 {
                     return DenoiseStatus::NonFiniteInput;
                 }
@@ -161,7 +152,7 @@ namespace Geometry::Smoothing
 
                 const glm::dvec3 areaVec = FaceAreaVector(mesh, f);
                 const double areaVecLen = glm::length(areaVec);
-                if (!IsFiniteVec(areaVec) || !std::isfinite(areaVecLen))
+                if (!Geometry::Validation::IsFinite(areaVec) || !std::isfinite(areaVecLen))
                 {
                     ++result.NonFiniteFaceCount;
                     continue;
@@ -434,7 +425,7 @@ namespace Geometry::Smoothing
                     // *after* narrowing to glm::vec3; on overflow the vertex is
                     // left at its (finite) current position.
                     const glm::dvec3 candidate = xi + step;
-                    if (IsFiniteVec(candidate) && IsFiniteVec(glm::vec3(candidate)))
+                    if (Geometry::Validation::IsFinite(candidate) && Geometry::Validation::IsFinite(glm::vec3(candidate)))
                     {
                         newPos[i] = candidate;
                     }

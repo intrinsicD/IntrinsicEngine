@@ -17,6 +17,7 @@ module;
 
 module Geometry.HalfedgeMesh.Builder;
 
+import Geometry.Validation;
 import Geometry.HalfedgeMesh;
 import Geometry.Subdivision;
 import Geometry.Properties;
@@ -29,25 +30,15 @@ namespace Geometry::HalfedgeMesh
         constexpr std::size_t kRevolveSegments = 24;
         constexpr std::size_t kHemisphereBands = 6;
 
-        [[nodiscard]] bool IsFiniteFloat(const float value) noexcept
-        {
-            return std::isfinite(value);
-        }
-
-        [[nodiscard]] bool IsFiniteVec3(const glm::vec3& value) noexcept
-        {
-            return IsFiniteFloat(value.x) && IsFiniteFloat(value.y) && IsFiniteFloat(value.z);
-        }
-
         [[nodiscard]] bool IsFiniteQuat(const glm::quat& value) noexcept
         {
-            return IsFiniteFloat(value.w) && IsFiniteFloat(value.x) && IsFiniteFloat(value.y) && IsFiniteFloat(value.z);
+            return Geometry::Validation::IsFinite(value.w) && Geometry::Validation::IsFinite(value.x) && Geometry::Validation::IsFinite(value.y) && Geometry::Validation::IsFinite(value.z);
         }
 
         [[nodiscard]] glm::quat NormalizeQuatSafe(const glm::quat& rotation) noexcept
         {
             const float lenSq = glm::dot(rotation, rotation);
-            if (lenSq <= kEpsilon || !IsFiniteFloat(lenSq))
+            if (lenSq <= kEpsilon || !Geometry::Validation::IsFinite(lenSq))
             {
                 return glm::quat{1.0f, 0.0f, 0.0f, 0.0f};
             }
@@ -80,7 +71,7 @@ namespace Geometry::HalfedgeMesh
         {
             for (const glm::vec3& corner : corners)
             {
-                if (!IsFiniteVec3(corner))
+                if (!Geometry::Validation::IsFinite(corner))
                 {
                     return std::nullopt;
                 }
@@ -137,7 +128,7 @@ namespace Geometry::HalfedgeMesh
         [[nodiscard]] std::optional<RevolutionFrame> MakeRevolutionFrame(const glm::vec3& pointA,
                                                                           const glm::vec3& pointB) noexcept
         {
-            if (!IsFiniteVec3(pointA) || !IsFiniteVec3(pointB))
+            if (!Geometry::Validation::IsFinite(pointA) || !Geometry::Validation::IsFinite(pointB))
             {
                 return std::nullopt;
             }
@@ -230,7 +221,7 @@ namespace Geometry::HalfedgeMesh
         for (glm::vec3& position : mesh.Positions())
         {
             const float lenSq = glm::dot(position, position);
-            if (lenSq <= kEpsilon || !IsFiniteFloat(lenSq))
+            if (lenSq <= kEpsilon || !Geometry::Validation::IsFinite(lenSq))
             {
                 continue;
             }
@@ -240,7 +231,7 @@ namespace Geometry::HalfedgeMesh
 
     std::optional<Mesh> MakeMesh(const AABB& aabb) noexcept
     {
-        if (!aabb.IsValid() || !IsFiniteVec3(aabb.Min) || !IsFiniteVec3(aabb.Max))
+        if (!aabb.IsValid() || !Geometry::Validation::IsFinite(aabb.Min) || !Geometry::Validation::IsFinite(aabb.Max))
         {
             return std::nullopt;
         }
@@ -256,7 +247,7 @@ namespace Geometry::HalfedgeMesh
 
     std::optional<Mesh> MakeMesh(const OBB& obb) noexcept
     {
-        if (!obb.IsValid() || !IsFiniteVec3(obb.Center) || !IsFiniteVec3(obb.Extents) || !IsFiniteQuat(obb.Rotation))
+        if (!obb.IsValid() || !Geometry::Validation::IsFinite(obb.Center) || !Geometry::Validation::IsFinite(obb.Extents) || !IsFiniteQuat(obb.Rotation))
         {
             return std::nullopt;
         }
@@ -283,7 +274,7 @@ namespace Geometry::HalfedgeMesh
 
     std::optional<Mesh> MakeMesh(const Sphere& sphere, const uint8_t subdiv_level) noexcept
     {
-        if (!IsFiniteVec3(sphere.Center) || !IsFiniteFloat(sphere.Radius) || sphere.Radius <= kEpsilon)
+        if (!Geometry::Validation::IsFinite(sphere.Center) || !Geometry::Validation::IsFinite(sphere.Radius) || sphere.Radius <= kEpsilon)
         {
             return std::nullopt;
         }
@@ -304,8 +295,8 @@ namespace Geometry::HalfedgeMesh
 
     std::optional<Mesh> MakeMesh(const Capsule& capsule) noexcept
     {
-        if (!IsFiniteVec3(capsule.PointA) || !IsFiniteVec3(capsule.PointB) ||
-            !IsFiniteFloat(capsule.Radius) || capsule.Radius <= kEpsilon)
+        if (!Geometry::Validation::IsFinite(capsule.PointA) || !Geometry::Validation::IsFinite(capsule.PointB) ||
+            !Geometry::Validation::IsFinite(capsule.Radius) || capsule.Radius <= kEpsilon)
         {
             return std::nullopt;
         }
@@ -413,8 +404,8 @@ namespace Geometry::HalfedgeMesh
 
     std::optional<Mesh> MakeMesh(const Cylinder& cylinder) noexcept
     {
-        if (!IsFiniteVec3(cylinder.PointA) || !IsFiniteVec3(cylinder.PointB) ||
-            !IsFiniteFloat(cylinder.Radius) || cylinder.Radius <= kEpsilon)
+        if (!Geometry::Validation::IsFinite(cylinder.PointA) || !Geometry::Validation::IsFinite(cylinder.PointB) ||
+            !Geometry::Validation::IsFinite(cylinder.Radius) || cylinder.Radius <= kEpsilon)
         {
             return std::nullopt;
         }
@@ -460,7 +451,7 @@ namespace Geometry::HalfedgeMesh
 
     std::optional<Mesh> MakeMesh(const Ellipsoid& ellipsoid) noexcept
     {
-        if (!IsFiniteVec3(ellipsoid.Center) || !IsFiniteVec3(ellipsoid.Radii) || !IsFiniteQuat(ellipsoid.Rotation))
+        if (!Geometry::Validation::IsFinite(ellipsoid.Center) || !Geometry::Validation::IsFinite(ellipsoid.Radii) || !IsFiniteQuat(ellipsoid.Rotation))
         {
             return std::nullopt;
         }

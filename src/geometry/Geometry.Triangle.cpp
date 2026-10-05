@@ -12,6 +12,7 @@ module;
 
 module Geometry.Triangle;
 
+import Geometry.Validation;
 import Geometry.Segment;
 
 namespace Geometry
@@ -20,10 +21,7 @@ namespace Geometry
     {
         constexpr float kTriangleDegenerateEpsilon = 1.0e-7f;
 
-        [[nodiscard]] bool IsFinite(const glm::vec3& v)
-        {
-            return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
-        }
+        using Geometry::Validation::IsFinite;
 
         [[nodiscard]] bool IsFinite(const Triangle& triangle)
         {

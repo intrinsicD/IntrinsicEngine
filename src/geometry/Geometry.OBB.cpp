@@ -13,6 +13,7 @@ module;
 
 module Geometry.OBB;
 
+import Geometry.Validation;
 import Geometry.PCA;
 
 namespace Geometry
@@ -178,11 +179,6 @@ namespace Geometry
 
     OBB ToOOBB(std::span<const glm::vec3> points)
     {
-        const auto isFinite = [](const glm::vec3& point)
-        {
-            return std::isfinite(point.x) && std::isfinite(point.y) && std::isfinite(point.z);
-        };
-
         const PCAResult pca = ToPCA(points);
         if (!pca.Valid)
         {
@@ -204,7 +200,7 @@ namespace Geometry
         glm::vec3 maxLocal(-std::numeric_limits<float>::max());
         for (const glm::vec3& point : points)
         {
-            if (!isFinite(point))
+            if (!Geometry::Validation::IsFinite(point))
             {
                 continue;
             }

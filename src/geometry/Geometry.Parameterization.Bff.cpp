@@ -15,6 +15,7 @@ module;
 
 module Geometry.Parameterization.Bff;
 
+import Geometry.Validation;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Utils;
 import Geometry.Parameterization.Diagnostics;
@@ -43,18 +44,6 @@ namespace Geometry::Parameterization
             std::vector<double> BoundaryLengths{};
             double CharacteristicLength{0.0};
         };
-
-        [[nodiscard]] bool IsFinite(const glm::vec3 value) noexcept
-        {
-            return std::isfinite(value.x)
-                && std::isfinite(value.y)
-                && std::isfinite(value.z);
-        }
-
-        [[nodiscard]] bool IsFinite(const glm::vec2 value) noexcept
-        {
-            return std::isfinite(value.x) && std::isfinite(value.y);
-        }
 
         [[nodiscard]] double CornerAngle(
             const glm::dvec3 vertex,
@@ -91,7 +80,7 @@ namespace Geometry::Parameterization
             for (std::size_t vi = 0u; vi < mesh.VerticesSize(); ++vi)
             {
                 const VertexHandle vertex{static_cast<PropertyIndex>(vi)};
-                if (!mesh.IsDeleted(vertex) && !IsFinite(mesh.Position(vertex)))
+                if (!mesh.IsDeleted(vertex) && !Geometry::Validation::IsFinite(mesh.Position(vertex)))
                     return BffStatus::NonFiniteGeometry;
             }
             for (std::size_t fi = 0u; fi < mesh.FacesSize(); ++fi)
@@ -919,7 +908,7 @@ namespace Geometry::Parameterization
             const glm::vec2 uv(
                 static_cast<float>(x[vertex.Index]),
                 static_cast<float>(y[vertex.Index]));
-            if (!IsFinite(uv))
+            if (!Geometry::Validation::IsFinite(uv))
                 return fail(BffStatus::NonFiniteResult);
             result.UVs[vertex.Index] = uv;
         }

@@ -26,6 +26,7 @@ module;
 
 module Geometry.HalfedgeMesh.IO;
 
+import Geometry.Validation;
 import Geometry.Properties;
 import Extrinsic.Core.Error;
 
@@ -288,15 +289,7 @@ namespace Geometry::MeshIO
             return false;
         }
 
-        [[nodiscard]] bool IsFinite(const glm::vec2& value)
-        {
-            return std::isfinite(value.x) && std::isfinite(value.y);
-        }
-
-        [[nodiscard]] bool IsFinite(const glm::vec3& value)
-        {
-            return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
-        }
+        using Geometry::Validation::IsFinite;
 
         [[nodiscard]] bool IsFinite(const glm::vec4& value)
         {

@@ -17,6 +17,7 @@ module;
 
 module Geometry.GaussianMixture;
 
+import Geometry.Validation;
 import Geometry.KMeans;
 
 namespace Geometry::GaussianMixture
@@ -43,21 +44,7 @@ namespace Geometry::GaussianMixture
             std::vector<Cholesky3> Factors{};
         };
 
-        [[nodiscard]] bool IsFinite(
-            const glm::dvec3& value) noexcept
-        {
-            return std::isfinite(value.x) &&
-                   std::isfinite(value.y) &&
-                   std::isfinite(value.z);
-        }
-
-        [[nodiscard]] bool IsFinite(
-            const glm::vec3& value) noexcept
-        {
-            return std::isfinite(value.x) &&
-                   std::isfinite(value.y) &&
-                   std::isfinite(value.z);
-        }
+        using Geometry::Validation::IsFinite;
 
         [[nodiscard]] bool IsFinite(
             const glm::dmat3& matrix) noexcept

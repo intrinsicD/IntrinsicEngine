@@ -20,6 +20,7 @@ module;
 
 module Geometry.PointCloud.Normals;
 
+import Geometry.Validation;
 import Geometry.KDTree;
 import Geometry.Octree;
 import Geometry.PCA;
@@ -47,13 +48,6 @@ namespace Geometry::PointCloud::Normals
             std::vector<std::size_t> OriginalToCompact{};
         };
 
-        [[nodiscard]] bool IsFinite(const glm::vec3 value) noexcept
-        {
-            return std::isfinite(value.x)
-                && std::isfinite(value.y)
-                && std::isfinite(value.z);
-        }
-
         [[nodiscard]] double Epsilon(const Params& params) noexcept
         {
             return params.DegenerateNormalLengthEpsilon > 0.0
@@ -75,7 +69,7 @@ namespace Geometry::PointCloud::Normals
                                Diagnostics& diagnostics,
                                glm::vec3& out) noexcept
         {
-            if (IsFinite(params.FallbackNormal))
+            if (Geometry::Validation::IsFinite(params.FallbackNormal))
             {
                 const double lenSq = static_cast<double>(glm::dot(params.FallbackNormal, params.FallbackNormal));
                 const double epsilon = Epsilon(params);
@@ -100,7 +94,7 @@ namespace Geometry::PointCloud::Normals
                 return false;
             }
             normal *= static_cast<float>(1.0 / std::sqrt(lenSq));
-            return IsFinite(normal);
+            return Geometry::Validation::IsFinite(normal);
         }
 
         [[nodiscard]] bool IsCollinearNeighborhood(const PCAResult& pca,
@@ -150,7 +144,7 @@ namespace Geometry::PointCloud::Normals
                                                return index >= points.size()
                                                    || index == queryIndex
                                                    || IsDeletedPoint(deleted, index, params)
-                                                   || !IsFinite(points[index]);
+                                                   || !Geometry::Validation::IsFinite(points[index]);
                                            }),
                             neighbors.end());
 
@@ -190,7 +184,7 @@ namespace Geometry::PointCloud::Normals
                     ++result.Diagnostics.SkippedDeletedPointCount;
                     continue;
                 }
-                if (!IsFinite(points[index]))
+                if (!Geometry::Validation::IsFinite(points[index]))
                 {
                     ++result.Diagnostics.NonFinitePointCount;
                     continue;
@@ -232,7 +226,7 @@ namespace Geometry::PointCloud::Normals
                     ++result.Diagnostics.SkippedDeletedPointCount;
                     continue;
                 }
-                if (!IsFinite(points[index]))
+                if (!Geometry::Validation::IsFinite(points[index]))
                 {
                     ++result.Diagnostics.NonFinitePointCount;
                     continue;
@@ -471,7 +465,7 @@ namespace Geometry::PointCloud::Normals
                     continue;
                 }
 
-                if (!IsFinite(points[index]))
+                if (!Geometry::Validation::IsFinite(points[index]))
                 {
                     ++result.Diagnostics.FallbackPointCount;
                     ++result.Diagnostics.WrittenCount;

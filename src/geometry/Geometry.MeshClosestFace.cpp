@@ -12,6 +12,7 @@ module;
 
 module Geometry.MeshClosestFace;
 
+import Geometry.Validation;
 import Geometry.AABB;
 import Geometry.BVH;
 import Geometry.Triangle;
@@ -32,13 +33,6 @@ namespace Geometry
 
     namespace
     {
-        [[nodiscard]] bool IsFinite(const glm::vec3& p) noexcept
-        {
-            return std::isfinite(p.x) &&
-                   std::isfinite(p.y) &&
-                   std::isfinite(p.z);
-        }
-
         [[nodiscard]] float PointAabbSquaredDistance(const AABB& aabb, const glm::vec3& p)
         {
             const glm::vec3 cp = ClosestPoint(aabb, p);
@@ -48,7 +42,7 @@ namespace Geometry
 
         [[nodiscard]] bool IsUsableTriangle(const Triangle& tri) noexcept
         {
-            if (!IsFinite(tri.A) || !IsFinite(tri.B) || !IsFinite(tri.C))
+            if (!Geometry::Validation::IsFinite(tri.A) || !Geometry::Validation::IsFinite(tri.B) || !Geometry::Validation::IsFinite(tri.C))
                 return false;
 
             const glm::vec3 normal = glm::cross(tri.B - tri.A, tri.C - tri.A);
@@ -108,7 +102,7 @@ namespace Geometry
                 const float sd = static_cast<float>(SquaredDistance(tri, point));
                 const glm::vec3 closest = ClosestPoint(tri, point);
                 const glm::vec3 normal = tri.GetNormal();
-                if (!std::isfinite(sd) || !IsFinite(closest) || !IsFinite(normal))
+                if (!std::isfinite(sd) || !Geometry::Validation::IsFinite(closest) || !Geometry::Validation::IsFinite(normal))
                     continue;
 
                 MeshClosestFaceHit hit{
@@ -141,7 +135,7 @@ namespace Geometry
                 if (!v.IsValid() || !mesh.IsValid(v) || mesh.IsDeleted(v))
                     continue;
                 const glm::vec3 p = mesh.Position(v);
-                if (!IsFinite(p))
+                if (!Geometry::Validation::IsFinite(p))
                     continue;
                 corners.push_back(p);
             }
@@ -330,7 +324,7 @@ namespace Geometry
             result.Status = MeshClosestFaceStatus::UnbuiltIndex;
             return result;
         }
-        if (!IsFinite(point))
+        if (!Geometry::Validation::IsFinite(point))
         {
             result.Status = MeshClosestFaceStatus::InvalidQueryPoint;
             return result;
@@ -441,7 +435,7 @@ namespace Geometry
             result.Status = MeshClosestFaceStatus::UnbuiltIndex;
             return result;
         }
-        if (!IsFinite(point))
+        if (!Geometry::Validation::IsFinite(point))
         {
             result.Status = MeshClosestFaceStatus::InvalidQueryPoint;
             return result;
