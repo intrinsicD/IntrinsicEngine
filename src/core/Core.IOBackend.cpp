@@ -6,25 +6,12 @@ module;
 #include <fstream>
 #include <span>
 #include <string>
-#include <string_view>
 #include <vector>
 
 module Extrinsic.Core.IOBackend;
 
 namespace Extrinsic::Core::IO
 {
-    PathKey PathKey::FromPath(std::string_view path) noexcept
-    {
-        // FNV-1a 64-bit
-        uint64_t hash = 14695981039346656037ULL;
-        for (const char c : path)
-        {
-            hash ^= static_cast<uint8_t>(c);
-            hash *= 1099511628211ULL;
-        }
-        return PathKey{hash};
-    }
-
     Core::Expected<IOReadResult> FileIOBackend::Read(const IORequest& request)
     {
         namespace fs = std::filesystem;

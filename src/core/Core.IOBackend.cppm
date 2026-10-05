@@ -1,3 +1,5 @@
+// Backend-neutral byte I/O: IIOBackend plus the synchronous FileIOBackend used
+// for config, asset loading and scene persistence.
 module;
 
 #include <cstddef>
@@ -5,7 +7,6 @@ module;
 #include <expected>
 #include <span>
 #include <string>
-#include <string_view>
 #include <vector>
 
 export module Extrinsic.Core.IOBackend;
@@ -20,24 +21,10 @@ import Extrinsic.Core.Error;
 // Phase 2: container/pak format locators.
 //
 // IIOBackend is the extension point; FileIOBackend is the Phase 0 impl.
-// PathKey is a stable 64-bit FNV-1a hash of a logical path — distinct from
-// Extrinsic::Assets::AssetId, which is an engine asset identity.
 // -----------------------------------------------------------------------
 
 export namespace Extrinsic::Core::IO
 {
-    // Stable key derived from a logical path (FNV-1a 64-bit).
-    // Not the same as Extrinsic::Assets::AssetId — this is purely an IO-layer
-    // cache key; the asset pipeline assigns its own identity above this layer.
-    struct PathKey
-    {
-        uint64_t Value = 0;
-
-        [[nodiscard]] static PathKey FromPath(std::string_view path) noexcept;
-        [[nodiscard]] constexpr bool IsValid() const noexcept { return Value != 0; }
-        constexpr bool operator==(const PathKey&) const = default;
-    };
-
     struct IORequest
     {
         std::string Path;       // Logical path / container locator.
