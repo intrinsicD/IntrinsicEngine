@@ -26,7 +26,6 @@ target_sources(${target_name}
         Core.FrameClock.cppm
         Core.Geometry2D.cppm
         Core.Filesystem.PathResolver.cppm
-        Core.Filesystem.cppm
         Core.Base64.cppm
         Core.Hash.cppm
         Core.HandleLease.cppm
@@ -56,7 +55,6 @@ target_sources(${target_name}
         Core.Dag.Scheduler.cpp
         Core.Dag.TaskGraph.cpp
         Core.FrameGraph.cpp
-        Core.Filesystem.cpp
         Core.Filesystem.PathResolver.cpp
         Core.IOBackend.cpp
         Core.Logging.cpp

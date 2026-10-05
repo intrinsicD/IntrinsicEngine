@@ -874,7 +874,7 @@ TEST(AssetService, ReloadPublishesReloadedEvent)
 
 TEST(AssetService, ReloadTokenDirectlyInvokableViaRegistry)
 {
-    // Demonstrates the use case: a FileWatcher (or similar) could hold the
+    // Demonstrates the use case: an external reload trigger could hold the
     // token and eventually drive AssetService::Reload(id). This test
     // verifies only that the token is observably live in the registry -
     // direct Invoke must NOT be used to bypass the state machine, but the

@@ -10,7 +10,7 @@ Root scanned: `src`
 |---|---:|
 | `app` | 7 |
 | `assets` | 10 |
-| `core` | 39 |
+| `core` | 38 |
 | `ecs` | 26 |
 | `geometry` | 133 |
 | `graphics/assets` | 1 |
@@ -58,7 +58,6 @@ Root scanned: `src`
 | `Extrinsic.Core.Dag.TaskGraph` | `src/core/Core.Dag.TaskGraph.cppm` | `core` |
 | `Extrinsic.Core.Error` | `src/core/Core.Error.cppm` | `core` |
 | `Extrinsic.Core.Filesystem.PathResolver` | `src/core/Core.Filesystem.PathResolver.cppm` | `core` |
-| `Extrinsic.Core.Filesystem` | `src/core/Core.Filesystem.cppm` | `core` |
 | `Extrinsic.Core.FrameClock` | `src/core/Core.FrameClock.cppm` | `core` |
 | `Extrinsic.Core.FrameGraph` | `src/core/Core.FrameGraph.cppm` | `core` |
 | `Extrinsic.Core.Geometry2D` | `src/core/Core.Geometry2D.cppm` | `core` |
@@ -478,4 +477,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **451**
+Total modules: **450**

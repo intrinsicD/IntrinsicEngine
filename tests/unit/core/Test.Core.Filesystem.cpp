@@ -3,7 +3,6 @@
 #include <string>
 #include <optional>
 
-import Extrinsic.Core.Filesystem;
 import Extrinsic.Core.Filesystem.PathResolver;
 import Extrinsic.Core.Hash;
 import Extrinsic.Core.Error;
@@ -25,17 +24,6 @@ TEST(CoreFilesystemPathResolver, TryResolveShaderPathReturnsErrorWhenLookupMissi
     ASSERT_FALSE(r.has_value());
     EXPECT_EQ(r.error(), ErrorCode::ResourceNotFound);
 }
-
-TEST(CoreFilesystemWatcher, StatsCanBeResetAndRead)
-{
-    Filesystem::FileWatcher::ResetStatsForTests();
-    const auto stats = Filesystem::FileWatcher::GetStats();
-    EXPECT_EQ(stats.DeferredEventCount, 0u);
-    EXPECT_EQ(stats.DroppedEventCount, 0u);
-    EXPECT_EQ(stats.InlineDispatchCount, 0u);
-    EXPECT_EQ(stats.SchedulerDispatchCount, 0u);
-}
-
 
 TEST(CoreFilesystemPathResolver, ShaderPathFallbackReturnsRelativeWhenMissing)
 {

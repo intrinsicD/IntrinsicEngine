@@ -19,7 +19,6 @@ engine subsystems.
 - `Extrinsic.Core.Error`
 - `Extrinsic.Core.FrameClock`
 - `Extrinsic.Core.Filesystem.PathResolver`
-- `Extrinsic.Core.Filesystem`
 - `Extrinsic.Core.FrameGraph`
 - `Extrinsic.Core.Hash`
 - `Extrinsic.Core.HandleLease`
