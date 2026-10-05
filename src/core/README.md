@@ -142,8 +142,6 @@ build nor a reuse. The frozen, order-balanced comparison is documented in the
 
 - `Extrinsic.Core.Dag.Scheduler:Types`
 - `Extrinsic.Core.Dag.Scheduler:Hazards`
-- `Extrinsic.Core.Dag.Scheduler:Policy`
-- `Extrinsic.Core.Dag.Scheduler:Compiler`
 - `Extrinsic.Core.Dag.Scheduler:DomainGraph`
 
 The `:DomainGraph` partition spelling is retained for module compatibility,

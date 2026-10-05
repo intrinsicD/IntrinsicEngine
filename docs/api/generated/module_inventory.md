@@ -10,14 +10,14 @@ Root scanned: `src`
 |---|---:|
 | `app` | 7 |
 | `assets` | 11 |
-| `core` | 42 |
+| `core` | 40 |
 | `ecs` | 27 |
 | `geometry` | 133 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 81 |
 | `graphics/rhi` | 18 |
-| `graphics/vulkan` | 13 |
+| `graphics/vulkan` | 11 |
 | `physics` | 1 |
 | `platform` | 6 |
 | `runtime` | 112 |
@@ -52,10 +52,8 @@ Root scanned: `src`
 | `Extrinsic.Core.Config.Render` | `src/core/Core.Config.Render.cppm` | `core` |
 | `Extrinsic.Core.Config.Simulation` | `src/core/Core.Config.Simulation.cppm` | `core` |
 | `Extrinsic.Core.Config.Window` | `src/core/Core.Config.Window.cppm` | `core` |
-| `Extrinsic.Core.Dag.Scheduler:Compiler` | `src/core/Core.Dag.Scheduler.Compiler.cppm` | `core` |
 | `Extrinsic.Core.Dag.Scheduler:DomainGraph` | `src/core/Core.Dag.Scheduler.DomainGraph.cppm` | `core` |
 | `Extrinsic.Core.Dag.Scheduler:Hazards` | `src/core/Core.Dag.Scheduler.Hazards.cppm` | `core` |
-| `Extrinsic.Core.Dag.Scheduler:Policy` | `src/core/Core.Dag.Scheduler.Policy.cppm` | `core` |
 | `Extrinsic.Core.Dag.Scheduler:Types` | `src/core/Core.Dag.Scheduler.Types.cppm` | `core` |
 | `Extrinsic.Core.Dag.Scheduler` | `src/core/Core.Dag.Scheduler.cppm` | `core` |
 | `Extrinsic.Core.Dag.TaskGraph` | `src/core/Core.Dag.TaskGraph.cppm` | `core` |
@@ -360,8 +358,6 @@ Root scanned: `src`
 | `Extrinsic.Backends.Vulkan:Memory` | `src/graphics/vulkan/Backends.Vulkan.Memory.cppm` | `graphics/vulkan` |
 | `Extrinsic.Backends.Vulkan:OperationalStatus` | `src/graphics/vulkan/Backends.Vulkan.OperationalStatus.cppm` | `graphics/vulkan` |
 | `Extrinsic.Backends.Vulkan:Pipelines` | `src/graphics/vulkan/Backends.Vulkan.Pipelines.cppm` | `graphics/vulkan` |
-| `Extrinsic.Backends.Vulkan:Queues` | `src/graphics/vulkan/Backends.Vulkan.Queues.cppm` | `graphics/vulkan` |
-| `Extrinsic.Backends.Vulkan:Surface` | `src/graphics/vulkan/Backends.Vulkan.Surface.cppm` | `graphics/vulkan` |
 | `Extrinsic.Backends.Vulkan:Swapchain` | `src/graphics/vulkan/Backends.Vulkan.Swapchain.cppm` | `graphics/vulkan` |
 | `Extrinsic.Backends.Vulkan:Sync` | `src/graphics/vulkan/Backends.Vulkan.Sync.cppm` | `graphics/vulkan` |
 | `Extrinsic.Backends.Vulkan:Transfer` | `src/graphics/vulkan/Backends.Vulkan.Transfer.cppm` | `graphics/vulkan` |
@@ -486,4 +482,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **459**
+Total modules: **455**

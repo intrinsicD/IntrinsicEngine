@@ -2042,7 +2042,6 @@ TEST(RuntimeEngineLayering, RenderGraphStaysOutOfECSAndCoreStaysOutOfGpuBarriers
     const std::vector<std::filesystem::path> coreGraphFiles{
         "src/core/Core.Dag.Scheduler.cppm",
         "src/core/Core.Dag.Scheduler.Types.cppm",
-        "src/core/Core.Dag.Scheduler.Compiler.cppm",
         "src/core/Core.Dag.Scheduler.Hazards.cppm",
         "src/core/Core.Dag.TaskGraph.cppm",
         "src/core/Core.Dag.TaskGraph.cpp",

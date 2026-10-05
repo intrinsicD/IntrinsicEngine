@@ -12,8 +12,6 @@ target_sources(${target_name}
         Backends.Vulkan.Memory.cppm
         Backends.Vulkan.OperationalStatus.cppm
         Backends.Vulkan.Pipelines.cppm
-        Backends.Vulkan.Queues.cppm
-        Backends.Vulkan.Surface.cppm
         Backends.Vulkan.Swapchain.cppm
         Backends.Vulkan.Sync.cppm
         Backends.Vulkan.Transfer.cppm

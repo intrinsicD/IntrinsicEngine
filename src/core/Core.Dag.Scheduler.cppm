@@ -1,3 +1,5 @@
+// DAG scheduler interface: producers report pending tasks each epoch and the
+// scheduler builds one deterministic, hazard-ordered plan from them.
 module;
 
 #include <string_view>
@@ -10,8 +12,6 @@ import Extrinsic.Core.Error;
 
 export import :Types;
 export import :Hazards;
-export import :Policy;
-export import :Compiler;
 export import :DomainGraph;
 
 export namespace Extrinsic::Core::Dag

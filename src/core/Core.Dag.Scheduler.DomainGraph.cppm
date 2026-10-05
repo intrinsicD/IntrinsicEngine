@@ -1,3 +1,5 @@
+// TaskPlanGraph: the per-domain task graph interface the scheduler uses to
+// collect submitted tasks and build their execution plan.
 module;
 
 #include <vector>
@@ -7,7 +9,6 @@ export module Extrinsic.Core.Dag.Scheduler:DomainGraph;
 
 import Extrinsic.Core.Error;
 import :Types;
-import :Compiler;
 
 export namespace Extrinsic::Core::Dag
 {

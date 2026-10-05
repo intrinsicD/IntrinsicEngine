@@ -1,3 +1,5 @@
+// :Device partition: VulkanDevice, the RHI::IDevice implementation that owns
+// the Vulkan instance, device, queues and all backend subsystems.
 module;
 
 #include <array>
@@ -34,8 +36,6 @@ export import :Diagnostics;
 export import :Memory;
 export import :OperationalStatus;
 export import :Pipelines;
-export import :Queues;
-export import :Surface;
 export import :Swapchain;
 export import :Sync;
 export import :Transfer;
