@@ -65,6 +65,7 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `RUNTIME-284`: `UI-064` — History window (tasks/backlog/ui/UI-064-history-window.md)
 - blocked by `RUNTIME-286`: `UI-066` — Mesh Health window (tasks/backlog/ui/UI-066-mesh-health-window.md)
 - unblocked: `UI-077` — Readiness field markers in every config panel (tasks/backlog/ui/UI-077-readiness-field-markers-in-all-panels.md)
+- unblocked: `UI-078` — Edit entity transforms with an ImGuizmo gizmo (tasks/backlog/ui/UI-078-imguizmo-transform-editing.md)
 
 ## Theme G — Active bugs
 

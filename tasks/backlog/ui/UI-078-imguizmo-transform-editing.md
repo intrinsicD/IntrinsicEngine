@@ -1,0 +1,106 @@
+---
+id: UI-078
+theme: F
+depends_on: []
+template: micro
+workflow_schema: 1
+workflow_profile: micro
+evidence: not_applicable
+evidence_skip_reason: interactive feature work; evidence is the diff, CPU contract tests, the ImGui integration suite, a Vulkan acceptance smoke, review and CI.
+contract_schema: 1
+contracts: [repo.source-documentation, repo.task-contract-discovery]
+contract_review: Reviewed the catalog. The change alters module surfaces and READMEs (source documentation) and the reusable runtime/UI gizmo interaction contract (task contract discovery). Engine/kernel/editor-frame locality contracts do not apply because those surfaces and dependencies are not extended; no method or geometry-property contract applies to entity TRS.
+---
+# UI-078 — Edit entity transforms with an ImGuizmo gizmo
+
+## Goal
+- Edit the transform of selected entities interactively with ImGuizmo
+  (translate, rotate, scale). Origin: REVIEW-007 T21 — the operator kept the
+  requested-but-unlinked `imguizmo` dependency for this feature (2026-10-06).
+- The gizmo is enabled only through the UI. While it is active, dragging it
+  previews the transform; releasing records one undoable command.
+- With several selected entities, all of them transform together around their
+  common pivot during the interaction.
+
+## Acceptance criteria
+- [ ] Gizmo is off by default and can only be switched on from the editor UI
+      (menu/toolbar); translate/rotate/scale modes are selectable there.
+- [ ] Multi-selection rotates/scales/translates around one pivot frozen at drag
+      start; positions move around the pivot, not only per-entity rotation/scale.
+- [ ] Parent and child both selected: the child is written through its parent
+      only (moves once); unselected children follow their parent.
+- [ ] One drag produces exactly one undo entry; no entry for a no-op or cancel;
+      results that cannot be stored as TRS are rejected without partial writes.
+- [ ] While the gizmo is hovered or dragged, camera and selection input are
+      blocked; hiding the UI, focus loss or a world/document change cancels the drag.
+- [ ] ImGuizmo types stay private to `src/app/Sandbox`; runtime owns preview,
+      multi-selection math and the undo transaction; layering stays strict.
+- [ ] CPU contract tests cover pivot math, hierarchy rule, rejection and undo;
+      the Sandbox integration suite covers UI activation and drag; a Vulkan
+      acceptance smoke shows a visible group move and its undo.
+- [ ] READMEs, ADR 0006 and affected architecture docs describe the new frontend.
+
+## Verification
+```bash
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests IntrinsicGraphicsContractCpuTests
+ctest --test-dir build/ci --output-on-failure --timeout 60 --no-tests=error -R '^(GizmoInteraction|GizmoInteractionEngineWiring|SceneInteractionModule|EditorCommandHistory|EditorUiHost|EditorUiModule|ImGuiAdapterEngineWiring|RuntimeEngineLayering|RuntimeEnginePrivateGlue|SelectionSnapshotExtraction|SandboxEditorPresentation|SandboxEditorGizmo|RenderWorldContract)\.'
+cmake --build --preset ci-vulkan --target IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests
+ctest --test-dir build/ci-vulkan --output-on-failure --timeout 120 --no-tests=error -L gpu -L vulkan -R '^RuntimeSandboxAcceptanceGpuSmoke\.(ImGuizmo.*|InspectorTransformEditShiftsReferenceTrianglePixels)$'
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root . --strict
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md --check
+python3 tools/agents/generate_session_brief.py --check
+```
+
+## Context
+Codex plan (2026-10-06, read-only on `3a47bde17`), condensed:
+
+- **Split.** ImGuizmo replaces the current hit-test, mouse-drag and draw
+  frontend. `Runtime.GizmoInteraction` stays the owner of preview, group math
+  and the undo transaction (reuse `DragCommit`/`DragCancel` and
+  `ExecuteUndoableEntityMutation(...TargetAlreadyApplied)`). The ray/pick API,
+  `m_AxisLock` and `TransformGizmoRenderPacketBuilder` go only where ImGuizmo
+  replaces them; the general graphics packet contracts stay.
+- **Existing defects to fix on the way.** `ComputePivot()` averages local
+  positions although it documents world positions; rotation/scale do not move
+  entity origins around the group pivot.
+- **Math.** Freeze selection, pivot, mode and basis at drag start. With start
+  gizmo matrix G0, current Gt and each start world matrix Wi0:
+  D = Gt·G0⁻¹, Wi' = D·Wi0; convert back with the existing TRS helper
+  (`ECS.Component.Transform.Local.cpp`), which silently drops shear — validate
+  and reject instead. Use current authoring world matrices, not a stale cache.
+- **Wiring.** `vcpkg.json`/`cmake/Dependencies.cmake`: move `imguizmo` out of
+  the windowing feature, link `imguizmo::imguizmo imgui_core_lib`; link
+  `imguizmo_lib` PRIVATE to `ExtrinsicSandboxEditor`. `SceneInteractionModule`
+  exposes a small runtime-typed model (copied matrices, pivot, availability,
+  session identity) plus begin/preview/commit/cancel; remove the automatic
+  platform mouse drag. `EditorUiHost` gets a per-frame viewport input request
+  merged after `CaptureSnapshot()` in `EditorUiModule` so existing camera/pick
+  gates also block during gizmo use. The shell calls ImGuizmo inside the scene
+  rectangle with a copied, unjittered view/projection.
+- **Keep.** Module names, ECS TRS storage, scene format, inspector transform
+  commands, generic `EditorCommandHistory`, camera controllers, picking,
+  layering allowlist.
+- **Snap/orientation.** Keep current snaps (0.25, 15°, 0.1) and the current
+  rule: single entity local or global, group global. No keyboard activation;
+  Escape cancels.
+- **Tests to change/add.** `Test.GizmoInteraction.cpp` (matrix drag cases),
+  `Test.GizmoInteractionEngineWiring.cpp`, `Test.SceneInteractionModule.cpp`,
+  `Test.EditorUiHost.cpp`, `Test.ImGuiAdapterEngineWiring.cpp`,
+  `Test.RuntimeEngineLayering.cpp`, `Test.RuntimeEnginePrivateGlue.cpp`, new
+  `SandboxEditorGizmo` suite in `Test.SandboxEditorPresentation.cpp`, and a
+  new `ImGuizmo*` case in `Test.RuntimeSandboxAcceptanceGpuSmoke.cpp`.
+- **Overlaps (do not absorb).** UI-037 (transform helper), RUNTIME-284/UI-064
+  (history), UI-047/UI-048 (shell), GEOM-115 (module names), RUNTIME-305 and
+  GRAPHICS-153 (other transform-preview users), RUNTIME-282, UI-076,
+  REVIEW-004. REVIEW-007 R16 (unused gizmo accessors) is affected.
+
+## Open operator questions
+1. Pivot: mean of selected entities' world origins (recommended), mean of their
+   world-bounds centers, or the center of their combined bounds?
+2. Results not representable as TRS (shear under non-uniform parent scale):
+   reject with a reason (recommended)?
+3. W/E/R mode shortcuts while the gizmo is active, and configurable snap steps,
+   or keep the minimal scope?
