@@ -82,21 +82,6 @@ namespace Extrinsic::Runtime
 
     }
 
-    const char* DebugNameForGraphPackStatus(GraphPackStatus status) noexcept
-    {
-        switch (status)
-        {
-            case GraphPackStatus::Success:             return "Graph.Success";
-            case GraphPackStatus::WrongDomain:         return "Graph.WrongDomain";
-            case GraphPackStatus::NoRenderLane:        return "Graph.NoRenderLane";
-            case GraphPackStatus::MissingNodes:        return "Graph.MissingNodes";
-            case GraphPackStatus::EmptyGraph:          return "Graph.EmptyGraph";
-            case GraphPackStatus::MissingEdgeTopology: return "Graph.MissingEdgeTopology";
-            case GraphPackStatus::InvalidEdge:         return "Graph.InvalidEdge";
-            case GraphPackStatus::NonFinitePosition:   return "Graph.NonFinitePosition";
-        }
-        return "Graph.Unknown";
-    }
 
     void GraphPackBuffer::Clear() noexcept
     {

@@ -40,8 +40,6 @@ export namespace Extrinsic::Runtime
         UnsupportedOperation,
     };
 
-    [[nodiscard]] const char* DebugNameForEditorCommandHistoryStatus(
-        EditorCommandHistoryStatus status) noexcept;
 
     struct EditorCommandHistoryResult
     {

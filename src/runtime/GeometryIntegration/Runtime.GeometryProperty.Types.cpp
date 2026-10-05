@@ -57,13 +57,6 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
-    const char* DebugNameForGeometryPropertyValueKindFilter(
-        const GeometryPropertyValueKindFilter filter) noexcept
-    {
-        return filter.has_value()
-                   ? DebugNameForGeometryPropertyValueKind(*filter)
-                   : "Any";
-    }
 
     bool IsTopologyProperty(const GeometryElementDomain domain, const std::string_view name) noexcept
     {

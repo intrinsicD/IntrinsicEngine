@@ -50,33 +50,6 @@ namespace Extrinsic::Runtime
         }
     } // namespace
 
-    const char* DebugNameForVertexChannel(const VertexChannel channel) noexcept
-    {
-        switch (channel)
-        {
-        case VertexChannel::Position: return "Position";
-        case VertexChannel::Normal:   return "Normal";
-        case VertexChannel::Texcoord: return "Texcoord";
-        case VertexChannel::Color:    return "Color";
-        case VertexChannel::Tangent:  return "Tangent";
-        case VertexChannel::Custom:   return "Custom";
-        }
-        return "Unknown";
-    }
-
-    const char* DebugNameForAttributeBindStatus(const AttributeBindStatus status) noexcept
-    {
-        switch (status)
-        {
-        case AttributeBindStatus::Bound:           return "Bound";
-        case AttributeBindStatus::EmptyBinding:    return "EmptyBinding";
-        case AttributeBindStatus::PropertyMissing: return "PropertyMissing";
-        case AttributeBindStatus::TypeMismatch:    return "TypeMismatch";
-        case AttributeBindStatus::CountMismatch:   return "CountMismatch";
-        }
-        return "Unknown";
-    }
-
     AttributeBindResult ResolveVec3Channel(
         const Geometry::PropertySet& properties,
         const VertexAttributeBinding& binding,

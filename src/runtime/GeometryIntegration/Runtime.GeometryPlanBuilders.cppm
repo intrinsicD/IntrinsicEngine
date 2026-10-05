@@ -125,8 +125,6 @@ export namespace Extrinsic::Runtime
         DegenerateAllFaces,
     };
 
-    [[nodiscard]] const char* DebugNameForMeshPackStatus(
-        MeshPackStatus status) noexcept;
 
     struct MeshPlanBuildResult
     {
@@ -175,8 +173,6 @@ export namespace Extrinsic::Runtime
         NonFinitePosition,
     };
 
-    [[nodiscard]] const char* DebugNameForGraphPackStatus(
-        GraphPackStatus status) noexcept;
 
     struct GraphPlanBuildResult
     {
@@ -225,8 +221,6 @@ export namespace Extrinsic::Runtime
         NonFinitePosition,
     };
 
-    [[nodiscard]] const char* DebugNameForPointCloudPackStatus(
-        PointCloudPackStatus status) noexcept;
 
     struct PointCloudPlanBuildResult
     {
@@ -274,8 +268,6 @@ export namespace Extrinsic::Runtime
         NonFinitePosition,
     };
 
-    [[nodiscard]] const char* DebugNameForMeshPrimitiveViewStatus(
-        MeshPrimitiveViewStatus status) noexcept;
 
     struct MeshPrimitiveViewPlanBuildResult
     {

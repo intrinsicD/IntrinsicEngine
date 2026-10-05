@@ -79,46 +79,6 @@ namespace Extrinsic::Runtime
 
     }
 
-    const char* DebugNameForEditorCommandHistoryStatus(
-        const EditorCommandHistoryStatus status) noexcept
-    {
-        switch (status)
-        {
-        case EditorCommandHistoryStatus::Applied:
-            return "Applied";
-        case EditorCommandHistoryStatus::Recorded:
-            return "Recorded";
-        case EditorCommandHistoryStatus::Undone:
-            return "Undone";
-        case EditorCommandHistoryStatus::Redone:
-            return "Redone";
-        case EditorCommandHistoryStatus::NoChange:
-            return "NoChange";
-        case EditorCommandHistoryStatus::EmptyUndoStack:
-            return "EmptyUndoStack";
-        case EditorCommandHistoryStatus::EmptyRedoStack:
-            return "EmptyRedoStack";
-        case EditorCommandHistoryStatus::InvalidCommand:
-            return "InvalidCommand";
-        case EditorCommandHistoryStatus::CommandFailed:
-            return "CommandFailed";
-        case EditorCommandHistoryStatus::UndoFailed:
-            return "UndoFailed";
-        case EditorCommandHistoryStatus::RedoFailed:
-            return "RedoFailed";
-        case EditorCommandHistoryStatus::StaleEntity:
-            return "StaleEntity";
-        case EditorCommandHistoryStatus::MissingScene:
-            return "MissingScene";
-        case EditorCommandHistoryStatus::MissingSelectionController:
-            return "MissingSelectionController";
-        case EditorCommandHistoryStatus::MissingTransform:
-            return "MissingTransform";
-        case EditorCommandHistoryStatus::UnsupportedOperation:
-            return "UnsupportedOperation";
-        }
-        return "Unknown";
-    }
 
     bool EditorCommandHistoryResult::Succeeded() const noexcept
     {

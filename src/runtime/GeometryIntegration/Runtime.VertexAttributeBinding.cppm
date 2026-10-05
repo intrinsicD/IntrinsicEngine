@@ -1,3 +1,5 @@
+// Resolves geometry properties into vertex-channel buffers for runtime upload
+// preparation.
 module;
 
 #include <cstdint>
@@ -50,8 +52,6 @@ export namespace Extrinsic::Runtime
         CountMismatch,    // property present and typed, but element count != vertexCount.
     };
 
-    [[nodiscard]] const char* DebugNameForVertexChannel(VertexChannel channel) noexcept;
-    [[nodiscard]] const char* DebugNameForAttributeBindStatus(AttributeBindStatus status) noexcept;
 
     // Declarative request: bind `SourceProperty` to `Channel`, with explicit
     // policy for what happens when the property cannot be resolved or an

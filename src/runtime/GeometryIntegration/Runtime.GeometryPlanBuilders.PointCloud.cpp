@@ -41,18 +41,6 @@ namespace Extrinsic::Runtime
 
     }
 
-    const char* DebugNameForPointCloudPackStatus(PointCloudPackStatus status) noexcept
-    {
-        switch (status)
-        {
-            case PointCloudPackStatus::Success:           return "PointCloud.Success";
-            case PointCloudPackStatus::WrongDomain:       return "PointCloud.WrongDomain";
-            case PointCloudPackStatus::MissingPositions:  return "PointCloud.MissingPositions";
-            case PointCloudPackStatus::EmptyCloud:        return "PointCloud.EmptyCloud";
-            case PointCloudPackStatus::NonFinitePosition: return "PointCloud.NonFinitePosition";
-        }
-        return "PointCloud.Unknown";
-    }
 
     void PointCloudPackBuffer::Clear() noexcept
     {

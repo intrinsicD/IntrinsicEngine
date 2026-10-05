@@ -99,24 +99,6 @@ namespace Extrinsic::Runtime
         return sources;
     }
 
-    const char* DebugNameForMeshPackStatus(MeshPackStatus status) noexcept
-    {
-        switch (status)
-        {
-            case MeshPackStatus::Success:                 return "Mesh.Success";
-            case MeshPackStatus::WrongDomain:             return "Mesh.WrongDomain";
-            case MeshPackStatus::MissingPositions:        return "Mesh.MissingPositions";
-            case MeshPackStatus::MissingHalfedgeTopology: return "Mesh.MissingHalfedgeTopology";
-            case MeshPackStatus::MissingFaceTopology:     return "Mesh.MissingFaceTopology";
-            case MeshPackStatus::EmptyMesh:               return "Mesh.EmptyMesh";
-            case MeshPackStatus::InvalidTopology:         return "Mesh.InvalidTopology";
-            case MeshPackStatus::NonFinitePosition:       return "Mesh.NonFinitePosition";
-            case MeshPackStatus::MissingTexcoords:        return "Mesh.MissingTexcoords";
-            case MeshPackStatus::NonFiniteTexcoord:       return "Mesh.NonFiniteTexcoord";
-            case MeshPackStatus::DegenerateAllFaces:      return "Mesh.DegenerateAllFaces";
-        }
-        return "Mesh.Unknown";
-    }
 
     void MeshPackBuffer::Clear() noexcept
     {

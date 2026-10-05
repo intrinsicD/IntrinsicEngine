@@ -45,8 +45,6 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] const char* DebugNameForGeometryPropertyValueKind(
         Geometry::PropertyValueKind kind) noexcept;
-    [[nodiscard]] const char* DebugNameForGeometryPropertyValueKindFilter(
-        GeometryPropertyValueKindFilter filter) noexcept;
     [[nodiscard]] bool IsTopologyProperty(GeometryElementDomain domain, std::string_view name) noexcept;
 
     // Canonical vertex storage belongs to topology/geometry authoring, not field outputs.

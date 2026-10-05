@@ -183,12 +183,6 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] const char*
     DebugNameForEditorRenderRecipeDraftState(EditorRenderRecipeDraftState state) noexcept;
 
-    [[nodiscard]] const char*
-    DebugNameForEditorRenderRecipeCommandKind(EditorRenderRecipeCommandKind kind) noexcept;
-
-    [[nodiscard]] const char*
-    DebugNameForEditorRenderRecipeCommandStatus(EditorRenderRecipeCommandStatus status) noexcept;
-
     struct EditorRenderRecipeSlotModel
     {
         std::string StableName{};

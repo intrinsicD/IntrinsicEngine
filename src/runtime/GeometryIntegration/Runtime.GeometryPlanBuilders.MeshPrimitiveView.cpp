@@ -319,20 +319,6 @@ namespace Extrinsic::Runtime
         }
     }
 
-    const char* DebugNameForMeshPrimitiveViewStatus(MeshPrimitiveViewStatus status) noexcept
-    {
-        switch (status)
-        {
-            case MeshPrimitiveViewStatus::Success:             return "MeshPrimitiveView.Success";
-            case MeshPrimitiveViewStatus::WrongDomain:         return "MeshPrimitiveView.WrongDomain";
-            case MeshPrimitiveViewStatus::MissingPositions:    return "MeshPrimitiveView.MissingPositions";
-            case MeshPrimitiveViewStatus::EmptyMesh:           return "MeshPrimitiveView.EmptyMesh";
-            case MeshPrimitiveViewStatus::MissingEdgeTopology: return "MeshPrimitiveView.MissingEdgeTopology";
-            case MeshPrimitiveViewStatus::InvalidEdge:         return "MeshPrimitiveView.InvalidEdge";
-            case MeshPrimitiveViewStatus::NonFinitePosition:   return "MeshPrimitiveView.NonFinitePosition";
-        }
-        return "MeshPrimitiveView.Unknown";
-    }
 
     void MeshPrimitiveViewBuffer::Clear() noexcept
     {
