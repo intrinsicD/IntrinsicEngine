@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Guardrail: large sandbox-editor diffs must be accompanied by runtime UI contract tests.
 # Usage:
-#   tools/check_ui_contract_guard.sh [base_ref] [threshold]
+#   tools/repo/check_ui_contract_guard.sh [base_ref] [threshold]
 # Defaults:
 #   base_ref=origin/main (falls back to merge-base/main/master/root commit)
 #   threshold=120 (added+deleted lines across guarded files)

@@ -84,7 +84,3 @@ the method adapter already consumes.
 - `kernel_convergence_policy.json`: versioned exact snapshot, substrate
   classification, and temporary-debt ownership consumed by
   `check_kernel_convergence.py`. `RUNTIME-178` owns the recorded debt.
-
-## Compatibility entrypoints
-
-- `tools/check_ui_contract_guard.sh` (root-level) is a surviving compatibility wrapper that delegates to the canonical `tools/repo/check_ui_contract_guard.sh`. The root-path move wrappers from the reorganization (RORG-071/RORG-112) are otherwise removed; this one entrypoint remains for historical callers.
