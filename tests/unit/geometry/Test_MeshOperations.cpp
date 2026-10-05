@@ -12,7 +12,6 @@ import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
 import Geometry.Graph;
 import Geometry.Simplification;
-import Geometry.Subdivision;
 import Geometry.CatmullClark;
 import Geometry.ImplicitPlaneField;
 import Geometry.MeshSoup;
@@ -21,100 +20,6 @@ import Geometry.HalfedgeMesh.Quality;
 import Geometry.Quadric;
 
 #include "Test_MeshBuilders.h"
-
-namespace
-{
-    Geometry::HalfedgeMesh::Mesh MakeDenseClosedTriangleMesh(std::size_t iterations = 3)
-    {
-        auto coarse = MakeIcosahedron();
-        Geometry::HalfedgeMesh::Mesh refined;
-
-        Geometry::Subdivision::SubdivisionParams params;
-        params.Iterations = iterations;
-
-        auto result = Geometry::Subdivision::Subdivide(coarse, refined, params);
-        EXPECT_TRUE(result.has_value());
-        return refined;
-    }
-
-    void ExtractTriangleSoup(
-        Geometry::HalfedgeMesh::Mesh& mesh,
-        std::vector<glm::vec3>& positions,
-        std::vector<uint32_t>& indices)
-    {
-        mesh.GarbageCollection();
-
-        positions.clear();
-        indices.clear();
-        positions.reserve(mesh.VertexCount());
-        indices.reserve(mesh.FaceCount() * 3);
-
-        std::vector<uint32_t> vMap(mesh.VerticesSize(), 0u);
-        uint32_t currentIdx = 0;
-        for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
-        {
-            Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
-            ASSERT_FALSE(mesh.IsDeleted(v));
-            vMap[i] = currentIdx++;
-            positions.push_back(mesh.Position(v));
-        }
-
-        for (std::size_t i = 0; i < mesh.FacesSize(); ++i)
-        {
-            Geometry::FaceHandle f{static_cast<Geometry::PropertyIndex>(i)};
-            ASSERT_FALSE(mesh.IsDeleted(f));
-
-            const auto h0 = mesh.Halfedge(f);
-            const auto h1 = mesh.NextHalfedge(h0);
-            const auto h2 = mesh.NextHalfedge(h1);
-            const auto v0 = mesh.ToVertex(h0);
-            const auto v1 = mesh.ToVertex(h1);
-            const auto v2 = mesh.ToVertex(h2);
-
-            ASSERT_TRUE(mesh.IsValid(v0));
-            ASSERT_TRUE(mesh.IsValid(v1));
-            ASSERT_TRUE(mesh.IsValid(v2));
-            ASSERT_LT(v0.Index, vMap.size());
-            ASSERT_LT(v1.Index, vMap.size());
-            ASSERT_LT(v2.Index, vMap.size());
-
-            indices.push_back(vMap[v0.Index]);
-            indices.push_back(vMap[v1.Index]);
-            indices.push_back(vMap[v2.Index]);
-        }
-    }
-
-    Geometry::HalfedgeMesh::Mesh RebuildMeshFromTriangleSoup(
-        const std::vector<glm::vec3>& positions,
-        const std::vector<uint32_t>& indices)
-    {
-        Geometry::HalfedgeMesh::Mesh mesh;
-        std::vector<Geometry::VertexHandle> verts;
-        verts.reserve(positions.size());
-        for (const auto& p : positions)
-        {
-            verts.push_back(mesh.AddVertex(p));
-        }
-
-        bool buildOk = true;
-        for (std::size_t i = 0; i + 2 < indices.size(); i += 3)
-        {
-            const auto maybeFace = mesh.AddTriangle(verts[indices[i]], verts[indices[i + 1]], verts[indices[i + 2]]);
-            if (!maybeFace.has_value())
-            {
-                ADD_FAILURE() << "Failed to rebuild triangle " << (i / 3)
-                              << " from indices (" << indices[i] << ", "
-                              << indices[i + 1] << ", "
-                              << indices[i + 2] << ")";
-                buildOk = false;
-                break;
-            }
-        }
-        EXPECT_TRUE(buildOk);
-        return mesh;
-    }
-}
-
 
 // =============================================================================
 // Quadric tests

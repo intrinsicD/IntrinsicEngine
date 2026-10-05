@@ -39,7 +39,8 @@ snapshot, command callbacks, drain loop and scheduler lifecycle compile once in
 
 ## Compiled geometry fixtures
 
-`geometry/Test_MeshBuilders.h` declares shared mesh fixtures; their bodies compile
+`geometry/Test_MeshBuilders.h` declares shared mesh fixtures and the
+triangle-soup extract/rebuild helpers; their bodies compile
 in `geometry/MeshBuilders.cpp`. `GeometryMeshBuilderTestSupportObjs` links into
 `IntrinsicGeometryTests`, `IntrinsicGeometryProcessStateTests` and
 `IntrinsicGeometrySlowTests`. Consumers import `Geometry.HalfedgeMesh` before

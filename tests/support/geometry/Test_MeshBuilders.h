@@ -3,6 +3,8 @@
 #pragma once
 
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <vector>
 #include <glm/glm.hpp>
 
@@ -56,3 +58,16 @@ Geometry::HalfedgeMesh::Mesh MakeDiskAndClosedComponent();
 
 // Two triangles sharing only their central vertex.
 Geometry::HalfedgeMesh::Mesh MakeBowtieTriangles();
+
+// Icosahedron after `iterations` subdivision steps (closed, dense triangle mesh).
+Geometry::HalfedgeMesh::Mesh MakeDenseClosedTriangleMesh(std::size_t iterations = 3);
+
+// Garbage-collects `mesh`, then fills positions/indices with its live vertices
+// and triangle faces (outputs are cleared first; faces must be triangles).
+void ExtractTriangleSoup(Geometry::HalfedgeMesh::Mesh& mesh,
+                         std::vector<glm::vec3>& positions,
+                         std::vector<uint32_t>& indices);
+
+// Builds a mesh from a triangle soup; indices must reference valid positions.
+Geometry::HalfedgeMesh::Mesh RebuildMeshFromTriangleSoup(const std::vector<glm::vec3>& positions,
+                                                         const std::vector<uint32_t>& indices);
