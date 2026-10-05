@@ -717,11 +717,10 @@ TEST(RuntimeSceneSerialization, LegacyPropertyRefKeysFailClosed)
              ref.erase("valueKind");
              ref["expectedValueKind"] = "Any";
          }},
-        {"legacy keys beside canonical keys", [](nlohmann::json& ref)
-         {
-             ref["propertyName"] = ref["name"];
-             ref["expectedValueKind"] = "ScalarFloat";
-         }},
+        {"propertyName beside canonical keys", [](nlohmann::json& ref)
+         { ref["propertyName"] = ref["name"]; }},
+        {"expectedValueKind beside canonical keys", [](nlohmann::json& ref)
+         { ref["expectedValueKind"] = "ScalarFloat"; }},
     };
     for (const auto& [label, mutate] : cases)
     {
