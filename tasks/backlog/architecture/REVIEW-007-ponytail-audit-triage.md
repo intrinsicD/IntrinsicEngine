@@ -256,7 +256,7 @@ als solche dokumentiert.
 
 Eine Etappe pro Sitzung genügt; die Reihenfolge kann der Operator ändern.
 
-- [ ] E0 — Codex-Audit-Gruppen ohne Gegenstück (PK03–PK12)
+- [x] E0 — Codex-Audit-Gruppen ohne Gegenstück (PK03–PK12), 2026-10-05
 - [ ] E1 — Querschnittsduplikate (X01–X04)
 - [ ] E2 — Tools, CI, Abhängigkeiten (T01–T23)
 - [ ] E3 — Core, ECS, Assets (C01–C17)
@@ -434,15 +434,15 @@ nächsten Abschnitt.
 ### PK — Codex-Audit-Gruppen ohne Gegenstück im Claude-Audit
 | ID | Fund | Tag | Schätz. | Claude | Codex | Operator |
 |----|---------|-----|------|--------|-------|----------|
-| PK03 | Legacy `CullingSystem` registration API (`Register`, `Unregister`, `UpdateBounds`, `SetDrawTemplate`, `CullingHandle`, `CullSlot`, dead getters) and, as a separate question, the empty `SyncGpuBuffer()` still called from `RenderPrepPipeline.cpp:133` | delete | small | bestätigt (Fable): Legacy-API + Getter → Task; leere Methode entfernen, Schritt CullingSync behalten (Vertrag; Schritt-Entfernung vertagen bis GRAPHICS-135) | bestätigt: Legacy-API/Getter ohne Verbraucher; Sync leer. Der beobachtbare `CullingSync`-Schritt ist separat: CullingSystem.cpp:440, RenderPrepPipeline.cpp:130. | — |
-| PK04 | Duplicate `MakeDenseClosedTriangleMesh` / `ExtractTriangleSoup` in `Test.MeshOperationsSlow.cpp` vs `Test_MeshOperations.cpp` → `tests/support/geometry/Test_MeshBuilders.h` | reuse | -85 | bestätigt: 93 identische Zeilen → Task (≈−85) | bestätigt: Alle drei Helfer einschließlich Wiederaufbau identisch; beide Testziele nutzen bereits Mesh-Support. Test.MeshOperationsSlow.cpp:25, Test_MeshOperations.cpp:27. | — |
-| PK05 | Unused types `CompiledGraph`, `ReadyNodePolicy`, `VulkanQueueFamilies`/`VulkanQueues`, `VulkanSurfaceState` in 4 partitions | delete | -80 | bestätigt: 4 tote Partitionen → 2 Tasks (core, vulkan) | bestätigt: Compiler-, Policy-, Queues- und Surface-Typen ohne Verbraucher; Partitionen jedoch re-exportiert/buildregistriert. Scheduler.cppm:11, Device.cppm:37. [≠ Claude: Präzisierung: nicht importlos] | — |
-| PK07 | GLFW `CreateVulkanSurface` bridge (0 callers; Vulkan.Device builds the surface itself) | delete | -54 | bestätigt: 0 Aufrufer → Task; Operator klärt Layer-Richtung, PLATFORM-004 anpassen | bestätigt: Brücke ohne Aufrufer; Vulkan erzeugt Surface direkt. Offene Überschneidung: PLATFORM-004. GlfwVulkanSurface.cpp:12, Device.cpp:1566. | — |
-| PK08 | Duplicate DAG cycle search in `Core.Dag.Scheduler.cpp` and `Core.Dag.TaskGraph.cpp` | reuse | -50 | teilweise: ≈−35, Owner unklar → behalten | teilweise: DFS und 32-Knoten-Begrenzung doppelt; Indextypen, Fehlerpfade und Selbstabhängigkeitsprüfung verschieden. Scheduler.cpp:233, TaskGraph.cpp:435. | — |
-| PK09 | Duplicate LOP benchmark metric helpers (`MeanPlaneError`, `MeanSphereError`, `MinimumPairwiseDistance`, `Finite`) | reuse | -40 | bestätigt → Task (gemeinsamer Benchmark-Header, EAR optional) | bestätigt: Vier Messhelfer semantisch identisch, einschließlich Leerfällen; Bestätigungsdaten unterscheiden sich. ContinuousLop:74, PointCloudConsolidation:74. | — |
-| PK10 | `CachedSelectedVertex/Edge/FaceIndices` (declaration only) and `Culling::Proxy` / `CullableTag` (0 importers) — four separate candidates | delete | -20 | bestätigt: 3 Caches + CullableTag + Proxy → Task (ECS-Cleanup) | bestätigt: Jeder der drei Cachetypen nur deklariert; `Proxy` und `CullableTag` ebenfalls ohne Verbraucher. Selection.cppm:26, Culling.Proxy.cppm:9. | — |
-| PK11 | `Core::PathKey` / `FromPath` (0 users; own FNV copy, see X01) | delete | -25 | bestätigt → Task (entfernen, kein Hash-Reuse) | bestätigt: `Core::IO::PathKey`/`FromPath` ohne Verbraucher; übriges IOBackend bleibt produktiv. IOBackend.cppm:32, IOBackend.cpp:16. | — |
-| PK12 | Legacy `propertyName` / `expectedValueKind` read fallbacks in `Runtime.SceneSerialization.cpp:1276-1298` (writer emits `name`/`valueKind`) | delete | -20 | bestätigt: Loader akzeptiert nur v4 → Legacy-Schlüssel unerreichbar → Task | teilweise: Writer nutzt neue Namen; alte Schlüssel bleiben auch in v4 erreichbar. Entfernung ändert akzeptierte Eingaben. SceneSerialization.cpp:1248, SceneSerialization.cpp:1273. [≠ Claude: Ja: „unerreichbar“ widerlegt] | — |
+| PK03 | Legacy `CullingSystem` registration API (`Register`, `Unregister`, `UpdateBounds`, `SetDrawTemplate`, `CullingHandle`, `CullSlot`, dead getters) and, as a separate question, the empty `SyncGpuBuffer()` still called from `RenderPrepPipeline.cpp:133` | delete | small | bestätigt (Fable): Legacy-API + Getter → Task; leere Methode entfernen, Schritt CullingSync behalten (Vertrag; Schritt-Entfernung vertagen bis GRAPHICS-135) | bestätigt: Legacy-API/Getter ohne Verbraucher; Sync leer. Der beobachtbare `CullingSync`-Schritt ist separat: CullingSystem.cpp:440, RenderPrepPipeline.cpp:130. | Task + Umsetzung (2026-10-05) → `c5ad77735`; CullingSync-Schritt bleibt |
+| PK04 | Duplicate `MakeDenseClosedTriangleMesh` / `ExtractTriangleSoup` in `Test.MeshOperationsSlow.cpp` vs `Test_MeshOperations.cpp` → `tests/support/geometry/Test_MeshBuilders.h` | reuse | -85 | bestätigt: 93 identische Zeilen → Task (≈−85) | bestätigt: Alle drei Helfer einschließlich Wiederaufbau identisch; beide Testziele nutzen bereits Mesh-Support. Test.MeshOperationsSlow.cpp:25, Test_MeshOperations.cpp:27. | Task + Umsetzung (2026-10-05) → `17fa476e7` |
+| PK05 | Unused types `CompiledGraph`, `ReadyNodePolicy`, `VulkanQueueFamilies`/`VulkanQueues`, `VulkanSurfaceState` in 4 partitions | delete | -80 | bestätigt: 4 tote Partitionen → 2 Tasks (core, vulkan) | bestätigt: Compiler-, Policy-, Queues- und Surface-Typen ohne Verbraucher; Partitionen jedoch re-exportiert/buildregistriert. Scheduler.cppm:11, Device.cppm:37. [≠ Claude: Präzisierung: nicht importlos] | Task + Umsetzung (2026-10-05) → `f8da99e86` (ganze Partitionen) |
+| PK07 | GLFW `CreateVulkanSurface` bridge (0 callers; Vulkan.Device builds the surface itself) | delete | -54 | bestätigt: 0 Aufrufer → Task; Operator klärt Layer-Richtung, PLATFORM-004 anpassen | bestätigt: Brücke ohne Aufrufer; Vulkan erzeugt Surface direkt. Offene Überschneidung: PLATFORM-004. GlfwVulkanSurface.cpp:12, Device.cpp:1566. | Task + Umsetzung (2026-10-05) → `aae3f7f50`, `ef51d6eaf`; PLATFORM-004 angepasst |
+| PK08 | Duplicate DAG cycle search in `Core.Dag.Scheduler.cpp` and `Core.Dag.TaskGraph.cpp` | reuse | -50 | teilweise: ≈−35, Owner unklar → behalten | teilweise: DFS und 32-Knoten-Begrenzung doppelt; Indextypen, Fehlerpfade und Selbstabhängigkeitsprüfung verschieden. Scheduler.cpp:233, TaskGraph.cpp:435. | Behalten (2026-10-05): verschiedene Semantik, Einsparung unbelegt |
+| PK09 | Duplicate LOP benchmark metric helpers (`MeanPlaneError`, `MeanSphereError`, `MinimumPairwiseDistance`, `Finite`) | reuse | -40 | bestätigt → Task (gemeinsamer Benchmark-Header, EAR optional) | bestätigt: Vier Messhelfer semantisch identisch, einschließlich Leerfällen; Bestätigungsdaten unterscheiden sich. ContinuousLop:74, PointCloudConsolidation:74. | Task + Umsetzung (2026-10-05) → `040af83ac` |
+| PK10 | `CachedSelectedVertex/Edge/FaceIndices` (declaration only) and `Culling::Proxy` / `CullableTag` (0 importers) — four separate candidates | delete | -20 | bestätigt: 3 Caches + CullableTag + Proxy → Task (ECS-Cleanup) | bestätigt: Jeder der drei Cachetypen nur deklariert; `Proxy` und `CullableTag` ebenfalls ohne Verbraucher. Selection.cppm:26, Culling.Proxy.cppm:9. | Task + Umsetzung (2026-10-05) → `b82b149fc` (ganzes Proxy-Modul) |
+| PK11 | `Core::PathKey` / `FromPath` (0 users; own FNV copy, see X01) | delete | -25 | bestätigt → Task (entfernen, kein Hash-Reuse) | bestätigt: `Core::IO::PathKey`/`FromPath` ohne Verbraucher; übriges IOBackend bleibt produktiv. IOBackend.cppm:32, IOBackend.cpp:16. | Task + Umsetzung (2026-10-05) → `71f37a218`, `0b9a12964` |
+| PK12 | Legacy `propertyName` / `expectedValueKind` read fallbacks in `Runtime.SceneSerialization.cpp:1276-1298` (writer emits `name`/`valueKind`) | delete | -20 | bestätigt: Loader akzeptiert nur v4 → Legacy-Schlüssel unerreichbar → Task | teilweise: Writer nutzt neue Namen; alte Schlüssel bleiben auch in v4 erreichbar. Entfernung ändert akzeptierte Eingaben. SceneSerialization.cpp:1248, SceneSerialization.cpp:1273. [≠ Claude: Ja: „unerreichbar“ widerlegt] | Task + Umsetzung (2026-10-05) → `83b3b54fe`, `72ca4d73a`; Szenenformat v5, alle v4-Dokumente abgelehnt |
 
 ## Claude-Gegenprüfung 2026-10-03
 
@@ -530,6 +530,59 @@ markiert eine Abweichung oder Präzisierung. Die Operator-Spalte bleibt offen.
   v4-Roundtrips mit alten Schlüsseln (PK12) und unveränderte Messwerte
   (PK09). Keine Zeilenschätzung ist bestätigt.
 
+## Etappe E0 — Entscheidungen und Umsetzung 2026-10-05
+
+Der Operator hat am 2026-10-05 jeden E0-Kandidaten einzeln entschieden: PK03,
+PK04, PK05, PK07, PK09, PK10, PK11 und PK12 als Task mit sofortiger Umsetzung,
+PK08 behalten. Für PK12 entschied er zusätzlich das Szenenformat v5, das alle
+v4-Dokumente ablehnt. Begründung: Es gibt noch keine gespeicherten Szenen.
+
+**Abweichung vom Ablauf in Phase C, vom Operator angewiesen:** Die
+Umsetzung lief in derselben interaktiven Sitzung. Deshalb gibt es keine
+eigenen Task-Dateien pro Kandidat. Entscheidung, Umfang und Nachweise stehen
+hier und in den Commit-Nachrichten. Ablauf je Kandidat:
+
+1. Codex-Plan (rein lesend).
+2. Umsetzung durch Claude.
+3. Fokussierter Build und fokussierte Tests.
+4. Codex-Review des fixierten Commits.
+5. Fixes.
+6. Bei Bedarf erneute Verifikation.
+
+Die Codex-Läufe liefen wie bei der Gegenprüfung ohne Sandbox und mit
+Leseauftrag. Die Basisrevision ist `83bb41593`.
+
+| Kandidat | Commits | Fokussierte Verifikation | Codex-Review |
+|---|---|---|---|
+| PK03 | `c5ad77735` | 4 Grafik-/Runtime-Testziele + Vulkan-Backend, 96/96 | freigeben |
+| PK04 | `17fa476e7` | 3 Geometry-Testziele, `Simplification_QEM` 18/18 | freigeben |
+| PK05 | `f8da99e86` | Core/Runtime/Vulkan-Ziele, 130/130 | freigeben |
+| PK07 | `aae3f7f50`, `ef51d6eaf` | Platform-Ziele + Vulkan-Backend, 5/5; Task-Policy strikt 0 | Anmerkung (Paritätsmatrix) → behoben |
+| PK08 | — | — | — (behalten) |
+| PK09 | `040af83ac` | `run_and_seal` vorher/nachher: beide Smokes bis auf `runtime_ms` identisch | freigeben |
+| PK10 | `b82b149fc` | ECS-/Runtime-Contract-Ziele, 125/125 | freigeben |
+| PK11 | `71f37a218`, `0b9a12964` | Core-/Runtime-Ziele, 119/119 | Nit (alter Kommentarblock) → behoben |
+| PK12 | `83b3b54fe`, `72ca4d73a` | Runtime-Contract, 54/54 bzw. 49/49; Mutationsprobe auf die `propertyName`-Ablehnung schlägt an | Anmerkung (Mischfall-Test) → behoben |
+
+Erhaltene Grenzen:
+
+- PK03: Der beobachtbare `CullingSync`-Schritt bleibt (GRAPHICS-135). Er
+  zeichnet nur noch den Schritt auf.
+- PK05: `DomainGraph` brauchte nur `:Types`.
+- PK07: PLATFORM-004 schreibt kein Platform-Surface-Hilfsmodul mehr vor. Die
+  Datei wurde dafür ins Micro-/Contract-Schema überführt, ihr Legacy-Hash
+  liegt unter `consumed`.
+- PK10: `LocalConvexHull` entfällt als ECS-Verbraucher von
+  `Geometry.ConvexHull`. Das ist für GE04 relevant.
+- PK12: Ein ausgelassenes `valueKind` lädt weiter als `Unknown`.
+
+Nebenbefund, außerhalb von Ponytail: `tools/benchmark/run_and_seal.py`
+scheitert vor und nach PK09 gleichermaßen beim Versiegeln. Ursache ist
+„unsupported backend“ für `geometry.harmonic_field`
+(`cpu_reference_sparse_cholesky`) und
+`geometry.property_smoothing.variational_fit_solvers` (`cpu_admm_sparse_cholesky`).
+Die Einzelergebnisse werden trotzdem geschrieben.
+
 ## Prüfhinweise aus dem Codex-Audit
 
 Die folgenden Hinweise stammen aus den zwölf Ausgangsgruppen des Codex-Audits
@@ -601,13 +654,13 @@ und gelten für die angegebenen Inventarzeilen.
 
 - Ausgangshypothese: ungefähr 80 Zeilen einschließlich Build-/Importeinträgen.
 - Einzeln prüfen:
-  [Scheduler.Compiler](../../../src/core/Core.Dag.Scheduler.Compiler.cppm)
+  Scheduler.Compiler (`src/core/Core.Dag.Scheduler.Compiler.cppm`, entfernt in `f8da99e86`)
   mit `CompiledGraph`,
-  [Scheduler.Policy](../../../src/core/Core.Dag.Scheduler.Policy.cppm)
+  Scheduler.Policy (`src/core/Core.Dag.Scheduler.Policy.cppm`, entfernt in `f8da99e86`)
   mit `ReadyNodePolicy`,
-  [Vulkan.Queues](../../../src/graphics/vulkan/Backends.Vulkan.Queues.cppm)
+  Vulkan.Queues (`src/graphics/vulkan/Backends.Vulkan.Queues.cppm`, entfernt in `f8da99e86`)
   mit `VulkanQueueFamilies` und `VulkanQueues`,
-  [Vulkan.Surface](../../../src/graphics/vulkan/Backends.Vulkan.Surface.cppm)
+  Vulkan.Surface (`src/graphics/vulkan/Backends.Vulkan.Surface.cppm`, entfernt in `f8da99e86`)
   mit `VulkanSurfaceState`.
 - Gegenprüfung: exakte Symbolgrenzen und Namespace beachten, transitive
   Re-Exports und Importabhängigkeiten verfolgen. Der gleichartig benannte
@@ -629,8 +682,8 @@ und gelten für die angegebenen Inventarzeilen.
 ### PK07 — GLFW-Vulkan-Surface-Brücke
 
 - Ausgangshypothese: 54 Zeilen in
-  [Interface](../../../src/platform/backends/glfw/Platform.Backend.GlfwVulkanSurface.cppm)
-  und [Implementierung](../../../src/platform/backends/glfw/Platform.Backend.GlfwVulkanSurface.cpp)
+  Interface (`src/platform/backends/glfw/Platform.Backend.GlfwVulkanSurface.cppm`, entfernt in `aae3f7f50`)
+  und Implementierung (`src/platform/backends/glfw/Platform.Backend.GlfwVulkanSurface.cpp`, entfernt in `aae3f7f50`)
   ohne Aufruf von `CreateVulkanSurface`.
 - Gegenprüfung: alle GLFW-/Vulkan-Buildpfade und den direkten Surface-Aufbau
   in [Vulkan.Device](../../../src/graphics/vulkan/Backends.Vulkan.Device.cpp)
@@ -670,7 +723,7 @@ und gelten für die angegebenen Inventarzeilen.
   `CachedSelectedEdgeIndices`, `CachedSelectedFaceIndices`, `Culling::Proxy`
   und `CullableTag` ohne aktuelle Verbraucher.
 - Einstieg: [Selection](../../../src/ecs/Components/ECS.Component.Selection.cppm)
-  und [Culling.Proxy](../../../src/ecs/Components/ECS.Component.Culling.Proxy.cppm).
+  und Culling.Proxy (`src/ecs/Components/ECS.Component.Culling.Proxy.cppm`, entfernt in `b82b149fc`).
 - Gegenprüfung: Komponenten-Registrierung, entt-Verwendung, Serialize/Load,
   Picking-/Selection-Pfade, Tests und mögliche deklarierte aktive Owner.
   Jeder Cache-Typ und der Proxy bekommen eine getrennte Entscheidung.
@@ -833,3 +886,8 @@ Prüfung der betroffenen Annahmen, nicht den Neustart der gesamten Liste.
   §„Codex-Gegenprüfung 2026-10-05“. Operator-Spalte offen; keine
   Entscheidung, kein Folgetask, keine Codeänderung. Nächster Schritt:
   Phase B mit Operator-Entscheidungen je Etappe.
+- 2026-10-05: Etappe E0 entschieden und umgesetzt. PK08 bleibt, die
+  übrigen acht Kandidaten sind umgesetzt, PK12 mit Szenenformat v5. Jeder
+  Kandidat wurde von Codex geplant und reviewt, die Funde sind behoben.
+  Details in §„Etappe E0 — Entscheidungen und Umsetzung 2026-10-05“.
+  Nächste Etappe: E1 (X01–X04).
