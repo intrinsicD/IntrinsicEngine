@@ -277,23 +277,5 @@ export namespace Extrinsic::Core::Telemetry
         std::chrono::high_resolution_clock::time_point m_Start;
     };
 
-    // Alias for macro consumers
     using Core::Hash::HashString;
 }
-
-// ---------------------------------------------------------------------------
-// Profiling macros
-// ---------------------------------------------------------------------------
-#define EXTRINSIC_PROFILE_SCOPE(name) \
-    static constexpr uint32_t _profileHash_##__LINE__ = \
-        Extrinsic::Core::Telemetry::HashString(name); \
-    Extrinsic::Core::Telemetry::ScopedTimer \
-        _profileTimer_##__LINE__(name, _profileHash_##__LINE__)
-
-#define EXTRINSIC_PROFILE_FUNCTION() EXTRINSIC_PROFILE_SCOPE(__func__)
-
-// Back-compat aliases used throughout legacy src/
-#define INTRINSIC_PROFILE_SCOPE  EXTRINSIC_PROFILE_SCOPE
-#define INTRINSIC_PROFILE_FUNCTION EXTRINSIC_PROFILE_FUNCTION
-#define PROFILE_SCOPE            EXTRINSIC_PROFILE_SCOPE
-#define PROFILE_FUNCTION         EXTRINSIC_PROFILE_FUNCTION
