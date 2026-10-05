@@ -257,7 +257,7 @@ als solche dokumentiert.
 Eine Etappe pro Sitzung genügt; die Reihenfolge kann der Operator ändern.
 
 - [x] E0 — Codex-Audit-Gruppen ohne Gegenstück (PK03–PK12), 2026-10-05
-- [ ] E1 — Querschnittsduplikate (X01–X04)
+- [x] E1 — Querschnittsduplikate (X01–X04), 2026-10-05
 - [ ] E2 — Tools, CI, Abhängigkeiten (T01–T23)
 - [ ] E3 — Core, ECS, Assets (C01–C17)
 - [ ] E4 — Graphics (G01–G18)
@@ -283,10 +283,10 @@ nächsten Abschnitt.
 ### X — Querschnittsduplikate
 | ID | Fund | Tag | Schätz. | Claude | Codex | Operator |
 |----|---------|-----|------|--------|--------|----------|
-| X01 | ~11 hand-rolled FNV-1a loops → `Core::HashString64` (+ bytes/incremental overload). Note: 4 copies use a truncated offset basis `1469598103934665603` (should be `…6656037`): HalfedgeMesh.Utils.cpp:69, AssetWorkflowRecipePolicies.cpp:71, GeometryProcessingOperations.Normals.cpp:615, …PointProperties.cpp:85 | reuse | -60 | teilweise: 7 Kand.; −60 nicht erreichbar (≈−20 nur mit neuer Core-API); abgeschnittene Basis wirkungslos (nur in-process); GpuWorld/TextureBake-Fingerprints sind Vertrag → vertagen; FromPath → PK11 | teilweise: Byte-Schleifen sind doppelt; wortweises Mischen hat andere Semantik. Core.Hash.cppm:30, Geometry.HalfedgeMesh.Utils.cpp:69. [≠ Claude: Gleiches Votum; „wirkungslos“ zu pauschal.] | — |
-| X02 | 5 consteval `__PRETTY_FUNCTION__` type-name/token helpers (Core.Hash TypeSig, TaskGraph TypeTokenValue, Asset.TypePool, ServiceRegistry/KernelEvents/JobService/CommandBus) → one `Core::TypeName<T>()` / `TypeToken<T>()` (merges C13, R06) | reuse | -90 | teilweise: Asset.TypePool-Helfer existiert nicht; TaskGraph-Token bewusst constexpr (behalten); 4 Kernel-`*TypeNameOf` → Task (≈−34) | teilweise: Vier Kernel-Namenshelfer wiederholen sich; Asset-Tokens beruhen auf Adressen. Runtime.ServiceRegistry.cppm:25, Asset.TypePool.cppm:19. | — |
-| X03 | ~67 file-local `IsFinite*` helpers in geometry + 4 overloads in VisualizationRecipes → `Geometry::Validation::IsFinite` / `glm::isfinite` (merges GE16, R19) | reuse | -260 | teilweise: R19 in RUNTIME-314 entschieden; AABB/Sphere/Triangle → Importzyklus; X03-05 (Validation inline) Task, danach X03-04 je Modulfamilie (≈−160, perf-prüfen) | teilweise: Vektorchecks wiederholen sich; zusätzliche Formprüfung und fehlende Overloads verhindern Pauschalersatz. Geometry.Linalg.cpp:30, Geometry.Validation.cppm:14. [≠ Claude: Gleiches Votum; Zyklusbegründung nicht belegt.] | — |
-| X04 | ~43 hand-written `DebugNameFor*` switches; many have 0 or test-only callers (merges R03, E02, E13, E14). Delete the uncalled ones first; table-driven helper is optional (loses `-Wswitch`) | delete/shrink | -300…-500 | teilweise: 10 ohne Aufrufer → Task in 3 Owner-Bündeln (≈−206); 11 nur-Test = Diagnose (behalten); Tabellenhelfer widerlegt | bestätigt: Zehn Exporte ohne Aufrufer belegt; Test-only ist weiterhin Nutzung. Runtime.EditorCommandHistory.cpp:82, Test.SandboxEditorModels.cpp:2077. [≠ Claude: Ja: Claude „teilweise“; Umfang weitgehend übereinstimmend.] | — |
+| X01 | ~11 hand-rolled FNV-1a loops → `Core::HashString64` (+ bytes/incremental overload). Note: 4 copies use a truncated offset basis `1469598103934665603` (should be `…6656037`): HalfedgeMesh.Utils.cpp:69, AssetWorkflowRecipePolicies.cpp:71, GeometryProcessingOperations.Normals.cpp:615, …PointProperties.cpp:85 | reuse | -60 | teilweise: 7 Kand.; −60 nicht erreichbar (≈−20 nur mit neuer Core-API); abgeschnittene Basis wirkungslos (nur in-process); GpuWorld/TextureBake-Fingerprints sind Vertrag → vertagen; FromPath → PK11 | teilweise: Byte-Schleifen sind doppelt; wortweises Mischen hat andere Semantik. Core.Hash.cppm:30, Geometry.HalfedgeMesh.Utils.cpp:69. [≠ Claude: Gleiches Votum; „wirkungslos“ zu pauschal.] | Task + Umsetzung (2026-10-05), nur byte-identische Schleifen → `9fe1d4732`, `3787b11f4` |
+| X02 | 5 consteval `__PRETTY_FUNCTION__` type-name/token helpers (Core.Hash TypeSig, TaskGraph TypeTokenValue, Asset.TypePool, ServiceRegistry/KernelEvents/JobService/CommandBus) → one `Core::TypeName<T>()` / `TypeToken<T>()` (merges C13, R06) | reuse | -90 | teilweise: Asset.TypePool-Helfer existiert nicht; TaskGraph-Token bewusst constexpr (behalten); 4 Kernel-`*TypeNameOf` → Task (≈−34) | teilweise: Vier Kernel-Namenshelfer wiederholen sich; Asset-Tokens beruhen auf Adressen. Runtime.ServiceRegistry.cppm:25, Asset.TypePool.cppm:19. | Task + Umsetzung (2026-10-05), 4 Kernel-Helfer → `1d5e1cf2d`, `3787b11f4` |
+| X03 | ~67 file-local `IsFinite*` helpers in geometry + 4 overloads in VisualizationRecipes → `Geometry::Validation::IsFinite` / `glm::isfinite` (merges GE16, R19) | reuse | -260 | teilweise: R19 in RUNTIME-314 entschieden; AABB/Sphere/Triangle → Importzyklus; X03-05 (Validation inline) Task, danach X03-04 je Modulfamilie (≈−160, perf-prüfen) | teilweise: Vektorchecks wiederholen sich; zusätzliche Formprüfung und fehlende Overloads verhindern Pauschalersatz. Geometry.Linalg.cpp:30, Geometry.Validation.cppm:14. [≠ Claude: Gleiches Votum; Zyklusbegründung nicht belegt.] | Task + Umsetzung (2026-10-05), nur identische Vektorprüfungen in Geometry → `9861d01ee` |
+| X04 | ~43 hand-written `DebugNameFor*` switches; many have 0 or test-only callers (merges R03, E02, E13, E14). Delete the uncalled ones first; table-driven helper is optional (loses `-Wswitch`) | delete/shrink | -300…-500 | teilweise: 10 ohne Aufrufer → Task in 3 Owner-Bündeln (≈−206); 11 nur-Test = Diagnose (behalten); Tabellenhelfer widerlegt | bestätigt: Zehn Exporte ohne Aufrufer belegt; Test-only ist weiterhin Nutzung. Runtime.EditorCommandHistory.cpp:82, Test.SandboxEditorModels.cpp:2077. [≠ Claude: Ja: Claude „teilweise“; Umfang weitgehend übereinstimmend.] | Task + Umsetzung (2026-10-05), 10 Funktionen ohne Aufrufer → `b941aa081` |
 
 ### T — Tools, CI, Abhängigkeiten
 | ID | Fund | Tag | Schätz. | Claude | Codex | Operator |
@@ -582,6 +582,37 @@ scheitert vor und nach PK09 gleichermaßen beim Versiegeln. Ursache ist
 (`cpu_reference_sparse_cholesky`) und
 `geometry.property_smoothing.variational_fit_solvers` (`cpu_admm_sparse_cholesky`).
 Die Einzelergebnisse werden trotzdem geschrieben.
+
+## Etappe E1 — Entscheidungen und Umsetzung 2026-10-05
+
+Der Operator hat am 2026-10-05 jeden Kandidaten einzeln entschieden und dabei
+jeweils die empfohlene enge Variante gewählt. Der Ablauf ist derselbe wie in
+E0: Codex-Plan, Umsetzung, fokussierter Build und fokussierte Tests,
+Codex-Review des fixierten Commits, dann Fixes. Es gibt keine eigenen
+Task-Dateien. Die Basisrevision ist `b8b84e3f4`. Die Codex-Planläufe nannten
+irrtümlich `83bb41593` als Basis. Codex bestätigte, dass die betroffenen
+Dateien zwischen beiden Ständen unverändert sind.
+
+| Kandidat | Umfang | Commits | Verifikation | Codex-Review |
+|---|---|---|---|---|
+| X01 | `HashString64` erhält einen optionalen Seed. RHI-`SamplerManager` und `HashProceduralGeometryParams` nutzen ihn, mit unveränderten Hashwerten (gleiche Bytes, Reihenfolge und Basis). Die Wortmischung, die GpuWorld-/TextureBake-Fingerprints und alle Kopien mit abgeschnittener Basis bleiben. | `9fe1d4732`, `3787b11f4` | 166/166, neuer Fortsetzungstest | Nit (Doku) → behoben |
+| X02 | `Core::TypeName<T>()` in `Core.Hash` über `Detail::TypeSig` ersetzt die vier Kernel-`*TypeNameOf`. TaskGraph-Token und `Asset.TypePool` bleiben. | `1d5e1cf2d`, `3787b11f4` | 126/126, Envelope-Tests 3/3, Kernel-Konvergenz strikt | Anmerkung (Envelope-Tests) → behoben |
+| X03 | Die fünf `Geometry::Validation::IsFinite` sind jetzt inline. 51 lokale Helfer und 2 Lambdas sind ersetzt, 15 Spezialprüfungen bleiben (siehe Commit). | `9861d01ee` | 775/775 Geometry + 37/37 Runtime-Guards; Release-Benchmarks je 3 Läufe vor/nach: Qualitätsmetriken identisch, keine Laufzeitregression | freigeben |
+| X04 | 10 `DebugNameFor*`-Funktionen ohne jeden Aufrufer gelöscht. Test-only- und produktive Namen bleiben, kein Tabellenhelfer. | `b941aa081` | 251/251, Nullaufrufer-Suche | freigeben |
+
+Bewusste Abweichungen von den Codex-Plänen, im Review bestätigt:
+
+- X01: kein neuer `std::span`-Overload, nur der Seed-Parameter.
+- X02: kein Makro mit neuem Header. Die geloggten Typnamen-Texte ändern damit
+  ihr Signaturpräfix. Sie dienen nur der Diagnose, und keine Stelle parst sie.
+- X03: Dateien mit einem verbleibenden lokalen `IsFinite`-Overload nutzen
+  `using Geometry::Validation::IsFinite;`.
+
+Folgen für spätere Etappen:
+
+- C13 und R06 sind durch X02 erledigt, soweit sie die Kernel-Helfer
+  betreffen.
+- GE16 ist durch X03 erledigt. R19 war bereits in RUNTIME-314 entschieden.
 
 ## Prüfhinweise aus dem Codex-Audit
 
@@ -891,3 +922,7 @@ Prüfung der betroffenen Annahmen, nicht den Neustart der gesamten Liste.
   Kandidat wurde von Codex geplant und reviewt, die Funde sind behoben.
   Details in §„Etappe E0 — Entscheidungen und Umsetzung 2026-10-05“.
   Nächste Etappe: E1 (X01–X04).
+- 2026-10-05: Etappe E1 entschieden und umgesetzt. Alle vier Kandidaten sind
+  in der jeweils engen Variante umgesetzt und von Codex geplant und reviewt,
+  die Funde sind behoben. Details in §„Etappe E1 — Entscheidungen und
+  Umsetzung 2026-10-05“. Nächste Etappe: E2 (T01–T23).
