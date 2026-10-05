@@ -48,25 +48,7 @@ export namespace Extrinsic::Core
     // -----------------------------------------------------------------------
     // FrameGraph pass options — scheduling metadata for the TaskGraph backend.
     // -----------------------------------------------------------------------
-    struct FrameGraphPassOptions
-    {
-        Dag::TaskPriority Priority = Dag::TaskPriority::Normal;
-        uint32_t EstimatedCost = 1;
-        bool MainThreadOnly = false;
-        bool AllowParallel = true;
-        std::string_view DebugCategory = {};
-    };
-
-    [[nodiscard]] constexpr Dag::TaskGraphPassOptions ToTaskGraphPassOptions(const FrameGraphPassOptions& options) noexcept
-    {
-        return {
-            .Priority = options.Priority,
-            .EstimatedCost = options.EstimatedCost,
-            .MainThreadOnly = options.MainThreadOnly,
-            .AllowParallel = options.AllowParallel,
-            .DebugCategory = options.DebugCategory,
-        };
-    }
+    using FrameGraphPassOptions = Dag::TaskGraphPassOptions;
 
     // -----------------------------------------------------------------------
     // Built-in structural and phase tokens.
@@ -149,7 +131,7 @@ export namespace Extrinsic::Core
                      ExecuteFn&& execute)
         {
             m_Graph->AddPass(name,
-                ToTaskGraphPassOptions(options),
+                options,
                 [setupFn = std::forward<SetupFn>(setup)](Dag::TaskGraphBuilder& b) mutable
                 {
                     FrameGraphBuilder fgb(std::move(b));

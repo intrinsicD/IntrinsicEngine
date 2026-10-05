@@ -56,7 +56,7 @@ Core owns reusable graph/scheduling primitives, not domain-specific GPU policy.
   - `TaskGraphExecutionMode::ExecuteCallbacks` is the default and enables
     whole-graph `Execute()`; `PlanOnly` preserves compilation and per-pass
     callback extraction but rejects whole-graph execution.
-  - Pass options (`TaskGraphPassOptions` / `FrameGraphPassOptions`) provide
+  - Pass options (`TaskGraphPassOptions`; `FrameGraphPassOptions` is an alias) provide
     `Priority`, `EstimatedCost`, `MainThreadOnly`, `AllowParallel`, and
     `DebugCategory`.
     Worker-pass dispatch maps `Critical` and `High` to the scheduler's `High`
