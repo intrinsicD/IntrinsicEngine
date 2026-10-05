@@ -20,5 +20,4 @@ target_include_directories(${target_name} PUBLIC .)
 target_link_libraries(${target_name} PRIVATE EnTT::EnTT)
 
 add_subdirectory(Components)
-add_subdirectory(Events)
 add_subdirectory(Systems)

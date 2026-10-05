@@ -307,7 +307,7 @@ Bundling that kind of rewrite into an unrelated feature commit makes review nois
 **What:** Three mechanisms for inter-system communication, each with distinct use cases:
 
 ### `entt::dispatcher` — Cross-System Notifications
-Value-type event structs in `ECS::Events`. All sinks run on main thread during `dispatcher.update()`.
+All sinks run on main thread during `dispatcher.update()`.
 
 > **ADR-0024:** for *new* module→module notifications use the kernel **EventBus**
 > (queued-only, two pump points, worker-safe inbox — [ADR-0024](../adr/0024-kernel-module-architecture.md)
@@ -326,7 +326,6 @@ Zero-size tag components consumed by `PropertySetDirtySyncSystem`. Efficient whe
 Synchronous and immediate. Fires during `reg.remove<T>()` or `reg.destroy()`. Never use deferred events for cleanup that must complete before next allocation.
 
 **Canonical examples:**
-- `ECS.Components.Events.cppm` — `SelectionChanged`, `HoverChanged`, `GpuPickCompleted`, `EntitySpawned`, `GeometryModified`.
 - `Graphics.Components.cppm` — `DirtyTag::VertexPositions` through `DirtyTag::FaceAttributes`.
 - `Runtime.SceneManager.cpp` — `on_destroy` hooks for GPUScene slot cleanup.
 
@@ -468,7 +467,6 @@ Each command captures the minimal before/after state needed to reverse the opera
 1. Creates a new `entt::entity` with `NameTag`, `Transform::Component`, and `Hierarchy::Component`.
 2. Attaches the appropriate geometry data component (`ECS::Mesh::Data`, `ECS::Graph::Data`, `ECS::PointCloud::Data`).
 3. Sets `GpuDirty = true` to trigger the lifecycle system on the next frame.
-4. Fires `EntitySpawned` via `entt::dispatcher`.
 
 **Canonical examples:**
 - `Interface.EntityFactory.cppm` — `CreateMeshEntity(registry, mesh, name)`, `CreateGraphEntity(...)`, `CreatePointCloudEntity(...)`.

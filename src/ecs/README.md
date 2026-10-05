@@ -59,15 +59,6 @@ plain data; systems are stateless functions that operate on components.
 - `Extrinsic.ECS.System.BoundsPropagation`
 - `Extrinsic.ECS.System.RenderSync`
 
-### Events
-
-- `Extrinsic.ECS.Events` — CPU-only payload types for promoted scene
-  mutations (`SelectionChanged`, `HoverChanged`, `EntitySpawned`,
-  `GeometryModified`). Dispatch/queueing/subscription belong to
-  `runtime`/`editor`; see `Events/README.md` for the `HARDEN-063`
-  ownership decision and the events that are deliberately
-  runtime/graphics-owned (`GpuPickCompleted`, `GeometryUploadFailed`).
-
 ## Event and command seams
 
 `HARDEN-063` defines ECS-owned mutation seams without promoting a generic
@@ -111,9 +102,7 @@ commands are queued, replayed, undone, coalesced, or translated from input.
 - **Selection and hover mutation.** ECS owns the selection/hover data carriers
   (`SelectableTag`, `SelectedTag`, `HoveredTag`, and `PickID`). Runtime/editor
   owns replace/add/toggle/clear semantics, primitive-cache invalidation policy,
-  input interpretation, GPU pick readback translation, and event dispatch. After mutating the ECS data,
-  those higher layers may publish the CPU-only `SelectionChanged` or
-  `HoverChanged` payloads through their own dispatcher.
+  input interpretation, GPU pick readback translation, and event dispatch.
 
 ## Directory layout
 
@@ -142,8 +131,6 @@ Components/
   ECS.Component.ShadowCaster.cppm
   ECS.Component.StableId.cppm
   ECS.Component.DirtyTags.cppm
-Events/
-  ECS.Events.cppm
 Systems/
   ECS.System.TransformHierarchy.{cppm,cpp}
   ECS.System.BoundsPropagation.{cppm,cpp}

@@ -1230,7 +1230,6 @@ set(_ecs_test_files
     Test.ECS.BoundsPropagation.cpp
     Test.ECS.ColliderAuthoring.cpp
     Test.ECS.RenderSync.cpp
-    Test.ECS.Events.cpp
     Test.ECS.GeometryDirtyDomains.cpp
     Test.ECS.GeometrySourcesPopulate.cpp
     Test.ECS.StableIdentity.cpp

@@ -5,7 +5,8 @@
 ## Responsibilities
 
 - Entity/component storage and mutation APIs.
-- Scheduling-safe command/event application boundaries.
+- Deterministic mutation primitives; scene notifications and their dispatch
+  belong to runtime/editor.
 - Snapshot/export seams for rendering and runtime wiring.
 
 ## Dependencies

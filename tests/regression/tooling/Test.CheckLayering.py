@@ -119,7 +119,7 @@ class CheckLayeringFixtureTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn("graphics cannot depend on ecs", result.stdout)
-        self.assertIn("Extrinsic.ECS.Events", result.stdout)
+        self.assertIn("Extrinsic.ECS.Scene.Handle", result.stdout)
 
     def test_negative_platform_imports_graphics_fails(self) -> None:
         result = run_checker(
