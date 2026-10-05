@@ -155,7 +155,6 @@ but it exports the domain-free `TaskPlanGraph` API.
 
 - `Extrinsic.Core.Memory:Common`
 - `Extrinsic.Core.Memory:LinearArena`
-- `Extrinsic.Core.Memory:ScopeStack`
 - `Extrinsic.Core.Memory:Polymorphic`
 
 ### Task partition exports

@@ -10,7 +10,7 @@ Root scanned: `src`
 |---|---:|
 | `app` | 7 |
 | `assets` | 10 |
-| `core` | 38 |
+| `core` | 37 |
 | `ecs` | 26 |
 | `geometry` | 133 |
 | `graphics/assets` | 1 |
@@ -70,7 +70,6 @@ Root scanned: `src`
 | `Extrinsic.Core.Memory:Common` | `src/core/Core.Memory.Common.cppm` | `core` |
 | `Extrinsic.Core.Memory:LinearArena` | `src/core/Core.Memory.LinearArena.cppm` | `core` |
 | `Extrinsic.Core.Memory:Polymorphic` | `src/core/Core.Memory.Polymorphic.cppm` | `core` |
-| `Extrinsic.Core.Memory:ScopeStack` | `src/core/Core.Memory.ScopeStack.cppm` | `core` |
 | `Extrinsic.Core.Memory` | `src/core/Core.Memory.cppm` | `core` |
 | `Extrinsic.Core.Process` | `src/core/Core.Process.cppm` | `core` |
 | `Extrinsic.Core.ResourcePool` | `src/core/Core.ResourcePool.cppm` | `core` |
@@ -477,4 +476,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **450**
+Total modules: **449**

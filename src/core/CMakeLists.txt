@@ -34,7 +34,6 @@ target_sources(${target_name}
         Core.Memory.cppm
         Core.Memory.Common.cppm
         Core.Memory.LinearArena.cppm
-        Core.Memory.ScopeStack.cppm
         Core.Memory.Polymorphic.cppm
         Core.Std.cppm
         Core.StrongHandle.cppm
@@ -47,8 +46,6 @@ target_sources(${target_name}
         Core.Tasks.LocalTask.cpp
         FILE_SET memory_impl TYPE CXX_MODULES FILES
         Core.Memory.LinearArena.cpp
-        Core.Memory.ScopeStack.cpp
-        Core.Memory.Polymorphic.cpp
         PRIVATE
         Core.Config.EngineLoad.cpp
         Core.Dag.Scheduler.Hazards.cpp

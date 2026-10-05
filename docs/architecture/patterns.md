@@ -229,8 +229,6 @@ class IRenderFeature {
 - **`WaitFor(label)`** — waits for a named signal from earlier passes.
 - **`Signal(label)`** — declares this pass fulfills a named stage.
 
-All per-frame transient data (pass nodes, adjacency lists, closures) allocated in a `ScopeStack` — zero per-frame heap allocation.
-
 **Canonical examples:**
 - `Core.FrameGraph.cppm` — Typed declarations over the task graph's compile-time
   type IDs; `Core.Hash.cppm` owns `Core::TypeToken<T>()` and the shared 64-bit hash.

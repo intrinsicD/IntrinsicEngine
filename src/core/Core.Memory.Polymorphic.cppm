@@ -1,9 +1,10 @@
+// Extrinsic.Core.Memory:Polymorphic — ArenaAllocator<T>, a std-allocator adapter
+// over LinearArena so standard containers can draw from an arena.
 module;
 
 #include <cstddef>
 #include <cstdlib>
 #include <limits>
-#include <memory_resource>
 
 export module Extrinsic.Core.Memory:Polymorphic;
 import :Common;
@@ -55,21 +56,5 @@ export namespace Extrinsic::Core::Memory
 
     private:
         LinearArena* m_Arena = nullptr;
-    };
-
-    class ArenaMemoryResource final : public std::pmr::memory_resource
-    {
-    public:
-        explicit ArenaMemoryResource(LinearArena& arena) noexcept : m_Arena(arena) {}
-
-        [[nodiscard]] void* do_allocate(size_t bytes, size_t alignment) override; // NOLINT
-        void do_deallocate(void*, size_t, size_t) override {} // NOLINT
-        [[nodiscard]] bool do_is_equal(const std::pmr::memory_resource& other) const noexcept override // NOLINT
-        {
-            return this == &other;
-        }
-
-    private:
-        LinearArena& m_Arena;
     };
 }
