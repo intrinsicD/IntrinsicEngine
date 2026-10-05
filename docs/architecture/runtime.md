@@ -1189,7 +1189,7 @@ before reporting an applied result. The complete ownership, staging, and
 failure contract is documented in
 [geometry property CPU/GPU coherence](property-coherence.md).
 
-Scene JSON version 3 remains backend-neutral. Version 2 made graph halfedge
+Scene JSON version 5 remains backend-neutral. Version 2 made graph halfedge
 connectivity mandatory so a loaded graph satisfies the same
 `Vertices + Halfedges + Edges` source contract as a freshly materialized one.
 Version 3 retires the `PointColor`, `PointScalarField`, `LineColor` and
@@ -1222,11 +1222,16 @@ Engine-derived mirrors (`v:point` on mesh, graph and point-cloud vertices,
 them, and a saved copy would go stale. Restored properties
 are new storages with fresh content revisions, so renderer and residency
 caches observe them as new content.
+Version 5 (REVIEW-007 PK12) drops the legacy property-reference keys. A
+reference is `{domain, name, valueKind?}`; an omitted `valueKind` loads as
+`Unknown` (unconstrained). A reference carrying `propertyName` or
+`expectedValueKind`, alone or beside the canonical keys, fails the whole
+document with `InvalidFormat`.
 The reader and writer reject non-compact graph sources, endpoint indices outside
 the vertex range, halfedge counts other than twice the edge count, endpoint/
 halfedge-pair disagreement, out-of-range next/previous handles, non-reciprocal
 next/previous links, and successor links that do not continue at the target
-vertex. Versions 1 to 3 are rejected rather than upgraded. Supported
+vertex. Versions 1 to 4 are rejected rather than upgraded. Supported
 persistence is limited to current
 sandbox-authoring CPU state: metadata names, stable ids, transforms, hierarchy,
 selection eligibility, render hints, visualization configs, authored

@@ -78,9 +78,8 @@ namespace Extrinsic::Runtime
         // lives here — owned by the serializer — rather than being derived from
         // `DebugNameForGeometryPropertyValueKind`.
         //
-        // The filter form additionally persists "Any" for an unconstrained
-        // expectation (`std::nullopt`). Bool/Int32/UInt64 joined with the
-        // RUNTIME-319 property tables and use the canonical spelling.
+        // Bool/Int32/UInt64 joined with the RUNTIME-319 property tables and
+        // use the canonical spelling.
         // ------------------------------------------------------------------
         constexpr std::pair<Geometry::PropertyValueKind, std::string_view>
             kPropertyValueKindWire[]{
@@ -95,8 +94,6 @@ namespace Extrinsic::Runtime
                 {Geometry::PropertyValueKind::Vec3, "Vec3"},
                 {Geometry::PropertyValueKind::Vec4, "Vec4"},
             };
-
-        constexpr std::string_view kPropertyValueKindAnyWire = "Any";
 
         // Legacy property-domain wire strings. Like the value kinds above these
         // are persisted and do NOT match the canonical `GeometryElementDomain`
@@ -178,28 +175,14 @@ namespace Extrinsic::Runtime
             return false;
         }
 
-        [[nodiscard]] bool TryPropertyValueKindFilterFromWire(
-            const std::string_view text,
-            GeometryPropertyValueKindFilter& out) noexcept
-        {
-            if (text == kPropertyValueKindAnyWire)
-            {
-                out = std::nullopt;
-                return true;
-            }
-            Geometry::PropertyValueKind kind{};
-            if (!TryPropertyValueKindFromWire(text, kind))
-                return false;
-            out = kind;
-            return true;
-        }
-
         // Version 2 makes graph halfedge connectivity mandatory. Version 3
         // retires the PointColor/PointScalarField/LineColor/LineScalarField
         // presentation slot semantics (RUNTIME-318; point/line color is the
         // visualization overlay). Version 4 adds the per-domain typed property
-        // tables (RUNTIME-319). Older versions are rejected, not upgraded.
-        constexpr std::uint32_t kSceneDocumentVersion = 4u;
+        // tables (RUNTIME-319). Version 5 drops the legacy property-reference
+        // keys `propertyName`/`expectedValueKind` (REVIEW-007 PK12). Older
+        // versions are rejected, not upgraded.
+        constexpr std::uint32_t kSceneDocumentVersion = 5u;
         constexpr std::uint32_t kInvalidSerializedId = 0xFFFFFFFFu;
 
         [[nodiscard]] std::uint32_t EntitySortKey(const ECS::EntityHandle entity) noexcept
@@ -1270,14 +1253,12 @@ namespace Extrinsic::Runtime
                 return false;
             }
 
-            const json* name = nullptr;
-            if (value.contains("name"))
-                name = &value["name"];
-            else if (value.contains("propertyName"))
-                name = &value["propertyName"];
-            if (name == nullptr || !name->is_string())
+            // Pre-v5 key spellings are rejected rather than silently ignored.
+            if (value.contains("propertyName") || value.contains("expectedValueKind"))
                 return false;
-            out.Name = name->get<std::string>();
+            if (!value.contains("name") || !value["name"].is_string())
+                return false;
+            out.Name = value["name"].get<std::string>();
 
             out.ValueKind = Geometry::PropertyValueKind::Unknown;
             if (value.contains("valueKind"))
@@ -1289,19 +1270,6 @@ namespace Extrinsic::Runtime
                 {
                     return false;
                 }
-            }
-            else if (value.contains("expectedValueKind"))
-            {
-                GeometryPropertyValueKindFilter legacyKind{};
-                if (!value["expectedValueKind"].is_string() ||
-                    !TryPropertyValueKindFilterFromWire(
-                        value["expectedValueKind"].get<std::string>(),
-                        legacyKind))
-                {
-                    return false;
-                }
-                out.ValueKind = legacyKind.value_or(
-                    Geometry::PropertyValueKind::Unknown);
             }
             return true;
         }

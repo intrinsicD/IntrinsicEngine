@@ -585,7 +585,7 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadAppliesParsedSceneOnMainThread)
 {
     TempSceneFile validScene(
         "runtime142_valid_scene.json",
-        R"({"version":4,"entities":[{"id":0,"name":"Loaded Scene Entity"}]})");
+        R"({"version":5,"entities":[{"id":0,"name":"Loaded Scene Entity"}]})");
     auto application = std::make_unique<WaitForConditionApplication>(
         [](Runtime::Engine& runningEngine)
         {
@@ -644,7 +644,7 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadRejectsActiveWorldSwitchBeforeApply)
 {
     TempSceneFile validScene(
         "runtime179_world_scoped_scene_load.json",
-        R"({"version":4,"entities":[{"id":0,"name":"Wrong World Load"}]})");
+        R"({"version":5,"entities":[{"id":0,"name":"Wrong World Load"}]})");
     Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig());
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
@@ -725,7 +725,7 @@ TEST(RuntimeSceneLifecycle,
     // JobService's fail-closed revalidation immediately before apply.
     TempSceneFile validScene(
         "runtime194_drain_revalidated_scene_load.json",
-        R"({"version":4,"entities":[{"id":0,"name":"Revalidated Load"}]})");
+        R"({"version":5,"entities":[{"id":0,"name":"Revalidated Load"}]})");
     Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig());
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
@@ -776,7 +776,7 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadRejectsAwayAndBackBindingEpoch)
 {
     TempSceneFile validScene(
         "runtime179_world_binding_epoch_scene_load.json",
-        R"({"version":4,"entities":[{"id":0,"name":"Stale Epoch Load"}]})");
+        R"({"version":5,"entities":[{"id":0,"name":"Stale Epoch Load"}]})");
 
     Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig());
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
@@ -829,7 +829,7 @@ TEST(RuntimeSceneLifecycle, CancelledQueuedSceneFilesPublishOneTerminalEvent)
         SCOPED_TRACE(kind == Runtime::RuntimeSceneFileOperation::Save ? "save" : "load");
         TempSceneFile savedScene(
             "runtime179_cancelled_scene_file.json",
-            R"({"version":4,"entities":[{"id":0,"name":"Cancelled load"}]})");
+            R"({"version":5,"entities":[{"id":0,"name":"Cancelled load"}]})");
 
         Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig());
         engine.EmplaceModule<Runtime::AsyncWorkModule>();

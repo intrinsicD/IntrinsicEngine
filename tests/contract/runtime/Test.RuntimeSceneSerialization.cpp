@@ -309,7 +309,7 @@ TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesPromotedSandboxSceneDa
     const std::string document = backend.Text("scene.json");
     ASSERT_FALSE(document.empty());
     const nlohmann::json parsed = nlohmann::json::parse(document);
-    ASSERT_EQ(parsed["version"].get<std::uint32_t>(), 4u);
+    ASSERT_EQ(parsed["version"].get<std::uint32_t>(), 5u);
     ASSERT_EQ(parsed["entities"].size(), 3u);
     EXPECT_EQ(parsed["stats"]["renderHintEntities"].get<std::uint32_t>(), 3u);
     ASSERT_TRUE(parsed["entities"][0]["render"]["visualization"].is_object());
@@ -497,9 +497,16 @@ TEST(RuntimeSceneSerialization, InvalidDocumentsFailClosed)
     EXPECT_FALSE(version3.has_value()) << "version 3 predates the property tables (RUNTIME-319)";
     EXPECT_EQ(version3.error(), Core::ErrorCode::InvalidFormat);
 
+    auto version4 = Runtime::DeserializeSceneDocument(
+        scene,
+        R"({"version":4,"entities":[]})");
+    EXPECT_FALSE(version4.has_value())
+        << "version 4 may carry legacy property-reference keys (REVIEW-007 PK12)";
+    EXPECT_EQ(version4.error(), Core::ErrorCode::InvalidFormat);
+
     auto badGeometry = Runtime::DeserializeSceneDocument(
         scene,
-        R"({"version":4,"entities":[{"id":0,"geometrySources":{"domain":"Mesh"}}]})");
+        R"({"version":5,"entities":[{"id":0,"geometrySources":{"domain":"Mesh"}}]})");
     EXPECT_FALSE(badGeometry.has_value());
     EXPECT_EQ(badGeometry.error(), Core::ErrorCode::InvalidFormat);
 }
@@ -507,7 +514,7 @@ TEST(RuntimeSceneSerialization, InvalidDocumentsFailClosed)
 TEST(RuntimeSceneSerialization, MalformedGraphTopologyFailsClosed)
 {
     const nlohmann::json valid = nlohmann::json::parse(
-        R"({"version":4,"entities":[{"id":0,"geometrySources":{"domain":"Graph","nodes":{"deleted":0,"positions":[[0,0,0],[1,0,0]]},"halfedges":{"toVertex":[1,0],"next":[1,0],"prev":[1,0]},"edges":{"deleted":0,"v0":[0],"v1":[1]}}}]})");
+        R"({"version":5,"entities":[{"id":0,"geometrySources":{"domain":"Graph","nodes":{"deleted":0,"positions":[[0,0,0],[1,0,0]]},"halfedges":{"toVertex":[1,0],"next":[1,0],"prev":[1,0]},"edges":{"deleted":0,"v0":[0],"v1":[1]}}}]})");
 
     {
         ECS::Scene::Registry scene;
@@ -574,8 +581,8 @@ TEST(RuntimeSceneSerialization, MalformedGraphTopologyFailsClosed)
 // The in-memory vocabulary uses Geometry::PropertyValueKind, whose debug names
 // are "Float"/"Double". The persisted scene format predates that and says
 // "ScalarFloat"/"ScalarDouble". Canonical references represent an
-// unconstrained kind as Unknown; the reader still accepts the legacy
-// expectedValueKind:"Any" spelling.
+// unconstrained kind as Unknown. Since version 5 the reader rejects the legacy
+// reference keys propertyName/expectedValueKind (REVIEW-007 PK12).
 // ============================================================================
 
 namespace
@@ -656,8 +663,91 @@ TEST(RuntimeSceneSerialization, PropertyValueKindKeepsLegacyWireStrings)
         << "double default must persist as ScalarDouble";
     EXPECT_NE(text.find("\"Unknown\""), std::string::npos)
         << "unconstrained references must persist as Unknown";
-    EXPECT_EQ(text.find("\"expectedValueKind\":\"Float\""), std::string::npos);
+    EXPECT_EQ(text.find("\"expectedValueKind\""), std::string::npos);
+    EXPECT_EQ(text.find("\"propertyName\""), std::string::npos);
     EXPECT_EQ(text.find("\"kind\":\"Double\""), std::string::npos);
+}
+
+namespace
+{
+    // Applies `mutate` to every saved property reference named `name`.
+    void MutatePropertyRefs(nlohmann::json& node, const std::string_view name,
+                            const std::function<void(nlohmann::json&)>& mutate)
+    {
+        if (node.is_object())
+        {
+            if (node.contains("domain") && node.contains("name") &&
+                node["name"].is_string() && node["name"].get<std::string>() == name)
+            {
+                mutate(node);
+            }
+            for (auto& [key, child] : node.items())
+                MutatePropertyRefs(child, name, mutate);
+        }
+        else if (node.is_array())
+        {
+            for (auto& child : node)
+                MutatePropertyRefs(child, name, mutate);
+        }
+    }
+}
+
+TEST(RuntimeSceneSerialization, LegacyPropertyRefKeysFailClosed)
+{
+    ECS::Scene::Registry source;
+    (void)AddGeometryPresentationEntity(source);
+    MemoryIOBackend backend;
+    ASSERT_TRUE(
+        Runtime::SaveSceneDocument(source, "presentation.json", backend).has_value());
+    const nlohmann::json saved = nlohmann::json::parse(backend.Text("presentation.json"));
+
+    const std::vector<std::pair<std::string, std::function<void(nlohmann::json&)>>> cases{
+        {"propertyName only", [](nlohmann::json& ref)
+         {
+             ref["propertyName"] = ref["name"];
+             ref.erase("name");
+         }},
+        {"expectedValueKind only", [](nlohmann::json& ref)
+         {
+             ref.erase("valueKind");
+             ref["expectedValueKind"] = "ScalarFloat";
+         }},
+        {"expectedValueKind Any", [](nlohmann::json& ref)
+         {
+             ref.erase("valueKind");
+             ref["expectedValueKind"] = "Any";
+         }},
+        {"legacy keys beside canonical keys", [](nlohmann::json& ref)
+         {
+             ref["propertyName"] = ref["name"];
+             ref["expectedValueKind"] = "ScalarFloat";
+         }},
+    };
+    for (const auto& [label, mutate] : cases)
+    {
+        nlohmann::json document = saved;
+        MutatePropertyRefs(document, "v:quality", mutate);
+        ASSERT_NE(document.dump(), saved.dump()) << label;
+
+        ECS::Scene::Registry loaded;
+        const auto result = Runtime::DeserializeSceneDocument(loaded, document.dump());
+        EXPECT_FALSE(result.has_value()) << label;
+        if (!result.has_value())
+            EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat) << label;
+    }
+
+    // Omitting valueKind stays valid and loads as an unconstrained reference.
+    nlohmann::json document = saved;
+    MutatePropertyRefs(document, "v:quality", [](nlohmann::json& ref) { ref.erase("valueKind"); });
+    ECS::Scene::Registry loaded;
+    ASSERT_TRUE(Runtime::DeserializeSceneDocument(loaded, document.dump()).has_value());
+    const ECS::EntityHandle entity = FindEntityByName(loaded, "Mesh Entity");
+    ASSERT_NE(entity, ECS::InvalidEntityHandle);
+    const auto* bindings = loaded.Raw().try_get<Runtime::GeometryPresentationRecipe>(entity);
+    ASSERT_NE(bindings, nullptr);
+    const auto* slot = FindSlot(*bindings, Runtime::GeometryPresentationSlotSemantic::ScalarField);
+    ASSERT_NE(slot, nullptr);
+    EXPECT_EQ(slot->Property.ValueKind, Geometry::PropertyValueKind::Unknown);
 }
 
 TEST(RuntimeSceneSerialization, PropertyValueKindRoundTripsThroughLegacyWire)
