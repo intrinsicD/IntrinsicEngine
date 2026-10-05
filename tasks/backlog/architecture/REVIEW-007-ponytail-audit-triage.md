@@ -283,166 +283,199 @@ nächsten Abschnitt.
 ### X — Querschnittsduplikate
 | ID | Fund | Tag | Schätz. | Claude | Codex | Operator |
 |----|---------|-----|------|--------|--------|----------|
-| X01 | ~11 hand-rolled FNV-1a loops → `Core::HashString64` (+ bytes/incremental overload). Note: 4 copies use a truncated offset basis `1469598103934665603` (should be `…6656037`): HalfedgeMesh.Utils.cpp:69, AssetWorkflowRecipePolicies.cpp:71, GeometryProcessingOperations.Normals.cpp:615, …PointProperties.cpp:85 | reuse | -60 | — | — | — |
-| X02 | 5 consteval `__PRETTY_FUNCTION__` type-name/token helpers (Core.Hash TypeSig, TaskGraph TypeTokenValue, Asset.TypePool, ServiceRegistry/KernelEvents/JobService/CommandBus) → one `Core::TypeName<T>()` / `TypeToken<T>()` (merges C13, R06) | reuse | -90 | — | — | — |
-| X03 | ~67 file-local `IsFinite*` helpers in geometry + 4 overloads in VisualizationRecipes → `Geometry::Validation::IsFinite` / `glm::isfinite` (merges GE16, R19) | reuse | -260 | — | — | — |
-| X04 | ~43 hand-written `DebugNameFor*` switches; many have 0 or test-only callers (merges R03, E02, E13, E14). Delete the uncalled ones first; table-driven helper is optional (loses `-Wswitch`) | delete/shrink | -300…-500 | — | — | — |
+| X01 | ~11 hand-rolled FNV-1a loops → `Core::HashString64` (+ bytes/incremental overload). Note: 4 copies use a truncated offset basis `1469598103934665603` (should be `…6656037`): HalfedgeMesh.Utils.cpp:69, AssetWorkflowRecipePolicies.cpp:71, GeometryProcessingOperations.Normals.cpp:615, …PointProperties.cpp:85 | reuse | -60 | teilweise: 7 Kand.; −60 nicht erreichbar (≈−20 nur mit neuer Core-API); abgeschnittene Basis wirkungslos (nur in-process); GpuWorld/TextureBake-Fingerprints sind Vertrag → vertagen; FromPath → PK11 | — | — |
+| X02 | 5 consteval `__PRETTY_FUNCTION__` type-name/token helpers (Core.Hash TypeSig, TaskGraph TypeTokenValue, Asset.TypePool, ServiceRegistry/KernelEvents/JobService/CommandBus) → one `Core::TypeName<T>()` / `TypeToken<T>()` (merges C13, R06) | reuse | -90 | teilweise: Asset.TypePool-Helfer existiert nicht; TaskGraph-Token bewusst constexpr (behalten); 4 Kernel-`*TypeNameOf` → Task (≈−34) | — | — |
+| X03 | ~67 file-local `IsFinite*` helpers in geometry + 4 overloads in VisualizationRecipes → `Geometry::Validation::IsFinite` / `glm::isfinite` (merges GE16, R19) | reuse | -260 | teilweise: R19 in RUNTIME-314 entschieden; AABB/Sphere/Triangle → Importzyklus; X03-05 (Validation inline) Task, danach X03-04 je Modulfamilie (≈−160, perf-prüfen) | — | — |
+| X04 | ~43 hand-written `DebugNameFor*` switches; many have 0 or test-only callers (merges R03, E02, E13, E14). Delete the uncalled ones first; table-driven helper is optional (loses `-Wswitch`) | delete/shrink | -300…-500 | teilweise: 10 ohne Aufrufer → Task in 3 Owner-Bündeln (≈−206); 11 nur-Test = Diagnose (behalten); Tabellenhelfer widerlegt | — | — |
 
 ### T — Tools, CI, Abhängigkeiten
 | ID | Fund | Tag | Schätz. | Claude | Codex | Operator |
 |----|---------|-----|------|--------|--------|----------|
-| T01 | `tools/agentkit/` standalone product, 0 refs from CI/CMake/src/AGENTS.md | yagni | -2800 | — | — | — |
-| T02 | Module-aware ccache fingerprinting `tools/ci/ccache_ci.py` + `ccache_module_invalidation_probe.py` + `cmake/Dependencies.cmake:47-90` (overlap CI-016) | yagni | -2000 | — | — | — |
-| T03 | `tools/diagnostics/curvature/` one-off experiment scripts + round JSONs (neck_sweep*, shape_diameter_*, thickness_*, …) (check METHOD-043/044/045) | delete | -1700 | — | — | — |
-| T04 | `tools/diagnostics/atlas/` collect/refine/trace scripts, keep `patch_merge.py`/`repack.py` (check METHOD-044/045) | delete | -2000 | — | — | — |
-| T05 | Coverage-cohort transition: `test_cohort_parity.py`, `test_cohort_manifest.py`, `slow_test_cohort.json` | delete | -700 | — | — | — |
-| T06 | Hand-rolled source coverage stack (`source_coverage.py`, `run_source_coverage.py`, `compare_source_coverage.py`) → gcovr / `llvm-cov export` | native | -1500…-2500 | — | — | — |
-| T07 | `tools/ci/touched_scope.py` (2081 lines) → path→gate table (overlap CI-014, CI-018) | yagni | -1200 | — | — | — |
-| T08 | Gate-timing telemetry chain (`collect_test_timing`, `validate_gate_timing_baseline`, `aggregate_gate_timing`, `time_command`, latency baseline JSON) → one script | yagni | -1100 | — | — | — |
-| T09 | Knowledge-graph tooling (`build_knowledge_graph.py`, `export_method_graph.py`, `export_module_graph.py`, `provision_knowledge_graph.sh`); MCP `graphify-mcp` not installed locally | delete | -750 | — | — | — |
-| T10 | `tools/analysis/benchmark_compile_iteration.py`, `compile_hotspot_post_pimpl.json`, dated build-time baseline md | delete | -500 | — | — | — |
-| T11 | Shared Python helper (`load_json`, `write_json`, `_write_github_outputs`, `parse_args`, 19× `sys.path.insert`) → `tools/_lib/common.py` | reuse | -600 | — | — | — |
-| T12 | Merge `workflow_evidence` / `experiment_custody` / `agent_work_graph` validators (~8.8k lines + ~23k test lines); subjective, the 2026-07-17 validator-rent audit kept them | yagni | -3000 | — | — | — |
-| T13 | `tools/agents/mcp_bridge.py` → thin stdio proxy (real wiring, shrink only) | shrink | -300 | — | — | — |
-| T14 | Skill mirror machinery `sync_skills.py` / `resync_skills.sh`; optionally `render_architecture.py` | yagni | -250…-1400 | — | — | — |
-| T15 | `check_codex_config.py` hand YAML parser (file is `.toml`) → `tomllib` | stdlib | -100 | — | — | — |
-| T16 | Shell/py shims: `check_expected_top_level.py`, `tools/check_ui_contract_guard.sh`, `tools/benchmark/check_perf_regression.sh`, `check_todo_active_only.sh`, `run_repo_hygiene_checks.sh` | delete | -40 | — | — | — |
-| T17 | Vendored `tools/agents/patches/research-manager-2.1.0-relevance.patch` | yagni | small | — | — | — |
-| T18 | Merge curvature boundary/extrema viewers in `benchmarks/runners/` | shrink | -150 | — | — | — |
-| T19 | Generate benchmark smoke manifests from one table (speculative) | shrink | -300 | — | — | — |
-| T20 | vcpkg `draco` — 0 uses in src/tests, only linked into tinygltf | native | 1 dep | — | — | — |
-| T21 | vcpkg `imguizmo` — 0 uses in src/tests, still linked | native | 1 dep | — | — | — |
-| T22 | vcpkg overlay ports xatlas/imgui — replaceable by registry features? | yagni | -190 | — | — | — |
-| T23 | Untracked stale `.claude/worktrees/agent-*` full-repo copies (local hygiene, not a repo change) | delete | local | — | — | — |
+| T01 | `tools/agentkit/` standalone product, 0 refs from CI/CMake/src/AGENTS.md | yagni | -2800 | teilweise: 0 Refs korrekt; Produkt-oder-Altlast ist Operatorfrage → vertagen | — | — |
+| T02 | Module-aware ccache fingerprinting `tools/ci/ccache_ci.py` + `ccache_module_invalidation_probe.py` + `cmake/Dependencies.cmake:47-90` (overlap CI-016) | yagni | -2000 | bestätigt als Überlappung → einordnen CI-016/CI-020 (Korrektheitsmaßnahme gegen stale BMIs) | — | — |
+| T03 | `tools/diagnostics/curvature/` one-off experiment scripts + round JSONs (neck_sweep*, shape_diameter_*, thickness_*, …) (check METHOD-043/044/045) | delete | -1700 | teilweise: ara-Claims, CI-Tests, C++-Probes binden → nur ungebundene Round-JSONs prüfen; Rest vertagen bis METHOD-043 | — | — |
+| T04 | `tools/diagnostics/atlas/` collect/refine/trace scripts, keep `patch_merge.py`/`repack.py` (check METHOD-044/045) | delete | -2000 | teilweise: Tests importieren baseline_atlas/boundary_refine → zerlegen (trace_* prüfen); vertagen bis METHOD-044/045 | — | — |
+| T05 | Coverage-cohort transition: `test_cohort_parity.py`, `test_cohort_manifest.py`, `slow_test_cohort.json` | delete | -700 | teilweise: Parity-Tool+Test+JSON → Task; Manifest-Zweig hängt an T06 | — | — |
+| T06 | Hand-rolled source coverage stack (`source_coverage.py`, `run_source_coverage.py`, `compare_source_coverage.py`) → gcovr / `llvm-cov export` | native | -1500…-2500 | teilweise: nutzt bereits llvm-cov export; gcovr passt nicht → Vereinfachung zerlegen, Löschen vertagen | — | — |
+| T07 | `tools/ci/touched_scope.py` (2081 lines) → path→gate table (overlap CI-014, CI-018) | yagni | -1200 | bestätigt als Überlappung → einordnen CI-014/CI-018/CI-020 (Löschen vor Soak verboten) | — | — |
+| T08 | Gate-timing telemetry chain (`collect_test_timing`, `validate_gate_timing_baseline`, `aggregate_gate_timing`, `time_command`, latency baseline JSON) → one script | yagni | -1100 | bestätigt als Überlappung → einordnen CI-020; Baseline-Validator separat | — | — |
+| T09 | Knowledge-graph tooling (`build_knowledge_graph.py`, `export_method_graph.py`, `export_module_graph.py`, `provision_knowledge_graph.sh`); MCP `graphify-mcp` not installed locally | delete | -750 | teilweise: MCP-Eintrag + provision_*.sh → Task; Python-Kern speist Draw-Architecture-Skill → behalten | — | — |
+| T10 | `tools/analysis/benchmark_compile_iteration.py`, `compile_hotspot_post_pimpl.json`, dated build-time baseline md | delete | -500 | T10-01 widerlegt (Runner hash-gepinnt in ara); T10-02 MD+JSON (Pfad korrigiert: tools/) → Task | — | — |
+| T11 | Shared Python helper (`load_json`, `write_json`, `_write_github_outputs`, `parse_args`, 19× `sys.path.insert`) → `tools/_lib/common.py` | reuse | -600 | teilweise: Helfer semantisch verschieden → vertagen bis T01–T10 entschieden | — | — |
+| T12 | Merge `workflow_evidence` / `experiment_custody` / `agent_work_graph` validators (~8.8k lines + ~23k test lines); subjective, the 2026-07-17 validator-rent audit kept them | yagni | -3000 | widerlegt (Fable): reale 5.9k statt 8.8k, Tests 3.7k statt 23k; CI-genutzt; PROC-027 behielt → behalten | — | — |
+| T13 | `tools/agents/mcp_bridge.py` → thin stdio proxy (real wiring, shrink only) | shrink | -300 | widerlegt: Protokoll-/Reconnect-/Deadline-Logik, kein reiner Proxy → behalten | — | — |
+| T14 | Skill mirror machinery `sync_skills.py` / `resync_skills.sh`; optionally `render_architecture.py` | yagni | -250…-1400 | T14-01 widerlegt (CI + AGENTS.md-Policy); T14-02 → mit T09 entscheiden | — | — |
+| T15 | `check_codex_config.py` hand YAML parser (file is `.toml`) → `tomllib` | stdlib | -100 | widerlegt: Datei ist `.codex/config.yaml` (YAML), tomllib passt nicht | — | — |
+| T16 | Shell/py shims: `check_expected_top_level.py`, `tools/check_ui_contract_guard.sh`, `tools/benchmark/check_perf_regression.sh`, `check_todo_active_only.sh`, `run_repo_hygiene_checks.sh` | delete | -40 | teilweise: 3 Shims ohne CI-Aufrufer → Task; check_expected_top_level (Test) und run_repo_hygiene behalten | — | — |
+| T17 | Vendored `tools/agents/patches/research-manager-2.1.0-relevance.patch` | yagni | small | widerlegt: Patch ist lokal aktiv angewendet, Reproduzierbarkeit → behalten | — | — |
+| T18 | Merge curvature boundary/extrema viewers in `benchmarks/runners/` | shrink | -150 | widerlegt: gemeinsamer Teil bereits geteilt → behalten | — | — |
+| T19 | Generate benchmark smoke manifests from one table (speculative) | shrink | -300 | widerlegt: Manifeste inhaltlich verschieden; Generator = zweite Wahrheitsquelle | — | — |
+| T20 | vcpkg `draco` — 0 uses in src/tests, only linked into tinygltf | native | 1 dep | teilweise: TINYGLTF_ENABLE_DRACO aktiviert Draco-glTF-Laden → Operatorfrage, vertagen | — | — |
+| T21 | vcpkg `imguizmo` — 0 uses in src/tests, still linked | native | 1 dep | bestätigt: `imguizmo_lib` nirgends gelinkt, 0 Nutzung → Task | — | — |
+| T22 | vcpkg overlay ports xatlas/imgui — replaceable by registry features? | yagni | -190 | imgui-Overlay teilweise (vertagen, GPU-Smoke nötig); xatlas-Overlay widerlegt (Baseline hat keinen Port) | — | — |
+| T23 | Untracked stale `.claude/worktrees/agent-*` full-repo copies (local hygiene, not a repo change) | delete | local | teilweise: KEINE stale Kopien — 3 Worktrees mit 4 ungemergten Commits; lokale Hygiene, Operator entscheidet | — | — |
 
 ### C — Core, ECS, Assets
 | ID | Fund | Tag | Schätz. | Claude | Codex | Operator |
 |----|---------|-----|------|--------|--------|----------|
-| C01 | `Core.Telemetry` — nothing in src reads it; `EXTRINSIC_PROFILE_*` unused | delete | -550 | — | — | — |
-| C02 | Coroutine `Tasks::Job`, WaitToken, Park/Unpark (0 co_await outside core) | delete | -450 | — | — | — |
-| C03 | `Core.Process` — test-only | delete | -325 | — | — | — |
-| C04 | `FileWatcher` / `Core.Filesystem` (not PathResolver) — test-only | delete | -238 | — | — | — |
-| C05 | `Memory::ScopeStack`, `ArenaMemoryResource` — test-only | delete | -230 | — | — | — |
-| C06 | `LinearArena` + `ArenaAllocator` → `std::pmr::monotonic_buffer_resource` (GJK/EPA ignore `scratch` in places) | stdlib | -200 | — | — | — |
-| C07 (PK06) | `Core::RingBuffer<T,N>` — 0 importers | delete | -66 | — | — | — |
-| C08 | `Asset.OperationStatus` — test-only | delete | -165 | — | — | — |
-| C09 | `FrameGraph` wrapper over `Dag::TaskGraph` (options duplicate field-for-field) | yagni | -150 | — | — | — |
-| C10 | `CallbackRegistry<Sig,Tag>` — exactly one instantiation (Asset.Service) | yagni | -150 | — | — | — |
-| C11 | `Core.Config.EngineLoad` per-field readers → table/`from_json` (low confidence; diagnostics deliberate) | shrink | -300 | — | — | — |
-| C12 | `AssetEventBus` per-asset Subscribe/Unsubscribe — only SubscribeAll used | delete | -60 | — | — | — |
-| C13 | Duplicate type-token generators → see X02 | reuse | (X02) | — | — | — |
-| C14 | `TaskGraphExecutionMode::PlanOnly` — legacy test only | delete | -60 | — | — | — |
-| C15 | `Core::Hash::U64Hash` — 0 users (culling proxy → PK10) | delete | -26 | — | — | — |
-| C16 | `ECS.Events` (SelectionChanged, HoverChanged, …) — test/fixture only | delete | -37 | — | — | — |
-| C17 | Logging `GetEntryCount`, `GetSequenceNumber`, `LevelMask` — 0 callers | delete | -30 | — | — | — |
+| C01 | `Core.Telemetry` — nothing in src reads it; `EXTRINSIC_PROFILE_*` unused | delete | -550 | teilweise (Fable): Profile-Makros → Task; Alloc-Zähler widerlegt (AgentOperations liest); TelemetrySystem → vertagen (Policy Marker-Pflicht) | — | — |
+| C02 | Coroutine `Tasks::Job`, WaitToken, Park/Unpark (0 co_await outside core) | delete | -450 | teilweise (Fable): Job/Awaiter/WaitToken-Pfad Löschkandidat nach SLO-Klärung; Worker-Park/Unpark widerlegt | — | — |
+| C03 | `Core.Process` — test-only | delete | -325 | teilweise: RUNTIME-282 plant Nutzung → vertagen | — | — |
+| C04 | `FileWatcher` / `Core.Filesystem` (not PathResolver) — test-only | delete | -238 | bestätigt: FileWatcher 0 Nutzer (PathResolver ausnehmen) → Task | — | — |
+| C05 | `Memory::ScopeStack`, `ArenaMemoryResource` — test-only | delete | -230 | bestätigt: ScopeStack → Task (+Doku-Korrektur); ArenaMemoryResource → mit C06 | — | — |
+| C06 | `LinearArena` + `ArenaAllocator` → `std::pmr::monotonic_buffer_resource` (GJK/EPA ignore `scratch` in places) | stdlib | -200 | teilweise: EPA nutzt Arena aktiv, Telemetry::Alloc hängt dran → zerlegen; toter GJK-`scratch`-Parameter → Task | — | — |
+| C07 (PK06) | `Core::RingBuffer<T,N>` — 0 importers | delete | -66 | bestätigt: 0 Importe; README-Falschaussage mit korrigieren → Task | — | — |
+| C08 | `Asset.OperationStatus` — test-only | delete | -165 | bestätigt → Task | — | — |
+| C09 | `FrameGraph` wrapper over `Dag::TaskGraph` (options duplicate field-for-field) | yagni | -150 | C09-01 Options-Alias → Task (≈−15); Fassade trägt ECS-Vokabular → behalten | — | — |
+| C10 | `CallbackRegistry<Sig,Tag>` — exactly one instantiation (Asset.Service) | yagni | -150 | widerlegt: Readiness-Report 2026-08-06 „retain“ (Stale-Token-Korrektheit) | — | — |
+| C11 | `Core.Config.EngineLoad` per-field readers → table/`from_json` (low confidence; diagnostics deliberate) | shrink | -300 | teilweise: ≈−120…−180, Diagnose-Parität schützen → vertagen | — | — |
+| C12 | `AssetEventBus` per-asset Subscribe/Unsubscribe — only SubscribeAll used | delete | -60 | bestätigt: per-Asset-Abo 0 Produktionsaufrufer → Task (Tests umschreiben) | — | — |
+| C13 | Duplicate type-token generators → see X02 | reuse | (X02) | → X02 | — | — |
+| C14 | `TaskGraphExecutionMode::PlanOnly` — legacy test only | delete | -60 | widerlegt: Bench_TaskGraphPlanReuseSmoke + 2 Baselines nutzen PlanOnly | — | — |
+| C15 | `Core::Hash::U64Hash` — 0 users (culling proxy → PK10) | delete | -26 | bestätigt (trivial) → Mini-Task, bündelbar | — | — |
+| C16 | `ECS.Events` (SelectionChanged, HoverChanged, …) — test/fixture only | delete | -37 | teilweise: Layering-Fixtures + Test.CheckLayering hängen daran → vertagen | — | — |
+| C17 | Logging `GetEntryCount`, `GetSequenceNumber`, `LevelMask` — 0 callers | delete | -30 | GetEntryCount/SequenceNumber behalten; LevelMask widerlegt (DiagnosticsStream nutzt) | — | — |
 
 ### G — Graphics
 | ID | Fund | Tag | Schätz. | Claude | Codex | Operator |
 |----|---------|-----|------|--------|--------|----------|
-| G01 (PK01) | 29 shaders no pipeline loads: the 20 PK01 files (pick_*, point_surfel/retained/flatdisc/sphere, scene_update, instance_cull_multigeo, debug_view.comp, deferred/gbuffer.vert) plus 8 root `line`/`point`/`triangle`/`debug_surface` `.vert/.frag` (only the `forward/` variants are loaded); GLOB still compiles them all | delete | -2300 | — | — | — |
-| G02 | `Graphics.SharedRenderRecipeExecution` + contract integration stats nobody reads | delete | -1450 | — | — | — |
-| G03 | Legacy pre-GpuScene shaders surface.vert, deferred_lighting.frag, shadow_depth.vert (+ source-grep test assertions, shadow_sampling/surface_color_resolve glsl) | delete | -800 | — | — | — |
-| G04 | ~40× pipeline-create/publish block in `InitializeOperationalPassResources` → one helper | shrink | -650 | — | — | — |
-| G05 (PK02) | `Graphics.GpuScene` legacy wrapper — 0 importers | delete | -500 | — | — | — |
-| G06 | `IRenderer` (58 virtuals, 1 impl misnamed `NullRenderer`) → concrete class | yagni | -250 | — | — | — |
-| G07 | `RenderSubsystemRegistry` lifecycle-event bookkeeping + `StopAfterStage` — test-only | yagni | -120 | — | — | — |
-| G08 | `ForwardSystem` / `DeferredSystem` — pimpl around one bool | delete | -130 | — | — | — |
-| G09 | `RenderCommandRouter` → map held in Renderer | shrink | -110 | — | — | — |
-| G10 | Dead public methods (SelectionSystem, ShadowSystem, CullingSystem → PK03, LightSystem, GpuWorld, ColormapSystem, AlwaysOnTop/DepthTested pipeline getters, BindlessHeap EnqueueRawUpdate/SetDefault/GetLayout) | delete | -150 | — | — | — |
-| G11 | `ICommandContext::BindFrameSampledTexture` — 0 callers | delete | -25 | — | — | — |
-| G12 | `RHI::IDevice::GetPresentMode` — 0 callers | delete | -15 | — | — | — |
-| G13 | `TextureManager::Reupload` — 0 external callers (confirm) | delete | -40 | — | — | — |
-| G14 | `CompiledPassDeclarations::Declares*/Require*` — 1 legacy test | delete | -60 | — | — | — |
-| G15 | 9 private `AlignUp`/`CeilDiv` copies → one shared constexpr helper | reuse | -45 | — | — | — |
-| G16 | `NextPow2` bit-smear → `std::bit_ceil` | stdlib | -12 | — | — | — |
-| G17 | Vulkan `FallbackBindlessHeap` / `FallbackTransferQueue` → reuse Null backend classes (keep fail-closed) | yagni | -80 | — | — | — |
-| G18 | `NullProfiler` 400-line state machine (low confidence; depends on Test.Profiler contract) | shrink | -250 | — | — | — |
+| G01 (PK01) | 29 shaders no pipeline loads: the 20 PK01 files (pick_*, point_surfel/retained/flatdisc/sphere, scene_update, instance_cull_multigeo, debug_view.comp, deferred/gbuffer.vert) plus 8 root `line`/`point`/`triangle`/`debug_surface` `.vert/.frag` (only the `forward/` variants are loaded); GLOB still compiles them all | delete | -2300 | bestätigt, zerlegt: 28 Dateien (nicht 29). pick_* (404), point_* (868, ohne point_splat.glsl), 3 Compute (283) → Task; deferred/gbuffer.vert, root line/point/triangle, debug_surface → einordnen LEGACY-043 | — | — |
+| G02 | `Graphics.SharedRenderRecipeExecution` + contract integration stats nobody reads | delete | -1450 | widerlegt: Contract-Prüfung bricht Frame ab (fail-closed), Tests + GPU-Smoke lesen | — | — |
+| G03 | Legacy pre-GpuScene shaders surface.vert, deferred_lighting.frag, shadow_depth.vert (+ source-grep test assertions, shadow_sampling/surface_color_resolve glsl) | delete | -800 | bestätigt → einordnen LEGACY-043 (shadow_depth.vert ergänzen; .glsl erst danach) | — | — |
+| G04 | ~40× pipeline-create/publish block in `InitializeOperationalPassResources` → one helper | shrink | -650 | teilweise: ≈−250…−400, Blöcke nicht gleichförmig → nach Familie zerlegen, gpu;vulkan nötig | — | — |
+| G05 (PK02) | `Graphics.GpuScene` legacy wrapper — 0 importers | delete | -500 | bestätigt: 0 Importe, kein Test → Task | — | — |
+| G06 | `IRenderer` (58 virtuals, 1 impl misnamed `NullRenderer`) → concrete class | yagni | -250 | bestätigt (Fable): Rename NullRenderer→Renderer, dann Interface kollabieren → Task (zweistufig) | — | — |
+| G07 | `RenderSubsystemRegistry` lifecycle-event bookkeeping + `StopAfterStage` — test-only | yagni | -120 | teilweise: Events (≈40 Z.) Kandidat; StopAfterStage ist Fehlerinjektions-Naht → behalten | — | — |
+| G08 | `ForwardSystem` / `DeferredSystem` — pimpl around one bool | delete | -130 | bestätigt; Benchmark-Manifest engine_compile_iteration_renderer_surface nutzt Datei → Task inkl. Manifest | — | — |
+| G09 | `RenderCommandRouter` → map held in Renderer | shrink | -110 | teilweise: Statustypen bleiben, Gewinn klein → behalten | — | — |
+| G10 | Dead public methods (SelectionSystem, ShadowSystem, CullingSystem → PK03, LightSystem, GpuWorld, ColormapSystem, AlwaysOnTop/DepthTested pipeline getters, BindlessHeap EnqueueRawUpdate/SetDefault/GetLayout) | delete | -150 | teilweise: 7 Methoden ohne Aufrufer → Task; Pipeline-Getter + GetLayout widerlegt | — | — |
+| G11 | `ICommandContext::BindFrameSampledTexture` — 0 callers | delete | -25 | bestätigt → Task, gebündelt mit G12 (vtable, frisches Build) | — | — |
+| G12 | `RHI::IDevice::GetPresentMode` — 0 callers | delete | -15 | bestätigt → mit G11 | — | — |
+| G13 | `TextureManager::Reupload` — 0 external callers (confirm) | delete | -40 | bestätigt, aber ≈15 Z. + dokumentierte Streaming-Naht → vertagen | — | — |
+| G14 | `CompiledPassDeclarations::Declares*/Require*` — 1 legacy test | delete | -60 | bestätigt (produktiv 0); einzige Naht für Executor-Vertragstest → Operatorentscheid | — | — |
+| G15 | 9 private `AlignUp`/`CeilDiv` copies → one shared constexpr helper | reuse | -45 | teilweise: 6× CeilDiv gleich → Task; 4× AlignUp mit abweichender 0-Semantik → separat | — | — |
+| G16 | `NextPow2` bit-smear → `std::bit_ceil` | stdlib | -12 | teilweise: saturiert bei Überlauf, Gewinn <10 → behalten | — | — |
+| G17 | Vulkan `FallbackBindlessHeap` / `FallbackTransferQueue` → reuse Null backend classes (keep fail-closed) | yagni | -80 | widerlegt (Fable): Fail-closed-Zähler im Vertragstest; Backend-Querkopplung | — | — |
+| G18 | `NullProfiler` 400-line state machine (low confidence; depends on Test.Profiler contract) | shrink | -250 | widerlegt (Fable): Referenz für IProfiler-Vertrag (Test.Profiler) | — | — |
 
 ### R — Runtime ohne Editor/Modules
 | ID | Fund | Tag | Schätz. | Claude | Codex | Operator |
 |----|---------|-----|------|--------|--------|----------|
-| R01 | `RenderArtifactRegistry` — no production producer; editor reads an always-empty registry | delete | -1100 | — | — | — |
-| R02 | Copy-pasted Validate/Get/Set/MakeRegistration for 5 feature config sections (+19 shorter) → one template | shrink | -300 | — | — | — |
-| R03 | Unused `DebugNameFor*` in GeometryIntegration/AssetWorkflow → see X04 | delete | (X04) | — | — | — |
-| R04 | `CameraControllerSlot` Preview/TopDown/EditorSecondary + registry/seed plumbing — test-only | yagni | -60 | — | — | — |
-| R05 | `JobTarget` / `JobDesc::Target` (GpuQueue rejected) | delete | -15 | — | — | — |
-| R06 | Type-name helpers → see X02 | reuse | (X02) | — | — | — |
-| R07 | Dead EngineConfigControl / RenderRecipeActivation API (`LoadAndApply*File`, `ActivateRenderRecipeConfigDocument`, …) | delete | -60 | — | — | — |
-| R08 | `SceneDocumentModule::SaveSceneToPath` / `LoadSceneFromPath` — test-only | delete | -65 | — | — | — |
-| R09 | Single-valued `RuntimeInputActionTrigger` | yagni | -15 | — | — | — |
-| R10 | No-bindings overloads of `Build{Mesh,Graph,PointCloud}GeometryPlan` | delete | -45 | — | — | — |
-| R11 | Module OnRegister/OnShutdown provide/withdraw boilerplate ×6 → `ProvideBorrowed<T>` | reuse | -80 | — | — | — |
-| R12 | Test-only/dead helpers (`ScheduleVisualizationHtexRecreate`, `AsPacketBatch`, `AcknowledgeRenderableAssetRebind`, `FindGeometryPropertyCatalogEntry`, `MakeTightLayout`, `ResolveSelected`, `AdvanceWorldGeneration`, `PeekPendingPick`, `OldestInFlightSequence`) | delete | -140 | — | — | — |
-| R13 | Byte-identical `GraphVertex` / `PointCloudVertex` / `MeshPrimitiveVertex` | reuse | -20 | — | — | — |
-| R14 | `JobService::CancelAll` unused while AsyncWorkModule hand-rolls it | delete/reuse | -23 | — | — | — |
-| R15 | Small forwarders: `RuntimeAssetIngestDiagnosticFromRouteStatus`, duplicate `ResolveExternalPath`, `ParentPathOf` | delete/shrink | -28 | — | — | — |
-| R16 | Dead gizmo accessors (`AxisLock`, `SetAxisLock`, `DragAxis`, `DragOrigin`, `MultiSelectPivot`) | delete | -10 | — | — | — |
-| R17 | Dead/test-only members (`GetFallback*AttemptCount`, `HasPlotContext`, `NegotiatedVersion`, `YawRadians`, …) | delete | -50 | — | — | — |
-| R18 | Default `ICameraController::Clone()` returning nullptr — all impls override | shrink | -6 | — | — | — |
-| R19 | Visualization `IsFinite` overloads → see X03 | stdlib | (X03) | — | — | — |
+| R01 | `RenderArtifactRegistry` — no production producer; editor reads an always-empty registry | delete | -1100 | teilweise (Fable): kein Produzent, aber GRAPHICS-109/RUNTIME-281 planen einen → vertagen | — | — |
+| R02 | Copy-pasted Validate/Get/Set/MakeRegistration for 5 feature config sections (+19 shorter) → one template | shrink | -300 | teilweise: nur Helfer in 3 Point-Dateien heben (≈−60…−110) → Task | — | — |
+| R03 | Unused `DebugNameFor*` in GeometryIntegration/AssetWorkflow → see X04 | delete | (X04) | → X04 | — | — |
+| R04 | `CameraControllerSlot` Preview/TopDown/EditorSecondary + registry/seed plumbing — test-only | yagni | -60 | widerlegt: RUNTIME-081 verlangt die Slots | — | — |
+| R05 | `JobTarget` / `JobDesc::Target` (GpuQueue rejected) | delete | -15 | bestätigt → Task inkl. ADR-0024-Korrektur | — | — |
+| R06 | Type-name helpers → see X02 | reuse | (X02) | → X02 | — | — |
+| R07 | Dead EngineConfigControl / RenderRecipeActivation API (`LoadAndApply*File`, `ActivateRenderRecipeConfigDocument`, …) | delete | -60 | HotSubsetFile widerlegt (RUNTIME-282 nutzt); RenderRecipeConfigFile-Member vertagen; ActivateDocument behalten | — | — |
+| R08 | `SceneDocumentModule::SaveSceneToPath` / `LoadSceneFromPath` — test-only | delete | -65 | teilweise: Test-Rückgrat → vertagen bis Test-Pump-Helfer existiert | — | — |
+| R09 | Single-valued `RuntimeInputActionTrigger` | yagni | -15 | teilweise → behalten | — | — |
+| R10 | No-bindings overloads of `Build{Mesh,Graph,PointCloud}GeometryPlan` | delete | -45 | bestätigt → Task (mit R13) | — | — |
+| R11 | Module OnRegister/OnShutdown provide/withdraw boilerplate ×6 → `ProvideBorrowed<T>` | reuse | -80 | widerlegt: ≈−20 statt −80 | — | — |
+| R12 | Test-only/dead helpers (`ScheduleVisualizationHtexRecreate`, `AsPacketBatch`, `AcknowledgeRenderableAssetRebind`, `FindGeometryPropertyCatalogEntry`, `MakeTightLayout`, `ResolveSelected`, `AdvanceWorldGeneration`, `PeekPendingPick`, `OldestInFlightSequence`) | delete | -140 | gemischt: AsPacketBatch → Task; HtexRecreate vertagen; Rest behalten. ⚠ AdvanceWorldGeneration und AcknowledgeRenderableAssetRebind haben keinen produktiven Aufrufer → Verdrahtungslücke klären | — | — |
+| R13 | Byte-identical `GraphVertex` / `PointCloudVertex` / `MeshPrimitiveVertex` | reuse | -20 | bestätigt → Task (mit R10) | — | — |
+| R14 | `JobService::CancelAll` unused while AsyncWorkModule hand-rolls it | delete/reuse | -23 | bestätigt → Task (AsyncWorkModule ruft CancelAll) | — | — |
+| R15 | Small forwarders: `RuntimeAssetIngestDiagnosticFromRouteStatus`, duplicate `ResolveExternalPath`, `ParentPathOf` | delete/shrink | -28 | bestätigt → Task (gebündelt) | — | — |
+| R16 | Dead gizmo accessors (`AxisLock`, `SetAxisLock`, `DragAxis`, `DragOrigin`, `MultiSelectPivot`) | delete | -10 | teilweise: Achsensperre-Feature tot (m_AxisLock immer None) → Entscheidung vertagen | — | — |
+| R17 | Dead/test-only members (`GetFallback*AttemptCount`, `HasPlotContext`, `NegotiatedVersion`, `YawRadians`, …) | delete | -50 | widerlegt: Fail-closed-Zähler + Testnutzen | — | — |
+| R18 | Default `ICameraController::Clone()` returning nullptr — all impls override | shrink | -6 | bestätigt, 0 Zeilen Gewinn → vertagen | — | — |
+| R19 | Visualization `IsFinite` overloads → see X03 | stdlib | (X03) | → X03 | — | — |
 
 ### E — Runtime-Editor/Modules und Sandbox-App
 | ID | Fund | Tag | Schätz. | Claude | Codex | Operator |
 |----|---------|-----|------|--------|--------|----------|
-| E01 | 9 identical `Prepare*Frame` bodies in `*Operations.Frame.cpp` → one template | shrink | -170 | — | — | — |
-| E02 | Enum-to-string switches → see X04 | shrink | (X04) | — | — | — |
-| E03 | 7 pasted result-header blocks in `Sandbox.MeshProcessingPanels.cpp` → `DrawProcessingResultHeader` | shrink | -80 | — | — | — |
-| E04 | `ClusteringService` / `PointCloudConsolidationService` / `TextureBakeService` same forwarding facade | yagni | -90 | — | — | — |
-| E05 | FNV loops → see X01 | reuse | (X01) | — | — | — |
-| E06 | Hand-formatted JSON frame-pacing report in `app/Sandbox/main.cpp` → nlohmann::json | native | -60 | — | — | — |
-| E07 | Three enum-combo idioms + 24 raw ImGui::Combo blocks → `DrawEnumCombo<E>` | shrink | -70 | — | — | — |
-| E08 | GPU-start lambda pasted 3× in scalar-field panels | shrink | -40 | — | — | — |
-| E09 | EditorShell → EditorUiHost → WindowRegistry delegate-only wrappers | yagni | -60 | — | — | — |
-| E10 | `EditorUiHostOwnerControl` capability token, 1 production caller (contract test greps it) | yagni | -50 | — | — | — |
-| E11 | Write-only `PhysicsModuleDiagnostics` fields | delete | -30 | — | — | — |
-| E12 | Declaration-only fields (`HasPrimitiveViewEntity`, `PrimitiveViewStableId`, `DefaultEncoder`, `InertiaSum`, `PanelFrameModelBuildTimeNs`) | delete | -5 | — | — | — |
-| E13 | 0-caller exports (`ApplyEditorConfiguredPointSampling`, CommandHistory/RenderRecipe DebugNames) | delete | -85 | — | — | — |
-| E14 | Test-only DebugName exports → see X04 | delete | (X04) | — | — | — |
-| E15 | 3 identical point input-catalog wrappers → `GetEditorPointInputCatalog` | yagni | -30 | — | — | — |
-| E16 | `SandboxEditorController` pimpl with one production caller | yagni | -50 | — | — | — |
-| E17 | tolower-search lambda in `EditorJobDomainOfBackend` | shrink | -6 | — | — | — |
+| E01 | 9 identical `Prepare*Frame` bodies in `*Operations.Frame.cpp` → one template | shrink | -170 | teilweise: 8 (nicht 9), ≈−40…−70, Source-Guards → vertagen | — | — |
+| E02 | Enum-to-string switches → see X04 | shrink | (X04) | → X04 | — | — |
+| E03 | 7 pasted result-header blocks in `Sandbox.MeshProcessingPanels.cpp` → `DrawProcessingResultHeader` | shrink | -80 | teilweise (≈−20) → vertagen, Bündel E03/E07/E08 | — | — |
+| E04 | `ClusteringService` / `PointCloudConsolidationService` / `TextureBakeService` same forwarding facade | yagni | -90 | widerlegt: tragende Service-Schnittstelle mit Agent-Nutzern | — | — |
+| E05 | FNV loops → see X01 | reuse | (X01) | → X01 | — | — |
+| E06 | Hand-formatted JSON frame-pacing report in `app/Sandbox/main.cpp` → nlohmann::json | native | -60 | teilweise: ≈−35, neue Link-Abhängigkeit → vertagen | — | — |
+| E07 | Three enum-combo idioms + 24 raw ImGui::Combo blocks → `DrawEnumCombo<E>` | shrink | -70 | teilweise (≈−35, Nutzen Typsicherheit) → vertagen, Bündel | — | — |
+| E08 | GPU-start lambda pasted 3× in scalar-field panels | shrink | -40 | teilweise (≈−20) → vertagen, Bündel | — | — |
+| E09 | EditorShell → EditorUiHost → WindowRegistry delegate-only wrappers | yagni | -60 | teilweise: >100 Aufrufstellen → behalten | — | — |
+| E10 | `EditorUiHostOwnerControl` capability token, 1 production caller (contract test greps it) | yagni | -50 | widerlegt: Claim-once-Zugriffsgrenze, Tests + Source-Guard | — | — |
+| E11 | Write-only `PhysicsModuleDiagnostics` fields | delete | -30 | bestätigt: 17/37 Felder ungelesen → vertagen bis Diagnostics-Konsument entschieden | — | — |
+| E12 | Declaration-only fields (`HasPrimitiveViewEntity`, `PrimitiveViewStableId`, `DefaultEncoder`, `InertiaSum`, `PanelFrameModelBuildTimeNs`) | delete | -5 | bestätigt → Task (mit E13-01) | — | — |
+| E13 | 0-caller exports (`ApplyEditorConfiguredPointSampling`, CommandHistory/RenderRecipe DebugNames) | delete | -85 | ApplyEditorConfiguredPointSampling → Task; DebugNames → X04 | — | — |
+| E14 | Test-only DebugName exports → see X04 | delete | (X04) | → X04 | — | — |
+| E15 | 3 identical point input-catalog wrappers → `GetEditorPointInputCatalog` | yagni | -30 | teilweise: Mindestzahl bewusst verschieden → behalten | — | — |
+| E16 | `SandboxEditorController` pimpl with one production caller | yagni | -50 | widerlegt: Kompositionswurzel | — | — |
+| E17 | tolower-search lambda in `EditorJobDomainOfBackend` | shrink | -6 | widerlegt: kein Helfer vorhanden | — | — |
 
 ### GE — Geometry
 | ID | Fund | Tag | Schätz. | Claude | Codex | Operator |
 |----|---------|-----|------|--------|--------|----------|
-| GE01 | 11 mesh/point-cloud file writers + write-status enums — test-only (planned by UI-046 / RUNTIME-282/283) | delete | -1600 | — | — | — |
-| GE02 | `Geometry.Graph.Utils` layouts, crossings, BuildKNNGraph, closest-edge queries, edge-length fills — test-only | delete | -1100 | — | — | — |
-| GE03 | `Geometry.VectorHeatMethod` — test-only (GEOM-089, METHOD-048) | delete | -820 | — | — | — |
-| GE04 | `Geometry.ConvexHullBuilder` (keep `ConvexHull` type) — test-only | delete | -811 | — | — | — |
-| GE05 | `Geometry.ImplicitPlaneField` + Octree node properties — test-only | delete | -830 | — | — | — |
-| GE06 | `Geometry.RotationAveraging` — test-only | delete | -735 | — | — | — |
-| GE07 | `Geometry.HtexPatch` — test-only (METHOD-048?) | delete | -510 | — | — | — |
-| GE08 | `Geometry.HalfedgeMesh.Analysis` — test-only | delete | -511 | — | — | — |
-| GE09 | `Geometry.Graph.ShortestPath` — test-only | delete | -436 | — | — | — |
-| GE10 | `Geometry.DomainViews` — test-only | delete | -394 | — | — | — |
-| GE11 | Boolean, PointCloud.Conversion, Sphere.Sampling, Curve, HalfedgeMesh.Boundary, Geometry.IO (export tables duplicate Asset.ImportRouter) — test-only | delete | -1370 | — | — | — |
-| GE12 | `Geometry.SDF` + `SDFContact`; Containment imports SDF without using it | delete | -580 | — | — | — |
-| GE13 | `SparseBiCGSTAB`, `SparsePreconditioner`, `AnalyzeSparseMatrix` — test-only | delete | -380 | — | — | — |
-| GE14 | `SparseGrid` — test-only | delete | -270 | — | — | — |
-| GE15 | Linalg `ComputeQR`, `SolveLeastSquares`, `RobustPCA`, map/ToEigen helpers — test-only | delete | -270 | — | — | — |
-| GE16 | `IsFinite` copies → see X03 | reuse | (X03) | — | — | — |
-| GE17 | PLY header/scalar/colour machinery duplicated mesh vs point-cloud readers → `Geometry.IOText.hpp` | reuse | -200 | — | — | — |
-| GE18 | Octree `SplitPoint::Median` / `ComputeMedianCenter` — test-only | delete | -80 | — | — | — |
-| GE19 | PointSampling mirror enums/struct duplicating ProgressivePoisson types | yagni | -60 | — | — | — |
-| GE20 | `IsDelaunay`, `DelaunayFlip`, `CalculateNormals`, `GenerateUVs`, `TargetValence`, `KeepLargestComponent` — 0 callers | delete | -80 | — | — | — |
-| GE21 | Vertex attribute-transfer rule hooks — test-only | delete | -70 | — | — | — |
-| GE22 | Statistics `Skewness`, `Kurtosis`, variances, `SafeAsin` — test-only | delete | -50 | — | — | — |
-| GE23 | `PointCloudIO::LoadPTS`, public NN-histogram/periodogram wrappers | delete | -50 | — | — | — |
-| GE24 | `RandomRotation`, `ChordalDistance`, `ApproxEqual` — 0 production callers | delete | -40 | — | — | — |
-| GE25 | File-local `kPi` ×4 → `std::numbers::pi` | stdlib | -10 | — | — | — |
+| GE01 | 11 mesh/point-cloud file writers + write-status enums — test-only (planned by UI-046 / RUNTIME-282/283) | delete | -1600 | widerlegt (Fable): 13 Writer ≈1.900 Z.; UI-046 baut ausdrücklich darauf → einordnen UI-046 | — | — |
+| GE02 | `Geometry.Graph.Utils` layouts, crossings, BuildKNNGraph, closest-edge queries, edge-length fills — test-only | delete | -1100 | teilweise: Layouts + CountEdgeCrossings (≈700) → Task; ClosestEdge*/EdgeLengths vertagen (GEOM-074); KNN behalten; ApplyGaussianNoise → Testhelfer | — | — |
+| GE03 | `Geometry.VectorHeatMethod` — test-only (GEOM-089, METHOD-048) | delete | -820 | widerlegt: GEOM-089 + METHOD-048 planen Nutzung → behalten | — | — |
+| GE04 | `Geometry.ConvexHullBuilder` (keep `ConvexHull` type) — test-only | delete | -811 | bestätigt (verwaist) → Task „Anbinden vs. Löschen“ nach PK10 (LocalConvexHull) | — | — |
+| GE05 | `Geometry.ImplicitPlaneField` + Octree node properties — test-only | delete | -830 | bestätigt: 791 Z. + Octree-NodeProperties → Task (inkl. 12 tote Test-Imports) | — | — |
+| GE06 | `Geometry.RotationAveraging` — test-only | delete | -735 | bestätigt → Task (zieht GE24/GE25-Anteile mit) | — | — |
+| GE07 | `Geometry.HtexPatch` — test-only (METHOD-048?) | delete | -510 | teilweise: Teil des entworfenen Htex-Systems (docs/architecture) → vertagen, Operatorentscheid Htex-Richtung | — | — |
+| GE08 | `Geometry.HalfedgeMesh.Analysis` — test-only | delete | -511 | widerlegt: GEOM-110/RUNTIME-286/RUNTIME-280 nennen Analyze als Reuse → behalten | — | — |
+| GE09 | `Geometry.Graph.ShortestPath` — test-only | delete | -436 | teilweise: Editor-Platzhalter ShortestPath, GEOM-074 → vertagen | — | — |
+| GE10 | `Geometry.DomainViews` — test-only | delete | -394 | teilweise: GEOM-012-Ergebnis, METHOD-003 → vertagen | — | — |
+| GE11 | Boolean, PointCloud.Conversion, Sphere.Sampling, Curve, HalfedgeMesh.Boundary, Geometry.IO (export tables duplicate Asset.ImportRouter) — test-only | delete | -1370 | zerlegt: Boolean widerlegt (METHOD-005 verbietet Löschen); Boundary widerlegt (GEOM-110); Geometry.IO widerlegt (UI-046, gewollte Doppelableitung aus .inc); PointCloud.Conversion, Sphere.Sampling, Curve (≈743) → Task | — | — |
+| GE12 | `Geometry.SDF` + `SDFContact`; Containment imports SDF without using it | delete | -580 | toter `import Geometry.SDF` in Containment → Task; SDF/SDFContact widerlegt (METHOD-003/GEOM-013) | — | — |
+| GE13 | `SparseBiCGSTAB`, `SparsePreconditioner`, `AnalyzeSparseMatrix` — test-only | delete | -380 | widerlegt: BiCGSTAB ist METHOD-003-Solverpfad; AnalyzeSparseMatrix produktiv (Eigensolver) | — | — |
+| GE14 | `SparseGrid` — test-only | delete | -270 | bestätigt → Task klein oder vertagen bis METHOD-003 | — | — |
+| GE15 | Linalg `ComputeQR`, `SolveLeastSquares`, `RobustPCA`, map/ToEigen helpers — test-only | delete | -270 | RobustPCA + ToEigen → Task; QR/LeastSquares vertagen (GEOM-013 QEF) | — | — |
+| GE16 | `IsFinite` copies → see X03 | reuse | (X03) | → X03 | — | — |
+| GE17 | PLY header/scalar/colour machinery duplicated mesh vs point-cloud readers → `Geometry.IOText.hpp` | reuse | -200 | teilweise: großteils schon in Geometry.IOText.hpp (ef3202f03); Rest ≈60–100 → klein oder behalten | — | — |
+| GE18 | Octree `SplitPoint::Median` / `ComputeMedianCenter` — test-only | delete | -80 | bestätigt (niedrige Prio) → Task oder behalten | — | — |
+| GE19 | PointSampling mirror enums/struct duplicating ProgressivePoisson types | yagni | -60 | teilweise: Spiegel schützt Modulgrenze zur Referenz-Impl → behalten | — | — |
+| GE20 | `IsDelaunay`, `DelaunayFlip`, `CalculateNormals`, `GenerateUVs`, `TargetValence`, `KeepLargestComponent` — 0 callers | delete | -80 | Delaunay + CalculateNormals/GenerateUVs → Task; TargetValence intern genutzt; KeepLargestComponent → einordnen GEOM-110 | — | — |
+| GE21 | Vertex attribute-transfer rule hooks — test-only | delete | -70 | bestätigt (nur Test), Hook im Kern verdrahtet → behalten oder kleiner Task | — | — |
+| GE22 | Statistics `Skewness`, `Kurtosis`, variances, `SafeAsin` — test-only | delete | -50 | bestätigt → kleiner Task oder behalten | — | — |
+| GE23 | `PointCloudIO::LoadPTS`, public NN-histogram/periodogram wrappers | delete | -50 | LoadPTS: PTS wird auf LoadXYZ geroutet → Task (Routing-Entscheid); QualityMetrics widerlegt (GEOM-087) | — | — |
+| GE24 | `RandomRotation`, `ChordalDistance`, `ApproxEqual` — 0 production callers | delete | -40 | RandomRotation/ChordalDistance teilweise (Test-Orakel) → behalten; ApproxEqual 0 Aufrufer → Task | — | — |
+| GE25 | File-local `kPi` ×4 → `std::numbers::pi` | stdlib | -10 | bestätigt → trivial, mit GE06 bündeln | — | — |
 
 ### PK — Codex-Audit-Gruppen ohne Gegenstück im Claude-Audit
 | ID | Fund | Tag | Schätz. | Claude | Codex | Operator |
 |----|---------|-----|------|--------|-------|----------|
-| PK03 | Legacy `CullingSystem` registration API (`Register`, `Unregister`, `UpdateBounds`, `SetDrawTemplate`, `CullingHandle`, `CullSlot`, dead getters) and, as a separate question, the empty `SyncGpuBuffer()` still called from `RenderPrepPipeline.cpp:133` | delete | small | — | — | — |
-| PK04 | Duplicate `MakeDenseClosedTriangleMesh` / `ExtractTriangleSoup` in `Test.MeshOperationsSlow.cpp` vs `Test_MeshOperations.cpp` → `tests/support/geometry/Test_MeshBuilders.h` | reuse | -85 | — | — | — |
-| PK05 | Unused types `CompiledGraph`, `ReadyNodePolicy`, `VulkanQueueFamilies`/`VulkanQueues`, `VulkanSurfaceState` in 4 partitions | delete | -80 | — | — | — |
-| PK07 | GLFW `CreateVulkanSurface` bridge (0 callers; Vulkan.Device builds the surface itself) | delete | -54 | — | — | — |
-| PK08 | Duplicate DAG cycle search in `Core.Dag.Scheduler.cpp` and `Core.Dag.TaskGraph.cpp` | reuse | -50 | — | — | — |
-| PK09 | Duplicate LOP benchmark metric helpers (`MeanPlaneError`, `MeanSphereError`, `MinimumPairwiseDistance`, `Finite`) | reuse | -40 | — | — | — |
-| PK10 | `CachedSelectedVertex/Edge/FaceIndices` (declaration only) and `Culling::Proxy` / `CullableTag` (0 importers) — four separate candidates | delete | -20 | — | — | — |
-| PK11 | `Core::PathKey` / `FromPath` (0 users; own FNV copy, see X01) | delete | -25 | — | — | — |
-| PK12 | Legacy `propertyName` / `expectedValueKind` read fallbacks in `Runtime.SceneSerialization.cpp:1276-1298` (writer emits `name`/`valueKind`) | delete | -20 | — | — | — |
+| PK03 | Legacy `CullingSystem` registration API (`Register`, `Unregister`, `UpdateBounds`, `SetDrawTemplate`, `CullingHandle`, `CullSlot`, dead getters) and, as a separate question, the empty `SyncGpuBuffer()` still called from `RenderPrepPipeline.cpp:133` | delete | small | bestätigt (Fable): Legacy-API + Getter → Task; leere Methode entfernen, Schritt CullingSync behalten (Vertrag; Schritt-Entfernung vertagen bis GRAPHICS-135) | — | — |
+| PK04 | Duplicate `MakeDenseClosedTriangleMesh` / `ExtractTriangleSoup` in `Test.MeshOperationsSlow.cpp` vs `Test_MeshOperations.cpp` → `tests/support/geometry/Test_MeshBuilders.h` | reuse | -85 | bestätigt: 93 identische Zeilen → Task (≈−85) | — | — |
+| PK05 | Unused types `CompiledGraph`, `ReadyNodePolicy`, `VulkanQueueFamilies`/`VulkanQueues`, `VulkanSurfaceState` in 4 partitions | delete | -80 | bestätigt: 4 tote Partitionen → 2 Tasks (core, vulkan) | — | — |
+| PK07 | GLFW `CreateVulkanSurface` bridge (0 callers; Vulkan.Device builds the surface itself) | delete | -54 | bestätigt: 0 Aufrufer → Task; Operator klärt Layer-Richtung, PLATFORM-004 anpassen | — | — |
+| PK08 | Duplicate DAG cycle search in `Core.Dag.Scheduler.cpp` and `Core.Dag.TaskGraph.cpp` | reuse | -50 | teilweise: ≈−35, Owner unklar → behalten | — | — |
+| PK09 | Duplicate LOP benchmark metric helpers (`MeanPlaneError`, `MeanSphereError`, `MinimumPairwiseDistance`, `Finite`) | reuse | -40 | bestätigt → Task (gemeinsamer Benchmark-Header, EAR optional) | — | — |
+| PK10 | `CachedSelectedVertex/Edge/FaceIndices` (declaration only) and `Culling::Proxy` / `CullableTag` (0 importers) — four separate candidates | delete | -20 | bestätigt: 3 Caches + CullableTag + Proxy → Task (ECS-Cleanup) | — | — |
+| PK11 | `Core::PathKey` / `FromPath` (0 users; own FNV copy, see X01) | delete | -25 | bestätigt → Task (entfernen, kein Hash-Reuse) | — | — |
+| PK12 | Legacy `propertyName` / `expectedValueKind` read fallbacks in `Runtime.SceneSerialization.cpp:1276-1298` (writer emits `name`/`valueKind`) | delete | -20 | bestätigt: Loader akzeptiert nur v4 → Legacy-Schlüssel unerreichbar → Task | — | — |
+
+## Claude-Gegenprüfung 2026-10-03
+
+Erste Claude-Prüfrunde auf `d12288094` (rein lesend, keine Builds). Das Votum
+steht verkürzt in der Spalte „Claude“; Belege, Gegenbelege und Prüfbefehle
+lagen in den Agentenberichten der Sitzung und werden beim jeweiligen
+Kandidaten-Dossier in Phase B ausgeschrieben. Die Codex-Spalte und die
+Operator-Spalte sind bewusst offen.
+
+- Prüfer: Fable 5.1 für Urteilsfragen (E0 PK, E1 X, E7 GE sowie G06, G17,
+  G18, R01, C01, C02, T12); Sonnet für die grep-lastigen Etappen (E2 T, E3 C,
+  E4 G, E5/E6 R/E).
+- Ergebnis grob: Viele große Einsparungen des Claude-Audits sind widerlegt
+  oder durch offene Tasks gedeckt (z. B. GE01/GE03/GE08/GE13, G02, T12/T13,
+  C10/C14). Die realistische freie Löschmenge liegt eher bei einigen tausend
+  statt ≈38.000 Zeilen. Die Codex-Gruppen PK03–PK12 sind fast vollständig
+  bestätigt.
+- Neue Überschneidung: `LEGACY-043` löscht bereits einen Teil der Shader aus
+  G01/G03 (903 Zeilen) → dort einordnen, nicht doppelt zählen.
+- Auffälligkeiten außerhalb von Ponytail, separat zu klären (keine
+  Löschkandidaten):
+  - `JobService::AdvanceWorldGeneration` hat keinen produktiven Aufrufer,
+    während fünf produktive Stellen `WorldGeneration` als Schutz lesen
+    (mögliche fehlende Verdrahtung beim Szenenwechsel).
+  - `AcknowledgeRenderableAssetRebind` ist laut ADR 0013 Pflichtschritt der
+    Rebind-Schleife, hat aber keinen produktiven Aufrufer.
+  - `HashProceduralGeometryParams` hasht rohe Struct-Bytes inklusive Padding
+    (möglicherweise nichtdeterministisch).
+  - Gizmo-Achsensperre ist funktional tot (`m_AxisLock` immer `None`).
+  - Editor-Algorithmen `ShortestPath`, `ConvexHull`, `VectorHeat`,
+    `BooleanCSG` haben Label und UI-Reihenfolge, aber keinen Ausführungspfad.
+  - Die lokalen Worktrees unter `.claude/worktrees/` enthalten 4 Commits,
+    die nicht auf `main` liegen (keine Repo-Änderung; Operator entscheidet).
 
 ## Prüfhinweise aus dem Codex-Audit
 
@@ -736,3 +769,8 @@ Prüfung der betroffenen Annahmen, nicht den Neustart der gesamten Liste.
   über eine Codeänderung getroffen. REVIEW-005 und REVIEW-006 als ersetzte
   Planungsnotizen retired. Nächster Schritt bei Aufnahme: Phase A,
   gemeinsame Zerlegung und Festlegung der ersten Einzelprüfung.
+- 2026-10-03: Erste Claude-Gegenprüfung aller 132 Inventarzeilen auf
+  `d12288094` (Fable 5.1 für Urteilsfragen, Sonnet für grep-lastige Etappen;
+  rein lesend). Voten in der Claude-Spalte, Zusammenfassung und Nebenbefunde
+  in §„Claude-Gegenprüfung 2026-10-03“. Codex- und Operator-Spalten offen;
+  keine Entscheidung, kein Folgetask, keine Codeänderung.
