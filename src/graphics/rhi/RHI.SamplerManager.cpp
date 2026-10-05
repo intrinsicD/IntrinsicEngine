@@ -6,11 +6,13 @@ module;
 #include <cstring>
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <unordered_map>
 
 module Extrinsic.RHI.SamplerManager;
 
 import Extrinsic.Core.Error;
+import Extrinsic.Core.Hash;
 import Extrinsic.Core.HandleLease;
 import Extrinsic.Core.StrongHandle;
 import Extrinsic.RHI.Handles;
@@ -46,18 +48,13 @@ namespace Extrinsic::RHI
         {
             // Hash only the value fields, not the DebugName char*.
             // Layout-stable fields in declaration order:
-            constexpr std::uint64_t FNV_OFFSET = 14695981039346656037ull;
-            constexpr std::uint64_t FNV_PRIME  = 1099511628211ull;
-
-            auto mix = [&](std::uint64_t h, const void* data, std::size_t n) -> std::uint64_t
+            auto mix = [](std::uint64_t h, const void* data, std::size_t n) -> std::uint64_t
             {
-                const auto* bytes = static_cast<const std::uint8_t*>(data);
-                for (std::size_t i = 0; i < n; ++i)
-                { h ^= bytes[i]; h *= FNV_PRIME; }
-                return h;
+                return Core::Hash::HashString64(
+                    std::string_view(static_cast<const char*>(data), n), h);
             };
 
-            std::uint64_t h = FNV_OFFSET;
+            std::uint64_t h = Core::Hash::HashString64({});
             h = mix(h, &d.MagFilter,       sizeof(d.MagFilter));
             h = mix(h, &d.MinFilter,       sizeof(d.MinFilter));
             h = mix(h, &d.MipFilter,       sizeof(d.MipFilter));

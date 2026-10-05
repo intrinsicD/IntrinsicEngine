@@ -26,10 +26,11 @@ namespace Extrinsic::Core::Hash
     // 64-bit FNV-1a over the bytes of `str`, each byte treated as unsigned and
     // embedded NULs included. Compile-time type identity and the task graph's
     // own type tokens share this one implementation; their signature sources
-    // stay distinct.
-    export [[nodiscard]] constexpr uint64_t HashString64(std::string_view str) noexcept
+    // stay distinct. Passing a previous result as `hash` continues the hash,
+    // so hashing "foo" then "bar" equals hashing "foobar".
+    export [[nodiscard]] constexpr uint64_t HashString64(std::string_view str,
+                                                         uint64_t hash = 14695981039346656037ULL) noexcept
     {
-        uint64_t hash = 14695981039346656037ULL;
         for (unsigned char c : str)
         {
             hash ^= c;

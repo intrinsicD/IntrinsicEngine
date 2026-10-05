@@ -6,10 +6,12 @@ module;
 #include <cstring>
 #include <optional>
 #include <span>
+#include <string_view>
 #include <vector>
 
 module Extrinsic.Runtime.GeometryPlanBuilders;
 
+import Extrinsic.Core.Hash;
 import Extrinsic.Graphics.GeometryResidency;
 import Extrinsic.Graphics.GpuWorld;
 
@@ -17,9 +19,6 @@ namespace Extrinsic::Runtime
 {
     namespace
     {
-        constexpr std::uint64_t kFnvOffset64 = 14695981039346656037ull;
-        constexpr std::uint64_t kFnvPrime64 = 1099511628211ull;
-
         constexpr std::array<ProceduralVertex, 3> kTriangleVertices{{
             {-0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f},
             { 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f},
@@ -63,15 +62,8 @@ namespace Extrinsic::Runtime
     std::uint64_t HashProceduralGeometryParams(
         const ProceduralGeometryParams& params) noexcept
     {
-        std::uint64_t hash = kFnvOffset64;
-        unsigned char bytes[sizeof(ProceduralGeometryParams)];
-        std::memcpy(bytes, &params, sizeof(ProceduralGeometryParams));
-        for (const unsigned char byte : bytes)
-        {
-            hash ^= static_cast<std::uint64_t>(byte);
-            hash *= kFnvPrime64;
-        }
-        return hash;
+        return Core::Hash::HashString64(
+            std::string_view(reinterpret_cast<const char*>(&params), sizeof(params)));
     }
 
     const char* DebugNameForProceduralGeometryKind(

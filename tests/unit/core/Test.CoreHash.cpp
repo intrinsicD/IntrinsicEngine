@@ -101,6 +101,14 @@ TEST(CoreHash, HashString64_HashesEmbeddedNulBytes)
     EXPECT_EQ(HashString64(withNul), 0xe5d29919042666b2ULL);
 }
 
+TEST(CoreHash, HashString64_ContinuesFromAPreviousHash)
+{
+    using Extrinsic::Core::Hash::HashString64;
+    static_assert(HashString64("bar", HashString64("foo")) == HashString64("foobar"));
+    EXPECT_EQ(HashString64("", HashString64("foo")), HashString64("foo"));
+    EXPECT_EQ(HashString64({}), HashString64(""));
+}
+
 TEST(CoreHash, HashString64_TreatsBytesAsUnsigned)
 {
     // A sign-extended byte would XOR in 0xFFFFFFFFFFFFFFFF instead of 0xFF and
