@@ -1331,10 +1331,11 @@ Slice 3 pins the contract for that constant:
   `Geometry::Internal::GJKDiagnostics` out-param (with fields
   `iterations` and `reason ∈ { Converged, EarlyOutNegativeSupport,
   NoSimplexProgress, MaxIterationsHit }`). Both `GJK_Boolean` and
-  `GJK_Intersection` gained a four-argument overload taking the
-  diagnostics by reference; the existing two- and three-argument entry
-  points stay as thin wrappers and produce byte-identical boolean
-  outcomes. Callers that only want overlap continue using the existing
+  `GJK_Intersection` have a three-argument overload `(a, b, diag)` taking
+  the diagnostics by reference; the two-argument `(a, b)` entry points
+  are thin wrappers and produce byte-identical boolean outcomes. GJK
+  itself takes no scratch arena; EPA still uses the caller's
+  `LinearArena`. Callers that only want overlap continue using the existing
   entry points; callers that need to distinguish a geometric "no
   overlap" (`EarlyOutNegativeSupport`) from a numerical fallback
   (`NoSimplexProgress`, `MaxIterationsHit`) opt in via the

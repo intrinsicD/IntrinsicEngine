@@ -1,3 +1,5 @@
+// Contact manifold generation between primitives: analytic pair routines with a
+// GJK+EPA fallback that uses a caller-provided scratch arena for EPA.
 module;
 #include <glm/glm.hpp>
 #include <optional>
@@ -112,7 +114,7 @@ export namespace Geometry
         std::optional<ContactManifold> Contact_Fallback(const A& a, const B& b, Extrinsic::Core::Memory::LinearArena& scratch)
         {
             // Use GJK_Intersection to get the simplex
-            auto simplexOpt = Internal::GJK_Intersection(a, b, scratch);
+            auto simplexOpt = Internal::GJK_Intersection(a, b);
 
             if (simplexOpt)
             {

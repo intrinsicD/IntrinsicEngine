@@ -33,65 +33,57 @@ TEST(GJK, SphereSphere_Overlapping)
 {
     Sphere a{glm::vec3(0, 0, 0), 1.0f};
     Sphere b{glm::vec3(1.5f, 0, 0), 1.0f};
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
-    EXPECT_TRUE(Internal::GJK_Boolean(a, b, scratch));
+    EXPECT_TRUE(Internal::GJK_Boolean(a, b));
 }
 
 TEST(GJK, SphereSphere_Separated)
 {
     Sphere a{glm::vec3(0, 0, 0), 1.0f};
     Sphere b{glm::vec3(5, 0, 0), 1.0f};
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
-    EXPECT_FALSE(Internal::GJK_Boolean(a, b, scratch));
+    EXPECT_FALSE(Internal::GJK_Boolean(a, b));
 }
 
 TEST(GJK, SphereSphere_Touching)
 {
     Sphere a{glm::vec3(0, 0, 0), 1.0f};
     Sphere b{glm::vec3(2.0f, 0, 0), 1.0f};
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
     // Touching should be detected as overlap
-    EXPECT_TRUE(Internal::GJK_Boolean(a, b, scratch));
+    EXPECT_TRUE(Internal::GJK_Boolean(a, b));
 }
 
 TEST(GJK, SphereSphere_Concentric)
 {
     Sphere a{glm::vec3(0, 0, 0), 2.0f};
     Sphere b{glm::vec3(0, 0, 0), 1.0f};
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
-    EXPECT_TRUE(Internal::GJK_Boolean(a, b, scratch));
+    EXPECT_TRUE(Internal::GJK_Boolean(a, b));
 }
 
 TEST(GJK, SphereAABB_Overlapping)
 {
     Sphere s{glm::vec3(0, 0, 0), 1.5f};
     AABB box{glm::vec3(1, -1, -1), glm::vec3(3, 1, 1)};
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
-    EXPECT_TRUE(Internal::GJK_Boolean(s, box, scratch));
+    EXPECT_TRUE(Internal::GJK_Boolean(s, box));
 }
 
 TEST(GJK, SphereAABB_Separated)
 {
     Sphere s{glm::vec3(0, 0, 0), 0.5f};
     AABB box{glm::vec3(2, 2, 2), glm::vec3(3, 3, 3)};
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
-    EXPECT_FALSE(Internal::GJK_Boolean(s, box, scratch));
+    EXPECT_FALSE(Internal::GJK_Boolean(s, box));
 }
 
 TEST(GJK, AABBAABB_Overlapping)
 {
     AABB a{glm::vec3(-1), glm::vec3(1)};
     AABB b{glm::vec3(0.5f, -1, -1), glm::vec3(2, 1, 1)};
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
-    EXPECT_TRUE(Internal::GJK_Boolean(a, b, scratch));
+    EXPECT_TRUE(Internal::GJK_Boolean(a, b));
 }
 
 TEST(GJK, AABBAABB_Separated)
 {
     AABB a{glm::vec3(-1), glm::vec3(1)};
     AABB b{glm::vec3(3, 3, 3), glm::vec3(5, 5, 5)};
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
-    EXPECT_FALSE(Internal::GJK_Boolean(a, b, scratch));
+    EXPECT_FALSE(Internal::GJK_Boolean(a, b));
 }
 
 // ============================================================================
@@ -102,24 +94,21 @@ TEST(GJK, OBBSphere_Overlapping)
 {
     OBB obb{glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), glm::quat(1, 0, 0, 0)};
     Sphere s{glm::vec3(1.5f, 0, 0), 1.0f};
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
-    EXPECT_TRUE(Internal::GJK_Boolean(obb, s, scratch));
+    EXPECT_TRUE(Internal::GJK_Boolean(obb, s));
 }
 
 TEST(GJK, CapsuleSphere_Overlapping)
 {
     Capsule cap{glm::vec3(0, 0, 0), glm::vec3(0, 5, 0), 1.0f};
     Sphere s{glm::vec3(1.5f, 2.5f, 0), 1.0f};
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
-    EXPECT_TRUE(Internal::GJK_Boolean(cap, s, scratch));
+    EXPECT_TRUE(Internal::GJK_Boolean(cap, s));
 }
 
 TEST(GJK, CapsuleCapsule_Separated)
 {
     Capsule a{glm::vec3(0, 0, 0), glm::vec3(0, 5, 0), 0.5f};
     Capsule b{glm::vec3(5, 0, 0), glm::vec3(5, 5, 0), 0.5f};
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
-    EXPECT_FALSE(Internal::GJK_Boolean(a, b, scratch));
+    EXPECT_FALSE(Internal::GJK_Boolean(a, b));
 }
 
 // ============================================================================
@@ -134,8 +123,7 @@ TEST(GJK, ConvexHullSphere_Overlapping)
         {-1, -1,  1}, {1, -1,  1}, {1, 1,  1}, {-1, 1,  1}
     };
     Sphere s{glm::vec3(0.5f, 0.5f, 0.5f), 0.1f};
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
-    EXPECT_TRUE(Internal::GJK_Boolean(hull, s, scratch));
+    EXPECT_TRUE(Internal::GJK_Boolean(hull, s));
 }
 
 TEST(GJK, ConvexHullSphere_Separated)
@@ -146,8 +134,7 @@ TEST(GJK, ConvexHullSphere_Separated)
         {-1, -1,  1}, {1, -1,  1}, {1, 1,  1}, {-1, 1,  1}
     };
     Sphere s{glm::vec3(5, 5, 5), 0.5f};
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
-    EXPECT_FALSE(Internal::GJK_Boolean(hull, s, scratch));
+    EXPECT_FALSE(Internal::GJK_Boolean(hull, s));
 }
 
 // ============================================================================
@@ -158,8 +145,7 @@ TEST(GJK, Intersection_ReturnsSimplex_WhenOverlapping)
 {
     Sphere a{glm::vec3(0, 0, 0), 2.0f};
     Sphere b{glm::vec3(1, 0, 0), 2.0f};
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
-    auto result = Internal::GJK_Intersection(a, b, scratch);
+    auto result = Internal::GJK_Intersection(a, b);
     EXPECT_TRUE(result.has_value());
     // Simplex should have 2-4 points
     EXPECT_GE(result->Size, 2);
@@ -170,23 +156,22 @@ TEST(GJK, Intersection_ReturnsNullopt_WhenSeparated)
 {
     Sphere a{glm::vec3(0, 0, 0), 1.0f};
     Sphere b{glm::vec3(5, 0, 0), 1.0f};
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
-    auto result = Internal::GJK_Intersection(a, b, scratch);
+    auto result = Internal::GJK_Intersection(a, b);
     EXPECT_FALSE(result.has_value());
 }
 
 // ============================================================================
-// GJK — Back-compat Overloads (no scratch arena)
+// GJK — Wrapper Overloads (no diagnostics argument)
 // ============================================================================
 
-TEST(GJK, BackCompat_Boolean_Overlapping)
+TEST(GJK, Wrapper_Boolean_Overlapping)
 {
     Sphere a{glm::vec3(0, 0, 0), 1.0f};
     Sphere b{glm::vec3(1.0f, 0, 0), 1.0f};
     EXPECT_TRUE(Internal::GJK_Boolean(a, b));
 }
 
-TEST(GJK, BackCompat_Intersection_Overlapping)
+TEST(GJK, Wrapper_Intersection_Overlapping)
 {
     Sphere a{glm::vec3(0, 0, 0), 2.0f};
     Sphere b{glm::vec3(1, 0, 0), 2.0f};
@@ -203,9 +188,8 @@ TEST(GJK, ConvergesWithinIterationLimit)
     // Use a complex pair: two oriented ellipsoids
     Ellipsoid a{glm::vec3(0, 0, 0), glm::vec3(3, 1, 1), glm::quat(1, 0, 0, 0)};
     Ellipsoid b{glm::vec3(2, 0, 0), glm::vec3(1, 3, 1), glm::quat(1, 0, 0, 0)};
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
     // Should detect overlap (elongated ellipsoids touching)
-    auto result = Internal::GJK_Boolean(a, b, scratch);
+    auto result = Internal::GJK_Boolean(a, b);
     EXPECT_TRUE(result);
 }
 
@@ -219,11 +203,10 @@ TEST(GJK, ScaleInvariance_VerySmallObjects)
     constexpr float s = 1e-3f;
     Sphere a{glm::vec3(0, 0, 0), s};
     Sphere b{glm::vec3(1.5f * s, 0, 0), s};
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
-    EXPECT_TRUE(Internal::GJK_Boolean(a, b, scratch)) << "Small overlapping spheres must be detected";
+    EXPECT_TRUE(Internal::GJK_Boolean(a, b)) << "Small overlapping spheres must be detected";
 
     Sphere c{glm::vec3(5.0f * s, 0, 0), s};
-    EXPECT_FALSE(Internal::GJK_Boolean(a, c, scratch)) << "Small separated spheres must not overlap";
+    EXPECT_FALSE(Internal::GJK_Boolean(a, c)) << "Small separated spheres must not overlap";
 }
 
 TEST(GJK, ScaleInvariance_VeryLargeObjects)
@@ -232,11 +215,10 @@ TEST(GJK, ScaleInvariance_VeryLargeObjects)
     constexpr float s = 1e3f;
     Sphere a{glm::vec3(0, 0, 0), s};
     Sphere b{glm::vec3(1.5f * s, 0, 0), s};
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
-    EXPECT_TRUE(Internal::GJK_Boolean(a, b, scratch)) << "Large overlapping spheres must be detected";
+    EXPECT_TRUE(Internal::GJK_Boolean(a, b)) << "Large overlapping spheres must be detected";
 
     Sphere c{glm::vec3(5.0f * s, 0, 0), s};
-    EXPECT_FALSE(Internal::GJK_Boolean(a, c, scratch)) << "Large separated spheres must not overlap";
+    EXPECT_FALSE(Internal::GJK_Boolean(a, c)) << "Large separated spheres must not overlap";
 }
 
 TEST(GJK, ScaleInvariance_TinyAABBs)
@@ -244,11 +226,10 @@ TEST(GJK, ScaleInvariance_TinyAABBs)
     constexpr float s = 1e-4f;
     AABB a{glm::vec3(-s), glm::vec3(s)};
     AABB b{glm::vec3(0.5f * s, -s, -s), glm::vec3(3 * s, s, s)};
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
-    EXPECT_TRUE(Internal::GJK_Boolean(a, b, scratch)) << "Tiny overlapping AABBs must be detected";
+    EXPECT_TRUE(Internal::GJK_Boolean(a, b)) << "Tiny overlapping AABBs must be detected";
 
     AABB c{glm::vec3(5 * s, 5 * s, 5 * s), glm::vec3(7 * s, 7 * s, 7 * s)};
-    EXPECT_FALSE(Internal::GJK_Boolean(a, c, scratch)) << "Tiny separated AABBs must not overlap";
+    EXPECT_FALSE(Internal::GJK_Boolean(a, c)) << "Tiny separated AABBs must not overlap";
 }
 
 TEST(GJK, ScaleInvariance_HugeAABBs)
@@ -256,11 +237,10 @@ TEST(GJK, ScaleInvariance_HugeAABBs)
     constexpr float s = 1e4f;
     AABB a{glm::vec3(-s), glm::vec3(s)};
     AABB b{glm::vec3(0.5f * s, -s, -s), glm::vec3(3 * s, s, s)};
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
-    EXPECT_TRUE(Internal::GJK_Boolean(a, b, scratch)) << "Huge overlapping AABBs must be detected";
+    EXPECT_TRUE(Internal::GJK_Boolean(a, b)) << "Huge overlapping AABBs must be detected";
 
     AABB c{glm::vec3(5 * s, 5 * s, 5 * s), glm::vec3(7 * s, 7 * s, 7 * s)};
-    EXPECT_FALSE(Internal::GJK_Boolean(a, c, scratch)) << "Huge separated AABBs must not overlap";
+    EXPECT_FALSE(Internal::GJK_Boolean(a, c)) << "Huge separated AABBs must not overlap";
 }
 
 TEST(GJK, ScaleInvariance_Intersection_TinyOverlap)
@@ -269,8 +249,7 @@ TEST(GJK, ScaleInvariance_Intersection_TinyOverlap)
     constexpr float s = 1e-3f;
     Sphere a{glm::vec3(0, 0, 0), 2.0f * s};
     Sphere b{glm::vec3(s, 0, 0), 2.0f * s};
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
-    auto result = Internal::GJK_Intersection(a, b, scratch);
+    auto result = Internal::GJK_Intersection(a, b);
     EXPECT_TRUE(result.has_value()) << "Intersection must succeed for small overlapping spheres";
 }
 
@@ -323,9 +302,8 @@ TEST(GJK, Diagnostics_Converged_OnOverlappingSpheres)
 {
     Sphere a{glm::vec3(0, 0, 0), 1.0f};
     Sphere b{glm::vec3(1.5f, 0, 0), 1.0f};
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
     Internal::GJKDiagnostics diag;
-    const bool overlap = Internal::GJK_Boolean(a, b, scratch, diag);
+    const bool overlap = Internal::GJK_Boolean(a, b, diag);
     EXPECT_TRUE(overlap);
     EXPECT_EQ(diag.reason, Internal::TerminationReason::Converged);
     EXPECT_GE(diag.iterations, 0);
@@ -336,9 +314,8 @@ TEST(GJK, Diagnostics_EarlyOutNegativeSupport_OnSeparatedSpheres)
 {
     Sphere a{glm::vec3(0, 0, 0), 1.0f};
     Sphere b{glm::vec3(5, 0, 0), 1.0f};
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
     Internal::GJKDiagnostics diag;
-    const bool overlap = Internal::GJK_Boolean(a, b, scratch, diag);
+    const bool overlap = Internal::GJK_Boolean(a, b, diag);
     EXPECT_FALSE(overlap);
     EXPECT_EQ(diag.reason, Internal::TerminationReason::EarlyOutNegativeSupport);
     EXPECT_GT(diag.iterations, 0);
@@ -349,9 +326,8 @@ TEST(GJK, Diagnostics_EarlyOutNegativeSupport_OnSeparatedAABBs)
 {
     AABB a{glm::vec3(-1), glm::vec3(1)};
     AABB b{glm::vec3(3, 3, 3), glm::vec3(5, 5, 5)};
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
     Internal::GJKDiagnostics diag;
-    const bool overlap = Internal::GJK_Boolean(a, b, scratch, diag);
+    const bool overlap = Internal::GJK_Boolean(a, b, diag);
     EXPECT_FALSE(overlap);
     EXPECT_EQ(diag.reason, Internal::TerminationReason::EarlyOutNegativeSupport);
 }
@@ -360,9 +336,8 @@ TEST(GJK, Diagnostics_Intersection_Converged_OnOverlap)
 {
     Sphere a{glm::vec3(0, 0, 0), 2.0f};
     Sphere b{glm::vec3(1, 0, 0), 2.0f};
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
     Internal::GJKDiagnostics diag;
-    auto result = Internal::GJK_Intersection(a, b, scratch, diag);
+    auto result = Internal::GJK_Intersection(a, b, diag);
     EXPECT_TRUE(result.has_value());
     EXPECT_EQ(diag.reason, Internal::TerminationReason::Converged);
     EXPECT_LT(diag.iterations, Internal::Config::GJK_MAX_ITERATIONS);
@@ -372,9 +347,8 @@ TEST(GJK, Diagnostics_Intersection_EarlyOutNegativeSupport_OnSeparated)
 {
     Sphere a{glm::vec3(0, 0, 0), 1.0f};
     Sphere b{glm::vec3(5, 0, 0), 1.0f};
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
     Internal::GJKDiagnostics diag;
-    auto result = Internal::GJK_Intersection(a, b, scratch, diag);
+    auto result = Internal::GJK_Intersection(a, b, diag);
     EXPECT_FALSE(result.has_value());
     EXPECT_EQ(diag.reason, Internal::TerminationReason::EarlyOutNegativeSupport);
 }
@@ -401,10 +375,9 @@ TEST(GJK, Diagnostics_BooleanWrapper_StillMatchesDiagnosticOverload)
     }};
     for (const auto& c : cases)
     {
-        Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
-        const bool wrapperResult = Internal::GJK_Boolean(c.a, c.b, scratch);
+        const bool wrapperResult = Internal::GJK_Boolean(c.a, c.b);
         Internal::GJKDiagnostics diag;
-        const bool diagResult = Internal::GJK_Boolean(c.a, c.b, scratch, diag);
+        const bool diagResult = Internal::GJK_Boolean(c.a, c.b, diag);
         EXPECT_EQ(wrapperResult, diagResult);
         EXPECT_EQ(wrapperResult, c.expectOverlap);
     }
@@ -425,11 +398,10 @@ TEST(GJK, Diagnostics_ConvergenceBudget_NotExhaustedOnStandardCorpus)
     // budget; an empirically generous upper bound is asserted here so that a
     // future tolerance regression that doubles iteration counts is caught.
     constexpr int kPracticalIterationBudget = 32;
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
 
     auto check = [&](auto a, auto b) {
         Internal::GJKDiagnostics diag;
-        (void)Internal::GJK_Boolean(a, b, scratch, diag);
+        (void)Internal::GJK_Boolean(a, b, diag);
         EXPECT_NE(diag.reason, Internal::TerminationReason::MaxIterationsHit);
         EXPECT_LE(diag.iterations, kPracticalIterationBudget);
     };
@@ -470,14 +442,13 @@ TEST(GJK, Parity_BooleanOutcomeAcrossScales)
     }};
     const std::array<float, 5> scales = {1e-3f, 1e-1f, 1.0f, 1e1f, 1e3f};
 
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
     for (float s : scales)
     {
         for (const auto& c : unitCases)
         {
             Sphere a{glm::vec3(0), c.radius * s};
             Sphere b{c.centerB * s, c.radius * s};
-            const bool result = Internal::GJK_Boolean(a, b, scratch);
+            const bool result = Internal::GJK_Boolean(a, b);
             EXPECT_EQ(result, c.expectOverlap)
                 << "Scale " << s << " centerB=" << c.centerB.x << " expected " << c.expectOverlap;
         }
@@ -492,7 +463,6 @@ TEST(GJK, Parity_NearTouchingSeparation_PreviouslyFlippedScales)
     // known to flip on `Geometry.Support`-side guards. With Slice 2 in
     // place, the GJK driver's normalized workspace must produce a
     // consistent "separated" outcome across the full scale range.
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
     const std::array<float, 5> scales = {1e-3f, 1e-1f, 1.0f, 1e1f, 1e3f};
     for (float s : scales)
     {
@@ -504,7 +474,7 @@ TEST(GJK, Parity_NearTouchingSeparation_PreviouslyFlippedScales)
         Sphere a{glm::vec3(0), radius};
         Sphere b{glm::vec3(2.0f * radius + gap, 0, 0), radius};
         Internal::GJKDiagnostics diag;
-        const bool overlap = Internal::GJK_Boolean(a, b, scratch, diag);
+        const bool overlap = Internal::GJK_Boolean(a, b, diag);
         EXPECT_FALSE(overlap)
             << "Scale " << s << ": gap=" << gap << " radius=" << radius
             << " should report separated";
@@ -518,14 +488,13 @@ TEST(GJK, Parity_TouchingSpheres_OverlapAcrossScales)
     // Touching spheres (centers exactly 2*r apart) are a canonical
     // boundary case. At every scale the driver must report overlap (the
     // surfaces share a point) and converge within the iteration budget.
-    Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
     const std::array<float, 5> scales = {1e-3f, 1e-1f, 1.0f, 1e1f, 1e3f};
     for (float s : scales)
     {
         Sphere a{glm::vec3(0), s};
         Sphere b{glm::vec3(2.0f * s, 0, 0), s};
         Internal::GJKDiagnostics diag;
-        const bool overlap = Internal::GJK_Boolean(a, b, scratch, diag);
+        const bool overlap = Internal::GJK_Boolean(a, b, diag);
         EXPECT_TRUE(overlap) << "Scale " << s << ": touching spheres must overlap";
         EXPECT_NE(diag.reason, Internal::TerminationReason::MaxIterationsHit)
             << "Scale " << s << ": did not converge within iteration budget";

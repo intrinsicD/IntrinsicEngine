@@ -1,3 +1,5 @@
+// GJK overlap queries over support-mapped shapes: boolean intersection and the
+// terminating simplex handed to EPA for penetration depth/normal.
 module;
 #include <glm/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
@@ -11,7 +13,6 @@ export module Geometry.GJK;
 
 import Geometry.Primitives;
 import Geometry.Support;
-import Extrinsic.Core.Memory;
 
 export namespace Geometry::Internal
 {
@@ -170,9 +171,8 @@ export namespace Geometry::Internal
     // =========================================================================
 
     template <typename A, typename B>
-    bool GJK_Boolean(const A& a, const B& b, Extrinsic::Core::Memory::LinearArena& /*scratch*/, GJKDiagnostics& diag)
+    bool GJK_Boolean(const A& a, const B& b, GJKDiagnostics& diag)
     {
-        // Currently allocation-free; scratch is plumbed for consistency with EPA.
         diag = {};
 
         glm::vec3 support = MinkowskiDifference::Support(a, b, {1, 0, 0});
@@ -260,14 +260,14 @@ export namespace Geometry::Internal
     }
 
     template <typename A, typename B>
-    bool GJK_Boolean(const A& a, const B& b, Extrinsic::Core::Memory::LinearArena& scratch)
+    bool GJK_Boolean(const A& a, const B& b)
     {
         GJKDiagnostics diag;
-        return GJK_Boolean(a, b, scratch, diag);
+        return GJK_Boolean(a, b, diag);
     }
 
     template <typename A, typename B>
-    std::optional<Simplex> GJK_Intersection(const A& a, const B& b, Extrinsic::Core::Memory::LinearArena& /*scratch*/, GJKDiagnostics& diag)
+    std::optional<Simplex> GJK_Intersection(const A& a, const B& b, GJKDiagnostics& diag)
     {
         diag = {};
 
@@ -341,24 +341,9 @@ export namespace Geometry::Internal
     }
 
     template <typename A, typename B>
-    std::optional<Simplex> GJK_Intersection(const A& a, const B& b, Extrinsic::Core::Memory::LinearArena& scratch)
-    {
-        GJKDiagnostics diag;
-        return GJK_Intersection(a, b, scratch, diag);
-    }
-
-    // Back-compat overloads (existing call sites): route through the scratch-taking versions.
-    template <typename A, typename B>
-    bool GJK_Boolean(const A& a, const B& b)
-    {
-        Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
-        return GJK_Boolean(a, b, scratch);
-    }
-
-    template <typename A, typename B>
     std::optional<Simplex> GJK_Intersection(const A& a, const B& b)
     {
-        Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
-        return GJK_Intersection(a, b, scratch);
+        GJKDiagnostics diag;
+        return GJK_Intersection(a, b, diag);
     }
 }
