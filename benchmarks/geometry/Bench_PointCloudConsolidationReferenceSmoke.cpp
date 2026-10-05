@@ -6,11 +6,11 @@
 #include <chrono>
 #include <cmath>
 #include <cstddef>
-#include <limits>
-#include <span>
 #include <vector>
 
 #include <glm/glm.hpp>
+
+#include "Bench.PointCloudMetrics.hpp"
 
 import Geometry.PointCloud.Consolidation;
 
@@ -18,6 +18,11 @@ namespace Intrinsic::Bench::Geometry
 {
     namespace
     {
+        using PointCloudMetrics::Finite;
+        using PointCloudMetrics::MeanPlaneError;
+        using PointCloudMetrics::MeanSphereError;
+        using PointCloudMetrics::MinimumPairwiseDistance;
+
         namespace Consolidation = ::Geometry::PointCloud::Consolidation;
 
         constexpr int kWarmupIterations = 1;
@@ -69,54 +74,6 @@ namespace Intrinsic::Bench::Geometry
                 }
             }
             return points;
-        }
-
-        [[nodiscard]] double MeanPlaneError(
-            const std::span<const glm::vec3> points)
-        {
-            double sum = 0.0;
-            for (const glm::vec3 point : points)
-                sum += std::abs(static_cast<double>(point.z));
-            return sum / static_cast<double>(points.size());
-        }
-
-        [[nodiscard]] double MeanSphereError(
-            const std::span<const glm::vec3> points)
-        {
-            double sum = 0.0;
-            for (const glm::vec3 point : points)
-            {
-                sum += std::abs(
-                    static_cast<double>(glm::length(point)) - 1.0);
-            }
-            return sum / static_cast<double>(points.size());
-        }
-
-        [[nodiscard]] double MinimumPairwiseDistance(
-            const std::span<const glm::vec3> points)
-        {
-            double minimum = std::numeric_limits<double>::infinity();
-            for (std::size_t i = 0u; i < points.size(); ++i)
-            {
-                for (std::size_t j = i + 1u; j < points.size(); ++j)
-                {
-                    minimum = std::min(
-                        minimum,
-                        static_cast<double>(
-                            glm::distance(points[i], points[j])));
-                }
-            }
-            return minimum;
-        }
-
-        [[nodiscard]] bool Finite(
-            const std::span<const glm::vec3> points)
-        {
-            return std::ranges::all_of(points, [](const glm::vec3 point)
-            {
-                return std::isfinite(point.x) && std::isfinite(point.y) &&
-                       std::isfinite(point.z);
-            });
         }
 
         [[nodiscard]] PointCloudConsolidationReferenceSmokeMetrics Tick()

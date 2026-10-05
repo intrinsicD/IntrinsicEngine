@@ -11,6 +11,8 @@ gate.
 - `Bench_*.cpp` — translation units that implement individual benchmark
   workloads. The workload entry point is declared in a sibling `Bench.*.hpp`
   header that the runner includes.
+- `Bench.PointCloudMetrics.hpp` — point-cloud quality metrics shared by the
+  CLOP and LOP/WLOP reference smokes.
 - `manifests/` — checked-in manifest YAML files. Each manifest binds a
   `benchmark_id` to a method/dataset/metric contract and declares the smoke
   thresholds the benchmark is expected to honour. Validated by
