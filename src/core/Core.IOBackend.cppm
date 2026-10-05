@@ -13,16 +13,6 @@ export module Extrinsic.Core.IOBackend;
 
 import Extrinsic.Core.Error;
 
-// -----------------------------------------------------------------------
-// Extrinsic::Core::IO — Abstract I/O backend for asset streaming.
-//
-// Phase 0: synchronous loose-file reads/writes via std::ifstream/ofstream.
-// Phase 1: camera-driven priority queues, async io_uring backend.
-// Phase 2: container/pak format locators.
-//
-// IIOBackend is the extension point; FileIOBackend is the Phase 0 impl.
-// -----------------------------------------------------------------------
-
 export namespace Extrinsic::Core::IO
 {
     struct IORequest
