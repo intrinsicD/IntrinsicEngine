@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 #include <atomic>
 #include <thread>
+#include <utility>
 #include <vector>
  
 import Extrinsic.Asset.EventBus;
@@ -18,51 +19,24 @@ namespace
 }
  
 // -----------------------------------------------------------------------------
-// Subscribe / Unsubscribe
+// Tokens
 // -----------------------------------------------------------------------------
- 
-TEST(AssetEventBus, SubscribeReturnsNonZeroToken)
-{
-    AssetEventBus bus;
-    auto tok = bus.Subscribe(MakeId(1u), [](AssetId, AssetEvent){});
-    EXPECT_NE(tok, AssetEventBus::InvalidToken);
-}
- 
-TEST(AssetEventBus, SubscribeRejectsEmptyCallback)
-{
-    AssetEventBus bus;
-    auto tok = bus.Subscribe(MakeId(1u), AssetEventBus::ListenerCallback{});
-    EXPECT_EQ(tok, AssetEventBus::InvalidToken);
-}
  
 TEST(AssetEventBus, FirstValidTokenIsNotInvalidSentinel)
 {
     // Regression: m_NextToken originally started at 0, which collided with
-    // the "invalid" sentinel. The first successful Subscribe must never
+    // the "invalid" sentinel. The first successful SubscribeAll must never
     // return InvalidToken.
     AssetEventBus bus;
-    auto tok = bus.Subscribe(MakeId(1u), [](AssetId, AssetEvent){});
+    auto tok = bus.SubscribeAll([](AssetId, AssetEvent){});
     EXPECT_NE(tok, AssetEventBus::InvalidToken);
 }
  
-TEST(AssetEventBus, UnsubscribeStopsDelivery)
+TEST(AssetEventBus, UnsubscribeAllUnknownTokenIsNoOp)
 {
     AssetEventBus bus;
-    std::atomic<int> hits{0};
-    auto tok = bus.Subscribe(MakeId(1u), [&](AssetId, AssetEvent){ ++hits; });
-    ASSERT_NE(tok, AssetEventBus::InvalidToken);
-    bus.Unsubscribe(MakeId(1u), tok);
- 
-    bus.Publish(MakeId(1u), AssetEvent::Ready);
-    bus.Flush();
-    EXPECT_EQ(hits.load(), 0);
-}
- 
-TEST(AssetEventBus, UnsubscribeUnknownTokenIsNoOp)
-{
-    AssetEventBus bus;
-    bus.Unsubscribe(MakeId(1u), 999u);
-    bus.Unsubscribe(MakeId(1u), AssetEventBus::InvalidToken);
+    bus.UnsubscribeAll(999u);
+    bus.UnsubscribeAll(AssetEventBus::InvalidToken);
     SUCCEED();
 }
  
@@ -74,7 +48,7 @@ TEST(AssetEventBus, PublishQueuesUntilFlush)
 {
     AssetEventBus bus;
     std::atomic<int> hits{0};
-    (void)bus.Subscribe(MakeId(1u), [&](AssetId, AssetEvent){ ++hits; });
+    (void)bus.SubscribeAll([&](AssetId, AssetEvent){ ++hits; });
     bus.Publish(MakeId(1u), AssetEvent::Ready);
     EXPECT_EQ(hits.load(), 0);
     EXPECT_EQ(bus.PendingCount(), 1u);
@@ -84,27 +58,11 @@ TEST(AssetEventBus, PublishQueuesUntilFlush)
     EXPECT_EQ(bus.PendingCount(), 0u);
 }
  
-TEST(AssetEventBus, FlushDeliversToMatchingId)
-{
-    AssetEventBus bus;
-    std::atomic<int> a{0}, b{0};
-    (void)bus.Subscribe(MakeId(1u), [&](AssetId, AssetEvent){ ++a; });
-    (void)bus.Subscribe(MakeId(2u), [&](AssetId, AssetEvent){ ++b; });
- 
-    bus.Publish(MakeId(1u), AssetEvent::Ready);
-    bus.Publish(MakeId(2u), AssetEvent::Failed);
-    bus.Publish(MakeId(1u), AssetEvent::Destroyed);
-    bus.Flush();
- 
-    EXPECT_EQ(a.load(), 2);
-    EXPECT_EQ(b.load(), 1);
-}
- 
 TEST(AssetEventBus, FlushIsIdempotent)
 {
     AssetEventBus bus;
     std::atomic<int> hits{0};
-    (void)bus.Subscribe(MakeId(1u), [&](AssetId, AssetEvent){ ++hits; });
+    (void)bus.SubscribeAll([&](AssetId, AssetEvent){ ++hits; });
     bus.Publish(MakeId(1u), AssetEvent::Ready);
     bus.Flush();
     bus.Flush(); // second flush sees empty queue - no re-delivery
@@ -115,7 +73,7 @@ TEST(AssetEventBus, FlushForwardsEventTypeUnchanged)
 {
     AssetEventBus bus;
     AssetEvent received = AssetEvent::Ready;
-    (void)bus.Subscribe(MakeId(1u), [&](AssetId, AssetEvent e){ received = e; });
+    (void)bus.SubscribeAll([&](AssetId, AssetEvent e){ received = e; });
  
     bus.Publish(MakeId(1u), AssetEvent::Failed);
     bus.Flush();
@@ -141,15 +99,10 @@ TEST(AssetEventBus, FlushWithNoSubscribersIsHarmless)
 TEST(AssetEventBus, FlushAssetDrainsOnlyMatchingIdInOrder)
 {
     AssetEventBus bus;
-    std::vector<AssetEvent> drained;
-    std::atomic<int> other{0};
-    (void)bus.Subscribe(MakeId(1u), [&](AssetId, AssetEvent e)
+    std::vector<std::pair<AssetId, AssetEvent>> delivered;
+    (void)bus.SubscribeAll([&](AssetId id, AssetEvent e)
     {
-        drained.push_back(e);
-    });
-    (void)bus.Subscribe(MakeId(2u), [&](AssetId, AssetEvent)
-    {
-        ++other;
+        delivered.emplace_back(id, e);
     });
 
     bus.Publish(MakeId(1u), AssetEvent::Reloaded);
@@ -157,14 +110,17 @@ TEST(AssetEventBus, FlushAssetDrainsOnlyMatchingIdInOrder)
     bus.Publish(MakeId(1u), AssetEvent::Ready);
 
     bus.Flush(MakeId(1u));
-    ASSERT_EQ(drained.size(), 2u);
-    EXPECT_EQ(drained[0], AssetEvent::Reloaded);
-    EXPECT_EQ(drained[1], AssetEvent::Ready);
-    EXPECT_EQ(other.load(), 0);
+    ASSERT_EQ(delivered.size(), 2u);
+    EXPECT_EQ(delivered[0].first, MakeId(1u));
+    EXPECT_EQ(delivered[0].second, AssetEvent::Reloaded);
+    EXPECT_EQ(delivered[1].first, MakeId(1u));
+    EXPECT_EQ(delivered[1].second, AssetEvent::Ready);
     EXPECT_EQ(bus.PendingCount(), 1u);
 
     bus.Flush();
-    EXPECT_EQ(other.load(), 1);
+    ASSERT_EQ(delivered.size(), 3u);
+    EXPECT_EQ(delivered[2].first, MakeId(2u));
+    EXPECT_EQ(delivered[2].second, AssetEvent::Ready);
     EXPECT_EQ(bus.PendingCount(), 0u);
 }
  
@@ -203,19 +159,19 @@ TEST(AssetEventBus, UnsubscribeAllStopsDelivery)
     EXPECT_EQ(hits.load(), 0);
 }
  
-TEST(AssetEventBus, PerIdAndBroadcastBothReceive)
+TEST(AssetEventBus, BroadcastListenersBothReceive)
 {
     AssetEventBus bus;
-    std::atomic<int> specific{0}, broadcast{0};
-    (void)bus.Subscribe(MakeId(1u), [&](AssetId, AssetEvent){ ++specific; });
-    (void)bus.SubscribeAll([&](AssetId, AssetEvent){ ++broadcast; });
+    std::atomic<int> first{0}, second{0};
+    (void)bus.SubscribeAll([&](AssetId, AssetEvent){ ++first; });
+    (void)bus.SubscribeAll([&](AssetId, AssetEvent){ ++second; });
  
     bus.Publish(MakeId(1u), AssetEvent::Ready);
     bus.Publish(MakeId(2u), AssetEvent::Ready);
     bus.Flush();
  
-    EXPECT_EQ(specific.load(), 1);
-    EXPECT_EQ(broadcast.load(), 2);
+    EXPECT_EQ(first.load(), 2);
+    EXPECT_EQ(second.load(), 2);
 }
  
 // -----------------------------------------------------------------------------
@@ -263,7 +219,7 @@ TEST(AssetEventBus, ConcurrentSubscriberTokensAreUnique)
             results[t].reserve(kPerThread);
             for (int i = 0; i < kPerThread; ++i)
             {
-                results[t].push_back(bus.Subscribe(MakeId(1u), [](AssetId, AssetEvent){}));
+                results[t].push_back(bus.SubscribeAll([](AssetId, AssetEvent){}));
             }
         });
     }
@@ -280,37 +236,12 @@ TEST(AssetEventBus, ConcurrentSubscriberTokensAreUnique)
 // Re-entrancy regression tests
 //
 // The EventBus originally held m_Mutex across callback invocation in Flush().
-// A subscriber callback that called back into Publish / Subscribe / Unsubscribe
+// A subscriber callback that called back into Publish / SubscribeAll / UnsubscribeAll
 // deadlocked on the same mutex. Commit 3355038 fixed this by copying callbacks
 // and pending events into local storage under the lock, then invoking them
 // without holding the lock. These tests pin that contract so future refactors
 // cannot silently regress.
 // -----------------------------------------------------------------------------
-
-TEST(AssetEventBus, CallbackPublishDuringFlushQueuesForNextFlush)
-{
-    // A callback that Publishes a new event must NOT deadlock and must NOT
-    // be delivered this Flush — the new event joins the pending queue and
-    // fires on the next Flush.
-    AssetEventBus bus;
-    std::atomic<int> aHits{0}, bHits{0};
-    (void)bus.Subscribe(MakeId(1u), [&](AssetId, AssetEvent)
-    {
-        ++aHits;
-        bus.Publish(MakeId(2u), AssetEvent::Reloaded);
-    });
-    (void)bus.Subscribe(MakeId(2u), [&](AssetId, AssetEvent){ ++bHits; });
-
-    bus.Publish(MakeId(1u), AssetEvent::Ready);
-    bus.Flush(); // must return in bounded time — no deadlock
-
-    EXPECT_EQ(aHits.load(), 1);
-    EXPECT_EQ(bHits.load(), 0) << "Re-publish in callback must defer to next Flush.";
-    EXPECT_EQ(bus.PendingCount(), 1u);
-
-    bus.Flush();
-    EXPECT_EQ(bHits.load(), 1);
-}
 
 TEST(AssetEventBus, CallbackUnsubscribesSelfDuringFlush)
 {
@@ -322,10 +253,10 @@ TEST(AssetEventBus, CallbackUnsubscribesSelfDuringFlush)
 
     // Subscribe then store the token in a shared slot the callback can read.
     AssetEventBus::ListenerToken tok = AssetEventBus::InvalidToken;
-    tok = bus.Subscribe(MakeId(1u), [&](AssetId id, AssetEvent)
+    tok = bus.SubscribeAll([&](AssetId, AssetEvent)
     {
         ++hits;
-        bus.Unsubscribe(id, tok);
+        bus.UnsubscribeAll(tok);
     });
     ASSERT_NE(tok, AssetEventBus::InvalidToken);
 
@@ -346,9 +277,9 @@ TEST(AssetEventBus, CallbackSubscribesNewListenerDuringFlush)
     // (already dispatched to the copied snapshot) but receives subsequent ones.
     AssetEventBus bus;
     std::atomic<int> newHits{0};
-    (void)bus.Subscribe(MakeId(1u), [&](AssetId, AssetEvent)
+    (void)bus.SubscribeAll([&](AssetId, AssetEvent)
     {
-        (void)bus.Subscribe(MakeId(1u), [&](AssetId, AssetEvent){ ++newHits; });
+        (void)bus.SubscribeAll([&](AssetId, AssetEvent){ ++newHits; });
     });
 
     bus.Publish(MakeId(1u), AssetEvent::Ready);
@@ -371,7 +302,11 @@ TEST(AssetEventBus, BroadcastCallbackPublishDuringFlushDoesNotDeadlock)
         if (id == MakeId(1u))
             bus.Publish(MakeId(2u), AssetEvent::Reloaded);
     });
-    (void)bus.Subscribe(MakeId(2u), [&](AssetId, AssetEvent){ ++otherHits; });
+    (void)bus.SubscribeAll([&](AssetId id, AssetEvent)
+    {
+        if (id == MakeId(2u))
+            ++otherHits;
+    });
 
     bus.Publish(MakeId(1u), AssetEvent::Ready);
     bus.Flush();

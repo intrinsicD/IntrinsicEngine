@@ -62,9 +62,10 @@ store, load pipeline, event bus, and path index behind a single façade.
   callback is already executing. It does not fence unrelated scheduler work,
   and the event bus and registry remain alive until the gate is invalidated.
 - `AssetEventBus` batches `Ready`, `Failed`, `Reloaded`, and `Destroyed`
-  notifications for main-thread fanout. It can also drain pending events for a
-  single asset while preserving unrelated pending events, which `AssetService`
-  uses during destroy.
+  notifications for main-thread fanout to global listeners registered with
+  `SubscribeAll`/`UnsubscribeAll`. `Flush(id)` drains pending events for a
+  single asset to those listeners while preserving unrelated pending events,
+  which `AssetService` uses during destroy.
 - `AssetPathIndex` resolves absolute paths to live assets.
 - `TypePools<Key>` in `Asset.TypePool.cppm` provides stable type IDs for
   payloads without requiring RTTI.
@@ -119,7 +120,7 @@ Reload is transactional through `AssetService`:
 - Failed loader callbacks leave the last good payload, payload ticket
   generation, registry payload slot, and `Ready` state intact.
 - Successful reload publishes a new payload ticket generation, then queues
-  `Reloaded` followed by `Ready` for same-asset subscribers.
+  `Reloaded` followed by `Ready` for that asset.
 - Failed pre-commit transitions restore the previous payload checkpoint and do
   not queue successful reload events.
 
