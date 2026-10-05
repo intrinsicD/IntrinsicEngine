@@ -27,10 +27,18 @@ contract_review: Reviewed the catalog. The change alters module surfaces and REA
       (menu/toolbar); translate/rotate/scale modes are selectable there.
 - [ ] Multi-selection rotates/scales/translates around one pivot frozen at drag
       start; positions move around the pivot, not only per-entity rotation/scale.
+- [ ] A UI toggle selects the pivot: mean of selected world origins (default) or
+      mean of world-bounds centers (entities without bounds fall back to their
+      origin).
+- [ ] Local/global orientation works for single entities and groups.
+- [ ] W/E/R switch translate/rotate/scale while the gizmo is active (not while a
+      text field has focus); Escape cancels the drag.
+- [ ] Snap steps are configurable in the UI (defaults 0.25, 15°, 0.1).
 - [ ] Parent and child both selected: the child is written through its parent
       only (moves once); unselected children follow their parent.
-- [ ] One drag produces exactly one undo entry; no entry for a no-op or cancel;
-      results that cannot be stored as TRS are rejected without partial writes.
+- [ ] One drag produces exactly one undo entry; no entry for a no-op or cancel.
+- [ ] A result that cannot be stored as TRS (shear under a non-uniformly scaled
+      parent) is rejected without partial writes, and the UI shows the reason.
 - [ ] While the gizmo is hovered or dragged, camera and selection input are
       blocked; hiding the UI, focus loss or a world/document change cancels the drag.
 - [ ] ImGuizmo types stay private to `src/app/Sandbox`; runtime owns preview,
@@ -83,9 +91,10 @@ Codex plan (2026-10-06, read-only on `3a47bde17`), condensed:
 - **Keep.** Module names, ECS TRS storage, scene format, inspector transform
   commands, generic `EditorCommandHistory`, camera controllers, picking,
   layering allowlist.
-- **Snap/orientation.** Keep current snaps (0.25, 15°, 0.1) and the current
-  rule: single entity local or global, group global. No keyboard activation;
-  Escape cancels.
+- **Snap/orientation.** Snap defaults stay 0.25, 15°, 0.1 but become UI
+  settings (Codex: configurable snap needs its own config path with
+  preview/validate/apply). Groups get local orientation too. The gizmo is
+  never activated by keyboard.
 - **Tests to change/add.** `Test.GizmoInteraction.cpp` (matrix drag cases),
   `Test.GizmoInteractionEngineWiring.cpp`, `Test.SceneInteractionModule.cpp`,
   `Test.EditorUiHost.cpp`, `Test.ImGuiAdapterEngineWiring.cpp`,
@@ -97,10 +106,18 @@ Codex plan (2026-10-06, read-only on `3a47bde17`), condensed:
   GRAPHICS-153 (other transform-preview users), RUNTIME-282, UI-076,
   REVIEW-004. REVIEW-007 R16 (unused gizmo accessors) is affected.
 
-## Open operator questions
-1. Pivot: mean of selected entities' world origins (recommended), mean of their
-   world-bounds centers, or the center of their combined bounds?
-2. Results not representable as TRS (shear under non-uniform parent scale):
-   reject with a reason (recommended)?
-3. W/E/R mode shortcuts while the gizmo is active, and configurable snap steps,
-   or keep the minimal scope?
+## Decisions (operator, 2026-10-06)
+1. Pivot: a toggle as in Blender/Unity. The default is the mean of selected world
+   origins (cheap, predictable, works for lights/cameras/empty groups). The
+   alternative is the mean of world-bounds centers, with origin fallback for
+   entities without bounds. Pivot cost was asked about: both are one O(n) pass
+   at drag start over already computed world data.
+2. Non-TRS results (shear) are rejected with a reason.
+3. Scope includes W/E/R shortcuts, configurable snap and local/global for
+   groups.
+4. Implement after REVIEW-007 is complete.
+
+## Open question at implementation start
+- Group local basis: recommended default is the active (last selected)
+  entity's rotation, as in Unity; confirm with the operator before
+  implementing.
