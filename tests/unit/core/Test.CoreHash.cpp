@@ -342,3 +342,12 @@ TEST(CoreHash, U64Hash_InUnorderedMap)
     EXPECT_EQ(map[0x1234567890ABCDEFull], "ResourceA");
     EXPECT_EQ(map.size(), 2u);
 }
+
+TEST(CoreHash, TypeName_NamesTheTypeForDiagnostics)
+{
+    using Extrinsic::Core::TypeName;
+    static_assert(!TypeName<int>().empty());
+    EXPECT_NE(TypeName<int>().find("int"), std::string_view::npos);
+    EXPECT_NE(TypeName<int>(), TypeName<float>());
+    EXPECT_EQ(TypeName<int>(), TypeName<int>());
+}

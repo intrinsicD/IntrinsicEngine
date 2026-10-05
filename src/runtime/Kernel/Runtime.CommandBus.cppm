@@ -67,23 +67,6 @@ namespace Extrinsic::Runtime
     // token of the compiler type signature, owned by `Extrinsic.Core.Hash`.
     export using CommandTypeKey = std::size_t;
 
-    // Compile-time, allocation-free diagnostics name for a command
-    // type. The returned view points at the compiler's function
-    // signature literal (static storage duration) and contains the
-    // type name; precise formatting is compiler-specific and only
-    // used for logs.
-    export template <typename TCommand>
-    [[nodiscard]] consteval std::string_view CommandTypeNameOf() noexcept
-    {
-#if defined(__clang__) || defined(__GNUC__)
-        return __PRETTY_FUNCTION__;
-#elif defined(_MSC_VER)
-        return __FUNCSIG__;
-#else
-        return "CommandTypeNameOf<unknown>";
-#endif
-    }
-
     export struct CommandCorrelationId
     {
         std::uint64_t Value{0};
@@ -145,7 +128,7 @@ namespace Extrinsic::Runtime
         {
             return CommandEnvelope(Core::TypeToken<TCommand>(),
                                    std::make_shared<const TCommand>(std::move(payload)),
-                                   CommandTypeNameOf<TCommand>());
+                                   Core::TypeName<TCommand>());
         }
 
         [[nodiscard]] bool IsValid() const noexcept { return static_cast<bool>(m_Payload); }
@@ -202,7 +185,7 @@ namespace Extrinsic::Runtime
         {
             RegisterHandlerErased(
                 Core::TypeToken<TCommand>(),
-                CommandTypeNameOf<TCommand>(),
+                Core::TypeName<TCommand>(),
                 [h = std::move(handler)](CommandContext& ctx,
                                          const void*     payload) -> CommandOutcome
                 { return h(ctx, *static_cast<const TCommand*>(payload)); });

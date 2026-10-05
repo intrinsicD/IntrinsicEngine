@@ -36,18 +36,6 @@ namespace Extrinsic::Runtime
 {
     export using KernelEventTypeKey = std::size_t;
 
-    export template <typename TEvent>
-    [[nodiscard]] consteval std::string_view KernelEventTypeNameOf() noexcept
-    {
-#if defined(__clang__) || defined(__GNUC__)
-        return __PRETTY_FUNCTION__;
-#elif defined(_MSC_VER)
-        return __FUNCSIG__;
-#else
-        return "KernelEventTypeNameOf<unknown>";
-#endif
-    }
-
     export struct KernelEventSubscription
     {
         std::uint64_t      Value{0};
@@ -71,7 +59,7 @@ namespace Extrinsic::Runtime
         {
             return KernelEventEnvelope(Core::TypeToken<TEvent>(),
                                        std::make_shared<const TEvent>(std::move(payload)),
-                                       KernelEventTypeNameOf<TEvent>());
+                                       Core::TypeName<TEvent>());
         }
 
         [[nodiscard]] bool IsValid() const noexcept
@@ -125,7 +113,7 @@ namespace Extrinsic::Runtime
 
             return SubscribeErased(
                 Core::TypeToken<TEvent>(),
-                KernelEventTypeNameOf<TEvent>(),
+                Core::TypeName<TEvent>(),
                 [h = std::move(listener)](const void* payload)
                 { h(*static_cast<const TEvent*>(payload)); });
         }

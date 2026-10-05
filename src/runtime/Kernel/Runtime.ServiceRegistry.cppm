@@ -21,18 +21,6 @@ namespace Extrinsic::Runtime
     // the shared token owned by `Extrinsic.Core.Hash`.
     export using ServiceTypeKey = std::size_t;
 
-    export template <typename TService>
-    [[nodiscard]] consteval std::string_view ServiceTypeNameOf() noexcept
-    {
-#if defined(__clang__) || defined(__GNUC__)
-        return __PRETTY_FUNCTION__;
-#elif defined(_MSC_VER)
-        return __FUNCSIG__;
-#else
-        return "ServiceTypeNameOf<unknown>";
-#endif
-    }
-
     export enum class ServiceRegistryPhase : std::uint8_t
     {
         Registration,
@@ -58,7 +46,7 @@ namespace Extrinsic::Runtime
             std::string_view provider = {})
         {
             return ProvideErased(Core::TypeToken<TService>(),
-                                 ServiceTypeNameOf<TService>(),
+                                 Core::TypeName<TService>(),
                                  &service,
                                  provider);
         }
@@ -92,7 +80,7 @@ namespace Extrinsic::Runtime
             if (TService* service = Find<TService>(); service != nullptr)
                 return std::ref(*service);
 
-            RecordMissingRequirement(requester, ServiceTypeNameOf<TService>());
+            RecordMissingRequirement(requester, Core::TypeName<TService>());
             return Core::Err<std::reference_wrapper<TService>>(
                 Core::ErrorCode::ResourceNotFound);
         }

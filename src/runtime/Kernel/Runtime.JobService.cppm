@@ -52,18 +52,6 @@ namespace Extrinsic::Runtime
 
     export using JobResultTypeKey = std::size_t;
 
-    export template <typename TResult>
-    [[nodiscard]] consteval std::string_view JobResultTypeNameOf() noexcept
-    {
-#if defined(__clang__) || defined(__GNUC__)
-        return __PRETTY_FUNCTION__;
-#elif defined(_MSC_VER)
-        return __FUNCSIG__;
-#else
-        return "JobResultTypeNameOf<unknown>";
-#endif
-    }
-
     export enum class JobTarget : std::uint8_t
     {
         CpuPool,
@@ -168,7 +156,7 @@ namespace Extrinsic::Runtime
             return JobResultEnvelope(Core::TypeToken<TResult>(),
                                      std::make_shared<const TResult>(
                                          std::move(payload)),
-                                     JobResultTypeNameOf<TResult>());
+                                     Core::TypeName<TResult>());
         }
 
         [[nodiscard]] bool IsValid() const noexcept

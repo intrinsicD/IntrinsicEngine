@@ -206,6 +206,9 @@ there beside `Hash::HashString64`, the one constexpr 64-bit FNV-1a byte hash.
 graphs keep their existing token values and nothing merges them. The 32-bit
 `HashString`/`StringID` naming lane is unchanged. Tokens are compiler-specific
 values with the high bit masked off, not a frozen cross-compiler ABI.
+`Core::TypeName<T>()` exposes the same signature text for diagnostics only;
+the command bus, kernel events, job results and service registry log it, and
+nothing may parse it.
 
 The four kernel interfaces that need only erased identity —
 `Runtime.CommandBus`, `Runtime.KernelEvents`, `Runtime.ServiceRegistry` and

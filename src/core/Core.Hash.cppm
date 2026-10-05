@@ -113,6 +113,14 @@ export namespace Extrinsic::Core
         }
     }
 
+    // Compiler signature naming T, for diagnostics only; the exact text is
+    // compiler-specific and must not be parsed.
+    template <typename T>
+    [[nodiscard]] constexpr std::string_view TypeName() noexcept
+    {
+        return Detail::TypeSig<T>();
+    }
+
     template <typename T>
     [[nodiscard]] std::size_t TypeToken() noexcept
     {

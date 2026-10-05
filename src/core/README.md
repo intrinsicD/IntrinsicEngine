@@ -109,7 +109,9 @@ Core owns reusable graph/scheduling primitives, not domain-specific GPU policy.
   and the scene document's typed property tables (RUNTIME-319).
 - **`Extrinsic.Core.Hash`**: canonical hashing owner — the 32-bit `HashString` /
   `StringID` naming lane, the constexpr 64-bit FNV-1a `Hash::HashString64`, and
-  the RTTI-free compile-time type identity `Core::TypeToken<T>()` built on it.
+  the RTTI-free compile-time type identity `Core::TypeToken<T>()` built on it,
+  plus `Core::TypeName<T>()`, the diagnostics-only signature text the kernel
+  services, events, jobs and commands log.
   `TaskGraph` reuses the 64-bit hash over its own signature source, and the
   runtime kernel's command/event/service/job interfaces import this module for
   identity instead of a graph. Tokens are compiler-specific values with the high
