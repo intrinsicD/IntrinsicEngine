@@ -19,7 +19,7 @@ Root scanned: `src`
 | `graphics/rhi` | 18 |
 | `graphics/vulkan` | 11 |
 | `physics` | 1 |
-| `platform` | 6 |
+| `platform` | 5 |
 | `runtime` | 112 |
 
 ## Modules
@@ -366,7 +366,6 @@ Root scanned: `src`
 | `Extrinsic.Platform.Input` | `src/platform/Platform.Input.cppm` | `platform` |
 | `Extrinsic.Platform.LocalSocket` | `src/platform/Platform.LocalSocket.cppm` | `platform` |
 | `Extrinsic.Platform.Backend.Glfw` | `src/platform/backends/glfw/Platform.Backend.Glfw.cppm` | `platform` |
-| `Extrinsic.Platform.Backend.GlfwVulkanSurface` | `src/platform/backends/glfw/Platform.Backend.GlfwVulkanSurface.cppm` | `platform` |
 | `Extrinsic.Platform.Backend.Null` | `src/platform/backends/null/Platform.Backend.Null.cppm` | `platform` |
 | `Extrinsic.Runtime.AgentOperations` | `src/runtime/Agent/Runtime.AgentOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.AgentServer` | `src/runtime/Agent/Runtime.AgentServer.cppm` | `runtime` |
@@ -481,4 +480,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **454**
+Total modules: **453**

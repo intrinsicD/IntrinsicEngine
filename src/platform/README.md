@@ -19,8 +19,6 @@ explicit backend modules under `backends/`.
 - `backends/glfw/Platform.Backend.Glfw.cppm` — GLFW window ownership, callback
   to platform event buffering, resize handling, clipboard, cursor modes, and
   input state updates.
-- `backends/glfw/Platform.Backend.GlfwVulkanSurface.cppm` — GLFW Vulkan surface
-  creation policy isolated from `Graphics` and `Runtime` imports.
 
 `Platform.CreateWindow.cpp` is the only selected-backend bridge for the public
 `Extrinsic::Platform::CreateWindow` factory. Configure with:
@@ -52,15 +50,14 @@ backends/
     Platform.Backend.Null.cppm
   glfw/
     Platform.Backend.Glfw.cppm
-    Platform.Backend.GlfwVulkanSurface.cppm
 ```
 
 ## Dependency note
 
 `Platform` depends on `Core` only. It must not import `Graphics`, `ECS`, or
-`Runtime`. Platform surfaces are consumed by `Runtime` (composition root) and
-by graphics/RHI backends through public platform handles or explicit surface
-helpers.
+`Runtime`. Platform surfaces are consumed by `Runtime` (composition root). Runtime passes
+the native window handle to graphics through `RHI::DeviceCreateDesc`; the Vulkan
+backend creates the surface itself.
 
 The interface/backend split is deliberate: headless tests and alternative
 platforms (Windows/macOS/Wayland) plug in by adding a sibling backend directory

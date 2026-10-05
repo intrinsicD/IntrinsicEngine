@@ -45,10 +45,8 @@ if(_intrinsic_platform_backend STREQUAL "Glfw")
                 PUBLIC
                 FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
                 backends/glfw/Platform.Backend.Glfw.cppm
-                backends/glfw/Platform.Backend.GlfwVulkanSurface.cppm
                 PRIVATE
                 backends/glfw/Platform.Backend.Glfw.cpp
-                backends/glfw/Platform.Backend.GlfwVulkanSurface.cpp
         )
         target_compile_definitions(${target_name} PRIVATE INTRINSIC_PLATFORM_BACKEND_GLFW=1)
         # BUG-139 removed the unreachable ImGui_ImplGlfw_* forwards, so the

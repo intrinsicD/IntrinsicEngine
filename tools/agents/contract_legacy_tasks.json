@@ -56,7 +56,8 @@
     "backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md": "e4301a1fcf62ee0a95c0365be429a989e4f38372810eca9197c3c787a0422c1e",
     "backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md": "900b23e61ead50e8ce418aab90f3d09af5e5b69bffc22621d20e1287897a2318",
     "backlog/ui/UI-038-progressive-poisson-destructive-conversion-safety.md": "ae1644b7ad871f02a1831f7dff154af631ff8fc16036fe8dfeb92d3fa0695fd6",
-    "backlog/methods/METHOD-006-cross-field-design-reference-backend.md": "8f85bc0e2c07c9d1f45e5ccd6271a2f5b2a48f5f6c22f7d106e1f0398d85d6bc"
+    "backlog/methods/METHOD-006-cross-field-design-reference-backend.md": "8f85bc0e2c07c9d1f45e5ccd6271a2f5b2a48f5f6c22f7d106e1f0398d85d6bc",
+    "backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md": "400f6efcbae0620ce0f8868f9afe3a1efbf010621ea1db7ce433ad546bdf5721"
   },
   "effective_date": "2026-08-02",
   "parallel_policy_task": "BUG-128",
@@ -93,7 +94,6 @@
     "backlog/methods/METHOD-029-discontinuity-aware-material-derivatives-and-jacobian-portability.md": "351f7365f8c5b7a69fac20c2121e975f56e7625de5b030b480ec7ed58fffe36e",
     "backlog/methods/METHOD-030-neural-render-proxy-path-replay-reference.md": "374403c0394b1bd16bf0c8d750f064016a2a9b30868caa2c6e7356766105680d",
     "backlog/methods/METHOD-031-jacobian-portability-predictive-study.md": "412b3fabcc2bf9d1209ed28f04c27cc4daf69f7167199fc38f17c744ad9ca690",
-    "backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md": "400f6efcbae0620ce0f8868f9afe3a1efbf010621ea1db7ce433ad546bdf5721",
     "backlog/rendering/GRAPHICS-123-slang-single-kernel-gradient-pilot.md": "21be04f6934df0d7a5da2058285a9f3ea3382d6d31696ce087c7b2a4932d10b8",
     "backlog/rendering/GRAPHICS-124-slughorn-world-space-vector-annotation-proof.md": "0b3e9bb8480980fb269c110738e63d1a22b705337be77ef5d6fe5d470601841c",
     "backlog/rendering/GRAPHICS-126-bandwidth-priced-frame-recipe-trace-model.md": "3a037abd7612f4e51b6b2d810f1020b485063b9518117b3eb1e68ea44bbc3ed9"

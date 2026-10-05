@@ -2,6 +2,14 @@
 id: PLATFORM-004
 theme: F
 depends_on: []
+template: micro
+workflow_schema: 1
+workflow_profile: micro
+evidence: not_applicable
+evidence_skip_reason: "Planning-only seed; the only change is correcting the surface-helper precedent after REVIEW-007 PK07 removed the unused bridge."
+contract_schema: 1
+contracts: []
+contract_review: "Planning-only text; no backend implementation, layer rule or workflow contract changes. A promoting implementation task declares its own contracts."
 ---
 # PLATFORM-004 — Alternative-platform backend onboarding policy (planning seed)
 
@@ -45,9 +53,12 @@ depends_on: []
   `INTRINSIC_HEADLESS_NO_GLFW` constraint.
 - Backend conventions to consider when this task is promoted:
   - One module per backend, named `Extrinsic.Platform.Backend.<Name>`.
-  - One backend-local Vulkan surface helper module per backend that owns a
-    Vulkan surface (`Extrinsic.Platform.Backend.<Name>VulkanSurface`),
-    matching the `GlfwVulkanSurface` precedent.
+  - Vulkan surface creation follows the existing layer boundaries: today
+    Runtime passes the native window handle through `RHI::DeviceCreateDesc`
+    and `Backends.Vulkan.Device.cpp` creates the surface. A backend task must
+    justify any extra integration; no Platform surface helper module is
+    prescribed (the unused `GlfwVulkanSurface` bridge was removed under
+    REVIEW-007 PK07, 2026-10-05).
   - `Platform.CreateWindow.cpp` extended only via additional preprocessor
     branches (`INTRINSIC_PLATFORM_BACKEND_<NAME>=1`).
   - CTest labels: `platform` for headless-safe tests; `<name>` (e.g.
@@ -61,7 +72,7 @@ depends_on: []
     matrix (CI or developer demand); coordinates with the `INFRA-001`
     dependency-toolchain work.
   - **macOS (Cocoa)** — justified when macOS parity becomes a requirement;
-    implies a MoltenVK decision inside the backend's Vulkan surface helper.
+    implies a MoltenVK integration decision in the concrete implementation task.
   - In all cases the implementing task records the concrete trigger (which
     task or host-matrix change demanded the backend) in its Context section.
 - Policy landing site: the promoted execution of this seed captures the
@@ -72,7 +83,7 @@ depends_on: []
 - ARCH-013 re-review (2026-07-08): Decision unchanged. Platform backend
   onboarding is unaffected by the runtime kernel seams; input capture remains
   a runtime/editor snapshot consumer above platform, while `platform` continues
-  to expose only window/input ports and backend-local surface helpers.
+  to expose only window/input ports; Runtime owns composition with graphics.
 
 ## Required changes
 - [ ] This task remains planning-only. No source or build changes.
