@@ -9,7 +9,7 @@ Root scanned: `src`
 | Layer | Module Count |
 |---|---:|
 | `app` | 7 |
-| `assets` | 11 |
+| `assets` | 10 |
 | `core` | 39 |
 | `ecs` | 26 |
 | `geometry` | 133 |
@@ -38,7 +38,6 @@ Root scanned: `src`
 | `Extrinsic.Asset.ImportRouter` | `src/assets/Asset.ImportRouter.cppm` | `assets` |
 | `Extrinsic.Asset.LoadPipeline` | `src/assets/Asset.LoadPipeline.cppm` | `assets` |
 | `Extrinsic.Asset.ModelTexturePayload` | `src/assets/Asset.ModelTexturePayload.cppm` | `assets` |
-| `Extrinsic.Asset.OperationStatus` | `src/assets/Asset.OperationStatus.cppm` | `assets` |
 | `Extrinsic.Asset.PathIndex` | `src/assets/Asset.PathIndex.cppm` | `assets` |
 | `Extrinsic.Asset.PayloadStore` | `src/assets/Asset.PayloadStore.cppm` | `assets` |
 | `Extrinsic.Asset.Registry` | `src/assets/Asset.Registry.cppm` | `assets` |
@@ -479,4 +478,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **452**
+Total modules: **451**

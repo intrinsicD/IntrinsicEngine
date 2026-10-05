@@ -12,7 +12,6 @@ store, load pipeline, event bus, and path index behind a single façade.
 - `Extrinsic.Asset.ImportRouter`
 - `Extrinsic.Asset.GeometryPayload`
 - `Extrinsic.Asset.ModelTexturePayload`
-- `Extrinsic.Asset.OperationStatus`
 - `Extrinsic.Asset.LoadPipeline`
 - `Extrinsic.Asset.EventBus`
 - `Extrinsic.Asset.PathIndex`
@@ -54,11 +53,6 @@ store, load pipeline, event bus, and path index behind a single façade.
   Current promoted workflows have no checked-in KTX assets or compressed/mip
   texture requirement, so `Asset.ModelTexturePayload` does not accept KTX CPU
   payloads and runtime registers no KTX decoder.
-- `Asset.OperationStatus` classifies promoted asset operation failures into a
-  narrow CPU-side taxonomy: invalid argument, missing resource, invalid state,
-  type mismatch, loader missing, callback failure, validation failure,
-  unsupported format, IO failure, upload handoff failure, resource busy, and
-  unknown failure.
 - `AssetLoadPipeline` tracks load stages, in-flight requests, GPU fence waits,
   and failure / completion transitions. Reload requests can queue a `Reloaded`
   event immediately after entering `QueuedIO`, so main-thread subscribers see
@@ -85,7 +79,6 @@ Asset.GeometryPayload.cppm
 Asset.ImportRouter.cppm
 Asset.LoadPipeline.cppm
 Asset.ModelTexturePayload.cppm
-Asset.OperationStatus.cppm
 Asset.PathIndex.cppm
 Asset.PayloadStore.cppm
 Asset.Registry.cppm
@@ -110,21 +103,16 @@ Asset.Service.cpp
 
 - `CMakeLists.txt` builds `ExtrinsicAssets` and links it publicly against
   `ExtrinsicCore`.
-- There is no separate `.cpp` implementation file for
-  `Asset.OperationStatus.cppm` or `Asset.TypePool.cppm`; both are interface-only
-  module surfaces.
+- There is no separate `.cpp` implementation file for `Asset.TypePool.cppm`;
+  it is an interface-only module surface.
 
 ## Dependency note
 
 `Assets` depends on `Core`, but `Core` does not depend on `Assets`.
 
-## Operation Status And Reload/Destroy Contract
+## Error Reporting And Reload/Destroy Contract
 
-Promoted asset errors reuse `Core::ErrorCode`; `Asset.OperationStatus` provides
-the replacement for legacy `Asset.Errors` grouping. Import decoders and
-`AssetService` preserve the original `Core::ErrorCode` while callers that need
-coarser UI/status decisions can classify it with
-`ClassifyAssetOperationStatus(...)` or `DiagnoseAssetOperation(...)`.
+Asset decoders and `AssetService` report failures using `Core::ErrorCode`.
 
 Reload is transactional through `AssetService`:
 

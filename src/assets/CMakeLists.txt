@@ -9,7 +9,6 @@ target_sources(${target_name}
         Asset.ImportRouter.cppm
         Asset.LoadPipeline.cppm
         Asset.ModelTexturePayload.cppm
-        Asset.OperationStatus.cppm
         Asset.PathIndex.cppm
         Asset.PayloadStore.cppm
         Asset.Registry.cppm

@@ -1760,7 +1760,6 @@ set(_asset_unit_test_files
     Test.Asset.EventBus.cpp
     Test.Asset.ImportRouter.cpp
     Test.Asset.ModelTexturePayload.cpp
-    Test.Asset.OperationStatus.cpp
     Test.Asset.PathIndex.cpp
     Test.Asset.PayloadStore.cpp
     Test.Asset.Registry.cpp
