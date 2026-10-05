@@ -40,7 +40,6 @@ plain data; systems are stateless functions that operate on components.
   (HARDEN-065 slice 2).
 - `Extrinsic.ECS.Component.Culling.Local`
 - `Extrinsic.ECS.Component.Culling.World`
-- `Extrinsic.ECS.Component.Culling.Proxy`
 - `Extrinsic.ECS.Component.AssetInstance`
 - `Extrinsic.ECS.Component.Collider`
 - `Extrinsic.ECS.Component.RigidBody`
@@ -110,10 +109,9 @@ commands are queued, replayed, undone, coalesced, or translated from input.
   consumes that CPU recompute marker and `System.RenderSync` forwards the GPU
   dirty signal. No transform command object is promoted by HARDEN-063.
 - **Selection and hover mutation.** ECS owns the selection/hover data carriers
-  (`SelectableTag`, `SelectedTag`, `HoveredTag`, `PickID`, and cached selected
-  primitive-index components). Runtime/editor owns replace/add/toggle/clear
-  semantics, primitive-cache invalidation policy, input interpretation, GPU
-  pick readback translation, and event dispatch. After mutating the ECS data,
+  (`SelectableTag`, `SelectedTag`, `HoveredTag`, and `PickID`). Runtime/editor
+  owns replace/add/toggle/clear semantics, primitive-cache invalidation policy,
+  input interpretation, GPU pick readback translation, and event dispatch. After mutating the ECS data,
   those higher layers may publish the CPU-only `SelectionChanged` or
   `HoverChanged` payloads through their own dispatcher.
 
@@ -135,7 +133,6 @@ Components/
   ECS.Component.GeometrySourcesPopulate.{cppm,cpp}
   ECS.Component.Culling.Local.cppm
   ECS.Component.Culling.World.cppm
-  ECS.Component.Culling.Proxy.cppm
   ECS.Component.AssetInstance.cppm
   ECS.Component.Collider.cppm
   ECS.Component.RigidBody.cppm
@@ -180,7 +177,7 @@ imports before they reach the layering allowlist.
   `entt::registry` storage used by the typed `Registry` wrapper.
 - `src/ecs/Components/CMakeLists.txt` links `IntrinsicGeometry` and
   `glm::glm` only — components import data-only `Geometry.*` types
-  (AABB, OBB, ConvexHull, Properties, and geometry containers for
+  (AABB, OBB, Properties, and geometry containers for
   `GeometrySources` population) and use `glm` for transform/pose math.
   `Collider` and `RigidBody` are ECS-owned authoring descriptors; they do
   not import a physics world, runtime bridge, graphics state, or live asset
@@ -297,7 +294,6 @@ counterpart:
 
 - `Geometry::Sphere`, `Geometry::AABB`, `Geometry::OBB` — bounding volumes
   on `Culling.Local` / `Culling.World` and `Light::AmbientLight`.
-- `Geometry::ConvexHull` — spatial proxy on `Culling.Proxy`.
 - `Geometry::PropertySet` (via `ObserverPtr`) — non-owning property set
   views on `GeometrySources::{Vertices,Edges,Faces,Halfedges,Tetrahedra}`.
 

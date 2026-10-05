@@ -11,7 +11,7 @@ Root scanned: `src`
 | `app` | 7 |
 | `assets` | 11 |
 | `core` | 40 |
-| `ecs` | 27 |
+| `ecs` | 26 |
 | `geometry` | 133 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
@@ -87,7 +87,6 @@ Root scanned: `src`
 | `Extrinsic.ECS.Components.AssetInstance` | `src/ecs/Components/ECS.Component.AssetInstance.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.Collider` | `src/ecs/Components/ECS.Component.Collider.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.Culling.Local` | `src/ecs/Components/ECS.Component.Culling.Local.cppm` | `ecs` |
-| `Extrinsic.ECS.Component.Culling.Proxy` | `src/ecs/Components/ECS.Component.Culling.Proxy.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.Culling.World` | `src/ecs/Components/ECS.Component.Culling.World.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.DirtyTags` | `src/ecs/Components/ECS.Component.DirtyTags.cppm` | `ecs` |
 | `Extrinsic.ECS.Components.GeometrySources` | `src/ecs/Components/ECS.Component.GeometrySources.cppm` | `ecs` |
@@ -482,4 +481,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **455**
+Total modules: **454**

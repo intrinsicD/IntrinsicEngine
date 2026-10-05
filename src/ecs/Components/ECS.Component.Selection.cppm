@@ -1,7 +1,8 @@
+// Selection data carriers: selectable/selected/hovered tags and explicit pick
+// IDs. Runtime/editor owns selection semantics and picking.
 module;
 
 #include <cstdint>
-#include <vector>
 
 export module Extrinsic.ECS.Components.Selection;
 
@@ -21,21 +22,6 @@ export namespace Extrinsic::ECS::Components::Selection
     struct PickID
     {
         uint32_t Value = 0;
-    };
-
-    struct CachedSelectedVertexIndices
-    {
-        std::vector<uint32_t> Indices;
-    };
-
-    struct CachedSelectedEdgeIndices
-    {
-        std::vector<uint32_t> Indices;
-    };
-
-    struct CachedSelectedFaceIndices
-    {
-        std::vector<uint32_t> Indices;
     };
 }
 
