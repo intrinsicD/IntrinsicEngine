@@ -15,7 +15,6 @@ module;
 
 module Extrinsic.Graphics.CullingSystem;
 
-import Extrinsic.Core.StrongHandle;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.BufferManager;
@@ -214,14 +213,6 @@ namespace Extrinsic::Graphics
         }
     }
 
-    struct CullSlot
-    {
-        RHI::BoundingSphere Sphere{};
-        RHI::GpuDrawIndexedCommand DrawTemplate{};
-        std::uint32_t       Generation = 0;
-        bool                Live       = false;
-    };
-
     struct BucketStorage
     {
         struct PhaseStorage
@@ -254,10 +245,7 @@ namespace Extrinsic::Graphics
 
         std::array<BucketStorage, static_cast<std::size_t>(RHI::GpuDrawBucketKind::Count)> Buckets{};
 
-        std::vector<CullSlot>      Slots;
-        std::vector<std::uint32_t> FreeList;
         std::uint32_t Capacity  = 0;
-        std::uint32_t LiveCount = 0;
 
         bool AllocateBucket(RHI::GpuDrawBucketKind kind, const bool indexed, const std::uint32_t capacity)
         {
@@ -357,17 +345,9 @@ namespace Extrinsic::Graphics
             CullBucketTableLease = std::move(*bucketTableOr);
             CullBucketTableBDA = Device->GetBufferDeviceAddress(CullBucketTableLease.GetHandle());
             Capacity = capacity;
-            Slots.assign(capacity, CullSlot{});
             return true;
         }
 
-        [[nodiscard]] CullSlot* Resolve(const CullingHandle h) noexcept
-        {
-            if (!h.IsValid() || h.Index >= static_cast<std::uint32_t>(Slots.size())) return nullptr;
-            auto& slot = Slots[h.Index];
-            if (!slot.Live || slot.Generation != h.Generation) return nullptr;
-            return &slot;
-        }
     };
 
     CullingSystem::CullingSystem()
@@ -428,72 +408,10 @@ namespace Extrinsic::Graphics
         m_Impl->CullBucketTableBDA = 0;
         m_Impl->PreviousCamera.reset();
         m_Impl->Diagnostics = {};
-        m_Impl->Slots.clear();
-        m_Impl->FreeList.clear();
         m_Impl->Capacity = 0;
-        m_Impl->LiveCount = 0;
         m_Impl->Device = nullptr;
         m_Impl->BufferMgr = nullptr;
         m_Impl->PipelineMgr = nullptr;
-    }
-
-    CullingHandle CullingSystem::Register(const RHI::BoundingSphere& sphere,
-                                          const RHI::GpuDrawIndexedCommand& drawTemplate)
-    {
-        assert(m_Impl->Device && "Register called before Initialize()");
-
-        std::uint32_t index = 0;
-        std::uint32_t generation = 0;
-        if (!m_Impl->FreeList.empty())
-        {
-            index = m_Impl->FreeList.back();
-            m_Impl->FreeList.pop_back();
-            generation = m_Impl->Slots[index].Generation;
-        }
-        else
-        {
-            assert(m_Impl->LiveCount < m_Impl->Capacity && "CullingSystem capacity exceeded");
-            index = m_Impl->LiveCount;
-        }
-
-        auto& slot = m_Impl->Slots[index];
-        slot.Sphere = sphere;
-        slot.DrawTemplate = drawTemplate;
-        slot.Generation = generation;
-        slot.Live = true;
-        ++m_Impl->LiveCount;
-        return CullingHandle{index, generation};
-    }
-
-    void CullingSystem::Unregister(const CullingHandle handle)
-    {
-        auto* slot = m_Impl->Resolve(handle);
-        if (!slot) return;
-
-        slot->Live = false;
-        ++slot->Generation;
-        m_Impl->FreeList.push_back(handle.Index);
-        --m_Impl->LiveCount;
-    }
-
-    void CullingSystem::UpdateBounds(const CullingHandle handle, const RHI::BoundingSphere& sphere)
-    {
-        auto* slot = m_Impl->Resolve(handle);
-        if (!slot) return;
-        slot->Sphere = sphere;
-    }
-
-    void CullingSystem::SetDrawTemplate(const CullingHandle handle, const RHI::GpuDrawIndexedCommand& cmd)
-    {
-        auto* slot = m_Impl->Resolve(handle);
-        if (!slot) return;
-        slot->DrawTemplate = cmd;
-    }
-
-    void CullingSystem::SyncGpuBuffer()
-    {
-        // Bucketed culling reads directly from GpuWorld SSBOs.
-        // No CPU-authored cull input buffer remains.
     }
 
     void CullingSystem::ResetCounters(RHI::ICommandContext& cmd)
@@ -654,25 +572,5 @@ namespace Extrinsic::Graphics
     CullingDiagnostics CullingSystem::GetDiagnostics() const noexcept
     {
         return m_Impl->Diagnostics;
-    }
-
-    RHI::BufferHandle CullingSystem::GetDrawCommandBuffer() const noexcept
-    {
-        return m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::SurfaceOpaque)].Bucket.IndexedArgsBuffer;
-    }
-
-    RHI::BufferHandle CullingSystem::GetVisibilityCountBuffer() const noexcept
-    {
-        return m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::SurfaceOpaque)].Bucket.CountBuffer;
-    }
-
-    std::uint32_t CullingSystem::GetRegisteredCount() const noexcept
-    {
-        return m_Impl->LiveCount;
-    }
-
-    std::uint32_t CullingSystem::GetCapacity() const noexcept
-    {
-        return m_Impl->Capacity;
     }
 }

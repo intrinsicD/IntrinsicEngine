@@ -4544,7 +4544,7 @@ void VulkanDevice::WriteBuffer(RHI::BufferHandle handle, const void* data,
     // ----------------------------------------------------------------
     // Slow path: device-local buffer — upload via temporary staging buffer.
     // This is synchronous (vkQueueWaitIdle).  Only used for scene loading
-    // and rare CPU→GPU writes (e.g. CullingSystem::SyncGpuBuffer).
+    // and rare CPU→GPU writes.
     // For async streaming use IDevice::GetTransferQueue().UploadBuffer().
     // ----------------------------------------------------------------
 

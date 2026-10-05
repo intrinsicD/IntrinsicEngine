@@ -541,36 +541,13 @@ Ask: *"Does this object outlive a single invocation?"*
 
 **Graphics — GPU frame graph:**
 
-```cpp
-// ✅ Owner — resource authority, no execution context
-class CullingSystem {
-    void Initialize(IDevice&, BufferManager&, PipelineManager&, ...);
-    void Shutdown();
-    CullingHandle Register(BoundingSphere, GpuDrawCommand); // slot management
-    void UpdateBounds(CullingHandle, BoundingSphere);        // dirty tracking
-    void SyncGpuBuffer();                                    // CPU→GPU upload
-    BufferHandle GetDrawCommandBuffer()     const noexcept;  // read-only accessors
-    BufferHandle GetVisibilityCountBuffer() const noexcept;
-    PipelineHandle GetCullPipeline()        const noexcept;
-    // VIOLATION: void ResetCounters(ICommandContext&);    ← move to Pass.Culling
-    // VIOLATION: void DispatchCull(ICommandContext&, ...) ← move to Pass.Culling
-};
-
-// ✅ Worker — frame-graph compute node, injects Owner by reference
-class CullingPass {
-    CullingSystem& m_Culling;  // injected, not owned
-    void Execute(ICommandContext& cmd, const CameraUBO& cam) {
-        m_Culling.SyncGpuBuffer();
-        cmd.ResetBuffer(m_Culling.GetVisibilityCountBuffer());
-        cmd.BindPipeline(m_Culling.GetCullPipeline());
-        cmd.PushConstants(BuildCullConstants(cam, m_Culling));
-        cmd.Dispatch(CeilDiv(m_Culling.GetRegisteredCount(), 64u));
-        cmd.UAVBarrier({m_Culling.GetDrawCommandBuffer(),
-                        m_Culling.GetVisibilityCountBuffer()});
-    }
-    // declares virtual WRITE: DrawCommandBuffer, VisibilityCountBuffer
-};
-```
+`CullingSystem` (Owner) holds the persistent bucket resources: indirect-args,
+count and diagnostics buffers, the cull bucket table and the cull pipeline.
+Instance bounds, render flags and geometry records come from `GpuWorld`; there
+is no per-object registration API. `CullingPass` (Worker) receives the system
+by reference and calls `ResetCounters(cmd)` and `DispatchCull(cmd, camera,
+gpuWorld)` each frame. Those two methods still take the command context on the
+owner, which is the remaining deviation from the role split above.
 
 **Simulation — CPU task graph:**
 

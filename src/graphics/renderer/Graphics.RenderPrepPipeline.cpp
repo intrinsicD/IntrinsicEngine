@@ -130,7 +130,8 @@ namespace Extrinsic::Graphics
         void ExecuteCullingSync(RenderPrepPipelineResult& result,
                                 const RenderPrepPipelineInputs& inputs)
         {
-            inputs.Culling->SyncGpuBuffer();
+            // Culling reads GpuWorld buffers directly, so this observable step
+            // has no upload of its own; it marks the end of CPU-side prep.
             RecordStep(result, inputs, RenderPrepStep::CullingSync);
         }
 

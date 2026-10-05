@@ -15,7 +15,6 @@ module;
 
 export module Extrinsic.Graphics.CullingSystem;
 
-import Extrinsic.Core.StrongHandle;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Device;
@@ -26,9 +25,6 @@ import Extrinsic.Graphics.GpuWorld;
 
 export namespace Extrinsic::Graphics
 {
-    struct CullingTag;
-    using CullingHandle = Core::StrongHandle<CullingTag>;
-
     enum class CullingPhase : std::uint32_t
     {
         Phase1 = static_cast<std::uint32_t>(RHI::GpuCullPhase::Phase1),
@@ -169,17 +165,6 @@ export namespace Extrinsic::Graphics
 
         void Shutdown();
 
-        [[deprecated("Legacy path: use GpuWorld instance/bounds/render-flags + DispatchCull().")]]
-        [[nodiscard]] CullingHandle Register(const RHI::BoundingSphere& sphere,
-                                             const RHI::GpuDrawIndexedCommand&  drawTemplate);
-        [[deprecated("Legacy path: use GpuWorld instance/bounds/render-flags + DispatchCull().")]]
-        void Unregister(CullingHandle handle);
-        [[deprecated("Legacy path: use GpuWorld::SetBounds() + DispatchCull().")]]
-        void UpdateBounds(CullingHandle handle, const RHI::BoundingSphere& sphere);
-        [[deprecated("Legacy path: draw templates are now generated from GpuWorld geometry records.")]]
-        void SetDrawTemplate(CullingHandle handle, const RHI::GpuDrawIndexedCommand& cmd);
-
-        void SyncGpuBuffer();
         void ResetCounters(RHI::ICommandContext& cmd);
         void DispatchCull(RHI::ICommandContext& cmd,
                           const RHI::CameraUBO& camera,
@@ -189,12 +174,6 @@ export namespace Extrinsic::Graphics
         [[nodiscard]] GpuDrawBucketPhase GetBucketPhase(RHI::GpuDrawBucketKind kind,
                                                         CullingPhase phase) const;
         [[nodiscard]] CullingDiagnostics GetDiagnostics() const noexcept;
-
-        [[nodiscard]] RHI::BufferHandle GetDrawCommandBuffer()     const noexcept;
-        [[nodiscard]] RHI::BufferHandle GetVisibilityCountBuffer() const noexcept;
-
-        [[nodiscard]] std::uint32_t GetRegisteredCount() const noexcept;
-        [[nodiscard]] std::uint32_t GetCapacity()        const noexcept;
 
     private:
         struct Impl;

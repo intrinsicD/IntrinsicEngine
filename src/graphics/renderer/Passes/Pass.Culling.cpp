@@ -8,7 +8,6 @@ namespace Extrinsic::Graphics
                               const RHI::CameraUBO& camera,
                               const GpuWorld&       gpuWorld)
     {
-        m_Culling.SyncGpuBuffer();
         m_Culling.ResetCounters(cmd);
         m_Culling.DispatchCull(cmd, camera, gpuWorld);
     }
