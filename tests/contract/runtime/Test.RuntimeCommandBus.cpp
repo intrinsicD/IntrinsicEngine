@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string_view>
+
 #include <atomic>
 #include <cstdint>
 #include <string>
@@ -223,4 +225,19 @@ TEST(RuntimeCommandBus, DiscardPendingDropsQueuedCommandsWithoutExecuting)
     EXPECT_EQ(executed, 0);
     EXPECT_EQ(bus.Stats().Executed, 0u);
     EXPECT_EQ(bus.DiscardPending(), 0u);
+}
+
+namespace TypeNameProbe
+{
+    struct ProbeCommand
+    {
+        int Value = 0;
+    };
+}
+
+TEST(RuntimeCommandBus, EnvelopeTypeNameNamesThePayloadType)
+{
+    const auto envelope = Extrinsic::Runtime::CommandEnvelope::Make(TypeNameProbe::ProbeCommand{});
+    EXPECT_NE(envelope.TypeName().find("TypeNameProbe::ProbeCommand"), std::string_view::npos)
+        << envelope.TypeName();
 }

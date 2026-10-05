@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string_view>
+
 #include <algorithm>
 #include <array>
 #include <numeric>
@@ -1906,4 +1908,19 @@ TEST(RuntimeJobService, EngineShutdownReleasesPendingGpuCaptureBeforeDevice)
     EXPECT_TRUE(released);
     EXPECT_EQ(finalizers, 1u);
     EXPECT_TRUE(engine.Jobs().SnapshotAll().empty());
+}
+
+namespace TypeNameProbe
+{
+    struct ProbeResult
+    {
+        int Value = 0;
+    };
+}
+
+TEST(RuntimeJobService, EnvelopeTypeNameNamesThePayloadType)
+{
+    const auto envelope = Extrinsic::Runtime::JobResultEnvelope::Make(TypeNameProbe::ProbeResult{});
+    EXPECT_NE(envelope.TypeName().find("TypeNameProbe::ProbeResult"), std::string_view::npos)
+        << envelope.TypeName();
 }

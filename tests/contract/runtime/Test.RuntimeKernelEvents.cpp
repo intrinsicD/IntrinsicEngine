@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string_view>
+
 #include <atomic>
 #include <cstdint>
 #include <memory>
@@ -229,4 +231,19 @@ TEST(RuntimeKernelEvents, EnginePumpsPostDrainAndPostSimulationOnNullBackend)
     EXPECT_EQ(appPtr->EventStats.DeliveredEvents, 2u);
 
     engine.Shutdown();
+}
+
+namespace TypeNameProbe
+{
+    struct ProbeEvent
+    {
+        int Value = 0;
+    };
+}
+
+TEST(RuntimeKernelEvents, EnvelopeTypeNameNamesThePayloadType)
+{
+    const auto envelope = Extrinsic::Runtime::KernelEventEnvelope::Make(TypeNameProbe::ProbeEvent{});
+    EXPECT_NE(envelope.TypeName().find("TypeNameProbe::ProbeEvent"), std::string_view::npos)
+        << envelope.TypeName();
 }

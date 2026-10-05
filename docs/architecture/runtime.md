@@ -200,7 +200,9 @@ it is a declared owner Engine must not import, and importing it again fails.
 
 `Extrinsic.Core.Hash` owns the kernel's compile-time type identity.
 `Core::TypeToken<T>()` and its `Core::Detail::TypeSig<T>()` signature source live
-there beside `Hash::HashString64`, the one constexpr 64-bit FNV-1a byte hash.
+there beside `Hash::HashString64`, the one constexpr 64-bit FNV-1a byte hash
+(an optional seed continues a previous hash; the RHI sampler cache and the
+procedural geometry params hash reuse it).
 `Extrinsic.Core.Dag.TaskGraph` reuses that hash for its own
 `Detail::TypeTokenValue<T>()`; the two signature sources stay distinct, so the
 graphs keep their existing token values and nothing merges them. The 32-bit
