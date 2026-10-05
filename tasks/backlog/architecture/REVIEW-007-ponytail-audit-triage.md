@@ -259,7 +259,7 @@ Eine Etappe pro Sitzung genügt; die Reihenfolge kann der Operator ändern.
 - [x] E0 — Codex-Audit-Gruppen ohne Gegenstück (PK03–PK12), 2026-10-05
 - [x] E1 — Querschnittsduplikate (X01–X04), 2026-10-05
 - [x] E2 — Tools, CI, Abhängigkeiten (T01–T23), 2026-10-06
-- [ ] E3 — Core, ECS, Assets (C01–C17)
+- [x] E3 — Core, ECS, Assets (C01–C17), 2026-10-06
 - [ ] E4 — Graphics (G01–G18)
 - [ ] E5 — Runtime ohne Editor/Modules (R01–R19)
 - [ ] E6 — Runtime-Editor/Modules und Sandbox-App (E01–E17)
@@ -318,23 +318,23 @@ nächsten Abschnitt.
 ### C — Core, ECS, Assets
 | ID | Fund | Tag | Schätz. | Claude | Codex | Operator |
 |----|---------|-----|------|--------|--------|----------|
-| C01 | `Core.Telemetry` — nothing in src reads it; `EXTRINSIC_PROFILE_*` unused | delete | -550 | teilweise (Fable): Profile-Makros → Task; Alloc-Zähler widerlegt (AgentOperations liest); TelemetrySystem → vertagen (Policy Marker-Pflicht) | teilweise: Makros ungenutzt; Alloc-Leser und GPU-Timing-Pfad sind real. Runtime.AgentOperations.cpp:28, Graphics.Renderer.cpp:8381. [≠ Claude: Ja, Begründung: konkrete TelemetrySystem-Nutzung.] | — |
-| C02 | Coroutine `Tasks::Job`, WaitToken, Park/Unpark (0 co_await outside core) | delete | -450 | teilweise (Fable): Job/Awaiter/WaitToken-Pfad Löschkandidat nach SLO-Klärung; Worker-Park/Unpark widerlegt | teilweise: Coroutine-Job ohne Produktionsnutzer; WaitToken hängt an CounterEvent, Worker-Warten ist aktiv. Core.Tasks.CounterEvent.cpp:17, Core.Tasks.Worker.cpp:59. [≠ Claude: Gleiches Votum; zusätzliche Verflechtung.] | — |
-| C03 | `Core.Process` — test-only | delete | -325 | teilweise: RUNTIME-282 plant Nutzung → vertagen | teilweise: Derzeit Testnutzung; strukturierter Prozessstart ist ausdrücklich für RUNTIME-282 vorgesehen. Test.CoreProcess.cpp:7, RUNTIME-282:43. | — |
-| C04 | `FileWatcher` / `Core.Filesystem` (not PathResolver) — test-only | delete | -238 | bestätigt: FileWatcher 0 Nutzer (PathResolver ausnehmen) → Task | bestätigt: Watch/Initialize ohne Verbraucher; Eigen-Test prüft nur Statistik. PathResolver ist separat produktiv. Test.Core.Filesystem.cpp:29, Asset.Service.cppm:21. | — |
-| C05 | `Memory::ScopeStack`, `ArenaMemoryResource` — test-only | delete | -230 | bestätigt: ScopeStack → Task (+Doku-Korrektur); ArenaMemoryResource → mit C06 | bestätigt: ScopeStack und ArenaMemoryResource nur in Eigen-Tests; kein offener Nutzerauftrag gefunden. Ihre Lebensdauer-/PMR-Verträge sind dennoch getestet. Test.CoreMemory.cpp:76, PMR-Test:481. | — |
-| C06 | `LinearArena` + `ArenaAllocator` → `std::pmr::monotonic_buffer_resource` (GJK/EPA ignore `scratch` in places) | stdlib | -200 | teilweise: EPA nutzt Arena aktiv, Telemetry::Alloc hängt dran → zerlegen; toter GJK-`scratch`-Parameter → Task | teilweise: GJK ignoriert scratch, EPA verwendet drei ArenaAllocator-Typen. PMR ist wegen Fehler-, Rewind- und Threadvertrag kein unmittelbarer Ersatz. Geometry.GJK.cppm:173, Geometry.EPA.cppm:101. | — |
-| C07 (PK06) | `Core::RingBuffer<T,N>` — 0 importers | delete | -66 | bestätigt: 0 Importe; README-Falschaussage mit korrigieren → Task | bestätigt: Keine Importe/Instanzen dieses Templates; CMake-Eintrag allein ist kein Verbraucher. Logging hat einen eigenen Puffer. src/core/CMakeLists.txt:24, Core.Logging.cpp:30. | — |
-| C08 | `Asset.OperationStatus` — test-only | delete | -165 | bestätigt → Task | bestätigt: Isolierte Fehlerklassifikation mit Eigen-Tests; Service verarbeitet Core-Fehler direkt. Kein offener Integrationsauftrag gefunden. Test.Asset.OperationStatus.cpp:12, Asset.Service.cpp:114. | — |
-| C09 | `FrameGraph` wrapper over `Dag::TaskGraph` (options duplicate field-for-field) | yagni | -150 | C09-01 Options-Alias → Task (≈−15); Fassade trägt ECS-Vokabular → behalten | teilweise: Optionsfelder und Konverter sind redundant; StructuralRead/Write und Phasentokens ergänzen dagegen echte Semantik. Core.FrameGraph.cppm:52, Strukturvertrag:100. | — |
-| C10 | `CallbackRegistry<Sig,Tag>` — exactly one instantiation (Asset.Service) | yagni | -150 | widerlegt: Readiness-Report 2026-08-06 „retain“ (Stale-Token-Korrektheit) | widerlegt: Ein Produktionskunde beweist keine nutzlose Registry: Generationen schützen Reload vor veralteten Tokens; Callbacks laufen außerhalb des Locks. Core.CallbackRegistry.cppm:98, Asset.Service.cpp:302. | — |
-| C11 | `Core.Config.EngineLoad` per-field readers → table/`from_json` (low confidence; diagnostics deliberate) | shrink | -300 | teilweise: ≈−120…−180, Diagnose-Parität schützen → vertagen | teilweise: Feldzuweisungen wiederholen sich; Warnungen, Referenzdefaults und ParsedFieldCount tragen Verhalten. Einsparumfang unbewiesen. Core.Config.EngineLoad.cpp:396, Test.Core.EngineConfigLoad.cpp:493. [≠ Claude: Gleiches Votum; keine bestätigte Zeilenschätzung.] | — |
-| C12 | `AssetEventBus` per-asset Subscribe/Unsubscribe — only SubscribeAll used | delete | -60 | bestätigt: per-Asset-Abo 0 Produktionsaufrufer → Task (Tests umschreiben) | bestätigt: Per-Asset-Abos nur in Tests; Produktionspfade verwenden SubscribeAll. Gezieltes Flush(id) ist davon getrennt. Asset.EventBus.cppm:29, Runtime.AssetWorkflowModule.cpp:1020. | — |
-| C13 | Duplicate type-token generators → see X02 | reuse | (X02) | → X02 | teilweise: Namenshelfer wiederholen sich; Hashkern bereits geteilt. TaskGraph nutzt constexpr-Tokens, Asset.TypePool dagegen Adressidentität. Core.Dag.TaskGraph.cppm:60, Asset.TypePool.cppm:18. | — |
-| C14 | `TaskGraphExecutionMode::PlanOnly` — legacy test only | delete | -60 | widerlegt: Bench_TaskGraphPlanReuseSmoke + 2 Baselines nutzen PlanOnly | widerlegt: PlanOnly wird vom registrierten Plan-Reuse-Benchmark verwendet, zusätzlich zu Tests. Bench_TaskGraphPlanReuseSmoke.cpp:82, benchmarks/CMakeLists.txt:26. | — |
-| C15 | `Core::Hash::U64Hash` — 0 users (culling proxy → PK10) | delete | -26 | bestätigt (trivial) → Mini-Task, bündelbar | teilweise: Keine Produktionsnutzer, aber zwei Eigen-Tests. U64Hash ist lediglich ein vierzeiliger std::hash-Wrapper. Core.Hash.cppm:87, Test.CoreHash.cpp:324. [≠ Claude: Ja: „0 Nutzer“ und Umfang korrigiert.] | — |
-| C16 | `ECS.Events` (SelectionChanged, HoverChanged, …) — test/fixture only | delete | -37 | teilweise: Layering-Fixtures + Test.CheckLayering hängen daran → vertagen | bestätigt: Keine Produktionsnutzer; Eigen-Test vorhanden. Layering-Fixtures prüfen Importtext ohne Auflösung des echten Moduls. Test.ECS.Events.cpp:5, check_layering.py:200. [≠ Claude: Ja: Fixtures sind kein Erhaltungsbeleg.] | — |
-| C17 | Logging `GetEntryCount`, `GetSequenceNumber`, `LevelMask` — 0 callers | delete | -30 | GetEntryCount/SequenceNumber behalten; LevelMask widerlegt (DiagnosticsStream nutzt) | widerlegt: Zähler haben Testaufrufer; LevelMask gehört zum produktiven Logfilter. „0 callers“ trifft auf die Gruppe nicht zu. Test.SandboxDiagnostics.cpp:95, Runtime.DiagnosticsStream.cpp:81. | — |
+| C01 | `Core.Telemetry` — nothing in src reads it; `EXTRINSIC_PROFILE_*` unused | delete | -550 | teilweise (Fable): Profile-Makros → Task; Alloc-Zähler widerlegt (AgentOperations liest); TelemetrySystem → vertagen (Policy Marker-Pflicht) | teilweise: Makros ungenutzt; Alloc-Leser und GPU-Timing-Pfad sind real. Runtime.AgentOperations.cpp:28, Graphics.Renderer.cpp:8381. [≠ Claude: Ja, Begründung: konkrete TelemetrySystem-Nutzung.] | Task + Umsetzung (2026-10-06): nur ungenutzte Profil-Makros → `42a776f17` |
+| C02 | Coroutine `Tasks::Job`, WaitToken, Park/Unpark (0 co_await outside core) | delete | -450 | teilweise (Fable): Job/Awaiter/WaitToken-Pfad Löschkandidat nach SLO-Klärung; Worker-Park/Unpark widerlegt | teilweise: Coroutine-Job ohne Produktionsnutzer; WaitToken hängt an CounterEvent, Worker-Warten ist aktiv. Core.Tasks.CounterEvent.cpp:17, Core.Tasks.Worker.cpp:59. [≠ Claude: Gleiches Votum; zusätzliche Verflechtung.] | Vertagen (2026-10-06): bis SLO-Frage geklärt |
+| C03 | `Core.Process` — test-only | delete | -325 | teilweise: RUNTIME-282 plant Nutzung → vertagen | teilweise: Derzeit Testnutzung; strukturierter Prozessstart ist ausdrücklich für RUNTIME-282 vorgesehen. Test.CoreProcess.cpp:7, RUNTIME-282:43. | Vertagen (2026-10-06): RUNTIME-282 plant Nutzung |
+| C04 | `FileWatcher` / `Core.Filesystem` (not PathResolver) — test-only | delete | -238 | bestätigt: FileWatcher 0 Nutzer (PathResolver ausnehmen) → Task | bestätigt: Watch/Initialize ohne Verbraucher; Eigen-Test prüft nur Statistik. PathResolver ist separat produktiv. Test.Core.Filesystem.cpp:29, Asset.Service.cppm:21. | Task + Umsetzung (2026-10-06): FileWatcher-Modul → `0bedd2376` |
+| C05 | `Memory::ScopeStack`, `ArenaMemoryResource` — test-only | delete | -230 | bestätigt: ScopeStack → Task (+Doku-Korrektur); ArenaMemoryResource → mit C06 | bestätigt: ScopeStack und ArenaMemoryResource nur in Eigen-Tests; kein offener Nutzerauftrag gefunden. Ihre Lebensdauer-/PMR-Verträge sind dennoch getestet. Test.CoreMemory.cpp:76, PMR-Test:481. | Task + Umsetzung (2026-10-06): ScopeStack + ArenaMemoryResource → `297df6ae0` |
+| C06 | `LinearArena` + `ArenaAllocator` → `std::pmr::monotonic_buffer_resource` (GJK/EPA ignore `scratch` in places) | stdlib | -200 | teilweise: EPA nutzt Arena aktiv, Telemetry::Alloc hängt dran → zerlegen; toter GJK-`scratch`-Parameter → Task | teilweise: GJK ignoriert scratch, EPA verwendet drei ArenaAllocator-Typen. PMR ist wegen Fehler-, Rewind- und Threadvertrag kein unmittelbarer Ersatz. Geometry.GJK.cppm:173, Geometry.EPA.cppm:101. | Task + Umsetzung (2026-10-06): nur toter GJK-`scratch` → `12ee32b5a` |
+| C07 (PK06) | `Core::RingBuffer<T,N>` — 0 importers | delete | -66 | bestätigt: 0 Importe; README-Falschaussage mit korrigieren → Task | bestätigt: Keine Importe/Instanzen dieses Templates; CMake-Eintrag allein ist kein Verbraucher. Logging hat einen eigenen Puffer. src/core/CMakeLists.txt:24, Core.Logging.cpp:30. | Task + Umsetzung (2026-10-06) → `f6b60b681` |
+| C08 | `Asset.OperationStatus` — test-only | delete | -165 | bestätigt → Task | bestätigt: Isolierte Fehlerklassifikation mit Eigen-Tests; Service verarbeitet Core-Fehler direkt. Kein offener Integrationsauftrag gefunden. Test.Asset.OperationStatus.cpp:12, Asset.Service.cpp:114. | Task + Umsetzung (2026-10-06) → `75778684c` |
+| C09 | `FrameGraph` wrapper over `Dag::TaskGraph` (options duplicate field-for-field) | yagni | -150 | C09-01 Options-Alias → Task (≈−15); Fassade trägt ECS-Vokabular → behalten | teilweise: Optionsfelder und Konverter sind redundant; StructuralRead/Write und Phasentokens ergänzen dagegen echte Semantik. Core.FrameGraph.cppm:52, Strukturvertrag:100. | Task + Umsetzung (2026-10-06): nur Options-Alias → `f96a2370d` |
+| C10 | `CallbackRegistry<Sig,Tag>` — exactly one instantiation (Asset.Service) | yagni | -150 | widerlegt: Readiness-Report 2026-08-06 „retain“ (Stale-Token-Korrektheit) | widerlegt: Ein Produktionskunde beweist keine nutzlose Registry: Generationen schützen Reload vor veralteten Tokens; Callbacks laufen außerhalb des Locks. Core.CallbackRegistry.cppm:98, Asset.Service.cpp:302. | Behalten (2026-10-06): widerlegt |
+| C11 | `Core.Config.EngineLoad` per-field readers → table/`from_json` (low confidence; diagnostics deliberate) | shrink | -300 | teilweise: ≈−120…−180, Diagnose-Parität schützen → vertagen | teilweise: Feldzuweisungen wiederholen sich; Warnungen, Referenzdefaults und ParsedFieldCount tragen Verhalten. Einsparumfang unbewiesen. Core.Config.EngineLoad.cpp:396, Test.Core.EngineConfigLoad.cpp:493. [≠ Claude: Gleiches Votum; keine bestätigte Zeilenschätzung.] | Vertagen (2026-10-06): Diagnose-Parität |
+| C12 | `AssetEventBus` per-asset Subscribe/Unsubscribe — only SubscribeAll used | delete | -60 | bestätigt: per-Asset-Abo 0 Produktionsaufrufer → Task (Tests umschreiben) | bestätigt: Per-Asset-Abos nur in Tests; Produktionspfade verwenden SubscribeAll. Gezieltes Flush(id) ist davon getrennt. Asset.EventBus.cppm:29, Runtime.AssetWorkflowModule.cpp:1020. | Task + Umsetzung (2026-10-06): per-Asset-Abo → `ae1aa9ae6` |
+| C13 | Duplicate type-token generators → see X02 | reuse | (X02) | → X02 | teilweise: Namenshelfer wiederholen sich; Hashkern bereits geteilt. TaskGraph nutzt constexpr-Tokens, Asset.TypePool dagegen Adressidentität. Core.Dag.TaskGraph.cppm:60, Asset.TypePool.cppm:18. | Erledigt durch X02 (2026-10-06) |
+| C14 | `TaskGraphExecutionMode::PlanOnly` — legacy test only | delete | -60 | widerlegt: Bench_TaskGraphPlanReuseSmoke + 2 Baselines nutzen PlanOnly | widerlegt: PlanOnly wird vom registrierten Plan-Reuse-Benchmark verwendet, zusätzlich zu Tests. Bench_TaskGraphPlanReuseSmoke.cpp:82, benchmarks/CMakeLists.txt:26. | Behalten (2026-10-06): widerlegt |
+| C15 | `Core::Hash::U64Hash` — 0 users (culling proxy → PK10) | delete | -26 | bestätigt (trivial) → Mini-Task, bündelbar | teilweise: Keine Produktionsnutzer, aber zwei Eigen-Tests. U64Hash ist lediglich ein vierzeiliger std::hash-Wrapper. Core.Hash.cppm:87, Test.CoreHash.cpp:324. [≠ Claude: Ja: „0 Nutzer“ und Umfang korrigiert.] | Task + Umsetzung (2026-10-06) → `e81825811` |
+| C16 | `ECS.Events` (SelectionChanged, HoverChanged, …) — test/fixture only | delete | -37 | teilweise: Layering-Fixtures + Test.CheckLayering hängen daran → vertagen | bestätigt: Keine Produktionsnutzer; Eigen-Test vorhanden. Layering-Fixtures prüfen Importtext ohne Auflösung des echten Moduls. Test.ECS.Events.cpp:5, check_layering.py:200. [≠ Claude: Ja: Fixtures sind kein Erhaltungsbeleg.] | Task + Umsetzung (2026-10-06): Fixtures auf `ECS.Scene.Handle` → `72f2fc36a` |
+| C17 | Logging `GetEntryCount`, `GetSequenceNumber`, `LevelMask` — 0 callers | delete | -30 | GetEntryCount/SequenceNumber behalten; LevelMask widerlegt (DiagnosticsStream nutzt) | widerlegt: Zähler haben Testaufrufer; LevelMask gehört zum produktiven Logfilter. „0 callers“ trifft auf die Gruppe nicht zu. Test.SandboxDiagnostics.cpp:95, Runtime.DiagnosticsStream.cpp:81. | Behalten (2026-10-06): widerlegt |
 
 ### G — Graphics
 | ID | Fund | Tag | Schätz. | Claude | Codex | Operator |
@@ -642,6 +642,33 @@ Nebenbefunde, vorbestehend und nicht durch E2 verursacht:
   `test_exact_multiworker_ctest_budgets_match_cpu_sources` als fehlschlagend,
   identisch vor und nach T05.
 
+## Etappe E3 — Entscheidungen und Umsetzung 2026-10-06
+
+Der Operator hat am 2026-10-06 zehn Kandidaten zur Umsetzung freigegeben,
+darunter die strittigen C15 und C16, bei denen Codex für das Löschen stimmte.
+C02, C03 und C11 sind vertagt, C10, C14 und C17 bleiben, C13 ist durch X02
+erledigt. Basisrevision `8cd95f90a`.
+
+Ablauf: Codex-Plan je Kandidat. Die Umsetzung übernahm ein Claude-Subagent,
+mit einem Commit je Kandidat, fokussiertem Build und fokussierten Tests,
+`check_layering` und Source-Doc-Audit. Anschließend reviewte Codex jeden
+Commit; alle zehn wurden ohne Funde freigegeben. Zusammen ergeben sie
+44 Dateien mit +132/−1613 Zeilen. Das Modulinventar sinkt von 453 auf 448
+Module.
+
+| Kandidat | Commit | Kern | Tests |
+|---|---|---|---|
+| C07 | `f6b60b681` | `Core.RingBuffer` gelöscht, README korrigiert | LogRingBuffer 15 |
+| C08 | `75778684c` | `Asset.OperationStatus` samt Test gelöscht | 149 |
+| C15 | `e81825811` | `U64Hash` samt 2 Tests gelöscht | CoreHash 29 |
+| C04 | `0bedd2376` | ganzes Modul `Core.Filesystem` gelöscht (nur FileWatcher); PathResolver bleibt | 4 |
+| C05 | `297df6ae0` | `ScopeStack`, `ArenaMemoryResource` gelöscht; LinearArena/ArenaAllocator bleiben | 53 |
+| C01 | `42a776f17` | `EXTRINSIC_PROFILE_*` und vier reine Alias-Makros gelöscht; Telemetrie bleibt | 15 |
+| C06 | `12ee32b5a` | toter GJK-`scratch` entfernt (6 → 4 Overloads); EPA-Arena bleibt | 140 |
+| C09 | `f96a2370d` | FrameGraph-Optionen sind Alias der identischen TaskGraph-Optionen | 62 |
+| C12 | `ae1aa9ae6` | per-Asset-Subscribe entfernt; `Flush(id)` bleibt, Tests auf SubscribeAll | 95 |
+| C16 | `72f2fc36a` | `ECS.Events` gelöscht; Layering-Fixtures prüfen dieselben Regeln mit `ECS.Scene.Handle` | 23 + `Test.CheckLayering.py` 15 |
+
 ## Prüfhinweise aus dem Codex-Audit
 
 Die folgenden Hinweise stammen aus den zwölf Ausgangsgruppen des Codex-Audits
@@ -730,7 +757,7 @@ und gelten für die angegebenen Inventarzeilen.
 ### PK06 → C07 — Core.RingBuffer
 
 - Ausgangshypothese: 66 Zeilen in
-  [Core.RingBuffer.cppm](../../../src/core/Core.RingBuffer.cppm) ohne Import
+  Core.RingBuffer.cppm (`src/core/Core.RingBuffer.cppm`, entfernt in `f6b60b681`) ohne Import
   oder Instanziierung.
 - Gegenprüfung: Scheduler-Interna, Logging-Ringpuffer, Tests, Benchmarks und
   bedingte Konfigurationen auseinanderhalten. Ähnliche Namen sind kein
@@ -960,3 +987,8 @@ Prüfung der betroffenen Annahmen, nicht den Neustart der gesamten Liste.
   Kandidaten werden behalten, eingeordnet oder vertagt. Details in
   §„Etappe E2 — Entscheidungen und Umsetzung 2026-10-06“. Nächste Etappe:
   E3 (C01–C17).
+- 2026-10-06: Etappe E3 entschieden. Zehn Kandidaten sind umgesetzt (durch
+  einen Claude-Subagenten, Codex-Plan und Codex-Review je Commit, ohne Funde).
+  C02, C03 und C11 sind vertagt, C10, C14 und C17 bleiben, C13 ist durch X02
+  erledigt. Details in §„Etappe E3 — Entscheidungen und Umsetzung
+  2026-10-06“. Nächste Etappe: E4 (G01–G18).
