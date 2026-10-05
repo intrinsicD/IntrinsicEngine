@@ -28,7 +28,6 @@ engine subsystems.
 - `Extrinsic.Core.Logging`
 - `Extrinsic.Core.Memory`
 - `Extrinsic.Core.Process`
-- `Extrinsic.Core.RingBuffer`
 - `Extrinsic.Core.ResourcePool`
 - `Extrinsic.Core.StrongHandle`
 - `Extrinsic.Core.Tasks`
@@ -325,6 +324,5 @@ partition are documented in
   are runtime/editor responsibilities, while render passes, ECS systems,
   panels, geometry operators, shader reload, and GPU-memory policy stay with
   their owning layers.
-- `Extrinsic.Core.BoundedHeap`, `Extrinsic.Core.RingBuffer`, and
-  `Extrinsic.Core.Telemetry` are the retained dependency-free utility and
-  instrumentation seams used by promoted consumers.
+- `Extrinsic.Core.BoundedHeap` and `Extrinsic.Core.Telemetry` provide
+  dependency-free utility and instrumentation facilities.

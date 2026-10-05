@@ -10,7 +10,7 @@ Root scanned: `src`
 |---|---:|
 | `app` | 7 |
 | `assets` | 11 |
-| `core` | 40 |
+| `core` | 39 |
 | `ecs` | 26 |
 | `geometry` | 133 |
 | `graphics/assets` | 1 |
@@ -76,7 +76,6 @@ Root scanned: `src`
 | `Extrinsic.Core.Memory` | `src/core/Core.Memory.cppm` | `core` |
 | `Extrinsic.Core.Process` | `src/core/Core.Process.cppm` | `core` |
 | `Extrinsic.Core.ResourcePool` | `src/core/Core.ResourcePool.cppm` | `core` |
-| `Extrinsic.Core.RingBuffer` | `src/core/Core.RingBuffer.cppm` | `core` |
 | `Extrinsic.Core.Std` | `src/core/Core.Std.cppm` | `core` |
 | `Extrinsic.Core.StrongHandle` | `src/core/Core.StrongHandle.cppm` | `core` |
 | `Extrinsic.Core.Tasks.CounterEvent` | `src/core/Core.Tasks.CounterEvent.cppm` | `core` |
@@ -480,4 +479,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **453**
+Total modules: **452**

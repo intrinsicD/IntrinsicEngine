@@ -19,7 +19,6 @@ target_sources(${target_name}
         Core.FrameGraph.cppm
         Core.IOBackend.cppm
         Core.Process.cppm
-        Core.RingBuffer.cppm
         Core.ResourcePool.cppm
         Core.Telemetry.cppm
         Core.CallbackRegistry.cppm
