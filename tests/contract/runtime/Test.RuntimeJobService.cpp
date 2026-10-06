@@ -820,37 +820,53 @@ TEST(RuntimeJobService, CancelAllForWorldOnlyCancelsMatchingScope)
 TEST(RuntimeJobService, CancelAllCancelsLiveJobsInTokenOrderAndCountsNewRequests)
 {
     SchedulerScope scheduler{1};
-    std::atomic<bool> blockerStarted{false};
-    std::atomic<bool> releaseBlocker{false};
-    Extrinsic::Core::Tasks::Scheduler::Dispatch(
-        [&]
-        {
-            blockerStarted.store(true, std::memory_order_release);
-            while (!releaseBlocker.load(std::memory_order_acquire))
-                std::this_thread::sleep_for(1ms);
-        });
-    ASSERT_TRUE(WaitUntil(
-        [&] { return blockerStarted.load(std::memory_order_acquire); }));
-
     std::vector<Runtime::JobToken> cancelOrder;
+    std::atomic<int> ran{0};
     Runtime::JobService jobs{Runtime::JobServiceTestHooks{
         .AfterCancelRequested = [&](const Runtime::JobToken token) { cancelOrder.push_back(token); },
     }};
+    Runtime::KernelEventBus events;
     EXPECT_EQ(jobs.CancelAll(), 0u);
 
-    std::atomic<int> ran{0};
-    std::vector<Runtime::JobToken> tokens;
-    for (int i = 0; i < 32; ++i)
+    const auto makeJob = [&ran](const Runtime::WorldHandle scope)
     {
-        tokens.push_back(jobs.Submit(Runtime::MakeCpuJobDesc<JobProbeResult>(
-            "cancel all", Runtime::WorldHandle{static_cast<std::uint32_t>(1 + i % 2), 1u},
+        return Runtime::MakeCpuJobDesc<JobProbeResult>(
+            "cancel all", scope,
             [&ran](const Runtime::JobCancellation&)
             {
                 ran.fetch_add(1, std::memory_order_acq_rel);
                 return JobProbeResult{.Value = 1};
             },
             [](const JobProbeResult& result)
-            { return JobSuppressedCompleted{.Value = result.Value}; })));
+            { return JobSuppressedCompleted{.Value = result.Value}; });
+    };
+
+    // A record that already published must stay untouched by CancelAll.
+    const Runtime::JobToken published = jobs.Submit(makeJob(Runtime::DefaultWorldHandle));
+    ASSERT_TRUE(published.IsValid());
+    Extrinsic::Core::Tasks::Scheduler::WaitForAll();
+    ASSERT_EQ(jobs.DrainCompletions(events), 1u);
+    ASSERT_EQ(jobs.GetState(published), Runtime::JobState::Published);
+    ran.store(0, std::memory_order_release);
+
+    CompletionQueueInterlock blocker;
+    struct ReleaseAndDrain
+    {
+        CompletionQueueInterlock& Blocker;
+        ~ReleaseAndDrain()
+        {
+            Blocker.ReleaseWorker();
+            Extrinsic::Core::Tasks::Scheduler::WaitForAll();
+        }
+    } releaseAndDrain{blocker};
+    Extrinsic::Core::Tasks::Scheduler::Dispatch(
+        [&] { blocker.PauseWorker({}); });
+    ASSERT_TRUE(blocker.WaitForWorkerPause());
+
+    std::vector<Runtime::JobToken> tokens;
+    for (std::uint32_t i = 0; i < 32u; ++i)
+    {
+        tokens.push_back(jobs.Submit(makeJob(Runtime::WorldHandle{1u + i % 2u, 1u})));
         ASSERT_TRUE(tokens.back().IsValid());
     }
 
@@ -865,11 +881,14 @@ TEST(RuntimeJobService, CancelAllCancelsLiveJobsInTokenOrderAndCountsNewRequests
     std::sort(expected.begin(), expected.end());
     EXPECT_EQ(cancelOrder, expected);
 
-    releaseBlocker.store(true, std::memory_order_release);
+    blocker.ReleaseWorker();
     Extrinsic::Core::Tasks::Scheduler::WaitForAll();
+    EXPECT_EQ(jobs.DrainCompletions(events), 0u);
     EXPECT_EQ(ran.load(std::memory_order_acquire), 0);
     for (const Runtime::JobToken token : tokens)
         EXPECT_EQ(jobs.GetState(token), Runtime::JobState::Cancelled);
+    EXPECT_EQ(jobs.GetState(published), Runtime::JobState::Published);
+    EXPECT_EQ(jobs.Stats().PublishedCompletions, 1u) << "the published record is not published again";
 }
 
 TEST(RuntimeJobService, InvalidSubmissionsCountAsRejectedWithoutRunning)
