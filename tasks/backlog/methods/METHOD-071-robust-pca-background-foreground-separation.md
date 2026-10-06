@@ -47,6 +47,7 @@ contracts: [method.engine-integration, geometry.element-domain-sources, geometry
       example), Bouwmans–Zahzah review of RPCA background subtraction.
 - [ ] CPU reference on synthetic sequences; static-only and all-moving inputs handled.
 - [ ] Benchmark against a per-pixel temporal median baseline, sealed.
+- [ ] New test suites `BackgroundSeparationOperations`, `BackgroundSeparationConfig` are added to `IntrinsicRuntimeContractTests`; they do not exist yet, and `--no-tests=error` cannot detect their absence while other selectors match.
 
 ## Verification
 ```bash

@@ -45,6 +45,7 @@ contracts: [repo.source-documentation, method.engine-integration, geometry.eleme
       only for live sources and an active attachment.
 - [ ] UI and agent share config/readiness/apply; the property is inspectable, saveable and visible
       (`RuntimeSandboxAcceptanceGpuSmoke.SparseGridPropertyIsVisible`).
+- [ ] New test suites `SparseGridOperations`, `SparseGridConfig` are added to `IntrinsicRuntimeContractTests`, and the new smoke case `RuntimeSandboxAcceptanceGpuSmoke.SparseGridPropertyIsVisible` to `IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests`; they do not exist yet, and `--no-tests=error` cannot detect their absence while other selectors match.
 - [ ] `Geometry.Grid` does not enter the config/prepared-frame closure; docs
       (`geometry.md`, `property-coherence.md`, `agent-control-lane.md`, READMEs) and the module
       inventory are updated.

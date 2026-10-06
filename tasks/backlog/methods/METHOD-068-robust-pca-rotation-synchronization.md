@@ -48,6 +48,7 @@ contracts: [method.engine-integration, geometry.element-domain-sources, repo.sou
 - [ ] Baseline comparison against RotationAveraging-based IRLS on the same graphs under the
       benchmark workflow; no default/adoption without it.
 - [ ] Panel and agent share config/apply; docs state the gauge, the ICP dependency and limits.
+- [ ] `RotationAveragingOperations` comes from RUNTIME-322 (dependency). New test suites `RotationSynchronizationOperations`, `RotationSynchronizationConfig` are added to `IntrinsicRuntimeContractTests`; they do not exist yet, and `--no-tests=error` cannot detect their absence while other selectors match.
 
 ## Verification
 ```bash

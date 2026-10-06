@@ -52,6 +52,7 @@ contracts: [method.engine-integration, geometry.element-domain-sources, geometry
 - [ ] Benchmark on a declared fixed-topology sequence (verify the dataset keeps vertex correspondence
       across frames) reports reconstruction error vs rank and sparse count, sealed.
 - [ ] Panel and agent share config and apply; docs record limits (no topology change, memory bound).
+- [ ] New test suites `SequenceLowRankOperations`, `SequenceLowRankConfig` are added to `IntrinsicRuntimeContractTests`; they do not exist yet, and `--no-tests=error` cannot detect their absence while other selectors match.
 
 ## Verification
 ```bash

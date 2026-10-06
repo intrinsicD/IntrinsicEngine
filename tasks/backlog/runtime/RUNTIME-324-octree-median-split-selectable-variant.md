@@ -6,7 +6,7 @@ template: micro
 workflow_schema: 1
 workflow_profile: micro
 evidence: not_applicable
-evidence_skip_reason: interactive variant wiring; evidence is the diff and focused kernel/runtime/config/agent/panel tests. An optional benchmark follows the benchmark workflow.
+evidence_skip_reason: interactive variant wiring; evidence is the diff and focused kernel/runtime/config/agent/panel tests.
 contract_schema: 1
 contracts: [repo.source-documentation, method.engine-integration, geometry.element-domain-sources, geometry.property-coherence, runtime.processing-compilation-locality]
 ---
@@ -42,24 +42,21 @@ contracts: [repo.source-documentation, method.engine-integration, geometry.eleme
 - [ ] Coincident points, axis-degenerate data, unequal clusters, ties and non-finite input are
       covered; no lost elements.
 - [ ] LBVH backends report no effective octree policy; the panel does not claim one.
-- [ ] Optional: a matched-baseline benchmark (build time, kNN query time, tree depth) per policy
-      under `benchmarks/` via the benchmark workflow; any performance statement needs an
-      `ara/logic/claims.md` row first (AGENTS.md §8b).
 - [ ] `spatial-indices.md`, `spatial-index-consumers.md`, `agent-control-lane.md` and the Sandbox
       README are updated.
 
 ## Verification
 ```bash
 cmake --build --preset ci --target IntrinsicGeometryTests IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests
-ctest --test-dir build/ci --output-on-failure --timeout 60 --no-tests=error -R '^(Octree|PointSpacing|PointCloud_Radius|PointSpacingOperations|PointSpacingConfig|AgentOperations|SandboxConfigSections|SandboxProcessingPanels|RuntimeEngineLayering|RuntimeEnginePrivateGlue|ProcessingCompilationLocality)\.'
+ctest --test-dir build/ci --output-on-failure --timeout 60 --no-tests=error -R '^(Octree|PointSpacing|PointCloud_Radius|PointSpacingOperations|PointSpacingConfig|AgentOperations|SandboxConfigSections|SandboxProcessingPanels|RuntimeEngineLayering|RuntimeEnginePrivateGlue|ProcessingCompilationLocality)\.|^PointCloud_Integration\.DownsampleThenEstimateRadii$'
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/check_test_layout.py --root . --strict
 python3 tools/agents/check_task_policy.py --root . --strict
-# Only if the optional benchmark is added:
-python3 tools/benchmark/validate_benchmark_manifests.py
 ```
 
 ## Context
+- Possible follow-up (not filed): a matched-baseline performance comparison of the three split
+  policies needs its own task and an `ara/logic/claims.md` row; this task makes no performance statement.
 - No GPU kernel or render path changes, so no Vulkan test is owed; if the shared Vulkan point
   dispatch is touched after all, rerun `PointLBVHGpuSmoke.PointSpacingPublishesAcrossDomainsAndPreservesCandidatePolicy`.
 - No global octree setting, `SpatialIndexCache` change or `ComputeMedianCenter` change.

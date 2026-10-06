@@ -31,12 +31,12 @@ contracts: [method.engine-integration, geometry.element-domain-sources, geometry
 | Field | Disposition |
 | --- | --- |
 | Least-structured input | Ordered F frames of M `vec3` samples with index correspondence; non-finite or flagged samples are missing. |
-| Compatible entity sources | Point-cloud points, graph nodes, mesh vertices (positions only). |
+| Compatible entity sources | Any compatible `vec3` `GeometryPropertyRef` binding, independent of property name: mesh vertices/halfedges/edges/faces, graph nodes/halfedges/edges, point-cloud points; all frames use the same domain and cardinality. |
 | RuntimeModule | Shares the multi-entity sequence capture with METHOD-067 (whichever lands first owns it); new trajectory-cleanup operation on it. |
 | Config/agent | `sandbox.trajectory_cleanup`: frame order, lambda, tolerance, missing-value policy; `preview_operation`/`run_operation`. |
 | UI | Panel over the multi-selection: corrupted/missing counts per marker, frame scrubber. |
-| Publication | Per frame cleaned positions (one undo step for the sequence) and a Bool corruption flag property. |
-| End-to-end tests | Synthetic articulated motion with injected swaps/spikes/gaps → panel/agent → error within tolerance on clean and filled samples. |
+| Publication | On each frame's source element domain: cleaned `vec3` values written back to the bound property (one undo step for the sequence) and a Bool corruption flag property. |
+| End-to-end tests | Every compatible domain (incl. faces, edges, halfedges) plus synthetic articulated motion with injected swaps/spikes/gaps → panel/agent → error within tolerance on clean and filled samples. |
 
 ## Acceptance criteria
 - [ ] Kernel extensions in `Geometry.Linalg` (reuse if present): observation mask for gaps
@@ -45,6 +45,7 @@ contracts: [method.engine-integration, geometry.element-domain-sources, geometry
       exchanging) analysed — entrywise sparsity may not capture it.
 - [ ] CPU reference on synthetic data; all-missing markers and F < rank fail closed.
 - [ ] Benchmark against linear/spline gap filling on the same data, sealed.
+- [ ] New test suites `TrajectoryCleanupOperations`, `TrajectoryCleanupConfig` are added to `IntrinsicRuntimeContractTests`; they do not exist yet, and `--no-tests=error` cannot detect their absence while other selectors match.
 
 ## Verification
 ```bash

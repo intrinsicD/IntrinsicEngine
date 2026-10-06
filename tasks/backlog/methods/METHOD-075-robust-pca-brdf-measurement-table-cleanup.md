@@ -50,6 +50,7 @@ contract_review: Input and output are measurement tables, not ECS geometry eleme
       Lawrence et al. 2004 (factored BRDFs); value transform (log) and its effect on sparsity.
 - [ ] CPU reference on synthetic tables; non-finite and negative measurements handled by policy.
 - [ ] Benchmark against plain truncated SVD on the same tables, sealed.
+- [ ] New test suites `TableLowRankOperations`, `TableLowRankConfig` are added to `IntrinsicRuntimeContractTests`; they do not exist yet, and `--no-tests=error` cannot detect their absence while other selectors match.
 
 ## Verification
 ```bash

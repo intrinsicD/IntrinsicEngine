@@ -49,6 +49,7 @@ contracts: [method.engine-integration, geometry.element-domain-sources, geometry
 - [ ] CPU reference on synthetic Lambertian sphere stacks with injected shadow/specular masks;
       fewer than three non-coplanar lights fail closed.
 - [ ] Benchmark against least-squares photometric stereo on the same synthetic stacks, sealed.
+- [ ] New test suites `PhotometricStereoOperations`, `PhotometricStereoConfig` are added to `IntrinsicRuntimeContractTests`; they do not exist yet, and `--no-tests=error` cannot detect their absence while other selectors match.
 
 ## Verification
 ```bash

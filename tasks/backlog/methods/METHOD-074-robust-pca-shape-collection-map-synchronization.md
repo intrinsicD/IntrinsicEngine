@@ -34,12 +34,12 @@ contracts: [method.engine-integration, geometry.element-domain-sources, geometry
 | Field | Disposition |
 | --- | --- |
 | Least-structured input | N sample sets (k samples each) and pairwise correspondence matrices, possibly partial. |
-| Compatible entity sources | Mesh vertices, point-cloud points, graph nodes (positions; sampling by existing samplers). |
+| Compatible entity sources | Any compatible `vec3` `GeometryPropertyRef` binding, independent of property name: mesh vertices/halfedges/edges/faces, graph nodes/halfedges/edges, point-cloud points; samples drawn from the bound property by existing samplers. |
 | RuntimeModule | New `Runtime.MapSynchronizationOperations`; pairwise correspondences from existing `Runtime.RegistrationOperations` (CPD/ICP) over the selection, bounded N and k. |
 | Config/agent | `sandbox.map_synchronization`: sample count, pairwise method, lambda, tolerance, reference shape; `preview_operation`/`run_operation`. |
 | UI | Panel over the multi-selection: pair consistency table, inconsistent-correspondence counts. |
-| Publication | Per shape: `uint` corresponding-sample index into the reference shape and scalar consistency score on the sample domain; no persistent map object until Pack 6. |
-| End-to-end tests | Synthetic collection (copies of one shape under rigid/nonrigid motion) with injected wrong matches → panel/agent → recovered correspondences above a stated accuracy. |
+| Publication | Per shape: `uint` corresponding-sample index into the reference shape and scalar consistency score on each shape's source element domain (unsampled elements marked invalid); no persistent map object until Pack 6. |
+| End-to-end tests | Every compatible domain (incl. faces, edges, halfedges) plus a synthetic collection (copies of one shape under rigid/nonrigid motion) with injected wrong matches → panel/agent → recovered correspondences above a stated accuracy. |
 
 ## Acceptance criteria
 - [ ] Kernel extension in `Geometry.Linalg` (reuse if present): observation mask for partial maps;
@@ -49,6 +49,7 @@ contracts: [method.engine-integration, geometry.element-domain-sources, geometry
       Huang et al. 2014 (functional map networks).
 - [ ] CPU reference on synthetic collections; collections with N < 3 or no overlap fail closed.
 - [ ] Benchmark against pairwise-only correspondences on the same collection, sealed.
+- [ ] New test suites `MapSynchronizationOperations`, `MapSynchronizationConfig` are added to `IntrinsicRuntimeContractTests`; they do not exist yet, and `--no-tests=error` cannot detect their absence while other selectors match.
 
 ## Verification
 ```bash

@@ -48,6 +48,7 @@ contracts: [method.engine-integration, geometry.element-domain-sources, geometry
       factorization (e.g. Eriksson–van den Hengel L1 Wiberg), PCP with missing data.
 - [ ] CPU reference with affine metric upgrade; the projective case is a documented follow-up.
 - [ ] Benchmark against plain SVD factorization on the same synthetic tracks, sealed.
+- [ ] New test suites `FactorizationSfmOperations`, `FactorizationSfmConfig` are added to `IntrinsicRuntimeContractTests`; they do not exist yet, and `--no-tests=error` cannot detect their absence while other selectors match.
 
 ## Verification
 ```bash

@@ -47,6 +47,7 @@ contracts: [repo.source-documentation, method.engine-integration, geometry.eleme
       the source mesh and its properties are unchanged.
 - [ ] New outputs are visible, selectable, undoable and saveable;
       `RuntimeSandboxAcceptanceGpuSmoke.ImplicitPlaneFieldCreatesVisibleSelectableMesh` checks pixels.
+- [ ] New test suites `ImplicitPlaneFieldOperations`, `ImplicitPlaneFieldConfig` are added to `IntrinsicRuntimeContractTests`, and the new smoke case `RuntimeSandboxAcceptanceGpuSmoke.ImplicitPlaneFieldCreatesVisibleSelectableMesh` to `IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests`; they do not exist yet, and `--no-tests=error` cannot detect their absence while other selectors match.
 - [ ] Prepared-frame and compilation-locality checks include the new producer without relaxed
       allowlists; `docs/architecture/geometry.md`, `spatial-index-consumers.md`,
       `agent-control-lane.md`, runtime/Sandbox READMEs and the module inventory are updated.

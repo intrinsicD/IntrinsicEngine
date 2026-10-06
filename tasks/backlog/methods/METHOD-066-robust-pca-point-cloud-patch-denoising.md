@@ -28,13 +28,13 @@ contracts: [method.engine-integration, geometry.element-domain-sources, geometry
 
 | Field | Disposition |
 | --- | --- |
-| Least-structured input | Finite `vec3` positions plus a kNN neighbourhood; no normals or topology needed. |
-| Compatible entity sources | Point-cloud points, mesh vertices, graph nodes (positions-only kernel). |
+| Least-structured input | Finite `vec3` samples from a selected property plus a kNN neighbourhood over them; no normals or topology needed. |
+| Compatible entity sources | Any compatible `vec3` `GeometryPropertyRef` binding, independent of property name: mesh vertices/halfedges/edges/faces, graph nodes/halfedges/edges, point-cloud points (samples-only kernel). |
 | RuntimeModule | Existing `Runtime.PointAnalysisOperations`/OutlierAnalysis family: new `OutlierAnalysisMethod::RobustPCA` reusing Analyze/RemoveMarked; denoised positions/normals published through the existing point-field publication. |
 | Config/agent | `sandbox.outlier_analysis` gains `robust_pca` with `k`, `lambda` (0 = default), `tolerance`, `outputs`; existing outlier agent operation. |
 | UI | Outlier-analysis panel method entry; parameters shown only for this method. |
-| Publication | Same-domain scalar score and Bool mask; optional `vec3` denoised-position and normal properties; positions are replaced only on an explicit apply with one undo step. |
-| End-to-end tests | Each domain → config/panel/agent → score/mask/positions, revision, undo, save/load. |
+| Publication | On the source element domain: scalar score and Bool mask; optional `vec3` denoised-position and normal properties; positions are replaced only on an explicit apply with one undo step. |
+| End-to-end tests | Every compatible domain listed above (incl. faces, edges, halfedges) → config/panel/agent → score/mask/positions, revision, undo, save/load. |
 
 ## Acceptance criteria
 - [ ] Paper intake recorded (formulation, lambda choice for k x 3, entrywise vs l2,1 sparsity);

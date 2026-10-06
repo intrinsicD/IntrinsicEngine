@@ -24,17 +24,17 @@ contracts: [repo.source-documentation, method.engine-integration, geometry.eleme
 | Field | Disposition |
 | --- | --- |
 | Least-structured input | Finite 3D samples from a `vec3` property; at least four non-coplanar points. |
-| Compatible entity sources | Mesh vertices/faces/edges, graph nodes/edges, point-cloud points (no vertex or name requirement); several selected entities are unioned in world space; a primitive selection on one entity (`Runtime.SelectionController` `ReadPrimitives`) restricts the samples. |
+| Compatible entity sources | Any compatible `vec3` `GeometryPropertyRef` binding: mesh vertices/halfedges/edges/faces, graph nodes/halfedges/edges, point-cloud points (no vertex or name requirement); several selected entities are unioned in world space; a primitive selection on one entity (`Runtime.SelectionController` `ReadPrimitives`) restricts the samples. |
 | RuntimeModule | Existing `Runtime.PointConstructionOperations`; no new `IRuntimeModule`. |
 | Config/agent | `sandbox.point_construction` gains `method = convex_hull` and `distance_epsilon`; existing `preview_operation`/`run_operation` with `operation = point_construction`; result reports method, backend and output entity. |
 | UI | Existing Construct-from-Points panel and Mesh/Graph/PointCloud menus; Hoppe/kNN controls shown only for their methods. |
 | Publication | New mesh entity (own topology, canonical position/normal properties); sources unchanged; one undo step via `PublishEditorGeneratedEntity`. No H-Rep property. |
-| End-to-end tests | Each compatible domain, multi-entity union and primitive subset → config → preview/apply and agent → new mesh; panel test; Vulkan pixel + pick smoke. |
+| End-to-end tests | Each of the eight compatible domains (incl. mesh and graph halfedges, as the existing PointConstruction tests cover), multi-entity union and primitive subset → config → preview/apply and agent → new mesh; panel test; Vulkan pixel + pick smoke. |
 
 ## Acceptance criteria
 - [ ] `PointConstructionMethod::ConvexHull` with `DistanceEpsilon` round-trips through the
       codec (`Runtime.PointFeaturesConfigCodecs.cpp`, which today assumes two methods);
-      non-finite or non-positive epsilon is rejected; non-CPU backends are rejected with a reason.
+      non-finite or non-positive epsilon is rejected; only `CpuReference` is accepted for this method; `CpuLBVH` and `VulkanLBVH` are rejected with a reason, each covered by a test.
 - [ ] Capture/compute in `Runtime.GeometryProcessingOperations.Construction.cpp` branches by
       method; the hull path needs no neighbourhood queue or normal estimation.
 - [ ] Non-canonical property names, deleted slots, multi-entity world-space union and
@@ -43,7 +43,7 @@ contracts: [repo.source-documentation, method.engine-integration, geometry.eleme
       error and publish nothing.
 - [ ] Undo/redo, dirty state, save/load, cancellation and stale sources are covered;
       no second or late publication.
-- [ ] `RuntimeSandboxAcceptanceGpuSmoke.ConvexHullCreatesVisibleSelectableMesh` runs the
+- [ ] New smoke case `RuntimeSandboxAcceptanceGpuSmoke.ConvexHullCreatesVisibleSelectableMesh` (added to `IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests`) runs the
       real editor/agent command and checks visible pixels and pickability.
 - [ ] `docs/architecture/point-construction.md`, `src/runtime/README.md`,
       `src/app/Sandbox/README.md` and the module inventory describe the new method.

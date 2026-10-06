@@ -49,11 +49,12 @@ contracts: [method.engine-integration, geometry.element-domain-sources, geometry
 - [ ] CPU reference on synthetic stacks with known diffuse texture; saturation and misregistration
       limits documented.
 - [ ] Benchmark against per-texel median on the same stacks, sealed.
+- [ ] New test suites `AppearanceLowRankOperations`, `AppearanceLowRankConfig` are added to `IntrinsicRuntimeContractTests`; they do not exist yet, and `--no-tests=error` cannot detect their absence while other selectors match.
 
 ## Verification
 ```bash
 cmake --build --preset ci --target IntrinsicGeometryTests IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests
-ctest --test-dir build/ci --output-on-failure --timeout 60 --no-tests=error -R '^(LinearAlgebra|AppearanceLowRankOperations|AppearanceLowRankConfig|TextureBakeModule|AgentOperations|SandboxConfigSections|RuntimeEngineLayering|RuntimeEnginePrivateGlue)\.'
+ctest --test-dir build/ci --output-on-failure --timeout 60 --no-tests=error -R '^(LinearAlgebra|AppearanceLowRankOperations|AppearanceLowRankConfig|RuntimeTextureBakeModule|AgentOperations|SandboxConfigSections|RuntimeEngineLayering|RuntimeEnginePrivateGlue)\.'
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/agents/check_ara_claims.py --root . --strict
