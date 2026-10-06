@@ -260,7 +260,7 @@ Eine Etappe pro Sitzung genügt; die Reihenfolge kann der Operator ändern.
 - [x] E1 — Querschnittsduplikate (X01–X04), 2026-10-05
 - [x] E2 — Tools, CI, Abhängigkeiten (T01–T23), 2026-10-06
 - [x] E3 — Core, ECS, Assets (C01–C17), 2026-10-06
-- [ ] E4 — Graphics (G01–G18)
+- [x] E4 — Graphics (G01–G18), 2026-10-06
 - [ ] E5 — Runtime ohne Editor/Modules (R01–R19)
 - [ ] E6 — Runtime-Editor/Modules und Sandbox-App (E01–E17)
 - [ ] E7 — Geometry (GE01–GE25)
@@ -339,24 +339,24 @@ nächsten Abschnitt.
 ### G — Graphics
 | ID | Fund | Tag | Schätz. | Claude | Codex | Operator |
 |----|---------|-----|------|--------|--------|----------|
-| G01 (PK01) | 29 shaders no pipeline loads: the 20 PK01 files (pick_*, point_surfel/retained/flatdisc/sphere, scene_update, instance_cull_multigeo, debug_view.comp, deferred/gbuffer.vert) plus 8 root `line`/`point`/`triangle`/`debug_surface` `.vert/.frag` (only the `forward/` variants are loaded); GLOB still compiles them all | delete | -2300 | bestätigt, zerlegt: 28 Dateien (nicht 29). pick_* (404), point_* (868, ohne point_splat.glsl), 3 Compute (283) → Task; deferred/gbuffer.vert, root line/point/triangle, debug_surface → einordnen LEGACY-043 | bestätigt: 28 statt 29 Shader ohne gefundenen Lader; der Glob kompiliert sie weiterhin. CompileShaders.cmake:39, Graphics.Renderer.cpp:4844 | — |
-| G02 | `Graphics.SharedRenderRecipeExecution` + contract integration stats nobody reads | delete | -1450 | widerlegt: Contract-Prüfung bricht Frame ab (fail-closed), Tests + GPU-Smoke lesen | widerlegt: Vertragsdaten steuern Frame-Abbruch und werden im GPU-Smoke ausgewertet. Graphics.Renderer.cpp:2754, Test.DefaultRecipeSurfaceGpuSmoke.cpp:1757 | — |
-| G03 | Legacy pre-GpuScene shaders surface.vert, deferred_lighting.frag, shadow_depth.vert (+ source-grep test assertions, shadow_sampling/surface_color_resolve glsl) | delete | -800 | bestätigt → einordnen LEGACY-043 (shadow_depth.vert ergänzen; .glsl erst danach) | bestätigt: Legacy-Familie ohne Pipeline-Lader; Includes hängen an alten Fragmentshadern. Quelltests sind betroffen. surface.frag:82, Test.RendererFrameLifecycle.cpp:2666 | — |
-| G04 | ~40× pipeline-create/publish block in `InitializeOperationalPassResources` → one helper | shrink | -650 | teilweise: ≈−250…−400, Blöcke nicht gleichförmig → nach Familie zerlegen, gpu;vulkan nötig | teilweise: Reset/Create/Publish wiederholt sich; Publikation und Fehlerverhalten unterscheiden sich. Einheitsblock und −650 unbelegt. Graphics.Renderer.cpp:5853, Graphics.Renderer.cpp:6978 | — |
-| G05 (PK02) | `Graphics.GpuScene` legacy wrapper — 0 importers | delete | -500 | bestätigt: 0 Importe, kein Test → Task | bestätigt: Keine Importierer oder Tests gefunden; CMake baut den Wrapper. Aktuelle Slot-/Buffer-Lifetime liegt bei GpuWorld. CMakeLists.txt:53, Graphics.GpuWorld.cpp:2384 | — |
-| G06 | `IRenderer` (58 virtuals, 1 impl misnamed `NullRenderer`) → concrete class | yagni | -250 | bestätigt (Fable): Rename NullRenderer→Renderer, dann Interface kollabieren → Task (zweistufig) | teilweise: Eine Implementierung stimmt. Eine konkrete Klasse muss weiterhin Zustand kapseln; weniger Gesamtcode folgt daraus nicht. Graphics.Renderer.cppm:182, Graphics.Renderer.cpp:1245 [≠ Claude: Ja: teilweise statt bestätigt.] | — |
-| G07 | `RenderSubsystemRegistry` lifecycle-event bookkeeping + `StopAfterStage` — test-only | yagni | -120 | teilweise: Events (≈40 Z.) Kandidat; StopAfterStage ist Fehlerinjektions-Naht → behalten | widerlegt: Auch Events tragen einen Vertragstest zur Lifecycle-Reihenfolge; StopAfterStage prüft Teilinitialisierung. Test.RenderSubsystemRegistry.cpp:85, Test.RenderSubsystemRegistry.cpp:104 [≠ Claude: Ja: Events ebenfalls begründet.] | — |
-| G08 | `ForwardSystem` / `DeferredSystem` — pimpl around one bool | delete | -130 | bestätigt; Benchmark-Manifest engine_compile_iteration_renderer_surface nutzt Datei → Task inkl. Manifest | bestätigt: Beide Pimpls enthalten nur Initialized. Die daran geknüpften Pass-Gates sind dennoch produktives Verhalten. Graphics.ForwardSystem.cpp:9, Pass.Deferred.GBuffers.cpp:21 [≠ Claude: Sachvotum nein; Manifestfolgerung ja.] | — |
-| G09 | `RenderCommandRouter` → map held in Renderer | shrink | -110 | teilweise: Statustypen bleiben, Gewinn klein → behalten | teilweise: Kleiner Vektor-Dispatcher; Map kann Suchmechanik kürzen, ersetzt aber nicht PassId-, Überschreib- und Fehlroutenregeln. Graphics.RenderCommandRouter.cpp:24, Test.RenderCommandRouter.cpp:73 | — |
-| G10 | Dead public methods (SelectionSystem, ShadowSystem, CullingSystem → PK03, LightSystem, GpuWorld, ColormapSystem, AlwaysOnTop/DepthTested pipeline getters, BindlessHeap EnqueueRawUpdate/SetDefault/GetLayout) | delete | -150 | teilweise: 7 Methoden ohne Aufrufer → Task; Pipeline-Getter + GetLayout widerlegt | teilweise: Sieben Methoden ohne Aufrufer gefunden; GetLayout und Pipeline-Getter sind produktiv genutzt. Backends.Vulkan.Device.cpp:2136, Graphics.Renderer.cpp:9970 | — |
-| G11 | `ICommandContext::BindFrameSampledTexture` — 0 callers | delete | -25 | bestätigt → Task, gebündelt mit G12 (vtable, frisches Build) | bestätigt: Slot-0-Komfortmethode ohne Aufrufer; Renderer verwendet die slotexplizite Variante. RHI.CommandContext.cpp:23, Graphics.Renderer.cpp:533 | — |
-| G12 | `RHI::IDevice::GetPresentMode` — 0 callers | delete | -15 | bestätigt → mit G11 | bestätigt: Nur Deklaration und Backend-/Mock-Overrides gefunden, keine Abfrage. RHI.Device.cppm:214, MockRHI.hpp:469 | — |
-| G13 | `TextureManager::Reupload` — 0 external callers (confirm) | delete | -40 | bestätigt, aber ≈15 Z. + dokumentierte Streaming-Naht → vertagen | bestätigt: Reupload ohne Aufrufer; dokumentierter Streaming-Einsatz ist ausdrücklich zukünftig. RHI.TextureManager.cpp:244, README.md:104 | — |
-| G14 | `CompiledPassDeclarations::Declares*/Require*` — 1 legacy test | delete | -60 | bestätigt (produktiv 0); einzige Naht für Executor-Vertragstest → Operatorentscheid | teilweise: Sechs Helfer ohne externe Nutzer; RequireTextureRead/DeclaresTextureRead tragen den Negativtest für undeclared access. Test.RenderGraphLegacy.cpp:1169, Graphics.RenderGraph.Compiler.cpp:1602 [≠ Claude: Ja: teilweise statt bestätigt.] | — |
-| G15 | 9 private `AlignUp`/`CeilDiv` copies → one shared constexpr helper | reuse | -45 | teilweise: 6× CeilDiv gleich → Task; 4× AlignUp mit abweichender 0-Semantik → separat | teilweise: Sechs gleiche CeilDiv; vier exakt benannte AlignUp mit teils verschiedener Nullsemantik. Kein blinder Einheitsersatz. Backends.Null.cpp:34, Graphics.RenderGraph.cpp:72 | — |
-| G16 | `NextPow2` bit-smear → `std::bit_ceil` | stdlib | -12 | teilweise: saturiert bei Überlauf, Gewinn <10 → behalten | teilweise: bit_ceil benötigt einen zusätzlichen Sättigungs-Guard; NextPow2 liefert oberhalb 2³¹ weiterhin 2³¹. Graphics.HZB.cpp:14 | — |
-| G17 | Vulkan `FallbackBindlessHeap` / `FallbackTransferQueue` → reuse Null backend classes (keep fail-closed) | yagni | -80 | widerlegt (Fable): Fail-closed-Zähler im Vertragstest; Backend-Querkopplung | widerlegt: Vulkan-Fallback lehnt Ressourcen ab; Null vergibt gültige Slots/Token. Wiederverwendung wäre semantisch verschieden. Backends.Vulkan.Device.cppm:180, Backends.Null.Bindless.cpp:21 | — |
-| G18 | `NullProfiler` 400-line state machine (low confidence; depends on Test.Profiler contract) | shrink | -250 | widerlegt (Fable): Referenz für IProfiler-Vertrag (Test.Profiler) | widerlegt: Zustandsmaschine prüft reale Token-, Queue- und Frame-Slot-Verträge; −250 ohne Vertragsverlust nicht belegt. Backends.Null.Profiler.cpp:32, Test.Profiler.cpp:153 | — |
+| G01 (PK01) | 29 shaders no pipeline loads: the 20 PK01 files (pick_*, point_surfel/retained/flatdisc/sphere, scene_update, instance_cull_multigeo, debug_view.comp, deferred/gbuffer.vert) plus 8 root `line`/`point`/`triangle`/`debug_surface` `.vert/.frag` (only the `forward/` variants are loaded); GLOB still compiles them all | delete | -2300 | bestätigt, zerlegt: 28 Dateien (nicht 29). pick_* (404), point_* (868, ohne point_splat.glsl), 3 Compute (283) → Task; deferred/gbuffer.vert, root line/point/triangle, debug_surface → einordnen LEGACY-043 | bestätigt: 28 statt 29 Shader ohne gefundenen Lader; der Glob kompiliert sie weiterhin. CompileShaders.cmake:39, Graphics.Renderer.cpp:4844 | Task + Umsetzung (2026-10-06): alle 28 gelöscht, Techniken in Tasks (RUNTIME-222/218, GRAPHICS-135/158, neu GRAPHICS-160…163) → `a3ded5d7c`, `98518e164`, `5e3ec3fd1` |
+| G02 | `Graphics.SharedRenderRecipeExecution` + contract integration stats nobody reads | delete | -1450 | widerlegt: Contract-Prüfung bricht Frame ab (fail-closed), Tests + GPU-Smoke lesen | widerlegt: Vertragsdaten steuern Frame-Abbruch und werden im GPU-Smoke ausgewertet. Graphics.Renderer.cpp:2754, Test.DefaultRecipeSurfaceGpuSmoke.cpp:1757 | Behalten (2026-10-06): widerlegt |
+| G03 | Legacy pre-GpuScene shaders surface.vert, deferred_lighting.frag, shadow_depth.vert (+ source-grep test assertions, shadow_sampling/surface_color_resolve glsl) | delete | -800 | bestätigt → einordnen LEGACY-043 (shadow_depth.vert ergänzen; .glsl erst danach) | bestätigt: Legacy-Familie ohne Pipeline-Lader; Includes hängen an alten Fragmentshadern. Quelltests sind betroffen. surface.frag:82, Test.RendererFrameLifecycle.cpp:2666 | Einordnen (2026-10-06): in LEGACY-043 → `98518e164` |
+| G04 | ~40× pipeline-create/publish block in `InitializeOperationalPassResources` → one helper | shrink | -650 | teilweise: ≈−250…−400, Blöcke nicht gleichförmig → nach Familie zerlegen, gpu;vulkan nötig | teilweise: Reset/Create/Publish wiederholt sich; Publikation und Fehlerverhalten unterscheiden sich. Einheitsblock und −650 unbelegt. Graphics.Renderer.cpp:5853, Graphics.Renderer.cpp:6978 | Vertagen (2026-10-06): Blöcke nicht gleichförmig, je Familie + GPU-Nachweis |
+| G05 (PK02) | `Graphics.GpuScene` legacy wrapper — 0 importers | delete | -500 | bestätigt: 0 Importe, kein Test → Task | bestätigt: Keine Importierer oder Tests gefunden; CMake baut den Wrapper. Aktuelle Slot-/Buffer-Lifetime liegt bei GpuWorld. CMakeLists.txt:53, Graphics.GpuWorld.cpp:2384 | Task + Umsetzung (2026-10-06) → `1643f8f97` |
+| G06 | `IRenderer` (58 virtuals, 1 impl misnamed `NullRenderer`) → concrete class | yagni | -250 | bestätigt (Fable): Rename NullRenderer→Renderer, dann Interface kollabieren → Task (zweistufig) | teilweise: Eine Implementierung stimmt. Eine konkrete Klasse muss weiterhin Zustand kapseln; weniger Gesamtcode folgt daraus nicht. Graphics.Renderer.cppm:182, Graphics.Renderer.cpp:1245 [≠ Claude: Ja: teilweise statt bestätigt.] | Nur Umbenennung (2026-10-06): NullRenderer → Renderer → `67f91f9e1`; IRenderer bleibt |
+| G07 | `RenderSubsystemRegistry` lifecycle-event bookkeeping + `StopAfterStage` — test-only | yagni | -120 | teilweise: Events (≈40 Z.) Kandidat; StopAfterStage ist Fehlerinjektions-Naht → behalten | widerlegt: Auch Events tragen einen Vertragstest zur Lifecycle-Reihenfolge; StopAfterStage prüft Teilinitialisierung. Test.RenderSubsystemRegistry.cpp:85, Test.RenderSubsystemRegistry.cpp:104 [≠ Claude: Ja: Events ebenfalls begründet.] | Behalten (2026-10-06): Lifecycle-Vertragstest |
+| G08 | `ForwardSystem` / `DeferredSystem` — pimpl around one bool | delete | -130 | bestätigt; Benchmark-Manifest engine_compile_iteration_renderer_surface nutzt Datei → Task inkl. Manifest | bestätigt: Beide Pimpls enthalten nur Initialized. Die daran geknüpften Pass-Gates sind dennoch produktives Verhalten. Graphics.ForwardSystem.cpp:9, Pass.Deferred.GBuffers.cpp:21 [≠ Claude: Sachvotum nein; Manifestfolgerung ja.] | Task + Umsetzung (2026-10-06) → `084c83477`, `5fe7e8bdb`; Benchmark-Manifest (versiegelt) unverändert |
+| G09 | `RenderCommandRouter` → map held in Renderer | shrink | -110 | teilweise: Statustypen bleiben, Gewinn klein → behalten | teilweise: Kleiner Vektor-Dispatcher; Map kann Suchmechanik kürzen, ersetzt aber nicht PassId-, Überschreib- und Fehlroutenregeln. Graphics.RenderCommandRouter.cpp:24, Test.RenderCommandRouter.cpp:73 | Behalten (2026-10-06): Gewinn zu klein |
+| G10 | Dead public methods (SelectionSystem, ShadowSystem, CullingSystem → PK03, LightSystem, GpuWorld, ColormapSystem, AlwaysOnTop/DepthTested pipeline getters, BindlessHeap EnqueueRawUpdate/SetDefault/GetLayout) | delete | -150 | teilweise: 7 Methoden ohne Aufrufer → Task; Pipeline-Getter + GetLayout widerlegt | teilweise: Sieben Methoden ohne Aufrufer gefunden; GetLayout und Pipeline-Getter sind produktiv genutzt. Backends.Vulkan.Device.cpp:2136, Graphics.Renderer.cpp:9970 | Task + Umsetzung (2026-10-06): 7 Methoden → `b2a7ef64d`, `fa385e00d` |
+| G11 | `ICommandContext::BindFrameSampledTexture` — 0 callers | delete | -25 | bestätigt → Task, gebündelt mit G12 (vtable, frisches Build) | bestätigt: Slot-0-Komfortmethode ohne Aufrufer; Renderer verwendet die slotexplizite Variante. RHI.CommandContext.cpp:23, Graphics.Renderer.cpp:533 | Task + Umsetzung (2026-10-06) (mit G12) → `df4271698` |
+| G12 | `RHI::IDevice::GetPresentMode` — 0 callers | delete | -15 | bestätigt → mit G11 | bestätigt: Nur Deklaration und Backend-/Mock-Overrides gefunden, keine Abfrage. RHI.Device.cppm:214, MockRHI.hpp:469 | Task + Umsetzung (2026-10-06) (mit G11) → `df4271698` |
+| G13 | `TextureManager::Reupload` — 0 external callers (confirm) | delete | -40 | bestätigt, aber ≈15 Z. + dokumentierte Streaming-Naht → vertagen | bestätigt: Reupload ohne Aufrufer; dokumentierter Streaming-Einsatz ist ausdrücklich zukünftig. RHI.TextureManager.cpp:244, README.md:104 | Vertagen (2026-10-06): dokumentierte Streaming-Naht |
+| G14 | `CompiledPassDeclarations::Declares*/Require*` — 1 legacy test | delete | -60 | bestätigt (produktiv 0); einzige Naht für Executor-Vertragstest → Operatorentscheid | teilweise: Sechs Helfer ohne externe Nutzer; RequireTextureRead/DeclaresTextureRead tragen den Negativtest für undeclared access. Test.RenderGraphLegacy.cpp:1169, Graphics.RenderGraph.Compiler.cpp:1602 [≠ Claude: Ja: teilweise statt bestätigt.] | Behalten (2026-10-06): Negativtest-Naht |
+| G15 | 9 private `AlignUp`/`CeilDiv` copies → one shared constexpr helper | reuse | -45 | teilweise: 6× CeilDiv gleich → Task; 4× AlignUp mit abweichender 0-Semantik → separat | teilweise: Sechs gleiche CeilDiv; vier exakt benannte AlignUp mit teils verschiedener Nullsemantik. Kein blinder Einheitsersatz. Backends.Null.cpp:34, Graphics.RenderGraph.cpp:72 | Task + Umsetzung (2026-10-06): 6× CeilDiv → `Core.IntegerMath`, `e266d7f1a`; AlignUp bleibt |
+| G16 | `NextPow2` bit-smear → `std::bit_ceil` | stdlib | -12 | teilweise: saturiert bei Überlauf, Gewinn <10 → behalten | teilweise: bit_ceil benötigt einen zusätzlichen Sättigungs-Guard; NextPow2 liefert oberhalb 2³¹ weiterhin 2³¹. Graphics.HZB.cpp:14 | Behalten (2026-10-06): Gewinn zu klein |
+| G17 | Vulkan `FallbackBindlessHeap` / `FallbackTransferQueue` → reuse Null backend classes (keep fail-closed) | yagni | -80 | widerlegt (Fable): Fail-closed-Zähler im Vertragstest; Backend-Querkopplung | widerlegt: Vulkan-Fallback lehnt Ressourcen ab; Null vergibt gültige Slots/Token. Wiederverwendung wäre semantisch verschieden. Backends.Vulkan.Device.cppm:180, Backends.Null.Bindless.cpp:21 | Behalten (2026-10-06): widerlegt |
+| G18 | `NullProfiler` 400-line state machine (low confidence; depends on Test.Profiler contract) | shrink | -250 | widerlegt (Fable): Referenz für IProfiler-Vertrag (Test.Profiler) | widerlegt: Zustandsmaschine prüft reale Token-, Queue- und Frame-Slot-Verträge; −250 ohne Vertragsverlust nicht belegt. Backends.Null.Profiler.cpp:32, Test.Profiler.cpp:153 | Behalten (2026-10-06): widerlegt |
 
 ### R — Runtime ohne Editor/Modules
 | ID | Fund | Tag | Schätz. | Claude | Codex | Operator |
@@ -669,6 +669,56 @@ Module.
 | C12 | `ae1aa9ae6` | per-Asset-Subscribe entfernt; `Flush(id)` bleibt, Tests auf SubscribeAll | 95 |
 | C16 | `72f2fc36a` | `ECS.Events` gelöscht; Layering-Fixtures prüfen dieselben Regeln mit `ECS.Scene.Handle` | 23 + `Test.CheckLayering.py` 15 |
 
+## Etappe E4 — Entscheidungen und Umsetzung 2026-10-06
+
+Der Operator hat am 2026-10-06 G05, G08, G10, G11/G12 und G15 freigegeben,
+dazu G06 nur als Umbenennung und G03 zur Einordnung in LEGACY-043. Die
+übrigen Kandidaten folgen der gemeinsamen Empfehlung.
+
+Vor der Entscheidung zu G01 verlangte der Operator eine Analyse, was die
+28 Shader tun. Codex hat jeden Shader bewertet:
+
+- 17 Shader sind durch `forward/*`, `selection/*` oder das aktuelle
+  Culling vollständig ersetzt.
+- 11 enthalten Techniken, die der aktive Pfad nicht oder nur eingeschränkt
+  hat: Surfel/EWA-Splatting, Punktradius im Weltraum, beleuchteter
+  Sphere-Impostor, Linien-AA mit verlängerten Enden, Quad-Linien-Picking,
+  GPU-Scatter, ID-Hashfarben und beleuchtete transiente Debug-Dreiecke.
+
+Entscheidung: alle 28 löschen und jede Technik revisionsfest
+(`assets/shaders/<datei> @ 087e6e17b`) in einem Task festhalten. Dafür
+wurden RUNTIME-222, RUNTIME-218, GRAPHICS-158 und GRAPHICS-135 ergänzt und
+vier neue Tasks angelegt: GRAPHICS-160 (Surfel/EWA), GRAPHICS-161
+(Linien-AA), GRAPHICS-162 (ID-Hashfarben) und GRAPHICS-163 (beleuchtete
+transiente Debug-Dreiecke).
+
+Ablauf: Codex-Plan, Umsetzung durch einen Claude-Subagenten, dann
+Codex-Review und Fixes. Basisrevision `087e6e17b`.
+
+| Kandidat | Commits | Codex-Review |
+|---|---|---|
+| G05 | `1643f8f97` | freigeben |
+| G11/G12 | `df4271698` | nachbessern: frischer BMI-Build fehlte → frischer Buildbaum ohne ccache nachgeholt (siehe unten) |
+| G08 | `084c83477`, `5fe7e8bdb` | Anmerkungen (Re-Init-Tests, Doku) → behoben |
+| G10 | `b2a7ef64d`, `fa385e00d` | Nit (Include) → behoben |
+| G15 | `e266d7f1a` | freigeben; das neue Modul `Core.IntegerMath` ist als Owner angemessen |
+| G06 | `67f91f9e1` | freigeben |
+| G01 | `a3ded5d7c` | nachbessern: frischer Buildbaum fehlte → nachgeholt (siehe unten) |
+| Tasks | `98518e164`, `5e3ec3fd1` | nachbessern: RUNTIME-218-Scope, GPU-Verifikation unter `ci-vulkan`, RUNTIME-222-Abgleich → behoben |
+
+Frischer Buildbaum für G11/G12 und G01 auf dem finalen Stand `5e3ec3fd1`:
+`cmake --preset ci -B build/review007-fresh -DINTRINSIC_ENABLE_CCACHE=OFF`
+mit `CCACHE_DISABLE=1`, also ohne alte BMIs und Objekte. Der Build umfasste
+2266 Schritte über das Vulkan-Backend, die Shader-Outputs und sieben
+Testziele. Danach liefen 298/298 fokussierte Tests grün. Unter den
+100 erzeugten `.spv` war keiner der 28 gelöschten Shader. Codex hat
+anschließend alle Fix-Commits ohne Funde freigegeben.
+
+Das Benchmark-Manifest `engine_compile_iteration_renderer_surface.yaml`
+bleibt bewusst unverändert. Sein Probe-Pfad existiert weiter, und der
+Datei-Hash ist in `ara/evidence/diagnostics/graphics138_20260915/inputs.json`
+versiegelt.
+
 ## Prüfhinweise aus dem Codex-Audit
 
 Die folgenden Hinweise stammen aus den zwölf Ausgangsgruppen des Codex-Audits
@@ -686,7 +736,7 @@ und gelten für die angegebenen Inventarzeilen.
   `pick_point.vert`, `pick_point.frag`, `pick_id.vert`, `pick_id.frag`,
   `scene_update.comp`, `instance_cull_multigeo.comp`, `debug_view.comp`,
   `deferred/gbuffer.vert`, jeweils unter `assets/shaders/`.
-- Einstieg: [point_retained.vert](../../../assets/shaders/point_retained.vert),
+- Einstieg: point_retained.vert (`assets/shaders/point_retained.vert`, entfernt in `a3ded5d7c`),
   [Renderer](../../../src/graphics/renderer/Graphics.Renderer.cpp),
   [RendererFrameLifecycle-Tests](../../../tests/contract/graphics/Test.RendererFrameLifecycle.cpp).
 - Gegenprüfung: dynamisch zusammengesetzte Shadernamen, Pipeline-Varianten,
@@ -698,8 +748,8 @@ und gelten für die angegebenen Inventarzeilen.
 
 ### PK02 → G05 — Alter GpuScene-Wrapper
 
-- Ausgangshypothese: [Interface](../../../src/graphics/renderer/Graphics.GpuScene.cppm)
-  und [Implementierung](../../../src/graphics/renderer/Graphics.GpuScene.cpp)
+- Ausgangshypothese: Interface (`src/graphics/renderer/Graphics.GpuScene.cppm`, entfernt in `1643f8f97`)
+  und Implementierung (`src/graphics/renderer/Graphics.GpuScene.cpp`, entfernt in `1643f8f97`)
   enthalten zusammen 499 Dateizeilen; keine Importierer im ersten Scan gefunden.
 - Gegenprüfung: aktuelle und bedingte Build-Ziele, Re-Exports, Tests,
   Migrationsaufrufer, Slot-Verantwortung und Buffer-Lifetime.
@@ -992,3 +1042,8 @@ Prüfung der betroffenen Annahmen, nicht den Neustart der gesamten Liste.
   C02, C03 und C11 sind vertagt, C10, C14 und C17 bleiben, C13 ist durch X02
   erledigt. Details in §„Etappe E3 — Entscheidungen und Umsetzung
   2026-10-06“. Nächste Etappe: E4 (G01–G18).
+- 2026-10-06: Etappe E4 entschieden und umgesetzt. G01 nach einer
+  Shader-Analyse vollständig gelöscht, die Techniken stehen in Tasks (neu
+  GRAPHICS-160…163). G03 ist in LEGACY-043 eingeordnet, G06 nur umbenannt.
+  Details in §„Etappe E4 — Entscheidungen und Umsetzung 2026-10-06“.
+  Nächste Etappe: E5 (R01–R19).
