@@ -423,12 +423,6 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
-    RuntimeAssetIngestDiagnostic RuntimeAssetIngestDiagnosticFromRouteStatus(
-        const Assets::AssetRouteStatus status) noexcept
-    {
-        return RouteDiagnosticFromStatus(status);
-    }
-
     RuntimeAssetIngestTransition RuntimeAssetIngestStateMachine::Submit(
         RuntimeAssetIngestRequest request)
     {

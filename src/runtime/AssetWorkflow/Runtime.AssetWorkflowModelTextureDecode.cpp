@@ -58,13 +58,6 @@ namespace Extrinsic::Runtime
             ExternalResourceReader ReadExternalResource{};
         };
 
-        [[nodiscard]] std::string ParentPathOf(const std::string_view path)
-        {
-            return std::filesystem::path(std::string(path))
-                .parent_path()
-                .string();
-        }
-
         [[nodiscard]] std::string ResolveExternalPath(
             const std::string_view basePath,
             const std::string_view uri)
@@ -117,7 +110,8 @@ namespace Extrinsic::Runtime
             Core::IO::IIOBackend& backend)
         {
             const std::string pathString{path};
-            std::string basePath = ParentPathOf(pathString);
+            std::string basePath =
+                std::filesystem::path(pathString).parent_path().string();
             return ModelTextureDecodeRequest{
                 .Route = route,
                 .Path = pathString,
@@ -238,20 +232,6 @@ namespace Extrinsic::Runtime
             return Assets::AssetModelResourceKind::Buffer;
         }
 
-        [[nodiscard]] std::string ResolveExternalPath(
-            const ModelTextureDecodeRequest& request,
-            const std::string_view path)
-        {
-            const std::filesystem::path candidate{std::string(path)};
-            if (candidate.is_absolute() || request.BasePath.empty())
-            {
-                return candidate.string();
-            }
-            return (std::filesystem::path(request.BasePath) / candidate)
-                .lexically_normal()
-                .string();
-        }
-
         void RecordExternalReadDiagnostic(
             std::vector<Assets::AssetModelExternalResourceDiagnostic>& diagnostics,
             const std::string& uri,
@@ -283,7 +263,7 @@ namespace Extrinsic::Runtime
                 return false;
             }
 
-            const std::string resolved = ResolveExternalPath(*context->Request, filename);
+            const std::string resolved = ResolveExternalPath(context->Request->BasePath, filename);
             auto read = context->Request->ReadExternalResource(resolved);
             if (!read.has_value() && context->Diagnostics != nullptr)
             {
@@ -304,7 +284,7 @@ namespace Extrinsic::Runtime
             {
                 return filename;
             }
-            return ResolveExternalPath(*context->Request, filename);
+            return ResolveExternalPath(context->Request->BasePath, filename);
         }
 
         bool GltfReadWholeFile(
@@ -324,7 +304,7 @@ namespace Extrinsic::Runtime
                 return false;
             }
 
-            const std::string resolved = ResolveExternalPath(*context->Request, filename);
+            const std::string resolved = ResolveExternalPath(context->Request->BasePath, filename);
             auto read = context->Request->ReadExternalResource(resolved);
             if (!read.has_value())
             {
@@ -377,7 +357,7 @@ namespace Extrinsic::Runtime
                 return false;
             }
 
-            const std::string resolved = ResolveExternalPath(*context->Request, filename);
+            const std::string resolved = ResolveExternalPath(context->Request->BasePath, filename);
             auto read = context->Request->ReadExternalResource(resolved);
             if (!read.has_value())
             {

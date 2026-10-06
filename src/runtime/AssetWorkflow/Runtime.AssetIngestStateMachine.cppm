@@ -1,3 +1,4 @@
+// Defines ingest records, transitions and queue snapshots shared by runtime import workflows.
 module;
 
 #include <chrono>
@@ -186,10 +187,6 @@ export namespace Extrinsic::Runtime
         RuntimeAssetImportQueueStage stage) noexcept;
     [[nodiscard]] const char* DebugNameForRuntimeAssetImportQueueTerminalStatus(
         RuntimeAssetImportQueueTerminalStatus status) noexcept;
-
-    [[nodiscard]] RuntimeAssetIngestDiagnostic
-        RuntimeAssetIngestDiagnosticFromRouteStatus(
-            Assets::AssetRouteStatus status) noexcept;
 
     class RuntimeAssetIngestStateMachine
     {
