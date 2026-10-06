@@ -50,13 +50,6 @@ namespace Extrinsic::Runtime
             c.OrientTowardFallback = d.at("orient_toward_fallback");
             return c;
         }
-        Core::Config::EngineConfigSection MakeNormalEstimationConfigSection(const NormalEstimationConfig &c)
-        {
-            return {.Name = std::string{kNormalEstimationConfigSectionName},
-                    .SchemaId = std::string{kNormalEstimationConfigSectionSchemaId},
-                    .SchemaVersion = 1,
-                    .PayloadJson = SerializeNormalEstimationConfig(c)};
-        }
     } // namespace
     const char *ToString(NormalEstimationMethod m) noexcept
     {
@@ -112,7 +105,6 @@ namespace Extrinsic::Runtime
     {
         using namespace Core::Config;
         using ConfigDetail::RejectConfigSection;
-        EngineConfigSectionValidationResult result;
         auto input = ConfigDetail::ParseConfigJson(payload, false),
              d = ConfigDetail::ParseConfigJson(SerializeNormalEstimationConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
@@ -170,26 +162,21 @@ namespace Extrinsic::Runtime
         else if (d["positions"]["domain"] != d["output"]["domain"] ||
                  d["positions"]["name"] == d["output"]["name"])
             return RejectConfigSection(subject, "Normals must use a distinct output property on the input domain.");
-        result.State = EngineConfigState::Valid;
-        result.CanonicalPayloadJson = SerializeNormalEstimationConfig(ParseNormalEstimationConfig(d));
-        result.ParsedFieldCount = input.size();
-        return result;
+        return ConfigDetail::AcceptConfigSection(SerializeNormalEstimationConfig(ParseNormalEstimationConfig(d)), input.size());
     }
     std::optional<NormalEstimationConfig> GetNormalEstimationConfig(const Core::Config::EngineConfig &c)
     {
-        const auto payload = ConfigDetail::FindValidatedCanonicalPayload(
-            c, kNormalEstimationConfigSectionName, kNormalEstimationConfigSectionSchemaId, 1u,
-            nullptr, ValidateNormalEstimationConfigSection);
-        if (!payload) return {};
-        return ParseNormalEstimationConfig(ConfigDetail::ParseConfigJson(*payload, true));
+        return ConfigDetail::GetPointConfig(c, kNormalEstimationConfigSectionName, kNormalEstimationConfigSectionSchemaId, 1u, ValidateNormalEstimationConfigSection, ParseNormalEstimationConfig);
     }
     void SetNormalEstimationConfig(Core::Config::EngineConfig &c, const NormalEstimationConfig &v)
     {
-        Core::Config::UpsertEngineConfigSection(c.AppSections, MakeNormalEstimationConfigSection(v));
+        Core::Config::UpsertEngineConfigSection(c.AppSections, ConfigDetail::MakeConfigSection(
+            kNormalEstimationConfigSectionName, kNormalEstimationConfigSectionSchemaId, 1, SerializeNormalEstimationConfig(v)));
     }
     Core::Config::EngineConfigSectionRegistration MakeNormalEstimationConfigSectionRegistration()
     {
-        return {.DefaultSection = MakeNormalEstimationConfigSection({}), .Validate = ValidateNormalEstimationConfigSection};
+        return ConfigDetail::MakeSectionRegistration(
+            kNormalEstimationConfigSectionName, kNormalEstimationConfigSectionSchemaId, 1, SerializeNormalEstimationConfig({}), ValidateNormalEstimationConfigSection, {});
     }
 } // namespace Extrinsic::Runtime
 
@@ -215,12 +202,6 @@ namespace Extrinsic::Runtime
             ConfigDetail::DecodePointPropertyRef(doc.at("target_positions"), c.TargetPositions);
             ConfigDetail::DecodePointPropertyRef(doc.at("target_normals"), c.TargetNormals);
             return c;
-        }
-        Core::Config::EngineConfigSection MakeRegistrationConfigSection(const RegistrationConfig& value)
-        {
-            return {.Name = std::string{kRegistrationConfigSectionName},
-                    .SchemaId = std::string{kRegistrationConfigSectionSchemaId}, .SchemaVersion = 1,
-                    .PayloadJson = SerializeRegistrationConfig(value)};
         }
     }
     const char* ToString(RegistrationBackend backend) noexcept
@@ -249,7 +230,6 @@ namespace Extrinsic::Runtime
     {
         using namespace Core::Config;
         using ConfigDetail::RejectConfigSection;
-        EngineConfigSectionValidationResult result;
         const auto input = ConfigDetail::ParseConfigJson(payload, false);
         auto doc = ConfigDetail::ParseConfigJson(SerializeRegistrationConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
@@ -276,25 +256,20 @@ namespace Extrinsic::Runtime
             if (validation == PointPropertyValidation::UnknownDomain)
                 return RejectConfigSection(subject, std::string(key) + " has an unknown element domain.");
         }
-        result.State = EngineConfigState::Valid;
-        result.CanonicalPayloadJson = SerializeRegistrationConfig(ParseRegistrationConfig(doc));
-        result.ParsedFieldCount = static_cast<std::uint32_t>(input.size());
-        return result;
+        return ConfigDetail::AcceptConfigSection(SerializeRegistrationConfig(ParseRegistrationConfig(doc)), input.size());
     }
     std::optional<RegistrationConfig> GetRegistrationConfig(const Core::Config::EngineConfig& config)
     {
-        const auto payload = ConfigDetail::FindValidatedCanonicalPayload(
-            config, kRegistrationConfigSectionName, kRegistrationConfigSectionSchemaId, 1u,
-            nullptr, ValidateRegistrationConfigSection);
-        if (!payload) return {};
-        return ParseRegistrationConfig(ConfigDetail::ParseConfigJson(*payload, true));
+        return ConfigDetail::GetPointConfig(config, kRegistrationConfigSectionName, kRegistrationConfigSectionSchemaId, 1u, ValidateRegistrationConfigSection, ParseRegistrationConfig);
     }
     void SetRegistrationConfig(Core::Config::EngineConfig& config, const RegistrationConfig& value)
     {
-        Core::Config::UpsertEngineConfigSection(config.AppSections, MakeRegistrationConfigSection(value));
+        Core::Config::UpsertEngineConfigSection(config.AppSections, ConfigDetail::MakeConfigSection(
+            kRegistrationConfigSectionName, kRegistrationConfigSectionSchemaId, 1, SerializeRegistrationConfig(value)));
     }
     Core::Config::EngineConfigSectionRegistration MakeRegistrationConfigSectionRegistration()
     {
-        return {.DefaultSection = MakeRegistrationConfigSection({}), .Validate = ValidateRegistrationConfigSection};
+        return ConfigDetail::MakeSectionRegistration(
+            kRegistrationConfigSectionName, kRegistrationConfigSectionSchemaId, 1, SerializeRegistrationConfig({}), ValidateRegistrationConfigSection, {});
     }
 }

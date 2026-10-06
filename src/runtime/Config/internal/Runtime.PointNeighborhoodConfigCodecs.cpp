@@ -36,11 +36,6 @@ namespace Extrinsic::Runtime
             c.GpuQueryBatchSize=data.at("gpu_query_batch_size");c.Radius=data.at("radius");c.StdDevMultiplier=data.at("stddev_multiplier");c.ScoreThreshold=data.at("score_threshold");
             return c;
         }
-        Core::Config::EngineConfigSection MakeOutlierAnalysisConfigSection(const OutlierAnalysisConfig& c)
-        {
-            return {.Name=std::string(kOutlierAnalysisConfigSectionName),.SchemaId=std::string(kOutlierAnalysisConfigSectionSchemaId),
-                    .SchemaVersion=1,.PayloadJson=SerializeOutlierAnalysisConfig(c)};
-        }
     }
     const char* ToString(OutlierAnalysisMethod m) noexcept
     {
@@ -69,7 +64,6 @@ namespace Extrinsic::Runtime
     {
         using namespace Core::Config;
         using ConfigDetail::RejectConfigSection;
-        EngineConfigSectionValidationResult result;
         auto input=ConfigDetail::ParseConfigJson(payload, false),data=ConfigDetail::ParseConfigJson(SerializeOutlierAnalysisConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, data, "Outlier analysis config must be an object.", "Unknown outlier field: ",
@@ -91,20 +85,18 @@ namespace Extrinsic::Runtime
         if(data["positions"]["domain"]!=data["mask"]["domain"] || data["mask"]["domain"]!=data["score"]["domain"] ||
            data["positions"]["name"]==data["mask"]["name"] || data["positions"]["name"]==data["score"]["name"] || data["mask"]["name"]==data["score"]["name"])
             return RejectConfigSection(subject, "Position, mask and score must be distinct properties on the same domain.");
-        result.State=EngineConfigState::Valid;result.CanonicalPayloadJson=SerializeOutlierAnalysisConfig(ParseOutlierAnalysisConfig(data));result.ParsedFieldCount=input.size();return result;
+        return ConfigDetail::AcceptConfigSection(SerializeOutlierAnalysisConfig(ParseOutlierAnalysisConfig(data)), input.size());
     }
     std::optional<OutlierAnalysisConfig> GetOutlierAnalysisConfig(const Core::Config::EngineConfig& c)
     {
-        const auto payload = ConfigDetail::FindValidatedCanonicalPayload(
-            c, kOutlierAnalysisConfigSectionName, kOutlierAnalysisConfigSectionSchemaId, 1u,
-            nullptr, ValidateOutlierAnalysisConfigSection);
-        if (!payload) return {};
-        return ParseOutlierAnalysisConfig(ConfigDetail::ParseConfigJson(*payload, true));
+        return ConfigDetail::GetPointConfig(c, kOutlierAnalysisConfigSectionName, kOutlierAnalysisConfigSectionSchemaId, 1u, ValidateOutlierAnalysisConfigSection, ParseOutlierAnalysisConfig);
     }
     void SetOutlierAnalysisConfig(Core::Config::EngineConfig& c,const OutlierAnalysisConfig& value)
-    {Core::Config::UpsertEngineConfigSection(c.AppSections,MakeOutlierAnalysisConfigSection(value));}
+    {Core::Config::UpsertEngineConfigSection(c.AppSections,ConfigDetail::MakeConfigSection(
+            kOutlierAnalysisConfigSectionName, kOutlierAnalysisConfigSectionSchemaId, 1, SerializeOutlierAnalysisConfig(value)));}
     Core::Config::EngineConfigSectionRegistration MakeOutlierAnalysisConfigSectionRegistration()
-    {return {.DefaultSection=MakeOutlierAnalysisConfigSection({}),.Validate=ValidateOutlierAnalysisConfigSection};}
+    {return ConfigDetail::MakeSectionRegistration(
+            kOutlierAnalysisConfigSectionName, kOutlierAnalysisConfigSectionSchemaId, 1, SerializeOutlierAnalysisConfig({}), ValidateOutlierAnalysisConfigSection, {});}
 }
 
 namespace Extrinsic::Runtime
@@ -120,11 +112,6 @@ namespace Extrinsic::Runtime
             c.KNeighbors=data.at("k_neighbors");
             c.GpuQueryBatchSize=data.at("gpu_query_batch_size");c.Bandwidth=data.at("bandwidth");
             return c;
-        }
-        Core::Config::EngineConfigSection MakeKernelDensityConfigSection(const KernelDensityConfig& c)
-        {
-            return {.Name=std::string(kKernelDensityConfigSectionName),.SchemaId=std::string(kKernelDensityConfigSectionSchemaId),
-                    .SchemaVersion=1,.PayloadJson=SerializeKernelDensityConfig(c)};
         }
     }
     const char* ToString(KernelDensityBackend b) noexcept
@@ -144,7 +131,6 @@ namespace Extrinsic::Runtime
     {
         using namespace Core::Config;
         using ConfigDetail::RejectConfigSection;
-        EngineConfigSectionValidationResult result;
         auto input=ConfigDetail::ParseConfigJson(payload, false),data=ConfigDetail::ParseConfigJson(SerializeKernelDensityConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, data, "Kernel density config must be an object.", "Unknown density field: ",
@@ -165,20 +151,18 @@ namespace Extrinsic::Runtime
         if(data["positions"]["domain"]!=data["density"]["domain"] ||
            data["positions"]["name"]==data["density"]["name"])
             return RejectConfigSection(subject, "Position and density must be distinct properties on the same domain.");
-        result.State=EngineConfigState::Valid;result.CanonicalPayloadJson=SerializeKernelDensityConfig(ParseKernelDensityConfig(data));result.ParsedFieldCount=input.size();return result;
+        return ConfigDetail::AcceptConfigSection(SerializeKernelDensityConfig(ParseKernelDensityConfig(data)), input.size());
     }
     std::optional<KernelDensityConfig> GetKernelDensityConfig(const Core::Config::EngineConfig& c)
     {
-        const auto payload = ConfigDetail::FindValidatedCanonicalPayload(
-            c, kKernelDensityConfigSectionName, kKernelDensityConfigSectionSchemaId, 1u,
-            nullptr, ValidateKernelDensityConfigSection);
-        if (!payload) return {};
-        return ParseKernelDensityConfig(ConfigDetail::ParseConfigJson(*payload, true));
+        return ConfigDetail::GetPointConfig(c, kKernelDensityConfigSectionName, kKernelDensityConfigSectionSchemaId, 1u, ValidateKernelDensityConfigSection, ParseKernelDensityConfig);
     }
     void SetKernelDensityConfig(Core::Config::EngineConfig& c,const KernelDensityConfig& value)
-    {Core::Config::UpsertEngineConfigSection(c.AppSections,MakeKernelDensityConfigSection(value));}
+    {Core::Config::UpsertEngineConfigSection(c.AppSections,ConfigDetail::MakeConfigSection(
+            kKernelDensityConfigSectionName, kKernelDensityConfigSectionSchemaId, 1, SerializeKernelDensityConfig(value)));}
     Core::Config::EngineConfigSectionRegistration MakeKernelDensityConfigSectionRegistration()
-    {return {.DefaultSection=MakeKernelDensityConfigSection({}),.Validate=ValidateKernelDensityConfigSection};}
+    {return ConfigDetail::MakeSectionRegistration(
+            kKernelDensityConfigSectionName, kKernelDensityConfigSectionSchemaId, 1, SerializeKernelDensityConfig({}), ValidateKernelDensityConfigSection, {});}
 }
 
 namespace Extrinsic::Runtime
@@ -194,11 +178,6 @@ namespace Extrinsic::Runtime
             c.KNeighbors=data.at("k_neighbors");
             c.GpuQueryBatchSize=data.at("gpu_query_batch_size");c.ScaleFactor=data.at("scale_factor");
             return c;
-        }
-        Core::Config::EngineConfigSection MakePointSpacingConfigSection(const PointSpacingConfig& c)
-        {
-            return {.Name=std::string(kPointSpacingConfigSectionName),.SchemaId=std::string(kPointSpacingConfigSectionSchemaId),
-                    .SchemaVersion=1,.PayloadJson=SerializePointSpacingConfig(c)};
         }
     }
     const char* ToString(PointSpacingBackend b) noexcept
@@ -218,7 +197,6 @@ namespace Extrinsic::Runtime
     {
         using namespace Core::Config;
         using ConfigDetail::RejectConfigSection;
-        EngineConfigSectionValidationResult result;
         auto input=ConfigDetail::ParseConfigJson(payload, false),data=ConfigDetail::ParseConfigJson(SerializePointSpacingConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, data, "Point spacing config must be an object.", "Unknown radii field: ",
@@ -239,20 +217,18 @@ namespace Extrinsic::Runtime
         if(data["positions"]["domain"]!=data["radii"]["domain"] ||
            data["positions"]["name"]==data["radii"]["name"])
             return RejectConfigSection(subject, "Position and radii must be distinct properties on the same domain.");
-        result.State=EngineConfigState::Valid;result.CanonicalPayloadJson=SerializePointSpacingConfig(ParsePointSpacingConfig(data));result.ParsedFieldCount=input.size();return result;
+        return ConfigDetail::AcceptConfigSection(SerializePointSpacingConfig(ParsePointSpacingConfig(data)), input.size());
     }
     std::optional<PointSpacingConfig> GetPointSpacingConfig(const Core::Config::EngineConfig& c)
     {
-        const auto payload = ConfigDetail::FindValidatedCanonicalPayload(
-            c, kPointSpacingConfigSectionName, kPointSpacingConfigSectionSchemaId, 1u,
-            nullptr, ValidatePointSpacingConfigSection);
-        if (!payload) return {};
-        return ParsePointSpacingConfig(ConfigDetail::ParseConfigJson(*payload, true));
+        return ConfigDetail::GetPointConfig(c, kPointSpacingConfigSectionName, kPointSpacingConfigSectionSchemaId, 1u, ValidatePointSpacingConfigSection, ParsePointSpacingConfig);
     }
     void SetPointSpacingConfig(Core::Config::EngineConfig& c,const PointSpacingConfig& value)
-    {Core::Config::UpsertEngineConfigSection(c.AppSections,MakePointSpacingConfigSection(value));}
+    {Core::Config::UpsertEngineConfigSection(c.AppSections,ConfigDetail::MakeConfigSection(
+            kPointSpacingConfigSectionName, kPointSpacingConfigSectionSchemaId, 1, SerializePointSpacingConfig(value)));}
     Core::Config::EngineConfigSectionRegistration MakePointSpacingConfigSectionRegistration()
-    {return {.DefaultSection=MakePointSpacingConfigSection({}),.Validate=ValidatePointSpacingConfigSection};}
+    {return ConfigDetail::MakeSectionRegistration(
+            kPointSpacingConfigSectionName, kPointSpacingConfigSectionSchemaId, 1, SerializePointSpacingConfig({}), ValidatePointSpacingConfigSection, {});}
 }
 
 namespace Extrinsic::Runtime
@@ -270,11 +246,6 @@ namespace Extrinsic::Runtime
             for(unsigned i=0;i<3;++i)if(data.at("kernel")==Geometry::PointCloud::Kernels::DebugName(Geometry::PointCloud::Kernels::KernelType(i)))c.Kernel=Geometry::PointCloud::Kernels::KernelType(i);
             for(unsigned i=0;i<2;++i)if(data.at("mode")==Geometry::PointCloud::Kernels::DebugName(Geometry::PointCloud::Kernels::DensityWeightMode(i)))c.Mode=Geometry::PointCloud::Kernels::DensityWeightMode(i);
             return c;
-        }
-        Core::Config::EngineConfigSection MakeDensityWeightConfigSection(const DensityWeightConfig& c)
-        {
-            return {.Name=std::string(kDensityWeightConfigSectionName),.SchemaId=std::string(kDensityWeightConfigSectionSchemaId),
-                    .SchemaVersion=1,.PayloadJson=SerializeDensityWeightConfig(c)};
         }
     }
 
@@ -297,7 +268,6 @@ namespace Extrinsic::Runtime
     {
         using namespace Core::Config;
         using ConfigDetail::RejectConfigSection;
-        EngineConfigSectionValidationResult result;
         auto input=ConfigDetail::ParseConfigJson(payload, false),data=ConfigDetail::ParseConfigJson(SerializeDensityWeightConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, data, "Density weight config must be an object.", "Unknown density weight field: ",
@@ -318,18 +288,16 @@ namespace Extrinsic::Runtime
            ConfigDetail::ValidatePointPropertyRef(data["weights"],Geometry::PropertyValueKind::Float, true) != PointPropertyValidation::Valid ||
            data["positions"]["domain"]!=data["weights"]["domain"] || data["positions"]["name"]==data["weights"]["name"])
             return RejectConfigSection(subject, "Position and weight bindings need distinct canonical vec3/float properties on the same domain.");
-        result.State=EngineConfigState::Valid;result.CanonicalPayloadJson=SerializeDensityWeightConfig(ParseDensityWeightConfig(data));result.ParsedFieldCount=input.size();return result;
+        return ConfigDetail::AcceptConfigSection(SerializeDensityWeightConfig(ParseDensityWeightConfig(data)), input.size());
     }
     std::optional<DensityWeightConfig> GetDensityWeightConfig(const Core::Config::EngineConfig& c)
     {
-        const auto payload = ConfigDetail::FindValidatedCanonicalPayload(
-            c, kDensityWeightConfigSectionName, kDensityWeightConfigSectionSchemaId, 1u,
-            nullptr, ValidateDensityWeightConfigSection);
-        if (!payload) return {};
-        return ParseDensityWeightConfig(ConfigDetail::ParseConfigJson(*payload, true));
+        return ConfigDetail::GetPointConfig(c, kDensityWeightConfigSectionName, kDensityWeightConfigSectionSchemaId, 1u, ValidateDensityWeightConfigSection, ParseDensityWeightConfig);
     }
     void SetDensityWeightConfig(Core::Config::EngineConfig& c,const DensityWeightConfig& value)
-    {Core::Config::UpsertEngineConfigSection(c.AppSections,MakeDensityWeightConfigSection(value));}
+    {Core::Config::UpsertEngineConfigSection(c.AppSections,ConfigDetail::MakeConfigSection(
+            kDensityWeightConfigSectionName, kDensityWeightConfigSectionSchemaId, 1, SerializeDensityWeightConfig(value)));}
     Core::Config::EngineConfigSectionRegistration MakeDensityWeightConfigSectionRegistration()
-    {return {.DefaultSection=MakeDensityWeightConfigSection({}),.Validate=ValidateDensityWeightConfigSection};}
+    {return ConfigDetail::MakeSectionRegistration(
+            kDensityWeightConfigSectionName, kDensityWeightConfigSectionSchemaId, 1, SerializeDensityWeightConfig({}), ValidateDensityWeightConfigSection, {});}
 }

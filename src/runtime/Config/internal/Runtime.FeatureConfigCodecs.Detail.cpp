@@ -57,6 +57,50 @@ namespace Extrinsic::Runtime::ConfigDetail
         return result;
     }
 
+    Core::Config::EngineConfigSectionValidationResult AcceptConfigSection(
+        std::string canonicalPayloadJson, const std::size_t parsedFieldCount)
+    {
+        Core::Config::EngineConfigSectionValidationResult result;
+        result.State = Core::Config::EngineConfigState::Valid;
+        result.CanonicalPayloadJson = std::move(canonicalPayloadJson);
+        result.ParsedFieldCount = static_cast<std::uint32_t>(parsedFieldCount);
+        return result;
+    }
+
+    Core::Config::EngineConfigSection MakeConfigSection(
+        const std::string_view name,
+        const std::string_view schemaId,
+        const std::uint32_t schemaVersion,
+        std::string payloadJson)
+    {
+        return Core::Config::EngineConfigSection{
+            .Name = std::string{name},
+            .SchemaId = std::string{schemaId},
+            .SchemaVersion = schemaVersion,
+            .PayloadJson = std::move(payloadJson),
+        };
+    }
+
+    Core::Config::EngineConfigSectionRegistration
+    MakeSectionRegistration(
+        const std::string_view name,
+        const std::string_view schemaId,
+        const std::uint32_t schemaVersion,
+        std::string defaultPayloadJson,
+        const SectionValidatorFn validate,
+        Core::Config::EngineConfigSectionChangedCallback&& onChanged)
+    {
+        return Core::Config::EngineConfigSectionRegistration{
+            .DefaultSection = MakeConfigSection(
+                name,
+                schemaId,
+                schemaVersion,
+                std::move(defaultPayloadJson)),
+            .Validate = validate,
+            .OnChanged = std::move(onChanged),
+        };
+    }
+
     [[nodiscard]] std::optional<std::string> FindValidatedCanonicalPayload(
         const Core::Config::EngineConfig& config,
         const std::string_view name,
@@ -427,39 +471,8 @@ namespace Extrinsic::Runtime
         using ConfigDetail::SectionValidatorFn;
         using ConfigDetail::FindValidatedCanonicalPayload;
 
-        [[nodiscard]] Core::Config::EngineConfigSection MakeConfigSection(
-            const std::string_view name,
-            const std::string_view schemaId,
-            const std::uint32_t schemaVersion,
-            std::string payloadJson)
-        {
-            return Core::Config::EngineConfigSection{
-                .Name = std::string{name},
-                .SchemaId = std::string{schemaId},
-                .SchemaVersion = schemaVersion,
-                .PayloadJson = std::move(payloadJson),
-            };
-        }
-
-        [[nodiscard]] Core::Config::EngineConfigSectionRegistration
-        MakeSectionRegistration(
-            const std::string_view name,
-            const std::string_view schemaId,
-            const std::uint32_t schemaVersion,
-            std::string defaultPayloadJson,
-            const SectionValidatorFn validate,
-            Core::Config::EngineConfigSectionChangedCallback&& onChanged)
-        {
-            return Core::Config::EngineConfigSectionRegistration{
-                .DefaultSection = MakeConfigSection(
-                    name,
-                    schemaId,
-                    schemaVersion,
-                    std::move(defaultPayloadJson)),
-                .Validate = validate,
-                .OnChanged = std::move(onChanged),
-            };
-        }
+        using ConfigDetail::MakeConfigSection;
+        using ConfigDetail::MakeSectionRegistration;
 
         struct ValidationContext
         {

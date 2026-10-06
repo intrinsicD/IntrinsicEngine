@@ -1,4 +1,5 @@
-// Parsing, serialization, validated lookup and property JSON shared by runtime configs.
+// Parsing, serialization, section construction, validated lookup and property JSON
+// shared by runtime configs.
 // Include after core config, JSON, standard-library and property declarations.
 #pragma once
 
@@ -12,6 +13,8 @@ extern "C++"
 
         [[nodiscard]] Core::Config::EngineConfigSectionValidationResult RejectConfigSection(
             std::string_view subject, std::string message);
+        [[nodiscard]] Core::Config::EngineConfigSectionValidationResult AcceptConfigSection(
+            std::string canonicalPayloadJson, std::size_t parsedFieldCount);
 
         using SectionValidatorFn = Core::Config::EngineConfigSectionValidationResult (*)(
             std::string_view, std::string_view, std::string_view);
@@ -22,6 +25,27 @@ extern "C++"
             const Core::Config::EngineConfig& config, std::string_view name,
             std::string_view schemaId, std::uint32_t schemaVersion,
             std::string (*serializeDefault)(), SectionValidatorFn validate);
+
+        [[nodiscard]] Core::Config::EngineConfigSection MakeConfigSection(
+            std::string_view name, std::string_view schemaId,
+            std::uint32_t schemaVersion, std::string payloadJson);
+        [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeSectionRegistration(
+            std::string_view name, std::string_view schemaId, std::uint32_t schemaVersion,
+            std::string defaultPayloadJson, SectionValidatorFn validate,
+            Core::Config::EngineConfigSectionChangedCallback&& onChanged);
+
+        // Decodes a point config only from a Valid canonical payload.
+        template <class T>
+        [[nodiscard]] std::optional<T> GetPointConfig(
+            const Core::Config::EngineConfig& config, std::string_view name,
+            std::string_view schemaId, std::uint32_t schemaVersion,
+            SectionValidatorFn validate, T (*parse)(const nlohmann::json&))
+        {
+            const auto payload = FindValidatedCanonicalPayload(
+                config, name, schemaId, schemaVersion, nullptr, validate);
+            if (!payload) return std::nullopt;
+            return parse(ParseConfigJson(*payload, true));
+        }
 
         // Defaults contain each unsigned field. Nested values replace defaults;
         // unknown keys precede integer diagnostics, which follow the supplied order.

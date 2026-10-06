@@ -34,11 +34,6 @@ namespace Extrinsic::Runtime
             c.GpuQueryBatchSize=data.at("gpu_query_batch_size");c.SpatialSigma=data.at("spatial_sigma");c.NormalSigma=data.at("normal_sigma");c.Iterations=data.at("iterations");
             return c;
         }
-        Core::Config::EngineConfigSection MakeBilateralFilterConfigSection(const BilateralFilterConfig& c)
-        {
-            return {.Name=std::string(kBilateralFilterConfigSectionName),.SchemaId=std::string(kBilateralFilterConfigSectionSchemaId),
-                    .SchemaVersion=1,.PayloadJson=SerializeBilateralFilterConfig(c)};
-        }
     }
     const char* ToString(BilateralFilterBackend b) noexcept
     {
@@ -57,7 +52,6 @@ namespace Extrinsic::Runtime
     {
         using namespace Core::Config;
         using ConfigDetail::RejectConfigSection;
-        EngineConfigSectionValidationResult result;
         auto input=ConfigDetail::ParseConfigJson(payload, false),data=ConfigDetail::ParseConfigJson(SerializeBilateralFilterConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, data, "Bilateral filter config must be an object.", "Unknown output field: ",
@@ -81,20 +75,18 @@ namespace Extrinsic::Runtime
             return RejectConfigSection(subject, "Positions, normals and output must share an element domain.");
         if(data["output"]["name"]==data["normals"]["name"] && data["positions"]["name"]!=data["normals"]["name"])
             return RejectConfigSection(subject, "Output cannot overwrite a distinct normal input.");
-        result.State=EngineConfigState::Valid;result.CanonicalPayloadJson=SerializeBilateralFilterConfig(ParseBilateralFilterConfig(data));result.ParsedFieldCount=input.size();return result;
+        return ConfigDetail::AcceptConfigSection(SerializeBilateralFilterConfig(ParseBilateralFilterConfig(data)), input.size());
     }
     std::optional<BilateralFilterConfig> GetBilateralFilterConfig(const Core::Config::EngineConfig& c)
     {
-        const auto payload = ConfigDetail::FindValidatedCanonicalPayload(
-            c, kBilateralFilterConfigSectionName, kBilateralFilterConfigSectionSchemaId, 1u,
-            nullptr, ValidateBilateralFilterConfigSection);
-        if (!payload) return {};
-        return ParseBilateralFilterConfig(ConfigDetail::ParseConfigJson(*payload, true));
+        return ConfigDetail::GetPointConfig(c, kBilateralFilterConfigSectionName, kBilateralFilterConfigSectionSchemaId, 1u, ValidateBilateralFilterConfigSection, ParseBilateralFilterConfig);
     }
     void SetBilateralFilterConfig(Core::Config::EngineConfig& c,const BilateralFilterConfig& value)
-    {Core::Config::UpsertEngineConfigSection(c.AppSections,MakeBilateralFilterConfigSection(value));}
+    {Core::Config::UpsertEngineConfigSection(c.AppSections,ConfigDetail::MakeConfigSection(
+            kBilateralFilterConfigSectionName, kBilateralFilterConfigSectionSchemaId, 1, SerializeBilateralFilterConfig(value)));}
     Core::Config::EngineConfigSectionRegistration MakeBilateralFilterConfigSectionRegistration()
-    {return {.DefaultSection=MakeBilateralFilterConfigSection({}),.Validate=ValidateBilateralFilterConfigSection};}
+    {return ConfigDetail::MakeSectionRegistration(
+            kBilateralFilterConfigSectionName, kBilateralFilterConfigSectionSchemaId, 1, SerializeBilateralFilterConfig({}), ValidateBilateralFilterConfigSection, {});}
 }
 
 namespace Extrinsic::Runtime
@@ -111,11 +103,6 @@ namespace Extrinsic::Runtime
             c.GpuRadiusCapacity=data.at("gpu_radius_capacity");c.SalientRadius=data.at("salient_radius");
             c.NonMaxRadius=data.at("nonmax_radius");c.Gamma21=data.at("gamma21");c.Gamma32=data.at("gamma32");
             return c;
-        }
-        Core::Config::EngineConfigSection MakeKeypointAnalysisConfigSection(const KeypointAnalysisConfig& c)
-        {
-            return {.Name=std::string(kKeypointAnalysisConfigSectionName),.SchemaId=std::string(kKeypointAnalysisConfigSectionSchemaId),
-                    .SchemaVersion=1,.PayloadJson=SerializeKeypointAnalysisConfig(c)};
         }
     }
 
@@ -138,7 +125,6 @@ namespace Extrinsic::Runtime
     {
         using namespace Core::Config;
         using ConfigDetail::RejectConfigSection;
-        EngineConfigSectionValidationResult result;
         auto input=ConfigDetail::ParseConfigJson(payload, false),data=ConfigDetail::ParseConfigJson(SerializeKeypointAnalysisConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, data, "Keypoint analysis config must be an object.", "Unknown keypoint field: ",
@@ -164,20 +150,18 @@ namespace Extrinsic::Runtime
         if(data["positions"]["domain"]!=data["mask"]["domain"] || data["mask"]["domain"]!=data["score"]["domain"] ||
            data["positions"]["name"]==data["mask"]["name"] || data["positions"]["name"]==data["score"]["name"] || data["mask"]["name"]==data["score"]["name"])
             return RejectConfigSection(subject, "Position, mask and score must be distinct properties on the same domain.");
-        result.State=EngineConfigState::Valid;result.CanonicalPayloadJson=SerializeKeypointAnalysisConfig(ParseKeypointAnalysisConfig(data));result.ParsedFieldCount=input.size();return result;
+        return ConfigDetail::AcceptConfigSection(SerializeKeypointAnalysisConfig(ParseKeypointAnalysisConfig(data)), input.size());
     }
     std::optional<KeypointAnalysisConfig> GetKeypointAnalysisConfig(const Core::Config::EngineConfig& c)
     {
-        const auto payload = ConfigDetail::FindValidatedCanonicalPayload(
-            c, kKeypointAnalysisConfigSectionName, kKeypointAnalysisConfigSectionSchemaId, 1u,
-            nullptr, ValidateKeypointAnalysisConfigSection);
-        if (!payload) return {};
-        return ParseKeypointAnalysisConfig(ConfigDetail::ParseConfigJson(*payload, true));
+        return ConfigDetail::GetPointConfig(c, kKeypointAnalysisConfigSectionName, kKeypointAnalysisConfigSectionSchemaId, 1u, ValidateKeypointAnalysisConfigSection, ParseKeypointAnalysisConfig);
     }
     void SetKeypointAnalysisConfig(Core::Config::EngineConfig& c,const KeypointAnalysisConfig& value)
-    {Core::Config::UpsertEngineConfigSection(c.AppSections,MakeKeypointAnalysisConfigSection(value));}
+    {Core::Config::UpsertEngineConfigSection(c.AppSections,ConfigDetail::MakeConfigSection(
+            kKeypointAnalysisConfigSectionName, kKeypointAnalysisConfigSectionSchemaId, 1, SerializeKeypointAnalysisConfig(value)));}
     Core::Config::EngineConfigSectionRegistration MakeKeypointAnalysisConfigSectionRegistration()
-    {return {.DefaultSection=MakeKeypointAnalysisConfigSection({}),.Validate=ValidateKeypointAnalysisConfigSection};}
+    {return ConfigDetail::MakeSectionRegistration(
+            kKeypointAnalysisConfigSectionName, kKeypointAnalysisConfigSectionSchemaId, 1, SerializeKeypointAnalysisConfig({}), ValidateKeypointAnalysisConfigSection, {});}
 }
 
 namespace Extrinsic::Runtime
@@ -194,11 +178,6 @@ namespace Extrinsic::Runtime
             c.MaxNeighbors=data.at("max_neighbors");c.GpuQueryBatchSize=data.at("gpu_query_batch_size");
             c.GpuRadiusCapacity=data.at("gpu_radius_capacity");c.FeatureRadius=data.at("feature_radius");
             return c;
-        }
-        Core::Config::EngineConfigSection MakeDescriptorAnalysisConfigSection(const DescriptorAnalysisConfig& c)
-        {
-            return {.Name=std::string(kDescriptorAnalysisConfigSectionName),.SchemaId=std::string(kDescriptorAnalysisConfigSectionSchemaId),
-                    .SchemaVersion=1,.PayloadJson=SerializeDescriptorAnalysisConfig(c)};
         }
     }
 
@@ -229,7 +208,6 @@ namespace Extrinsic::Runtime
     {
         using namespace Core::Config;
         using ConfigDetail::RejectConfigSection;
-        EngineConfigSectionValidationResult result;
         auto input=ConfigDetail::ParseConfigJson(payload, false),data=ConfigDetail::ParseConfigJson(SerializeDescriptorAnalysisConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, data, "Descriptor analysis config must be an object.", "Unknown descriptor field: ",
@@ -260,20 +238,18 @@ namespace Extrinsic::Runtime
             for(unsigned j=0;j<i;++j)if(ref["name"]==data["outputs"][j]["name"])
                 return RejectConfigSection(subject, "Descriptor output names must be unique.");
         }
-        result.State=EngineConfigState::Valid;result.CanonicalPayloadJson=SerializeDescriptorAnalysisConfig(ParseDescriptorAnalysisConfig(data));result.ParsedFieldCount=input.size();return result;
+        return ConfigDetail::AcceptConfigSection(SerializeDescriptorAnalysisConfig(ParseDescriptorAnalysisConfig(data)), input.size());
     }
     std::optional<DescriptorAnalysisConfig> GetDescriptorAnalysisConfig(const Core::Config::EngineConfig& c)
     {
-        const auto payload = ConfigDetail::FindValidatedCanonicalPayload(
-            c, kDescriptorAnalysisConfigSectionName, kDescriptorAnalysisConfigSectionSchemaId, 1u,
-            nullptr, ValidateDescriptorAnalysisConfigSection);
-        if (!payload) return {};
-        return ParseDescriptorAnalysisConfig(ConfigDetail::ParseConfigJson(*payload, true));
+        return ConfigDetail::GetPointConfig(c, kDescriptorAnalysisConfigSectionName, kDescriptorAnalysisConfigSectionSchemaId, 1u, ValidateDescriptorAnalysisConfigSection, ParseDescriptorAnalysisConfig);
     }
     void SetDescriptorAnalysisConfig(Core::Config::EngineConfig& c,const DescriptorAnalysisConfig& value)
-    {Core::Config::UpsertEngineConfigSection(c.AppSections,MakeDescriptorAnalysisConfigSection(value));}
+    {Core::Config::UpsertEngineConfigSection(c.AppSections,ConfigDetail::MakeConfigSection(
+            kDescriptorAnalysisConfigSectionName, kDescriptorAnalysisConfigSectionSchemaId, 1, SerializeDescriptorAnalysisConfig(value)));}
     Core::Config::EngineConfigSectionRegistration MakeDescriptorAnalysisConfigSectionRegistration()
-    {return {.DefaultSection=MakeDescriptorAnalysisConfigSection({}),.Validate=ValidateDescriptorAnalysisConfigSection};}
+    {return ConfigDetail::MakeSectionRegistration(
+            kDescriptorAnalysisConfigSectionName, kDescriptorAnalysisConfigSectionSchemaId, 1, SerializeDescriptorAnalysisConfig({}), ValidateDescriptorAnalysisConfigSection, {});}
 }
 
 namespace Extrinsic::Runtime
@@ -306,13 +282,6 @@ namespace Extrinsic::Runtime
             c.KernelSigmaScale = data.at("kernel_sigma_scale");
             c.MinDistanceEpsilon = data.at("min_distance_epsilon");
             return c;
-        }
-        Core::Config::EngineConfigSection MakePointConstructionConfigSection(const PointConstructionConfig& c)
-        {
-            return {.Name = std::string(kPointConstructionConfigSectionName),
-                    .SchemaId = std::string(kPointConstructionConfigSectionSchemaId),
-                    .SchemaVersion = 1,
-                    .PayloadJson = SerializePointConstructionConfig(c)};
         }
     } // namespace
     const char* ToString(PointConstructionMethod m) noexcept
@@ -365,7 +334,6 @@ namespace Extrinsic::Runtime
     {
         using namespace Core::Config;
         using ConfigDetail::RejectConfigSection;
-        EngineConfigSectionValidationResult result;
         auto input = ConfigDetail::ParseConfigJson(payload, false),
              data = ConfigDetail::ParseConfigJson(SerializePointConstructionConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
@@ -403,27 +371,22 @@ namespace Extrinsic::Runtime
         if (data["method"] == "hoppe" && data["estimate_normals"] == false &&
             data["positions"]["domain"] != data["normals"]["domain"])
             return RejectConfigSection(subject, "Supplied normals must share the position domain.");
-        result.State = EngineConfigState::Valid;
-        result.CanonicalPayloadJson = SerializePointConstructionConfig(ParsePointConstructionConfig(data));
-        result.ParsedFieldCount = input.size();
-        return result;
+        return ConfigDetail::AcceptConfigSection(SerializePointConstructionConfig(ParsePointConstructionConfig(data)), input.size());
     }
     std::optional<PointConstructionConfig>
     GetPointConstructionConfig(const Core::Config::EngineConfig& c)
     {
-        const auto payload = ConfigDetail::FindValidatedCanonicalPayload(
-            c, kPointConstructionConfigSectionName, kPointConstructionConfigSectionSchemaId, 1u,
-            nullptr, ValidatePointConstructionConfigSection);
-        if (!payload) return {};
-        return ParsePointConstructionConfig(ConfigDetail::ParseConfigJson(*payload, true));
+        return ConfigDetail::GetPointConfig(c, kPointConstructionConfigSectionName, kPointConstructionConfigSectionSchemaId, 1u, ValidatePointConstructionConfigSection, ParsePointConstructionConfig);
     }
     void SetPointConstructionConfig(Core::Config::EngineConfig& c,
                                     const PointConstructionConfig& value)
     {
-        Core::Config::UpsertEngineConfigSection(c.AppSections, MakePointConstructionConfigSection(value));
+        Core::Config::UpsertEngineConfigSection(c.AppSections, ConfigDetail::MakeConfigSection(
+            kPointConstructionConfigSectionName, kPointConstructionConfigSectionSchemaId, 1, SerializePointConstructionConfig(value)));
     }
     Core::Config::EngineConfigSectionRegistration MakePointConstructionConfigSectionRegistration()
     {
-        return {.DefaultSection = MakePointConstructionConfigSection({}), .Validate = ValidatePointConstructionConfigSection};
+        return ConfigDetail::MakeSectionRegistration(
+            kPointConstructionConfigSectionName, kPointConstructionConfigSectionSchemaId, 1, SerializePointConstructionConfig({}), ValidatePointConstructionConfigSection, {});
     }
 } // namespace Extrinsic::Runtime

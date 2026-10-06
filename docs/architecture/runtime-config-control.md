@@ -103,6 +103,10 @@ and outlier radius guard compare signed and unsigned JSON numbers consistently.
 Normal estimation and point construction also reuse the compiled canonical
 property-reference decoder and validator. Their vec3-only serializers and
 family-specific diagnostic/domain rules remain local.
+The ten point families also share section construction, registration, the
+Valid-result assembly and the Valid-only getter decode (`MakeConfigSection`,
+`MakeSectionRegistration`, `AcceptConfigSection`, `GetPointConfig`) from the
+same private header; setters still store the raw serialized payload.
 The fallback-oriented feature codecs keep their
 separate warning/merge semantics.
 
