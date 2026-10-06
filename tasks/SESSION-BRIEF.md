@@ -33,6 +33,10 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `GRAPHICS-137`: `GRAPHICS-136` — Rename `Pipeline*` to `GraphicsState*` at the RHI boundary (tasks/backlog/rendering/GRAPHICS-136-rename-pipeline-to-graphics-state-rhi-boundary.md)
 - unblocked: `GRAPHICS-137` — Shader-object realization spike (ADR-0028 killing experiment) (tasks/backlog/rendering/GRAPHICS-137-shader-object-realization-spike.md)
 - unblocked: `GRAPHICS-157` — Completion-based retirement of freed and replaced bindless slots (tasks/backlog/rendering/GRAPHICS-157-bindless-slot-completion-retirement.md)
+- blocked by `RUNTIME-222`: `GRAPHICS-160` — Surfel/EWA point splatting mode (tasks/backlog/rendering/GRAPHICS-160-surfel-ewa-point-splatting-mode.md)
+- unblocked: `GRAPHICS-161` — Line anti-aliasing with extended segment ends (tasks/backlog/rendering/GRAPHICS-161-line-antialiasing-extended-segment-ends.md)
+- unblocked: `GRAPHICS-162` — Debug view: integer ID hash coloring (tasks/backlog/rendering/GRAPHICS-162-debug-view-integer-id-hash-coloring.md)
+- unblocked: `GRAPHICS-163` — Lit transient debug triangles with alpha pass-through (tasks/backlog/rendering/GRAPHICS-163-lit-transient-debug-triangles.md)
 
 ## Theme C — Physics readiness
 

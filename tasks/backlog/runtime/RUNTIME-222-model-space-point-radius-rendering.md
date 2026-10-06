@@ -23,6 +23,9 @@ Bind published radius properties to retained points with explicit model-space un
 - Reuse RUNTIME-221 and SpatialIndexCache for optional estimation. Rendering consumes the published property and must not rebuild an LBVH each frame. Preserve the estimator's k+1/self/duplicate policy.
 - Define zero radii, transforms (including nonuniform scale), camera projection, depth and picking consistently; retain current pixel-size behavior for existing recipes.
 
+## References
+- REVIEW-007 G01 deleted unloaded shaders that implement world-space point radius (read with `git show 087e6e17b:<path>`): `assets/shaders/point_flatdisc.vert @ 087e6e17b` and `assets/shaders/point_sphere.vert @ 087e6e17b` (radius buffer → camera-facing billboard with world radius; sphere center/radius for depth), and `assets/shaders/pick_point.vert @ 087e6e17b` (picking quad with the same world radius, so pick and visible footprint agree). Reuse the projection principle only; not their size clamp or Camera-UBO/push-constant ABI.
+
 ## Acceptance criteria
 - [ ] A serialized, validated config/UI path binds a canonical float radius with explicit units and diagnostics.
 - [ ] Runtime uploads and invalidates radius buffers with position/deletion mapping, preserving unrelated properties.

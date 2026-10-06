@@ -14,6 +14,7 @@ claimed_at:
 contract_schema: 1
 contracts:
   - repo.task-contract-discovery
+  - repo.source-documentation
 ---
 # LEGACY-043 — Retire stale multi-descriptor-set shader sources
 
@@ -34,6 +35,13 @@ contracts:
 - No shader feature work, no new pipelines.
 
 ## Context
+- REVIEW-007 G03 (operator decision 2026-10-06) added root `shadow_depth.vert`
+  and the conditional `.glsl` includes below to this task; no immediate
+  deletion or unblocking of `GRAPHICS-105`.
+- REVIEW-007 G01 already deleted root `triangle.vert`, `triangle.frag`,
+  `point.vert`, `point.frag`, `line.vert`, `line.frag` and
+  `deferred/gbuffer.vert` (commit a3ded5d7c, together with 21 other unloaded
+  shaders). They are no longer candidates here; read them at `087e6e17b`.
 - The compiler-locality work through GRAPHICS-143 did not remove these shader
   sources. Preserve the GRAPHICS-105 dependency and its deferred-shader decision;
   GRAPHICS-144 is a separate renderer dependency task, not a shader retirement.
@@ -54,14 +62,23 @@ contracts:
   `assets/shaders/deferred/gbuffer.frag` is read by
   `RendererFrameLifecycle` and is one of `GRAPHICS-105`'s two promoted
   `ResolveSurfaceNormal` contract paths even though the production descriptor
-  currently loads `deferred/default_debug_gbuffer.frag.spv`; and root
-  `assets/shaders/line.frag` was named only by the now-retired isolated
-  pipeline-registry fixture. It is therefore a current deletion candidate,
-  subject to the same execution-time full-path re-verification as the others.
+  currently loads `deferred/default_debug_gbuffer.frag.spv`.
 - Current deletion candidates are root `surface.vert`, `surface.frag`,
-  `surface_gbuffer.frag`, `deferred_lighting.frag`,
-  `deferred/gbuffer.vert`, root `triangle.vert`, `triangle.frag`,
-  `point.vert`, `point.frag`, `line.vert`, and `line.frag`.
+  `surface_gbuffer.frag`, `deferred_lighting.frag`, and `shadow_depth.vert`
+  (fixed `set = 0` `CameraBuffer` layout; the shadow pipeline already loads
+  `depth_prepass.vert.spv`, so a `set > 0` search alone misses it).
+- Conditional include candidates: `shadow_sampling.glsl` (included only by
+  `surface.frag` and `deferred_lighting.frag`) and `surface_color_resolve.glsl`
+  (included only by `surface.frag` and `surface_gbuffer.frag`). Delete each
+  only after its last includer is gone and a repository-wide reference check
+  is empty; no blanket `.glsl` cleanup.
+- Known legacy source-test readers: `Test.RendererFrameLifecycle.cpp`
+  (`ForwardSurfacePipelineSurvivesOperationalRebuild`) reads `surface.frag`
+  and `surface_gbuffer.frag` into `retainedSurfaceFragment` /
+  `retainedGBufferFragment` and asserts `DecodePropertyTextureNormal` on them.
+  Remove exactly those two readers and their assertions with the shaders; keep
+  the test and its active-shader, `common/surface_material.glsl` and
+  `common/property_texture_normal.glsl` checks.
   `deferred/gbuffer.frag` becomes eligible only if `GRAPHICS-105` explicitly
   consolidates its contract into the surviving default deferred path; if
   `GRAPHICS-105` retains it, this task must retain it too.
@@ -91,8 +108,14 @@ contracts:
       `deferred/gbuffer.frag` if it remains a promoted contract path, or add it
       to the deletion inventory only if its contract has been consolidated
       into a surviving shader.
-- [ ] Re-verify root `line.frag` has no surviving full-path references and
-      retain it only if execution-time evidence finds a current consumer.
+- [x] Root `line.frag` (and the other root triangle/point/line shaders plus
+      `deferred/gbuffer.vert`) deleted by REVIEW-007 G01 (commit a3ded5d7c).
+- [ ] Re-verify `shadow_depth.vert` is unreferenced; the active shadow
+      pipeline stays unchanged.
+- [ ] Remove the two legacy source-test readers named in Context together
+      with their assertions; do not remove any other test or fixture.
+- [ ] Delete `shadow_sampling.glsl` / `surface_color_resolve.glsl` only if no
+      includer remains.
 - [ ] Delete the confirmed-stale shader sources.
 - [ ] Remove or update stale mentions of the deleted files in
       renderer/FrameRecipe/pass source comments, renderer contract tests,
@@ -100,6 +123,15 @@ contracts:
       review guidance that still treats them as available (`rg` each resolved
       filename across `src/`, `tests/`, `assets/`, and `docs/`). Explanatory
       retirement history may continue to name deleted paths explicitly.
+      Known sites at `087e6e17b`: `Graphics.Renderer.cpp` (legacy-shader
+      comments near the surface/shadow/deferred pipeline builders),
+      `Graphics.FrameRecipe.cpp`, `Pass.Deferred.Lighting.cpp`,
+      `Test.RendererFrameLifecycle.cpp` comments,
+      `deferred/lighting.frag`, `deferred/default_debug_gbuffer.frag`,
+      `src/graphics/renderer/README.md` (push-constant compatibility policy),
+      `docs/architecture/rendering-target-architecture.md`,
+      `docs/architecture/rendering-three-pass.md`, ADR-0011, ADR-0022,
+      `docs/agent/review.md`, and `RUNTIME-218` (`deferred_lighting.frag:92`).
 - [ ] Update the legacy-model reference in
       `assets/shaders/deferred/lighting.frag`'s header comment so it does
       not point at a deleted file (describe the retired model inline
@@ -130,7 +162,11 @@ contracts:
 - [ ] The build output `shaders/` directory no longer contains `.spv`
       artifacts for the deleted sources after the dedicated fresh build.
 - [ ] `deferred/gbuffer.frag` follows the recorded `GRAPHICS-105` outcome, and
-      no referenced shader or test fixture is deleted.
+      no referenced shader or test fixture is deleted, except the two
+      inventoried legacy source-test readers removed with their shaders.
+- [ ] `shadow_depth.vert` is re-confirmed unreferenced and the active shadow
+      pipeline is unchanged; includes are deleted only without remaining
+      includers; active material/normal-decode assertions still pass.
 - [ ] No live pipeline, recipe, config, or test reference treats a deleted
       shader path as available; explicit compatibility explanation and retired
       history may still name it as deleted.
@@ -142,20 +178,23 @@ test ! -e build/legacy-043-ci
 cmake --preset ci -B build/legacy-043-ci
 cmake --build build/legacy-043-ci --target IntrinsicTests
 ctest --test-dir build/legacy-043-ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
-deleted=(surface.vert surface.frag surface_gbuffer.frag deferred_lighting.frag deferred/gbuffer.vert triangle.vert triangle.frag point.vert point.frag line.vert line.frag)
+deleted=(surface.vert surface.frag surface_gbuffer.frag deferred_lighting.frag shadow_depth.vert)
 # If GRAPHICS-105 consolidated deferred/gbuffer.frag, append it to deleted.
 for f in "${deleted[@]}"; do
   test ! -e "assets/shaders/$f"
   test ! -e "build/legacy-043-ci/bin/shaders/$f.spv"
   ! rg -n --fixed-strings "shaders/$f.spv" src tests assets
+  ! rg -n --fixed-strings "ReadShaderSource(\"$f\")" tests
 done
+# For each deleted include: ! rg -n '#include "(shadow_sampling|surface_color_resolve).glsl"' assets/shaders
+cmake --build build/legacy-043-ci --target IntrinsicShaderOutputs
 ```
 
 ## Forbidden changes
 - Deleting or editing any shader referenced by a renderer pass, recipe
   document, or test, except deleting `deferred/gbuffer.frag` after an explicit
-  `GRAPHICS-105` consolidation decision or redirecting the test-only root
-  `line.frag` fixture before deletion.
+  `GRAPHICS-105` consolidation decision, and removing only the two
+  inventoried legacy source-test readers together with their shaders.
 - Redesigning the binding model or `CompileShaders.cmake` beyond stale
   removal.
 - Mixing in unrelated shader or renderer work.

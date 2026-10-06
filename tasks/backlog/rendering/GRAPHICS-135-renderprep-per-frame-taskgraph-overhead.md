@@ -110,6 +110,9 @@ Also observed by the audit, lower priority, same rules (measure before acting):
       renderable every frame; `GpuWorld` setters (`Graphics.GpuWorld.cpp` ~2061-2126) mark dirty
       without comparison, so `SyncFrame` re-uploads instance/entity-config/bounds buffers each
       frame, and an exhausted staging belt falls back to the H1 synchronous path.
+      Measured alternative only (not a default): `assets/shaders/scene_update.comp @ 087e6e17b`
+      (deleted by REVIEW-007 G01) scattered sparse slot updates on the GPU; compare it
+      against change-gated CPU uploads only after H4 is measured.
 - [ ] H5: `VulkanDevice::ReadBuffer` calls `vkDeviceWaitIdle` even for host-visible buffers;
       production callers are the pick drain (three reads per pick) and the histogram drain
       (every frame only while `EnableHistogram`, default off).
