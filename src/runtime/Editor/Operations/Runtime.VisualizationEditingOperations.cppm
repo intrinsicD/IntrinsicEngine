@@ -385,7 +385,6 @@ export namespace Extrinsic::Runtime
         std::string DisabledReason{};
         GeometryPresentationSlotSemantic DefaultTargetSemantic{
             GeometryPresentationSlotSemantic::Albedo};
-        PropertyTextureBakeEncoding DefaultEncoder{PropertyTextureBakeEncoding::Auto};
         std::uint32_t DefaultWidth{1024u};
         std::uint32_t DefaultHeight{1024u};
         EditorUvDiagnosticsModel Uv{};

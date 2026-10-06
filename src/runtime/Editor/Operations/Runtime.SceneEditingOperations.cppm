@@ -325,8 +325,6 @@ export namespace Extrinsic::Runtime
         // The current selection, for the Camera panel's View presets and Focus selection (the
         // selection model is only built when its own window is open).
         std::vector<std::uint32_t> SelectedStableIds{};
-        bool HasPrimitiveViewEntity{false};
-        std::uint32_t PrimitiveViewStableId{0u};
         EditorPrimitiveViewSettings PrimitiveView{};
         std::vector<EditorDiagnostic> Diagnostics{};
     };
