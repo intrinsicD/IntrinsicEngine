@@ -8,11 +8,15 @@
 #include <vector>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <gtest/gtest.h>
 #include "RuntimeTestModule.hpp"
 
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Geometry2D;
+import Extrinsic.ECS.Component.Hierarchy;
 import Extrinsic.ECS.Component.Transform;
+import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.Renderer;
@@ -121,11 +125,11 @@ TEST(GizmoInteractionEngineWiring, ExtractionSubmitsTransformGizmoPackets)
 
     std::vector<EntityHandle> selected{entity};
     Extrinsic::Runtime::TransformGizmoRenderPacketBuilder builder{};
+    const Extrinsic::Runtime::GizmoInteraction gizmo{
+        Extrinsic::Runtime::GizmoConfig{.AxisLength = 1.25f}};
     const auto packets = builder.Build(*engine.Worlds().Get(engine.ActiveWorld()),
                                        selected,
-                                       Extrinsic::Runtime::GizmoMode::Translate,
-                                       Extrinsic::Runtime::GizmoOrientation::Global,
-                                       1.25f);
+                                       gizmo);
     ASSERT_EQ(packets.size(), 1u);
 
     Extrinsic::Runtime::RenderExtractionCache extraction{};
@@ -163,6 +167,87 @@ TEST(GizmoInteractionEngineWiring, ExtractionSubmitsTransformGizmoPackets)
     EXPECT_NEAR(world.Gizmos.TransformGizmos[0].Transform[3].y, 3.f, 1.0e-4f);
     EXPECT_NEAR(world.Gizmos.TransformGizmos[0].Transform[3].z, 4.f, 1.0e-4f);
 
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+// UI-078 slice 1: a multi-selection publishes one group gizmo on the shared
+// world-pivot frame; the hit test resolves on that frame and an accepted
+// preview moves the published gizmo with it.
+TEST(GizmoInteractionEngineWiring, GroupSelectionPublishesOneSharedFrameGizmo)
+{
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<SelectGizmoEntityApplication>());
+    engine.EmplaceModule<
+        Extrinsic::Runtime::SceneInteractionModule>();
+    engine.EmplaceModule<
+        Extrinsic::Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<
+        Extrinsic::Runtime::AssetWorkflowModule>();
+    engine.Initialize();
+    auto& registry = *engine.Worlds().Get(engine.ActiveWorld());
+
+    // Parent at x=-3, child local +1 (world -2) and a root at +2: world pivot 0.
+    const EntityHandle parent = MakeTransformEntity(engine, glm::vec3{-3.f, 0.f, 0.f});
+    const EntityHandle child = MakeTransformEntity(engine, glm::vec3{1.f, 0.f, 0.f});
+    registry.Raw().emplace<Extrinsic::ECS::Components::Hierarchy::Component>(
+        child, Extrinsic::ECS::Components::Hierarchy::Component{.Parent = parent});
+    const EntityHandle root = MakeTransformEntity(engine, glm::vec3{2.f, 0.f, 0.f});
+    const std::vector<EntityHandle> selected{root, child};
+
+    Extrinsic::Runtime::GizmoInteraction gizmo{};
+    Extrinsic::Runtime::TransformGizmoRenderPacketBuilder builder{};
+    auto packets = builder.Build(registry, selected, gizmo);
+    ASSERT_EQ(packets.size(), 1u);
+    EXPECT_NEAR(packets[0].Transform[3].x, 0.f, 1.0e-4f);
+
+    // Ortho camera: world x in [-4,4] over 800 px, so pivot -> (400,300) and
+    // the +X handle -> (500,300).
+    Extrinsic::Graphics::CameraViewInput cameraInput{};
+    cameraInput.View = glm::lookAt(glm::vec3{0.f, 0.f, 5.f}, glm::vec3{0.f}, glm::vec3{0.f, 1.f, 0.f});
+    cameraInput.Projection = glm::ortho(-4.f, 4.f, -3.f, 3.f, 0.1f, 100.f);
+    cameraInput.Position = {0.f, 0.f, 5.f};
+    cameraInput.Forward = {0.f, 0.f, -1.f};
+    cameraInput.Up = {0.f, 1.f, 0.f};
+    cameraInput.NearPlane = 0.1f;
+    cameraInput.FarPlane = 100.f;
+    cameraInput.Valid = true;
+    const Extrinsic::Core::Extent2D viewport{.Width = 800, .Height = 600};
+    const auto hit = gizmo.HitTest(registry,
+                                   Extrinsic::Graphics::BuildCameraViewSnapshot(cameraInput, viewport),
+                                   glm::vec2{450.f, 300.f}, viewport, selected);
+    ASSERT_TRUE(hit.Hit);
+    EXPECT_EQ(hit.Axis, Extrinsic::Runtime::GizmoAxis::X);
+    EXPECT_EQ(Extrinsic::Runtime::StableEntityLookup::ToRenderId(hit.Entity), packets[0].StableId);
+
+    ASSERT_TRUE(gizmo.Begin(registry, selected, Extrinsic::Runtime::GizmoMode::Translate,
+                            Extrinsic::Runtime::GizmoOrientation::Global,
+                            Extrinsic::Runtime::GizmoPivotMode::WorldOrigins).Succeeded());
+    ASSERT_TRUE(gizmo.Preview(registry, glm::translate(glm::mat4{1.f}, glm::vec3{0.f, 1.f, 0.f}) *
+                                            gizmo.SessionFrame().Matrix).Succeeded());
+    packets = builder.Build(registry, selected, gizmo);
+    ASSERT_EQ(packets.size(), 1u);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction{};
+    extraction.SubmitSceneInteractionSnapshot(
+        Extrinsic::Runtime::RuntimeSceneInteractionRenderSnapshot{
+            .World = engine.ActiveWorld(),
+            .GizmoDrawPackets =
+                std::vector<Extrinsic::Graphics::TransformGizmoRenderPacket>(packets.begin(), packets.end()),
+        });
+    (void)extraction.ExtractAndSubmit(registry,
+                                      engine.GetRenderer(),
+                                      &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine),
+                                      0u,
+                                      engine.ActiveWorld());
+    Extrinsic::Graphics::RenderFrameInput input{};
+    input.Viewport = engine.GetWindow().GetFramebufferExtent();
+    const Extrinsic::Graphics::RenderWorld world = engine.GetRenderer().ExtractRenderWorld(input, 0u);
+    ASSERT_EQ(world.Gizmos.TransformGizmoCount, 1u);
+    EXPECT_EQ(world.Gizmos.TransformGizmos[0].Transform, gizmo.AcceptedGizmoMatrix());
+    EXPECT_NEAR(world.Gizmos.TransformGizmos[0].Transform[3].y, 1.f, 1.0e-4f);
+
+    gizmo.DragCancel(registry);
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
 }

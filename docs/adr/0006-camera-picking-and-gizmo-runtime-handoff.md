@@ -1,6 +1,6 @@
 # ADR 0006 — Camera, Picking-Request, and Gizmo Runtime Handoff
 
-- **Status:** Accepted
+- **Status:** Accepted; amended 2026-10-06 by `UI-078` slice 1 (see "Amendment" below).
 - **Date:** 2026-05-17
 - **Owners:** Runtime composition, Graphics (CameraSnapshots boundary)
 - **Related tasks:** [`tasks/done/GRAPHICS-017`](../../tasks/archive/GRAPHICS-017-camera-interaction-and-gizmo-boundaries.md), [`GRAPHICS-017Q`](../../tasks/archive/GRAPHICS-017Q-camera-gizmo-runtime-clarifications.md)
@@ -169,3 +169,41 @@ Follow-up tasks required: none from this ADR. The matrix-tracked legacy promotio
 - [`docs/migration/nonlegacy-parity-matrix.md`](../migration/nonlegacy-parity-matrix.md) is the single source of truth for the legacy `Graphics.TransformGizmo` / `Graphics.Interaction` feature handoff inventory; this ADR cross-links it instead of duplicating the matrix.
 - `src/graphics/renderer/README.md` carries the matching `Graphics.CameraSnapshots` ownership-contract bullet authored by `GRAPHICS-017Q`.
 - Layering invariant validation: `python3 tools/repo/check_layering.py --root src --strict` continues to pass because graphics does not import `src/platform/`, ECS, or editor code; only data-only `CameraViewInput` / `PickPixelRequest` / `TransformGizmoRenderPacket` cross the seam.
+
+## Amendment — 2026-10-06 (`UI-078` slice 1)
+
+§§4–5 are made concrete for multi-selection by a matrix drag session in
+`Extrinsic.Runtime.GizmoInteraction`; the graphics packet contract is
+unchanged.
+
+- **Frozen session.** `Begin` deduplicates and sorts the selection and freezes
+  it with mode, orientation, pivot policy and the start state; it writes no ECS
+  data, and a second session is refused. Start world matrices are composed from
+  local TRS along the parent chain, not read from the `WorldMatrix` cache.
+- **Pivot and basis.** Pivot is the mean of selected world origins (default) or
+  of per-entity world-bounds centers with origin fallback. The basis is world,
+  a single entity's world rotation, or for groups the chordal mean of the
+  selected world rotations; an unavailable mean falls back to world with an
+  explicit reason.
+- **Group delta.** Each preview computes `D = Gt·G0⁻¹`, `Wi' = D·Wi0`,
+  `Li' = Wparent⁻¹·Wi'` from the start state and writes only selected entities
+  without a selected ancestor, so selected descendants move once.
+- **Atomic rejection.** A preview whose local result is not storable as TRS
+  (shear, perspective, non-finite, singular parent) writes nothing for any
+  entity; the last accepted preview stays and the reason is returned.
+- **Session check.** Preview, commit and cancel first run one write-free check:
+  same registry, every write target still holds its last accepted TRS under an
+  unchanged parent world matrix, and every selected entity and its ancestors
+  (including selected descendants and intermediate nodes that are not write
+  targets) is alive with an unchanged parent link and, for non-targets,
+  unchanged local TRS. `Gt` itself must be affine. A foreign registry is
+  refused without writes and the session stays.
+- **Undo.** Commit records one before/after batch through the generation-
+  validated history transaction (§5's single command). A no-op drag (equal
+  local 3x3, so equivalent TRS such as mirrors count as unchanged, and
+  translation equal within a few ulps) and
+  cancel record nothing and restore the exact original TRS. A conflicting or
+  unrecorded commit records nothing and rolls back every target that still
+  holds its accepted preview; a foreign change to a target is kept.
+- **Packets.** A multi-selection publishes one gizmo on the shared frame that
+  hit testing uses, instead of one gizmo per entity.

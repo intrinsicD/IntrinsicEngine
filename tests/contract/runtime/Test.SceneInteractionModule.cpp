@@ -1,4 +1,5 @@
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -1104,6 +1105,68 @@ TEST(SceneInteractionModule,
     EXPECT_EQ(
         scene.Raw().get<Tf::Component>(entity).Position,
         glm::vec3{0.0f});
+}
+
+// UI-078 slice 1: the mouse adapter drives the matrix core, so a group
+// rotation moves both origins around the shared pivot and commits once.
+TEST(SceneInteractionModule,
+     ViewportGizmoGroupRotationMovesOriginsAroundPivotAndCommitsOnce)
+{
+    DirectHarness harness;
+    ASSERT_TRUE(harness.Start(true).has_value());
+    Runtime::SelectionController& selection =
+        *harness.Services.Find<Runtime::SelectionController>();
+    Runtime::EditorCommandHistory* const history =
+        harness.Services.Find<Runtime::EditorCommandHistory>();
+    ASSERT_NE(history, nullptr);
+    ECS::Scene::Registry& scene =
+        *harness.Worlds.Get(harness.InitialWorld);
+    const ECS::EntityHandle right =
+        MakeTransformSelectable(scene, glm::vec3{1.0f, 0.0f, 0.0f});
+    const ECS::EntityHandle left =
+        MakeTransformSelectable(scene, glm::vec3{-1.0f, 0.0f, 0.0f});
+    for (const ECS::EntityHandle entity : {right, left})
+    {
+        selection.RequestClickPick(0u, 0u, Runtime::SelectionPickMode::Add);
+        (void)selection.ConsumePendingPick();
+        selection.ConsumeHit(
+            scene, Runtime::SelectionController::ToStableEntityId(entity));
+    }
+    ASSERT_EQ(selection.SelectedCount(), 2u);
+    harness.Interaction.Interaction().SetMode(Runtime::GizmoMode::Rotate);
+
+    Graphics::RenderFrameInput input{};
+    input.Camera = OrthoCameraInput();
+    auto& window = harness.InputWindow();
+    const Platform::Extent2D viewport{.Width = 800, .Height = 600};
+
+    // Pivot (0,0,0) projects to (400,300); the Y handle runs up to (400,200).
+    window.QueueCursor(400.0, 250.0);
+    window.QueueMouseButton(0, true);
+    window.PollEvents();
+    harness.InvokeViewportHook(0u, input, {}, viewport);
+    ASSERT_TRUE(harness.Interaction.Interaction().IsDragging());
+    EXPECT_EQ(harness.Interaction.Interaction().DragAxis(), Runtime::GizmoAxis::Y);
+
+    // +1 world unit along Y = 1 rad about world Y through the pivot.
+    window.QueueCursor(400.0, 150.0);
+    window.PollEvents();
+    harness.InvokeViewportHook(0u, input, {}, viewport);
+    const glm::vec3 rightPosition = scene.Raw().get<Tf::Component>(right).Position;
+    const glm::vec3 leftPosition = scene.Raw().get<Tf::Component>(left).Position;
+    EXPECT_NEAR(rightPosition.x, std::cos(1.0f), 1.0e-3f);
+    EXPECT_NEAR(rightPosition.z, -std::sin(1.0f), 1.0e-3f);
+    EXPECT_NEAR(leftPosition.x, -std::cos(1.0f), 1.0e-3f);
+    EXPECT_NEAR(leftPosition.z, std::sin(1.0f), 1.0e-3f);
+
+    window.QueueMouseButton(0, false);
+    window.PollEvents();
+    harness.InvokeViewportHook(0u, input, {}, viewport);
+    EXPECT_FALSE(harness.Interaction.Interaction().IsDragging());
+    ASSERT_EQ(history->UndoCount(), 1u);
+    ASSERT_EQ(history->Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(scene.Raw().get<Tf::Component>(right).Position, glm::vec3(1.0f, 0.0f, 0.0f));
+    EXPECT_EQ(scene.Raw().get<Tf::Component>(left).Position, glm::vec3(-1.0f, 0.0f, 0.0f));
 }
 
 TEST(SceneInteractionModule,

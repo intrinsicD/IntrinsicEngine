@@ -71,6 +71,16 @@ contracts:
       - tests/contract/runtime/Test.RuntimeJobService.cpp
       - tools/analysis/compile_hotspots.py
       - tests/CMakeLists.txt
+  runtime.gizmo-transform-session:
+    owner: runtime-editor
+    source: docs/adr/0006-camera-picking-and-gizmo-runtime-handoff.md
+    applies_when:
+      - Gizmo drag-session semantics change (frozen selection, pivot or basis policy, group delta, hierarchy write rule, non-TRS rejection, session conflict checks, undo/no-op/cancel/rollback rules).
+      - A gizmo frontend or another transform-preview path drives entity TRS through GizmoInteraction Begin/Preview/DragCommit/DragCancel.
+    proofs:
+      - tests/contract/runtime/Test.GizmoInteraction.cpp
+      - tests/contract/runtime/Test.GizmoInteractionEngineWiring.cpp
+      - tests/contract/runtime/Test.SceneInteractionModule.cpp
   runtime.engine-compilation-locality:
     owner: runtime-build
     source: docs/architecture/runtime.md

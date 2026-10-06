@@ -101,7 +101,7 @@ The retired Sandbox facade export ledger and current owner map are recorded in
 | Queued CPU jobs across these families | A queued job follows the full submit → dispatch → drain → publish lifecycle, and a job that reaches a terminal state **without** publishing reconciles through `JobDesc::FinalizeUnpublishedOnMainThread`: it emits one terminal result on the same operation's guarded completion callback, carrying `StaleEntity` plus the reason recorded by the apply gate (source changed, entity gone, world retired) or `GeometryProcessingFailed` otherwise. A queued operation therefore never leaves the editor holding its submit-time `Pending` message (`BUG-138`). |
 | `Extrinsic.Runtime.VisualizationEditingOperations` | Typed property, binding, geometry-presentation, vector-field, spatial-debug, visualization-config, and visualization-recipe snapshots/operations. Geometry-presentation changes (including `ApplyEditorGeometryVectorFieldCommand`) are undoable and validate undo/redo against the recipe content they last produced. |
 | `Extrinsic.Runtime.RenderRecipeEditingOperations` | Typed render-graph, recipe draft/apply, profiling, and artifact publication snapshots/operations. |
-| `Extrinsic.Runtime.GizmoInteraction` | Runtime/editor transform-gizmo interaction (`RUNTIME-084`, history convergence in `RUNTIME-201`). It performs screen-space handle hit testing and axis-constrained translate/rotate/scale preview edits, stamps transform dirtiness, and coalesces every moved entity from one drag into one generation-validated `EditorCommandHistory` transaction. Undo/redo revalidates the exact expected batch before restoring it atomically; the retired `GizmoUndoStack` has no replacement stack. In production `SceneInteractionModule` directly owns the interaction plus its packet builder and reusable selected-entity scratch, and graphics receives only frozen copied `TransformGizmoRenderPacket` values in the interaction render snapshot. |
+| `Extrinsic.Runtime.GizmoInteraction` | Runtime/editor transform-gizmo interaction (`RUNTIME-084`, history convergence in `RUNTIME-201`, matrix session in `UI-078`). Its core is one matrix drag session: `Begin` freezes the deduplicated selection, mode, orientation, pivot policy (world origins or world-bounds centers) and start world matrices composed from local TRS, `Preview(Gt)` applies `D = Gt·G0⁻¹` to every selected entity without a selected ancestor and rejects non-TRS results atomically, and `DragCommit`/`DragCancel` run the same write-free session check as `Preview` (registry, target TRS, parent chains and non-target TRS of the whole frozen selection) before recording one generation-validated `EditorCommandHistory` batch or restoring exact TRS. The basis is world, single-entity local, or the chordal mean of the group's world rotations with an explicit world fallback. The ray hit-test/drag API is an adapter that builds `Gt` from axis and snap. In production `SceneInteractionModule` directly owns the interaction plus its packet builder and reusable selected-entity scratch, and graphics receives one copied group `TransformGizmoRenderPacket` on the shared frame in the interaction render snapshot. |
 
 Editor service callers use `ClusteringTypes` / `PointCloudConsolidationTypes`;
 registration stays in their lifecycle modules. Shared exact property comparisons
@@ -2041,9 +2041,10 @@ controller state is authoritative and graphics receives only immutable
 Known gaps relative to legacy and planned camera work are tracked in
 `tasks/archive/RUNTIME-081A-camera-legacy-gap-analysis.md`: editor-specific camera
 shortcuts and any policy that renders multiple camera outputs in one frame remain
-outside this runtime-controller surface. Transform-gizmo hit testing,
-translate/rotate/scale drag application, and the generation-validated
-`EditorCommandHistory` batch commit live in
+outside this runtime-controller surface. Transform-gizmo hit testing, the
+matrix drag session (frozen selection/pivot/basis, group delta about one
+pivot, atomic non-TRS rejection), the ray drag adapter on top of it, and the
+generation-validated `EditorCommandHistory` batch commit live in
 `Extrinsic.Runtime.GizmoInteraction`. `SceneInteractionModule` directly owns
 the default input binding, selected-entity scratch, selection-click interlock,
 and extraction packet submission. Graphics consumes only copied

@@ -1,3 +1,4 @@
+// Transform-gizmo drag sessions (pivot, basis, atomic TRS preview, one undo batch), ray adapter and packet builder.
 module;
 
 #include <cstdint>
@@ -39,13 +40,77 @@ export namespace Extrinsic::Runtime
         Z    = 3,
     };
 
-    // Whether the gizmo axes follow world space (`Global`) or the primary
-    // selected entity's local rotation frame (`Local`). Multi-select always uses
-    // the `Global` frame about the selection pivot.
+    // Whether the gizmo axes follow world space (`Global`) or the selection's
+    // rotation (`Local`): a single entity's world rotation, or for groups the
+    // chordal mean of the selected world rotations (falls back to `Global`
+    // with a `GizmoBasisFallback` reason when that mean is unavailable).
     enum class GizmoOrientation : std::uint8_t
     {
         Global = 0,
         Local  = 1,
+    };
+
+    // Where the group pivot sits: the mean of selected world origins, or the
+    // mean of per-entity world-bounds centers (`LocalBoundingAABB` through the
+    // entity's world matrix; entities without valid bounds use their origin).
+    enum class GizmoPivotMode : std::uint8_t
+    {
+        WorldOrigins  = 0,
+        BoundsCenters = 1,
+    };
+
+    // Outcome of a session request. From `Begin` and `Preview`, anything but
+    // `Ok` leaves ECS untouched. `DragCancel` is the exception: on a session
+    // conflict it still restores the previews it owns and returns
+    // `StaleSession` (see `DragCancel`).
+    enum class GizmoStatus : std::uint8_t
+    {
+        Ok = 0,
+        SessionActive,   // Begin while a session is already running.
+        NoSession,       // Preview without a running session.
+        EmptySelection,
+        InvalidEntity,   // Selected handle is dead or has no Transform.
+        BrokenHierarchy, // Dead/transform-less parent or a parent cycle.
+        SingularParent,  // Parent world matrix cannot be inverted.
+        NonFiniteMatrix,
+        NonTrsResult,    // Local result needs shear/perspective; not storable as TRS.
+        StaleSession,    // Registry, entity, parent chain or transform changed under the session.
+    };
+
+    struct GizmoResult
+    {
+        GizmoStatus Status{GizmoStatus::Ok};
+        // Entity the failure refers to, when there is one.
+        Extrinsic::ECS::EntityHandle Entity{Extrinsic::ECS::InvalidEntityHandle};
+
+        [[nodiscard]] bool Succeeded() const noexcept { return Status == GizmoStatus::Ok; }
+    };
+
+    // Why a requested `Local` basis was replaced by the world basis.
+    enum class GizmoBasisFallback : std::uint8_t
+    {
+        None = 0,
+        RotationUnavailable, // A selected world matrix did not decompose.
+        MeanDegenerate,      // ChordalMean reported DegenerateInput (e.g. antipodal rotations).
+        MeanFailed,          // Any other failed or non-finite ChordalMean result.
+    };
+
+    // Copied gizmo frame for a selection. `Matrix` is `T(Pivot) * R(Basis)`
+    // with unit scale (G0). `Primary` is the deterministic representative
+    // (lowest entity handle) whose render id the packet carries.
+    struct GizmoFrame
+    {
+        GizmoResult                  Result{GizmoStatus::EmptySelection};
+        Extrinsic::ECS::EntityHandle Primary{Extrinsic::ECS::InvalidEntityHandle};
+        glm::vec3                    Pivot{0.f};
+        glm::mat3                    Basis{1.f};
+        glm::mat4                    Matrix{1.f};
+        GizmoPivotMode               PivotMode{GizmoPivotMode::WorldOrigins};
+        GizmoOrientation             RequestedOrientation{GizmoOrientation::Global};
+        GizmoOrientation             ActualOrientation{GizmoOrientation::Global};
+        GizmoBasisFallback           BasisFallback{GizmoBasisFallback::None};
+
+        [[nodiscard]] bool Available() const noexcept { return Result.Succeeded(); }
     };
 
     // Modifier bit flags the interaction observes. `Snap` rounds the applied
@@ -123,21 +188,29 @@ export namespace Extrinsic::Runtime
         std::uint32_t EditsEmitted       = 0u;
     };
 
-    // Runtime / editor-owned transform-gizmo interaction (RUNTIME-084).
+    // Runtime / editor-owned transform-gizmo interaction (RUNTIME-084, UI-078).
     //
-    // Owns per-frame interaction state (mode, axis lock, drag origin, snap step,
-    // modifier mask, multi-select pivot, orientation frame), screen-space handle
-    // hit testing, axis-constrained drag application against ECS authoring
-    // transforms, and undo emission on drag-commit. Hit testing reads
-    // `CameraViewSnapshot::ViewProjection` + a cursor pixel + viewport; drag math
-    // reads the world `PickRay`. Graphics never sees this state: only the frozen
+    // Core: a matrix drag session. `Begin` freezes the deduplicated, sorted
+    // selection, mode, orientation, pivot mode and start state (current
+    // authoring world matrices composed from local TRS along the parent chain,
+    // never the cached WorldMatrix) and writes nothing. Each `Preview(Gt)`
+    // recomputes from that start state: `D = Gt * G0^-1`, `Wi' = D * Wi0`,
+    // `Li' = Wparent^-1 * Wi'`, writing only selected entities without a
+    // selected ancestor. A tick whose local result is not storable as TRS
+    // (shear, perspective, non-finite) is rejected for the whole group:
+    // nothing is written and the last accepted preview stays. Preview,
+    // commit and cancel first run one write-free session check: same
+    // registry, targets still hold the last accepted TRS under unchanged
+    // parent world matrices, and every selected entity and ancestor is alive
+    // with an unchanged parent link (non-targets also with unchanged local
+    // TRS). `DragCommit` records one batch; a no-op drag and
+    // `DragCancel` leave no history and restore exact TRS.
+    //
+    // Adapter: `HitTest`/`BeginDrag`/`DragTick` keep the ray-driven sandbox
+    // mouse path; `DragTick` turns axis, snap and ray into `Gt` and writes
+    // only through `Preview`. Graphics never sees this state: only the frozen
     // `Graphics::TransformGizmoRenderPacket` field set is produced by
     // `TransformGizmoRenderPacketBuilder`.
-    //
-    // Layering: imports promoted ECS registry/handle/transform plus the existing
-    // graphics camera-snapshot and render-world (gizmo packet) edges. It never
-    // imports platform input or the renderer; `Engine` wiring is the deferred
-    // Slice B.
     class GizmoInteraction
     {
     public:
@@ -147,11 +220,13 @@ export namespace Extrinsic::Runtime
         GizmoInteraction() = default;
         explicit GizmoInteraction(const GizmoConfig& config) noexcept;
 
-        // --- interaction-state accessors ---
+        // --- interaction-state accessors (read by the adapter at BeginDrag) ---
         void SetMode(GizmoMode mode) noexcept { m_Mode = mode; }
         [[nodiscard]] GizmoMode Mode() const noexcept { return m_Mode; }
         void SetOrientation(GizmoOrientation frame) noexcept { m_Orientation = frame; }
         [[nodiscard]] GizmoOrientation Orientation() const noexcept { return m_Orientation; }
+        void SetPivotMode(GizmoPivotMode pivot) noexcept { m_PivotMode = pivot; }
+        [[nodiscard]] GizmoPivotMode PivotMode() const noexcept { return m_PivotMode; }
         void SetAxisLock(GizmoAxis axis) noexcept { m_AxisLock = axis; }
         [[nodiscard]] GizmoAxis AxisLock() const noexcept { return m_AxisLock; }
         void SetModifierMask(std::uint32_t mask) noexcept { m_ModifierMask = mask; }
@@ -159,109 +234,146 @@ export namespace Extrinsic::Runtime
 
         [[nodiscard]] bool      IsDragging() const noexcept { return m_Dragging; }
         [[nodiscard]] GizmoAxis DragAxis() const noexcept { return m_DragAxis; }
-        [[nodiscard]] glm::vec3 DragOrigin() const noexcept { return m_DragOrigin; }
-        [[nodiscard]] glm::vec3 MultiSelectPivot() const noexcept { return m_Pivot; }
 
-        // --- gizmo pivot / frame helpers ---
-        // World-space pivot for the current selection (average of selected entity
-        // positions). Returns false when the selection is empty or has no live
-        // transforms.
-        [[nodiscard]] bool ComputePivot(const Registry& registry,
+        // Side-effect-free frame for `selected` from current authoring state.
+        [[nodiscard]] GizmoFrame ComputeFrame(const Registry& registry,
+                                              std::span<const EntityHandle> selected,
+                                              GizmoOrientation orientation,
+                                              GizmoPivotMode pivotMode) const;
+
+        // --- matrix session ---
+        [[nodiscard]] GizmoResult Begin(const Registry& registry,
                                         std::span<const EntityHandle> selected,
-                                        glm::vec3& outPivot) const;
+                                        GizmoMode mode,
+                                        GizmoOrientation orientation,
+                                        GizmoPivotMode pivotMode);
+        // `gizmoMatrix` is the requested gizmo matrix Gt. Atomic: all targets
+        // are written or none.
+        [[nodiscard]] GizmoResult Preview(Registry& registry, const glm::mat4& gizmoMatrix);
 
-        // --- hit testing (screen-space handle pick) ---
+        // Frozen session frame (Matrix = G0); meaningful while dragging.
+        [[nodiscard]] const GizmoFrame& SessionFrame() const noexcept { return m_SessionFrame; }
+        [[nodiscard]] GizmoMode SessionMode() const noexcept { return m_DragMode; }
+        // Last accepted Gt (G0 until a preview is accepted).
+        [[nodiscard]] const glm::mat4& AcceptedGizmoMatrix() const noexcept { return m_AcceptedGizmo; }
+
+        // --- hit testing (screen-space handle pick against the shared frame) ---
         [[nodiscard]] GizmoHitResult HitTest(const Registry& registry,
                                              const Extrinsic::Graphics::CameraViewSnapshot& camera,
                                              glm::vec2 cursorPixel,
                                              Core::Extent2D viewport,
                                              std::span<const EntityHandle> selected);
 
-        // --- drag lifecycle ---
-        // Begin an axis drag from a resolved hit. Records the per-entity before
-        // transforms and the drag anchor parameter along the world axis. Returns
-        // false when the hit is a no-hit, the selection is empty, or the ray is
-        // degenerate.
+        // --- ray adapter ---
+        // Begins a session with the current mode/orientation/pivot mode and
+        // anchors the ray on the hit axis. False for a no-hit, degenerate ray,
+        // or a refused `Begin`.
         bool BeginDrag(const Registry& registry,
                        const GizmoHitResult& hit,
                        const PickRay& ray,
                        std::span<const EntityHandle> selected);
 
-        // Apply an in-progress drag for the current ray. Mutates ECS authoring
-        // transforms (translate / rotate / scale along the locked axis) and
-        // stamps the transform dirty marker. No-op (returns false) when not
-        // dragging or the ray is degenerate. The drag mode is latched at
-        // BeginDrag; snap rounds the active operation to its configured step.
+        // Builds Gt from the latched axis, ray delta and snap, then `Preview`s
+        // it. False when not dragging, the ray is degenerate, or the preview
+        // was rejected (the last accepted preview stays).
         bool DragTick(Registry& registry, const PickRay& ray);
 
-        // Commit every moved entity as one generation-validated history
-        // transaction, then clear drag state. The already-applied live preview
-        // is recorded without being published a second time.
+        // Records the accepted preview as one generation-validated history
+        // transaction without publishing it again, then ends the session.
+        // Targets whose accepted local matrix equals the original are
+        // restored exactly and not recorded; an all-no-op drag records
+        // nothing. A foreign registry writes nothing and keeps the session
+        // (`StaleEntity`). A session conflict or a failed recording records
+        // nothing and rolls back every target that still holds its accepted
+        // preview; targets changed by someone else keep that change.
         [[nodiscard]] EditorCommandHistoryResult DragCommit(
             Registry& registry,
             WorldHandle world,
             EditorCommandHistory& history);
 
-        // Abort the drag, restoring each entity to its recorded before transform.
-        void DragCancel(Registry& registry);
+        // Copies the original TRS back to every target that still holds its
+        // accepted preview and ends the session. Returns the session check:
+        // `Ok`, or the conflict that left a foreign change in place. A foreign
+        // registry writes nothing and keeps the session (`StaleSession`);
+        // without a session `NoSession`.
+        GizmoResult DragCancel(Registry& registry);
 
         [[nodiscard]] const GizmoInteractionDiagnostics& Diagnostics() const noexcept { return m_Diagnostics; }
         [[nodiscard]] GizmoConfig&       Config() noexcept { return m_Config; }
         [[nodiscard]] const GizmoConfig& Config() const noexcept { return m_Config; }
 
     private:
-        struct DragEntry
+        struct SessionTarget
         {
             EntityHandle Entity{Extrinsic::ECS::InvalidEntityHandle};
-            glm::vec3    BeforePosition{0.f};
-            glm::quat    BeforeRotation{1.f, 0.f, 0.f, 0.f};
-            glm::vec3    BeforeScale{1.f};
+            EntityHandle Parent{Extrinsic::ECS::InvalidEntityHandle};
+            glm::vec3    OriginalPosition{0.f};
+            glm::quat    OriginalRotation{1.f, 0.f, 0.f, 0.f};
+            glm::vec3    OriginalScale{1.f};
+            glm::vec3    AcceptedPosition{0.f};
+            glm::quat    AcceptedRotation{1.f, 0.f, 0.f, 0.f};
+            glm::vec3    AcceptedScale{1.f};
+            glm::mat4    World0{1.f};
+            glm::mat4    ParentWorld{1.f};
         };
 
-        // World-space unit direction for `axis` under the current orientation
-        // frame and (for Local) the primary entity's rotation.
-        [[nodiscard]] glm::vec3 AxisDirection(const Registry& registry,
-                                              EntityHandle primary,
-                                              GizmoAxis axis) const;
+        // Frozen selection entry or ancestor. Non-target links also freeze
+        // their local TRS; write targets are checked against their accepted
+        // preview instead.
+        struct SessionLink
+        {
+            EntityHandle Entity{Extrinsic::ECS::InvalidEntityHandle};
+            EntityHandle Parent{Extrinsic::ECS::InvalidEntityHandle};
+            bool         Target{false};
+            glm::vec3    Position{0.f};
+            glm::quat    Rotation{1.f, 0.f, 0.f, 0.f};
+            glm::vec3    Scale{1.f};
+        };
+
+        void EndSession() noexcept;
+        [[nodiscard]] GizmoResult ValidateSession(const Registry& registry) const;
+        void RestoreOwnedTargets(Registry& registry);
 
         GizmoConfig                 m_Config{};
         GizmoInteractionDiagnostics m_Diagnostics{};
 
         GizmoMode        m_Mode{GizmoMode::Translate};
         GizmoOrientation m_Orientation{GizmoOrientation::Global};
+        GizmoPivotMode   m_PivotMode{GizmoPivotMode::WorldOrigins};
         GizmoAxis        m_AxisLock{GizmoAxis::None};
         std::uint32_t    m_ModifierMask{0u};
 
-        bool        m_Dragging{false};
-        GizmoMode   m_DragMode{GizmoMode::Translate};
-        GizmoAxis   m_DragAxis{GizmoAxis::None};
-        glm::vec3   m_DragOrigin{0.f};   // gizmo pivot at drag start
-        glm::vec3   m_DragAxisDir{1.f, 0.f, 0.f};
-        float       m_DragStartParam{0.f};
-        glm::vec3   m_Pivot{0.f};
-        std::vector<DragEntry> m_DragEntries{};
+        bool            m_Dragging{false};
+        GizmoMode       m_DragMode{GizmoMode::Translate};
+        const Registry* m_SessionRegistry{nullptr};
+        GizmoFrame      m_SessionFrame{};
+        glm::mat4       m_AcceptedGizmo{1.f};
+        std::vector<SessionTarget> m_Targets{};
+        std::vector<SessionLink>   m_Links{};
+
+        // Ray-adapter anchor.
+        GizmoAxis m_DragAxis{GizmoAxis::None};
+        glm::vec3 m_DragAxisDir{1.f, 0.f, 0.f};
+        float     m_DragStartParam{0.f};
     };
 
-    // Produces `Graphics::TransformGizmoRenderPacket` records for the active
-    // selection + interaction state. The packet field set is frozen by
-    // GRAPHICS-017Q; this builder maps only those fields (stable id, gizmo
-    // transform, axis length, mode visibility flags) and never the drag state,
-    // axis lock, snap thresholds, or modifier keys.
+    // Produces `Graphics::TransformGizmoRenderPacket` records. The packet field
+    // set is frozen by GRAPHICS-017Q; this builder maps only those fields
+    // (stable id, gizmo transform, axis length, mode visibility flags).
     class TransformGizmoRenderPacketBuilder
     {
     public:
         using Registry     = Extrinsic::ECS::Scene::Registry;
         using EntityHandle = Extrinsic::ECS::EntityHandle;
 
-        // Rebuilds the packet vector for `selected`. One packet per live,
-        // transform-bearing entity. Returns the produced span (valid until the
-        // next `Build` / builder destruction).
+        // Rebuilds the packets for `selected`: one group gizmo on the same
+        // frame `gizmo.HitTest` uses, or, while a session runs, its frozen
+        // mode and accepted gizmo matrix. Empty when no frame is available.
+        // The span stays valid until the next `Build` / builder destruction.
         std::span<const Extrinsic::Graphics::TransformGizmoRenderPacket> Build(
             const Registry& registry,
             std::span<const EntityHandle> selected,
-            GizmoMode mode,
-            GizmoOrientation orientation,
-            float axisLength);
+            const GizmoInteraction& gizmo);
 
         [[nodiscard]] std::span<const Extrinsic::Graphics::TransformGizmoRenderPacket> Packets() const noexcept
         {

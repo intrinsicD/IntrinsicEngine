@@ -382,11 +382,13 @@ namespace Extrinsic::Runtime
                 const GizmoMode gizmoMode = Gizmo.Mode();
                 const GizmoOrientation gizmoOrientation =
                     Gizmo.Orientation();
+                const GizmoPivotMode gizmoPivotMode = Gizmo.PivotMode();
                 if (BoundRegistry != nullptr && Gizmo.IsDragging())
                     Gizmo.DragCancel(*BoundRegistry);
                 Gizmo = GizmoInteraction{gizmoConfig};
                 Gizmo.SetMode(gizmoMode);
                 Gizmo.SetOrientation(gizmoOrientation);
+                Gizmo.SetPivotMode(gizmoPivotMode);
                 GizmoSelectedEntities.clear();
                 GizmoPacketBuilder =
                     TransformGizmoRenderPacketBuilder{};
@@ -594,9 +596,7 @@ namespace Extrinsic::Runtime
                     GizmoPacketBuilder.Build(
                         *BoundRegistry,
                         GizmoSelectedEntities,
-                        Gizmo.Mode(),
-                        Gizmo.Orientation(),
-                        Gizmo.Config().AxisLength);
+                        Gizmo);
 
                 Selection.PrunePrimitives(*BoundRegistry);
                 RenderSnapshot = BuildPrimitiveSelectionRenderSnapshot(

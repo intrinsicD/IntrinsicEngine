@@ -8,8 +8,8 @@ workflow_profile: micro
 evidence: not_applicable
 evidence_skip_reason: interactive feature work; evidence is the diff, CPU contract tests, the ImGui integration suite, a Vulkan acceptance smoke, review and CI.
 contract_schema: 1
-contracts: [repo.source-documentation, repo.task-contract-discovery]
-contract_review: Reviewed the catalog. The change alters module surfaces and READMEs (source documentation) and the reusable runtime/UI gizmo interaction contract (task contract discovery). Engine/kernel/editor-frame locality contracts do not apply because those surfaces and dependencies are not extended; no method or geometry-property contract applies to entity TRS.
+contracts: [repo.source-documentation, repo.task-contract-discovery, runtime.gizmo-transform-session]
+contract_review: Reviewed the catalog. The change alters module surfaces and READMEs (source documentation) and the reusable runtime/UI gizmo interaction contract (task contract discovery); slice 1 adds `runtime.gizmo-transform-session` (source ADR 0006 amendment, proofs the CPU contract tests) for the session rules slices 2–3 and other transform-preview users build on. Engine/kernel/editor-frame locality contracts do not apply because those surfaces and dependencies are not extended; no method or geometry-property contract applies to entity TRS.
 ---
 # UI-078 — Edit entity transforms with an ImGuizmo gizmo
 
@@ -117,7 +117,7 @@ Codex plan (2026-10-06, read-only on `3a47bde17`), condensed:
    groups.
 4. Implement after REVIEW-007 is complete.
 
-5. Group local basis (2026-10-07): the averaged rotation of the selected
+5. Group local basis (2026-10-06): the averaged rotation of the selected
    entities' world rotations, `Geometry::Rotation::ChordalMean` (Markley
    quaternion-moment mean; closed form, deterministic, sign-invariant), frozen
    at drag start. A single entity uses its own rotation. If the mean is not
@@ -149,3 +149,40 @@ Codex review of the fixed commit → fixes → re-verification.
    ImGui integration tests (`SandboxEditorGizmo`).
 4. **Docs and Operational evidence:** READMEs, ADR 0006, architecture docs;
    Vulkan acceptance smoke with a real ImGuizmo drag of a group and its undo.
+
+## Progress
+- **Slice 1 — runtime transform core (CPU), 2026-10-06: implemented, Codex
+  review fixes applied, awaiting re-review and commit.** `GizmoInteraction`
+  owns one matrix session (`Begin`/`Preview`/`DragCommit`/`DragCancel`): frozen
+  selection, origin or bounds-center pivot, world/local/ChordalMean basis with
+  explicit fallback, `D = Gt·G0⁻¹` from the start state, writes only for
+  selected entities without a selected ancestor, atomic non-TRS rejection
+  (shear, perspective row, singular parent), one undo batch. Preview, commit
+  and cancel share one write-free session check (registry, target TRS and
+  parent world, parent chains and non-target TRS of the whole frozen
+  selection, affine `Gt`); a failed commit records nothing and rolls back
+  owned previews; no-ops compare the local 3x3 (mirrors) and translation
+  within a few ulps. The ray adapter and group packet builder use the same frame. ADR
+  0006 amendment, runtime README and catalog contract
+  `runtime.gizmo-transform-session` updated.
+- **CPU evidence:** `GizmoInteraction.*` in
+  `tests/contract/runtime/Test.GizmoInteraction.cpp` (pivot/stale cache,
+  bounds pivot, group rotate/scale, descendants, permutations, local/degenerate
+  basis, shear rejection, no-op/move-and-return incl. mirrored scale, 100 ticks
+  → one undo, cancel, frozen/stale session, invalid selection, ray adapter;
+  review regressions `FailedCommitRollsBackOwnedPreviewsWithoutHistory`,
+  `CommitAndCancelOnForeignRegistryWriteNothingAndKeepSession`,
+  `ReparentingBeforeCommitIsRejectedWithoutHistory`,
+  `SelectedDescendantDeletedOrReparentedDuringDragIsConflict`,
+  `PerspectiveGizmoMatrixIsRejectedWithoutWrites`,
+  `LargeTranslationDoesNotHideShear`,
+  `NearlySingularParentIsRejectedWithReasonAndNoWrites`,
+  `RealMoveAtLargePositionIsCommittedAndUndoable`,
+  `ForeignChangeToSelectedDescendantTransformIsConflict`), plus
+  `GizmoInteractionEngineWiring.*`, `SceneInteractionModule.*`,
+  `EditorCommandHistory.*`, `RuntimeEngineLayering.*`,
+  `RuntimeEnginePrivateGlue.*`, `GeometryRotationAveraging.*`.
+- **Remaining:** slice 2 (viewport input ownership and cancel triggers), slice
+  3 (ImGuizmo frontend, UI toggles, W/E/R, Escape, snap config, retire the ray
+  frontend where replaced, `SandboxEditorGizmo` tests), slice 4 (docs and the
+  Vulkan acceptance smoke). All acceptance boxes stay open until then.
