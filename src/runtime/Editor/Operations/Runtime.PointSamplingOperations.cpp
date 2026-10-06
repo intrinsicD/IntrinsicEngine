@@ -399,19 +399,6 @@ namespace Extrinsic::Runtime
         return Apply(EditorProcessingCommandsAccess::Resolve(commands), config, std::move(onComplete));
     }
 
-    EditorPointSamplingResult ApplyEditorConfiguredPointSampling(const EditorProcessingCommands& commands,
-                                                                 std::function<void(EditorPointSamplingResult)> onComplete)
-    {
-        const auto config = GetEditorPointSamplingConfig(commands);
-        if (!config)
-        {
-            auto failure = Failure(EditorCommandStatus::InvalidProcessingParameters, "The sandbox.point_sampling section is unavailable.");
-            if (onComplete) onComplete(failure);
-            return failure;
-        }
-        return ApplyEditorPointSamplingCommand(commands, *config, std::move(onComplete));
-    }
-
     RuntimeEngineConfigApplyResult ApplyEditorPointSamplingConfig(const EditorProcessingCommands& commands,
                                                                  const PointSamplingOperationConfig& config,
                                                                  std::string sourceId)

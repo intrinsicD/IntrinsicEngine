@@ -44,8 +44,6 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] EditorPointSamplingResult ApplyEditorPointSamplingCommand(
         const EditorProcessingCommands&, const PointSamplingOperationConfig&,
         std::function<void(EditorPointSamplingResult)> onComplete = {});
-    [[nodiscard]] EditorPointSamplingResult ApplyEditorConfiguredPointSampling(
-        const EditorProcessingCommands&, std::function<void(EditorPointSamplingResult)> onComplete = {});
     [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorPointSamplingConfig(const EditorProcessingCommands&,
                                                                                const PointSamplingOperationConfig&,
                                                                                std::string sourceId = {});
