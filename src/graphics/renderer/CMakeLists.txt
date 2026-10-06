@@ -50,7 +50,6 @@ target_sources(${target_name}
         Graphics.SelectionSystem.cppm
         Graphics.ForwardSystem.cppm
         Graphics.SpatialDebugVisualizers.cppm
-        Graphics.GpuScene.cppm
         Graphics.DeferredSystem.cppm
         Graphics.PostProcessSystem.cppm
         Graphics.Reconstruction.cppm
@@ -95,7 +94,6 @@ target_sources(${target_name}
         Graphics.VisualizationPackets.cpp
         Graphics.VisualizationPropertyBufferResidency.cpp
         Graphics.VisualizationSyncSystem.cpp
-        Graphics.GpuScene.cpp
         Graphics.CullingSystem.cpp
         Graphics.DebugViewSystem.cpp
         Graphics.ImGuiOverlaySystem.cpp

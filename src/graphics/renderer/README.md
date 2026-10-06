@@ -407,7 +407,6 @@ into graphics public contracts.
 - `Extrinsic.Graphics.SelectionSystem`
 - `Extrinsic.Graphics.ForwardSystem`
 - `Extrinsic.Graphics.SpatialDebugVisualizers`
-- `Extrinsic.Graphics.GpuScene`
 - `Extrinsic.Graphics.DeferredSystem`
 - `Extrinsic.Graphics.PostProcessSystem`
 - `Extrinsic.Graphics.Reconstruction`

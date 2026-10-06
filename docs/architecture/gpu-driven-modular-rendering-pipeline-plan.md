@@ -159,6 +159,10 @@ No Vulkan handles or descriptor ownership in ECS components.
 
 ### 3.2 `Graphics.GpuScene` (authoritative GPU data ownership)
 
+> `Graphics.GpuScene` is a design name here, not the removed compatibility
+> wrapper module. Current instance/geometry pools and buffer leases belong to
+> `Graphics.GpuWorld`; further ownership listed below remains design.
+
 Owns:
 
 - `GpuSceneVertexArena` (single buffer, BDA)
