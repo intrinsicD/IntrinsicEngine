@@ -100,9 +100,7 @@ target_sources(${target_name}
         Graphics.ImGuiUploadHelper.cpp
         Graphics.LightSystem.cpp
         Graphics.SelectionSystem.cpp
-        Graphics.ForwardSystem.cpp
         Graphics.SpatialDebugVisualizers.cpp
-        Graphics.DeferredSystem.cpp
         Graphics.PostProcessSystem.cpp
         Graphics.Reconstruction.cpp
         Graphics.ShadowSystem.cpp

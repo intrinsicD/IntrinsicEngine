@@ -130,6 +130,10 @@ TEST(GraphicsSurfacePassContracts, ForwardSurfaceRequiresInitializedSystemAndRec
     ExpectSurfaceBucketDraw(cmd, world, culling, pipeline, 4u);
 
     forward.Shutdown();
+    MockCommandContext shutdownCmd;
+    pass.Execute(shutdownCmd, camera, world, culling, 4u);
+    EXPECT_TRUE(shutdownCmd.Events.empty());
+
     culling.Shutdown();
     world.Shutdown();
 }
@@ -163,6 +167,10 @@ TEST(GraphicsSurfacePassContracts, DeferredGBufferRequiresInitializedSystemAndRe
     ExpectSurfaceBucketDraw(cmd, world, culling, pipeline, 5u);
 
     deferred.Shutdown();
+    MockCommandContext shutdownCmd;
+    pass.Execute(shutdownCmd, camera, world, culling, 5u);
+    EXPECT_TRUE(shutdownCmd.Events.empty());
+
     culling.Shutdown();
     world.Shutdown();
 }
