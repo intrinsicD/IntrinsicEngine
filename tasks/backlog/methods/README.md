@@ -43,6 +43,23 @@ its dependencies, conditional gates, scope and verification.
 - [METHOD-061 — Vulkan flat beta-greedy / implicit MIS sampling](METHOD-061-vulkan-flat-beta-greedy.md)
 - [METHOD-062 — Vulkan lazy greedy sampling over the point LBVH](METHOD-062-vulkan-lazy-greedy-lbvh.md)
 
+## RobustPCA applications (REVIEW-007 E7, GE15)
+
+Operator-requested proposals for `Geometry::Linalg::RobustPCA` (2026-10-06).
+Each task owns its formulation, kernel extensions (thin SVD, observation mask)
+and any missing-input prerequisite; none states a result.
+
+- [METHOD-066 — Point-cloud patch denoising and outlier scoring](METHOD-066-robust-pca-point-cloud-patch-denoising.md)
+- [METHOD-067 — Fixed-topology mesh-sequence cleanup and compression](METHOD-067-robust-pca-mesh-sequence-cleanup-compression.md)
+- [METHOD-068 — Rotation synchronization for multi-view alignment](METHOD-068-robust-pca-rotation-synchronization.md)
+- [METHOD-069 — Robust photometric stereo (needs image-stack input)](METHOD-069-robust-pca-photometric-stereo.md)
+- [METHOD-070 — Material-capture highlight and defect removal (needs image-stack input)](METHOD-070-robust-pca-material-capture-highlight-removal.md)
+- [METHOD-071 — Background/foreground separation (needs image-sequence input)](METHOD-071-robust-pca-background-foreground-separation.md)
+- [METHOD-072 — Animation and motion-capture trajectory cleanup](METHOD-072-robust-pca-motion-trajectory-cleanup.md)
+- [METHOD-073 — Structure-from-motion measurement-matrix factorization (needs correspondences)](METHOD-073-robust-pca-structure-from-motion-factorization.md)
+- [METHOD-074 — Shape-collection map synchronization](METHOD-074-robust-pca-shape-collection-map-synchronization.md)
+- [METHOD-075 — BRDF and measurement-table cleanup (needs BRDF input and consumer)](METHOD-075-robust-pca-brdf-measurement-table-cleanup.md)
+
 Theme I remains paused behind REVIEW-004 except explicit operator direction
 and named product dependencies. A retired prerequisite does not prove a
 method, backend, or adoption gate passed.

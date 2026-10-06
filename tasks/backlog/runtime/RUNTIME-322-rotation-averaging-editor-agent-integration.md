@@ -20,7 +20,7 @@ contract_review: The product case consumes entity orientations and writes entity
   to average"), as one undoable transform command.
 - This is the bounded single-rotation-averaging product case. Multi-view alignment from pairwise
   registrations needs relative-rotation synchronization over a view graph and is owned by
-  METHOD-068 (RobustPCA rotation synchronization), which builds on this task.
+  [METHOD-068](../methods/METHOD-068-robust-pca-rotation-synchronization.md), which builds on this task.
 - Origin: REVIEW-007 E7 (2026-10-06), GE06. Draft: Codex, read-only on `e47a1484b`;
   paths re-checked on `098d47df9`.
 
