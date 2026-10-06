@@ -537,3 +537,19 @@ TEST(LinearAlgebra, RobustPCAAnalyticCasesAreDeterministic)
         EXPECT_EQ(a.Rank, b.Rank);
     }
 }
+
+// M = [3 * 2^1022], Mu = 2^-1022: step 1 gives L = 2^1023, S = 0, Y = 1, so the
+// step-2 SVD argument M - S + Y / Mu = 2^1024 overflows. That must report
+// NonFinite with zeroed outputs, not keep the stale non-zero L.
+TEST(LinearAlgebra, RobustPCAOverflowingSvdArgumentReportsNonFinite)
+{
+    Geometry::Linalg::DenseMatrix input(1, 1);
+    input(0, 0) = 3.0 * std::ldexp(1.0, 1022);
+    const Geometry::Linalg::RobustPCAResult result =
+        Geometry::Linalg::RobustPCA(input, {.Mu = std::ldexp(1.0, -1022)});
+    EXPECT_EQ(result.Diagnostics.Status, Geometry::Linalg::NumericStatus::NonFinite);
+    EXPECT_EQ(result.Iterations, 2u);
+    EXPECT_EQ(result.Diagnostics.Iterations, 2u);
+    EXPECT_EQ(result.LowRank.Values, std::vector<double>{0.0});
+    EXPECT_EQ(result.Sparse.Values, std::vector<double>{0.0});
+}

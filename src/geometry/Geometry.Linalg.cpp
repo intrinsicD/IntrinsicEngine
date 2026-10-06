@@ -674,6 +674,13 @@ namespace Geometry::Linalg
         for (std::size_t iteration = 1; iteration <= options.MaxIterations; ++iteration)
         {
             const DenseMatrix lowRankArgument = MakeLowRankArgument(matrix, result.Sparse, dual, mu);
+            // M - S + Y/mu can overflow even with finite iterates; ComputeSVD
+            // would report that as InvalidInput and keep a stale L.
+            if (!IsFinite(lowRankArgument))
+            {
+                finish(NumericStatus::NonFinite, iteration);
+                return result;
+            }
             const SVDResult svd = ComputeSVD(lowRankArgument, options.RankTolerance);
             if (IsHardSvdFailure(svd.Diagnostics.Status))
             {
@@ -683,6 +690,11 @@ namespace Geometry::Linalg
 
             result.LowRank = SoftThresholdSingularValues(svd, singularThreshold, options.RankTolerance, recoveredRank);
             const DenseMatrix sparseArgument = MakeSparseArgument(matrix, result.LowRank, dual, mu);
+            if (!IsFinite(sparseArgument))
+            {
+                finish(NumericStatus::NonFinite, iteration);
+                return result;
+            }
             DenseMatrix sparse = SoftThresholdElements(sparseArgument, sparseThreshold);
             const double sparseStep = DifferenceNorm(sparse, result.Sparse);
             result.Sparse = std::move(sparse);
