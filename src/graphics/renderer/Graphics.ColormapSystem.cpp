@@ -6,7 +6,6 @@ module;
 #include <cassert>
 #include <cmath>
 #include <cstdint>
-#include <glm/glm.hpp>
 #include <memory>
 
 module Extrinsic.Graphics.ColormapSystem;
