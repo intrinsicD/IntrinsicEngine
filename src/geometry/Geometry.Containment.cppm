@@ -1,3 +1,4 @@
+// Strict geometric containment queries with analytic and vertex-based dispatch.
 module;
 #include <optional>
 #include <array>
@@ -9,7 +10,6 @@ module;
 export module Geometry.Containment;
 
 import Geometry.Primitives;
-import Geometry.SDF;
 import Geometry.RobustPredicates;
 
 export namespace Geometry
