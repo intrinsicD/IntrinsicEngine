@@ -261,7 +261,7 @@ Eine Etappe pro Sitzung genügt; die Reihenfolge kann der Operator ändern.
 - [x] E2 — Tools, CI, Abhängigkeiten (T01–T23), 2026-10-06
 - [x] E3 — Core, ECS, Assets (C01–C17), 2026-10-06
 - [x] E4 — Graphics (G01–G18), 2026-10-06
-- [ ] E5 — Runtime ohne Editor/Modules (R01–R19)
+- [x] E5 — Runtime ohne Editor/Modules (R01–R19), 2026-10-06
 - [ ] E6 — Runtime-Editor/Modules und Sandbox-App (E01–E17)
 - [ ] E7 — Geometry (GE01–GE25)
 - [ ] E8 — Konsolidierung nach Phase C: freigegebene Folgetasks anlegen
@@ -361,25 +361,25 @@ nächsten Abschnitt.
 ### R — Runtime ohne Editor/Modules
 | ID | Fund | Tag | Schätz. | Claude | Codex | Operator |
 |----|---------|-----|------|--------|--------|----------|
-| R01 | `RenderArtifactRegistry` — no production producer; editor reads an always-empty registry | delete | -1100 | teilweise (Fable): kein Produzent, aber GRAPHICS-109/RUNTIME-281 planen einen → vertagen | teilweise: Kein produktiver Produzent; GRAPHICS-109 verlangt ausdrücklich die Publikation. RenderArtifactPublication.cpp:469, GRAPHICS-109:46 | — |
-| R02 | Copy-pasted Validate/Get/Set/MakeRegistration for 5 feature config sections (+19 shorter) → one template | shrink | -300 | teilweise: nur Helfer in 3 Point-Dateien heben (≈−60…−110) → Task | teilweise: Auch die fünf großen Validatoren wiederholen denselben Ablauf; fachliche Parser und Point-Validierungen unterscheiden sich. FeatureConfigCodecs.Detail.cpp:2961, PointFeaturesConfigCodecs.cpp:55 [≠ Claude: Ja, Umfang] | — |
-| R03 | Unused `DebugNameFor*` in GeometryIntegration/AssetWorkflow → see X04 | delete | (X04) | → X04 | teilweise: Vier Packstatus-Namensfunktionen ohne Aufrufer; AssetWorkflow enthält produktive und testgenutzte Diagnosefunktionen. GeometryPlanBuilders.Graph.cpp:85, Test.AssetIngestStateMachine.cpp:94 | — |
-| R04 | `CameraControllerSlot` Preview/TopDown/EditorSecondary + registry/seed plumbing — test-only | yagni | -60 | widerlegt: RUNTIME-081 verlangt die Slots | teilweise: Zusatzslots nur testgenutzt; Registry und World-Seed dagegen produktiv. Test.RuntimeCameraControllers.cpp:450, Sandbox.cpp:86 [≠ Claude: Ja] | — |
-| R05 | `JobTarget` / `JobDesc::Target` (GpuQueue rejected) | delete | -15 | bestätigt → Task inkl. ADR-0024-Korrektur | bestätigt: Nur CpuPool akzeptiert; GpuQueue wird abgewiesen. Das Target-Feld steuert keinen zweiten Ausführungspfad. JobService.cppm:67, JobService.cpp:340 | — |
-| R06 | Type-name helpers → see X02 | reuse | (X02) | → X02 | teilweise: Vier gleichartige Diagnose-Namenshelfer; TaskGraph benötigt hingegen einen constexpr-Token. ServiceRegistry.cppm:25, Core.Dag.TaskGraph.cppm:60 | — |
-| R07 | Dead EngineConfigControl / RenderRecipeActivation API (`LoadAndApply*File`, `ActivateRenderRecipeConfigDocument`, …) | delete | -60 | HotSubsetFile widerlegt (RUNTIME-282 nutzt); RenderRecipeConfigFile-Member vertagen; ActivateDocument behalten | teilweise: Ungenutzte Member vorhanden; freie Ladefunktion produktiv, ActivateDocument testgenutzt; HotSubsetFile für RUNTIME-282 vorgesehen. Engine.cpp:584, RUNTIME-282:32 [≠ Claude: Ja: geplant ≠ benutzt] | — |
-| R08 | `SceneDocumentModule::SaveSceneToPath` / `LoadSceneFromPath` — test-only | delete | -65 | teilweise: Test-Rückgrat → vertagen bis Test-Pump-Helfer existiert | widerlegt: Beide Synchronpfade tragen echte Save/Load-, History- und Fehleratomaritätstests; „test-only“ begründet ihre Entbehrlichkeit nicht. SceneDocumentModule.cpp:831, Test.SceneDocumentModule.cpp:530 [≠ Claude: Einstufung anders; Testnutzen einig] | — |
-| R09 | Single-valued `RuntimeInputActionTrigger` | yagni | -15 | teilweise → behalten | bestätigt: Ein Enumwert, ein Switchzweig; kein weiterer Trigger oder offener Erweiterungsowner gefunden. InputActions.cppm:22, InputActions.cpp:28 [≠ Claude: Ja] | — |
-| R10 | No-bindings overloads of `Build{Mesh,Graph,PointCloud}GeometryPlan` | delete | -45 | bestätigt → Task (mit R13) | bestätigt: Alle drei Overloads reichen nur nullptr weiter; sämtliche gefundenen Aufrufer nutzen die Bindings-Varianten. GeometryPlanBuilders.Mesh.cpp:131, RenderExtraction.Geometry.cpp:709 | — |
-| R11 | Module OnRegister/OnShutdown provide/withdraw boilerplate ×6 → `ProvideBorrowed<T>` | reuse | -80 | widerlegt: ≈−20 statt −80 | widerlegt: `Provide<T>(T&)` ist bereits nichtbesitzend; Registrierung, Teilrollback und Shutdown sind nicht gleichförmig. ServiceRegistry.cppm:56, SceneInteractionModule.cpp:843 | — |
-| R12 | Test-only/dead helpers (`ScheduleVisualizationHtexRecreate`, `AsPacketBatch`, `AcknowledgeRenderableAssetRebind`, `FindGeometryPropertyCatalogEntry`, `MakeTightLayout`, `ResolveSelected`, `AdvanceWorldGeneration`, `PeekPendingPick`, `OldestInFlightSequence`) | delete | -140 | gemischt: AsPacketBatch → Task; HtexRecreate vertagen; Rest behalten. ⚠ AdvanceWorldGeneration und AcknowledgeRenderableAssetRebind haben keinen produktiven Aufrufer → Verdrahtungslücke klären | teilweise: AsPacketBatch isoliert; Htex-Job publiziert nur einen Token. Andere Helfer sichern etwa Generationen- und Pick-Verträge. VisualizationRecipes.cpp:1362, Test.RuntimeJobService.cpp:1245 [≠ Claude: Gemischtes Votum gleich; Präzisierungen unten] | — |
-| R13 | Byte-identical `GraphVertex` / `PointCloudVertex` / `MeshPrimitiveVertex` | reuse | -20 | bestätigt → Task (mit R10) | bestätigt: Alle drei Typen bestehen aus denselben fünf Floats, jeweils 20 Byte; auch die Befüllung ist gleichartig. GeometryPlanBuilders.cppm:147, GeometryPlanBuilders.cppm:247 | — |
-| R14 | `JobService::CancelAll` unused while AsyncWorkModule hand-rolls it | delete/reuse | -23 | bestätigt → Task (AsyncWorkModule ruft CancelAll) | bestätigt: AsyncWorkModule bildet Snapshot→Cancel selbst nach; CancelAll kapselt denselben Abbruchzweck. AsyncWorkModule.cpp:16, JobService.cpp:550 | — |
-| R15 | Small forwarders: `RuntimeAssetIngestDiagnosticFromRouteStatus`, duplicate `ResolveExternalPath`, `ParentPathOf` | delete/shrink | -28 | bestätigt → Task (gebündelt) | bestätigt: Pfadauflösung semantisch doppelt; ParentPathOf einmaliger Wrapper, Diagnoseforwarder ohne Aufrufer. ModelTextureDecode.cpp:68, ModelTextureDecode.cpp:241 | — |
-| R16 | Dead gizmo accessors (`AxisLock`, `SetAxisLock`, `DragAxis`, `DragOrigin`, `MultiSelectPivot`) | delete | -10 | teilweise: Achsensperre-Feature tot (m_AxisLock immer None) → Entscheidung vertagen | bestätigt: Alle fünf Accessoren ohne Aufrufer. Drag-Zustand bleibt intern verwendet; dessen Entfernung folgt daraus nicht. GizmoInteraction.cppm:155, GizmoInteraction.cpp:490 [≠ Claude: Ja, Zuschnitt] | — |
-| R17 | Dead/test-only members (`GetFallback*AttemptCount`, `HasPlotContext`, `NegotiatedVersion`, `YawRadians`, …) | delete | -50 | widerlegt: Fail-closed-Zähler + Testnutzen | widerlegt: Die genannten Getter prüfen Fehlerpfade, Kontextlebenszeit, Protokollaushandlung und Kamerainvarianten. Test.VulkanFailClosedContract.cpp:381, Test.AgentOperations.cpp:650 | — |
-| R18 | Default `ICameraController::Clone()` returning nullptr — all impls override | shrink | -6 | bestätigt, 0 Zeilen Gewinn → vertagen | widerlegt: Vier Produktcontroller überschreiben Clone; mehrere Testcontroller erben den Default. „Alle Implementierungen“ ist falsch. CameraControllers.cppm:67, Test.RuntimeCameraFocusCommand.cpp:40 [≠ Claude: Ja] | — |
-| R19 | Visualization `IsFinite` overloads → see X03 | stdlib | (X03) | → X03 | teilweise: vec2/vec3-Prüfungen identisch; gemeinsamer Owner besitzt keinen vec4-Overload. Kein pauschaler Austausch. VisualizationRecipes.cpp:62, Geometry.Validation.cppm:14 [≠ Claude: Ja, Begründung zu X03] | — |
+| R01 | `RenderArtifactRegistry` — no production producer; editor reads an always-empty registry | delete | -1100 | teilweise (Fable): kein Produzent, aber GRAPHICS-109/RUNTIME-281 planen einen → vertagen | teilweise: Kein produktiver Produzent; GRAPHICS-109 verlangt ausdrücklich die Publikation. RenderArtifactPublication.cpp:469, GRAPHICS-109:46 | Vertagen (2026-10-06): GRAPHICS-109 braucht die Registry |
+| R02 | Copy-pasted Validate/Get/Set/MakeRegistration for 5 feature config sections (+19 shorter) → one template | shrink | -300 | teilweise: nur Helfer in 3 Point-Dateien heben (≈−60…−110) → Task | teilweise: Auch die fünf großen Validatoren wiederholen denselben Ablauf; fachliche Parser und Point-Validierungen unterscheiden sich. FeatureConfigCodecs.Detail.cpp:2961, PointFeaturesConfigCodecs.cpp:55 [≠ Claude: Ja, Umfang] | Task + Umsetzung (2026-10-06): nur Point-Config-Helfer → `fa6f9c64a`, `78832b061` |
+| R03 | Unused `DebugNameFor*` in GeometryIntegration/AssetWorkflow → see X04 | delete | (X04) | → X04 | teilweise: Vier Packstatus-Namensfunktionen ohne Aufrufer; AssetWorkflow enthält produktive und testgenutzte Diagnosefunktionen. GeometryPlanBuilders.Graph.cpp:85, Test.AssetIngestStateMachine.cpp:94 | Erledigt durch X04 (2026-10-06) |
+| R04 | `CameraControllerSlot` Preview/TopDown/EditorSecondary + registry/seed plumbing — test-only | yagni | -60 | widerlegt: RUNTIME-081 verlangt die Slots | teilweise: Zusatzslots nur testgenutzt; Registry und World-Seed dagegen produktiv. Test.RuntimeCameraControllers.cpp:450, Sandbox.cpp:86 [≠ Claude: Ja] | Behalten (2026-10-06): getestetes Feature, plausibel für UI-076/Preview-Viewports |
+| R05 | `JobTarget` / `JobDesc::Target` (GpuQueue rejected) | delete | -15 | bestätigt → Task inkl. ADR-0024-Korrektur | bestätigt: Nur CpuPool akzeptiert; GpuQueue wird abgewiesen. Das Target-Feld steuert keinen zweiten Ausführungspfad. JobService.cppm:67, JobService.cpp:340 | Task + Umsetzung (2026-10-06): JobTarget entfernt, ADR-0024-Amendment → `ba0f4e5a0`, `ed35d2d07` |
+| R06 | Type-name helpers → see X02 | reuse | (X02) | → X02 | teilweise: Vier gleichartige Diagnose-Namenshelfer; TaskGraph benötigt hingegen einen constexpr-Token. ServiceRegistry.cppm:25, Core.Dag.TaskGraph.cppm:60 | Erledigt durch X02 (2026-10-06) |
+| R07 | Dead EngineConfigControl / RenderRecipeActivation API (`LoadAndApply*File`, `ActivateRenderRecipeConfigDocument`, …) | delete | -60 | HotSubsetFile widerlegt (RUNTIME-282 nutzt); RenderRecipeConfigFile-Member vertagen; ActivateDocument behalten | teilweise: Ungenutzte Member vorhanden; freie Ladefunktion produktiv, ActivateDocument testgenutzt; HotSubsetFile für RUNTIME-282 vorgesehen. Engine.cpp:584, RUNTIME-282:32 [≠ Claude: Ja: geplant ≠ benutzt] | Eng umgesetzt (2026-10-06): nur Member ohne Nutzer/Plan → `21afc45d6`; HotSubsetFile (RUNTIME-282) bleibt |
+| R08 | `SceneDocumentModule::SaveSceneToPath` / `LoadSceneFromPath` — test-only | delete | -65 | teilweise: Test-Rückgrat → vertagen bis Test-Pump-Helfer existiert | widerlegt: Beide Synchronpfade tragen echte Save/Load-, History- und Fehleratomaritätstests; „test-only“ begründet ihre Entbehrlichkeit nicht. SceneDocumentModule.cpp:831, Test.SceneDocumentModule.cpp:530 [≠ Claude: Einstufung anders; Testnutzen einig] | Behalten (2026-10-06): widerlegt |
+| R09 | Single-valued `RuntimeInputActionTrigger` | yagni | -15 | teilweise → behalten | bestätigt: Ein Enumwert, ein Switchzweig; kein weiterer Trigger oder offener Erweiterungsowner gefunden. InputActions.cppm:22, InputActions.cpp:28 [≠ Claude: Ja] | Behalten (2026-10-06): explizit an Bindestellen, gering |
+| R10 | No-bindings overloads of `Build{Mesh,Graph,PointCloud}GeometryPlan` | delete | -45 | bestätigt → Task (mit R13) | bestätigt: Alle drei Overloads reichen nur nullptr weiter; sämtliche gefundenen Aufrufer nutzen die Bindings-Varianten. GeometryPlanBuilders.Mesh.cpp:131, RenderExtraction.Geometry.cpp:709 | Task + Umsetzung (2026-10-06) (mit R13) → `6f762c8dd` |
+| R11 | Module OnRegister/OnShutdown provide/withdraw boilerplate ×6 → `ProvideBorrowed<T>` | reuse | -80 | widerlegt: ≈−20 statt −80 | widerlegt: `Provide<T>(T&)` ist bereits nichtbesitzend; Registrierung, Teilrollback und Shutdown sind nicht gleichförmig. ServiceRegistry.cppm:56, SceneInteractionModule.cpp:843 | Behalten (2026-10-06): widerlegt |
+| R12 | Test-only/dead helpers (`ScheduleVisualizationHtexRecreate`, `AsPacketBatch`, `AcknowledgeRenderableAssetRebind`, `FindGeometryPropertyCatalogEntry`, `MakeTightLayout`, `ResolveSelected`, `AdvanceWorldGeneration`, `PeekPendingPick`, `OldestInFlightSequence`) | delete | -140 | gemischt: AsPacketBatch → Task; HtexRecreate vertagen; Rest behalten. ⚠ AdvanceWorldGeneration und AcknowledgeRenderableAssetRebind haben keinen produktiven Aufrufer → Verdrahtungslücke klären | teilweise: AsPacketBatch isoliert; Htex-Job publiziert nur einen Token. Andere Helfer sichern etwa Generationen- und Pick-Verträge. VisualizationRecipes.cpp:1362, Test.RuntimeJobService.cpp:1245 [≠ Claude: Gemischtes Votum gleich; Präzisierungen unten] | Eng umgesetzt (2026-10-06): nur AsPacketBatch → `a09a31f5a` |
+| R13 | Byte-identical `GraphVertex` / `PointCloudVertex` / `MeshPrimitiveVertex` | reuse | -20 | bestätigt → Task (mit R10) | bestätigt: Alle drei Typen bestehen aus denselben fünf Floats, jeweils 20 Byte; auch die Befüllung ist gleichartig. GeometryPlanBuilders.cppm:147, GeometryPlanBuilders.cppm:247 | Task + Umsetzung (2026-10-06) (mit R10): `PositionUvVertex` → `6f762c8dd` |
+| R14 | `JobService::CancelAll` unused while AsyncWorkModule hand-rolls it | delete/reuse | -23 | bestätigt → Task (AsyncWorkModule ruft CancelAll) | bestätigt: AsyncWorkModule bildet Snapshot→Cancel selbst nach; CancelAll kapselt denselben Abbruchzweck. AsyncWorkModule.cpp:16, JobService.cpp:550 | Task + Umsetzung (2026-10-06): CancelAll deterministisch (Token-Ordnung) und von AsyncWorkModule genutzt → `8fc9eeb7d` |
+| R15 | Small forwarders: `RuntimeAssetIngestDiagnosticFromRouteStatus`, duplicate `ResolveExternalPath`, `ParentPathOf` | delete/shrink | -28 | bestätigt → Task (gebündelt) | bestätigt: Pfadauflösung semantisch doppelt; ParentPathOf einmaliger Wrapper, Diagnoseforwarder ohne Aufrufer. ModelTextureDecode.cpp:68, ModelTextureDecode.cpp:241 | Task + Umsetzung (2026-10-06) → `484667baa` |
+| R16 | Dead gizmo accessors (`AxisLock`, `SetAxisLock`, `DragAxis`, `DragOrigin`, `MultiSelectPivot`) | delete | -10 | teilweise: Achsensperre-Feature tot (m_AxisLock immer None) → Entscheidung vertagen | bestätigt: Alle fünf Accessoren ohne Aufrufer. Drag-Zustand bleibt intern verwendet; dessen Entfernung folgt daraus nicht. GizmoInteraction.cppm:155, GizmoInteraction.cpp:490 [≠ Claude: Ja, Zuschnitt] | Einordnen (2026-10-06): in UI-078 (Gizmo-Umbau ersetzt die Accessoren) |
+| R17 | Dead/test-only members (`GetFallback*AttemptCount`, `HasPlotContext`, `NegotiatedVersion`, `YawRadians`, …) | delete | -50 | widerlegt: Fail-closed-Zähler + Testnutzen | widerlegt: Die genannten Getter prüfen Fehlerpfade, Kontextlebenszeit, Protokollaushandlung und Kamerainvarianten. Test.VulkanFailClosedContract.cpp:381, Test.AgentOperations.cpp:650 | Behalten (2026-10-06): widerlegt |
+| R18 | Default `ICameraController::Clone()` returning nullptr — all impls override | shrink | -6 | bestätigt, 0 Zeilen Gewinn → vertagen | widerlegt: Vier Produktcontroller überschreiben Clone; mehrere Testcontroller erben den Default. „Alle Implementierungen“ ist falsch. CameraControllers.cppm:67, Test.RuntimeCameraFocusCommand.cpp:40 [≠ Claude: Ja] | Behalten (2026-10-06): widerlegt |
+| R19 | Visualization `IsFinite` overloads → see X03 | stdlib | (X03) | → X03 | teilweise: vec2/vec3-Prüfungen identisch; gemeinsamer Owner besitzt keinen vec4-Overload. Kein pauschaler Austausch. VisualizationRecipes.cpp:62, Geometry.Validation.cppm:14 [≠ Claude: Ja, Begründung zu X03] | Erledigt durch X03/RUNTIME-314 (2026-10-06) |
 
 ### E — Runtime-Editor/Modules und Sandbox-App
 | ID | Fund | Tag | Schätz. | Claude | Codex | Operator |
@@ -719,6 +719,43 @@ bleibt bewusst unverändert. Sein Probe-Pfad existiert weiter, und der
 Datei-Hash ist in `ara/evidence/diagnostics/graphics138_20260915/inputs.json`
 versiegelt.
 
+## Etappe E5 — Entscheidungen und Umsetzung 2026-10-06
+
+Zu R05 und den drei strittigen Kandidaten verlangte der Operator eine
+Erklärung mit Für und Wider.
+
+- R05: ADR-0024 plante eine Submit-API mit dem Ziel `CpuPool | GpuQueue`.
+  RUNTIME-137 setzte GPU-Arbeit stattdessen über die Participant-Registry
+  und `QueueGpuCompute` um. `JobTarget` war ein Überbleibsel, das niemand
+  setzte und das GpuQueue ablehnte. Entscheidung: entfernen und ADR-0024
+  mit einem datierten Amendment ergänzen.
+- R09 (Trigger-Enum mit einem Wert) und R04 (Kamera-Slots, die nur Tests
+  nutzen) bleiben.
+- R07 wird eng umgesetzt: nur der Member ohne Nutzer und ohne Plan.
+
+R14 wurde zunächst übersprungen, weil `CancelAll` in undefinierter
+`unordered_map`-Reihenfolge abbrach, AsyncWorkModule dagegen in
+Token-Ordnung. Gelöst wurde das, indem `CancelAll` jetzt ebenfalls in
+aufsteigender Token-Ordnung abbricht; danach nutzt AsyncWorkModule
+`CancelAll`. Für den Ordnungstest wurde die bestehende
+`JobServiceTestHooks` um einen Hook erweitert.
+
+Ablauf: Codex-Plan, Umsetzung durch einen Claude-Subagenten,
+Codex-Review und Fixes. Basisrevision `29688c7ae`.
+
+| Kandidat | Commits | Codex-Review |
+|---|---|---|
+| R12 | `a09a31f5a` | freigeben |
+| R15 | `484667baa` | freigeben |
+| R10/R13 | `6f762c8dd` | freigeben (`PositionUvVertex`, Offset-Asserts; Wire-Name `GraphVertex` bleibt) |
+| R02 | `fa6f9c64a`, `78832b061` | Anmerkung (Sammeltest) → behoben |
+| R07 | `21afc45d6` | freigeben |
+| R05 | `ba0f4e5a0`, `ed35d2d07` | Anmerkung (Reject-Tests) → behoben |
+| R14 | `8fc9eeb7d`, `9a1f09f4c` | Anmerkungen (RAII-Freigabe im Test, Mischfall mit publiziertem Job) → behoben |
+
+Vollbuild aller `ci`-Ziele nach den Umsetzungen grün, weil
+`Runtime.JobService.cppm` breit importiert wird.
+
 ## Prüfhinweise aus dem Codex-Audit
 
 Die folgenden Hinweise stammen aus den zwölf Ausgangsgruppen des Codex-Audits
@@ -1047,3 +1084,8 @@ Prüfung der betroffenen Annahmen, nicht den Neustart der gesamten Liste.
   GRAPHICS-160…163). G03 ist in LEGACY-043 eingeordnet, G06 nur umbenannt.
   Details in §„Etappe E4 — Entscheidungen und Umsetzung 2026-10-06“.
   Nächste Etappe: E5 (R01–R19).
+- 2026-10-06: Etappe E5 entschieden und umgesetzt. R05 (mit
+  ADR-0024-Amendment), R02, R07 (eng), R10/R13, R12, R14 (mit
+  deterministischem `CancelAll`) und R15 sind umgesetzt. R04 und R09
+  bleiben, R16 ist in UI-078 eingeordnet. Details in §„Etappe E5 —
+  Entscheidungen und Umsetzung 2026-10-06“. Nächste Etappe: E6 (E01–E17).
