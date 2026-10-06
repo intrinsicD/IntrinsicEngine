@@ -263,7 +263,7 @@ Eine Etappe pro Sitzung genügt; die Reihenfolge kann der Operator ändern.
 - [x] E4 — Graphics (G01–G18), 2026-10-06
 - [x] E5 — Runtime ohne Editor/Modules (R01–R19), 2026-10-06
 - [x] E6 — Runtime-Editor/Modules und Sandbox-App (E01–E17), 2026-10-06
-- [ ] E7 — Geometry (GE01–GE25)
+- [x] E7 — Geometry (GE01–GE25), 2026-10-06
 - [ ] E8 — Konsolidierung nach Phase C: freigegebene Folgetasks anlegen
   (Kandidaten mit gleichem Owner gebündelt, wenn der Operator zustimmt),
   Einordnungen in bestehende Tasks vermerken, Session-Brief regenerieren.
@@ -405,31 +405,31 @@ nächsten Abschnitt.
 ### GE — Geometry
 | ID | Fund | Tag | Schätz. | Claude | Codex | Operator |
 |----|---------|-----|------|--------|--------|----------|
-| GE01 | 11 mesh/point-cloud file writers + write-status enums — test-only (planned by UI-046 / RUNTIME-282/283) | delete | -1600 | widerlegt (Fable): 13 Writer ≈1.900 Z.; UI-046 baut ausdrücklich darauf → einordnen UI-046 | widerlegt: Writer sind Grundlage von UI-046; Überschneidung RUNTIME-282/283. HalfedgeMesh.IO.cppm:42, UI-046:21. [≠ Claude: Votum nein; Zählung korrigiert] | — |
-| GE02 | `Geometry.Graph.Utils` layouts, crossings, BuildKNNGraph, closest-edge queries, edge-length fills — test-only | delete | -1100 | teilweise: Layouts + CountEdgeCrossings (≈700) → Task; ClosestEdge*/EdgeLengths vertagen (GEOM-074); KNN behalten; ApplyGaussianNoise → Testhelfer | teilweise: Layouts testseitig; KNN-Nachbarpfad produktiv, Queries berühren GEOM-074. Construction.cpp:476, GEOM-074:32. | — |
-| GE03 | `Geometry.VectorHeatMethod` — test-only (GEOM-089, METHOD-048) | delete | -820 | widerlegt: GEOM-089 + METHOD-048 planen Nutzung → behalten | widerlegt: Bestehende CPU-Referenz für GEOM-089; METHOD-048 nennt Transport und LogMap ausdrücklich. VectorHeatMethod.cppm:116, METHOD-048:92. | — |
-| GE04 | `Geometry.ConvexHullBuilder` (keep `ConvexHull` type) — test-only | delete | -811 | bestätigt (verwaist) → Task „Anbinden vs. Löschen“ nach PK10 (LocalConvexHull) | bestätigt: Builder nur testseitig; `LocalConvexHull` benötigt den separaten Datentyp. Test_ConvexHull.cpp:178, Culling.Proxy.cppm:13. | — |
-| GE05 | `Geometry.ImplicitPlaneField` + Octree node properties — test-only | delete | -830 | bestätigt: 791 Z. + Octree-NodeProperties → Task (inkl. 12 tote Test-Imports) | bestätigt: PlaneField nur eigene Tests; kein weiterer fachlicher Nutzer der Octree-NodeProperties gefunden. ImplicitPlaneField.cpp:193, Test_ImplicitPlaneField.cpp:40. | — |
-| GE06 | `Geometry.RotationAveraging` — test-only | delete | -735 | bestätigt → Task (zieht GE24/GE25-Anteile mit) | bestätigt: Mittelwert-/Medianverfahren nur eigene Tests; kein konkreter offener Integrationsauftrag gefunden. RotationAveraging.cppm:59, Test_RotationAveraging.cpp:55. | — |
-| GE07 | `Geometry.HtexPatch` — test-only (METHOD-048?) | delete | -510 | teilweise: Teil des entworfenen Htex-Systems (docs/architecture) → vertagen, Operatorentscheid Htex-Richtung | bestätigt: Konkretes Modul nur testseitig. Htex-Entwurf ist `legacy-background`; METHOD-048 begründet keine Nutzung. Test_HtexPatch.cpp:19, index.md:93. [≠ Claude: Ja, Claude: teilweise] | — |
-| GE08 | `Geometry.HalfedgeMesh.Analysis` — test-only | delete | -511 | widerlegt: GEOM-110/RUNTIME-286/RUNTIME-280 nennen Analyze als Reuse → behalten | widerlegt: Analyse ist ausdrücklich Grundlage von GEOM-110 und RUNTIME-286; zusätzlich GEOM-013. Analysis.cppm:94, RUNTIME-286:26. | — |
-| GE09 | `Geometry.Graph.ShortestPath` — test-only | delete | -436 | teilweise: Editor-Platzhalter ShortestPath, GEOM-074 → vertagen | widerlegt: GEOM-068/069 erweitern genau dieses Modul; zusätzlich GEOM-074. Mehr als ein Editor-Platzhalter. ShortestPath.cppm:52, GEOM-069:10. [≠ Claude: Ja, stärkeres Gegenargument] | — |
-| GE10 | `Geometry.DomainViews` — test-only | delete | -394 | teilweise: GEOM-012-Ergebnis, METHOD-003 → vertagen | teilweise: Nutzer testseitig, aber eigenständiger Borrow-/Property-Vertrag und weiche Voraussetzung von METHOD-003. DomainViews.cppm:52, METHOD-003:39. | — |
-| GE11 | Boolean, PointCloud.Conversion, Sphere.Sampling, Curve, HalfedgeMesh.Boundary, Geometry.IO (export tables duplicate Asset.ImportRouter) — test-only | delete | -1370 | zerlegt: Boolean widerlegt (METHOD-005 verbietet Löschen); Boundary widerlegt (GEOM-110); Geometry.IO widerlegt (UI-046, gewollte Doppelableitung aus .inc); PointCloud.Conversion, Sphere.Sampling, Curve (≈743) → Task | teilweise: Conversion/Sphere/Curve isoliert; Boolean: METHOD-005, Boundary: GEOM-110, IO: UI-046. Formatkatalog bereits gemeinsam. METHOD-005:27, Geometry.IO.cpp:26. | — |
-| GE12 | `Geometry.SDF` + `SDFContact`; Containment imports SDF without using it | delete | -580 | toter `import Geometry.SDF` in Containment → Task; SDF/SDFContact widerlegt (METHOD-003/GEOM-013) | teilweise: SDF durch METHOD-003/004 und GEOM-013 gedeckt. Kontaktsolver gesondert testseitig; Containment-Import ungenutzt. Containment.cppm:12, SDFContact.cppm:38. [≠ Claude: Ja, SDFContact differenzieren] | — |
-| GE13 | `SparseBiCGSTAB`, `SparsePreconditioner`, `AnalyzeSparseMatrix` — test-only | delete | -380 | widerlegt: BiCGSTAB ist METHOD-003-Solverpfad; AnalyzeSparseMatrix produktiv (Eigensolver) | widerlegt: Matrixanalyse läuft im Eigensolver; BiCGSTAB ist benannter METHOD-003-Solver. Sparse.Eigensolver.cpp:85, METHOD-003:38. | — |
-| GE14 | `SparseGrid` — test-only | delete | -270 | bestätigt → Task klein oder vertagen bis METHOD-003 | bestätigt: SparseGrid nur in Grid-Tests; kein konkreter offener Nutzer dieses Typs gefunden. Grid.cppm:228, Test_Grid.cpp:369. | — |
-| GE15 | Linalg `ComputeQR`, `SolveLeastSquares`, `RobustPCA`, map/ToEigen helpers — test-only | delete | -270 | RobustPCA + ToEigen → Task; QR/LeastSquares vertagen (GEOM-013 QEF) | teilweise: Maps tragen `MapProperty`; METHOD-048 nennt QR-Reuse. RobustPCA/ToEigen dagegen isoliert. Properties.cppm:622, METHOD-048:91. [≠ Claude: Ergänzung: Maps und METHOD-048] | — |
-| GE16 | `IsFinite` copies → see X03 | reuse | (X03) | → X03 | bestätigt: Identische Vektorprüfungen und passender gemeinsamer Owner vorhanden; Spezialprüfungen separat behandeln. Graph.Vertex.Normals.cpp:32, Validation.cpp:35. [≠ Claude: Ja, zur Zyklusbegründung in X03] | — |
-| GE17 | PLY header/scalar/colour machinery duplicated mesh vs point-cloud readers → `Geometry.IOText.hpp` | reuse | -200 | teilweise: großteils schon in Geometry.IOText.hpp (ef3202f03); Rest ≈60–100 → klein oder behalten | teilweise: Skalartypen/-lesen bereits gemeinsam; Headerparser und Farbnormalisierung weiterhin doppelt. IOText.hpp:177, HalfedgeMesh.IO.cpp:1710. | — |
-| GE18 | Octree `SplitPoint::Median` / `ComputeMedianCenter` — test-only | delete | -80 | bestätigt (niedrige Prio) → Task oder behalten | bestätigt: Median wird außerhalb des eigenen Dispatchs nur in Octree-Tests gewählt; produktive Nutzer wählen Center/Mean. Octree.cpp:694, Test_Octree.cpp:178. | — |
-| GE19 | PointSampling mirror enums/struct duplicating ProgressivePoisson types | yagni | -60 | teilweise: Spiegel schützt Modulgrenze zur Referenz-Impl → behalten | teilweise: Spiegelung real, aber lebende API-Adaption; Referenzconfig besitzt zusätzlich `HashLoadFactor`. GEOM-111/RUNTIME-289 betroffen. PointSampling.cpp:350, ProgressivePoissonReference.hpp:76. | — |
-| GE20 | `IsDelaunay`, `DelaunayFlip`, `CalculateNormals`, `GenerateUVs`, `TargetValence`, `KeepLargestComponent` — 0 callers | delete | -80 | Delaunay + CalculateNormals/GenerateUVs → Task; TargetValence intern genutzt; KeepLargestComponent → einordnen GEOM-110 | teilweise: `TargetValence` läuft im Remeshing; übrige Außenfunktionen ohne Verbraucher. GEOM-110/115 überschneiden sich. HalfedgeMesh.Utils.cpp:1197, Remeshing.cpp:202. | — |
-| GE21 | Vertex attribute-transfer rule hooks — test-only | delete | -70 | bestätigt (nur Test), Hook im Kern verdrahtet → behalten oder kleiner Task | teilweise: Regeln nur testseitig gesetzt; Hooks implementieren dennoch geprüfte Property-Übertragung bei Split/Collapse. HalfedgeMesh.cpp:1666, Test_GeometryAttributePropagation.cpp:95. [≠ Claude: Ja, Bewertung enger] | — |
-| GE22 | Statistics `Skewness`, `Kurtosis`, variances, `SafeAsin` — test-only | delete | -50 | bestätigt → kleiner Task oder behalten | bestätigt: Genannte Abfragen nur Statistiktests; kein offener konkreter Verbraucher gefunden. Momentenakkumulation getrennt betrachten. Statistics.cpp:75, Test_Statistics.cpp:56. | — |
-| GE23 | `PointCloudIO::LoadPTS`, public NN-histogram/periodogram wrappers | delete | -50 | LoadPTS: PTS wird auf LoadXYZ geroutet → Task (Routing-Entscheid); QualityMetrics widerlegt (GEOM-087) | teilweise: LoadPTS ungerufen, aber strenger als XYZ; Periodogrammkern intern genutzt. Wrapper und GEOM-087-Orakel unterscheiden. PointCloud.IO.cpp:1436, QualityMetrics.cpp:760. [≠ Claude: Präzisierung des Sammelurteils] | — |
-| GE24 | `RandomRotation`, `ChordalDistance`, `ApproxEqual` — 0 production callers | delete | -40 | RandomRotation/ChordalDistance teilweise (Test-Orakel) → behalten; ApproxEqual 0 Aufrufer → Task | teilweise: RandomRotation/ChordalDistance prüfen auch bestehende Rotationsoperationen; ApproxEqual ohne Aufrufer. Test_Rotation.cpp:64, RobustPredicates.cpp:12. | — |
-| GE25 | File-local `kPi` ×4 → `std::numbers::pi` | stdlib | -10 | bestätigt → trivial, mit GE06 bündeln | bestätigt: Vier lokale Double-π-Konstanten; `std::numbers::pi` passt typgleich. Rotation.cpp:18, HalfedgeMesh.Quality.cpp:25. | — |
+| GE01 | 11 mesh/point-cloud file writers + write-status enums — test-only (planned by UI-046 / RUNTIME-282/283) | delete | -1600 | widerlegt (Fable): 13 Writer ≈1.900 Z.; UI-046 baut ausdrücklich darauf → einordnen UI-046 | widerlegt: Writer sind Grundlage von UI-046; Überschneidung RUNTIME-282/283. HalfedgeMesh.IO.cppm:42, UI-046:21. [≠ Claude: Votum nein; Zählung korrigiert] | Behalten (2026-10-06): Grundlage von UI-046 |
+| GE02 | `Geometry.Graph.Utils` layouts, crossings, BuildKNNGraph, closest-edge queries, edge-length fills — test-only | delete | -1100 | teilweise: Layouts + CountEdgeCrossings (≈700) → Task; ClosestEdge*/EdgeLengths vertagen (GEOM-074); KNN behalten; ApplyGaussianNoise → Testhelfer | teilweise: Layouts testseitig; KNN-Nachbarpfad produktiv, Queries berühren GEOM-074. Construction.cpp:476, GEOM-074:32. | Teilweise gelöscht (2026-10-06): Layouts + Crossings → `7d7166816`, `e9cbbd183`; KNN/ClosestEdge bleiben |
+| GE03 | `Geometry.VectorHeatMethod` — test-only (GEOM-089, METHOD-048) | delete | -820 | widerlegt: GEOM-089 + METHOD-048 planen Nutzung → behalten | widerlegt: Bestehende CPU-Referenz für GEOM-089; METHOD-048 nennt Transport und LogMap ausdrücklich. VectorHeatMethod.cppm:116, METHOD-048:92. | Behalten (2026-10-06): GEOM-089/METHOD-048 |
+| GE04 | `Geometry.ConvexHullBuilder` (keep `ConvexHull` type) — test-only | delete | -811 | bestätigt (verwaist) → Task „Anbinden vs. Löschen“ nach PK10 (LocalConvexHull) | bestätigt: Builder nur testseitig; `LocalConvexHull` benötigt den separaten Datentyp. Test_ConvexHull.cpp:178, Culling.Proxy.cppm:13. | Behalten (2026-10-06): Integration end-to-end mit UI + MCP → [RUNTIME-320](../runtime/RUNTIME-320-convex-hull-editor-agent-integration.md) |
+| GE05 | `Geometry.ImplicitPlaneField` + Octree node properties — test-only | delete | -830 | bestätigt: 791 Z. + Octree-NodeProperties → Task (inkl. 12 tote Test-Imports) | bestätigt: PlaneField nur eigene Tests; kein weiterer fachlicher Nutzer der Octree-NodeProperties gefunden. ImplicitPlaneField.cpp:193, Test_ImplicitPlaneField.cpp:40. | Behalten (2026-10-06): Integration end-to-end mit UI + MCP → RUNTIME-321 |
+| GE06 | `Geometry.RotationAveraging` — test-only | delete | -735 | bestätigt → Task (zieht GE24/GE25-Anteile mit) | bestätigt: Mittelwert-/Medianverfahren nur eigene Tests; kein konkreter offener Integrationsauftrag gefunden. RotationAveraging.cppm:59, Test_RotationAveraging.cpp:55. | Behalten (2026-10-06): Integration end-to-end mit UI + MCP → RUNTIME-322 (+ METHOD-068) |
+| GE07 | `Geometry.HtexPatch` — test-only (METHOD-048?) | delete | -510 | teilweise: Teil des entworfenen Htex-Systems (docs/architecture) → vertagen, Operatorentscheid Htex-Richtung | bestätigt: Konkretes Modul nur testseitig. Htex-Entwurf ist `legacy-background`; METHOD-048 begründet keine Nutzung. Test_HtexPatch.cpp:19, index.md:93. [≠ Claude: Ja, Claude: teilweise] | Löschen (2026-10-06) → `a6d9f7ba0` |
+| GE08 | `Geometry.HalfedgeMesh.Analysis` — test-only | delete | -511 | widerlegt: GEOM-110/RUNTIME-286/RUNTIME-280 nennen Analyze als Reuse → behalten | widerlegt: Analyse ist ausdrücklich Grundlage von GEOM-110 und RUNTIME-286; zusätzlich GEOM-013. Analysis.cppm:94, RUNTIME-286:26. | Behalten (2026-10-06): GEOM-110/RUNTIME-286 |
+| GE09 | `Geometry.Graph.ShortestPath` — test-only | delete | -436 | teilweise: Editor-Platzhalter ShortestPath, GEOM-074 → vertagen | widerlegt: GEOM-068/069 erweitern genau dieses Modul; zusätzlich GEOM-074. Mehr als ein Editor-Platzhalter. ShortestPath.cppm:52, GEOM-069:10. [≠ Claude: Ja, stärkeres Gegenargument] | Behalten (2026-10-06): GEOM-068/069/074 |
+| GE10 | `Geometry.DomainViews` — test-only | delete | -394 | teilweise: GEOM-012-Ergebnis, METHOD-003 → vertagen | teilweise: Nutzer testseitig, aber eigenständiger Borrow-/Property-Vertrag und weiche Voraussetzung von METHOD-003. DomainViews.cppm:52, METHOD-003:39. | Behalten (2026-10-06): METHOD-003 |
+| GE11 | Boolean, PointCloud.Conversion, Sphere.Sampling, Curve, HalfedgeMesh.Boundary, Geometry.IO (export tables duplicate Asset.ImportRouter) — test-only | delete | -1370 | zerlegt: Boolean widerlegt (METHOD-005 verbietet Löschen); Boundary widerlegt (GEOM-110); Geometry.IO widerlegt (UI-046, gewollte Doppelableitung aus .inc); PointCloud.Conversion, Sphere.Sampling, Curve (≈743) → Task | teilweise: Conversion/Sphere/Curve isoliert; Boolean: METHOD-005, Boundary: GEOM-110, IO: UI-046. Formatkatalog bereits gemeinsam. METHOD-005:27, Geometry.IO.cpp:26. | Behalten (2026-10-06): Boolean/Boundary/IO mit Ownern |
+| GE12 | `Geometry.SDF` + `SDFContact`; Containment imports SDF without using it | delete | -580 | toter `import Geometry.SDF` in Containment → Task; SDF/SDFContact widerlegt (METHOD-003/GEOM-013) | teilweise: SDF durch METHOD-003/004 und GEOM-013 gedeckt. Kontaktsolver gesondert testseitig; Containment-Import ungenutzt. Containment.cppm:12, SDFContact.cppm:38. [≠ Claude: Ja, SDFContact differenzieren] | Task + Umsetzung (2026-10-06): nur toter Import → `30fa56363` |
+| GE13 | `SparseBiCGSTAB`, `SparsePreconditioner`, `AnalyzeSparseMatrix` — test-only | delete | -380 | widerlegt: BiCGSTAB ist METHOD-003-Solverpfad; AnalyzeSparseMatrix produktiv (Eigensolver) | widerlegt: Matrixanalyse läuft im Eigensolver; BiCGSTAB ist benannter METHOD-003-Solver. Sparse.Eigensolver.cpp:85, METHOD-003:38. | Behalten (2026-10-06): widerlegt |
+| GE14 | `SparseGrid` — test-only | delete | -270 | bestätigt → Task klein oder vertagen bis METHOD-003 | bestätigt: SparseGrid nur in Grid-Tests; kein konkreter offener Nutzer dieses Typs gefunden. Grid.cppm:228, Test_Grid.cpp:369. | Behalten (2026-10-06): Integration end-to-end mit UI + MCP → RUNTIME-323 |
+| GE15 | Linalg `ComputeQR`, `SolveLeastSquares`, `RobustPCA`, map/ToEigen helpers — test-only | delete | -270 | RobustPCA + ToEigen → Task; QR/LeastSquares vertagen (GEOM-013 QEF) | teilweise: Maps tragen `MapProperty`; METHOD-048 nennt QR-Reuse. RobustPCA/ToEigen dagegen isoliert. Properties.cppm:622, METHOD-048:91. [≠ Claude: Ergänzung: Maps und METHOD-048] | RobustPCA behalten und korrigiert (2026-10-06) → `74135dfff`, `1a4fad901`; Anwendungen METHOD-066…075; Maps/QR bleiben |
+| GE16 | `IsFinite` copies → see X03 | reuse | (X03) | → X03 | bestätigt: Identische Vektorprüfungen und passender gemeinsamer Owner vorhanden; Spezialprüfungen separat behandeln. Graph.Vertex.Normals.cpp:32, Validation.cpp:35. [≠ Claude: Ja, zur Zyklusbegründung in X03] | Erledigt durch X03 (2026-10-06) |
+| GE17 | PLY header/scalar/colour machinery duplicated mesh vs point-cloud readers → `Geometry.IOText.hpp` | reuse | -200 | teilweise: großteils schon in Geometry.IOText.hpp (ef3202f03); Rest ≈60–100 → klein oder behalten | teilweise: Skalartypen/-lesen bereits gemeinsam; Headerparser und Farbnormalisierung weiterhin doppelt. IOText.hpp:177, HalfedgeMesh.IO.cpp:1710. | Behalten (2026-10-06): Rest klein |
+| GE18 | Octree `SplitPoint::Median` / `ComputeMedianCenter` — test-only | delete | -80 | bestätigt (niedrige Prio) → Task oder behalten | bestätigt: Median wird außerhalb des eigenen Dispatchs nur in Octree-Tests gewählt; produktive Nutzer wählen Center/Mean. Octree.cpp:694, Test_Octree.cpp:178. | Als Produktionsvariante (2026-10-06) → RUNTIME-324 |
+| GE19 | PointSampling mirror enums/struct duplicating ProgressivePoisson types | yagni | -60 | teilweise: Spiegel schützt Modulgrenze zur Referenz-Impl → behalten | teilweise: Spiegelung real, aber lebende API-Adaption; Referenzconfig besitzt zusätzlich `HashLoadFactor`. GEOM-111/RUNTIME-289 betroffen. PointSampling.cpp:350, ProgressivePoissonReference.hpp:76. | Behalten (2026-10-06): lebende API-Adaption |
+| GE20 | `IsDelaunay`, `DelaunayFlip`, `CalculateNormals`, `GenerateUVs`, `TargetValence`, `KeepLargestComponent` — 0 callers | delete | -80 | Delaunay + CalculateNormals/GenerateUVs → Task; TargetValence intern genutzt; KeepLargestComponent → einordnen GEOM-110 | teilweise: `TargetValence` läuft im Remeshing; übrige Außenfunktionen ohne Verbraucher. GEOM-110/115 überschneiden sich. HalfedgeMesh.Utils.cpp:1197, Remeshing.cpp:202. | Task + Umsetzung (2026-10-06) → `f8b30e452`; TargetValence/KeepLargestComponent bleiben |
+| GE21 | Vertex attribute-transfer rule hooks — test-only | delete | -70 | bestätigt (nur Test), Hook im Kern verdrahtet → behalten oder kleiner Task | teilweise: Regeln nur testseitig gesetzt; Hooks implementieren dennoch geprüfte Property-Übertragung bei Split/Collapse. HalfedgeMesh.cpp:1666, Test_GeometryAttributePropagation.cpp:95. [≠ Claude: Ja, Bewertung enger] | Behalten (2026-10-06): geprüfte Property-Übertragung |
+| GE22 | Statistics `Skewness`, `Kurtosis`, variances, `SafeAsin` — test-only | delete | -50 | bestätigt → kleiner Task oder behalten | bestätigt: Genannte Abfragen nur Statistiktests; kein offener konkreter Verbraucher gefunden. Momentenakkumulation getrennt betrachten. Statistics.cpp:75, Test_Statistics.cpp:56. | Task + Umsetzung (2026-10-06) → `774fbe05f` |
+| GE23 | `PointCloudIO::LoadPTS`, public NN-histogram/periodogram wrappers | delete | -50 | LoadPTS: PTS wird auf LoadXYZ geroutet → Task (Routing-Entscheid); QualityMetrics widerlegt (GEOM-087) | teilweise: LoadPTS ungerufen, aber strenger als XYZ; Periodogrammkern intern genutzt. Wrapper und GEOM-087-Orakel unterscheiden. PointCloud.IO.cpp:1436, QualityMetrics.cpp:760. [≠ Claude: Präzisierung des Sammelurteils] | `.pts` → erweitertes `LoadPTS` (2026-10-06) → `098d47df9`, `bfb28b400` |
+| GE24 | `RandomRotation`, `ChordalDistance`, `ApproxEqual` — 0 production callers | delete | -40 | RandomRotation/ChordalDistance teilweise (Test-Orakel) → behalten; ApproxEqual 0 Aufrufer → Task | teilweise: RandomRotation/ChordalDistance prüfen auch bestehende Rotationsoperationen; ApproxEqual ohne Aufrufer. Test_Rotation.cpp:64, RobustPredicates.cpp:12. | Nur ApproxEqual (2026-10-06) → `930d28c55` |
+| GE25 | File-local `kPi` ×4 → `std::numbers::pi` | stdlib | -10 | bestätigt → trivial, mit GE06 bündeln | bestätigt: Vier lokale Double-π-Konstanten; `std::numbers::pi` passt typgleich. Rotation.cpp:18, HalfedgeMesh.Quality.cpp:25. | Task + Umsetzung (2026-10-06) → `ed8968d7b` |
 
 ### PK — Codex-Audit-Gruppen ohne Gegenstück im Claude-Audit
 | ID | Fund | Tag | Schätz. | Claude | Codex | Operator |
@@ -776,6 +776,49 @@ E06 nutzt `nlohmann::ordered_json`, damit die Schlüsselreihenfolge des
 v1-Reports erhalten bleibt. Der Validator prüft jetzt alle Schlüssel und
 Typen sowie genau die 24 Phasennamen.
 
+## Etappe E7 — Entscheidungen und Umsetzung 2026-10-06
+
+Geometry ist teils Forschungsbibliothek. Der Operator hat am 2026-10-06
+entschieden:
+
+- GE04, GE05, GE06 und GE14 werden nicht gelöscht. Sie bekommen je einen
+  Task für die End-to-End-Integration mit UI und MCP: RUNTIME-320 bis 323.
+- GE18 (Median-Split) kommt als wählbare Produktionsvariante: RUNTIME-324.
+- GE02, GE22 und GE07 werden gelöscht.
+- Die Kleinteile GE25, GE24, GE12 und GE20 werden umgesetzt.
+- GE23 leitet `.pts` künftig an `LoadPTS`. Nach der Codex-Analyse der
+  Verhaltensunterschiede wurde `LoadPTS` erweitert: Es akzeptiert auch 6
+  Spalten und zeigt Intensität als Grau. Bei falscher Punktanzahl, defekten
+  Zeilen und Scanmarkern bleibt es strikt.
+
+GE15 RobustPCA: Auf Operatorfrage prüfte Codex die Implementierung. Es
+handelt sich um Principal Component Pursuit (Candès et al. 2011) per ADMM.
+Die Updates sind korrekt, aber das Abbruchkriterium prüfte nur den primalen
+Rest und konnte nicht optimale Lösungen als Erfolg melden; das exakte
+Gegenbeispiel ist M=[1], λ=0,5, μ=2. Behoben in `74135dfff` mit dualem
+Kriterium, stabilen Normen, Eingabe- und SVD-Statusprüfungen sowie Tests,
+die gegen den alten Stand scheitern. Den Überlauf-Gegenfall aus dem Review
+behebt `1a4fad901`. Auf Operatorwunsch wurden alle Anwendungen als Tasks
+angelegt: METHOD-066 bis 075, mit fehlender Infrastruktur als ausdrücklicher
+Voraussetzung. Zwei Kernel-Grenzen sind dort vermerkt: volle SVD pro
+Iteration und keine Maske für fehlende Einträge.
+
+Ablauf: Codex-Analyse und -Plan, Umsetzung durch zwei Claude-Subagenten
+(Code; Tasks), dann Codex-Review und Fixes. Basisrevision `e47a1484b`.
+
+| Teil | Commits | Codex-Review |
+|---|---|---|
+| GE25, GE24, GE12, GE20, GE22, GE07 | `ed8968d7b`, `930d28c55`, `30fa56363`, `f8b30e452`, `774fbe05f`, `a6d9f7ba0` | freigeben |
+| GE02 | `7d7166816`, `e9cbbd183` | Anmerkung (Roadmap) → behoben |
+| GE15 | `74135dfff`, `1a4fad901` | nachbessern (Überlauf umging `NonFinite`) → behoben |
+| GE23 | `098d47df9`, `bfb28b400` | Anmerkung (Gleichwertigkeit nur 3/4/6/7 Spalten) → behoben |
+| Tasks RUNTIME-320…324, METHOD-066…075 | `15ec18553`, `92da21fb7`, `7080d63b4` | nachbessern (Domänen, CPU-Backend, Testfilter, neue Suites) → behoben |
+
+Gesamtprüfung: Der Vollbuild aller `ci`-Ziele ist grün. Die kombinierten
+Geometry- und Runtime-Suites ohne `gpu|vulkan|slow` liefen 526/526 grün.
+`PointConstructionGpuSmoke.*` (2/2) läuft auf `ci-vulkan` grün; im
+`ci`-Baum ohne operatives Vulkan läuft er nur in den Timeout.
+
 ## Prüfhinweise aus dem Codex-Audit
 
 Die folgenden Hinweise stammen aus den zwölf Ausgangsgruppen des Codex-Audits
@@ -1113,3 +1156,9 @@ Prüfung der betroffenen Annahmen, nicht den Neustart der gesamten Liste.
   E15 und E16 bleiben, das UI-Bündel E03/E07/E08 ist vertagt. Details in
   §„Etappe E6 — Entscheidungen und Umsetzung 2026-10-06“. Nächste Etappe:
   E7 (GE01–GE25).
+- 2026-10-06: Etappe E7 entschieden und umgesetzt. GE02, GE07, GE12, GE20,
+  GE22, GE24 und GE25 sind umgesetzt, GE23 ist auf ein erweitertes `LoadPTS`
+  umgestellt, RobustPCA ist korrigiert. Neue Tasks: RUNTIME-320…324 und
+  METHOD-066…075. Damit sind alle 132 Inventarzeilen vom Operator
+  entschieden. Details in §„Etappe E7 — Entscheidungen und Umsetzung
+  2026-10-06“.
