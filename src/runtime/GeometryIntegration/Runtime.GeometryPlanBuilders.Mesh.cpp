@@ -112,14 +112,6 @@ namespace Extrinsic::Runtime
 
     MeshPlanBuildResult BuildMeshGeometryPlan(
         const ECS::Components::GeometrySources::ConstSourceView& view,
-        const GeometryPlanBuildRequest& request,
-        MeshPackBuffer& outBuffer)
-    {
-        return BuildMeshGeometryPlan(view, nullptr, request, outBuffer);
-    }
-
-    MeshPlanBuildResult BuildMeshGeometryPlan(
-        const ECS::Components::GeometrySources::ConstSourceView& view,
         const VertexChannelBindingSet* channelBindings,
         const GeometryPlanBuildRequest& request,
         MeshPackBuffer& outBuffer)

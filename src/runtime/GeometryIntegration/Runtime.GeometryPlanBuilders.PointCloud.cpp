@@ -50,15 +50,6 @@ namespace Extrinsic::Runtime
 
     PointCloudPlanBuildResult BuildPointCloudGeometryPlan(
         const ECS::Components::GeometrySources::ConstSourceView& view,
-        const GeometryPlanBuildRequest& request,
-        PointCloudPackBuffer& outBuffer)
-    {
-        return BuildPointCloudGeometryPlan(
-            view, nullptr, request, outBuffer);
-    }
-
-    PointCloudPlanBuildResult BuildPointCloudGeometryPlan(
-        const ECS::Components::GeometrySources::ConstSourceView& view,
         const VertexChannelBindingSet* channelBindings,
         const GeometryPlanBuildRequest& request,
         PointCloudPackBuffer& outBuffer)
@@ -88,8 +79,8 @@ namespace Extrinsic::Runtime
         {
             return Failure(PointCloudPackStatus::EmptyCloud, outBuffer);
         }
-        outBuffer.VertexBytes.resize(sizeof(PointCloudVertex) * pointCount);
-        auto* vData = reinterpret_cast<PointCloudVertex*>(outBuffer.VertexBytes.data());
+        outBuffer.VertexBytes.resize(sizeof(PositionUvVertex) * pointCount);
+        auto* vData = reinterpret_cast<PositionUvVertex*>(outBuffer.VertexBytes.data());
 
         constexpr float kInf = std::numeric_limits<float>::infinity();
         glm::vec3 minP{+kInf, +kInf, +kInf};
@@ -102,7 +93,7 @@ namespace Extrinsic::Runtime
             {
                 return Failure(PointCloudPackStatus::NonFinitePosition, outBuffer);
             }
-            vData[i] = PointCloudVertex{p.x, p.y, p.z, 0.0f, 0.0f};
+            vData[i] = PositionUvVertex{p.x, p.y, p.z, 0.0f, 0.0f};
             minP = glm::min(minP, p);
             maxP = glm::max(maxP, p);
         }

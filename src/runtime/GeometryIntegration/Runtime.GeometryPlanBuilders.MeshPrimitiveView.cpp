@@ -160,8 +160,8 @@ namespace Extrinsic::Runtime
             MeshPrimitiveViewStatus& status) noexcept
         {
             const std::size_t vertexCount = positions.size();
-            outBuffer.VertexBytes.resize(sizeof(MeshPrimitiveVertex) * vertexCount);
-            auto* vData = reinterpret_cast<MeshPrimitiveVertex*>(outBuffer.VertexBytes.data());
+            outBuffer.VertexBytes.resize(sizeof(PositionUvVertex) * vertexCount);
+            auto* vData = reinterpret_cast<PositionUvVertex*>(outBuffer.VertexBytes.data());
 
             constexpr float kInf = std::numeric_limits<float>::infinity();
             minP = glm::vec3{+kInf, +kInf, +kInf};
@@ -175,7 +175,7 @@ namespace Extrinsic::Runtime
                     status = MeshPrimitiveViewStatus::NonFinitePosition;
                     return false;
                 }
-                vData[i] = MeshPrimitiveVertex{p.x, p.y, p.z, 0.0f, 0.0f};
+                vData[i] = PositionUvVertex{p.x, p.y, p.z, 0.0f, 0.0f};
                 minP = glm::min(minP, p);
                 maxP = glm::max(maxP, p);
             }

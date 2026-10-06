@@ -142,7 +142,7 @@ TEST(VertexChannelStreams, CountMismatchLeavesChannelAbsent)
 
 TEST(VertexChannelStreams, PositionUvLayoutMatchesLineAndPointStride)
 {
-    // GraphVertex / PointCloudVertex: position (12B) @0, texcoord (8B) @12,
+    // PositionUvVertex: position (12B) @0, texcoord (8B) @12,
     // stride 20.
     const std::pair<VertexChannel, std::uint32_t> channels[] = {
         {VertexChannel::Position, sizeof(glm::vec3)},

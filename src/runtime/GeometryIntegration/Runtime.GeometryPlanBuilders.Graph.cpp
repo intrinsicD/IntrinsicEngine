@@ -94,17 +94,6 @@ namespace Extrinsic::Runtime
         const ECS::Components::GeometrySources::ConstSourceView& view,
         const bool wantLines,
         const bool wantPoints,
-        const GeometryPlanBuildRequest& request,
-        GraphPackBuffer& outBuffer)
-    {
-        return BuildGraphGeometryPlan(
-            view, wantLines, wantPoints, nullptr, request, outBuffer);
-    }
-
-    GraphPlanBuildResult BuildGraphGeometryPlan(
-        const ECS::Components::GeometrySources::ConstSourceView& view,
-        const bool wantLines,
-        const bool wantPoints,
         const VertexChannelBindingSet* channelBindings,
         const GeometryPlanBuildRequest& request,
         GraphPackBuffer& outBuffer)
@@ -175,8 +164,8 @@ namespace Extrinsic::Runtime
             }
         }
 
-        outBuffer.VertexBytes.resize(sizeof(GraphVertex) * nodeCount);
-        auto* vData = reinterpret_cast<GraphVertex*>(outBuffer.VertexBytes.data());
+        outBuffer.VertexBytes.resize(sizeof(PositionUvVertex) * nodeCount);
+        auto* vData = reinterpret_cast<PositionUvVertex*>(outBuffer.VertexBytes.data());
         const auto nodeCountU32 = static_cast<std::uint32_t>(nodeCount);
 
         constexpr float kInf = std::numeric_limits<float>::infinity();
@@ -190,7 +179,7 @@ namespace Extrinsic::Runtime
             {
                 return Failure(GraphPackStatus::NonFinitePosition, outBuffer);
             }
-            vData[i] = GraphVertex{p.x, p.y, p.z, 0.0f, 0.0f};
+            vData[i] = PositionUvVertex{p.x, p.y, p.z, 0.0f, 0.0f};
             minP = glm::min(minP, p);
             maxP = glm::max(maxP, p);
         }

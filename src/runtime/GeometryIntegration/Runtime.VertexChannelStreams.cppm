@@ -1,3 +1,4 @@
+// Declares vertex-channel layouts and SoA channel streams that geometry plan builders hand to graphics uploads.
 module;
 
 #include <cstddef>
@@ -30,7 +31,7 @@ export namespace Extrinsic::Runtime
     };
 
     // Declarative interleaved vertex layout: ordered channels + total stride.
-    // Mirrors the existing MeshVertex / GraphVertex / PointCloudVertex structs.
+    // Mirrors the existing MeshVertex / PositionUvVertex structs.
     struct VertexLayout
     {
         std::vector<VertexChannelLayout> Channels{};

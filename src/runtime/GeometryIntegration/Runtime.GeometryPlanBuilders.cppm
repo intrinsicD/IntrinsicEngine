@@ -134,15 +134,13 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] MeshPlanBuildResult BuildMeshGeometryPlan(
         const ECS::Components::GeometrySources::ConstSourceView& view,
-        const GeometryPlanBuildRequest& request,
-        MeshPackBuffer& outBuffer);
-    [[nodiscard]] MeshPlanBuildResult BuildMeshGeometryPlan(
-        const ECS::Components::GeometrySources::ConstSourceView& view,
         const VertexChannelBindingSet* channelBindings,
         const GeometryPlanBuildRequest& request,
         MeshPackBuffer& outBuffer);
 
-    struct GraphVertex
+    // Packed position+texcoord AoS vertex shared by graph, point-cloud and
+    // mesh-primitive-view uploads; graphics splits it at offsets 0 and 12.
+    struct PositionUvVertex
     {
         float Px = 0.0f;
         float Py = 0.0f;
@@ -150,7 +148,12 @@ export namespace Extrinsic::Runtime
         float U = 0.0f;
         float V = 0.0f;
     };
-    static_assert(sizeof(GraphVertex) == 20u);
+    static_assert(sizeof(PositionUvVertex) == 20u);
+    static_assert(offsetof(PositionUvVertex, Px) == 0u);
+    static_assert(offsetof(PositionUvVertex, Py) == 4u);
+    static_assert(offsetof(PositionUvVertex, Pz) == 8u);
+    static_assert(offsetof(PositionUvVertex, U) == 12u);
+    static_assert(offsetof(PositionUvVertex, V) == 16u);
 
     struct GraphPackBuffer
     {
@@ -184,25 +187,9 @@ export namespace Extrinsic::Runtime
         const ECS::Components::GeometrySources::ConstSourceView& view,
         bool wantLines,
         bool wantPoints,
-        const GeometryPlanBuildRequest& request,
-        GraphPackBuffer& outBuffer);
-    [[nodiscard]] GraphPlanBuildResult BuildGraphGeometryPlan(
-        const ECS::Components::GeometrySources::ConstSourceView& view,
-        bool wantLines,
-        bool wantPoints,
         const VertexChannelBindingSet* channelBindings,
         const GeometryPlanBuildRequest& request,
         GraphPackBuffer& outBuffer);
-
-    struct PointCloudVertex
-    {
-        float Px = 0.0f;
-        float Py = 0.0f;
-        float Pz = 0.0f;
-        float U = 0.0f;
-        float V = 0.0f;
-    };
-    static_assert(sizeof(PointCloudVertex) == 20u);
 
     struct PointCloudPackBuffer
     {
@@ -230,23 +217,9 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] PointCloudPlanBuildResult BuildPointCloudGeometryPlan(
         const ECS::Components::GeometrySources::ConstSourceView& view,
-        const GeometryPlanBuildRequest& request,
-        PointCloudPackBuffer& outBuffer);
-    [[nodiscard]] PointCloudPlanBuildResult BuildPointCloudGeometryPlan(
-        const ECS::Components::GeometrySources::ConstSourceView& view,
         const VertexChannelBindingSet* channelBindings,
         const GeometryPlanBuildRequest& request,
         PointCloudPackBuffer& outBuffer);
-
-    struct MeshPrimitiveVertex
-    {
-        float Px = 0.0f;
-        float Py = 0.0f;
-        float Pz = 0.0f;
-        float U = 0.0f;
-        float V = 0.0f;
-    };
-    static_assert(sizeof(MeshPrimitiveVertex) == 20u);
 
     struct MeshPrimitiveViewBuffer
     {
