@@ -9,25 +9,6 @@ module Geometry.RobustPredicates;
 
 namespace Geometry::RobustPredicates
 {
-[[nodiscard]] bool ApproxEqual(double a, double b, double scale,
-                                          double relative) noexcept
-    {
-        const double diff = a - b;
-        const double eps = ScaledEpsilon(scale, relative);
-        return (diff < 0.0 ? -diff : diff) <= eps;
-    }
-
-[[nodiscard]] bool ApproxEqual(const glm::vec3& a, const glm::vec3& b,
-                                          double scale,
-                                          double relative) noexcept
-    {
-        const double eps = ScaledEpsilon(scale, relative);
-        const double dx = static_cast<double>(a.x) - static_cast<double>(b.x);
-        const double dy = static_cast<double>(a.y) - static_cast<double>(b.y);
-        const double dz = static_cast<double>(a.z) - static_cast<double>(b.z);
-        return (dx * dx + dy * dy + dz * dz) <= eps * eps;
-    }
-
 [[nodiscard]] SignedResult ApproxZeroSqDiagnostic(double valueSq,
                                                              double scale,
                                                              double relative) noexcept

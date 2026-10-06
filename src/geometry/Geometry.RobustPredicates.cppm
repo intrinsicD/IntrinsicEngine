@@ -1,3 +1,4 @@
+// Filtered geometric predicates with explicit uncertainty for geometry algorithms.
 module;
 
 #include <algorithm>
@@ -136,13 +137,6 @@ export namespace Geometry::RobustPredicates
         const double scaled = relative * absScale;
         return scaled > floor ? scaled : floor;
     }
-
-    [[nodiscard]] bool ApproxEqual(double a, double b, double scale,
-                                          double relative = 1.0e-9) noexcept;
-
-    [[nodiscard]] bool ApproxEqual(const glm::vec3& a, const glm::vec3& b,
-                                          double scale,
-                                          double relative = 1.0e-9) noexcept;
 
     // -----------------------------------------------------------------------
     // Scale-aware zero-magnitude tests (GEOM-015 Slice 1).

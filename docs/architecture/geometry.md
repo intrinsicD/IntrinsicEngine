@@ -1268,7 +1268,7 @@ Slice 1. Callers `import Geometry.RobustPredicates;` explicitly. Surface:
 - `ClassifyTriangleBarycentric(a, b, c, query)` returning
   `BarycentricResult { Region, WA, WB, WC, PlaneDistance }` with
   `BarycentricRegion ∈ {VertexA/B/C, EdgeAB/BC/CA, Interior, Outside, Degenerate, Uncertain}`.
-- Scale-aware helpers `ScaledEpsilon(scale, relative)` and `ApproxEqual`.
+- Scale-aware helper `ScaledEpsilon(scale, relative)`.
 
 Numerical policy and limitations:
 
