@@ -48,3 +48,7 @@ Compile-iteration manifests may map scenario paths and `probe_sources` by source
 arm when implementations move. Each arm touches the current owner and verifies
 its declared producers; target timings include every shared owner and link. See
 [analysis runner](../../tools/analysis/README.md).
+`engine_compile_iteration_renderer_surface` measures its two fixed historical
+source revisions, touching `Graphics.ForwardSystem.cppm` at each. Later edits to
+that interface (REVIEW-007 G08 removed its pimpl) do not invalidate the recorded
+results, and no build-time claim is made for G08 without a new matched run.

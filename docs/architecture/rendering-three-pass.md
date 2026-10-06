@@ -302,6 +302,8 @@ Empty or invalid culling-bucket inputs (`Capacity == 0u`, invalid args/count han
 
 The global camera-light packet now carries shadow cascade matrices, split/count data, bias/filter params, and atlas size/enabled flags. Forward and deferred shaders share that packet contract; later Vulkan/backend work may bind the atlas sampler, but CPU/null tests validate the packing without requiring a Vulkan device.
 
+`ForwardSystem` and `DeferredSystem` hold their initialization state directly (no heap state). Their passes record nothing until `Initialize()`; `Shutdown()` closes the gate again until the next `Initialize()`. Repeated calls are idempotent.
+
 `DeferredLightingPass` is the promoted `CompositionPass` command contract. With an initialized `DeferredSystem` and a configured pipeline it binds the fullscreen lighting pipeline, pushes the scene-table BDA, and records a fullscreen triangle draw that resolves canonical G-buffer resources into `SceneColorHDR`. Without the owning system or pipeline it records no commands.
 
 The `DeferredLightingPushConstants` packet stays scene-table-only (`SceneTableBDA` + alignment padding, total ≤ 128 bytes). Shader-side debug/lighting visualization modes are owned by `Pass.DebugView` and `DebugViewPushConstants`, not by the deferred lighting push constant. Future lighting-mode toggles (for example a typed deferred-PBR vs flat-debug split) land either on `LightEnvironmentPacket`/`CameraUBO` so forward and deferred share the state, or via an explicit follow-up task that justifies the budget cost on the deferred-lighting push constant; no preemptive field is reserved here.

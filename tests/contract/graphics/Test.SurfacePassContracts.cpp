@@ -124,15 +124,25 @@ TEST(GraphicsSurfacePassContracts, ForwardSurfaceRequiresInitializedSystemAndRec
     pass.Execute(uninitializedCmd, camera, world, culling, 4u);
     EXPECT_TRUE(uninitializedCmd.Events.empty());
 
+    EXPECT_FALSE(forward.IsInitialized());
     forward.Initialize();
+    forward.Initialize();
+    EXPECT_TRUE(forward.IsInitialized());
     MockCommandContext cmd;
     pass.Execute(cmd, camera, world, culling, 4u);
     ExpectSurfaceBucketDraw(cmd, world, culling, pipeline, 4u);
 
     forward.Shutdown();
+    forward.Shutdown();
+    EXPECT_FALSE(forward.IsInitialized());
     MockCommandContext shutdownCmd;
     pass.Execute(shutdownCmd, camera, world, culling, 4u);
     EXPECT_TRUE(shutdownCmd.Events.empty());
+
+    forward.Initialize();
+    MockCommandContext reinitCmd;
+    pass.Execute(reinitCmd, camera, world, culling, 4u);
+    ExpectSurfaceBucketDraw(reinitCmd, world, culling, pipeline, 4u);
 
     culling.Shutdown();
     world.Shutdown();
@@ -161,15 +171,25 @@ TEST(GraphicsSurfacePassContracts, DeferredGBufferRequiresInitializedSystemAndRe
     pass.Execute(uninitializedCmd, camera, world, culling, 5u);
     EXPECT_TRUE(uninitializedCmd.Events.empty());
 
+    EXPECT_FALSE(deferred.IsInitialized());
     deferred.Initialize();
+    deferred.Initialize();
+    EXPECT_TRUE(deferred.IsInitialized());
     MockCommandContext cmd;
     pass.Execute(cmd, camera, world, culling, 5u);
     ExpectSurfaceBucketDraw(cmd, world, culling, pipeline, 5u);
 
     deferred.Shutdown();
+    deferred.Shutdown();
+    EXPECT_FALSE(deferred.IsInitialized());
     MockCommandContext shutdownCmd;
     pass.Execute(shutdownCmd, camera, world, culling, 5u);
     EXPECT_TRUE(shutdownCmd.Events.empty());
+
+    deferred.Initialize();
+    MockCommandContext reinitCmd;
+    pass.Execute(reinitCmd, camera, world, culling, 5u);
+    ExpectSurfaceBucketDraw(reinitCmd, world, culling, pipeline, 5u);
 
     culling.Shutdown();
     world.Shutdown();
