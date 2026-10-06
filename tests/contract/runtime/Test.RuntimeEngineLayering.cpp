@@ -1038,9 +1038,7 @@ TEST(RuntimeEngineLayering, AsyncWorkModulePublishesOnlyKernelJobService)
     EXPECT_NE(moduleImpl.find(
                   "Withdraw<JobService>(context.Jobs)"),
               std::string::npos);
-    EXPECT_NE(moduleImpl.find("jobs.SnapshotAll()"), std::string::npos);
-    EXPECT_NE(moduleImpl.find("jobs.Cancel(survivor.Token)"),
-              std::string::npos);
+    EXPECT_NE(moduleImpl.find("context.Jobs.CancelAll()"), std::string::npos);
     EXPECT_EQ(moduleImpl.find("StreamingExecutor"), std::string::npos);
     EXPECT_EQ(moduleImpl.find("DerivedJobRegistry"), std::string::npos);
 

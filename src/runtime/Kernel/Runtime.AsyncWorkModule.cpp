@@ -11,15 +11,6 @@ import Extrinsic.Runtime.ServiceRegistry;
 
 namespace Extrinsic::Runtime
 {
-    namespace
-    {
-        void CancelJobServiceSurvivors(JobService& jobs)
-        {
-            for (const JobSnapshot& survivor : jobs.SnapshotAll())
-                (void)jobs.Cancel(survivor.Token);
-        }
-    }
-
     std::string_view AsyncWorkModule::Name() const noexcept
     {
         return "Runtime.AsyncWorkModule";
@@ -52,9 +43,9 @@ namespace Extrinsic::Runtime
 
         // Stop publishing the borrowed kernel service before later modules in
         // reverse shutdown order run, then request cancellation for every
-        // survivor. The engine owns worker quiescence after module shutdown.
+        // survivor. Engine already ran CancelAndDrain() before module shutdown.
         (void)context.Services.Withdraw<JobService>(context.Jobs);
-        CancelJobServiceSurvivors(context.Jobs);
+        (void)context.Jobs.CancelAll();
         m_Registered = false;
     }
 }

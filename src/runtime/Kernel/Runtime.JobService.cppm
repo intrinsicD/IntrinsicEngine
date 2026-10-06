@@ -338,6 +338,10 @@ namespace Extrinsic::Runtime
         // tests use this to force the cancellation/finalizer ordering without
         // sleeps or scheduler timing assumptions.
         std::function<void(JobToken)> BeforeWorkerUnpublishedQueued{};
+
+        // Invoked on the cancelling thread, outside the service mutex, after a
+        // cancellation request is newly set. Contract tests observe order.
+        std::function<void(JobToken)> AfterCancelRequested{};
     };
 
     export class JobService
@@ -360,6 +364,8 @@ namespace Extrinsic::Runtime
         [[nodiscard]] JobToken Submit(JobDesc desc);
         [[nodiscard]] bool Cancel(JobToken token);
         [[nodiscard]] std::uint64_t CancelAllForWorld(WorldHandle world);
+        // Requests cancellation of every live job in ascending token order;
+        // returns how many requests were newly set.
         [[nodiscard]] std::uint64_t CancelAll();
 
         // A terminal state that still owes an unpublished main-thread

@@ -500,12 +500,13 @@ namespace Extrinsic::Runtime
             if (!job || IsTerminal(job->State.load(std::memory_order_acquire)))
                 return false;
 
-            const bool alreadyCancelled =
-                job->CancelRequested->exchange(true, std::memory_order_acq_rel);
-            if (!alreadyCancelled)
-                m_State->Stats.CancelledJobs += 1;
-            return !alreadyCancelled;
+            if (job->CancelRequested->exchange(true, std::memory_order_acq_rel))
+                return false;
+            m_State->Stats.CancelledJobs += 1;
         }
+        if (m_State->TestHooks.AfterCancelRequested)
+            m_State->TestHooks.AfterCancelRequested(token);
+        return true;
     }
 
     std::uint64_t JobService::CancelAllForWorld(const WorldHandle world)
@@ -549,6 +550,8 @@ namespace Extrinsic::Runtime
                     tokens.push_back(token);
             }
         }
+        // Token order, not map order, so cancellation requests are deterministic.
+        std::sort(tokens.begin(), tokens.end());
 
         std::uint64_t cancelled = 0;
         for (const JobToken token : tokens)

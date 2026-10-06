@@ -817,6 +817,61 @@ TEST(RuntimeJobService, CancelAllForWorldOnlyCancelsMatchingScope)
     EXPECT_EQ(jobs.GetState(tokenB), Runtime::JobState::AwaitingGate);
 }
 
+TEST(RuntimeJobService, CancelAllCancelsLiveJobsInTokenOrderAndCountsNewRequests)
+{
+    SchedulerScope scheduler{1};
+    std::atomic<bool> blockerStarted{false};
+    std::atomic<bool> releaseBlocker{false};
+    Extrinsic::Core::Tasks::Scheduler::Dispatch(
+        [&]
+        {
+            blockerStarted.store(true, std::memory_order_release);
+            while (!releaseBlocker.load(std::memory_order_acquire))
+                std::this_thread::sleep_for(1ms);
+        });
+    ASSERT_TRUE(WaitUntil(
+        [&] { return blockerStarted.load(std::memory_order_acquire); }));
+
+    std::vector<Runtime::JobToken> cancelOrder;
+    Runtime::JobService jobs{Runtime::JobServiceTestHooks{
+        .AfterCancelRequested = [&](const Runtime::JobToken token) { cancelOrder.push_back(token); },
+    }};
+    EXPECT_EQ(jobs.CancelAll(), 0u);
+
+    std::atomic<int> ran{0};
+    std::vector<Runtime::JobToken> tokens;
+    for (int i = 0; i < 32; ++i)
+    {
+        tokens.push_back(jobs.Submit(Runtime::MakeCpuJobDesc<JobProbeResult>(
+            "cancel all", Runtime::WorldHandle{static_cast<std::uint32_t>(1 + i % 2), 1u},
+            [&ran](const Runtime::JobCancellation&)
+            {
+                ran.fetch_add(1, std::memory_order_acq_rel);
+                return JobProbeResult{.Value = 1};
+            },
+            [](const JobProbeResult& result)
+            { return JobSuppressedCompleted{.Value = result.Value}; })));
+        ASSERT_TRUE(tokens.back().IsValid());
+    }
+
+    ASSERT_TRUE(jobs.Cancel(tokens[5]));
+    cancelOrder.clear();
+    EXPECT_EQ(jobs.CancelAll(), tokens.size() - 1u);
+    EXPECT_EQ(jobs.CancelAll(), 0u) << "repeat requests are not counted again";
+    EXPECT_EQ(jobs.Stats().CancelledJobs, tokens.size());
+
+    std::vector<Runtime::JobToken> expected = tokens;
+    expected.erase(expected.begin() + 5);
+    std::sort(expected.begin(), expected.end());
+    EXPECT_EQ(cancelOrder, expected);
+
+    releaseBlocker.store(true, std::memory_order_release);
+    Extrinsic::Core::Tasks::Scheduler::WaitForAll();
+    EXPECT_EQ(ran.load(std::memory_order_acquire), 0);
+    for (const Runtime::JobToken token : tokens)
+        EXPECT_EQ(jobs.GetState(token), Runtime::JobState::Cancelled);
+}
+
 TEST(RuntimeJobService, InvalidSubmissionsCountAsRejectedWithoutRunning)
 {
     if (Extrinsic::Core::Tasks::Scheduler::IsInitialized())
