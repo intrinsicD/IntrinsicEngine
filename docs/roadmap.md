@@ -275,7 +275,7 @@ build/test gates.
 
 ### Geometry Processing — Remaining
 
-Core operators are complete (16 mesh operators + DEC + graph builders/layouts + collision/spatial queries). Remaining:
+Core operators are complete (16 mesh operators + DEC + graph builders + collision/spatial queries). Remaining:
 - **Exact Boolean CSG:** Robust triangle clipping + stitched remeshing for partial-overlap union/intersection/difference. The baseline (disjoint/full-containment) is done.
 - **GPU K-means clustering:** deferred until a method/backend task proves a
   concrete workload and chooses an opt-in compute backend.
