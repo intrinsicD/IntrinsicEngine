@@ -1507,10 +1507,11 @@ TEST(GeometryIO_PointCloudIO, LoadsPTSFixture)
     }
 }
 
-// `.pts` used to route through LoadXYZ; LoadPTS must keep every layout that
-// path accepted with the same colors: x y z, x y z i (gray = intensity, values
+// `.pts` used to route through LoadXYZ. For LoadPTS's accepted 3/4/6/7-column
+// layouts both readers must agree: x y z, x y z i (gray = intensity, values
 // above 1 divided by 255, then clamped to [0, 1]), x y z r g b and x y z i r g b.
-TEST(GeometryIO_PointCloudIO, PTSAcceptsXyzCompatibleLayoutsWithMatchingColors)
+// Other column counts (e.g. 8, accepted by LoadXYZ) are rejected by LoadPTS.
+TEST(GeometryIO_PointCloudIO, PTSAcceptedLayoutsMatchXyzColors)
 {
     struct Case
     {

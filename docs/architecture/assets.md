@@ -52,6 +52,7 @@ OFF has a geometry writer and a mesh export route. Export UI remains separate
 work. PTS, PWN, CSV, 3D and TXT use their dedicated strict point-cloud loaders;
 XYZ/XYZRGB routes retain the permissive XYZ parser. PTS (`LoadPTS`) enforces an
 optional positive count header exactly and rejects malformed rows, scan-line
-markers and non-finite values with `InvalidFormat`, never a partial cloud; it
-still accepts every column layout the former XYZ routing did (see the geometry
-architecture note).
+markers and non-finite values with `InvalidFormat`, never a partial cloud. For
+its accepted 3/4/6/7-column layouts it produces the same positions and colors as
+the former XYZ routing (see the geometry architecture note); other column counts
+(for example 8, which `LoadXYZ` accepts) are rejected.
