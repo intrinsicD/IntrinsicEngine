@@ -1,3 +1,4 @@
+// Eigen-backed dense decompositions, GLM/Eigen adapters and robust PCA with geometry-owned diagnostics.
 module;
 
 #ifndef EIGEN_MPL2_ONLY
@@ -91,6 +92,10 @@ export namespace Geometry::Linalg
         NumericDiagnostics Diagnostics{};
     };
 
+    // Principal Component Pursuit, min ||L||_* + Lambda ||S||_1 s.t. M = L + S,
+    // solved by two-block ADMM with constant Mu and Y0 = 0. Success requires
+    // ||M - L - S||_F <= Tolerance * ||M||_F and the dual residual
+    // Mu * ||S_k+1 - S_k||_F <= Tolerance * max(1, ||Y_k+1||_F).
     struct RobustPCAOptions
     {
         // Zero selects 1 / sqrt(max(rows, cols)).
@@ -99,6 +104,7 @@ export namespace Geometry::Linalg
         double Mu{0.0};
         std::size_t MaxIterations{1000};
         double Tolerance{1.0e-7};
+        // Absolute singular-value threshold for the reported rank; scale it with M.
         double RankTolerance{1.0e-8};
     };
 
@@ -358,6 +364,8 @@ export namespace Geometry::Linalg
     [[nodiscard]] EigenDenseMap MapVec3Array(std::span<glm::dvec3> values);
     [[nodiscard]] ConstEigenDenseMap MapVec3Array(std::span<const glm::dvec3> values);
 
+    // Fails closed (NoConvergence/NonFinite, empty factors) when Eigen reports a
+    // failure or produces non-finite factors.
     [[nodiscard]] SVDResult ComputeSVD(const DenseMatrix& matrix, double tolerance = 1e-12);
     [[nodiscard]] QRResult ComputeQR(const DenseMatrix& matrix, double tolerance = 1e-12);
     [[nodiscard]] SymmetricEigenResult ComputeSymmetricEigen(const DenseMatrix& matrix, double tolerance = 1e-12);
@@ -365,5 +373,8 @@ export namespace Geometry::Linalg
     [[nodiscard]] LeastSquaresResult SolveLeastSquares(const DenseMatrix& matrix,
                                                        std::span<const double> rhs,
                                                        double tolerance = 1e-12);
+    // Rejects empty, zero, malformed or Eigen-unrepresentable shapes and invalid
+    // options/thresholds with InvalidInput, non-finite input with NonFinite, and
+    // never publishes non-finite L/S. NoConvergence returns the last iterate.
     [[nodiscard]] RobustPCAResult RobustPCA(const DenseMatrix& matrix, const RobustPCAOptions& options = {});
 }

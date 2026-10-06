@@ -70,13 +70,24 @@
   exposes GLM round-trip adapters, explicit row-major and strided `Eigen::Map`
   helpers for contiguous scalar buffers and fixed-size GLM vector arrays, and
   dense decomposition wrappers that return geometry-owned diagnostics rather
-  than raw Eigen solver state. `RobustPCA` implements deterministic Principal
-  Component Pursuit / ADMM on top of `ComputeSVD`: lambda defaults to
-  `1 / sqrt(max(rows, cols))`, convergence is the relative Frobenius residual
-  `||M - L - S||_F / ||M||_F`, and empty, zero, non-finite, invalid-option, or
-  hard SVD-failure inputs return non-success `NumericStatus` diagnostics
-  without NaNs or asserts. Rank-deficient SVDs are accepted inside RPCA because
-  low rank is the expected solution shape.
+  than raw Eigen solver state; `ComputeSVD` fails closed when Eigen reports a
+  failure or returns non-finite factors. `RobustPCA` implements deterministic
+  Principal Component Pursuit (`min ||L||_* + lambda ||S||_1` subject to
+  `M = L + S`) by two-block ADMM with constant `mu` and zero initial dual on top
+  of `ComputeSVD`: lambda defaults to `1 / sqrt(max(rows, cols))` and mu to
+  `1.25 / ||M||_2`. Success requires both the primal criterion
+  `||M - L - S||_F <= Tolerance * ||M||_F` and the dual (stationarity) criterion
+  `mu * ||S_k+1 - S_k||_F <= Tolerance * max(1, ||Y_k+1||_F)`; a primal-only
+  rule can stop at a feasible but non-optimal split. Frobenius norms use hypot
+  accumulation, so finite inputs far from 1 (for example 1e200 or 1e-199) are
+  accepted, and with default mu the result is scale-equivariant. `RankTolerance`
+  is absolute. Empty, zero, malformed or index-overflowing shapes, non-finite
+  input, invalid options or unrepresentable thresholds (`1/mu`, `lambda/mu`),
+  and hard SVD failures return non-success `NumericStatus` diagnostics; non-finite
+  iterates report `NonFinite` with zeroed outputs, never NaNs or asserts.
+  Rank-deficient SVDs are accepted inside RPCA because low rank is the expected
+  solution shape. Exact recovery of a planted decomposition additionally needs
+  the usual incoherence/sparsity conditions; each iteration costs a full SVD.
 - `Geometry.Rotation` owns the shared SO(3) primitive surface: hat/vee, exp/log,
   geodesic and chordal distances, deterministic seeded random rotations,
   `ProjectOnSO3`, and optimal-rotation/Kabsch helpers for corresponded point

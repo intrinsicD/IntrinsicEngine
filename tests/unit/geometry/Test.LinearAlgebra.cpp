@@ -5,6 +5,7 @@
 #include <cmath>
 #include <limits>
 #include <span>
+#include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -21,11 +22,10 @@ namespace
         {
             for (std::size_t col = 0; col < a.Cols; ++col)
             {
-                const double delta = a(row, col) - b(row, col);
-                error += delta * delta;
+                error = std::hypot(error, a(row, col) - b(row, col));
             }
         }
-        return std::sqrt(error);
+        return error;
     }
 
     [[nodiscard]] double FrobeniusNorm(const Geometry::Linalg::DenseMatrix& matrix)
@@ -33,9 +33,9 @@ namespace
         double norm = 0.0;
         for (const double value : matrix.Values)
         {
-            norm += value * value;
+            norm = std::hypot(norm, value);
         }
-        return std::sqrt(norm);
+        return norm;
     }
 
     [[nodiscard]] double RelativeFrobeniusError(const Geometry::Linalg::DenseMatrix& a,
@@ -44,16 +44,46 @@ namespace
         return FrobeniusError(a, b) / std::max(FrobeniusNorm(b), 1.0);
     }
 
-    [[nodiscard]] bool HasNoNaNs(const Geometry::Linalg::DenseMatrix& matrix)
+    [[nodiscard]] bool AllFinite(const Geometry::Linalg::DenseMatrix& matrix)
     {
-        for (const double value : matrix.Values)
+        return std::ranges::all_of(matrix.Values, [](double value) { return std::isfinite(value); });
+    }
+
+    [[nodiscard]] Geometry::Linalg::DenseMatrix Scaled(Geometry::Linalg::DenseMatrix matrix, double scale)
+    {
+        for (double& value : matrix.Values)
         {
-            if (std::isnan(value))
+            value *= scale;
+        }
+        return matrix;
+    }
+
+    [[nodiscard]] Geometry::Linalg::DenseMatrix Identity2()
+    {
+        Geometry::Linalg::DenseMatrix identity(2, 2);
+        identity(0, 0) = 1.0;
+        identity(1, 1) = 1.0;
+        return identity;
+    }
+
+    [[nodiscard]] Geometry::Linalg::DenseMatrix OuterProduct(std::span<const double> u, std::span<const double> v)
+    {
+        Geometry::Linalg::DenseMatrix result(u.size(), v.size());
+        for (std::size_t row = 0; row < u.size(); ++row)
+        {
+            for (std::size_t col = 0; col < v.size(); ++col)
             {
-                return false;
+                result(row, col) = u[row] * v[col];
             }
         }
-        return true;
+        return result;
+    }
+
+    void ExpectFailsClosed(const Geometry::Linalg::RobustPCAResult& result, Geometry::Linalg::NumericStatus status)
+    {
+        EXPECT_EQ(result.Diagnostics.Status, status);
+        EXPECT_TRUE(AllFinite(result.LowRank));
+        EXPECT_TRUE(AllFinite(result.Sparse));
     }
 
     struct RobustPCASynthetic
@@ -308,14 +338,14 @@ TEST(LinearAlgebra, RobustPCAFailsClosedForDegenerateInput)
 {
     const Geometry::Linalg::RobustPCAResult empty = Geometry::Linalg::RobustPCA(Geometry::Linalg::DenseMatrix{});
     EXPECT_FALSE(empty.Diagnostics.Succeeded());
-    EXPECT_TRUE(HasNoNaNs(empty.LowRank));
-    EXPECT_TRUE(HasNoNaNs(empty.Sparse));
+    EXPECT_TRUE(AllFinite(empty.LowRank));
+    EXPECT_TRUE(AllFinite(empty.Sparse));
 
     Geometry::Linalg::DenseMatrix zero(2, 2);
     const Geometry::Linalg::RobustPCAResult zeroResult = Geometry::Linalg::RobustPCA(zero);
     EXPECT_FALSE(zeroResult.Diagnostics.Succeeded());
-    EXPECT_TRUE(HasNoNaNs(zeroResult.LowRank));
-    EXPECT_TRUE(HasNoNaNs(zeroResult.Sparse));
+    EXPECT_TRUE(AllFinite(zeroResult.LowRank));
+    EXPECT_TRUE(AllFinite(zeroResult.Sparse));
 
     Geometry::Linalg::DenseMatrix nonFinite(2, 2);
     nonFinite(0, 0) = 1.0;
@@ -325,8 +355,8 @@ TEST(LinearAlgebra, RobustPCAFailsClosedForDegenerateInput)
     const Geometry::Linalg::RobustPCAResult nonFiniteResult = Geometry::Linalg::RobustPCA(nonFinite);
     EXPECT_FALSE(nonFiniteResult.Diagnostics.Succeeded());
     EXPECT_EQ(nonFiniteResult.Diagnostics.Status, Geometry::Linalg::NumericStatus::NonFinite);
-    EXPECT_TRUE(HasNoNaNs(nonFiniteResult.LowRank));
-    EXPECT_TRUE(HasNoNaNs(nonFiniteResult.Sparse));
+    EXPECT_TRUE(AllFinite(nonFiniteResult.LowRank));
+    EXPECT_TRUE(AllFinite(nonFiniteResult.Sparse));
 
     Geometry::Linalg::RobustPCAOptions invalidOptions;
     invalidOptions.Tolerance = 0.0;
@@ -334,6 +364,176 @@ TEST(LinearAlgebra, RobustPCAFailsClosedForDegenerateInput)
         Geometry::Linalg::RobustPCA(MakeRobustPCASynthetic().Input, invalidOptions);
     EXPECT_FALSE(invalidOptionResult.Diagnostics.Succeeded());
     EXPECT_EQ(invalidOptionResult.Diagnostics.Status, Geometry::Linalg::NumericStatus::InvalidInput);
-    EXPECT_TRUE(HasNoNaNs(invalidOptionResult.LowRank));
-    EXPECT_TRUE(HasNoNaNs(invalidOptionResult.Sparse));
+    EXPECT_TRUE(AllFinite(invalidOptionResult.LowRank));
+    EXPECT_TRUE(AllFinite(invalidOptionResult.Sparse));
+}
+
+// M = [1], lambda = 0.5, mu = 2: the unique optimum is L = 0, S = 1 (objective
+// 0.5). Iteration 2 reaches L = S = 0.5 with zero primal residual (objective
+// 0.75); a primal-only stopping rule reported that point as Success.
+TEST(LinearAlgebra, RobustPCAScalarRequiresDualConvergence)
+{
+    Geometry::Linalg::DenseMatrix scalar(1, 1);
+    scalar(0, 0) = 1.0;
+    Geometry::Linalg::RobustPCAOptions options;
+    options.Lambda = 0.5;
+    options.Mu = 2.0;
+
+    const Geometry::Linalg::RobustPCAResult result = Geometry::Linalg::RobustPCA(scalar, options);
+    ASSERT_TRUE(result.Diagnostics.Succeeded());
+    EXPECT_NEAR(result.LowRank(0, 0), 0.0, 1.0e-12);
+    EXPECT_NEAR(result.Sparse(0, 0), 1.0, 1.0e-12);
+    EXPECT_EQ(result.Rank, 0u);
+
+    options.MaxIterations = 2;
+    const Geometry::Linalg::RobustPCAResult truncated = Geometry::Linalg::RobustPCA(scalar, options);
+    EXPECT_EQ(truncated.Diagnostics.Status, Geometry::Linalg::NumericStatus::NoConvergence);
+    EXPECT_EQ(truncated.Iterations, 2u);
+    EXPECT_TRUE(AllFinite(truncated.LowRank));
+    EXPECT_TRUE(AllFinite(truncated.Sparse));
+}
+
+// For M = I2 with default lambda = 1/sqrt(2), Y = lambda * I certifies L = 0, S = I.
+TEST(LinearAlgebra, RobustPCAIdentityWithDefaultsIsAllSparse)
+{
+    const Geometry::Linalg::DenseMatrix identity = Identity2();
+    const Geometry::Linalg::RobustPCAResult result = Geometry::Linalg::RobustPCA(identity);
+    ASSERT_TRUE(result.Diagnostics.Succeeded());
+    EXPECT_LT(FrobeniusNorm(result.LowRank), 1.0e-5);
+    EXPECT_LT(FrobeniusError(result.Sparse, identity), 1.0e-5);
+    EXPECT_EQ(result.Rank, 0u);
+}
+
+// Default mu = 1.25 / ||M||_2 makes PCP scale-equivariant; entries near 1e200
+// and 1e-199 overflow/underflow a plain sum-of-squares norm.
+TEST(LinearAlgebra, RobustPCAIsScaleEquivariantAtExtremeFiniteScales)
+{
+    const RobustPCASynthetic synthetic = MakeRobustPCASynthetic();
+    Geometry::Linalg::RobustPCAOptions options;
+    options.Lambda = 0.5;
+    options.Tolerance = 1.0e-6;
+    const Geometry::Linalg::RobustPCAResult reference = Geometry::Linalg::RobustPCA(synthetic.Input, options);
+    ASSERT_TRUE(reference.Diagnostics.Succeeded());
+
+    for (const double scale : {std::ldexp(1.0, 660), std::ldexp(1.0, -660)})
+    {
+        SCOPED_TRACE(scale);
+        Geometry::Linalg::RobustPCAOptions scaledOptions = options;
+        scaledOptions.RankTolerance = options.RankTolerance * scale; // RankTolerance is absolute.
+        const Geometry::Linalg::RobustPCAResult result =
+            Geometry::Linalg::RobustPCA(Scaled(synthetic.Input, scale), scaledOptions);
+        ASSERT_TRUE(result.Diagnostics.Succeeded());
+        EXPECT_EQ(result.Rank, reference.Rank);
+        EXPECT_LT(RelativeFrobeniusError(Scaled(result.LowRank, 1.0 / scale), reference.LowRank), 1.0e-8);
+        EXPECT_LT(RelativeFrobeniusError(Scaled(result.Sparse, 1.0 / scale), reference.Sparse), 1.0e-8);
+        EXPECT_LT(RelativeFrobeniusError(Scaled(result.LowRank, 1.0 / scale), synthetic.LowRank), 1.0e-4);
+    }
+}
+
+TEST(LinearAlgebra, RobustPCAKeepsRectangularRankOneInputLowRank)
+{
+    const std::array<double, 3> u{1.0, 2.0, 3.0};
+    const std::array<double, 5> v{1.0, 1.0, 1.0, 1.0, 1.0};
+    for (const Geometry::Linalg::DenseMatrix& input : {OuterProduct(u, v), OuterProduct(v, u)})
+    {
+        SCOPED_TRACE(input.Rows);
+        const Geometry::Linalg::RobustPCAResult result = Geometry::Linalg::RobustPCA(input);
+        ASSERT_TRUE(result.Diagnostics.Succeeded());
+        EXPECT_EQ(result.LowRank.Rows, input.Rows);
+        EXPECT_EQ(result.LowRank.Cols, input.Cols);
+        EXPECT_EQ(result.Rank, 1u);
+        EXPECT_LT(RelativeFrobeniusError(result.LowRank, input), 1.0e-4);
+        EXPECT_LT(FrobeniusNorm(result.Sparse), 1.0e-4);
+    }
+}
+
+TEST(LinearAlgebra, RobustPCARejectsMalformedAndOverflowingShapes)
+{
+    Geometry::Linalg::DenseMatrix mismatched;
+    mismatched.Rows = 2;
+    mismatched.Cols = 2;
+    mismatched.Values = {1.0, 2.0, 3.0};
+    ExpectFailsClosed(Geometry::Linalg::RobustPCA(mismatched), Geometry::Linalg::NumericStatus::InvalidInput);
+
+    // Rows * Cols wraps to 0 and to 1; both satisfy IsShapeValid() but must be
+    // rejected before any Rows/Cols-sized allocation.
+    constexpr std::size_t kMax = std::numeric_limits<std::size_t>::max();
+    Geometry::Linalg::DenseMatrix wrapsToZero;
+    wrapsToZero.Rows = kMax / 2 + 1;
+    wrapsToZero.Cols = 2;
+    ASSERT_TRUE(wrapsToZero.IsShapeValid());
+    const Geometry::Linalg::RobustPCAResult zeroResult = Geometry::Linalg::RobustPCA(wrapsToZero);
+    ExpectFailsClosed(zeroResult, Geometry::Linalg::NumericStatus::InvalidInput);
+    EXPECT_TRUE(zeroResult.LowRank.Values.empty());
+
+    Geometry::Linalg::DenseMatrix wrapsToOne;
+    wrapsToOne.Rows = kMax;
+    wrapsToOne.Cols = kMax;
+    wrapsToOne.Values = {1.0};
+    ASSERT_TRUE(wrapsToOne.IsShapeValid());
+    const Geometry::Linalg::RobustPCAResult oneResult = Geometry::Linalg::RobustPCA(wrapsToOne);
+    ExpectFailsClosed(oneResult, Geometry::Linalg::NumericStatus::InvalidInput);
+    EXPECT_TRUE(oneResult.LowRank.Values.empty());
+}
+
+TEST(LinearAlgebra, RobustPCARejectsNonFiniteInputAndInvalidOptions)
+{
+    for (const double bad : {std::numeric_limits<double>::infinity(),
+                             -std::numeric_limits<double>::infinity(),
+                             std::numeric_limits<double>::quiet_NaN()})
+    {
+        Geometry::Linalg::DenseMatrix input = Identity2();
+        input(1, 0) = bad;
+        ExpectFailsClosed(Geometry::Linalg::RobustPCA(input), Geometry::Linalg::NumericStatus::NonFinite);
+    }
+
+    const Geometry::Linalg::DenseMatrix input = MakeRobustPCASynthetic().Input;
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double inf = std::numeric_limits<double>::infinity();
+    const auto expectInvalid = [&](Geometry::Linalg::RobustPCAOptions options) {
+        ExpectFailsClosed(Geometry::Linalg::RobustPCA(input, options), Geometry::Linalg::NumericStatus::InvalidInput);
+    };
+    expectInvalid({.Lambda = -1.0});
+    expectInvalid({.Lambda = nan});
+    expectInvalid({.Mu = -1.0});
+    expectInvalid({.Mu = inf});
+    expectInvalid({.MaxIterations = 0});
+    expectInvalid({.Tolerance = nan});
+    expectInvalid({.RankTolerance = 0.0});
+    // Valid finite options whose derived thresholds 1/mu or lambda/mu overflow.
+    expectInvalid({.Mu = std::numeric_limits<double>::denorm_min()});
+    expectInvalid({.Lambda = 1.0e300, .Mu = 1.0e-300});
+}
+
+TEST(LinearAlgebra, RobustPCANearOverflowInputNeverPublishesNonFiniteValues)
+{
+    Geometry::Linalg::DenseMatrix input(2, 2);
+    input(0, 0) = 1.0e307;
+    input(0, 1) = -1.0e307;
+    input(1, 0) = 1.0e307;
+    input(1, 1) = 1.0e307;
+    const Geometry::Linalg::RobustPCAResult result = Geometry::Linalg::RobustPCA(input);
+    EXPECT_TRUE(AllFinite(result.LowRank));
+    EXPECT_TRUE(AllFinite(result.Sparse));
+    EXPECT_TRUE(std::isfinite(result.ResidualNorm));
+}
+
+TEST(LinearAlgebra, RobustPCAAnalyticCasesAreDeterministic)
+{
+    Geometry::Linalg::DenseMatrix scalar(1, 1);
+    scalar(0, 0) = 1.0;
+    const Geometry::Linalg::RobustPCAOptions scalarOptions{.Lambda = 0.5, .Mu = 2.0};
+    const Geometry::Linalg::DenseMatrix identity = Identity2();
+
+    for (const auto& [input, options] : {std::pair{scalar, scalarOptions},
+                                         std::pair{identity, Geometry::Linalg::RobustPCAOptions{}}})
+    {
+        const Geometry::Linalg::RobustPCAResult a = Geometry::Linalg::RobustPCA(input, options);
+        const Geometry::Linalg::RobustPCAResult b = Geometry::Linalg::RobustPCA(input, options);
+        ASSERT_TRUE(a.Diagnostics.Succeeded());
+        EXPECT_EQ(a.LowRank.Values, b.LowRank.Values);
+        EXPECT_EQ(a.Sparse.Values, b.Sparse.Values);
+        EXPECT_EQ(a.Iterations, b.Iterations);
+        EXPECT_EQ(a.Rank, b.Rank);
+    }
 }

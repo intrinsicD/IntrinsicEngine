@@ -10,6 +10,7 @@ module;
 #include <cstddef>
 #include <limits>
 #include <span>
+#include <utility>
 #include <vector>
 
 #include <Eigen/Core>
@@ -126,14 +127,38 @@ namespace Geometry::Linalg
                    status == NumericStatus::NoConvergence;
         }
 
-        [[nodiscard]] double FrobeniusNorm(const DenseMatrix& matrix)
+        // hypot accumulation: a plain sum of squares overflows above ~1e154 and
+        // underflows below ~1e-154 even when the norm itself is representable.
+        [[nodiscard]] double FrobeniusNorm(std::span<const double> values)
         {
-            double sum = 0.0;
-            for (const double value : matrix.Values)
+            double norm = 0.0;
+            for (const double value : values)
             {
-                sum += value * value;
+                norm = std::hypot(norm, value);
             }
-            return std::sqrt(sum);
+            return norm;
+        }
+
+        [[nodiscard]] double DifferenceNorm(const DenseMatrix& a, const DenseMatrix& b)
+        {
+            double norm = 0.0;
+            for (std::size_t i = 0; i < a.Values.size(); ++i)
+            {
+                norm = std::hypot(norm, a.Values[i] - b.Values[i]);
+            }
+            return norm;
+        }
+
+        // DenseMatrix::IsShapeValid() multiplies Rows * Cols unchecked. Reject
+        // wrapped products and dimensions Eigen::Index cannot hold before any
+        // allocation sized from Rows/Cols.
+        [[nodiscard]] bool HasRepresentableNonEmptyShape(const DenseMatrix& matrix) noexcept
+        {
+            constexpr auto kMaxIndex = static_cast<std::size_t>(std::numeric_limits<Eigen::Index>::max());
+            return matrix.Rows > 0 && matrix.Cols > 0 &&
+                   matrix.Rows <= kMaxIndex && matrix.Cols <= kMaxIndex &&
+                   matrix.Rows <= std::numeric_limits<std::size_t>::max() / matrix.Cols &&
+                   matrix.Values.size() == matrix.Rows * matrix.Cols;
         }
 
         [[nodiscard]] DenseMatrix MakeResidual(const DenseMatrix& matrix,
@@ -418,7 +443,19 @@ namespace Geometry::Linalg
 
         const EigenRowMajorMatrixXd A = ToEigenMatrix(matrix);
         Eigen::JacobiSVD<EigenRowMajorMatrixXd> svd(A, Eigen::ComputeFullU | Eigen::ComputeFullV);
+        if (svd.info() != Eigen::Success)
+        {
+            result.Diagnostics.Status = svd.info() == Eigen::NoConvergence
+                ? NumericStatus::NoConvergence
+                : NumericStatus::NonFinite;
+            return result;
+        }
         const Eigen::VectorXd singularValues = svd.singularValues();
+        if (!singularValues.allFinite() || !svd.matrixU().allFinite() || !svd.matrixV().allFinite())
+        {
+            result.Diagnostics.Status = NumericStatus::NonFinite;
+            return result;
+        }
 
         result.U = FromEigenMatrix(svd.matrixU());
         result.Vt = FromEigenMatrix(svd.matrixV().transpose());
@@ -550,7 +587,7 @@ namespace Geometry::Linalg
     RobustPCAResult RobustPCA(const DenseMatrix& matrix, const RobustPCAOptions& options)
     {
         RobustPCAResult result;
-        if (!matrix.IsShapeValid() || matrix.Rows == 0 || matrix.Cols == 0)
+        if (!HasRepresentableNonEmptyShape(matrix))
         {
             result.Diagnostics.Status = NumericStatus::InvalidInput;
             return result;
@@ -574,7 +611,7 @@ namespace Geometry::Linalg
             return result;
         }
 
-        const double matrixNorm = FrobeniusNorm(matrix);
+        const double matrixNorm = FrobeniusNorm(matrix.Values);
         if (!(matrixNorm > 0.0) || !std::isfinite(matrixNorm))
         {
             result.Diagnostics.Status = NumericStatus::InvalidInput;
@@ -599,7 +636,11 @@ namespace Geometry::Linalg
         const double mu = options.Mu > 0.0
             ? options.Mu
             : (spectralNorm > 0.0 ? 1.25 / spectralNorm : 1.0);
-        if (!(lambda > 0.0) || !std::isfinite(lambda) || !(mu > 0.0) || !std::isfinite(mu))
+        const double singularThreshold = 1.0 / mu;
+        const double sparseThreshold = lambda / mu;
+        if (!(lambda > 0.0) || !std::isfinite(lambda) || !(mu > 0.0) || !std::isfinite(mu) ||
+            !(singularThreshold > 0.0) || !std::isfinite(singularThreshold) ||
+            !(sparseThreshold > 0.0) || !std::isfinite(sparseThreshold))
         {
             result.Diagnostics.Status = NumericStatus::InvalidInput;
             return result;
@@ -610,52 +651,68 @@ namespace Geometry::Linalg
         double relativeResidual = 1.0;
         std::size_t recoveredRank = 0;
 
+        const auto finish = [&](NumericStatus status, std::size_t iterations) {
+            result.Iterations = iterations;
+            result.Diagnostics.Status = status;
+            result.Diagnostics.Iterations = iterations;
+            if (status == NumericStatus::NonFinite)
+            {
+                // Never publish non-finite iterates.
+                result.LowRank = DenseMatrix(matrix.Rows, matrix.Cols);
+                result.Sparse = DenseMatrix(matrix.Rows, matrix.Cols);
+                return;
+            }
+            result.Rank = recoveredRank;
+            result.ResidualNorm = residualNorm;
+            result.RelativeResidual = relativeResidual;
+            result.Diagnostics.ResidualNorm = residualNorm;
+            result.Diagnostics.RelativeResidual = relativeResidual;
+            result.Diagnostics.Rank = recoveredRank;
+            result.Diagnostics.ConditionEstimate = inputSvd.Diagnostics.ConditionEstimate;
+        };
+
         for (std::size_t iteration = 1; iteration <= options.MaxIterations; ++iteration)
         {
             const DenseMatrix lowRankArgument = MakeLowRankArgument(matrix, result.Sparse, dual, mu);
             const SVDResult svd = ComputeSVD(lowRankArgument, options.RankTolerance);
             if (IsHardSvdFailure(svd.Diagnostics.Status))
             {
-                result.Diagnostics = svd.Diagnostics;
-                result.Iterations = iteration;
-                result.Diagnostics.Iterations = iteration;
+                finish(svd.Diagnostics.Status, iteration);
                 return result;
             }
 
-            result.LowRank = SoftThresholdSingularValues(svd, 1.0 / mu, options.RankTolerance, recoveredRank);
+            result.LowRank = SoftThresholdSingularValues(svd, singularThreshold, options.RankTolerance, recoveredRank);
             const DenseMatrix sparseArgument = MakeSparseArgument(matrix, result.LowRank, dual, mu);
-            result.Sparse = SoftThresholdElements(sparseArgument, lambda / mu);
+            DenseMatrix sparse = SoftThresholdElements(sparseArgument, sparseThreshold);
+            const double sparseStep = DifferenceNorm(sparse, result.Sparse);
+            result.Sparse = std::move(sparse);
 
             const DenseMatrix residual = MakeResidual(matrix, result.LowRank, result.Sparse);
-            residualNorm = FrobeniusNorm(residual);
+            residualNorm = FrobeniusNorm(residual.Values);
             relativeResidual = residualNorm / matrixNorm;
             AddScaled(dual, residual, mu);
+            const double dualNorm = FrobeniusNorm(dual.Values);
 
-            result.Iterations = iteration;
-            if (relativeResidual <= options.Tolerance)
+            // Finite ||M - L - S||, ||S_k+1 - S_k|| and ||Y|| imply finite L, S and Y.
+            if (!std::isfinite(residualNorm) || !std::isfinite(sparseStep) || !std::isfinite(dualNorm))
             {
-                result.Rank = recoveredRank;
-                result.ResidualNorm = residualNorm;
-                result.RelativeResidual = relativeResidual;
-                result.Diagnostics.Status = NumericStatus::Success;
-                result.Diagnostics.ResidualNorm = residualNorm;
-                result.Diagnostics.RelativeResidual = relativeResidual;
-                result.Diagnostics.Rank = recoveredRank;
-                result.Diagnostics.Iterations = iteration;
-                result.Diagnostics.ConditionEstimate = inputSvd.Diagnostics.ConditionEstimate;
+                finish(NumericStatus::NonFinite, iteration);
+                return result;
+            }
+
+            // Primal feasibility alone can stall at a non-optimal split; also
+            // require the ADMM dual (stationarity) residual mu * ||S_k+1 - S_k||.
+            // An overflowing product compares false and simply keeps iterating.
+            const bool primalConverged = relativeResidual <= options.Tolerance;
+            const bool dualConverged = mu * sparseStep <= options.Tolerance * std::max(1.0, dualNorm);
+            if (primalConverged && dualConverged)
+            {
+                finish(NumericStatus::Success, iteration);
                 return result;
             }
         }
 
-        result.Rank = recoveredRank;
-        result.ResidualNorm = residualNorm;
-        result.RelativeResidual = relativeResidual;
-        result.Diagnostics.Status = NumericStatus::NoConvergence;
-        result.Diagnostics.ResidualNorm = residualNorm;
-        result.Diagnostics.RelativeResidual = relativeResidual;
-        result.Diagnostics.Rank = recoveredRank;
-        result.Diagnostics.Iterations = result.Iterations;
-        result.Diagnostics.ConditionEstimate = inputSvd.Diagnostics.ConditionEstimate;
+        finish(NumericStatus::NoConvergence, options.MaxIterations);
         return result;
     }
 }
