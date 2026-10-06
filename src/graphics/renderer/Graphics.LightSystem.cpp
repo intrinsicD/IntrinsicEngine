@@ -54,30 +54,9 @@ namespace Extrinsic::Graphics
 		m_Impl->Initialized = false;
 	}
 
-	void LightSystem::SetState(const LightState& state) noexcept
-	{
-		m_Impl->State = state;
-		m_Impl->State.Direction = NormalizeOrFallback(m_Impl->State.Direction);
-	}
-
 	LightState LightSystem::GetState() const noexcept
 	{
 		return m_Impl->State;
-	}
-
-	void LightSystem::SetDirectionalLight(glm::vec3 direction,
-										  float     intensity,
-										  glm::vec3 color) noexcept
-	{
-		m_Impl->State.Direction = NormalizeOrFallback(direction);
-		m_Impl->State.Intensity = intensity;
-		m_Impl->State.Color     = color;
-	}
-
-	void LightSystem::SetAmbientLight(glm::vec3 color, float intensity) noexcept
-	{
-		m_Impl->State.AmbientColor     = color;
-		m_Impl->State.AmbientIntensity = intensity;
 	}
 
 	void LightSystem::ApplyTo(RHI::CameraUBO& camera) const noexcept

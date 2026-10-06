@@ -330,14 +330,5 @@ namespace Extrinsic::Graphics
              | (static_cast<std::uint32_t>(c.A));
     }
 
-    // ----------------------------------------------------------------
-    std::uint32_t ColormapSystem::PackVec4(glm::vec4 c) noexcept
-    {
-        const auto clamp8 = [](float v) -> std::uint8_t {
-            return static_cast<std::uint8_t>(std::clamp(v, 0.f, 1.f) * 255.f + 0.5f);
-        };
-        return PackRGBA8({clamp8(c.x), clamp8(c.y), clamp8(c.z), clamp8(c.w)});
-    }
-
 } // namespace Extrinsic::Graphics
 

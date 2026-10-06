@@ -190,11 +190,6 @@ namespace Extrinsic::Graphics
         }
     }
 
-    ShadowCascadeData ShadowSystem::GetCascadeData() const noexcept
-    {
-        return m_Impl->Cascades;
-    }
-
     ShadowAtlasDesc ShadowSystem::BuildAtlasDesc() const noexcept
     {
         const std::uint32_t cascadeCount = ClampCascadeCount(m_Impl->Params.CascadeCount);

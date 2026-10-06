@@ -2582,7 +2582,6 @@ namespace Extrinsic::Graphics
     std::uint32_t GpuWorld::GetLiveGeometryCount() const noexcept { return m_Impl->GeometrySlots.LiveCount; }
     std::uint32_t GpuWorld::GetGeometryCapacity() const noexcept { return m_Impl->Desc.MaxGeometryRecords; }
     std::uint32_t GpuWorld::GetLightCount() const noexcept { return static_cast<std::uint32_t>(m_Impl->LightsCpu.size()); }
-    std::uint32_t GpuWorld::GetLightCapacity() const noexcept { return m_Impl->Desc.MaxLights; }
     GpuWorld::Diagnostics GpuWorld::GetDiagnostics() const noexcept
     {
         return Diagnostics{

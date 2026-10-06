@@ -1,3 +1,5 @@
+// LightSystem: global light state and per-frame light snapshots packed for
+// the camera UBO and the GpuWorld light buffer.
 module;
 
 #include <memory>
@@ -74,14 +76,7 @@ export namespace Extrinsic::Graphics
 		void Initialize();
 		void Shutdown();
 
-		void SetState(const LightState& state) noexcept;
 		[[nodiscard]] LightState GetState() const noexcept;
-
-		void SetDirectionalLight(glm::vec3 direction,
-								 float     intensity,
-								 glm::vec3 color) noexcept;
-
-		void SetAmbientLight(glm::vec3 color, float intensity) noexcept;
 
 		void ApplyTo(RHI::CameraUBO& camera) const noexcept;
 		[[nodiscard]] LightEnvironmentPacket BuildEnvironmentPacket(std::span<const LightSnapshot> lights) const;

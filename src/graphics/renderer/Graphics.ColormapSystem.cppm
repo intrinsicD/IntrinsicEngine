@@ -1,8 +1,9 @@
+// ColormapSystem: colormap LUT residency for shaders plus CPU reference
+// sampling and RGBA8 packing.
 module;
 
 #include <cstdint>
 #include <memory>
-#include <glm/glm.hpp>
 
 export module Extrinsic.Graphics.ColormapSystem;
 
@@ -91,9 +92,6 @@ export namespace Extrinsic::Graphics
         /// Pack a RGBA8 sample as a uint32_t (R in MSB, A in LSB):
         ///   bits [31:24] = R  [23:16] = G  [15:8] = B  [7:0] = A
         [[nodiscard]] static std::uint32_t PackRGBA8(RGBA8 c) noexcept;
-
-        /// Pack a normalised glm::vec4 colour to a uint32_t RGBA8.
-        [[nodiscard]] static std::uint32_t PackVec4(glm::vec4 c) noexcept;
 
     private:
         struct Impl;

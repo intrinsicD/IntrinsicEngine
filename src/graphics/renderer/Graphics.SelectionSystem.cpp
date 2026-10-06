@@ -84,11 +84,6 @@ namespace Extrinsic::Graphics
 		return PointSelectionResult{.PointID = result->EncodedId.Payload(), .EntityID = result->StableEntityId};
 	}
 
-	void SelectionSystem::ClearLastPointIdResult() noexcept
-	{
-		ClearLastPickResult();
-	}
-
 	void SelectionSystem::RequestPick(PickRequest request) noexcept
 	{
 		m_Impl->PendingPick = request;

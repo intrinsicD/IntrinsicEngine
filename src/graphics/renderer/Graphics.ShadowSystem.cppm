@@ -1,3 +1,5 @@
+// ShadowSystem: backend-agnostic shadow parameters, cascade data and the
+// shadow-atlas description packed into the camera UBO.
 module;
 
 #include <memory>
@@ -81,7 +83,6 @@ export namespace Extrinsic::Graphics
         [[nodiscard]] ShadowParams GetParams() const noexcept;
 
         void SetCascadeData(const ShadowCascadeData& cascades) noexcept;
-        [[nodiscard]] ShadowCascadeData GetCascadeData() const noexcept;
 
         [[nodiscard]] ShadowAtlasDesc BuildAtlasDesc() const noexcept;
         void ApplyTo(RHI::CameraUBO& camera) const noexcept;

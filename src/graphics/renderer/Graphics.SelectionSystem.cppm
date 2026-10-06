@@ -1,3 +1,5 @@
+// SelectionSystem: GPU pick requests, selection-ID encoding and readback
+// results handed across the renderer/runtime boundary.
 module;
 
 #include <cstdint>
@@ -109,7 +111,6 @@ export namespace Extrinsic::Graphics
 
 		void PublishPointIdResult(PointSelectionResult result) noexcept;
 		[[nodiscard]] std::optional<PointSelectionResult> GetLastPointIdResult() const noexcept;
-		void ClearLastPointIdResult() noexcept;
 
 		void RequestPick(PickRequest request) noexcept;
 		[[nodiscard]] bool HasPendingPick() const noexcept;
