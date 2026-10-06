@@ -499,7 +499,12 @@ namespace Geometry::HarmonicField
             return fail("Invalid variational-fit parameters or value shape.");
         if (!std::ranges::all_of(values, [](double x) { return std::isfinite(x); }))
             return fail("Property contains non-finite live values.");
-        Problem problem{.F = values, .Channels = channels, .Count = values.size() / channels, .Edges = edges, .P = &params};
+        Problem problem{};
+        problem.F = values;
+        problem.Channels = channels;
+        problem.Count = values.size() / channels;
+        problem.Edges = edges;
+        problem.P = &params;
         const auto count = problem.Count;
         problem.Fixed.assign(count, false);
         for (const auto row : fixedRows)

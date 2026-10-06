@@ -137,6 +137,7 @@ namespace Extrinsic::Core::Log
             .Sequence = s_Sequence.load(std::memory_order_relaxed) + 1,
             .TimestampNs = static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
                 std::chrono::system_clock::now().time_since_epoch()).count()),
+            .Category = {}
         };
 
         if (msg.starts_with('['))
@@ -207,7 +208,7 @@ namespace Extrinsic::Core::Log
         const auto newest = s_Sequence.load(std::memory_order_relaxed);
         const bool reset = sequence > newest;
         const auto cursor = reset ? std::uint64_t{0} : sequence;
-        CursorSnapshot result{.NextCursor = cursor, .ClearedThrough = s_ClearedThrough, .CursorReset = reset};
+        CursorSnapshot result{.NextCursor = cursor, .ClearedThrough = s_ClearedThrough, .CursorReset = reset, .Entries = {}};
         if (maxEntries == 0) return result;
         const auto retainedStart = newest - s_Ring.Count;
         if (cursor < retainedStart)
