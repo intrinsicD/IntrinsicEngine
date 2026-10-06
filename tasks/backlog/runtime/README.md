@@ -54,6 +54,17 @@ and their paired UI or method work are recorded there, not here.
 - [RUNTIME-284 — History label listing and entity-property checkpoints](RUNTIME-284-history-labels-and-checkpoints.md)
 - [RUNTIME-286 — Mesh health report](RUNTIME-286-mesh-health-report.md)
 
+## Integration of test-only geometry kernels
+
+From REVIEW-007 E7 (2026-10-06): the operator chose end-to-end integration
+(config, Sandbox UI, agent operation, publication, tests) over deletion.
+
+- [RUNTIME-320 — Convex hull of a selection, point cloud or mesh](RUNTIME-320-convex-hull-editor-agent-integration.md)
+- [RUNTIME-321 — Implicit plane field remeshing and Octree node properties](RUNTIME-321-implicit-plane-field-editor-agent-integration.md)
+- [RUNTIME-322 — Average instance orientations with RotationAveraging](RUNTIME-322-rotation-averaging-editor-agent-integration.md)
+- [RUNTIME-323 — Grid occupancy via SparseGrid](RUNTIME-323-sparse-grid-occupancy-editor-agent-integration.md)
+- [RUNTIME-324 — Octree split point Center/Mean/Median selectable in point spacing](RUNTIME-324-octree-median-split-selectable-variant.md)
+
 ## Consolidation of duplicated runtime mechanisms
 
 From the 2026-10-01 duplication/consistency audit; each task owns its own scope.
