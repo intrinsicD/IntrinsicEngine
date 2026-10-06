@@ -61,6 +61,16 @@ contract_review: Reviewed the catalog. A coroutine job kind changes the JobServi
       `docs/architecture/runtime.md` describe the result (integration or
       removal).
 
+- [ ] **Operator rule (2026-10-06), applies to every coroutine adoption, here and
+      in later tasks:** coroutines are harder to debug and maintain, so they are
+      never rushed. Each commit adopts the coroutine path in **at most one method**.
+      Before the next method is adopted, that commit is verified thoroughly:
+      focused CPU contract tests, the method's real end-to-end workflow (Sandbox UI
+      and agent/MCP lane, Vulkan where GPU is involved), its interaction with every
+      other method already on the coroutine path (concurrent runs, cancellation,
+      world switch, teardown), and engine-wide regression of the affected suites.
+      The verification of each commit is recorded in its message or the task log.
+
 ## Verification
 ```bash
 cmake --build --preset ci --target IntrinsicCoreWrapperUnitTests IntrinsicRuntimeContractTests IntrinsicBenchmarkTests
