@@ -1722,7 +1722,8 @@ Concretely:
 - `Graphics.VisualizationPackets` is a CPU-only packet contract for scalar,
   color, vector-field, isoline, UV-backed fragment-bake, and Htex-backed
   visualization data. Existing mesh texcoords may drive per-fragment bakes;
-  Htex can still be recreated and selected for any mesh. The packet contract
+  existing Htex atlas descriptors may be selected, and a Htex recreate may be
+  requested (no in-tree producer currently generates Htex atlases). The packet contract
   validates domains, ranges, colormap IDs, BDA/resource seams, missing texcoords,
   and Htex atlas descriptors while leaving texture residency and geometry
   algorithm generation to later graphics-assets/runtime/geometry owners.
@@ -1806,14 +1807,13 @@ Concretely:
   standard material, or displacement intent for later `GpuAssetCache`
   residency; these fields are diagnostics/residency inputs and never trigger
   graphics-side UV generation or new shading features. `RecreateHtex` is an
-  explicit user-driven request
-  scheduled by runtime/geometry on a background task through
-  `Extrinsic.Runtime.JobService` (async visualization baking remains
-  CPU/runtime-only). Graphics increments
-  `VisualizationDiagnostics::HtexRecreateRequestCount` and accepts the
-  descriptor without owning the Htex regeneration algorithm; once regeneration
-  completes the next extraction frame submits the `FragmentBakeAtlasPacket`
-  with `Mapping = ExistingHtex`. UV-backed bakes require
+  explicit user-driven request; `ScheduleVisualizationHtexRecreate(...)`
+  submits a `Extrinsic.Runtime.JobService` task that only publishes a
+  `HtexRecreateScheduled` token event and does not generate an atlas. Graphics
+  increments `VisualizationDiagnostics::HtexRecreateRequestCount` and accepts
+  the descriptor without owning Htex regeneration; a future producer that
+  generates an atlas would submit the `FragmentBakeAtlasPacket` with
+  `Mapping = ExistingHtex` on a later extraction frame. UV-backed bakes require
   `MeshHasTexcoords = true` and a non-zero `TexcoordBufferBDA`; missing
   texcoords are rejected from the snapshot and counted in
   `MissingTexcoordCount`.

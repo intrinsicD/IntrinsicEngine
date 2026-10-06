@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 10 |
 | `core` | 38 |
 | `ecs` | 25 |
-| `geometry` | 133 |
+| `geometry` | 132 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 80 |
@@ -165,7 +165,6 @@ Root scanned: `src`
 | `Geometry.Handle` | `src/geometry/Geometry.Handle.cppm` | `geometry` |
 | `Geometry.HarmonicField.Types` | `src/geometry/Geometry.HarmonicField.Types.cppm` | `geometry` |
 | `Geometry.HarmonicField` | `src/geometry/Geometry.HarmonicField.cppm` | `geometry` |
-| `Geometry.HtexPatch` | `src/geometry/Geometry.HtexPatch.cppm` | `geometry` |
 | `Geometry.IO` | `src/geometry/Geometry.IO.cppm` | `geometry` |
 | `Geometry.ImplicitPlaneField` | `src/geometry/Geometry.ImplicitPlaneField.cppm` | `geometry` |
 | `Geometry.IntersectionClassification` | `src/geometry/Geometry.IntersectionClassification.cppm` | `geometry` |
@@ -475,4 +474,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **448**
+Total modules: **447**

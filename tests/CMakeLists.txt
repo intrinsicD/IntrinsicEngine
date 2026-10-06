@@ -1686,7 +1686,6 @@ intrinsic_resolve_test_sources(_geometry_process_state_test_sources
     SEARCH_DIRS unit/geometry
     FILES
         Test_RuntimeGeometry.cpp
-        Test_HtexPatch.cpp
         Test_SDF.cpp
         Test_ContactManifold.cpp
         Test_GJK.cpp

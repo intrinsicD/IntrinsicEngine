@@ -27,6 +27,8 @@ Theme-I pause behind REVIEW-004. This note is **planned backlog work**, not an
 implementation claim. Creating/reviewing the task does not start engine changes.
 METHOD-047 supplies the existing atlas/property bake and inspection baseline reused
 by S04/S11/S14; it is a retired prerequisite, not HKTex evidence.
+HKTex does not depend on the removed test-only `Geometry.HtexPatch` prototype
+(REVIEW-007 GE07).
 `ParityProven` is cumulative in the repository taxonomy and includes Operational;
 its listed signals include promotion to the default. S18 adds the product gate.
 The micro profile does not relax CPU-reference-first, research evidence, full CPU,

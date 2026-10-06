@@ -64,7 +64,6 @@ target_sources(${target_name}
         Geometry.HalfedgeMesh.VectorHeatMethod.cppm
         Geometry.HalfedgeMesh.cppm
         Geometry.Handle.cppm
-        Geometry.HtexPatch.cppm
         Geometry.IO.cppm
         Geometry.ImplicitPlaneField.cppm
         Geometry.IntersectionClassification.cppm
@@ -193,7 +192,6 @@ target_sources(${target_name}
         Geometry.HalfedgeMesh.Vertices.Normals.cpp
         Geometry.HalfedgeMesh.VectorHeatMethod.cpp
         Geometry.HalfedgeMesh.cpp
-        Geometry.HtexPatch.cpp
         Geometry.IO.cpp
         Geometry.ImplicitPlaneField.cpp
         Geometry.KMeans.cpp

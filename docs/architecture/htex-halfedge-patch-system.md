@@ -1,5 +1,11 @@
 # Htex-Inspired Halfedge-Pair Patch System
 
+> **Status: historical design note.** The test-only `Geometry.HtexPatch`
+> prototype and its unit test were removed (REVIEW-007 GE07). Module, file and
+> test names below describe the original proposal, not current source, and do
+> not commit to a rebuild. The runtime/graphics Htex preview packet types are
+> separate and remain.
+
 This document describes a proposed **float-render-target-first** patch system for IntrinsicEngine, inspired by Htex but adapted to the engine’s existing halfedge, PropertySet, and bindless-texture architecture.
 
 The goal is to make **undirected edges** the storage primitive for surface-space render targets while keeping the implementation compatible with the current geometry kernel and render graph. Htex is a complement to regular mesh UVs, not a replacement: if a mesh already has usable texcoords, per-fragment visualization bakes may use those texcoords directly; Htex provides an always-available alternate mapping for meshes without UVs and for cases where the user explicitly wants to recreate/use an Htex atlas instead.
@@ -118,7 +124,7 @@ Suggested sidecar buffers:
 - `std::vector<uint32_t>` patch dirty bits / revision stamps
 - optional per-patch diagnostics buffer for normalization/coverage
 
-### Recommended module shape
+### Recommended module shape (historical proposal)
 
 Add a new geometry module pair:
 
@@ -341,7 +347,7 @@ Add tests for:
 - color-mapped float payload generation for known labels
 - patch preview output for a deterministic mesh fixture
 
-### Suggested test file
+### Suggested test file (historical proposal)
 
 - `tests/Test_HtexPatch.cpp`
 
@@ -370,9 +376,9 @@ Add tests for:
 
 These later items are intentionally left as backlog items in `tasks/backlog/legacy-todo.md` until the data-layout tradeoffs are proven.
 
-## 13. Practical File List for an Initial Implementation
+## 13. Practical File List for an Initial Implementation (historical proposal)
 
-If implementation starts, the most likely files are:
+If implementation starts, the most likely files were:
 
 - `docs/architecture/htex-halfedge-patch-system.md` ← this note
 - `src/geometry/Geometry.HtexPatch.cppm`

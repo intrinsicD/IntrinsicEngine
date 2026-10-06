@@ -139,11 +139,6 @@ GROUPED_EXCLUDED_SOURCE_OWNERS = {
         "GeometryIoTestObjs",
         "IntrinsicGeometryIoTests",
     ),
-    "tests/unit/geometry/Test_HtexPatch.cpp": SourceOwner(
-        "tests/unit/geometry/Test_HtexPatch.cpp",
-        "GeometryProcessStateTestObjs",
-        "IntrinsicGeometryProcessStateTests",
-    ),
     "tests/unit/geometry/Test_RuntimeGeometry.cpp": SourceOwner(
         "tests/unit/geometry/Test_RuntimeGeometry.cpp",
         "GeometryProcessStateTestObjs",

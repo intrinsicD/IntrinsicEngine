@@ -22,7 +22,6 @@ The current promoted geometry layer already provides useful parameterization and
 - `Geometry.DEC` and the reusable `Geometry.Sparse` seam provide sparse matrix and conjugate-gradient infrastructure that future parameterization solvers can share.
 - `Geometry.Linalg` provides dense decomposition, covariance, least-squares, and GLM/Eigen adapter utilities behind an explicit geometry-owned numerical module.
 - `Geometry.HalfedgeMesh.Boundary`, `Geometry.HalfedgeMesh.Analysis`, `Geometry.HalfedgeMesh.Quality`, and mesh/soup conversion contracts provide topology and fixture utilities for disk topology, boundary loops, degenerate faces, and validation.
-- `Geometry.HtexPatch` provides patch metadata and simple atlas layout helpers, but it is not a complete UV atlas segmentation or chart-packing system.
 - `GEOM-005` through `GEOM-009` provide the style/numeric policy, mesh/soup conversion contracts, robust predicates, reusable numerical infrastructure, and benchmark manifest groundwork future packs should use.
 
 The gaps below come from the [`src/geometry` gap analysis](../reviews/2026-05-12-src-geometry-gap-analysis.md), especially the parameterization/mapping, diagnostics, reproducibility, and benchmark sections.
@@ -234,7 +233,6 @@ Scope:
 
 - Add geometry-owned chart records, seam cuts, atlas segmentation, and CPU chart packing suitable for later renderer/material consumers without depending on those layers. Current promoted state is the `Geometry.UvAtlas` backend contract with `FastStaged` as the default concrete CPU backend, deterministic connected planar chart proposals, per-chart LSCM/harmonic attempts with projection fallback for unsupported topology, per-chart quality records, deterministic shelf packing, chart records, seam records, and explicit xatlas fallback diagnostics for failing fast backends when compatibility fallback is enabled.
 - METHOD-037 currently publishes non-destructive connected-region and edge-boundary properties for inspection. They are not atlas seams and do not affect the promoted default. METHOD-039's local patch candidate failed its seed-stability gate, so METHOD-040 owns the next global-partition attempt. `GEOM-076` must then compare any accepted result with existing, baseline, and control partitions on a frozen corpus before optional hint input or runtime/config/UI adoption; a failed evidence gate leaves the current atlas path unchanged.
-- Clarify how `Geometry.HtexPatch` patch metadata relates to UV charts and atlas tiles.
 
 Primary home: `src/geometry`.
 
