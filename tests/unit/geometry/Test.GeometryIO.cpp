@@ -1496,6 +1496,90 @@ TEST(GeometryIO_PointCloudIO, LoadsPTSFixture)
     EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{1}), glm::vec3(1.0f, 2.0f, 3.0f));
     EXPECT_EQ(result->Cloud.Color(Geometry::VertexHandle{0}), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
     EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{1}).y, 128.0f / 255.0f, 1.0e-6f);
+
+    const auto again = Geometry::PointCloudIO::LoadPTS(GeometryIOFixturePath("valid.pts"));
+    ASSERT_TRUE(again.has_value());
+    ASSERT_EQ(again->Cloud.VerticesSize(), result->Cloud.VerticesSize());
+    for (std::uint32_t i = 0; i < result->Cloud.VerticesSize(); ++i)
+    {
+        EXPECT_EQ(again->Cloud.Position(Geometry::VertexHandle{i}), result->Cloud.Position(Geometry::VertexHandle{i}));
+        EXPECT_EQ(again->Cloud.Color(Geometry::VertexHandle{i}), result->Cloud.Color(Geometry::VertexHandle{i}));
+    }
+}
+
+// `.pts` used to route through LoadXYZ; LoadPTS must keep every layout that
+// path accepted with the same colors: x y z, x y z i (gray = intensity, values
+// above 1 divided by 255, then clamped to [0, 1]), x y z r g b and x y z i r g b.
+TEST(GeometryIO_PointCloudIO, PTSAcceptsXyzCompatibleLayoutsWithMatchingColors)
+{
+    struct Case
+    {
+        const char* Contents;
+        bool Colors;
+        glm::vec4 First;
+        glm::vec4 Second;
+    };
+    const glm::vec4 white(1.0f);
+    const std::array cases{
+        Case{"0 0 0\n1 2 3\n", false, white, white},
+        Case{"2\n0 0 0\n1 2 3\n", false, white, white},
+        Case{"2\n0 0 0 255\n1 2 3 0.5\n", true, white, glm::vec4(0.5f, 0.5f, 0.5f, 1.0f)},
+        Case{"0 0 0 -2047\n1 2 3 1020\n", true, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), white},
+        Case{"0 0 0 255 0 0\n1 2 3 0 255 128\n", true, glm::vec4(1, 0, 0, 1), glm::vec4(0, 1, 128.0f / 255.0f, 1)},
+        Case{"2\n0 0 0 -5 255 0 0\n1 2 3 7 0 255 128\n", true, glm::vec4(1, 0, 0, 1),
+             glm::vec4(0, 1, 128.0f / 255.0f, 1)},
+    };
+    for (const Case& item : cases)
+    {
+        SCOPED_TRACE(item.Contents);
+        TempFile file(".pts", item.Contents);
+        const auto pts = Geometry::PointCloudIO::LoadPTS(file.Path);
+        const auto xyz = Geometry::PointCloudIO::LoadXYZ(file.Path);
+        ASSERT_TRUE(pts.has_value());
+        ASSERT_TRUE(xyz.has_value());
+        ASSERT_EQ(pts->Cloud.VerticesSize(), 2u);
+        ASSERT_EQ(xyz->Cloud.VerticesSize(), 2u);
+        EXPECT_EQ(pts->Cloud.Position(Geometry::VertexHandle{1}), glm::vec3(1.0f, 2.0f, 3.0f));
+        EXPECT_EQ(pts->Cloud.HasColors(), item.Colors);
+        EXPECT_EQ(xyz->Cloud.HasColors(), item.Colors);
+        for (std::uint32_t i = 0; i < 2u; ++i)
+        {
+            EXPECT_EQ(pts->Cloud.Position(Geometry::VertexHandle{i}), xyz->Cloud.Position(Geometry::VertexHandle{i}));
+        }
+        if (item.Colors)
+        {
+            EXPECT_EQ(pts->Cloud.Color(Geometry::VertexHandle{0}), item.First);
+            EXPECT_EQ(pts->Cloud.Color(Geometry::VertexHandle{1}), item.Second);
+            EXPECT_EQ(xyz->Cloud.Color(Geometry::VertexHandle{0}), item.First);
+            EXPECT_EQ(xyz->Cloud.Color(Geometry::VertexHandle{1}), item.Second);
+        }
+    }
+}
+
+TEST(GeometryIO_PointCloudIO, PTSRejectsMalformedFilesWithoutPartialClouds)
+{
+    for (const char* contents : {
+             "0\n0 0 0\n",
+             "-1\n0 0 0\n",
+             "99999999999999999999999999\n0 0 0\n",
+             "3\n0 0 0\n1 1 1\n",
+             "1\n0 0 0\n1 1 1\n",
+             "0 0 0 1 2\n",
+             "0 0 0 1 2 3 4 5\n",
+             "0 0 0\nfoo\n1 1 1\n",
+             "0 0 0 nan\n",
+             "0 0 0 1 inf 0 0\n",
+             "0 0 0 255 0 nan\n",
+             "LH001\n0 0 0\n",
+             "0 0 0\nLH001\n1 1 1\n",
+         })
+    {
+        SCOPED_TRACE(contents);
+        TempFile file(".pts", contents);
+        const auto result = Geometry::PointCloudIO::LoadPTS(file.Path);
+        ASSERT_FALSE(result.has_value());
+        EXPECT_EQ(result.error(), Extrinsic::Core::ErrorCode::InvalidFormat);
+    }
 }
 
 TEST(GeometryIO_PointCloudIO, LoadsPWNFixtureWithNormals)

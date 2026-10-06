@@ -1084,9 +1084,11 @@ namespace Extrinsic::Runtime
                 switch (route->Format)
                 {
                 case Assets::AssetFileFormat::XYZ:
-                case Assets::AssetFileFormat::PTS:
                 case Assets::AssetFileFormat::XYZRGB:
                     cloudPayload = Geometry::PointCloudIO::LoadXYZ(request.Path);
+                    break;
+                case Assets::AssetFileFormat::PTS:
+                    cloudPayload = Geometry::PointCloudIO::LoadPTS(request.Path);
                     break;
                 case Assets::AssetFileFormat::PWN:
                     cloudPayload = Geometry::PointCloudIO::LoadPWN(request.Path);

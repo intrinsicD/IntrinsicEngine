@@ -846,9 +846,17 @@ TEST(AssetWorkflowModule, ImportsStrictAsciiFormatsWithPropertiesAndRenderCompon
         glm::vec3 Second;
         bool Normals;
         bool Colors;
+        glm::vec4 FirstColor{1, 0, 0, 1};
+        glm::vec4 SecondColor{0, 1, 128.0f / 255.0f, 1};
     };
     const std::array fixtures{
         Fixture{"pwn", "2\n0 0 0\n1 0 0\n0 0 1\n0 1 0\n", {0, 0, 0}, {1, 0, 0}, true, false},
+        // .pts routes to LoadPTS: count + x y z i r g b, x y z r g b, x y z i (gray).
+        Fixture{"pts", "2\n0 0 0 42 255 0 0\n2 3 4 7 0 255 128\n", {0, 0, 0}, {2, 3, 4}, false, true},
+        Fixture{"pts", "0 0 0 255 0 0\n2 3 4 0 255 128\n", {0, 0, 0}, {2, 3, 4}, false, true},
+        Fixture{"pts", "2\n0 0 0 255\n2 3 4 0.5\n", {0, 0, 0}, {2, 3, 4}, false, true,
+                {1, 1, 1, 1}, {0.5f, 0.5f, 0.5f, 1}},
+        Fixture{"pts", "0 0 0\n2 3 4\n", {0, 0, 0}, {2, 3, 4}, false, false},
         Fixture{"csv", "0,0,0,0,0,1\n1,2,3,0,1,0\n", {0, 0, 0}, {1, 2, 3}, true, false},
         Fixture{"3d", "-1 0 2 5\n3 4 5 6\n", {-1, 0, 2}, {3, 4, 5}, false, false},
         Fixture{"txt", "2\n0 0 0 255 0 0 0.25\n2 3 4 0 255 128 0.5\n", {0, 0, 0}, {2, 3, 4}, false, true}};
@@ -889,13 +897,14 @@ TEST(AssetWorkflowModule, ImportsStrictAsciiFormatsWithPropertiesAndRenderCompon
                 EXPECT_EQ(normals.Vector()[0], glm::vec3(0, 0, 1));
                 EXPECT_EQ(normals.Vector()[1], glm::vec3(0, 1, 0));
             }
+            const auto colors = properties.Get<glm::vec4>("p:color");
+            EXPECT_EQ(static_cast<bool>(colors), fixture.Colors);
             if (fixture.Colors)
             {
-                const auto colors = properties.Get<glm::vec4>("p:color");
                 ASSERT_TRUE(colors);
                 ASSERT_EQ(colors.Vector().size(), 2u);
-                EXPECT_EQ(colors.Vector()[0], glm::vec4(1, 0, 0, 1));
-                EXPECT_EQ(colors.Vector()[1], glm::vec4(0, 1, 128.0f / 255.0f, 1));
+                EXPECT_EQ(colors.Vector()[0], fixture.FirstColor);
+                EXPECT_EQ(colors.Vector()[1], fixture.SecondColor);
             }
             EXPECT_TRUE((raw.all_of<Graphics::Components::RenderPoints,
                 Graphics::Components::VisualizationConfig,
@@ -911,7 +920,10 @@ TEST(AssetWorkflowModule, StrictAsciiImportRejectsMalformedPayloadBeforeMaterial
              std::pair{"pwn", "2\n0 0 0\n1 0 0\n0 0 1\n"},
              std::pair{"csv", "0,0,0,1\n"},
              std::pair{"3d", "0 0 0 1 2\n"},
-             std::pair{"txt", "0 0 0 1\n"}})
+             std::pair{"txt", "0 0 0 1\n"},
+             std::pair{"pts", "3\n0 0 0\n1 1 1\n"},
+             std::pair{"pts", "0 0 0 1 2\n"},
+             std::pair{"pts", "0 0 0\nLH001\n1 1 1\n"}})
     {
         SCOPED_TRACE(extension);
         TempSceneFile file{std::string{"assetio012-invalid."} + extension, contents};

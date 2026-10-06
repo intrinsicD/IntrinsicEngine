@@ -295,7 +295,12 @@ reader.
 import plus XYZ/PLY/PCD export. The PWN reader consumes a count header followed
 by point rows and normal rows; CSV and 3D inputs may carry normals through their
 six-column layouts; PTS and TXT validate their count/intensity/color/reflectance
-columns and store supported color channels. The additional ASCII readers share
+columns and store supported color channels. PTS accepts an optional positive
+count header that must match the row count exactly, then `x y z`, `x y z i`,
+`x y z r g b` or `x y z i r g b` rows. A four-column intensity becomes a gray
+`p:color` with the same mapping as `LoadXYZ` (values above 1 are divided by 255,
+then clamped to `[0, 1]`, so negative intensities map to black); intensity is not
+stored separately. Color channels use the same normalization. The additional ASCII readers share
 one strict scanner and fail closed on empty, malformed, wrong-column, or
 non-finite inputs. Binary point-cloud PLY import retains only the declared
 vertex scalars, but consumes every non-vertex scalar and list property in file

@@ -3315,6 +3315,86 @@ TEST(RuntimeAssetImportFormatCoverage, RepresentativePromotedFormatsMaterializeD
     engine.Shutdown();
 }
 
+namespace
+{
+    struct QueuedPointCloudImport
+    {
+        Runtime::RuntimeAssetImportQueueTerminalStatus Status{};
+        std::optional<Runtime::RuntimeAssetImportEvent> Event{};
+        std::size_t PointClouds{0};
+        std::vector<glm::vec4> Colors{};
+        bool RenderPoints{false};
+    };
+
+    [[nodiscard]] QueuedPointCloudImport RunQueuedPointCloudImport(const TempAssetFile& file)
+    {
+        Intrinsic::Tests::RuntimeTestKernel engine(
+            HeadlessConfig(),
+            std::make_unique<WaitForConditionApplication>(
+                [](Runtime::Engine& runningEngine)
+                {
+                    const Runtime::RuntimeAssetImportQueueSnapshot queue =
+                        RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(runningEngine)
+                            .GetAssetImportQueueSnapshot();
+                    return queue.Entries.size() == 1u && queue.TerminalCount == 1u;
+                },
+                256u));
+        InitializeAssetImportEngine(engine);
+        InstallSandboxDefaultRuntimePolicies(engine);
+
+        Runtime::AssetWorkflowModule& pipeline =
+            RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine);
+        const auto queued = pipeline.QueueAssetImport(Runtime::AssetImportRecipe{
+            .Path = file.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::PointCloud,
+        });
+        EXPECT_TRUE(queued.has_value());
+        engine.Run();
+
+        QueuedPointCloudImport out{};
+        const Runtime::RuntimeAssetImportQueueSnapshot queue = pipeline.GetAssetImportQueueSnapshot();
+        if (queue.Entries.size() == 1u)
+            out.Status = queue.Entries[0].TerminalStatus;
+        out.Event = pipeline.GetLastAssetImportEvent();
+        auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+        out.PointClouds = CountEntitiesWithDomain(scene, GS::Domain::PointCloud);
+        if (const auto entity = FindFirstEntityWithDomain(scene, GS::Domain::PointCloud))
+        {
+            auto& raw = scene.Raw();
+            out.RenderPoints = raw.all_of<G::RenderPoints>(*entity);
+            if (const auto colors = raw.get<GS::Vertices>(*entity).Properties.Get<glm::vec4>("p:color"))
+                out.Colors = colors.Vector();
+        }
+        engine.Shutdown();
+        return out;
+    }
+}
+
+TEST(RuntimeAssetImportFormatCoverage, PtsQueuedImportPreservesColorsAndRenderComponents)
+{
+    TempAssetFile file("ge23_queued_colors.pts", "2\n0 0 0 42 255 0 0\n1 2 3 7 0 255 128\n");
+    const QueuedPointCloudImport result = RunQueuedPointCloudImport(file);
+    EXPECT_EQ(result.Status, Runtime::RuntimeAssetImportQueueTerminalStatus::Complete);
+    ASSERT_TRUE(result.Event.has_value());
+    EXPECT_TRUE(result.Event->Succeeded());
+    EXPECT_EQ(result.PointClouds, 1u);
+    EXPECT_TRUE(result.RenderPoints);
+    ASSERT_EQ(result.Colors.size(), 2u);
+    EXPECT_EQ(result.Colors[0], glm::vec4(1, 0, 0, 1));
+    EXPECT_EQ(result.Colors[1], glm::vec4(0, 1, 128.0f / 255.0f, 1));
+}
+
+TEST(RuntimeAssetImportFormatCoverage, PtsQueuedImportRejectsCountMismatch)
+{
+    TempAssetFile file("ge23_queued_mismatch.pts", "3\n0 0 0\n1 1 1\n");
+    const QueuedPointCloudImport result = RunQueuedPointCloudImport(file);
+    EXPECT_EQ(result.Status, Runtime::RuntimeAssetImportQueueTerminalStatus::Failed);
+    ASSERT_TRUE(result.Event.has_value());
+    EXPECT_FALSE(result.Event->Succeeded());
+    EXPECT_EQ(result.Event->Error, Core::ErrorCode::InvalidFormat);
+    EXPECT_EQ(result.PointClouds, 0u);
+}
+
 TEST(RuntimeAssetImportFormatCoverage, AuthoredModelMaterialsUseOnlyPerRenderableLeases)
 {
     ExpectModelSceneCompletionRoute(false, true);

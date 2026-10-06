@@ -49,5 +49,9 @@ the existing concrete loader and preserves format-specific validation and
 property semantics; recognizing a filename alone does not prove a working import.
 
 OFF has a geometry writer and a mesh export route. Export UI remains separate
-work. PWN, CSV, 3D and TXT use their dedicated point-cloud loaders; existing
-XYZ/PTS/XYZRGB routes retain their current permissive XYZ parser behavior.
+work. PTS, PWN, CSV, 3D and TXT use their dedicated strict point-cloud loaders;
+XYZ/XYZRGB routes retain the permissive XYZ parser. PTS (`LoadPTS`) enforces an
+optional positive count header exactly and rejects malformed rows, scan-line
+markers and non-finite values with `InvalidFormat`, never a partial cloud; it
+still accepts every column layout the former XYZ routing did (see the geometry
+architecture note).

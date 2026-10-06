@@ -271,7 +271,7 @@ namespace Geometry::PointCloudIO
             switch (format)
             {
             case StrictAsciiPointCloudFormat::PTS:
-                return count == 3 || count == 4 || count == 7;
+                return count == 3 || count == 4 || count == 6 || count == 7;
             case StrictAsciiPointCloudFormat::CSV:
                 return count == 3 || count == 5 || count == 6;
             case StrictAsciiPointCloudFormat::ThreeD:
@@ -296,9 +296,12 @@ namespace Geometry::PointCloudIO
             const StrictAsciiPointCloudFormat format,
             const std::size_t count)
         {
-            return count == 7 &&
-                   (format == StrictAsciiPointCloudFormat::PTS ||
-                    format == StrictAsciiPointCloudFormat::TXT);
+            // PTS: x y z i (intensity as gray), x y z r g b, x y z i r g b.
+            if (format == StrictAsciiPointCloudFormat::PTS)
+            {
+                return count == 4 || count == 6 || count == 7;
+            }
+            return count == 7 && format == StrictAsciiPointCloudFormat::TXT;
         }
 
         [[nodiscard]] Extrinsic::Core::Expected<PointCloudIOResult> ParseStrictAsciiPointCloud(
@@ -391,10 +394,15 @@ namespace Geometry::PointCloudIO
                     }
                     result.Cloud.Normal(point) = normal;
                 }
-                if (hasColor)
+                if (hasColor && values->size() == 4)
+                {
+                    const float gray = NormalizeColorChannel((*values)[3]);
+                    result.Cloud.Color(point) = glm::vec4(gray, gray, gray, 1.0f);
+                }
+                else if (hasColor)
                 {
                     const std::size_t colorOffset =
-                        format == StrictAsciiPointCloudFormat::PTS ? 4u : 3u;
+                        format == StrictAsciiPointCloudFormat::PTS && values->size() == 7 ? 4u : 3u;
                     result.Cloud.Color(point) = glm::vec4(
                         NormalizeColorChannel((*values)[colorOffset]),
                         NormalizeColorChannel((*values)[colorOffset + 1]),
