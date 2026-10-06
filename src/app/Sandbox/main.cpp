@@ -15,6 +15,8 @@
 #include <utility>
 #include <vector>
 
+#include <nlohmann/json.hpp>
+
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
@@ -307,11 +309,6 @@ namespace
         return *best;
     }
 
-    void WriteBool(std::ofstream& out, const bool value)
-    {
-        out << (value ? "true" : "false");
-    }
-
     [[nodiscard]] bool WriteFramePacingReport(
         const std::filesystem::path& path,
         const std::uint32_t requestedFrames,
@@ -351,64 +348,54 @@ namespace
         const std::uint64_t meanTotalMicros =
             samples.empty() ? 0u : totalMicros / samples.size();
 
-        out << "{\n";
-        out << "  \"schema\": \"intrinsic.frame_pacing.v1\",\n";
-        out << "  \"source\": \"ExtrinsicSandbox\",\n";
-        out << "  \"requested_frames\": " << requestedFrames << ",\n";
-        out << "  \"frame_count\": " << samples.size() << ",\n";
-        out << "  \"summary\": {\n";
-        out << "    \"total_micros\": " << totalMicros << ",\n";
-        out << "    \"mean_total_micros\": " << meanTotalMicros << ",\n";
-        out << "    \"max_total_micros\": " << maxTotalMicros << ",\n";
-        out << "    \"final_device_operational\": ";
-        WriteBool(out, finalDeviceOperational);
-        out << ",\n";
-        out << "    \"top_phase_by_total\": \"" << topPhase.Name << "\",\n";
-        out << "    \"top_phase_total_micros\": " << topPhaseTotal << ",\n";
-        out << "    \"phase_totals\": {\n";
-        for (std::size_t index = 0; index < kPhaseFields.size(); ++index)
+        // ordered_json keeps the documented key order of the v1 report.
+        nlohmann::ordered_json phaseTotals = nlohmann::ordered_json::object();
+        for (const PhaseField& phase : kPhaseFields)
         {
-            const PhaseField& phase = kPhaseFields[index];
             std::uint64_t phaseTotal = 0u;
             for (const auto& sample : samples)
             {
                 phaseTotal += sample.*(phase.Member);
             }
-            out << "      \"" << phase.Name << "\": " << phaseTotal;
-            out << (index + 1u == kPhaseFields.size() ? "\n" : ",\n");
+            phaseTotals[std::string(phase.Name)] = phaseTotal;
         }
-        out << "    }\n";
-        out << "  },\n";
-        out << "  \"samples\": [\n";
-        for (std::size_t sampleIndex = 0; sampleIndex < samples.size(); ++sampleIndex)
+
+        nlohmann::ordered_json sampleArray = nlohmann::ordered_json::array();
+        for (const auto& sample : samples)
         {
-            const auto& sample = samples[sampleIndex];
-            out << "    {\n";
-            out << "      \"frame_index\": " << sample.FrameIndex << ",\n";
-            out << "      \"total_micros\": " << sample.TotalMicros << ",\n";
-            out << "      \"platform_continue_frame\": ";
-            WriteBool(out, sample.PlatformContinueFrame);
-            out << ",\n";
-            out << "      \"renderer_began_frame\": ";
-            WriteBool(out, sample.RendererBeganFrame);
-            out << ",\n";
-            out << "      \"renderer_completed_frame\": ";
-            WriteBool(out, sample.RendererCompletedFrame);
-            out << ",\n";
-            out << "      \"phases\": {\n";
-            for (std::size_t phaseIndex = 0; phaseIndex < kPhaseFields.size(); ++phaseIndex)
+            nlohmann::ordered_json phases = nlohmann::ordered_json::object();
+            for (const PhaseField& phase : kPhaseFields)
             {
-                const PhaseField& phase = kPhaseFields[phaseIndex];
-                out << "        \"" << phase.Name << "\": "
-                    << sample.*(phase.Member);
-                out << (phaseIndex + 1u == kPhaseFields.size() ? "\n" : ",\n");
+                phases[std::string(phase.Name)] = sample.*(phase.Member);
             }
-            out << "      }\n";
-            out << "    }";
-            out << (sampleIndex + 1u == samples.size() ? "\n" : ",\n");
+            sampleArray.push_back({
+                {"frame_index", sample.FrameIndex},
+                {"total_micros", sample.TotalMicros},
+                {"platform_continue_frame", sample.PlatformContinueFrame},
+                {"renderer_began_frame", sample.RendererBeganFrame},
+                {"renderer_completed_frame", sample.RendererCompletedFrame},
+                {"phases", std::move(phases)},
+            });
         }
-        out << "  ]\n";
-        out << "}\n";
+
+        const nlohmann::ordered_json report{
+            {"schema", "intrinsic.frame_pacing.v1"},
+            {"source", "ExtrinsicSandbox"},
+            {"requested_frames", requestedFrames},
+            {"frame_count", samples.size()},
+            {"summary",
+             {
+                 {"total_micros", totalMicros},
+                 {"mean_total_micros", meanTotalMicros},
+                 {"max_total_micros", maxTotalMicros},
+                 {"final_device_operational", finalDeviceOperational},
+                 {"top_phase_by_total", std::string(topPhase.Name)},
+                 {"top_phase_total_micros", topPhaseTotal},
+                 {"phase_totals", std::move(phaseTotals)},
+             }},
+            {"samples", std::move(sampleArray)},
+        };
+        out << report.dump(2) << '\n';
 
         return true;
     }

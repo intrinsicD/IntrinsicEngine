@@ -51,6 +51,7 @@ if(INTRINSIC_BUILD_SANDBOX AND NOT INTRINSIC_HEADLESS_NO_GLFW)
         PRIVATE
         ExtrinsicRuntime
         ExtrinsicSandboxEditor
+        nlohmann_json::nlohmann_json
     )
 
     include(${CMAKE_SOURCE_DIR}/cmake/CompileShaders.cmake)
