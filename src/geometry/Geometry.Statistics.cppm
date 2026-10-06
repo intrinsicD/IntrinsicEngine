@@ -1,3 +1,4 @@
+// Deterministic, fail-closed scalar statistics: streaming mean, medians and quantiles.
 module;
 
 #include <cstddef>
@@ -10,25 +11,22 @@ module;
 
 export module Geometry.Statistics;
 
-// Geometry.Statistics — deterministic, fail-closed scalar statistics utilities.
-//
 // Numeric/fail-closed contract (GEOM-005 / GEOM-007):
 //  - Non-finite samples are ignored by the accumulators (never poison state).
-//  - Moment/median/quantile queries with insufficient data return std::nullopt
+//  - Mean/median/quantile queries with insufficient data return std::nullopt
 //    rather than producing NaN/Inf.
-//  - SafeAcos/SafeAsin clamp finite inputs into the valid domain and return a
-//    defined finite fall-back (0.0) for non-finite input.
+//  - SafeAcos clamps finite inputs into the valid domain and returns a defined
+//    finite fall-back (0.0) for non-finite input.
 export namespace Geometry::Statistics
 {
-    // Clamp the argument into [-1, 1] before std::acos / std::asin so callers
+    // Clamp the argument into [-1, 1] before std::acos so callers
     // never trip on tiny out-of-domain rounding error. Finite input always
     // yields a finite result; non-finite input returns 0.0 (defined fail-closed).
     [[nodiscard]] double SafeAcos(double x) noexcept;
-    [[nodiscard]] double SafeAsin(double x) noexcept;
 
-    // Mergeable streaming moments using the Pébay/Terriberry online update for
-    // M2/M3/M4 (mean, variance, skewness, excess kurtosis). Two accumulators can
-    // be combined exactly with Merge / operator+ (parallel combine).
+    // Mergeable streaming moments (Pébay/Terriberry online M2/M3/M4 update); only
+    // Count/Mean are exposed. Two accumulators combine exactly with Merge /
+    // operator+ (parallel combine).
     class StreamingMoments
     {
     public:
@@ -39,10 +37,6 @@ export namespace Geometry::Statistics
         [[nodiscard]] bool Empty() const noexcept { return count_ == 0; }
 
         [[nodiscard]] std::optional<double> Mean() const noexcept;
-        [[nodiscard]] std::optional<double> PopulationVariance() const noexcept; // /n
-        [[nodiscard]] std::optional<double> SampleVariance() const noexcept;     // /(n-1)
-        [[nodiscard]] std::optional<double> Skewness() const noexcept;           // population
-        [[nodiscard]] std::optional<double> Kurtosis() const noexcept;          // excess
 
         void Merge(const StreamingMoments& other) noexcept;
         [[nodiscard]] StreamingMoments operator+(const StreamingMoments& other) const noexcept;

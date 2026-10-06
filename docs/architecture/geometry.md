@@ -101,12 +101,11 @@
   sentinels without asserts or NaNs. Single finite samples return unchanged with
   `SingleSample`.
 - `Geometry.Statistics` owns scalar CPU statistics utilities that are
-  deterministic and fail closed: `StreamingMoments` accumulates count, mean,
-  population/sample variance, skewness, and excess kurtosis with mergeable
-  Pébay/Terriberry M2/M3/M4 state; `RunningMedian` tracks a streaming median
-  with two heaps; `Median` and `Quantile` provide finite-sample order
-  statistics over double spans and arithmetic vectors; and `SafeAcos` /
-  `SafeAsin` centralize inverse-trig domain clamping. Empty, non-finite, or
+  deterministic and fail closed: `StreamingMoments` exposes count and mean
+  over mergeable Pébay/Terriberry M2/M3/M4 state; `RunningMedian` tracks a
+  streaming median with two heaps; `Median` and `Quantile` provide
+  finite-sample order statistics over double spans and arithmetic vectors; and
+  `SafeAcos` centralizes inverse-cosine domain clamping. Empty, non-finite, or
   out-of-domain order-statistic queries return `std::nullopt`; non-finite
   accumulator samples are ignored rather than poisoning state.
 - `Geometry.Robust` owns robust M-estimator kernels for CPU fitting and IRLS

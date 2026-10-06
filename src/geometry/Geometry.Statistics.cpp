@@ -20,15 +20,6 @@ namespace Geometry::Statistics
         return std::acos(std::clamp(x, -1.0, 1.0));
     }
 
-    double SafeAsin(double x) noexcept
-    {
-        if (!std::isfinite(x))
-        {
-            return 0.0;
-        }
-        return std::asin(std::clamp(x, -1.0, 1.0));
-    }
-
     void StreamingMoments::Reset() noexcept
     {
         count_ = 0;
@@ -70,44 +61,6 @@ namespace Geometry::Statistics
             return std::nullopt;
         }
         return mean_;
-    }
-
-    std::optional<double> StreamingMoments::PopulationVariance() const noexcept
-    {
-        if (count_ == 0)
-        {
-            return std::nullopt;
-        }
-        return m2_ / static_cast<double>(count_);
-    }
-
-    std::optional<double> StreamingMoments::SampleVariance() const noexcept
-    {
-        if (count_ < 2)
-        {
-            return std::nullopt;
-        }
-        return m2_ / static_cast<double>(count_ - 1);
-    }
-
-    std::optional<double> StreamingMoments::Skewness() const noexcept
-    {
-        if (count_ < 2 || !(m2_ > 0.0))
-        {
-            return std::nullopt;
-        }
-        const double nd = static_cast<double>(count_);
-        return (std::sqrt(nd) * m3_) / std::pow(m2_, 1.5);
-    }
-
-    std::optional<double> StreamingMoments::Kurtosis() const noexcept
-    {
-        if (count_ < 2 || !(m2_ > 0.0))
-        {
-            return std::nullopt;
-        }
-        const double nd = static_cast<double>(count_);
-        return (nd * m4_) / (m2_ * m2_) - 3.0; // excess kurtosis
     }
 
     void StreamingMoments::Merge(const StreamingMoments& other) noexcept
