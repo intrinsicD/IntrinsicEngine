@@ -1008,11 +1008,9 @@ Concretely:
   R32_UINT outputs matching the recipe's `PickingPass` color targets —
   location 0 = stable entity ID into `EntityId`, location 1 =
   `EncodeSelectionId(SelectionPrimitiveDomain::Entity, 0)` into
-  `PrimitiveId` per `GRAPHICS-012Q`. The legacy
-  `assets/shaders/pick_id.{vert,frag}` declares the pre-GpuScene
-  `mat4 Model + PtrPositions + ... + uint EntityID` push block and is
-  deliberately *not* referenced — see the "Shader push-constant
-  compatibility policy" subsection above for the explicit rule. The typed
+  `PrimitiveId` per `GRAPHICS-012Q`. The retired pre-GpuScene pick ABI
+  (`mat4 Model + PtrPositions + ... + uint EntityID`) must not return — see
+  the "Shader push-constant compatibility policy" subsection above. The typed
   `PickingPass` command route invokes `RecordSelectionEntityIdPass(...)` with
   the standard
   `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy.
@@ -1084,10 +1082,7 @@ Concretely:
   `gl_PrimitiveID` is the per-draw-call primitive index over the
   respective `SurfaceOpaque` / `Lines` / `Points` cull bucket; the
   per-instance stable entity ID is still written into `EntityId`. The
-  legacy `assets/shaders/pick_mesh.{vert,frag}` /
-  `assets/shaders/pick_line.{vert,frag}` /
-  `assets/shaders/pick_point.{vert,frag}` shaders declare the pre-GpuScene
-  push block and are deliberately *not* referenced — see the "Shader
+  retired pre-GpuScene pick push block must not return — see the "Shader
   push-constant compatibility policy" subsection above. The typed `PickingPass` command route now invokes
   `RecordSelectionEntityIdPass(...)` then
   `RecordSelectionPrimitiveIdPass(...)` for the Face, Edge and Point

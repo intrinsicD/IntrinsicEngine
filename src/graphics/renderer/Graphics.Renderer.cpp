@@ -4811,12 +4811,11 @@ namespace Extrinsic::Graphics
         // 0 = stable entity ID into the `EntityId` target, location 1 =
         // `EncodeSelectionId(SelectionPrimitiveDomain::Entity, 0)` into the
         // `PrimitiveId` target per the GRAPHICS-012Q encoding contract). The
-        // legacy `assets/shaders/pick_id.{vert,frag}` declares the pre-GpuScene
-        // `mat4 Model + PtrPositions + PtrNormals + PtrAux + uint EntityID`
-        // push-constant block and would silently truncate / misinterpret the
-        // `RHI::GpuScenePushConstants` bytes that `EntityIdPass::Execute`
-        // pushes via `cmd.PushConstants(&pc, sizeof(pc))`, so it is
-        // deliberately *not* referenced here — see
+        // retired pre-GpuScene pick ABI (`mat4 Model + PtrPositions +
+        // PtrNormals + PtrAux + uint EntityID`) would silently truncate /
+        // misinterpret the `RHI::GpuScenePushConstants` bytes that
+        // `EntityIdPass::Execute` pushes via `cmd.PushConstants(&pc,
+        // sizeof(pc))`, so selection shaders must not use it — see
         // `src/graphics/renderer/README.md` ("Shader push-constant
         // compatibility policy") for the parallel forward / deferred /
         // shadow precedents. Two color targets match the frame recipe's

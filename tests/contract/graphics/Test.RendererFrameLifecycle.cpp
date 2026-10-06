@@ -3738,11 +3738,9 @@ TEST(RendererFrameLifecycle, DeferredLightingPushConstantsCarryShadowAtlasBindle
 // republish. The CPU/null contract here is the byte-identical descriptor
 // across the initial init and `RebuildOperationalResources()`, plus the
 // shader-path and color-target assertions that catch the GpuScene-aware
-// shader-pair contract (the legacy `assets/shaders/pick_id.{vert,frag}` is a
-// known footgun because it declares the pre-GpuScene `mat4 Model +
-// PtrPositions + ... + uint EntityID` push block and would silently
-// misinterpret the `RHI::GpuScenePushConstants` bytes that
-// `EntityIdPass::Execute` pushes).
+// shader-pair contract (the retired pre-GpuScene pick ABI, `mat4 Model +
+// PtrPositions + ... + uint EntityID`, would silently misinterpret the
+// `RHI::GpuScenePushConstants` bytes that `EntityIdPass::Execute` pushes).
 //
 // Render-pass compatibility: GRAPHICS-074's recipe-side follow-up reordered
 // `BuildDefaultFrameRecipe` so `PickingPass` runs *after* `DepthPrepass` and
@@ -3853,10 +3851,8 @@ TEST(RendererFrameLifecycle, EntityIdOutlinePipelineUsesSingleTargetShape)
 // GRAPHICS-074 Slice B — default-recipe Face / Edge / Point selection ID
 // pipeline lease + republish. Each test mirrors the EntityId pipeline check:
 // the operational publisher creates the pipeline on initial init, the
-// descriptor matches the shader-pair contract (the legacy
-// `assets/shaders/pick_mesh.{vert,frag}` / `pick_line.{vert,frag}` /
-// `pick_point.{vert,frag}` shaders are pre-GpuScene footguns and are
-// deliberately *not* used here — see `src/graphics/renderer/README.md`
+// descriptor matches the shader-pair contract (the retired pre-GpuScene
+// pick ABI must not return — see `src/graphics/renderer/README.md`
 // "Shader push-constant compatibility policy"), and
 // `RebuildOperationalResources()` republishes a byte-identical descriptor.
 // All three pipelines share the EntityId pipeline's depth-equal / depth-write-

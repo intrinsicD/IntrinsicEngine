@@ -14,10 +14,10 @@
 //
 // Push-constant compatibility: the block below MUST mirror
 // `RHI::GpuScenePushConstants` exactly. `EntityIdPass::Execute` pushes those
-// bytes via `cmd.PushConstants(&pc, sizeof(pc))`. Reusing the legacy
-// `assets/shaders/pick_id.vert` (declares `mat4 Model + PtrPositions + ... +
-// uint EntityID`) is a known footgun — see the "Shader push-constant
-// compatibility policy" section in `src/graphics/renderer/README.md`.
+// bytes via `cmd.PushConstants(&pc, sizeof(pc))`. Do not reintroduce the
+// retired pre-GpuScene pick ABI (`mat4 Model + PtrPositions + ... +
+// uint EntityID`) — see the "Shader push-constant compatibility policy"
+// section in `src/graphics/renderer/README.md`.
 
 #include "../common/gpu_scene.glsl"
 

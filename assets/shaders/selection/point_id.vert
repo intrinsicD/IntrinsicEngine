@@ -27,10 +27,10 @@
 //
 // Push-constant compatibility: the block below MUST mirror
 // `RHI::GpuScenePushConstants` exactly. `PointIdPass::Execute` pushes
-// those bytes via `cmd.PushConstants(&pc, sizeof(pc))`. Reusing the
-// legacy `assets/shaders/pick_point.vert` (declares the pre-GpuScene
-// push block) is a known footgun — see the "Shader push-constant
-// compatibility policy" section in `src/graphics/renderer/README.md`.
+// those bytes via `cmd.PushConstants(&pc, sizeof(pc))`. Do not
+// reintroduce the retired pre-GpuScene pick push block — see the "Shader
+// push-constant compatibility policy" section in
+// `src/graphics/renderer/README.md`.
 
 #include "../common/gpu_scene.glsl"
 

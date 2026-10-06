@@ -1,5 +1,13 @@
 # Modular GPU-Driven Rendering Pipeline Plan (Code-Aware Reuse + Gap Audit)
 
+> **Historical document.** This plan describes the pre-promotion renderer. Several
+> shaders and loaders it names as current (`instance_cull_multigeo.comp`,
+> `scene_update.comp`, `pick_mesh`/`pick_line`/`pick_point`) were never loaded by
+> the promoted renderer and were deleted by REVIEW-007 G01; read them at revision
+> `087e6e17b`. Current owners: `Graphics.GpuWorld` (instance/geometry pools),
+> `Graphics.CullingSystem` with `assets/shaders/instance_cull.comp`, and the
+> `assets/shaders/selection/*` picking shaders.
+
 ## 0) Scope
 
 This plan is a **code-aware redesign map**: what already exists in IntrinsicEngine, what should be reused as-is, what should be refactored, and what must be added to reach a truly modular GPU-driven pipeline.

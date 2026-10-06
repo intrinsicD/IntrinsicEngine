@@ -1063,7 +1063,7 @@ KMeansStateRef, KMeansPush and matching reduction declarations are copied across
 
 ### R32 — Point/surfel EWA math
 
-**Locations:** [assets/shaders/point.vert:91](../../assets/shaders/point.vert#L91); [assets/shaders/point_retained.vert:106](../../assets/shaders/point_retained.vert#L106); [assets/shaders/point_surfel.vert:118](../../assets/shaders/point_surfel.vert#L118); [assets/shaders/point.frag:29](../../assets/shaders/point.frag#L29); [assets/shaders/point_retained.frag:39](../../assets/shaders/point_retained.frag#L39).
+**Locations** (deleted by REVIEW-007 G01; read at revision `087e6e17b`): `assets/shaders/point.vert:91`; `assets/shaders/point_retained.vert:106`; `assets/shaders/point_surfel.vert:118`; `assets/shaders/point.frag:29`; `assets/shaders/point_retained.frag:39`.
 
 The point shader family repeats tangent-frame projection, covariance construction, EWA evaluation and guarded lighting.
 
