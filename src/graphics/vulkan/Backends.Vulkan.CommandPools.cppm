@@ -1,3 +1,5 @@
+// :CommandPools partition: VulkanCommandContext, the RHI::ICommandContext
+// implementation that records into a Vulkan command buffer.
 module;
 
 
@@ -84,7 +86,6 @@ namespace Extrinsic::Backends::Vulkan
         void SetScissor(int32_t x, int32_t y, uint32_t w, uint32_t h) override;
 
         void BindPipeline(RHI::PipelineHandle pipeline) override;
-        void BindFrameSampledTexture(RHI::TextureHandle texture) override;
         void BindFrameSampledTextureAt(RHI::TextureHandle texture, std::uint32_t descriptorIndex) override;
         void BindIndexBuffer(RHI::BufferHandle buffer, uint64_t offset,
                              RHI::IndexType indexType) override;

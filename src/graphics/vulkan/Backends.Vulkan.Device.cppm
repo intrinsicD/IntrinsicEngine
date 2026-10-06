@@ -77,7 +77,6 @@ namespace Extrinsic::Backends::Vulkan
         [[nodiscard]] RHI::Format GetBackbufferFormat() const override;
 
         void SetPresentMode(RHI::PresentMode mode) override;
-        [[nodiscard]] RHI::PresentMode GetPresentMode() const override { return m_PresentMode; }
 
         [[nodiscard]] RHI::TextureHandle GetBackbufferHandle(const RHI::FrameHandle& frame) const override;
 

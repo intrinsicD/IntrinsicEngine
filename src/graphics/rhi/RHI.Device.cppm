@@ -211,7 +211,6 @@ namespace Extrinsic::RHI
         /// Change swapchain present mode.  Takes effect on the next Resize()
         /// or the next swapchain recreation — no immediate GPU stall.
         virtual void SetPresentMode(PresentMode mode) = 0;
-        [[nodiscard]] virtual PresentMode GetPresentMode() const = 0;
 
         /// Return a TextureHandle for the swapchain image corresponding to this frame.
         /// The handle is valid only for the duration of the frame (between BeginFrame and Present).

@@ -466,7 +466,6 @@ namespace Extrinsic::Tests
         void Present(const RHI::FrameHandle&) override { ++PresentCount; }
         void Resize(std::uint32_t, std::uint32_t) override { ++ResizeCount; }
         void SetPresentMode(RHI::PresentMode) override {}
-        [[nodiscard]] RHI::PresentMode GetPresentMode() const override { return RHI::PresentMode::VSync; }
         [[nodiscard]] RHI::TextureHandle GetBackbufferHandle(const RHI::FrameHandle& frame) const override;
         Core::Extent2D GetBackbufferExtent() const override { return {}; }
         [[nodiscard]] RHI::Format GetBackbufferFormat() const override { return BackbufferFormat; }

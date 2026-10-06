@@ -382,11 +382,6 @@ void VulkanCommandContext::BindPipeline(RHI::PipelineHandle handle)
                             0, 1, &m_BindlessSet, 0, nullptr);
 }
 
-void VulkanCommandContext::BindFrameSampledTexture(RHI::TextureHandle texture)
-{
-    UpdateFrameSampledDescriptor(texture, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0u);
-}
-
 void VulkanCommandContext::BindFrameSampledTextureAt(RHI::TextureHandle texture, const std::uint32_t descriptorIndex)
 {
     UpdateFrameSampledDescriptor(texture, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, descriptorIndex);

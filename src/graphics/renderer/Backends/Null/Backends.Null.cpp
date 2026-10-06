@@ -164,7 +164,6 @@ namespace Extrinsic::Backends::Null
         Core::Extent2D GetBackbufferExtent() const override { return m_BackbufferExtent; }
 
         void SetPresentMode(RHI::PresentMode mode) override { m_PresentMode = mode; }
-        [[nodiscard]] RHI::PresentMode GetPresentMode() const override { return m_PresentMode; }
 
         [[nodiscard]] RHI::TextureHandle GetBackbufferHandle(const RHI::FrameHandle&) const override
         {

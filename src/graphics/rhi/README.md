@@ -232,12 +232,12 @@ any other exported polymorphic RHI interface):
   destructor is declared in the `.cppm` and defined there as the **out-of-line
   key function**, so the `ICommandContext` vtable is emitted in exactly one TU
   (a single authoritative module-owned emission). The defaulted-virtual bodies
-  (`BindFrameSampledTexture`, `CopyTextureToBuffer`, `BindFrameSampledTextureAt`)
+  (`CopyTextureToBuffer`, `BindFrameSampledTextureAt`)
   are defined alongside it; `SubmitBarriers` is pure virtual and has no body to
   host. Note: this anchoring does **not** prevent the stale-BMI slot-mismatch
   failure mode above — that is a slot-offset problem, not a symbol-emission one;
   the clean-rebuild rule remains the authoritative prevention.
-- The class definition and all four of its out-of-line member definitions in
+- The class definition and all three of its out-of-line member definitions in
   `RHI.CommandContext.cpp` are wrapped in `extern "C++"`. That keeps the type,
   and its vtable globally attached, so a CPU interface that only
   borrows an `ICommandContext&` (currently `Extrinsic.Runtime.JobService`) can
@@ -246,7 +246,7 @@ any other exported polymorphic RHI interface):
   on the destructor key function leaves derived TUs referencing a vtable that
   nothing emits — a link error. Keep the two in step; RTTI is disabled.
 - `BindFrameSampledTextureAt(TextureHandle, std::uint32_t)` is the
-  slot-explicit sibling of `BindFrameSampledTexture(TextureHandle)`. Backends
+  slot-explicit sampled-input hook. Backends
   that bridge framegraph sampled inputs through a global bindless array use it
   when two fullscreen passes in one command buffer must keep distinct sampled
   descriptors alive; backends with explicit descriptor binding may ignore it.
@@ -256,9 +256,4 @@ any other exported polymorphic RHI interface):
   Real bindless texture leases start after those bridge slots.
 
 History: HARDEN-072 (`tasks/archive/HARDEN-072-rhi-surface-fixes-for-default-recipe-pipeline-bringup.md`)
-removed default arguments from `CopyTextureToBuffer` after they tripped a related
-clang-20 vtable-mangling bug. BUG-013
-(`tasks/archive/BUG-013-backbuffer-readback-contract-vtable-segv.md`) was a
-backbuffer-readback contract SEGV traced to stale BMIs after `BindFrameSampledTexture`
-was added; it did **not** reproduce on a clean build — the contract suite is
-green (225/225 in `IntrinsicGraphicsContractCpuTests`) once BMIs are consistent.
+and BUG-013 (`tasks/archive/BUG-013-backbuffer-readback-contract-vtable-segv.md`).
