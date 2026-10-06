@@ -1,3 +1,4 @@
+// Exposes validated live config control as an app-composed runtime module.
 module;
 
 #include <cstdint>
@@ -103,10 +104,6 @@ namespace Extrinsic::Runtime
                 RuntimeRenderRecipeActivationSource::Programmatic);
         [[nodiscard]] RuntimeRenderRecipeApplyResult ApplyRenderRecipeConfigPreview(
             const Graphics::RenderRecipeConfigLoadResult& loadResult,
-            RuntimeRenderRecipeActivationSource source =
-                RuntimeRenderRecipeActivationSource::Programmatic);
-        [[nodiscard]] RuntimeRenderRecipeApplyResult LoadAndApplyRenderRecipeConfigFile(
-            std::string path,
             RuntimeRenderRecipeActivationSource source =
                 RuntimeRenderRecipeActivationSource::Programmatic);
         void ClearActiveRenderRecipeOverride() noexcept;

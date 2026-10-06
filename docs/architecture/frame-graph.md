@@ -95,7 +95,7 @@ There are three current edit lanes over the same preview/apply contract:
 - **Config files.** A resolved
   `Runtime::EngineConfigControl` service previews a recipe file with
   `LoadRenderRecipeConfigPreviewFile(...)` and applies a usable preview with
-  `LoadAndApplyRenderRecipeConfigFile(...)`, installing a
+  `ApplyRenderRecipeConfigPreview(...)`, installing a
   `FrameRecipeOverride` on the renderer.
 - **Sandbox UI.** The `Render Recipes` sandbox editor panel validates, previews,
   activates, cancels, publishes, and applies recipe drafts through runtime-owned

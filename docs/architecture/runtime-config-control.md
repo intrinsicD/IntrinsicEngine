@@ -34,8 +34,6 @@ Render-recipe control:
 - `ApplyRenderRecipeConfigPreview(loadResult, source)` installs a validated
   `Graphics::FrameRecipeOverride` on the renderer and records
   `RuntimeRenderRecipeState`.
-- `LoadAndApplyRenderRecipeConfigFile(path, source)` is the startup/programmatic
-  file helper.
 
 Engine-config control:
 

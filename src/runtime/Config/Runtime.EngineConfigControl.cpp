@@ -335,17 +335,6 @@ namespace Extrinsic::Runtime
             source);
     }
 
-    RuntimeRenderRecipeApplyResult
-    EngineConfigControl::LoadAndApplyRenderRecipeConfigFile(
-        std::string path,
-        const RuntimeRenderRecipeActivationSource source)
-    {
-        return LoadAndApplyRuntimeRenderRecipeConfigFile(
-            m_RecipeActivation,
-            std::move(path),
-            source);
-    }
-
     void EngineConfigControl::ClearActiveRenderRecipeOverride() noexcept
     {
         ClearRuntimeRenderRecipeOverride(m_RecipeActivation);
