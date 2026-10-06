@@ -262,7 +262,7 @@ Eine Etappe pro Sitzung genügt; die Reihenfolge kann der Operator ändern.
 - [x] E3 — Core, ECS, Assets (C01–C17), 2026-10-06
 - [x] E4 — Graphics (G01–G18), 2026-10-06
 - [x] E5 — Runtime ohne Editor/Modules (R01–R19), 2026-10-06
-- [ ] E6 — Runtime-Editor/Modules und Sandbox-App (E01–E17)
+- [x] E6 — Runtime-Editor/Modules und Sandbox-App (E01–E17), 2026-10-06
 - [ ] E7 — Geometry (GE01–GE25)
 - [ ] E8 — Konsolidierung nach Phase C: freigegebene Folgetasks anlegen
   (Kandidaten mit gleichem Owner gebündelt, wenn der Operator zustimmt),
@@ -384,23 +384,23 @@ nächsten Abschnitt.
 ### E — Runtime-Editor/Modules und Sandbox-App
 | ID | Fund | Tag | Schätz. | Claude | Codex | Operator |
 |----|---------|-----|------|--------|--------|----------|
-| E01 | 9 identical `Prepare*Frame` bodies in `*Operations.Frame.cpp` → one template | shrink | -170 | teilweise: 8 (nicht 9), ≈−40…−70, Source-Guards → vertagen | teilweise: Acht Standardadapter; zusätzliche UV-Daten verhindern pauschale Gleichsetzung. Runtime.MeshFieldOperations.Frame.cpp:10, Runtime.ParameterizationOperations.Frame.cpp:18. | — |
-| E02 | Enum-to-string switches → see X04 | shrink | (X04) | → X04 | teilweise: Viele Namen dienen produktiven UI-/Agent-Ausgaben; pauschaler Tabellenumbau unbegründet. Runtime.EditorCommon.Public.cpp:31, Sandbox.MeshProcessingPanels.cpp:930. | — |
-| E03 | 7 pasted result-header blocks in `Sandbox.MeshProcessingPanels.cpp` → `DrawProcessingResultHeader` | shrink | -80 | teilweise (≈−20) → vertagen, Bündel E03/E07/E08 | teilweise: Sieben ähnliche Leer-/Statusköpfe; Kontrollfluss und Ergebnisdetails unterscheiden sich. Sandbox.MeshProcessingPanels.cpp:923, Sandbox.MeshProcessingPanels.cpp:2944. | — |
-| E04 | `ClusteringService` / `PointCloudConsolidationService` / `TextureBakeService` same forwarding facade | yagni | -90 | widerlegt: tragende Service-Schnittstelle mit Agent-Nutzern | widerlegt: Typisierte Servicegrenzen; TextureBake besitzt zudem eigene Ausführungslogik. Runtime.ClusteringTypes.cppm:173, Runtime.TextureBakeModule.cpp:3329. | — |
-| E05 | FNV loops → see X01 | reuse | (X01) | → X01 | teilweise: Byte-/Wortmischung und Nachmischung unterscheiden sich; kein identischer Hash-Vertrag. Runtime.ParameterizationOperations.cpp:101, Runtime.TextureBakeModule.cpp:421. | — |
-| E06 | Hand-formatted JSON frame-pacing report in `app/Sandbox/main.cpp` → nlohmann::json | native | -60 | teilweise: ≈−35, neue Link-Abhängigkeit → vertagen | bestätigt: Manuelle JSON-Zeichensetzung ist ersetzbar; Paket vorhanden, Target-Verknüpfung fehlt. main.cpp:354, CMakeLists.txt:50. [≠ Claude: Ja: Claude teilweise] | — |
-| E07 | Three enum-combo idioms + 24 raw ImGui::Combo blocks → `DrawEnumCombo<E>` | shrink | -70 | teilweise (≈−35, Nutzen Typsicherheit) → vertagen, Bündel | teilweise: Wiederholung vorhanden; Spec-Combo existiert bereits, andere Combos benötigen Wertzuordnung. Sandbox.PanelSupport.cpp:2223, Sandbox.DomainPanels.cpp:200. | — |
-| E08 | GPU-start lambda pasted 3× in scalar-field panels | shrink | -40 | teilweise (≈−20) → vertagen, Bündel | teilweise: Drei ähnliche GPU/CPU-Starter, jeweils nur vier Quellzeilen. Sandbox.MeshProcessingPanels.cpp:2481, Sandbox.MeshProcessingPanels.cpp:2749. [≠ Claude: Ja: Einsparschätzung] | — |
-| E09 | EditorShell → EditorUiHost → WindowRegistry delegate-only wrappers | yagni | -60 | teilweise: >100 Aufrufstellen → behalten | teilweise: Reine Weiterleitungen existieren; Shell ergänzt Kontextbindung und Fensterbesitz. Runtime.EditorUiHost.cpp:130, Sandbox.EditorShell.cpp:2416. | — |
-| E10 | `EditorUiHostOwnerControl` capability token, 1 production caller (contract test greps it) | yagni | -50 | widerlegt: Claim-once-Zugriffsgrenze, Tests + Source-Guard | widerlegt: Einmalige Besitzerbefugnis; echter Verhaltenstest prüft verweigerten zweiten Claim. Runtime.EditorUiHost.cpp:190, Test.EditorUiHost.cpp:335. | — |
-| E11 | Write-only `PhysicsModuleDiagnostics` fields | delete | -30 | bestätigt: 17/37 Felder ungelesen → vertagen bis Diagnostics-Konsument entschieden | teilweise: 16/38 Felder ohne Einzelleser; 21 testgenutzt, eines intern gelesen. Runtime.PhysicsModule.cppm:60, Runtime.PhysicsModule.cpp:666. [≠ Claude: Ja: Votum und Zählung] | — |
-| E12 | Declaration-only fields (`HasPrimitiveViewEntity`, `PrimitiveViewStableId`, `DefaultEncoder`, `InertiaSum`, `PanelFrameModelBuildTimeNs`) | delete | -5 | bestätigt → Task (mit E13-01) | teilweise: Vier Felder nur deklariert; `InertiaSum` trägt das GPU-Datenlayout. Runtime.ClusteringGpuBackend.cpp:50, kmeans_state.glsl:14. [≠ Claude: Ja: Claude bestätigt] | — |
-| E13 | 0-caller exports (`ApplyEditorConfiguredPointSampling`, CommandHistory/RenderRecipe DebugNames) | delete | -85 | ApplyEditorConfiguredPointSampling → Task; DebugNames → X04 | bestätigt: Sampling-Wrapper und drei History/Recipe-Namenshelfer ohne Aufrufer. Runtime.PointSamplingOperations.cpp:402, Runtime.RenderRecipeEditingOperations.Debug.cpp:50. | — |
-| E14 | Test-only DebugName exports → see X04 | delete | (X04) | → X04 | teilweise: Fünf Namenshelfer im E-Scope nur testgenutzt; allein daraus folgt keine tote Diagnose-API. Test.SandboxEditorModels.cpp:2077, Test.ProgressivePoissonGpuBackend.cpp:949. | — |
-| E15 | 3 identical point input-catalog wrappers → `GetEditorPointInputCatalog` | yagni | -30 | teilweise: Mindestzahl bewusst verschieden → behalten | bestätigt: Die drei gemeinten Wrapper reichen identisch Mindestzahl 2 weiter. Runtime.GeometryProcessingOperations.Density.cpp:351, Runtime.GeometryProcessingOperations.Bilateral.cpp:300. [≠ Claude: Ja: Claudes Gegenbegründung falsch] | — |
-| E16 | `SandboxEditorController` pimpl with one production caller | yagni | -50 | widerlegt: Kompositionswurzel | teilweise: Controller besitzt echten Lifecycle; dessen Notwendigkeit begründet nicht zwingend die Pimpl-Hülle. Sandbox.EditorController.cpp:14, Sandbox.EditorController.cppm:30. [≠ Claude: Ja: Claude widerlegt] | — |
-| E17 | tolower-search lambda in `EditorJobDomainOfBackend` | shrink | -6 | widerlegt: kein Helfer vorhanden | widerlegt: Bereits `std::ranges::search` mit kleinem ASCII-Vergleich; kein passender Ersatzhelfer gefunden. Runtime.EditorJobProjection.Public.cpp:29. | — |
+| E01 | 9 identical `Prepare*Frame` bodies in `*Operations.Frame.cpp` → one template | shrink | -170 | teilweise: 8 (nicht 9), ≈−40…−70, Source-Guards → vertagen | teilweise: Acht Standardadapter; zusätzliche UV-Daten verhindern pauschale Gleichsetzung. Runtime.MeshFieldOperations.Frame.cpp:10, Runtime.ParameterizationOperations.Frame.cpp:18. | Vertagen (2026-10-06): UV-Daten verhindern Pauschal-Template |
+| E02 | Enum-to-string switches → see X04 | shrink | (X04) | → X04 | teilweise: Viele Namen dienen produktiven UI-/Agent-Ausgaben; pauschaler Tabellenumbau unbegründet. Runtime.EditorCommon.Public.cpp:31, Sandbox.MeshProcessingPanels.cpp:930. | Erledigt durch X04 (2026-10-06) |
+| E03 | 7 pasted result-header blocks in `Sandbox.MeshProcessingPanels.cpp` → `DrawProcessingResultHeader` | shrink | -80 | teilweise (≈−20) → vertagen, Bündel E03/E07/E08 | teilweise: Sieben ähnliche Leer-/Statusköpfe; Kontrollfluss und Ergebnisdetails unterscheiden sich. Sandbox.MeshProcessingPanels.cpp:923, Sandbox.MeshProcessingPanels.cpp:2944. | Vertagen (2026-10-06): UI-Bündel E03/E07/E08 mit nächster Panelarbeit (UI-075/UI-077) |
+| E04 | `ClusteringService` / `PointCloudConsolidationService` / `TextureBakeService` same forwarding facade | yagni | -90 | widerlegt: tragende Service-Schnittstelle mit Agent-Nutzern | widerlegt: Typisierte Servicegrenzen; TextureBake besitzt zudem eigene Ausführungslogik. Runtime.ClusteringTypes.cppm:173, Runtime.TextureBakeModule.cpp:3329. | Behalten (2026-10-06): widerlegt |
+| E05 | FNV loops → see X01 | reuse | (X01) | → X01 | teilweise: Byte-/Wortmischung und Nachmischung unterscheiden sich; kein identischer Hash-Vertrag. Runtime.ParameterizationOperations.cpp:101, Runtime.TextureBakeModule.cpp:421. | Erledigt durch X01 (2026-10-06) |
+| E06 | Hand-formatted JSON frame-pacing report in `app/Sandbox/main.cpp` → nlohmann::json | native | -60 | teilweise: ≈−35, neue Link-Abhängigkeit → vertagen | bestätigt: Manuelle JSON-Zeichensetzung ist ersetzbar; Paket vorhanden, Target-Verknüpfung fehlt. main.cpp:354, CMakeLists.txt:50. [≠ Claude: Ja: Claude teilweise] | Task + Umsetzung (2026-10-06): nlohmann::ordered_json, Validator prüft volles Schema → `ff8943e86`, `8e2d7f257` |
+| E07 | Three enum-combo idioms + 24 raw ImGui::Combo blocks → `DrawEnumCombo<E>` | shrink | -70 | teilweise (≈−35, Nutzen Typsicherheit) → vertagen, Bündel | teilweise: Wiederholung vorhanden; Spec-Combo existiert bereits, andere Combos benötigen Wertzuordnung. Sandbox.PanelSupport.cpp:2223, Sandbox.DomainPanels.cpp:200. | Vertagen (2026-10-06): UI-Bündel E03/E07/E08 |
+| E08 | GPU-start lambda pasted 3× in scalar-field panels | shrink | -40 | teilweise (≈−20) → vertagen, Bündel | teilweise: Drei ähnliche GPU/CPU-Starter, jeweils nur vier Quellzeilen. Sandbox.MeshProcessingPanels.cpp:2481, Sandbox.MeshProcessingPanels.cpp:2749. [≠ Claude: Ja: Einsparschätzung] | Vertagen (2026-10-06): UI-Bündel E03/E07/E08 |
+| E09 | EditorShell → EditorUiHost → WindowRegistry delegate-only wrappers | yagni | -60 | teilweise: >100 Aufrufstellen → behalten | teilweise: Reine Weiterleitungen existieren; Shell ergänzt Kontextbindung und Fensterbesitz. Runtime.EditorUiHost.cpp:130, Sandbox.EditorShell.cpp:2416. | Behalten (2026-10-06): >100 Aufrufstellen, Kontextbindung |
+| E10 | `EditorUiHostOwnerControl` capability token, 1 production caller (contract test greps it) | yagni | -50 | widerlegt: Claim-once-Zugriffsgrenze, Tests + Source-Guard | widerlegt: Einmalige Besitzerbefugnis; echter Verhaltenstest prüft verweigerten zweiten Claim. Runtime.EditorUiHost.cpp:190, Test.EditorUiHost.cpp:335. | Behalten (2026-10-06): widerlegt |
+| E11 | Write-only `PhysicsModuleDiagnostics` fields | delete | -30 | bestätigt: 17/37 Felder ungelesen → vertagen bis Diagnostics-Konsument entschieden | teilweise: 16/38 Felder ohne Einzelleser; 21 testgenutzt, eines intern gelesen. Runtime.PhysicsModule.cppm:60, Runtime.PhysicsModule.cpp:666. [≠ Claude: Ja: Votum und Zählung] | Behalten (2026-10-06): Physik wird bald umgesetzt |
+| E12 | Declaration-only fields (`HasPrimitiveViewEntity`, `PrimitiveViewStableId`, `DefaultEncoder`, `InertiaSum`, `PanelFrameModelBuildTimeNs`) | delete | -5 | bestätigt → Task (mit E13-01) | teilweise: Vier Felder nur deklariert; `InertiaSum` trägt das GPU-Datenlayout. Runtime.ClusteringGpuBackend.cpp:50, kmeans_state.glsl:14. [≠ Claude: Ja: Claude bestätigt] | Task + Umsetzung (2026-10-06): 4 Felder, `InertiaSum` bleibt → `b3f7312d1` |
+| E13 | 0-caller exports (`ApplyEditorConfiguredPointSampling`, CommandHistory/RenderRecipe DebugNames) | delete | -85 | ApplyEditorConfiguredPointSampling → Task; DebugNames → X04 | bestätigt: Sampling-Wrapper und drei History/Recipe-Namenshelfer ohne Aufrufer. Runtime.PointSamplingOperations.cpp:402, Runtime.RenderRecipeEditingOperations.Debug.cpp:50. | Task + Umsetzung (2026-10-06): Sampling-Wrapper → `e0c2db3c2`; Debug-Namen via X04 |
+| E14 | Test-only DebugName exports → see X04 | delete | (X04) | → X04 | teilweise: Fünf Namenshelfer im E-Scope nur testgenutzt; allein daraus folgt keine tote Diagnose-API. Test.SandboxEditorModels.cpp:2077, Test.ProgressivePoissonGpuBackend.cpp:949. | Erledigt durch X04 (2026-10-06) |
+| E15 | 3 identical point input-catalog wrappers → `GetEditorPointInputCatalog` | yagni | -30 | teilweise: Mindestzahl bewusst verschieden → behalten | bestätigt: Die drei gemeinten Wrapper reichen identisch Mindestzahl 2 weiter. Runtime.GeometryProcessingOperations.Density.cpp:351, Runtime.GeometryProcessingOperations.Bilateral.cpp:300. [≠ Claude: Ja: Claudes Gegenbegründung falsch] | Behalten (2026-10-06): kleiner Gewinn, verschiedene Command-Kontexte |
+| E16 | `SandboxEditorController` pimpl with one production caller | yagni | -50 | widerlegt: Kompositionswurzel | teilweise: Controller besitzt echten Lifecycle; dessen Notwendigkeit begründet nicht zwingend die Pimpl-Hülle. Sandbox.EditorController.cpp:14, Sandbox.EditorController.cppm:30. [≠ Claude: Ja: Claude widerlegt] | Behalten (2026-10-06): Pimpl isoliert die Kompositionswurzel |
+| E17 | tolower-search lambda in `EditorJobDomainOfBackend` | shrink | -6 | widerlegt: kein Helfer vorhanden | widerlegt: Bereits `std::ranges::search` mit kleinem ASCII-Vergleich; kein passender Ersatzhelfer gefunden. Runtime.EditorJobProjection.Public.cpp:29. | Behalten (2026-10-06): widerlegt |
 
 ### GE — Geometry
 | ID | Fund | Tag | Schätz. | Claude | Codex | Operator |
@@ -756,6 +756,26 @@ Codex-Review und Fixes. Basisrevision `29688c7ae`.
 Vollbuild aller `ci`-Ziele nach den Umsetzungen grün, weil
 `Runtime.JobService.cppm` breit importiert wird.
 
+## Etappe E6 — Entscheidungen und Umsetzung 2026-10-06
+
+Der Operator hat am 2026-10-06 E13, E12 und E06 freigegeben; für E06 soll
+`nlohmann::json` als Abhängigkeit genutzt werden. E11 bleibt, weil die
+Physik bald umgesetzt wird. Zu E15 und E16 verlangte er Für und Wider:
+beide bleiben, aus den Gründen in der Operator-Spalte. Das UI-Bündel
+E03/E07/E08 ist vertagt. Die übrigen Kandidaten folgen der Empfehlung.
+Basisrevision `79f695014`; diese Etappe hat Claude direkt umgesetzt, nach
+Codex-Plan und mit Codex-Review.
+
+| Kandidat | Commits | Verifikation | Codex-Review |
+|---|---|---|---|
+| E13 | `e0c2db3c2` | 258/258 + 13 nachgereichte Fälle (`ResidentPointSampling.*`, `EditorKeypointAgent.…`) | Anmerkung (Testauswahl) → behoben |
+| E12 | `b3f7312d1` | 258/258 | freigeben |
+| E06 | `ff8943e86`, `8e2d7f257` | `ExtrinsicSandbox.FramePacingDiagnosticCapture` auf `ci-vulkan` mit echtem Display; Mutationsproben (fehlende Phase, Objekt statt Array) werden abgelehnt | nachbessern (Validator-Schema) → behoben; Anmerkung (Array-Typ) → behoben |
+
+E06 nutzt `nlohmann::ordered_json`, damit die Schlüsselreihenfolge des
+v1-Reports erhalten bleibt. Der Validator prüft jetzt alle Schlüssel und
+Typen sowie genau die 24 Phasennamen.
+
 ## Prüfhinweise aus dem Codex-Audit
 
 Die folgenden Hinweise stammen aus den zwölf Ausgangsgruppen des Codex-Audits
@@ -1089,3 +1109,7 @@ Prüfung der betroffenen Annahmen, nicht den Neustart der gesamten Liste.
   deterministischem `CancelAll`) und R15 sind umgesetzt. R04 und R09
   bleiben, R16 ist in UI-078 eingeordnet. Details in §„Etappe E5 —
   Entscheidungen und Umsetzung 2026-10-06“. Nächste Etappe: E6 (E01–E17).
+- 2026-10-06: Etappe E6 entschieden. E06, E12 und E13 sind umgesetzt. E11,
+  E15 und E16 bleiben, das UI-Bündel E03/E07/E08 ist vertagt. Details in
+  §„Etappe E6 — Entscheidungen und Umsetzung 2026-10-06“. Nächste Etappe:
+  E7 (GE01–GE25).
