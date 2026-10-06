@@ -295,13 +295,6 @@ export namespace Geometry::HalfedgeMesh
         // Conservative vertex-removal predicate used by cleanup utilities.
         [[nodiscard]] bool IsRemovalOk(VertexHandle v) const;
 
-        // Intrinsic in-circle/Delaunay test for an interior triangle edge.
-        // Boundary/non-triangle/degenerate edges fail closed to true.
-        [[nodiscard]] bool IsDelaunay(EdgeHandle e) const;
-
-        // Flip an interior edge only when IsDelaunay(e) is false.
-        [[nodiscard]] bool DelaunayFlip(EdgeHandle e);
-
         // Edge length accessor for the canonical e:length property surface.
         [[nodiscard]] double EdgeLength(EdgeHandle e) const;
 

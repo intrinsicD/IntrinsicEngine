@@ -89,7 +89,7 @@ python3 tools/benchmark/validate_benchmark_results.py --root build/ci-vulkan-rel
 ```
 
 ## Notes (2026-10-01 audit, not scope)
-- A per-face scalar-gradient GPU kernel (CPU: `Geometry.HalfedgeMesh.Utils.cpp` ~965; editor op
+- A per-face scalar-gradient GPU kernel (CPU: `Geometry.HalfedgeMesh.Utils.cpp` — `MeshUtils::ComputeFaceScalarGradients`; editor op
   `Runtime.MeshFieldOperations.Gradient.cpp`) could reuse the vertex-to-face CSR gather from
   `vertex_normals.comp`. It is cheap on the CPU; this task's "not faster means removed" rule
   applies to it before any code is written.

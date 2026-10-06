@@ -116,13 +116,6 @@ export namespace Geometry::MeshUtils
     [[nodiscard]] bool IsConnectedManifoldWithEulerOne(
         const HalfedgeMesh::Mesh& mesh, VertexHandle seed);
 
-    // --- Index-buffer mesh utilities ---
-
-    int GenerateUVs(std::span<const glm::vec3> positions, std::span<glm::vec4> aux);
-
-    void CalculateNormals(std::span<const glm::vec3> positions, std::span<const uint32_t> indices,
-                          std::span<glm::vec3> normals);
-
     // --- Halfedge mesh math utilities ---
     // These were previously duplicated as static functions across Curvature, DEC,
     // Smoothing, Geodesic, Remeshing, AdaptiveRemeshing, and MeshQuality modules.

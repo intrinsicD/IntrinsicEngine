@@ -5,7 +5,6 @@ module;
 #include <cmath>
 #include <cstddef>
 #include <memory>
-#include <numbers>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -1259,47 +1258,6 @@ namespace Geometry::HalfedgeMesh
         if (!v.IsValid() || !IsValid(v) || IsDeleted(v) || IsIsolated(v)) return false;
         if (IsBoundary(v)) return false;
         return Valence(v) >= 3;
-    }
-
-    namespace
-    {
-        [[nodiscard]] double SafeAngle(const glm::vec3 a, const glm::vec3 b, const glm::vec3 c)
-        {
-            const glm::vec3 u = a - b;
-            const glm::vec3 v = c - b;
-            const double lu = glm::length(u);
-            const double lv = glm::length(v);
-            if (lu <= 1.0e-12 || lv <= 1.0e-12) return 0.0;
-            const double cosine = std::clamp(static_cast<double>(glm::dot(u, v)) / (lu * lv), -1.0, 1.0);
-            return std::acos(cosine);
-        }
-    }
-
-    bool Mesh::IsDelaunay(EdgeHandle e) const
-    {
-        if (!e.IsValid() || !IsValid(e) || IsDeleted(e) || IsBoundary(e)) return true;
-
-        const HalfedgeHandle h0 = Halfedge(e, 0);
-        const HalfedgeHandle h1 = Halfedge(e, 1);
-        if (IsBoundary(h0) || IsBoundary(h1)) return true;
-
-        const FaceHandle f0 = Face(h0);
-        const FaceHandle f1 = Face(h1);
-        if (!f0.IsValid() || !f1.IsValid() || Valence(f0) != 3 || Valence(f1) != 3) return true;
-
-        const VertexHandle a = FromVertex(h0);
-        const VertexHandle b = ToVertex(h0);
-        const VertexHandle c = ToVertex(NextHalfedge(h0));
-        const VertexHandle d = ToVertex(NextHalfedge(h1));
-        const double angleC = SafeAngle(Position(a), Position(c), Position(b));
-        const double angleD = SafeAngle(Position(a), Position(d), Position(b));
-        return angleC + angleD <= std::numbers::pi + 1.0e-10;
-    }
-
-    bool Mesh::DelaunayFlip(EdgeHandle e)
-    {
-        if (IsDelaunay(e)) return false;
-        return Flip(e);
     }
 
     double Mesh::EdgeLength(EdgeHandle e) const

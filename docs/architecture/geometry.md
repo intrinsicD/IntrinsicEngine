@@ -352,8 +352,8 @@ faces and its separate boundary-turning promotion remain local compatibility
 behavior.
 
 `Geometry.HalfedgeMesh::Mesh` publishes core topology helpers for polygon
-`Triangulate`, conservative `IsRemovalOk`, intrinsic `IsDelaunay`, conditional
-`DelaunayFlip`, direct `EdgeLength`, and `UpdateEdgeLengths`. `UpdateEdgeLengths`
+`Triangulate`, conservative `IsRemovalOk`, direct `EdgeLength`, and
+`UpdateEdgeLengths`. `UpdateEdgeLengths`
 recomputes the canonical `e:length` `double` edge property; the cache is not
 automatically invalidated, so callers that mutate topology or positions must
 refresh it before consuming the property. `Geometry.MeshRepair` provides
