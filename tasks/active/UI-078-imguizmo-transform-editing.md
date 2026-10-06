@@ -117,7 +117,35 @@ Codex plan (2026-10-06, read-only on `3a47bde17`), condensed:
    groups.
 4. Implement after REVIEW-007 is complete.
 
-## Open question at implementation start
-- Group local basis: recommended default is the active (last selected)
-  entity's rotation, as in Unity; confirm with the operator before
-  implementing.
+5. Group local basis (2026-10-07): the averaged rotation of the selected
+   entities' world rotations, `Geometry::Rotation::ChordalMean` (Markley
+   quaternion-moment mean; closed form, deterministic, sign-invariant), frozen
+   at drag start. A single entity uses its own rotation. If the mean is not
+   available (`DegenerateInput`, non-finite or failed status), the gizmo falls
+   back to the world basis and shows the reason; it never guesses. Runtime may
+   import `Geometry.RotationAveraging` (runtime → geometry is allowed). This is
+   the first production consumer of GE06; RUNTIME-322 owns the separate
+   "align to average" operation.
+
+## Slice plan
+Each slice: Codex plan (read-only) → implementation → focused build/tests →
+Codex review of the fixed commit → fixes → re-verification.
+1. **Runtime transform core (CPU):** freeze selection, pivot (origin mean |
+   bounds-center mean with origin fallback), mode and basis (world | single
+   local | group ChordalMean) at drag start; group delta `D = Gt·G0⁻¹`,
+   `Wi' = D·Wi0`; write only selected entities without a selected ancestor;
+   reject non-TRS (shear) results without partial writes; one undo entry per
+   changed drag. Fixes the two existing defects (local-position pivot; group
+   rotate/scale not moving positions). CPU contract tests.
+2. **Viewport input ownership:** per-frame viewport input request in
+   `EditorUiHost`, merged after `CaptureSnapshot()` in `EditorUiModule`, so
+   camera and pick gates block while the gizmo is hovered or dragged; cancel on
+   focus loss, UI hide, world/document change.
+3. **ImGuizmo frontend in the Sandbox shell:** link `imguizmo_lib` privately,
+   UI-only enable, translate/rotate/scale, W/E/R while active (not in text
+   fields), Escape cancels, pivot toggle, local/global, configurable snap
+   (config path with preview/validate/apply); remove the old ray/drag frontend
+   and `TransformGizmoRenderPacketBuilder` only where ImGuizmo replaces them.
+   ImGui integration tests (`SandboxEditorGizmo`).
+4. **Docs and Operational evidence:** READMEs, ADR 0006, architecture docs;
+   Vulkan acceptance smoke with a real ImGuizmo drag of a group and its undo.
