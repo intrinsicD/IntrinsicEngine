@@ -151,8 +151,8 @@ Codex review of the fixed commit → fixes → re-verification.
    Vulkan acceptance smoke with a real ImGuizmo drag of a group and its undo.
 
 ## Progress
-- **Slice 1 — runtime transform core (CPU), 2026-10-06: implemented, Codex
-  review fixes applied, awaiting re-review and commit.** `GizmoInteraction`
+- **Slice 1 — runtime transform core (CPU), 2026-10-06: done in `5ba6f9b97`
+  after four Codex review rounds (final verdict: approve).** `GizmoInteraction`
   owns one matrix session (`Begin`/`Preview`/`DragCommit`/`DragCancel`): frozen
   selection, origin or bounds-center pivot, world/local/ChordalMean basis with
   explicit fallback, `D = Gt·G0⁻¹` from the start state, writes only for
