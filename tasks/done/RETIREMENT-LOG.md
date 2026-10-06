@@ -8,11 +8,22 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-06 — REVIEW-007 Ponytail audit triage
+
+Retired [REVIEW-007](REVIEW-007-ponytail-audit-triage.md).
+
+- All 132 inventory rows from the Claude and Codex Ponytail audits were decided by the operator, stage by stage (E0–E7), with separate Claude and Codex votes. Each implementation went through a Codex plan, implementation, a Codex review of the fixed commit and fixes.
+- Implemented: dead modules, partitions and APIs removed; 28 unloaded shaders deleted with their techniques recorded in tasks; duplicate helpers shared. Real defects fixed on the way: the RobustPCA stopping criterion, deterministic `JobService::CancelAll`, `.pts` routed to an extended `LoadPTS`, and scene format v5 rejecting the legacy property keys.
+- New follow-up tasks: UI-078, GRAPHICS-160–163, RUNTIME-320–324, METHOD-066–075. Overlaps were filed into LEGACY-043, CI-014–020, RUNTIME-218/222 and GRAPHICS-135/158.
+- Operator-directed deviation: the selected candidates were implemented directly in the session instead of as separate implementation tasks.
+
+Commit range `0483ff3d8..` this retirement commit; per-stage commits are listed in the task.
+
 ## 2026-10-03 — REVIEW-005 and REVIEW-006 merged into REVIEW-007
 
 Retired [REVIEW-005](REVIEW-005-ponytail-overengineering-audit-triage.md) and [REVIEW-006](REVIEW-006-ponytail-candidate-triage-and-human-decisions.md) as superseded planning notes.
 
-- Claude and Codex had each run a Ponytail over-engineering audit on `0ebb2f450` and opened a parallel triage note. At the operator's request both were merged into [REVIEW-007](../backlog/architecture/REVIEW-007-ponytail-audit-triage.md).
+- Claude and Codex had each run a Ponytail over-engineering audit on `0ebb2f450` and opened a parallel triage note. At the operator's request both were merged into [REVIEW-007](REVIEW-007-ponytail-audit-triage.md).
 - REVIEW-007 takes the process, authorization limits, decomposition rules and dossier format from REVIEW-006 and the full 123-row inventory from REVIEW-005. The 9 Codex-only groups were added and overlapping findings unified into single rows.
 - No candidate was reviewed and no code changed; all open work belongs to REVIEW-007.
 

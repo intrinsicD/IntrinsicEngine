@@ -243,7 +243,6 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-232` — A failed frame submit loses an accepted position copy (tasks/backlog/bugs/BUG-232-gpuworld-commit-copy-lost-on-failed-submit.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 - unblocked: `GRAPHICS-147` — Refine shared Morton cells in the GPU point LBVH (tasks/backlog/rendering/GRAPHICS-147-gpu-lbvh-shared-cell-refinement.md)
-- unblocked: `REVIEW-007` — Ponytail-Audit: Funde zerlegen und einzeln mit Operator, Claude und Codex entscheiden (tasks/backlog/architecture/REVIEW-007-ponytail-audit-triage.md)
 
 ## Audits
 

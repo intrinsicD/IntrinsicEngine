@@ -17,7 +17,7 @@ contract_review: "Reviewed the catalog. This task only triages audit findings an
 
 Planungsnotiz für die Triage des Ponytail-Audits vom 2026-10-03 (Revision
 `0ebb2f450`). Auf Operator-Wunsch mit der parallel angelegten Notiz in
-[REVIEW-007](../backlog/architecture/REVIEW-007-ponytail-audit-triage.md)
+[REVIEW-007](REVIEW-007-ponytail-audit-triage.md)
 zusammengeführt und als ersetzte Planungsnotiz retired.
 
 ## Acceptance criteria

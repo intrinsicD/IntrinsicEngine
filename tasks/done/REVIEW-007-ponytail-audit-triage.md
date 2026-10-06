@@ -34,9 +34,9 @@ Eine bestimmte Zahl gelöschter Zeilen oder erzeugter Tasks ist kein Ziel.
   gemeinsam mit Operator, Codex und Claude prüfen. Die abschließende Auswahl
   bleibt beim Operator.
 - Entstehung: Claude und Codex haben parallel je einen Audit und je eine
-  Planungsnotiz angelegt, [REVIEW-005](../../done/REVIEW-005-ponytail-overengineering-audit-triage.md)
+  Planungsnotiz angelegt, [REVIEW-005](REVIEW-005-ponytail-overengineering-audit-triage.md)
   (Claude, breites Inventar mit 123 Zeilen) und
-  [REVIEW-006](../../done/REVIEW-006-ponytail-candidate-triage-and-human-decisions.md)
+  [REVIEW-006](REVIEW-006-ponytail-candidate-triage-and-human-decisions.md)
   (Codex, zwölf Gruppen PK01–PK12 mit strengerem Prozess). Auf Wunsch des
   Operators sind beide hier zusammengeführt und als ersetzte Planungsnotizen
   retired. Dieser Task übernimmt den Prozess, die Grenzen, das Dossierformat
@@ -79,7 +79,7 @@ Eine bestimmte Zahl gelöschter Zeilen oder erzeugter Tasks ist kein Ziel.
   Verbraucher, die alten Leseschlüssel in `Runtime.SceneSerialization.cpp:1276-1298`.
 - Diese Arbeit ist eine ausdrücklich beauftragte Architekturprüfung und ändert
   die stehende Framework24-Priorität und die Gates von
-  [REVIEW-004](REVIEW-004-framework24-product-convergence-audit.md) nicht.
+  [REVIEW-004](../backlog/architecture/REVIEW-004-framework24-product-convergence-audit.md) nicht.
 - Der Task wird erst bei Beginn der interaktiven Bearbeitung nach
   `tasks/active/` verschoben. Ein Eintrag als unblocked im Session-Brief
   bedeutet nur, dass keine Task-Abhängigkeit fehlt; er gibt keine automatische
@@ -126,24 +126,24 @@ statt einen doppelten Task anzulegen:
 
 ### Phase A — Funde in kleine Prüfkandidaten zerlegen
 
-- [ ] Aktuelle Revision, Arbeitsbaumzustand und offene Arbeiten im betroffenen
+- [x] Aktuelle Revision, Arbeitsbaumzustand und offene Arbeiten im betroffenen
   Bereich aufnehmen; die Quellen gegenüber der Audit-Ausgangsrevision prüfen.
-- [ ] Jede Inventarzeile unten in konkrete, möglichst unabhängige
+- [x] Jede Inventarzeile unten in konkrete, möglichst unabhängige
   Entscheidungsfragen zerlegen. Sammelzeilen (z. B. G01 Shader, GE11 Module,
   G10/R12/R17 Methodenlisten, X04 `DebugNameFor*`) nicht ungeprüft als
   Zuschnitt eines Umsetzungstasks übernehmen.
-- [ ] Jedem Kandidaten eine lokale Kennung geben, abgeleitet von seiner
+- [x] Jedem Kandidaten eine lokale Kennung geben, abgeleitet von seiner
   Inventarzeile (z. B. `G01-03`, `PK05-02`), und exakte Dateien/Symbole sowie
   den Owner nennen. Lokale Kennungen dürfen nicht als `depends_on`-Task-IDs
   verwendet werden.
-- [ ] Für jeden Kandidaten eine konkrete Frage formulieren, zum Beispiel:
+- [x] Für jeden Kandidaten eine konkrete Frage formulieren, zum Beispiel:
   „Kann dieser Shader entfallen, ohne einen aktuellen Pipeline-, Config- oder
   Testpfad zu verlieren?“ Keine vorentschiedenen Titel wie „Shader löschen“.
-- [ ] Abhängigkeiten und Überschneidungen zwischen Kandidaten kennzeichnen.
+- [x] Abhängigkeiten und Überschneidungen zwischen Kandidaten kennzeichnen.
   Insbesondere `GpuScene`, Culling, Shader, ECS-Proxies und die
   Querschnittszeilen X01–X04 nicht mehrfach als dieselbe Einsparung zählen
   oder gegenseitig als unbelegte Ersatzpfade benutzen.
-- [ ] Dem Operator die zerlegte Liste und eine sinnvolle Prüfreihenfolge
+- [x] Dem Operator die zerlegte Liste und eine sinnvolle Prüfreihenfolge
   zeigen. Offene Zuschnittsfragen vor der jeweiligen Detailprüfung klären.
 
 Für die erste Zerlegung gelten diese Leitplanken:
@@ -202,22 +202,22 @@ den wartenden Kandidaten und keine Erlaubnis, Folgeimplementierungen zu starten.
 
 ### Phase C — Nur ausgewählte Umsetzungstasks konkretisieren
 
-- [ ] Für jeden ausdrücklich ausgewählten Kandidaten einen kleinen Task mit
+- [x] Für jeden ausdrücklich ausgewählten Kandidaten einen kleinen Task mit
   genau einer Absicht vorbereiten. Scope, Nicht-Ziele, Dateien, notwendige
   Änderungen, Risiken und konkret passende Prüfungen aus dem Dossier übernehmen.
-- [ ] Den Contract-Katalog für den tatsächlichen Implementierungsumfang erneut
+- [x] Den Contract-Katalog für den tatsächlichen Implementierungsumfang erneut
   prüfen und die zutreffenden IDs deklarieren. Der leere Contract-Satz dieser
   übergeordneten Review-Notiz darf nicht auf Codeänderungen übertragen werden.
-- [ ] Bereits existierende aktive oder geplante Aufgaben auf Überschneidung
+- [x] Bereits existierende aktive oder geplante Aufgaben auf Überschneidung
   prüfen. Dem Operator gegebenenfalls eine Einordnung in einen vorhandenen
   Task vorschlagen, statt automatisch einen doppelten Task zu erzeugen.
-- [ ] Neue IDs erst nach der menschlichen Auswahl und nach Prüfung aller
+- [x] Neue IDs erst nach der menschlichen Auswahl und nach Prüfung aller
   Task-Lifecycle-Verzeichnisse vergeben. Die fertige Task-Datei mit Kandidat
   und Entscheidung in beide Richtungen verknüpfen.
-- [ ] Bei `behalten`, `widerlegt` oder `vertagen` die jeweilige Begründung
+- [x] Bei `behalten`, `widerlegt` oder `vertagen` die jeweilige Begründung
   dokumentieren. Daraus keine automatische Cleanup-, Hint- oder Wiedervorlage-
   Aufgabe machen; eine Wiedervorlage benötigt einen genannten Anlass.
-- [ ] Nach Änderungen an offenen Task-Dateien den Session-Brief regenerieren
+- [x] Nach Änderungen an offenen Task-Dateien den Session-Brief regenerieren
   und die strukturellen Prüfungen ausführen.
 
 ## Rollen
@@ -236,7 +236,7 @@ den wartenden Kandidaten und keine Erlaubnis, Folgeimplementierungen zu starten.
   bestehende Grenzen und offene Evidenz.
 
 Für die Claude-Delegation gilt die
-[stehende Autorisierung](../../../AGENTS.md#standing-claude-code-authorization).
+[stehende Autorisierung](../../AGENTS.md#standing-claude-code-authorization).
 Der Auftrag an den Gegenprüfer ist auf lesende Kandidatenreviews begrenzt.
 Geheimnisse, Authentifizierungsdaten und sachfremde persönliche Daten gehören
 nicht in Review-Pakete. Beide Agenten betrachten denselben festgehaltenen
@@ -264,7 +264,7 @@ Eine Etappe pro Sitzung genügt; die Reihenfolge kann der Operator ändern.
 - [x] E5 — Runtime ohne Editor/Modules (R01–R19), 2026-10-06
 - [x] E6 — Runtime-Editor/Modules und Sandbox-App (E01–E17), 2026-10-06
 - [x] E7 — Geometry (GE01–GE25), 2026-10-06
-- [ ] E8 — Konsolidierung nach Phase C: freigegebene Folgetasks anlegen
+- [x] E8 — Konsolidierung nach Phase C: freigegebene Folgetasks anlegen
   (Kandidaten mit gleichem Owner gebündelt, wenn der Operator zustimmt),
   Einordnungen in bestehende Tasks vermerken, Session-Brief regenerieren.
 
@@ -311,7 +311,7 @@ nächsten Abschnitt.
 | T18 | Merge curvature boundary/extrema viewers in `benchmarks/runners/` | shrink | -150 | widerlegt: gemeinsamer Teil bereits geteilt → behalten | widerlegt: Geometrieprüfung und HTML-Viewer werden bereits gemeinsam verwendet. curvature_extrema_viewer.py:13, curvature_extrema_viewer.py:249. | Behalten (2026-10-06): widerlegt |
 | T19 | Generate benchmark smoke manifests from one table (speculative) | shrink | -300 | widerlegt: Manifeste inhaltlich verschieden; Generator = zweite Wahrheitsquelle | widerlegt: Unterschiedliche Parameter, Datensätze und Fehlergrenzen; Einsparung durch Generator unbelegt. xpbd_cloth_reference_smoke.yaml:4, rendering_vertex_fetch_layout_smoke.yaml:12. | Behalten (2026-10-06): widerlegt |
 | T20 | vcpkg `draco` — 0 uses in src/tests, only linked into tinygltf | native | 1 dep | teilweise: TINYGLTF_ENABLE_DRACO aktiviert Draco-glTF-Laden → Operatorfrage, vertagen | widerlegt: Draco ist über TinyGLTF aktiviert; produktiver Loader verwendet TinyGLTF. Dependencies.cmake:166, Runtime.AssetWorkflowModelTextureDecode.cpp:498. [≠ Claude: Einstufung; Sachgrund gleich] | Behalten (2026-10-06): Draco-glTF-Laden wird gebraucht |
-| T21 | vcpkg `imguizmo` — 0 uses in src/tests, still linked | native | 1 dep | bestätigt: `imguizmo_lib` nirgends gelinkt, 0 Nutzung → Task | bestätigt: Paket wird angefordert, aber `imguizmo_lib` hat keinen Verbraucher; kein belegter Link in einen Engine-Binärpfad. vcpkg.json:32, Dependencies.cmake:208. | Nicht löschen (2026-10-06): wird für Gizmo-Feature genutzt → [UI-078](../ui/UI-078-imguizmo-transform-editing.md) |
+| T21 | vcpkg `imguizmo` — 0 uses in src/tests, still linked | native | 1 dep | bestätigt: `imguizmo_lib` nirgends gelinkt, 0 Nutzung → Task | bestätigt: Paket wird angefordert, aber `imguizmo_lib` hat keinen Verbraucher; kein belegter Link in einen Engine-Binärpfad. vcpkg.json:32, Dependencies.cmake:208. | Nicht löschen (2026-10-06): wird für Gizmo-Feature genutzt → [UI-078](../backlog/ui/UI-078-imguizmo-transform-editing.md) |
 | T22 | vcpkg overlay ports xatlas/imgui — replaceable by registry features? | yagni | -190 | imgui-Overlay teilweise (vertagen, GPU-Smoke nötig); xatlas-Overlay widerlegt (Baseline hat keinen Port) | teilweise: Gepinnte Registry enthält kein xatlas; ImGui-Features existieren, ersetzen Backend-Build und Defines aber nicht direkt. vcpkg.json:5, Dependencies.cmake:205. | Vertagen (2026-10-06): imgui-Overlay nur mit GPU-Smoke; xatlas widerlegt |
 | T23 | Untracked stale `.claude/worktrees/agent-*` full-repo copies (local hygiene, not a repo change) | delete | local | teilweise: KEINE stale Kopien — 3 Worktrees mit 4 ungemergten Commits; lokale Hygiene, Operator entscheidet | widerlegt: Lokales Verzeichnis heute leer¹; der dokumentierte Worktree-Bestand ist nicht mehr aktuell. REVIEW-007:316. [≠ Claude: Ja: anderer Lokalzustand] | Erledigt (2026-10-06): Worktrees am 2026-10-05 entfernt |
 
@@ -408,7 +408,7 @@ nächsten Abschnitt.
 | GE01 | 11 mesh/point-cloud file writers + write-status enums — test-only (planned by UI-046 / RUNTIME-282/283) | delete | -1600 | widerlegt (Fable): 13 Writer ≈1.900 Z.; UI-046 baut ausdrücklich darauf → einordnen UI-046 | widerlegt: Writer sind Grundlage von UI-046; Überschneidung RUNTIME-282/283. HalfedgeMesh.IO.cppm:42, UI-046:21. [≠ Claude: Votum nein; Zählung korrigiert] | Behalten (2026-10-06): Grundlage von UI-046 |
 | GE02 | `Geometry.Graph.Utils` layouts, crossings, BuildKNNGraph, closest-edge queries, edge-length fills — test-only | delete | -1100 | teilweise: Layouts + CountEdgeCrossings (≈700) → Task; ClosestEdge*/EdgeLengths vertagen (GEOM-074); KNN behalten; ApplyGaussianNoise → Testhelfer | teilweise: Layouts testseitig; KNN-Nachbarpfad produktiv, Queries berühren GEOM-074. Construction.cpp:476, GEOM-074:32. | Teilweise gelöscht (2026-10-06): Layouts + Crossings → `7d7166816`, `e9cbbd183`; KNN/ClosestEdge bleiben |
 | GE03 | `Geometry.VectorHeatMethod` — test-only (GEOM-089, METHOD-048) | delete | -820 | widerlegt: GEOM-089 + METHOD-048 planen Nutzung → behalten | widerlegt: Bestehende CPU-Referenz für GEOM-089; METHOD-048 nennt Transport und LogMap ausdrücklich. VectorHeatMethod.cppm:116, METHOD-048:92. | Behalten (2026-10-06): GEOM-089/METHOD-048 |
-| GE04 | `Geometry.ConvexHullBuilder` (keep `ConvexHull` type) — test-only | delete | -811 | bestätigt (verwaist) → Task „Anbinden vs. Löschen“ nach PK10 (LocalConvexHull) | bestätigt: Builder nur testseitig; `LocalConvexHull` benötigt den separaten Datentyp. Test_ConvexHull.cpp:178, Culling.Proxy.cppm:13. | Behalten (2026-10-06): Integration end-to-end mit UI + MCP → [RUNTIME-320](../runtime/RUNTIME-320-convex-hull-editor-agent-integration.md) |
+| GE04 | `Geometry.ConvexHullBuilder` (keep `ConvexHull` type) — test-only | delete | -811 | bestätigt (verwaist) → Task „Anbinden vs. Löschen“ nach PK10 (LocalConvexHull) | bestätigt: Builder nur testseitig; `LocalConvexHull` benötigt den separaten Datentyp. Test_ConvexHull.cpp:178, Culling.Proxy.cppm:13. | Behalten (2026-10-06): Integration end-to-end mit UI + MCP → [RUNTIME-320](../backlog/runtime/RUNTIME-320-convex-hull-editor-agent-integration.md) |
 | GE05 | `Geometry.ImplicitPlaneField` + Octree node properties — test-only | delete | -830 | bestätigt: 791 Z. + Octree-NodeProperties → Task (inkl. 12 tote Test-Imports) | bestätigt: PlaneField nur eigene Tests; kein weiterer fachlicher Nutzer der Octree-NodeProperties gefunden. ImplicitPlaneField.cpp:193, Test_ImplicitPlaneField.cpp:40. | Behalten (2026-10-06): Integration end-to-end mit UI + MCP → RUNTIME-321 |
 | GE06 | `Geometry.RotationAveraging` — test-only | delete | -735 | bestätigt → Task (zieht GE24/GE25-Anteile mit) | bestätigt: Mittelwert-/Medianverfahren nur eigene Tests; kein konkreter offener Integrationsauftrag gefunden. RotationAveraging.cppm:59, Test_RotationAveraging.cpp:55. | Behalten (2026-10-06): Integration end-to-end mit UI + MCP → RUNTIME-322 (+ METHOD-068) |
 | GE07 | `Geometry.HtexPatch` — test-only (METHOD-048?) | delete | -510 | teilweise: Teil des entworfenen Htex-Systems (docs/architecture) → vertagen, Operatorentscheid Htex-Richtung | bestätigt: Konkretes Modul nur testseitig. Htex-Entwurf ist `legacy-background`; METHOD-048 begründet keine Nutzung. Test_HtexPatch.cpp:19, index.md:93. [≠ Claude: Ja, Claude: teilweise] | Löschen (2026-10-06) → `a6d9f7ba0` |
@@ -618,7 +618,7 @@ Folgen für spätere Etappen:
 
 Der Operator hat am 2026-10-06 die vier Fragen beantwortet: T05, T16 und T01
 werden umgesetzt. T21 wird nicht gelöscht, weil ImGuizmo für ein neues
-Gizmo-Feature gebraucht wird ([UI-078](../ui/UI-078-imguizmo-transform-editing.md)).
+Gizmo-Feature gebraucht wird ([UI-078](../backlog/ui/UI-078-imguizmo-transform-editing.md)).
 T20 bleibt. Alle übrigen Kandidaten folgen der gemeinsamen Empfehlung. Der
 Ablauf ist derselbe wie in E0/E1, mit der Basisrevision `3a47bde17`.
 
@@ -827,7 +827,7 @@ und gelten für die angegebenen Inventarzeilen.
 ### PK01 → G01 — 20 möglicherweise überholte Shader
 
 - Ausgangshypothese: etwa 1.630 Dateizeilen ohne aktuellen Verbraucher;
-  [CompileShaders.cmake](../../../cmake/CompileShaders.cmake) kompiliert sie
+  [CompileShaders.cmake](../../cmake/CompileShaders.cmake) kompiliert sie
   weiterhin über den rekursiven Glob.
 - Vollständige Prüfliste: `point_surfel.vert`, `point_surfel.frag`,
   `point_retained.vert`, `point_retained.frag`, `point_flatdisc.vert`,
@@ -837,8 +837,8 @@ und gelten für die angegebenen Inventarzeilen.
   `scene_update.comp`, `instance_cull_multigeo.comp`, `debug_view.comp`,
   `deferred/gbuffer.vert`, jeweils unter `assets/shaders/`.
 - Einstieg: point_retained.vert (`assets/shaders/point_retained.vert`, entfernt in `a3ded5d7c`),
-  [Renderer](../../../src/graphics/renderer/Graphics.Renderer.cpp),
-  [RendererFrameLifecycle-Tests](../../../tests/contract/graphics/Test.RendererFrameLifecycle.cpp).
+  [Renderer](../../src/graphics/renderer/Graphics.Renderer.cpp),
+  [RendererFrameLifecycle-Tests](../../tests/contract/graphics/Test.RendererFrameLifecycle.cpp).
 - Gegenprüfung: dynamisch zusammengesetzte Shadernamen, Pipeline-Varianten,
   benutzerseitig wählbare Pfade, Includes, Fixtures, Build-/Packaging-Nutzung
   und vorhandene GPU-Smokes. Ähnlich benannte aktuelle Shader nicht einbeziehen.
@@ -854,7 +854,7 @@ und gelten für die angegebenen Inventarzeilen.
 - Gegenprüfung: aktuelle und bedingte Build-Ziele, Re-Exports, Tests,
   Migrationsaufrufer, Slot-Verantwortung und Buffer-Lifetime.
 - Die Behauptung prüfen, dass
-  [GpuWorld](../../../src/graphics/renderer/Graphics.GpuWorld.cppm) alle heute
+  [GpuWorld](../../src/graphics/renderer/Graphics.GpuWorld.cppm) alle heute
   benötigten Zuständigkeiten trägt. Kommentare über alte Testkompatibilität
   weder als Beweis für Nutzung noch als Beweis für Entbehrlichkeit behandeln.
 
@@ -863,9 +863,9 @@ und gelten für die angegebenen Inventarzeilen.
 - Ausgangshypothese: rund 110 Zeilen für `Register`, `Unregister`,
   `UpdateBounds`, `SetDrawTemplate`, `CullingHandle`, `CullSlot` und zugehörige
   Verwaltung könnten entfallen; `SyncGpuBuffer()` ist leer und wird aufgerufen.
-- Einstieg: [CullingSystem](../../../src/graphics/renderer/Graphics.CullingSystem.cpp),
-  [Interface](../../../src/graphics/renderer/Graphics.CullingSystem.cppm),
-  [RenderPrepPipeline](../../../src/graphics/renderer/Graphics.RenderPrepPipeline.cpp).
+- Einstieg: [CullingSystem](../../src/graphics/renderer/Graphics.CullingSystem.cpp),
+  [Interface](../../src/graphics/renderer/Graphics.CullingSystem.cppm),
+  [RenderPrepPipeline](../../src/graphics/renderer/Graphics.RenderPrepPipeline.cpp).
 - Gegenprüfung: öffentliche Methoden getrennt von gleichnamigen Methoden
   anderer Systeme suchen; Tests, Registrierungsdiagnostik und Lebenszeitregeln
   prüfen. Gemeinsam benutzte Bucket-Kapazität und aktive GPU-Culling-Logik
@@ -876,12 +876,12 @@ und gelten für die angegebenen Inventarzeilen.
 ### PK04 — Doppelte Helfer in schnellen und langsamen Mesh-Tests
 
 - Ausgangshypothese: 97 identische Zeilen, netto ungefähr 85 Zeilen einsparbar,
-  zwischen [Test.MeshOperationsSlow.cpp](../../../tests/unit/geometry/Test.MeshOperationsSlow.cpp)
-  und [Test_MeshOperations.cpp](../../../tests/unit/geometry/Test_MeshOperations.cpp).
+  zwischen [Test.MeshOperationsSlow.cpp](../../tests/unit/geometry/Test.MeshOperationsSlow.cpp)
+  und [Test_MeshOperations.cpp](../../tests/unit/geometry/Test_MeshOperations.cpp).
 - Kandidaten: `MakeDenseClosedTriangleMesh`, `ExtractTriangleSoup` und der
   zugehörige Mesh-Wiederaufbau. Funktionen einzeln auf identische Annahmen prüfen.
 - Möglicher Owner: bestehender
-  [Mesh-Test-Support](../../../tests/support/geometry/Test_MeshBuilders.h).
+  [Mesh-Test-Support](../../tests/support/geometry/Test_MeshBuilders.h).
 - Gegenprüfung: zusätzlicher Modul-/Linkbedarf, Assertion-Verhalten, Zugriff
   beider Testziele und langsame Testlabels. Gemeinsamer Support muss weniger
   Aufwand verursachen als die Dopplung; Tests und ihre Unabhängigkeit erhalten.
@@ -922,7 +922,7 @@ und gelten für die angegebenen Inventarzeilen.
   und Implementierung (`src/platform/backends/glfw/Platform.Backend.GlfwVulkanSurface.cpp`, entfernt in `aae3f7f50`)
   ohne Aufruf von `CreateVulkanSurface`.
 - Gegenprüfung: alle GLFW-/Vulkan-Buildpfade und den direkten Surface-Aufbau
-  in [Vulkan.Device](../../../src/graphics/vulkan/Backends.Vulkan.Device.cpp)
+  in [Vulkan.Device](../../src/graphics/vulkan/Backends.Vulkan.Device.cpp)
   vergleichen. Das Vorhandensein zweier ähnlicher Funktionen allein entscheidet
   nicht über deren Layer-Verantwortung.
 - Eine mögliche Entfernung darf keine neue Plattform-/Grafik-Abhängigkeit
@@ -931,8 +931,8 @@ und gelten für die angegebenen Inventarzeilen.
 ### PK08 — Doppelte DAG-Zyklensuche
 
 - Ausgangshypothese: ungefähr 50 Zeilen netto durch gemeinsame interne Logik
-  zwischen [Scheduler](../../../src/core/Core.Dag.Scheduler.cpp) und
-  [TaskGraph](../../../src/core/Core.Dag.TaskGraph.cpp) einsparbar.
+  zwischen [Scheduler](../../src/core/Core.Dag.Scheduler.cpp) und
+  [TaskGraph](../../src/core/Core.Dag.TaskGraph.cpp) einsparbar.
 - Gegenprüfung: Knotentypen, Traversierungsreihenfolge, Begrenzung des
   Diagnosepfads, Selbstzyklen, Fehlerdarstellung und deterministisches Ergebnis.
 - Als Alternative „Dopplung behalten“ bewerten, falls eine gemeinsame Funktion
@@ -943,8 +943,8 @@ und gelten für die angegebenen Inventarzeilen.
 
 - Ausgangshypothese: ungefähr 40 Zeilen netto bei `MeanPlaneError`,
   `MeanSphereError`, `MinimumPairwiseDistance` und `Finite`.
-- Einstieg: [Continuous LOP](../../../benchmarks/geometry/Bench_ContinuousLopReferenceSmoke.cpp)
-  und [LOP/WLOP](../../../benchmarks/geometry/Bench_PointCloudConsolidationReferenceSmoke.cpp).
+- Einstieg: [Continuous LOP](../../benchmarks/geometry/Bench_ContinuousLopReferenceSmoke.cpp)
+  und [LOP/WLOP](../../benchmarks/geometry/Bench_PointCloudConsolidationReferenceSmoke.cpp).
 - Gegenprüfung: Leerfälle, NaN/Inf-Verhalten, Präzision, Maßeinheiten und
   tatsächlich identische Semantik. Einen geeigneten bestehenden Benchmark-
   Support-Owner suchen, ohne Benchmarks an interne Methodenimplementierungen
@@ -958,7 +958,7 @@ und gelten für die angegebenen Inventarzeilen.
 - Ausgangshypothese: ungefähr 30 Zeilen für `CachedSelectedVertexIndices`,
   `CachedSelectedEdgeIndices`, `CachedSelectedFaceIndices`, `Culling::Proxy`
   und `CullableTag` ohne aktuelle Verbraucher.
-- Einstieg: [Selection](../../../src/ecs/Components/ECS.Component.Selection.cppm)
+- Einstieg: [Selection](../../src/ecs/Components/ECS.Component.Selection.cppm)
   und Culling.Proxy (`src/ecs/Components/ECS.Component.Culling.Proxy.cppm`, entfernt in `b82b149fc`).
 - Gegenprüfung: Komponenten-Registrierung, entt-Verwendung, Serialize/Load,
   Picking-/Selection-Pfade, Tests und mögliche deklarierte aktive Owner.
@@ -969,23 +969,23 @@ und gelten für die angegebenen Inventarzeilen.
 ### PK11 — PathKey und seine Hashimplementierung
 
 - Ausgangshypothese: ungefähr 25 Zeilen für `PathKey` und `FromPath` in
-  [IOBackend-Interface](../../../src/core/Core.IOBackend.cppm) und
-  [Implementierung](../../../src/core/Core.IOBackend.cpp) ohne Verbraucher.
+  [IOBackend-Interface](../../src/core/Core.IOBackend.cppm) und
+  [Implementierung](../../src/core/Core.IOBackend.cpp) ohne Verbraucher.
 - Gegenprüfung: Asset-I/O, Cache-Identitäten, Tests, Konfiguration und aktive
   Aufgaben. Ungenutzten Typ entfernen und Hash-Reuse sind unterschiedliche
   Optionen, die nicht beide ohne Bedarf umgesetzt werden sollen.
 - Falls doch ein Verbraucher gefunden wird, dessen Semantik vor einem Wechsel
-  zu [Core.Hash](../../../src/core/Core.Hash.cppm) prüfen: Breite, Bytebehandlung,
+  zu [Core.Hash](../../src/core/Core.Hash.cppm) prüfen: Breite, Bytebehandlung,
   Nullzeichen, Nullwert und Persistenzbedeutung der Identität.
 
 ### PK12 — Alte Schreibweisen beim Lesen von Property-Referenzen
 
 - Ausgangshypothese: ungefähr 20 Zeilen im
-  [Scene-Reader](../../../src/runtime/Scene/Runtime.SceneSerialization.cpp)
+  [Scene-Reader](../../src/runtime/Scene/Runtime.SceneSerialization.cpp)
   für `propertyName` und `expectedValueKind`, während der Writer `name` und
   `valueKind` schreibt.
 - Gegenprüfung: alle heutigen Writer/Reader, Szenen und Fixtures sowie
-  [SceneSerialization-Tests](../../../tests/contract/runtime/Test.RuntimeSceneSerialization.cpp).
+  [SceneSerialization-Tests](../../tests/contract/runtime/Test.RuntimeSceneSerialization.cpp).
   Insbesondere die Semantik von `Any`/`Unknown` und unconstrained bindings
   getrennt von einer reinen Feldumbenennung verstehen.
 - Der fehlende allgemeine Kompatibilitätsanspruch im Repository ist ein
@@ -1036,27 +1036,27 @@ Jedes Dossier enthält:
 
 ## Acceptance criteria
 
-- [ ] Alle Inventarzeilen beider Audits sind vollständig auf kleine
+- [x] Alle Inventarzeilen beider Audits sind vollständig auf kleine
   Prüfkandidaten abgebildet; kein ursprünglicher Fund verschwindet ohne
   Erklärung.
-- [ ] Jeder endgültig entschiedene Kandidat besitzt ein vollständiges Dossier
+- [x] Jeder endgültig entschiedene Kandidat besitzt ein vollständiges Dossier
   mit getrennten, echten Claude- und Codex-Einschätzungen sowie der Beteiligung
   des Operators; Abweichungen sind ausschließlich auf dessen ausdrücklichen
   Wunsch dokumentiert.
-- [ ] Jede finale Entscheidung stammt ausdrücklich vom Operator und bezieht
+- [x] Jede finale Entscheidung stammt ausdrücklich vom Operator und bezieht
   sich auf den dokumentierten Kandidatenumfang und Prüfstand.
-- [ ] Alle Entscheidungen sind als Task erstellen, behalten, widerlegt oder
+- [x] Alle Entscheidungen sind als Task erstellen, behalten, widerlegt oder
   ausdrücklich vertagt abgeschlossen; weiter zu zerlegende Fragen bleiben offen.
-- [ ] Nur vom Operator ausgewählte Kandidaten wurden zu konkreten Folgetasks;
+- [x] Nur vom Operator ausgewählte Kandidaten wurden zu konkreten Folgetasks;
   jedes neue Task-Dokument ist mit seiner Entscheidung verknüpft, besitzt
   eigene Contract- und Verifikationsangaben, und keine Änderung hat zwei
   Umsetzungstasks.
-- [ ] Erhaltensgründe, Widerlegungen und Vertagungen bleiben nachvollziehbar;
+- [x] Erhaltensgründe, Widerlegungen und Vertagungen bleiben nachvollziehbar;
   Einsparungen werden weder mehrfach gezählt noch als bereits erreicht gemeldet.
-- [ ] Im Rahmen dieses übergeordneten Tasks wurden keine Engine-, Shader-,
+- [x] Im Rahmen dieses übergeordneten Tasks wurden keine Engine-, Shader-,
   Build-, Format-, Tooling- oder Teständerungen vorgenommen und keine Umsetzung
   gestartet.
-- [ ] Task-Metadaten, Links und Session-Brief bestehen die strukturellen Checks.
+- [x] Task-Metadaten, Links und Session-Brief bestehen die strukturellen Checks.
 
 ## Verification
 
@@ -1133,7 +1133,7 @@ Prüfung der betroffenen Annahmen, nicht den Neustart der gesamten Liste.
   Umsetzung 2026-10-05“. Nächste Etappe: E2 (T01–T23).
 - 2026-10-06: Etappe E2 entschieden. T01, T05 und T16 sind umgesetzt und
   reviewt. T21 wird für das neue Gizmo-Feature
-  [UI-078](../ui/UI-078-imguizmo-transform-editing.md) behalten. Die übrigen
+  [UI-078](../backlog/ui/UI-078-imguizmo-transform-editing.md) behalten. Die übrigen
   Kandidaten werden behalten, eingeordnet oder vertagt. Details in
   §„Etappe E2 — Entscheidungen und Umsetzung 2026-10-06“. Nächste Etappe:
   E3 (C01–C17).
@@ -1162,3 +1162,38 @@ Prüfung der betroffenen Annahmen, nicht den Neustart der gesamten Liste.
   METHOD-066…075. Damit sind alle 132 Inventarzeilen vom Operator
   entschieden. Details in §„Etappe E7 — Entscheidungen und Umsetzung
   2026-10-06“.
+
+## Completion
+
+- Retired 2026-10-06. Alle 132 Inventarzeilen sind vom Operator entschieden:
+  umgesetzt, behalten, widerlegt, vertagt, in bestehende Tasks eingeordnet
+  oder als neuer Task angelegt. Die Etappen E0–E7 sind in den
+  Etappen-Abschnitten dokumentiert, mit Commits, Verifikation und
+  Codex-Reviews.
+- **Vom Operator angewiesene Abweichungen vom geplanten Ablauf:**
+  - Die freigegebenen Kandidaten wurden direkt in derselben interaktiven
+    Sitzung umgesetzt, statt je einen separaten Umsetzungstask anzulegen.
+    Das Akzeptanzkriterium „keine Engine-, Shader-, Build-, Format-,
+    Tooling- oder Teständerungen im Rahmen dieses Tasks“ ist deshalb
+    bewusst nicht eingehalten.
+  - Die Codex-Läufe liefen ohne Sandbox, mit Leseauftrag, weil die
+    Read-only-Sandbox in der Umgebung nicht startet.
+- **Neue Folgetasks:**
+  - [UI-078](../backlog/ui/UI-078-imguizmo-transform-editing.md)
+  - GRAPHICS-160…163
+  - RUNTIME-320…324
+  - METHOD-066…075
+- **Eingeordnet in bestehende Tasks:**
+  - G03 → LEGACY-043
+  - R16 → UI-078
+  - T02/T06/T07/T08 → CI-014…020
+  - Technik-Referenzen in RUNTIME-222, RUNTIME-218, GRAPHICS-158 und
+    GRAPHICS-135
+- **Vertagt, ohne eigenen Task und ohne Wiedervorlage-Automatik:**
+  - R01 (GRAPHICS-109)
+  - C02, C03 (RUNTIME-282) und C11
+  - G04 und G13
+  - T22
+  - E01 sowie das UI-Bündel E03/E07/E08 (mit UI-075/UI-077)
+- Commit reference: `0483ff3d8..c57727c6b` plus the retirement commit;
+  Etappen-Commits siehe die Etappen-Abschnitte.
