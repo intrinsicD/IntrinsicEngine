@@ -159,43 +159,6 @@ TEST(GraphQueries, ClosestEdgeWithinOneRingOnlySearchesIncidentEdges)
     EXPECT_NEAR(result.SquaredDistance, brute.SquaredDistance, 1.0e-6F);
 }
 
-TEST(GraphQueries, GaussianNoiseIsDeterministicAndIdentityAtZeroScale)
-{
-    Geometry::Graph::Graph original;
-    for (std::uint32_t i = 0; i < 128; ++i)
-    {
-        original.AddVertex({static_cast<float>(i), static_cast<float>(i % 7u), static_cast<float>(i % 5u)});
-    }
-
-    auto identity = original;
-    const auto identityResult = Geometry::Graph::ApplyGaussianNoise(identity, {.StdDevFraction = 0.0F, .Seed = 7});
-    ASSERT_EQ(identityResult.Status, Geometry::Graph::GaussianNoiseStatus::Success);
-    EXPECT_EQ(identityResult.DisplacedCount, 0u);
-    for (const auto vertex : original.LiveVertices())
-    {
-        EXPECT_EQ(identity.VertexPosition(vertex), original.VertexPosition(vertex));
-    }
-
-    auto a = original;
-    auto b = original;
-    auto c = original;
-    const auto noiseA = Geometry::Graph::ApplyGaussianNoise(a, {.StdDevFraction = 0.01F, .Seed = 1234});
-    const auto noiseB = Geometry::Graph::ApplyGaussianNoise(b, {.StdDevFraction = 0.01F, .Seed = 1234});
-    const auto noiseC = Geometry::Graph::ApplyGaussianNoise(c, {.StdDevFraction = 0.01F, .Seed = 5678});
-    ASSERT_EQ(noiseA.Status, Geometry::Graph::GaussianNoiseStatus::Success);
-    ASSERT_EQ(noiseB.Status, Geometry::Graph::GaussianNoiseStatus::Success);
-    ASSERT_EQ(noiseC.Status, Geometry::Graph::GaussianNoiseStatus::Success);
-    EXPECT_FLOAT_EQ(noiseA.Scale, noiseB.Scale);
-
-    bool differentSeedMovedDifferently = false;
-    for (const auto vertex : original.LiveVertices())
-    {
-        EXPECT_EQ(a.VertexPosition(vertex), b.VertexPosition(vertex));
-        if (a.VertexPosition(vertex) != c.VertexPosition(vertex)) differentSeedMovedDifferently = true;
-    }
-    EXPECT_TRUE(differentSeedMovedDifferently);
-}
-
 TEST(GraphQueries, DegenerateInputsFailClosed)
 {
     Geometry::Graph::Graph empty;

@@ -13,8 +13,9 @@ contracts: [method.engine-integration, geometry.element-domain-sources, geometry
 # RUNTIME-275 — Gaussian noise editor operation
 
 ## Goal
-Expose the existing `ApplyGaussianNoise` kernels (point clouds and graphs) as an
-editor operation so denoising, LOP/consolidation and outlier workflows can be
+Expose the existing point-cloud `ApplyGaussianNoise` kernel (graph and mesh
+domains reuse the shared `Geometry.Sampling` primitives; no graph wrapper exists)
+as an editor operation so denoising, LOP/consolidation and outlier workflows can be
 exercised on controlled noise. The Framework24 inventory row "Point-cloud Gaussian
 noise" requires a disposition.
 

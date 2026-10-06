@@ -34,9 +34,9 @@ maturity_target: CPUContracted
   `VertexProperty`. Their actual requirements are adjacency and specific typed
   properties, which mesh vertex/halfedge/edge sources can provide.
 - Re-read Dijkstra's original shortest-path note (DOI
-  `10.1007/BF01386390`), Fruchterman–Reingold layout (DOI
-  `10.1002/spe.4380211102`), and relevant later weighted/A*/multilevel layout
-  improvements before each migrated family. Preserve current formulations and
+  `10.1007/BF01386390`) and relevant later weighted/A* improvements before each
+  migrated family. The unused graph layout and edge-crossing APIs were removed
+  (REVIEW-007 GE02) and are not part of this migration. Preserve current formulations and
   keep `GEOM-068`/`GEOM-069` ownership distinct.
 
 ## Spatial acceleration consideration
@@ -46,7 +46,7 @@ and creates a separate graph through the shared point-construction workflow.
 Preserve its fixed k+1-before-self/epsilon filtering and union/mutual policy.
 Nearest-edge/radius-edge operations still need segment bounds and exact segment
 distance, not point centroids. Preserve the current graph algorithms and
-property/adjacency contract in this slice. Dijkstra, layouts and connectivity
+property/adjacency contract in this slice. Dijkstra and connectivity
 are not replaced by proximity queries; geometry remains independent of runtime.
 
 See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
@@ -66,7 +66,7 @@ See the [shared spatial-index consumer inventory](../../../docs/architecture/spa
 
 ## Tests
 
-- [ ] Run shortest-path, edge-query/length, and layout representatives against
+- [ ] Run shortest-path and edge-query/length representatives against
       equivalent graph and mesh sources and compare results/diagnostics.
 - [ ] Cover custom cost/position properties, invalid adjacency, deleted slots,
       and property lifetime rules.

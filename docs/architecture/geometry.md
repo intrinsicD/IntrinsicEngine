@@ -374,11 +374,11 @@ undersized caller buffers. Edge spatial queries (`ClosestEdge`, `KClosestEdges`,
 `Geometry.BVH` over edge segment AABBs for candidate enumeration; returned sets
 are ordered by squared distance with ascending edge handle tie-breaks.
 
-Graph and point-cloud Gaussian augmentation is deterministic and true-Gaussian:
-each element seeds its own RNG from `(Seed, element index)` and draws independent
-per-component normal samples. Graph displacement standard deviation is
-`StdDevFraction * vertex-AABB diagonal`; point-cloud displacement standard
-deviation is `StdDevFraction * ComputeStatistics(...).AverageSpacing`. A zero
+Point-cloud Gaussian augmentation (`Geometry.PointCloud.Utils::ApplyGaussianNoise`)
+is deterministic and true-Gaussian: each point seeds its own RNG from
+`(Seed, element index)` and draws independent per-component normal samples. The
+displacement standard deviation is
+`StdDevFraction * ComputeStatistics(...).AverageSpacing`. A zero
 fraction is an identity operation, while empty input, non-finite positions,
 negative/non-finite fractions, and non-zero requests with degenerate scale report
 explicit status values.
