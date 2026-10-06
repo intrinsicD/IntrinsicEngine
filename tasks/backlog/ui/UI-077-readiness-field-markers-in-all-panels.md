@@ -29,6 +29,11 @@ does.
   its family produces field keys.
 - Smooth Property's inline `TextWrapped` reason shows only the first reason. Align
   it with the tooltip when adopting.
+- REVIEW-007 E03/E07/E08 (2026-10-06): while touching these panels, consolidate
+  the truly identical parts of the result-header blocks (E03), the enum-combo
+  idioms (E07; `DrawSpecEnumCombo` in `Sandbox.PanelSupport.hpp` already exists)
+  and the GPU-start lambdas (E08) in `src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp`
+  and `Sandbox.PanelSupport`. Keep the parts that differ. About −75 lines.
 
 ## Acceptance criteria
 - [ ] The Eigenbasis, Harmonic Field and Scalar Gradient panels wrap their config controls in `ReadinessMarkerScope`. So does each further family once UI-037 gives it field-keyed reasons; record which in a slice log.

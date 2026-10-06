@@ -8,6 +8,20 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-06 — REVIEW-007 deferred candidates decided
+
+Operator decisions on the candidates [REVIEW-007](REVIEW-007-ponytail-audit-triage.md) left deferred. No task is retired.
+
+- R01 `RenderArtifactRegistry` → note in GRAPHICS-109: the first planned producer; delete the registry if GRAPHICS-109 is dropped.
+- C03 `Core.Process` → note in RUNTIME-282: kept for its structured process launch; delete if that need goes.
+- C02 coroutine `Tasks::Job`/`WaitFor`/`WaitToken` → new [RUNTIME-325](../backlog/runtime/RUNTIME-325-coroutine-waits-in-jobservice.md): JobService integration with a first consumer, or deletion.
+- G04 pipeline blocks in `InitializeOperationalPassResources` → new [GRAPHICS-164](../backlog/rendering/GRAPHICS-164-pipeline-init-block-helpers.md), one family at a time, with Vulkan evidence.
+- T22 ImGui overlay port → new [BUILD-012](../backlog/process/BUILD-012-imgui-registry-port-evaluation.md); the xatlas overlay stays.
+- E03/E07/E08 panel duplication → note in UI-077, to do with its panel work.
+- Kept, no task: C11 (warnings, reference defaults and `ParsedFieldCount` carry behavior), G13 (documented texture-streaming seam, about 15 lines), E01 (the UV variant differs; small gain).
+
+Commit reference: the commit that files these follow-ups.
+
 ## 2026-10-06 — REVIEW-007 Ponytail audit triage
 
 Retired [REVIEW-007](REVIEW-007-ponytail-audit-triage.md).

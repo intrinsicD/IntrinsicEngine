@@ -17,6 +17,7 @@ its dependencies, conditional gates, scope and verification.
 - [GRAPHICS-161 — Line anti-aliasing with extended segment ends](GRAPHICS-161-line-antialiasing-extended-segment-ends.md)
 - [GRAPHICS-162 — Debug view: integer ID hash coloring](GRAPHICS-162-debug-view-integer-id-hash-coloring.md)
 - [GRAPHICS-163 — Lit transient debug triangles with alpha pass-through](GRAPHICS-163-lit-transient-debug-triangles.md)
+- [GRAPHICS-164 — Factor the pipeline reset/create/publish blocks in renderer init](GRAPHICS-164-pipeline-init-block-helpers.md)
 - [GRAPHICS-135 — Measure current render-prep scheduling and material-sync overhead](GRAPHICS-135-renderprep-per-frame-taskgraph-overhead.md)
 - [GRAPHICS-136 — Rename `Pipeline*` to `GraphicsState*` at the RHI boundary](GRAPHICS-136-rename-pipeline-to-graphics-state-rhi-boundary.md)
 - [GRAPHICS-137 — Shader-object realization spike (ADR-0028 killing experiment)](GRAPHICS-137-shader-object-realization-spike.md)

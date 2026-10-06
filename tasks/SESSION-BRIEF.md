@@ -37,6 +37,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `GRAPHICS-161` — Line anti-aliasing with extended segment ends (tasks/backlog/rendering/GRAPHICS-161-line-antialiasing-extended-segment-ends.md)
 - unblocked: `GRAPHICS-162` — Debug view: integer ID hash coloring (tasks/backlog/rendering/GRAPHICS-162-debug-view-integer-id-hash-coloring.md)
 - unblocked: `GRAPHICS-163` — Lit transient debug triangles with alpha pass-through (tasks/backlog/rendering/GRAPHICS-163-lit-transient-debug-triangles.md)
+- unblocked: `GRAPHICS-164` — Factor the pipeline reset/create/publish blocks in renderer init (tasks/backlog/rendering/GRAPHICS-164-pipeline-init-block-helpers.md)
 
 ## Theme C — Physics readiness
 
@@ -69,6 +70,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `RUNTIME-322` — Average instance orientations with RotationAveraging in Sandbox and agent (tasks/backlog/runtime/RUNTIME-322-rotation-averaging-editor-agent-integration.md)
 - unblocked: `RUNTIME-323` — Grid occupancy via SparseGrid in Sandbox and agent (tasks/backlog/runtime/RUNTIME-323-sparse-grid-occupancy-editor-agent-integration.md)
 - unblocked: `RUNTIME-324` — Octree split point Center/Mean/Median selectable in point spacing (tasks/backlog/runtime/RUNTIME-324-octree-median-split-selectable-variant.md)
+- unblocked: `RUNTIME-325` — Coroutine waits in JobService, or delete the coroutine path (tasks/backlog/runtime/RUNTIME-325-coroutine-waits-in-jobservice.md)
 - blocked by `RUNTIME-280`: `UI-061` — Select-by-query controls and "use selection as mask/source" (tasks/backlog/ui/UI-061-select-by-query-controls.md)
 - blocked by `RUNTIME-283`: `UI-063` — File > Properties import/export window (tasks/backlog/ui/UI-063-properties-import-export-window.md)
 - blocked by `RUNTIME-284`: `UI-064` — History window (tasks/backlog/ui/UI-064-history-window.md)
@@ -241,6 +243,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-228` — Vulkan smoke timeout depends on the display environment (tasks/backlog/bugs/BUG-228-desktop-display-vulkan-smoke-timeouts.md)
 - unblocked: `BUG-229` — NVIDIA shutdown retention on a nested Xephyr display (tasks/backlog/bugs/BUG-229-nvidia-xephyr-shutdown-retention.md)
 - unblocked: `BUG-232` — A failed frame submit loses an accepted position copy (tasks/backlog/bugs/BUG-232-gpuworld-commit-copy-lost-on-failed-submit.md)
+- unblocked: `BUILD-012` — Evaluate replacing the ImGui vcpkg overlay port with the registry port (tasks/backlog/process/BUILD-012-imgui-registry-port-evaluation.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 - unblocked: `GRAPHICS-147` — Refine shared Morton cells in the GPU point LBVH (tasks/backlog/rendering/GRAPHICS-147-gpu-lbvh-shared-cell-refinement.md)
 

@@ -27,6 +27,7 @@ contracts: [repo.source-documentation]
 - Operator direction 2026-09-27: agent control lane and user-facing inspection capabilities, planned with Fable 5.1; attach-to-running transport; declarative schemas; integer enums.
 - Exists: `Core::Config::WindowBackend::Null` + Null RHI drive every Sandbox integration test (`tests/integration/runtime/Test.RuntimeSandboxAcceptance.cpp` `HeadlessConfig()`, `Test.SandboxAppComposition.cpp`); `src/app/Sandbox/main.cpp` parses `--frame-pacing-report`/`--frame-pacing-frames`/`--engine-config` (`ResolveEngineConfigForBoot`) and composes `FramePacingCaptureModule` on the `UiBuild` hook that calls `engine.RequestExit()`; async import via `AssetWorkflowModule` and `EditorAssetImportQueueModel`; `LoadAndApplyEngineConfigHotSubsetFile(path, AgentCli)`.
 - Export uses UI-046's runtime export command; property export uses RUNTIME-283 once available.
+- REVIEW-007 C03 (2026-10-06): `Core.Process` is test-only today (`tests/integration/runtime/Test.CoreProcess.cpp`) and is kept for this task's structured process launch. If RUNTIME-282 drops that need, delete `Core.Process`.
 
 ## Control surfaces
 - Config: `--apply <config.json>` uses `LoadAndApplyEngineConfigHotSubsetFile(..., AgentCli)`.

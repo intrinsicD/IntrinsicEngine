@@ -8,6 +8,7 @@ its dependencies, conditional gates, scope and verification.
 
 - [BUILD-005 — Define hermetic toolchain and action identity](BUILD-005-hermetic-toolchain-action-identity.md)
 - [BUILD-006 — Run a C++23-module build and cache backend bake-off](BUILD-006-cxx23-module-build-backend-bakeoff.md)
+- [BUILD-012 — Evaluate replacing the ImGui vcpkg overlay port with the registry port](BUILD-012-imgui-registry-port-evaluation.md)
 - [CI-012 — Compile a versioned verification evidence graph](CI-012-versioned-verification-evidence-graph.md)
 - [CI-013 — Add unified verifier profiles and receipts](CI-013-unified-verifier-profiles-and-receipts.md)
 - [CI-014 — Derive the static build and contract impact graph](CI-014-static-build-contract-impact-graph.md)
