@@ -1242,7 +1242,7 @@ namespace Extrinsic::Graphics
         };
     }
 
-    class NullRenderer final : public IRenderer
+    class Renderer final : public IRenderer
     {
     private:
         static constexpr std::uint32_t kRuntimeSnapshotStorageSlots = 4u;
@@ -1365,7 +1365,7 @@ namespace Extrinsic::Graphics
         }
 
     public:
-        NullRenderer()
+        Renderer()
         {
             m_RenderGraph.SetTransientAliasingEnabled(false);
             RegisterCommandRoutes();
@@ -1591,7 +1591,7 @@ namespace Extrinsic::Graphics
                     *m_Subsystems.SamplerManager);
             }
             // CullingSystem::Initialize requires a shader path — concrete
-            // renderers supply it.  NullRenderer skips the cull dispatch.
+            // renderers supply it.  Renderer skips the cull dispatch.
         }
 
         bool RebuildOperationalResources(RHI::IDevice& device) override
@@ -10727,12 +10727,12 @@ namespace Extrinsic::Graphics
         std::mutex                           m_ReadbackIssueMutex;
     };
 
-    NullRenderer::RenderCommandRouteContext& NullRenderer::RouteContextFrom(void* context) noexcept
+    Renderer::RenderCommandRouteContext& Renderer::RouteContextFrom(void* context) noexcept
     {
         return *static_cast<RenderCommandRouteContext*>(context);
     }
 
-    void NullRenderer::EndActiveRenderPassForRoute(RHI::ICommandContext& cmd,
+    void Renderer::EndActiveRenderPassForRoute(RHI::ICommandContext& cmd,
                                                    RenderCommandRouteContext& context)
     {
         if (context.RenderPassEnded != nullptr &&
@@ -10745,7 +10745,7 @@ namespace Extrinsic::Graphics
         }
     }
 
-    void NullRenderer::RecordPickingCommandRoute(const RenderCommandRoute& route,
+    void Renderer::RecordPickingCommandRoute(const RenderCommandRoute& route,
                                                  RHI::ICommandContext& cmd,
                                                  RenderCommandRouteContext& context)
     {
@@ -10880,7 +10880,7 @@ namespace Extrinsic::Graphics
         }
     }
 
-    void NullRenderer::RecordPostProcessCommandRoute(const RenderCommandRoute& route,
+    void Renderer::RecordPostProcessCommandRoute(const RenderCommandRoute& route,
                                                      RHI::ICommandContext& cmd,
                                                      RenderCommandRouteContext& context)
     {
@@ -10925,7 +10925,7 @@ namespace Extrinsic::Graphics
         AccumulateCommandRecordStatus(route.DebugName, route.PassId, toneMapStatus);
     }
 
-    void NullRenderer::RecordPostProcessHistogramCommandRoute(const RenderCommandRoute& route,
+    void Renderer::RecordPostProcessHistogramCommandRoute(const RenderCommandRoute& route,
                                                               RHI::ICommandContext& cmd,
                                                               RenderCommandRouteContext& context)
     {
@@ -11000,7 +11000,7 @@ namespace Extrinsic::Graphics
         }
     }
 
-    void NullRenderer::RegisterCommandRoutes()
+    void Renderer::RegisterCommandRoutes()
     {
         m_CommandRouter.Clear();
         const auto id = [](const FrameRecipePassKind kind) noexcept {
@@ -11210,6 +11210,6 @@ namespace Extrinsic::Graphics
 
     std::unique_ptr<IRenderer> CreateRenderer()
     {
-        return std::make_unique<NullRenderer>();
+        return std::make_unique<Renderer>();
     }
 }

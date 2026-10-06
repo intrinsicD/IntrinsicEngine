@@ -25,7 +25,7 @@ namespace
     }
 }
 
-TEST(GraphicsRenderer, NullRendererExecutesRenderGraphPath)
+TEST(GraphicsRenderer, RendererExecutesRenderGraphPath)
 {
     MockDevice device;
     auto renderer = Graphics::CreateRenderer();
@@ -64,7 +64,7 @@ TEST(GraphicsRenderer, NullRendererExecutesRenderGraphPath)
     renderer->Shutdown();
 }
 
-TEST(GraphicsRenderer, NullRendererReusesCompiledGraphForSteadyStateFrames)
+TEST(GraphicsRenderer, RendererReusesCompiledGraphForSteadyStateFrames)
 {
     MockDevice device;
     auto renderer = Graphics::CreateRenderer();
@@ -109,7 +109,7 @@ TEST(GraphicsRenderer, NullRendererReusesCompiledGraphForSteadyStateFrames)
     renderer->Shutdown();
 }
 
-TEST(GraphicsRenderer, NullRendererRecompilesOnFeatureAndSizingChangesAndRebindsImports)
+TEST(GraphicsRenderer, RendererRecompilesOnFeatureAndSizingChangesAndRebindsImports)
 {
     MockDevice device;
     auto renderer = Graphics::CreateRenderer();
@@ -187,7 +187,7 @@ TEST(GraphicsRenderer, NullRendererRecompilesOnFeatureAndSizingChangesAndRebinds
     renderer->Shutdown();
 }
 
-TEST(GraphicsRenderer, NullRendererCachedDebugDumpMatchesInitialCompileWhenEnabled)
+TEST(GraphicsRenderer, RendererCachedDebugDumpMatchesInitialCompileWhenEnabled)
 {
     MockDevice device;
     auto renderer = Graphics::CreateRenderer();
@@ -228,7 +228,7 @@ TEST(GraphicsRenderer, NullRendererCachedDebugDumpMatchesInitialCompileWhenEnabl
     renderer->Shutdown();
 }
 
-TEST(GraphicsRenderer, NullRendererForwardDebugDumpContainsCanonicalPassesAndDataflowOrder)
+TEST(GraphicsRenderer, RendererForwardDebugDumpContainsCanonicalPassesAndDataflowOrder)
 {
     MockDevice device;
     auto renderer = Graphics::CreateRenderer();
@@ -289,7 +289,7 @@ TEST(GraphicsRenderer, NullRendererForwardDebugDumpContainsCanonicalPassesAndDat
     renderer->Shutdown();
 }
 
-TEST(GraphicsRenderer, NullRendererDeferredDebugDumpPlacesCompositionBetweenSurfaceAndLine)
+TEST(GraphicsRenderer, RendererDeferredDebugDumpPlacesCompositionBetweenSurfaceAndLine)
 {
     MockDevice device;
     auto renderer = Graphics::CreateRenderer();
@@ -329,7 +329,7 @@ TEST(GraphicsRenderer, NullRendererDeferredDebugDumpPlacesCompositionBetweenSurf
     renderer->Shutdown();
 }
 
-TEST(GraphicsRenderer, NullRendererEnablesDebugChainWhenRequested)
+TEST(GraphicsRenderer, RendererEnablesDebugChainWhenRequested)
 {
     MockDevice device;
     auto renderer = Graphics::CreateRenderer();
@@ -366,7 +366,7 @@ TEST(GraphicsRenderer, NullRendererEnablesDebugChainWhenRequested)
     renderer->Shutdown();
 }
 
-TEST(GraphicsRenderer, NullRendererAddsPickingPassWhenPickIsPending)
+TEST(GraphicsRenderer, RendererAddsPickingPassWhenPickIsPending)
 {
     MockDevice device;
     auto renderer = Graphics::CreateRenderer();
@@ -396,7 +396,7 @@ TEST(GraphicsRenderer, NullRendererAddsPickingPassWhenPickIsPending)
     renderer->Shutdown();
 }
 
-TEST(GraphicsRenderer, NullRendererExecuteFrameRequiresPreparePhase)
+TEST(GraphicsRenderer, RendererExecuteFrameRequiresPreparePhase)
 {
     MockDevice device;
     auto renderer = Graphics::CreateRenderer();
@@ -422,7 +422,7 @@ TEST(GraphicsRenderer, NullRendererExecuteFrameRequiresPreparePhase)
     renderer->Shutdown();
 }
 
-TEST(GraphicsRenderer, NullRendererPrepareBeforeExtractPreventsExecute)
+TEST(GraphicsRenderer, RendererPrepareBeforeExtractPreventsExecute)
 {
     MockDevice device;
     auto renderer = Graphics::CreateRenderer();

@@ -1,3 +1,5 @@
+// RenderFrameInput: the immutable per-frame snapshot (interpolation alpha,
+// scene viewport, camera) that Runtime::Engine hands to the renderer.
 module;
 
 #include <algorithm>
@@ -51,7 +53,7 @@ namespace Extrinsic::Graphics
         /// Interpolated camera/view data produced outside graphics.
         CameraViewInput Camera{};
 
-        /// Enables debug/overlay post chain in the null renderer path.
+        /// Enables the debug/overlay post chain in the renderer path.
         /// When false (default), presentation samples the selection output
         /// directly so optional debug visualization passes are culled.
         bool DebugOverlayEnabled{false};

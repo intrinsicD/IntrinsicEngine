@@ -476,7 +476,7 @@ into graphics public contracts.
 - `Graphics.FrameRecipe` owns the reusable default frame recipe: typed feature
   gates, typed pass/resource IDs, canonical diagnostic names, resource
   declarations, pass-order introspection, and the backend-agnostic graph
-  construction path used by the null renderer. It emits passes without blanket
+  construction path used by `Renderer`. It emits passes without blanket
   previous-pass chaining; declared reads/writes own ordering wherever possible,
   and explicit pass dependencies are reserved for real side-effect constraints.
   `CompiledRenderGraph` carries the recipe's typed texture/buffer resource IDs
@@ -497,7 +497,7 @@ into graphics public contracts.
 - `Graphics.RenderSubsystemRegistry` owns the renderer core manager/subsystem
   lifetime seam: RHI buffer/texture/sampler/pipeline managers, `GpuWorld`,
   material, colormap, visualization sync, culling, transform sync, light,
-  selection, forward, deferred, postprocess, and shadow systems. `NullRenderer`
+  selection, forward, deferred, postprocess, and shadow systems. `Renderer`
   forwards the public accessors used by callers to the registry's owned optional
   fields. The registry keeps lifecycle methods and private diagnostic state;
   storage access adds no forwarding methods. Transform,
@@ -551,7 +551,7 @@ Concretely:
 - Promoted BDA retained shaders also read current camera state through
   `GpuSceneTable` (`CameraView`, `CameraProj`, `CameraViewProj`, inverse
   matrices, camera vectors, viewport, near/far, and frame/culling flags).
-  `NullRenderer::PrepareFrame()` publishes the extracted `RenderWorld.Camera`
+  `Renderer::PrepareFrame()` publishes the extracted `RenderWorld.Camera`
   into `GpuWorld` before `GpuWorld::SyncFrame()` writes the scene-table buffer,
   so surface/depth/line/point/selection vertex shaders must transform
   world-space positions with `scene.CameraViewProj` instead of declaring a
@@ -589,7 +589,7 @@ Concretely:
   `gpu;vulkan` smoke that runs the pass.
 
 - GRAPHICS-070 wires the default-recipe `"SurfacePass"` to the existing
-  `ForwardSurfacePass` body. `NullRenderer` owns the
+  `ForwardSurfacePass` body. `Renderer` owns the
   `m_ForwardSurfacePass` instance (constructed against the renderer's
   `m_ForwardSystem`) and the `m_ForwardSurfacePipelineLease`. The pipeline is
   created in `InitializeOperationalPassResources()` from
@@ -643,7 +643,7 @@ Concretely:
   (the renderer-stored test seam added in GRAPHICS-072 Slice A).
 - GRAPHICS-071 wires the default-recipe `"LinePass"` and `"PointPass"` to
   the existing retained-renderable `ForwardLinePass` and `ForwardPointPass`
-  bodies. `NullRenderer` owns `m_ForwardLinePass`, `m_ForwardPointPass`,
+  bodies. `Renderer` owns `m_ForwardLinePass`, `m_ForwardPointPass`,
   `m_ForwardLinePipelineLease`, and `m_ForwardPointPipelineLease` alongside the
   forward surface pass. The line pipeline uses
   `shaders/forward/line.vert.spv` + `shaders/forward/line.frag.spv` with
@@ -681,7 +681,7 @@ Concretely:
   encoding. Transient debug-point expansion remains owned by
   GRAPHICS-077 and must not route through the retained `Points` cull bucket.
 - GRAPHICS-073 Slice A wires the default-recipe `"ShadowPass"` to the
-  existing `ShadowPass` body. `NullRenderer` owns `m_ShadowPass` (constructed
+  existing `ShadowPass` body. `Renderer` owns `m_ShadowPass` (constructed
   against `m_ShadowSystem`) and the depth-only `m_ShadowPipelineLease`. The
   shadow pipeline reuses `shaders/depth_prepass.vert.spv` for the GpuScene
   push-constant + BDA descriptor contract, declares no fragment shader and no
@@ -890,7 +890,7 @@ Concretely:
   on the CPU/null route, and reports `ReconstructorAppliedFrames`,
   `HistoryDisocclusionPercent`, and `JitterOffsetX/Y`.
 - GRAPHICS-072 Slice A wires the default-recipe deferred-mode `"SurfacePass"`
-  to the existing `DeferredGBufferPass` body. `NullRenderer` owns
+  to the existing `DeferredGBufferPass` body. `Renderer` owns
   `m_DeferredGBufferPass` (constructed against `m_DeferredSystem`) and the
   `m_DeferredGBufferPipelineLease`. The pipeline is created in
   `InitializeOperationalPassResources()` from
@@ -931,7 +931,7 @@ Concretely:
   `DeferredLightingPushConstants::ShadowAtlasBindlessIndex` push-constant
   field sourced from `ShadowSystem::GetAtlasBindlessIndex()`.
 - GRAPHICS-072 Slice B wires the default-recipe `"CompositionPass"` to the
-  existing `DeferredLightingPass` body. `NullRenderer` owns
+  existing `DeferredLightingPass` body. `Renderer` owns
   `m_DeferredLightingPass` (constructed against `m_DeferredSystem` alongside
   `m_DeferredGBufferPass`) and the `m_DeferredLightingPipelineLease`. The
   pipeline is created in `InitializeOperationalPassResources()` from
@@ -994,7 +994,7 @@ Concretely:
   introspection removes `ShadowAtlas` from the deferred `SurfacePass`
   inputs to match.
 - GRAPHICS-074 Slice A wires the default-recipe `"PickingPass"` to the
-  existing `EntityIdPass` body. `NullRenderer` owns `m_SelectionEntityIdPass`
+  existing `EntityIdPass` body. `Renderer` owns `m_SelectionEntityIdPass`
   (constructed against `m_SelectionSystem`) and the
   `m_SelectionEntityIdPipelineLease`. The pipeline is created in
   `InitializeOperationalPassResources()` from
@@ -1055,7 +1055,7 @@ Concretely:
   outline pipeline (Slice C) is unaffected by the reorder.
 - GRAPHICS-074 Slice B extends the default-recipe `"PickingPass"` executor
   branch to fan out to the Face / Edge / Point selection ID sub-passes
-  alongside the EntityId sub-pass. `NullRenderer` owns
+  alongside the EntityId sub-pass. `Renderer` owns
   `m_SelectionFaceIdPass` / `m_SelectionEdgeIdPass` /
   `m_SelectionPointIdPass` (each constructed against `m_SelectionSystem`,
   emplaced *before* `InitializeOperationalPassResources()` runs so the
@@ -1100,7 +1100,7 @@ Concretely:
   `Picking.Readback` buffer + drain +
   `PublishPickResult`/`PublishNoHit` wiring (Slice D) remain.
 - GRAPHICS-074 Slice C wires the default-recipe `"SelectionOutlinePass"`
-  typed command route. `NullRenderer` owns `m_SelectionOutlinePass`
+  typed command route. `Renderer` owns `m_SelectionOutlinePass`
   (constructed against `m_SelectionSystem`, emplaced *before*
   `InitializeOperationalPassResources()` runs so the publisher's
   `SetPipeline(...)` actually lands on the pass on the initial operational
@@ -1272,7 +1272,7 @@ Concretely:
   `CompiledRenderPassAttachment` pair (mirrors the canonical
   `Pass.Present` wiring rationale — without `SetRenderPass` the future
   bind/draw would land outside a render-pass scope, invalid on Vulkan).
-  Renderer-side, `NullRenderer` owns a plain `m_TransientDebugSurfacePass`
+  Renderer-side, `Renderer` owns a plain `m_TransientDebugSurfacePass`
   member (no system dependency) and a typed `TransientDebugSurfacePass` command route invokes `RecordTransientDebugSurfacePass(...)`
   with the `SkippedNonOperational` / `SkippedUnavailable` taxonomy used
   by the other default-recipe helpers. The new
@@ -1285,7 +1285,7 @@ Concretely:
   with an operational device but no pipeline (the scaffold-only
   signal that distinguished "feature on" from "feature off").
   GRAPHICS-077 Slice B promotes the triangle lane from
-  `SkippedUnavailable` to `Recorded`. `NullRenderer` now owns two
+  `SkippedUnavailable` to `Recorded`. `Renderer` now owns two
   triangle pipeline leases (`m_TransientDebugTrianglePipelineLeaseDepthTested`
   / `m_TransientDebugTrianglePipelineLeaseAlwaysOnTop`), created via
   `BuildTransientDebugTrianglePipelineDesc(depthTested)` at call indices
@@ -1315,7 +1315,7 @@ Concretely:
   `MissingPipelineSkipCount` continues to increment on the
   operational-no-pipeline path (e.g. `FailPipelineCreateCall = 25`).
   GRAPHICS-077 Slice C extends the helper + pass to the line + point
-  lanes. `NullRenderer` now owns four additional pipeline leases
+  lanes. `Renderer` now owns four additional pipeline leases
   (`m_TransientDebugLinePipelineLeaseDepthTested` /
   `m_TransientDebugLinePipelineLeaseAlwaysOnTop` /
   `m_TransientDebugPointPipelineLeaseDepthTested` /
@@ -1387,7 +1387,7 @@ Concretely:
   Write(SceneColorHDR, ColorAttachmentWrite) + SetRenderPass(LOAD-store color,
   LOAD/Store depth)` so the framegraph compiler emits a real
   `CompiledRenderPassAttachment` pair before any future Slice B/C
-  bind/draw lands. Renderer-side, `NullRenderer` owns a plain
+  bind/draw lands. Renderer-side, `Renderer` owns a plain
   `m_VisualizationOverlayPass` member (no system dependency) and a typed `VisualizationOverlayPass` command route invokes
   `RecordVisualizationOverlayPass(...)` with the
   `SkippedNonOperational` / `SkippedUnavailable` taxonomy used by the
@@ -2173,7 +2173,7 @@ Concretely:
   deterministic stage description, sanitized diagnostics, and push-constant
   packet data for `Histogram`, `Bloom`, `ToneMap`, `FXAA`, and `SMAA`. The
   `ToneMap` leaf is operationally wired under `GRAPHICS-075` Slice A: the
-  `NullRenderer` owns `m_PostProcessToneMapPass` +
+  `Renderer` owns `m_PostProcessToneMapPass` +
   `m_PostProcessToneMapPipelineLease`, the tonemap pipeline (vertex
   `post_fullscreen.vert.spv` + fragment `post_tonemap.frag.spv`, single
   backbuffer-format color target, no depth, `PushConstantSize =
@@ -2204,7 +2204,7 @@ Concretely:
   matching the `PostProcess.BloomScratch` recipe declaration, no depth,
   `PushConstantSize = sizeof(PostProcessBloom{Downsample,Upsample}PushConstants)`
   — each 16 bytes mirroring the shader's std430 push block). The
-  `NullRenderer` owns `m_PostProcessBloomPass` plus
+  `Renderer` owns `m_PostProcessBloomPass` plus
   `m_PostProcessBloomDownsamplePipelineLease` +
   `m_PostProcessBloomUpsamplePipelineLease`, both republished byte-identical
   across `RebuildOperationalResources()`. The umbrella branch fans out to
@@ -2249,7 +2249,7 @@ Concretely:
   sizeof(PostProcessFXAAPushConstants)` — 20 bytes mirroring the
   shader's `vec2 InvResolution + float ContrastThreshold + float
   RelativeThreshold + float SubpixelBlending` std430 push block). The
-  `NullRenderer` owns `m_PostProcessFXAAPass` +
+  `Renderer` owns `m_PostProcessFXAAPass` +
   `m_PostProcessFXAAPipelineLease`, both republished byte-identical
   across `RebuildOperationalResources()`. **GRAPHICS-040C keeps the
   GRAPHICS-075 split but makes it mode-selected rather than a default
@@ -2313,7 +2313,7 @@ Concretely:
   shader's `Push` declaration byte-for-byte; the canonical 20-byte
   `PostProcessPushConstants` is intentionally not reused per the same
   shader-push-constant compatibility policy that motivated the
-  Slice A / B / C pass-local push blocks. `NullRenderer` owns
+  Slice A / B / C pass-local push blocks. `Renderer` owns
   `m_PostProcessSMAAPass` +
   `m_PostProcessSMAA{Edge,Blend,Resolve}PipelineLease`, all four
   republished byte-identical across `RebuildOperationalResources()`.
