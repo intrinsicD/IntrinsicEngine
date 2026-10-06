@@ -817,6 +817,48 @@ TEST(RuntimeJobService, CancelAllForWorldOnlyCancelsMatchingScope)
     EXPECT_EQ(jobs.GetState(tokenB), Runtime::JobState::AwaitingGate);
 }
 
+TEST(RuntimeJobService, InvalidSubmissionsCountAsRejectedWithoutRunning)
+{
+    if (Extrinsic::Core::Tasks::Scheduler::IsInitialized())
+        Extrinsic::Core::Tasks::Scheduler::Shutdown();
+
+    Runtime::JobService jobs;
+    std::atomic<int> ran{0};
+    const auto makeDesc = [&ran](const char* name)
+    {
+        return Runtime::MakeCpuJobDesc<JobProbeResult>(
+            name, Runtime::DefaultWorldHandle,
+            [&ran](const Runtime::JobCancellation&)
+            {
+                ran.fetch_add(1, std::memory_order_acq_rel);
+                return JobProbeResult{.Value = 1};
+            },
+            [](const JobProbeResult& result)
+            { return JobSuppressedCompleted{.Value = result.Value}; });
+    };
+
+    EXPECT_FALSE(jobs.Submit(makeDesc("no scheduler")).IsValid());
+    EXPECT_EQ(jobs.Stats().RejectedJobs, 1u);
+
+    SchedulerScope scheduler{1};
+    auto noWork = makeDesc("missing work");
+    noWork.Work = {};
+    EXPECT_FALSE(jobs.Submit(std::move(noWork)).IsValid());
+    EXPECT_EQ(jobs.Stats().RejectedJobs, 2u);
+
+    auto noPublisher = makeDesc("missing publisher");
+    noPublisher.PublishCompletion = {};
+    EXPECT_FALSE(jobs.Submit(std::move(noPublisher)).IsValid());
+    EXPECT_EQ(jobs.Stats().RejectedJobs, 3u);
+    EXPECT_EQ(jobs.Stats().SubmittedJobs, 0u);
+
+    EXPECT_TRUE(jobs.Submit(makeDesc("valid")).IsValid());
+    Extrinsic::Core::Tasks::Scheduler::WaitForAll();
+    EXPECT_EQ(jobs.Stats().RejectedJobs, 3u) << "successful submissions are not rejects";
+    EXPECT_EQ(ran.load(std::memory_order_acquire), 1) << "rejected work never runs";
+    jobs.CancelAndDrain();
+}
+
 TEST(RuntimeJobService, ReapCompletedRemovesTerminalRecords)
 {
     SchedulerScope scheduler{2};
@@ -1850,7 +1892,9 @@ TEST(RuntimeJobService, ShutdownJoinsWorkFinalizesAndReleasesEveryCallback)
         ++finalized;
         auto rejected = Runtime::MakeCpuJobDesc<JobProbeResult>("shutdown reentry", Runtime::DefaultWorldHandle,
             [](const auto&) { return JobProbeResult{}; }, [](const auto&) { return JobSuppressedCompleted{}; });
+        const auto rejectedBefore = jobs.Stats().RejectedJobs;
         EXPECT_FALSE(jobs.Submit(std::move(rejected)).IsValid());
+        EXPECT_EQ(jobs.Stats().RejectedJobs, rejectedBefore + 1u) << "re-entry during drain is a reject";
     };
     const auto token = jobs.Submit(std::move(running));
     ASSERT_TRUE(token.IsValid());
@@ -1871,11 +1915,14 @@ TEST(RuntimeJobService, ShutdownJoinsWorkFinalizesAndReleasesEveryCallback)
     EXPECT_EQ(finalized, 2u);
     auto late = Runtime::MakeCpuJobDesc<JobProbeResult>("after drain", Runtime::DefaultWorldHandle,
         [](const auto&) { return JobProbeResult{}; }, [](const auto&) { return JobSuppressedCompleted{}; });
+    const auto rejectedBeforeLate = jobs.Stats().RejectedJobs;
     EXPECT_FALSE(jobs.Submit(std::move(late)).IsValid()) << "module teardown after the drain cannot queue work";
+    EXPECT_EQ(jobs.Stats().RejectedJobs, rejectedBeforeLate + 1u);
     jobs.ResumeSubmissions();
     auto resumed = Runtime::MakeCpuJobDesc<JobProbeResult>("reinitialized", Runtime::DefaultWorldHandle,
         [](const auto&) { return JobProbeResult{}; }, [](const auto&) { return JobSuppressedCompleted{}; });
     EXPECT_TRUE(jobs.Submit(std::move(resumed)).IsValid());
+    EXPECT_EQ(jobs.Stats().RejectedJobs, rejectedBeforeLate + 1u) << "resumed submissions are not rejects";
     jobs.CancelAndDrain();
 }
 
