@@ -1197,6 +1197,98 @@ TEST(SandboxConfigSections, PointConfigGettersRequireMatchingSchemaAndValidatedP
     }
 }
 
+namespace
+{
+    using PointConfigValidator = CoreConfig::EngineConfigSectionValidationResult (*)(
+        std::string_view, std::string_view, std::string_view);
+
+    template <class T>
+    void ExpectPointConfigSectionContract(
+        const std::string_view name, const std::string_view schemaId,
+        std::string (*serialize)(const T&), const PointConfigValidator validate,
+        CoreConfig::EngineConfigSectionRegistration (*makeRegistration)(),
+        void (*set)(CoreConfig::EngineConfig&, const T&),
+        std::optional<T> (*get)(const CoreConfig::EngineConfig&),
+        void (*invalidate)(T&))
+    {
+        SCOPED_TRACE(name);
+        const CoreConfig::EngineConfigSectionRegistration registration = makeRegistration();
+        EXPECT_EQ(registration.DefaultSection.Name, name);
+        EXPECT_EQ(registration.DefaultSection.SchemaId, schemaId);
+        EXPECT_EQ(registration.DefaultSection.SchemaVersion, 1u);
+        EXPECT_EQ(registration.DefaultSection.PayloadJson, serialize(T{}));
+        const auto* registeredValidator = registration.Validate.template target<PointConfigValidator>();
+        ASSERT_NE(registeredValidator, nullptr);
+        EXPECT_EQ(*registeredValidator, validate);
+        EXPECT_FALSE(static_cast<bool>(registration.OnChanged));
+        EXPECT_TRUE(registration.SchemaJson.empty());
+
+        CoreConfig::EngineConfig config;
+        set(config, T{});
+        set(config, T{});
+        ASSERT_EQ(config.AppSections.size(), 1u);
+        EXPECT_EQ(config.AppSections.front().Name, name);
+        EXPECT_EQ(config.AppSections.front().SchemaId, schemaId);
+        EXPECT_EQ(config.AppSections.front().SchemaVersion, 1u);
+        EXPECT_TRUE(get(config).has_value());
+
+        T invalid{};
+        invalidate(invalid);
+        set(config, invalid);
+        ASSERT_EQ(config.AppSections.size(), 1u);
+        EXPECT_EQ(config.AppSections.front().PayloadJson, serialize(invalid));
+        EXPECT_FALSE(get(config).has_value());
+    }
+
+    template <class T>
+    void ZeroGpuQueryBatch(T& config) { config.GpuQueryBatchSize = 0u; }
+}
+
+TEST(SandboxConfigSections, PointConfigSectionsShareRegistrationSetAndGetContract)
+{
+    using namespace Extrinsic::Runtime;
+    ExpectPointConfigSectionContract<BilateralFilterConfig>(kBilateralFilterConfigSectionName,
+        kBilateralFilterConfigSectionSchemaId, SerializeBilateralFilterConfig, ValidateBilateralFilterConfigSection,
+        MakeBilateralFilterConfigSectionRegistration, SetBilateralFilterConfig, GetBilateralFilterConfig,
+        ZeroGpuQueryBatch<BilateralFilterConfig>);
+    ExpectPointConfigSectionContract<KeypointAnalysisConfig>(kKeypointAnalysisConfigSectionName,
+        kKeypointAnalysisConfigSectionSchemaId, SerializeKeypointAnalysisConfig, ValidateKeypointAnalysisConfigSection,
+        MakeKeypointAnalysisConfigSectionRegistration, SetKeypointAnalysisConfig, GetKeypointAnalysisConfig,
+        ZeroGpuQueryBatch<KeypointAnalysisConfig>);
+    ExpectPointConfigSectionContract<DescriptorAnalysisConfig>(kDescriptorAnalysisConfigSectionName,
+        kDescriptorAnalysisConfigSectionSchemaId, SerializeDescriptorAnalysisConfig, ValidateDescriptorAnalysisConfigSection,
+        MakeDescriptorAnalysisConfigSectionRegistration, SetDescriptorAnalysisConfig, GetDescriptorAnalysisConfig,
+        ZeroGpuQueryBatch<DescriptorAnalysisConfig>);
+    ExpectPointConfigSectionContract<PointConstructionConfig>(kPointConstructionConfigSectionName,
+        kPointConstructionConfigSectionSchemaId, SerializePointConstructionConfig, ValidatePointConstructionConfigSection,
+        MakePointConstructionConfigSectionRegistration, SetPointConstructionConfig, GetPointConstructionConfig,
+        ZeroGpuQueryBatch<PointConstructionConfig>);
+    ExpectPointConfigSectionContract<OutlierAnalysisConfig>(kOutlierAnalysisConfigSectionName,
+        kOutlierAnalysisConfigSectionSchemaId, SerializeOutlierAnalysisConfig, ValidateOutlierAnalysisConfigSection,
+        MakeOutlierAnalysisConfigSectionRegistration, SetOutlierAnalysisConfig, GetOutlierAnalysisConfig,
+        ZeroGpuQueryBatch<OutlierAnalysisConfig>);
+    ExpectPointConfigSectionContract<KernelDensityConfig>(kKernelDensityConfigSectionName,
+        kKernelDensityConfigSectionSchemaId, SerializeKernelDensityConfig, ValidateKernelDensityConfigSection,
+        MakeKernelDensityConfigSectionRegistration, SetKernelDensityConfig, GetKernelDensityConfig,
+        ZeroGpuQueryBatch<KernelDensityConfig>);
+    ExpectPointConfigSectionContract<PointSpacingConfig>(kPointSpacingConfigSectionName,
+        kPointSpacingConfigSectionSchemaId, SerializePointSpacingConfig, ValidatePointSpacingConfigSection,
+        MakePointSpacingConfigSectionRegistration, SetPointSpacingConfig, GetPointSpacingConfig,
+        ZeroGpuQueryBatch<PointSpacingConfig>);
+    ExpectPointConfigSectionContract<DensityWeightConfig>(kDensityWeightConfigSectionName,
+        kDensityWeightConfigSectionSchemaId, SerializeDensityWeightConfig, ValidateDensityWeightConfigSection,
+        MakeDensityWeightConfigSectionRegistration, SetDensityWeightConfig, GetDensityWeightConfig,
+        ZeroGpuQueryBatch<DensityWeightConfig>);
+    ExpectPointConfigSectionContract<NormalEstimationConfig>(kNormalEstimationConfigSectionName,
+        kNormalEstimationConfigSectionSchemaId, SerializeNormalEstimationConfig, ValidateNormalEstimationConfigSection,
+        MakeNormalEstimationConfigSectionRegistration, SetNormalEstimationConfig, GetNormalEstimationConfig,
+        ZeroGpuQueryBatch<NormalEstimationConfig>);
+    ExpectPointConfigSectionContract<RegistrationConfig>(kRegistrationConfigSectionName,
+        kRegistrationConfigSectionSchemaId, SerializeRegistrationConfig, ValidateRegistrationConfigSection,
+        MakeRegistrationConfigSectionRegistration, SetRegistrationConfig, GetRegistrationConfig,
+        [](RegistrationConfig& config) { config.MaxIterations = 0u; });
+}
+
 TEST(SandboxConfigSections, PointPropertySerializersPreserveTokensAndNameBytes)
 {
     using D = Runtime::GeometryElementDomain;
