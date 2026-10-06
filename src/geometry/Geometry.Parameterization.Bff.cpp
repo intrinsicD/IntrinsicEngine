@@ -5,6 +5,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <numbers>
 #include <numeric>
 #include <span>
 #include <utility>
@@ -26,7 +27,6 @@ namespace Geometry::Parameterization
 {
     namespace
     {
-        constexpr double kPi = 3.141592653589793238462643383279502884;
         constexpr std::size_t kInvalidIndex =
             std::numeric_limits<std::size_t>::max();
 
@@ -204,10 +204,10 @@ namespace Geometry::Parameterization
                     return BffStatus::NonFiniteGeometry;
                 if (disk.BoundaryOf[vertex.Index] != kInvalidIndex)
                     disk.BoundaryCurvature[vertex.Index] =
-                        kPi - angleSum[vertex.Index];
+                        std::numbers::pi - angleSum[vertex.Index];
                 else
                     disk.GaussianCurvature[vertex.Index] =
-                        2.0 * kPi - angleSum[vertex.Index];
+                        2.0 * std::numbers::pi - angleSum[vertex.Index];
             }
 
             for (std::size_t ei = 0u; ei < mesh.EdgesSize(); ++ei)
@@ -611,7 +611,7 @@ namespace Geometry::Parameterization
                     const double actual = orientation
                         * ExteriorTurn(previous, vertex, next);
                     const double error = std::abs(std::remainder(
-                        actual - params.BoundaryData[i], 2.0 * kPi));
+                        actual - params.BoundaryData[i], 2.0 * std::numbers::pi));
                     sumSquared += error * error;
                     maximum = std::max(maximum, error);
                 }
@@ -724,7 +724,7 @@ namespace Geometry::Parameterization
             result.Diagnostics.TargetAngleSum = std::accumulate(
                 params.BoundaryData.begin(), params.BoundaryData.end(), 0.0);
             if (!std::isfinite(result.Diagnostics.TargetAngleSum)
-                || std::abs(result.Diagnostics.TargetAngleSum - 2.0 * kPi)
+                || std::abs(result.Diagnostics.TargetAngleSum - 2.0 * std::numbers::pi)
                     > params.AngleSumTolerance)
             {
                 return fail(BffStatus::InconsistentAngleSum);

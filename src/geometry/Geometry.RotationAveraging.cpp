@@ -5,6 +5,7 @@ module;
 #include <cmath>
 #include <cstddef>
 #include <limits>
+#include <numbers>
 #include <span>
 #include <vector>
 
@@ -20,7 +21,6 @@ namespace Geometry::Rotation
 {
     namespace
     {
-        constexpr double kPi = 3.14159265358979323846;
         constexpr double kQuatEpsilon = 1e-14;
         constexpr double kDistanceEpsilon = 1e-8;
 
@@ -211,7 +211,7 @@ namespace Geometry::Rotation
                     static_cast<double>(options.Tolerance) * weightScale;
                 const bool cutLocusPair =
                     AngularDistance(samples[0].Rotation, samples[1].Rotation) >=
-                    static_cast<float>(kPi - 1e-5);
+                    static_cast<float>(std::numbers::pi - 1e-5);
                 if (equalWeights && cutLocusPair)
                 {
                     return MakeResult(RotationAverageStatus::DegenerateInput);

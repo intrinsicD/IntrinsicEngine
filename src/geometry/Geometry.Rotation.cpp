@@ -3,6 +3,7 @@ module;
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <numbers>
 #include <span>
 #include <utility>
 #include <glm/glm.hpp>
@@ -15,8 +16,6 @@ namespace Geometry::Rotation
 {
     namespace
     {
-        constexpr double kPi = 3.14159265358979323846;
-
         [[nodiscard]] glm::dmat3 HatD(const glm::dvec3& w)
         {
             glm::dmat3 k(0.0);
@@ -82,7 +81,7 @@ namespace Geometry::Rotation
             {
                 return axial; // ~ w for small angles
             }
-            if (theta < kPi - 1e-4)
+            if (theta < std::numbers::pi - 1e-4)
             {
                 return axial * (theta / std::sin(theta));
             }
@@ -283,8 +282,8 @@ namespace Geometry::Rotation
         const double u3 = NextUnit(state);
         const double s1 = std::sqrt(1.0 - u1);
         const double s2 = std::sqrt(u1);
-        const double t2 = 2.0 * kPi * u2;
-        const double t3 = 2.0 * kPi * u3;
+        const double t2 = 2.0 * std::numbers::pi * u2;
+        const double t3 = 2.0 * std::numbers::pi * u3;
         const double x = s1 * std::sin(t2);
         const double y = s1 * std::cos(t2);
         const double z = s2 * std::sin(t3);

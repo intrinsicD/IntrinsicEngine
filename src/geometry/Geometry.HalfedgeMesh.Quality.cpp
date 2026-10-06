@@ -4,6 +4,7 @@ module;
 #include <cmath>
 #include <cstddef>
 #include <limits>
+#include <numbers>
 #include <optional>
 #include <vector>
 
@@ -22,8 +23,7 @@ namespace Geometry::MeshQuality
 
     namespace
     {
-        constexpr double kPi = 3.14159265358979323846;
-        constexpr double kRadToDeg = 180.0 / kPi;
+        constexpr double kRadToDeg = 180.0 / std::numbers::pi;
         constexpr double kSqrt3 = 1.7320508075688772;
 
         // Compute angle at vertex B in triangle ABC using atan2 for robustness.
