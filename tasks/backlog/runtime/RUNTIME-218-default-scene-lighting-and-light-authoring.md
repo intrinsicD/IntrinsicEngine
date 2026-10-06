@@ -36,15 +36,15 @@ contract_review: >-
   and there is no UI to create one (`grep -rn 'Light' src/app/Sandbox/` is
   empty, and there is no add-entity command in the editor at all). Lights exist
   only if a loaded scene document happens to contain them.
-- With zero lights every shading path collapses to its ambient term —
-  `deferred_lighting.frag:92` (`result = (ambient + diffuse*shadow) * albedo`),
-  `debug_surface.frag:26` and `point.frag:55` (both `@ 087e6e17b`, deleted by
-  REVIEW-007 G01) — which yields flat unshaded fill.
-- Reference for lit point impostors: `assets/shaders/point_sphere.frag @ 087e6e17b`
-  (hemisphere surface, projected `gl_FragDepth`, scene light plus specular term).
-  The active helper `assets/shaders/common/point_sphere_impostor.glsl` keeps the
-  surface/depth reconstruction but uses a fixed light; feed it the authored
-  light rather than adding a second impostor implementation.
+- Original finding: with zero lights the shaders inspected then collapse to
+  their ambient term — `assets/shaders/deferred_lighting.frag:92`
+  (`result = (ambient + diffuse*shadow) * albedo`),
+  `assets/shaders/debug_surface.frag:26` and `assets/shaders/point.frag:55`
+  (all cited `@ 087e6e17b`; none is loaded by the promoted renderer, and the
+  latter two were deleted by REVIEW-007 G01) — which yields flat unshaded fill.
+- The active point impostor helper `assets/shaders/common/point_sphere_impostor.glsl`
+  uses a fixed light. `assets/shaders/point_sphere.frag @ 087e6e17b` is a
+  reference for a sphere impostor lit by the scene light.
 - The consuming machinery already exists and is unused: ECS
   `Lights::DirectionalLight` / `Lights::PointLight` components,
   the light snapshot extraction in `Runtime.RenderExtraction.cpp` and

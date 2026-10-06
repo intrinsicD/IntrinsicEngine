@@ -34,11 +34,14 @@ contract_review: Reviewed the catalog. Shader-quality change inside the existing
 - [ ] `forward/line.vert` emits a pixel-space center-line distance and extends segment ends by half the width.
 - [ ] `forward/line.frag` applies an analytic AA falloff; opaque/blend state stays correct for the line bucket.
 - [ ] Width-1 lines and per-element widths still render; picking is unchanged.
-- [ ] A `gpu;vulkan` readback shows a soft edge and no gap at a polyline joint.
+- [ ] New `RuntimeSandboxAcceptanceGpuSmoke.LineEdgeAntialiasingAndJointCoverage` reads back a soft edge and no gap at a polyline joint on `ci-vulkan`.
 
 ## Verification
 ```bash
-cmake --build --preset ci --target IntrinsicShaderOutputs IntrinsicGraphicsContractCpuTests IntrinsicGraphicsVulkanSmokeTests
-ctest --test-dir build/ci --output-on-failure --timeout 60 -R '^(GraphicsLinePointPassContracts|RendererFrameLifecycle)\.'
-ctest --test-dir build/ci --output-on-failure --timeout 120 -L gpu -R '^DefaultRecipeSurfaceGpuSmoke\.'
+cmake --build --preset ci --target IntrinsicShaderOutputs IntrinsicGraphicsContractCpuTests
+ctest --test-dir build/ci --output-on-failure --timeout 60 --no-tests=error -R '^(GraphicsLinePointPassContracts|RendererFrameLifecycle)\.'
+cmake --preset ci-vulkan
+CCACHE_DISABLE=1 cmake --build --preset ci-vulkan --target IntrinsicShaderOutputs IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests
+# LineEdgeAntialiasingAndJointCoverage is the readback this task adds.
+ctest --test-dir build/ci-vulkan --output-on-failure --timeout 120 --no-tests=error -L gpu -L vulkan -R '^RuntimeSandboxAcceptanceGpuSmoke\.(LineEdgeAntialiasingAndJointCoverage|ReferenceTriangleMeshConfiguredLineWidthAndPointDrawLanesPresent|ReferenceTriangleScalarFieldColormapResolvesOnLineAndPointLanes)$'
 ```

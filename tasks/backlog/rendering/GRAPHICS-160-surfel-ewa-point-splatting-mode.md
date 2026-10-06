@@ -39,11 +39,14 @@ maturity_target: Operational
 - [ ] Point render config exposes the surfel/EWA mode through the existing validated recipe/config path; existing modes render unchanged.
 - [ ] The vertex stage uses the bound per-point normal and model-space radius, with a flat-disk fallback for degenerate projections.
 - [ ] Picking and depth stay consistent with the visible footprint.
-- [ ] CPU pass contract covers mode selection; a `gpu;vulkan` readback shows an oriented, normal-dependent footprint.
+- [ ] CPU pass contract covers mode selection; new `RuntimeSandboxAcceptanceGpuSmoke.SurfelPointFootprintFollowsBoundNormal` reads back an oriented, normal-dependent footprint on `ci-vulkan`.
 
 ## Verification
 ```bash
-cmake --build --preset ci --target IntrinsicShaderOutputs IntrinsicGraphicsContractCpuTests IntrinsicGraphicsVulkanSmokeTests
-ctest --test-dir build/ci --output-on-failure --timeout 60 -R '^(GraphicsLinePointPassContracts|RendererFrameLifecycle)\.'
-ctest --test-dir build/ci --output-on-failure --timeout 120 -L gpu -R '^DefaultRecipeSurfaceGpuSmoke\.'
+cmake --build --preset ci --target IntrinsicShaderOutputs IntrinsicGraphicsContractCpuTests
+ctest --test-dir build/ci --output-on-failure --timeout 60 --no-tests=error -R '^(GraphicsLinePointPassContracts|RendererFrameLifecycle)\.'
+cmake --preset ci-vulkan
+CCACHE_DISABLE=1 cmake --build --preset ci-vulkan --target IntrinsicShaderOutputs IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests
+# SurfelPointFootprintFollowsBoundNormal is the readback this task adds.
+ctest --test-dir build/ci-vulkan --output-on-failure --timeout 120 --no-tests=error -L gpu -L vulkan -R '^RuntimeSandboxAcceptanceGpuSmoke\.(SurfelPointFootprintFollowsBoundNormal|ReferenceTriangleMeshConfiguredLineWidthAndPointDrawLanesPresent)$'
 ```

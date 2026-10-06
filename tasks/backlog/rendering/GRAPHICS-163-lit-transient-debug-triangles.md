@@ -32,11 +32,14 @@ contract_review: Reviewed the catalog. Shading change inside the transient debug
 ## Acceptance criteria
 - [ ] Transient triangles carry or derive a normal and are lit from the active light packet.
 - [ ] Alpha below 1 blends with correct blend state; opaque callers render unchanged.
-- [ ] `TransientDebugSurfacePassContract` covers the new layout; `TransientDebugSurfaceGpuSmoke` reads back shading variation and alpha.
+- [ ] `TransientDebugSurfacePassContract` covers the new layout; new `TransientDebugSurfaceGpuSmoke.LitTrianglesShadeAndKeepAlpha` reads back shading variation and alpha on `ci-vulkan`.
 
 ## Verification
 ```bash
-cmake --build --preset ci --target IntrinsicShaderOutputs IntrinsicGraphicsContractCpuTests IntrinsicGraphicsVulkanSmokeTests
-ctest --test-dir build/ci --output-on-failure --timeout 60 -R '^TransientDebugSurfacePassContract\.'
-ctest --test-dir build/ci --output-on-failure --timeout 120 -L gpu -R '^TransientDebugSurfaceGpuSmoke\.'
+cmake --build --preset ci --target IntrinsicShaderOutputs IntrinsicGraphicsContractCpuTests
+ctest --test-dir build/ci --output-on-failure --timeout 60 --no-tests=error -R '^TransientDebugSurfacePassContract\.'
+cmake --preset ci-vulkan
+CCACHE_DISABLE=1 cmake --build --preset ci-vulkan --target IntrinsicShaderOutputs IntrinsicGraphicsVulkanSmokeTests
+# LitTrianglesShadeAndKeepAlpha is the readback this task adds.
+ctest --test-dir build/ci-vulkan --output-on-failure --timeout 120 --no-tests=error -L gpu -L vulkan -R '^TransientDebugSurfaceGpuSmoke\.(LitTrianglesShadeAndKeepAlpha|MixedLanesReadBackExpectedSampleColors|WorldSpacePacketsFollowTheCameraAndPointsKeepTheirRadius)$'
 ```

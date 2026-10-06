@@ -30,10 +30,14 @@ contract_review: Reviewed the catalog. Debug-view presentation of integer render
 ## Acceptance criteria
 - [ ] `DebugViewPushConstants`/resource classification identifies integer targets, and `debug_view.frag` samples them through an unsigned-integer path into `HashColor`.
 - [ ] Float and depth targets render as before.
-- [ ] Contract tests cover classification of an R32_UINT target; a `gpu;vulkan` readback shows distinct colors for distinct IDs.
+- [ ] Contract tests cover classification of an R32_UINT target; new `DefaultRecipeSurfaceGpuSmoke.DebugViewHashesEntityIdTarget` reads back distinct colors for distinct IDs on `ci-vulkan`.
 
 ## Verification
 ```bash
 cmake --build --preset ci --target IntrinsicShaderOutputs IntrinsicGraphicsContractCpuTests IntrinsicGraphicsRendererCpuUnitTests
-ctest --test-dir build/ci --output-on-failure --timeout 60 -R '^(GraphicsDebugViewContract|DebugViewPassContract|GraphicsDebugViewSystem)\.'
+ctest --test-dir build/ci --output-on-failure --timeout 60 --no-tests=error -R '^(GraphicsDebugViewContract|DebugViewPassContract|GraphicsDebugViewSystem)\.'
+cmake --preset ci-vulkan
+CCACHE_DISABLE=1 cmake --build --preset ci-vulkan --target IntrinsicShaderOutputs IntrinsicGraphicsVulkanSmokeTests
+# DebugViewHashesEntityIdTarget is the readback this task adds.
+ctest --test-dir build/ci-vulkan --output-on-failure --timeout 120 --no-tests=error -L gpu -L vulkan -R '^DefaultRecipeSurfaceGpuSmoke\.(DebugViewHashesEntityIdTarget|ReferenceTriangleDebugViewReadbackMatchesMinimalHarnessSamples)$'
 ```
