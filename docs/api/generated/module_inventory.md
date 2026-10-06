@@ -10,7 +10,7 @@ Root scanned: `src`
 |---|---:|
 | `app` | 7 |
 | `assets` | 10 |
-| `core` | 37 |
+| `core` | 38 |
 | `ecs` | 25 |
 | `geometry` | 133 |
 | `graphics/assets` | 1 |
@@ -65,6 +65,7 @@ Root scanned: `src`
 | `Extrinsic.Core.Hash` | `src/core/Core.Hash.cppm` | `core` |
 | `Extrinsic.Core.IOBackend` | `src/core/Core.IOBackend.cppm` | `core` |
 | `Extrinsic.Core.IndexedHeap` | `src/core/Core.IndexedHeap.cppm` | `core` |
+| `Extrinsic.Core.IntegerMath` | `src/core/Core.IntegerMath.cppm` | `core` |
 | `Extrinsic.Core.LockFreeQueue` | `src/core/Core.LockFreeQueue.cppm` | `core` |
 | `Extrinsic.Core.Logging` | `src/core/Core.Logging.cppm` | `core` |
 | `Extrinsic.Core.Memory:Common` | `src/core/Core.Memory.Common.cppm` | `core` |
@@ -474,4 +475,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **447**
+Total modules: **448**

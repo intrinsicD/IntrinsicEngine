@@ -21,6 +21,7 @@ engine subsystems.
 - `Extrinsic.Core.Filesystem.PathResolver`
 - `Extrinsic.Core.FrameGraph`
 - `Extrinsic.Core.Hash`
+- `Extrinsic.Core.IntegerMath`
 - `Extrinsic.Core.HandleLease`
 - `Extrinsic.Core.IOBackend`
 - `Extrinsic.Core.LockFreeQueue`
@@ -105,6 +106,9 @@ Core owns reusable graph/scheduling primitives, not domain-specific GPU policy.
   documents. Decoding is strict (one accepted spelling per byte sequence) and
   `DecodedSize` bounds a payload before it is decoded. Users: agent PNG replies
   and the scene document's typed property tables (RUNTIME-319).
+- **`Extrinsic.Core.IntegerMath`**: constexpr `Core::CeilDiv` for dispatch
+  group counts (zero divisor yields 0; plain `uint32_t` wrap near the maximum).
+  Distinct `AlignUp` helpers keep their own zero semantics locally.
 - **`Extrinsic.Core.Hash`**: canonical hashing owner — the 32-bit `HashString` /
   `StringID` naming lane, the constexpr 64-bit FNV-1a `Hash::HashString64` (an
   optional seed continues a previous hash; the sampler cache and procedural

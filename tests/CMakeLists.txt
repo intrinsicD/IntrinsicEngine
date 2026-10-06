@@ -1209,6 +1209,7 @@ endfunction()
 set(_core_test_files
     Test_IndexedHeap.cpp
     Test.CoreError.cpp
+    Test.Core.IntegerMath.cpp
     Test.LogRingBuffer.cpp
 )
 intrinsic_resolve_test_sources(_core_test_sources

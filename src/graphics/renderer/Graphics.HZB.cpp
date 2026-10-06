@@ -9,6 +9,8 @@ module;
 
 module Extrinsic.Graphics.HZB;
 
+import Extrinsic.Core.IntegerMath;
+
 namespace Extrinsic::Graphics
 {
     std::uint32_t NextPow2(std::uint32_t v) noexcept
@@ -53,12 +55,6 @@ namespace Extrinsic::Graphics
 
     namespace
     {
-        [[nodiscard]] constexpr std::uint32_t CeilDiv(const std::uint32_t value,
-                                                       const std::uint32_t divisor) noexcept
-        {
-            return divisor == 0u ? 0u : (value + divisor - 1u) / divisor;
-        }
-
         [[nodiscard]] constexpr std::uint32_t MipExtent(const std::uint32_t base,
                                                         const std::uint32_t mip) noexcept
         {
@@ -88,8 +84,8 @@ namespace Extrinsic::Graphics
                 .ReadsDepthSource = true,
                 .TargetWidth = desc.Width,
                 .TargetHeight = desc.Height,
-                .GroupCountX = CeilDiv(desc.Width, tileSize),
-                .GroupCountY = CeilDiv(desc.Height, tileSize),
+                .GroupCountX = Core::CeilDiv(desc.Width, tileSize),
+                .GroupCountY = Core::CeilDiv(desc.Height, tileSize),
                 .GroupCountZ = 1u,
             });
             return plan;
@@ -106,8 +102,8 @@ namespace Extrinsic::Graphics
                 .ReadsDepthSource = mip == 0u,
                 .TargetWidth = width,
                 .TargetHeight = height,
-                .GroupCountX = CeilDiv(width, tileSize),
-                .GroupCountY = CeilDiv(height, tileSize),
+                .GroupCountX = Core::CeilDiv(width, tileSize),
+                .GroupCountY = Core::CeilDiv(height, tileSize),
                 .GroupCountZ = 1u,
             });
         }

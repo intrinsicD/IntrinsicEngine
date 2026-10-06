@@ -28,6 +28,7 @@ target_sources(${target_name}
         Core.Filesystem.PathResolver.cppm
         Core.Base64.cppm
         Core.Hash.cppm
+        Core.IntegerMath.cppm
         Core.HandleLease.cppm
         Core.LockFreeQueue.cppm
         Core.Logging.cppm

@@ -15,6 +15,7 @@ module;
 
 module Extrinsic.Runtime.ProgressivePoissonGpuBackend;
 
+import Extrinsic.Core.IntegerMath;
 import Extrinsic.Graphics.ComputeParallelPrimitives;
 import Extrinsic.Graphics.GpuTransfer;
 import Extrinsic.RHI.BufferManager;
@@ -28,13 +29,6 @@ namespace Extrinsic::Runtime
 {
     namespace
     {
-        [[nodiscard]] constexpr std::uint32_t CeilDiv(
-            const std::uint32_t value,
-            const std::uint32_t divisor) noexcept
-        {
-            return divisor == 0u ? 0u : (value + divisor - 1u) / divisor;
-        }
-
         [[nodiscard]] constexpr std::uint64_t FloatBytes(
             const std::uint32_t count) noexcept
         {
@@ -210,7 +204,7 @@ namespace Extrinsic::Runtime
                 .ElementCount = elementCount,
                 .HashTableCapacity = hashCapacity,
                 .GroupSize = groupSize,
-                .GroupCountX = CeilDiv(std::max(elementCount, hashCapacity),
+                .GroupCountX = Core::CeilDiv(std::max(elementCount, hashCapacity),
                                         groupSize),
                 .GroupCountY = 1u,
                 .GroupCountZ = 1u,

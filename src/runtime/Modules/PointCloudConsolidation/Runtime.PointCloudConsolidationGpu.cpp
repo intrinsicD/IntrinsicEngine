@@ -24,6 +24,7 @@ module;
 
 module Extrinsic.Runtime.PointCloudConsolidationModule;
 
+import Extrinsic.Core.IntegerMath;
 import Geometry.Validation;
 import Extrinsic.Core.Filesystem.PathResolver;
 import Extrinsic.ECS.Components.GeometrySources;
@@ -246,13 +247,6 @@ namespace Extrinsic::Runtime
         {
             return std::ranges::find_if(resources.Leases,
                 [handle](const auto& lease) { return lease.GetHandle() == handle; });
-        }
-
-        [[nodiscard]] constexpr std::uint32_t CeilDiv(
-            const std::uint32_t value,
-            const std::uint32_t divisor) noexcept
-        {
-            return divisor == 0u ? 0u : (value + divisor - 1u) / divisor;
         }
 
         [[nodiscard]] bool CheckedAdd(
@@ -1280,7 +1274,7 @@ namespace Extrinsic::Runtime
                 static_cast<std::uint32_t>(sizeof(push)),
                 0u);
             commandContext.Dispatch(
-                std::max(CeilDiv(elementCount, kLopGpuGroupSize), 1u),
+                std::max(Core::CeilDiv(elementCount, kLopGpuGroupSize), 1u),
                 1u,
                 1u);
         }

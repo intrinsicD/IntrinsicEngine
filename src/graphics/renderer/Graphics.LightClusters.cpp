@@ -12,16 +12,12 @@ module;
 
 module Extrinsic.Graphics.LightClusters;
 
+import Extrinsic.Core.IntegerMath;
+
 namespace Extrinsic::Graphics
 {
     namespace
     {
-        [[nodiscard]] constexpr std::uint32_t CeilDiv(const std::uint32_t value,
-                                                       const std::uint32_t divisor) noexcept
-        {
-            return divisor == 0u ? 0u : (value + divisor - 1u) / divisor;
-        }
-
         [[nodiscard]] bool IsFinitePositive(const float value) noexcept
         {
             return std::isfinite(value) && value > 0.f;
@@ -186,8 +182,8 @@ namespace Extrinsic::Graphics
         desc.RenderWidth = renderWidth;
         desc.RenderHeight = renderHeight;
         desc.ClusterTilePx = clusterTilePx;
-        desc.TilesX = CeilDiv(renderWidth, clusterTilePx);
-        desc.TilesY = CeilDiv(renderHeight, clusterTilePx);
+        desc.TilesX = Core::CeilDiv(renderWidth, clusterTilePx);
+        desc.TilesY = Core::CeilDiv(renderHeight, clusterTilePx);
         desc.SlicesZ = slicesZ;
         desc.CellCount = desc.TilesX * desc.TilesY * desc.SlicesZ;
         return desc;
@@ -424,7 +420,7 @@ namespace Extrinsic::Graphics
             return plan;
         }
 
-        plan.GroupCountX = CeilDiv(desc.CellCount, groupSize);
+        plan.GroupCountX = Core::CeilDiv(desc.CellCount, groupSize);
         plan.GroupCountY = 1u;
         plan.GroupCountZ = 1u;
         return plan;
@@ -446,7 +442,7 @@ namespace Extrinsic::Graphics
         }
 
         plan.MaxLightsPerCell = ClampMaxLightsPerCell(maxLightsPerCell);
-        plan.GroupCountX = CeilDiv(desc.CellCount, groupSize);
+        plan.GroupCountX = Core::CeilDiv(desc.CellCount, groupSize);
         plan.GroupCountY = 1u;
         plan.GroupCountZ = 1u;
         return plan;

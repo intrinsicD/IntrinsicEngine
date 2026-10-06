@@ -4,6 +4,8 @@ module;
 
 module Extrinsic.Graphics.Pass.PostProcess.Histogram;
 
+import Extrinsic.Core.IntegerMath;
+
 namespace Extrinsic::Graphics
 {
     namespace
@@ -28,12 +30,6 @@ namespace Extrinsic::Graphics
         // publishes the prior frame's average log luminance.
         constexpr float kHistogramMinLogLum = -10.0f;
         constexpr float kHistogramMaxLogLum =  10.0f;
-
-        [[nodiscard]] constexpr std::uint32_t CeilDiv(std::uint32_t value, std::uint32_t divisor) noexcept
-        {
-            if (divisor == 0u) { return 0u; }
-            return (value + divisor - 1u) / divisor;
-        }
     }
 
     PostProcessHistogramPushConstants BuildPostProcessHistogramPushConstants(
@@ -106,8 +102,8 @@ namespace Extrinsic::Graphics
         const PostProcessHistogramPushConstants pc = BuildPostProcessHistogramPushConstants(
             m_PostProcessSystem.GetSettings(), m_ViewportWidth, m_ViewportHeight);
 
-        const std::uint32_t groupsX = m_ViewportWidth  > 0u ? CeilDiv(m_ViewportWidth,  kHistogramTileSize) : 1u;
-        const std::uint32_t groupsY = m_ViewportHeight > 0u ? CeilDiv(m_ViewportHeight, kHistogramTileSize) : 1u;
+        const std::uint32_t groupsX = m_ViewportWidth  > 0u ? Core::CeilDiv(m_ViewportWidth,  kHistogramTileSize) : 1u;
+        const std::uint32_t groupsY = m_ViewportHeight > 0u ? Core::CeilDiv(m_ViewportHeight, kHistogramTileSize) : 1u;
 
         cmd.BindPipeline(m_Pipeline);
         cmd.PushConstants(&pc, sizeof(pc));

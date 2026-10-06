@@ -7,7 +7,8 @@ work-efficient scan/overflow guard.
 `Extrinsic.Graphics.ComputeParallelPrimitives` owns generic `uint32` prefix-scan,
 stream-compaction, count-publication, and deterministic float segmented-reduction
 building blocks for GPU-oriented methods. The seam lives in `graphics` and
-imports RHI contracts only; it must not import ECS, runtime, platform, app,
+imports RHI contracts and Core helpers only (for example the shared
+`Core::CeilDiv` from `Extrinsic.Core.IntegerMath`, imported privately); it must not import ECS, runtime, platform, app,
 method packages, live asset services, or Vulkan-native handles.
 
 ## Current Contract

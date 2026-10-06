@@ -11,6 +11,7 @@ module;
 
 module Extrinsic.Graphics.ComputeParallelPrimitives;
 
+import Extrinsic.Core.IntegerMath;
 import Extrinsic.Core.Filesystem.PathResolver;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.CommandContext;
@@ -27,13 +28,6 @@ namespace Extrinsic::Graphics
         {
             return accumulator + static_cast<std::uint64_t>(value) >
                    static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max());
-        }
-
-        [[nodiscard]] constexpr std::uint32_t CeilDiv(
-            const std::uint32_t value,
-            const std::uint32_t divisor) noexcept
-        {
-            return divisor == 0u ? 0u : (value + divisor - 1u) / divisor;
         }
 
         [[nodiscard]] constexpr std::uint64_t Uint32Bytes(
@@ -53,12 +47,12 @@ namespace Extrinsic::Graphics
                 return levels;
             }
 
-            std::uint32_t levelElementCount = CeilDiv(elementCount, groupSize);
+            std::uint32_t levelElementCount = Core::CeilDiv(elementCount, groupSize);
             std::uint64_t offsetBytes = baseOffsetBytes;
             std::uint32_t levelIndex = 0u;
             while (levelElementCount > 1u)
             {
-                const std::uint32_t blockCount = CeilDiv(levelElementCount, groupSize);
+                const std::uint32_t blockCount = Core::CeilDiv(levelElementCount, groupSize);
                 const std::uint64_t sizeBytes = Uint32Bytes(levelElementCount);
                 levels.push_back(ParallelPrimitiveScratchLevel{
                     .LevelIndex = levelIndex,
@@ -136,7 +130,7 @@ namespace Extrinsic::Graphics
                 .LevelIndex = 0u,
                 .ElementCount = scanCount,
                 .GroupSize = plan.GroupSize,
-                .GroupCountX = CeilDiv(scanCount, plan.GroupSize),
+                .GroupCountX = Core::CeilDiv(scanCount, plan.GroupSize),
                 .GroupCountY = 1u,
                 .GroupCountZ = 1u,
                 .InputRole = inputRole,
@@ -179,7 +173,7 @@ namespace Extrinsic::Graphics
                     .LevelIndex = level + 1u,
                     .ElementCount = scratch.ElementCount,
                     .GroupSize = plan.GroupSize,
-                    .GroupCountX = CeilDiv(scratch.ElementCount, plan.GroupSize),
+                    .GroupCountX = Core::CeilDiv(scratch.ElementCount, plan.GroupSize),
                     .GroupCountY = 1u,
                     .GroupCountZ = 1u,
                     .InputRole = ParallelPrimitiveBufferRole::Scratch,
@@ -212,7 +206,7 @@ namespace Extrinsic::Graphics
                         .LevelIndex = targetLevel,
                         .ElementCount = scratch.ElementCount,
                         .GroupSize = plan.GroupSize,
-                        .GroupCountX = CeilDiv(scratch.ElementCount, plan.GroupSize),
+                        .GroupCountX = Core::CeilDiv(scratch.ElementCount, plan.GroupSize),
                         .GroupCountY = 1u,
                         .GroupCountZ = 1u,
                         .OutputRole = ParallelPrimitiveBufferRole::Scratch,
@@ -232,7 +226,7 @@ namespace Extrinsic::Graphics
                     .LevelIndex = 0u,
                     .ElementCount = scanCount,
                     .GroupSize = plan.GroupSize,
-                    .GroupCountX = CeilDiv(scanCount, plan.GroupSize),
+                    .GroupCountX = Core::CeilDiv(scanCount, plan.GroupSize),
                     .GroupCountY = 1u,
                     .GroupCountZ = 1u,
                     .OutputRole = outputRole,
@@ -1059,7 +1053,7 @@ namespace Extrinsic::Graphics
             .LevelIndex = 0u,
             .ElementCount = elementCount,
             .GroupSize = groupSize,
-            .GroupCountX = CeilDiv(elementCount, groupSize),
+            .GroupCountX = Core::CeilDiv(elementCount, groupSize),
             .GroupCountY = 1u,
             .GroupCountZ = 1u,
             .InputRole = ParallelPrimitiveBufferRole::Keys,
@@ -1143,7 +1137,7 @@ namespace Extrinsic::Graphics
         }
 
         // Scratch: record copy | digit counts | their exclusive scan | scan levels.
-        const std::uint32_t groups = CeilDiv(elementCount, groupSize);
+        const std::uint32_t groups = Core::CeilDiv(elementCount, groupSize);
         const std::uint32_t digitCounts = groups * (1u << kParallelRadixDigitBits);
         const std::uint64_t copyBytes =
             static_cast<std::uint64_t>(elementCount) * (keyWords + 1u) * sizeof(std::uint32_t);
@@ -1155,7 +1149,7 @@ namespace Extrinsic::Graphics
         plan.ScratchBytes = EndOfScratchLevels(plan.ScratchLevels, levelsOffset);
 
         // An even pass count leaves the result in the caller's records (Keys role).
-        std::uint32_t passes = CeilDiv(keyBits, kParallelRadixDigitBits);
+        std::uint32_t passes = Core::CeilDiv(keyBits, kParallelRadixDigitBits);
         passes += passes % 2u;
         for (std::uint32_t pass = 0u; pass < passes; ++pass)
         {
