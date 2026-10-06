@@ -116,4 +116,88 @@ if(_phase_total_error OR _phase_total LESS_EQUAL 0)
     message(FATAL_ERROR "Invalid top_phase_total_micros: ${_phase_total_error} ${_phase_total}")
 endif()
 
+# Schema check: every documented key with its JSON type, and exactly the
+# phase names main.cpp writes (kPhaseFields), in summary and every sample.
+function(_frame_pacing_expect_type expected)
+    string(JSON _type ERROR_VARIABLE _error TYPE "${_json}" ${ARGN})
+    if(_error OR NOT _type STREQUAL expected)
+        message(FATAL_ERROR "Frame-pacing report: ${ARGN} must be ${expected}: ${_error} ${_type}")
+    endif()
+endfunction()
+
+set(_phase_names
+    platform_begin_micros
+    resize_micros
+    operational_transition_micros
+    fixed_step_micros
+    imgui_begin_micros
+    variable_tick_micros
+    imgui_end_micros
+    imgui_editor_callback_micros
+    imgui_draw_data_copy_micros
+    pre_render_setup_micros
+    pre_render_transform_flush_micros
+    selection_pick_drain_micros
+    render_contract_micros
+    render_begin_frame_micros
+    render_extraction_micros
+    render_prepare_micros
+    render_execute_micros
+    render_end_frame_micros
+    render_graph_compile_micros
+    render_graph_execute_micros
+    present_micros
+    maintenance_micros
+    selection_readback_micros
+    release_render_world_micros
+)
+
+string(JSON _source GET "${_json}" source)
+if(NOT _source STREQUAL "ExtrinsicSandbox")
+    message(FATAL_ERROR "Unexpected frame-pacing source: ${_source}")
+endif()
+string(JSON _requested_frames GET "${_json}" requested_frames)
+if(NOT _requested_frames EQUAL FRAME_COUNT)
+    message(FATAL_ERROR "requested_frames (${_requested_frames}) != FRAME_COUNT (${FRAME_COUNT})")
+endif()
+_frame_pacing_expect_type(ARRAY samples)
+_frame_pacing_expect_type(OBJECT summary)
+_frame_pacing_expect_type(OBJECT summary phase_totals)
+foreach(_key requested_frames frame_count)
+    _frame_pacing_expect_type(NUMBER ${_key})
+endforeach()
+foreach(_key total_micros mean_total_micros max_total_micros top_phase_total_micros)
+    _frame_pacing_expect_type(NUMBER summary ${_key})
+endforeach()
+_frame_pacing_expect_type(BOOLEAN summary final_device_operational)
+_frame_pacing_expect_type(STRING summary top_phase_by_total)
+
+list(LENGTH _phase_names _phase_count)
+string(JSON _summary_phase_count LENGTH "${_json}" summary phase_totals)
+if(NOT _summary_phase_count EQUAL _phase_count)
+    message(FATAL_ERROR "summary.phase_totals has ${_summary_phase_count} keys, expected ${_phase_count}")
+endif()
+foreach(_phase IN LISTS _phase_names)
+    _frame_pacing_expect_type(NUMBER summary phase_totals ${_phase})
+endforeach()
+
+math(EXPR _last_sample "${_samples_length} - 1")
+foreach(_index RANGE ${_last_sample})
+    foreach(_key frame_index total_micros)
+        _frame_pacing_expect_type(NUMBER samples ${_index} ${_key})
+    endforeach()
+    foreach(_key platform_continue_frame renderer_began_frame renderer_completed_frame)
+        _frame_pacing_expect_type(BOOLEAN samples ${_index} ${_key})
+    endforeach()
+    _frame_pacing_expect_type(OBJECT samples ${_index})
+    _frame_pacing_expect_type(OBJECT samples ${_index} phases)
+    string(JSON _sample_phase_count LENGTH "${_json}" samples ${_index} phases)
+    if(NOT _sample_phase_count EQUAL _phase_count)
+        message(FATAL_ERROR "samples[${_index}].phases has ${_sample_phase_count} keys, expected ${_phase_count}")
+    endif()
+    foreach(_phase IN LISTS _phase_names)
+        _frame_pacing_expect_type(NUMBER samples ${_index} phases ${_phase})
+    endforeach()
+endforeach()
+
 message(STATUS "Validated frame-pacing report: ${REPORT_PATH}")
