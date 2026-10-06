@@ -1612,22 +1612,4 @@ namespace Extrinsic::Runtime
             std::make_move_iterator(other.FragmentBakeAtlases.end()));
     }
 
-    Graphics::VisualizationPacketBatch VisualizationEncodingBatch::AsPacketBatch(
-        const bool enforceDomain,
-        const Graphics::VisualizationAttributeDomain expectedDomain) const noexcept
-    {
-        return Graphics::VisualizationPacketBatch{
-            .PropertyBuffers = PropertyBuffers,
-            .AttributeBuffers = AttributeBuffers,
-            .Scalars = Scalars,
-            .Colors = Colors,
-            .VectorFields = VectorFields,
-            .Isolines = Isolines,
-            .HtexAtlases = HtexAtlases,
-            .FragmentBakeAtlases = FragmentBakeAtlases,
-            .EnforceDomain = enforceDomain,
-            .ExpectedDomain = expectedDomain,
-        };
-    }
-
 }

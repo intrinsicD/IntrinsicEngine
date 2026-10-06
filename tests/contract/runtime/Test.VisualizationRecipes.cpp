@@ -753,20 +753,14 @@ TEST(VisualizationRecipes, EncodingBatchAppendOwnsPayloadSpansAndClearResetsAllL
     EXPECT_FALSE(combined.PropertyBuffers[0].Bytes.empty());
     EXPECT_FALSE(combined.PropertyBuffers[1].Bytes.empty());
 
-    const G::VisualizationPacketBatch packets = combined.AsPacketBatch();
-    EXPECT_EQ(packets.PropertyBuffers.size(), 2u);
-    EXPECT_EQ(packets.Scalars.size(), 1u);
-    EXPECT_EQ(packets.Colors.size(), 1u);
+    EXPECT_EQ(combined.Scalars.size(), 1u);
+    EXPECT_EQ(combined.Colors.size(), 1u);
 
     combined.Clear();
     EXPECT_TRUE(combined.PropertyBuffers.empty());
     EXPECT_TRUE(combined.PropertyBufferPayloads.empty());
     EXPECT_TRUE(combined.Scalars.empty());
     EXPECT_TRUE(combined.Colors.empty());
-    const G::VisualizationPacketBatch cleared = combined.AsPacketBatch();
-    EXPECT_TRUE(cleared.PropertyBuffers.empty());
-    EXPECT_TRUE(cleared.Scalars.empty());
-    EXPECT_TRUE(cleared.Colors.empty());
 }
 
 TEST(VisualizationRecipes, RecipeIdentityIsClosedAndComparable)

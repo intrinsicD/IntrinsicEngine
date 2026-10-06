@@ -39,11 +39,6 @@ export namespace Extrinsic::Runtime
 
         void Clear() noexcept;
         void Append(VisualizationEncodingBatch&& other);
-
-        [[nodiscard]] Graphics::VisualizationPacketBatch AsPacketBatch(
-            bool enforceDomain = false,
-            Graphics::VisualizationAttributeDomain expectedDomain =
-                Graphics::VisualizationAttributeDomain::Vertex) const noexcept;
     };
 
     struct VisualizationEncodingDiagnostics
