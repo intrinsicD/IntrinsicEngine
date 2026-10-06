@@ -52,12 +52,6 @@ namespace Extrinsic::Runtime
 
     export using JobResultTypeKey = std::size_t;
 
-    export enum class JobTarget : std::uint8_t
-    {
-        CpuPool,
-        GpuQueue,
-    };
-
     export enum class JobState : std::uint8_t
     {
         Invalid,
@@ -191,10 +185,11 @@ namespace Extrinsic::Runtime
         std::string_view           m_TypeName{};
     };
 
+    // CPU-pool work published on the main thread; GPU frame work registers a
+    // GpuQueue participant instead.
     export struct JobDesc
     {
         std::string DebugName{};
-        JobTarget Target{JobTarget::CpuPool};
         WorldHandle Scope{DefaultWorldHandle};
         // Opaque submitter key (a command correlation id); 0 = none. Lets the
         // submitter find this job again without keeping its token.
@@ -263,7 +258,6 @@ namespace Extrinsic::Runtime
     {
         JobDesc desc{};
         desc.DebugName = std::move(debugName);
-        desc.Target = JobTarget::CpuPool;
         desc.Scope = scope.IsValid() ? scope : DefaultWorldHandle;
         desc.Work = [work = std::move(work)](const JobCancellation& cancellation) mutable
             -> JobResultEnvelope

@@ -66,7 +66,6 @@ namespace Extrinsic::Runtime
     {
         JobToken Token{};
         WorldHandle Scope{DefaultWorldHandle};
-        JobTarget Target{JobTarget::CpuPool};
         std::string DebugName{};
         std::move_only_function<JobResultEnvelope(const JobCancellation&)>
             Work{};
@@ -337,18 +336,6 @@ namespace Extrinsic::Runtime
         if (!m_State)
             return {};
 
-        if (desc.Target != JobTarget::CpuPool)
-        {
-            std::lock_guard lock(m_State->Mutex);
-            m_State->Stats.RejectedJobs += 1;
-            Core::Log::Error(
-                "[JobService] Rejected job '{}': JobDesc targets only the CPU "
-                "pool; GPU frame work must register through "
-                "RegisterGpuQueueParticipant.",
-                desc.DebugName);
-            return {};
-        }
-
         if (!desc.Work || !desc.PublishCompletion)
         {
             std::lock_guard lock(m_State->Mutex);
@@ -381,7 +368,6 @@ namespace Extrinsic::Runtime
             }
             job->Token = JobToken{m_State->NextTokenIndex++, 1u};
             job->Scope = desc.Scope.IsValid() ? desc.Scope : DefaultWorldHandle;
-            job->Target = desc.Target;
             job->DebugName = std::move(desc.DebugName);
             job->CorrelationId = desc.CorrelationId;
             job->SubmittedAt = std::chrono::steady_clock::now();

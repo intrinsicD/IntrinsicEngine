@@ -496,8 +496,8 @@ is allocated per slice (the `GRAPHICS-072/073/074` series pattern).
    `ActualBackend`/`FellBackToCPU` commits to the Algorithm-Variant-Dispatch
    contract: every result reports the backend that actually ran; a GPU request
    resolving to CPU is valid only when telemetry says so (KMeans precedent). The
-   `JobService` exposes an explicit `GpuQueue` target, but an async GPU algorithm
-   still needs a concrete registered GPU participant/backend; the CPU async path
+   `JobService` `Submit` path is CPU-only; an async GPU algorithm needs a
+   concrete registered GpuQueue participant/backend; the CPU async path
    works independently today.
 6. **Method-contract boundary.** The moment TEASER/FGR/CPD/symmetric-P2Plane/
    non-rigid are implemented, `AGENTS.md` §6 and the method workflow bind them

@@ -169,6 +169,16 @@ One shared worker pool, two tiers:
   and reference-backend parity — rather than mutating inputs in place.
   Live-world locking/checkout semantics are rejected.
 
+**2026-10-06 amendment (REVIEW-007 R05).** `Submit(JobDesc)` is a CPU-pool
+API only; the `CpuPool | GpuQueue` target selection above was never realized
+as a second submit path. As decided by
+[`RUNTIME-137`](../../tasks/archive/RUNTIME-137-async-gpu-readback-helper-for-compute-backends.md),
+GPU work runs through the `JobService` GpuQueue participant registry
+(`RegisterGpuQueueParticipant`, `RecordGpuQueueFrameCommands`,
+`DrainGpuQueueCompletedTransfers`) and `SpatialIndexCache::QueueGpuCompute`.
+"GpuQueue substrate" in the validation notes below means that registry. The
+unused `JobTarget`/`JobDesc::Target` selector was removed.
+
 ### D9 — The kernel/module litmus test
 
 **ADR-0027 amendment.** The litmus test is an ownership test, not a naming or
