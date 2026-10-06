@@ -208,7 +208,7 @@ namespace Extrinsic::Core::Log
         const auto newest = s_Sequence.load(std::memory_order_relaxed);
         const bool reset = sequence > newest;
         const auto cursor = reset ? std::uint64_t{0} : sequence;
-        CursorSnapshot result{.NextCursor = cursor, .ClearedThrough = s_ClearedThrough, .CursorReset = reset, .Entries = {}};
+        CursorSnapshot result{.Entries = {}, .NextCursor = cursor, .Dropped = 0, .ClearedThrough = s_ClearedThrough, .CursorReset = reset};
         if (maxEntries == 0) return result;
         const auto retainedStart = newest - s_Ring.Count;
         if (cursor < retainedStart)
