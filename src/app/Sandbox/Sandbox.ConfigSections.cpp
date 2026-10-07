@@ -19,6 +19,7 @@ import Extrinsic.Runtime.KeypointAnalysisConfig;
 import Extrinsic.Runtime.DescriptorAnalysisConfig;
 import Extrinsic.Runtime.DensityWeightConfig;
 import Extrinsic.Runtime.PointConstructionConfig;
+import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.CoherentPointDriftConfig;
 import Extrinsic.Runtime.PointSamplingConfig;
@@ -35,6 +36,7 @@ namespace Extrinsic::Sandbox
     {
         Runtime::RuntimeEngineConfigSectionRegistry registry{};
         if (!registry.Register(Runtime::MakeSelectionConfigSectionRegistration()) ||
+            !registry.Register(Runtime::MakeGizmoSnapConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeGeodesicsConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeScalarGradientConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakePropertySmoothingConfigSectionRegistration()) ||

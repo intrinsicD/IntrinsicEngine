@@ -15,6 +15,8 @@ module;
 
 export module Extrinsic.Runtime.SceneInteractionModule;
 
+import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Error;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Scene.Handle;
@@ -43,6 +45,26 @@ namespace Extrinsic::Runtime
     // between the request and its readback discards the pick. Empty for a stale id.
     export [[nodiscard]] std::vector<std::uint64_t> BuildPrimitivePickStamp(
         const ECS::Scene::Registry& scene, std::uint32_t stableEntityId, bool uncommittedPositions);
+
+    // Gizmo snap steps (`sandbox.gizmo`, schema `intrinsic.runtime.sandbox.gizmo` v1).
+    // Every step is a positive, finite value representable as a normal float.
+    // Rotation stays in degrees because the editor gizmo consumes degrees.
+    export inline constexpr std::string_view kGizmoSnapConfigSectionName = "sandbox.gizmo";
+    export inline constexpr std::string_view kGizmoSnapConfigSectionSchemaId =
+        "intrinsic.runtime.sandbox.gizmo";
+    export struct GizmoSnapConfig
+    {
+        float TranslateStep{0.25f};      // world units
+        float RotateStepDegrees{15.0f};
+        float ScaleStep{0.1f};           // scale factor increment
+    };
+    export [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidateGizmoSnapConfigSection(
+        std::string_view payload, std::string_view reference, std::string_view subject);
+    // The applied value, or nullopt when the section is absent, of another schema, or invalid.
+    export [[nodiscard]] std::optional<GizmoSnapConfig> GetGizmoSnapConfig(
+        const Core::Config::EngineConfig& config);
+    export void SetGizmoSnapConfig(Core::Config::EngineConfig& config, const GizmoSnapConfig& value);
+    export [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeGizmoSnapConfigSectionRegistration();
 
     // Optional app-composed owner for every active-world interaction record.
     // The object has app-global lifetime; its mutable cohort binds to exactly

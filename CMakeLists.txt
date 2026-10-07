@@ -69,6 +69,17 @@ if("${_INTRINSIC_ACTIVE_TOOLCHAIN}" STREQUAL "${_INTRINSIC_REPO_VCPKG_TOOLCHAIN_
     endif()
 endif()
 
+# The vcpkg toolchain reads VCPKG_MANIFEST_FEATURES during project(), so these
+# options and the feature they select must exist before it. ExtrinsicSandboxEditor
+# is built for the Sandbox and for tests (also headless), so its private
+# dependencies come from their own manifest feature instead of `windowing`.
+option(INTRINSIC_BUILD_SANDBOX "Build Sandbox application target" ON)
+option(INTRINSIC_BUILD_TESTS "Build test targets" ON)
+if((INTRINSIC_BUILD_SANDBOX OR INTRINSIC_BUILD_TESTS)
+    AND NOT "sandbox-editor" IN_LIST VCPKG_MANIFEST_FEATURES)
+    list(APPEND VCPKG_MANIFEST_FEATURES "sandbox-editor")
+endif()
+
 unset(_INTRINSIC_ACTIVE_TOOLCHAIN)
 unset(_INTRINSIC_BUILD_TREE_NAME)
 unset(_INTRINSIC_REPO_CLANG_CHAINLOAD)
@@ -350,8 +361,6 @@ endif()
 
 option(INTRINSIC_ENABLE_NATIVE_ARCH "Enable -march=native for local profiling builds" OFF)
 option(INTRINSIC_ENABLE_CUDA "Enable CUDA compute backend for GPU-accelerated geometry processing" OFF)
-option(INTRINSIC_BUILD_SANDBOX "Build Sandbox application target" ON)
-option(INTRINSIC_BUILD_TESTS "Build test targets" ON)
 option(INTRINSIC_BUILD_BENCHMARKS "Build benchmark scaffold targets" ON)
 option(INTRINSIC_BUILD_DIAGNOSTIC_TOOLS
     "Build opt-in local diagnostic executables"

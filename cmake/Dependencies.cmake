@@ -175,7 +175,6 @@ if(NOT INTRINSIC_HEADLESS_NO_GLFW)
     find_package(volk CONFIG REQUIRED)
     find_package(Vulkan REQUIRED)
     find_package(VulkanMemoryAllocator CONFIG REQUIRED)
-    find_package(imguizmo CONFIG REQUIRED)
 
     if(NOT TARGET volk)
         add_library(volk INTERFACE IMPORTED)
@@ -204,9 +203,15 @@ if(NOT INTRINSIC_HEADLESS_NO_GLFW)
     target_include_directories(imgui_lib PUBLIC "${IMGUI_BACKEND_SOURCE_DIR}")
     target_compile_definitions(imgui_lib PUBLIC IMGUI_IMPL_VULKAN_NO_PROTOTYPES GLFW_INCLUDE_NONE)
     target_link_libraries(imgui_lib PUBLIC imgui_core_lib glfw volk)
-
-    add_library(imguizmo_lib INTERFACE)
-    target_link_libraries(imguizmo_lib INTERFACE imguizmo::imguizmo imgui_lib)
 else()
     add_library(glfw INTERFACE)
+endif()
+
+# Editor-only gizmo widgets (vcpkg feature `sandbox-editor`, selected in the
+# top-level CMakeLists.txt under the same condition). Only ExtrinsicSandboxEditor
+# links it; it needs the ImGui core, not the GLFW/Vulkan backends.
+if(INTRINSIC_BUILD_SANDBOX OR INTRINSIC_BUILD_TESTS)
+    find_package(imguizmo CONFIG REQUIRED)
+    add_library(imguizmo_lib INTERFACE)
+    target_link_libraries(imguizmo_lib INTERFACE imguizmo::imguizmo imgui_core_lib)
 endif()

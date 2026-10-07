@@ -30,8 +30,8 @@ method.
 `Sandbox.ConfigSections` is the pre-boot composition surface for runtime configuration, including
 `sandbox.clustering`, `sandbox.progressive_poisson`,
 `sandbox.mesh_curvature`, `sandbox.curvature_segmentation`,
-`sandbox.parameterization`, `sandbox.point_cloud_consolidation`, and
-`sandbox.physics` records.
+`sandbox.parameterization`, `sandbox.point_cloud_consolidation`,
+`sandbox.gizmo` (gizmo snap steps), and `sandbox.physics` records.
 Their runtime feature modules own the typed DTOs/codecs. `main.cpp` constructs the
 app-composed `Runtime::EngineConfigControl` first, gives it the registered
 Sandbox section registry, resolves boot config through that exact control's
@@ -490,6 +490,11 @@ Repeated app shutdown sees an empty handle record and is a no-op.
   disabled, promoted Vulkan disabled). With tests enabled it still builds
   `ExtrinsicSandboxEditor` and the `integration;runtime` app-composition tests,
   including the pre-boot config registry plus Null `Engine::Run()` proof.
+- `ExtrinsicSandboxEditor` links ImGuizmo privately (`imguizmo_lib`). Its
+  package comes from the vcpkg manifest feature `sandbox-editor`, which the
+  top-level CMake selects whenever `INTRINSIC_BUILD_SANDBOX` or
+  `INTRINSIC_BUILD_TESTS` is on, also for presets without default features
+  such as `ci-fast`; runtime does not depend on ImGuizmo.
 - `cmake --preset ci-vulkan` configures the same Debug + tests profile with
   `INTRINSIC_BUILD_SANDBOX=ON` and `INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN=ON`
   so `ExtrinsicSandbox` runs against the promoted Vulkan backend on

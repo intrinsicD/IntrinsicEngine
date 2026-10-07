@@ -131,7 +131,8 @@ TEST(EngineConfigSectionSchemas, GeneratedSchemasAgreeWithTheirValidators)
     }
     // Slice A of RUNTIME-276: the mesh-field family carries generated schemas.
     for (const auto* section : {"sandbox.property_smoothing", "sandbox.harmonic_field", "sandbox.laplacian_eigenbasis",
-                                "sandbox.scalar_gradient", "sandbox.geodesics", "sandbox.mesh_curvature"})
+                                "sandbox.scalar_gradient", "sandbox.geodesics", "sandbox.mesh_curvature",
+                                "sandbox.gizmo"})
         EXPECT_TRUE(withSchema.contains(section)) << section << " has no generated schema";
 }
 

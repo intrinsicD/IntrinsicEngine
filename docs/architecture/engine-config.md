@@ -219,8 +219,8 @@ table abbreviates `app.sections[name=sandbox.progressive_poisson].payload` as
 `curvature_segmentation`, and
 `app.sections[name=sandbox.parameterization].payload` as `parameterization`, and
 `app.sections[name=sandbox.point_cloud_consolidation].payload` as
-`consolidation`, and `app.sections[name=sandbox.physics].payload` as
-`physics`.
+`consolidation`, `app.sections[name=sandbox.physics].payload` as
+`physics`, and `app.sections[name=sandbox.gizmo].payload` as `gizmo`.
 
 | Payload | Field | Values |
 |---|---|---|
@@ -270,6 +270,7 @@ table abbreviates `app.sections[name=sandbox.progressive_poisson].payload` as
 | `physics` | `max_accumulated_seconds` | Finite number in `[fixed_delta_seconds, 10]` seconds |
 | `physics` | `max_steps_per_frame` | Integer in `[1, 1024]` |
 | `physics` | `gravity` | Array of exactly three finite numbers, each in `[-100000, 100000]` |
+| `gizmo` | `translate_step`, `rotate_step_degrees`, `scale_step` | Finite numbers representable as positive normal floats (`[FLT_MIN, FLT_MAX]`); defaults `0.25`, `15` degrees, `0.1`; unknown fields are rejected |
 | `consolidation` | `backend` | `cpu_reference`, `gpu_vulkan_compute`; Vulkan is implemented for LOP and isotropic WLOP, falls back honestly when the device/transport is unavailable, and fails preview for anisotropic WLOP, CLOP, or EAR |
 | `consolidation` | `strategy` | `lop`, `wlop`, `clop`, `ear`; backend/strategy compatibility is checked by the same runtime preflight used by config, editor, and agent callers |
 | `consolidation` | `support_radius_mode` | `auto` profiles the selected position property; `manual` preserves `support_radius` exactly |

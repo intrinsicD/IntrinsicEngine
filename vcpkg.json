@@ -29,9 +29,14 @@
       "description": "Dependencies used by GLFW/Vulkan-backed interactive builds. Headless presets can disable default features before the vcpkg toolchain cutover.",
       "dependencies": [
         "glfw3",
-        "imguizmo",
         "volk",
         "vulkan-memory-allocator"
+      ]
+    },
+    "sandbox-editor": {
+      "description": "Dependencies private to the Sandbox editor library (ExtrinsicSandboxEditor). Top-level CMake selects this feature whenever INTRINSIC_BUILD_SANDBOX or INTRINSIC_BUILD_TESTS is on, also without default features.",
+      "dependencies": [
+        "imguizmo"
       ]
     }
   }

@@ -1,10 +1,12 @@
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <initializer_list>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -42,6 +44,7 @@ import Extrinsic.Runtime.DensityWeightConfig;
 import Extrinsic.Runtime.NormalEstimationConfig;
 import Extrinsic.Runtime.PointConstructionConfig;
 import Extrinsic.Runtime.RegistrationConfig;
+import Extrinsic.Runtime.SceneInteractionModule;
 
 namespace CoreConfig = Extrinsic::Core::Config;
 namespace Runtime = Extrinsic::Runtime;
@@ -2074,4 +2077,110 @@ TEST(SandboxConfigSections, PersistedSegmentationFeatureKindHasStableMeaning)
     ASSERT_EQ(restored->Features.size(), 1u);
     EXPECT_EQ(restored->Features.front().ValueKind, Geometry::PropertyValueKind::Float);
     EXPECT_EQ(restored->Features.front().Name, "temperature");
+}
+
+TEST(SandboxConfigSections, GizmoSnapStepsRegisterValidateAndApplyThroughTheConfigLane)
+{
+    const auto registry = Sandbox::CreateSandboxConfigSectionRegistry();
+    const auto* registration = registry.Find(Runtime::kGizmoSnapConfigSectionName);
+    ASSERT_NE(registration, nullptr);
+    EXPECT_EQ(registration->DefaultSection.SchemaId, "intrinsic.runtime.sandbox.gizmo");
+    EXPECT_EQ(registration->DefaultSection.SchemaVersion, 1u);
+    EXPECT_FALSE(registration->SchemaJson.empty());
+
+    const auto validate = [](std::string_view payload) {
+        return Runtime::ValidateGizmoSnapConfigSection(payload, {}, "gizmo");
+    };
+    const auto rejected = [&](std::string_view payload, std::string_view message) {
+        const auto result = validate(payload);
+        EXPECT_FALSE(result.Usable()) << payload;
+        ASSERT_EQ(result.Diagnostics.size(), 1u) << payload;
+        EXPECT_EQ(result.Diagnostics.front().Subject, "gizmo");
+        EXPECT_NE(result.Diagnostics.front().Message.find(message), std::string::npos)
+            << payload << ": " << result.Diagnostics.front().Message;
+    };
+    for (const char* field : {"translate_step", "rotate_step_degrees", "scale_step"})
+    {
+        const std::string key = std::string{"{\""} + field + "\":";
+        for (const char* value : {"0", "-1", "-0.25", "1e-40", "3.5e38"})
+            rejected(key + value + "}", std::string{field} + " must be");
+        rejected(key + "1e400}", "must be an object"); // a double overflow fails JSON parsing
+        rejected(key + "\"1\"}", std::string{field} + " must be a finite number");
+        rejected(key + "null}", std::string{field} + " must be a finite number");
+        rejected(key + "true}", std::string{field} + " must be a finite number");
+    }
+    rejected(R"({"snap":true})", "Unknown gizmo snap field: snap");
+    rejected(R"([0.25])", "Gizmo snap config must be an object.");
+    const auto partial = validate(R"({"scale_step":2})");
+    ASSERT_EQ(partial.State, CoreConfig::EngineConfigState::Valid);
+    EXPECT_EQ(partial.CanonicalPayloadJson,
+              validate(R"({"translate_step":0.25,"rotate_step_degrees":15,"scale_step":2})").CanonicalPayloadJson);
+
+    // A non-finite float cannot be persisted: the stored section stops decoding.
+    CoreConfig::EngineConfig nonFinite{};
+    Runtime::SetGizmoSnapConfig(nonFinite, {.TranslateStep = std::numeric_limits<float>::quiet_NaN()});
+    EXPECT_FALSE(Runtime::GetGizmoSnapConfig(nonFinite).has_value());
+    Runtime::SetGizmoSnapConfig(nonFinite, {.RotateStepDegrees = std::numeric_limits<float>::infinity()});
+    EXPECT_FALSE(Runtime::GetGizmoSnapConfig(nonFinite).has_value());
+
+    ConfigControlHarness harness{};
+    const auto active = [&] {
+        return Runtime::GetGizmoSnapConfig(harness.Control().GetEngineConfigControlState().ActiveConfig);
+    };
+    const auto defaults = active();
+    ASSERT_TRUE(defaults.has_value());
+    EXPECT_EQ(defaults->TranslateStep, 0.25f);
+    EXPECT_EQ(defaults->RotateStepDegrees, 15.0f);
+    EXPECT_EQ(defaults->ScaleStep, 0.1f);
+
+    // Preview validates without touching the active config.
+    const Runtime::GizmoSnapConfig requested{.TranslateStep = 0.5f, .RotateStepDegrees = 22.5f, .ScaleStep = 0.25f};
+    CoreConfig::EngineConfig candidate = harness.Control().GetEngineConfigControlState().ActiveConfig;
+    Runtime::SetGizmoSnapConfig(candidate, requested);
+    const auto preview = harness.Control().PreviewEngineConfigControlDocument(
+        CoreConfig::SerializeEngineConfig(candidate), "gizmo-snap");
+    ASSERT_EQ(preview.State, CoreConfig::EngineConfigState::Valid);
+    const auto previewed = Runtime::GetGizmoSnapConfig(preview.Preview.Config);
+    ASSERT_TRUE(previewed.has_value());
+    EXPECT_EQ(previewed->RotateStepDegrees, 22.5f);
+    EXPECT_EQ(active()->TranslateStep, defaults->TranslateStep);
+    EXPECT_EQ(active()->RotateStepDegrees, defaults->RotateStepDegrees);
+    EXPECT_EQ(active()->ScaleStep, defaults->ScaleStep);
+
+    const auto applied = harness.Control().ApplyEngineConfigHotSubset(preview, Runtime::RuntimeConfigControlSource::Editor);
+    ASSERT_EQ(applied.Status, Runtime::RuntimeEngineConfigApplyStatus::Applied);
+    EXPECT_TRUE(applied.SectionChanged(Runtime::kGizmoSnapConfigSectionName));
+    ASSERT_TRUE(active().has_value());
+    EXPECT_EQ(active()->TranslateStep, requested.TranslateStep);
+    EXPECT_EQ(active()->RotateStepDegrees, requested.RotateStepDegrees);
+    EXPECT_EQ(active()->ScaleStep, requested.ScaleStep);
+
+    // The serialized active config round-trips to the same steps and changes nothing.
+    const auto roundTrip = harness.Control().PreviewEngineConfigControlDocument(
+        CoreConfig::SerializeEngineConfig(harness.Control().GetEngineConfigControlState().ActiveConfig));
+    ASSERT_EQ(roundTrip.State, CoreConfig::EngineConfigState::Valid);
+    EXPECT_EQ(Runtime::GetGizmoSnapConfig(roundTrip.Preview.Config)->ScaleStep, requested.ScaleStep);
+    EXPECT_EQ(harness.Control().ApplyEngineConfigHotSubset(roundTrip).Status,
+              Runtime::RuntimeEngineConfigApplyStatus::NoChange);
+
+    // An invalid section keeps the applied steps: preview retains them and reports why.
+    CoreConfig::EngineConfig invalid = harness.Control().GetEngineConfigControlState().ActiveConfig;
+    CoreConfig::UpsertEngineConfigSection(invalid.AppSections,
+        {.Name = std::string{Runtime::kGizmoSnapConfigSectionName},
+         .SchemaId = std::string{Runtime::kGizmoSnapConfigSectionSchemaId},
+         .SchemaVersion = 1u,
+         .PayloadJson = R"({"translate_step":0,"rotate_step_degrees":90,"scale_step":1})"});
+    const auto invalidPreview = harness.Control().PreviewEngineConfigControlDocument(
+        CoreConfig::SerializeEngineConfig(invalid), "gizmo-snap-invalid");
+    EXPECT_EQ(invalidPreview.State, CoreConfig::EngineConfigState::FallbackApplied);
+    EXPECT_TRUE(std::ranges::any_of(invalidPreview.Diagnostics, [](const auto& diagnostic) {
+        return diagnostic.Message.find("translate_step must be") != std::string::npos;
+    }));
+    EXPECT_EQ(Runtime::GetGizmoSnapConfig(invalidPreview.Preview.Config)->RotateStepDegrees,
+              requested.RotateStepDegrees);
+    EXPECT_EQ(harness.Control().ApplyEngineConfigHotSubset(invalidPreview).Status,
+              Runtime::RuntimeEngineConfigApplyStatus::NoChange);
+    EXPECT_EQ(active()->TranslateStep, requested.TranslateStep);
+    EXPECT_EQ(active()->RotateStepDegrees, requested.RotateStepDegrees);
+    EXPECT_EQ(active()->ScaleStep, requested.ScaleStep);
 }

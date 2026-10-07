@@ -273,6 +273,7 @@ target_sources(${target_name}
         Modules/PhysicsIntegration/Runtime.PhysicsModule.cpp
         Scene/Runtime.SceneDocumentModule.cpp
         Scene/Runtime.SceneInteractionModule.cpp
+        Scene/Runtime.SceneInteractionModule.Config.cpp
         Scene/Runtime.SceneInteractionModule.Selection.cpp
         Scene/Runtime.SceneSerialization.cpp
         Cameras/Runtime.CameraModule.cpp

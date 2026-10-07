@@ -215,6 +215,32 @@ Codex review of the fixed commit → fixes → re-verification.
   `SandboxEditorPresentation` now drive the key through the platform queue;
   the claim test also proves a claimed `F` press does not run (mutation-checked).
   No native GLFW focus run yet.
+- **Slice 3 — ImGuizmo frontend, 2026-10-07: 3a approved by Codex
+  in one round; 3b and 3c open.** Operator decisions: three sub-commits — (a)
+  dependencies plus snap config with tests, (b) runtime frontend interface with
+  contract tests, (c) atomic ImGuizmo frontend plus old ray-path removal,
+  `SandboxEditorGizmo` suite and immediate doc corrections. Snap stays
+  activated by holding Shift; the UI only configures step sizes and shows the
+  modifier (no persistent snap toggle). Release after a rejected preview
+  commits the last accepted state (existing runtime contract) and keeps the
+  error visible; Escape discards. Mode, pivot, local/global and snap steps are
+  frozen during a drag and apply to the next one. The gizmo's enabled choice
+  survives UI hide, its effective activity is bound to visibility, and hide
+  always cancels a running drag.
+  **3a:** vcpkg feature `sandbox-editor` (only `imguizmo`, removed from
+  `windowing`), selected before `project()` whenever
+  `INTRINSIC_BUILD_SANDBOX OR INTRINSIC_BUILD_TESTS` (both options moved
+  before `project()`); `imguizmo_lib` (`imguizmo::imguizmo imgui_core_lib`)
+  outside the GLFW block, linked PRIVATE only to `ExtrinsicSandboxEditor`.
+  `GizmoSnapConfig` and its `sandbox.gizmo` section (schema
+  `intrinsic.runtime.sandbox.gizmo` v1; `translate_step`,
+  `rotate_step_degrees`, `scale_step`, defaults 0.25/15/0.1, positive normal
+  floats, unknown fields rejected) are owned by `SceneInteractionModule`
+  (codec `Runtime.SceneInteractionModule.Config.cpp`, field table with
+  generated schema) and registered by Sandbox; no drag consumes it yet and the
+  old `GizmoInteraction::Config()` path is untouched until 3c. Evidence:
+  `SandboxConfigSections.GizmoSnapStepsRegisterValidateAndApplyThroughTheConfigLane`,
+  `EngineConfigSectionSchemas.*` (now requires the `sandbox.gizmo` schema).
 - **Remaining:** slice 3 (ImGuizmo frontend, UI toggles, W/E/R, Escape, snap
   config, retire the ray frontend where replaced, `SandboxEditorGizmo` tests),
   slice 4 (docs and the Vulkan acceptance smoke). All acceptance boxes stay
