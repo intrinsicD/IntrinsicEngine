@@ -13,8 +13,8 @@ contract_review: The fix patches how the vendored ImGuizmo picks and drags singl
 ---
 # BUG-236 — ImGuizmo scale axis handles fail where the eye lies in the axis plane
 
-Status: in-progress. Commit 1 (CPU fix) and commit 2 (Vulkan scale smoke)
-done; all acceptance criteria are met, retirement pending.
+Status: done. Commit 1 (CPU fix) and commit 2 (Vulkan scale smoke) landed;
+all acceptance criteria are met.
 
 ## Goal
 - The Sandbox gizmo's X/Y/Z scale handles can be grabbed and dragged in
@@ -119,3 +119,9 @@ cmake --build --preset ci-vulkan --target IntrinsicRuntimeSandboxAcceptanceGpuSm
 ctest --test-dir build/ci-vulkan --output-on-failure --no-tests=error -L gpu -L vulkan --repeat until-fail:3 -R '^RuntimeSandboxAcceptanceGpuSmoke\.ImGuizmo'
 python3 tools/agents/check_ara_claims.py --root . --strict
 ```
+
+## Completion
+Completed 2026-10-08. Commit: `53d44fef7` (overlay patch and CPU regressions,
+Codex approve with two notes, applied) and `87427dcd7` (Vulkan scale smoke,
+two Codex rounds). Maturity: Operational on Vulkan for the frontal X scale
+handle (ara C118); the top-down orthographic case was not broken.
