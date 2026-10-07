@@ -16,6 +16,7 @@ import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.Platform.Backend.Null;
 import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.CommandBus;
@@ -231,17 +232,70 @@ public:
     void Frame(double, double) override
     {
         auto& engine = Kernel();
-        if (BootCount == 2u)
-        {
-            const Extrinsic::Platform::IWindow& window = engine.GetWindow();
-            auto& input = const_cast<Extrinsic::Platform::Input::Context&>(window.GetInput());
-            input.SetKeyState(Extrinsic::Platform::Input::Key::G, true);
-        }
         engine.RequestExit();
     }
     void Shutdown() override {}
 
     std::uint32_t BootCount{0u};
+};
+
+// Scripted frames: the application's UiBuild tick runs `Script` with the
+// 1-based frame number; a tail probe records the merged capture.
+struct ViewportRequestProbeState {
+  std::function<void(std::uint32_t)> Script{};
+  std::uint32_t Frames{0u};
+  std::uint32_t LastFrame{0u};
+  std::vector<Runtime::EditorInputCaptureSnapshot> UiEndCaptures{};
+  std::vector<bool> BeforeExtractionClaims{};
+};
+
+class ScriptedApplication final : public Intrinsic::Tests::RuntimeTestModule
+{
+public:
+  explicit ScriptedApplication(ViewportRequestProbeState &state) : State(state) {}
+  void Frame(double, double) override
+  {
+    ++State.Frames;
+    if (State.Script)
+      State.Script(State.Frames);
+    if (State.Frames >= State.LastFrame)
+      Kernel().RequestExit();
+  }
+
+private:
+  ViewportRequestProbeState &State;
+};
+
+class ViewportRequestProbeModule final : public Runtime::IRuntimeModule {
+public:
+  explicit ViewportRequestProbeModule(ViewportRequestProbeState &state)
+      : State(state) {}
+  [[nodiscard]] std::string_view Name() const noexcept override {
+    return "zz.Runtime.ViewportRequestProbe";
+  }
+  [[nodiscard]] Core::Result OnRegister(Runtime::EngineSetup &setup) override {
+    if (Core::Result result = setup.RegisterFrameHook(
+            Runtime::FramePhase::UiEndCapture,
+            [this](Runtime::RuntimeFrameHookContext &context) {
+              State.UiEndCaptures.push_back(context.EditorCapture);
+            });
+        !result.has_value()) {
+      return result;
+    }
+    return setup.RegisterFrameHook(
+        Runtime::FramePhase::BeforeExtraction,
+        [this](Runtime::RuntimeFrameHookContext &context) {
+          State.BeforeExtractionClaims.push_back(
+              context.EditorCapture.CapturesViewportInput());
+        });
+  }
+  [[nodiscard]] Core::Result OnResolve(Runtime::EngineSetup &) override {
+    return Core::Ok();
+  }
+  void OnShutdown(Runtime::RuntimeModuleShutdownContext &) override {}
+
+private:
+  ViewportRequestProbeState &State;
 };
 
 [[nodiscard]] Core::Config::EngineConfig HeadlessConfig() {
@@ -368,6 +422,92 @@ TEST(EditorUiHost, FrameContributionMutationIsSafeAndDeterministic) {
   EXPECT_EQ(removedPeerCalls, 0u);
 }
 
+TEST(EditorUiHost, ViewportInputRequestsAccumulateAndResetWithOwnerAndVisibility) {
+  Runtime::EditorUiHost host;
+  Runtime::EditorUiHostOwnerControl owner = host.ClaimOwnerControl();
+  ASSERT_TRUE(owner.IsValid());
+  const auto claimed = [&host] {
+    return host.ViewportInputRequest().CaptureViewportInput;
+  };
+
+  host.RequestViewportInput({.CaptureViewportInput = true});
+  EXPECT_FALSE(claimed()) << "a non-operational host ignores requests";
+
+  owner.SetOperational(true);
+  host.RequestViewportInput({.CaptureViewportInput = false});
+  EXPECT_FALSE(claimed());
+  host.RequestViewportInput({.CaptureViewportInput = true});
+  host.RequestViewportInput({.CaptureViewportInput = false});
+  EXPECT_TRUE(claimed()) << "contributions OR their requests";
+  owner.ResetViewportInputRequest();
+  EXPECT_FALSE(claimed());
+
+  host.RequestViewportInput({.CaptureViewportInput = true});
+  (void)host.ApplyVisibilityCommand({Runtime::EditorUiVisibilityCommandKind::Hide});
+  EXPECT_FALSE(claimed()) << "hiding drops the claim";
+  host.RequestViewportInput({.CaptureViewportInput = true});
+  EXPECT_FALSE(claimed()) << "a hidden host ignores requests";
+  (void)host.ApplyVisibilityCommand({Runtime::EditorUiVisibilityCommandKind::Show});
+  EXPECT_FALSE(claimed()) << "showing again restores no stale claim";
+
+  host.RequestViewportInput({.CaptureViewportInput = true});
+  owner.SetOperational(false);
+  EXPECT_FALSE(claimed());
+}
+
+// UI-078 slice 2: the claim joins the adapter's capture after the adapter
+// wrote it (mouse and keyboard), diagnostics publish the merged value, and
+// the owner resets the claim at every UiBegin, including hidden frames.
+TEST(EditorUiModule, ViewportInputRequestMergesAfterAdapterCaptureAndResetsEachFrame) {
+  ViewportRequestProbeState state{};
+  state.LastFrame = 4u;
+  Intrinsic::Tests::RuntimeTestKernel engine(
+      HeadlessConfig(), std::make_unique<ScriptedApplication>(state));
+  engine.EmplaceModule<Runtime::EditorUiModule>();
+  engine.EmplaceModule<ViewportRequestProbeModule>(state);
+  engine.Initialize();
+
+  Runtime::EditorUiHost *host = engine.Services().Find<Runtime::EditorUiHost>();
+  ASSERT_NE(host, nullptr);
+  std::vector<bool> diagnosticsAfterRequest{};
+  // A claim made outside any UI frame is dropped by frame 1's UiBegin.
+  host->RequestViewportInput({.CaptureViewportInput = true});
+  state.Script = [&](const std::uint32_t frame) {
+    // Frame 2 requests, frame 3 does not, frame 4 requests and then hides.
+    if (frame == 2u || frame == 4u)
+      host->RequestViewportInput({.CaptureViewportInput = true});
+    if (frame == 4u) {
+      (void)host->ApplyVisibilityCommand(
+          {Runtime::EditorUiVisibilityCommandKind::Hide});
+    }
+  };
+  const Runtime::EditorUiFrameContributionHandle contribution =
+      host->RegisterFrameContribution([&] {
+        diagnosticsAfterRequest.push_back(
+            host->GetDiagnostics().CapturesViewportInput);
+      });
+  ASSERT_TRUE(contribution.IsValid());
+
+  engine.Run();
+
+  ASSERT_EQ(state.UiEndCaptures.size(), 4u);
+  EXPECT_FALSE(state.UiEndCaptures[0].CapturesViewportInput());
+  EXPECT_TRUE(state.UiEndCaptures[1].CapturedMouse);
+  EXPECT_TRUE(state.UiEndCaptures[1].CapturedKeyboard);
+  EXPECT_FALSE(state.UiEndCaptures[2].CapturesViewportInput());
+  EXPECT_FALSE(state.UiEndCaptures[3].CapturesViewportInput());
+  EXPECT_EQ(state.BeforeExtractionClaims,
+            (std::vector<bool>{false, true, false, false}));
+  // Each contribution sees the merged value the previous frame published;
+  // the hidden frame 4 runs none.
+  EXPECT_EQ(diagnosticsAfterRequest, (std::vector<bool>{false, false, true}));
+  EXPECT_FALSE(host->GetDiagnostics().CapturesViewportInput);
+  EXPECT_FALSE(host->ViewportInputRequest().CaptureViewportInput);
+
+  EXPECT_TRUE(host->UnregisterFrameContribution(contribution));
+  engine.Shutdown();
+}
+
 TEST(EditorUiModule, PreservesBeginVariableBuildEndAndCaptureOrdering) {
   UiBracketProbeState state{};
   Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
@@ -481,10 +621,13 @@ TEST(EditorUiModule, ShutdownReinitializeStartsFromFreshEditorState) {
   EXPECT_EQ(secondHost->GetDiagnostics().FramesProduced, 0u);
   EXPECT_FALSE(secondHost->GetDiagnostics().CapturesViewportInput);
 
+  static_cast<Extrinsic::Platform::Backends::Null::NullWindow &>(
+      engine.GetWindow())
+      .QueueKey(Extrinsic::Platform::Input::Key::G, true);
   engine.Run();
 
-  // One fresh G action toggles visible -> hidden. A leaked first-boot action
-  // would toggle twice and leave the host visible.
+  // One fresh G toggles visible -> hidden at UiBegin. A leaked first-boot
+  // toggle would run twice and leave the host visible.
   EXPECT_FALSE(secondHost->IsVisible());
   EXPECT_FALSE(secondHost->GetDiagnostics().CapturesViewportInput);
   EXPECT_EQ(staleContributionCalls, 1u);

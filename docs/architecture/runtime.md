@@ -567,13 +567,18 @@ The frame order is:
    [ADR-0024](../adr/0024-kernel-module-architecture.md) D8 (ARCH-009);
 6. pump the queued kernel event bus post-simulation, before UI/extraction;
 7. runtime-module `UiBegin`, `UiBuild`, then `UiEndCapture` hooks. The optional
-   `EditorUiModule` opens the ImGui frame in `UiBegin`, draws registered
-   contributions in `UiBuild`, and closes the frame plus writes capture in
-   `UiEndCapture`;
+   `EditorUiModule` resets the host's viewport input request, applies the
+   global `G` visibility toggle and opens the ImGui frame in `UiBegin`, draws
+   registered contributions in `UiBuild`, and closes the frame, writes the
+   adapter capture and then merges a contribution's viewport claim in
+   `UiEndCapture`. SceneInteraction's `UiBegin` hook cancels a running gizmo
+   session when the UI has just been hidden;
 8. build `Graphics::RenderFrameInput`, then dispatch deterministic typed
    viewport-input hooks. Module-name order places optional Camera population
    before optional SceneInteraction gizmo/pick input; both see completed editor
-   capture. Flush pre-render transforms, dispatch generic input actions, then
+   capture. SceneInteraction cancels a session on a hide seen since `UiBegin`
+   and skips its ray gizmo driver while a viewport claim is active. Flush
+   pre-render transforms, dispatch generic input actions, then
    run `BeforeExtraction`, where SceneInteraction drains one pending pick,
    builds gizmo packets, and submits its copied render snapshot. This is not a
    seventh generic frame phase;
@@ -595,11 +600,14 @@ Editor UI contribution is data-driven through
 structured menu paths, open state, and draw callbacks, and closed or globally
 hidden windows receive no callback. The app-composed
 `Extrinsic.Runtime.EditorUiModule` owns the ImGui adapter, graphics overlay,
-paired frame hooks, and unsuppressed global `G` visibility action. It requires
-only the exact built-in `Platform::IWindow`, `Graphics::IRenderer`, and
-`RuntimeInputActionRegistry` services, then publishes an Engine-free
-`Extrinsic.Runtime.EditorUiHost`. The host owns the registry and parameterless
-frame contributions; it passes neither `Engine&` nor application state to
+paired frame hooks, and the global `G` visibility toggle, which it applies in
+`UiBegin` independent of ImGui keyboard capture so that a hide reaches the
+pre-render transform flush. It requires only the exact built-in
+`Platform::IWindow` and `Graphics::IRenderer` services, then publishes an
+Engine-free `Extrinsic.Runtime.EditorUiHost`. The host owns the registry,
+parameterless frame contributions and the per-frame viewport input request
+(OR of contributions, reset by the owner each `UiBegin`, dropped on hide or
+non-operation); it passes neither `Engine&` nor application state to
 contributors. The app-owned `Extrinsic.Sandbox.Editor.Shell` resolves that
 host during attachment, registers one owned frame contribution plus the ten
 core Sandbox windows and app panel registrations, and unregisters them before
@@ -612,9 +620,15 @@ draw-switch table.
 The frame loop owns one `EditorInputCaptureSnapshot`, resets it at frame
 start, and lends the same value by reference to every hook context.
 `EditorUiModule` copies the adapter's completed capture into that value only
-after `EndFrame`; typed Camera and SceneInteraction hooks, input actions, and
-later hooks consume the same snapshot rather than reading ImGui capture flags
-independently.
+after `EndFrame`, then ORs a host viewport claim into it as mouse and keyboard
+capture and publishes the merged value as `CapturesViewportInput`; typed Camera
+and SceneInteraction hooks, input actions, and later hooks consume the same
+snapshot rather than reading ImGui capture flags independently. A claim is not
+a cancel: SceneInteraction skips its ray gizmo driver for a claimed frame so
+the claiming frontend's session survives. Native focus loss reaches it as a
+kernel event (`Platform::WindowFocusEvent`, republished by Engine) and cancels
+a running session at delivery; its `Idle` hook keeps minimized frames pumping
+such events (see [ADR 0006](../adr/0006-camera-picking-and-gizmo-runtime-handoff.md)).
 Omitting the module leaves the value unclaimed and all ImGui pacing counters
 zero. Its ImGui context owns a paired ImPlot context.
 

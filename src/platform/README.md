@@ -113,6 +113,10 @@ data-only payloads:
   composition is not a promoted platform goal yet.
 - `WindowDropEvent` carries dropped file paths only. Runtime owns import,
   ingest, scene replacement, and status reporting.
+- `WindowFocusEvent` reports native window focus gain/loss (GLFW focus
+  callback; Null through `QueueEvent`). Runtime forwards it to ImGui IO and
+  republishes it on the kernel event bus, where a loss cancels a running
+  transform-gizmo drag.
 - Clipboard text and cursor mode are exposed through `IWindow` methods so ImGui
   and editor adapters can remain backend-neutral.
 

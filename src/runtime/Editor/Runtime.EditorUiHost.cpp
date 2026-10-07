@@ -32,6 +32,7 @@ struct EditorUiHost::Impl
     bool OwnerControlClaimed{false};
     std::optional<EditorSceneViewportRect> SceneViewport{};
     std::optional<EditorSceneViewportRect> PresentedSceneViewport{};
+    EditorViewportInputRequest ViewportInput{};
 };
 
 EditorUiHostOwnerControl::EditorUiHostOwnerControl(
@@ -89,6 +90,12 @@ void EditorUiHostOwnerControl::SetVisibilityChangedCallback(
         m_Host->SetVisibilityChangedCallback(
             std::move(callback));
     }
+}
+
+void EditorUiHostOwnerControl::ResetViewportInputRequest() noexcept
+{
+    if (m_Host != nullptr)
+        m_Host->m_Impl->ViewportInput = {};
 }
 
 EditorUiHost::EditorUiHost() : m_Impl(std::make_unique<Impl>()) {}
@@ -156,6 +163,8 @@ EditorUiVisibilityCommandResult EditorUiHost::ApplyVisibilityCommand(
     const EditorUiVisibilityCommandResult result =
         ApplyEditorUiVisibilityCommand(
         m_Impl->WindowRegistry, command);
+    if (!result.IsVisible)
+        m_Impl->ViewportInput = {};
     if (m_Impl->VisibilityChanged)
         m_Impl->VisibilityChanged(result.IsVisible);
     return result;
@@ -211,6 +220,21 @@ std::optional<EditorSceneViewportRect> EditorUiHost::PresentedSceneViewport() co
     return m_Impl->PresentedSceneViewport;
 }
 
+void EditorUiHost::RequestViewportInput(
+    const EditorViewportInputRequest request) noexcept
+{
+    if (!m_Impl->Operational || !m_Impl->WindowRegistry.IsVisible())
+        return;
+    m_Impl->ViewportInput.CaptureViewportInput =
+        m_Impl->ViewportInput.CaptureViewportInput ||
+        request.CaptureViewportInput;
+}
+
+EditorViewportInputRequest EditorUiHost::ViewportInputRequest() const noexcept
+{
+    return m_Impl->ViewportInput;
+}
+
 std::size_t EditorUiHost::DrawFrameContributions()
 {
     m_Impl->PresentedSceneViewport = std::exchange(m_Impl->SceneViewport, std::nullopt);
@@ -244,6 +268,8 @@ std::size_t EditorUiHost::DrawFrameContributions()
 void EditorUiHost::SetOperational(const bool operational) noexcept
 {
     m_Impl->Operational = operational;
+    if (!operational)
+        m_Impl->ViewportInput = {};
 }
 
 void EditorUiHost::PublishDiagnostics(

@@ -63,6 +63,12 @@ namespace Extrinsic::Platform
         std::vector<std::string> Paths{};
     };
 
+    // Native window focus change (gained or lost).
+    export struct WindowFocusEvent
+    {
+        bool Focused;
+    };
+
     // Type-safe variant
     export using Event = std::variant<
         WindowCloseEvent,
@@ -72,7 +78,8 @@ namespace Extrinsic::Platform
         ScrollEvent,
         CursorEvent,
         CharEvent,
-        WindowDropEvent
+        WindowDropEvent,
+        WindowFocusEvent
     >;
 
     export enum class CursorMode

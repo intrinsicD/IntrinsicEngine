@@ -484,6 +484,10 @@ namespace Extrinsic::Runtime
                     {
                         io.AddInputCharacter(e.Character);
                     }
+                    else if constexpr (std::is_same_v<T, Platform::WindowFocusEvent>)
+                    {
+                        io.AddFocusEvent(e.Focused);
+                    }
                     else if constexpr (std::is_same_v<T, Platform::KeyEvent>)
                     {
                         const ImGuiKey key = ToImGuiKey(e.KeyCode);

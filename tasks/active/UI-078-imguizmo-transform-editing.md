@@ -9,7 +9,7 @@ evidence: not_applicable
 evidence_skip_reason: interactive feature work; evidence is the diff, CPU contract tests, the ImGui integration suite, a Vulkan acceptance smoke, review and CI.
 contract_schema: 1
 contracts: [repo.source-documentation, repo.task-contract-discovery, runtime.gizmo-transform-session]
-contract_review: Reviewed the catalog. The change alters module surfaces and READMEs (source documentation) and the reusable runtime/UI gizmo interaction contract (task contract discovery); slice 1 adds `runtime.gizmo-transform-session` (source ADR 0006 amendment, proofs the CPU contract tests) for the session rules slices 2–3 and other transform-preview users build on. Engine/kernel/editor-frame locality contracts do not apply because those surfaces and dependencies are not extended; no method or geometry-property contract applies to entity TRS.
+contract_review: Reviewed the catalog. The change alters module surfaces and READMEs (source documentation) and the reusable runtime/UI gizmo interaction contract (task contract discovery); slice 1 adds `runtime.gizmo-transform-session` (source ADR 0006 amendment, proofs the CPU contract tests) for the session rules slices 2–3 and other transform-preview users build on; slice 2 extends that contract (no parallel one) with viewport input ownership and the lifecycle cancel triggers. Engine/kernel/editor-frame locality contracts do not apply because those surfaces and dependencies are not extended; no method or geometry-property contract applies to entity TRS.
 ---
 # UI-078 — Edit entity transforms with an ImGuizmo gizmo
 
@@ -182,7 +182,40 @@ Codex review of the fixed commit → fixes → re-verification.
   `GizmoInteractionEngineWiring.*`, `SceneInteractionModule.*`,
   `EditorCommandHistory.*`, `RuntimeEngineLayering.*`,
   `RuntimeEnginePrivateGlue.*`, `GeometryRotationAveraging.*`.
-- **Remaining:** slice 2 (viewport input ownership and cancel triggers), slice
-  3 (ImGuizmo frontend, UI toggles, W/E/R, Escape, snap config, retire the ray
-  frontend where replaced, `SandboxEditorGizmo` tests), slice 4 (docs and the
-  Vulkan acceptance smoke). All acceptance boxes stay open until then.
+- **Slice 2 — viewport input ownership, 2026-10-07: implemented after two
+  Codex review rounds (final verdict: approve).** Operator decisions: native window focus only (no
+  scene-panel focus); move only `G` to `UiBegin`; no ray hover pass; the
+  claim covers mouse and keyboard; cancel also while minimized.
+  `EditorUiHost::RequestViewportInput` ORs contribution claims, reset by the
+  owner at `UiBegin`, dropped on hide/`SetOperational(false)`, ignored while
+  hidden/non-operational; `EditorUiModule` merges it as mouse+keyboard capture
+  after `Adapter->CaptureSnapshot()` and publishes the merged
+  `CapturesViewportInput`. `SceneInteractionModule` skips the ray driver for a
+  claimed frame (capture is not cancel) and cancels a running session via
+  `DragCancel` on the visible→hidden transition (`UiBegin`, `Idle`, before the
+  viewport driver) and on `Platform::WindowFocusEvent{false}` (new platform
+  event: GLFW focus callback, Null `QueueEvent`; Engine republishes it on the
+  kernel bus, `ImGuiAdapter` forwards `io.AddFocusEvent`); its `Idle` hook keeps
+  minimized frames pumping. `G` now toggles at `UiBegin` independent of ImGui
+  keyboard capture (the input action and the `RuntimeInputActionRegistry`
+  requirement are gone), so every cancel precedes the single pre-render flush.
+  World/document change keeps the existing `ClearWorldBoundState` cancel.
+  ADR 0006 amendment, catalog contract, `runtime.md`, runtime/platform READMEs.
+- **Slice 2 CPU evidence:** `EditorUiHost.ViewportInputRequests…`,
+  `EditorUiModule.ViewportInputRequestMergesAfterAdapterCaptureAndResetsEachFrame`,
+  `ImGuiAdapterEngineWiring.{ViewportClaimBlocksCameraAndPickWithoutEndingItsSession,
+  HostHideEndsDragBeforeTheTransformFlush, ShortcutHideEndsDragBeforeTheTransformFlush,
+  FocusLossWhileMinimizedCancelsDragWithoutHistory}`,
+  `SceneInteractionModule.{FrontendViewportClaimOwnsTheSessionAndUiHideCancelsIt,
+  WindowFocusLossCancelsPreviewWithoutHistory,
+  WorldAndDocumentChangesCancelMatrixPreviewWithoutHistory}`,
+  `ImGuiAdapter.PumpedFocusEventsReachImGuiIoInOrder`,
+  `NullPlatform.DeliversWindowFocusEventsInOrder`, order checks in
+  `RuntimeEnginePrivateGlue.*`; the `G` tests in `EditorUiModule` and
+  `SandboxEditorPresentation` now drive the key through the platform queue;
+  the claim test also proves a claimed `F` press does not run (mutation-checked).
+  No native GLFW focus run yet.
+- **Remaining:** slice 3 (ImGuizmo frontend, UI toggles, W/E/R, Escape, snap
+  config, retire the ray frontend where replaced, `SandboxEditorGizmo` tests),
+  slice 4 (docs and the Vulkan acceptance smoke). All acceptance boxes stay
+  open until then.

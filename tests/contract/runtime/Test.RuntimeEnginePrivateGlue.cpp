@@ -142,6 +142,14 @@ TEST(RuntimeEnginePrivateGlue,
     EXPECT_LT(transformFlush, inputActions);
     EXPECT_LT(viewportDispatch, inputActions);
     EXPECT_LT(inputActions, beforeExtraction);
+    const auto extraction = engineImpl.find(
+        "m_Impl->m_RenderExtractionCache.ExtractAndSubmit(");
+    ASSERT_NE(extraction, std::string::npos);
+    EXPECT_LT(beforeExtraction, extraction);
+    // Exactly one pre-render transform flush.
+    EXPECT_EQ(engineImpl.find("ECS::Systems::TransformHierarchy::OnUpdate(",
+                              transformFlush + 1u),
+              std::string::npos);
     EXPECT_EQ(
         engineImpl.find(
             "m_GizmoFrameService.DriveInputForFrame("),
@@ -168,6 +176,25 @@ TEST(RuntimeEnginePrivateGlue,
     ASSERT_NE(picking, std::string::npos);
     ASSERT_NE(gizmoPackets, std::string::npos);
     EXPECT_LT(interactionViewport, gizmoInput);
+    // UI-078 slice 2: a hide is seen, and a frontend claim skips the ray
+    // driver, before the driver runs inside the viewport hook.
+    const auto hideCancel = interactionImpl.find(
+        "CancelDragOnUiHide();", interactionViewport);
+    const auto claimSkip = interactionImpl.find(
+        "!Ui->ViewportInputRequest().CaptureViewportInput",
+        interactionViewport);
+    ASSERT_NE(hideCancel, std::string::npos);
+    ASSERT_NE(claimSkip, std::string::npos);
+    EXPECT_LT(hideCancel, gizmoInput);
+    EXPECT_LT(claimSkip, gizmoInput);
+    EXPECT_NE(interactionImpl.find("FramePhase::UiBegin"), std::string::npos);
+    EXPECT_NE(interactionImpl.find("FramePhase::Idle"), std::string::npos);
+    EXPECT_NE(interactionImpl.find(
+                  "setup.Subscribe<Platform::WindowFocusEvent>("),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find(
+                  "m_Impl->m_KernelEvents.Publish(*focus);"),
+              std::string::npos);
     EXPECT_LT(gizmoInput, interactionExtraction);
     EXPECT_LT(picking, gizmoPackets);
     EXPECT_NE(
@@ -316,8 +343,8 @@ TEST(RuntimeEnginePrivateGlue, EditorUiModuleOwnsOptionalEditorUiComposition)
     EXPECT_NE(moduleImpl.find(
                   "setup.Services().Require<Graphics::IRenderer>(Name())"),
               std::string::npos);
-    EXPECT_NE(moduleImpl.find(
-                  "setup.Services().Require<RuntimeInputActionRegistry>(Name())"),
+    // UI-078: the G toggle no longer registers an input action.
+    EXPECT_EQ(moduleImpl.find("RuntimeInputActionRegistry"),
               std::string::npos);
     EXPECT_EQ(moduleImpl.find("Require<ECS::"), std::string::npos);
     EXPECT_EQ(moduleImpl.find("Require<Assets::"), std::string::npos);
@@ -390,15 +417,39 @@ TEST(RuntimeEnginePrivateGlue, EditorUiModuleOwnsOptionalEditorUiComposition)
     ASSERT_NE(captureWrite, std::string::npos);
     EXPECT_LT(adapterEndFrame, captureWrite);
 
-    EXPECT_NE(moduleImpl.find(
-                  ".KeyCode = Platform::Input::Key::G"),
+    // UI-078 slice 2: UiBegin resets the viewport request and runs the G
+    // toggle (capture-independent) before the adapter opens the frame; the
+    // claim merges into the capture only after the adapter wrote it, and the
+    // merged value is what diagnostics publish.
+    const auto runUiBegin = moduleImpl.find("void EditorUiModule::RunUiBegin(");
+    const auto requestReset =
+        moduleImpl.find("HostOwner.ResetViewportInputRequest();", runUiBegin);
+    const auto hideShortcut = moduleImpl.find(
+        "IsKeyJustPressed(Platform::Input::Key::G)", runUiBegin);
+    const auto toggle = moduleImpl.find(
+        "EditorUiVisibilityCommandKind::Toggle", hideShortcut);
+    const auto beginFrame = moduleImpl.find(
+        "m_Impl->Adapter->BeginFrame(context.FrameDeltaSeconds)", runUiBegin);
+    const auto requestMerge = moduleImpl.find(
+        "m_Impl->Host.ViewportInputRequest().CaptureViewportInput");
+    const auto mergedDiagnostics =
+        moduleImpl.find("published.CapturesViewportInput =");
+    const auto publishMerged =
+        moduleImpl.find("PublishDiagnostics(published)", mergedDiagnostics);
+    ASSERT_NE(runUiBegin, std::string::npos);
+    ASSERT_NE(requestReset, std::string::npos);
+    ASSERT_NE(hideShortcut, std::string::npos);
+    ASSERT_NE(toggle, std::string::npos);
+    ASSERT_NE(requestMerge, std::string::npos);
+    ASSERT_NE(mergedDiagnostics, std::string::npos);
+    ASSERT_NE(publishMerged, std::string::npos);
+    EXPECT_LT(requestReset, beginFrame);
+    EXPECT_LT(toggle, beginFrame);
+    EXPECT_LT(captureWrite, requestMerge);
+    EXPECT_LT(requestMerge, mergedDiagnostics);
+    EXPECT_EQ(moduleImpl.find("SuppressWhenImGuiCapturesKeyboard"),
               std::string::npos);
-    EXPECT_NE(moduleImpl.find(
-                  ".SuppressWhenImGuiCapturesKeyboard = false"),
-              std::string::npos);
-    EXPECT_NE(moduleImpl.find(
-                  "m_Impl->InputActions->Unregister("),
-              std::string::npos);
+    EXPECT_EQ(moduleImpl.find("InputActions"), std::string::npos);
     EXPECT_NE(moduleImpl.find(
                   "m_Impl->Renderer->SetImGuiOverlaySystem(nullptr)"),
               std::string::npos);

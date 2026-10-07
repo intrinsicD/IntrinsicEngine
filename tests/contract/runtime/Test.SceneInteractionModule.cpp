@@ -41,6 +41,7 @@ import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.FramePacingDiagnostics;
 import Extrinsic.Runtime.GeometryProperty.Types;
@@ -175,6 +176,16 @@ namespace
                 !result.has_value())
             {
                 return result;
+            }
+            if (UiHost)
+            {
+                if (Core::Result result =
+                        Services.Provide<Runtime::EditorUiHost>(
+                            *UiHost, "Test.EditorUi");
+                    !result.has_value())
+                {
+                    return result;
+                }
             }
             return Services.Provide<
                 Runtime::RenderExtractionCache>(
@@ -364,6 +375,7 @@ namespace
         std::unique_ptr<Platform::IWindow> Window{};
         std::unique_ptr<Graphics::IRenderer> Renderer{};
         Runtime::RenderExtractionCache Extraction{};
+        std::unique_ptr<Runtime::EditorUiHost> UiHost{};
         Runtime::SceneInteractionModule Interaction{};
         std::unique_ptr<Runtime::SceneDocumentModule>
             Document{};
@@ -451,6 +463,27 @@ namespace
         return scene.Raw().all_of<Sel::HoveredTag>(entity);
     }
 
+    // A frontend-style matrix session: Begin on `entity`, then one accepted
+    // translation preview of `dx` along world X.
+    void BeginTranslatePreview(
+        Runtime::GizmoInteraction& gizmo,
+        ECS::Scene::Registry& scene,
+        const ECS::EntityHandle entity,
+        const float dx)
+    {
+        const ECS::EntityHandle selected[] = {entity};
+        ASSERT_EQ(gizmo.Begin(scene, selected, Runtime::GizmoMode::Translate,
+                              Runtime::GizmoOrientation::Global,
+                              Runtime::GizmoPivotMode::WorldOrigins)
+                      .Status,
+                  Runtime::GizmoStatus::Ok);
+        ASSERT_EQ(gizmo.Preview(scene,
+                                glm::translate(glm::mat4{1.0f}, glm::vec3{dx, 0.0f, 0.0f}) *
+                                    gizmo.SessionFrame().Matrix)
+                      .Status,
+                  Runtime::GizmoStatus::Ok);
+    }
+
     void PublishHit(
         Graphics::SelectionSystem& system,
         const ECS::EntityHandle entity,
@@ -490,7 +523,7 @@ TEST(SceneInteractionModule,
         0u);
     EXPECT_EQ(selection->SelectedCount(), 0u);
     EXPECT_EQ(harness.ViewportHooks.size(), 1u);
-    EXPECT_EQ(harness.FrameHooks.size(), 2u);
+    EXPECT_EQ(harness.FrameHooks.size(), 4u);
 
     harness.Stop();
     EXPECT_EQ(
@@ -581,7 +614,7 @@ TEST(SceneInteractionModule,
             harness.Services
                 .Find<Runtime::SelectionController>(),
             nullptr);
-        ASSERT_EQ(harness.FrameHooks.size(), 2u);
+        ASSERT_EQ(harness.FrameHooks.size(), 4u);
 
         Runtime::EditorInputCaptureSnapshot capture{};
         Runtime::RuntimeFramePacingDiagnostics pacing{};
@@ -612,13 +645,13 @@ TEST(SceneInteractionModule,
         ASSERT_TRUE(
             harness.Interaction.OnRegister(valid)
                 .has_value());
-        ASSERT_EQ(harness.FrameHooks.size(), 4u);
+        ASSERT_EQ(harness.FrameHooks.size(), 8u);
         ASSERT_EQ(harness.ViewportHooks.size(), 1u);
         EXPECT_EQ(
-            harness.FrameHooks[2].Phase,
+            harness.FrameHooks[4].Phase,
             Runtime::FramePhase::BeforeExtraction);
         EXPECT_EQ(
-            harness.FrameHooks[3].Phase,
+            harness.FrameHooks[5].Phase,
             Runtime::FramePhase::Maintenance);
 
         harness.InitializeRendererForHooks();
@@ -637,11 +670,11 @@ TEST(SceneInteractionModule,
         harness.InvokeViewportHook(
             0u, renderInput, capture);
 
-        // The registrar has no unregister surface. The failed attempt's two
+        // The registrar has no unregister surface. The failed attempt's four
         // retained lambdas therefore remain in the harness, but their weak
-        // state expired during rollback and both are inert.
-        harness.InvokeFrameHook(0u, capture, pacing);
-        harness.InvokeFrameHook(1u, capture, pacing);
+        // state expired during rollback and all are inert.
+        for (std::size_t index = 0u; index < 4u; ++index)
+            harness.InvokeFrameHook(index, capture, pacing);
         EXPECT_TRUE(selection.HasPendingPick());
         EXPECT_EQ(
             selection.GetDiagnostics().PicksDrained,
@@ -656,8 +689,8 @@ TEST(SceneInteractionModule,
         // Invoking the retry's live records produces exactly one effect: one
         // controller drain and one renderer-side request, with no duplicate
         // callback from the stale records.
-        harness.InvokeFrameHook(2u, capture, pacing);
-        harness.InvokeFrameHook(3u, capture, pacing);
+        harness.InvokeFrameHook(4u, capture, pacing);
+        harness.InvokeFrameHook(5u, capture, pacing);
         EXPECT_FALSE(selection.HasPendingPick());
         EXPECT_EQ(selection.InFlightPickCount(), 1u);
         EXPECT_TRUE(renderInput.HasPendingPick);
@@ -735,13 +768,20 @@ TEST(SceneInteractionModule,
     harness.InitializeRendererForHooks();
     ASSERT_TRUE(harness.Start().has_value());
     ASSERT_EQ(harness.ViewportHooks.size(), 1u);
-    ASSERT_EQ(harness.FrameHooks.size(), 2u);
+    ASSERT_EQ(harness.FrameHooks.size(), 4u);
     EXPECT_EQ(
         harness.FrameHooks[0].Phase,
         Runtime::FramePhase::BeforeExtraction);
     EXPECT_EQ(
         harness.FrameHooks[1].Phase,
         Runtime::FramePhase::Maintenance);
+    EXPECT_EQ(
+        harness.FrameHooks[2].Phase,
+        Runtime::FramePhase::UiBegin);
+    // The Idle hook keeps minimized frames pumping focus events.
+    EXPECT_EQ(
+        harness.FrameHooks[3].Phase,
+        Runtime::FramePhase::Idle);
 
     Runtime::SelectionController& selection =
         *harness.Services
@@ -1231,6 +1271,173 @@ TEST(SceneInteractionModule,
     EXPECT_FLOAT_EQ(
         harness.Interaction.Interaction().Config().AxisLength,
         2.5f);
+}
+
+// UI-078 slice 2: a frontend's viewport claim owns the frame. The ray driver
+// neither cancels (capture), ticks nor commits (released mouse) the frontend
+// session, and the claimed capture blocks new picks. Hiding the UI cancels at
+// UiBegin or, for a hide during UiBuild, before the driver; a session begun
+// while the UI is already hidden keeps running.
+TEST(SceneInteractionModule,
+     FrontendViewportClaimOwnsTheSessionAndUiHideCancelsIt)
+{
+    DirectHarness harness;
+    harness.UiHost = std::make_unique<Runtime::EditorUiHost>();
+    Runtime::EditorUiHostOwnerControl owner =
+        harness.UiHost->ClaimOwnerControl();
+    owner.SetOperational(true);
+    ASSERT_TRUE(harness.Start(true).has_value());
+    ASSERT_EQ(harness.FrameHooks[2].Phase, Runtime::FramePhase::UiBegin);
+    Runtime::SelectionController& selection =
+        *harness.Services.Find<Runtime::SelectionController>();
+    Runtime::EditorCommandHistory& history =
+        *harness.Services.Find<Runtime::EditorCommandHistory>();
+    ECS::Scene::Registry& scene =
+        *harness.Worlds.Get(harness.InitialWorld);
+    const ECS::EntityHandle entity = MakeTransformSelectable(scene);
+    ASSERT_TRUE(selection.SetSelectedEntity(scene, entity));
+    Runtime::GizmoInteraction& gizmo = harness.Interaction.Interaction();
+    gizmo.SetMode(Runtime::GizmoMode::Rotate);
+
+    Graphics::RenderFrameInput input{};
+    input.Camera = OrthoCameraInput();
+    auto& window = harness.InputWindow();
+    const Platform::Extent2D viewport{.Width = 800, .Height = 600};
+    const Runtime::EditorInputCaptureSnapshot merged{
+        .CapturedKeyboard = true,
+        .CapturedMouse = true,
+    };
+    Runtime::EditorInputCaptureSnapshot capture{};
+    Runtime::RuntimeFramePacingDiagnostics pacing{};
+
+    BeginTranslatePreview(gizmo, scene, entity, 1.0f);
+    harness.UiHost->RequestViewportInput({.CaptureViewportInput = true});
+    // Mouse up with an active session: the ray driver would commit.
+    harness.InvokeViewportHook(0u, input, merged, viewport);
+    EXPECT_TRUE(gizmo.IsDragging());
+    // A fresh click under the claim: the ray driver would cancel on capture.
+    window.QueueCursor(450.0, 300.0);
+    window.QueueMouseButton(0, true);
+    window.PollEvents();
+    harness.InvokeViewportHook(0u, input, merged, viewport);
+    EXPECT_TRUE(gizmo.IsDragging());
+    EXPECT_FALSE(selection.HasPendingPick());
+    EXPECT_EQ(scene.Raw().get<Tf::Component>(entity).Position.x, 1.0f);
+    EXPECT_EQ(history.UndoCount(), 0u);
+
+    // Hide via the host command, observed by the next UiBegin.
+    (void)harness.UiHost->ApplyVisibilityCommand(
+        {Runtime::EditorUiVisibilityCommandKind::Hide});
+    EXPECT_FALSE(
+        harness.UiHost->ViewportInputRequest().CaptureViewportInput);
+    harness.InvokeFrameHook(2u, capture, pacing);
+    EXPECT_FALSE(gizmo.IsDragging());
+    EXPECT_EQ(scene.Raw().get<Tf::Component>(entity).Position, glm::vec3{0.0f});
+    EXPECT_EQ(history.UndoCount(), 0u);
+    EXPECT_TRUE(selection.IsSelected(entity));
+    EXPECT_EQ(gizmo.Mode(), Runtime::GizmoMode::Rotate);
+
+    // Only the visible -> hidden transition cancels.
+    BeginTranslatePreview(gizmo, scene, entity, 1.0f);
+    harness.InvokeFrameHook(2u, capture, pacing);
+    EXPECT_TRUE(gizmo.IsDragging());
+    EXPECT_EQ(gizmo.DragCancel(scene).Status, Runtime::GizmoStatus::Ok);
+
+    // A hide during UiBuild cancels before the ray driver runs.
+    window.QueueMouseButton(0, false);
+    window.PollEvents();
+    (void)harness.UiHost->ApplyVisibilityCommand(
+        {Runtime::EditorUiVisibilityCommandKind::Show});
+    harness.InvokeFrameHook(2u, capture, pacing);
+    BeginTranslatePreview(gizmo, scene, entity, 2.0f);
+    (void)harness.UiHost->ApplyVisibilityCommand(
+        {Runtime::EditorUiVisibilityCommandKind::Hide});
+    harness.InvokeViewportHook(0u, input, {}, viewport);
+    EXPECT_FALSE(gizmo.IsDragging());
+    EXPECT_EQ(scene.Raw().get<Tf::Component>(entity).Position, glm::vec3{0.0f});
+    EXPECT_EQ(history.UndoCount(), 0u);
+}
+
+// UI-078 slice 2: native focus loss cancels at event delivery, also when the
+// focus returns within the same event batch; a focus gain alone does not.
+TEST(SceneInteractionModule,
+     WindowFocusLossCancelsPreviewWithoutHistory)
+{
+    DirectHarness harness;
+    ASSERT_TRUE(harness.Start(true).has_value());
+    Runtime::SelectionController& selection =
+        *harness.Services.Find<Runtime::SelectionController>();
+    Runtime::EditorCommandHistory& history =
+        *harness.Services.Find<Runtime::EditorCommandHistory>();
+    ECS::Scene::Registry& scene =
+        *harness.Worlds.Get(harness.InitialWorld);
+    const ECS::EntityHandle entity = MakeTransformSelectable(scene);
+    ASSERT_TRUE(selection.SetSelectedEntity(scene, entity));
+    Runtime::GizmoInteraction& gizmo = harness.Interaction.Interaction();
+
+    BeginTranslatePreview(gizmo, scene, entity, 1.0f);
+    harness.Events.Publish(Platform::WindowFocusEvent{.Focused = true});
+    (void)harness.Events.Pump();
+    EXPECT_TRUE(gizmo.IsDragging());
+
+    harness.Events.Publish(Platform::WindowFocusEvent{.Focused = false});
+    harness.Events.Publish(Platform::WindowFocusEvent{.Focused = true});
+    (void)harness.Events.Pump();
+    EXPECT_FALSE(gizmo.IsDragging());
+    EXPECT_EQ(scene.Raw().get<Tf::Component>(entity).Position, glm::vec3{0.0f});
+    EXPECT_EQ(history.UndoCount(), 0u);
+    EXPECT_EQ(gizmo.Diagnostics().DragsCancelled, 1u);
+    EXPECT_TRUE(selection.IsSelected(entity));
+}
+
+// UI-078 slice 2: world switch and New/Close/Load during a matrix preview
+// cancel through the existing world-bound reset, before the outgoing registry
+// goes away; the incoming registry is untouched and a new session can begin.
+TEST(SceneInteractionModule,
+     WorldAndDocumentChangesCancelMatrixPreviewWithoutHistory)
+{
+    ScopedScenePath saved{"intrinsic-ui078-preview.scene.json"};
+    DirectHarness harness;
+    ASSERT_TRUE(harness.Start(true).has_value());
+    Runtime::EditorCommandHistory& history =
+        *harness.Services.Find<Runtime::EditorCommandHistory>();
+    Runtime::GizmoInteraction& gizmo = harness.Interaction.Interaction();
+    ECS::Scene::Registry& first = *harness.Worlds.Get(harness.InitialWorld);
+    ASSERT_TRUE(harness.Document->SaveSceneToPath(saved.Path.string()).has_value());
+
+    using DocumentOp = bool (*)(Runtime::SceneDocumentModule&, const std::string&);
+    const DocumentOp operations[] = {
+        [](Runtime::SceneDocumentModule& document, const std::string&)
+        { return document.NewSceneDocument().has_value(); },
+        [](Runtime::SceneDocumentModule& document, const std::string&)
+        { return document.CloseSceneDocument().has_value(); },
+        [](Runtime::SceneDocumentModule& document, const std::string& path)
+        { return document.LoadSceneFromPath(path).has_value(); },
+    };
+    for (const DocumentOp operation : operations)
+    {
+        BeginTranslatePreview(gizmo, first, MakeTransformSelectable(first), 1.0f);
+        ASSERT_TRUE(operation(*harness.Document, saved.Path.string()));
+        EXPECT_FALSE(gizmo.IsDragging());
+        EXPECT_EQ(history.UndoCount(), 0u);
+    }
+
+    const ECS::EntityHandle entity = MakeTransformSelectable(first);
+    const Runtime::WorldHandle secondWorld = harness.Worlds.CreateWorld("Second");
+    ECS::Scene::Registry& second = *harness.Worlds.Get(secondWorld);
+    const ECS::EntityHandle other =
+        MakeTransformSelectable(second, glm::vec3{5.0f, 0.0f, 0.0f});
+    BeginTranslatePreview(gizmo, first, entity, 1.0f);
+    ASSERT_TRUE(harness.Worlds.RequestSetActiveWorld(secondWorld).has_value());
+    (void)harness.Worlds.ApplyMaintenance(harness.Events, harness.Jobs);
+    (void)harness.Events.Pump();
+    EXPECT_FALSE(gizmo.IsDragging());
+    EXPECT_EQ(first.Raw().get<Tf::Component>(entity).Position, glm::vec3{0.0f});
+    EXPECT_EQ(second.Raw().get<Tf::Component>(other).Position,
+              glm::vec3(5.0f, 0.0f, 0.0f));
+    EXPECT_EQ(history.UndoCount(), 0u);
+    BeginTranslatePreview(gizmo, second, other, 1.0f);
+    EXPECT_EQ(gizmo.DragCancel(second).Status, Runtime::GizmoStatus::Ok);
 }
 
 TEST(SceneInteractionModule,

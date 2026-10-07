@@ -207,3 +207,33 @@ unchanged.
   holds its accepted preview; a foreign change to a target is kept.
 - **Packets.** A multi-selection publishes one gizmo on the shared frame that
   hit testing uses, instead of one gizmo per entity.
+
+## Amendment — 2026-10-07 (`UI-078` slice 2)
+
+Viewport input ownership and the lifecycle cancel of a running session.
+
+- **Ownership request.** A frame contribution claims the viewport through
+  `EditorUiHost::RequestViewportInput`; contributions OR their requests into
+  one per-frame claim. `EditorUiModule` resets it at the start of `UiBegin`,
+  a hide or `SetOperational(false)` drops it, and a hidden or non-operational
+  host ignores it. After the adapter has written the frame's capture snapshot,
+  `UiEndCapture` merges the claim as mouse and keyboard capture, and
+  `EditorUiDiagnostics::CapturesViewportInput` publishes the merged value. The
+  existing consumers therefore block: camera controller updates, new viewport
+  pick requests, and keyboard camera actions such as `F`.
+- **Capture is not cancel.** While a claim is active, `SceneInteractionModule`
+  skips the ray-driven gizmo adapter for that frame, so the adapter neither
+  cancels (on capture), ticks nor commits (on mouse release) a session the
+  claiming frontend drives. The ray adapter keeps its own click guard until
+  the ImGuizmo frontend replaces it.
+- **Cancel triggers.** `DragCancel` on the bound registry ends a running
+  session without history; selection, mode, orientation, pivot and tuning
+  stay. Triggers: the UI turning hidden (seen in `UiBegin`, again before the
+  viewport driver, and on minimized frames), native window focus loss
+  (`Platform::WindowFocusEvent`, republished on the kernel event bus and
+  handled at delivery, so a loss and regain in one batch still cancels; an
+  `Idle` hook keeps minimized frames pumping), and the existing world or
+  document change reset. Every trigger fires before the single pre-render
+  transform flush, so the restored transform reaches the same frame's
+  extraction. The global `G` toggle therefore runs at `UiBegin`, independent of
+  ImGui keyboard capture, instead of as a post-flush input action.

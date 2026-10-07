@@ -136,3 +136,43 @@ TEST(NullPlatform, BuffersTextAndDropEventsForEditorWorkflows)
               nullptr);
 }
 
+
+// UI-078 slice 2: native focus changes are ordinary queued events, delivered
+// in order to the listener and the drain, and count as input activity.
+TEST(NullPlatform, DeliversWindowFocusEventsInOrder)
+{
+    WindowConfig config;
+    config.Width = 64;
+    config.Height = 48;
+
+    NullWindow window{config};
+    std::vector<Extrinsic::Platform::Event> callbacks;
+    window.Listen([&callbacks](const Extrinsic::Platform::Event& event)
+    {
+        callbacks.push_back(event);
+    });
+
+    window.QueueEvent(Extrinsic::Platform::WindowFocusEvent{.Focused = false});
+    window.QueueKey(Extrinsic::Platform::Input::Key::Space, true);
+    window.QueueEvent(Extrinsic::Platform::WindowFocusEvent{.Focused = true});
+    window.PollEvents();
+
+    EXPECT_TRUE(window.ConsumeInputActivity());
+    auto drained = window.DrainEvents();
+    ASSERT_EQ(drained.size(), 3u);
+    ASSERT_EQ(callbacks.size(), 3u);
+    for (const auto* events : {&drained, &callbacks})
+    {
+        const auto* lost = std::get_if<Extrinsic::Platform::WindowFocusEvent>(&(*events)[0]);
+        const auto* gained = std::get_if<Extrinsic::Platform::WindowFocusEvent>(&(*events)[2]);
+        ASSERT_NE(lost, nullptr);
+        ASSERT_NE(gained, nullptr);
+        EXPECT_FALSE(lost->Focused);
+        EXPECT_TRUE(gained->Focused);
+        EXPECT_NE(std::get_if<Extrinsic::Platform::KeyEvent>(&(*events)[1]), nullptr);
+    }
+
+    window.QueueEvent(Extrinsic::Platform::WindowFocusEvent{.Focused = false});
+    window.PollEvents();
+    EXPECT_TRUE(window.ConsumeInputActivity()) << "focus alone is input activity";
+}

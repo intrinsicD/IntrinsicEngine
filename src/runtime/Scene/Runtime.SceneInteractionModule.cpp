@@ -34,6 +34,7 @@ import Extrinsic.Graphics.SelectionSystem;
 import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
@@ -308,6 +309,8 @@ namespace Extrinsic::Runtime
             RenderExtractionCache* Extraction{nullptr};
             SceneDocumentModule* Documents{nullptr};
             EditorCommandHistory* History{nullptr};
+            EditorUiHost* Ui{nullptr};
+            bool UiVisible{true};
 
             SelectionController Selection{};
             StableEntityLookup Lookup{};
@@ -370,6 +373,25 @@ namespace Extrinsic::Runtime
                     return;
                 Extraction->SubmitSceneInteractionSnapshot(
                     RenderSnapshot);
+            }
+
+            // Lifecycle cancel (UI-078): ends only a running session on the
+            // known-live bound registry, restoring its start TRS without
+            // history. Selection, mode, orientation, pivot and tuning stay.
+            void CancelActiveDrag()
+            {
+                if (BoundRegistry != nullptr && Gizmo.IsDragging())
+                    (void)Gizmo.DragCancel(*BoundRegistry);
+            }
+
+            // Cancels on the visible -> hidden transition only, so the ray
+            // gizmo still works in a viewport whose UI was already hidden.
+            void CancelDragOnUiHide()
+            {
+                const bool visible = Ui == nullptr || Ui->IsVisible();
+                if (UiVisible && !visible)
+                    CancelActiveDrag();
+                UiVisible = visible;
             }
 
             void ClearWorldBoundState()
@@ -495,17 +517,26 @@ namespace Extrinsic::Runtime
                     if (Gizmo.IsDragging()) Gizmo.DragCancel(*BoundRegistry);
                     GizmoSelectedEntities.clear();
                 }
-                DriveGizmoInteractionForFrame(
-                    Gizmo,
-                    *BoundRegistry,
-                    BoundWorld,
-                    History,
-                    input,
-                    context.RenderInput.Camera,
-                    cursor,
-                    context.Viewport,
-                    context.EditorCapture.CapturesViewportInput(),
-                    GizmoSelectedEntities);
+                // A hide during UiBuild cancels here, still before the flush.
+                CancelDragOnUiHide();
+                // A frontend's viewport claim owns this frame's input: the
+                // ray driver must not cancel, tick or commit its session.
+                // Camera and pick gates read the merged capture instead.
+                if (Ui == nullptr ||
+                    !Ui->ViewportInputRequest().CaptureViewportInput)
+                {
+                    DriveGizmoInteractionForFrame(
+                        Gizmo,
+                        *BoundRegistry,
+                        BoundWorld,
+                        History,
+                        input,
+                        context.RenderInput.Camera,
+                        cursor,
+                        context.Viewport,
+                        context.EditorCapture.CapturesViewportInput(),
+                        GizmoSelectedEntities);
+                }
                 SubmitViewportSelectionClickForFrame(
                     Selection,
                     input,
@@ -771,6 +802,7 @@ namespace Extrinsic::Runtime
                 // observe a destroyed provider.
                 Documents = nullptr;
                 History = nullptr;
+                Ui = nullptr;
                 Window = nullptr;
                 Renderer = nullptr;
                 Extraction = nullptr;
@@ -782,6 +814,7 @@ namespace Extrinsic::Runtime
         KernelEventSubscription ActiveWorldChangedSubscription{};
         KernelEventSubscription WorldDestroyedSubscription{};
         KernelEventSubscription ShutdownSubscription{};
+        KernelEventSubscription FocusSubscription{};
         bool ModulePublished{false};
         bool SelectionPublished{false};
     };
@@ -812,6 +845,7 @@ namespace Extrinsic::Runtime
             m_Impl->ActiveWorldChangedSubscription.IsValid() ||
             m_Impl->WorldDestroyedSubscription.IsValid() ||
             m_Impl->ShutdownSubscription.IsValid() ||
+            m_Impl->FocusSubscription.IsValid() ||
             setup.Services().Phase() !=
                 ServiceRegistryPhase::Registration ||
             setup.Services().Find<SceneInteractionModule>() !=
@@ -880,6 +914,18 @@ namespace Extrinsic::Runtime
                     if (const auto state = weakState.lock())
                         state->AnnounceShutdown();
                 });
+        // Native focus loss cancels at delivery, so a loss and regain in one
+        // event batch still cancels.
+        m_Impl->FocusSubscription =
+            setup.Subscribe<Platform::WindowFocusEvent>(
+                [weakState](const Platform::WindowFocusEvent& event)
+                {
+                    if (const auto state = weakState.lock();
+                        state && !event.Focused)
+                    {
+                        state->CancelActiveDrag();
+                    }
+                });
 
         Core::Result viewportRegistered =
             setup.RegisterViewportInputHook(
@@ -905,13 +951,34 @@ namespace Extrinsic::Runtime
                     if (const auto state = weakState.lock())
                         state->RunMaintenance(context);
                 });
+        Core::Result uiBeginRegistered =
+            setup.RegisterFrameHook(
+                FramePhase::UiBegin,
+                [weakState](RuntimeFrameHookContext&)
+                {
+                    if (const auto state = weakState.lock())
+                        state->CancelDragOnUiHide();
+                });
+        // Registering an Idle hook keeps the minimized path pumping events,
+        // so a focus loss while minimized cancels without waiting for restore.
+        Core::Result idleRegistered =
+            setup.RegisterFrameHook(
+                FramePhase::Idle,
+                [weakState](RuntimeFrameHookContext&)
+                {
+                    if (const auto state = weakState.lock())
+                        state->CancelDragOnUiHide();
+                });
 
         if (!m_Impl->ActiveWorldChangedSubscription.IsValid() ||
             !m_Impl->WorldDestroyedSubscription.IsValid() ||
             !m_Impl->ShutdownSubscription.IsValid() ||
+            !m_Impl->FocusSubscription.IsValid() ||
             !viewportRegistered.has_value() ||
             !extractionRegistered.has_value() ||
-            !maintenanceRegistered.has_value())
+            !maintenanceRegistered.has_value() ||
+            !uiBeginRegistered.has_value() ||
+            !idleRegistered.has_value())
         {
             RuntimeModuleShutdownContext context{
                 .Commands = setup.Commands(),
@@ -969,6 +1036,7 @@ namespace Extrinsic::Runtime
             setup.Services().Find<SceneDocumentModule>();
         state.History =
             setup.Services().Find<EditorCommandHistory>();
+        state.Ui = setup.Services().Find<EditorUiHost>();
         if (state.Documents != nullptr)
         {
             const std::weak_ptr<Impl::State> weakState =
@@ -1054,9 +1122,12 @@ namespace Extrinsic::Runtime
             context.Events.Unsubscribe(
                 m_Impl->ShutdownSubscription);
         }
+        if (m_Impl->FocusSubscription.IsValid())
+            context.Events.Unsubscribe(m_Impl->FocusSubscription);
         m_Impl->ActiveWorldChangedSubscription = {};
         m_Impl->WorldDestroyedSubscription = {};
         m_Impl->ShutdownSubscription = {};
+        m_Impl->FocusSubscription = {};
 
         if (m_Impl->Shared &&
             m_Impl->SelectionPublished)

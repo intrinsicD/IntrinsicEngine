@@ -156,7 +156,8 @@ namespace Extrinsic::Platform::Backends::Null
             {
                 GetInput().SetMousePosition(static_cast<float>(value.XPos), static_cast<float>(value.YPos));
             }
-            else if constexpr (std::is_same_v<T, Platform::CharEvent> || std::is_same_v<T, Platform::WindowDropEvent>)
+            else if constexpr (std::is_same_v<T, Platform::CharEvent> || std::is_same_v<T, Platform::WindowDropEvent> ||
+                               std::is_same_v<T, Platform::WindowFocusEvent>)
             {
                 m_InputActivity = true;
             }

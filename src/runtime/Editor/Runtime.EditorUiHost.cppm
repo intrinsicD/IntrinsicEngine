@@ -47,6 +47,13 @@ struct EditorUiDiagnostics
     std::uint64_t LastEndFrameMicros{0u};
 };
 
+// A frame contribution's claim on viewport input for the current UI frame
+// (for example while a transform gizmo is hovered or dragged).
+struct EditorViewportInputRequest
+{
+    bool CaptureViewportInput{false};
+};
+
 struct EditorUiFrameContributionHandle
 {
     std::uint64_t Value{0u};
@@ -80,6 +87,7 @@ public:
     void PublishDiagnostics(EditorUiDiagnostics diagnostics) noexcept;
     void SetVisibilityChangedCallback(
         std::function<void(bool)> callback);
+    void ResetViewportInputRequest() noexcept;
 
 private:
     friend class EditorUiHost;
@@ -127,6 +135,15 @@ public:
     // the engine is presenting while this frame's contributions run.
     [[nodiscard]] std::optional<EditorSceneViewportRect>
     PresentedSceneViewport() const noexcept;
+
+    // Contributions OR their requests into one per-frame claim. The owner
+    // resets it before each UI frame; hiding the UI or leaving operation
+    // drops it, and a hidden or non-operational host ignores requests. The
+    // owner merges the claim into the frame's capture after the adapter's own
+    // capture, so camera, pick and keyboard camera actions stay blocked.
+    void RequestViewportInput(EditorViewportInputRequest request) noexcept;
+    [[nodiscard]] EditorViewportInputRequest
+    ViewportInputRequest() const noexcept;
 
     [[nodiscard]] EditorWindowRegistry& Windows() noexcept;
     [[nodiscard]] const EditorWindowRegistry& Windows() const noexcept;

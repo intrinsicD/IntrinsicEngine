@@ -785,6 +785,37 @@ TEST(ImGuiAdapter, PumpsInputAndResizeReportsFramebufferPixelsWithoutDoubleScali
     }
 }
 
+// UI-078 slice 2: native focus events reach ImGui IO in pump order. A focus
+// loss releases what ImGui still holds; a key pressed after the regain stays.
+TEST(ImGuiAdapter, PumpedFocusEventsReachImGuiIoInOrder)
+{
+    FakeWindow         window(400, 300);
+    ImGuiOverlaySystem overlay;
+    ImGuiAdapter       adapter(window, overlay);
+    ASSERT_TRUE(adapter.Initialize());
+
+    window.QueueEvent(Plat::KeyEvent{65, true}); // A
+    adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
+    EXPECT_TRUE(ImGui::IsKeyDown(ImGuiKey_A));
+    adapter.EndFrame();
+
+    window.QueueEvent(Plat::WindowFocusEvent{.Focused = false});
+    adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
+    EXPECT_FALSE(ImGui::IsKeyDown(ImGuiKey_A))
+        << "focus loss must reach io.AddFocusEvent and clear held keys";
+    adapter.EndFrame();
+
+    window.QueueEvent(Plat::WindowFocusEvent{.Focused = true});
+    window.QueueEvent(Plat::KeyEvent{66, true}); // B
+    adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
+    EXPECT_TRUE(ImGui::IsKeyDown(ImGuiKey_B));
+    adapter.EndFrame();
+    EXPECT_EQ(adapter.GetDiagnostics().PumpedEventCount, 4u);
+}
+
 // BUG-139: the pump dropped `Platform::KeyEvent` entirely, so every editor
 // text field was append-only — printable characters arrived through
 // `CharEvent`, but Backspace, the arrows, Enter and every Ctrl chord did not

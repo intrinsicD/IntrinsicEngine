@@ -21,12 +21,15 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <thread>
 #include <utility>
+#include <vector>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <gtest/gtest.h>
 #include <imgui.h>
 
@@ -36,14 +39,21 @@ import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
+import Extrinsic.ECS.Component.Transform;
+import Extrinsic.ECS.Component.Transform.WorldMatrix;
+import Extrinsic.ECS.Scene.Bootstrap;
+import Extrinsic.ECS.Scene.Handle;
+import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.Platform.Backend.Null;
 import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraModule;
+import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.Engine;
@@ -52,6 +62,9 @@ import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.InputActions;
+import Extrinsic.Runtime.Module;
+import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
 
@@ -331,6 +344,94 @@ namespace
         std::uint32_t              VariableTicks{0u};
         bool                       NativeCloseRequested{false};
     };
+
+    class RecordingCameraApplication final : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        void Resolve() override
+        {
+            auto controller = std::make_unique<RecordingCameraController>();
+            Controller = controller.get();
+            Kernel().Services().Find<Runtime::CameraControllerRegistry>()->Register(
+                Runtime::CameraControllerSlot::Main, std::move(controller));
+        }
+
+        RecordingCameraController* Controller{nullptr};
+    };
+
+    // UI-078: scripted frontend stand-in, sorted after every production module.
+    // `UiBuild` gets the 1-based frame number; an `Idle` script, when set before
+    // Initialize(), also registers the minimized-frame hook.
+    class GizmoFrontendProbe final : public Runtime::IRuntimeModule
+    {
+    public:
+        [[nodiscard]] std::string_view Name() const noexcept override
+        {
+            return "zz.Test.GizmoFrontendProbe";
+        }
+        [[nodiscard]] Core::Result OnRegister(Runtime::EngineSetup& setup) override
+        {
+            if (Core::Result result = setup.RegisterFrameHook(
+                    Runtime::FramePhase::UiBuild,
+                    [this](Runtime::RuntimeFrameHookContext&) { UiBuild(++Frame); });
+                !result.has_value())
+            {
+                return result;
+            }
+            if (Idle)
+            {
+                if (Core::Result result = setup.RegisterFrameHook(
+                        Runtime::FramePhase::Idle,
+                        [this](Runtime::RuntimeFrameHookContext&) { Idle(); });
+                    !result.has_value())
+                {
+                    return result;
+                }
+            }
+            return setup.RegisterFrameHook(
+                Runtime::FramePhase::BeforeExtraction,
+                [this](Runtime::RuntimeFrameHookContext&) { BeforeExtraction(Frame); });
+        }
+        [[nodiscard]] Core::Result OnResolve(Runtime::EngineSetup&) override
+        {
+            return Core::Ok();
+        }
+        void OnShutdown(Runtime::RuntimeModuleShutdownContext&) override {}
+
+        std::function<void(std::uint32_t)> UiBuild{[](std::uint32_t) {}};
+        std::function<void(std::uint32_t)> BeforeExtraction{[](std::uint32_t) {}};
+        std::function<void()> Idle{};
+        std::uint32_t Frame{0u};
+    };
+
+    [[nodiscard]] Platform::Input::Context& MutableInput(Engine& engine)
+    {
+        const Platform::IWindow& window = engine.GetWindow();
+        return const_cast<Platform::Input::Context&>(window.GetInput());
+    }
+
+    [[nodiscard]] Extrinsic::ECS::Scene::Registry& ActiveScene(Engine& engine)
+    {
+        return *engine.Worlds().Get(engine.ActiveWorld());
+    }
+
+    // A frontend-style matrix session on `entity` with an accepted translation
+    // preview of `dx` along world X.
+    void BeginTranslatePreview(Runtime::GizmoInteraction& gizmo,
+                               Extrinsic::ECS::Scene::Registry& scene,
+                               const Extrinsic::ECS::EntityHandle entity,
+                               const float dx)
+    {
+        const Extrinsic::ECS::EntityHandle selected[] = {entity};
+        ASSERT_TRUE(gizmo.Begin(scene, selected, Runtime::GizmoMode::Translate,
+                                Runtime::GizmoOrientation::Global,
+                                Runtime::GizmoPivotMode::WorldOrigins)
+                        .Succeeded());
+        ASSERT_TRUE(gizmo.Preview(scene,
+                                  glm::translate(glm::mat4{1.0f}, glm::vec3{dx, 0.0f, 0.0f}) *
+                                      gizmo.SessionFrame().Matrix)
+                        .Succeeded());
+    }
 
     // Camera and reference scene are disabled so the bounded run exercises the
     // minimal frame path (no controller creation, no scene population). The
@@ -788,5 +889,240 @@ TEST(ImGuiAdapterEngineWiring, RunNormalizesNativeCloseAfterInteractiveInput)
     EXPECT_TRUE(engine.GetWindow().ShouldClose());
     EXPECT_FALSE(engine.IsRunning());
 
+    engine.Shutdown();
+}
+
+// UI-078 slice 2: a frontend's viewport claim, merged after the adapter
+// capture, blocks camera controller updates and new pick requests while the
+// gizmo is hovered (frame 1) or dragged (frames 2-3), and suppresses keyboard
+// input actions such as F. The claim does not end its own session: the ray
+// driver neither cancels it on capture nor commits it on mouse release.
+// Without a claim (frame 4) all consumers run again.
+TEST(ImGuiAdapterEngineWiring, ViewportClaimBlocksCameraAndPickWithoutEndingItsSession)
+{
+    auto app = std::make_unique<RecordingCameraApplication>();
+    auto* appPtr = app.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(NullInputRoutingConfig(), std::move(app));
+    engine.EmplaceModule<Runtime::CameraModule>();
+    engine.EmplaceModule<Runtime::EditorUiModule>();
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
+    auto& probe = engine.EmplaceModule<GizmoFrontendProbe>();
+    engine.Initialize();
+
+    Runtime::EditorUiHost& host = *engine.Services().Find<Runtime::EditorUiHost>();
+    Runtime::GizmoInteraction& gizmo =
+        engine.Services().Find<Runtime::SceneInteractionModule>()->Interaction();
+    auto& inputActions = *engine.Services().Find<Runtime::RuntimeInputActionRegistry>();
+    std::uint32_t focusKeyRuns = 0u;
+    const Runtime::RuntimeInputActionHandle focusKey = inputActions.Register({
+        .DebugName = "Test.ClaimedFocusKey",
+        .Binding = {.KeyCode = 'F'},
+        .Execute = [&focusKeyRuns](const Runtime::RuntimeInputActionContext&,
+                                   Runtime::RuntimeInputActionServices&)
+        {
+            ++focusKeyRuns;
+            return Core::Ok();
+        },
+    });
+    ASSERT_TRUE(focusKey.IsValid());
+    Extrinsic::ECS::EntityHandle entity{};
+    std::vector<bool> dragging{};
+    std::vector<bool> claimed{};
+    float previewX = 0.0f;
+    probe.UiBuild = [&](const std::uint32_t frame)
+    {
+        auto& input = MutableInput(engine);
+        auto& scene = ActiveScene(engine);
+        if (frame == 1u)
+        {
+            entity = Extrinsic::ECS::Scene::CreateDefault(scene, "Gizmo target");
+            input.SetMousePosition(32.0f, 48.0f);
+            input.SetMouseButtonState(0, true);
+            input.SetKeyState(Platform::Input::Key::W, true);
+            input.SetKeyState(Platform::Input::Key::F, true);
+        }
+        if (frame == 2u)
+        {
+            BeginTranslatePreview(gizmo, scene, entity, 1.0f);
+            input.SetKeyState(Platform::Input::Key::F, false);
+        }
+        if (frame == 3u)
+        {
+            ASSERT_TRUE(gizmo.Preview(scene,
+                glm::translate(glm::mat4{1.0f}, glm::vec3{2.0f, 0.0f, 0.0f}) *
+                    gizmo.SessionFrame().Matrix).Succeeded());
+            input.SetMouseButtonState(0, false);
+        }
+        if (frame == 4u)
+        {
+            ASSERT_TRUE(gizmo.DragCancel(scene).Succeeded());
+            input.SetMouseButtonState(0, true);
+            input.SetKeyState(Platform::Input::Key::F, true);
+            engine.RequestExit();
+            return;
+        }
+        host.RequestViewportInput({.CaptureViewportInput = true});
+    };
+    probe.BeforeExtraction = [&](const std::uint32_t frame)
+    {
+        dragging.push_back(gizmo.IsDragging());
+        claimed.push_back(host.GetDiagnostics().CapturesViewportInput);
+        if (frame == 3u)
+            previewX = ActiveScene(engine).Raw()
+                .get<Extrinsic::ECS::Components::Transform::Component>(entity).Position.x;
+    };
+
+    ASSERT_FALSE(engine.GetWindow().ShouldClose());
+    engine.Run();
+
+    EXPECT_EQ(claimed, (std::vector<bool>{true, true, true, false}));
+    EXPECT_EQ(dragging, (std::vector<bool>{false, true, true, false}));
+    EXPECT_EQ(previewX, 2.0f);
+    EXPECT_EQ(gizmo.Diagnostics().DragsCommitted, 0u);
+    EXPECT_EQ(gizmo.Diagnostics().DragsCancelled, 1u);
+    ASSERT_NE(appPtr->Controller, nullptr);
+    EXPECT_EQ(appPtr->Controller->Updates, 1u);
+    EXPECT_EQ(appPtr->Controller->MouseClickUpdates, 1u);
+    EXPECT_EQ(engine.Services().Find<Runtime::SelectionController>()
+                  ->GetDiagnostics().ClickRequestsSubmitted,
+              1u);
+    // The claim also captures the keyboard: F pressed in frame 1 must not run,
+    // the fresh press in unclaimed frame 4 runs exactly once.
+    EXPECT_EQ(focusKeyRuns, 1u);
+
+    inputActions.Unregister(focusKey);
+    engine.Shutdown();
+}
+
+namespace
+{
+    enum class HideRoute
+    {
+        HostCommand,
+        Shortcut,
+    };
+
+    // Frame 1 previews +2 along X under a claim; frame 2 hides the UI. The
+    // drag must end in frame 2 with the start TRS restored, no history entry,
+    // and the restored world matrix already flushed for that frame's
+    // extraction.
+    void ExpectHideEndsDragBeforeTheTransformFlush(const HideRoute route)
+    {
+        Intrinsic::Tests::RuntimeTestKernel engine(
+            NullWindowHeadlessConfig(), std::make_unique<BoundedRunApplication>(2u));
+        engine.EmplaceModule<Runtime::EditorUiModule>();
+        engine.EmplaceModule<Runtime::SceneDocumentModule>();
+        engine.EmplaceModule<Runtime::SceneInteractionModule>();
+        auto& probe = engine.EmplaceModule<GizmoFrontendProbe>();
+        engine.Initialize();
+
+        Runtime::EditorUiHost& host = *engine.Services().Find<Runtime::EditorUiHost>();
+        Runtime::EditorCommandHistory& history =
+            *engine.Services().Find<Runtime::EditorCommandHistory>();
+        Runtime::GizmoInteraction& gizmo =
+            engine.Services().Find<Runtime::SceneInteractionModule>()->Interaction();
+        auto& scene = ActiveScene(engine);
+        const Extrinsic::ECS::EntityHandle entity =
+            Extrinsic::ECS::Scene::CreateDefault(scene, "Gizmo target");
+        std::vector<float> extractedX{};
+        std::vector<bool> dragging{};
+        probe.UiBuild = [&](const std::uint32_t frame)
+        {
+            if (frame == 1u)
+            {
+                BeginTranslatePreview(gizmo, scene, entity, 2.0f);
+                host.RequestViewportInput({.CaptureViewportInput = true});
+                if (route == HideRoute::Shortcut)
+                {
+                    static_cast<Platform::Backends::Null::NullWindow&>(engine.GetWindow())
+                        .QueueKey(Platform::Input::Key::G, true);
+                }
+                return;
+            }
+            host.RequestViewportInput({.CaptureViewportInput = true});
+            if (route == HideRoute::HostCommand)
+            {
+                (void)host.ApplyVisibilityCommand(
+                    {Runtime::EditorUiVisibilityCommandKind::Hide});
+            }
+        };
+        probe.BeforeExtraction = [&](std::uint32_t)
+        {
+            dragging.push_back(gizmo.IsDragging());
+            extractedX.push_back(
+                scene.Raw()
+                    .get<Extrinsic::ECS::Components::Transform::WorldMatrix>(entity)
+                    .Matrix[3][0]);
+        };
+
+        engine.Run();
+
+        EXPECT_FALSE(host.IsVisible());
+        EXPECT_EQ(dragging, (std::vector<bool>{true, false}));
+        EXPECT_EQ(extractedX, (std::vector<float>{2.0f, 0.0f}));
+        EXPECT_EQ(scene.Raw().get<Extrinsic::ECS::Components::Transform::Component>(entity)
+                      .Position,
+                  glm::vec3{0.0f});
+        EXPECT_EQ(history.UndoCount(), 0u);
+        EXPECT_EQ(gizmo.Diagnostics().DragsCommitted, 0u);
+        EXPECT_EQ(gizmo.Diagnostics().DragsCancelled, 1u);
+        engine.Shutdown();
+    }
+}
+
+TEST(ImGuiAdapterEngineWiring, HostHideEndsDragBeforeTheTransformFlush)
+{
+    ExpectHideEndsDragBeforeTheTransformFlush(HideRoute::HostCommand);
+}
+
+TEST(ImGuiAdapterEngineWiring, ShortcutHideEndsDragBeforeTheTransformFlush)
+{
+    ExpectHideEndsDragBeforeTheTransformFlush(HideRoute::Shortcut);
+}
+
+// UI-078 slice 2: Engine republishes native focus events on the kernel bus.
+// A loss while the window is minimized reaches SceneInteractionModule on the
+// minimized path, before any restore, and cancels without history.
+TEST(ImGuiAdapterEngineWiring, FocusLossWhileMinimizedCancelsDragWithoutHistory)
+{
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        NullWindowHeadlessConfig(), std::make_unique<BoundedRunApplication>(1000u));
+    engine.EmplaceModule<Runtime::EditorUiModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
+    auto& probe = engine.EmplaceModule<GizmoFrontendProbe>();
+    bool draggingWhenIdle = true;
+    float idleX = -1.0f;
+    Extrinsic::ECS::EntityHandle entity{};
+    Runtime::GizmoInteraction* gizmo = nullptr;
+    probe.Idle = [&]
+    {
+        draggingWhenIdle = gizmo->IsDragging();
+        idleX = ActiveScene(engine).Raw()
+            .get<Extrinsic::ECS::Components::Transform::Component>(entity).Position.x;
+        engine.RequestExit();
+    };
+    engine.Initialize();
+
+    gizmo = &engine.Services().Find<Runtime::SceneInteractionModule>()->Interaction();
+    Runtime::EditorUiHost& host = *engine.Services().Find<Runtime::EditorUiHost>();
+    auto& scene = ActiveScene(engine);
+    entity = Extrinsic::ECS::Scene::CreateDefault(scene, "Gizmo target");
+    probe.UiBuild = [&](std::uint32_t)
+    {
+        BeginTranslatePreview(*gizmo, scene, entity, 2.0f);
+        host.RequestViewportInput({.CaptureViewportInput = true});
+        auto& window = static_cast<Platform::Backends::Null::NullWindow&>(engine.GetWindow());
+        window.QueueResize(0, 0);
+        window.QueueEvent(Platform::WindowFocusEvent{.Focused = false});
+    };
+
+    engine.Run();
+
+    EXPECT_EQ(probe.Frame, 1u) << "the second frame is minimized";
+    EXPECT_FALSE(draggingWhenIdle);
+    EXPECT_EQ(idleX, 0.0f);
+    EXPECT_EQ(engine.Services().Find<Runtime::EditorCommandHistory>()->UndoCount(), 0u);
+    EXPECT_EQ(gizmo->Diagnostics().DragsCommitted, 0u);
     engine.Shutdown();
 }

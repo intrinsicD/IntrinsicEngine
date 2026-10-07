@@ -15,7 +15,6 @@ import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.FramePacingDiagnostics;
 import Extrinsic.Runtime.ImGuiAdapter;
-import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.ServiceRegistry;
 
@@ -124,8 +123,6 @@ namespace Extrinsic::Runtime
         std::unique_ptr<ImGuiAdapter> Adapter{};
         Platform::IWindow* Window{nullptr};
         Graphics::IRenderer* Renderer{nullptr};
-        RuntimeInputActionRegistry* InputActions{nullptr};
-        RuntimeInputActionHandle VisibilityAction{};
         bool HostPublished{false};
     };
 
@@ -205,11 +202,7 @@ namespace Extrinsic::Runtime
         auto window = setup.Services().Require<Platform::IWindow>(Name());
         auto renderer =
             setup.Services().Require<Graphics::IRenderer>(Name());
-        auto inputActions =
-            setup.Services().Require<RuntimeInputActionRegistry>(Name());
-        if (!window.has_value() ||
-            !renderer.has_value() ||
-            !inputActions.has_value())
+        if (!window.has_value() || !renderer.has_value())
         {
             ShutdownAndReset(&setup.Services());
             return Core::Err(Core::ErrorCode::ResourceNotFound);
@@ -217,7 +210,6 @@ namespace Extrinsic::Runtime
 
         m_Impl->Window = &window->get();
         m_Impl->Renderer = &renderer->get();
-        m_Impl->InputActions = &inputActions->get();
         m_Impl->Adapter = std::make_unique<ImGuiAdapter>(
             *m_Impl->Window, m_Impl->Overlay);
         if (!m_Impl->Adapter->Initialize())
@@ -249,35 +241,6 @@ namespace Extrinsic::Runtime
         m_Impl->Adapter->SetEditorVisible(m_Impl->Host.IsVisible());
         m_Impl->Renderer->SetImGuiOverlaySystem(&m_Impl->Overlay);
 
-        m_Impl->VisibilityAction = m_Impl->InputActions->Register(
-            RuntimeInputActionDesc{
-                .DebugName = "EditorUi.ToggleVisibility",
-                .Binding =
-                    RuntimeInputActionBinding{
-                        .KeyCode = Platform::Input::Key::G,
-                        .Trigger =
-                            RuntimeInputActionTrigger::KeyJustPressed,
-                        .SuppressWhenImGuiCapturesKeyboard = false,
-                    },
-                .Execute =
-                    [this](const RuntimeInputActionContext&,
-                           RuntimeInputActionServices&) -> Core::Result
-                    {
-                        if (!m_Impl)
-                            return Core::Err(
-                                Core::ErrorCode::InvalidState);
-                        (void)m_Impl->Host.ApplyVisibilityCommand(
-                            EditorUiVisibilityCommand{
-                                EditorUiVisibilityCommandKind::Toggle});
-                        return Core::Ok();
-                    },
-            });
-        if (!m_Impl->VisibilityAction.IsValid())
-        {
-            ShutdownAndReset(&setup.Services());
-            return Core::Err(Core::ErrorCode::InvalidState);
-        }
-
         m_Impl->HostOwner.SetOperational(true);
         m_Impl->HostOwner.PublishDiagnostics(
             CopyEditorUiDiagnostics(*m_Impl->Adapter));
@@ -296,6 +259,17 @@ namespace Extrinsic::Runtime
         if (!m_Impl || !m_Impl->Adapter)
             return;
 
+        m_Impl->HostOwner.ResetViewportInputRequest();
+        // The global G toggle runs before any viewport or transform work of
+        // this frame, independent of ImGui keyboard capture, so a hide that
+        // cancels a gizmo drag reaches the single pre-render transform flush.
+        const Platform::IWindow& window = *m_Impl->Window;
+        if (window.GetInput().IsKeyJustPressed(Platform::Input::Key::G))
+        {
+            (void)m_Impl->Host.ApplyVisibilityCommand(
+                EditorUiVisibilityCommand{
+                    EditorUiVisibilityCommandKind::Toggle});
+        }
         m_Impl->Adapter->SetEditorVisible(m_Impl->Host.IsVisible());
         const auto begin = std::chrono::steady_clock::now();
         m_Impl->Adapter->BeginFrame(context.FrameDeltaSeconds);
@@ -327,12 +301,22 @@ namespace Extrinsic::Runtime
             context.EditorCapture.HasSceneViewport = true;
             context.EditorCapture.SceneViewport = *scene;
         }
+        // A contribution's claim joins the adapter's capture (mouse and
+        // keyboard) only after the adapter wrote it, so it is never lost.
+        if (m_Impl->Host.ViewportInputRequest().CaptureViewportInput)
+        {
+            context.EditorCapture.CapturedMouse = true;
+            context.EditorCapture.CapturedKeyboard = true;
+        }
 
         const ImGuiAdapterDiagnostics& diagnostics =
             m_Impl->Adapter->GetDiagnostics();
         MirrorImGuiDiagnostics(context.Pacing, diagnostics);
-        m_Impl->HostOwner.PublishDiagnostics(
-            CopyEditorUiDiagnostics(*m_Impl->Adapter));
+        EditorUiDiagnostics published =
+            CopyEditorUiDiagnostics(*m_Impl->Adapter);
+        published.CapturesViewportInput =
+            context.EditorCapture.CapturesViewportInput();
+        m_Impl->HostOwner.PublishDiagnostics(published);
     }
 
     void EditorUiModule::ShutdownAndReset(
@@ -343,13 +327,6 @@ namespace Extrinsic::Runtime
 
         m_Impl->HostOwner.SetOperational(false);
         m_Impl->HostOwner.SetVisibilityChangedCallback({});
-        if (m_Impl->InputActions &&
-            m_Impl->VisibilityAction.IsValid())
-        {
-            m_Impl->InputActions->Unregister(
-                m_Impl->VisibilityAction);
-        }
-        m_Impl->VisibilityAction = {};
         if (m_Impl->Adapter)
             m_Impl->Adapter->SetEditorCallback({});
         if (m_Impl->Renderer)

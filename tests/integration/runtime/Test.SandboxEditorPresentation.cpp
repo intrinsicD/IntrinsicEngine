@@ -288,12 +288,13 @@ namespace
             ++m_Frames;
             if (m_Frames == 1u)
             {
+                // G toggles at the next UiBegin, ImGui keyboard capture
+                // notwithstanding.
                 ImGui::SetNextFrameWantCaptureKeyboard(true);
+                static_cast<Plat::Backends::Null::NullWindow&>(engine.GetWindow())
+                    .QueueKey(Plat::Input::Key::G, true);
                 return;
             }
-            const Plat::IWindow& window = engine.GetWindow();
-            auto& input = const_cast<Plat::Input::Context&>(window.GetInput());
-            input.SetKeyState(Plat::Input::Key::G, true);
             engine.RequestExit();
         }
         void Shutdown() override {}

@@ -1229,6 +1229,12 @@ namespace Extrinsic::Runtime
         {
             HandleWindowDropEvent(*dropped);
         }
+
+        // Queued like every kernel event: a focus loss reaches subscribers at
+        // the next pump, which the minimized path also runs when a module
+        // registered an Idle hook.
+        if (const auto* focus = std::get_if<Platform::WindowFocusEvent>(&event))
+            m_Impl->m_KernelEvents.Publish(*focus);
     }
 
     void Engine::DispatchPlatformEventForTest(const Platform::Event& event)
