@@ -64,6 +64,13 @@ this pattern instead of re-deriving it.
   command path (e.g. `EditorCommandHistory`), never by writing
   `Transform::WorldMatrix`, GPU instance buffers, or readback bytes directly
   from the test — otherwise the smoke proves nothing about the engine.
+  For UI input, invoke the GLFW callbacks the production window registered
+  (read from the native handle) from a `Simulation` hook, before `UiBegin`,
+  and click real items via `tests/support/ImGuiItemProbe.hpp`. Example:
+  `RuntimeSandboxAcceptanceGpuSmoke.ImGuizmo*` (production shell, one
+  `BeforeExtraction`/`Maintenance` readback per frame of interest, so the first
+  preview frame is asserted on its own pixels). State that boundary: callback
+  input is not OS-generated input.
 - **Readback assertions.** Idioms in order of strength:
   - Full-frame content: `nonBlackPixels > totalPixels / 2` (a lit/cleared
     frame, not a single stray pixel).
@@ -99,6 +106,12 @@ The default CPU gate must stay green alongside
 - Cite the smoke run in the task's `Verification` **as actually executed**,
   with host GPU and driver (e.g. "NVIDIA GeForce RTX 3050, driver 590.48.01")
   and pass counts — this is what upgrades maturity to `Operational`.
+- Record window size, framebuffer size and pixel ratio. A run at ratio 1 is no
+  HiDPI evidence, and a forced `DisplayFramebufferScale` is none either; limit
+  the claim to the measured ratio (`UI-079` owns the gizmo's HiDPI run).
+- Present-bound and focus smokes need an unlocked session with the monitor on
+  (DPMS off blocks presents ~1 s per frame; a locked GNOME session refuses
+  programmatic focus). Record the session state with the run.
 - Never relax, skip, or delete a readback assertion to make a gate pass; that
   is a forbidden change in every bug task that owns one (`BUG-016`,
   `BUG-024B`). A flaky smoke gets a diagnosis (`intrinsicengine-diagnose`) or

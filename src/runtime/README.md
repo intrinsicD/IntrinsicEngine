@@ -1986,9 +1986,10 @@ microsecond timings for `BeginFrame`, the editor callback, `ImGui::Render()`,
 draw-data/font/list copying, and total `EndFrame()` so runtime frame-pacing
 samples can separate editor CPU work from ImGui producer-copy cost.
 
-Runtime owns camera motion, input-to-pick-request translation, gizmo hit testing,
-and transform application. Graphics receives only immutable `CameraViewInput`,
-`PickPixelRequest`, and transform-gizmo render packets during extraction.
+Runtime owns camera motion, input-to-pick-request translation, the gizmo matrix
+session and transform application; the Sandbox shell draws and hit-tests the gizmo
+through ImGuizmo. Graphics receives only immutable `CameraViewInput`,
+`PickPixelRequest`, and generic render packets during extraction.
 
 ## Camera controller baseline
 
@@ -2045,14 +2046,13 @@ controller state is authoritative and graphics receives only immutable
 Known gaps relative to legacy and planned camera work are tracked in
 `tasks/archive/RUNTIME-081A-camera-legacy-gap-analysis.md`: editor-specific camera
 shortcuts and any policy that renders multiple camera outputs in one frame remain
-outside this runtime-controller surface. Transform-gizmo hit testing, the
-matrix drag session (frozen selection/pivot/basis, group delta about one
-pivot, atomic non-TRS rejection), the ray drag adapter on top of it, and the
-generation-validated `EditorCommandHistory` batch commit live in
-`Extrinsic.Runtime.GizmoInteraction`. `SceneInteractionModule` directly owns
-the default input binding, selected-entity scratch, selection-click interlock,
-and extraction packet submission. Graphics consumes only copied
-`TransformGizmoRenderPacket` spans.
+outside this runtime-controller surface. The gizmo matrix session (frozen
+selection/pivot/basis, group delta about one pivot, atomic non-TRS rejection)
+and its generation-validated `EditorCommandHistory` batch commit live in
+`Extrinsic.Runtime.GizmoInteraction`; `SceneInteractionModule` owns it, the
+selection-click interlock and the frontend calls. Drawing and hit testing
+belong to the Sandbox's ImGuizmo frontend
+([ADR 0006](../../docs/adr/0006-camera-picking-and-gizmo-runtime-handoff.md)).
 
 ## Geometry-property vocabularies (RUNTIME-192)
 

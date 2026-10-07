@@ -4347,3 +4347,15 @@ observations:
     promoted_to: logic/claims.md:C117
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O261
+    timestamp: 2026-10-07T20:30+02:00
+    provenance: ai-executed
+    content: The Sandbox ImGuizmo gizmo, driven through the production window's registered GLFW callbacks, moves a two-entity group in the first preview frame's own Vulkan readback (perspective and offset orthographic split) and its File / Scene Undo restores transforms and pixels; removing the pre-render flush fails the first preview readback. Real GLFW focus changes emit the production WindowFocusEvents.
+    context: NVIDIA RTX 3050, driver 590.48.01, X11/GNOME unlocked session, window 1600x900 = framebuffer 1600x900 (pixel ratio 1); ci-vulkan with ASan/UBSan on the 95d093bb1 tree plus the then-uncommitted slice-4a diff, whose smoke code was committed unchanged as 49a609334.
+    potential_type: claim
+    bound_to: []
+    promoted: true
+    promoted_to: logic/claims.md:C118
+    crystallized_via: artifact-commitment
+    stale: false

@@ -23,30 +23,79 @@ contract_review: Reviewed the catalog. The change alters module surfaces and REA
   common pivot during the interaction.
 
 ## Acceptance criteria
-- [ ] Gizmo is off by default and can only be switched on from the editor UI
+Evidence keys: S1 `5ba6f9b97`, S2 `6441f256e`, S3a `a6fc6f4fc`, S3b `0ae5e4538`,
+S3c `b513f2787`, S4a `49a609334`; `GI` = `GizmoInteraction`, `SG` =
+`SandboxEditorGizmo`, `GPU` = `RuntimeSandboxAcceptanceGpuSmoke`.
+- [x] Gizmo is off by default and can only be switched on from the editor UI
       (menu/toolbar); translate/rotate/scale modes are selectable there.
-- [ ] Multi-selection rotates/scales/translates around one pivot frozen at drag
+      S3c `SG.OffByDefaultEnabledOnlyFromTheMenuAndInactiveWhileHidden`,
+      `SG.WerSwitchModesOnlyWhenEnabledAndNotWhileTypingOrCaptured`; S4a GPU
+      smokes click Gizmo → Enabled.
+- [x] Multi-selection rotates/scales/translates around one pivot frozen at drag
       start; positions move around the pivot, not only per-entity rotation/scale.
-- [ ] A UI toggle selects the pivot: mean of selected world origins (default) or
+      S1 `GI.GroupRotateAndScaleMoveOriginsAroundPivot`,
+      `GI.SessionIsFrozenAndRejectsStaleState`; S3c
+      `SG.GroupDragClaimsBlocksCameraAndPickAndCommitsOneUndo`; S4a GPU group
+      drag moves both triangles with their relative position kept.
+- [x] A UI toggle selects the pivot: mean of selected world origins (default) or
       mean of world-bounds centers (entities without bounds fall back to their
-      origin).
-- [ ] Local/global orientation works for single entities and groups.
-- [ ] W/E/R switch translate/rotate/scale while the gizmo is active (not while a
-      text field has focus); Escape cancels the drag.
-- [ ] Snap steps are configurable in the UI (defaults 0.25, 15°, 0.1).
-- [ ] Parent and child both selected: the child is written through its parent
-      only (moves once); unselected children follow their parent.
-- [ ] One drag produces exactly one undo entry; no entry for a no-op or cancel.
-- [ ] A result that cannot be stored as TRS (shear under a non-uniformly scaled
+      origin). S1 `GI.WorldOriginPivotComposesParentChainAndIgnoresStaleWorldCache`,
+      `GI.BoundsPivotAveragesWorldBoundsCentersWithOriginFallback`; S3c
+      `SG.PivotAndLocalAxesFromTheMenuIncludingTheGroupFallback`.
+- [x] Local/global orientation works for single entities and groups.
+      S1 `GI.LocalBasisUsesWorldRotationAndSignInvariantGroupMean`,
+      `GI.DegenerateGroupMeanFallsBackToWorldBasisWithReason`; S3c
+      `SG.PivotAndLocalAxesFromTheMenuIncludingTheGroupFallback`.
+- [x] W/E/R switch translate/rotate/scale while the gizmo is active (not while a
+      text field has focus); Escape cancels the drag. S3c
+      `SG.WerSwitchModesOnlyWhenEnabledAndNotWhileTypingOrCaptured`,
+      `SG.NoOpAndEscapeLeaveNoUndoAndEscapeBlocksARestartUntilRelease`,
+      `SG.OverlappingModeKeysKeepTheCameraOffUntilTheLastRelease`.
+- [x] Snap steps are configurable in the UI (defaults 0.25, 15°, 0.1). S3a/S3c
+      `SandboxConfigSections.GizmoSnapStepsRegisterValidateAndApplyThroughTheConfigLane`,
+      `SG.SnapStepsPreviewValidateApplyAndShiftSnapsEachMode`,
+      `SG.ShiftSnappedRotationUnderANonUniformParentIsAccepted`, the
+      `GI.SnapGizmoRotation*` cases.
+- [x] Parent and child both selected: the child is written through its parent
+      only (moves once); unselected children follow their parent. S1
+      `GI.SelectedDescendantsMoveOnlyThroughSelectedAncestor`.
+- [x] One drag produces exactly one undo entry; no entry for a no-op or cancel.
+      S1 `GI.ManyPreviewTicksCommitExactlyOneUndoableBatch`,
+      `GI.NoOpAndMoveAndReturnLeaveExactTransformsAndNoHistory`,
+      `GI.CancelRestoresExactOriginalTransformsWithoutHistory`; S3c
+      `SG.GroupDragClaimsBlocksCameraAndPickAndCommitsOneUndo`,
+      `SG.NoOpAndEscapeLeaveNoUndoAndEscapeBlocksARestartUntilRelease`,
+      `SG.ScaleAndRotateReleasedOverAPanelCommitOnce`; S4a GPU: no row during
+      preview, one on release, Undo click restores pixels.
+- [x] A result that cannot be stored as TRS (shear under a non-uniformly scaled
       parent) is rejected without partial writes, and the UI shows the reason.
-- [ ] While the gizmo is hovered or dragged, camera and selection input are
+      S1 `GI.ShearResultIsRejectedWithoutPartialWrites`; S3c
+      `SG.RejectedPreviewShowsReasonWritesNothingAndReleaseCommitsLastAccepted`.
+- [x] While the gizmo is hovered or dragged, camera and selection input are
       blocked; hiding the UI, focus loss or a world/document change cancels the drag.
-- [ ] ImGuizmo types stay private to `src/app/Sandbox`; runtime owns preview,
+      S2 `ImGuiAdapterEngineWiring.*`, `SceneInteractionModule.{FrontendViewportClaimOwnsTheSessionAndUiHideCancelsIt,
+      WindowFocusLossCancelsPreviewWithoutHistory, WorldAndDocumentChangesCancelMatrixPreviewWithoutHistory}`;
+      S3c `SG.GroupDragClaimsBlocksCameraAndPickAndCommitsOneUndo`,
+      `SG.HideFocusLossWorldAndDocumentChangesPreventTheReleaseCommit`; S4a GPU
+      claim with camera and pick count unchanged, native focus
+      `GlfwPlatformSmoke.NativeFocusChangesEmitWindowFocusEvents`.
+- [x] ImGuizmo types stay private to `src/app/Sandbox`; runtime owns preview,
       multi-selection math and the undo transaction; layering stays strict.
-- [ ] CPU contract tests cover pivot math, hierarchy rule, rejection and undo;
+      S3a private `imguizmo_lib` link, S3b typed frontend interface,
+      `RuntimeEngineLayering.*`, `RuntimeEnginePrivateGlue.*`;
+      `check_layering.py --strict` clean on 2026-10-07.
+- [x] CPU contract tests cover pivot math, hierarchy rule, rejection and undo;
       the Sandbox integration suite covers UI activation and drag; a Vulkan
-      acceptance smoke shows a visible group move and its undo.
-- [ ] READMEs, ADR 0006 and affected architecture docs describe the new frontend.
+      acceptance smoke shows a visible group move and its undo. CPU and `SG`
+      above; S4a `GPU.{ImGuizmoGroupDragAndUndoReachSameFramePixels,
+      ImGuizmoOrthographicSplitViewportDragAndUndo}` 3/3 each (RTX 3050, driver
+      590.48.01, X11, pixel ratio 1; ara C118). HiDPI is limited to ratio 1;
+      the real ratio ≠ 1 run is UI-079 (CPU evidence:
+      `SceneInteractionModule.GizmoUiSceneRectIsTheCurrentClaimMappedBackFromFramebufferPixels`).
+      Accepted limitation: top-down orthographic X/Z scale handles are not
+      pickable (workaround documented; BUG-236).
+- [x] READMEs, ADR 0006 and affected architecture docs describe the new frontend.
+      Slice 4b (see Progress).
 
 ## Verification
 ```bash
@@ -272,7 +321,7 @@ Codex review of the fixed commit → fixes → re-verification.
   SelectionAloneDoesNotStartAGizmoSession}` (mutation-checked: dropping the
   session-generation check in Preview/Commit or in Begin, or reading the
   presented rectangle, fails them).
-  **3c (uncommitted):** further operator decisions: Gizmo enabled only from
+  **3c:** further operator decisions: Gizmo enabled only from
   the menu, initially off; W/E/R only while enabled and not typing; the
   `sandbox.gizmo` reason reads "must be greater than 0" (exclusive minimum 0
   plus a normal-float check "is too small or too large for a float").
@@ -399,6 +448,17 @@ Codex review of the fixed commit → fixes → re-verification.
   (~13 s each; perspective and orthographic split 560,90 960x720), and
   `GlfwPlatformSmoke.NativeFocusChangesEmitWindowFocusEvents` passes (GNOME
   Shell/X11 grants programmatic focus on an unlocked session).
-- **Remaining:** slice 4 (docs and the Vulkan acceptance smoke, including the
-  known top-down orthographic X/Z scale-handle limitation). All acceptance boxes stay
-  open until then.
+- **Slice 4b — docs and retirement, 2026-10-07.** ADR 0006 §§3–5 rewritten as
+  one current decision (slice amendments folded in, change history, Validation
+  split into CPU, shell, Vulkan and native focus); runtime, Sandbox (user
+  section, acceptance), platform and renderer READMEs; `runtime.md`,
+  `rendering-three-pass.md`; catalog proofs; input-lifecycle and gpu-smoke
+  skills; ara claim C118 (Operational on Vulkan, executed path, ratio 1).
+  Operator decisions: callback-injected input suffices (no OS input claimed);
+  native focus proven on this host, no PLATFORM follow-up; HiDPI claim limited
+  to ratio 1 with follow-up UI-079; the top-down orthographic X/Z scale
+  limitation is accepted with its workaround and follow-up BUG-236.
+- **Completed 2026-10-07.** Commit reference: `5ba6f9b97`, `6441f256e`, `a6fc6f4fc`,
+  `0ae5e4538`, `b513f2787`, `49a609334` and the slice 4b docs/retirement
+  commits. Maturity: Operational on Vulkan for the executed path at pixel
+  ratio 1 (C118); HiDPI owned by UI-079, top-down scale handles by BUG-236.

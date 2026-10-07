@@ -88,6 +88,10 @@ contracts:
       - tests/contract/runtime/Test.ImGuiAdapterEngineWiring.cpp
       - tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp
       - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+      # Operational on Vulkan for the executed path at pixel ratio 1 only (ara claim C118);
+      # a HiDPI run is owned by UI-079.
+      - tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
+      - tests/integration/platform/Test.GlfwPlatformSmoke.cpp
   runtime.engine-compilation-locality:
     owner: runtime-build
     source: docs/architecture/runtime.md

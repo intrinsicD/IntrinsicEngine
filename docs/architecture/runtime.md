@@ -628,6 +628,17 @@ a cancel: the claiming frontend's session survives a claimed frame. Native focus
 kernel event (`Platform::WindowFocusEvent`, republished by Engine) and cancels
 a running session at delivery; its `Idle` hook keeps minimized frames pumping
 such events (see [ADR 0006](../adr/0006-camera-picking-and-gizmo-runtime-handoff.md)).
+The Sandbox's ImGuizmo frontend reads `SceneInteractionModule::PrepareGizmo` in
+`UiBuild`: the Main controller's unjittered view/projection before this frame's
+camera update (unchanged on a claimed frame, so it equals the rendered camera)
+and the scene rectangle resolved in framebuffer pixels and mapped back to
+logical window coordinates. Its previews, and every cancel, precede the single
+pre-render transform flush, so the first preview frame already renders the
+moved entities. Operational on Vulkan only for the executed path and a pixel
+ratio of 1 (claim C118; `RuntimeSandboxAcceptanceGpuSmoke.ImGuizmo*`, native
+focus `GlfwPlatformSmoke.NativeFocusChangesEmitWindowFocusEvents`); other
+ratios rest on CPU evidence until
+[UI-079](../../tasks/backlog/ui/UI-079-imguizmo-hidpi-operational-run.md).
 Omitting the module leaves the value unclaimed and all ImGui pacing counters
 zero. Its ImGui context owns a paired ImPlot context.
 

@@ -90,14 +90,35 @@ module plus exact `SelectionController`. The editor operations and app default p
 resolve those services once; they never call an Engine interaction getter.
 Camera and completed UI capture reach interaction through deterministic typed
 viewport hooks. Render extraction receives only a copied, world-tagged
-selection/hover snapshot and treats omission or mismatch as empty. The
-editor gizmo is ImGuizmo, private to `EditorShell`: enabled only from the
-**Gizmo** menu (off by default, inactive while the UI is hidden), W/E/R mode
-keys when not typing, Escape cancels, Shift snaps with the `sandbox.gizmo`
-steps; it drives `SceneInteractionModule`'s token-checked gizmo calls and
-claims the viewport while hovered or dragged.
+selection/hover snapshot and treats omission or mismatch as empty.
 Document New/Load/Close, active-world switch/retirement, and shutdown clear the
 cohort without resurrecting old state.
+
+**Transform gizmo.** The editor gizmo is ImGuizmo, private to `EditorShell`; it drives
+`SceneInteractionModule`'s token-checked gizmo calls
+([ADR 0006](../../../docs/adr/0006-camera-picking-and-gizmo-runtime-handoff.md)).
+
+- **Gizmo → Enabled** turns it on (off by default, inactive while the UI is
+  hidden). W/E/R pick translate/rotate/scale while it is enabled and no text
+  field is focused. While hovered or dragged it owns the viewport: no camera
+  input, no click selection.
+- All selected entities move together. The pivot is the mean of their world
+  origins, or of their world-bounds centers with **Pivot at bounds centers**
+  (entities without bounds use their origin). **Local axes** uses the entity's
+  rotation, for a group the averaged rotation; if no average exists the gizmo
+  falls back to world axes and says so.
+- Hold Shift to snap. Steps are edited under **Snap steps** and take effect
+  with **Apply snap steps** (defaults 0.25, 15°, 0.1; rotation at least
+  0.001°). Mode, pivot, axes and steps are frozen during a drag and apply to
+  the next one.
+- Releasing records one undo entry (**File / Scene → Undo**); Escape, hiding
+  the UI, focus loss or a world/document change cancel without one. A result
+  that is not storable as TRS (shear under a non-uniformly scaled parent) is
+  not applied; the status overlay shows the reason.
+- Limitation: in an exactly top-down orthographic view the X/Z scale handles
+  cannot be picked ([BUG-236](../../../tasks/backlog/bugs/BUG-236-topdown-ortho-gizmo-scale-handles.md)).
+  Tilt the view slightly, scale uniformly with the center handle, or edit
+  scale in the Inspector.
 
 Sandbox also explicitly composes optional `Runtime::AssetWorkflowModule` after
 the document and interaction owners. The module is the exact published import
@@ -535,6 +556,14 @@ models. On Vulkan-capable hosts, the opt-in
 smoke drives bounded `Engine::Run()` frames with the same mesh/graph/point-cloud
 scene and the app-owned `SandboxEditorController` attached, then asserts canonical default-recipe
 `Present` plus no canonical `SkippedUnavailable` pass.
+
+The gizmo smokes `RuntimeSandboxAcceptanceGpuSmoke.{ImGuizmoGroupDragAndUndoReachSameFramePixels,
+ImGuizmoOrthographicSplitViewportDragAndUndo}` drive the production Sandbox
+through the GLFW callbacks the window registered (no OS-generated input):
+a menu click enables the gizmo, a group drag moves both triangles in its first
+preview frame's own readback, and a click on Undo restores transforms and
+pixels. They ran on an RTX 3050 (X11, pixel ratio 1, unlocked session); a real
+HiDPI run is open in [UI-079](../../../tasks/backlog/ui/UI-079-imguizmo-hidpi-operational-run.md).
 
 Run the scoped operational smoke with:
 

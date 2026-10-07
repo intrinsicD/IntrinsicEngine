@@ -49,10 +49,14 @@ corners for that convention.
 - UI-078 slice 4a stays a separate diff/commit.
 
 ## Acceptance criteria
-- [ ] All engine, test, method and benchmark compile entries carry the three defines; nothing relies on `IntrinsicConfig` for them.
-- [ ] Runtime projections and `Geometry::Frustum` map near to 0 and far to 1. The `static_assert` in `Runtime.CameraControllers.cpp` fails to compile with the HEAD CMake config; `Containment.FrustumFromZeroToOneDepthMatrixUsesCameraNearPlane` fails without the frustum fix; `RuntimeCameraControllers.EveryControllerProjectsVulkanZeroToOneDepth` confirms the analytic depth mapping (it cannot fail on HEAD in its binary, where the ODR merge picked a test TU's ZO copy).
-- [ ] Picking, Y orientation and existing depth tests stay consistent; the CPU gate and named Vulkan smokes pass without weakened assertions.
-- [ ] `RuntimeSandboxAcceptanceGpuSmoke.ImGuizmoOrthographicSplitViewportDragAndUndo` passes operationally (revision, GPU/driver recorded).
+- [x] All engine, test, method and benchmark compile entries carry the three defines; nothing relies on `IntrinsicConfig` for them.
+      Compile DBs of `ci` and `ci-vulkan`: src 885/885, tests 434/434, methods 8/8, benchmarks 47/47 (before: src 0/885, benchmarks 38/47).
+- [x] Runtime projections and `Geometry::Frustum` map near to 0 and far to 1. The `static_assert` in `Runtime.CameraControllers.cpp` fails to compile with the HEAD CMake config; `Containment.FrustumFromZeroToOneDepthMatrixUsesCameraNearPlane` fails without the frustum fix; `RuntimeCameraControllers.EveryControllerProjectsVulkanZeroToOneDepth` confirms the analytic depth mapping (it cannot fail on HEAD in its binary, where the ODR merge picked a test TU's ZO copy).
+      All three checked as stated (static_assert with the HEAD CMake config, frustum test with the frustum fix reverted).
+- [x] Picking, Y orientation and existing depth tests stay consistent; the CPU gate and named Vulkan smokes pass without weakened assertions.
+      Focused CPU 204/204; full CPU gate 5825 entries: 5823 passed, 1 skipped, 1 failure (`SandboxEditorGizmo.RejectedPreviewShowsReasonWritesNothingAndReleaseCommitsLastAccepted` on a degenerate pose where the X-scale plane contains the eye) fixed by a non-degenerate pose with unchanged assertions (`SandboxEditorGizmo` 3× 12/12); `Test.CcacheWorkflow.py` 23/23; Vulkan 59/59.
+- [x] `RuntimeSandboxAcceptanceGpuSmoke.ImGuizmoOrthographicSplitViewportDragAndUndo` passes operationally (revision, GPU/driver recorded).
+      Passed in the 59/59 `ci-vulkan` run (NVIDIA RTX 3050, driver 590.48.01, X11) on the `95d093bb1` source plus the then-uncommitted UI-078 slice 4a test diff (`49a609334`).
 
 ## Verification
 ```bash
@@ -68,3 +72,9 @@ python3 tests/regression/tooling/Test.CcacheWorkflow.py
 python3 tools/agents/validate_tasks.py --root tasks --strict
 python3 tools/docs/check_doc_links.py --root . --strict
 ```
+
+## Completion
+Completed 2026-10-07. Commit: `95d093bb1`, after one Codex review (approve with two
+notes, both applied: separated acceptance wording, `Geometry.Frustum.cppm`
+synopsis). Maturity: Operational on Vulkan for the named smokes (the
+orthographic gizmo run is part of ara C118).

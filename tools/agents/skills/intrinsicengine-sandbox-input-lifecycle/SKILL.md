@@ -28,8 +28,11 @@ The optional `EditorUiModule` runs adapter begin/build/end through
 capture only after `EndFrame()`. Later viewport behavior and input actions
 derive `imguiCapturesInput` from that completed value and its
 `CapturesViewportInput()` result; a viewport click submits a pick request only
-when neither ImGui nor a gizmo owns the click. Omitting the module leaves the
-snapshot unclaimed.
+when neither ImGui nor a gizmo owns the click. A frontend that is not an ImGui
+window (the Sandbox's ImGuizmo gizmo) claims the viewport explicitly through
+`EditorUiHost::RequestViewportInput`, merged after the adapter capture; the
+claim blocks camera and pick but never cancels the claimant's own drag
+(`UI-078`, ADR 0006 §5). Omitting the module leaves the snapshot unclaimed.
 
 Evidence: `BUG-017` (clicks over UI fell through to selection / black outline),
 `BUG-036` (UI-captured input leaked into engine controls).
@@ -63,7 +66,9 @@ editor hook (which hosts the editor gizmo's previews, `UI-078`) and the
 viewport-input hooks (lifecycle cancels) — but **before** render extraction.
 
 Evidence: `BUG-024` (Inspector/gizmo transform edits did not move the rendered
-triangle).
+triangle). Prove it in the **first** changed frame's own readback, not a later
+one: `RuntimeSandboxAcceptanceGpuSmoke.ImGuizmoGroupDragAndUndoReachSameFramePixels`
+fails with the flush removed, a multi-frame smoke would not.
 
 ### 4. Never block the platform poll thread on decode
 
@@ -89,12 +94,17 @@ Evidence: `BUG-020` (camera modes / centering), `BUG-039` → `BUG-040`
 
 ### 6. HiDPI window-vs-framebuffer cursor scaling
 
-Click-pick cursor coordinates are in window space but the pick target is in
-framebuffer space; on HiDPI they differ. Pick math must scale window → framebuffer
-before sampling, or picks land off-target.
+Platform cursor events, ImGui, ImGuizmo and the `SceneViewport()` claim use
+logical window coordinates; render targets and pick readback use framebuffer
+pixels, and only `ResolveSceneViewportPixels()` scales and clamps the claim into
+them. On HiDPI they differ. Convert exactly once at the boundary: pick math
+scales window → framebuffer before sampling, and `PrepareGizmo` maps the
+resolved pixel rectangle back to window coordinates for the UI. Never scale
+twice or flip Y on the way.
 
 Evidence: `BUG-026` (viewport click selection — cursor/readback coordinate
-reconstruction).
+reconstruction); `SceneInteractionModule.GizmoUiSceneRectIsTheCurrentClaimMappedBackFromFramebufferPixels`
+(CPU). The Vulkan gizmo smokes ran only at ratio 1; a real HiDPI run is `UI-079`.
 
 ## How to prove a change is correct
 

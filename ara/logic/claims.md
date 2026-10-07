@@ -2454,3 +2454,14 @@
 - **Tags**: registration, Coherent Point Drift, Vulkan, GPU E-step, performance
 - **From staging**: O257
 
+
+## C118: Bounded operational ImGuizmo transform editing on Vulkan
+- **Statement**: UI-078's ImGuizmo frontend in the production Sandbox, driven through the GLFW callbacks the window registered (no OS-generated input), is enabled by a menu click, translates a two-triangle group with a claimed drag (camera and pick count unchanged, no history row until release, exactly one then) whose first preview frame's own readback shows both triangles moved, and a click on File / Scene Undo restores transforms, world matrices and pixels, in a perspective full-window and an orthographic top-down offset split viewport. Both cases passed 3/3, and `GlfwPlatformSmoke.NativeFocusChangesEmitWindowFocusEvents` passed, on an NVIDIA RTX 3050 (driver 590.48.01, X11, unlocked GNOME session, pixel ratio 1, ci-vulkan with ASan/UBSan) on the 95d093bb1 tree plus the then-uncommitted slice-4a diff, whose smoke code was committed unchanged as 49a609334; the orthographic case was also in BUG-235's 59/59 Vulkan run on 233025b75 plus the then-uncommitted BUG-235 and slice-4a diffs (committed as 95d093bb1 and 49a609334).
+- **Status**: supported — Operational for the executed path, device and pixel ratio 1 only; no HiDPI (UI-079), OS-input, rotate/scale-on-GPU, cross-device or timing claim. Top-down orthographic X/Z scale handles are not pickable (BUG-236).
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Either ImGuizmo smoke skips after the engine is operational, fails a pixel, transform, claim or history assertion, or passes with the pre-render flush removed; the focus smoke fails on an unlocked X11 session; or the source differs from the tested revision.
+- **Proof**: [tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp, tests/integration/platform/Test.GlfwPlatformSmoke.cpp, tests/support/ImGuiItemProbe.hpp, docs/adr/0006-camera-picking-and-gizmo-runtime-handoff.md, commit 49a609334, commit 95d093bb1]
+- **Dependencies**: []
+- **Tags**: Vulkan, Operational, editor gizmo, ImGuizmo, input ownership, pixel readback
+- **From staging**: O261

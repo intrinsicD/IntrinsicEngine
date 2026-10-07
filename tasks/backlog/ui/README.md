@@ -17,6 +17,7 @@ its dependencies, conditional gates, scope and verification.
 - [UI-075 — One Appearance panel for all domains with per-attribute source selectors](UI-075-unified-appearance-panel-with-attribute-source-selectors.md)
 - [UI-076 — Camera preset and focus visual smoke](UI-076-camera-preset-visual-smoke.md)
 - [UI-077 — Readiness field markers in every config panel](UI-077-readiness-field-markers-in-all-panels.md)
+- [UI-079 — Run the ImGuizmo smokes at a real HiDPI pixel ratio](UI-079-imguizmo-hidpi-operational-run.md)
 
 ## Agent lane and inspection windows
 

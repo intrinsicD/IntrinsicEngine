@@ -116,7 +116,14 @@ data-only payloads:
 - `WindowFocusEvent` reports native window focus gain/loss (GLFW focus
   callback; Null through `QueueEvent`). Runtime forwards it to ImGui IO and
   republishes it on the kernel event bus, where a loss cancels a running
-  transform-gizmo drag.
+  transform-gizmo drag. A real focus change emits `{false}` on the window
+  losing focus and `{true}` on the one gaining it.
+  Evidence: `NullPlatform.DeliversWindowFocusEventsInOrder` (CPU) and
+  `GlfwPlatformSmoke.NativeFocusChangesEmitWindowFocusEvents` (two real GLFW
+  windows, focus requested A → B → A). The GLFW smoke needs a display and a
+  window manager that grants programmatic focus; it passed on an unlocked
+  GNOME/X11 session and skips with its reason where focus is refused (for
+  example a locked session).
 - Clipboard text and cursor mode are exposed through `IWindow` methods so ImGui
   and editor adapters can remain backend-neutral.
 
