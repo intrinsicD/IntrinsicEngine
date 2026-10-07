@@ -1960,6 +1960,7 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
         SOURCES
             ${_runtime_sandbox_acceptance_gpu_smoke_test_sources}
         DEPS ExtrinsicSandboxEditor ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore glm::glm
+             imgui_core_lib
     )
 endif()
 
@@ -2985,11 +2986,12 @@ if(_intrinsic_registered_test_targets)
         "  set_tests_properties(PointCloudConsolidationGpuParity.ResidentLopMultipleProjectionAndReducePagesMatchCpu PROPERTIES TIMEOUT 120)\n"
         "endif()\n"
     )
-    # The surface-appearance sequence keeps a 90 s watchdog; leave time for its
-    # failure diagnostics and Vulkan shutdown under slow presentation pacing.
+    # The surface-appearance and UI-078 ImGuizmo sequences keep a 90 s watchdog;
+    # leave time for failure diagnostics and Vulkan shutdown under slow pacing.
     string(APPEND _intrinsic_property_fixup_script
         "if(DEFINED IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests_TESTS)\n"
         "  set_tests_properties(RuntimeSandboxAcceptanceGpuSmoke.SurfaceAppearanceBakesSelectedPropertyAndRestoresAttributes PROPERTIES TIMEOUT 120)\n"
+        "  set_tests_properties(RuntimeSandboxAcceptanceGpuSmoke.ImGuizmoGroupDragAndUndoReachSameFramePixels RuntimeSandboxAcceptanceGpuSmoke.ImGuizmoOrthographicSplitViewportDragAndUndo PROPERTIES TIMEOUT 120)\n"
         "endif()\n"
     )
     set(_intrinsic_property_fixup_file "${CMAKE_CURRENT_BINARY_DIR}/IntrinsicTestPropertyFixups.cmake")

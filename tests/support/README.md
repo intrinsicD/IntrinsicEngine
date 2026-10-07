@@ -37,6 +37,12 @@ event stream and submission-ordered push-constant payloads.
 snapshot, command callbacks, drain loop and scheduler lifecycle compile once in
 `SandboxEditorJobHarness.cpp`, linked by the runtime contract test target.
 
+`ImGuiItemProbe.hpp` (header-only) finds a Dear ImGui item on its actual
+rectangle: a cursor scan line steps once per frame until ImGui reports the item
+hovered. The `SandboxEditorGizmo` shell suite drives it through the Null window,
+the UI-078 Vulkan smoke through the production GLFW callbacks; neither needs a
+production test hook or fixed menu coordinates.
+
 ## Compiled geometry fixtures
 
 `geometry/Test_MeshBuilders.h` declares shared mesh fixtures and the

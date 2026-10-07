@@ -32,6 +32,7 @@
 #include "RuntimeTestModule.hpp"
 
 #include "EditorFeatureTestContext.hpp"
+#include "ImGuiItemProbe.hpp"
 #include "TestImGuiFrameScope.hpp"
 
 import Extrinsic.Runtime.NormalOperations;
@@ -2478,50 +2479,28 @@ namespace
             Mouse(false);
         }
 
-        // Moves the cursor through `at(0)`, `at(1)`, ... (one point per frame)
-        // until `hit()` reports the hover two frames later; `found` then holds
-        // that point and the cursor stays there ({0,0}: not found).
+        // A TestSupport::ImGuiCursorProbe over the Null window, one step per
+        // frame; `found` ends as its `Found`.
         void Probe(std::function<bool()> hit, std::function<glm::vec2(int)> at,
                    const std::shared_ptr<glm::vec2>& found, const int count)
         {
-            auto probes = std::make_shared<std::vector<glm::vec2>>();
-            Script->Steps.push_back([this, hit, at, found, probes, count]
+            auto probe = std::make_shared<TestSupport::ImGuiCursorProbe>();
+            Script->Steps.push_back([this, hit, at, found, probe, count]
             {
-                const int k = static_cast<int>(probes->size());
-                if (k >= 2 && hit())
-                {
-                    *found = (*probes)[static_cast<std::size_t>(k - 2)];
-                    Window().QueueCursor(found->x, found->y);
-                    return true;
-                }
-                if (k >= count)
-                    return true;
-                probes->push_back(at(k));
-                Window().QueueCursor(probes->back().x, probes->back().y);
-                return false;
+                const bool done =
+                    probe->Step(hit, at, count, [this](const glm::vec2 p) { Window().QueueCursor(p.x, p.y); });
+                *found = probe->Found;
+                return done;
             });
         }
-        // Clicks item `label` of ImGui window `window` on its actual rectangle:
-        // scans along `line` until ImGui reports that item hovered. A menu-bar
-        // item's id is scoped by "##MenuBar".
+        // Clicks item `label` of ImGui window `window` on its actual rectangle,
+        // found by scanning along `line`.
         void ClickItem(const char* window, const char* label, const bool menuBar,
                        std::function<glm::vec2(const ImGuiWindow&, int)> line, const int count)
         {
             auto found = std::make_shared<glm::vec2>(0.0f);
-            Probe([window, label, menuBar]
-                  {
-                      const ImGuiWindow* w = ImGui::FindWindowByName(window);
-                      if (w == nullptr)
-                          return false;
-                      const ImGuiID seed = menuBar ? ImHashStr("##MenuBar", 0, w->ID) : w->ID;
-                      return ImGui::GetCurrentContext()->HoveredIdPreviousFrame == ImHashStr(label, 0, seed);
-                  },
-                  [window, line](const int k)
-                  {
-                      const ImGuiWindow* w = ImGui::FindWindowByName(window);
-                      return w != nullptr ? line(*w, k) : glm::vec2{};
-                  },
-                  found, count);
+            Probe([window, label, menuBar] { return TestSupport::ImGuiItemHoveredPreviousFrame(window, label, menuBar); },
+                  [window, line](const int k) { return TestSupport::ImGuiWindowScan(window, line, k); }, found, count);
             Do([found, label] { EXPECT_NE(*found, glm::vec2{0.0f}) << label << " not found"; });
             Mouse(true);
             Mouse(false);
@@ -2529,16 +2508,12 @@ namespace
         void OpenGizmoMenu()
         {
             Wait(); // the menu bar needs one drawn frame
-            ClickItem("##MainMenuBar", "Gizmo", true,
-                      [](const ImGuiWindow& w, const int k) { return glm::vec2{6.0f * k, w.Pos.y + w.Size.y * 0.5f}; },
-                      200);
+            ClickItem("##MainMenuBar", "Gizmo", true, TestSupport::MenuBarScan, 200);
             Wait();
         }
         void ClickMenuItem(const char* label)
         {
-            ClickItem("###Menu_00", label, false,
-                      [](const ImGuiWindow& w, const int k) { return glm::vec2{w.Pos.x + 30.0f, w.Pos.y + 3.0f * k}; },
-                      150);
+            ClickItem("###Menu_00", label, false, TestSupport::WindowColumnScan, 150);
         }
         void EnableGizmo()
         {

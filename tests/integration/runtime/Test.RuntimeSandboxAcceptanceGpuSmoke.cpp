@@ -29,6 +29,7 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <iostream>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -49,6 +50,12 @@
 #include "RuntimeTestModule.hpp"
 
 #include "EditorFeatureTestContext.hpp"
+#include "ImGuiItemProbe.hpp"
+
+#ifndef GLFW_INCLUDE_NONE
+#define GLFW_INCLUDE_NONE
+#endif
+#include <GLFW/glfw3.h>
 
 import Extrinsic.Runtime.NormalOperations;
 import Extrinsic.Asset.ImportRouter;
@@ -119,6 +126,10 @@ import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
+import Extrinsic.Runtime.GizmoInteraction;
+import Extrinsic.ECS.Scene.Bootstrap;
+import Extrinsic.Platform.Window;
+import Geometry.HalfedgeMesh;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.WorldHandle;
@@ -1026,8 +1037,11 @@ struct AcceptanceBootstrap
 
 // Reproduce the actual `src/app/Sandbox/main.cpp` config path: keep
 // `CreateReferenceEngineConfig()` defaults, including validation and VSync.
+// `probe` is an optional test module that needs its own frame hooks; modules
+// can only be added before Initialize().
 [[nodiscard]] AcceptanceBootstrap
-BootstrapDefaultSandboxAppEngineWithApp(std::unique_ptr<Intrinsic::Tests::RuntimeTestModule> app)
+BootstrapDefaultSandboxAppEngineWithApp(std::unique_ptr<Intrinsic::Tests::RuntimeTestModule> app,
+                                        std::unique_ptr<RT::IRuntimeModule> probe = {})
 {
     if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
     {
@@ -1056,6 +1070,8 @@ BootstrapDefaultSandboxAppEngineWithApp(std::unique_ptr<Intrinsic::Tests::Runtim
     enginePtr->EmplaceModule<Extrinsic::Runtime::SceneInteractionModule>();
     enginePtr->EmplaceModule<Extrinsic::Runtime::AssetWorkflowModule>();
     enginePtr->EmplaceModule<Extrinsic::Runtime::TextureBakeModule>();
+    if (probe)
+        enginePtr->AddModule(std::move(probe));
     enginePtr->Initialize();
 
     const auto initInputs = GetVulkanDeviceOperationalInputs(&enginePtr->GetDevice());
@@ -8702,4 +8718,590 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, PresentedSceneKeepsWorldUpWithAndWithoutT
     EXPECT_EQ(FindPassStatus(overlay.Stats, "TransientDebugSurfacePass"), RenderCommandPassStatus::Recorded)
         << BuildPassStatusSummary(overlay.Stats);
     probe(overlay, "transient debug");
+}
+
+// --- UI-078: ImGuizmo group drag and undo through the production Sandbox ---
+//
+// Input enters through the GLFW callbacks the production window registered
+// (read back from the native handle, reinstalled at once, then invoked), so
+// every event takes the full path Window::Emit -> input state and event queue
+// -> ImGuiAdapter -> EditorShell -> ImGuizmo -> runtime gizmo session. No
+// OS-generated input is involved: this proves the path from the platform
+// callback to the presented pixels, not the window system's event delivery.
+namespace
+{
+// Invokes the callback the production window registered for `set`'s event.
+struct GlfwCallbackInput
+{
+    GLFWwindow* Window{nullptr};
+
+    template <typename Callback, typename... Args>
+    void Invoke(Callback (*set)(GLFWwindow*, Callback), Args... args) const
+    {
+        const Callback callback = set(Window, nullptr);
+        (void)set(Window, callback);
+        if (callback == nullptr)
+            ADD_FAILURE() << "The production window registered no GLFW callback for this event.";
+        else
+            callback(Window, args...);
+    }
+    void Cursor(const glm::vec2 p) const { Invoke(glfwSetCursorPosCallback, double{p.x}, double{p.y}); }
+    void Left(const bool down) const
+    {
+        Invoke(glfwSetMouseButtonCallback, GLFW_MOUSE_BUTTON_LEFT, down ? GLFW_PRESS : GLFW_RELEASE, 0);
+    }
+    void Scroll(const double y) const { Invoke(glfwSetScrollCallback, 0.0, y); }
+};
+
+// One presented frame, read back synchronously after its own present.
+struct GizmoSmokeCapture
+{
+    bool Requested{false};
+    bool Taken{false};
+    std::uint64_t Frame{0u};
+    std::vector<std::uint8_t> Bytes{};
+    Extrinsic::Graphics::RenderGraphFrameStats Stats{};
+    // The frame's post-camera-hook gizmo model (camera, scene rectangle) and transforms.
+    RT::GizmoUiFrame Gizmo{};
+    std::array<glm::vec3, 2> Positions{};
+    std::array<glm::mat4, 2> Worlds{};
+    bool Flushed{false};
+};
+
+// Runs one script step per frame at Simulation (after PollEvents, before
+// UiBegin, so an injected event reaches this frame's UI), lets the test observe
+// BeforeExtraction (after the pre-render flush and the camera hook), and reads
+// the frame a capture was requested for back in Maintenance, after its present.
+class GizmoSmokeProbe final : public RT::IRuntimeModule
+{
+public:
+    using Step = std::function<bool(RT::RuntimeFrameHookContext&)>;
+
+    std::vector<Step> Steps{};
+    std::function<void(RT::RuntimeFrameHookContext&)> Observe{};
+    Engine* Kernel{nullptr};
+    Extrinsic::RHI::BufferHandle Readback{};
+    std::uint64_t ReadbackSize{0u};
+    // Set before or during BeforeExtraction: that frame is read back.
+    GizmoSmokeCapture* Pending{nullptr};
+
+    [[nodiscard]] bool Done() const noexcept { return m_Next >= Steps.size(); }
+
+    [[nodiscard]] std::string_view Name() const noexcept override { return "Test.GizmoSmokeProbe"; }
+
+    [[nodiscard]] Extrinsic::Core::Result OnRegister(RT::EngineSetup& setup) override
+    {
+        if (auto r = setup.RegisterFrameHook(RT::FramePhase::Simulation, [this](RT::RuntimeFrameHookContext& ctx)
+            { if (Kernel != nullptr && !Done() && Steps[m_Next](ctx)) ++m_Next; });
+            !r.has_value())
+            return r;
+        if (auto r = setup.RegisterFrameHook(RT::FramePhase::BeforeExtraction, [this](RT::RuntimeFrameHookContext& ctx)
+            {
+                if (Kernel == nullptr)
+                    return;
+                if (Observe)
+                    Observe(ctx);
+                if (Pending != nullptr && !Pending->Requested)
+                {
+                    Pending->Requested = true;
+                    Pending->Frame = ctx.FrameIndex;
+                    Kernel->GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer(Readback);
+                }
+            });
+            !r.has_value())
+            return r;
+        return setup.RegisterFrameHook(RT::FramePhase::Maintenance, [this](RT::RuntimeFrameHookContext&)
+        {
+            if (Kernel == nullptr || Pending == nullptr || !Pending->Requested)
+                return;
+            Kernel->GetDevice().WaitIdle();
+            Pending->Bytes.assign(static_cast<std::size_t>(ReadbackSize), 0u);
+            Kernel->GetDevice().ReadBuffer(Readback, Pending->Bytes.data(), ReadbackSize, 0u);
+            Pending->Stats = Kernel->GetRenderer().GetLastRenderGraphStats();
+            Pending->Taken = true;
+            Pending = nullptr;
+            Kernel->GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+        });
+    }
+
+    void OnShutdown(RT::RuntimeModuleShutdownContext&) override {}
+
+private:
+    std::size_t m_Next{0u};
+};
+
+// Two small asymmetric right triangles with legs `Size * U` and `Size * V`
+// (U screen-right, V screen-up, U x V towards the camera) and origins at
+// `Pivot + Offset`; the group moves by `Drag`. Chosen so that, around both the
+// first preview frame (80% of the drag) and the final one, neither the gizmo
+// nor the other triangle covers an old or new sample point.
+struct GizmoSmokeLayout
+{
+    bool Orthographic{false};
+    glm::vec3 Pivot{};
+    std::array<glm::vec3, 2> Offset{};
+    glm::vec3 Drag{};
+    float Size{0.3f};
+    glm::vec3 U{1.0f, 0.0f, 0.0f};
+    glm::vec3 V{0.0f, 1.0f, 0.0f};
+
+    // Interior sample (wide side) and its vertical mirror in the triangle's
+    // bounding box, which lies outside: a Y-flipped image swaps them.
+    [[nodiscard]] glm::vec3 Inside() const { return Size * (0.3f * U + 0.1f * V); }
+    [[nodiscard]] glm::vec3 Mirror() const { return Size * (0.3f * U + 0.9f * V); }
+};
+
+constexpr int kGizmoSmokeTolerance = 48;
+constexpr std::array kGizmoSmokeDragFractions{0.8f, 0.9f, 1.0f};
+
+// Where ImGuizmo draws `world` (window coordinates, as GizmoFixture::ToScreen
+// in the SandboxEditorGizmo suite): NDC is Y-up, the window Y-down.
+[[nodiscard]] glm::vec2 GizmoSmokeScreen(const RT::GizmoUiFrame& frame, const glm::vec3 world)
+{
+    const glm::vec4 clip = frame.Projection * frame.View * glm::vec4{world, 1.0f};
+    const glm::vec2 ndc = glm::vec2{clip} / clip.w;
+    return {frame.SceneRect.X + (ndc.x * 0.5f + 0.5f) * frame.SceneRect.Width,
+            frame.SceneRect.Y + (0.5f - ndc.y * 0.5f) * frame.SceneRect.Height};
+}
+
+std::string GizmoSmokePixelText(const RgbaPixel p)
+{
+    return "(" + std::to_string(p.R) + "," + std::to_string(p.G) + "," + std::to_string(p.B) + ")";
+}
+
+void RunImGuizmoGroupDragSmoke(const GizmoSmokeLayout& layout)
+{
+    auto probeOwner = std::make_unique<GizmoSmokeProbe>();
+    GizmoSmokeProbe& probe = *probeOwner;
+    auto app = std::make_unique<ExitWhenReadyApp>(
+        [&probe](Engine&) { return probe.Done(); }, 1u, 6000u, std::chrono::seconds{90}, false);
+    ExitWhenReadyApp& exitApp = *app;
+    auto bootstrap = BootstrapDefaultSandboxAppEngineWithApp(std::move(app), std::move(probeOwner));
+    if (bootstrap.Skipped)
+        GTEST_SKIP() << bootstrap.SkipReason;
+    Engine& engine = *bootstrap.EnginePtr;
+    auto& device = engine.GetDevice();
+    auto& renderer = engine.GetRenderer();
+    const Extrinsic::RHI::Format format = device.GetBackbufferFormat();
+    const std::uint32_t bytesPerPixel = Extrinsic::RHI::BytesPerBlock(format);
+    const Extrinsic::Core::Extent2D extent = device.GetBackbufferExtent();
+    if (bytesPerPixel < 4u || extent.Width <= 0 || extent.Height <= 0)
+        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style smoke readback.";
+    probe.ReadbackSize = static_cast<std::uint64_t>(bytesPerPixel) * static_cast<std::uint64_t>(extent.Width) *
+                         static_cast<std::uint64_t>(extent.Height);
+    probe.Readback = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+        .SizeBytes = probe.ReadbackSize,
+        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+        .HostVisible = true,
+        .DebugName = "Sandbox.Ui078ImGuizmo.Readback",
+    });
+    if (!probe.Readback.IsValid())
+        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan smoke is opt-in.";
+
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    auto& raw = scene.Raw();
+    std::array<EntityHandle, 2> triangles{};
+    for (std::size_t i = 0u; i < triangles.size(); ++i)
+    {
+        const EntityHandle entity = Extrinsic::ECS::Scene::CreateDefault(scene, i == 0u ? "GizmoSmokeA" : "GizmoSmokeB");
+        raw.emplace_or_replace<ECSC::Selection::SelectableTag>(entity);
+        raw.emplace<G::RenderSurface>(entity, G::RenderSurface{.Domain = G::RenderSurface::SourceDomain::Vertex});
+        G::VisualizationConfig white{};
+        white.Source = G::VisualizationConfig::ColorSource::UniformColor;
+        white.Color = glm::vec4{1.0f};
+        raw.emplace<G::VisualizationConfig>(entity, white);
+        Geometry::HalfedgeMesh::Mesh mesh;
+        const auto v0 = mesh.AddVertex(glm::vec3{0.0f});
+        const auto v1 = mesh.AddVertex(layout.Size * layout.U);
+        const auto v2 = mesh.AddVertex(layout.Size * layout.V);
+        ASSERT_TRUE(mesh.AddTriangle(v0, v1, v2).has_value());
+        gs::PopulateFromMesh(raw, entity, mesh);
+        raw.get<ECSC::Transform::Component>(entity).Position = layout.Pivot + layout.Offset[i];
+        raw.emplace_or_replace<ECSC::Transform::IsDirtyTag>(entity);
+        triangles[i] = entity;
+    }
+    auto& selection = Selection(engine);
+    ASSERT_TRUE(selection.SetSelectedEntity(scene, triangles[0]));
+    selection.RequestClickPick(0u, 0u, RT::SelectionPickMode::Add);
+    (void)selection.ConsumePendingPick();
+    selection.ConsumeHit(scene, RT::SelectionController::ToStableEntityId(triangles[1]));
+    ASSERT_EQ(selection.SelectedCount(), 2u);
+
+    auto& window = engine.GetWindow();
+    auto* host = engine.Services().Find<RT::EditorUiHost>();
+    auto* history = engine.Services().Find<RT::EditorCommandHistory>();
+    ASSERT_NE(host, nullptr);
+    ASSERT_NE(history, nullptr);
+    const GlfwCallbackInput input{static_cast<GLFWwindow*>(window.GetNativeHandle())};
+    ASSERT_NE(input.Window, nullptr);
+    // The orthographic case renders into an offset split rectangle claimed
+    // during panel layout, as `SandboxEditorContext::ClaimSceneViewport` does.
+    if (layout.Orthographic)
+    {
+        const Extrinsic::Core::Extent2D logical = window.GetWindowExtent();
+        const RT::EditorSceneViewportRect split{
+            .X = 0.35f * static_cast<float>(logical.Width), .Y = 0.1f * static_cast<float>(logical.Height),
+            .Width = 0.6f * static_cast<float>(logical.Width), .Height = 0.8f * static_cast<float>(logical.Height)};
+        ASSERT_TRUE(host->RegisterWindow(RT::EditorWindowDescriptor{
+            .Id = "test.gizmo_split", .MenuPath = {"View"}, .Title = "Gizmo split", .OpenByDefault = true,
+            .Draw = [host, split](bool&) { host->SetSceneViewport(split); }}).IsValid());
+    }
+
+    const auto prepare = [&engine]
+    { return Interaction(engine).PrepareGizmo(RT::GizmoOrientation::Global, RT::GizmoPivotMode::WorldOrigins); };
+    const auto positions = [&]
+    { return std::array{raw.get<ECSC::Transform::Component>(triangles[0]).Position,
+                        raw.get<ECSC::Transform::Component>(triangles[1]).Position}; };
+    const auto worlds = [&]
+    { return std::array{raw.get<ECSC::Transform::WorldMatrix>(triangles[0]).Matrix,
+                        raw.get<ECSC::Transform::WorldMatrix>(triangles[1]).Matrix}; };
+    // Window coordinates scale to framebuffer pixels exactly once, here.
+    const auto toPixel = [&window](const glm::vec2 logical)
+    {
+        const auto w = window.GetWindowExtent();
+        const auto f = window.GetFramebufferExtent();
+        return glm::vec2{logical.x * static_cast<float>(f.Width) / static_cast<float>(w.Width),
+                         logical.y * static_cast<float>(f.Height) / static_cast<float>(w.Height)};
+    };
+    const auto describe = [&](GizmoSmokeCapture& capture, const RT::RuntimeFrameHookContext& ctx)
+    {
+        capture.Gizmo = prepare();
+        capture.Positions = positions();
+        capture.Worlds = worlds();
+        capture.Flushed = ctx.Pacing.PreRenderTransformFlushRan;
+    };
+
+    GizmoSmokeCapture disabled{}, enabled{}, preview{}, undone{};
+    const auto step = [&probe](std::function<void(RT::RuntimeFrameHookContext&)> body)
+    { probe.Steps.push_back([body = std::move(body)](RT::RuntimeFrameHookContext& ctx) { body(ctx); return true; }); };
+    // Moves the mouse away (nothing hovered) and, with `target`, reads that frame back.
+    glm::vec2 away{};
+    const auto moveAway = [&](GizmoSmokeCapture* target)
+    {
+        step([&, target](RT::RuntimeFrameHookContext&)
+        {
+            const RT::GizmoUiFrame frame = prepare();
+            away = {frame.SceneRect.X + 0.9f * frame.SceneRect.Width, frame.SceneRect.Y + 0.85f * frame.SceneRect.Height};
+            input.Cursor(away);
+            probe.Pending = target;
+        });
+        if (target != nullptr)
+            probe.Steps.push_back([target](RT::RuntimeFrameHookContext&) { return target->Taken; });
+    };
+    const auto click = [&](const char* windowName, const char* label, const bool menuBar,
+                           const std::function<glm::vec2(const ImGuiWindow&, int)>& line, const int count)
+    {
+        auto scan = std::make_shared<TestSupport::ImGuiCursorProbe>();
+        probe.Steps.push_back([=, &input](RT::RuntimeFrameHookContext&)
+        {
+            return scan->Step([=] { return TestSupport::ImGuiItemHoveredPreviousFrame(windowName, label, menuBar); },
+                              [=](const int k) { return TestSupport::ImGuiWindowScan(windowName, line, k); }, count,
+                              [&input](const glm::vec2 p) { input.Cursor(p); });
+        });
+        step([scan, label, &input](RT::RuntimeFrameHookContext&)
+        {
+            EXPECT_NE(scan->Found, glm::vec2{0.0f}) << label << " not found";
+            input.Left(true);
+        });
+        step([&input](RT::RuntimeFrameHookContext&) { input.Left(false); });
+    };
+
+    // 1. Operational, the selection framed by the requested camera, geometry resident.
+    bool cameraSwitched = !layout.Orthographic;
+    probe.Steps.push_back([&, settled = 0u](RT::RuntimeFrameHookContext&) mutable
+    {
+        if (!device.IsOperational())
+            return false;
+        auto* cameras = engine.Services().Find<RT::CameraControllerRegistry>();
+        if (!cameraSwitched)
+        {
+            if (cameras == nullptr || cameras->ResolveOrNull(RT::CameraControllerSlot::Main) == nullptr)
+                return false;
+            // The Camera / Render panel's "Top down" command, keeping the current view's framing.
+            const Intrinsic::Tests::EditorFeatureTestContext context{
+                .Scene = &scene, .Selection = &selection, .CameraControllers = cameras, .CameraViewport = extent};
+            EXPECT_EQ(RT::ApplyEditorCameraControllerCommand(
+                          context, RT::EditorCameraControllerCommand{.Kind = Config::CameraControllerKind::TopDown}),
+                      RT::EditorCommandStatus::Applied);
+            cameraSwitched = true;
+            return false;
+        }
+        const RT::GizmoUiFrame frame = prepare();
+        if (!frame.Available() || frame.Orthographic != layout.Orthographic)
+            return false;
+        return ++settled >= 4u; // geometry upload and swapchain latency
+    });
+
+    // 2. Gizmo off, menu closed, mouse away: the reference image.
+    moveAway(&disabled);
+    // 3. Enable it with real clicks on Gizmo -> Enabled.
+    click("##MainMenuBar", "Gizmo", true, TestSupport::MenuBarScan, 320);
+    click("###Menu_00", "Enabled", false, TestSupport::WindowColumnScan, 150);
+    moveAway(&enabled);
+
+    // 4. One group drag on the center (screen-plane) handle with X and Y
+    // components; the first move jumps 80% so the first preview frame already
+    // clears both old positions. Between moves the wheel scrolls (camera zoom
+    // input) in frames of its own: ImGui defers a move or button change that
+    // follows a wheel event in the same frame to the next frame.
+    RT::GizmoUiFrame idle{};
+    std::array<glm::vec3, 2> startPositions{};
+    std::array<glm::mat4, 2> startWorlds{};
+    std::size_t startUndo = 0u;
+    std::uint64_t startPicks = 0u;
+    std::array<glm::vec2, kGizmoSmokeDragFractions.size()> targets{};
+    std::optional<std::uint64_t> pressFrame{}, firstMoveFrame{}, releaseFrame{};
+    struct DragFrame
+    {
+        std::uint64_t Frame{0u};
+        RT::GizmoUiFrame PreHook{};  // as the shell sees it, before this frame's camera hook
+        RT::GizmoUiFrame PostHook{}; // after it, at BeforeExtraction
+        bool Claimed{false};
+        std::size_t Undo{0u};
+        std::uint64_t Picks{0u};
+    };
+    std::vector<DragFrame> dragFrames{};
+    const auto dragStep = [&](std::function<void(RT::RuntimeFrameHookContext&)> body)
+    {
+        step([&, body = std::move(body)](RT::RuntimeFrameHookContext& ctx)
+        {
+            dragFrames.push_back({.Frame = ctx.FrameIndex, .PreHook = prepare()});
+            body(ctx);
+        });
+    };
+    step([&](RT::RuntimeFrameHookContext&)
+    {
+        idle = prepare();
+        startPositions = positions();
+        startWorlds = worlds();
+        startUndo = history->UndoCount();
+        startPicks = selection.GetDiagnostics().ClickRequestsSubmitted;
+        for (std::size_t i = 0u; i < targets.size(); ++i)
+            targets[i] = GizmoSmokeScreen(idle, idle.Frame.Pivot + kGizmoSmokeDragFractions[i] * layout.Drag);
+        input.Cursor(GizmoSmokeScreen(idle, idle.Frame.Pivot));
+    });
+    step([](RT::RuntimeFrameHookContext&) {}); // hover the handle first
+    dragStep([&](RT::RuntimeFrameHookContext& ctx) { pressFrame = ctx.FrameIndex; input.Left(true); });
+    for (std::size_t i = 0u; i < targets.size(); ++i)
+    {
+        if (i > 0u)
+            dragStep([&, i](RT::RuntimeFrameHookContext&) { input.Scroll(i == 1u ? 1.0 : -1.0); });
+        dragStep([&, i](RT::RuntimeFrameHookContext& ctx)
+        {
+            if (i == 0u)
+                firstMoveFrame = ctx.FrameIndex;
+            input.Cursor(targets[i]);
+        });
+    }
+    dragStep([&](RT::RuntimeFrameHookContext& ctx) { releaseFrame = ctx.FrameIndex; input.Left(false); });
+    moveAway(nullptr);
+
+    // 5. Undo with the real button of the "File / Scene" window.
+    step([&](RT::RuntimeFrameHookContext&) { EXPECT_TRUE(host->SetWindowOpen("file.scene", true)); });
+    click("File / Scene", "Undo", false, TestSupport::WindowColumnScan, 150);
+    probe.Steps.push_back([&](RT::RuntimeFrameHookContext&) { return undone.Taken; });
+
+    // BeforeExtraction: record the drag and pick the first changed preview
+    // frame and the undo frame for readback.
+    probe.Observe = [&](RT::RuntimeFrameHookContext& ctx)
+    {
+        if (!dragFrames.empty() && dragFrames.back().Frame == ctx.FrameIndex)
+        {
+            DragFrame& drag = dragFrames.back();
+            drag.PostHook = prepare();
+            drag.Claimed = ctx.EditorCapture.CapturesViewportInput();
+            drag.Undo = history->UndoCount();
+            drag.Picks = selection.GetDiagnostics().ClickRequestsSubmitted;
+        }
+        if (pressFrame && !releaseFrame && !preview.Requested && probe.Pending == nullptr &&
+            positions() != startPositions)
+        {
+            probe.Pending = &preview;
+            describe(preview, ctx);
+        }
+        if (releaseFrame && *releaseFrame < ctx.FrameIndex && !undone.Requested && probe.Pending == nullptr &&
+            history->UndoCount() == startUndo && positions() == startPositions)
+        {
+            probe.Pending = &undone;
+            describe(undone, ctx);
+        }
+        for (GizmoSmokeCapture* still : {&disabled, &enabled})
+        {
+            if (probe.Pending == still && !still->Requested)
+                describe(*still, ctx);
+        }
+    };
+
+    probe.Kernel = &engine;
+    const Counters::Snapshot before = ToCounterSnapshot(GetVulkanOperationalDiagnosticsSnapshot());
+    engine.Run();
+    const Counters::Snapshot after = ToCounterSnapshot(GetVulkanOperationalDiagnosticsSnapshot());
+    const Extrinsic::Core::Extent2D logical = window.GetWindowExtent();
+    const Extrinsic::Core::Extent2D framebuffer = window.GetFramebufferExtent();
+    const auto finalPositions = positions();
+    const std::size_t finalUndo = history->UndoCount();
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+    device.DestroyBuffer(probe.Readback);
+    probe.Kernel = nullptr;
+
+    // Host evidence: the claim covers only this measured pixel ratio.
+    const RT::EditorSceneViewportRect rect = idle.SceneRect;
+    std::cout << "[UI-078 smoke] " << (layout.Orthographic ? "orthographic split" : "perspective full")
+              << " window=" << logical.Width << "x" << logical.Height << " framebuffer=" << framebuffer.Width << "x"
+              << framebuffer.Height << " scale=" << static_cast<float>(framebuffer.Width) / logical.Width << ","
+              << static_cast<float>(framebuffer.Height) / logical.Height << " sceneRect=" << rect.X << ","
+              << rect.Y << " " << rect.Width << "x" << rect.Height
+              << " firstPreviewFrame=" << preview.Frame << " undoFrame=" << undone.Frame << " " << exitApp.ExitSummary()
+              << '\n';
+
+    ASSERT_TRUE(device.IsOperational()) << "Promoted Vulkan left operation during the gizmo smoke.";
+    ASSERT_TRUE(probe.Done()) << "The gizmo script did not finish: " << exitApp.ExitSummary();
+    ASSERT_TRUE(disabled.Taken && enabled.Taken && preview.Taken && undone.Taken)
+        << "Missing readback: disabled=" << disabled.Taken << " enabled=" << enabled.Taken
+        << " preview=" << preview.Taken << " undo=" << undone.Taken;
+    EXPECT_TRUE(Counters::IsStable(before, after))
+        << "Vulkan fallback/error counters changed: fallbackToNull " << before.FallbackToNull << " -> "
+        << after.FallbackToNull << ", initFailure " << before.InitFailure << " -> " << after.InitFailure
+        << ", validationError " << before.ValidationError << " -> " << after.ValidationError
+        << ", gateFailure " << before.OperationalGateFailure << " -> " << after.OperationalGateFailure;
+    EXPECT_EQ(idle.Orthographic, layout.Orthographic);
+    if (layout.Orthographic)
+        EXPECT_GT(idle.SceneRect.X, 0.0f) << "the split rectangle must be offset";
+
+    const auto pixelAt = [&](const GizmoSmokeCapture& c, const glm::vec2 px)
+    {
+        return ReadPixel(c.Bytes, format, bytesPerPixel, extent, static_cast<std::uint32_t>(std::lround(px.x)),
+                         static_cast<std::uint32_t>(std::lround(px.y)));
+    };
+    const auto pixel = [&](const GizmoSmokeCapture& c, const glm::vec2 logicalPoint)
+    { return pixelAt(c, toPixel(logicalPoint)); };
+    // Every pixel of a 5x5 patch around `world` is background (or none is).
+    const auto patchIs = [&](const GizmoSmokeCapture& c, const glm::vec3 world, const bool background)
+    {
+        const glm::vec2 center = toPixel(GizmoSmokeScreen(c.Gizmo, world));
+        const RgbaPixel reference = pixel(c, away);
+        for (int dy = -2; dy <= 2; ++dy)
+            for (int dx = -2; dx <= 2; ++dx)
+            {
+                const RgbaPixel p = pixelAt(c, center + glm::vec2{dx, dy});
+                if ((RgbDistance(p, reference) < kGizmoSmokeTolerance) != background)
+                    return testing::AssertionFailure()
+                           << "pixel " << GizmoSmokePixelText(p) << " at " << center.x + dx << "," << center.y + dy
+                           << " vs background " << GizmoSmokePixelText(reference) << " (frame " << c.Frame << ")";
+            }
+        return testing::AssertionSuccess();
+    };
+    const auto checkFrame = [&](const GizmoSmokeCapture& c, const char* label)
+    {
+        SCOPED_TRACE(label);
+        EXPECT_EQ(FindPassStatus(c.Stats, "SurfacePass"), RenderCommandPassStatus::Recorded) << BuildPassStatusSummary(c.Stats);
+        EXPECT_EQ(FindPassStatus(c.Stats, "ImGuiPass"), RenderCommandPassStatus::Recorded) << BuildPassStatusSummary(c.Stats);
+        EXPECT_EQ(FindPassStatus(c.Stats, "Present"), RenderCommandPassStatus::Recorded) << BuildPassStatusSummary(c.Stats);
+        EXPECT_EQ(c.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u);
+        EXPECT_EQ(c.Gizmo.SceneRect.X, idle.SceneRect.X);
+        EXPECT_EQ(c.Gizmo.SceneRect.Width, idle.SceneRect.Width);
+    };
+    // Old/new interior points of both triangles, and the new points' vertical mirrors.
+    const auto checkPixels = [&](const GizmoSmokeCapture& c, const std::array<glm::vec3, 2>& at, const bool there)
+    {
+        for (std::size_t i = 0u; i < 2u; ++i)
+        {
+            SCOPED_TRACE(i);
+            EXPECT_TRUE(patchIs(c, at[i] + layout.Inside(), !there)) << "interior";
+            if (there)
+                EXPECT_TRUE(patchIs(c, at[i] + layout.Mirror(), true)) << "Y-mirrored interior";
+        }
+    };
+
+    // Visibility: handle pixels around the pivot appear only when enabled.
+    checkFrame(disabled, "disabled");
+    checkFrame(enabled, "enabled");
+    {
+        const glm::vec2 pivot = toPixel(GizmoSmokeScreen(enabled.Gizmo, enabled.Gizmo.Frame.Pivot));
+        int changed = 0;
+        for (int dy = -80; dy <= 80; ++dy)
+            for (int dx = -80; dx <= 80; ++dx)
+                changed += RgbDistance(pixelAt(enabled, pivot + glm::vec2{dx, dy}),
+                                       pixelAt(disabled, pivot + glm::vec2{dx, dy})) > 60 ? 1 : 0;
+        EXPECT_GT(changed, 150) << "the enabled gizmo drew no handle around the pivot " << pivot.x << "," << pivot.y;
+        checkPixels(disabled, startPositions, true);
+        checkPixels(enabled, startPositions, true);
+    }
+
+    // The drag: claimed throughout, camera and picks untouched, the camera the
+    // shell drew with is the one the frame rendered, one undo row on release.
+    ASSERT_TRUE(pressFrame && firstMoveFrame && releaseFrame);
+    ASSERT_EQ(dragFrames.size(), 2u * targets.size() + 1u);
+    for (const DragFrame& drag : dragFrames)
+    {
+        SCOPED_TRACE(drag.Frame);
+        EXPECT_TRUE(drag.Claimed);
+        EXPECT_EQ(drag.Picks, startPicks);
+        EXPECT_EQ(drag.PreHook.View, drag.PostHook.View) << "the claimed camera hook must not move the camera";
+        EXPECT_EQ(drag.PreHook.Projection, drag.PostHook.Projection);
+        EXPECT_EQ(drag.PostHook.View, idle.View);
+        EXPECT_EQ(drag.PostHook.Projection, idle.Projection);
+        EXPECT_EQ(drag.Undo, drag.Frame == *releaseFrame ? startUndo + 1u : startUndo);
+        EXPECT_EQ(drag.PostHook.Dragging, drag.Frame != *releaseFrame);
+    }
+    EXPECT_EQ(finalUndo, startUndo) << "the undo button must remove the drag's one row";
+
+    // The first changed preview frame is the first move's own frame.
+    checkFrame(preview, "first preview");
+    EXPECT_EQ(preview.Frame, *firstMoveFrame);
+    EXPECT_TRUE(preview.Flushed);
+    const glm::vec3 moved = preview.Positions[0] - startPositions[0];
+    EXPECT_GT(std::abs(moved.x), 0.1f);
+    EXPECT_GT(glm::length(moved - glm::dot(moved, layout.U) * layout.U), 0.1f) << "the drag needs a vertical part";
+    EXPECT_NEAR(glm::length(moved - kGizmoSmokeDragFractions[0] * layout.Drag), 0.0f, 0.05f);
+    for (std::size_t i = 0u; i < 2u; ++i)
+    {
+        EXPECT_LT(glm::length(preview.Positions[i] - startPositions[i] - moved), 1e-4f)
+            << "the group moves by one translation";
+        EXPECT_EQ(preview.Worlds[i][3], glm::vec4(preview.Positions[i], 1.0f)) << "world matrix flushed this frame";
+    }
+    checkPixels(preview, startPositions, false);
+    checkPixels(preview, preview.Positions, true);
+
+    // The undo frame restores TRS, world matrices and pixels.
+    checkFrame(undone, "undo");
+    EXPECT_EQ(undone.Positions, startPositions);
+    EXPECT_EQ(undone.Worlds, startWorlds);
+    EXPECT_EQ(finalPositions, startPositions);
+    checkPixels(undone, startPositions, true);
+    checkPixels(undone, std::array{startPositions[0] + layout.Drag, startPositions[1] + layout.Drag}, false);
+    for (std::size_t i = 0u; i < 2u; ++i)
+        EXPECT_LT(RgbDistance(pixel(undone, GizmoSmokeScreen(undone.Gizmo, startPositions[i] + layout.Inside())),
+                              pixel(enabled, GizmoSmokeScreen(enabled.Gizmo, startPositions[i] + layout.Inside()))),
+                  kGizmoSmokeTolerance) << "original pixels restored";
+}
+} // namespace
+
+// UI-078: a translate group drag of two selected triangles through the real
+// GLFW callbacks, production EditorShell and ImGuizmo moves their pixels in the
+// first preview frame, records one undo row on release, and the real Undo
+// button restores transforms and pixels in its own frame.
+TEST(RuntimeSandboxAcceptanceGpuSmoke, ImGuizmoGroupDragAndUndoReachSameFramePixels)
+{
+    RunImGuizmoGroupDragSmoke(GizmoSmokeLayout{
+        .Orthographic = false,
+        .Pivot = {1.25f, -0.5f, 0.0f},
+        .Offset = {glm::vec3{-0.4f, -0.3f, 0.0f}, glm::vec3{0.4f, 0.38f, 0.0f}},
+        .Drag = {-0.35f, 0.4f, 0.0f},
+        .Size = 0.3f,
+    });
+}
+
+// The same drag in the top-down orthographic view inside an offset split
+// scene rectangle (geometry in the XZ plane, screen-up is -Z).
+TEST(RuntimeSandboxAcceptanceGpuSmoke, ImGuizmoOrthographicSplitViewportDragAndUndo)
+{
+    RunImGuizmoGroupDragSmoke(GizmoSmokeLayout{
+        .Orthographic = true,
+        .Pivot = {2.0f, 0.0f, 0.8f},
+        .Offset = {glm::vec3{-0.8f, 0.0f, 0.5f}, glm::vec3{0.7f, 0.0f, -0.35f}},
+        .Drag = {-0.6f, 0.0f, -0.7f},
+        .Size = 0.5f,
+        .V = {0.0f, 0.0f, -1.0f},
+    });
 }

@@ -352,6 +352,53 @@ Codex review of the fixed commit → fixes → re-verification.
   survives on tilted and identity bases. Evidence:
   `SandboxConfigSections.GizmoSnapStepsRegisterValidateAndApplyThroughTheConfigLane`
   (fails without the floor).
+- **Slice 4a — smoke/evidence, 2026-10-07: approved by Codex after two rounds
+  (round 1: the focus smoke now starts from B focused so A→B→A are real
+  transitions).** Operator decisions: automated input goes through the GLFW callbacks
+  the production window registered (read from the native handle, reinstalled,
+  invoked), i.e. Window::Emit → input state/event queue → ImGuiAdapter →
+  EditorShell → ImGuizmo → runtime; no OS-generated input is involved and no
+  direct Begin/PreviewGizmoDrag call substitutes for it. Native focus is a
+  separate GLFW smoke that skips with its reason where the window manager
+  refuses programmatic focus. The HiDPI claim is limited to the measured pixel
+  ratio. The top-down orthographic X/Z scale limitation is accepted (documented
+  in 4b). Added: `RuntimeSandboxAcceptanceGpuSmoke.{ImGuizmoGroupDragAndUndoReachSameFramePixels,
+  ImGuizmoOrthographicSplitViewportDragAndUndo}` (one driver: production
+  Sandbox bootstrap plus a test probe module with Simulation/BeforeExtraction/
+  Maintenance hooks; real clicks on Gizmo → Enabled and on the File / Scene
+  Undo button through the shared `tests/support/ImGuiItemProbe.hpp`, also used
+  by `SandboxEditorGizmo`; handle pixels appear only when enabled; a translate
+  group drag with X and Y components and wheel input stays claimed with the
+  camera and pick count unchanged, the shell's pre-hook camera equal to the
+  rendered one, no history row until release and exactly one then; the first
+  changed preview frame is the first move's own frame, flushed, and its
+  readback shows both old interior points as background and the projected new
+  ones, not their vertical mirrors, as geometry; the Undo frame restores TRS,
+  world matrices and pixels), and `GlfwPlatformSmoke.NativeFocusChangesEmitWindowFocusEvents`.
+  Mutation: with the pre-render flush's systems removed the first preview
+  readback (and the world-matrix check) fails.
+  **Finding (blocks the orthographic case, outside 4a):** the top-down camera
+  renders no surfaces on Vulkan. `ExtrinsicRuntime` compiles without
+  `GLM_FORCE_DEPTH_ZERO_TO_ONE` (only `IntrinsicConfig` consumers define it),
+  so `MakeOrthographicProjection` yields OpenGL clip depth; at the default
+  top-down pose (altitude 3, near 0.1, far 100) geometry lands at NDC z ≈ −0.94
+  and is clipped. With `glm::orthoRH_ZO` (local experiment, reverted) the
+  orthographic smoke passes.
+  Host evidence (revision `233025b75` + this diff): NVIDIA GeForce RTX 3050,
+  driver 590.48.01, X11 (GNOME Shell, session locked, monitor DPMS-off, so
+  presents block ~1 s per frame); window 1600x900 = framebuffer 1600x900,
+  scale 1,1; scene rectangle 0,0 1600x900 (perspective) and 560,90 960x720
+  (orthographic split). Runs (ci-vulkan, ASan/UBSan, 4 times): the
+  perspective ImGuizmo smoke, `InspectorTransformEditShiftsReferenceTrianglePixels`
+  and `PresentedSceneKeepsWorldUpWithAndWithoutTransientDebug` pass 4/4; the
+  orthographic smoke fails 4/4, only on the interior-geometry pixels (the
+  clipping above). Native focus skipped: GNOME Shell granted neither window
+  focus. CPU route: 252/252 focused tests pass.
+  **Resolved by BUG-235 (`95d093bb1`), rerun on that base with the session
+  unlocked (monitor on, idle inhibited):** both ImGuizmo smokes pass 3/3
+  (~13 s each; perspective and orthographic split 560,90 960x720), and
+  `GlfwPlatformSmoke.NativeFocusChangesEmitWindowFocusEvents` passes (GNOME
+  Shell/X11 grants programmatic focus on an unlocked session).
 - **Remaining:** slice 4 (docs and the Vulkan acceptance smoke, including the
   known top-down orthographic X/Z scale-handle limitation). All acceptance boxes stay
   open until then.
