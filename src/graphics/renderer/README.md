@@ -2476,7 +2476,7 @@ Concretely:
   remaining backend-local under `src/graphics/vulkan`. Visualization mode is
   derived deterministically from `FrameRecipeResourceKind` plus
   `DebugViewResourceClass`: direct LDR color blit for `SceneColorLDR`,
-  Reinhard tonemap for `SceneColorHDR`, depth-linearize-to-grayscale for
+  Reinhard tonemap for `SceneColorHDR`, raw device depth as grayscale for
   `SceneDepth`/`ShadowAtlas`/`HZB.Current`, world-space normal for `SceneNormal`,
   integer-hash to color for `EntityId`/`PrimitiveId` (`PrimitiveId` decoded
   via `EncodedSelectionId`), direct color for `Albedo`, and scalar

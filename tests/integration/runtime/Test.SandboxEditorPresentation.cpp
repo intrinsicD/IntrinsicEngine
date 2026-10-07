@@ -3111,9 +3111,11 @@ TEST(SandboxEditorGizmo, RejectedPreviewShowsReasonWritesNothingAndReleaseCommit
 {
     GizmoFixture f;
     // Scaling world X skews the entity turned 45 degrees about Y: the whole
-    // group is rejected, though the unrotated one alone would be valid.
-    const auto plain = f.Select(glm::vec3{-1.0f, 0.0f, 0.0f});
-    const auto turned = f.Select(glm::vec3{1.0f, 0.0f, 0.0f}, true);
+    // group is rejected, though the unrotated one alone would be valid. The
+    // pivot sits off x=0: a pivot whose X-scale plane contains the eye leaves
+    // ImGuizmo's handle hit test to float noise (the known axis-plane limit).
+    const auto plain = f.Select(glm::vec3{-0.5f, 0.3f, 0.0f});
+    const auto turned = f.Select(glm::vec3{1.5f, 0.3f, 0.0f}, true);
     f.TransformOf(turned).Rotation = glm::angleAxis(glm::radians(45.0f), glm::vec3{0.0f, 1.0f, 0.0f});
     const Tf::Component plainBefore = f.TransformOf(plain);
     const Tf::Component turnedBefore = f.TransformOf(turned);

@@ -19,6 +19,9 @@ module Extrinsic.Runtime.CameraControllers;
 
 import Geometry.Validation;
 
+// Vulkan clip space: right-handed, depth [0, 1] (set build-wide in CMakeLists.txt).
+static_assert(GLM_CONFIG_CLIP_CONTROL == GLM_CLIP_CONTROL_RH_ZO);
+
 namespace Extrinsic::Runtime
 {
     namespace Detail

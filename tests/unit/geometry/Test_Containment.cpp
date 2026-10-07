@@ -182,6 +182,30 @@ TEST(Containment, FrustumSphere_StraddlingPlane)
     EXPECT_FALSE(Contains(frustum, s));
 }
 
+TEST(Containment, FrustumFromZeroToOneDepthMatrixUsesCameraNearPlane)
+{
+    // BUG-235: Vulkan clip space puts the near plane at NDC z = 0, not -1.
+    // Eye at z = 10 looking down -Z with near 1: the near plane is z = 9.
+    const glm::mat4 view = glm::lookAt(glm::vec3(0, 0, 10), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+    const glm::mat4 projections[] = {
+        glm::perspectiveRH_ZO(glm::radians(60.0f), 1.0f, 1.0f, 50.0f),
+        glm::orthoRH_ZO(-5.0f, 5.0f, -5.0f, 5.0f, 1.0f, 50.0f),
+    };
+
+    for (const glm::mat4& proj : projections)
+    {
+        const glm::mat4 viewProj = proj * view;
+        const Frustum frustum = Frustum::CreateFromMatrix(viewProj);
+        for (int i = 0; i < 8; ++i)
+        {
+            const glm::vec4 clip = viewProj * glm::vec4(frustum.Corners[i], 1.0f);
+            EXPECT_NEAR(clip.z / clip.w, i < 4 ? 0.0f : 1.0f, 1.0e-4f) << "corner " << i;
+        }
+        EXPECT_FALSE(Contains(frustum, glm::vec3(0, 0, 9.25f)));
+        EXPECT_TRUE(Contains(frustum, glm::vec3(0, 0, 8.5f)));
+    }
+}
+
 // ============================================================================
 // Frustum contains AABB / Sphere parity battery (GEOM-007 Slice 3.3.c)
 // ============================================================================

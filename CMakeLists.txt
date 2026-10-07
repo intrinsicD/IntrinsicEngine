@@ -413,12 +413,17 @@ set(INTRINSIC_LINK_FLAGS
 # minimum supported Clang is 22 or newer (BUG-157).
 add_compile_definitions(GLM_FORCE_XYZW_ONLY)
 
-add_library(IntrinsicConfig INTERFACE)
-target_compile_definitions(IntrinsicConfig INTERFACE
+# GLM clip-space convention for every TU in this build: right-handed, radians,
+# Vulkan depth [0, 1] (BUG-235). Directory scope, not an IntrinsicConfig usage
+# requirement: glm::perspective/ortho are inline templates, so TUs compiled
+# with different conventions silently ODR-merge into one arbitrary variant.
+add_compile_definitions(
         GLM_FORCE_RADIANS
         GLM_FORCE_DEPTH_ZERO_TO_ONE
         GLM_RIGHT_HANDED
 )
+
+add_library(IntrinsicConfig INTERFACE)
 
 include(cmake/Dependencies.cmake)
 include(cmake/IntrinsicModule.cmake)

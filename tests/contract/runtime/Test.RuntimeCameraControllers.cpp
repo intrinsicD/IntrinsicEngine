@@ -410,6 +410,40 @@ TEST(RuntimeCameraControllers, TopDownUsesOrthographicProjectionAndClampsZoom)
     ExpectValidCameraView(view);
 }
 
+TEST(RuntimeCameraControllers, EveryControllerProjectsVulkanZeroToOneDepth)
+{
+    // BUG-235: the controllers' own TU must build Vulkan clip depth [0, 1]
+    // (near 0, far 1), not OpenGL [-1, 1]. Expectations are analytic. TopDown
+    // seeds at altitude 3 above its target (near 0.1, far 100): the target
+    // must land at (3 - 0.1) / 99.9 ~= 0.029029, not the OpenGL ~= -0.941942.
+    constexpr Core::Config::CameraControllerKind kinds[] = {
+        Core::Config::CameraControllerKind::Orbit,
+        Core::Config::CameraControllerKind::Fly,
+        Core::Config::CameraControllerKind::FreeLook,
+        Core::Config::CameraControllerKind::TopDown,
+    };
+
+    for (const Core::Config::CameraControllerKind kind : kinds)
+    {
+        SCOPED_TRACE(static_cast<int>(kind));
+        const std::unique_ptr<Runtime::ICameraController> controller =
+            Runtime::CreateCameraController(kind, MakeSeed());
+        ASSERT_NE(controller, nullptr);
+        const Graphics::CameraViewInput view = controller->GetView(Core::Extent2D{1280, 720});
+        const float n = view.NearPlane;
+        const float f = view.FarPlane;
+        const bool orthographic = kind == Core::Config::CameraControllerKind::TopDown;
+
+        for (const float d : {n, 1.5f * n, 3.0f, f})
+        {
+            const glm::vec4 clip =
+                view.Projection * view.View * glm::vec4(view.Position + view.Forward * d, 1.0f);
+            const float expected = orthographic ? (d - n) / (f - n) : f * (d - n) / (d * (f - n));
+            EXPECT_NEAR(clip.z / clip.w, expected, 1.0e-4f) << "distance " << d;
+        }
+    }
+}
+
 TEST(RuntimeCameraControllers, RegistryCanSeedTopDownFromTerminalReferenceView)
 {
     Runtime::CameraControllerRegistry registry;

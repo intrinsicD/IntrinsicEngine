@@ -23,6 +23,8 @@ if(INTRINSIC_ENABLE_CCACHE AND CCACHE_PROGRAM)
     if(NOT _intrinsic_ccache_config_compile_definitions)
         set(_intrinsic_ccache_config_compile_definitions "")
     endif()
+    get_directory_property(_intrinsic_ccache_directory_compile_definitions
+        COMPILE_DEFINITIONS)
     string(TOUPPER "${CMAKE_BUILD_TYPE}" _intrinsic_ccache_build_type_upper)
     set(_intrinsic_ccache_active_cxx_flags
         "${CMAKE_CXX_FLAGS_${_intrinsic_ccache_build_type_upper}}")
@@ -32,7 +34,8 @@ if(INTRINSIC_ENABLE_CCACHE AND CCACHE_PROGRAM)
         "cxx_flags=${CMAKE_CXX_FLAGS}\n"
         "active_cxx_flags=${_intrinsic_ccache_active_cxx_flags}\n"
         "intrinsic_compile_flags=${INTRINSIC_COMPILE_FLAGS}\n"
-        "intrinsic_config_compile_definitions=${_intrinsic_ccache_config_compile_definitions}\n")
+        "intrinsic_config_compile_definitions=${_intrinsic_ccache_config_compile_definitions}\n"
+        "directory_compile_definitions=${_intrinsic_ccache_directory_compile_definitions}\n")
     string(SHA256 _intrinsic_ccache_global_module_context_hash
         "${_intrinsic_ccache_global_module_context}")
 

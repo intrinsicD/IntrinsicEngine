@@ -34,7 +34,7 @@ Concrete camera controllers (orbit, fly, free-look, top-down) live as runtime mo
 Each frame:
 
 1. The active controller reads platform input deltas through the existing platform input port and translates them into camera-state mutations (target, distance, yaw/pitch/roll, position, look-at) on runtime-owned camera state.
-2. Runtime extraction reads the resulting view/projection from the active controller and fills `CameraViewInput` (eye, look-at/forward, up, fov, near/far, viewport pixel width/height, view/projection matrices).
+2. Runtime extraction reads the resulting view/projection from the active controller and fills `CameraViewInput` (eye, look-at/forward, up, fov, near/far, viewport pixel width/height, view/projection matrices). Projections follow the [clip-space convention](../architecture/graphics.md#gpu-scene-ownership) (right-handed, depth [0, 1]).
 3. Runtime submits the input through `IRenderer::SubmitRuntimeSnapshots()`.
 4. Graphics validates the input through `Extrinsic.Graphics.CameraSnapshots` to produce the immutable `CameraViewSnapshot` (with extracted frustum planes) consumed by passes.
 
