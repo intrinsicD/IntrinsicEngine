@@ -352,7 +352,7 @@ Codex review of the fixed commit → fixes → re-verification.
   survives on tilted and identity bases. Evidence:
   `SandboxConfigSections.GizmoSnapStepsRegisterValidateAndApplyThroughTheConfigLane`
   (fails without the floor).
-- **Slice 4a — smoke/evidence, 2026-10-07: approved by Codex after two rounds
+- **Slice 4a — smoke/evidence, 2026-10-07: done in `49a609334` after two Codex rounds
   (round 1: the focus smoke now starts from B focused so A→B→A are real
   transitions).** Operator decisions: automated input goes through the GLFW callbacks
   the production window registered (read from the native handle, reinstalled,
