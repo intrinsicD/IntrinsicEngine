@@ -8,6 +8,25 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-07 — UI-078 ImGuizmo transform editing
+
+Retired [UI-078](UI-078-imguizmo-transform-editing.md).
+
+- The Sandbox edits entity transforms with an app-private ImGuizmo gizmo (menu-only enable, W/E/R, Escape, Shift snap with configurable steps, origin or bounds-center pivot, local/global incl. groups). Runtime owns the frozen matrix session, atomic non-TRS rejection, viewport claim, lifecycle cancels and one undo batch per drag; the old runtime ray adapter and gizmo packet builder are gone. ADR 0006 §§3–5 hold the consolidated decision.
+- Maturity: Operational on Vulkan for the executed path at pixel ratio 1 (ara C118: perspective and orthographic split smokes, native GLFW focus smoke; RTX 3050, X11).
+- Owned elsewhere: real HiDPI run [UI-079](../backlog/ui/UI-079-imguizmo-hidpi-operational-run.md); accepted top-down orthographic X/Z scale-handle limitation [BUG-236](../backlog/bugs/BUG-236-topdown-ortho-gizmo-scale-handles.md).
+
+Commits `5ba6f9b97`, `6441f256e`, `a6fc6f4fc`, `0ae5e4538`, `b513f2787`, `49a609334` and the slice 4b docs and retirement commits.
+
+## 2026-10-07 — BUG-235 global GLM depth convention
+
+Retired [BUG-235](BUG-235-global-glm-depth-convention.md).
+
+- `GLM_FORCE_DEPTH_ZERO_TO_ONE`, `GLM_FORCE_RADIANS` and `GLM_RIGHT_HANDED` are build-wide (engine TUs previously built OpenGL depth; the test binaries hid it through inline-template ODR merging). A `static_assert` guards the camera controllers; `Geometry::Frustum` uses the [0, 1] near plane.
+- Maturity: Operational; the full CPU gate ran 5823 passed, 1 failed, 1 skipped, and the one failure (a gizmo test on a degenerate ImGuizmo pose) passed 3/3 after the pose fix; 59/59 Vulkan smokes pass, including UI-078's orthographic gizmo smoke that found the defect. Nothing remains open.
+
+Commit `95d093bb1`.
+
 ## 2026-10-06 — REVIEW-007 deferred candidates decided
 
 Operator decisions on the candidates [REVIEW-007](REVIEW-007-ponytail-audit-triage.md) left deferred. No task is retired.

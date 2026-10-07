@@ -8,7 +8,6 @@ picking backlog work; theme priorities and rationale live in
 
 ## Active tasks
 
-- `BUG-235` — Global GLM depth convention (tasks/active/BUG-235-global-glm-depth-convention.md)
 - `GEOM-111` — Unified progressive point sampling (`Geometry.PointSampling`) (tasks/active/GEOM-111-unified-progressive-point-sampling.md)
 - `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/active/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
 - `GRAPHICS-153` — GPU methods reuse resident buffers; CPU<->GPU IO only at start and end (tasks/active/GRAPHICS-153-gpu-buffer-reuse-and-minimal-io.md)
@@ -21,7 +20,6 @@ picking backlog work; theme priorities and rationale live in
 - `RUNTIME-294` — Migrate every GPU method to the property residency (tasks/active/RUNTIME-294-migrate-gpu-methods-to-property-residency.md)
 - `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/active/UI-037-linear-domain-action-readiness-tooltips.md)
 - `UI-053` — Curvature-extremum engine overlay (tasks/active/UI-053-curvature-extremum-engine-overlay.md)
-- `UI-078` — Edit entity transforms with an ImGuizmo gizmo (tasks/active/UI-078-imguizmo-transform-editing.md)
 
 ## Theme B — Rendering modernization
 

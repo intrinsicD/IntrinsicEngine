@@ -311,7 +311,7 @@ nächsten Abschnitt.
 | T18 | Merge curvature boundary/extrema viewers in `benchmarks/runners/` | shrink | -150 | widerlegt: gemeinsamer Teil bereits geteilt → behalten | widerlegt: Geometrieprüfung und HTML-Viewer werden bereits gemeinsam verwendet. curvature_extrema_viewer.py:13, curvature_extrema_viewer.py:249. | Behalten (2026-10-06): widerlegt |
 | T19 | Generate benchmark smoke manifests from one table (speculative) | shrink | -300 | widerlegt: Manifeste inhaltlich verschieden; Generator = zweite Wahrheitsquelle | widerlegt: Unterschiedliche Parameter, Datensätze und Fehlergrenzen; Einsparung durch Generator unbelegt. xpbd_cloth_reference_smoke.yaml:4, rendering_vertex_fetch_layout_smoke.yaml:12. | Behalten (2026-10-06): widerlegt |
 | T20 | vcpkg `draco` — 0 uses in src/tests, only linked into tinygltf | native | 1 dep | teilweise: TINYGLTF_ENABLE_DRACO aktiviert Draco-glTF-Laden → Operatorfrage, vertagen | widerlegt: Draco ist über TinyGLTF aktiviert; produktiver Loader verwendet TinyGLTF. Dependencies.cmake:166, Runtime.AssetWorkflowModelTextureDecode.cpp:498. [≠ Claude: Einstufung; Sachgrund gleich] | Behalten (2026-10-06): Draco-glTF-Laden wird gebraucht |
-| T21 | vcpkg `imguizmo` — 0 uses in src/tests, still linked | native | 1 dep | bestätigt: `imguizmo_lib` nirgends gelinkt, 0 Nutzung → Task | bestätigt: Paket wird angefordert, aber `imguizmo_lib` hat keinen Verbraucher; kein belegter Link in einen Engine-Binärpfad. vcpkg.json:32, Dependencies.cmake:208. | Nicht löschen (2026-10-06): wird für Gizmo-Feature genutzt → [UI-078](../active/UI-078-imguizmo-transform-editing.md) |
+| T21 | vcpkg `imguizmo` — 0 uses in src/tests, still linked | native | 1 dep | bestätigt: `imguizmo_lib` nirgends gelinkt, 0 Nutzung → Task | bestätigt: Paket wird angefordert, aber `imguizmo_lib` hat keinen Verbraucher; kein belegter Link in einen Engine-Binärpfad. vcpkg.json:32, Dependencies.cmake:208. | Nicht löschen (2026-10-06): wird für Gizmo-Feature genutzt → [UI-078](UI-078-imguizmo-transform-editing.md) |
 | T22 | vcpkg overlay ports xatlas/imgui — replaceable by registry features? | yagni | -190 | imgui-Overlay teilweise (vertagen, GPU-Smoke nötig); xatlas-Overlay widerlegt (Baseline hat keinen Port) | teilweise: Gepinnte Registry enthält kein xatlas; ImGui-Features existieren, ersetzen Backend-Build und Defines aber nicht direkt. vcpkg.json:5, Dependencies.cmake:205. | Vertagen (2026-10-06): imgui-Overlay nur mit GPU-Smoke; xatlas widerlegt |
 | T23 | Untracked stale `.claude/worktrees/agent-*` full-repo copies (local hygiene, not a repo change) | delete | local | teilweise: KEINE stale Kopien — 3 Worktrees mit 4 ungemergten Commits; lokale Hygiene, Operator entscheidet | widerlegt: Lokales Verzeichnis heute leer¹; der dokumentierte Worktree-Bestand ist nicht mehr aktuell. REVIEW-007:316. [≠ Claude: Ja: anderer Lokalzustand] | Erledigt (2026-10-06): Worktrees am 2026-10-05 entfernt |
 
@@ -618,7 +618,7 @@ Folgen für spätere Etappen:
 
 Der Operator hat am 2026-10-06 die vier Fragen beantwortet: T05, T16 und T01
 werden umgesetzt. T21 wird nicht gelöscht, weil ImGuizmo für ein neues
-Gizmo-Feature gebraucht wird ([UI-078](../active/UI-078-imguizmo-transform-editing.md)).
+Gizmo-Feature gebraucht wird ([UI-078](UI-078-imguizmo-transform-editing.md)).
 T20 bleibt. Alle übrigen Kandidaten folgen der gemeinsamen Empfehlung. Der
 Ablauf ist derselbe wie in E0/E1, mit der Basisrevision `3a47bde17`.
 
@@ -1133,7 +1133,7 @@ Prüfung der betroffenen Annahmen, nicht den Neustart der gesamten Liste.
   Umsetzung 2026-10-05“. Nächste Etappe: E2 (T01–T23).
 - 2026-10-06: Etappe E2 entschieden. T01, T05 und T16 sind umgesetzt und
   reviewt. T21 wird für das neue Gizmo-Feature
-  [UI-078](../active/UI-078-imguizmo-transform-editing.md) behalten. Die übrigen
+  [UI-078](UI-078-imguizmo-transform-editing.md) behalten. Die übrigen
   Kandidaten werden behalten, eingeordnet oder vertagt. Details in
   §„Etappe E2 — Entscheidungen und Umsetzung 2026-10-06“. Nächste Etappe:
   E3 (C01–C17).
@@ -1179,7 +1179,7 @@ Prüfung der betroffenen Annahmen, nicht den Neustart der gesamten Liste.
   - Die Codex-Läufe liefen ohne Sandbox, mit Leseauftrag, weil die
     Read-only-Sandbox in der Umgebung nicht startet.
 - **Neue Folgetasks:**
-  - [UI-078](../active/UI-078-imguizmo-transform-editing.md)
+  - [UI-078](UI-078-imguizmo-transform-editing.md)
   - GRAPHICS-160…163
   - RUNTIME-320…324
   - METHOD-066…075
