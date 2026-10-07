@@ -215,8 +215,8 @@ Codex review of the fixed commit → fixes → re-verification.
   `SandboxEditorPresentation` now drive the key through the platform queue;
   the claim test also proves a claimed `F` press does not run (mutation-checked).
   No native GLFW focus run yet.
-- **Slice 3 — ImGuizmo frontend, 2026-10-07: 3a approved by Codex
-  in one round; 3b and 3c open.** Operator decisions: three sub-commits — (a)
+- **Slice 3 — ImGuizmo frontend, 2026-10-07: 3a done in `a6fc6f4fc`,
+  approved by Codex in one round; 3b and 3c open.** Operator decisions: three sub-commits — (a)
   dependencies plus snap config with tests, (b) runtime frontend interface with
   contract tests, (c) atomic ImGuizmo frontend plus old ray-path removal,
   `SandboxEditorGizmo` suite and immediate doc corrections. Snap stays
