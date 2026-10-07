@@ -4359,3 +4359,15 @@ observations:
     promoted_to: logic/claims.md:C118
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O262
+    timestamp: 2026-10-08T01:15+02:00
+    provenance: ai-executed
+    content: The Sandbox ImGuizmo gizmo in R mode (R key through the registered GLFW key callback) scales a two-entity group on X by its X handle, 4 px beside the handle line, in the frontal perspective view whose eye lies in the pivot's X axis plane; the first preview frame's own Vulkan readback shows both triangles under their scaled world matrices (factor 1.8 +- 0.1 about the pivot), the drag is claimed with camera and pick count unchanged, release records exactly one history row, and File / Scene Undo restores transforms and pixels. With unpatched ImGuizmo 1.10 (BUG-236) the group never changes and the first preview readback is missing; exactly on the handle line the unpatched build passes.
+    context: NVIDIA RTX 3050, driver 590.48.01, X11/GNOME unlocked session, window 1600x900 = framebuffer 1600x900 (pixel ratio 1); ci-vulkan with ASan/UBSan, imguizmo 1.10 port-version 1; 53d44fef7 tree plus the then-uncommitted BUG-236 commit-2 diff. Scale, translate and orthographic cases 3/3 each.
+    potential_type: claim
+    bound_to: []
+    promoted: true
+    promoted_to: logic/claims.md:C118
+    crystallized_via: artifact-commitment
+    stale: false

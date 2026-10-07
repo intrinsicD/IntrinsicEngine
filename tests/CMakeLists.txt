@@ -2991,7 +2991,7 @@ if(_intrinsic_registered_test_targets)
     string(APPEND _intrinsic_property_fixup_script
         "if(DEFINED IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests_TESTS)\n"
         "  set_tests_properties(RuntimeSandboxAcceptanceGpuSmoke.SurfaceAppearanceBakesSelectedPropertyAndRestoresAttributes PROPERTIES TIMEOUT 120)\n"
-        "  set_tests_properties(RuntimeSandboxAcceptanceGpuSmoke.ImGuizmoGroupDragAndUndoReachSameFramePixels RuntimeSandboxAcceptanceGpuSmoke.ImGuizmoOrthographicSplitViewportDragAndUndo PROPERTIES TIMEOUT 120)\n"
+        "  set_tests_properties(RuntimeSandboxAcceptanceGpuSmoke.ImGuizmoGroupDragAndUndoReachSameFramePixels RuntimeSandboxAcceptanceGpuSmoke.ImGuizmoOrthographicSplitViewportDragAndUndo RuntimeSandboxAcceptanceGpuSmoke.ImGuizmoScaleAxisDragAndUndo PROPERTIES TIMEOUT 120)\n"
         "endif()\n"
     )
     set(_intrinsic_property_fixup_file "${CMAKE_CURRENT_BINARY_DIR}/IntrinsicTestPropertyFixups.cmake")

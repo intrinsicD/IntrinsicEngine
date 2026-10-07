@@ -13,8 +13,8 @@ contract_review: The fix patches how the vendored ImGuizmo picks and drags singl
 ---
 # BUG-236 — ImGuizmo scale axis handles fail where the eye lies in the axis plane
 
-Status: in-progress. Commit 1 (CPU fix) done; a Vulkan scale smoke follows
-as commit 2 before closure.
+Status: in-progress. Commit 1 (CPU fix) and commit 2 (Vulkan scale smoke)
+done; all acceptance criteria are met, retirement pending.
 
 ## Goal
 - The Sandbox gizmo's X/Y/Z scale handles can be grabbed and dragged in
@@ -66,8 +66,8 @@ as commit 2 before closure.
       ImGuizmo 1.10 and passes with the patch;
       `TopDownScaleAxesDragAndUndo` guards the top-down case.
 - [x] ADR 0006 §3 and the Sandbox README drop the limitation.
-- [ ] A Vulkan acceptance smoke drags a scale axis handle and undoes it
-      (commit 2).
+- [x] A Vulkan acceptance smoke drags a scale axis handle and undoes it
+      (commit 2): `RuntimeSandboxAcceptanceGpuSmoke.ImGuizmoScaleAxisDragAndUndo`.
 
 ## Evidence (commit 1, 2026-10-08)
 - Red (unpatched 1.10, final tests): `FrontalScaleAxesDragAndUndo` fails.
@@ -80,6 +80,32 @@ as commit 2 before closure.
   selection (Sandbox editor, gizmo, interaction, UI host, engine-layering
   suites) 202/202.
 
+## Evidence (commit 2, 2026-10-08)
+- `ImGuizmoScaleAxisDragAndUndo` reuses the UI-078 smoke driver
+  (`RunImGuizmoGroupDragSmoke`, new `GizmoSmokeLayout::ScaleAxis`): R through
+  the registered GLFW key callback, then a drag 4 px beside the X scale
+  handle from 60% to 120% of its length, in the frontal perspective view
+  centered on the pivot (asserted: eye in the pivot's X axis plane). The
+  drag is claimed with camera and pick count unchanged and records exactly
+  one history row on release; the first changed preview frame's own readback
+  shows both triangles where their full world matrices put them (scale
+  1.8 ± 0.1 about the pivot, old interiors background); the Undo click
+  restores transforms, world matrices and pixels, and the geometry under the
+  release frame's committed world matrices is gone from the undo frame. Pixel
+  checks of the translate cases now also use full world matrices.
+- Gone-check mutation: reading the first post-release frame back as the undo
+  frame fails that check on both triangles in all three cases (with the
+  80% preview matrices instead, both translate cases would miss it).
+- Red (imguizmo 1.10 without the patch, ci-vulkan): the group never changes,
+  so the first preview readback is missing. Exactly on the handle line the
+  unpatched build passes by numerical accident, hence the 4 px offset (as in
+  the CPU cases).
+- Green (port-version 1): the scale case and both translate cases 3/3 each,
+  12.4–13.0 s per run; NVIDIA RTX 3050, driver 590.48.01, X11/GNOME unlocked
+  session, window = framebuffer 1600x900 (ratio 1), ci-vulkan with ASan/UBSan,
+  on `53d44fef7` plus the then-uncommitted commit-2 diff. Claim C118
+  (O262).
+
 ## Verification
 ```bash
 cmake --preset ci -DVCPKG_MANIFEST_INSTALL=ON   # a cached OFF keeps the unpatched port; check Port-Version: 1 in external/vcpkg-installed/ci/vcpkg/status
@@ -88,4 +114,8 @@ ctest --test-dir build/ci --output-on-failure --timeout 60 --no-tests=error -R '
 ctest --test-dir build/ci --output-on-failure --timeout 60 --no-tests=error -LE 'gpu|vulkan|slow|flaky-quarantine' -R '^(SandboxEditorGizmo|SandboxEditorPresentation|SandboxConfigSections|GizmoInteraction|GizmoInteractionEngineWiring|SceneInteractionModule|EditorUiHost|ImGuiAdapterEngineWiring|RuntimeEngineLayering|RuntimeEnginePrivateGlue)\.'
 python3 tools/agents/validate_tasks.py --root tasks --strict
 python3 tools/docs/check_doc_links.py --root . --strict
+# Vulkan (ci-vulkan; same Port-Version: 1 check in external/vcpkg-installed/ci-vulkan/vcpkg/status)
+cmake --build --preset ci-vulkan --target IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests
+ctest --test-dir build/ci-vulkan --output-on-failure --no-tests=error -L gpu -L vulkan --repeat until-fail:3 -R '^RuntimeSandboxAcceptanceGpuSmoke\.ImGuizmo'
+python3 tools/agents/check_ara_claims.py --root . --strict
 ```

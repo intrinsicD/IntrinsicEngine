@@ -554,10 +554,10 @@ scene and the app-owned `SandboxEditorController` attached, then asserts canonic
 `Present` plus no canonical `SkippedUnavailable` pass.
 
 The gizmo smokes `RuntimeSandboxAcceptanceGpuSmoke.{ImGuizmoGroupDragAndUndoReachSameFramePixels,
-ImGuizmoOrthographicSplitViewportDragAndUndo}` drive the production Sandbox
+ImGuizmoOrthographicSplitViewportDragAndUndo, ImGuizmoScaleAxisDragAndUndo}` drive the production Sandbox
 through the GLFW callbacks the window registered (no OS-generated input):
-a menu click enables the gizmo, a group drag moves both triangles in its first
-preview frame's own readback, and a click on Undo restores transforms and
+a menu click enables the gizmo, a group translate (or single-axis scale) drag
+changes both triangles in its first preview frame's own readback, and a click on Undo restores transforms and
 pixels. They ran on an RTX 3050 (X11, pixel ratio 1, unlocked session); a real
 HiDPI run is open in [UI-079](../../../tasks/backlog/ui/UI-079-imguizmo-hidpi-operational-run.md).
 

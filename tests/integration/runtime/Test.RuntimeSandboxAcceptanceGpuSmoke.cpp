@@ -8751,6 +8751,10 @@ struct GlfwCallbackInput
         Invoke(glfwSetMouseButtonCallback, GLFW_MOUSE_BUTTON_LEFT, down ? GLFW_PRESS : GLFW_RELEASE, 0);
     }
     void Scroll(const double y) const { Invoke(glfwSetScrollCallback, 0.0, y); }
+    void Key(const int key, const bool down) const
+    {
+        Invoke(glfwSetKeyCallback, key, 0, down ? GLFW_PRESS : GLFW_RELEASE, 0);
+    }
 };
 
 // One presented frame, read back synchronously after its own present.
@@ -8832,7 +8836,9 @@ private:
 
 // Two small asymmetric right triangles with legs `Size * U` and `Size * V`
 // (U screen-right, V screen-up, U x V towards the camera) and origins at
-// `Pivot + Offset`; the group moves by `Drag`. Chosen so that, around both the
+// `Pivot + Offset`; the group moves by `Drag`, or, with `ScaleAxis`, the
+// handle of that world axis (R mode) drags from 60% of its length to 120%,
+// doubling the group's scale on it about the pivot. Chosen so that, around both the
 // first preview frame (80% of the drag) and the final one, neither the gizmo
 // nor the other triangle covers an old or new sample point.
 struct GizmoSmokeLayout
@@ -8844,6 +8850,7 @@ struct GizmoSmokeLayout
     float Size{0.3f};
     glm::vec3 U{1.0f, 0.0f, 0.0f};
     glm::vec3 V{0.0f, 1.0f, 0.0f};
+    int ScaleAxis{-1};
 
     // Interior sample (wide side) and its vertical mirror in the triangle's
     // bounding box, which lies outside: a Y-flipped image swaps them.
@@ -8862,6 +8869,26 @@ constexpr std::array kGizmoSmokeDragFractions{0.8f, 0.9f, 1.0f};
     const glm::vec2 ndc = glm::vec2{clip} / clip.w;
     return {frame.SceneRect.X + (ndc.x * 0.5f + 0.5f) * frame.SceneRect.Width,
             frame.SceneRect.Y + (0.5f - ndc.y * 0.5f) * frame.SceneRect.Height};
+}
+
+// A point on ImGuizmo's handle for world axis `axis` at `fraction` of its
+// length, as GizmoFixture::AxisHandle in the SandboxEditorGizmo suite: 0.1
+// clip units of the camera-right vector, on the side ImGuizmo draws.
+[[nodiscard]] glm::vec2 GizmoSmokeAxisHandle(const RT::GizmoUiFrame& frame, const int axis, const float fraction)
+{
+    const glm::vec3 pivot = frame.Frame.Pivot;
+    const auto ndc = [&](const glm::vec3 p)
+    {
+        const glm::vec4 clip = frame.Projection * frame.View * glm::vec4{p, 1.0f};
+        return glm::vec2{clip} / clip.w;
+    };
+    glm::vec2 d = ndc(pivot + glm::vec3{glm::inverse(frame.View)[0]}) - ndc(pivot);
+    d.y /= frame.SceneRect.Width / frame.SceneRect.Height;
+    const glm::vec3 direction = frame.Frame.Basis[axis] * (0.1f * fraction / glm::length(d));
+    const glm::vec2 center = GizmoSmokeScreen(frame, pivot);
+    const glm::vec2 plus = GizmoSmokeScreen(frame, pivot + direction);
+    const glm::vec2 minus = GizmoSmokeScreen(frame, pivot - direction);
+    return glm::length(minus - center) > glm::length(plus - center) + 0.5f ? minus : plus;
 }
 
 std::string GizmoSmokePixelText(const RgbaPixel p)
@@ -9037,6 +9064,11 @@ void RunImGuizmoGroupDragSmoke(const GizmoSmokeLayout& layout)
     // 3. Enable it with real clicks on Gizmo -> Enabled.
     click("##MainMenuBar", "Gizmo", true, TestSupport::MenuBarScan, 320);
     click("###Menu_00", "Enabled", false, TestSupport::WindowColumnScan, 150);
+    if (layout.ScaleAxis >= 0)
+    {
+        step([&input](RT::RuntimeFrameHookContext&) { input.Key(GLFW_KEY_R, true); });
+        step([&input](RT::RuntimeFrameHookContext&) { input.Key(GLFW_KEY_R, false); });
+    }
     moveAway(&enabled);
 
     // 4. One group drag on the center (screen-plane) handle with X and Y
@@ -9061,6 +9093,7 @@ void RunImGuizmoGroupDragSmoke(const GizmoSmokeLayout& layout)
         std::uint64_t Picks{0u};
     };
     std::vector<DragFrame> dragFrames{};
+    std::array<glm::mat4, 2> releasedWorlds{}; // flushed in the release frame: the committed drag
     const auto dragStep = [&](std::function<void(RT::RuntimeFrameHookContext&)> body)
     {
         step([&, body = std::move(body)](RT::RuntimeFrameHookContext& ctx)
@@ -9076,9 +9109,20 @@ void RunImGuizmoGroupDragSmoke(const GizmoSmokeLayout& layout)
         startWorlds = worlds();
         startUndo = history->UndoCount();
         startPicks = selection.GetDiagnostics().ClickRequestsSubmitted;
+        // A hand is never pixel-exact: the scale drag stays 4 px beside the handle
+        // line (exactly on it, unpatched ImGuizmo 1.10 passes by numerical accident).
+        const auto onAxis = [&](const float fraction)
+        { return GizmoSmokeAxisHandle(idle, layout.ScaleAxis, 0.6f * (1.0f + fraction)); };
+        const auto handle = [&](const float fraction)
+        {
+            if (layout.ScaleAxis < 0)
+                return GizmoSmokeScreen(idle, idle.Frame.Pivot + fraction * layout.Drag);
+            const glm::vec2 along = glm::normalize(onAxis(1.0f) - onAxis(0.0f));
+            return onAxis(fraction) + 4.0f * glm::vec2{-along.y, along.x};
+        };
         for (std::size_t i = 0u; i < targets.size(); ++i)
-            targets[i] = GizmoSmokeScreen(idle, idle.Frame.Pivot + kGizmoSmokeDragFractions[i] * layout.Drag);
-        input.Cursor(GizmoSmokeScreen(idle, idle.Frame.Pivot));
+            targets[i] = handle(kGizmoSmokeDragFractions[i]);
+        input.Cursor(handle(0.0f));
     });
     step([](RT::RuntimeFrameHookContext&) {}); // hover the handle first
     dragStep([&](RT::RuntimeFrameHookContext& ctx) { pressFrame = ctx.FrameIndex; input.Left(true); });
@@ -9112,6 +9156,8 @@ void RunImGuizmoGroupDragSmoke(const GizmoSmokeLayout& layout)
             drag.Claimed = ctx.EditorCapture.CapturesViewportInput();
             drag.Undo = history->UndoCount();
             drag.Picks = selection.GetDiagnostics().ClickRequestsSubmitted;
+            if (releaseFrame && drag.Frame == *releaseFrame)
+                releasedWorlds = worlds();
         }
         if (pressFrame && !releaseFrame && !preview.Requested && probe.Pending == nullptr &&
             positions() != startPositions)
@@ -9151,7 +9197,8 @@ void RunImGuizmoGroupDragSmoke(const GizmoSmokeLayout& layout)
               << framebuffer.Height << " scale=" << static_cast<float>(framebuffer.Width) / logical.Width << ","
               << static_cast<float>(framebuffer.Height) / logical.Height << " sceneRect=" << rect.X << ","
               << rect.Y << " " << rect.Width << "x" << rect.Height
-              << " firstPreviewFrame=" << preview.Frame << " undoFrame=" << undone.Frame << " " << exitApp.ExitSummary()
+              << " scaleAxis=" << layout.ScaleAxis << " firstPreviewFrame=" << preview.Frame
+              << " undoFrame=" << undone.Frame << " " << exitApp.ExitSummary()
               << '\n';
 
     ASSERT_TRUE(device.IsOperational()) << "Promoted Vulkan left operation during the gizmo smoke.";
@@ -9167,6 +9214,9 @@ void RunImGuizmoGroupDragSmoke(const GizmoSmokeLayout& layout)
     EXPECT_EQ(idle.Orthographic, layout.Orthographic);
     if (layout.Orthographic)
         EXPECT_GT(idle.SceneRect.X, 0.0f) << "the split rectangle must be offset";
+    if (layout.ScaleAxis >= 0)
+        EXPECT_NEAR(glm::inverse(idle.View)[3][layout.ScaleAxis], idle.Frame.Pivot[layout.ScaleAxis], 1e-4f)
+            << "the scale case needs the eye in the axis plane through the pivot (BUG-236)";
 
     const auto pixelAt = [&](const GizmoSmokeCapture& c, const glm::vec2 px)
     {
@@ -9201,15 +9251,17 @@ void RunImGuizmoGroupDragSmoke(const GizmoSmokeLayout& layout)
         EXPECT_EQ(c.Gizmo.SceneRect.X, idle.SceneRect.X);
         EXPECT_EQ(c.Gizmo.SceneRect.Width, idle.SceneRect.Width);
     };
-    // Old/new interior points of both triangles, and the new points' vertical mirrors.
-    const auto checkPixels = [&](const GizmoSmokeCapture& c, const std::array<glm::vec3, 2>& at, const bool there)
+    // Old/new interior points of both triangles under their full world
+    // matrices, and the new points' vertical mirrors.
+    const auto checkPixels = [&](const GizmoSmokeCapture& c, const std::array<glm::mat4, 2>& at, const bool there)
     {
         for (std::size_t i = 0u; i < 2u; ++i)
         {
             SCOPED_TRACE(i);
-            EXPECT_TRUE(patchIs(c, at[i] + layout.Inside(), !there)) << "interior";
+            EXPECT_TRUE(patchIs(c, glm::vec3{at[i] * glm::vec4{layout.Inside(), 1.0f}}, !there)) << "interior";
             if (there)
-                EXPECT_TRUE(patchIs(c, at[i] + layout.Mirror(), true)) << "Y-mirrored interior";
+                EXPECT_TRUE(patchIs(c, glm::vec3{at[i] * glm::vec4{layout.Mirror(), 1.0f}}, true))
+                    << "Y-mirrored interior";
         }
     };
 
@@ -9224,8 +9276,8 @@ void RunImGuizmoGroupDragSmoke(const GizmoSmokeLayout& layout)
                 changed += RgbDistance(pixelAt(enabled, pivot + glm::vec2{dx, dy}),
                                        pixelAt(disabled, pivot + glm::vec2{dx, dy})) > 60 ? 1 : 0;
         EXPECT_GT(changed, 150) << "the enabled gizmo drew no handle around the pivot " << pivot.x << "," << pivot.y;
-        checkPixels(disabled, startPositions, true);
-        checkPixels(enabled, startPositions, true);
+        checkPixels(disabled, startWorlds, true);
+        checkPixels(enabled, startWorlds, true);
     }
 
     // The drag: claimed throughout, camera and picks untouched, the camera the
@@ -9250,26 +9302,44 @@ void RunImGuizmoGroupDragSmoke(const GizmoSmokeLayout& layout)
     checkFrame(preview, "first preview");
     EXPECT_EQ(preview.Frame, *firstMoveFrame);
     EXPECT_TRUE(preview.Flushed);
-    const glm::vec3 moved = preview.Positions[0] - startPositions[0];
-    EXPECT_GT(std::abs(moved.x), 0.1f);
-    EXPECT_GT(glm::length(moved - glm::dot(moved, layout.U) * layout.U), 0.1f) << "the drag needs a vertical part";
-    EXPECT_NEAR(glm::length(moved - kGizmoSmokeDragFractions[0] * layout.Drag), 0.0f, 0.05f);
+    // The group's one change about the pivot: a translation, or a scale on the axis.
+    glm::mat4 change{1.0f};
+    if (layout.ScaleAxis < 0)
+    {
+        const glm::vec3 moved = preview.Positions[0] - startPositions[0];
+        EXPECT_GT(std::abs(moved.x), 0.1f);
+        EXPECT_GT(glm::length(moved - glm::dot(moved, layout.U) * layout.U), 0.1f) << "the drag needs a vertical part";
+        EXPECT_NEAR(glm::length(moved - kGizmoSmokeDragFractions[0] * layout.Drag), 0.0f, 0.05f);
+        change = glm::translate(change, moved);
+    }
+    else
+    {
+        glm::vec3 factor{1.0f};
+        factor[layout.ScaleAxis] = glm::length(glm::vec3{preview.Worlds[0][layout.ScaleAxis]});
+        EXPECT_NEAR(factor[layout.ScaleAxis], 1.0f + kGizmoSmokeDragFractions[0], 0.1f);
+        const glm::vec3 pivot = idle.Frame.Pivot;
+        change = glm::translate(change, pivot) * glm::scale(glm::mat4{1.0f}, factor) *
+                 glm::translate(glm::mat4{1.0f}, -pivot);
+    }
     for (std::size_t i = 0u; i < 2u; ++i)
     {
-        EXPECT_LT(glm::length(preview.Positions[i] - startPositions[i] - moved), 1e-4f)
-            << "the group moves by one translation";
+        const glm::mat4 expected = change * startWorlds[i];
+        for (int column = 0; column < 4; ++column)
+            EXPECT_LT(glm::length(preview.Worlds[i][column] - expected[column]), 1e-4f)
+                << column << ": the group changes by one transform about the pivot";
         EXPECT_EQ(preview.Worlds[i][3], glm::vec4(preview.Positions[i], 1.0f)) << "world matrix flushed this frame";
     }
-    checkPixels(preview, startPositions, false);
-    checkPixels(preview, preview.Positions, true);
+    checkPixels(preview, startWorlds, false);
+    checkPixels(preview, preview.Worlds, true);
 
     // The undo frame restores TRS, world matrices and pixels.
     checkFrame(undone, "undo");
     EXPECT_EQ(undone.Positions, startPositions);
     EXPECT_EQ(undone.Worlds, startWorlds);
     EXPECT_EQ(finalPositions, startPositions);
-    checkPixels(undone, startPositions, true);
-    checkPixels(undone, std::array{startPositions[0] + layout.Drag, startPositions[1] + layout.Drag}, false);
+    checkPixels(undone, startWorlds, true);
+    EXPECT_NE(releasedWorlds, startWorlds) << "the release frame must hold the committed drag";
+    checkPixels(undone, releasedWorlds, false);
     for (std::size_t i = 0u; i < 2u; ++i)
         EXPECT_LT(RgbDistance(pixel(undone, GizmoSmokeScreen(undone.Gizmo, startPositions[i] + layout.Inside())),
                               pixel(enabled, GizmoSmokeScreen(enabled.Gizmo, startPositions[i] + layout.Inside()))),
@@ -9303,5 +9373,20 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImGuizmoOrthographicSplitViewportDragAndU
         .Drag = {-0.6f, 0.0f, -0.7f},
         .Size = 0.5f,
         .V = {0.0f, 0.0f, -1.0f},
+    });
+}
+
+// BUG-236: an X scale handle drag in the frontal perspective view centered on
+// the pivot, where the eye lies in the axis plane (unpatched ImGuizmo 1.10
+// does not scale), scales both triangles in the first preview frame's
+// own readback; Undo restores them.
+TEST(RuntimeSandboxAcceptanceGpuSmoke, ImGuizmoScaleAxisDragAndUndo)
+{
+    RunImGuizmoGroupDragSmoke(GizmoSmokeLayout{
+        .Orthographic = false,
+        .Pivot = {0.0f, 0.0f, 0.0f},
+        .Offset = {glm::vec3{0.6f, 0.2f, 0.0f}, glm::vec3{-0.6f, -0.2f, 0.0f}},
+        .Size = 0.3f,
+        .ScaleAxis = 0,
     });
 }
