@@ -182,7 +182,7 @@ Codex review of the fixed commit → fixes → re-verification.
   `GizmoInteractionEngineWiring.*`, `SceneInteractionModule.*`,
   `EditorCommandHistory.*`, `RuntimeEngineLayering.*`,
   `RuntimeEnginePrivateGlue.*`, `GeometryRotationAveraging.*`.
-- **Slice 2 — viewport input ownership, 2026-10-07: implemented after two
+- **Slice 2 — viewport input ownership, 2026-10-07: done in `6441f256e` after two
   Codex review rounds (final verdict: approve).** Operator decisions: native window focus only (no
   scene-panel focus); move only `G` to `UiBegin`; no ray hover pass; the
   claim covers mouse and keyboard; cancel also while minimized.
