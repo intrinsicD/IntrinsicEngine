@@ -115,10 +115,6 @@ cohort without resurrecting old state.
   the UI, focus loss or a world/document change cancel without one. A result
   that is not storable as TRS (shear under a non-uniformly scaled parent) is
   not applied; the status overlay shows the reason.
-- Limitation: in an exactly top-down orthographic view the X/Z scale handles
-  cannot be picked ([BUG-236](../../../tasks/backlog/bugs/BUG-236-topdown-ortho-gizmo-scale-handles.md)).
-  Tilt the view slightly, scale uniformly with the center handle, or edit
-  scale in the Inspector.
 
 Sandbox also explicitly composes optional `Runtime::AssetWorkflowModule` after
 the document and interaction owners. The module is the exact published import

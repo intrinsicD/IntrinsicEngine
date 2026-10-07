@@ -1,0 +1,54 @@
+--- a/src/ImGuizmo.cpp
++++ b/src/ImGuizmo.cpp
+@@ -1981,18 +1981,16 @@
+          dirPlaneX.TransformVector(gContext.mModelLocal);
+          dirPlaneY.TransformVector(gContext.mModelLocal);
+ 
+-         const float len = IntersectRayPlane(gContext.mRayOrigin, gContext.mRayVector, BuildPlan(gContext.mModelLocal.v.position, dirAxis));
+-         vec_t posOnPlan = gContext.mRayOrigin + gContext.mRayVector * len;
+-
++         // The mouse against the drawn segment: a ray through an axis-normal
++         // plane that contains the eye (or is seen edge-on) has no usable hit.
+          const float startOffset = Contains(op, static_cast<OPERATION>(TRANSLATE_X << i)) ? 1.0f : 0.1f;
+          const float endOffset = Contains(op, static_cast<OPERATION>(TRANSLATE_X << i)) ? 1.4f : 1.0f;
+-         const ImVec2 posOnPlanScreen = worldToPos(posOnPlan, gContext.mViewProjection);
+          const ImVec2 axisStartOnScreen = worldToPos(gContext.mModelLocal.v.position + dirAxis * gContext.mScreenFactor * startOffset, gContext.mViewProjection);
+          const ImVec2 axisEndOnScreen = worldToPos(gContext.mModelLocal.v.position + dirAxis * gContext.mScreenFactor * endOffset, gContext.mViewProjection);
+ 
+-         vec_t closestPointOnAxis = PointOnSegment(makeVect(posOnPlanScreen), makeVect(axisStartOnScreen), makeVect(axisEndOnScreen));
++         vec_t closestPointOnAxis = PointOnSegment(makeVect(io.MousePos), makeVect(axisStartOnScreen), makeVect(axisEndOnScreen));
+ 
+-         if ((closestPointOnAxis - makeVect(posOnPlanScreen)).Length() < 12.f) // pixel size
++         if (belowAxisLimit && (closestPointOnAxis - makeVect(io.MousePos)).Length() < 12.f) // pixel size
+          {
+             if (!isAxisMasked)
+                type = MT_SCALE_X + i;
+@@ -2325,6 +2323,14 @@
+             // pickup plan
+ 
+             gContext.mTranslationPlan = BuildPlan(gContext.mModelLocal.v.position, movePlanNormal[type - MT_SCALE_X]);
++            if (type <= MT_SCALE_Z)
++            {
++               // The fixed plane seen (nearly) edge-on: drag on the camera-facing plane through the axis.
++               const vec_t axis = gContext.mModelLocal.component[type - MT_SCALE_X];
++               const vec_t view = gContext.mIsOrthographic ? gContext.mRayVector : Normalized(gContext.mModelLocal.v.position - gContext.mCameraEye);
++               if (fabsf(Dot(movePlanNormal[type - MT_SCALE_X], view)) < 0.1f)
++                  gContext.mTranslationPlan = BuildPlan(gContext.mModelLocal.v.position, Normalized(view - axis * Dot(axis, view)));
++            }
+             const float len = IntersectRayPlane(gContext.mRayOrigin, gContext.mRayVector, gContext.mTranslationPlan);
+             gContext.mTranslationPlanOrigin = gContext.mRayOrigin + gContext.mRayVector * len;
+             gContext.mMatrixOrigin = gContext.mModelLocal.v.position;
+@@ -2356,9 +2362,11 @@
+             delta = axisValue * lengthOnAxis;
+ 
+             vec_t baseVector = gContext.mTranslationPlanOrigin - gContext.mModelLocal.v.position;
+-            float ratio = Dot(axisValue, baseVector + delta) / Dot(axisValue, baseVector);
++            const float baseLength = Dot(axisValue, baseVector);
++            const float ratio = Dot(axisValue, baseVector + delta) / baseLength;
+ 
+-            gContext.mScale[axisIndex] = max(ratio, 0.001f);
++            if (fabsf(baseLength) > FLT_EPSILON && isfinite(ratio))
++               gContext.mScale[axisIndex] = max(ratio, 0.001f);
+          }
+          else
+          {

@@ -107,10 +107,14 @@ contract (`RuntimeSceneInteractionRenderSnapshot::GizmoDrawPackets` →
 `RenderWorld`; origin, scale, mode, highlight mask, handle flags; no
 interaction state) stays for other producers.
 
-Known limitation: in an exactly top-down orthographic view ImGuizmo cannot pick
-the X/Z scale handles, because the pick ray is parallel to the plane it
-intersects for those axes. Accepted; tracked by
-[`BUG-236`](../../tasks/backlog/bugs/BUG-236-topdown-ortho-gizmo-scale-handles.md).
+ImGuizmo comes from the overlay port `tools/vcpkg/overlay-ports/imguizmo`
+(1.10 plus `fix-scale-axis-picking.patch`): scale axis handles are picked
+against their drawn screen segment, and a single-axis scale whose fixed drag
+plane is seen edge-on drags on the camera-facing plane through the axis.
+Upstream 1.10 picks through the plane whose normal is the handle's axis and
+drags on a fixed plane per axis (normal Y for X, Z for Y, X for Z); both fail
+when the eye lies in that plane, e.g. a perspective view centered on the pivot
+([`BUG-236`](../../tasks/active/BUG-236-imguizmo-scale-axis-plane-picking.md)).
 
 ### 4. Runtime matrix session
 

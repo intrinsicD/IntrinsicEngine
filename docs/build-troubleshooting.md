@@ -324,6 +324,13 @@ installing `xatlas`, delete the failed package/buildtree under
 rerun `cmake --preset ci`; do not add a FetchContent fallback or write into
 `external/cache`.
 
+`imguizmo` comes from `tools/vcpkg/overlay-ports/imguizmo` (1.10 plus a scale
+handle fix, BUG-236). A build tree whose cache holds
+`VCPKG_MANIFEST_INSTALL=OFF` keeps the previously installed, unpatched port;
+reconfigure it once with `-DVCPKG_MANIFEST_INSTALL=ON` and check for
+`Port-Version: 1` under `imguizmo` in
+`external/vcpkg-installed/<preset>/vcpkg/status`.
+
 ## Blocked follow-on CI steps
 
 Some local CI sweeps intentionally continue after a build failure to collect logs.

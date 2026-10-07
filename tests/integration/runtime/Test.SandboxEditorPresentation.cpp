@@ -2537,10 +2537,10 @@ namespace
             EXPECT_TRUE(Shell.SetEditorWindowOpen("test.gizmo_panel", true));
             return {1050.0f, 560.0f};
         }
-        // A point on ImGuizmo's handle for frame axis `axis` at 60% of its
-        // length (0.1 clip units of the camera-right vector), on the side it
-        // draws (the longer projection).
-        [[nodiscard]] glm::vec2 AxisHandle(const int axis)
+        // A point on ImGuizmo's handle for frame axis `axis` at `fraction` of
+        // its length (0.1 clip units of the camera-right vector), on the side
+        // it draws (the clearly longer projection, else the positive one).
+        [[nodiscard]] glm::vec2 AxisHandle(const int axis, const float fraction = 0.6f)
         {
             const Runtime::GizmoUiFrame frame = Interaction->PrepareGizmo(Orientation, Pivot);
             const glm::vec3 pivot = frame.Frame.Pivot;
@@ -2553,11 +2553,11 @@ namespace
             };
             glm::vec2 d = ndc(pivot + right) - ndc(pivot);
             d.y /= frame.SceneRect.Width / frame.SceneRect.Height;
-            const glm::vec3 direction = frame.Frame.Basis[axis] * (0.06f / glm::length(d));
+            const glm::vec3 direction = frame.Frame.Basis[axis] * (0.1f * fraction / glm::length(d));
             const glm::vec2 center = ToScreen(frame, pivot);
             const glm::vec2 plus = ToScreen(frame, pivot + direction);
             const glm::vec2 minus = ToScreen(frame, pivot - direction);
-            return glm::length(plus - center) >= glm::length(minus - center) ? plus : minus;
+            return glm::length(minus - center) > glm::length(plus - center) + 0.5f ? minus : plus;
         }
         // A screen-space drag from the pivot (translate: camera-plane move,
         // scale: uniform; rotate has no center handle).
@@ -3086,11 +3086,9 @@ TEST(SandboxEditorGizmo, RejectedPreviewShowsReasonWritesNothingAndReleaseCommit
 {
     GizmoFixture f;
     // Scaling world X skews the entity turned 45 degrees about Y: the whole
-    // group is rejected, though the unrotated one alone would be valid. The
-    // pivot sits off x=0: a pivot whose X-scale plane contains the eye leaves
-    // ImGuizmo's handle hit test to float noise (the known axis-plane limit).
-    const auto plain = f.Select(glm::vec3{-0.5f, 0.3f, 0.0f});
-    const auto turned = f.Select(glm::vec3{1.5f, 0.3f, 0.0f}, true);
+    // group is rejected, though the unrotated one alone would be valid.
+    const auto plain = f.Select(glm::vec3{-1.0f, 0.0f, 0.0f});
+    const auto turned = f.Select(glm::vec3{1.0f, 0.0f, 0.0f}, true);
     f.TransformOf(turned).Rotation = glm::angleAxis(glm::radians(45.0f), glm::vec3{0.0f, 1.0f, 0.0f});
     const Tf::Component plainBefore = f.TransformOf(plain);
     const Tf::Component turnedBefore = f.TransformOf(turned);
@@ -3276,4 +3274,87 @@ TEST(SandboxEditorGizmo, ShiftSnappedRotationUnderANonUniformParentIsAccepted)
         EXPECT_NEAR(AngleDegrees(f.TransformOf(child).Rotation), 90.0f, 0.01f);
     });
     f.Engine->Run();
+}
+
+namespace
+{
+    // Drags the scale handle of world axis `axis` from 60% to 90% of its
+    // length. Two unrotated entities symmetric to the pivot scale by 1.5 on
+    // that axis only and move with it about the pivot; the drag is claimed,
+    // leaves camera and pick alone, and its release records one undo.
+    void ExpectAxisScaleDragAndUndo(const Core::Config::CameraControllerKind camera, const int axis)
+    {
+        SCOPED_TRACE(axis);
+        GizmoFixture f{camera};
+        glm::vec3 offset{0.0f};
+        offset[axis] = 0.5f;
+        offset[(axis + 1) % 3] = 0.25f;
+        const auto plus = f.Select(offset);
+        const auto minus = f.Select(-offset, true);
+        auto& selection = *f.Engine->Services().Find<Runtime::SelectionController>();
+        f.EnableGizmo();
+        f.Tap(Plat::Input::Key::R);
+        glm::mat4 view{};
+        std::uint64_t picks = 0u;
+        auto start = std::make_shared<glm::vec2>();
+        auto end = std::make_shared<glm::vec2>();
+        f.Do([&f, &view, &picks, &selection, start, end, axis]
+        {
+            view = f.CameraView();
+            picks = selection.GetDiagnostics().ClickRequestsSubmitted;
+            *start = f.AxisHandle(axis);
+            *end = f.AxisHandle(axis, 0.9f);
+            // A hand is never pixel-exact: stay 4 px beside the handle line.
+            const glm::vec2 side = glm::normalize(glm::vec2{*start - *end}) * 4.0f;
+            *start += glm::vec2{-side.y, side.x};
+            *end += glm::vec2{-side.y, side.x};
+        });
+        f.MoveTo([start] { return *start; });
+        f.Mouse(true);
+        for (int i = 1; i <= 6; ++i)
+            f.MoveTo([start, end, i] { return *start + (*end - *start) * (i / 6.0f); });
+        f.Then([&]
+        {
+            EXPECT_TRUE(f.Dragging());
+            EXPECT_TRUE(f.Claimed());
+            EXPECT_EQ(f.History->UndoCount(), 0u);
+        });
+        f.Mouse(false);
+        f.Then([&] { EXPECT_FALSE(f.Dragging()); });
+        f.Engine->Run();
+
+        EXPECT_EQ(f.CameraView(), view) << "a claimed drag must not move the camera";
+        EXPECT_EQ(selection.GetDiagnostics().ClickRequestsSubmitted, picks);
+        ASSERT_EQ(f.History->UndoCount(), 1u);
+        for (const auto& [entity, sign] : {std::pair{plus, 1.0f}, std::pair{minus, -1.0f}})
+        {
+            const Tf::Component& now = f.TransformOf(entity);
+            for (int i = 0; i < 3; ++i)
+            {
+                ASSERT_TRUE(std::isfinite(now.Position[i]) && std::isfinite(now.Scale[i])) << i;
+                const float factor = i == axis ? now.Scale[axis] : 1.0f;
+                EXPECT_NEAR(now.Scale[i], i == axis ? 1.5f : 1.0f, 0.03f) << i;
+                EXPECT_NEAR(now.Position[i], sign * offset[i] * factor, 1.0e-4f) << i;
+            }
+        }
+        ASSERT_TRUE(f.History->Undo().Succeeded());
+        EXPECT_EQ(f.TransformOf(plus).Position, offset);
+        EXPECT_EQ(f.TransformOf(minus).Position, -offset);
+        EXPECT_EQ(f.TransformOf(plus).Scale, glm::vec3{1.0f});
+        EXPECT_EQ(f.TransformOf(minus).Scale, glm::vec3{1.0f});
+    }
+}
+
+TEST(SandboxEditorGizmo, TopDownScaleAxesDragAndUndo)
+{
+    for (const int axis : {0, 2})
+        ExpectAxisScaleDragAndUndo(Core::Config::CameraControllerKind::TopDown, axis);
+}
+
+TEST(SandboxEditorGizmo, FrontalScaleAxesDragAndUndo)
+{
+    // The default orbit camera looks along -Z at the origin: the eye lies in
+    // the pivot's X and Y axis planes.
+    for (const int axis : {0, 1})
+        ExpectAxisScaleDragAndUndo(Core::Config::CameraControllerKind::Orbit, axis);
 }
