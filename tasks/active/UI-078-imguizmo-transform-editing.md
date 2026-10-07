@@ -219,7 +219,7 @@ Codex review of the fixed commit → fixes → re-verification.
   approved by Codex in one round; 3b done in `0ae5e4538` after three Codex rounds
   (round 1: stale Begin tokens, camera timing comment, Begin precondition;
   round 2: the interaction epoch survives Shutdown/Initialize, so pre-restart
-  tokens stay stale); 3c approved by Codex after six rounds.** Operator decisions: three sub-commits — (a)
+  tokens stay stale); 3c done in `b513f2787` after six Codex rounds.** Operator decisions: three sub-commits — (a)
   dependencies plus snap config with tests, (b) runtime frontend interface with
   contract tests, (c) atomic ImGuizmo frontend plus old ray-path removal,
   `SandboxEditorGizmo` suite and immediate doc corrections. Snap stays
