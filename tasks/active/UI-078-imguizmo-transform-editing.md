@@ -216,7 +216,7 @@ Codex review of the fixed commit → fixes → re-verification.
   the claim test also proves a claimed `F` press does not run (mutation-checked).
   No native GLFW focus run yet.
 - **Slice 3 — ImGuizmo frontend, 2026-10-07: 3a done in `a6fc6f4fc`,
-  approved by Codex in one round; 3b approved by Codex after three rounds
+  approved by Codex in one round; 3b done in `0ae5e4538` after three Codex rounds
   (round 1: stale Begin tokens, camera timing comment, Begin precondition;
   round 2: the interaction epoch survives Shutdown/Initialize, so pre-restart
   tokens stay stale); 3c open.** Operator decisions: three sub-commits — (a)
