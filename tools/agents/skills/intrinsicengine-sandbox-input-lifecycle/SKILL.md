@@ -59,8 +59,8 @@ UI/gizmo transform edits applied *after* the fixed-step systems ran will not
 reach the rendered model matrix in the same frame unless flushed. `RunFrame()`
 runs the runtime-owned `FlushPreRenderTransformState`
 (transform-hierarchy → bounds → render-sync) after the variable tick, the ImGui
-editor hook, and the gizmo drive — but **before** gizmo packet build and render
-extraction.
+editor hook (which hosts the editor gizmo's previews, `UI-078`) and the
+viewport-input hooks (lifecycle cancels) — but **before** render extraction.
 
 Evidence: `BUG-024` (Inspector/gizmo transform edits did not move the rendered
 triangle).

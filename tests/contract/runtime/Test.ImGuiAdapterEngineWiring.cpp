@@ -811,12 +811,6 @@ TEST(ImGuiAdapterEngineWiring, UiCaptureSuppressesRuntimeInputConsumers)
             .Find<Runtime::SelectionController>()
             ->InFlightPickCount(),
         0u);
-    EXPECT_EQ(
-        engine.Services()
-            .Find<Runtime::SceneInteractionModule>()
-            ->Interaction()
-            .ModifierMask(),
-        0u);
 
     engine.Shutdown();
 }
@@ -895,8 +889,8 @@ TEST(ImGuiAdapterEngineWiring, RunNormalizesNativeCloseAfterInteractiveInput)
 // UI-078 slice 2: a frontend's viewport claim, merged after the adapter
 // capture, blocks camera controller updates and new pick requests while the
 // gizmo is hovered (frame 1) or dragged (frames 2-3), and suppresses keyboard
-// input actions such as F. The claim does not end its own session: the ray
-// driver neither cancels it on capture nor commits it on mouse release.
+// input actions such as F. The claim does not end its own session: nothing
+// cancels it on capture or commits it on mouse release.
 // Without a claim (frame 4) all consumers run again.
 TEST(ImGuiAdapterEngineWiring, ViewportClaimBlocksCameraAndPickWithoutEndingItsSession)
 {

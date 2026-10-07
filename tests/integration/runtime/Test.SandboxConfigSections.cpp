@@ -2102,13 +2102,20 @@ TEST(SandboxConfigSections, GizmoSnapStepsRegisterValidateAndApplyThroughTheConf
     for (const char* field : {"translate_step", "rotate_step_degrees", "scale_step"})
     {
         const std::string key = std::string{"{\""} + field + "\":";
-        for (const char* value : {"0", "-1", "-0.25", "1e-40", "3.5e38"})
-            rejected(key + value + "}", std::string{field} + " must be");
+        // Rotation steps have a 0.001-degree floor; the others only need to be positive.
+        const bool rotate = std::string_view{field} == "rotate_step_degrees";
+        const std::string tooSmall = std::string{field} + (rotate ? " must be at least 0.001" : " must be greater than 0.");
+        for (const char* value : {"0", "-1", "-0.25"})
+            rejected(key + value + "}", tooSmall);
+        rejected(key + "1e-40}", rotate ? tooSmall : std::string{field} + " is too small or too large for a float.");
+        rejected(key + "3.5e38}", std::string{field} + " is too small or too large for a float.");
         rejected(key + "1e400}", "must be an object"); // a double overflow fails JSON parsing
         rejected(key + "\"1\"}", std::string{field} + " must be a finite number");
         rejected(key + "null}", std::string{field} + " must be a finite number");
         rejected(key + "true}", std::string{field} + " must be a finite number");
     }
+    rejected(R"({"rotate_step_degrees":0.0009})", "rotate_step_degrees must be at least 0.001");
+    EXPECT_TRUE(validate(R"({"rotate_step_degrees":0.001})").Usable());
     rejected(R"({"snap":true})", "Unknown gizmo snap field: snap");
     rejected(R"([0.25])", "Gizmo snap config must be an object.");
     const auto partial = validate(R"({"scale_step":2})");

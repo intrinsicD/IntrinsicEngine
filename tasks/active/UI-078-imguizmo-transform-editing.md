@@ -219,7 +219,7 @@ Codex review of the fixed commit → fixes → re-verification.
   approved by Codex in one round; 3b done in `0ae5e4538` after three Codex rounds
   (round 1: stale Begin tokens, camera timing comment, Begin precondition;
   round 2: the interaction epoch survives Shutdown/Initialize, so pre-restart
-  tokens stay stale); 3c open.** Operator decisions: three sub-commits — (a)
+  tokens stay stale); 3c approved by Codex after six rounds.** Operator decisions: three sub-commits — (a)
   dependencies plus snap config with tests, (b) runtime frontend interface with
   contract tests, (c) atomic ImGuizmo frontend plus old ray-path removal,
   `SandboxEditorGizmo` suite and immediate doc corrections. Snap stays
@@ -272,7 +272,86 @@ Codex review of the fixed commit → fixes → re-verification.
   SelectionAloneDoesNotStartAGizmoSession}` (mutation-checked: dropping the
   session-generation check in Preview/Commit or in Begin, or reading the
   presented rectangle, fails them).
-- **Remaining:** slice 3 (ImGuizmo frontend, UI toggles, W/E/R, Escape, snap
-  config, retire the ray frontend where replaced, `SandboxEditorGizmo` tests),
-  slice 4 (docs and the Vulkan acceptance smoke). All acceptance boxes stay
+  **3c (uncommitted):** further operator decisions: Gizmo enabled only from
+  the menu, initially off; W/E/R only while enabled and not typing; the
+  `sandbox.gizmo` reason reads "must be greater than 0" (exclusive minimum 0
+  plus a normal-float check "is too small or too large for a float").
+  `EditorShell` hosts the ImGuizmo frontend: a **Gizmo** menu (Enabled,
+  Translate/Rotate/Scale, bounds-center pivot, local axes, snap-step draft with
+  validation reason and Apply through `PreviewGizmoSnapConfig`/
+  `ApplyGizmoSnapConfig`, new in `SceneInteractionModule` because the app may
+  import only runtime modules); `BeginFrame` before the panels, `Manipulate`
+  after them on `PrepareGizmo`'s camera and scene rectangle (display origin
+  added, no extra scale or Y flip); the drag lifecycle follows
+  `ImGuizmo::IsUsing()` (begin on false→true right after Prepare, absolute
+  `Gt` preview each frame, one commit on release), ImGuizmo's working matrix
+  stays separate from the accepted one, Escape/disable/lost token cancel or
+  drop the session, reset ImGuizmo and block a restart until release; hover,
+  drag, release/cancel frames and a held consumed W/E/R claim the viewport;
+  rejections and the local-axes fallback show in a status overlay. Removed:
+  the ray adapter (`HitTest`/`BeginDrag`/`DragTick`, axis/modifier/ray types,
+  `GizmoConfig`, ray counters, mode/orientation/pivot setters),
+  `TransformGizmoRenderPacketBuilder`, `SceneInteractionModule`'s mouse driver
+  and gizmo packet production (the general packet contract stays). Migrated
+  tests: ray/builder cases replaced by matrix undo/redo per mode and group
+  stale-undo cases, `ViewportMouseNeverDrivesTheGizmo`,
+  `TypedGizmoDragRotatesGroupAroundPivotAndCommitsOnce`, explicit-packet and
+  selection-publishes-nothing wiring cases, layering/private-glue expectations
+  (no automatic driver, ImGuizmo only in the app, UI edits before the single
+  flush). Docs: catalog contract, ADR 0006 (§§3–4 marked superseded, slice 3
+  amendment), `runtime.md`, `rendering-three-pass.md`, `graphics.md`, runtime/
+  Sandbox/renderer READMEs, input-lifecycle skill §3. Evidence:
+  `SandboxEditorGizmo.*` (9 cases in `Test.SandboxEditorPresentation.cpp`,
+  real Null-window events, production shell): off by default/menu-only/hidden;
+  group drag claim, camera and pick blocked, one undo restoring the group,
+  pivot follows the cursor; no-op and Escape without undo plus restart lock;
+  hide/focus/world/document never commit on release; W/E/R incl. text field,
+  keyboard capture and no camera W leak; bounds pivot, local axes, group
+  fallback; snap draft/reason/apply/round trip and Shift snapping per mode;
+  rejected preview reason without partial write, return to valid, release;
+  offset split rectangle in perspective and orthographic views. Mutations
+  (each fails the suite): committing every frame or never, no restart lock,
+  no typing guard, no held-key claim, ignoring the rectangle offset. HiDPI
+  stays covered by the 3b runtime case (the Null window has no pixel ratio).
+  **3c review round 1 (Codex: nachbessern), fixed:** a left-button release
+  of our own session commits once and resets ImGuizmo even when ImGuizmo
+  missed it (rotate/scale released over a panel after an ImGui-owned press);
+  every consumed W/E/R stays claimed until its own release; the group test
+  observes press, drag, release and the following off-gizmo frame in order.
+  Operator decisions: snapped rotation is corrected in the frontend (the
+  preview is the exact snapped angle about the frozen pivot, ImGuizmo's
+  working matrix untouched; core tolerance unchanged); `Interaction()` stays
+  as a marked test accessor; menu items are clicked on their actual
+  rectangles found by ImGui hover ids (test-only, no production hooks); the
+  snap draft is previewed once per edit. New cases:
+  `SandboxEditorGizmo.{ScaleAndRotateReleasedOverAPanelCommitOnce,
+  OverlappingModeKeysKeepTheCameraOffUntilTheLastRelease,
+  ShiftSnappedRotationUnderANonUniformParentIsAccepted}`, each failing
+  without its fix. **Known limitation (revisit with slice 4's ortho/Vulkan
+  acceptance):** in an exactly top-down orthographic view ImGuizmo cannot
+  pick the X/Z scale axis handles (the pick ray lies in the axis plane);
+  the center (uniform) handle and the rotation rings still work.
+  **3c review round 2, fixed:** the exact rotation snap moved into runtime
+  `SnapGizmoRotation` (pure, contract-tested): it keeps the signed angle by
+  rounding both "θ about a" and "θ − 2π about a" (a 100° step no longer turns
+  +200° into +160°) and takes the axis from the quaternion's vector part
+  (tiny steps keep their X/Y axis instead of glm::axis's Z fallback); a
+  rotation snapping to none or a whole turn previews G0 exactly. Evidence:
+  `GizmoInteraction.{SnapGizmoRotationKeepsTheSignedAngleForStepsThatDoNotDivide360,
+  SnapGizmoRotationKeepsTheAxisOfTinySteps}` (each fails with its fix reverted).
+  **3c review rounds 3–4, fixed:** the snap decides in step counts: zero
+  steps, or a whole turn within the float error of steps·step (bounded by half
+  a step), preview G0; the earlier half-step test discarded a real 270° snap
+  and a fixed 1e-5 rad zone a real 0.0005° step. Evidence:
+  `GizmoInteraction.{SnapGizmoRotationKeepsLargeStepsThatAreNotAWholeTurn,
+  SnapGizmoRotationKeepsTheSmallestConfiguredStep}` (each fails with the
+  respective earlier test restored). **Round 5, operator decision:**
+  `rotate_step_degrees` has a 0.001° floor (finer turns are float noise in
+  ImGuizmo's matrix; 1e-37 overflowed the step count), which
+  `SnapGizmoRotation` documents as its precondition; the smallest step
+  survives on tilted and identity bases. Evidence:
+  `SandboxConfigSections.GizmoSnapStepsRegisterValidateAndApplyThroughTheConfigLane`
+  (fails without the floor).
+- **Remaining:** slice 4 (docs and the Vulkan acceptance smoke, including the
+  known top-down orthographic X/Z scale-handle limitation). All acceptance boxes stay
   open until then.

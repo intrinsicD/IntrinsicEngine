@@ -1,7 +1,7 @@
 // RUNTIME-084 / UI-078 — contract coverage for the runtime transform-gizmo
-// interaction module: screen-space handle hit testing, the matrix drag session
-// (world pivot, basis, hierarchy write rule, atomic TRS rejection, undo), the
-// ray adapter's translate/rotate/scale and snap, and the render-packet fields.
+// matrix drag session: world pivot, basis, hierarchy write rule, atomic TRS
+// rejection, undo/redo of translate/rotate/scale batches. Snap and hit testing
+// belong to the editor frontend (SandboxEditorGizmo).
 
 #include <cmath>
 #include <cstdint>
@@ -14,7 +14,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Component.Culling.Local;
 import Extrinsic.ECS.Component.Hierarchy;
 import Extrinsic.ECS.Component.Transform;
@@ -22,32 +21,19 @@ import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
-import Extrinsic.Graphics.CameraSnapshots;
-import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GizmoInteraction;
-import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.WorldHandle;
 
 using Extrinsic::ECS::EntityHandle;
 using Extrinsic::ECS::Scene::Registry;
-using Extrinsic::Graphics::BuildCameraViewSnapshot;
-using Extrinsic::Graphics::CameraViewInput;
-using Extrinsic::Graphics::CameraViewSnapshot;
-using Extrinsic::Graphics::TransformGizmoRenderPacket;
-using Extrinsic::Runtime::GizmoAxis;
 using Extrinsic::Runtime::GizmoBasisFallback;
 using Extrinsic::Runtime::GizmoFrame;
 using Extrinsic::Runtime::GizmoPivotMode;
 using Extrinsic::Runtime::GizmoStatus;
-using Extrinsic::Runtime::GizmoConfig;
-using Extrinsic::Runtime::GizmoHitResult;
 using Extrinsic::Runtime::GizmoInteraction;
 using Extrinsic::Runtime::GizmoMode;
-using Extrinsic::Runtime::GizmoModifier;
 using Extrinsic::Runtime::GizmoOrientation;
-using Extrinsic::Runtime::PickRay;
-using Extrinsic::Runtime::TransformGizmoRenderPacketBuilder;
 
 namespace Tf = Extrinsic::ECS::Components::Transform;
 namespace Hi = Extrinsic::ECS::Components::Hierarchy;
@@ -68,399 +54,94 @@ namespace
         });
         return entity;
     }
+}
 
-    // A centred orthographic camera looking down -Z. World (0,0,0) projects to
-    // the viewport centre; +X projects to the right, +Y up. Orthographic so the
-    // pixel mapping is linear and exact for the hit-test assertions.
-    CameraViewInput OrthoCameraInput()
+// --- Undo/redo per mode (ported from the retired ray adapter) ------------
+
+TEST(GizmoInteraction, TranslateRotateScaleDragsCommitOneUndoableRedoableBatch)
+{
+    struct Case
     {
-        CameraViewInput input{};
-        input.View = glm::lookAt(glm::vec3{0.f, 0.f, 5.f}, glm::vec3{0.f}, glm::vec3{0.f, 1.f, 0.f});
-        // Half-width 4 → world x in [-4, 4] maps to pixel x in [0, Width].
-        input.Projection = glm::ortho(-4.f, 4.f, -3.f, 3.f, 0.1f, 100.f);
-        input.Position = {0.f, 0.f, 5.f};
-        input.Forward = {0.f, 0.f, -1.f};
-        input.Up = {0.f, 1.f, 0.f};
-        input.NearPlane = 0.1f;
-        input.FarPlane = 100.f;
-        input.Valid = true;
-        return input;
-    }
-
-    CameraViewSnapshot OrthoCamera(const Extrinsic::Core::Extent2D viewport)
+        GizmoMode Mode;
+        glm::mat4 Delta;
+        Tf::Component Expected;
+    };
+    const Case cases[] = {
+        {GizmoMode::Translate, glm::translate(glm::mat4{1.f}, glm::vec3{3.f, 0.f, 0.f}),
+         {.Position = {3.f, 0.f, 0.f}}},
+        {GizmoMode::Rotate, glm::mat4_cast(glm::angleAxis(1.5f, glm::vec3{1.f, 0.f, 0.f})),
+         {.Rotation = glm::angleAxis(1.5f, glm::vec3{1.f, 0.f, 0.f})}},
+        {GizmoMode::Scale, glm::scale(glm::mat4{1.f}, glm::vec3{2.f, 1.f, 1.f}),
+         {.Scale = {2.f, 1.f, 1.f}}},
+    };
+    for (const Case& c : cases)
     {
-        return BuildCameraViewSnapshot(
-            OrthoCameraInput(), viewport);
+        Registry registry{};
+        const EntityHandle entity = MakeEntity(registry, glm::vec3{0.f});
+        const EntityHandle selected[] = {entity};
+        GizmoInteraction gizmo{};
+        ASSERT_TRUE(gizmo.Begin(registry, selected, c.Mode, GizmoOrientation::Global,
+                                GizmoPivotMode::WorldOrigins).Succeeded());
+        EXPECT_EQ(gizmo.SessionMode(), c.Mode);
+        ASSERT_TRUE(gizmo.Preview(registry, c.Delta * gizmo.SessionFrame().Matrix).Succeeded());
+        const auto& preview = registry.Raw().get<Tf::Component>(entity);
+        EXPECT_TRUE((registry.Raw().all_of<Tf::IsDirtyTag>(entity)));
+
+        EditorCommandHistory history;
+        ASSERT_EQ(gizmo.DragCommit(registry, Extrinsic::Runtime::DefaultWorldHandle, history).Status,
+                  EditorCommandHistoryStatus::Applied);
+        EXPECT_FALSE(gizmo.IsDragging());
+        ASSERT_EQ(history.UndoCount(), 1u);
+        EXPECT_EQ(history.Snapshot().UndoLabel, "Manipulate Transform");
+        const auto expectNear = [&](const Tf::Component& expected)
+        {
+            for (int i = 0; i < 3; ++i)
+            {
+                EXPECT_NEAR(preview.Position[i], expected.Position[i], 1.0e-4f);
+                EXPECT_NEAR(preview.Scale[i], expected.Scale[i], 1.0e-4f);
+            }
+            EXPECT_NEAR(std::abs(glm::dot(preview.Rotation, expected.Rotation)), 1.f, 1.0e-4f);
+        };
+        expectNear(c.Expected);
+        ASSERT_EQ(history.Undo().Status, EditorCommandHistoryStatus::Undone);
+        expectNear(Tf::Component{});
+        ASSERT_EQ(history.Redo().Status, EditorCommandHistoryStatus::Redone);
+        expectNear(c.Expected);
     }
 }
 
-// --- Hit testing -----------------------------------------------------------
-
-TEST(GizmoInteraction, HitTestResolvesXAxisAndRejectsOffAxisCursor)
+TEST(GizmoInteraction, GroupCommitUndoesAsOneBatchAndRefusesInterveningState)
 {
     Registry registry{};
-    const EntityHandle entity = MakeEntity(registry, glm::vec3{0.f});
-    const EntityHandle selected[] = {entity};
-
-    const Extrinsic::Core::Extent2D viewport{.Width = 800, .Height = 600};
-    const CameraViewSnapshot camera = OrthoCamera(viewport);
-    ASSERT_TRUE(camera.Valid);
-
-    GizmoInteraction gizmo{GizmoConfig{.HandlePickRadiusPixels = 8.f, .AxisLength = 1.f}};
-
-    // Gizmo origin projects to (400, 300); the +X handle end (world (1,0,0))
-    // projects to (500, 300). A cursor on that horizontal line resolves to X.
-    const GizmoHitResult hit = gizmo.HitTest(registry, camera, glm::vec2{450.f, 300.f}, viewport, selected);
-    EXPECT_TRUE(hit.Hit);
-    EXPECT_EQ(hit.Axis, GizmoAxis::X);
-    EXPECT_EQ(hit.Entity, entity);
-
-    // A cursor well off every handle line (40px below the X handle, far from the
-    // Y/Z handles too) is a background no-hit.
-    const GizmoHitResult miss = gizmo.HitTest(registry, camera, glm::vec2{450.f, 340.f}, viewport, selected);
-    EXPECT_FALSE(miss.Hit);
-    EXPECT_EQ(miss.Axis, GizmoAxis::None);
-}
-
-TEST(GizmoInteraction, HitTestEmptySelectionIsNoHit)
-{
-    Registry registry{};
-    const Extrinsic::Core::Extent2D viewport{.Width = 800, .Height = 600};
-    const CameraViewSnapshot camera = OrthoCamera(viewport);
-
-    GizmoInteraction gizmo{};
-    const GizmoHitResult hit = gizmo.HitTest(registry, camera, glm::vec2{400.f, 300.f}, viewport, {});
-    EXPECT_FALSE(hit.Hit);
-}
-
-// --- Drag application + undo emission --------------------------------------
-
-TEST(GizmoInteraction, DragTickTranslatesAlongAxisAndCommitsHistory)
-{
-    Registry registry{};
-    const EntityHandle entity = MakeEntity(registry, glm::vec3{0.f});
-    const EntityHandle selected[] = {entity};
-
-    GizmoInteraction gizmo{};
-    GizmoHitResult hit{};
-    hit.Hit = true;
-    hit.Axis = GizmoAxis::X;
-    hit.Entity = entity;
-
-    // Pick ray closest point on the X axis is at param 2.
-    const PickRay startRay{.Origin = {2.f, 0.f, 5.f}, .Direction = {0.f, 0.f, -1.f}};
-    ASSERT_TRUE(gizmo.BeginDrag(registry, hit, startRay, selected));
-    EXPECT_TRUE(gizmo.IsDragging());
-
-    // Move the ray so its closest point on the X axis is at param 5 → +3 delta.
-    const PickRay currentRay{.Origin = {5.f, 0.f, 5.f}, .Direction = {0.f, 0.f, -1.f}};
-    ASSERT_TRUE(gizmo.DragTick(registry, currentRay));
-
-    const auto& transform = registry.Raw().get<Tf::Component>(entity);
-    EXPECT_NEAR(transform.Position.x, 3.f, 1.0e-4f);
-    EXPECT_NEAR(transform.Position.y, 0.f, 1.0e-4f);
-    EXPECT_NEAR(transform.Position.z, 0.f, 1.0e-4f);
-    EXPECT_TRUE((registry.Raw().all_of<Tf::IsDirtyTag>(entity)));
-
-    Extrinsic::Runtime::EditorCommandHistory history;
-    const Extrinsic::Runtime::EditorCommandHistoryResult committed =
-        gizmo.DragCommit(
-            registry,
-            Extrinsic::Runtime::DefaultWorldHandle,
-            history);
-    EXPECT_EQ(
-        committed.Status,
-        Extrinsic::Runtime::EditorCommandHistoryStatus::Applied);
-    EXPECT_FALSE(gizmo.IsDragging());
-    ASSERT_EQ(history.UndoCount(), 1u);
-    EXPECT_EQ(history.Snapshot().UndoLabel, "Manipulate Transform");
-
-    ASSERT_EQ(
-        history.Undo().Status,
-        Extrinsic::Runtime::EditorCommandHistoryStatus::Undone);
-    EXPECT_EQ(
-        registry.Raw().get<Tf::Component>(entity).Position,
-        glm::vec3(0.f));
-    ASSERT_EQ(
-        history.Redo().Status,
-        Extrinsic::Runtime::EditorCommandHistoryStatus::Redone);
-    EXPECT_NEAR(
-        registry.Raw().get<Tf::Component>(entity).Position.x,
-        3.f,
-        1.0e-4f);
-}
-
-TEST(GizmoInteraction,
-     DragCommitCoalescesMultiSelectionAndRejectsInterveningState)
-{
-    Registry registry{};
-    const EntityHandle first =
-        MakeEntity(registry, glm::vec3{0.f});
-    const EntityHandle second =
-        MakeEntity(registry, glm::vec3{10.f, 2.f, 0.f});
+    const EntityHandle first = MakeEntity(registry, glm::vec3{0.f});
+    const EntityHandle second = MakeEntity(registry, glm::vec3{10.f, 2.f, 0.f});
     const EntityHandle selected[] = {first, second};
 
     GizmoInteraction gizmo{};
-    const GizmoHitResult hit{
-        .Hit = true,
-        .Axis = GizmoAxis::X,
-        .Entity = first,
-    };
-    const PickRay startRay{
-        .Origin = {5.f, 0.f, 5.f},
-        .Direction = {0.f, 0.f, -1.f},
-    };
-    const PickRay currentRay{
-        .Origin = {8.f, 0.f, 5.f},
-        .Direction = {0.f, 0.f, -1.f},
-    };
-    ASSERT_TRUE(
-        gizmo.BeginDrag(
-            registry, hit, startRay, selected));
-    ASSERT_TRUE(gizmo.DragTick(registry, currentRay));
-
-    Extrinsic::Runtime::EditorCommandHistory history;
-    ASSERT_EQ(
-        gizmo.DragCommit(
-                 registry,
-                 Extrinsic::Runtime::DefaultWorldHandle,
-                 history)
-            .Status,
-        Extrinsic::Runtime::EditorCommandHistoryStatus::Applied);
+    ASSERT_TRUE(gizmo.Begin(registry, selected, GizmoMode::Translate, GizmoOrientation::Global,
+                            GizmoPivotMode::WorldOrigins).Succeeded());
+    ASSERT_TRUE(gizmo.Preview(registry, glm::translate(glm::mat4{1.f}, glm::vec3{3.f, 0.f, 0.f}) *
+                                            gizmo.SessionFrame().Matrix).Succeeded());
+    EditorCommandHistory history;
+    ASSERT_EQ(gizmo.DragCommit(registry, Extrinsic::Runtime::DefaultWorldHandle, history).Status,
+              EditorCommandHistoryStatus::Applied);
     ASSERT_EQ(history.UndoCount(), 1u);
-    EXPECT_NEAR(
-        registry.Raw().get<Tf::Component>(first).Position.x,
-        3.f,
-        1.0e-4f);
-    EXPECT_NEAR(
-        registry.Raw().get<Tf::Component>(second).Position.x,
-        13.f,
-        1.0e-4f);
+    EXPECT_NEAR(registry.Raw().get<Tf::Component>(first).Position.x, 3.f, 1.0e-4f);
+    EXPECT_NEAR(registry.Raw().get<Tf::Component>(second).Position.x, 13.f, 1.0e-4f);
 
-    ASSERT_EQ(
-        history.Undo().Status,
-        Extrinsic::Runtime::EditorCommandHistoryStatus::Undone);
-    EXPECT_EQ(
-        registry.Raw().get<Tf::Component>(first).Position,
-        glm::vec3(0.f));
-    EXPECT_EQ(
-        registry.Raw().get<Tf::Component>(second).Position,
-        glm::vec3(10.f, 2.f, 0.f));
+    ASSERT_EQ(history.Undo().Status, EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(registry.Raw().get<Tf::Component>(first).Position, glm::vec3(0.f));
+    EXPECT_EQ(registry.Raw().get<Tf::Component>(second).Position, glm::vec3(10.f, 2.f, 0.f));
 
-    ASSERT_EQ(
-        history.Redo().Status,
-        Extrinsic::Runtime::EditorCommandHistoryStatus::Redone);
-    auto& firstTransform =
-        registry.Raw().get<Tf::Component>(first);
-    const Tf::Component secondBeforeRejectedUndo =
-        registry.Raw().get<Tf::Component>(second);
-    firstTransform.Position.x = 99.f;
-
-    EXPECT_EQ(
-        history.Undo().Status,
-        Extrinsic::Runtime::EditorCommandHistoryStatus::StaleEntity);
-    EXPECT_FLOAT_EQ(firstTransform.Position.x, 99.f);
-    EXPECT_EQ(
-        registry.Raw().get<Tf::Component>(second).Position,
-        secondBeforeRejectedUndo.Position);
+    // A foreign edit after redo makes the whole batch stale: no partial undo.
+    ASSERT_EQ(history.Redo().Status, EditorCommandHistoryStatus::Redone);
+    registry.Raw().get<Tf::Component>(first).Position.x = 99.f;
+    const Tf::Component secondBefore = registry.Raw().get<Tf::Component>(second);
+    EXPECT_EQ(history.Undo().Status, EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_FLOAT_EQ(registry.Raw().get<Tf::Component>(first).Position.x, 99.f);
+    EXPECT_EQ(registry.Raw().get<Tf::Component>(second).Position, secondBefore.Position);
     EXPECT_EQ(history.UndoCount(), 1u);
     EXPECT_EQ(history.RedoCount(), 0u);
-}
-
-TEST(GizmoInteraction, DragCancelRestoresBeforeTransform)
-{
-    Registry registry{};
-    const EntityHandle entity = MakeEntity(registry, glm::vec3{1.f, 0.f, 0.f});
-    const EntityHandle selected[] = {entity};
-
-    GizmoInteraction gizmo{};
-    GizmoHitResult hit{};
-    hit.Hit = true;
-    hit.Axis = GizmoAxis::X;
-    hit.Entity = entity;
-
-    const PickRay startRay{.Origin = {2.f, 0.f, 5.f}, .Direction = {0.f, 0.f, -1.f}};
-    ASSERT_TRUE(gizmo.BeginDrag(registry, hit, startRay, selected));
-    const PickRay currentRay{.Origin = {6.f, 0.f, 5.f}, .Direction = {0.f, 0.f, -1.f}};
-    ASSERT_TRUE(gizmo.DragTick(registry, currentRay));
-    EXPECT_GT(registry.Raw().get<Tf::Component>(entity).Position.x, 1.f);
-
-    gizmo.DragCancel(registry);
-    EXPECT_FALSE(gizmo.IsDragging());
-    const auto& restored = registry.Raw().get<Tf::Component>(entity);
-    EXPECT_NEAR(restored.Position.x, 1.f, 1.0e-4f);
-    EXPECT_NEAR(restored.Scale.x, 1.f, 1.0e-4f);
-    EXPECT_NEAR(restored.Rotation.w, 1.f, 1.0e-4f);
-}
-
-TEST(GizmoInteraction, DragTickRotatesAroundAxisAndCommitsHistory)
-{
-    Registry registry{};
-    const EntityHandle entity = MakeEntity(registry, glm::vec3{0.f});
-    const EntityHandle selected[] = {entity};
-
-    GizmoHitResult hit{};
-    hit.Hit = true;
-    hit.Axis = GizmoAxis::X;
-    hit.Entity = entity;
-    const PickRay startRay{.Origin = {2.f, 0.f, 5.f}, .Direction = {0.f, 0.f, -1.f}};
-    const PickRay currentRay{.Origin = {5.f, 0.f, 5.f}, .Direction = {0.f, 0.f, -1.f}};
-
-    GizmoInteraction gizmo{};
-    gizmo.SetMode(GizmoMode::Rotate);
-    ASSERT_TRUE(gizmo.BeginDrag(registry, hit, startRay, selected));
-    ASSERT_TRUE(gizmo.DragTick(registry, currentRay));
-
-    const auto& transform = registry.Raw().get<Tf::Component>(entity);
-    EXPECT_NEAR(transform.Position.x, 0.f, 1.0e-4f);
-    EXPECT_NEAR(transform.Rotation.w, std::cos(1.5f), 1.0e-4f);
-    EXPECT_NEAR(transform.Rotation.x, std::sin(1.5f), 1.0e-4f);
-
-    Extrinsic::Runtime::EditorCommandHistory history;
-    EXPECT_EQ(
-        gizmo.DragCommit(
-                 registry,
-                 Extrinsic::Runtime::DefaultWorldHandle,
-                 history)
-            .Status,
-        Extrinsic::Runtime::EditorCommandHistoryStatus::Applied);
-    ASSERT_EQ(history.UndoCount(), 1u);
-    ASSERT_EQ(
-        history.Undo().Status,
-        Extrinsic::Runtime::EditorCommandHistoryStatus::Undone);
-    EXPECT_NEAR(
-        registry.Raw().get<Tf::Component>(entity).Rotation.w,
-        1.f,
-        1.0e-4f);
-}
-
-TEST(GizmoInteraction, DragTickScalesAlongAxisAndCommitsHistory)
-{
-    Registry registry{};
-    const EntityHandle entity = MakeEntity(registry, glm::vec3{0.f});
-    const EntityHandle selected[] = {entity};
-
-    GizmoHitResult hit{};
-    hit.Hit = true;
-    hit.Axis = GizmoAxis::X;
-    hit.Entity = entity;
-    const PickRay startRay{.Origin = {2.f, 0.f, 5.f}, .Direction = {0.f, 0.f, -1.f}};
-    const PickRay currentRay{.Origin = {3.f, 0.f, 5.f}, .Direction = {0.f, 0.f, -1.f}};
-
-    GizmoInteraction gizmo{};
-    gizmo.SetMode(GizmoMode::Scale);
-    ASSERT_TRUE(gizmo.BeginDrag(registry, hit, startRay, selected));
-    ASSERT_TRUE(gizmo.DragTick(registry, currentRay));
-
-    const auto& transform = registry.Raw().get<Tf::Component>(entity);
-    EXPECT_NEAR(transform.Scale.x, 2.f, 1.0e-4f);
-    EXPECT_NEAR(transform.Scale.y, 1.f, 1.0e-4f);
-    EXPECT_NEAR(transform.Scale.z, 1.f, 1.0e-4f);
-
-    Extrinsic::Runtime::EditorCommandHistory history;
-    EXPECT_EQ(
-        gizmo.DragCommit(
-                 registry,
-                 Extrinsic::Runtime::DefaultWorldHandle,
-                 history)
-            .Status,
-        Extrinsic::Runtime::EditorCommandHistoryStatus::Applied);
-    ASSERT_EQ(history.UndoCount(), 1u);
-    ASSERT_EQ(
-        history.Undo().Status,
-        Extrinsic::Runtime::EditorCommandHistoryStatus::Undone);
-    EXPECT_NEAR(
-        registry.Raw().get<Tf::Component>(entity).Scale.x,
-        1.f,
-        1.0e-4f);
-}
-
-TEST(GizmoInteraction, DragModeIsLatchedWhenToolbarModeChangesMidDrag)
-{
-    Registry registry{};
-    const EntityHandle entity = MakeEntity(registry, glm::vec3{0.f});
-    const EntityHandle selected[] = {entity};
-
-    GizmoHitResult hit{};
-    hit.Hit = true;
-    hit.Axis = GizmoAxis::X;
-    hit.Entity = entity;
-    const PickRay startRay{.Origin = {2.f, 0.f, 5.f}, .Direction = {0.f, 0.f, -1.f}};
-    const PickRay currentRay{.Origin = {5.f, 0.f, 5.f}, .Direction = {0.f, 0.f, -1.f}};
-
-    GizmoInteraction gizmo{};
-    ASSERT_TRUE(gizmo.BeginDrag(registry, hit, startRay, selected));
-    gizmo.SetMode(GizmoMode::Rotate);
-    ASSERT_TRUE(gizmo.DragTick(registry, currentRay));
-
-    const auto& transform = registry.Raw().get<Tf::Component>(entity);
-    EXPECT_NEAR(transform.Position.x, 3.f, 1.0e-4f);
-    EXPECT_NEAR(transform.Rotation.w, 1.f, 1.0e-4f);
-}
-
-// --- Snap rounding ---------------------------------------------------------
-
-TEST(GizmoInteraction, SnapModifierRoundsTranslationToStep)
-{
-    Registry registry{};
-    const EntityHandle entity = MakeEntity(registry, glm::vec3{0.f});
-    const EntityHandle selected[] = {entity};
-
-    GizmoInteraction gizmo{GizmoConfig{.HandlePickRadiusPixels = 8.f, .AxisLength = 1.f, .TranslateSnapStep = 1.f}};
-    GizmoHitResult hit{};
-    hit.Hit = true;
-    hit.Axis = GizmoAxis::X;
-    hit.Entity = entity;
-
-    const PickRay startRay{.Origin = {2.f, 0.f, 5.f}, .Direction = {0.f, 0.f, -1.f}};
-    ASSERT_TRUE(gizmo.BeginDrag(registry, hit, startRay, selected));
-
-    // Delta would be +3.4; with snap step 1.0 it rounds to +3.0.
-    gizmo.SetModifierMask(static_cast<std::uint32_t>(GizmoModifier::Snap));
-    const PickRay currentRay{.Origin = {5.4f, 0.f, 5.f}, .Direction = {0.f, 0.f, -1.f}};
-    ASSERT_TRUE(gizmo.DragTick(registry, currentRay));
-    EXPECT_NEAR(registry.Raw().get<Tf::Component>(entity).Position.x, 3.f, 1.0e-4f);
-
-    // Clearing the modifier applies the raw delta.
-    gizmo.SetModifierMask(0u);
-    ASSERT_TRUE(gizmo.DragTick(registry, currentRay));
-    EXPECT_NEAR(registry.Raw().get<Tf::Component>(entity).Position.x, 3.4f, 1.0e-4f);
-}
-
-// --- Render packet field set ------------------------------------------------
-
-TEST(GizmoInteraction, RenderPacketBuilderMapsOnlyFrozenFields)
-{
-    Registry registry{};
-    const EntityHandle entity = MakeEntity(registry, glm::vec3{2.f, 3.f, 4.f});
-    const EntityHandle selected[] = {entity};
-
-    TransformGizmoRenderPacketBuilder builder{};
-    GizmoInteraction gizmo{GizmoConfig{.AxisLength = 1.5f}};
-    const auto translatePackets = builder.Build(registry, selected, gizmo);
-
-    ASSERT_EQ(translatePackets.size(), 1u);
-    const TransformGizmoRenderPacket& packet = translatePackets[0];
-    EXPECT_EQ(packet.StableId, Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
-    EXPECT_NEAR(packet.AxisLength, 1.5f, 1.0e-4f);
-    EXPECT_NEAR(packet.Transform[3].x, 2.f, 1.0e-4f);
-    EXPECT_NEAR(packet.Transform[3].y, 3.f, 1.0e-4f);
-    EXPECT_NEAR(packet.Transform[3].z, 4.f, 1.0e-4f);
-    // Global orientation → identity rotation columns.
-    EXPECT_NEAR(packet.Transform[0].x, 1.f, 1.0e-4f);
-    EXPECT_NEAR(packet.Transform[1].y, 1.f, 1.0e-4f);
-    EXPECT_NEAR(packet.Transform[2].z, 1.f, 1.0e-4f);
-    EXPECT_TRUE(packet.ShowTranslate);
-    EXPECT_FALSE(packet.ShowRotate);
-    EXPECT_FALSE(packet.ShowScale);
-
-    // Mode visibility is the only thing that changes for rotate.
-    gizmo.SetMode(GizmoMode::Rotate);
-    const auto rotatePackets = builder.Build(registry, selected, gizmo);
-    ASSERT_EQ(rotatePackets.size(), 1u);
-    EXPECT_FALSE(rotatePackets[0].ShowTranslate);
-    EXPECT_TRUE(rotatePackets[0].ShowRotate);
-    EXPECT_FALSE(rotatePackets[0].ShowScale);
 }
 
 // --- Matrix session core (UI-078 slice 1) -----------------------------------
@@ -866,11 +547,8 @@ TEST(GizmoInteraction, SessionIsFrozenAndRejectsStaleState)
                           GizmoPivotMode::BoundsCenters).Status,
               GizmoStatus::SessionActive);
 
-    // Later selection / settings changes do not reinterpret the running session.
+    // A later selection change does not reinterpret the running session.
     selected.pop_back();
-    gizmo.SetMode(GizmoMode::Scale);
-    gizmo.SetOrientation(GizmoOrientation::Local);
-    gizmo.SetPivotMode(GizmoPivotMode::BoundsCenters);
     EXPECT_EQ(gizmo.SessionMode(), GizmoMode::Translate);
     ExpectVecNear(gizmo.SessionFrame().Pivot, {2.f, 0.f, 0.f});
     const glm::mat4 g0 = gizmo.SessionFrame().Matrix;
@@ -929,37 +607,6 @@ TEST(GizmoInteraction, BeginRejectsInvalidSelectionAndHierarchyWithoutSession)
     EXPECT_EQ(refused.Status, GizmoStatus::SingularParent);
     EXPECT_EQ(refused.Entity, flatChild);
     EXPECT_FALSE(gizmo.IsDragging());
-}
-
-TEST(GizmoInteraction, RayAdapterRotatesGroupAroundSharedPivotAndPacketFollowsSession)
-{
-    Registry registry{};
-    const EntityHandle right = MakeEntity(registry, glm::vec3{1.f, 0.f, 0.f});
-    const EntityHandle left = MakeEntity(registry, glm::vec3{-1.f, 0.f, 0.f});
-    const EntityHandle selected[] = {left, right};
-
-    GizmoInteraction gizmo{};
-    TransformGizmoRenderPacketBuilder builder{};
-    auto packets = builder.Build(registry, selected, gizmo);
-    ASSERT_EQ(packets.size(), 1u);
-    ExpectVecNear(glm::vec3{packets[0].Transform[3]}, {0.f, 0.f, 0.f});
-    EXPECT_EQ(packets[0].StableId,
-              Extrinsic::Runtime::StableEntityLookup::ToRenderId(std::min(left, right)));
-
-    gizmo.SetMode(GizmoMode::Rotate);
-    const GizmoHitResult hit{.Hit = true, .Axis = GizmoAxis::Y, .Entity = left};
-    // Ortho rays along -Z: the closest Y-axis parameter is the ray's y.
-    ASSERT_TRUE(gizmo.BeginDrag(registry, hit, PickRay{.Origin = {0.f, 0.5f, 5.f}}, selected));
-    ASSERT_TRUE(gizmo.DragTick(registry, PickRay{.Origin = {0.f, 1.5f, 5.f}}));
-
-    // 1 rad about world Y through the pivot moves both origins.
-    ExpectVecNear(registry.Raw().get<Tf::Component>(right).Position, {std::cos(1.f), 0.f, -std::sin(1.f)});
-    ExpectVecNear(registry.Raw().get<Tf::Component>(left).Position, {-std::cos(1.f), 0.f, std::sin(1.f)});
-
-    packets = builder.Build(registry, selected, gizmo);
-    ASSERT_EQ(packets.size(), 1u);
-    EXPECT_EQ(packets[0].Transform, gizmo.AcceptedGizmoMatrix());
-    EXPECT_TRUE(packets[0].ShowRotate);
 }
 
 // --- Review regressions (UI-078 slice 1) -----------------------------------
@@ -1232,5 +879,118 @@ TEST(GizmoInteraction, ForeignChangeToSelectedDescendantTransformIsConflict)
                   EditorCommandHistoryStatus::StaleEntity) << removeComponent;
         EXPECT_EQ(history.UndoCount(), 0u);
         ExpectSameTransform(registry.Raw().get<Tf::Component>(parent), parentBefore);
+    }
+}
+
+// --- Exact rotation snap for the editor frontend (UI-078 3c) ----------------
+
+namespace
+{
+    // G0 at (1,2,3) with a tilted basis; `turn` applied about world `axis`.
+    GizmoFrame TiltedFrame()
+    {
+        GizmoFrame frame{};
+        frame.Pivot = {1.f, 2.f, 3.f};
+        frame.Basis = glm::mat3_cast(glm::angleAxis(0.4f, glm::normalize(glm::vec3{1.f, 1.f, 0.f})));
+        frame.Matrix = glm::translate(glm::mat4{1.f}, frame.Pivot) * glm::mat4{frame.Basis};
+        return frame;
+    }
+    glm::mat4 Turned(const GizmoFrame& frame, const float degrees, const glm::vec3 axis)
+    {
+        return glm::translate(glm::mat4{1.f}, frame.Pivot) *
+               glm::mat4_cast(glm::angleAxis(glm::radians(degrees), glm::normalize(axis))) *
+               glm::mat4{frame.Basis};
+    }
+    // Same full transform: rotation (either quaternion sign) and the pivot.
+    void ExpectSameRotation(const glm::mat4& actual, const glm::mat4& expected)
+    {
+        const glm::quat a = glm::quat_cast(glm::mat3{actual});
+        const glm::quat e = glm::quat_cast(glm::mat3{expected});
+        EXPECT_NEAR(std::abs(glm::dot(a, e)), 1.f, 1.0e-6f) << "rotation differs";
+        for (int c = 0; c < 3; ++c)
+            for (int r = 0; r < 3; ++r)
+                EXPECT_NEAR(actual[c][r], expected[c][r], 1.0e-5f) << c << "," << r;
+        ExpectVecNear(glm::vec3{actual[3]}, glm::vec3{expected[3]}, 1.0e-5f);
+    }
+}
+
+TEST(GizmoInteraction, SnapGizmoRotationKeepsTheSignedAngleForStepsThatDoNotDivide360)
+{
+    const GizmoFrame frame = TiltedFrame();
+    const float step = glm::radians(100.f);
+    const glm::vec3 axis{1.f, 2.f, 3.f};
+    // ImGuizmo can snap to +-200 degrees (beyond 180) with a 100-degree step; with drift.
+    for (const float degrees : {200.f, -200.f, 100.f, -100.f})
+    {
+        SCOPED_TRACE(degrees);
+        const float drift = degrees > 0.f ? 0.03f : -0.03f;
+        ExpectSameRotation(Extrinsic::Runtime::SnapGizmoRotation(frame, Turned(frame, degrees + drift, axis), step),
+                           Turned(frame, degrees, axis));
+    }
+}
+
+TEST(GizmoInteraction, SnapGizmoRotationKeepsTheAxisOfTinySteps)
+{
+    const GizmoFrame frame = TiltedFrame();
+    const float step = glm::radians(0.01f);
+    for (const glm::vec3 axis : {glm::vec3{1.f, 0.f, 0.f}, glm::vec3{0.f, 1.f, 0.f}})
+    {
+        SCOPED_TRACE(axis.x);
+        ExpectSameRotation(Extrinsic::Runtime::SnapGizmoRotation(frame, Turned(frame, 0.02f, axis), step),
+                           Turned(frame, 0.02f, axis));
+        const glm::mat4 snapped = Extrinsic::Runtime::SnapGizmoRotation(frame, Turned(frame, 0.02f, axis), step);
+        const glm::quat delta = glm::quat_cast(glm::mat3{snapped} * glm::transpose(frame.Basis));
+        EXPECT_NEAR(std::abs(delta.z), 0.f, 1.0e-7f) << "no Z rotation";
+        EXPECT_NEAR(std::abs(axis.x > 0.f ? delta.x : delta.y), std::sin(glm::radians(0.01f)), 1.0e-6f);
+    }
+    // Below half a step, or no rotation at all: exactly G0.
+    EXPECT_EQ(Extrinsic::Runtime::SnapGizmoRotation(frame, Turned(frame, 0.004f, {1.f, 0.f, 0.f}), step), frame.Matrix);
+    EXPECT_EQ(Extrinsic::Runtime::SnapGizmoRotation(frame, frame.Matrix, step), frame.Matrix);
+}
+
+TEST(GizmoInteraction, SnapGizmoRotationKeepsLargeStepsThatAreNotAWholeTurn)
+{
+    const GizmoFrame frame = TiltedFrame();
+    const float step = glm::radians(270.f);
+    const glm::vec3 axis{1.f, 2.f, 3.f};
+    for (const float degrees : {270.f, -270.f})
+    {
+        SCOPED_TRACE(degrees);
+        ExpectSameRotation(Extrinsic::Runtime::SnapGizmoRotation(frame, Turned(frame, degrees, axis), step),
+                           Turned(frame, degrees, axis));
+    }
+    // Snapping to a whole turn (355 degrees on a 120-degree step) is no turn: exactly G0.
+    EXPECT_EQ(Extrinsic::Runtime::SnapGizmoRotation(frame, Turned(frame, 355.f, axis), glm::radians(120.f)),
+              frame.Matrix);
+}
+
+TEST(GizmoInteraction, SnapGizmoRotationKeepsTheSmallestConfiguredStep)
+{
+    // 0.001 degrees (~1.7e-5 rad) is the `sandbox.gizmo` floor; one such step must
+    // survive on a tilted basis and on the identity basis (where only Z turns).
+    const float step = glm::radians(0.001f);
+    GizmoFrame identity{};
+    identity.Pivot = {1000.f, 0.f, 0.f};
+    identity.Matrix = glm::translate(glm::mat4{1.f}, identity.Pivot);
+    const std::array<std::pair<GizmoFrame, glm::vec3>, 2> cases{{
+        {TiltedFrame(), glm::normalize(glm::vec3{1.f, 2.f, 3.f})},
+        {identity, glm::vec3{0.f, 0.f, 1.f}},
+    }};
+    for (const auto& [frame, axis] : cases)
+    {
+        for (const float sign : {1.f, -1.f})
+        {
+            SCOPED_TRACE(sign * axis.z);
+            const glm::mat4 snapped =
+                Extrinsic::Runtime::SnapGizmoRotation(frame, Turned(frame, sign * 0.001f, axis), step);
+            // The signed angle about `axis`, from the vector part (exact for tiny turns).
+            glm::quat delta = glm::quat_cast(glm::mat3{snapped} * glm::transpose(frame.Basis));
+            if (delta.w < 0.f)
+                delta = -delta;
+            EXPECT_NEAR(2.f * glm::dot(glm::vec3{delta.x, delta.y, delta.z}, axis), sign * step, 2.0e-7f);
+            // Below half a step: exactly G0.
+            EXPECT_EQ(Extrinsic::Runtime::SnapGizmoRotation(frame, Turned(frame, sign * 0.0004f, axis), step),
+                      frame.Matrix);
+        }
     }
 }

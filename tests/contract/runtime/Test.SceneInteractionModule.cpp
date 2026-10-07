@@ -1113,224 +1113,97 @@ TEST(SceneInteractionModule,
         1u);
 }
 
-TEST(SceneInteractionModule,
-     ViewportGizmoRequiresHistoryHonorsCaptureAndCommitsOneUndoableDrag)
+// UI-078: the viewport hook never drives the gizmo. A press, drag and
+// release over the selected entity's pivot starts no session and writes
+// nothing; only the editor frontend's typed calls do.
+TEST(SceneInteractionModule, ViewportMouseNeverDrivesTheGizmo)
 {
-    {
-        DirectHarness harness;
-        ASSERT_TRUE(harness.Start().has_value());
-        Runtime::SelectionController& selection =
-            *harness.Services.Find<Runtime::SelectionController>();
-        ECS::Scene::Registry& scene =
-            *harness.Worlds.Get(harness.InitialWorld);
-        const ECS::EntityHandle entity =
-            MakeTransformSelectable(scene);
-        ASSERT_TRUE(selection.SetSelectedEntity(scene, entity));
-
-        Graphics::RenderFrameInput input{};
-        input.Camera = OrthoCameraInput();
-        auto& window = harness.InputWindow();
-        window.QueueCursor(450.0, 300.0);
-        window.QueueMouseButton(0, true);
-        window.PollEvents();
-        harness.InvokeViewportHook(
-            0u,
-            input,
-            {},
-            Platform::Extent2D{.Width = 800, .Height = 600});
-        EXPECT_FALSE(harness.Interaction.Interaction().IsDragging());
-    }
-
     DirectHarness harness;
     ASSERT_TRUE(harness.Start(true).has_value());
     Runtime::SelectionController& selection =
         *harness.Services.Find<Runtime::SelectionController>();
-    Runtime::EditorCommandHistory* const history =
-        harness.Services.Find<Runtime::EditorCommandHistory>();
-    ASSERT_NE(history, nullptr);
-    ECS::Scene::Registry& scene =
-        *harness.Worlds.Get(harness.InitialWorld);
-    const ECS::EntityHandle entity =
-        MakeTransformSelectable(scene);
+    Runtime::EditorCommandHistory& history =
+        *harness.Services.Find<Runtime::EditorCommandHistory>();
+    ECS::Scene::Registry& scene = *harness.Worlds.Get(harness.InitialWorld);
+    const ECS::EntityHandle entity = MakeTransformSelectable(scene);
     ASSERT_TRUE(selection.SetSelectedEntity(scene, entity));
 
     Graphics::RenderFrameInput input{};
     input.Camera = OrthoCameraInput();
     auto& window = harness.InputWindow();
-    const Platform::Extent2D viewport{
-        .Width = 800,
-        .Height = 600,
-    };
-    Runtime::EditorInputCaptureSnapshot captured{
-        .CapturedMouse = true,
-    };
-
+    const Platform::Extent2D viewport{.Width = 800, .Height = 600};
+    // The pivot projects to (400,300) and the old X handle ran to (500,300).
     window.QueueCursor(450.0, 300.0);
     window.QueueMouseButton(0, true);
     window.PollEvents();
-    harness.InvokeViewportHook(0u, input, captured, viewport);
-    EXPECT_FALSE(harness.Interaction.Interaction().IsDragging());
-    EXPECT_FALSE(selection.HasPendingPick());
-
-    window.QueueMouseButton(0, false);
-    window.PollEvents();
-    harness.InvokeViewportHook(0u, input, captured, viewport);
-    window.QueueMouseButton(0, true);
-    window.PollEvents();
     harness.InvokeViewportHook(0u, input, {}, viewport);
-    ASSERT_TRUE(harness.Interaction.Interaction().IsDragging());
-
     window.QueueCursor(550.0, 300.0);
     window.PollEvents();
     harness.InvokeViewportHook(0u, input, {}, viewport);
-    EXPECT_GT(
-        scene.Raw().get<Tf::Component>(entity).Position.x,
-        0.0f);
-
     window.QueueMouseButton(0, false);
     window.PollEvents();
     harness.InvokeViewportHook(0u, input, {}, viewport);
+
     EXPECT_FALSE(harness.Interaction.Interaction().IsDragging());
-    ASSERT_EQ(history->UndoCount(), 1u);
-    EXPECT_EQ(
-        history->Undo().Status,
-        Runtime::EditorCommandHistoryStatus::Undone);
-    EXPECT_EQ(
-        scene.Raw().get<Tf::Component>(entity).Position,
-        glm::vec3{0.0f});
+    EXPECT_EQ(harness.Interaction.Interaction().Diagnostics().DragsStarted, 0u);
+    EXPECT_EQ(scene.Raw().get<Tf::Component>(entity).Position, glm::vec3{0.0f});
+    EXPECT_EQ(history.UndoCount(), 0u);
+    // The click is an ordinary pick request instead.
+    EXPECT_TRUE(selection.HasPendingPick());
 }
 
-// UI-078 slice 1: the mouse adapter drives the matrix core, so a group
+// UI-078: the typed frontend calls drive the matrix core, so a group
 // rotation moves both origins around the shared pivot and commits once.
-TEST(SceneInteractionModule,
-     ViewportGizmoGroupRotationMovesOriginsAroundPivotAndCommitsOnce)
+TEST(SceneInteractionModule, TypedGizmoDragRotatesGroupAroundPivotAndCommitsOnce)
 {
     DirectHarness harness;
     ASSERT_TRUE(harness.Start(true).has_value());
     Runtime::SelectionController& selection =
         *harness.Services.Find<Runtime::SelectionController>();
-    Runtime::EditorCommandHistory* const history =
-        harness.Services.Find<Runtime::EditorCommandHistory>();
-    ASSERT_NE(history, nullptr);
-    ECS::Scene::Registry& scene =
-        *harness.Worlds.Get(harness.InitialWorld);
-    const ECS::EntityHandle right =
-        MakeTransformSelectable(scene, glm::vec3{1.0f, 0.0f, 0.0f});
-    const ECS::EntityHandle left =
-        MakeTransformSelectable(scene, glm::vec3{-1.0f, 0.0f, 0.0f});
+    Runtime::EditorCommandHistory& history =
+        *harness.Services.Find<Runtime::EditorCommandHistory>();
+    ECS::Scene::Registry& scene = *harness.Worlds.Get(harness.InitialWorld);
+    const ECS::EntityHandle right = MakeTransformSelectable(scene, glm::vec3{1.0f, 0.0f, 0.0f});
+    const ECS::EntityHandle left = MakeTransformSelectable(scene, glm::vec3{-1.0f, 0.0f, 0.0f});
     for (const ECS::EntityHandle entity : {right, left})
     {
         selection.RequestClickPick(0u, 0u, Runtime::SelectionPickMode::Add);
         (void)selection.ConsumePendingPick();
-        selection.ConsumeHit(
-            scene, Runtime::SelectionController::ToStableEntityId(entity));
+        selection.ConsumeHit(scene, Runtime::SelectionController::ToStableEntityId(entity));
     }
     ASSERT_EQ(selection.SelectedCount(), 2u);
-    harness.Interaction.Interaction().SetMode(Runtime::GizmoMode::Rotate);
 
-    Graphics::RenderFrameInput input{};
-    input.Camera = OrthoCameraInput();
-    auto& window = harness.InputWindow();
-    const Platform::Extent2D viewport{.Width = 800, .Height = 600};
-
-    // Pivot (0,0,0) projects to (400,300); the Y handle runs up to (400,200).
-    window.QueueCursor(400.0, 250.0);
-    window.QueueMouseButton(0, true);
-    window.PollEvents();
-    harness.InvokeViewportHook(0u, input, {}, viewport);
-    ASSERT_TRUE(harness.Interaction.Interaction().IsDragging());
-    EXPECT_EQ(harness.Interaction.Interaction().DragAxis(), Runtime::GizmoAxis::Y);
-
-    // +1 world unit along Y = 1 rad about world Y through the pivot.
-    window.QueueCursor(400.0, 150.0);
-    window.PollEvents();
-    harness.InvokeViewportHook(0u, input, {}, viewport);
+    constexpr auto kGlobal = Runtime::GizmoOrientation::Global;
+    constexpr auto kOrigins = Runtime::GizmoPivotMode::WorldOrigins;
+    Runtime::SceneInteractionModule& module = harness.Interaction;
+    const Runtime::GizmoUiFrame frame = module.PrepareGizmo(kGlobal, kOrigins);
+    const Runtime::GizmoUiBeginResult begun =
+        module.BeginGizmoDrag(frame.Token, Runtime::GizmoMode::Rotate, kGlobal, kOrigins);
+    ASSERT_TRUE(begun.Succeeded());
+    // 1 rad about world Y through the pivot (0,0,0).
+    ASSERT_TRUE(module.PreviewGizmoDrag(
+        begun.Token, glm::rotate(glm::mat4{1.0f}, 1.0f, glm::vec3{0.0f, 1.0f, 0.0f}) * frame.Frame.Matrix)
+                    .Succeeded());
     const glm::vec3 rightPosition = scene.Raw().get<Tf::Component>(right).Position;
     const glm::vec3 leftPosition = scene.Raw().get<Tf::Component>(left).Position;
-    EXPECT_NEAR(rightPosition.x, std::cos(1.0f), 1.0e-3f);
-    EXPECT_NEAR(rightPosition.z, -std::sin(1.0f), 1.0e-3f);
-    EXPECT_NEAR(leftPosition.x, -std::cos(1.0f), 1.0e-3f);
-    EXPECT_NEAR(leftPosition.z, std::sin(1.0f), 1.0e-3f);
+    EXPECT_NEAR(rightPosition.x, std::cos(1.0f), 1.0e-4f);
+    EXPECT_NEAR(rightPosition.z, -std::sin(1.0f), 1.0e-4f);
+    EXPECT_NEAR(leftPosition.x, -std::cos(1.0f), 1.0e-4f);
+    EXPECT_NEAR(leftPosition.z, std::sin(1.0f), 1.0e-4f);
 
-    window.QueueMouseButton(0, false);
-    window.PollEvents();
-    harness.InvokeViewportHook(0u, input, {}, viewport);
-    EXPECT_FALSE(harness.Interaction.Interaction().IsDragging());
-    ASSERT_EQ(history->UndoCount(), 1u);
-    ASSERT_EQ(history->Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+    ASSERT_TRUE(module.CommitGizmoDrag(begun.Token).Succeeded());
+    EXPECT_FALSE(module.Interaction().IsDragging());
+    ASSERT_EQ(history.UndoCount(), 1u);
+    ASSERT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
     EXPECT_EQ(scene.Raw().get<Tf::Component>(right).Position, glm::vec3(1.0f, 0.0f, 0.0f));
     EXPECT_EQ(scene.Raw().get<Tf::Component>(left).Position, glm::vec3(-1.0f, 0.0f, 0.0f));
 }
 
-TEST(SceneInteractionModule,
-     WorldSwitchCancelsDragAndPreservesGizmoTuning)
-{
-    DirectHarness harness;
-    ASSERT_TRUE(harness.Start().has_value());
-    ECS::Scene::Registry& firstScene =
-        *harness.Worlds.Get(harness.InitialWorld);
-    const ECS::EntityHandle entity =
-        MakeTransformSelectable(
-            firstScene,
-            glm::vec3{1.0f, 0.0f, 0.0f});
-    Runtime::GizmoInteraction& gizmo =
-        harness.Interaction.Interaction();
-    gizmo.Config().AxisLength = 2.5f;
-    gizmo.SetMode(Runtime::GizmoMode::Scale);
-    gizmo.SetOrientation(Runtime::GizmoOrientation::Local);
-    const ECS::EntityHandle selected[] = {entity};
-    ASSERT_TRUE(gizmo.BeginDrag(
-        firstScene,
-        Runtime::GizmoHitResult{
-            .Hit = true,
-            .Axis = Runtime::GizmoAxis::X,
-            .Entity = entity,
-        },
-        Runtime::PickRay{
-            .Origin = {2.0f, 0.0f, 5.0f},
-            .Direction = {0.0f, 0.0f, -1.0f},
-        },
-        selected));
-    ASSERT_TRUE(gizmo.DragTick(
-        firstScene,
-        Runtime::PickRay{
-            .Origin = {3.0f, 0.0f, 5.0f},
-            .Direction = {0.0f, 0.0f, -1.0f},
-        }));
-    EXPECT_FLOAT_EQ(
-        firstScene.Raw().get<Tf::Component>(entity).Scale.x,
-        2.0f);
-
-    const Runtime::WorldHandle secondWorld =
-        harness.Worlds.CreateWorld("Gizmo reset world");
-    ASSERT_TRUE(
-        harness.Worlds.RequestSetActiveWorld(secondWorld)
-            .has_value());
-    (void)harness.Worlds.ApplyMaintenance(
-        harness.Events, harness.Jobs);
-    (void)harness.Interaction.ResolveEntityByStableId(
-        ECSC::StableId{0x205u, 0x61u});
-
-    EXPECT_FALSE(harness.Interaction.Interaction().IsDragging());
-    EXPECT_FLOAT_EQ(
-        firstScene.Raw().get<Tf::Component>(entity).Scale.x,
-        1.0f);
-    EXPECT_EQ(
-        harness.Interaction.Interaction().Mode(),
-        Runtime::GizmoMode::Scale);
-    EXPECT_EQ(
-        harness.Interaction.Interaction().Orientation(),
-        Runtime::GizmoOrientation::Local);
-    EXPECT_FLOAT_EQ(
-        harness.Interaction.Interaction().Config().AxisLength,
-        2.5f);
-}
-
-// UI-078 slice 2: a frontend's viewport claim owns the frame. The ray driver
-// neither cancels (capture), ticks nor commits (released mouse) the frontend
+// UI-078 slice 2: a frontend's viewport claim owns the frame. The viewport
+// hook neither cancels (capture) nor commits (released mouse) the frontend
 // session, and the claimed capture blocks new picks. Hiding the UI cancels at
-// UiBegin or, for a hide during UiBuild, before the driver; a session begun
-// while the UI is already hidden keeps running.
+// UiBegin or, for a hide during UiBuild, inside the viewport hook; a session
+// begun while the UI is already hidden keeps running.
 TEST(SceneInteractionModule,
      FrontendViewportClaimOwnsTheSessionAndUiHideCancelsIt)
 {
@@ -1350,7 +1223,6 @@ TEST(SceneInteractionModule,
     const ECS::EntityHandle entity = MakeTransformSelectable(scene);
     ASSERT_TRUE(selection.SetSelectedEntity(scene, entity));
     Runtime::GizmoInteraction& gizmo = harness.Interaction.Interaction();
-    gizmo.SetMode(Runtime::GizmoMode::Rotate);
 
     Graphics::RenderFrameInput input{};
     input.Camera = OrthoCameraInput();
@@ -1365,10 +1237,10 @@ TEST(SceneInteractionModule,
 
     BeginTranslatePreview(gizmo, scene, entity, 1.0f);
     harness.UiHost->RequestViewportInput({.CaptureViewportInput = true});
-    // Mouse up with an active session: the ray driver would commit.
+    // Mouse up with an active session: no commit.
     harness.InvokeViewportHook(0u, input, merged, viewport);
     EXPECT_TRUE(gizmo.IsDragging());
-    // A fresh click under the claim: the ray driver would cancel on capture.
+    // A fresh click under the claim: no cancel on capture.
     window.QueueCursor(450.0, 300.0);
     window.QueueMouseButton(0, true);
     window.PollEvents();
@@ -1388,7 +1260,6 @@ TEST(SceneInteractionModule,
     EXPECT_EQ(scene.Raw().get<Tf::Component>(entity).Position, glm::vec3{0.0f});
     EXPECT_EQ(history.UndoCount(), 0u);
     EXPECT_TRUE(selection.IsSelected(entity));
-    EXPECT_EQ(gizmo.Mode(), Runtime::GizmoMode::Rotate);
 
     // Only the visible -> hidden transition cancels.
     BeginTranslatePreview(gizmo, scene, entity, 1.0f);
@@ -1396,7 +1267,7 @@ TEST(SceneInteractionModule,
     EXPECT_TRUE(gizmo.IsDragging());
     EXPECT_EQ(gizmo.DragCancel(scene).Status, Runtime::GizmoStatus::Ok);
 
-    // A hide during UiBuild cancels before the ray driver runs.
+    // A hide during UiBuild cancels in the viewport hook, before the flush.
     window.QueueMouseButton(0, false);
     window.PollEvents();
     (void)harness.UiHost->ApplyVisibilityCommand(

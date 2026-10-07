@@ -270,7 +270,7 @@ table abbreviates `app.sections[name=sandbox.progressive_poisson].payload` as
 | `physics` | `max_accumulated_seconds` | Finite number in `[fixed_delta_seconds, 10]` seconds |
 | `physics` | `max_steps_per_frame` | Integer in `[1, 1024]` |
 | `physics` | `gravity` | Array of exactly three finite numbers, each in `[-100000, 100000]` |
-| `gizmo` | `translate_step`, `rotate_step_degrees`, `scale_step` | Finite numbers representable as positive normal floats (`[FLT_MIN, FLT_MAX]`); defaults `0.25`, `15` degrees, `0.1`; unknown fields are rejected |
+| `gizmo` | `translate_step`, `rotate_step_degrees`, `scale_step` | Positive finite numbers representable as normal floats, `rotate_step_degrees` at least `0.001` (finer turns are float noise in the gizmo matrix); defaults `0.25`, `15` degrees, `0.1`; unknown fields are rejected |
 | `consolidation` | `backend` | `cpu_reference`, `gpu_vulkan_compute`; Vulkan is implemented for LOP and isotropic WLOP, falls back honestly when the device/transport is unavailable, and fails preview for anisotropic WLOP, CLOP, or EAR |
 | `consolidation` | `strategy` | `lop`, `wlop`, `clop`, `ear`; backend/strategy compatibility is checked by the same runtime preflight used by config, editor, and agent callers |
 | `consolidation` | `support_radius_mode` | `auto` profiles the selected position property; `manual` preserves `support_radius` exactly |

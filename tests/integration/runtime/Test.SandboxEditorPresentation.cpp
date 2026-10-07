@@ -5,6 +5,9 @@
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 #include <glm/vec2.hpp>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 // ARCH-006 Slice 5 app-owned editor presentation and composition coverage.
 #include <algorithm>
 #include <array>
@@ -65,6 +68,15 @@ import Extrinsic.Sandbox.Editor.DomainPanels;
 import Extrinsic.Sandbox.Editor.MeshProcessingPanels;
 import Extrinsic.Sandbox.Editor.MethodPanels;
 import Extrinsic.Sandbox.Editor.Shell;
+import Extrinsic.Sandbox.ConfigSections;
+import Extrinsic.ECS.Component.Culling.Local;
+import Extrinsic.ECS.Component.Hierarchy;
+import Extrinsic.ECS.Components.Selection;
+import Extrinsic.ECS.Scene.Bootstrap;
+import Extrinsic.Runtime.CameraModule;
+import Extrinsic.Runtime.EngineConfigBoot;
+import Extrinsic.Runtime.GizmoInteraction;
+import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Config.EngineLoad;
@@ -2286,4 +2298,1005 @@ TEST(SandboxEditorPresentation, ActionButtonsNeverSitInABareBeginDisabled)
                 << file << ":" << line << " draws a button in a bare BeginDisabled; use DrawProcessingActionButton";
         }
     }
+}
+
+// --- UI-078: the ImGuizmo frontend in the production shell ------------------
+
+namespace
+{
+    namespace Tf = Extrinsic::ECS::Components::Transform;
+    namespace CameraKind = Extrinsic::Core::Config;
+    using NullWindow = Plat::Backends::Null::NullWindow;
+
+    // Runs one scripted step per frame at the variable tick, i.e. after that
+    // frame's event poll and before its UI; a step returning false runs again
+    // next frame. Exits when the script is done.
+    class GizmoScriptApplication final : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        std::vector<std::function<bool()>> Steps{};
+
+        void Frame(double, double) override
+        {
+            if (m_Next >= Steps.size())
+                Kernel().RequestExit();
+            else if (Steps[m_Next]())
+                ++m_Next;
+        }
+
+    private:
+        std::size_t m_Next{0u};
+    };
+
+    // The production shell over the Sandbox's editor/camera/document/config
+    // modules, driven by real Null-window events. Events a step queues reach
+    // the next frame's UI; `Then` observes that UI's result one step later.
+    struct GizmoFixture
+    {
+        GizmoScriptApplication* Script{};
+        std::unique_ptr<Intrinsic::Tests::RuntimeTestKernel> Engine{};
+        Editor::EditorShell Shell{};
+        Runtime::SceneInteractionModule* Interaction{};
+        Runtime::EditorUiHost* Host{};
+        Runtime::EditorCommandHistory* History{};
+        Runtime::EngineConfigControl* Config{};
+        Runtime::GizmoOrientation Orientation{Runtime::GizmoOrientation::Global};
+        Runtime::GizmoPivotMode Pivot{Runtime::GizmoPivotMode::WorldOrigins};
+
+        explicit GizmoFixture(
+            const Core::Config::CameraControllerKind camera = Core::Config::CameraControllerKind::Orbit)
+        {
+            auto sections = Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry();
+            Core::Config::EngineConfig config = Runtime::CreateReferenceEngineConfig(sections);
+            config.Simulation.WorkerThreadCount = 1u;
+            config.ReferenceScene.Enabled = false;
+            config.Camera.Enabled = true;
+            config.Camera.Controller = camera;
+            config.Window.Backend = Core::Config::WindowBackend::Null;
+            config.Window.Width = 1280;
+            config.Window.Height = 720;
+            config.Render.EnablePromotedVulkanDevice = false;
+            config.Render.DefaultRecipeConfigPath.clear();
+            auto script = std::make_unique<GizmoScriptApplication>();
+            Script = script.get();
+            Engine = std::make_unique<Intrinsic::Tests::RuntimeTestKernel>(std::move(config), std::move(script));
+            Engine->EmplaceModule<Runtime::EngineConfigControl>(std::move(sections));
+            Engine->EmplaceModule<Runtime::CameraModule>();
+            Engine->EmplaceModule<Runtime::EditorUiModule>();
+            Engine->EmplaceModule<Runtime::SceneDocumentModule>();
+            Engine->EmplaceModule<Runtime::SceneInteractionModule>();
+            Engine->Initialize();
+            Shell.Attach(Engine->Worlds(), Engine->Services());
+            Interaction = Engine->Services().Find<Runtime::SceneInteractionModule>();
+            Host = Engine->Services().Find<Runtime::EditorUiHost>();
+            History = Engine->Services().Find<Runtime::EditorCommandHistory>();
+            Config = Engine->Services().Find<Runtime::EngineConfigControl>();
+            EXPECT_TRUE(Shell.IsAttached());
+        }
+
+        ~GizmoFixture()
+        {
+            Shell.Detach();
+            Engine->Shutdown();
+        }
+
+        GizmoFixture(const GizmoFixture&) = delete;
+        GizmoFixture& operator=(const GizmoFixture&) = delete;
+
+        [[nodiscard]] NullWindow& Window() { return static_cast<NullWindow&>(Engine->GetWindow()); }
+        [[nodiscard]] Extrinsic::ECS::Scene::Registry& Scene() { return *Engine->Worlds().Get(Engine->ActiveWorld()); }
+        [[nodiscard]] Tf::Component& TransformOf(const Extrinsic::ECS::EntityHandle entity)
+        {
+            return Scene().Raw().get<Tf::Component>(entity);
+        }
+        [[nodiscard]] bool Claimed() const { return Host->GetDiagnostics().CapturesViewportInput; }
+        [[nodiscard]] bool Dragging() { return Interaction->Interaction().IsDragging(); }
+        [[nodiscard]] glm::mat4 CameraView()
+        {
+            return Interaction->PrepareGizmo(Orientation, Pivot).View;
+        }
+
+        Extrinsic::ECS::EntityHandle Select(const glm::vec3 position, const bool add = false)
+        {
+            auto& scene = Scene();
+            const Extrinsic::ECS::EntityHandle entity = Extrinsic::ECS::Scene::CreateDefault(scene, "Gizmo target");
+            TransformOf(entity).Position = position;
+            scene.Raw().emplace_or_replace<Extrinsic::ECS::Components::Selection::SelectableTag>(entity);
+            auto& selection = *Engine->Services().Find<Runtime::SelectionController>();
+            if (!add)
+            {
+                EXPECT_TRUE(selection.SetSelectedEntity(scene, entity));
+                return entity;
+            }
+            selection.RequestClickPick(0u, 0u, Runtime::SelectionPickMode::Add);
+            (void)selection.ConsumePendingPick();
+            selection.ConsumeHit(scene, Runtime::SelectionController::ToStableEntityId(entity));
+            return entity;
+        }
+
+        // Where ImGuizmo draws a world point: the frame's camera mapped into
+        // its scene rectangle (the Null display origin is 0,0). No Y flip:
+        // NDC is Y-up, ImGui Y-down.
+        [[nodiscard]] static glm::vec2 ToScreen(const Runtime::GizmoUiFrame& frame, const glm::vec3 point)
+        {
+            const glm::vec4 clip = frame.Projection * frame.View * glm::vec4{point, 1.0f};
+            const glm::vec2 ndc = glm::vec2{clip} / clip.w;
+            return {frame.SceneRect.X + (ndc.x * 0.5f + 0.5f) * frame.SceneRect.Width,
+                    frame.SceneRect.Y + (0.5f - ndc.y * 0.5f) * frame.SceneRect.Height};
+        }
+        [[nodiscard]] glm::vec2 Screen(const glm::vec3 point)
+        {
+            return ToScreen(Interaction->PrepareGizmo(Orientation, Pivot), point);
+        }
+        [[nodiscard]] glm::vec2 PivotScreen()
+        {
+            const Runtime::GizmoUiFrame frame = Interaction->PrepareGizmo(Orientation, Pivot);
+            return ToScreen(frame, frame.Frame.Pivot);
+        }
+
+        void Do(std::function<void()> step)
+        {
+            Script->Steps.push_back([step = std::move(step)] { step(); return true; });
+        }
+        void Wait(const int frames = 1)
+        {
+            for (int i = 0; i < frames; ++i)
+                Do([] {});
+        }
+        void Then(std::function<void()> check)
+        {
+            Wait();
+            Do(std::move(check));
+        }
+        void MoveTo(std::function<glm::vec2()> where)
+        {
+            Do([this, where = std::move(where)]
+            {
+                const glm::vec2 p = where();
+                Window().QueueCursor(p.x, p.y);
+            });
+        }
+        void MoveTo(const glm::vec2 p) { MoveTo([p] { return p; }); }
+        void Mouse(const bool down) { Do([this, down] { Window().QueueMouseButton(0, down); }); }
+        void Key(const int key, const bool down) { Do([this, key, down] { Window().QueueKey(key, down); }); }
+        void Tap(const int key)
+        {
+            Key(key, true);
+            Key(key, false);
+        }
+        // Press at `from`, move in `steps` frames to `to`, release.
+        void Drag(std::function<glm::vec2()> from, std::function<glm::vec2(glm::vec2)> to, const int steps = 6)
+        {
+            auto start = std::make_shared<glm::vec2>();
+            MoveTo([start, from = std::move(from)] { return *start = from(); });
+            Mouse(true);
+            for (int i = 1; i <= steps; ++i)
+            {
+                MoveTo([start, to, i, steps]
+                       { return *start + (to(*start) - *start) * (static_cast<float>(i) / steps); });
+            }
+            Mouse(false);
+        }
+
+        // Moves the cursor through `at(0)`, `at(1)`, ... (one point per frame)
+        // until `hit()` reports the hover two frames later; `found` then holds
+        // that point and the cursor stays there ({0,0}: not found).
+        void Probe(std::function<bool()> hit, std::function<glm::vec2(int)> at,
+                   const std::shared_ptr<glm::vec2>& found, const int count)
+        {
+            auto probes = std::make_shared<std::vector<glm::vec2>>();
+            Script->Steps.push_back([this, hit, at, found, probes, count]
+            {
+                const int k = static_cast<int>(probes->size());
+                if (k >= 2 && hit())
+                {
+                    *found = (*probes)[static_cast<std::size_t>(k - 2)];
+                    Window().QueueCursor(found->x, found->y);
+                    return true;
+                }
+                if (k >= count)
+                    return true;
+                probes->push_back(at(k));
+                Window().QueueCursor(probes->back().x, probes->back().y);
+                return false;
+            });
+        }
+        // Clicks item `label` of ImGui window `window` on its actual rectangle:
+        // scans along `line` until ImGui reports that item hovered. A menu-bar
+        // item's id is scoped by "##MenuBar".
+        void ClickItem(const char* window, const char* label, const bool menuBar,
+                       std::function<glm::vec2(const ImGuiWindow&, int)> line, const int count)
+        {
+            auto found = std::make_shared<glm::vec2>(0.0f);
+            Probe([window, label, menuBar]
+                  {
+                      const ImGuiWindow* w = ImGui::FindWindowByName(window);
+                      if (w == nullptr)
+                          return false;
+                      const ImGuiID seed = menuBar ? ImHashStr("##MenuBar", 0, w->ID) : w->ID;
+                      return ImGui::GetCurrentContext()->HoveredIdPreviousFrame == ImHashStr(label, 0, seed);
+                  },
+                  [window, line](const int k)
+                  {
+                      const ImGuiWindow* w = ImGui::FindWindowByName(window);
+                      return w != nullptr ? line(*w, k) : glm::vec2{};
+                  },
+                  found, count);
+            Do([found, label] { EXPECT_NE(*found, glm::vec2{0.0f}) << label << " not found"; });
+            Mouse(true);
+            Mouse(false);
+        }
+        void OpenGizmoMenu()
+        {
+            Wait(); // the menu bar needs one drawn frame
+            ClickItem("##MainMenuBar", "Gizmo", true,
+                      [](const ImGuiWindow& w, const int k) { return glm::vec2{6.0f * k, w.Pos.y + w.Size.y * 0.5f}; },
+                      200);
+            Wait();
+        }
+        void ClickMenuItem(const char* label)
+        {
+            ClickItem("###Menu_00", label, false,
+                      [](const ImGuiWindow& w, const int k) { return glm::vec2{w.Pos.x + 30.0f, w.Pos.y + 3.0f * k}; },
+                      150);
+        }
+        void EnableGizmo()
+        {
+            OpenGizmoMenu();
+            ClickMenuItem("Enabled");
+            Wait();
+        }
+        // An ImGui panel over the scene; returns its center.
+        glm::vec2 AddPanel()
+        {
+            EXPECT_TRUE(Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+                .Id = "test.gizmo_panel", .MenuPath = {"View"}, .Title = "Gizmo panel",
+                .Draw = [](bool& open, const Editor::SandboxEditorContext&)
+                {
+                    ImGui::SetNextWindowPos(ImVec2{900.0f, 480.0f});
+                    ImGui::SetNextWindowSize(ImVec2{300.0f, 160.0f});
+                    if (ImGui::Begin("Gizmo panel", &open, ImGuiWindowFlags_NoSavedSettings))
+                        ImGui::TextUnformatted("panel");
+                    ImGui::End();
+                }}).IsValid());
+            EXPECT_TRUE(Shell.SetEditorWindowOpen("test.gizmo_panel", true));
+            return {1050.0f, 560.0f};
+        }
+        // A point on ImGuizmo's handle for frame axis `axis` at 60% of its
+        // length (0.1 clip units of the camera-right vector), on the side it
+        // draws (the longer projection).
+        [[nodiscard]] glm::vec2 AxisHandle(const int axis)
+        {
+            const Runtime::GizmoUiFrame frame = Interaction->PrepareGizmo(Orientation, Pivot);
+            const glm::vec3 pivot = frame.Frame.Pivot;
+            const glm::vec3 right = glm::vec3{glm::inverse(frame.View)[0]};
+            const glm::mat4 viewProjection = frame.Projection * frame.View;
+            const auto ndc = [&](const glm::vec3 p)
+            {
+                const glm::vec4 clip = viewProjection * glm::vec4{p, 1.0f};
+                return glm::vec2{clip} / clip.w;
+            };
+            glm::vec2 d = ndc(pivot + right) - ndc(pivot);
+            d.y /= frame.SceneRect.Width / frame.SceneRect.Height;
+            const glm::vec3 direction = frame.Frame.Basis[axis] * (0.06f / glm::length(d));
+            const glm::vec2 center = ToScreen(frame, pivot);
+            const glm::vec2 plus = ToScreen(frame, pivot + direction);
+            const glm::vec2 minus = ToScreen(frame, pivot - direction);
+            return glm::length(plus - center) >= glm::length(minus - center) ? plus : minus;
+        }
+        // A screen-space drag from the pivot (translate: camera-plane move,
+        // scale: uniform; rotate has no center handle).
+        void CenterDrag(const glm::vec2 offset)
+        {
+            Drag([this] { return PivotScreen(); }, [offset](const glm::vec2 p) { return p + offset; });
+        }
+        // Finds a rotation ring along the screen diagonal from the pivot (the
+        // edge-on rings of a top-down view lie on the screen axes): the first
+        // point outwards whose hover the gizmo claims.
+        void FindRing(const std::shared_ptr<glm::vec2>& found)
+        {
+            Probe([this] { return Claimed(); },
+                  [this](const int k)
+                  { return PivotScreen() + glm::vec2{20.0f + 2.0f * k} / std::sqrt(2.0f); },
+                  found, 64);
+        }
+        // Moves the held cursor along the circle through `ring` around `center`
+        // from `fromDegrees` to `toDegrees`.
+        void Sweep(const std::shared_ptr<glm::vec2>& ring, const std::shared_ptr<glm::vec2>& center,
+                   const float fromDegrees, const float toDegrees)
+        {
+            constexpr int kSteps = 6;
+            for (int i = 1; i <= kSteps; ++i)
+            {
+                MoveTo([ring, center, fromDegrees, toDegrees, i]
+                {
+                    const float t = glm::radians(fromDegrees + (toDegrees - fromDegrees) * i / kSteps);
+                    const glm::vec2 v = *ring - *center;
+                    return *center + glm::vec2{v.x * std::cos(t) - v.y * std::sin(t),
+                                               v.x * std::sin(t) + v.y * std::cos(t)};
+                });
+            }
+        }
+    };
+
+    [[nodiscard]] bool GizmoStatusShown()
+    {
+        const ImGuiWindow* window = ImGui::FindWindowByName("##GizmoStatus");
+        return window != nullptr && window->WasActive;
+    }
+
+    // Rotation angle in degrees of a unit quaternion.
+    [[nodiscard]] float AngleDegrees(const glm::quat q)
+    {
+        return glm::degrees(2.0f * std::acos(std::min(1.0f, std::abs(q.w))));
+    }
+}
+
+TEST(SandboxEditorGizmo, OffByDefaultEnabledOnlyFromTheMenuAndInactiveWhileHidden)
+{
+    GizmoFixture f;
+    const auto entity = f.Select(glm::vec3{0.0f});
+    const auto drawsGizmo = []
+    {
+        // Steps run after this frame's NewFrame: the last frame's activity.
+        const ImGuiWindow* window = ImGui::FindWindowByName("gizmo");
+        return window != nullptr && window->WasActive && !window->DrawList->VtxBuffer.empty();
+    };
+    // Off: hovering, W and a drag over the pivot do nothing gizmo-related.
+    f.MoveTo([&f] { return f.PivotScreen(); });
+    f.Tap(Plat::Input::Key::W);
+    f.Then([&] { EXPECT_FALSE(f.Claimed()); EXPECT_FALSE(drawsGizmo()); });
+    f.Drag([&f] { return f.PivotScreen(); }, [](glm::vec2 p) { return p + glm::vec2{40.0f, 0.0f}; });
+    f.Then([&]
+    {
+        EXPECT_FALSE(f.Dragging());
+        EXPECT_EQ(f.TransformOf(entity).Position, glm::vec3{0.0f});
+        EXPECT_EQ(f.History->UndoCount(), 0u);
+    });
+
+    f.EnableGizmo();
+    f.MoveTo([&f] { return f.PivotScreen(); });
+    f.Then([&] { EXPECT_TRUE(f.Claimed()); EXPECT_TRUE(drawsGizmo()); });
+
+    // Hidden: neither drawn nor claimed nor draggable; the choice survives.
+    f.Do([&] { (void)f.Shell.ApplyEditorUiVisibilityCommand({Runtime::EditorUiVisibilityCommandKind::Hide}); });
+    f.Then([&] { EXPECT_FALSE(f.Claimed()); EXPECT_FALSE(drawsGizmo()); });
+    f.Drag([&f] { return f.PivotScreen(); }, [](glm::vec2 p) { return p + glm::vec2{40.0f, 0.0f}; });
+    f.Then([&]
+    {
+        EXPECT_FALSE(f.Dragging());
+        EXPECT_EQ(f.TransformOf(entity).Position, glm::vec3{0.0f});
+    });
+    f.Do([&] { (void)f.Shell.ApplyEditorUiVisibilityCommand({Runtime::EditorUiVisibilityCommandKind::Show}); });
+    f.MoveTo([&f] { return f.PivotScreen(); });
+    f.Then([&] { EXPECT_TRUE(f.Claimed()); EXPECT_TRUE(drawsGizmo()); });
+    f.Engine->Run();
+    EXPECT_EQ(f.History->UndoCount(), 0u);
+}
+
+TEST(SandboxEditorGizmo, GroupDragClaimsBlocksCameraAndPickAndCommitsOneUndo)
+{
+    GizmoFixture f;
+    const auto first = f.Select(glm::vec3{-1.0f, 0.0f, 0.0f});
+    const auto second = f.Select(glm::vec3{1.0f, 0.5f, 0.0f}, true);
+    auto& selection = *f.Engine->Services().Find<Runtime::SelectionController>();
+    f.EnableGizmo();
+    glm::mat4 view{};
+    glm::vec2 start{};
+    glm::vec2 target{};
+    std::uint64_t picks = 0u;
+    // Each step queues one input and records the state; a record shows the
+    // frame that processed the input queued two steps earlier.
+    struct Seen
+    {
+        bool Claimed{};
+        bool Dragging{};
+        std::size_t Undo{};
+    };
+    std::vector<Seen> seen{};
+    const auto step = [&](std::function<void()> input)
+    {
+        f.Do([&f, &seen, input = std::move(input)]
+        {
+            input();
+            seen.push_back({f.Claimed(), f.Dragging(), f.History->UndoCount()});
+        });
+    };
+    f.Do([&]
+    {
+        view = f.CameraView();
+        start = f.PivotScreen();
+        target = start + glm::vec2{60.0f, -30.0f};
+        picks = selection.GetDiagnostics().ClickRequestsSubmitted;
+    });
+    step([&] { f.Window().QueueCursor(start.x, start.y); });
+    step([&] { f.Window().QueueMouseButton(0, true); });                  // record 1
+    constexpr int kMoves = 10;
+    for (int i = 1; i <= kMoves; ++i)
+    {
+        step([&, i]
+        {
+            const glm::vec2 p = start + (target - start) * (static_cast<float>(i) / kMoves);
+            f.Window().QueueCursor(p.x, p.y);
+        });
+    }
+    step([&] { f.Window().QueueMouseButton(0, false); });                 // record 12
+    step([&] { f.Window().QueueCursor(60.0f, 650.0f); });                 // away from the gizmo
+    step([] {});
+    step([] {});
+    step([] {});
+    f.Engine->Run();
+
+    ASSERT_EQ(seen.size(), 17u);
+    // Press through the last drag frame: dragging, claimed, nothing recorded.
+    for (std::size_t i = 3u; i <= 13u; ++i)
+    {
+        EXPECT_TRUE(seen[i].Dragging) << i;
+        EXPECT_TRUE(seen[i].Claimed) << i;
+        EXPECT_EQ(seen[i].Undo, 0u) << i;
+    }
+    // The release frame claims and commits exactly once; off the gizmo the
+    // claim ends (after ImGuizmo's one-frame hover capture request).
+    EXPECT_FALSE(seen[14].Dragging);
+    EXPECT_TRUE(seen[14].Claimed);
+    EXPECT_EQ(seen[14].Undo, 1u);
+    EXPECT_FALSE(seen[16].Claimed);
+    EXPECT_EQ(seen[16].Undo, 1u);
+    EXPECT_EQ(f.CameraView(), view) << "a claimed drag must not move the camera";
+    EXPECT_EQ(selection.GetDiagnostics().ClickRequestsSubmitted, picks);
+    ASSERT_EQ(f.History->UndoCount(), 1u);
+    const glm::vec3 delta = f.TransformOf(first).Position - glm::vec3{-1.0f, 0.0f, 0.0f};
+    EXPECT_GT(glm::length(delta), 0.01f);
+    EXPECT_EQ(f.TransformOf(second).Position - glm::vec3(1.0f, 0.5f, 0.0f), delta);
+    // The pivot followed the cursor: no Y flip, no rectangle or scale error.
+    const glm::vec2 pivot = f.PivotScreen();
+    EXPECT_NEAR(pivot.x, target.x, 1.0f);
+    EXPECT_NEAR(pivot.y, target.y, 1.0f);
+
+    ASSERT_TRUE(f.History->Undo().Succeeded());
+    EXPECT_EQ(f.TransformOf(first).Position, glm::vec3(-1.0f, 0.0f, 0.0f));
+    EXPECT_EQ(f.TransformOf(second).Position, glm::vec3(1.0f, 0.5f, 0.0f));
+}
+TEST(SandboxEditorGizmo, NoOpAndEscapeLeaveNoUndoAndEscapeBlocksARestartUntilRelease)
+{
+    GizmoFixture f;
+    const auto entity = f.Select(glm::vec3{0.0f});
+    f.EnableGizmo();
+    // Press and release without motion: a no-op drag.
+    f.MoveTo([&f] { return f.PivotScreen(); });
+    f.Mouse(true);
+    f.Then([&] { EXPECT_TRUE(f.Dragging()); });
+    f.Mouse(false);
+    f.Then([&] { EXPECT_FALSE(f.Dragging()); EXPECT_EQ(f.History->UndoCount(), 0u); });
+
+    // Escape discards a moved drag; the still-held mouse cannot start another.
+    auto start = std::make_shared<glm::vec2>();
+    f.MoveTo([&f, start] { return *start = f.PivotScreen(); });
+    f.Mouse(true);
+    f.MoveTo([start] { return *start + glm::vec2{50.0f, 0.0f}; });
+    f.Then([&] { EXPECT_TRUE(f.Dragging()); EXPECT_NE(f.TransformOf(entity).Position, glm::vec3{0.0f}); });
+    f.Key(Plat::Input::Key::Escape, true);
+    f.Then([&]
+    {
+        EXPECT_FALSE(f.Dragging());
+        EXPECT_EQ(f.TransformOf(entity).Position, glm::vec3{0.0f});
+        EXPECT_TRUE(f.Claimed()) << "the cancel frame keeps the camera off";
+    });
+    f.Key(Plat::Input::Key::Escape, false);
+    f.MoveTo([start] { return *start; });
+    f.MoveTo([start] { return *start + glm::vec2{30.0f, 0.0f}; });
+    f.Then([&]
+    {
+        EXPECT_FALSE(f.Dragging()) << "no restart while the mouse is held";
+        EXPECT_EQ(f.TransformOf(entity).Position, glm::vec3{0.0f});
+        EXPECT_TRUE(f.Claimed());
+    });
+    f.Mouse(false);
+    f.Then([&] { EXPECT_FALSE(f.Dragging()); EXPECT_EQ(f.History->UndoCount(), 0u); });
+    // After the release the gizmo works again.
+    f.CenterDrag({40.0f, 0.0f});
+    f.Then([&] { EXPECT_EQ(f.History->UndoCount(), 1u); });
+    f.Engine->Run();
+    EXPECT_NE(f.TransformOf(entity).Position, glm::vec3{0.0f});
+}
+
+namespace
+{
+    // A drag whose session ends elsewhere is never committed by the later
+    // release, and the held mouse does not restart it (UI-078 restart lock).
+    void ExpectLifecycleCancelNeverCommits(const std::function<void(GizmoFixture&)>& end,
+                                           const std::function<void(GizmoFixture&)>& resume)
+    {
+        GizmoFixture f;
+        Extrinsic::ECS::Scene::Registry* const registry = &f.Scene();
+        const auto entity = f.Select(glm::vec3{0.0f});
+        f.EnableGizmo();
+        auto start = std::make_shared<glm::vec2>();
+        f.MoveTo([&f, start] { return *start = f.PivotScreen(); });
+        f.Mouse(true);
+        f.MoveTo([start] { return *start + glm::vec2{50.0f, 0.0f}; });
+        f.Then([&] { EXPECT_TRUE(f.Dragging()); });
+        f.Do([&] { end(f); });
+        f.Then([&] { EXPECT_FALSE(f.Dragging()); });
+        f.Do([&] { resume(f); });
+        f.MoveTo([start] { return *start; });
+        f.MoveTo([start] { return *start + glm::vec2{80.0f, 0.0f}; });
+        f.Then([&] { EXPECT_FALSE(f.Dragging()) << "no restart while the mouse is held"; });
+        f.Mouse(false);
+        f.Wait(2);
+        f.Engine->Run();
+        EXPECT_FALSE(f.Dragging());
+        EXPECT_EQ(f.History->UndoCount(), 0u);
+        if (registry->IsValid(entity))
+            EXPECT_EQ(registry->Raw().get<Tf::Component>(entity).Position, glm::vec3{0.0f});
+    }
+}
+
+TEST(SandboxEditorGizmo, HideFocusLossWorldAndDocumentChangesPreventTheReleaseCommit)
+{
+    const auto nothing = [](GizmoFixture&) {};
+    {
+        SCOPED_TRACE("hide, shown again while held");
+        ExpectLifecycleCancelNeverCommits(
+            [](GizmoFixture& f) { (void)f.Shell.ApplyEditorUiVisibilityCommand({Runtime::EditorUiVisibilityCommandKind::Hide}); },
+            [](GizmoFixture& f) { (void)f.Shell.ApplyEditorUiVisibilityCommand({Runtime::EditorUiVisibilityCommandKind::Show}); });
+    }
+    {
+        SCOPED_TRACE("focus loss and regain");
+        ExpectLifecycleCancelNeverCommits(
+            [](GizmoFixture& f) { f.Window().QueueEvent(Plat::WindowFocusEvent{.Focused = false}); },
+            [](GizmoFixture& f) { f.Window().QueueEvent(Plat::WindowFocusEvent{.Focused = true}); });
+    }
+    {
+        SCOPED_TRACE("world switch");
+        ExpectLifecycleCancelNeverCommits(
+            [](GizmoFixture& f)
+            {
+                const Runtime::WorldHandle other = f.Engine->Worlds().CreateWorld("Gizmo other world");
+                ASSERT_TRUE(f.Engine->Worlds().RequestSetActiveWorld(other).has_value());
+            },
+            nothing);
+    }
+    {
+        SCOPED_TRACE("document replacement");
+        ExpectLifecycleCancelNeverCommits(
+            [](GizmoFixture& f)
+            { ASSERT_TRUE(f.Engine->Services().Find<Runtime::SceneDocumentModule>()->NewSceneDocument().has_value()); },
+            nothing);
+    }
+}
+
+TEST(SandboxEditorGizmo, WerSwitchModesOnlyWhenEnabledAndNotWhileTypingOrCaptured)
+{
+    GizmoFixture f;
+    const auto entity = f.Select(glm::vec3{0.0f});
+    char text[16] = {};
+    bool captureKeyboard = false;
+    const Runtime::EditorUiFrameContributionHandle capture = f.Host->RegisterFrameContribution([&]
+    {
+        if (captureKeyboard)
+            ImGui::SetNextFrameWantCaptureKeyboard(true);
+    });
+    ASSERT_TRUE(f.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+        .Id = "test.gizmo_text", .MenuPath = {"View"}, .Title = "Gizmo text probe",
+        .Draw = [&text](bool& open, const Editor::SandboxEditorContext&)
+        {
+            ImGui::SetNextWindowPos(ImVec2{900.0f, 500.0f});
+            ImGui::SetNextWindowSize(ImVec2{300.0f, 120.0f});
+            if (ImGui::Begin("Gizmo text probe", &open, ImGuiWindowFlags_NoSavedSettings))
+                ImGui::InputText("##text", text, sizeof(text));
+            ImGui::End();
+        }}).IsValid());
+    ASSERT_TRUE(f.Shell.SetEditorWindowOpen("test.gizmo_text", true));
+    const auto moved = [&] { return f.TransformOf(entity).Position != glm::vec3{0.0f}; };
+    const auto scaled = [&] { return f.TransformOf(entity).Scale != glm::vec3{1.0f}; };
+    const auto undoAll = [&] { while (f.History->UndoCount() > 0u) (void)f.History->Undo(); };
+
+    // Disabled: R switches nothing (the later default drag still translates).
+    f.Tap(Plat::Input::Key::R);
+    f.Then([&] { EXPECT_FALSE(f.Claimed()); });
+    f.EnableGizmo();
+    f.CenterDrag({40.0f, 0.0f});
+    f.Then([&] { EXPECT_TRUE(moved()); EXPECT_FALSE(scaled()); undoAll(); });
+
+    // Enabled: R selects scale and the consumed key claims the viewport.
+    f.Key(Plat::Input::Key::R, true);
+    f.Then([&] { EXPECT_TRUE(f.Claimed()); });
+    f.Key(Plat::Input::Key::R, false);
+    f.CenterDrag({40.0f, 0.0f});
+    f.Then([&] { EXPECT_FALSE(moved()); EXPECT_TRUE(scaled()); undoAll(); });
+
+    // E selects rotate (no center handle), then W translate; a held W never
+    // reaches the camera.
+    f.Tap(Plat::Input::Key::E);
+    f.CenterDrag({40.0f, 0.0f});
+    f.Then([&] { EXPECT_FALSE(moved()); EXPECT_FALSE(scaled()); EXPECT_EQ(f.History->UndoCount(), 0u); });
+    glm::mat4 view{};
+    f.MoveTo(glm::vec2{60.0f, 400.0f});
+    f.Do([&] { view = f.CameraView(); });
+    f.Key(Plat::Input::Key::W, true);
+    f.Wait(8);
+    f.Key(Plat::Input::Key::W, false);
+    f.Then([&] { EXPECT_EQ(f.CameraView(), view) << "W leaked into the camera"; });
+    f.CenterDrag({40.0f, 0.0f});
+    f.Then([&] { EXPECT_TRUE(moved()); undoAll(); });
+
+    // Typing an R into a text field does not switch the mode.
+    f.MoveTo([] {
+        const ImGuiWindow* window = ImGui::FindWindowByName("Gizmo text probe");
+        return window != nullptr ? glm::vec2{window->DC.CursorStartPos.x + 20.0f,
+                                             window->DC.CursorStartPos.y + ImGui::GetFrameHeight() * 0.5f}
+                                 : glm::vec2{};
+    });
+    f.Mouse(true);
+    f.Mouse(false);
+    f.Wait();
+    f.Key(Plat::Input::Key::R, true);
+    f.Do([&] { f.Window().QueueEvent(Plat::CharEvent{.Character = 'r'}); });
+    f.Key(Plat::Input::Key::R, false);
+    f.Then([&] { EXPECT_STREQ(text, "r"); });
+    f.CenterDrag({40.0f, 0.0f});
+    f.Then([&] { EXPECT_TRUE(moved()); EXPECT_FALSE(scaled()); undoAll(); });
+
+    // Nor does an R while ImGui captures the keyboard.
+    f.Do([&] { captureKeyboard = true; });
+    f.Wait();
+    f.Tap(Plat::Input::Key::R);
+    f.Then([&] { captureKeyboard = false; });
+    f.Wait();
+    f.CenterDrag({40.0f, 0.0f});
+    f.Then([&] { EXPECT_TRUE(moved()); EXPECT_FALSE(scaled()); });
+    f.Engine->Run();
+    (void)f.Host->UnregisterFrameContribution(capture);
+}
+
+TEST(SandboxEditorGizmo, PivotAndLocalAxesFromTheMenuIncludingTheGroupFallback)
+{
+    GizmoFixture f;
+    // Bounds centered at local (0.5,0,0), rotated 90 degrees about Z: world (0,0.5,0).
+    const auto entity = f.Select(glm::vec3{0.0f});
+    f.TransformOf(entity).Rotation = glm::angleAxis(glm::radians(90.0f), glm::vec3{0.0f, 0.0f, 1.0f});
+    f.Scene().Raw().emplace_or_replace<Extrinsic::ECS::Components::Culling::Local::Bounds>(
+        entity, Extrinsic::ECS::Components::Culling::Local::Bounds{
+                    .LocalBoundingAABB = {.Min = {0.0f, -0.5f, -0.5f}, .Max = {1.0f, 0.5f, 0.5f}}});
+    f.EnableGizmo();
+
+    // Bounds-center pivot: the gizmo sits at (0,0.5,0), not at the origin.
+    f.OpenGizmoMenu();
+    f.ClickMenuItem("Pivot at bounds centers");
+    f.Do([&] { f.Pivot = Runtime::GizmoPivotMode::BoundsCenters; });
+    f.Wait();
+    f.CenterDrag({40.0f, 0.0f});
+    f.Then([&]
+    {
+        ASSERT_EQ(f.History->UndoCount(), 1u);
+        EXPECT_NE(f.TransformOf(entity).Position, glm::vec3{0.0f});
+        (void)f.History->Undo();
+    });
+
+    // Local axes: the X handle is the entity's local X, i.e. world Y.
+    f.OpenGizmoMenu();
+    f.ClickMenuItem("Local axes");
+    f.Do([&] { f.Orientation = Runtime::GizmoOrientation::Local; f.Pivot = Runtime::GizmoPivotMode::WorldOrigins; });
+    f.OpenGizmoMenu();
+    f.ClickMenuItem("Pivot at bounds centers");
+    f.Wait();
+    auto handle = std::make_shared<glm::vec2>();
+    f.Do([&f, handle] { *handle = f.AxisHandle(0); });
+    f.Drag([handle] { return *handle; }, [](const glm::vec2 p) { return p + glm::vec2{25.0f, 25.0f}; });
+    f.Then([&]
+    {
+        ASSERT_EQ(f.History->UndoCount(), 1u);
+        const glm::vec3 position = f.TransformOf(entity).Position;
+        EXPECT_GT(std::abs(position.y), 0.01f);
+        EXPECT_NEAR(position.x, 0.0f, 1.0e-4f);
+        EXPECT_NEAR(position.z, 0.0f, 1.0e-4f);
+    });
+
+    // A group whose rotations average to nothing falls back to world axes and says so.
+    f.Do([&] {
+        const auto other = f.Select(glm::vec3{2.0f, 0.0f, 0.0f}, true);
+        f.TransformOf(other).Rotation = glm::angleAxis(glm::radians(180.0f), glm::vec3{1.0f, 0.0f, 0.0f});
+        f.TransformOf(entity).Rotation = glm::quat{1.0f, 0.0f, 0.0f, 0.0f};
+    });
+    f.Then([&]
+    {
+        EXPECT_NE(f.Interaction->PrepareGizmo(f.Orientation, f.Pivot).Frame.BasisFallback,
+                  Runtime::GizmoBasisFallback::None);
+        EXPECT_TRUE(GizmoStatusShown());
+    });
+    f.Engine->Run();
+}
+
+TEST(SandboxEditorGizmo, SnapStepsPreviewValidateApplyAndShiftSnapsEachMode)
+{
+    GizmoFixture f{Core::Config::CameraControllerKind::TopDown};
+    const auto entity = f.Select(glm::vec3{0.0f});
+    const auto active = [&] { return Runtime::GetGizmoSnapConfig(f.Config->GetEngineConfigControlState().ActiveConfig); };
+    const auto type = [&f](const std::string& value)
+    {
+        for (const char c : value)
+            f.Do([&f, c] { f.Window().QueueEvent(Plat::CharEvent{.Character = static_cast<unsigned int>(c)}); });
+    };
+    f.EnableGizmo();
+
+    // An invalid draft shows its reason and cannot be applied.
+    f.OpenGizmoMenu();
+    f.ClickMenuItem("Translate step");
+    f.Wait();
+    type("0");
+    f.ClickMenuItem("Apply snap steps");
+    f.Then([&]
+    {
+        ASSERT_TRUE(active().has_value());
+        EXPECT_EQ(active()->TranslateStep, 0.25f);
+        EXPECT_FALSE(Runtime::PreviewGizmoSnapConfig(*f.Config, {.TranslateStep = 0.0f}).empty());
+    });
+    // A valid draft is applied through the config lane and round-trips.
+    f.ClickMenuItem("Translate step");
+    f.Wait();
+    type("0.5");
+    f.ClickMenuItem("Rotate step (degrees)");
+    f.Wait();
+    type("30");
+    f.ClickMenuItem("Scale step");
+    f.Wait();
+    type("0.5");
+    f.Then([&] { EXPECT_EQ(active()->TranslateStep, 0.25f) << "editing a draft applies nothing"; });
+    f.ClickMenuItem("Apply snap steps");
+    f.Then([&]
+    {
+        ASSERT_TRUE(active().has_value());
+        EXPECT_EQ(*active(), (Runtime::GizmoSnapConfig{.TranslateStep = 0.5f, .RotateStepDegrees = 30.0f,
+                                                       .ScaleStep = 0.5f}));
+        const auto roundTrip = f.Config->PreviewEngineConfigControlDocument(
+            Core::Config::SerializeEngineConfig(f.Config->GetEngineConfigControlState().ActiveConfig));
+        EXPECT_EQ(Runtime::GetGizmoSnapConfig(roundTrip.Preview.Config), active());
+    });
+    f.MoveTo(glm::vec2{60.0f, 400.0f});
+    f.Mouse(true); // closes the menu
+    f.Mouse(false);
+    f.Wait();
+
+    const auto multipleOf = [](const float value, const float step)
+    { return std::abs(value / step - std::round(value / step)) < 1.0e-3f; };
+    // Translate with Shift: every world component is a multiple of 0.5.
+    f.Key(Plat::Input::Key::LeftShift, true);
+    f.CenterDrag({37.0f, -23.0f});
+    f.Key(Plat::Input::Key::LeftShift, false);
+    f.Then([&]
+    {
+        const glm::vec3 p = f.TransformOf(entity).Position;
+        EXPECT_GT(glm::length(p), 0.1f);
+        for (int i = 0; i < 3; ++i)
+            EXPECT_TRUE(multipleOf(p[i], 0.5f)) << p[i];
+        while (f.History->UndoCount() > 0u) (void)f.History->Undo();
+    });
+    // Scale with Shift: the uniform factor is a multiple of 0.5.
+    f.Tap(Plat::Input::Key::R);
+    f.Key(Plat::Input::Key::LeftShift, true);
+    f.CenterDrag({37.0f, 0.0f});
+    f.Key(Plat::Input::Key::LeftShift, false);
+    f.Then([&]
+    {
+        const glm::vec3 scale = f.TransformOf(entity).Scale;
+        EXPECT_NE(scale, glm::vec3{1.0f});
+        for (int i = 0; i < 3; ++i)
+            EXPECT_TRUE(multipleOf(scale[i], 0.5f)) << scale[i];
+        while (f.History->UndoCount() > 0u) (void)f.History->Undo();
+    });
+    // Rotate with Shift: the angle is a multiple of 30 degrees.
+    f.Tap(Plat::Input::Key::E);
+    auto ring = std::make_shared<glm::vec2>(0.0f);
+    auto center = std::make_shared<glm::vec2>();
+    f.Do([&f, center] { *center = f.PivotScreen(); });
+    f.FindRing(ring);
+    f.Then([ring] { ASSERT_NE(*ring, glm::vec2{0.0f}) << "no rotation ring found"; });
+    f.Key(Plat::Input::Key::LeftShift, true);
+    f.Mouse(true);
+    f.Sweep(ring, center, 0.0f, 50.0f);
+    f.Mouse(false);
+    f.Key(Plat::Input::Key::LeftShift, false);
+    f.Then([&]
+    {
+        ASSERT_EQ(f.History->UndoCount(), 1u);
+        const float angle = AngleDegrees(f.TransformOf(entity).Rotation);
+        EXPECT_GT(angle, 1.0f);
+        EXPECT_TRUE(multipleOf(angle, 30.0f)) << angle;
+    });
+    f.Engine->Run();
+}
+
+TEST(SandboxEditorGizmo, RejectedPreviewShowsReasonWritesNothingAndReleaseCommitsLastAccepted)
+{
+    GizmoFixture f;
+    // Scaling world X skews the entity turned 45 degrees about Y: the whole
+    // group is rejected, though the unrotated one alone would be valid.
+    const auto plain = f.Select(glm::vec3{-1.0f, 0.0f, 0.0f});
+    const auto turned = f.Select(glm::vec3{1.0f, 0.0f, 0.0f}, true);
+    f.TransformOf(turned).Rotation = glm::angleAxis(glm::radians(45.0f), glm::vec3{0.0f, 1.0f, 0.0f});
+    const Tf::Component plainBefore = f.TransformOf(plain);
+    const Tf::Component turnedBefore = f.TransformOf(turned);
+    const auto unchanged = [&]
+    {
+        for (const auto& [entity, before] : {std::pair{plain, plainBefore}, std::pair{turned, turnedBefore}})
+        {
+            const Tf::Component& now = f.TransformOf(entity);
+            for (int i = 0; i < 3; ++i)
+            {
+                EXPECT_NEAR(now.Position[i], before.Position[i], 1.0e-5f);
+                EXPECT_NEAR(now.Scale[i], before.Scale[i], 1.0e-5f);
+            }
+        }
+    };
+    f.EnableGizmo();
+    f.Tap(Plat::Input::Key::R);
+    auto start = std::make_shared<glm::vec2>();
+    f.MoveTo([&f, start] { return *start = f.AxisHandle(0); });
+    f.Mouse(true);
+    f.MoveTo([start] { return *start + glm::vec2{30.0f, 0.0f}; });
+    f.Then([&]
+    {
+        EXPECT_TRUE(f.Dragging());
+        EXPECT_TRUE(GizmoStatusShown()) << "the rejection reason is shown";
+        unchanged(); // no partial write
+    });
+    // Back at the start pixel the candidate is valid again.
+    f.MoveTo([start] { return *start; });
+    f.Then([&] { EXPECT_TRUE(f.Dragging()); EXPECT_FALSE(GizmoStatusShown()); unchanged(); });
+    // Release on a rejected tick commits the last accepted (here: start) state.
+    f.MoveTo([start] { return *start + glm::vec2{40.0f, 0.0f}; });
+    f.Then([&] { EXPECT_TRUE(GizmoStatusShown()); });
+    f.Mouse(false);
+    f.Then([&]
+    {
+        EXPECT_FALSE(f.Dragging());
+        EXPECT_EQ(f.History->UndoCount(), 0u) << "the last accepted state was the start";
+        unchanged();
+        EXPECT_TRUE(GizmoStatusShown()) << "the error stays visible after the release";
+    });
+    f.Engine->Run();
+}
+
+TEST(SandboxEditorGizmo, OffsetSplitSceneRectInPerspectiveAndOrthographicViews)
+{
+    for (const auto camera : {Core::Config::CameraControllerKind::Orbit, Core::Config::CameraControllerKind::TopDown})
+    {
+        SCOPED_TRACE(static_cast<int>(camera));
+        GizmoFixture f{camera};
+        const auto entity = f.Select(glm::vec3{0.5f, 0.0f, 0.25f});
+        ASSERT_TRUE(f.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+            .Id = "test.gizmo_split", .MenuPath = {"View"}, .Title = "Gizmo split",
+            .Draw = [](bool&, const Editor::SandboxEditorContext& context)
+            { context.ClaimSceneViewport(420.0f, 80.0f, 640.0f, 480.0f); }}).IsValid());
+        ASSERT_TRUE(f.Shell.SetEditorWindowOpen("test.gizmo_split", true));
+        f.EnableGizmo();
+        glm::vec2 target{};
+        f.Do([&]
+        {
+            const Runtime::GizmoUiFrame frame = f.Interaction->PrepareGizmo(f.Orientation, f.Pivot);
+            EXPECT_EQ(frame.SceneRect.X, 420.0f);
+            EXPECT_EQ(frame.SceneRect.Width, 640.0f);
+            EXPECT_EQ(frame.Orthographic, camera == Core::Config::CameraControllerKind::TopDown);
+            target = f.PivotScreen() + glm::vec2{-45.0f, 35.0f};
+        });
+        f.Drag([&f] { return f.PivotScreen(); }, [&](glm::vec2) { return target; });
+        f.Then([&]
+        {
+            ASSERT_EQ(f.History->UndoCount(), 1u);
+            const glm::vec2 pivot = f.Screen(f.TransformOf(entity).Position);
+            EXPECT_NEAR(pivot.x, target.x, 1.0f);
+            EXPECT_NEAR(pivot.y, target.y, 1.0f);
+        });
+        f.Engine->Run();
+    }
+}
+
+TEST(SandboxEditorGizmo, ScaleAndRotateReleasedOverAPanelCommitOnce)
+{
+    // ImGuizmo 1.10 skips its scale/rotate release while another window is
+    // hovered. ImGui reports that window during a drag when the press was
+    // ImGui-owned, e.g. the click that also closes an open menu.
+    for (const int key : {Plat::Input::Key::R, Plat::Input::Key::E})
+    {
+        SCOPED_TRACE(key);
+        GizmoFixture f{Core::Config::CameraControllerKind::TopDown};
+        const auto entity = f.Select(glm::vec3{0.0f});
+        const glm::vec2 panel = f.AddPanel();
+        f.EnableGizmo();
+        f.Tap(key);
+        auto start = std::make_shared<glm::vec2>(0.0f);
+        if (key == Plat::Input::Key::E)
+            f.FindRing(start);
+        else
+            f.Do([&f, start] { *start = f.PivotScreen(); });
+        f.OpenGizmoMenu();
+        f.MoveTo([start] { return *start; });
+        f.Mouse(true);
+        for (int i = 1; i <= 6; ++i)
+            f.MoveTo([start, panel, i] { return *start + (panel - *start) * (i / 6.0f); });
+        f.Then([&] { EXPECT_TRUE(f.Dragging()); });
+        f.Mouse(false);
+        Tf::Component released{};
+        f.Then([&]
+        {
+            EXPECT_FALSE(f.Dragging()) << "the release over the panel ends the drag";
+            EXPECT_EQ(f.History->UndoCount(), 1u);
+            released = f.TransformOf(entity);
+        });
+        // Moving back over the gizmo without a button transforms nothing.
+        f.MoveTo([start] { return *start; });
+        f.MoveTo([start] { return *start + glm::vec2{-40.0f, 30.0f}; });
+        f.Then([&]
+        {
+            EXPECT_FALSE(f.Dragging());
+            EXPECT_EQ(f.History->UndoCount(), 1u);
+            EXPECT_EQ(f.TransformOf(entity).Rotation, released.Rotation);
+            EXPECT_EQ(f.TransformOf(entity).Scale, released.Scale);
+        });
+        f.Engine->Run();
+        EXPECT_TRUE(released.Scale != glm::vec3(1.0f) || released.Rotation != glm::quat(1.0f, 0.0f, 0.0f, 0.0f))
+            << "the drag transformed before reaching the panel";
+    }
+}
+
+TEST(SandboxEditorGizmo, OverlappingModeKeysKeepTheCameraOffUntilTheLastRelease)
+{
+    GizmoFixture f;
+    (void)f.Select(glm::vec3{0.0f});
+    f.EnableGizmo();
+    glm::mat4 view{};
+    f.MoveTo(glm::vec2{60.0f, 650.0f});
+    f.Do([&] { view = f.CameraView(); });
+    f.Key(Plat::Input::Key::W, true);
+    f.Wait();
+    f.Key(Plat::Input::Key::E, true);
+    f.Key(Plat::Input::Key::E, false);
+    f.Wait(6); // W still held
+    f.Then([&] { EXPECT_EQ(f.CameraView(), view) << "the held W leaked into the camera"; });
+    f.Key(Plat::Input::Key::W, false);
+    f.Engine->Run();
+}
+
+TEST(SandboxEditorGizmo, ShiftSnappedRotationUnderANonUniformParentIsAccepted)
+{
+    GizmoFixture f{Core::Config::CameraControllerKind::TopDown};
+    // Rotating about the view (Y) axis under a parent scaled (1,1,2) is TRS
+    // only at multiples of 90 degrees; ImGuizmo's own snap drifts off them.
+    const auto parent = f.Select(glm::vec3{0.0f});
+    f.TransformOf(parent).Scale = {1.0f, 1.0f, 2.0f};
+    const auto child = f.Select(glm::vec3{0.0f});
+    f.Scene().Raw().emplace_or_replace<Extrinsic::ECS::Components::Hierarchy::Component>(
+        child, Extrinsic::ECS::Components::Hierarchy::Component{.Parent = parent});
+    const Tf::Component original = f.TransformOf(child);
+    f.EnableGizmo();
+    f.Tap(Plat::Input::Key::E);
+    auto ring = std::make_shared<glm::vec2>(0.0f);
+    auto center = std::make_shared<glm::vec2>();
+    f.Do([&f, center] { *center = f.PivotScreen(); });
+    f.FindRing(ring);
+    f.Key(Plat::Input::Key::LeftShift, true);
+    f.Mouse(true);
+    f.Sweep(ring, center, 0.0f, 88.0f);
+    f.Then([&]
+    {
+        EXPECT_FALSE(GizmoStatusShown()) << "the snapped 90 degrees are accepted";
+        EXPECT_NEAR(AngleDegrees(f.TransformOf(child).Rotation), 90.0f, 0.01f);
+    });
+    f.Sweep(ring, center, 88.0f, 3.0f);
+    f.Then([&]
+    {
+        EXPECT_FALSE(GizmoStatusShown());
+        EXPECT_EQ(f.TransformOf(child).Rotation, original.Rotation) << "back at the exact start";
+    });
+    f.Sweep(ring, center, 3.0f, 88.0f);
+    f.Mouse(false);
+    f.Key(Plat::Input::Key::LeftShift, false);
+    f.Then([&]
+    {
+        EXPECT_FALSE(f.Dragging());
+        ASSERT_EQ(f.History->UndoCount(), 1u);
+        EXPECT_NEAR(AngleDegrees(f.TransformOf(child).Rotation), 90.0f, 0.01f);
+    });
+    f.Engine->Run();
 }

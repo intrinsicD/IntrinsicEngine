@@ -28,7 +28,6 @@ import Geometry.Validation;
 import Extrinsic.ECS.Component.Culling.Local;
 import Extrinsic.ECS.Component.Hierarchy;
 import Extrinsic.ECS.Component.Transform;
-import Extrinsic.Runtime.StableEntityLookup;
 
 #include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
 
@@ -37,65 +36,6 @@ namespace Extrinsic::Runtime
     namespace
     {
         using Geometry::Validation::IsFinite;
-
-        constexpr float kEpsilon = 1.0e-6f;
-
-        // Project a world point to pixel coordinates. Returns false when the
-        // point is behind the camera (clip w <= 0) or non-finite.
-        [[nodiscard]] bool ProjectToPixels(const glm::mat4& viewProjection,
-                                           const Core::Extent2D viewport,
-                                           const glm::vec3 world,
-                                           glm::vec2& outPixel) noexcept
-        {
-            const glm::vec4 clip = viewProjection * glm::vec4{world, 1.f};
-            if (!(std::abs(clip.w) > kEpsilon) || clip.w <= 0.f)
-                return false;
-            const glm::vec3 ndc = glm::vec3{clip} / clip.w;
-            if (!IsFinite(ndc))
-                return false;
-            const float w = static_cast<float>(viewport.Width);
-            const float h = static_cast<float>(viewport.Height);
-            outPixel.x = (ndc.x * 0.5f + 0.5f) * w;
-            // NDC +Y is up; pixel +Y is down.
-            outPixel.y = (1.f - (ndc.y * 0.5f + 0.5f)) * h;
-            return true;
-        }
-
-        // 2D distance from point p to segment [a, b].
-        [[nodiscard]] float DistancePointToSegment2D(const glm::vec2 p,
-                                                     const glm::vec2 a,
-                                                     const glm::vec2 b) noexcept
-        {
-            const glm::vec2 ab = b - a;
-            const float lenSq = glm::dot(ab, ab);
-            if (lenSq <= kEpsilon)
-                return glm::length(p - a);
-            float t = glm::dot(p - a, ab) / lenSq;
-            t = glm::clamp(t, 0.f, 1.f);
-            const glm::vec2 closest = a + ab * t;
-            return glm::length(p - closest);
-        }
-
-        // Signed parameter along the axis line (origin + dir * t) of the point on
-        // that line closest to the given ray. `dir` must be unit length. Returns
-        // false for a degenerate / parallel configuration.
-        [[nodiscard]] bool ClosestAxisParam(const glm::vec3 rayOrigin,
-                                            const glm::vec3 rayDir,
-                                            const glm::vec3 axisOrigin,
-                                            const glm::vec3 axisDir,
-                                            float& outParam) noexcept
-        {
-            // Lines: P1 = rayOrigin + s*rayDir ; P2 = axisOrigin + t*axisDir.
-            const glm::vec3 r = rayOrigin - axisOrigin;
-            const float b = glm::dot(rayDir, axisDir);
-            const float d = glm::dot(rayDir, r);
-            const float e = glm::dot(axisDir, r);
-            const float denom = 1.f - b * b; // rayDir, axisDir assumed unit.
-            if (!(std::abs(denom) > kEpsilon))
-                return false; // parallel
-            outParam = (e - b * d) / denom;
-            return std::isfinite(outParam);
-        }
 
         struct GizmoTransformMutationIdentity
         {
@@ -453,9 +393,29 @@ namespace Extrinsic::Runtime
         }
     }
 
-    GizmoInteraction::GizmoInteraction(const GizmoConfig& config) noexcept
-        : m_Config(config)
+    glm::mat4 SnapGizmoRotation(const GizmoFrame& frame, const glm::mat4& gizmoMatrix, const float stepRadians)
     {
+        const glm::quat delta = glm::quat_cast(glm::mat3{gizmoMatrix} * glm::transpose(frame.Basis));
+        const glm::vec3 vector{delta.x, delta.y, delta.z};
+        const float sine = glm::length(vector);
+        // The axis comes from the vector part: glm::axis falls back to Z once w rounds to 1.
+        // sin(theta/2) <= 1e-7 is float noise, far below half the smallest step (0.001 degrees).
+        if (!(sine > 1.0e-7f))
+            return frame.Matrix;
+        const float theta = 2.f * std::atan2(sine, delta.w); // [0, 2pi) about `axis`
+        const float turn = 2.f * glm::pi<float>();
+        const float ka = std::round(theta / stepRadians);
+        const float kb = std::round((theta - turn) / stepRadians);
+        const float steps = std::abs(theta - ka * stepRadians) <= std::abs(theta - turn - kb * stepRadians) ? ka : kb;
+        const float angle = steps * stepRadians;
+        // G0 for zero steps, or for a whole turn within the float error of steps * step
+        // (bounded by half a step, so the smallest real step and a 270-degree step stay turns).
+        const float wholeTurnTolerance =
+            std::min(8.f * std::numeric_limits<float>::epsilon() * turn, 0.5f * stepRadians);
+        if (steps == 0.f || std::abs(std::remainder(angle, turn)) < wholeTurnTolerance)
+            return frame.Matrix;
+        return glm::translate(glm::mat4{1.f}, frame.Pivot) * glm::mat4_cast(glm::angleAxis(angle, vector / sine)) *
+               glm::mat4{frame.Basis};
     }
 
     void GizmoInteraction::EndSession() noexcept
@@ -464,7 +424,6 @@ namespace Extrinsic::Runtime
             ++m_SessionGeneration;
         m_Dragging = false;
         m_DragMode = GizmoMode::Translate;
-        m_DragAxis = GizmoAxis::None;
         m_SessionRegistry = nullptr;
         m_SessionFrame = {};
         m_AcceptedGizmo = glm::mat4{1.f};
@@ -660,170 +619,6 @@ namespace Extrinsic::Runtime
         return {};
     }
 
-    GizmoHitResult GizmoInteraction::HitTest(const Registry& registry,
-                                             const Extrinsic::Graphics::CameraViewSnapshot& camera,
-                                             const glm::vec2 cursorPixel,
-                                             const Core::Extent2D viewport,
-                                             std::span<const EntityHandle> selected)
-    {
-        ++m_Diagnostics.HitTests;
-
-        GizmoHitResult result{};
-        if (!camera.Valid || Core::IsEmpty(viewport) || selected.empty())
-            return result;
-
-        const GizmoFrame frame = ComputeFrame(registry, selected, m_Orientation, m_PivotMode);
-        if (!frame.Available())
-            return result;
-
-        const float axisLength = m_Config.AxisLength > kEpsilon ? m_Config.AxisLength : 1.f;
-        float bestDistance = m_Config.HandlePickRadiusPixels;
-        GizmoAxis bestAxis = GizmoAxis::None;
-
-        const GizmoAxis candidates[3] = {GizmoAxis::X, GizmoAxis::Y, GizmoAxis::Z};
-        for (const GizmoAxis axis : candidates)
-        {
-            if (m_AxisLock != GizmoAxis::None && m_AxisLock != axis)
-                continue;
-
-            const glm::vec3 dir = frame.Basis[static_cast<int>(axis) - 1];
-            const glm::vec3 worldEnd = frame.Pivot + dir * axisLength;
-
-            glm::vec2 pixelStart{0.f};
-            glm::vec2 pixelEnd{0.f};
-            if (!ProjectToPixels(camera.ViewProjection, viewport, frame.Pivot, pixelStart))
-                continue;
-            if (!ProjectToPixels(camera.ViewProjection, viewport, worldEnd, pixelEnd))
-                continue;
-
-            const float distance = DistancePointToSegment2D(cursorPixel, pixelStart, pixelEnd);
-            if (distance <= bestDistance)
-            {
-                bestDistance = distance;
-                bestAxis = axis;
-            }
-        }
-
-        if (bestAxis == GizmoAxis::None)
-            return result;
-
-        result.Hit = true;
-        result.Axis = bestAxis;
-        result.Entity = frame.Primary;
-        result.PixelDistance = bestDistance;
-        ++m_Diagnostics.HitsResolved;
-        return result;
-    }
-
-    bool GizmoInteraction::BeginDrag(const Registry& registry,
-                                     const GizmoHitResult& hit,
-                                     const PickRay& ray,
-                                     std::span<const EntityHandle> selected)
-    {
-        if (!hit.Hit || hit.Axis == GizmoAxis::None || selected.empty() || m_Dragging)
-            return false;
-
-        const float dirLen = glm::length(ray.Direction);
-        if (!(std::isfinite(dirLen) && dirLen > kEpsilon) || !IsFinite(ray.Origin))
-            return false;
-        const glm::vec3 rayDir = ray.Direction / dirLen;
-
-        if (!Begin(registry, selected, m_Mode, m_Orientation, m_PivotMode).Succeeded())
-            return false;
-
-        const glm::vec3 axisDir = m_SessionFrame.Basis[static_cast<int>(hit.Axis) - 1];
-        float startParam = 0.f;
-        if (!ClosestAxisParam(ray.Origin, rayDir, m_SessionFrame.Pivot, axisDir, startParam))
-        {
-            // Begin wrote nothing; drop the session without a cancel.
-            EndSession();
-            return false;
-        }
-
-        m_DragAxis = hit.Axis;
-        m_DragAxisDir = axisDir;
-        m_DragStartParam = startParam;
-        return true;
-    }
-
-    bool GizmoInteraction::DragTick(Registry& registry, const PickRay& ray)
-    {
-        if (!m_Dragging || m_DragAxis == GizmoAxis::None)
-            return false;
-
-        const float dirLen = glm::length(ray.Direction);
-        if (!(std::isfinite(dirLen) && dirLen > kEpsilon) || !IsFinite(ray.Origin))
-            return false;
-        const glm::vec3 rayDir = ray.Direction / dirLen;
-
-        const glm::vec3 pivot = m_SessionFrame.Pivot;
-        float currentParam = 0.f;
-        if (!ClosestAxisParam(ray.Origin, rayDir, pivot, m_DragAxisDir, currentParam))
-            return false;
-
-        const float rawDeltaScalar = currentParam - m_DragStartParam;
-        float deltaScalar = rawDeltaScalar;
-        const bool snap = HasModifier(m_ModifierMask, GizmoModifier::Snap);
-        if (snap && m_DragMode == GizmoMode::Translate && m_Config.TranslateSnapStep > kEpsilon)
-        {
-            deltaScalar = std::round(deltaScalar / m_Config.TranslateSnapStep) * m_Config.TranslateSnapStep;
-            ++m_Diagnostics.SnappedTicks;
-        }
-        else if (snap && m_DragMode == GizmoMode::Rotate && m_Config.RotateSnapStepRadians > kEpsilon)
-        {
-            float radians = rawDeltaScalar * m_Config.RotateRadiansPerWorldUnit;
-            radians = std::round(radians / m_Config.RotateSnapStepRadians) * m_Config.RotateSnapStepRadians;
-            deltaScalar = m_Config.RotateRadiansPerWorldUnit > kEpsilon
-                ? radians / m_Config.RotateRadiansPerWorldUnit
-                : rawDeltaScalar;
-            ++m_Diagnostics.SnappedTicks;
-        }
-        else if (snap && m_DragMode == GizmoMode::Scale && m_Config.ScaleSnapStep > kEpsilon)
-        {
-            float factor = 1.0f + rawDeltaScalar * m_Config.ScaleFactorPerWorldUnit;
-            factor = std::round(factor / m_Config.ScaleSnapStep) * m_Config.ScaleSnapStep;
-            deltaScalar = m_Config.ScaleFactorPerWorldUnit > kEpsilon
-                ? (factor - 1.0f) / m_Config.ScaleFactorPerWorldUnit
-                : rawDeltaScalar;
-            ++m_Diagnostics.SnappedTicks;
-        }
-
-        const glm::mat4 identity{1.f};
-        const glm::mat4& start = m_SessionFrame.Matrix;
-        glm::mat4 gizmoMatrix = start;
-        switch (m_DragMode)
-        {
-        case GizmoMode::Translate:
-            gizmoMatrix = glm::translate(identity, m_DragAxisDir * deltaScalar) * start;
-            break;
-        case GizmoMode::Rotate:
-        {
-            const float radians = deltaScalar * m_Config.RotateRadiansPerWorldUnit;
-            gizmoMatrix = glm::translate(identity, pivot) *
-                          glm::mat4_cast(glm::angleAxis(radians, m_DragAxisDir)) *
-                          glm::translate(identity, -pivot) * start;
-            break;
-        }
-        case GizmoMode::Scale:
-        {
-            // Scale along the frozen basis axis about the pivot.
-            const float minScale = m_Config.MinScale > kEpsilon ? m_Config.MinScale : kEpsilon;
-            glm::vec3 factors{1.f};
-            factors[static_cast<int>(m_DragAxis) - 1] =
-                std::max(minScale, 1.0f + deltaScalar * m_Config.ScaleFactorPerWorldUnit);
-            gizmoMatrix = start * glm::scale(identity, factors);
-            break;
-        }
-        }
-
-        if (deltaScalar == 0.f)
-            gizmoMatrix = start;
-        if (!Preview(registry, gizmoMatrix).Succeeded())
-            return false;
-        ++m_Diagnostics.DragTicks;
-        return true;
-    }
-
     EditorCommandHistoryResult GizmoInteraction::DragCommit(
         Registry& registry,
         const WorldHandle world,
@@ -932,42 +727,5 @@ namespace Extrinsic::Runtime
         EndSession();
         ++m_Diagnostics.DragsCancelled;
         return validity;
-    }
-
-    std::span<const Extrinsic::Graphics::TransformGizmoRenderPacket>
-    TransformGizmoRenderPacketBuilder::Build(const Registry& registry,
-                                             std::span<const EntityHandle> selected,
-                                             const GizmoInteraction& gizmo)
-    {
-        m_Packets.clear();
-
-        GizmoFrame frame{};
-        GizmoMode mode = gizmo.Mode();
-        glm::mat4 matrix{1.f};
-        if (gizmo.IsDragging())
-        {
-            frame = gizmo.SessionFrame();
-            mode = gizmo.SessionMode();
-            matrix = gizmo.AcceptedGizmoMatrix();
-        }
-        else
-        {
-            frame = gizmo.ComputeFrame(registry, selected, gizmo.Orientation(), gizmo.PivotMode());
-            matrix = frame.Matrix;
-        }
-        if (!frame.Available())
-            return m_Packets;
-
-        Extrinsic::Graphics::TransformGizmoRenderPacket packet{};
-        // BUG-026: graphics-facing ids use the render-id encoding
-        // (entt handle + 1, 0 reserved) shared with extraction/selection.
-        packet.StableId = StableEntityLookup::ToRenderId(frame.Primary);
-        packet.Transform = matrix;
-        packet.AxisLength = gizmo.Config().AxisLength > kEpsilon ? gizmo.Config().AxisLength : 1.f;
-        packet.ShowTranslate = (mode == GizmoMode::Translate);
-        packet.ShowRotate = (mode == GizmoMode::Rotate);
-        packet.ShowScale = (mode == GizmoMode::Scale);
-        m_Packets.push_back(packet);
-        return m_Packets;
     }
 }

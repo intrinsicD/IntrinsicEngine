@@ -85,12 +85,17 @@ For vertex/edge/face selection, shared method inputs, and selection settings, se
 
 Sandbox separately composes optional `Runtime::SceneInteractionModule`. It
 owns one active-world interaction cohort—selection, stable lookup, pick
-readback/refinement, gizmo drag/undo/scratch/packets—and publishes the exact
+readback/refinement, the gizmo drag session and its undo—and publishes the exact
 module plus exact `SelectionController`. The editor operations and app default policy
 resolve those services once; they never call an Engine interaction getter.
 Camera and completed UI capture reach interaction through deterministic typed
 viewport hooks. Render extraction receives only a copied, world-tagged
-selection/hover/gizmo snapshot and treats omission or mismatch as empty.
+selection/hover snapshot and treats omission or mismatch as empty. The
+editor gizmo is ImGuizmo, private to `EditorShell`: enabled only from the
+**Gizmo** menu (off by default, inactive while the UI is hidden), W/E/R mode
+keys when not typing, Escape cancels, Shift snaps with the `sandbox.gizmo`
+steps; it drives `SceneInteractionModule`'s token-checked gizmo calls and
+claims the viewport while hovered or dragged.
 Document New/Load/Close, active-world switch/retirement, and shutdown clear the
 cohort without resurrecting old state.
 

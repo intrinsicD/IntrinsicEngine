@@ -1645,12 +1645,9 @@ Concretely:
   `Picking.Readback` on the next `BeginFrame()` mirroring the drain
   pattern from `GRAPHICS-012Q`, and there is no graphics-side
   persistent pending-pick queue across frames. Transform-gizmo hit
-  testing is runtime/editor-owned under the planned umbrella module
-  name `Extrinsic.Runtime.GizmoInteraction`; the hit-test path reads
-  selection authoring transforms from runtime ECS/editor state, the
-  same `CameraViewSnapshot::ViewProjection`/`PickRay` derivation
-  that graphics already produces, and raw pointer pixels from the
-  platform input port. Graphics never receives raw pointer
+  testing is editor-owned (the Sandbox's app-private ImGuizmo
+  frontend since `UI-078`; the drag session stays in
+  `Extrinsic.Runtime.GizmoInteraction`). Graphics never receives raw pointer
   coordinates and never imports any gizmo hit-test code path. The
   `TransformGizmoRenderPacket` spans on `RenderWorld` carry only
   render-relevant data — world-space origin, camera-relative scale,

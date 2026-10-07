@@ -1,6 +1,6 @@
 # ADR 0006 — Camera, Picking-Request, and Gizmo Runtime Handoff
 
-- **Status:** Accepted; amended 2026-10-06 by `UI-078` slice 1 (see "Amendment" below).
+- **Status:** Accepted; amended 2026-10-06/07 by `UI-078` slices 1–3 (see the amendments below; slice 3 supersedes §§3–4 for the Sandbox editor).
 - **Date:** 2026-05-17
 - **Owners:** Runtime composition, Graphics (CameraSnapshots boundary)
 - **Related tasks:** [`tasks/done/GRAPHICS-017`](../../tasks/archive/GRAPHICS-017-camera-interaction-and-gizmo-boundaries.md), [`GRAPHICS-017Q`](../../tasks/archive/GRAPHICS-017Q-camera-gizmo-runtime-clarifications.md)
@@ -63,6 +63,10 @@ There is **no** graphics-side persistent pending-pick queue across frames and **
 
 ### 3. Transform-gizmo hit testing ownership
 
+> Superseded for the Sandbox editor by the slice 3 amendment: the app-private
+> ImGuizmo frontend hit-tests and draws the gizmo; runtime keeps the session.
+> The packet contract below stays for other producers.
+
 Hit testing lives in the concrete runtime/editor-owned `Extrinsic.Runtime.GizmoInteraction` module, mirroring the same adapter pattern as the camera-controller umbrella.
 
 The hit-test path reads:
@@ -91,6 +95,10 @@ Active drag state, axis lock, screen-space drag origin, snap thresholds, modifie
 Either choice is invisible to graphics.
 
 ### 4. Interaction-state storage and lifetime
+
+> Superseded for the Sandbox editor by the slice 3 amendment: the frontend
+> state (mode choice, pointer state, snap steps) lives in the Sandbox shell,
+> the frozen session in `GizmoInteraction`.
 
 Interaction state is runtime/editor-owned. Implementations may store it as either:
 
@@ -205,8 +213,8 @@ unchanged.
   cancel record nothing and restore the exact original TRS. A conflicting or
   unrecorded commit records nothing and rolls back every target that still
   holds its accepted preview; a foreign change to a target is kept.
-- **Packets.** A multi-selection publishes one gizmo on the shared frame that
-  hit testing uses, instead of one gizmo per entity.
+- **Packets.** (Superseded by slice 3: runtime publishes no gizmo packets.)
+  A multi-selection published one gizmo on the shared session frame.
 
 ## Amendment — 2026-10-07 (`UI-078` slice 2)
 
@@ -221,11 +229,9 @@ Viewport input ownership and the lifecycle cancel of a running session.
   `EditorUiDiagnostics::CapturesViewportInput` publishes the merged value. The
   existing consumers therefore block: camera controller updates, new viewport
   pick requests, and keyboard camera actions such as `F`.
-- **Capture is not cancel.** While a claim is active, `SceneInteractionModule`
-  skips the ray-driven gizmo adapter for that frame, so the adapter neither
-  cancels (on capture), ticks nor commits (on mouse release) a session the
-  claiming frontend drives. The ray adapter keeps its own click guard until
-  the ImGuizmo frontend replaces it.
+- **Capture is not cancel.** A claim never cancels or commits the session the
+  claiming frontend drives. (Slice 3 removed the ray-driven adapter this
+  originally skipped while claimed.)
 - **Cancel triggers.** `DragCancel` on the bound registry ends a running
   session without history; selection, mode, orientation, pivot and tuning
   stay. Triggers: the UI turning hidden (seen in `UiBegin`, again before the
@@ -237,3 +243,29 @@ Viewport input ownership and the lifecycle cancel of a running session.
   transform flush, so the restored transform reaches the same frame's
   extraction. The global `G` toggle therefore runs at `UiBegin`, independent of
   ImGui keyboard capture, instead of as a post-flush input action.
+
+## Amendment — 2026-10-07 (`UI-078` slice 3)
+
+The Sandbox editor's gizmo frontend is ImGuizmo, private to
+`src/app/Sandbox` (`EditorShell`); runtime no longer hit-tests, drives or
+draws the gizmo.
+
+- **Removed.** `GizmoInteraction`'s ray adapter (`HitTest`, `BeginDrag`,
+  `DragTick`, axis lock, modifier mask, ray tuning `GizmoConfig`),
+  `TransformGizmoRenderPacketBuilder`, and `SceneInteractionModule`'s
+  automatic mouse driver and gizmo packet production. The general
+  `RuntimeSceneInteractionRenderSnapshot::GizmoDrawPackets` → `RenderWorld`
+  packet contract stays for other producers; the Sandbox publishes none.
+- **Frontend.** The shell reads `SceneInteractionModule::PrepareGizmo` and
+  drives the token-checked `BeginGizmoDrag`/`PreviewGizmoDrag`/
+  `CommitGizmoDrag`/`CancelGizmoDrag` from `ImGuizmo::IsUsing()` transitions:
+  begin when it turns true, an absolute `Gt` preview every frame, exactly one
+  commit on release. Escape, a disabled gizmo, or a session that ended
+  elsewhere (hide, focus loss, world/document change: the token no longer
+  matches) never commits; ImGuizmo is reset and no drag restarts until the
+  mouse is released. Hover, drag, the release/cancel frame and a consumed
+  W/E/R claim the viewport (slice 2). Snap steps come from the `sandbox.gizmo`
+  config section (Shift snaps), frozen per drag; a snapped rotation is
+  previewed as the exact snapped angle about the frozen pivot, since
+  ImGuizmo's own snap drifts by up to ~5e-4 rad. A left-button release ends
+  the drag even where ImGuizmo misses it (over a panel).

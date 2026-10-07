@@ -20,11 +20,14 @@ module;
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
+#include <ImGuizmo.h>
 
 module Extrinsic.Sandbox.Editor.Shell;
 
 import Extrinsic.Runtime.DiagnosticsStream;
+import Extrinsic.Runtime.GizmoInteraction;
 
 
 import Extrinsic.Runtime.PointFieldOperations;
@@ -2023,6 +2026,68 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::End();
             }
         }
+
+        // Editor gizmo (UI-078): the menu choices, the running drag's token,
+        // and ImGuizmo's working matrix. The working matrix stays separate
+        // from the accepted one: ImGuizmo 1.10 integrates rotation from the
+        // matrix it is handed, so resetting it to a rejected tick's accepted
+        // state would distort the rest of the drag.
+        struct GizmoUiState
+        {
+            bool Enabled{false};
+            GizmoMode Mode{GizmoMode::Translate};
+            GizmoOrientation Orientation{GizmoOrientation::Global};
+            GizmoPivotMode Pivot{GizmoPivotMode::WorldOrigins};
+            std::optional<GizmoUiToken> Drag{};
+            glm::mat4 Working{1.0f};
+            GizmoSnapConfig Snap{}; // frozen at drag start
+            // After a cancel or lost session: no new drag until the mouse is released.
+            bool WaitForRelease{false};
+            std::array<bool, 3> HeldModeKeys{}; // consumed W/E/R still held, by mode
+            std::string Message{};
+            std::string Unavailable{}; // why the last frame had nothing to manipulate
+            std::optional<GizmoSnapConfig> SnapDraft{};
+            std::string SnapReason{}; // the draft's preview verdict, empty when valid
+            std::string SnapMessage{};
+        };
+
+        [[nodiscard]] const char* DescribeGizmoStatus(const GizmoStatus status) noexcept
+        {
+            switch (status)
+            {
+            case GizmoStatus::NonTrsResult:
+                return "Rejected: the result needs shear and cannot be stored as translate/rotate/scale.";
+            case GizmoStatus::SingularParent:
+                return "Rejected: a selected entity's parent has zero scale.";
+            case GizmoStatus::NonFiniteMatrix:
+                return "Rejected: the transform is not finite.";
+            case GizmoStatus::BrokenHierarchy:
+                return "Rejected: a parent chain is broken.";
+            case GizmoStatus::InvalidEntity:
+                return "Rejected: a selected entity has no transform.";
+            case GizmoStatus::StaleSession:
+                return "Cancelled: the scene changed during the drag.";
+            default:
+                return "The gizmo request was refused.";
+            }
+        }
+
+        [[nodiscard]] std::string DescribeGizmoUnavailable(const GizmoUiFrame& frame)
+        {
+            switch (frame.Unavailable)
+            {
+            case GizmoUiUnavailable::None:
+                return {};
+            case GizmoUiUnavailable::NoEntitySelection:
+                return "Select an entity to transform.";
+            case GizmoUiUnavailable::InvalidFrame:
+                return DescribeGizmoStatus(frame.Frame.Result.Status);
+            case GizmoUiUnavailable::NoCamera:
+                return "No camera for the scene view.";
+            default:
+                return "No active scene with undo history.";
+            }
+        }
     }
 
     extern "C++"
@@ -2043,6 +2108,8 @@ namespace Extrinsic::Sandbox::Editor
             Runtime::ViewCaptureModule* ViewCapture{nullptr};
             const Runtime::SelectionController* Selection{nullptr};
             Runtime::SceneInteractionModule* Interaction{nullptr};
+            Runtime::EngineConfigControl* ConfigControl{nullptr};
+            GizmoUiState Gizmo{};
             // The capture the user started last (menu, F12 or window) and when it finished,
             // for the short "Saved ..." notice; agent captures stay silent.
             std::uint64_t UserCaptureTicket{0u};
@@ -2230,8 +2297,16 @@ namespace Extrinsic::Sandbox::Editor
                         host->SetSceneViewport(Runtime::EditorSceneViewportRect{
                             .X = x, .Y = y, .Width = width, .Height = height});
                     };
+                // ImGuizmo's frame starts first so its window stays behind the panels.
+                const bool gizmoActive = Gizmo.Enabled && Interaction != nullptr;
+                if (gizmoActive)
+                {
+                    ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
+                    ImGuizmo::BeginFrame();
+                }
                 if (const std::uint64_t ticket = DrawMainMenuBar(&Host->Windows(), ViewCapture))
                     UserCaptureTicket = ticket;
+                DrawGizmoMenu();
                 DrawScreenshotShortcutAndNotice();
                 // Copy: an observer may add or remove observers.
                 const auto observers = FrameObservers;
@@ -2241,9 +2316,246 @@ namespace Extrinsic::Sandbox::Editor
                         observer(*ActiveContext);
                 }
                 (void)Host->Windows().DrawOpenWindows();
+                // After the panels: their layout claims this frame's scene rectangle.
+                DrawGizmo(gizmoActive);
                 // Drop the context before the frame storage it borrows.
                 ActiveContext.reset();
                 ActivePreparedFrame.reset();
+            }
+
+            [[nodiscard]] GizmoSnapConfig ActiveGizmoSnap() const
+            {
+                return ConfigControl != nullptr
+                    ? GetGizmoSnapConfig(ConfigControl->GetEngineConfigControlState().ActiveConfig)
+                          .value_or(GizmoSnapConfig{})
+                    : GizmoSnapConfig{};
+            }
+
+            void DrawGizmoSnapSteps()
+            {
+                ImGui::SeparatorText("Snap steps (hold Shift)");
+                if (ConfigControl == nullptr)
+                {
+                    ImGui::TextDisabled("No config control; default steps apply.");
+                    return;
+                }
+                GizmoSnapConfig draft = Gizmo.SnapDraft.value_or(ActiveGizmoSnap());
+                bool edited = ImGui::InputFloat("Translate step", &draft.TranslateStep, 0.0f, 0.0f, "%g");
+                edited |= ImGui::InputFloat("Rotate step (degrees)", &draft.RotateStepDegrees, 0.0f, 0.0f, "%g");
+                edited |= ImGui::InputFloat("Scale step", &draft.ScaleStep, 0.0f, 0.0f, "%g");
+                if (edited)
+                {
+                    // The draft previewed through the config lane, without side effects.
+                    Gizmo.SnapDraft = draft;
+                    Gizmo.SnapReason = PreviewGizmoSnapConfig(*ConfigControl, draft);
+                }
+                if (Gizmo.SnapDraft.has_value())
+                {
+                    const std::string& reason = Gizmo.SnapReason;
+                    if (!reason.empty())
+                        ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", reason.c_str());
+                    if (DrawProcessingActionButton("Apply snap steps", ReadinessUnlessBlocked({
+                            {!reason.empty(), reason, ReadinessCode::InvalidConfig}})))
+                    {
+                        const RuntimeEngineConfigApplyResult applied =
+                            ApplyGizmoSnapConfig(*ConfigControl, *Gizmo.SnapDraft);
+                        Gizmo.SnapMessage = applied.Succeeded() ? "Snap steps apply to the next drag."
+                                                                : "Snap steps could not be applied.";
+                        if (applied.Succeeded())
+                            Gizmo.SnapDraft.reset();
+                    }
+                }
+                if (!Gizmo.SnapMessage.empty())
+                    ImGui::TextDisabled("%s", Gizmo.SnapMessage.c_str());
+            }
+
+            // The UI is the only way to enable the gizmo; mode, pivot and axes
+            // apply to the next drag (a running drag keeps its frozen session).
+            void DrawGizmoMenu()
+            {
+                if (Interaction == nullptr || !ImGui::BeginMainMenuBar())
+                    return;
+                if (ImGui::BeginMenu("Gizmo"))
+                {
+                    (void)ImGui::MenuItem("Enabled", nullptr, &Gizmo.Enabled);
+                    constexpr std::array<std::pair<const char*, const char*>, 3> kModes{{
+                        {"Translate", "W"}, {"Rotate", "E"}, {"Scale", "R"}}};
+                    for (std::size_t i = 0u; i < kModes.size(); ++i)
+                    {
+                        if (ImGui::MenuItem(kModes[i].first, kModes[i].second,
+                                            Gizmo.Mode == static_cast<GizmoMode>(i)))
+                            Gizmo.Mode = static_cast<GizmoMode>(i);
+                    }
+                    bool bounds = Gizmo.Pivot == GizmoPivotMode::BoundsCenters;
+                    if (ImGui::MenuItem("Pivot at bounds centers", nullptr, &bounds))
+                        Gizmo.Pivot = bounds ? GizmoPivotMode::BoundsCenters : GizmoPivotMode::WorldOrigins;
+                    bool local = Gizmo.Orientation == GizmoOrientation::Local;
+                    if (ImGui::MenuItem("Local axes", nullptr, &local))
+                        Gizmo.Orientation = local ? GizmoOrientation::Local : GizmoOrientation::Global;
+                    ImGui::TextDisabled("Mode, pivot and axes apply to the next drag.");
+                    DrawGizmoSnapSteps();
+                    if (Gizmo.Enabled && !Gizmo.Unavailable.empty())
+                        ImGui::TextDisabled("%s", Gizmo.Unavailable.c_str());
+                    ImGui::EndMenu();
+                }
+                ImGui::EndMainMenuBar();
+            }
+
+            // A session that ended (cancel, refusal, or elsewhere) never
+            // commits; ImGuizmo is reset and no drag restarts until release.
+            void EndGizmoDrag()
+            {
+                Gizmo.Drag.reset();
+                Gizmo.WaitForRelease = true;
+                ImGuizmo::Enable(false);
+            }
+
+            void DrawGizmo(const bool active)
+            {
+                if (Interaction == nullptr)
+                    return;
+                const ImGuiIO& io = ImGui::GetIO();
+                const bool typing = io.WantTextInput || io.WantCaptureKeyboard || ImGui::IsAnyItemActive();
+                constexpr std::array kModeKeys{ImGuiKey_W, ImGuiKey_E, ImGuiKey_R}; // by GizmoMode
+                bool claim = false;
+                for (std::size_t i = 0u; i < kModeKeys.size(); ++i)
+                {
+                    if (active && !typing && ImGui::IsKeyPressed(kModeKeys[i], false))
+                    {
+                        Gizmo.Mode = static_cast<GizmoMode>(i);
+                        Gizmo.HeldModeKeys[i] = true;
+                    }
+                    // A consumed key stays claimed until released, so the camera never sees it.
+                    Gizmo.HeldModeKeys[i] = Gizmo.HeldModeKeys[i] && ImGui::IsKeyDown(kModeKeys[i]);
+                    claim |= Gizmo.HeldModeKeys[i];
+                }
+                if (Gizmo.Drag.has_value() && (!active || ImGui::IsKeyPressed(ImGuiKey_Escape, false)))
+                {
+                    (void)Interaction->CancelGizmoDrag(*Gizmo.Drag);
+                    EndGizmoDrag();
+                    claim = true;
+                }
+                if (active)
+                    claim |= ManipulateGizmo();
+                if (claim)
+                    Host->RequestViewportInput({.CaptureViewportInput = true});
+            }
+
+            // Returns whether the gizmo owns this frame's viewport input.
+            [[nodiscard]] bool ManipulateGizmo()
+            {
+                const GizmoUiFrame frame = Interaction->PrepareGizmo(Gizmo.Orientation, Gizmo.Pivot);
+                Gizmo.Unavailable = DescribeGizmoUnavailable(frame);
+                bool claim = false;
+                // Hide, focus loss, world or document change ended the session elsewhere.
+                if (Gizmo.Drag.has_value() && frame.Token != *Gizmo.Drag)
+                {
+                    EndGizmoDrag();
+                    claim = true;
+                }
+                if (Gizmo.WaitForRelease && !ImGui::IsMouseDown(ImGuiMouseButton_Left))
+                    Gizmo.WaitForRelease = false;
+                claim |= Gizmo.WaitForRelease;
+                ImGuizmo::Enable(!Gizmo.WaitForRelease);
+                if (frame.Available())
+                {
+                    // Idle: start from the runtime's G0 with the current steps; the
+                    // working matrix and steps then stay the drag's own.
+                    if (!Gizmo.Drag.has_value())
+                    {
+                        Gizmo.Working = frame.GizmoMatrix;
+                        Gizmo.Snap = ActiveGizmoSnap();
+                    }
+                    const GizmoMode mode = Gizmo.Drag.has_value() ? frame.SessionMode : Gizmo.Mode;
+                    const float translate = Gizmo.Snap.TranslateStep;
+                    const std::array<float, 3> snap = mode == GizmoMode::Translate
+                        ? std::array{translate, translate, translate}
+                        : std::array{mode == GizmoMode::Rotate ? Gizmo.Snap.RotateStepDegrees : Gizmo.Snap.ScaleStep,
+                                     0.0f, 0.0f};
+                    const bool snapping = ImGui::GetIO().KeyShift;
+                    constexpr std::array kOperations{ImGuizmo::TRANSLATE, ImGuizmo::ROTATE, ImGuizmo::SCALE};
+                    // The scene rectangle is in ImGui logical coordinates relative to the
+                    // display origin; the camera is unjittered and already Y-up in NDC.
+                    const ImVec2 origin = ImGui::GetMainViewport()->Pos;
+                    ImGuizmo::SetOrthographic(frame.Orthographic);
+                    ImGuizmo::SetRect(origin.x + frame.SceneRect.X, origin.y + frame.SceneRect.Y,
+                                      frame.SceneRect.Width, frame.SceneRect.Height);
+                    (void)ImGuizmo::Manipulate(
+                        glm::value_ptr(frame.View), glm::value_ptr(frame.Projection),
+                        kOperations[static_cast<std::size_t>(mode)],
+                        frame.Frame.ActualOrientation == GizmoOrientation::Local ? ImGuizmo::LOCAL : ImGuizmo::WORLD,
+                        glm::value_ptr(Gizmo.Working), nullptr, snapping ? snap.data() : nullptr);
+                    // The drag lifecycle follows IsUsing, never Manipulate's result.
+                    const bool inUse = ImGuizmo::IsUsing();
+                    claim |= ImGuizmo::IsOver() || inUse;
+                    if (!Gizmo.Drag.has_value() && inUse)
+                    {
+                        // PrepareGizmo above and Begin run back to back: G0 matches.
+                        const GizmoUiBeginResult begun =
+                            Interaction->BeginGizmoDrag(frame.Token, Gizmo.Mode, Gizmo.Orientation, Gizmo.Pivot);
+                        if (begun.Succeeded())
+                        {
+                            Gizmo.Drag = begun.Token;
+                            Gizmo.Message.clear();
+                        }
+                        else
+                        {
+                            Gizmo.Message = DescribeGizmoStatus(begun.Result.Status);
+                            EndGizmoDrag();
+                        }
+                    }
+                    if (Gizmo.Drag.has_value())
+                    {
+                        // ImGuizmo's snapped rotation drifts (its start angle comes from
+                        // acos), enough for the core to reject it as shear under a
+                        // non-uniformly scaled parent: preview the exact snapped angle.
+                        // ImGuizmo keeps integrating its own working matrix.
+                        const GizmoResult previewed = Interaction->PreviewGizmoDrag(
+                            *Gizmo.Drag, snapping && mode == GizmoMode::Rotate
+                                             ? SnapGizmoRotation(frame.Frame, Gizmo.Working,
+                                                                 glm::radians(Gizmo.Snap.RotateStepDegrees))
+                                             : Gizmo.Working);
+                        // A rejected tick keeps the last accepted state and the working matrix.
+                        Gizmo.Message = previewed.Succeeded() ? std::string{} : DescribeGizmoStatus(previewed.Status);
+                        if (previewed.Status == GizmoStatus::StaleSession)
+                        {
+                            (void)Interaction->CancelGizmoDrag(*Gizmo.Drag);
+                            EndGizmoDrag();
+                        }
+                        // Release, also over a panel where ImGuizmo 1.10 skips its
+                        // rotate/scale release: the last accepted state, exactly once.
+                        else if (!inUse || !ImGui::IsMouseDown(ImGuiMouseButton_Left))
+                        {
+                            if (!Interaction->CommitGizmoDrag(*Gizmo.Drag).Succeeded())
+                                Gizmo.Message = "The drag could not be recorded and was rolled back.";
+                            Gizmo.Drag.reset();
+                            ImGuizmo::Enable(false); // ends a still-running ImGuizmo drag
+                            claim = true;
+                        }
+                    }
+                }
+                DrawGizmoStatus(frame);
+                return claim;
+            }
+
+            // Refusals and the local-axes fallback stay visible in the scene's corner.
+            void DrawGizmoStatus(const GizmoUiFrame& frame)
+            {
+                std::string text = Gizmo.Message;
+                if (text.empty() && frame.Available() && frame.Frame.BasisFallback != GizmoBasisFallback::None)
+                    text = "Local axes unavailable for this selection; using world axes.";
+                if (text.empty())
+                    return;
+                const ImVec2 origin = ImGui::GetMainViewport()->Pos;
+                ImGui::SetNextWindowPos(ImVec2(origin.x + frame.SceneRect.X + 12.0f,
+                                               origin.y + frame.SceneRect.Y + 36.0f));
+                ImGui::SetNextWindowBgAlpha(0.85f);
+                if (ImGui::Begin("##GizmoStatus", nullptr,
+                                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
+                                     ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
+                                     ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs))
+                    ImGui::TextUnformatted(text.c_str());
+                ImGui::End();
             }
 
             // Present only when the Sandbox runs with --agent-socket: shows who is
@@ -2458,6 +2770,7 @@ namespace Extrinsic::Sandbox::Editor
                 ViewCapture = services.Find<Runtime::ViewCaptureModule>();
                 Selection = services.Find<Runtime::SelectionController>();
                 Interaction = services.Find<Runtime::SceneInteractionModule>();
+                ConfigControl = services.Find<Runtime::EngineConfigControl>();
                 if (ViewCapture != nullptr)
                     RegisterScreenshotWindow();
                 RegisterJobsWindow();
@@ -2495,7 +2808,14 @@ namespace Extrinsic::Sandbox::Editor
                 Diagnostics = nullptr;
                 DiagnosticsState = {};
                 Selection = nullptr;
+                if (Gizmo.Drag.has_value())
+                {
+                    (void)Interaction->CancelGizmoDrag(*Gizmo.Drag);
+                    ImGuizmo::Enable(false);
+                }
+                Gizmo = {};
                 Interaction = nullptr;
+                ConfigControl = nullptr;
                 UserCaptureTicket = 0u;
                 Attachment.Detach();
             }

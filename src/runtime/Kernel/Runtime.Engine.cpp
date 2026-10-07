@@ -964,16 +964,15 @@ namespace Extrinsic::Runtime
 
         // ── BUG-024/RUNTIME-145: pre-render transform flush ───────────────
         // Local-transform mutations made after the fixed-step ECS bundle —
-        // Sandbox Editor UI inspector edits (applied inside the ImGui editor
-        // hook during EndFrame above), variable-frame hook mutations, and the
-        // GizmoInteraction drag just driven — would otherwise reach render
-        // extraction with a stale Transform::WorldMatrix and only become
-        // visible one frame late (or never, when no further fixed-step tick
-        // runs). Flush TransformHierarchy → BoundsPropagation → RenderSync
-        // here, before the transform-gizmo packets are built and before
-        // ExtractRenderWorld observes the scene, so the rendered model
-        // matrix and the gizmo packets agree with the authored transform in
-        // the same frame.
+        // Sandbox Editor UI inspector edits and editor gizmo previews (both
+        // applied inside the ImGui editor hook during EndFrame above),
+        // variable-frame hook mutations, and lifecycle cancels in the
+        // viewport-input hooks — would otherwise reach render extraction with
+        // a stale Transform::WorldMatrix and only become visible one frame
+        // late (or never, when no further fixed-step tick runs). Flush
+        // TransformHierarchy → BoundsPropagation → RenderSync here, before
+        // ExtractRenderWorld observes the scene, so the rendered model matrix
+        // agrees with the authored transform in the same frame.
         const auto preRenderFlushBegin = std::chrono::steady_clock::now();
         if (preRenderTransformFlushNeeded)
         {
@@ -1000,8 +999,8 @@ namespace Extrinsic::Runtime
         // this frame's module-frame-hook / editor-hook / gizmo transform edits.
         // The default `F` focus action is edge-triggered and suppressed while
         // Dear ImGui owns the keyboard; successful camera actions rebuild the
-        // render camera so the snapped view reaches transform-gizmo packet
-        // building and render extraction this same frame.
+        // render camera so the snapped view reaches render extraction this
+        // same frame.
         const auto postFlushSetupBegin = std::chrono::steady_clock::now();
         m_Impl->m_InputActions.DispatchForFrame(m_Impl->m_Config,
                                         *m_Impl->m_Scene,

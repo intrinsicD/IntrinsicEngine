@@ -575,13 +575,13 @@ The frame order is:
    session when the UI has just been hidden;
 8. build `Graphics::RenderFrameInput`, then dispatch deterministic typed
    viewport-input hooks. Module-name order places optional Camera population
-   before optional SceneInteraction gizmo/pick input; both see completed editor
-   capture. SceneInteraction cancels a session on a hide seen since `UiBegin`
-   and skips its ray gizmo driver while a viewport claim is active. Flush
-   pre-render transforms, dispatch generic input actions, then
-   run `BeforeExtraction`, where SceneInteraction drains one pending pick,
-   builds gizmo packets, and submits its copied render snapshot. This is not a
-   seventh generic frame phase;
+   before optional SceneInteraction pick input; both see completed editor
+   capture. SceneInteraction cancels a gizmo session on a hide seen since
+   `UiBegin`; the editor gizmo itself (ImGuizmo, app-only) previews during
+   `UiBuild`. Flush pre-render transforms, dispatch generic input actions, then
+   run `BeforeExtraction`, where SceneInteraction drains one pending pick and
+   submits its copied render snapshot. This is not a seventh generic frame
+   phase;
 9. execute the render-frame contract: begin frame, runtime render extraction,
    renderer world extraction, prepare, execute, and end frame;
 10. present the completed frame;
@@ -624,8 +624,7 @@ after `EndFrame`, then ORs a host viewport claim into it as mouse and keyboard
 capture and publishes the merged value as `CapturesViewportInput`; typed Camera
 and SceneInteraction hooks, input actions, and later hooks consume the same
 snapshot rather than reading ImGui capture flags independently. A claim is not
-a cancel: SceneInteraction skips its ray gizmo driver for a claimed frame so
-the claiming frontend's session survives. Native focus loss reaches it as a
+a cancel: the claiming frontend's session survives a claimed frame. Native focus loss reaches it as a
 kernel event (`Platform::WindowFocusEvent`, republished by Engine) and cancels
 a running session at delivery; its `Idle` hook keeps minimized frames pumping
 such events (see [ADR 0006](../adr/0006-camera-picking-and-gizmo-runtime-handoff.md)).
@@ -634,7 +633,8 @@ zero. Its ImGui context owns a paired ImPlot context.
 
 The interaction-to-render boundary is one
 `RuntimeSceneInteractionRenderSnapshot`: a world handle plus owned vectors for
-selected render ids and gizmo packets and copied hover identity. Submission
+selected render ids, gizmo packets (none from the Sandbox editor, whose
+ImGuizmo frontend draws in the UI) and copied hover identity. Submission
 copies caller storage into reusable extraction-owned storage. Extraction
 accepts it only for the current world and otherwise supplies empty interaction
 data. No controller, module pointer, pick/refinement context, or ECS handle is
@@ -1146,7 +1146,7 @@ invented rollback protocol exists.
 `SceneInteractionModule` retains its own strong participant handle. Before
 replacement it cancels any drag while the registry is live and clears
 selection/hover tags, pending and in-flight picks, readback contexts/refined
-output, gizmo scratch/packets, stable lookup binding, and its copied render
+output, the gizmo session, stable lookup binding, and its copied render
 snapshot. Gizmo drag release coalesces the selected transform batch into the
 document-owned `EditorCommandHistory`; when that service is absent, transform
 dragging is disabled rather than recorded in a second stack. After replacement

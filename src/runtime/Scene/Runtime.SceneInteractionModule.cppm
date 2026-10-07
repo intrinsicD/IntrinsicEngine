@@ -1,4 +1,4 @@
-// Owns active-world viewport interaction and publishes selection/gizmo snapshots.
+// Owns active-world viewport interaction, publishes selection snapshots and serves the editor gizmo frontend.
 module;
 
 #include <cstddef>
@@ -22,6 +22,7 @@ import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.GizmoInteraction;
@@ -59,6 +60,8 @@ namespace Extrinsic::Runtime
         float TranslateStep{0.25f};      // world units
         float RotateStepDegrees{15.0f};
         float ScaleStep{0.1f};           // scale factor increment
+
+        [[nodiscard]] friend bool operator==(const GizmoSnapConfig&, const GizmoSnapConfig&) noexcept = default;
     };
     export [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidateGizmoSnapConfigSection(
         std::string_view payload, std::string_view reference, std::string_view subject);
@@ -67,6 +70,15 @@ namespace Extrinsic::Runtime
         const Core::Config::EngineConfig& config);
     export void SetGizmoSnapConfig(Core::Config::EngineConfig& config, const GizmoSnapConfig& value);
     export [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeGizmoSnapConfigSectionRegistration();
+    // The editor's snap-step lane: `draft` replaces the section in the control's
+    // current config and that candidate is previewed without side effects.
+    // Empty when the draft is valid, else the validation reason.
+    export [[nodiscard]] std::string PreviewGizmoSnapConfig(const EngineConfigControl& control,
+                                                            const GizmoSnapConfig& draft);
+    // Previews again from the current config and hot-applies a valid candidate
+    // (`Rejected` with the preview's diagnostics otherwise).
+    export [[nodiscard]] RuntimeEngineConfigApplyResult ApplyGizmoSnapConfig(EngineConfigControl& control,
+                                                                            const GizmoSnapConfig& draft);
 
     // Why the editor gizmo frontend has nothing to manipulate (UI-078).
     export enum class GizmoUiUnavailable : std::uint8_t
@@ -164,6 +176,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] const StableEntityLookupDiagnostics&
             LookupDiagnostics() const noexcept;
 
+        // Test accessor for the session core; production frontends use the gizmo calls below.
         [[nodiscard]] GizmoInteraction& Interaction() noexcept;
         [[nodiscard]] const GizmoInteraction& Interaction() const noexcept;
 

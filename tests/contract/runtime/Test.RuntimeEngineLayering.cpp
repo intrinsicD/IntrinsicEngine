@@ -615,28 +615,30 @@ TEST(RuntimeEngineLayering,
         std::string::npos);
     EXPECT_NE(
         interactionImpl.find(
-            "DriveGizmoInteractionForFrame("),
-        std::string::npos);
-    EXPECT_NE(
-        interactionImpl.find(
-            "GizmoPacketBuilder.Build("),
-        std::string::npos);
-    EXPECT_NE(
-        interactionImpl.find(
             "Gizmo.DragCancel(*BoundRegistry)"),
         std::string::npos);
     EXPECT_NE(
         interactionImpl.find(
-            "Gizmo = GizmoInteraction{gizmoConfig}"),
+            "Gizmo = GizmoInteraction{}"),
         std::string::npos);
-    EXPECT_NE(
-        interactionImpl.find(
-            "std::vector<ECS::EntityHandle> GizmoSelectedEntities"),
-        std::string::npos);
-    EXPECT_NE(
-        interactionImpl.find(
-            "TransformGizmoRenderPacketBuilder GizmoPacketBuilder"),
-        std::string::npos);
+    // UI-078: the editor frontend (ImGuizmo, app-only) drives the session;
+    // runtime has no automatic mouse driver and builds no gizmo packets.
+    const auto gizmoImpl =
+        ReadFile(root / "src/runtime/Gizmos/Runtime.GizmoInteraction.cpp");
+    const auto shellImpl =
+        ReadFile(root / "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp");
+    for (const std::string_view retired :
+         {"DriveGizmoInteractionForFrame", "GizmoPacketBuilder",
+          "TransformGizmoRenderPacketBuilder", "GizmoSelectedEntities",
+          "HitTest(", "DragTick(", "BeginDrag(", "ImGuizmo"})
+    {
+        EXPECT_EQ(interactionImpl.find(retired), std::string::npos) << retired;
+        EXPECT_EQ(interactionInterface.find(retired), std::string::npos) << retired;
+        EXPECT_EQ(gizmoInterface.find(retired), std::string::npos) << retired;
+        EXPECT_EQ(gizmoImpl.find(retired), std::string::npos) << retired;
+    }
+    EXPECT_NE(shellImpl.find("#include <ImGuizmo.h>"), std::string::npos);
+    EXPECT_NE(shellImpl.find("BeginGizmoDrag("), std::string::npos);
     EXPECT_EQ(
         interactionInterface.find("UndoStack"),
         std::string::npos);
@@ -651,7 +653,7 @@ TEST(RuntimeEngineLayering,
             "void BindTo(");
     const auto gizmoClear =
         unifiedClear.find(
-            "Gizmo = GizmoInteraction{gizmoConfig}");
+            "Gizmo = GizmoInteraction{}");
     const auto selectionClear =
         unifiedClear.find(
             "Selection.ClearSceneState(*BoundRegistry)");

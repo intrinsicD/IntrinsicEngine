@@ -159,34 +159,28 @@ TEST(RuntimeEnginePrivateGlue,
             "m_SelectionReadback.DrainPendingPickForFrame("),
         std::string::npos);
 
+    // UI-078: the editor gizmo previews during UiBuild, before the single
+    // flush; runtime has no automatic gizmo driver. A hide is seen inside the
+    // viewport hook, still before the flush.
+    const auto uiBuild = engineImpl.find("FramePhase::UiBuild");
+    ASSERT_NE(uiBuild, std::string::npos);
+    EXPECT_LT(uiBuild, transformFlush);
+    EXPECT_EQ(interactionImpl.find("DriveGizmoInteractionForFrame"), std::string::npos);
+    EXPECT_EQ(interactionImpl.find("GizmoPacketBuilder"), std::string::npos);
     const auto interactionViewport =
         interactionImpl.find("void RunViewportInput(");
-    const auto gizmoInput = interactionImpl.find(
-        "DriveGizmoInteractionForFrame(", interactionViewport);
     const auto interactionExtraction =
         interactionImpl.find("void RunBeforeExtraction(");
     const auto picking = interactionImpl.find(
         "Selection.ConsumePendingPick()",
         interactionExtraction);
-    const auto gizmoPackets = interactionImpl.find(
-        "GizmoPacketBuilder.Build(", interactionExtraction);
-    ASSERT_NE(interactionViewport, std::string::npos);
-    ASSERT_NE(gizmoInput, std::string::npos);
-    ASSERT_NE(interactionExtraction, std::string::npos);
-    ASSERT_NE(picking, std::string::npos);
-    ASSERT_NE(gizmoPackets, std::string::npos);
-    EXPECT_LT(interactionViewport, gizmoInput);
-    // UI-078 slice 2: a hide is seen, and a frontend claim skips the ray
-    // driver, before the driver runs inside the viewport hook.
     const auto hideCancel = interactionImpl.find(
         "CancelDragOnUiHide();", interactionViewport);
-    const auto claimSkip = interactionImpl.find(
-        "!Ui->ViewportInputRequest().CaptureViewportInput",
-        interactionViewport);
+    ASSERT_NE(interactionViewport, std::string::npos);
+    ASSERT_NE(interactionExtraction, std::string::npos);
+    ASSERT_NE(picking, std::string::npos);
     ASSERT_NE(hideCancel, std::string::npos);
-    ASSERT_NE(claimSkip, std::string::npos);
-    EXPECT_LT(hideCancel, gizmoInput);
-    EXPECT_LT(claimSkip, gizmoInput);
+    EXPECT_LT(hideCancel, interactionExtraction);
     EXPECT_NE(interactionImpl.find("FramePhase::UiBegin"), std::string::npos);
     EXPECT_NE(interactionImpl.find("FramePhase::Idle"), std::string::npos);
     EXPECT_NE(interactionImpl.find(
@@ -195,8 +189,6 @@ TEST(RuntimeEnginePrivateGlue,
     EXPECT_NE(engineImpl.find(
                   "m_Impl->m_KernelEvents.Publish(*focus);"),
               std::string::npos);
-    EXPECT_LT(gizmoInput, interactionExtraction);
-    EXPECT_LT(picking, gizmoPackets);
     EXPECT_NE(
         interactionImpl.find(
             ".CapturesViewportInput()"),
