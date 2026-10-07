@@ -26,6 +26,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
+import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.Renderer;
@@ -114,7 +115,7 @@ namespace Extrinsic::Runtime
 
         void RebuildSelectedGizmoEntities(
             const SelectionController& selection,
-            ECS::Scene::Registry& scene,
+            const ECS::Scene::Registry& scene,
             std::vector<ECS::EntityHandle>& outSelected)
         {
             outSelected.clear();
@@ -310,6 +311,7 @@ namespace Extrinsic::Runtime
             SceneDocumentModule* Documents{nullptr};
             EditorCommandHistory* History{nullptr};
             EditorUiHost* Ui{nullptr};
+            CameraControllerRegistry* Cameras{nullptr};
             bool UiVisible{true};
 
             SelectionController Selection{};
@@ -392,6 +394,126 @@ namespace Extrinsic::Runtime
                 if (UiVisible && !visible)
                     CancelActiveDrag();
                 UiVisible = visible;
+            }
+
+            // UI-078 frontend: live entity targets of the current selection.
+            [[nodiscard]] std::vector<ECS::EntityHandle> GizmoTargets() const
+            {
+                std::vector<ECS::EntityHandle> targets{};
+                if (Selection.GetConfig().Interaction.Target == SelectionTarget::Entity)
+                    RebuildSelectedGizmoEntities(Selection, *BoundRegistry, targets);
+                return targets;
+            }
+
+            [[nodiscard]] GizmoUiToken CurrentGizmoToken() const noexcept
+            {
+                return {BoundWorld, InteractionEpoch, Gizmo.SessionGeneration()};
+            }
+
+            // The token names the running session on the live binding. Any
+            // session end (commit, cancel, lifecycle cancel) or epoch change
+            // makes it stale, so a later call can never preview or commit.
+            [[nodiscard]] bool OwnsGizmoSession(const GizmoUiToken& token)
+            {
+                return ValidateBinding() && Gizmo.IsDragging() && token == CurrentGizmoToken();
+            }
+
+            [[nodiscard]] GizmoUiFrame PrepareGizmo(const GizmoOrientation orientation,
+                                                    const GizmoPivotMode pivotMode)
+            {
+                GizmoUiFrame frame{};
+                if (!ValidateBinding() || Window == nullptr)
+                    return frame;
+                frame.Token = CurrentGizmoToken();
+                frame.Dragging = Gizmo.IsDragging();
+                bool hasTargets = true;
+                if (frame.Dragging)
+                {
+                    frame.SessionMode = Gizmo.SessionMode();
+                    frame.Frame = Gizmo.SessionFrame();
+                    frame.GizmoMatrix = Gizmo.AcceptedGizmoMatrix();
+                }
+                else
+                {
+                    const std::vector<ECS::EntityHandle> targets = GizmoTargets();
+                    hasTargets = !targets.empty();
+                    if (hasTargets)
+                        frame.Frame = Gizmo.ComputeFrame(*BoundRegistry, targets, orientation, pivotMode);
+                    frame.GizmoMatrix = frame.Frame.Matrix;
+                }
+
+                // This frame's current claim (set during panel layout), resolved
+                // as the engine resolves it after the UI; never the presented one.
+                EditorInputCaptureSnapshot claim{};
+                if (Ui != nullptr && Ui->IsVisible())
+                {
+                    if (const auto rect = Ui->SceneViewport())
+                    {
+                        claim.HasSceneViewport = true;
+                        claim.SceneViewport = *rect;
+                    }
+                }
+                const Core::Extent2D windowExtent = Window->GetWindowExtent();
+                const Core::Extent2D framebufferExtent = Window->GetFramebufferExtent();
+                const Core::Rect2D pixels = ResolveSceneViewportPixels(windowExtent, framebufferExtent, claim);
+                if (!Core::IsEmpty(windowExtent) && !Core::IsEmpty(framebufferExtent))
+                {
+                    const float scaleX = static_cast<float>(windowExtent.Width) /
+                                         static_cast<float>(framebufferExtent.Width);
+                    const float scaleY = static_cast<float>(windowExtent.Height) /
+                                         static_cast<float>(framebufferExtent.Height);
+                    frame.SceneRect = {
+                        .X = static_cast<float>(pixels.Offset.X) * scaleX,
+                        .Y = static_cast<float>(pixels.Offset.Y) * scaleY,
+                        .Width = static_cast<float>(pixels.Extent.Width) * scaleX,
+                        .Height = static_cast<float>(pixels.Extent.Height) * scaleY,
+                    };
+                }
+
+                // The engine builds the render camera only after the UI, so read
+                // the controller's current view without advancing it.
+                bool cameraValid = false;
+                ICameraController* const camera =
+                    Cameras != nullptr && Cameras->BoundWorld() == BoundWorld
+                        ? Cameras->ResolveOrNull(CameraControllerSlot::Main)
+                        : nullptr;
+                if (camera != nullptr && !Core::IsEmpty(pixels.Extent))
+                {
+                    const Graphics::CameraViewInput view = camera->GetView(pixels.Extent);
+                    cameraValid = view.Valid;
+                    frame.View = view.View;
+                    frame.Projection = view.Projection;
+                    frame.Orthographic = IsOrthographicProjection(view.Projection);
+                }
+
+                frame.Unavailable = History == nullptr ? GizmoUiUnavailable::NoHistory
+                    : !hasTargets                      ? GizmoUiUnavailable::NoEntitySelection
+                    : !frame.Frame.Available()         ? GizmoUiUnavailable::InvalidFrame
+                    : !cameraValid                     ? GizmoUiUnavailable::NoCamera
+                                                       : GizmoUiUnavailable::None;
+                return frame;
+            }
+
+            [[nodiscard]] GizmoUiBeginResult BeginGizmoDrag(const GizmoUiToken& token,
+                                                            const GizmoMode mode,
+                                                            const GizmoOrientation orientation,
+                                                            const GizmoPivotMode pivotMode)
+            {
+                if (!ValidateBinding())
+                    return {.Unavailable = GizmoUiUnavailable::NoBinding};
+                if (Gizmo.IsDragging())
+                    return {.Result = {GizmoStatus::SessionActive}};
+                // Only a token from PrepareGizmo in the current idle interval:
+                // any session started or ended since then makes it stale.
+                if (token != CurrentGizmoToken())
+                    return {.Result = {GizmoStatus::StaleSession}};
+                if (History == nullptr)
+                    return {.Unavailable = GizmoUiUnavailable::NoHistory};
+                const std::vector<ECS::EntityHandle> targets = GizmoTargets();
+                if (targets.empty())
+                    return {.Unavailable = GizmoUiUnavailable::NoEntitySelection};
+                const GizmoResult begun = Gizmo.Begin(*BoundRegistry, targets, mode, orientation, pivotMode);
+                return {.Result = begun, .Token = begun.Succeeded() ? CurrentGizmoToken() : GizmoUiToken{}};
             }
 
             void ClearWorldBoundState()
@@ -803,6 +925,7 @@ namespace Extrinsic::Runtime
                 Documents = nullptr;
                 History = nullptr;
                 Ui = nullptr;
+                Cameras = nullptr;
                 Window = nullptr;
                 Renderer = nullptr;
                 Extraction = nullptr;
@@ -817,6 +940,10 @@ namespace Extrinsic::Runtime
         KernelEventSubscription FocusSubscription{};
         bool ModulePublished{false};
         bool SelectionPublished{false};
+        // Survives State recreation (Shutdown/Initialize reuses the boot
+        // WorldHandle), so a fresh State never reissues an old epoch and
+        // gizmo tokens from before the restart stay stale.
+        std::uint64_t LastInteractionEpoch{0u};
     };
 
     SceneInteractionModule::SceneInteractionModule()
@@ -857,6 +984,9 @@ namespace Extrinsic::Runtime
         }
 
         m_Impl->Shared = std::make_shared<Impl::State>();
+        m_Impl->Shared->InteractionEpoch = m_Impl->LastInteractionEpoch;
+        m_Impl->Shared->AdvanceEpoch();
+        m_Impl->LastInteractionEpoch = m_Impl->Shared->InteractionEpoch;
         m_Impl->Shared->Worlds = &setup.Worlds();
         m_Impl->Shared->BindTo(
             setup.Worlds().ActiveWorld(),
@@ -1037,6 +1167,7 @@ namespace Extrinsic::Runtime
         state.History =
             setup.Services().Find<EditorCommandHistory>();
         state.Ui = setup.Services().Find<EditorUiHost>();
+        state.Cameras = setup.Services().Find<CameraControllerRegistry>();
         if (state.Documents != nullptr)
         {
             const std::weak_ptr<Impl::State> weakState =
@@ -1143,6 +1274,8 @@ namespace Extrinsic::Runtime
                 SceneInteractionModule>(*this);
         }
         m_Impl->ModulePublished = false;
+        if (m_Impl->Shared)
+            m_Impl->LastInteractionEpoch = m_Impl->Shared->InteractionEpoch;
         m_Impl->Shared.reset();
     }
 
@@ -1174,6 +1307,47 @@ namespace Extrinsic::Runtime
     SceneInteractionModule::Interaction() const noexcept
     {
         return m_Impl->Shared->Gizmo;
+    }
+
+    GizmoUiFrame SceneInteractionModule::PrepareGizmo(const GizmoOrientation orientation,
+                                                      const GizmoPivotMode pivotMode)
+    {
+        return m_Impl->Shared ? m_Impl->Shared->PrepareGizmo(orientation, pivotMode) : GizmoUiFrame{};
+    }
+
+    GizmoUiBeginResult SceneInteractionModule::BeginGizmoDrag(const GizmoUiToken& token,
+                                                              const GizmoMode mode,
+                                                              const GizmoOrientation orientation,
+                                                              const GizmoPivotMode pivotMode)
+    {
+        if (!m_Impl->Shared)
+            return {.Unavailable = GizmoUiUnavailable::NoBinding};
+        return m_Impl->Shared->BeginGizmoDrag(token, mode, orientation, pivotMode);
+    }
+
+    GizmoResult SceneInteractionModule::PreviewGizmoDrag(const GizmoUiToken& token,
+                                                         const glm::mat4& gizmoMatrix)
+    {
+        const auto& state = m_Impl->Shared;
+        if (!state || !state->OwnsGizmoSession(token))
+            return {GizmoStatus::StaleSession};
+        return state->Gizmo.Preview(*state->BoundRegistry, gizmoMatrix);
+    }
+
+    EditorCommandHistoryResult SceneInteractionModule::CommitGizmoDrag(const GizmoUiToken& token)
+    {
+        const auto& state = m_Impl->Shared;
+        if (!state || !state->OwnsGizmoSession(token) || state->History == nullptr)
+            return {.Status = EditorCommandHistoryStatus::StaleEntity};
+        return state->Gizmo.DragCommit(*state->BoundRegistry, state->BoundWorld, *state->History);
+    }
+
+    GizmoResult SceneInteractionModule::CancelGizmoDrag(const GizmoUiToken& token)
+    {
+        const auto& state = m_Impl->Shared;
+        if (!state || !state->OwnsGizmoSession(token))
+            return {GizmoStatus::StaleSession};
+        return state->Gizmo.DragCancel(*state->BoundRegistry);
     }
 
     const std::optional<PrimitiveSelectionResult>&

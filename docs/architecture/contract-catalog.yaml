@@ -78,6 +78,7 @@ contracts:
       - Gizmo drag-session semantics change (frozen selection, pivot or basis policy, group delta, hierarchy write rule, non-TRS rejection, session conflict checks, undo/no-op/cancel/rollback rules).
       - A gizmo frontend or another transform-preview path drives entity TRS through GizmoInteraction Begin/Preview/DragCommit/DragCancel.
       - Viewport input ownership (the EditorUiHost per-frame request, its merge after the adapter capture, the ray-adapter skip while claimed) or the session's lifecycle cancel triggers (UI hide, native focus loss, world/document change) and their order relative to the pre-render transform flush change.
+      - The SceneInteractionModule editor-gizmo frontend interface changes (copied GizmoUiFrame with availability reason, frame, accepted matrix, unjittered Main-camera view/projection and scene rectangle; token-checked PrepareGizmo/BeginGizmoDrag/PreviewGizmoDrag/CommitGizmoDrag/CancelGizmoDrag where a stale token writes nothing).
     proofs:
       - tests/contract/runtime/Test.GizmoInteraction.cpp
       - tests/contract/runtime/Test.GizmoInteractionEngineWiring.cpp

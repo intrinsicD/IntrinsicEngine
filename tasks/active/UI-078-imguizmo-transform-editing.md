@@ -216,7 +216,10 @@ Codex review of the fixed commit → fixes → re-verification.
   the claim test also proves a claimed `F` press does not run (mutation-checked).
   No native GLFW focus run yet.
 - **Slice 3 — ImGuizmo frontend, 2026-10-07: 3a done in `a6fc6f4fc`,
-  approved by Codex in one round; 3b and 3c open.** Operator decisions: three sub-commits — (a)
+  approved by Codex in one round; 3b approved by Codex after three rounds
+  (round 1: stale Begin tokens, camera timing comment, Begin precondition;
+  round 2: the interaction epoch survives Shutdown/Initialize, so pre-restart
+  tokens stay stale); 3c open.** Operator decisions: three sub-commits — (a)
   dependencies plus snap config with tests, (b) runtime frontend interface with
   contract tests, (c) atomic ImGuizmo frontend plus old ray-path removal,
   `SandboxEditorGizmo` suite and immediate doc corrections. Snap stays
@@ -241,6 +244,34 @@ Codex review of the fixed commit → fixes → re-verification.
   old `GizmoInteraction::Config()` path is untouched until 3c. Evidence:
   `SandboxConfigSections.GizmoSnapStepsRegisterValidateAndApplyThroughTheConfigLane`,
   `EngineConfigSectionSchemas.*` (now requires the `sandbox.gizmo` schema).
+  **3b:** `SceneInteractionModule` gains the runtime-typed frontend interface
+  (no ImGui types): `PrepareGizmo(orientation, pivot)` returns a copied
+  `GizmoUiFrame` — availability reason (`NoBinding`, `NoHistory`,
+  `NoEntitySelection`, `InvalidFrame`, `NoCamera`), `ComputeFrame` before a
+  drag or the frozen `SessionFrame`/`SessionMode` and accepted `Gt` during
+  one, the Main controller's unjittered view/projection via `GetView` (no
+  `Update`), orthographic flag, and the scene rectangle (current
+  `SceneViewport()` claim or full client, resolved with
+  `ResolveSceneViewportPixels`, mapped back to window/ImGui logical
+  coordinates) — plus a `{world, epoch, session}` token. `BeginGizmoDrag`,
+  `PreviewGizmoDrag(Gt)`, `CommitGizmoDrag`, `CancelGizmoDrag` resolve
+  selection/registry/history internally and drive the existing matrix core;
+  a stale token (world switch, document replacement, hide/focus cancel,
+  any session start or end) writes and starts nothing; Begin accepts only
+  the current idle token and needs Prepare/Begin back to back (G0 is
+  recomputed). `GizmoInteraction::SessionGeneration()` increments on every
+  session start and end. The camera is the controller state before this
+  frame's `CameraModule` update. Snap steps stay frontend state (ImGuizmo
+  snaps `Gt`). Evidence:
+  `SceneInteractionModule.{GizmoUiFrameReportsWhyNothingCanBeManipulated,
+  GizmoUiFrameIsComputeFrameBeforeBeginAndTheFrozenSessionDuringADrag,
+  GizmoUiSceneRectIsTheCurrentClaimMappedBackFromFramebufferPixels,
+  GizmoUiDragCommitsTheLastAcceptedStateAsOneUndoAndCancelLeavesNone,
+  StaleGizmoUiTokensAreRejectedWithoutWrites,
+  GizmoUiTokensFromBeforeShutdownInitializeAreStale,
+  SelectionAloneDoesNotStartAGizmoSession}` (mutation-checked: dropping the
+  session-generation check in Preview/Commit or in Begin, or reading the
+  presented rectangle, fails them).
 - **Remaining:** slice 3 (ImGuizmo frontend, UI toggles, W/E/R, Escape, snap
   config, retire the ray frontend where replaced, `SandboxEditorGizmo` tests),
   slice 4 (docs and the Vulkan acceptance smoke). All acceptance boxes stay

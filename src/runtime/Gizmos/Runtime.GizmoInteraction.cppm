@@ -254,6 +254,10 @@ export namespace Extrinsic::Runtime
         // Frozen session frame (Matrix = G0); meaningful while dragging.
         [[nodiscard]] const GizmoFrame& SessionFrame() const noexcept { return m_SessionFrame; }
         [[nodiscard]] GizmoMode SessionMode() const noexcept { return m_DragMode; }
+        // Increments on every session start (successful `Begin`) and every
+        // session end (commit, cancel, rollback), so a value read at any time
+        // names exactly the current idle or running interval.
+        [[nodiscard]] std::uint64_t SessionGeneration() const noexcept { return m_SessionGeneration; }
         // Last accepted Gt (G0 until a preview is accepted).
         [[nodiscard]] const glm::mat4& AcceptedGizmoMatrix() const noexcept { return m_AcceptedGizmo; }
 
@@ -345,6 +349,7 @@ export namespace Extrinsic::Runtime
 
         bool            m_Dragging{false};
         GizmoMode       m_DragMode{GizmoMode::Translate};
+        std::uint64_t   m_SessionGeneration{0u};
         const Registry* m_SessionRegistry{nullptr};
         GizmoFrame      m_SessionFrame{};
         glm::mat4       m_AcceptedGizmo{1.f};

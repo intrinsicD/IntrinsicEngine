@@ -14,6 +14,7 @@
 #include <entt/entity/entity.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 #include "RuntimeTestModule.hpp"
 
@@ -39,6 +40,7 @@ import Extrinsic.Graphics.SelectionSystem;
 import Extrinsic.Platform.Backend.Null;
 import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
+import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorUiHost;
@@ -182,6 +184,15 @@ namespace
                 if (Core::Result result =
                         Services.Provide<Runtime::EditorUiHost>(
                             *UiHost, "Test.EditorUi");
+                    !result.has_value())
+                {
+                    return result;
+                }
+            }
+            if (Cameras)
+            {
+                if (Core::Result result =
+                        Services.Provide<Runtime::CameraControllerRegistry>(*Cameras, "Test.Cameras");
                     !result.has_value())
                 {
                     return result;
@@ -376,6 +387,7 @@ namespace
         std::unique_ptr<Graphics::IRenderer> Renderer{};
         Runtime::RenderExtractionCache Extraction{};
         std::unique_ptr<Runtime::EditorUiHost> UiHost{};
+        std::unique_ptr<Runtime::CameraControllerRegistry> Cameras{};
         Runtime::SceneInteractionModule Interaction{};
         std::unique_ptr<Runtime::SceneDocumentModule>
             Document{};
@@ -482,6 +494,47 @@ namespace
                                     gizmo.SessionFrame().Matrix)
                       .Status,
                   Runtime::GizmoStatus::Ok);
+    }
+
+    // A Main controller bound to the active world, as CameraModule leaves it.
+    Runtime::ICameraController& BindMainCamera(
+        DirectHarness& harness,
+        const Core::Config::CameraControllerKind kind = Core::Config::CameraControllerKind::FreeLook)
+    {
+        harness.Cameras->ResetForWorld(harness.Worlds.ActiveWorld());
+        harness.Cameras->Register(Runtime::CameraControllerSlot::Main, Runtime::CreateCameraController(kind));
+        return harness.Cameras->Resolve(Runtime::CameraControllerSlot::Main);
+    }
+
+    // A window whose framebuffer is twice its window extent (HiDPI).
+    class HiDpiWindow final : public Platform::IWindow
+    {
+    public:
+        void PollEvents() override {}
+        [[nodiscard]] bool ShouldClose() const override { return false; }
+        [[nodiscard]] bool IsMinimized() const override { return false; }
+        [[nodiscard]] bool WasResized() const override { return false; }
+        void AcknowledgeResize() override {}
+        [[nodiscard]] bool ConsumeInputActivity() override { return false; }
+        [[nodiscard]] Platform::Extent2D GetWindowExtent() const override { return {.Width = 400, .Height = 300}; }
+        [[nodiscard]] Platform::Extent2D GetFramebufferExtent() const override { return {.Width = 800, .Height = 600}; }
+        [[nodiscard]] void* GetNativeHandle() const override { return nullptr; }
+        void Listen(EventCallbackFn) override {}
+        [[nodiscard]] std::vector<Platform::Event> DrainEvents() override { return {}; }
+        void OnUpdate() override {}
+        void WaitForEventsTimeout(double) override {}
+        void SetClipboardText(std::string_view) override {}
+        [[nodiscard]] std::string GetClipboardText() const override { return {}; }
+        void SetCursorMode(Platform::CursorMode) override {}
+        [[nodiscard]] Platform::CursorMode GetCursorMode() const override { return Platform::CursorMode::Normal; }
+    };
+
+    void ExpectRect(const Runtime::EditorSceneViewportRect actual, const Runtime::EditorSceneViewportRect expected)
+    {
+        EXPECT_FLOAT_EQ(actual.X, expected.X);
+        EXPECT_FLOAT_EQ(actual.Y, expected.Y);
+        EXPECT_FLOAT_EQ(actual.Width, expected.Width);
+        EXPECT_FLOAT_EQ(actual.Height, expected.Height);
     }
 
     void PublishHit(
@@ -1440,6 +1493,445 @@ TEST(SceneInteractionModule,
     EXPECT_EQ(gizmo.DragCancel(second).Status, Runtime::GizmoStatus::Ok);
 }
 
+// UI-078 slice 3b: the frontend model names why nothing can be manipulated,
+// and Begin refuses for the same reasons without starting a session.
+TEST(SceneInteractionModule, GizmoUiFrameReportsWhyNothingCanBeManipulated)
+{
+    using Runtime::GizmoUiUnavailable;
+    constexpr auto kGlobal = Runtime::GizmoOrientation::Global;
+    constexpr auto kOrigins = Runtime::GizmoPivotMode::WorldOrigins;
+    constexpr auto kTranslate = Runtime::GizmoMode::Translate;
+    {
+        DirectHarness harness; // No SceneDocumentModule, so no history.
+        harness.Cameras = std::make_unique<Runtime::CameraControllerRegistry>();
+        ASSERT_TRUE(harness.Start().has_value());
+        (void)BindMainCamera(harness);
+        ECS::Scene::Registry& scene = *harness.Worlds.Get(harness.InitialWorld);
+        ASSERT_TRUE(harness.Services.Find<Runtime::SelectionController>()->SetSelectedEntity(
+            scene, MakeTransformSelectable(scene)));
+        const Runtime::GizmoUiFrame frame = harness.Interaction.PrepareGizmo(kGlobal, kOrigins);
+        EXPECT_EQ(frame.Unavailable, GizmoUiUnavailable::NoHistory);
+        EXPECT_EQ(harness.Interaction.BeginGizmoDrag(frame.Token, kTranslate, kGlobal, kOrigins).Unavailable,
+                  GizmoUiUnavailable::NoHistory);
+        EXPECT_FALSE(harness.Interaction.Interaction().IsDragging());
+    }
+
+    DirectHarness harness;
+    harness.Cameras = std::make_unique<Runtime::CameraControllerRegistry>();
+    ASSERT_TRUE(harness.Start(true).has_value());
+    Runtime::SelectionController& selection = *harness.Services.Find<Runtime::SelectionController>();
+    ECS::Scene::Registry& scene = *harness.Worlds.Get(harness.InitialWorld);
+    Runtime::SceneInteractionModule& module = harness.Interaction;
+
+    EXPECT_EQ(module.PrepareGizmo(kGlobal, kOrigins).Unavailable, GizmoUiUnavailable::NoEntitySelection);
+    EXPECT_EQ(module.BeginGizmoDrag(module.PrepareGizmo(kGlobal, kOrigins).Token, kTranslate, kGlobal, kOrigins)
+                  .Unavailable,
+              GizmoUiUnavailable::NoEntitySelection);
+
+    // A selected entity without a Transform has no frame.
+    ASSERT_TRUE(selection.SetSelectedEntity(scene, MakeSelectable(scene)));
+    Runtime::GizmoUiFrame frame = module.PrepareGizmo(kGlobal, kOrigins);
+    EXPECT_EQ(frame.Unavailable, GizmoUiUnavailable::InvalidFrame);
+    EXPECT_EQ(frame.Frame.Result.Status, Runtime::GizmoStatus::InvalidEntity);
+
+    const ECS::EntityHandle entity = MakeTransformSelectable(scene, glm::vec3{1.0f, 2.0f, 3.0f});
+    ASSERT_TRUE(selection.SetSelectedEntity(scene, entity));
+    EXPECT_EQ(module.PrepareGizmo(kGlobal, kOrigins).Unavailable, GizmoUiUnavailable::NoCamera);
+    // A controller still bound to another world is not this world's camera.
+    harness.Cameras->ResetForWorld(harness.Worlds.CreateWorld("Other"));
+    harness.Cameras->Register(Runtime::CameraControllerSlot::Main,
+                              Runtime::CreateCameraController(Core::Config::CameraControllerKind::FreeLook));
+    EXPECT_EQ(module.PrepareGizmo(kGlobal, kOrigins).Unavailable, GizmoUiUnavailable::NoCamera);
+
+    (void)BindMainCamera(harness);
+    frame = module.PrepareGizmo(kGlobal, kOrigins);
+    ASSERT_TRUE(frame.Available());
+    EXPECT_FALSE(frame.Dragging);
+    EXPECT_EQ(frame.Token.World, harness.InitialWorld);
+    EXPECT_EQ(frame.Token.Session, 0u);
+    EXPECT_EQ(glm::vec3(frame.GizmoMatrix[3]), glm::vec3(1.0f, 2.0f, 3.0f));
+
+    // A primitive selection target has no entity gizmo.
+    harness.SelectionSettings.Target = Runtime::SelectionTarget::Face;
+    Graphics::RenderFrameInput input{};
+    harness.InvokeViewportHook(0u, input);
+    EXPECT_EQ(module.PrepareGizmo(kGlobal, kOrigins).Unavailable, GizmoUiUnavailable::NoEntitySelection);
+    EXPECT_EQ(module.BeginGizmoDrag(frame.Token, kTranslate, kGlobal, kOrigins).Unavailable,
+              GizmoUiUnavailable::NoEntitySelection);
+    EXPECT_FALSE(module.Interaction().IsDragging());
+
+    harness.Stop();
+    EXPECT_EQ(module.PrepareGizmo(kGlobal, kOrigins).Unavailable, GizmoUiUnavailable::NoBinding);
+    EXPECT_EQ(module.BeginGizmoDrag(frame.Token, kTranslate, kGlobal, kOrigins).Unavailable,
+              GizmoUiUnavailable::NoBinding);
+}
+
+// UI-078 slice 3b: before Begin the frame is ComputeFrame for the requested
+// options; during a drag it is the frozen session (mode, frame, accepted Gt)
+// whatever options or selection the frontend shows. The camera is the Main
+// controller's current view for the scene rectangle, read without Update.
+TEST(SceneInteractionModule, GizmoUiFrameIsComputeFrameBeforeBeginAndTheFrozenSessionDuringADrag)
+{
+    DirectHarness harness;
+    harness.Cameras = std::make_unique<Runtime::CameraControllerRegistry>();
+    ASSERT_TRUE(harness.Start(true).has_value());
+    Runtime::SelectionController& selection = *harness.Services.Find<Runtime::SelectionController>();
+    ECS::Scene::Registry& scene = *harness.Worlds.Get(harness.InitialWorld);
+    Runtime::SceneInteractionModule& module = harness.Interaction;
+    Runtime::GizmoInteraction& gizmo = module.Interaction();
+    const ECS::EntityHandle a = MakeTransformSelectable(scene, glm::vec3{1.0f, 0.0f, 0.0f});
+    const ECS::EntityHandle b = MakeTransformSelectable(scene, glm::vec3{-1.0f, 0.0f, 2.0f});
+    scene.Raw().get<Tf::Component>(a).Rotation = glm::angleAxis(0.5f, glm::vec3{0.0f, 1.0f, 0.0f});
+    for (const ECS::EntityHandle entity : {a, b})
+    {
+        selection.RequestClickPick(0u, 0u, Runtime::SelectionPickMode::Add);
+        (void)selection.ConsumePendingPick();
+        selection.ConsumeHit(scene, Runtime::SelectionController::ToStableEntityId(entity));
+    }
+    ASSERT_EQ(selection.SelectedCount(), 2u);
+
+    Runtime::ICameraController& camera = BindMainCamera(harness);
+    // Hold W: an Update would move the free-look camera.
+    harness.InputWindow().QueueKey(Platform::Input::Key::W, true);
+    harness.InputWindow().PollEvents();
+    const Graphics::CameraViewInput expected = camera.GetView({.Width = 800, .Height = 600});
+
+    const ECS::EntityHandle selected[] = {a, b};
+    const Runtime::GizmoFrame computed = gizmo.ComputeFrame(
+        scene, selected, Runtime::GizmoOrientation::Local, Runtime::GizmoPivotMode::BoundsCenters);
+    ASSERT_TRUE(computed.Available());
+    const Runtime::GizmoUiFrame before =
+        module.PrepareGizmo(Runtime::GizmoOrientation::Local, Runtime::GizmoPivotMode::BoundsCenters);
+    ASSERT_TRUE(before.Available());
+    EXPECT_FALSE(before.Dragging);
+    EXPECT_EQ(before.Frame.Matrix, computed.Matrix);
+    EXPECT_EQ(before.Frame.Pivot, computed.Pivot);
+    EXPECT_EQ(before.Frame.Primary, computed.Primary);
+    EXPECT_EQ(before.Frame.ActualOrientation, Runtime::GizmoOrientation::Local);
+    EXPECT_EQ(before.GizmoMatrix, computed.Matrix);
+    EXPECT_EQ(before.View, expected.View);
+    EXPECT_EQ(before.Projection, expected.Projection);
+    EXPECT_FALSE(before.Orthographic);
+    ExpectRect(before.SceneRect, {.X = 0.0f, .Y = 0.0f, .Width = 800.0f, .Height = 600.0f});
+    EXPECT_EQ(camera.GetView({.Width = 800, .Height = 600}).View, expected.View);
+
+    const Runtime::GizmoUiBeginResult begun = module.BeginGizmoDrag(
+        before.Token, Runtime::GizmoMode::Rotate, Runtime::GizmoOrientation::Local,
+        Runtime::GizmoPivotMode::BoundsCenters);
+    ASSERT_TRUE(begun.Succeeded());
+    EXPECT_NE(begun.Token, before.Token);
+    EXPECT_EQ(begun.Token.World, before.Token.World);
+    EXPECT_EQ(begun.Token.InteractionEpoch, before.Token.InteractionEpoch);
+    const glm::mat4 moved = glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 1.0f, 0.0f}) * before.Frame.Matrix;
+    ASSERT_TRUE(module.PreviewGizmoDrag(begun.Token, moved).Succeeded());
+
+    ASSERT_TRUE(selection.SetSelectedEntity(scene, a));
+    const Runtime::GizmoUiFrame during =
+        module.PrepareGizmo(Runtime::GizmoOrientation::Global, Runtime::GizmoPivotMode::WorldOrigins);
+    ASSERT_TRUE(during.Available());
+    EXPECT_TRUE(during.Dragging);
+    EXPECT_EQ(during.Token, begun.Token);
+    EXPECT_EQ(during.SessionMode, Runtime::GizmoMode::Rotate);
+    EXPECT_EQ(during.Frame.Matrix, gizmo.SessionFrame().Matrix);
+    EXPECT_EQ(during.Frame.Matrix, computed.Matrix);
+    EXPECT_EQ(during.Frame.ActualOrientation, Runtime::GizmoOrientation::Local);
+    EXPECT_EQ(during.GizmoMatrix, moved);
+
+    harness.Cameras->Replace(Runtime::CameraControllerSlot::Main,
+                             Runtime::CreateCameraController(Core::Config::CameraControllerKind::TopDown));
+    const Runtime::GizmoUiFrame ortho =
+        module.PrepareGizmo(Runtime::GizmoOrientation::Global, Runtime::GizmoPivotMode::WorldOrigins);
+    EXPECT_TRUE(ortho.Orthographic);
+    EXPECT_EQ(ortho.Projection,
+              harness.Cameras->Resolve(Runtime::CameraControllerSlot::Main)
+                  .GetView({.Width = 800, .Height = 600})
+                  .Projection);
+    EXPECT_EQ(module.CancelGizmoDrag(begun.Token).Status, Runtime::GizmoStatus::Ok);
+}
+
+// UI-078 slice 3b: the scene rectangle is this UI frame's current claim (not
+// the presented one of the previous frame), else the whole client area,
+// resolved to framebuffer pixels like the engine and mapped back to window
+// (ImGui logical) coordinates; the projection uses the pixel extent.
+TEST(SceneInteractionModule, GizmoUiSceneRectIsTheCurrentClaimMappedBackFromFramebufferPixels)
+{
+    constexpr auto kGlobal = Runtime::GizmoOrientation::Global;
+    constexpr auto kOrigins = Runtime::GizmoPivotMode::WorldOrigins;
+    {
+        DirectHarness harness;
+        harness.UiHost = std::make_unique<Runtime::EditorUiHost>();
+        Runtime::EditorUiHostOwnerControl owner = harness.UiHost->ClaimOwnerControl();
+        owner.SetOperational(true);
+        harness.Cameras = std::make_unique<Runtime::CameraControllerRegistry>();
+        ASSERT_TRUE(harness.Start(true).has_value());
+        ECS::Scene::Registry& scene = *harness.Worlds.Get(harness.InitialWorld);
+        ASSERT_TRUE(harness.Services.Find<Runtime::SelectionController>()->SetSelectedEntity(
+            scene, MakeTransformSelectable(scene)));
+        Runtime::ICameraController& camera = BindMainCamera(harness);
+        Runtime::SceneInteractionModule& module = harness.Interaction;
+
+        // An offset split pane claimed during this frame's layout.
+        harness.UiHost->SetSceneViewport({.X = 100.0f, .Y = 50.0f, .Width = 400.0f, .Height = 200.0f});
+        Runtime::GizmoUiFrame frame = module.PrepareGizmo(kGlobal, kOrigins);
+        ASSERT_TRUE(frame.Available());
+        ExpectRect(frame.SceneRect, {.X = 100.0f, .Y = 50.0f, .Width = 400.0f, .Height = 200.0f});
+        EXPECT_EQ(frame.Projection, camera.GetView({.Width = 400, .Height = 200}).Projection);
+        EXPECT_NE(frame.Projection, camera.GetView({.Width = 800, .Height = 600}).Projection);
+
+        // Next frame before layout: the old claim is only presented now.
+        (void)owner.DrawFrameContributions();
+        ASSERT_TRUE(harness.UiHost->PresentedSceneViewport().has_value());
+        frame = module.PrepareGizmo(kGlobal, kOrigins);
+        ExpectRect(frame.SceneRect, {.X = 0.0f, .Y = 0.0f, .Width = 800.0f, .Height = 600.0f});
+        EXPECT_EQ(frame.Projection, camera.GetView({.Width = 800, .Height = 600}).Projection);
+
+        // A hidden editor's claim never applies.
+        harness.UiHost->SetSceneViewport({.X = 100.0f, .Y = 50.0f, .Width = 400.0f, .Height = 200.0f});
+        (void)harness.UiHost->ApplyVisibilityCommand({Runtime::EditorUiVisibilityCommandKind::Hide});
+        ExpectRect(module.PrepareGizmo(kGlobal, kOrigins).SceneRect,
+                   {.X = 0.0f, .Y = 0.0f, .Width = 800.0f, .Height = 600.0f});
+    }
+
+    DirectHarness harness;
+    harness.Window = std::make_unique<HiDpiWindow>();
+    harness.UiHost = std::make_unique<Runtime::EditorUiHost>();
+    Runtime::EditorUiHostOwnerControl owner = harness.UiHost->ClaimOwnerControl();
+    owner.SetOperational(true);
+    harness.Cameras = std::make_unique<Runtime::CameraControllerRegistry>();
+    ASSERT_TRUE(harness.Start(true).has_value());
+    ECS::Scene::Registry& scene = *harness.Worlds.Get(harness.InitialWorld);
+    ASSERT_TRUE(harness.Services.Find<Runtime::SelectionController>()->SetSelectedEntity(
+        scene, MakeTransformSelectable(scene)));
+    Runtime::ICameraController& camera = BindMainCamera(harness);
+
+    Runtime::GizmoUiFrame frame = harness.Interaction.PrepareGizmo(kGlobal, kOrigins);
+    ExpectRect(frame.SceneRect, {.X = 0.0f, .Y = 0.0f, .Width = 400.0f, .Height = 300.0f});
+    EXPECT_EQ(frame.Projection, camera.GetView({.Width = 800, .Height = 600}).Projection);
+
+    // 2x scale; pixel edges round (200.6 -> 201, 600.6 -> 601) and map back.
+    harness.UiHost->SetSceneViewport({.X = 100.3f, .Y = 20.0f, .Width = 200.0f, .Height = 250.0f});
+    frame = harness.Interaction.PrepareGizmo(kGlobal, kOrigins);
+    ExpectRect(frame.SceneRect, {.X = 100.5f, .Y = 20.0f, .Width = 200.0f, .Height = 250.0f});
+    EXPECT_EQ(frame.Projection, camera.GetView({.Width = 400, .Height = 500}).Projection);
+}
+
+// UI-078 slice 3b: many previews then one commit record exactly one undo
+// entry of the last accepted state; a rejected Gt between them changes
+// nothing; cancel restores without history.
+TEST(SceneInteractionModule, GizmoUiDragCommitsTheLastAcceptedStateAsOneUndoAndCancelLeavesNone)
+{
+    constexpr auto kGlobal = Runtime::GizmoOrientation::Global;
+    constexpr auto kOrigins = Runtime::GizmoPivotMode::WorldOrigins;
+    DirectHarness harness;
+    harness.Cameras = std::make_unique<Runtime::CameraControllerRegistry>();
+    ASSERT_TRUE(harness.Start(true).has_value());
+    Runtime::EditorCommandHistory& history = *harness.Services.Find<Runtime::EditorCommandHistory>();
+    ECS::Scene::Registry& scene = *harness.Worlds.Get(harness.InitialWorld);
+    const ECS::EntityHandle entity = MakeTransformSelectable(scene);
+    ASSERT_TRUE(harness.Services.Find<Runtime::SelectionController>()->SetSelectedEntity(scene, entity));
+    (void)BindMainCamera(harness);
+    Runtime::SceneInteractionModule& module = harness.Interaction;
+    const auto positionX = [&] { return scene.Raw().get<Tf::Component>(entity).Position.x; };
+    const auto translateX = [](const float x, const glm::mat4& g0)
+    { return glm::translate(glm::mat4{1.0f}, glm::vec3{x, 0.0f, 0.0f}) * g0; };
+
+    const Runtime::GizmoUiFrame frame = module.PrepareGizmo(kGlobal, kOrigins);
+    ASSERT_TRUE(frame.Available());
+    const glm::mat4 g0 = frame.Frame.Matrix;
+    const Runtime::GizmoUiBeginResult begun =
+        module.BeginGizmoDrag(frame.Token, Runtime::GizmoMode::Translate, kGlobal, kOrigins);
+    ASSERT_TRUE(begun.Succeeded());
+    for (int step = 1; step <= 10; ++step)
+        ASSERT_TRUE(module.PreviewGizmoDrag(begun.Token, translateX(static_cast<float>(step) / 10.0f, g0))
+                        .Succeeded());
+    glm::mat4 perspective = translateX(4.0f, g0);
+    perspective[0][3] = 0.5f;
+    EXPECT_EQ(module.PreviewGizmoDrag(begun.Token, perspective).Status, Runtime::GizmoStatus::NonTrsResult);
+    EXPECT_FLOAT_EQ(positionX(), 1.0f);
+    EXPECT_EQ(module.PrepareGizmo(kGlobal, kOrigins).GizmoMatrix, translateX(1.0f, g0));
+    EXPECT_EQ(history.UndoCount(), 0u);
+
+    // Release after the rejected tick commits the last accepted state, once.
+    EXPECT_TRUE(module.CommitGizmoDrag(begun.Token).Succeeded());
+    EXPECT_FALSE(module.Interaction().IsDragging());
+    EXPECT_FLOAT_EQ(positionX(), 1.0f);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_NE(module.PrepareGizmo(kGlobal, kOrigins).Token, begun.Token);
+    EXPECT_EQ(module.CommitGizmoDrag(begun.Token).Status, Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    // Neither the finished session's token nor the idle token prepared
+    // before it starts a new session.
+    for (const Runtime::GizmoUiToken& old : {begun.Token, frame.Token})
+    {
+        EXPECT_EQ(module.BeginGizmoDrag(old, Runtime::GizmoMode::Translate, kGlobal, kOrigins).Result.Status,
+                  Runtime::GizmoStatus::StaleSession);
+        EXPECT_FALSE(module.Interaction().IsDragging());
+    }
+    EXPECT_FLOAT_EQ(positionX(), 1.0f);
+    ASSERT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_FLOAT_EQ(positionX(), 0.0f);
+
+    const Runtime::GizmoUiBeginResult again = module.BeginGizmoDrag(
+        module.PrepareGizmo(kGlobal, kOrigins).Token, Runtime::GizmoMode::Translate, kGlobal, kOrigins);
+    ASSERT_TRUE(again.Succeeded());
+    EXPECT_NE(again.Token, begun.Token);
+    ASSERT_TRUE(module.PreviewGizmoDrag(again.Token, translateX(2.0f, g0)).Succeeded());
+    EXPECT_FLOAT_EQ(positionX(), 2.0f);
+    EXPECT_EQ(module.CancelGizmoDrag(again.Token).Status, Runtime::GizmoStatus::Ok);
+    EXPECT_FLOAT_EQ(positionX(), 0.0f);
+    EXPECT_EQ(history.UndoCount(), 0u);
+    EXPECT_FALSE(module.Interaction().IsDragging());
+}
+
+// UI-078 slice 3b: after a lifecycle cancel (UI hide, focus loss, document
+// replacement, world switch) the frontend's token is stale: Preview, Commit,
+// Cancel and Begin write, record and start nothing, a later session never
+// accepts it, and an idle token prepared before another session (or a world
+// switch) cannot begin.
+TEST(SceneInteractionModule, StaleGizmoUiTokensAreRejectedWithoutWrites)
+{
+    constexpr auto kGlobal = Runtime::GizmoOrientation::Global;
+    constexpr auto kOrigins = Runtime::GizmoPivotMode::WorldOrigins;
+    constexpr auto kTranslate = Runtime::GizmoMode::Translate;
+    DirectHarness harness;
+    harness.UiHost = std::make_unique<Runtime::EditorUiHost>();
+    Runtime::EditorUiHostOwnerControl owner = harness.UiHost->ClaimOwnerControl();
+    owner.SetOperational(true);
+    harness.Cameras = std::make_unique<Runtime::CameraControllerRegistry>();
+    ASSERT_TRUE(harness.Start(true).has_value());
+    ASSERT_EQ(harness.FrameHooks[2].Phase, Runtime::FramePhase::UiBegin);
+    Runtime::SelectionController& selection = *harness.Services.Find<Runtime::SelectionController>();
+    Runtime::EditorCommandHistory& history = *harness.Services.Find<Runtime::EditorCommandHistory>();
+    Runtime::SceneInteractionModule& module = harness.Interaction;
+    ECS::Scene::Registry& scene = *harness.Worlds.Get(harness.InitialWorld);
+    ECS::EntityHandle entity = MakeTransformSelectable(scene);
+    ASSERT_TRUE(selection.SetSelectedEntity(scene, entity));
+    (void)BindMainCamera(harness);
+    Runtime::EditorInputCaptureSnapshot capture{};
+    Runtime::RuntimeFramePacingDiagnostics pacing{};
+    const auto positionX = [&] { return scene.Raw().get<Tf::Component>(entity).Position.x; };
+
+    // Begins a session and accepts a move of +1 along X.
+    const auto beginMoved = [&]
+    {
+        const Runtime::GizmoUiFrame frame = module.PrepareGizmo(kGlobal, kOrigins);
+        const Runtime::GizmoUiBeginResult begun = module.BeginGizmoDrag(frame.Token, kTranslate, kGlobal, kOrigins);
+        EXPECT_TRUE(begun.Succeeded());
+        EXPECT_TRUE(module.PreviewGizmoDrag(
+            begun.Token, glm::translate(glm::mat4{1.0f}, glm::vec3{1.0f, 0.0f, 0.0f}) * frame.Frame.Matrix)
+                        .Succeeded());
+        return begun.Token;
+    };
+    const glm::mat4 farAway = glm::translate(glm::mat4{1.0f}, glm::vec3{3.0f, 0.0f, 0.0f});
+    const auto expectStale = [&](const Runtime::GizmoUiToken& token)
+    {
+        EXPECT_EQ(module.PreviewGizmoDrag(token, farAway).Status, Runtime::GizmoStatus::StaleSession);
+        EXPECT_EQ(module.CommitGizmoDrag(token).Status, Runtime::EditorCommandHistoryStatus::StaleEntity);
+        EXPECT_EQ(module.CancelGizmoDrag(token).Status, Runtime::GizmoStatus::StaleSession);
+        EXPECT_EQ(module.BeginGizmoDrag(token, kTranslate, kGlobal, kOrigins).Result.Status,
+                  Runtime::GizmoStatus::StaleSession);
+        EXPECT_FALSE(module.Interaction().IsDragging());
+        EXPECT_EQ(history.UndoCount(), 0u);
+    };
+
+    // UI hide, observed at UiBegin.
+    Runtime::GizmoUiToken token = beginMoved();
+    (void)harness.UiHost->ApplyVisibilityCommand({Runtime::EditorUiVisibilityCommandKind::Hide});
+    harness.InvokeFrameHook(2u, capture, pacing);
+    EXPECT_FALSE(module.Interaction().IsDragging());
+    expectStale(token);
+    EXPECT_FLOAT_EQ(positionX(), 0.0f);
+    (void)harness.UiHost->ApplyVisibilityCommand({Runtime::EditorUiVisibilityCommandKind::Show});
+    harness.InvokeFrameHook(2u, capture, pacing);
+
+    // Native focus loss.
+    token = beginMoved();
+    harness.Events.Publish(Platform::WindowFocusEvent{.Focused = false});
+    (void)harness.Events.Pump();
+    expectStale(token);
+    EXPECT_FLOAT_EQ(positionX(), 0.0f);
+
+    // A later session on the same binding never accepts the older token.
+    const Runtime::GizmoUiToken fresh = beginMoved();
+    EXPECT_EQ(fresh.InteractionEpoch, token.InteractionEpoch);
+    EXPECT_EQ(module.PreviewGizmoDrag(token, farAway).Status, Runtime::GizmoStatus::StaleSession);
+    EXPECT_EQ(module.CommitGizmoDrag(token).Status, Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(module.CancelGizmoDrag(token).Status, Runtime::GizmoStatus::StaleSession);
+    EXPECT_TRUE(module.Interaction().IsDragging());
+    EXPECT_FLOAT_EQ(positionX(), 1.0f);
+    EXPECT_EQ(history.UndoCount(), 0u);
+    EXPECT_EQ(module.CancelGizmoDrag(fresh).Status, Runtime::GizmoStatus::Ok);
+    EXPECT_FLOAT_EQ(positionX(), 0.0f);
+
+    // An idle token prepared before another session started and ended.
+    const Runtime::GizmoUiToken idle = module.PrepareGizmo(kGlobal, kOrigins).Token;
+    EXPECT_EQ(module.CancelGizmoDrag(beginMoved()).Status, Runtime::GizmoStatus::Ok);
+    expectStale(idle);
+    EXPECT_FLOAT_EQ(positionX(), 0.0f);
+
+    // Document replacement.
+    token = beginMoved();
+    ASSERT_TRUE(harness.Document->NewSceneDocument().has_value());
+    EXPECT_FALSE(module.Interaction().IsDragging());
+    expectStale(token);
+
+    // World switch; a token prepared before it cannot begin either.
+    ECS::Scene::Registry& first = *harness.Worlds.Get(harness.Worlds.ActiveWorld());
+    entity = MakeTransformSelectable(first);
+    ASSERT_TRUE(selection.SetSelectedEntity(first, entity));
+    const auto firstX = [&] { return first.Raw().get<Tf::Component>(entity).Position.x; };
+    const Runtime::GizmoUiToken prepared = module.PrepareGizmo(kGlobal, kOrigins).Token;
+    token = beginMoved();
+    EXPECT_FLOAT_EQ(firstX(), 1.0f);
+    const Runtime::WorldHandle second = harness.Worlds.CreateWorld("Second");
+    ASSERT_TRUE(harness.Worlds.RequestSetActiveWorld(second).has_value());
+    (void)harness.Worlds.ApplyMaintenance(harness.Events, harness.Jobs);
+    (void)harness.Events.Pump();
+    expectStale(token);
+    EXPECT_FLOAT_EQ(firstX(), 0.0f);
+    EXPECT_EQ(module.BeginGizmoDrag(prepared, kTranslate, kGlobal, kOrigins).Result.Status,
+              Runtime::GizmoStatus::StaleSession);
+    EXPECT_FALSE(module.Interaction().IsDragging());
+}
+
+// UI-078 slice 3b: selecting, preparing frames and running frames (cursor
+// over the gizmo, no button) never starts a session or writes a transform.
+TEST(SceneInteractionModule, SelectionAloneDoesNotStartAGizmoSession)
+{
+    DirectHarness harness;
+    harness.UiHost = std::make_unique<Runtime::EditorUiHost>();
+    Runtime::EditorUiHostOwnerControl owner = harness.UiHost->ClaimOwnerControl();
+    owner.SetOperational(true);
+    harness.Cameras = std::make_unique<Runtime::CameraControllerRegistry>();
+    ASSERT_TRUE(harness.Start(true).has_value());
+    Runtime::EditorCommandHistory& history = *harness.Services.Find<Runtime::EditorCommandHistory>();
+    ECS::Scene::Registry& scene = *harness.Worlds.Get(harness.InitialWorld);
+    const ECS::EntityHandle entity = MakeTransformSelectable(scene, glm::vec3{0.5f, 0.0f, 0.0f});
+    ASSERT_TRUE(harness.Services.Find<Runtime::SelectionController>()->SetSelectedEntity(scene, entity));
+    (void)BindMainCamera(harness);
+
+    Graphics::RenderFrameInput input{};
+    input.Camera = OrthoCameraInput();
+    Runtime::EditorInputCaptureSnapshot capture{};
+    Runtime::RuntimeFramePacingDiagnostics pacing{};
+    harness.InputWindow().QueueCursor(450.0, 300.0);
+    harness.InputWindow().PollEvents();
+    for (int frame = 0; frame < 3; ++frame)
+    {
+        harness.InvokeFrameHook(2u, capture, pacing);
+        const Runtime::GizmoUiFrame ui = harness.Interaction.PrepareGizmo(
+            Runtime::GizmoOrientation::Global, Runtime::GizmoPivotMode::WorldOrigins);
+        EXPECT_TRUE(ui.Available());
+        EXPECT_FALSE(ui.Dragging);
+        EXPECT_EQ(ui.Token.Session, 0u);
+        harness.InvokeViewportHook(0u, input, {}, Platform::Extent2D{.Width = 800, .Height = 600});
+    }
+    EXPECT_FALSE(harness.Interaction.Interaction().IsDragging());
+    EXPECT_EQ(harness.Interaction.Interaction().Diagnostics().DragsStarted, 0u);
+    EXPECT_EQ(scene.Raw().get<Tf::Component>(entity).Position, glm::vec3(0.5f, 0.0f, 0.0f));
+    EXPECT_EQ(history.UndoCount(), 0u);
+}
+
 TEST(SceneInteractionModule,
      ShutdownAnnouncementReleasesDocumentParticipant)
 {
@@ -1806,6 +2298,73 @@ TEST(SceneInteractionModule,
     EXPECT_EQ(
         interaction->LastRefinedPrimitiveGeneration(),
         0u);
+    engine.Shutdown();
+}
+
+// UI-078 slice 3b: Shutdown/Initialize recreates the interaction state on
+// the recycled boot WorldHandle; gizmo tokens from before (idle, finished and
+// still-running sessions) start, preview, commit and cancel nothing after it,
+// also once a new session reaches the same session generation.
+TEST(SceneInteractionModule, GizmoUiTokensFromBeforeShutdownInitializeAreStale)
+{
+    constexpr auto kGlobal = Runtime::GizmoOrientation::Global;
+    constexpr auto kOrigins = Runtime::GizmoPivotMode::WorldOrigins;
+    constexpr auto kTranslate = Runtime::GizmoMode::Translate;
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<ExitAfterOneFrameApplication>());
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.Initialize();
+    const glm::mat4 moved = glm::translate(glm::mat4{1.0f}, glm::vec3{1.0f, 0.0f, 0.0f});
+
+    std::vector<Runtime::GizmoUiToken> old{};
+    {
+        auto& module = *engine.Services().Find<Runtime::SceneInteractionModule>();
+        ECS::Scene::Registry& scene = *engine.Worlds().Get(engine.ActiveWorld());
+        ASSERT_TRUE(engine.Services().Find<Runtime::SelectionController>()->SetSelectedEntity(
+            scene, MakeTransformSelectable(scene)));
+        old.push_back(module.PrepareGizmo(kGlobal, kOrigins).Token);
+        const Runtime::GizmoUiBeginResult finished = module.BeginGizmoDrag(old.back(), kTranslate, kGlobal, kOrigins);
+        ASSERT_TRUE(finished.Succeeded());
+        ASSERT_TRUE(module.PreviewGizmoDrag(finished.Token, moved).Succeeded());
+        ASSERT_EQ(module.CancelGizmoDrag(finished.Token).Status, Runtime::GizmoStatus::Ok);
+        old.push_back(finished.Token);
+        const Runtime::GizmoUiBeginResult running = module.BeginGizmoDrag(
+            module.PrepareGizmo(kGlobal, kOrigins).Token, kTranslate, kGlobal, kOrigins);
+        ASSERT_TRUE(running.Succeeded());
+        ASSERT_TRUE(module.PreviewGizmoDrag(running.Token, moved).Succeeded());
+        old.push_back(running.Token);
+    }
+    const Runtime::WorldHandle bootWorld = engine.ActiveWorld();
+    engine.Shutdown();
+    engine.Initialize();
+    ASSERT_EQ(engine.ActiveWorld(), bootWorld);
+
+    auto& module = *engine.Services().Find<Runtime::SceneInteractionModule>();
+    Runtime::EditorCommandHistory& history = *engine.Services().Find<Runtime::EditorCommandHistory>();
+    ECS::Scene::Registry& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const ECS::EntityHandle entity = MakeTransformSelectable(scene);
+    ASSERT_TRUE(engine.Services().Find<Runtime::SelectionController>()->SetSelectedEntity(scene, entity));
+    for (const Runtime::GizmoUiToken& token : old)
+    {
+        EXPECT_EQ(module.BeginGizmoDrag(token, kTranslate, kGlobal, kOrigins).Result.Status,
+                  Runtime::GizmoStatus::StaleSession);
+        EXPECT_FALSE(module.Interaction().IsDragging());
+    }
+
+    // A new session reaches the generation the finished one had.
+    const Runtime::GizmoUiBeginResult fresh =
+        module.BeginGizmoDrag(module.PrepareGizmo(kGlobal, kOrigins).Token, kTranslate, kGlobal, kOrigins);
+    ASSERT_TRUE(fresh.Succeeded());
+    for (const Runtime::GizmoUiToken& token : old)
+    {
+        EXPECT_EQ(module.PreviewGizmoDrag(token, moved).Status, Runtime::GizmoStatus::StaleSession);
+        EXPECT_EQ(module.CommitGizmoDrag(token).Status, Runtime::EditorCommandHistoryStatus::StaleEntity);
+        EXPECT_EQ(module.CancelGizmoDrag(token).Status, Runtime::GizmoStatus::StaleSession);
+        EXPECT_TRUE(module.Interaction().IsDragging());
+    }
+    EXPECT_EQ(scene.Raw().get<Tf::Component>(entity).Position, glm::vec3{0.0f});
+    EXPECT_EQ(history.UndoCount(), 0u);
+    EXPECT_EQ(module.CancelGizmoDrag(fresh.Token).Status, Runtime::GizmoStatus::Ok);
     engine.Shutdown();
 }
 

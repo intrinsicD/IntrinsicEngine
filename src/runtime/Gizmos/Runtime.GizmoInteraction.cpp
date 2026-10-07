@@ -460,6 +460,8 @@ namespace Extrinsic::Runtime
 
     void GizmoInteraction::EndSession() noexcept
     {
+        if (m_Dragging)
+            ++m_SessionGeneration;
         m_Dragging = false;
         m_DragMode = GizmoMode::Translate;
         m_DragAxis = GizmoAxis::None;
@@ -544,6 +546,7 @@ namespace Extrinsic::Runtime
         m_AcceptedGizmo = analysis.Frame.Matrix;
         m_Targets = std::move(targets);
         m_Links = std::move(links);
+        ++m_SessionGeneration;
         ++m_Diagnostics.DragsStarted;
         return {};
     }

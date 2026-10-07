@@ -21,6 +21,8 @@ import Extrinsic.Core.Error;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.SelectionController;
@@ -66,6 +68,79 @@ namespace Extrinsic::Runtime
     export void SetGizmoSnapConfig(Core::Config::EngineConfig& config, const GizmoSnapConfig& value);
     export [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeGizmoSnapConfigSectionRegistration();
 
+    // Why the editor gizmo frontend has nothing to manipulate (UI-078).
+    export enum class GizmoUiUnavailable : std::uint8_t
+    {
+        None = 0,
+        NoBinding,         // No live active world/registry binding (or the module shut down).
+        NoHistory,         // No EditorCommandHistory to record the drag.
+        NoEntitySelection, // Selection target is not Entity, or no live entity is selected.
+        InvalidFrame,      // ComputeFrame failed; `GizmoUiFrame::Frame.Result` names status and entity.
+        NoCamera,          // No valid Main camera view for the bound world and a non-empty scene rectangle.
+    };
+
+    // Names the bound world, interaction epoch and gizmo session generation
+    // (GizmoInteraction::SessionGeneration) a frontend call refers to. A
+    // world switch, document replacement, or any session start or end
+    // (commit, cancel, UI hide, focus loss) makes an older token stale; stale
+    // calls write nothing and start nothing.
+    export struct GizmoUiToken
+    {
+        WorldHandle World{};
+        std::uint64_t InteractionEpoch{0u};
+        std::uint64_t Session{0u};
+
+        [[nodiscard]] friend bool operator==(const GizmoUiToken&, const GizmoUiToken&) noexcept = default;
+    };
+
+    // Copied per-UI-frame model for an editor gizmo frontend. All values are
+    // runtime-typed; the frontend never sees the registry or selection.
+    export struct GizmoUiFrame
+    {
+        GizmoUiUnavailable Unavailable{GizmoUiUnavailable::NoBinding};
+        // Compare with the token `BeginGizmoDrag` returned: a mismatch means
+        // the frontend's session ended elsewhere and must not be committed.
+        // While idle, it is the only token `BeginGizmoDrag` accepts.
+        GizmoUiToken Token{};
+        bool Dragging{false};
+        // While dragging: the frozen session mode and frame (G0); otherwise
+        // ComputeFrame for the requested orientation and pivot mode.
+        GizmoMode SessionMode{GizmoMode::Translate};
+        GizmoFrame Frame{};
+        // Last accepted Gt while dragging, else `Frame.Matrix`.
+        glm::mat4 GizmoMatrix{1.0f};
+        // Unjittered column-major Main camera view/projection for the scene
+        // rectangle's aspect, read from the controller without Update: its
+        // state BEFORE this frame's CameraModule update, which runs after the
+        // UI. It equals this frame's render camera only when a viewport claim
+        // suppresses that update (e.g. while the gizmo is hovered or dragged).
+        glm::mat4 View{1.0f};
+        glm::mat4 Projection{1.0f};
+        bool Orthographic{false};
+        // The engine's scene rectangle (ResolveSceneViewportPixels on this
+        // frame's current editor claim, else the whole framebuffer) mapped
+        // back to window coordinates relative to the client origin, i.e.
+        // ImGui logical coordinates before the frontend adds its display origin.
+        EditorSceneViewportRect SceneRect{};
+
+        [[nodiscard]] bool Available() const noexcept { return Unavailable == GizmoUiUnavailable::None; }
+    };
+
+    export struct GizmoUiBeginResult
+    {
+        // Not None: refused before reaching the session core.
+        GizmoUiUnavailable Unavailable{GizmoUiUnavailable::None};
+        // The session core's status (StaleSession for a stale token).
+        GizmoResult Result{};
+        // Names the new session on success.
+        GizmoUiToken Token{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Unavailable == GizmoUiUnavailable::None && Result.Succeeded();
+        }
+    };
+
     // Optional app-composed owner for every active-world interaction record.
     // The object has app-global lifetime; its mutable cohort binds to exactly
     // one WorldHandle/Registry pair and never retains per-world history.
@@ -91,6 +166,27 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] GizmoInteraction& Interaction() noexcept;
         [[nodiscard]] const GizmoInteraction& Interaction() const noexcept;
+
+        // Editor gizmo frontend (UI-078). Selection, registry and history are
+        // resolved here; every call validates the binding and the token
+        // first. Snap is the frontend's: it is already applied to Gt.
+        [[nodiscard]] GizmoUiFrame PrepareGizmo(GizmoOrientation orientation, GizmoPivotMode pivotMode);
+        // Starts a session on the current entity selection. `token` must be
+        // the current idle token from PrepareGizmo (else StaleSession;
+        // SessionActive while a session runs). G0 is recomputed from current
+        // state, so call PrepareGizmo and BeginGizmoDrag back to back with no
+        // transform writes in between, or the frontend's start matrix differs
+        // from G0. Mode, orientation and pivot mode freeze until the end.
+        [[nodiscard]] GizmoUiBeginResult BeginGizmoDrag(
+            const GizmoUiToken& token, GizmoMode mode, GizmoOrientation orientation, GizmoPivotMode pivotMode);
+        // Absolute gizmo matrix Gt; the core applies Gt * G0^-1. A rejected
+        // Gt keeps the last accepted state.
+        [[nodiscard]] GizmoResult PreviewGizmoDrag(const GizmoUiToken& token, const glm::mat4& gizmoMatrix);
+        // Records the last accepted state as one undo entry (none for a
+        // no-op) and ends the session. Stale token: StaleEntity, no write.
+        [[nodiscard]] EditorCommandHistoryResult CommitGizmoDrag(const GizmoUiToken& token);
+        // Restores the start state without history. Stale token: StaleSession, no write.
+        GizmoResult CancelGizmoDrag(const GizmoUiToken& token);
 
         [[nodiscard]] const std::optional<PrimitiveSelectionResult>&
             LastRefinedPrimitive() const noexcept;
