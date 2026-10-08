@@ -65,9 +65,20 @@ python3 tools/agents/sync_skills.py --check
 ```
 
 ## Completion
-Completed 2026-10-08. Commit: the BUG-237 retirement commit. The six done tasks carry `template: micro`,
+Completed 2026-10-08. Commit: `8a83bc328cd6ec8214fc903a19c9d6d141a9b469`. The six done tasks carry `template: micro`,
 `workflow_profile: micro`, `evidence: not_applicable` and an `evidence_skip_reason` naming this
 task; their bodies are unchanged. `workflow_evidence.py validate` exits 0 (0 errors, 105
 pre-existing warnings). `docs/agent/prompt/prompt.md` §Verification runs the validator when a
 task retires and states the micro switch; the `intrinsicengine-task-workflow` skill says the same.
 The `ci-docs` push trigger on `main` is unchanged (out of scope).
+
+## Review
+- 2026-10-08, Claude → Codex (`codex exec`, requested `gpt-6-astra` effort `xhigh`, read-only
+  sandbox), thread `01a11b3b-c403-7d32-8148-ac642c81e32c`, object `8a83bc328` (sha256 of
+  `git show` starts `7819d0c5d5e02dbb`). Verdict verbatim: "**revise required**" with one finding,
+  "[P2] Complete BUG-237's commit reference … Replace the placeholder with
+  `8a83bc328cd6ec8214fc903a19c9d6d141a9b469`; retirement is otherwise complete." Ponytail: "no
+  cut/shrink findings." Applied in the follow-up commit. Recursion protection: instruction-only
+  (other MCP servers were not disabled).
+- Related: the `ci-docs` push trigger and the checks it had missed are in
+  [BUG-238](BUG-238-ci-docs-not-run-on-main.md).
