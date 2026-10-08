@@ -68,4 +68,4 @@ per-PR duties.
 Overnight-lane retirements additionally owe enrolled evidence per
 `intrinsicengine-task-workflow` (`workflow-evidence.md`); interactive work
 owes the sweep, the independent review for non-trivial changes, and the
-experiment pre-flight for results-bearing runs, not evidence artifacts.
+experiment pre-flight for results-bearing runs, not completion evidence artifacts.

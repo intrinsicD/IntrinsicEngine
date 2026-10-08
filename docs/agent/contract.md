@@ -624,7 +624,7 @@ Before commit/PR, verify:
 - For unattended overnight work: enrolled completion evidence matches the
   final source surface and profile, and high-risk acceptance is independent
   and revision-bound. Interactive work owes the sweep above (and the experiment
-  pre-flight for results-bearing runs), not evidence artifacts.
+  pre-flight for results-bearing runs), not completion evidence artifacts.
 
 ## Temporary migration exceptions
 
