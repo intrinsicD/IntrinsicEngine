@@ -54,7 +54,7 @@ operator's GNOME Wayland session.
 3. Copy the relevant logs and host data to `ara/evidence/diagnostics/`, bind
    C118 to them, update ADR 0006 Validation, retire this task.
 
-Phase-1 tested commit: _to be recorded at commit time_. X11 logs:
+Phase-1 tested commit: `d6af297f9`. X11 logs:
 `build/ui079-evidence/` (not versioned).
 
 ## Acceptance criteria
