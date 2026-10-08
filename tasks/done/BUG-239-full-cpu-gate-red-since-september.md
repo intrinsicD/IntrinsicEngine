@@ -40,11 +40,11 @@ contract_review: CI gate selection and test registration; no catalog contract co
   (`EXCLUDED_LABELS` is replicated policy and would drop them from `full-cpu`).
 
 ## Acceptance criteria
-- [ ] Root cause of the first `full-cpu` failure after 2026-09-11 identified with its run id.
-- [ ] Script tests from an allowlist (`SCRIPT_TESTS`) are captured as `script_tests` in the CPU
+- [x] Root cause of the first `full-cpu` failure after 2026-09-11 identified with its run id.
+- [x] Script tests from an allowlist (`SCRIPT_TESTS`) are captured as `script_tests` in the CPU
       selection (schema v2, digest, summary, variant compare) and timed by script; any other
       producer-less test still blocks; documented in `tools/ci/README.md`; no gate weakened.
-- [ ] `full-cpu` passes on `main`, or every remaining failure has its own BUG task.
+- [x] `full-cpu` passes on `main`, or every remaining failure has its own BUG task.
 
 ## Verification
 ```bash
@@ -80,3 +80,9 @@ python3 tools/ci/cpu_test_selection.py --help
   Locally: `IntrinsicGeometryTests.Grouped` 21 s, the 38 CPD cases pass under `-L slow`, routing
   reconciles for `IntrinsicCpuTests` and `IntrinsicCpuSlowTests`, capture passes,
   `check_ara_claims --strict` OK.
+
+## Completion
+Completed 2026-10-08. Commit: `1d837f430`, `1cbc67251` (script-test category) and `62ce4bdff`,
+`080cbd9b1` (CPD slow lane). `ci-linux-clang` run 37811723376 on `1c79eacbb`: `full-cpu`
+success, the first since 2026-09-11. Not exercised by that push run: the sanitizer jobs and
+the cross-variant selection parity job, which run on pull requests and manual dispatch only.

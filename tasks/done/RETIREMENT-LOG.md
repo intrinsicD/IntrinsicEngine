@@ -8,6 +8,13 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-08 — BUG-239 full-cpu green again
+
+Retired [BUG-239](BUG-239-full-cpu-gate-red-since-september.md).
+
+- `ci-linux-clang` `full-cpu` had been red on `main` since 2026-09-11; each failing step hid the next. After BUG-238's fixes, CPU selection records the 96 compilation-locality script tests as typed `script_tests` (selection schema v2; timing by script), and the Coherent Point Drift reference tests (backing ara C113-C115, fixtures unchanged) run in the slow lane via `IntrinsicGeometryRegistrationSlowTests`.
+- Run 37811723376: `full-cpu` success. Sanitizer and selection-parity jobs run only on pull requests and manual dispatch and were not exercised.
+
 ## 2026-10-08 — BUG-238 ci-docs on main
 
 Retired [BUG-238](BUG-238-ci-docs-not-run-on-main.md).

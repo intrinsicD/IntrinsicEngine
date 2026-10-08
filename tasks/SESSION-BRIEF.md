@@ -84,7 +84,6 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-097` — Progressive model-scene UV job publishes a zero atlas (tasks/backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md)
 - unblocked: `BUG-149` — Benchmark sealer escapes dotted output directories (tasks/backlog/bugs/BUG-149-benchmark-sealer-dotted-output-directory.md)
 - unblocked: `BUG-193` — Investigate GPU pacing variability and watchdog margin (tasks/backlog/bugs/BUG-193-gpu-pacing-and-watchdog-margin.md)
-- unblocked: `BUG-239` — `ci-linux-clang` `full-cpu` has been red on `main` since 2026-09-11 (tasks/backlog/bugs/BUG-239-full-cpu-gate-red-since-september.md)
 - unblocked: `RUNTIME-291` — Scale-aware default radii for point operations (tasks/backlog/runtime/RUNTIME-291-scale-aware-radius-defaults.md)
 
 ## Theme H — Agentic workflow hardening
