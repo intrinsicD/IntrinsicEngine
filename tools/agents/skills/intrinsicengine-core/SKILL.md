@@ -55,6 +55,8 @@ Load only the procedure whose scope applies. The names below resolve under
 | Before adding a non-trivial implementation/helper/file, finding canonical code, or consolidating duplicated mechanisms | `intrinsicengine-reuse` |
 | Creating, promoting, retiring, or materially updating files under `tasks/` | `intrinsicengine-task-workflow` |
 | Before committing or reporting completion for a non-trivial change (the pre-merge sweep) | `intrinsicengine-review` |
+| Counter-reviewing a non-trivial plan, or the independent review of a non-trivial change | global `peer` skill (calls the other agent); rules in `docs/agent/review.md` |
+| Before a results-bearing run: outcome used for a claim, parameter, or decision (campaign, method/parity/benchmark run, claim-bound `Operational` run, pilot, calibration) | global `experiment-preflight` skill; repository mapping in `docs/agent/ara-evidence-policy.md` §"Experiment pre-flight" |
 | Changing dependency boundaries, module ownership, source layout, runtime wiring | `intrinsicengine-review` (architecture deep review + clean-workshop scorecard) |
 | Planning or reviewing new abstraction surface (interfaces, service/bridge/registry facades, module frameworks, event/command indirection), a small change fanning out across many files, or suspected over-engineering/glue | `intrinsicengine-right-sizing` |
 | Proposing novel, unconventional, cross-domain, or potentially publishable research directions (the ideation front end that feeds the method track) | `intrinsicengine-research-ideation` |

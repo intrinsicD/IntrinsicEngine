@@ -44,18 +44,20 @@ A hint the human rejects or ignores is dropped for the session unless it escalat
 
 **Questions.** When two plausible destinations diverge — or the observed edits contradict the stated goal — ask **one question at a time, with your recommended answer and the reason for it**. At most two questions per checkpoint. If the codebase can answer the question, read the codebase instead. Decisions worth remembering go into the task note or the commit message.
 
-**Pre-commit sweep.** Read the staged diff and answer four things: scope is one intent; layering intact (`check_layering.py` when `src/` is touched); changed behavior has a test and the touched-scope gate is green; docs and task notes updated only if a surface or structure actually changed. Deliver findings as hints, not as a gate.
+**Plans.** A non-trivial plan — the human's or an agent's — gets a counter-review by an agent that did not write it (global `peer` skill: ponytail ladder plus the `intrinsicengine-right-sizing` keep-list). Its findings are hints.
+
+**Pre-commit sweep.** Read the staged diff and answer five things: scope is one intent; layering intact (`check_layering.py` when `src/` is touched); changed behavior has a test that fails without the change and the touched-scope gate is green; docs and task notes updated only if a surface or structure actually changed; `ponytail-review` findings on the diff. Deliver findings as hints, not as a gate. A non-trivial change also gets the independent review in [review.md](../../../../../docs/agent/review.md#the-pre-merge-sweep-every-change).
 
 ## Delegate (on explicit hand-off)
 
 "Take this and finish it" switches you to a bounded solo loop:
 
 1. Read the task note — or write one if the work outlives the session (§Task notes).
-2. Ask clarifying questions **once, up front**; then choose robust defaults and record them in the note. Do not block mid-loop on questions you can answer with a robust default.
+2. Ask clarifying questions **once, up front**; then choose robust defaults and record them in the note. Do not block mid-loop on questions you can answer with a robust default. A non-trivial slice plan gets its counter-review (§Pair "Plans") before implementation.
 3. Implement the smallest robust slice; add or update tests with it.
 4. Update docs only when a surface or structure actually changed.
 5. Verify with the strongest relevant subset (§Verification), touched-scope first.
-6. Run the pre-commit sweep, commit (imperative subject ≤ 72 chars; body says why and lists the verification actually run), push.
+6. Run the pre-commit sweep and the independent review until the reviewer's explicit verdict, commit (imperative subject ≤ 72 chars; body says why and lists the verification actually run), push.
 7. Report back: **what changed, how it was verified, what remains uncertain, and at most one suggestion.**
 
 Interactive implementation uses the diff, tests, and CI as evidence; no task claims,
@@ -97,6 +99,7 @@ use it when preparing an approval request instead of seeking per-packet consent.
 | Optimized or GPU backend beyond the CPU reference | Parity evidence versus the reference before the backend token is claimable |
 | Destructive or hard-to-reverse action (history rewrite, deleting evidence or fixtures, retiring a public surface) | Confirm the concrete action is authorized before executing it; ask if that authorization is missing |
 | Publication-bound experiment | Opt-in custody: the `claim-grade`/`protected` chain in `docs/agent/workflow-evidence.md` |
+| Results-bearing run (outcome used for a claim, parameter, or decision; includes pilots and calibration) | Global `experiment-preflight` before the start — a gate in every posture; [repository mapping](../../../../../docs/agent/ara-evidence-policy.md#experiment-pre-flight) |
 
 # Work selection
 
@@ -307,4 +310,5 @@ Interactive postures assume the human is present. Unattended runs (overnight loo
 - Weakening a gate, assertion, or label set to reach green.
 - Continuing a committed plan after an observation contradicted its premise — a surprising result (including an unexpected pass) voids the remainder of the plan until re-diagnosed.
 - Reporting completion without having run the verification in this session.
+- Starting a results-bearing run without a passed experiment pre-flight.
 - Loading both a `docs/agent/*` file and its mirror `intrinsicengine-*` skill for the same scope.

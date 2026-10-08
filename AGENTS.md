@@ -163,8 +163,8 @@ work also reads the [consumer inventory](docs/architecture/spatial-index-consume
 
 ## 7. Testing protocol
 
-Testing must be fast. Add/update tests for behavior changes; do not weaken gates
-to reach green. Before code, build, or test changes, read
+Testing must be fast. Add/update tests for behavior changes; a test for new or
+fixed behavior must fail without the change. Do not weaken gates to reach green. Before code, build, or test changes, read
 [verification requirements](docs/agent/contract.md#testing-and-verification-protocol)
 for labels, focused selection, full CPU, sanitizer, and Vulkan gates.
 Task-specific stricter checks still apply. C++ tests use `Test.<Name>.cpp`;
@@ -225,6 +225,11 @@ and [ARA policy](docs/agent/ara-evidence-policy.md); use
 `intrinsicengine-results-audit` when its review trigger applies. Run
 `python3 tools/agents/check_ara_claims.py --root . --strict` when touching this scope.
 
+Results-bearing runs (outcome used for a claim, parameter, or decision, including
+pilots, calibration, and claim-bound `Operational` runs) start only after the
+global `experiment-preflight`, in every posture; read the
+[repository mapping](docs/agent/ara-evidence-policy.md#experiment-pre-flight).
+
 Apply [research-bookkeeping relevance](docs/agent/ara-evidence-policy.md#research-bookkeeping-relevance)
 from the conversation before loading research-manager references or ARA ledgers.
 Ordinary engineering exits without a research epilogue; research events and
@@ -282,8 +287,9 @@ reports; research evidence still applies in every posture.
 Before delegated work, task lifecycle changes, unattended execution, or workflow
 policy changes, read the [detailed execution requirements](docs/agent/contract.md#task-execution-workflow)
 and the matching [workflow section](docs/agent/prompt/prompt.md). The core skill
-maps posture and trigger to section. Delegated work follows inspect → scoped
-implementation/tests/docs → verification → review → commit/push → report.
+maps posture and trigger to section. Delegated work follows inspect → plan with
+independent counter-review → scoped implementation/tests/docs → verification →
+review → commit/push → report.
 Unattended work accepts only fully specified night-ready tasks and observes its
 stop conditions. Audits are on demand, not an ambient duty; offer deferred hints
 before filing them. Preserve frozen task/evidence history.
@@ -310,7 +316,8 @@ scope and purpose.
 
 Before committing or reporting non-trivial work complete, use
 `intrinsicengine-review`: one intent, intact layering, tested changed behavior,
-current docs/tasks, scoped mechanical/semantic changes, and tracked exceptions.
+current docs/tasks, scoped mechanical/semantic changes, tracked exceptions, a
+`ponytail-review` pass, and an independent review for non-trivial changes.
 Risk signals require the corresponding deeper review. Unattended work also needs
 profile-specific completion evidence and independent revision-bound review when
 required. See the [full checklist](docs/agent/contract.md#review-checklist).

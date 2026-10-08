@@ -515,6 +515,24 @@ The checked-in fixture under
 rows and no network reference. Regression tests use it to exercise the full
 review/authorization/consumption policy without touching real protected data.
 
+## Experiment pre-flight under custody
+
+Custody does not replace the global experiment pre-flight
+([ara-evidence-policy.md](ara-evidence-policy.md#experiment-pre-flight)); it
+supplies parts of it:
+
+- The frozen protocol and `init-run` provide the freeze and start binding only
+  for the content they seal. Packet content they do not seal (untracked inputs,
+  intent fields outside the protocol) stays in the pre-flight manifest.
+- `scratch` and `screening` protocols are pilot/calibration packets;
+  `confirmation` is the confirmation packet.
+- The two pre-run reviews remain owed. A `protected` prospective review counts
+  as one of them only if it is fully equivalent: a fresh session independent
+  of the author, the blind two-layer procedure and checklist, and `PASS` on the
+  same fully bound packet; the two reviews together are one Claude and one
+  Codex session. Launch authorization stays separate, and every start still
+  checks packet and cell.
+
 ## Required gates
 
 ```bash

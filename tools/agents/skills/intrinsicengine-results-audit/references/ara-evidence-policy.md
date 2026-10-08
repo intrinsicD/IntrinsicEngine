@@ -129,6 +129,35 @@ CPU, GPU/Vulkan, and sanitizer results remain distinct evidence classes.
 Ordinary implementation and refactoring does not enter the research ledger
 unless it produces a research-result claim (`AGENTS.md` §8b).
 
+## Experiment pre-flight
+
+A run is **results-bearing** when its outcome is used to support, refute, or set
+a claim, a parameter, or a decision: evidence-campaign runs, method
+reproductions and parity sessions, benchmark comparisons, `Operational` runs
+whose result enters a claim row, and the pilot, smoke, and calibration runs
+whose numbers inform any of these. A run that checks code against a pass/fail
+expectation fixed before the run, with no other use of its numbers, is
+verification (tests, a fix proof against a stated expected state).
+
+Every results-bearing run starts only after the global `experiment-preflight`
+skill (from the operator's agent-config repository): a frozen packet, two
+independent pre-run reviews (one fresh Claude and one fresh Codex session; the
+author is neither) with blind reconstruction, and a start check against the
+frozen run plan. This gate holds in every posture, including pair; the
+conversational pre-merge sweep does not replace it. Repository mapping:
+
+- Packet and verbatim verdicts live with the run's evidence:
+  `tasks/evidence/<ID>/preflight/<run>/` for task work, otherwise next to the
+  run's raw outputs (under `ara/evidence/` when a claim row will cite them). A
+  micro task's `evidence: not_applicable` exempts it from completion
+  artifacts, not from the pre-flight; no task file is created only to hold a
+  packet.
+- Pilot and calibration packets are reviewed prospectively; a confirmation run
+  needs the pilot's measurement checks passed (the skill's §Stages). Custody
+  profiles: [Experiment pre-flight under custody](../../../../../docs/agent/workflow-evidence.md#experiment-pre-flight-under-custody).
+- Task and claim validators do not check packets or verdicts; the coordinator
+  checks them before every start.
+
 ## Running an evidence campaign (the experiment loop)
 
 The ledger records outcomes; this loop produces them. It applies whenever an
@@ -136,8 +165,9 @@ experiment probes behavior not fully known in advance — a novel formulation,
 regime behavior on real data, numerics beyond a paper's reported envelope.
 This is the scientist's loop: maintain an explicit, testable model of the
 partially-known system and spend experiments where they discriminate. Paper
-reproduction against reported results needs only the method workflow; the more
-the ground truth is already known, the less of this loop is owed.
+reproduction against reported results needs the method workflow instead of
+this loop (its runs still pass the pre-flight above); the more the ground
+truth is already known, the less of this loop is owed.
 
 1. **Model explicitly.** State the current working model of the system as
    beliefs with status — established (`K`/`H` rows, `supported` claims),
@@ -146,8 +176,9 @@ the ground truth is already known, the less of this loop is owed.
 2. **Predict, then run.** Before executing an experiment, record what the
    working model predicts (the `intrinsicengine-research-ideation`
    killing-experiment fields: null hypothesis, signature if correct, signature
-   under the strongest conventional explanation). A run without a recorded
-   prediction cannot surprise you — it can only be rationalized afterwards.
+   under the strongest conventional explanation), then pass the
+   [pre-flight](#experiment-pre-flight). A run without a recorded prediction
+   cannot surprise you — it can only be rationalized afterwards.
 3. **Append, never curate.** Every executed experiment lands in the campaign
    record — predicted vs. observed, including failed, contradictory, and null
    runs. A sweep may share one `O<NN>`; what may never happen is dropping a

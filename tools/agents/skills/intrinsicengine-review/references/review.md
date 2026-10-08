@@ -1,7 +1,8 @@
 # Review
 
 One document owns review in this repository. Interactive work gets the
-**pre-merge sweep**; risk signals add the **deep sections**; the **audit
+**pre-merge sweep** and, for non-trivial changes, an **independent review**;
+risk signals add the **deep sections**; the **audit
 sweeps** run on demand, preferably overnight. The five previous instruments
 (`review-checklist.md`, `architecture-review-checklist.md`,
 `clean-workshop-review.md`, `agent-output-review-checklist.md`,
@@ -10,7 +11,7 @@ redesign; their filenames remain as redirects so history keeps resolving.
 
 ## The pre-merge sweep (every change)
 
-Answer four questions against the staged diff. Findings are delivered as
+Answer five questions against the staged diff. Findings are delivered as
 hints or fixed on the spot — the sweep is a conversation, not a gate.
 
 1. **Scope** — one intent; mechanical moves and semantic edits not mixed; no
@@ -21,7 +22,9 @@ hints or fixed on the spot — the sweep is a conversation, not a gate.
    `python3 tools/repo/check_layering.py --root src --strict` when `src/` is
    touched (it covers both C++23 module imports and CMake
    `target_link_libraries(...)` edges).
-3. **Tests** — changed behavior has a test; labels follow the taxonomy in
+3. **Tests** — changed behavior has a test, and a test for new or fixed
+   behavior fails without the change ([contract](../../../../../docs/agent/contract.md#testing-and-verification-protocol));
+   labels follow the taxonomy in
    `AGENTS.md` §7 / `tests/README.md`; the strongest relevant verification
    subset was run **in this session**, focused targets first; pass/fail read
    from the CTest run just executed, never from
@@ -34,6 +37,16 @@ hints or fixed on the spot — the sweep is a conversation, not a gate.
    inventories refreshed after module-surface changes; no unsubstantiated
    performance claims (a claim-shaped statement routes through `AGENTS.md`
    §8b).
+5. **Complexity** — run `ponytail-review` on the staged diff; its findings are
+   hints. It does not check correctness, and `intrinsicengine-right-sizing`
+   decides whether a flagged seam carries weight.
+
+**Independent review.** A non-trivial change also gets a correctness review by
+an agent that did not write it (global `peer` skill), bound to the fixed diff.
+In pair posture its findings are hints; delegated non-trivial work iterates
+until the reviewer's explicit verdict. Results-bearing runs additionally pass
+the [experiment pre-flight](../../../../../docs/agent/ara-evidence-policy.md#experiment-pre-flight),
+which is a gate in every posture.
 
 Optional local hook: `tools/repo/githooks/pre-commit` runs the cheap
 deterministic subset automatically — enable with
@@ -47,6 +60,8 @@ work does not.
 
 When a task moves to `tasks/done/`:
 
+- Acceptance boxes reflect the reviewer's decision; the implementer may record
+  it verbatim with its source, never tick a box on its own judgment.
 - Name the reached maturity level ([task-maturity.md](../../../../../docs/agent/task-maturity.md):
   `Scaffolded`, `CPUContracted`, `Operational`, `ParityProven`, `Retired`) in
   the task status block, retirement commit, or completion summary.

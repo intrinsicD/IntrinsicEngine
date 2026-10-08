@@ -329,7 +329,8 @@ For each change:
   select their suites with `ctest -R '^(Suite)\.'`. Slices, small tasks, and local refactors never run the full suite.
   The full suite runs only when the operator asks, or when a focused selection cannot be bounded (CMake/test-registry/
   toolchain changes, a widely imported module interface, a cross-cutting refactor); state the reason before running.
-- Add/update tests for behavior changes.
+- Add/update tests for behavior changes. A test for new or fixed behavior must fail without the change; show it
+  (e.g. with the change reverted). Tests of behavior-preserving refactors pass before and after.
 - Preserve or improve pass rate unless a temporary shim is documented.
 - Label tests using the documented CTest allow-list in `tests/README.md` and `tests/CMakeLists.txt` (categories:
   `unit`, `contract`, `integration`, `regression`, `benchmark`, `slo`; ownership labels:
@@ -419,6 +420,8 @@ full CPU, sanitizer, or capability-specific gates.
 - Distinguish smoke checks from heavy/nightly runs.
 - Record metrics and diagnostics in machine-readable output.
 - Do not claim performance wins without baseline comparison.
+- A benchmark comparison whose result informs a decision or claim is a results-bearing run: it starts only after
+  the [experiment pre-flight](../../../../../docs/agent/ara-evidence-policy.md#experiment-pre-flight).
 - Validate manifests and result payloads with `python3 tools/benchmark/validate_benchmark_manifests.py` and
   `python3 tools/benchmark/validate_benchmark_results.py`.
 - A benchmark result that becomes a repeatable claim also owes an `ara/logic/claims.md` row (§8b).
@@ -554,13 +557,15 @@ Delegated and unattended work follows this sequence:
 
 1. Inspect existing code and docs; identify the owning subsystem and layer.
 2. Read or write the task note; ask clarifying questions once, up front, then
-   record chosen defaults.
+   record chosen defaults. A non-trivial plan gets a counter-review by an agent
+   that did not write it before implementation (`prompt.md` §Delegate).
 3. Implement the smallest robust slice; add or update tests with it.
 4. Update docs when a surface or structure actually changed (§9).
 5. Run the strongest relevant verification (§7), touched-scope first; update
    generated inventories when module surfaces changed.
-6. Sweep the diff (scope, layering, tests, docs — §12), commit, push, and
-   report what changed, how it was verified, and what remains uncertain.
+6. Sweep the diff and obtain the independent review (§12, `review.md`), commit,
+   push, and report what changed, how it was verified, and what remains
+   uncertain.
 
 Claim (`task_claim.py`), live work-graph (`agent_work_graph.py`), and
 completion-evidence (`workflow_evidence.py`) machinery is scoped to unattended
@@ -612,12 +617,14 @@ Before commit/PR, verify:
 - Layering invariants are preserved.
 - Tests are updated and pass for touched scope.
 - Docs and task records are synchronized.
+- `ponytail-review` ran on the diff, and a non-trivial change got an independent review
+  ([review.md](../../../../../docs/agent/review.md#the-pre-merge-sweep-every-change)); acceptance boxes reflect the reviewer's decision.
 - Temporary compatibility shims are tracked with removal follow-up.
 - Mechanical moves and semantic edits are not mixed.
 - For unattended overnight work: enrolled completion evidence matches the
   final source surface and profile, and high-risk acceptance is independent
-  and revision-bound. Interactive work owes the sweep above, not evidence
-  artifacts.
+  and revision-bound. Interactive work owes the sweep above (and the experiment
+  pre-flight for results-bearing runs), not evidence artifacts.
 
 ## Temporary migration exceptions
 
