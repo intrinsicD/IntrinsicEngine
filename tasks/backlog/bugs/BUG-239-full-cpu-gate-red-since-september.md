@@ -51,3 +51,22 @@ contract_review: CI gate selection and test registration; no catalog contract co
 gh run list --workflow ci-linux-clang.yml --branch main --limit 5
 python3 tools/ci/cpu_test_selection.py --help
 ```
+
+## Review
+- 2026-10-08, Claude → Codex (`codex exec`, requested `gpt-6-astra` effort `xhigh`, read-only
+  sandbox), thread `01a11b90-ec4d-7421-8adb-9933f8c98500`. Recursion protection: instruction-only
+  (other MCP servers were not disabled).
+- Plan: "**Verdict: revise.**" — keep v2 bump, complete the timing record path, label
+  ScalarRidges, test timing and touched-scope routing, document in `tools/ci/README.md`. All
+  adopted.
+- Code on `1d837f430` (sha256 of `git show` starts `4191851d7e6194ad`): "**revise required** — fix
+  1 and 2" (script recognition accepted non-interpreter launchers, option operands and relative
+  paths; absolute script-test names passed validation; optional: name metadata-only drift).
+  Fixed in `1cbc67251`.
+- Fixes `1d837f430..1cbc67251` (diff sha256 starts `0eac7ed3aa64c8b4`): "**Verdict: approve.**"
+
+## Log
+- 2026-10-08 local (grouped CI configuration, `IntrinsicCpuTests` built): real capture 31
+  producers / 96 script tests / 5827 logical cases; `CompilationLocality.*` 96/96; full CPU
+  `ctest -LE "gpu|vulkan|slow|flaky-quarantine" --parallel 4` 4003/4003 (one GLFW LSan skip);
+  compile hotspot baseline gate passed.
