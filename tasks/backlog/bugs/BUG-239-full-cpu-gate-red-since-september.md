@@ -64,6 +64,8 @@ python3 tools/ci/cpu_test_selection.py --help
   paths; absolute script-test names passed validation; optional: name metadata-only drift).
   Fixed in `1cbc67251`.
 - Fixes `1d837f430..1cbc67251` (diff sha256 starts `0eac7ed3aa64c8b4`): "**Verdict: approve.**"
+- Slow-lane move `62ce4bdff` (sha256 of `git show` starts `89a73a84ce0a292c`): "**Verdict:
+  approve.**" Optional: name the slow target in the CPD method README; done in the next commit.
 
 ## Log
 - 2026-10-08 local (grouped CI configuration, `IntrinsicCpuTests` built): real capture 31
