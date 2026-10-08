@@ -5,6 +5,10 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [BUG-239 — `ci-linux-clang` `full-cpu` has been red on `main` since 2026-09-11](BUG-239-full-cpu-gate-red-since-september.md):
+  each failing step masked the next; current blocker is script-based `ProcessingCompilationLocality.*`
+  CTest tests that map to no registered producer in CPU test selection.
+
 - [BUG-232 — A failed frame submit loses an accepted position copy](BUG-232-gpuworld-commit-copy-lost-on-failed-submit.md):
   a `CommitOnCopy` preview is erased once its copy is recorded; a submit failure leaves the block
   older than its shadow. Found in RUNTIME-311 review; keep the front lease until the copy ran.
