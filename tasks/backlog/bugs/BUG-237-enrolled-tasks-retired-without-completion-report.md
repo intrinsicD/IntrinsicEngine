@@ -8,8 +8,7 @@ workflow_profile: micro
 evidence: not_applicable
 evidence_skip_reason: interactive fix; evidence is the diff and the strict validator run
 contract_schema: 1
-contracts: []
-contract_review: workflow-evidence tooling and task metadata; no engine contract in docs/architecture/contract-catalog.yaml applies
+contracts: [repo.task-contract-discovery]
 ---
 # BUG-237 — Enrolled tasks retired without a completion report fail workflow-evidence validation
 
@@ -24,25 +23,32 @@ contract_review: workflow-evidence tooling and task metadata; no engine contract
   BUG-160, CORE-010, GEOM-024, METHOD-015, RUNTIME-277 and RUNTIME-288. All six are in
   `tasks/done/` with `workflow_schema: 1`, `workflow_profile: standard` (GEOM-024: `high-risk`),
   `evidence: required`, and none has a `tasks/evidence/<ID>/` directory.
-- They were retired between 2026-09-26 and 2026-10-02 in interactive commits (`d4d58076e`,
-  `0ad27fec2`, `b6277e373`, `f010ebf33`, `349101058`, `9d2a0af78`). New tasks seeded from
-  `tasks/templates/task.md` or `bug-task.md` enroll as `standard` by default; interactive work
-  rides the micro lane and produces no report.
-- Why unnoticed: the docs/task-only verification route in `docs/agent/prompt/prompt.md`
-  §Verification does not run `workflow_evidence.py validate` (it is owed only "when overnight
-  evidence or custody state is touched"), and `ci-docs` runs on pull requests only; its last run
-  was 2026-09-23, before the first of these retirements. The next pull request will fail its
-  "Validate enrolled workflow evidence and experiment custody" step for reasons unrelated to it.
+- They were retired between 2026-09-26 and 2026-10-02 (`d4d58076e`, `0ad27fec2`, `b6277e373`,
+  `f010ebf33`, `349101058`, `9d2a0af78`) without any evidence artifacts. New tasks seeded from
+  `tasks/templates/task.md` or `bug-task.md` enroll as `standard` by default; work done in the
+  interactive micro lane produces no report.
+- Why unnoticed: `docs/agent/task-format.md` retirement step 3 already requires
+  `workflow_evidence.py validate --require-complete <ID>` for enrolled non-micro work, but the
+  docs/task-only verification route in `docs/agent/prompt/prompt.md` §Verification does not run
+  the validator (owed only "when overnight evidence or custody state is touched"). `ci-docs` has
+  no push trigger on `main` (`pull_request`, `merge_group`, `workflow_dispatch` only); per
+  `gh run list` its last run was 2026-09-23, before the first of these retirements. The next pull
+  request will fail its "Validate enrolled workflow evidence and experiment custody" step for
+  reasons unrelated to it.
 - Ruled out: not caused by the agent-workflow docs change `18e3c5f67`/`7f154fe1a` (same six
   errors on `e0362e4ff`); validator code unchanged since the retirements.
 
 ## Decision needed (operator)
-Choose how to clear the six historical errors; each touches frozen task history differently:
-1. Re-profile the six done tasks to `workflow_profile: micro`, `evidence: not_applicable` with
-   the reason "retired in an interactive session" (edits retired task front-matter).
+Choose how to clear the six historical errors; each changes the retired records differently:
+1. Re-profile the six done tasks to `template: micro`, `workflow_profile: micro`,
+   `evidence: not_applicable` with a concrete reason (edits retired task front-matter after the
+   fact; normally this switch happens before retirement).
 2. Generate reports after the fact (`workflow_evidence.py generate-report` at each retirement
-   commit); likely incomplete, since no command receipts exist.
-3. A validator rule for tasks retired before a stated cut-off (code change, keeps history bytes).
+   commit). This clears the errors only with successful required command receipts, which do
+   not exist; GEOM-024 (`high-risk`) also needs the final handoff and an accepted independent
+   review bound to the report digest.
+3. A validator exception that names exactly these six IDs with this note as its reason (code
+   change, keeps the task bytes); not a blanket cut-off date, which could hide later errors.
 
 ## Acceptance criteria
 - [ ] The six errors are cleared by the chosen option; `workflow_evidence.py validate` exits 0.
