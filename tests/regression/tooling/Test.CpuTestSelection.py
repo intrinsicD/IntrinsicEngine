@@ -649,18 +649,61 @@ Alpha.
         )
         self.assertNotIn(str(REPO_ROOT), output.read_text(encoding="utf-8"))
 
-    def test_capture_rejects_script_test_outside_the_allowlist(self) -> None:
-        build = self.root / "build"
-        tests = _default_tests(build)
-        tests.append(
-            _script_record(build, "Other.Script", "tools/ci/cpu_test_selection.py")
+    def test_capture_rejects_commands_that_do_not_run_an_allowlisted_script(
+        self,
+    ) -> None:
+        script = str(REPO_ROOT / "tools/analysis/compile_hotspots.py")
+        commands = {
+            "other-script": [
+                sys.executable,
+                str(REPO_ROOT / "tools/ci/cpu_test_selection.py"),
+            ],
+            "non-interpreter": ["/usr/bin/python3-config", script],
+            "option-operand": [sys.executable, f"--not-a-script={script}"],
+            "relative-operand": [sys.executable, "tools/analysis/compile_hotspots.py"],
+        }
+        for case, command in commands.items():
+            with self.subTest(case=case):
+                build = self.root / case
+                record = _script_record(build, "Other.Script")
+                record["command"] = command
+                _write_build(build, "none", tests=[*_default_tests(build), record])
+                result, _output = self._capture(
+                    build, "ci", "none", output_name=f"{case}.json", check=False
+                )
+                self.assertEqual(result.returncode, 3)
+                self.assertIn(
+                    "'Other.Script' does not map to a registered producer",
+                    result.stderr,
+                )
+
+    def test_compare_rejects_absolute_script_test_names(self) -> None:
+        reports: list[Path] = []
+        for name, sanitizer in (("first", "none"), ("second", "asan")):
+            build = self.root / name
+            _write_build(
+                build,
+                sanitizer,
+                tests=[*_default_tests(build), _script_record(build, "L.A")],
+            )
+            _result, output = self._capture(build, name, sanitizer)
+            reports.append(output)
+        tampered = json.loads(reports[1].read_text(encoding="utf-8"))
+        normalized = tampered["selection"]["normalized"]
+        normalized["script_tests"][0]["name"] = str(self.root / "L.A")
+        tampered["selection"]["digest"] = _canonical_digest(normalized)
+        reports[1].write_text(json.dumps(tampered), encoding="utf-8")
+        result = self._run(
+            "compare",
+            "--report",
+            str(reports[0]),
+            "--report",
+            str(reports[1]),
+            "--output",
+            str(self.root / "parity.json"),
         )
-        _write_build(build, "none", tests=tests)
-        result, _output = self._capture(build, "ci", "none", check=False)
         self.assertEqual(result.returncode, 3)
-        self.assertIn(
-            "'Other.Script' does not map to a registered producer", result.stderr
-        )
+        self.assertIn("invalid script test record 0 identity", result.stderr)
 
     def test_compare_rejects_script_test_drift(self) -> None:
         first_build = self.root / "first"
@@ -689,6 +732,28 @@ Alpha.
         self.assertEqual(result.returncode, 3)
         self.assertIn("missing_script_tests=['L.A']", result.stderr)
         self.assertIn("extra_script_tests=['L.B']", result.stderr)
+
+        third_build = self.root / "third"
+        _write_build(
+            third_build,
+            "ubsan",
+            tests=[
+                *_default_tests(third_build),
+                _script_record(third_build, "L.A", disabled=True),
+            ],
+        )
+        _result, third = self._capture(third_build, "ci-ubsan", "ubsan")
+        result = self._run(
+            "compare",
+            "--report",
+            str(first),
+            "--report",
+            str(third),
+            "--output",
+            str(self.root / "parity-disabled.json"),
+        )
+        self.assertEqual(result.returncode, 3)
+        self.assertIn("changed_script_tests=['L.A']", result.stderr)
 
     def test_compare_rejects_exact_case_drift(self) -> None:
         first_build = self.root / "first"

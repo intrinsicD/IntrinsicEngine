@@ -32,6 +32,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # Repository scripts that CTest runs directly instead of a registered test
 # binary (build-graph contracts); selected as script tests, not producer cases.
 SCRIPT_TESTS = ("tools/analysis/compile_hotspots.py",)
+_PYTHON_LAUNCHER_RE = re.compile(r"python(?:3(?:\.[0-9]+)?)?")
 _GTEST_SUITE_RE = re.compile(r"^(?P<suite>\S+)\.\s*(?:#.*)?$")
 _GTEST_COMMENT_RE = re.compile(r"\s+#.*$")
 ExecutionContext = tuple[Path, tuple[tuple[str, str], ...]]
@@ -378,10 +379,14 @@ def _producer_for_command(
 
 
 def script_for_command(command: Sequence[str]) -> str | None:
-    """Return the allowlisted script a CTest command runs as `python3 <script>`."""
-    if len(command) < 2 or not Path(command[0]).name.startswith("python"):
+    """Return the allowlisted script a CTest command runs as `python3 /abs/script`."""
+    if (
+        len(command) < 2
+        or not _PYTHON_LAUNCHER_RE.fullmatch(Path(command[0]).name)
+        or not Path(command[1]).is_absolute()
+    ):
         return None
-    script = _argument_path(command[1])
+    script = Path(os.path.realpath(command[1]))
     for relative in SCRIPT_TESTS:
         if script == Path(os.path.realpath(REPO_ROOT / relative)):
             return relative
@@ -993,6 +998,7 @@ def _validate_normalized(
         if (
             not isinstance(name, str)
             or not name
+            or Path(name).is_absolute()
             or record.get("script") not in SCRIPT_TESTS
             or not isinstance(record.get("disabled"), bool)
         ):
@@ -1090,13 +1096,23 @@ def _compare(
             _selection_names(normalized, "script_tests")
             - _selection_names(baseline, "script_tests")
         )
+        baseline_scripts = {
+            str(record["name"]): record for record in baseline["script_tests"]
+        }
+        changed_script_tests = sorted(
+            str(record["name"])
+            for record in normalized["script_tests"]
+            if str(record["name"]) in baseline_scripts
+            and record != baseline_scripts[str(record["name"])]
+        )
         raise SelectionError(
             f"report {index} selection differs from report 1: "
             f"missing_producers={missing_producers!r}, "
             f"extra_producers={extra_producers!r}, "
             f"missing_tests={missing_tests!r}, extra_tests={extra_tests!r}, "
             f"missing_script_tests={missing_script_tests!r}, "
-            f"extra_script_tests={extra_script_tests!r}"
+            f"extra_script_tests={extra_script_tests!r}, "
+            f"changed_script_tests={changed_script_tests!r}"
         )
 
     variants = [
