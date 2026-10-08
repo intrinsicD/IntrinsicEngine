@@ -638,7 +638,7 @@ moved entities. Operational on Vulkan only for the executed path and a pixel
 ratio of 1 (claim C118; `RuntimeSandboxAcceptanceGpuSmoke.ImGuizmo*`, native
 focus `GlfwPlatformSmoke.NativeFocusChangesEmitWindowFocusEvents`); other
 ratios rest on CPU evidence until
-[UI-079](../../tasks/backlog/ui/UI-079-imguizmo-hidpi-operational-run.md).
+[UI-079](../../tasks/active/UI-079-imguizmo-hidpi-operational-run.md).
 Omitting the module leaves the value unclaimed and all ImGui pacing counters
 zero. Its ImGui context owns a paired ImPlot context.
 

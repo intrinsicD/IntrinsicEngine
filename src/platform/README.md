@@ -60,8 +60,16 @@ the native window handle to graphics through `RHI::DeviceCreateDesc`; the Vulkan
 backend creates the surface itself.
 
 The interface/backend split is deliberate: headless tests and alternative
-platforms (Windows/macOS/Wayland) plug in by adding a sibling backend directory
-under `backends/` without touching the interface modules.
+backends plug in by adding a sibling backend directory under `backends/`
+without touching the interface modules.
+
+X11 and Wayland are platforms of the existing GLFW backend, not separate
+backends: on Linux GLFW is built with both and picks the session's platform at
+`glfwInit` (native Wayland inside a Wayland session, X11 under X11); the
+backend logs the selected platform and GLFW version once. Under native Wayland
+programmatic focus changes are not granted without user input, so
+`GlfwPlatformSmoke.NativeFocusChangesEmitWindowFocusEvents` skips there; its
+native focus evidence is X11.
 
 Platform owns window/input ports only. It exposes input state/events to runtime;
 it does not create graphics camera snapshots, pick requests, gizmo packets, or

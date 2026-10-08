@@ -28,6 +28,19 @@ namespace Extrinsic::Platform::Backends::Glfw
             Core::Log::Error("GLFW Error ({0}): {1}", error, description ? description : "<null>");
         }
 
+        const char* PlatformName(int platform)
+        {
+            switch (platform)
+            {
+            case GLFW_PLATFORM_WAYLAND: return "Wayland";
+            case GLFW_PLATFORM_X11: return "X11";
+            case GLFW_PLATFORM_WIN32: return "Win32";
+            case GLFW_PLATFORM_COCOA: return "Cocoa";
+            case GLFW_PLATFORM_NULL: return "Null";
+            default: return "Unknown";
+            }
+        }
+
         class GLFWLifetime
         {
         public:
@@ -38,6 +51,8 @@ namespace Extrinsic::Platform::Backends::Glfw
                 {
                     glfwSetErrorCallback(GLFWErrorCallback);
                     s_GLFWInitialized = glfwInit() == GLFW_TRUE;
+                    if (s_GLFWInitialized)
+                        Core::Log::Info("GLFW {} initialized; platform={}", glfwGetVersionString(), PlatformName(glfwGetPlatform()));
                 }
                 return instance;
             }

@@ -559,7 +559,10 @@ through the GLFW callbacks the window registered (no OS-generated input):
 a menu click enables the gizmo, a group translate (or single-axis scale) drag
 changes both triangles in its first preview frame's own readback, and a click on Undo restores transforms and
 pixels. They ran on an RTX 3050 (X11, pixel ratio 1, unlocked session); a real
-HiDPI run is open in [UI-079](../../../tasks/backlog/ui/UI-079-imguizmo-hidpi-operational-run.md).
+HiDPI run is open in [UI-079](../../../tasks/active/UI-079-imguizmo-hidpi-operational-run.md).
+Each case logs one `[UI-078 smoke]` line with the GLFW platform, window,
+framebuffer and backbuffer sizes, ratio, GLFW content scale, ImGui framebuffer
+scale, and the scene rectangle in window and framebuffer pixels.
 
 Run the scoped operational smoke with:
 
@@ -568,6 +571,11 @@ cmake --preset ci-vulkan
 cmake --build --preset ci-vulkan --target IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests ExtrinsicSandbox
 ctest --test-dir build/ci-vulkan --output-on-failure -R RuntimeSandboxAcceptanceGpuSmoke --timeout 120
 ```
+
+For a HiDPI run, log into a GNOME Wayland session with display scaling (GLFW
+then selects native Wayland), keep it unlocked, and run the three
+`ImGuizmo` cases with `-V` so the `[UI-078 smoke]` lines are kept; a
+forced `DisplayFramebufferScale` or an XWayland run is no HiDPI evidence.
 
 This acceptance does not claim every asset format, KTX decode, post-upload
 material re-resolution, advanced PBR, transparent selection, Gaussian splats, or

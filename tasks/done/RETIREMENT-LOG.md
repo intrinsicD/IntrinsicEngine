@@ -23,7 +23,7 @@ Retired [UI-078](UI-078-imguizmo-transform-editing.md).
 
 - The Sandbox edits entity transforms with an app-private ImGuizmo gizmo (menu-only enable, W/E/R, Escape, Shift snap with configurable steps, origin or bounds-center pivot, local/global incl. groups). Runtime owns the frozen matrix session, atomic non-TRS rejection, viewport claim, lifecycle cancels and one undo batch per drag; the old runtime ray adapter and gizmo packet builder are gone. ADR 0006 §§3–5 hold the consolidated decision.
 - Maturity: Operational on Vulkan for the executed path at pixel ratio 1 (ara C118: perspective and orthographic split smokes, native GLFW focus smoke; RTX 3050, X11).
-- Owned elsewhere: real HiDPI run [UI-079](../backlog/ui/UI-079-imguizmo-hidpi-operational-run.md); accepted top-down orthographic X/Z scale-handle limitation [BUG-236](BUG-236-imguizmo-scale-axis-plane-picking.md).
+- Owned elsewhere: real HiDPI run [UI-079](../active/UI-079-imguizmo-hidpi-operational-run.md); accepted top-down orthographic X/Z scale-handle limitation [BUG-236](BUG-236-imguizmo-scale-axis-plane-picking.md).
 
 Commits `5ba6f9b97`, `6441f256e`, `a6fc6f4fc`, `0ae5e4538`, `b513f2787`, `49a609334` and the slice 4b docs and retirement commits.
 

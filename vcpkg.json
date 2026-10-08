@@ -28,7 +28,17 @@
     "windowing": {
       "description": "Dependencies used by GLFW/Vulkan-backed interactive builds. Headless presets can disable default features before the vcpkg toolchain cutover.",
       "dependencies": [
-        "glfw3",
+        {
+          "name": "glfw3",
+          "platform": "linux",
+          "features": [
+            "wayland"
+          ]
+        },
+        {
+          "name": "glfw3",
+          "platform": "!linux"
+        },
         "volk",
         "vulkan-memory-allocator"
       ]

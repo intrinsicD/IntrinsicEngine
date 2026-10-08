@@ -94,7 +94,7 @@ jobs:
         id: vcpkg-cache
         uses: ./.github/actions/setup-build
         with:
-          system-packages: base
+          system-packages: graphics
           extra-packages: python3-yaml
 
       - name: Validate benchmark manifests (strict)

@@ -108,7 +108,9 @@ toolchain_present() {
         libxext-dev
         libxfixes-dev
         libwayland-dev
+        libwayland-bin
         libxkbcommon-dev
+        pkg-config
         libgl1-mesa-dev
     )
 
@@ -205,6 +207,8 @@ install_system_deps() {
     dpkg -s libxext-dev &>/dev/null || missing+=(libxext-dev)
     dpkg -s libxfixes-dev &>/dev/null || missing+=(libxfixes-dev)
     dpkg -s libwayland-dev &>/dev/null || missing+=(libwayland-dev)
+    dpkg -s libwayland-bin &>/dev/null || missing+=(libwayland-bin)
+    dpkg -s pkg-config &>/dev/null || missing+=(pkg-config)
     dpkg -s libxkbcommon-dev &>/dev/null || missing+=(libxkbcommon-dev)
     dpkg -s libgl1-mesa-dev &>/dev/null || missing+=(libgl1-mesa-dev)
 

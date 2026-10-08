@@ -132,6 +132,13 @@ seams only": import what you use rather than relying on transitive reach.
 
 Some containers do not provide X11 RandR headers; CMake enables `INTRINSIC_HEADLESS_NO_GLFW=ON` in that case. This disables GLFW-dependent runtime/sandbox modules but still allows core libraries and headless tests to build.
 
+On Linux the `windowing` manifest feature builds GLFW with X11 and Wayland.
+The GLFW port then needs `pkg-config`, `libwayland-dev`, `libwayland-bin`
+(`wayland-scanner`), and `libxkbcommon-dev` on the host; a missing one fails
+the `glfw3` port build during manifest install. GLFW loads the Wayland
+libraries at runtime and picks the platform from the session
+(`XDG_SESSION_TYPE`); the backend logs the selected platform once at init.
+
 ## Dependency bootstrap and recovery
 
 Repository presets resolve third-party C/C++ libraries through the root

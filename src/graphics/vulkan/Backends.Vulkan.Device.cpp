@@ -1655,8 +1655,11 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
         m_ShaderInt64AtomicsSupported = featureProbe.ShaderBufferInt64AtomicsSupported;
         {
             // Subgroup (Vulkan 1.1 core) and shared-memory limits for compute kernels.
+            VkPhysicalDeviceDriverProperties driver{};
+            driver.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES;
             VkPhysicalDeviceSubgroupProperties subgroup{};
             subgroup.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
+            subgroup.pNext = &driver;
             VkPhysicalDeviceProperties2 properties2{};
             properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
             properties2.pNext = &subgroup;
@@ -1665,6 +1668,13 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
             m_SubgroupArithmeticSupported = (subgroup.supportedStages & VK_SHADER_STAGE_COMPUTE_BIT) != 0 &&
                                             (subgroup.supportedOperations & VK_SUBGROUP_FEATURE_ARITHMETIC_BIT) != 0;
             m_MaxComputeSharedMemoryBytes = properties2.properties.limits.maxComputeSharedMemorySize;
+            Core::Log::Info("[VulkanDevice::Initialize] Selected physical device \"{}\" vendorID=0x{:04x} deviceID=0x{:04x} driver=\"{}\" \"{}\" driverVersion={}",
+                            properties2.properties.deviceName,
+                            properties2.properties.vendorID,
+                            properties2.properties.deviceID,
+                            driver.driverName,
+                            driver.driverInfo,
+                            properties2.properties.driverVersion);
         }
         diagnostics.DescriptorIndexingEnabled = true;
         diagnostics.TimelineSemaphoreEnabled = true;

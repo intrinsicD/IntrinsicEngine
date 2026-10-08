@@ -30,7 +30,7 @@ runs:
             packages+=(
               libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev
               libxi-dev libxext-dev libxfixes-dev libwayland-dev
-              libxkbcommon-dev libgl1-mesa-dev libvulkan-dev
+              libwayland-bin libxkbcommon-dev pkg-config libgl1-mesa-dev libvulkan-dev
               vulkan-tools spirv-tools
             )
             ;;

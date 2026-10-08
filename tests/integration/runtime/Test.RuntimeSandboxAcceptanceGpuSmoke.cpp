@@ -8911,19 +8911,10 @@ void RunImGuizmoGroupDragSmoke(const GizmoSmokeLayout& layout)
     auto& renderer = engine.GetRenderer();
     const Extrinsic::RHI::Format format = device.GetBackbufferFormat();
     const std::uint32_t bytesPerPixel = Extrinsic::RHI::BytesPerBlock(format);
-    const Extrinsic::Core::Extent2D extent = device.GetBackbufferExtent();
-    if (bytesPerPixel < 4u || extent.Width <= 0 || extent.Height <= 0)
-        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style smoke readback.";
-    probe.ReadbackSize = static_cast<std::uint64_t>(bytesPerPixel) * static_cast<std::uint64_t>(extent.Width) *
-                         static_cast<std::uint64_t>(extent.Height);
-    probe.Readback = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
-        .SizeBytes = probe.ReadbackSize,
-        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
-        .HostVisible = true,
-        .DebugName = "Sandbox.Ui078ImGuizmo.Readback",
-    });
-    if (!probe.Readback.IsValid())
-        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan smoke is opt-in.";
+    if (bytesPerPixel < 4u)
+        GTEST_SKIP() << "Backbuffer format cannot support rgba-style smoke readback.";
+    // Readback extent, fixed by the settle step (1.) once the sizes below hold.
+    Extrinsic::Core::Extent2D extent{};
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -8961,17 +8952,31 @@ void RunImGuizmoGroupDragSmoke(const GizmoSmokeLayout& layout)
     ASSERT_NE(history, nullptr);
     const GlfwCallbackInput input{static_cast<GLFWwindow*>(window.GetNativeHandle())};
     ASSERT_NE(input.Window, nullptr);
+    // Window, framebuffer and backbuffer sizes; a compositor may still resize
+    // (or scale) the window after the first frames, so the settle step waits.
+    const auto sizes = [&]
+    {
+        const auto w = window.GetWindowExtent();
+        const auto f = window.GetFramebufferExtent();
+        const auto b = device.GetBackbufferExtent();
+        return std::array{w.Width, w.Height, f.Width, f.Height, b.Width, b.Height};
+    };
+    std::array<int, 6> settledSizes{};
+    std::optional<std::array<int, 6>> resized{}; // first size change after settling
     // The orthographic case renders into an offset split rectangle claimed
     // during panel layout, as `SandboxEditorContext::ClaimSceneViewport` does.
     if (layout.Orthographic)
     {
-        const Extrinsic::Core::Extent2D logical = window.GetWindowExtent();
-        const RT::EditorSceneViewportRect split{
-            .X = 0.35f * static_cast<float>(logical.Width), .Y = 0.1f * static_cast<float>(logical.Height),
-            .Width = 0.6f * static_cast<float>(logical.Width), .Height = 0.8f * static_cast<float>(logical.Height)};
         ASSERT_TRUE(host->RegisterWindow(RT::EditorWindowDescriptor{
             .Id = "test.gizmo_split", .MenuPath = {"View"}, .Title = "Gizmo split", .OpenByDefault = true,
-            .Draw = [host, split](bool&) { host->SetSceneViewport(split); }}).IsValid());
+            .Draw = [host, &window](bool&)
+            {
+                const Extrinsic::Core::Extent2D logical = window.GetWindowExtent();
+                host->SetSceneViewport(RT::EditorSceneViewportRect{
+                    .X = 0.35f * static_cast<float>(logical.Width), .Y = 0.1f * static_cast<float>(logical.Height),
+                    .Width = 0.6f * static_cast<float>(logical.Width),
+                    .Height = 0.8f * static_cast<float>(logical.Height)});
+            }}).IsValid());
     }
 
     const auto prepare = [&engine]
@@ -9033,8 +9038,10 @@ void RunImGuizmoGroupDragSmoke(const GizmoSmokeLayout& layout)
         step([&input](RT::RuntimeFrameHookContext&) { input.Left(false); });
     };
 
-    // 1. Operational, the selection framed by the requested camera, geometry resident.
+    // 1. Operational, the selection framed by the requested camera, geometry
+    // resident, sizes stable; then the readback is sized.
     bool cameraSwitched = !layout.Orthographic;
+    glm::vec2 contentScale{}, imguiScale{};
     probe.Steps.push_back([&, settled = 0u](RT::RuntimeFrameHookContext&) mutable
     {
         if (!device.IsOperational())
@@ -9046,7 +9053,8 @@ void RunImGuizmoGroupDragSmoke(const GizmoSmokeLayout& layout)
                 return false;
             // The Camera / Render panel's "Top down" command, keeping the current view's framing.
             const Intrinsic::Tests::EditorFeatureTestContext context{
-                .Scene = &scene, .Selection = &selection, .CameraControllers = cameras, .CameraViewport = extent};
+                .Scene = &scene, .Selection = &selection, .CameraControllers = cameras,
+                .CameraViewport = device.GetBackbufferExtent()};
             EXPECT_EQ(RT::ApplyEditorCameraControllerCommand(
                           context, RT::EditorCameraControllerCommand{.Kind = Config::CameraControllerKind::TopDown}),
                       RT::EditorCommandStatus::Applied);
@@ -9056,7 +9064,30 @@ void RunImGuizmoGroupDragSmoke(const GizmoSmokeLayout& layout)
         const RT::GizmoUiFrame frame = prepare();
         if (!frame.Available() || frame.Orthographic != layout.Orthographic)
             return false;
-        return ++settled >= 4u; // geometry upload and swapchain latency
+        // Geometry upload and swapchain latency, at positive sizes unchanged
+        // over these frames and a backbuffer matching the framebuffer.
+        const auto now = sizes();
+        if (now != settledSizes || now[0] <= 0 || now[1] <= 0 || now[2] <= 0 || now[3] <= 0 || now[2] != now[4] ||
+            now[3] != now[5])
+        {
+            settledSizes = now;
+            settled = 0u;
+            return false;
+        }
+        if (++settled < 4u)
+            return false;
+        extent = {now[4], now[5]};
+        probe.ReadbackSize = static_cast<std::uint64_t>(bytesPerPixel) * static_cast<std::uint64_t>(extent.Width) *
+                             static_cast<std::uint64_t>(extent.Height);
+        probe.Readback = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+            .SizeBytes = probe.ReadbackSize,
+            .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+            .HostVisible = true,
+            .DebugName = "Sandbox.Ui078ImGuizmo.Readback",
+        });
+        glfwGetWindowContentScale(input.Window, &contentScale.x, &contentScale.y);
+        imguiScale = {ImGui::GetIO().DisplayFramebufferScale.x, ImGui::GetIO().DisplayFramebufferScale.y};
+        return true;
     });
 
     // 2. Gizmo off, menu closed, mouse away: the reference image.
@@ -9077,6 +9108,7 @@ void RunImGuizmoGroupDragSmoke(const GizmoSmokeLayout& layout)
     // input) in frames of its own: ImGui defers a move or button change that
     // follows a wheel event in the same frame to the next frame.
     RT::GizmoUiFrame idle{};
+    Extrinsic::Core::Rect2D idlePixels{}; // the press frame's scene rectangle in framebuffer pixels
     std::array<glm::vec3, 2> startPositions{};
     std::array<glm::mat4, 2> startWorlds{};
     std::size_t startUndo = 0u;
@@ -9149,6 +9181,17 @@ void RunImGuizmoGroupDragSmoke(const GizmoSmokeLayout& layout)
     // frame and the undo frame for readback.
     probe.Observe = [&](RT::RuntimeFrameHookContext& ctx)
     {
+        if (probe.Readback.IsValid() && sizes() != settledSizes)
+        {
+            // The renderer copies the whole backbuffer without checking the
+            // buffer's capacity: stop reading back and end the run at once.
+            resized = sizes();
+            probe.Pending = nullptr;
+            probe.Kernel = nullptr;
+            renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+            engine.RequestExit();
+            return;
+        }
         if (!dragFrames.empty() && dragFrames.back().Frame == ctx.FrameIndex)
         {
             DragFrame& drag = dragFrames.back();
@@ -9158,6 +9201,9 @@ void RunImGuizmoGroupDragSmoke(const GizmoSmokeLayout& layout)
             drag.Picks = selection.GetDiagnostics().ClickRequestsSubmitted;
             if (releaseFrame && drag.Frame == *releaseFrame)
                 releasedWorlds = worlds();
+            if (dragFrames.size() == 1u)
+                idlePixels = RT::ResolveSceneViewportPixels(window.GetWindowExtent(), window.GetFramebufferExtent(),
+                                                            ctx.EditorCapture);
         }
         if (pressFrame && !releaseFrame && !preview.Requested && probe.Pending == nullptr &&
             positions() != startPositions)
@@ -9192,17 +9238,27 @@ void RunImGuizmoGroupDragSmoke(const GizmoSmokeLayout& layout)
 
     // Host evidence: the claim covers only this measured pixel ratio.
     const RT::EditorSceneViewportRect rect = idle.SceneRect;
+    const int platform = glfwGetPlatform();
     std::cout << "[UI-078 smoke] " << (layout.Orthographic ? "orthographic split" : "perspective full")
+              << " platform="
+              << (platform == GLFW_PLATFORM_WAYLAND ? "Wayland" : platform == GLFW_PLATFORM_X11 ? "X11" : "other")
               << " window=" << logical.Width << "x" << logical.Height << " framebuffer=" << framebuffer.Width << "x"
-              << framebuffer.Height << " scale=" << static_cast<float>(framebuffer.Width) / logical.Width << ","
-              << static_cast<float>(framebuffer.Height) / logical.Height << " sceneRect=" << rect.X << ","
-              << rect.Y << " " << rect.Width << "x" << rect.Height
+              << framebuffer.Height << " backbuffer=" << extent.Width << "x" << extent.Height
+              << " ratio=" << static_cast<float>(framebuffer.Width) / logical.Width << ","
+              << static_cast<float>(framebuffer.Height) / logical.Height << " contentScale=" << contentScale.x << ","
+              << contentScale.y << " imguiScale=" << imguiScale.x << "," << imguiScale.y << " sceneRect=" << rect.X
+              << "," << rect.Y << " " << rect.Width << "x" << rect.Height << " sceneRectPx=" << idlePixels.Offset.X
+              << "," << idlePixels.Offset.Y << " " << idlePixels.Extent.Width << "x" << idlePixels.Extent.Height
               << " scaleAxis=" << layout.ScaleAxis << " firstPreviewFrame=" << preview.Frame
               << " undoFrame=" << undone.Frame << " " << exitApp.ExitSummary()
               << '\n';
 
+    ASSERT_FALSE(resized.has_value()) << "window/framebuffer/backbuffer resized during the proof frames: " << (*resized)[0] << "x"
+                          << (*resized)[1] << " " << (*resized)[2] << "x" << (*resized)[3] << " " << (*resized)[4]
+                          << "x" << (*resized)[5];
     ASSERT_TRUE(device.IsOperational()) << "Promoted Vulkan left operation during the gizmo smoke.";
     ASSERT_TRUE(probe.Done()) << "The gizmo script did not finish: " << exitApp.ExitSummary();
+    ASSERT_TRUE(probe.ReadbackSize > 0u && probe.Readback.IsValid()) << "Readback buffer allocation failed.";
     ASSERT_TRUE(disabled.Taken && enabled.Taken && preview.Taken && undone.Taken)
         << "Missing readback: disabled=" << disabled.Taken << " enabled=" << enabled.Taken
         << " preview=" << preview.Taken << " undo=" << undone.Taken;
