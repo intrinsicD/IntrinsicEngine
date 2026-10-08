@@ -119,6 +119,25 @@ def _default_tests(build_dir: Path) -> list[dict[str, object]]:
     ]
 
 
+def _script_record(
+    build_dir: Path,
+    name: str,
+    script: str = "tools/analysis/compile_hotspots.py",
+    *,
+    disabled: bool = False,
+) -> dict[str, object]:
+    return {
+        "command": [
+            sys.executable,
+            str(REPO_ROOT / script),
+            "--build-dir",
+            str(build_dir),
+        ],
+        "name": name,
+        "properties": _properties(("build", "contract", "runtime"), build_dir, disabled),
+    }
+
+
 def _grouped_record(
     build_dir: Path,
     producer: str,
@@ -307,7 +326,7 @@ class CpuTestSelectionTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, msg=result.stderr)
 
         report = json.loads(output.read_text(encoding="utf-8"))
-        self.assertEqual(report["schema"], "intrinsic.cpu-test-selection/v1")
+        self.assertEqual(report["schema"], "intrinsic.cpu-test-selection/v2")
         self.assertEqual(report["identity"]["preset"], "ci")
         self.assertEqual(report["identity"]["sanitizer"], "none")
         self.assertEqual(
@@ -319,6 +338,7 @@ class CpuTestSelectionTests(unittest.TestCase):
             {
                 "disabled_test_count": 1,
                 "producer_count": 2,
+                "script_test_count": 0,
                 "selected_test_count": 3,
             },
         )
@@ -589,6 +609,86 @@ Alpha.
         result, _output = self._capture(build, "ci", "none", check=False)
         self.assertEqual(result.returncode, 3)
         self.assertIn("does not map to a registered producer", result.stderr)
+
+    def test_capture_records_allowlisted_script_tests_without_build_paths(
+        self,
+    ) -> None:
+        build = self.root / "build"
+        tests = _default_tests(build)
+        tests.append(_script_record(build, "Locality.B", disabled=True))
+        tests.append(_script_record(build, "Locality.A"))
+        _write_build(build, "none", tests=tests)
+        _result, output = self._capture(build, "ci", "none")
+
+        report = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual(
+            report["selection"]["normalized"]["script_tests"],
+            [
+                {
+                    "disabled": False,
+                    "labels": ["build", "contract", "runtime"],
+                    "name": "Locality.A",
+                    "script": "tools/analysis/compile_hotspots.py",
+                },
+                {
+                    "disabled": True,
+                    "labels": ["build", "contract", "runtime"],
+                    "name": "Locality.B",
+                    "script": "tools/analysis/compile_hotspots.py",
+                },
+            ],
+        )
+        self.assertEqual(
+            report["summary"],
+            {
+                "disabled_test_count": 2,
+                "producer_count": 2,
+                "script_test_count": 2,
+                "selected_test_count": 5,
+            },
+        )
+        self.assertNotIn(str(REPO_ROOT), output.read_text(encoding="utf-8"))
+
+    def test_capture_rejects_script_test_outside_the_allowlist(self) -> None:
+        build = self.root / "build"
+        tests = _default_tests(build)
+        tests.append(
+            _script_record(build, "Other.Script", "tools/ci/cpu_test_selection.py")
+        )
+        _write_build(build, "none", tests=tests)
+        result, _output = self._capture(build, "ci", "none", check=False)
+        self.assertEqual(result.returncode, 3)
+        self.assertIn(
+            "'Other.Script' does not map to a registered producer", result.stderr
+        )
+
+    def test_compare_rejects_script_test_drift(self) -> None:
+        first_build = self.root / "first"
+        second_build = self.root / "second"
+        _write_build(
+            first_build,
+            "none",
+            tests=[*_default_tests(first_build), _script_record(first_build, "L.A")],
+        )
+        _write_build(
+            second_build,
+            "asan",
+            tests=[*_default_tests(second_build), _script_record(second_build, "L.B")],
+        )
+        _result, first = self._capture(first_build, "ci", "none")
+        _result, second = self._capture(second_build, "ci-asan", "asan")
+        result = self._run(
+            "compare",
+            "--report",
+            str(first),
+            "--report",
+            str(second),
+            "--output",
+            str(self.root / "parity.json"),
+        )
+        self.assertEqual(result.returncode, 3)
+        self.assertIn("missing_script_tests=['L.A']", result.stderr)
+        self.assertIn("extra_script_tests=['L.B']", result.stderr)
 
     def test_compare_rejects_exact_case_drift(self) -> None:
         first_build = self.root / "first"

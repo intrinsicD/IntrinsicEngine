@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Mapping, Sequence
 
 
-REPORT_SCHEMA = "intrinsic.cpu-test-selection/v1"
+REPORT_SCHEMA = "intrinsic.cpu-test-selection/v2"
 PARITY_SCHEMA = "intrinsic.cpu-test-selection-parity/v1"
 AGGREGATE = "IntrinsicCpuTests"
 EXCLUDED_LABELS = ("flaky-quarantine", "gpu", "slow", "vulkan")
@@ -28,6 +28,10 @@ MODE_IDENTITIES = {
     "undefined": "ubsan",
     "address,undefined": "asan-ubsan",
 }
+REPO_ROOT = Path(__file__).resolve().parents[2]
+# Repository scripts that CTest runs directly instead of a registered test
+# binary (build-graph contracts); selected as script tests, not producer cases.
+SCRIPT_TESTS = ("tools/analysis/compile_hotspots.py",)
 _GTEST_SUITE_RE = re.compile(r"^(?P<suite>\S+)\.\s*(?:#.*)?$")
 _GTEST_COMMENT_RE = re.compile(r"\s+#.*$")
 ExecutionContext = tuple[Path, tuple[tuple[str, str], ...]]
@@ -373,6 +377,17 @@ def _producer_for_command(
     return next(iter(matches), None)
 
 
+def script_for_command(command: Sequence[str]) -> str | None:
+    """Return the allowlisted script a CTest command runs as `python3 <script>`."""
+    if len(command) < 2 or not Path(command[0]).name.startswith("python"):
+        return None
+    script = _argument_path(command[1])
+    for relative in SCRIPT_TESTS:
+        if script == Path(os.path.realpath(REPO_ROOT / relative)):
+            return relative
+    return None
+
+
 def _parse_gtest_listing(output: str, producer: str) -> tuple[str, ...]:
     suite: str | None = None
     cases: list[str] = []
@@ -564,6 +579,7 @@ def _capture(
     document = _ctest_document(build_dir)
     seen_names: set[str] = set()
     selected_tests: list[dict[str, object]] = []
+    script_tests: list[dict[str, object]] = []
     producer_case_counts = Counter[str]()
     representations: dict[str, set[str]] = {}
     discovered_cases: dict[str, dict[str, bool]] = {}
@@ -602,9 +618,20 @@ def _capture(
         if command is None:
             raise SelectionError(f"selected CTest test {name!r} has no valid command")
         if producer is None:
-            raise SelectionError(
-                f"selected CTest test {name!r} does not map to a registered producer"
+            script = script_for_command(command)
+            if script is None:
+                raise SelectionError(
+                    f"selected CTest test {name!r} does not map to a registered producer"
+                )
+            script_tests.append(
+                {
+                    "disabled": _disabled(raw_test),
+                    "labels": list(labels),
+                    "name": name,
+                    "script": script,
+                }
             )
+            continue
         if producer not in members:
             raise SelectionError(
                 f"selected CTest test {name!r} maps outside {AGGREGATE}: {producer!r}"
@@ -749,10 +776,12 @@ def _capture(
         }
         for target in members
     ]
+    script_tests.sort(key=lambda record: str(record["name"]))
     normalized = {
         "aggregate": AGGREGATE,
         "excluded_labels": list(EXCLUDED_LABELS),
         "producers": producers,
+        "script_tests": script_tests,
         "tests": selected_tests,
     }
     report: dict[str, object] = {
@@ -769,17 +798,27 @@ def _capture(
             "digest": _digest(normalized),
             "normalized": normalized,
         },
-        "summary": {
-            "disabled_test_count": sum(
-                bool(record["disabled"]) for record in selected_tests
-            ),
-            "producer_count": len(producers),
-            "selected_test_count": len(selected_tests),
-        },
+        "summary": _summary(producers, selected_tests, script_tests),
     }
     if str(build_dir) in _canonical_json(report).decode("ascii"):
         raise SelectionError("normalized CPU selection leaked its absolute build path")
     return report
+
+
+def _summary(
+    producers: Sequence[object],
+    tests: Sequence[Mapping[str, object]],
+    script_tests: Sequence[Mapping[str, object]],
+) -> dict[str, int]:
+    # Logical selected cases: producer cases plus script tests, disabled included.
+    return {
+        "disabled_test_count": sum(
+            bool(record["disabled"]) for record in (*tests, *script_tests)
+        ),
+        "producer_count": len(producers),
+        "script_test_count": len(script_tests),
+        "selected_test_count": len(tests) + len(script_tests),
+    }
 
 
 def _load_report(path: Path) -> dict[str, object]:
@@ -821,12 +860,8 @@ def _load_report(path: Path) -> dict[str, object]:
     digest = selection.get("digest")
     if digest != _digest(normalized):
         raise SelectionError(f"{path}: selection digest does not match normalized data")
-    producers, tests = _validate_normalized(path, normalized)
-    expected_summary = {
-        "disabled_test_count": sum(bool(record["disabled"]) for record in tests),
-        "producer_count": len(producers),
-        "selected_test_count": len(tests),
-    }
+    producers, tests, script_tests = _validate_normalized(path, normalized)
+    expected_summary = _summary(producers, tests, script_tests)
     if summary != expected_summary:
         raise SelectionError(
             f"{path}: summary disagrees with normalized selection: "
@@ -849,9 +884,12 @@ def _validate_labels(path: Path, context: str, value: object) -> tuple[str, ...]
 
 def _validate_normalized(
     path: Path, normalized: Mapping[str, object]
-) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+) -> tuple[
+    list[dict[str, object]], list[dict[str, object]], list[dict[str, object]]
+]:
     if (
-        set(normalized) != {"aggregate", "excluded_labels", "producers", "tests"}
+        set(normalized)
+        != {"aggregate", "excluded_labels", "producers", "script_tests", "tests"}
         or normalized.get("aggregate") != AGGREGATE
         or normalized.get("excluded_labels") != list(EXCLUDED_LABELS)
     ):
@@ -937,7 +975,36 @@ def _validate_normalized(
         raise SelectionError(
             f"{path}: producer selected-test counts disagree with test records"
         )
-    return producers, tests
+
+    raw_script_tests = normalized.get("script_tests")
+    if not isinstance(raw_script_tests, list):
+        raise SelectionError(f"{path}: normalized selection has invalid structure")
+    script_tests: list[dict[str, object]] = []
+    for index, record in enumerate(raw_script_tests):
+        context = f"script test record {index}"
+        if not isinstance(record, dict) or set(record) != {
+            "disabled",
+            "labels",
+            "name",
+            "script",
+        }:
+            raise SelectionError(f"{path}: malformed {context}")
+        name = record.get("name")
+        if (
+            not isinstance(name, str)
+            or not name
+            or record.get("script") not in SCRIPT_TESTS
+            or not isinstance(record.get("disabled"), bool)
+        ):
+            raise SelectionError(f"{path}: invalid {context} identity")
+        labels = _validate_labels(path, context, record.get("labels"))
+        if set(labels).intersection(EXCLUDED_LABELS):
+            raise SelectionError(f"{path}: {context} carries an excluded label")
+        script_tests.append(record)
+    script_names = [str(record["name"]) for record in script_tests]
+    if script_names != sorted(set(script_names)):
+        raise SelectionError(f"{path}: script test records must be sorted and unique")
+    return producers, tests, script_tests
 
 
 def _selection_names(normalized: Mapping[str, object], key: str) -> set[str]:
@@ -1015,11 +1082,21 @@ def _compare(
             _selection_test_identities(normalized)
             - _selection_test_identities(baseline)
         )
+        missing_script_tests = sorted(
+            _selection_names(baseline, "script_tests")
+            - _selection_names(normalized, "script_tests")
+        )
+        extra_script_tests = sorted(
+            _selection_names(normalized, "script_tests")
+            - _selection_names(baseline, "script_tests")
+        )
         raise SelectionError(
             f"report {index} selection differs from report 1: "
             f"missing_producers={missing_producers!r}, "
             f"extra_producers={extra_producers!r}, "
-            f"missing_tests={missing_tests!r}, extra_tests={extra_tests!r}"
+            f"missing_tests={missing_tests!r}, extra_tests={extra_tests!r}, "
+            f"missing_script_tests={missing_script_tests!r}, "
+            f"extra_script_tests={extra_script_tests!r}"
         )
 
     variants = [

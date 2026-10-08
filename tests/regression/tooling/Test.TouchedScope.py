@@ -282,7 +282,21 @@ class TouchedScopeTests(unittest.TestCase):
         )
         self.assertIn("Test.CpuTestSelection.py", selection_text)
         self.assertIn("Test.SanitizerPresets.py", selection_text)
+        self.assertIn("Test.TestTiming.py", selection_text)
         self.assertNotIn("Test.TouchedScope.py", selection_text)
+
+        collector = touched_scope.analyze_change_records(
+            [record("tools/ci/collect_test_timing.py")]
+        )
+        collector_text = "\n".join(
+            command.shell_text()
+            for command in touched_scope.structural_commands(
+                ".",
+                collector["structural_checks"],
+            )
+        )
+        self.assertIn("Test.TestTiming.py", collector_text)
+        self.assertNotIn("Test.TouchedScope.py", collector_text)
 
         timing = touched_scope.analyze_change_records(
             [record("tests/regression/tooling/Test.CiTiming.py")]

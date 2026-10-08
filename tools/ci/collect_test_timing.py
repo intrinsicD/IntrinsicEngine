@@ -207,9 +207,22 @@ def _capture_inventory(
                 f"expected={registered[producer]!r}, actual={labels!r}"
             )
         if producer is None:
-            raise TimingError(
-                f"selected CTest test {name!r} does not map to a registered producer"
+            script = cpu_test_selection.script_for_command(command)
+            if script is None:
+                raise TimingError(
+                    f"selected CTest test {name!r} does not map to a registered producer"
+                )
+            selected.append(
+                {
+                    "disabled": disabled,
+                    "grouped_gtest_xml": None,
+                    "labels": list(labels),
+                    "name": name,
+                    "producer": None,
+                    "script": script,
+                }
             )
+            continue
         if producer not in members:
             raise TimingError(
                 f"selected CTest test {name!r} maps outside "
@@ -250,6 +263,7 @@ def _capture_inventory(
                 "labels": list(labels),
                 "name": name,
                 "producer": producer,
+                "script": None,
             }
         )
         producer_counts[producer] += 1
@@ -609,7 +623,9 @@ def _build_report(
                     "p95": _p95(durations),
                     "samples": durations,
                 },
-                "executable": expected_record["producer"],
+                "executable": (
+                    expected_record["producer"] or expected_record["script"]
+                ),
                 "labels": expected_record["labels"],
                 "name": name,
                 "statuses": statuses,

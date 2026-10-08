@@ -70,7 +70,12 @@ CI helper scripts and workflow validation tools.
   `--gtest_list_tests`, and compares reports without treating representation or
   isolated build-directory paths as selection drift. Pull-request and manual
   `ci-linux-clang` runs require the comparison over artifacts from the
-  unsanitized job and its reusable ASan/UBSan jobs.
+  unsanitized job and its reusable ASan/UBSan jobs. Selected CTest tests that
+  run an allowlisted repository script (`SCRIPT_TESTS`, currently the
+  `tools/analysis/compile_hotspots.py` compilation-locality contracts) have no
+  producer binary; they are recorded as `script_tests` and counted in
+  `selected-test-count`. Any other selected test without a producer blocks.
+  `collect_test_timing.py` times the same script tests with the script as executable.
 - `collect_test_timing.py`: runs repeated canonical `pr-fast`, `cpu`, or
   `cpu-slow` CTest cohorts at an explicit recorded parallelism, reconciles every
   JUnit result against serial PRE_TEST discovery and aggregate inventories,

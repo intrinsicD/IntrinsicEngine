@@ -62,6 +62,7 @@ def _write_build(
     *,
     aggregate: tuple[str, ...] | None = None,
     grouped: bool = False,
+    script: str | None = None,
 ) -> None:
     (build_dir / "bin").mkdir(parents=True)
     inventory = build_dir / "test-inventories"
@@ -110,6 +111,16 @@ def _write_build(
             build_dir, "Slow.Stress", "SlowTests", REGISTERED["SlowTests"]
         ),
     ]
+    if script is not None:
+        # A build-graph contract that CTest runs as `python3 <script>`.
+        tests.append(
+            {
+                "command": [sys.executable, str(REPO_ROOT / script), "--build-dir"],
+                "name": "Locality.Config",
+                "properties": _properties(("build", "contract", "runtime")),
+            }
+        )
+        (build_dir / "script").touch()
     (build_dir / "ctest.json").write_text(
         json.dumps({"kind": "ctestInfo", "tests": tests}),
         encoding="utf-8",
@@ -180,6 +191,8 @@ else:
         ("Alpha.Disabled", "core;unit", "disabled", 0, ""),
         ("Beta.Contract", "contract;runtime", "run", 2000 + sample, "skipped" if sample == 3 else ""),
     ]
+if (build / "script").exists():
+    cases.append(("Locality.Config", "build;contract;runtime", "run", 500 + sample, ""))
 lines = ['<?xml version="1.0" encoding="UTF-8"?>', '<testsuite name="timing">']
 for name, labels, status, micros, outcome in cases:
     lines.append(
@@ -326,6 +339,29 @@ class TestTimingTests(unittest.TestCase):
                 command[command.index("-LE") + 1],
                 "^(flaky-quarantine|gpu|slow|vulkan)$",
             )
+
+    def test_times_allowlisted_script_tests_by_script(self) -> None:
+        build = self.root / "build"
+        output = self.root / "timing"
+        _write_build(build, script="tools/analysis/compile_hotspots.py")
+        result = self._run(build, output, samples=1)
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        report = json.loads((output / "report.json").read_text(encoding="utf-8"))
+        self.assertEqual(report["summary"]["selected_test_count"], 4)
+        cases = {record["name"]: record for record in report["cases"]}
+        self.assertEqual(
+            cases["Locality.Config"]["executable"],
+            "tools/analysis/compile_hotspots.py",
+        )
+        self.assertEqual(cases["Locality.Config"]["statuses"], ["passed"])
+
+        other = self.root / "other-build"
+        _write_build(other, script="tools/ci/collect_test_timing.py")
+        result = self._run(other, self.root / "other-timing", samples=1)
+        self.assertEqual(result.returncode, 3)
+        self.assertIn(
+            "'Locality.Config' does not map to a registered producer", result.stderr
+        )
 
     def test_cpu_slow_selector_anchors_slo_exclusion(self) -> None:
         build = self.root / "build"

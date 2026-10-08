@@ -53,10 +53,12 @@ CI_TOOL_REGRESSION_SCRIPTS: dict[str, tuple[str, ...]] = {
         "Test.WorkflowConcurrency.py",
         "Test.WorkflowRouting.py",
     ),
+    "collect_test_timing.py": ("Test.TestTiming.py",),
     "compare_source_coverage.py": ("Test.SourceCoverage.py",),
     "cpu_test_selection.py": (
         "Test.CpuTestSelection.py",
         "Test.SanitizerPresets.py",
+        "Test.TestTiming.py",
     ),
     "run_source_coverage.py": ("Test.SourceCoverage.py",),
     "source_coverage.py": ("Test.SourceCoverage.py",),

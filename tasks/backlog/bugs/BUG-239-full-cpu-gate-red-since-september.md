@@ -29,16 +29,21 @@ contract_review: CI gate selection and test registration; no catalog contract co
 - Likely cause: `intrinsic_add_module_boundary_test` (`tests/CMakeLists.txt:20`, from `688ec68ca`
   2026-09-15, tests since `8a35af54a` 2026-09-14) registers Python-command CTest tests labelled
   `contract;runtime;build;headless`. `_producer_for_command` maps tests only to registered test
-  binaries, so none of the eight `ProcessingCompilationLocality.*` tests has a producer. Not yet
-  verified which commit first broke `full-cpu` between 2026-09-11 and 2026-09-14.
-- Decision to make: whether these script tests belong to the CPU aggregate (register a producer
-  for them) or to a separate build-graph lane (label them out of the CPU selection), per the
-  CPU selection contract in `docs/agent/contract.md` §Testing and verification protocol.
+  binaries, so none of the 96 compilation-locality script tests has a producer.
+  `ProcessingCompilationLocality.ScalarRidges` (`15a4b6cb7`) also had no `LABELS`.
+- First failure after the last green job: run 34835799762 on `e1cde3fda` (2026-09-14), "Build
+  required CPU cohort": `Test.Graphics.DebugViewSystem.cpp` compared `FrameResourceId` with gtest
+  `==` without an `operator==`. Fixed since; the build step passes on 2026-10-08.
+- Decision (operator, 2026-10-08, after Codex plan review `01a11b90-ec4d-7421-8adb-9933f8c98500`):
+  keep the script tests in the CPU run and record them as their own typed category in the
+  selection and timing reports, not as a pseudo-producer and not behind a new excluded label
+  (`EXCLUDED_LABELS` is replicated policy and would drop them from `full-cpu`).
 
 ## Acceptance criteria
 - [ ] Root cause of the first `full-cpu` failure after 2026-09-11 identified with its run id.
-- [ ] `ProcessingCompilationLocality.*` are either selected through a registered producer or
-      excluded by an explicit, documented lane; no gate weakened.
+- [ ] Script tests from an allowlist (`SCRIPT_TESTS`) are captured as `script_tests` in the CPU
+      selection (schema v2, digest, summary, variant compare) and timed by script; any other
+      producer-less test still blocks; documented in `tools/ci/README.md`; no gate weakened.
 - [ ] `full-cpu` passes on `main`, or every remaining failure has its own BUG task.
 
 ## Verification
