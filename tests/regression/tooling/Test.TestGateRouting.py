@@ -186,12 +186,12 @@ AFFECTED_SHARED_SUITES = {
 AFFECTED_TARGET_CASE_COUNTS = {
     "IntrinsicGraphicsIntegrationCpuTests": 74,
     "IntrinsicGraphicsUnitTests": 20,
-    "IntrinsicRuntimeContractTests": 39,
+    "IntrinsicRuntimeContractTests": 40,
     "IntrinsicRuntimeGpuResultReadbackSmokeTests": 1,
     "IntrinsicRuntimeGraphicsCpuTests": 9,
     "IntrinsicRuntimeIntegrationTests": 90,
 }
-EXPECTED_AFFECTED_CASE_COUNT = 233
+EXPECTED_AFFECTED_CASE_COUNT = 234
 
 AggregatePredicate = Callable[[frozenset[str]], bool]
 

@@ -29,6 +29,11 @@ contract_review: CI trigger, two tooling-test expectations and a default argumen
   - `Test.CheckCompilerHazards.py`: `0f4926355` (2026-10-02) gave
     `JobFailure.hpp` `Finalize(const std::optional<Result>& = std::nullopt)`, the BUG-223 pattern
     the checker forbids.
+- After the hazard fix, `ci-linux-clang` run 37771112179 (`b4e0ca630`) reached the next masked
+  failure: the BUG-106 affected-case baseline in `Test.TestGateRouting` lacked
+  `RuntimeEngineLayering.MinimizedFrameWorkKeepsTheFrameOrderAndExcludesTheFullFrame` (added in
+  `e6d1832b2`, 2026-10-01). Added to the baseline and counts; the live reconcile against
+  `build/ci` passes.
 - `Test.RootHygiene.py` fails only in the local checkout (untracked root entries); it passes on a
   clean worktree and is not part of this bug.
 
