@@ -85,6 +85,10 @@ source's local space. Agents use `preview_registration` and `run_registration`
   determinism, truncation and fast-Gauss bound validity, two-pass fallback, low-rank
   convergence) and `Test.CoherentPointDriftBayesian.cpp` (similarity and deformation
   recovery, clutter, density, subsampling, accelerated parity, fail-closed states).
+- These three files build `IntrinsicGeometryRegistrationSlowTests` (label `slow`): the
+  required CPU gate excludes them and `nightly-deep` runs them. Run them with
+  `cmake --build --preset ci --target IntrinsicGeometryRegistrationSlowTests` and
+  `ctest --test-dir build/ci -L slow -R '^CoherentPointDrift'`.
 - Benchmarks: `geometry.coherent_point_drift.reference.smoke`
   ([manifest](../../../benchmarks/geometry/manifests/coherent_point_drift_reference_smoke.yaml)),
   ground-truth RMS per variant including Bayesian;
