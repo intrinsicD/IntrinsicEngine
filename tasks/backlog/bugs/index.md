@@ -5,6 +5,10 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [BUG-240 — ASan and UBSan CPU jobs have been red since 2026-09-05](BUG-240-sanitizer-cpu-jobs-red-since-september.md):
+  sanitizer jobs run only on PRs/manual dispatch; six timeouts and one ProgressivePoisson panel
+  assertion failure under ASan, one timeout under UBSan.
+
 - [BUG-232 — A failed frame submit loses an accepted position copy](BUG-232-gpuworld-commit-copy-lost-on-failed-submit.md):
   a `CommitOnCopy` preview is erased once its copy is recorded; a submit failure leaves the block
   older than its shadow. Found in RUNTIME-311 review; keep the front lease until the copy ran.
