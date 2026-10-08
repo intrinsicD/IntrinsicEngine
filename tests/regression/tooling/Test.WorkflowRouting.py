@@ -103,6 +103,21 @@ def _run_workflow_step(
     return _run_script(script, env)
 
 
+def _git_rev(rev: str) -> str:
+    return subprocess.run(
+        ["git", "rev-parse", rev],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=True,
+    ).stdout.strip()
+
+
+# Real commits: the push route asks git whether the range is a fast-forward.
+PUSH_AFTER = _git_rev("HEAD")
+PUSH_BEFORE = _git_rev("HEAD~1")
+
+
 def _run_route_step(
     workflow_name: str,
     job_name: str,
@@ -113,8 +128,8 @@ def _run_route_step(
     pr_head: str = "pr-head",
     merge_base: str = "merge-base",
     merge_head: str = "merge-head",
-    push_before: str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    push_after: str = "push-after",
+    push_before: str = PUSH_BEFORE,
+    push_after: str = PUSH_AFTER,
     stub_exit: int = 0,
 ) -> tuple[subprocess.CompletedProcess[str], list[str]]:
     with tempfile.TemporaryDirectory(prefix="intrinsic-ci009-route-") as temp:
@@ -182,6 +197,10 @@ class WorkflowRoutingTests(unittest.TestCase):
                 )
                 self.assertIn("workflow_dispatch", triggers)
 
+    def test_docs_validation_runs_on_every_push_to_main(self) -> None:
+        payload, _ = _load_workflow("ci-docs.yml")
+        self.assertEqual(_triggers(payload)["push"], {"branches": ["main"]})
+
     def test_heavy_workflows_cover_candidate_events_without_path_filters(
         self,
     ) -> None:
@@ -246,7 +265,7 @@ class WorkflowRoutingTests(unittest.TestCase):
             "PUSH_BEFORE_SHA": "${{ github.event.before }}",
             "PUSH_AFTER_SHA": "${{ github.event.after }}",
         }
-        push_refs = (("push", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "push-after"),)
+        push_refs = (("push", PUSH_BEFORE, PUSH_AFTER),)
         for workflow, job, step, script_path in route_steps:
             payload, _ = _load_workflow(workflow)
             route_step = _named_steps(payload["jobs"][job])[step]
@@ -288,6 +307,10 @@ class WorkflowRoutingTests(unittest.TestCase):
                 missing_cases += (
                     ("push", {"push_before": ""}),
                     ("push", {"push_before": "0" * 40}),
+                    (
+                        "push",
+                        {"push_before": PUSH_AFTER, "push_after": PUSH_BEFORE},
+                    ),
                 )
             for event_name, missing in missing_cases:
                 with self.subTest(

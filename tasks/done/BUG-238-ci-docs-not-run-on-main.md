@@ -34,8 +34,10 @@ contract_review: CI trigger, two tooling-test expectations and a default argumen
 
 ## Acceptance criteria
 - [x] `ci-docs` runs on push to `main`; its docs-sync step diffs the pushed range
-      (`github.event.before`..`after`) and fails closed without a valid `before` SHA.
-- [x] The three tooling tests pass; the routing test covers the push route and fails without it.
+      (`github.event.before`..`after`) and fails closed without a valid `before` SHA or when
+      `before` is not an ancestor of `after` (a rewinding force push would otherwise diff empty).
+- [x] The three tooling tests pass; the routing test asserts the push trigger and covers the push
+      route, and each of these checks fails without its workflow change.
 - [x] The eight budgets are applied by CTest (`PROCESSORS` 2 or 3).
 - [x] `Finalize()` keeps its behavior through a forwarding overload; affected runtime suites pass.
 

@@ -93,6 +93,11 @@ jobs:
                 echo "::error::push docs route is missing the before SHA"
                 exit 1
               }
+              # A rewinding force push would diff from the merge base and pass empty.
+              git merge-base --is-ancestor "$PUSH_BEFORE_SHA" "$PUSH_AFTER_SHA" || {
+                echo "::error::push docs route requires before to be an ancestor of after"
+                exit 1
+              }
               base_ref="$PUSH_BEFORE_SHA"
               head_ref="$PUSH_AFTER_SHA"
               ;;
