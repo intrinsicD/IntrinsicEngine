@@ -70,3 +70,11 @@ python3 tools/ci/cpu_test_selection.py --help
   producers / 96 script tests / 5827 logical cases; `CompilationLocality.*` 96/96; full CPU
   `ctest -LE "gpu|vulkan|slow|flaky-quarantine" --parallel 4` 4003/4003 (one GLFW LSan skip);
   compile hotspot baseline gate passed.
+- 2026-10-08 CI run 37781537942 (`e50de0395`): capture passed; "Run full CPU test suite" failed
+  only on `IntrinsicGeometryTests.Grouped (Timeout)` at 120 s (60.5 s locally). The three
+  Coherent Point Drift files took about 35 s of it. Operator decision: they back ara C113-C115,
+  so their fixtures stay; they move unchanged to `IntrinsicGeometryRegistrationSlowTests`
+  (`unit;geometry;slow`), which `nightly-deep` builds and runs with `IntrinsicCpuSlowTests`.
+  Locally: `IntrinsicGeometryTests.Grouped` 21 s, the 38 CPD cases pass under `-L slow`, routing
+  reconciles for `IntrinsicCpuTests` and `IntrinsicCpuSlowTests`, capture passes,
+  `check_ara_claims --strict` OK.

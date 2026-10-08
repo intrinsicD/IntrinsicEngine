@@ -1609,9 +1609,6 @@ set(_geometry_test_files
     Test.DescriptorAnalysis.cpp
     Test.PointCloudKernels.cpp
     Test_Registration.cpp
-    Test.CoherentPointDrift.cpp
-    Test.CoherentPointDriftAccelerated.cpp
-    Test.CoherentPointDriftBayesian.cpp
     Test_PointCloudRobustness.cpp
     Test.PointCloudOutlierRemoval.cpp
     Test.KernelDensity.cpp
@@ -1753,6 +1750,22 @@ intrinsic_test_object_lib(GeometryMethodSlowTestObjs
     SOURCES
         ${_geometry_method_slow_test_sources}
     DEPS ExtrinsicCore IntrinsicProgressivePoissonReference
+)
+
+# BUG-239: the Coherent Point Drift reference cases took about 35 s of the
+# grouped IntrinsicGeometryTests run and pushed it past its CI timeout. Their
+# fixtures back ara C113-C115, so they keep their sizes and run in the slow lane.
+intrinsic_resolve_test_sources(_geometry_registration_slow_test_sources
+    SEARCH_DIRS unit/geometry
+    FILES
+        Test.CoherentPointDrift.cpp
+        Test.CoherentPointDriftAccelerated.cpp
+        Test.CoherentPointDriftBayesian.cpp
+)
+intrinsic_test_object_lib(GeometryRegistrationSlowTestObjs
+    SOURCES
+        ${_geometry_registration_slow_test_sources}
+    DEPS ExtrinsicCore IntrinsicGeometry
 )
 
 # --- Relocated HARDEN-041 wrapper sources: assets/core/ecs/graphics/runtime taxonomy ---
@@ -2421,6 +2434,12 @@ endif()
 intrinsic_test_executable(IntrinsicGeometryMethodSlowTests
     OBJECTS GeometryMethodSlowTestObjs
     LINK_LIBS ExtrinsicCore IntrinsicProgressivePoissonReference
+    LABELS unit geometry slow
+)
+
+intrinsic_test_executable(IntrinsicGeometryRegistrationSlowTests
+    OBJECTS GeometryRegistrationSlowTestObjs
+    LINK_LIBS ExtrinsicCore IntrinsicGeometry
     LABELS unit geometry slow
 )
 
