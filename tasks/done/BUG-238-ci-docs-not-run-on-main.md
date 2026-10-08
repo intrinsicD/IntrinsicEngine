@@ -52,4 +52,16 @@ ctest --test-dir build/ci --output-on-failure --timeout 60 -j8 -R '^(DensityWeig
 ```
 
 ## Completion
-Completed 2026-10-08. Commit: the BUG-238 commit following `8a83bc328`.
+Completed 2026-10-08. Commit: `ea3c467403d0cfbaa68750c2868bd92081498719` (fix) and
+`607f985cd` (review fixes).
+
+## Review
+- 2026-10-08, Claude → Codex (`codex exec`, requested `gpt-6-astra` effort `xhigh`, read-only
+  sandbox), thread `01a11b43-ecbf-78c3-8e63-088f2b6887d9`.
+- Round 1 on `ea3c46740` (sha256 of `git show` starts `c0bb886a45f89517`): "**revise required**",
+  two findings: "[P2] Force pushes can silently skip changes" and "[P2] The original
+  missing-trigger bug remains untested"; "No additional ponytail complexity findings or weakened
+  existing gates." Both fixed in `607f985cd`.
+- Round 2 on `ea3c46740..607f985cd` (diff sha256 starts `87f8714b574c951b`): "**approve** …
+  No remaining correctness or ponytail findings."
+- Recursion protection: instruction-only (other MCP servers were not disabled).
