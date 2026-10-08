@@ -113,6 +113,8 @@ def _run_route_step(
     pr_head: str = "pr-head",
     merge_base: str = "merge-base",
     merge_head: str = "merge-head",
+    push_before: str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    push_after: str = "push-after",
     stub_exit: int = 0,
 ) -> tuple[subprocess.CompletedProcess[str], list[str]]:
     with tempfile.TemporaryDirectory(prefix="intrinsic-ci009-route-") as temp:
@@ -138,6 +140,8 @@ def _run_route_step(
                 "PR_HEAD_SHA": pr_head,
                 "MERGE_GROUP_BASE_SHA": merge_base,
                 "MERGE_GROUP_HEAD_SHA": merge_head,
+                "PUSH_BEFORE_SHA": push_before,
+                "PUSH_AFTER_SHA": push_after,
                 "GITHUB_OUTPUT": str(temp_root / "github-output.txt"),
                 "GITHUB_STEP_SUMMARY": str(temp_root / "summary.md"),
                 "CAPTURE_ARGS": str(captured_args),
@@ -237,11 +241,23 @@ class WorkflowRoutingTests(unittest.TestCase):
             "MERGE_GROUP_BASE_SHA": "${{ github.event.merge_group.base_sha }}",
             "MERGE_GROUP_HEAD_SHA": "${{ github.event.merge_group.head_sha }}",
         }
+        # ci-docs also runs on pushes to main and diffs the pushed range.
+        push_env = {
+            "PUSH_BEFORE_SHA": "${{ github.event.before }}",
+            "PUSH_AFTER_SHA": "${{ github.event.after }}",
+        }
+        push_refs = (("push", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "push-after"),)
         for workflow, job, step, script_path in route_steps:
             payload, _ = _load_workflow(workflow)
             route_step = _named_steps(payload["jobs"][job])[step]
-            self.assertEqual(route_step["env"], expected_env)
-            for event_name, expected_base, expected_head in event_refs:
+            pushes = workflow == "ci-docs.yml"
+            self.assertEqual(
+                route_step["env"],
+                expected_env | push_env if pushes else expected_env,
+            )
+            for event_name, expected_base, expected_head in (
+                event_refs + push_refs if pushes else event_refs
+            ):
                 with self.subTest(workflow=workflow, event=event_name):
                     result, arguments = _run_route_step(
                         workflow,
@@ -264,10 +280,16 @@ class WorkflowRoutingTests(unittest.TestCase):
                         expected_head,
                     )
 
-            for event_name, missing in (
+            missing_cases = (
                 ("pull_request", {"pr_base": "", "pr_head": ""}),
                 ("merge_group", {"merge_base": "", "merge_head": ""}),
-            ):
+            )
+            if pushes:
+                missing_cases += (
+                    ("push", {"push_before": ""}),
+                    ("push", {"push_before": "0" * 40}),
+                )
+            for event_name, missing in missing_cases:
                 with self.subTest(
                     workflow=workflow,
                     event=event_name,

@@ -8,6 +8,12 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-08 — BUG-238 ci-docs on main
+
+Retired [BUG-238](BUG-238-ci-docs-not-run-on-main.md).
+
+- `ci-docs` now runs on pushes to `main` and diffs the pushed range for docs sync. Three of its checks had gone red on `main` unseen and are fixed: eight missing multi-worker `PROCESSORS` budgets, a stale target order in the touched-scope test, and a `= std::nullopt` const-reference default (BUG-223 pattern) replaced by a forwarding overload.
+
 ## 2026-10-08 — BUG-237 enrolled tasks retired without a completion report
 
 Retired [BUG-237](BUG-237-enrolled-tasks-retired-without-completion-report.md).

@@ -91,7 +91,8 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
         // `FinalizeUnpublishedOnMainThread`. A failure the run recorded (a stage
         // that refused to continue) is delivered as it is; otherwise the pending
         // snapshot ends as StaleEntity with the shared wording.
-        void Finalize(const std::optional<Result>& failure = std::nullopt) const
+        void Finalize() const { Finalize(std::nullopt); }
+        void Finalize(const std::optional<Result>& failure) const
         {
             if (failure)
                 Deliver(*failure);

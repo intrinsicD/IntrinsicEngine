@@ -312,7 +312,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         source_budgets = _source_multiworker_budgets()
 
         self.assertEqual(declared, source_budgets)
-        self.assertEqual(len(declared), 80)
+        self.assertEqual(len(declared), 88)
         self.assertEqual(
             {
                 budget: sum(
@@ -320,7 +320,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
                 )
                 for budget in (2, 3, 4, 8)
             },
-            {2: 3, 3: 53, 4: 22, 8: 2},
+            {2: 4, 3: 60, 4: 22, 8: 2},
         )
         self.assertIn(
             "Declared multi-worker test "
