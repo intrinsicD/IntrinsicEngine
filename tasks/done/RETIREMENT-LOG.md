@@ -8,6 +8,13 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-10-08 — BUG-237 enrolled tasks retired without a completion report
+
+Retired [BUG-237](BUG-237-enrolled-tasks-retired-without-completion-report.md).
+
+- Six interactively retired tasks (BUG-160, CORE-010, GEOM-024, METHOD-015, RUNTIME-277, RUNTIME-288) were enrolled as `standard`/`high-risk` but had no completion report; by operator decision they are re-profiled to micro with a skip reason naming BUG-237. `workflow_evidence.py validate` passes again.
+- Recurrence: the docs/task verification route now runs the validator when a task retires, and the task-workflow skill requires the micro switch before retiring without a report.
+
 ## 2026-10-08 — BUG-236 ImGuizmo scale handles in eye-in-axis-plane views
 
 Retired [BUG-236](BUG-236-imguizmo-scale-axis-plane-picking.md).

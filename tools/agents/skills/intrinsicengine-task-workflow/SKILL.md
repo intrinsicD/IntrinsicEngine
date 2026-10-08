@@ -47,6 +47,9 @@ Keep planned work in `tasks/backlog/`, ongoing work in `tasks/active/`, and
 completed notes in `tasks/done/`. Retire with closed acceptance criteria,
 completion date, commit/PR reference, and an append to `tasks/done/RETIREMENT-LOG.md`;
 regenerate `tasks/SESSION-BRIEF.md` after opening, retiring, or re-gating work.
+A task enrolled as `standard` or higher retires only with its completion report;
+interactive work without one switches to the micro profile with an
+`evidence_skip_reason` first. Run `workflow_evidence.py validate --root .` at retirement.
 Do not create a separate root-level planning tree.
 
 When a stop-state is ambiguous, use `references/task-maturity.md` to distinguish

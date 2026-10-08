@@ -38,8 +38,8 @@ contracts: [repo.task-contract-discovery]
 - Ruled out: not caused by the agent-workflow docs change `18e3c5f67`/`7f154fe1a` (same six
   errors on `e0362e4ff`); validator code unchanged since the retirements.
 
-## Decision needed (operator)
-Choose how to clear the six historical errors; each changes the retired records differently:
+## Decision (operator, 2026-10-08): option 1
+Options considered for how to clear the six historical errors; each changes the retired records differently:
 1. Re-profile the six done tasks to `template: micro`, `workflow_profile: micro`,
    `evidence: not_applicable` with a concrete reason (edits retired task front-matter after the
    fact; normally this switch happens before retirement).
@@ -51,8 +51,8 @@ Choose how to clear the six historical errors; each changes the retired records 
    change, keeps the task bytes); not a blanket cut-off date, which could hide later errors.
 
 ## Acceptance criteria
-- [ ] The six errors are cleared by the chosen option; `workflow_evidence.py validate` exits 0.
-- [ ] Recurrence is prevented: retiring an enrolled task runs `workflow_evidence.py validate`
+- [x] The six errors are cleared by the chosen option; `workflow_evidence.py validate` exits 0.
+- [x] Recurrence is prevented: retiring an enrolled task runs `workflow_evidence.py validate`
       (or switches the task to the micro profile with a reason first), stated in
       `docs/agent/prompt/prompt.md` §Verification and the `intrinsicengine-task-workflow` skill.
 
@@ -63,3 +63,11 @@ python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/agents/generate_session_brief.py --check
 python3 tools/agents/sync_skills.py --check
 ```
+
+## Completion
+Completed 2026-10-08. Commit: the BUG-237 retirement commit. The six done tasks carry `template: micro`,
+`workflow_profile: micro`, `evidence: not_applicable` and an `evidence_skip_reason` naming this
+task; their bodies are unchanged. `workflow_evidence.py validate` exits 0 (0 errors, 105
+pre-existing warnings). `docs/agent/prompt/prompt.md` §Verification runs the validator when a
+task retires and states the micro switch; the `intrinsicengine-task-workflow` skill says the same.
+The `ci-docs` push trigger on `main` is unchanged (out of scope).

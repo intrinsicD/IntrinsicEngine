@@ -5,12 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [BUG-237 — Enrolled tasks retired without a completion report fail workflow-evidence validation](BUG-237-enrolled-tasks-retired-without-completion-report.md):
-  six retirements without evidence left `workflow_evidence.py validate` red on `main`; `ci-docs`
-  has no push trigger, so the next PR fails. Needs an operator decision on the historical records.
-
-
-
 - [BUG-232 — A failed frame submit loses an accepted position copy](BUG-232-gpuworld-commit-copy-lost-on-failed-submit.md):
   a `CommitOnCopy` preview is erased once its copy is recorded; a submit failure leaves the block
   older than its shadow. Found in RUNTIME-311 review; keep the front lease until the copy ran.

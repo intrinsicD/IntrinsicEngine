@@ -151,6 +151,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
 python3 tools/agents/generate_session_brief.py --check   # when tasks/ changed
 python3 tools/agents/sync_skills.py --check              # when docs/agent/* changed
+python3 tools/agents/workflow_evidence.py validate --root .  # when a task retires
 ```
 
 Layering-touching changes (in addition to the focused tests):
@@ -159,7 +160,7 @@ python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/check_test_layout.py --root . --strict
 ```
 
-If the task note lists additional or stricter verification commands, run those too — note-level verification supersedes these defaults. `workflow_evidence.py validate` and `experiment_custody.py validate` apply when overnight evidence or custody state is touched.
+If the task note lists additional or stricter verification commands, run those too — note-level verification supersedes these defaults. `workflow_evidence.py validate` and `experiment_custody.py validate` apply when overnight evidence or custody state is touched. Retiring a task enrolled as `standard` or higher needs its completion report; interactive work without one switches the task to the micro profile with an `evidence_skip_reason` before it retires.
 
 Hygiene: preserve noisy output and exit status using [Tool output and waits](#tool-output-and-waits). Do not trust non-default build trees unless their compiler satisfies the C++23 requirement. `Testing/Temporary/LastTestsFailed.log` is historical; current state comes from the CTest run you just executed. Only the labels `gpu|vulkan|slow|flaky-quarantine` are exempt by default policy.
 

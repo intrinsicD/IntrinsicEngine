@@ -2,9 +2,11 @@
 id: GEOM-024
 theme: I
 depends_on: [GEOM-020]
+template: micro
 workflow_schema: 1
-workflow_profile: high-risk
-evidence: required
+workflow_profile: micro
+evidence: not_applicable
+evidence_skip_reason: "Retired interactively without a completion report; re-profiled to micro after retirement under BUG-237 (operator decision 2026-10-08). The task body and its commits are the record."
 owner:
 branch:
 worktree:
