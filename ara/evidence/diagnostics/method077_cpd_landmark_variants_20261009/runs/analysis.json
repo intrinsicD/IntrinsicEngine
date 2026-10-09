@@ -1,0 +1,320 @@
+{
+  "pairs": {
+    "full/1": {
+      "gates": {
+        "exact": false,
+        "determinism": true,
+        "baseline": true,
+        "floor": true,
+        "negative": true,
+        "perturbation": true
+      },
+      "decided": false,
+      "timing_noise": 0.005304912397179888
+    },
+    "full/2": {
+      "gates": {
+        "exact": false,
+        "determinism": true,
+        "baseline": true,
+        "floor": true,
+        "negative": true,
+        "perturbation": true
+      },
+      "decided": false,
+      "timing_noise": 0.007346354337858806
+    },
+    "full/3": {
+      "gates": {
+        "exact": false,
+        "determinism": true,
+        "baseline": true,
+        "floor": true,
+        "negative": true,
+        "perturbation": true
+      },
+      "decided": false,
+      "timing_noise": 0.006425079453502499
+    },
+    "partial/1": {
+      "gates": {
+        "exact": true,
+        "determinism": true,
+        "baseline": true,
+        "floor": true,
+        "negative": true,
+        "perturbation": true
+      },
+      "decided": true,
+      "timing_noise": 0.0068405327287966835
+    },
+    "partial/2": {
+      "gates": {
+        "exact": true,
+        "determinism": true,
+        "baseline": true,
+        "floor": true,
+        "negative": true,
+        "perturbation": true
+      },
+      "decided": true,
+      "timing_noise": 0.0036912457669637092
+    },
+    "partial/3": {
+      "gates": {
+        "exact": true,
+        "determinism": true,
+        "baseline": true,
+        "floor": true,
+        "negative": true,
+        "perturbation": true
+      },
+      "decided": true,
+      "timing_noise": 0.004201625822605801
+    }
+  },
+  "variants": {
+    "points/fixed/random": {
+      "decision": "no ranking",
+      "pairs": [
+        {
+          "pair": "partial/1",
+          "equivalent": true,
+          "seconds_ratio": 0.9998089234158102,
+          "nystrom_iterations": 2,
+          "rms_to_exact": 2.8994233752686318e-06,
+          "max_to_exact": 1.478152679434741e-05
+        },
+        {
+          "pair": "partial/2",
+          "equivalent": true,
+          "seconds_ratio": 0.9995281985649622,
+          "nystrom_iterations": 2,
+          "rms_to_exact": 1.3106295275777172e-06,
+          "max_to_exact": 8.808309365319086e-06
+        },
+        {
+          "pair": "partial/3",
+          "equivalent": true,
+          "seconds_ratio": 1.0304860534517308,
+          "nystrom_iterations": 1,
+          "rms_to_exact": 5.124914563666795e-07,
+          "max_to_exact": 2.780331771427541e-06
+        }
+      ]
+    },
+    "points/resampled/random": {
+      "decision": "no ranking",
+      "pairs": [
+        {
+          "pair": "partial/1",
+          "equivalent": true,
+          "seconds_ratio": 0.9999316313098097,
+          "nystrom_iterations": 2,
+          "rms_to_exact": 2.415416620516929e-06,
+          "max_to_exact": 1.1035322874373639e-05
+        },
+        {
+          "pair": "partial/2",
+          "equivalent": true,
+          "seconds_ratio": 0.9990357252414047,
+          "nystrom_iterations": 2,
+          "rms_to_exact": 2.694917473269257e-06,
+          "max_to_exact": 1.7265490569411917e-05
+        },
+        {
+          "pair": "partial/3",
+          "equivalent": true,
+          "seconds_ratio": 1.000397408533715,
+          "nystrom_iterations": 2,
+          "rms_to_exact": 6.940541018670942e-07,
+          "max_to_exact": 3.180122771036679e-06
+        }
+      ]
+    },
+    "box/mixed/random": {
+      "decision": "no ranking",
+      "pairs": [
+        {
+          "pair": "partial/1",
+          "equivalent": true,
+          "seconds_ratio": 1.0608609029398,
+          "nystrom_iterations": 0,
+          "rms_to_exact": 0,
+          "max_to_exact": 0
+        },
+        {
+          "pair": "partial/2",
+          "equivalent": true,
+          "seconds_ratio": 1.032706009872966,
+          "nystrom_iterations": 1,
+          "rms_to_exact": 8.66175007074372e-05,
+          "max_to_exact": 0.0003359272166100149
+        },
+        {
+          "pair": "partial/3",
+          "equivalent": true,
+          "seconds_ratio": 1.0329679823138112,
+          "nystrom_iterations": 1,
+          "rms_to_exact": 0.00042304073497412243,
+          "max_to_exact": 0.0021695433832583824
+        }
+      ]
+    },
+    "box/fixed/random": {
+      "decision": "no ranking",
+      "pairs": [
+        {
+          "pair": "partial/1",
+          "equivalent": true,
+          "seconds_ratio": 1.061317913860575,
+          "nystrom_iterations": 0,
+          "rms_to_exact": 0,
+          "max_to_exact": 0
+        },
+        {
+          "pair": "partial/2",
+          "equivalent": true,
+          "seconds_ratio": 1.0316282799359517,
+          "nystrom_iterations": 1,
+          "rms_to_exact": 8.66175007074372e-05,
+          "max_to_exact": 0.0003359272166100149
+        },
+        {
+          "pair": "partial/3",
+          "equivalent": true,
+          "seconds_ratio": 1.0318205511651073,
+          "nystrom_iterations": 1,
+          "rms_to_exact": 0.00042304073497412243,
+          "max_to_exact": 0.0021695433832583824
+        }
+      ]
+    },
+    "box/resampled/random": {
+      "decision": "no ranking",
+      "pairs": [
+        {
+          "pair": "partial/1",
+          "equivalent": true,
+          "seconds_ratio": 1.0610802814742875,
+          "nystrom_iterations": 0,
+          "rms_to_exact": 0,
+          "max_to_exact": 0
+        },
+        {
+          "pair": "partial/2",
+          "equivalent": true,
+          "seconds_ratio": 1.0332018930354876,
+          "nystrom_iterations": 1,
+          "rms_to_exact": 8.66175007074372e-05,
+          "max_to_exact": 0.0003359272166100149
+        },
+        {
+          "pair": "partial/3",
+          "equivalent": true,
+          "seconds_ratio": 1.0299144994926488,
+          "nystrom_iterations": 1,
+          "rms_to_exact": 0.00042304073497412243,
+          "max_to_exact": 0.0021695433832583824
+        }
+      ]
+    },
+    "box/mixed/halton": {
+      "decision": "no ranking",
+      "pairs": [
+        {
+          "pair": "partial/1",
+          "equivalent": true,
+          "seconds_ratio": 1.0607729512010746,
+          "nystrom_iterations": 0,
+          "rms_to_exact": 0,
+          "max_to_exact": 0
+        },
+        {
+          "pair": "partial/2",
+          "equivalent": true,
+          "seconds_ratio": 1.0312230052082103,
+          "nystrom_iterations": 1,
+          "rms_to_exact": 0.00021867452481537004,
+          "max_to_exact": 0.001109906865823676
+        },
+        {
+          "pair": "partial/3",
+          "equivalent": true,
+          "seconds_ratio": 1.031553883582968,
+          "nystrom_iterations": 1,
+          "rms_to_exact": 0.0003961353566378349,
+          "max_to_exact": 0.0016729034948881946
+        }
+      ]
+    },
+    "box/fixed/halton": {
+      "decision": "no ranking",
+      "pairs": [
+        {
+          "pair": "partial/1",
+          "equivalent": true,
+          "seconds_ratio": 1.0621694115716593,
+          "nystrom_iterations": 0,
+          "rms_to_exact": 0,
+          "max_to_exact": 0
+        },
+        {
+          "pair": "partial/2",
+          "equivalent": true,
+          "seconds_ratio": 1.0306280291953989,
+          "nystrom_iterations": 1,
+          "rms_to_exact": 0.00021867452481537004,
+          "max_to_exact": 0.001109906865823676
+        },
+        {
+          "pair": "partial/3",
+          "equivalent": true,
+          "seconds_ratio": 1.0321807720416916,
+          "nystrom_iterations": 1,
+          "rms_to_exact": 0.0003961353566378349,
+          "max_to_exact": 0.0016729034948881946
+        }
+      ]
+    },
+    "box/resampled/halton": {
+      "decision": "no ranking",
+      "pairs": [
+        {
+          "pair": "partial/1",
+          "equivalent": true,
+          "seconds_ratio": 1.0649967647873144,
+          "nystrom_iterations": 0,
+          "rms_to_exact": 0,
+          "max_to_exact": 0
+        },
+        {
+          "pair": "partial/2",
+          "equivalent": true,
+          "seconds_ratio": 1.0320266165582692,
+          "nystrom_iterations": 1,
+          "rms_to_exact": 0.00021867452481537004,
+          "max_to_exact": 0.001109906865823676
+        },
+        {
+          "pair": "partial/3",
+          "equivalent": true,
+          "seconds_ratio": 1.0300930292405663,
+          "nystrom_iterations": 1,
+          "rms_to_exact": 0.0003961353566378349,
+          "max_to_exact": 0.0016729034948881946
+        }
+      ]
+    }
+  },
+  "predictions": {
+    "P1": null,
+    "P2": true,
+    "P3": null,
+    "P4": true,
+    "P5": true,
+    "P6": true,
+    "P7": true
+  },
+  "ranking": false
+}

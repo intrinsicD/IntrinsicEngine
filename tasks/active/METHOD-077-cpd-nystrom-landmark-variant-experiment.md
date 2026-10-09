@@ -19,10 +19,10 @@ contract_review: benchmark runner and experiment only; no engine surface or cata
   decision) while staying equivalent to the exact E-step.
 
 ## Acceptance criteria
-- [ ] Full-tier pre-flight packet (Layer A, Layer B, manifest) committed; two independent
+- [x] Full-tier pre-flight packet (Layer A, Layer B, manifest) committed; two independent
       reviews (Claude, Codex) PASS on the same digest.
-- [ ] Run plan executed by `tools/benchmark/cpd_landmark_variants.py`; raw outputs kept.
-- [ ] Referee audit from raw outputs: decision per variant, predictions P1-P7, controls.
+- [x] Run plan executed by `tools/benchmark/cpd_landmark_variants.py`; raw outputs kept.
+- [x] Referee audit from raw outputs: decision per variant, predictions P1-P7, controls.
 
 ## Verification
 ```bash
@@ -59,3 +59,9 @@ python3 tools/agents/check_task_policy.py --root . --strict
   not evaluable unless all nine variants are measured; the analysis needs `--runner`, compares
   every record with HEAD and that runner's sha256 and refuses missing planned cells;
   `max_to_exact` in the analysis rows; wording.
+- 2026-10-09 third delta round on digest `7bb6c425…4e3f` (commit `74a198c0e`): Codex "PASS",
+  Claude "PASS". Start gate: live manifest digest equal, tree clean.
+- 2026-10-10 run: 138/138 cells completed (21:56-00:48). Frozen analysis: no ranking; the exact
+  gate fails on all `full` pairs (exact `rms_to_truth` about 0.157 > 0.02; scale 1.011 vs 1.1);
+  Nystroem engages in 0-6 of 150 iterations. Surprise: the remaining plan is void. Audit in
+  `ara/evidence/diagnostics/method077_cpd_landmark_variants_20261009/audit.md`.
