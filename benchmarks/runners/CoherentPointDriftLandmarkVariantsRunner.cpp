@@ -148,6 +148,9 @@ int main(int argc, char** argv)
     params.Threads = std::uint32_t(std::stoul(get("--threads", "16")));
     params.NystromLandmarks = std::uint32_t(std::stoul(get("--landmarks", "256")));
     params.NystromErrorLimit = std::stod(get("--error-limit", "0.001"));
+    // Landmark draws follow the fixture seed (box streams and Halton shifts, resampled seeds);
+    // farthest point ignores the seed, so G's landmarks and point landmarks stay as they were.
+    params.LandmarkSampling.Seed = seed;
     if (!ParseVariant(variant, params))
     {
         std::cerr << "unknown variant " << variant << "\n";

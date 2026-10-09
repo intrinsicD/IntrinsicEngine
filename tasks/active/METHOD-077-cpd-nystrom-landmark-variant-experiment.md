@@ -26,7 +26,8 @@ contract_review: benchmark runner and experiment only; no engine surface or cata
 
 ## Verification
 ```bash
-python3 tools/benchmark/cpd_landmark_variants.py --runner build/ci-release/bin/IntrinsicCoherentPointDriftLandmarkVariants --out /tmp/plan --positions /tmp/plan --plan
+python3 tools/benchmark/cpd_landmark_variants.py --runner build/ci-release/bin/IntrinsicCoherentPointDriftLandmarkVariants --out /tmp/plan --plan
+python3 tests/regression/tooling/Test.CpdLandmarkVariantsAnalysis.py
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
 
@@ -34,3 +35,12 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - 2026-10-09 technical test (not evidence): the runner completes `exact` and a Nystroem variant
   at 10^4 and 10^5 points; about 106 s and 88 s at 10^5, peak about 394 MB; every run reaches the
   150-iteration cap.
+- 2026-10-09 pre-flight round 1 on digest `de8b3cc3…fa56` (Codex thread
+  `01a121ef-db33-7601-9b89-5051a6b9d62a`, Claude session `656249ac-d122-4bb0-9113-4e6974f66001`;
+  an earlier Codex attempt on `345d6fc0…` was blocked by its own approval check before reading
+  and the Claude reconstruction of that digest drove the first hardening): both "REVISE". Operator
+  decisions recorded in Layer B item 4. Revision: wall time with two passes (reverse order,
+  pinned to one CPU per core) as the decision metric, perturbation control, landmark seed =
+  fixture seed, gates and decision rule implemented in the frozen `--analyze` with its test
+  (mutation-checked: noise condition, determinism gate), resume bound to commit, runner and size,
+  lock file, accurate descriptions of `exact`, the controls and the kernel counter.

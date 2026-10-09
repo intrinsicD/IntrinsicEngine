@@ -1,21 +1,22 @@
 # METHOD-077 pre-flight — Layer A (what runs)
 
 ## Code
-- Baseline for the variants: commit `90214f4a5` (METHOD-076: selectable Nystroem landmarks).
-- Run commit: the commit that adds this packet, the runner
+- Library baseline: commit `90214f4a5` (METHOD-076: selectable Nystroem landmarks); no library
+  file differs from it in the run commit.
+- Run commit: the commit that adds this revision of the packet; it contains the runner
   `benchmarks/runners/CoherentPointDriftLandmarkVariantsRunner.cpp` (target
-  `IntrinsicCoherentPointDriftLandmarkVariants`, `benchmarks/CMakeLists.txt`) and the driver
-  `tools/benchmark/cpd_landmark_variants.py`. No library code differs from `90214f4a5`.
+  `IntrinsicCoherentPointDriftLandmarkVariants`, `benchmarks/CMakeLists.txt`), the driver and
+  frozen analysis `tools/benchmark/cpd_landmark_variants.py`, and its test
+  `tests/regression/tooling/Test.CpdLandmarkVariantsAnalysis.py`.
 - Code under measurement: `src/geometry/Geometry.Registration.CoherentPointDrift.{cppm,cpp}`,
   `src/geometry/Geometry.Registration.CoherentPointDrift.EStep.{cppm,cpp}` (`BuildLandmarks`,
   `UnionBoxPoints`, `NystromRows`, the Nystroem driver in `Evaluator::Evaluate`),
   `src/geometry/Geometry.PointSampling*.cpp` (landmark orders).
-- Metric code: the runner (`rms_to_truth`, `rms_to_exact`, `max_to_exact`, trace counters).
 
 ## Environment
-AMD Ryzen 9 7950X (16 cores, 32 threads), 62 GiB RAM, Ubuntu clang 23.0.0, preset `ci-release`
-(Release). One run at a time, 16 solver threads. Peak memory at 10^5 points: about 394 MB
-(technical test, `/usr/bin/time`).
+AMD Ryzen 9 7950X (16 cores, 32 threads; logical CPUs 0-15 are one per core), 62 GiB RAM,
+Ubuntu clang 23.0.0, preset `ci-release` (Release). One cell at a time, pinned with
+`taskset -c 0-15`, 16 solver threads. Peak memory at 10^5 points about 394 MB (technical test).
 
 ## Build
 ```bash
@@ -31,62 +32,77 @@ Built in, no files: `--points 100000`, fixture seeds 1, 2, 3.
   normalize(1, 2, 0.5), translation (0.3, -0.2, 0.1).
 - Target `full`: truth + N(0, 0.004^2) per coordinate; every 20th point replaced by uniform
   clutter in [-1.6, 1.6]^3 (5000 points); 10^5 targets.
-- Target `partial`: as `full`, keeping only clutter points and points whose truth has x < 0.2
-  (47355 targets at seed 1).
+- Target `partial`: the same draws, keeping only clutter points and points whose truth has
+  x < 0.2 (47355 targets at seed 1); a subset of `full`.
 - Raw data looked at (`--dump 3`, seed 1, both fixtures): counts and the first and last three
   source, truth and target points.
 
 ## Configuration (every cell)
 Bayesian CPD: `OutlierWeight 0.1`, `Beta 1.0`, `Lambda 2.0` (normalized units, `NormalizeInputs`
-default true), `Gamma 1`, `Kappa inf`, `LowRank 100` (landmarks for G: 200, farthest point,
-fixed), `MaxIterations 150`, default tolerance, `Threads 16`. E-step `Auto` for `exact`;
-`Nystrom` otherwise with `NystromLandmarks 256`, `NystromErrorLimit 1e-3`, landmark method
-farthest point, seed 0, and the cell's source / schedule / pattern (for point sources the
-`random` pattern field is unused). Floor control: `points/mixed/random` with
-`NystromErrorLimit 1e-300` (never accepted; every iteration takes the exact fallback, which is
-`Auto` without fast Gauss). Negative control: `points/mixed/random` with `NystromLandmarks 2`,
-`NystromErrorLimit 1e300` (only non-positive sums reject; a rejection doubles the landmarks).
+true), `Gamma 1`, `Kappa inf`, posterior-variance terms off, `LowRank 100` (200 farthest-point
+landmarks for G, identical in every cell), `MaxIterations 150`, tolerance 1e-5, `Threads 16`,
+landmark seed = fixture seed (`LandmarkSampling.Seed`; farthest point ignores it, so G and point
+landmarks do not change with it; box streams, Halton shifts and resampled seeds do).
+- `exact`: E-step `Auto`, which picks truncated (row error <= 1e-6), fast Gauss (<= 1e-6) or dense
+  per iteration; the mix is not recorded.
+- Variants: E-step `Nystrom`, `NystromLandmarks 256`, `NystromErrorLimit 1e-3`, farthest point,
+  and the cell's source / schedule / pattern (for point sources the pattern field is unused;
+  `points/resampled` shifts the farthest-point start index with the draw). Each iteration starts
+  at the last landmark count that passed (at least 256) and doubles on rejection while all
+  attempts stay below half the dense cost (effective cap 1024 on `full`, 512 on `partial`); a
+  rejected iteration runs exactly (`Auto` without fast Gauss), and Nystroem is not tried again at
+  or below that sigma^2.
+- `perturbation_control`: `points/mixed/random` with `NystromErrorLimit 1e-5`.
+- `floor_control`: `points/mixed/random` with `NystromErrorLimit 1e-300` (an attempt passes only
+  at a sampled error of exactly 0, so practically every iteration takes the exact fallback).
+- `negative_control`: `points/mixed/random` with `NystromLandmarks 2`, `NystromErrorLimit 1e300`
+  (only non-positive sums reject; a rejection doubles the landmarks).
 
-## Run plan (78 cells, enforced by the driver)
+## Run plan (138 cells, enforced by the driver)
 For fixture in (full, partial), seed in (1, 2, 3), in this order:
-1. `exact` (writes the reference positions),
-2. the 9 variants `points/{mixed,fixed,resampled}/random`,
-   `box/{mixed,fixed,resampled}/{random,halton}`,
-3. `points/mixed/random#repeat` (same command again),
-4. `floor_control`,
-5. `negative_control`.
+1. `exact` (writes the reference),
+2. pass 1: the 9 variants `points/{mixed,fixed,resampled}/random`,
+   `box/{mixed,fixed,resampled}/{random,halton}` and `perturbation_control`, each `@1`,
+3. `floor_control`, `negative_control`,
+4. pass 2: the same 10 timed arms in reverse order, each `@2`.
 
-Timeout 600 s per cell (technical test: about 90-110 s per cell at 10^5). The exact cell deletes
-any old reference first; only a successful, complete exact run writes
-`runs/references/<fixture>_<seed>.bin` (exactly 10^5 double3), whose sha256 is recorded; the
-other cells of the pair run only when that recorded reference exists with that digest, otherwise
-they are recorded as unevaluated without running. Each cell writes its own JSON
-(`runs/cells/`), which must name the cell's fixture, seed, variant, landmarks and error limit.
-Every record carries the git commit and the runner's sha256. Records are appended to
-`runs/results.jsonl`; recorded cells are skipped on restart; nothing is overwritten. A timeout
-records the cell as unevaluated. Estimated total about 2.2 hours. Driver technical test (2000
-points, not evidence): 78 cells completed; with every exact cell failing, 6 failed and 72
-unevaluated without running.
+Timeout 600 s per cell (technical test: about 90-110 s per cell at 10^5; estimated total about
+4-4.5 hours). The exact cell deletes any old reference first; only a successful, complete exact
+run writes `runs/references/<fixture>_<seed>.bin` (exactly 10^5 double3, size checked) and its
+sha256 is recorded; the other cells of the pair run only against that recorded reference,
+otherwise they are recorded as unevaluated without running. Each cell writes its own JSON
+(`runs/cells/`), which must name the cell's fixture, seed, points, threads, variant, landmarks
+and error limit. Every record carries the git commit, the runner's sha256 and the point count;
+a restart refuses records of another commit, runner or size and skips recorded cells; a lock
+file prevents two drivers. A timeout records the cell as unevaluated. Records are appended to
+`runs/results.jsonl`; nothing is overwritten. Exit 0 when every cell completed, else 1.
+
+Driver technical test (2000 points, not evidence): 138 cells completed; with every exact cell
+failing (earlier driver revision), all dependent cells unevaluated without running; a restart
+with another point count and an unknown `--only` cell are refused.
 
 ## Commands
 ```bash
 python3 tools/benchmark/cpd_landmark_variants.py \
   --runner build/ci-release/bin/IntrinsicCoherentPointDriftLandmarkVariants \
   --out ara/evidence/diagnostics/method077_cpd_landmark_variants_20261009/runs
+python3 tools/benchmark/cpd_landmark_variants.py \
+  --out ara/evidence/diagnostics/method077_cpd_landmark_variants_20261009/runs --analyze
 ```
-Plan listing: the same command with `--plan`.
+Plan listing: the first command with `--plan`. Analysis test:
+`python3 tests/regression/tooling/Test.CpdLandmarkVariantsAnalysis.py`.
 
 ## Outputs per cell (JSON)
-`status`, `termination`, `iterations`, `nystrom_iterations` (iterations whose E-step was
-Nystroem), `max_sampled_error`, `kernel_evaluations` (`CPD::Result::KernelEvaluations`),
-`seconds` (wall clock of `CPD::Register`, fixture construction excluded), `sigma2`, `scale`,
-`backend`, `rms_to_truth` (RMS over all source points of |T(y_i) - truth_i|, world units; null
-for an incomplete result), `rms_to_exact` and `max_to_exact` (RMS / max over all source points of
-the distance to the same fixture and seed's `exact` result, world units; null when no comparison
-was possible, with `reference_error`). `kernel_evaluations` counts kernel terms of every E-step
-attempt including rejected Nystroem attempts; it excludes landmark selection, the landmark
-eigendecompositions and the G setup. Runner exit codes: 0 complete, 1 incomplete result,
-2 usage, 3 no comparison possible.
+`status`, `termination`, `iterations`, `nystrom_iterations` (completed iterations whose E-step
+was Nystroem; the final convergence-check E-step is not counted), `max_sampled_error`,
+`kernel_evaluations` (`CPD::Result::KernelEvaluations`: kernel terms of the E-steps; a Nystroem
+attempt rejected before its last pass is undercounted, only n L of its terms are added; landmark
+selection, the landmark eigendecompositions of about 2 L^3 and the G setup are not counted),
+`seconds` (wall clock of `CPD::Register`), `sigma2`, `scale`, `backend`, `rms_to_truth` (RMS over
+all source points of |T(y_i) - truth_i|, world units; null for an incomplete result),
+`rms_to_exact` and `max_to_exact` (RMS / max over all source points of the distance to the same
+pair's `exact` result, world units; null with `reference_error` when no comparison was possible).
+Runner exit codes: 0 complete, 1 incomplete result, 2 usage, 3 no comparison possible.
 
 ## Manifest
 ```bash

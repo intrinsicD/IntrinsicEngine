@@ -1,110 +1,120 @@
 # METHOD-077 pre-flight — Layer B (intent)
 
-## Operator questions (verbatim, 2026-10-09)
+## Operator questions and decisions (verbatim, 2026-10-09)
 1. "um P nun schnell zu bestimmen brauchen wir ja K_{YX}. Hier kann man subsampeln und K_{VV}
    nutzen. Hier möchte ich gerne verschiedene varianten testen: fixes subsampling und
    resampling von den vertices/punkten. fixes sampling und resampling aus der union der
    bounding boxes mit random oder strukturiertem sampling."
 2. "Interessant. Kannst du nun die sampling Varianten implementieren?" (done: METHOD-076)
-3. "Ja bitte" — to running the comparison; scope chosen by the operator: synthetic fixtures,
-   10^5 points, Bayesian CPD.
+3. "Ja bitte" — to running the comparison. Scope chosen by the operator (answers to the
+   agent's questions): data "Synthetische Fixtures (Recommended)", size "10^5", CPD variant
+   "Bayesian (BCPD) (Recommended)".
+4. Decisions after the first reviews (answers to the agent's questions): cost metric
+   "Wandzeit, wiederholt (Recommended)" (wall time, every timed cell run twice; kernel counts only
+   explain); equivalence "RMS ≤ 1e-3 (Recommended)" (distance to the exact run, plus a
+   perturbation control); gates "Paar ohne Entscheidung (Recommended)" (a failed control removes
+   its pair from the decision; more than 2 of 6 such pairs: no ranking).
 
-No goal file exists in the repository. This run answers question 1 for the chosen scope; it is
-the shortest path because the variants exist (METHOD-076) and the runner reuses the library
-path the editor uses.
+No goal file exists in the repository (searched by name and content). This run answers
+question 1 for the chosen scope; it is the shortest path because the variants exist
+(METHOD-076) and the runner is a thin wrapper over the library module the editor operation uses.
+`box/mixed` is the third box schedule: the boxes follow the current source while the draw stays
+the same, the box analogue of the default point scheme.
 
 ## Question
 For Bayesian CPD at 10^5 points, which Nystroem landmark variant (points or bounding-box union;
-mixed, fixed or resampled; random or Halton boxes) computes P (via K_YV K_VV^+ K_VX) with the
-fewest kernel evaluations while the registration stays equivalent to the exact E-step?
+mixed, fixed or resampled; random or Halton boxes) registers fastest (wall time) while the
+result stays equivalent to the exact E-step?
 
 ## Hypothesis
 Landmarks on the data (points) approximate the kernel on a 2-D surface far better than
 landmarks spread through the boxes' volume, so box variants pass the sampled-error limit in
-fewer iterations and save less work. Fixing or redrawing point landmarks matters little.
+fewer iterations and save less time. Fixing or redrawing point landmarks matters little.
 
 ## Metrics (per cell; units)
-- Cost: `kernel_evaluations` (count; deterministic, primary) and `seconds` (wall clock,
-  secondary).
-- Equivalence to exact: `rms_to_exact` (world units; the fixture spans about 2.6 units, target
-  noise sigma 0.004).
-- Accuracy to ground truth: `rms_to_truth` (world units), reported, not used for the decision.
-- Use of the approximation: `nystrom_iterations` (count of 150).
+- Speed: `seconds` (wall clock), mean of the two passes per arm (decision metric).
+- Equivalence: `rms_to_exact` (world units; the fixture spans about 2.6 units, target noise
+  sigma 0.004).
+- Explanatory only: `nystrom_iterations` (count of up to 150), `kernel_evaluations` (count; see
+  Layer A for what it misses), `rms_to_truth` (world units).
 
-## Decision rule (fixed now)
-Baseline B = `points/mixed/random` (the METHOD-053 default). For each variant V and each of the
-6 (fixture, seed) pairs, V is equivalent if `rms_to_exact(V) <= 1e-3`, and cheaper if
-`kernel_evaluations(V) <= 0.9 * kernel_evaluations(B)`.
-- V beats B: cheaper and equivalent in all 6 pairs.
-- V is worse than B: in at least 4 of 6 pairs either not equivalent or more expensive than B by
-  more than 10 %.
-- Otherwise: no decision for V.
-Smallest decision-relevant effect: 10 % fewer kernel evaluations at equivalence (kernel
-evaluations dominate runtime at this size). Wall time is reported with the timing noise from the
-repeat cell (|seconds(B) - seconds(B#repeat)| / seconds(B)); a wall-time difference below twice
-that noise is not interpreted.
+## Gates per (fixture, seed) pair (a failed gate: the pair gives no decision)
+- exact: completed; on `full` also `rms_to_truth <= 0.02`.
+- determinism: both passes of every timed arm completed with identical iterations,
+  `nystrom_iterations`, `kernel_evaluations`, `rms_to_exact`, `max_to_exact` and `sigma2`.
+- baseline B = `points/mixed/random` (positive control): `nystrom_iterations > 0` and
+  `rms_to_exact <= 1e-3`.
+- floor control: completed, `nystrom_iterations = 0`, `rms_to_exact <= 2e-4` (the exact fallback
+  alone stays well below the equivalence threshold).
+- negative control: completed, `nystrom_iterations > 0`, `rms_to_exact > 1e-3` (the evaluation
+  rejects a poor approximation).
+- perturbation control: completed, `rms_to_exact <= 1e-3` (a tighter approximation of the same
+  scheme is equivalent: path sensitivity alone does not exceed the threshold).
+More than 2 of the 6 pairs undecided: no ranking at all.
 
-## Predictions (written before the run)
-- P1: Every box variant has fewer `nystrom_iterations` than B in every pair, and no box variant
-  beats B.
-- P2: `points/fixed/random` is within 10 % of B in kernel evaluations in every pair and
-  equivalent (rms_to_exact <= 1e-3).
+## Decision rule (fixed now; implemented in `cpd_landmark_variants.py --analyze`)
+Over the k decided pairs, for each variant V other than B:
+- equivalent: V completed and `rms_to_exact(V) <= 1e-3` (a failed or unevaluated V is not
+  equivalent);
+- faster: mean seconds ratio r = s(V) / s(B) <= 0.9 and 1 - r > 2 x noise, where noise is the
+  pair's largest relative spread |s@1 - s@2| / mean over its 10 timed arms;
+- V beats B: equivalent and faster in all k pairs;
+- V is worse than B: not equivalent or r > 1.1 in at least ceil(2k/3) pairs;
+- otherwise: no decision.
+Smallest decision-relevant effect: 10 % less wall time at equivalence, and at least twice the
+measured timing spread.
+
+## Predictions (written before the run; evaluated by the analysis)
+- P1: In every decided pair every box variant has fewer `nystrom_iterations` than B, and no box
+  variant beats B.
+- P2: `points/fixed/random` is within 10 % of B in mean seconds and equivalent in every decided
+  pair.
 - P3: `points/resampled/random` does not beat B.
-- P4: Within the box variants, Halton versus random shows no consistent sign in
-  `kernel_evaluations` across the 6 pairs.
-- P5 (control): the negative control approximates some iterations (`nystrom_iterations > 0`)
-  and has `rms_to_exact` above 1e-3 and at least 10 times the largest `rms_to_exact` of the 9
-  variants, in every pair.
-- P7 (control): the floor control has `nystrom_iterations = 0` and `rms_to_exact <= 1e-4` in every
-  pair (the fallback differs from `exact` only by not choosing fast Gauss).
-- P6 (control): B has `nystrom_iterations > 0` and `rms_to_exact <= 1e-3` in every pair
-  (METHOD-053 measured equivalence for rigid and low-rank nonrigid CPD).
+- P4: Halton versus random within the box variants shows no consistent sign in mean seconds over
+  the decided pairs and schedules.
+- P5: The negative control's `rms_to_exact` is at least 10 times the largest `rms_to_exact` of
+  the 9 variants in every decided pair.
+- P6: B engages (`nystrom_iterations > 0`) and is equivalent in all 6 pairs.
+- P7: The floor control passes its gate in all 6 pairs.
 
 ## What an ineffective method would show
-If landmark choice did not matter, all 9 variants would have equal `nystrom_iterations` and
-kernel evaluations within the repeat noise. If Nystroem never engaged, every variant would show
-`nystrom_iterations = 0` and identical results to `exact` (then the comparison says nothing).
-
-## Kill conditions (stop and report, no ranking)
-- An `exact` cell fails, or `exact` on `full` has `rms_to_truth > 0.02` (the registration itself
-  is broken).
-- B has `nystrom_iterations = 0` in every pair (P6 fails: the setting does not exercise the
-  approximation).
-- The negative control is equivalent (`rms_to_exact <= 1e-3`) or never approximates
-  (`nystrom_iterations = 0`) in any pair: the evaluation is not shown to reject a poor
-  approximation.
-- The floor control has `rms_to_exact > 2e-4` in any pair: the 1e-3 equivalence threshold is not
-  separated from the difference the exact fallback alone causes.
-- A `#repeat` cell differs from its baseline in any count or distance (determinism broken).
+If landmark choice did not matter, all 9 variants would have equal `nystrom_iterations` and mean
+seconds within the timing spread. If Nystroem never engaged, every variant would show
+`nystrom_iterations = 0`; B's gate then fails in every pair and there is no ranking.
 
 ## Controls
-- Null arm: `exact` (exact E-step choice, `Auto`); reference for `rms_to_exact`.
-- Floor control: Nystroem never accepted; measures the difference the exact fallback alone
-  makes (it cannot choose fast Gauss, `exact` can).
-- Negative control: 2 landmarks, no error rejection; shows that `rms_to_exact` rejects a poor
-  approximation (valid only if it approximates some iterations).
-- Positive control: B, whose equivalence METHOD-053 measured on other CPD variants.
-- Timing repeat: B run twice.
+- Null arm: `exact` (reference for `rms_to_exact`; tolerance-bounded `Auto`, not dense).
+- Floor control: the exact fallback without fast Gauss.
+- Perturbation control: B with a 100 times tighter error limit.
+- Negative control: 2 starting landmarks, no error rejection (it may still double on
+  non-positive sums; its gate requires that it approximated some iterations).
+- Positive control: B.
+- Timing: every timed arm twice, pass 2 in reverse order.
 
 ## Replication
-Unit: (fixture, seed) pair, 6 pairs; arms are paired (same data, same configuration except
-the landmark variant; landmark seeds identical). Landmark draws are deterministic, so a repeat
-reproduces every count bitwise; only wall time varies. Six pairs over two overlap regimes are
-enough for the all-pairs / 4-of-6 rule; no p-values are computed.
+Unit: (fixture, seed) pair, 6 pairs over two overlap regimes; arms are paired (same data, same
+configuration except the variant). The landmark seed follows the fixture seed, so the box draws
+and Halton shifts differ between pairs. Counts and distances repeat bitwise; only wall time
+varies (two samples per arm). The all-pairs / two-thirds rule needs no p-values.
 
 ## What this run cannot distinguish (stated limits)
-- Landmark quality versus acceptance dynamics: the landmark count used per iteration (start at
-  the last passing count, doubling under the cost cap, no retry below a rejected sigma^2) is not
-  recorded; `nystrom_iterations` and kernel evaluations show the combined effect.
+- Landmark quality versus acceptance dynamics: the landmark count per iteration (start at the
+  last passing count, doubling to 1024 on `full` and 512 on `partial`, no retry at or below a
+  rejected sigma^2) is not recorded; `nystrom_iterations` and the times show the combined effect.
 - The clutter cube sets the target box, so box landmarks are partly placed by the clutter; 8 of
-  the 32 sampled target rows of the acceptance check are clutter points in `full`.
-- For point sources `points/resampled` redraws farthest point by shifting the start index with
-  the draw; it is not a random redraw.
-- Wall time: one sample per cell, threads not pinned (16 of 32 hardware threads), fixed cell
-  order; the repeat gives one timing pair per block. Kernel evaluations are the decision metric.
-- One size, one landmark start count (256), one error limit (1e-3), one deformation.
+  the 32 sampled target rows of the acceptance check are clutter points in `full`; PX moments are
+  not checked by the acceptance test.
+- `points/resampled` redraws farthest point by shifting its start index, not randomly.
+- `exact` is tolerance-bounded `Auto`; a non-zero floor cannot be split into fast Gauss and other
+  path effects.
+- `kernel_evaluations` undercounts early-rejected attempts and excludes the L^3
+  eigendecompositions; it explains, it does not decide.
+- One size, one start landmark count (256), one error limit (1e-3), one deformation, one surface,
+  one host.
 
 ## Analysis
-One table per fixture: per variant, the 3 seeds' `nystrom_iterations`, `kernel_evaluations`
-relative to B, `rms_to_exact`, `rms_to_truth`, `seconds`; then the decision per variant and the
-predictions P1-P6 as passed or failed. Unevaluated cells are listed and count as no decision.
+`cpd_landmark_variants.py --analyze` writes `analysis.json`: per pair the gates, whether it is
+decided and its timing noise; per variant the decision and per pair `equivalent`, the seconds
+ratio, `nystrom_iterations` and `rms_to_exact`; predictions P1-P7. The referee audit recomputes
+these from `results.jsonl` and the cell JSONs, and reports `rms_to_truth` and kernel counts
+beside them. Unevaluated or failed cells are listed.
