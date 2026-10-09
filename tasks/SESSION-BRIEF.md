@@ -12,6 +12,7 @@ picking backlog work; theme priorities and rationale live in
 - `GRAPHICS-153` — GPU methods reuse resident buffers; CPU<->GPU IO only at start and end (tasks/active/GRAPHICS-153-gpu-buffer-reuse-and-minimal-io.md)
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
 - `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)
+- `METHOD-077` — Compare the Nystroem landmark variants for Bayesian CPD (tasks/active/METHOD-077-cpd-nystrom-landmark-variant-experiment.md)
 - `RUNTIME-274` — Point-cloud subsampling editor workflow (tasks/active/RUNTIME-274-point-cloud-subsampling-workflow.md)
 - `RUNTIME-294` — Migrate every GPU method to the property residency (tasks/active/RUNTIME-294-migrate-gpu-methods-to-property-residency.md)
 - `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/active/UI-037-linear-domain-action-readiness-tooltips.md)

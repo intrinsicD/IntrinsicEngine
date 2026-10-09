@@ -361,6 +361,15 @@ target_compile_options(IntrinsicCoherentPointDriftScaling PRIVATE ${INTRINSIC_CO
 target_link_options(IntrinsicCoherentPointDriftScaling PRIVATE ${INTRINSIC_LINK_FLAGS})
 target_link_libraries(IntrinsicCoherentPointDriftScaling PRIVATE ExtrinsicCore IntrinsicGeometry)
 
+# METHOD-077 opt-in Nystroem landmark-variant runs of Bayesian CPD (one run per call; driven by
+# tools/benchmark/cpd_landmark_variants.py); run on a Release build.
+add_executable(IntrinsicCoherentPointDriftLandmarkVariants runners/CoherentPointDriftLandmarkVariantsRunner.cpp)
+set_target_properties(IntrinsicCoherentPointDriftLandmarkVariants PROPERTIES CXX_SCAN_FOR_MODULES ON)
+target_compile_features(IntrinsicCoherentPointDriftLandmarkVariants PRIVATE cxx_std_23)
+target_compile_options(IntrinsicCoherentPointDriftLandmarkVariants PRIVATE ${INTRINSIC_COMPILE_FLAGS})
+target_link_options(IntrinsicCoherentPointDriftLandmarkVariants PRIVATE ${INTRINSIC_LINK_FLAGS})
+target_link_libraries(IntrinsicCoherentPointDriftLandmarkVariants PRIVATE ExtrinsicCore IntrinsicGeometry)
+
 # GEOM-113 opt-in comparison of every Geometry.PointSampling method; run on a Release build.
 add_executable(IntrinsicPointSamplingComparison runners/PointSamplingComparisonRunner.cpp)
 set_target_properties(IntrinsicPointSamplingComparison PROPERTIES CXX_SCAN_FOR_MODULES ON)
