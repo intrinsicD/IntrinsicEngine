@@ -115,6 +115,10 @@ export namespace Geometry::CoherentPointDrift
         // relative error; iterations above it run exactly (truncated or dense).
         std::uint32_t NystromLandmarks{256u};
         double NystromErrorLimit{1.0e-3};
+        // Nystrom landmark variant (METHOD-076; see EStep::NystromLandmarkSchedule).
+        EStep::NystromLandmarkSource NystromSource{EStep::NystromLandmarkSource::Points};
+        EStep::NystromLandmarkSchedule NystromSchedule{EStep::NystromLandmarkSchedule::Mixed};
+        EStep::NystromBoxPattern NystromPattern{EStep::NystromBoxPattern::Random};
         // Nonrigid/Bayesian: 0 solves with the full Gram matrix; k > 0 uses its k leading eigenpairs.
         std::uint32_t LowRank{0u};
         // Bayesian: OutlierWeight is omega, Beta and Lambda the kernel width and deformation

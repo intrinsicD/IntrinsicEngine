@@ -463,6 +463,66 @@ TEST(CoherentPointDriftOperations, NystromEStepReportsItsBackendAndSampledError)
     EXPECT_NEAR(s.Registry.Raw().get<T::Component>(source).Position.x, 0.1f, 1e-3f);
 }
 
+// METHOD-076: the landmark variant is part of the section and reaches the solver: the same run
+// with box landmarks reports a different sampled error than with point landmarks.
+TEST(CoherentPointDriftOperations, NystromLandmarkVariantRoundTripsAndReachesTheSolver)
+{
+    R::CoherentPointDriftConfig roundTrip{};
+    roundTrip.NystromSource = R::CoherentPointDriftNystromSource::BoundingBox;
+    roundTrip.NystromSchedule = R::CoherentPointDriftNystromSchedule::Resampled;
+    roundTrip.NystromBoxPattern = R::CoherentPointDriftNystromBoxPattern::Halton;
+    const auto decoded = R::DecodeCoherentPointDriftConfig(R::SerializeCoherentPointDriftConfig(roundTrip));
+    ASSERT_TRUE(decoded.has_value());
+    EXPECT_EQ(decoded->NystromSource, R::CoherentPointDriftNystromSource::BoundingBox);
+    EXPECT_EQ(decoded->NystromSchedule, R::CoherentPointDriftNystromSchedule::Resampled);
+    EXPECT_EQ(decoded->NystromBoxPattern, R::CoherentPointDriftNystromBoxPattern::Halton);
+    const auto registration = R::MakeCoherentPointDriftConfigSectionRegistration();
+    EXPECT_FALSE(registration.Validate(R"({"nystrom_landmark_schedule": 3})", {}, "test").Usable());
+
+    Scene s;
+    const auto points = Cloud(1500, 23);
+    std::vector<glm::vec3> moved;
+    const glm::mat3 turn = glm::mat3(glm::rotate(glm::mat4(1.0f), 0.25f, glm::vec3(0.0f, 0.0f, 1.0f)));
+    for (const auto& p : points) moved.push_back(turn * p + glm::vec3(0.1f, -0.05f, 0.0f));
+    const auto source = Make(s.Registry, D::PointCloudPoint, points);
+    const auto target = Make(s.Registry, D::PointCloudPoint, moved);
+    R::CoherentPointDriftConfig fixedOrder;
+    fixedOrder.NystromSchedule = R::CoherentPointDriftNystromSchedule::Resampled;
+    fixedOrder.LandmarkSampling.Method = R::PointSamplingMethod::SampleElimination;
+    EXPECT_FALSE(registration.Validate(R::SerializeCoherentPointDriftConfig(fixedOrder), {}, "test").Usable());
+
+    // Source, schedule and pattern each reach the solver: every variant reports its own sampled error.
+    using Src = R::CoherentPointDriftNystromSource;
+    using Sch = R::CoherentPointDriftNystromSchedule;
+    using Pat = R::CoherentPointDriftNystromBoxPattern;
+    struct Choice { Src Source; Sch Schedule; Pat Pattern; const char* Name; };
+    std::vector<R::EditorCoherentPointDriftResult> results;
+    for (const Choice choice : {Choice{Src::Points, Sch::Mixed, Pat::Random, "cpd_points"},
+                                Choice{Src::BoundingBox, Sch::Mixed, Pat::Random, "cpd_box"},
+                                Choice{Src::BoundingBox, Sch::Resampled, Pat::Random, "cpd_box_resampled"},
+                                Choice{Src::BoundingBox, Sch::Mixed, Pat::Halton, "cpd_box_halton"}})
+    {
+        R::CoherentPointDriftConfig config{.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target),
+                                           .OutlierWeight = 0.0, .EStep = R::CoherentPointDriftEStep::Nystrom,
+                                           .NystromLandmarks = 64};
+        config.Output = O::DisplacementProperty;
+        // Box landmarks miss the default 1e-3 (box Halton even 0.05) in every iteration here (measured).
+        config.NystromErrorLimit = 0.5;
+        config.NystromSource = choice.Source;
+        config.NystromSchedule = choice.Schedule;
+        config.NystromBoxPattern = choice.Pattern;
+        config.DisplacementName = choice.Name;
+        results.push_back(R::ApplyEditorCoherentPointDriftCommand(s.Commands(), config));
+        ASSERT_TRUE(results.back().Succeeded()) << results.back().Message;
+        EXPECT_EQ(results.back().Backend, "cpu_nystrom") << choice.Name;
+    }
+    // Every variant approximates some iterations (limit 0.5; box Halton missed 0.05 in every
+    // iteration) and reports its own largest sampled error (measured 0.47, 0.42, 0.36, 0.49).
+    for (std::size_t a = 0; a < results.size(); ++a)
+        for (std::size_t b = a + 1; b < results.size(); ++b)
+            EXPECT_NE(results[a].EStepSampledError, results[b].EStepSampledError) << a << " vs " << b;
+}
+
 TEST(CoherentPointDriftOperations, VulkanEStepWithoutADeviceRunsOnTheCpuAndSaysWhy)
 {
     // METHOD-056: without a framed device (synchronous and queued runs alike) every device-bound

@@ -3182,6 +3182,13 @@ namespace Extrinsic::Sandbox::Editor
             {
                 changed |= DrawSpecInputUInt("Landmarks##CPD", fields, "nystrom_landmarks", config.NystromLandmarks,
                                              defaults.NystromLandmarks);
+                changed |= DrawSpecEnumCombo("Landmark source##CPD", fields, "nystrom_landmark_source", config.NystromSource,
+                                             defaults.NystromSource);
+                changed |= DrawSpecEnumCombo("Landmark schedule##CPD", fields, "nystrom_landmark_schedule",
+                                             config.NystromSchedule, defaults.NystromSchedule);
+                if (config.NystromSource == Runtime::CoherentPointDriftNystromSource::BoundingBox)
+                    changed |= DrawSpecEnumCombo("Box pattern##CPD", fields, "nystrom_box_pattern", config.NystromBoxPattern,
+                                                 defaults.NystromBoxPattern);
                 changed |= DrawSpecInputDouble("Error limit##CPD", fields, "nystrom_error_limit", config.NystromErrorLimit,
                                                defaults.NystromErrorLimit, "%.1e");
             }

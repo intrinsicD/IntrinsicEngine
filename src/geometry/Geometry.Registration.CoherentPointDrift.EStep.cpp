@@ -9,6 +9,7 @@ module;
 #include <functional>
 #include <limits>
 #include <memory>
+#include <random>
 #include <span>
 #include <string_view>
 #include <thread>
@@ -60,6 +61,55 @@ namespace Geometry::CoherentPointDrift::EStep
     {
         constexpr std::uint32_t kNone = std::numeric_limits<std::uint32_t>::max();
         constexpr std::size_t kRowGrain = 64;
+
+        // Axis-aligned box (lo, hi) of a non-empty point set, padded by `pad` on every side.
+        std::array<Eigen::Vector3d, 2> PaddedBox(const PointSet points, const double pad)
+        {
+            Eigen::Vector3d lo = Eigen::Vector3d::Constant(std::numeric_limits<double>::infinity()), hi = -lo;
+            for (std::size_t i = 0; i < points.Size(); ++i)
+            {
+                const Eigen::Vector3d p{points.X[i], points.Y[i], points.Z[i]};
+                lo = lo.cwiseMin(p);
+                hi = hi.cwiseMax(p);
+            }
+            return {lo.array() - pad, hi.array() + pad};
+        }
+
+        // METHOD-076: `count` points uniform over the union of two boxes. Each candidate picks a
+        // box with probability proportional to its volume and a point in it, and is dropped with
+        // probability 1/2 when it lies in both boxes, so kept points are uniform over the union.
+        // The candidate stream depends only on the boxes, pattern and seed: a longer request
+        // extends a shorter one by its prefix. Halton uses bases 2, 3, 5, 7, 11 shifted modulo 1
+        // by seeded offsets (Cranley-Patterson). Stops early only after 64 candidates per point.
+        void UnionBoxPoints(const std::array<Eigen::Vector3d, 2>& a, const std::array<Eigen::Vector3d, 2>& b,
+                            const std::size_t count, const NystromBoxPattern pattern, const std::uint64_t seed,
+                            std::vector<double>& x, std::vector<double>& y, std::vector<double>& z)
+        {
+            const double va = (a[1] - a[0]).prod(), vb = (b[1] - b[0]).prod();
+            const auto inside = [](const Eigen::Vector3d& p, const std::array<Eigen::Vector3d, 2>& box) {
+                return (p.array() >= box[0].array()).all() && (p.array() <= box[1].array()).all();
+            };
+            const auto radical = [](std::uint64_t index, const std::uint32_t base) {
+                double result = 0.0, digit = 1.0 / double(base);
+                for (; index > 0u; index /= base, digit /= double(base)) result += double(index % base) * digit;
+                return result;
+            };
+            constexpr std::array<std::uint32_t, 5> kBases{2u, 3u, 5u, 7u, 11u};
+            std::mt19937_64 random(seed);
+            std::uniform_real_distribution<double> unit(0.0, 1.0);
+            std::array<double, 5> shift{};
+            for (double& s : shift) s = unit(random);
+            for (std::uint64_t k = 1u; x.size() < count && k <= 64u * std::uint64_t(count); ++k)
+            {
+                std::array<double, 5> u{};
+                for (std::size_t d = 0; d < u.size(); ++d)
+                    u[d] = pattern == NystromBoxPattern::Halton ? std::fmod(radical(k, kBases[d]) + shift[d], 1.0) : unit(random);
+                const auto& box = u[0] * (va + vb) < va ? a : b;
+                const Eigen::Vector3d p = box[0] + (box[1] - box[0]).cwiseProduct(Eigen::Vector3d(u[1], u[2], u[3]));
+                if (inside(p, a) && inside(p, b) && u[4] >= 0.5) continue;
+                x.push_back(p.x()); y.push_back(p.y()); z.push_back(p.z());
+            }
+        }
 
         // The calling thread's cancellation predicate (CancellationScope).
         thread_local const std::function<bool()>* tCancelled = nullptr;
@@ -683,6 +733,25 @@ namespace Geometry::CoherentPointDrift::EStep
         // landmarks, and the largest sigma^2 whose approximation was rejected (smaller kernels
         // are not retried, since the approximation only degrades as the kernel narrows).
         std::vector<std::uint32_t> TargetLandmarks{}; // progressive order of the fixed target (cached)
+        // METHOD-076 variants: Fixed keeps the first Nystrom iteration's source (for its point order)
+        // or its boxes; NystromDraw counts Evaluate calls that tried Nystrom (Resampled seeds).
+        std::vector<double> FixedSourceX{}, FixedSourceY{}, FixedSourceZ{};
+        std::vector<std::uint32_t> SourceLandmarks{};
+        bool SourceLandmarksExhausted{false};
+        std::array<std::array<Eigen::Vector3d, 2>, 2> Boxes{};
+        bool BoxesFrozen{false};
+        std::uint64_t NystromDraw{0u};
+        std::uint32_t NystromVariant{0u}; // source | schedule << 8 | pattern << 16 of the cached state
+        std::size_t NystromSourceSize{0u}; // source size of the cached state
+
+        void ResetLandmarkVariant()
+        {
+            FixedSourceX.clear(); FixedSourceY.clear(); FixedSourceZ.clear();
+            SourceLandmarks = {};
+            SourceLandmarksExhausted = false;
+            BoxesFrozen = false;
+            NystromDraw = 0u;
+        }
         std::vector<double> LandmarkX{}, LandmarkY{}, LandmarkZ{}, LandmarkZero{};
         double NystromRejectedSigma2{0.0};
         bool TargetLandmarksExhausted{false}; // the target order ended (duplicates) before the request
@@ -1256,31 +1325,105 @@ namespace Geometry::CoherentPointDrift::EStep
         // the result does not depend on the thread count. Returns false when a denominator or
         // P1 entry is not positive, or when the sampled relative error (exact rows: 32 target
         // denominators and 32 source P1 entries) exceeds the limit; `out` is then unspecified.
+        // Extends a cached order by a longer one, keeping the cached identities as the prefix (for
+        // progressive orders the result equals the longer order; sample elimination picks another set
+        // for a larger count).
+        static void ExtendOrder(std::vector<std::uint32_t>& cached, const std::vector<std::uint32_t>& longer)
+        {
+            for (const std::uint32_t i : longer)
+                if (std::find(cached.begin(), cached.end(), i) == cached.end()) cached.push_back(i);
+        }
+
+        // The landmarks of one Nystrom attempt (NystromLandmarkSchedule / Source, METHOD-076).
+        void BuildLandmarks(const PointSet target, const PointSet moved, const std::size_t landmarks, const double sigma2,
+                            const Settings& settings)
+        {
+            const std::size_t n = target.Size(), m = moved.Size();
+            const auto schedule = settings.NystromSchedule;
+            // Another source starts the variant's draws afresh (fixed orders and boxes belong to it).
+            if (m != NystromSourceSize)
+            {
+                ResetLandmarkVariant();
+                NystromSourceSize = m;
+            }
+            LandmarkX.clear(); LandmarkY.clear(); LandmarkZ.clear();
+            if (settings.NystromSource == NystromLandmarkSource::BoundingBox)
+            {
+                if (!BoxesFrozen)
+                {
+                    const double pad = std::sqrt(sigma2);
+                    Boxes = {PaddedBox(target, pad), PaddedBox(moved, pad)};
+                    BoxesFrozen = schedule == NystromLandmarkSchedule::Fixed;
+                }
+                const std::uint64_t seed =
+                    settings.NystromSampling.Seed + (schedule == NystromLandmarkSchedule::Resampled ? NystromDraw : 0u);
+                UnionBoxPoints(Boxes[0], Boxes[1], landmarks, settings.NystromPattern, seed, LandmarkX, LandmarkY, LandmarkZ);
+                return;
+            }
+            const std::size_t half = std::max<std::size_t>(1u, landmarks / 2u);
+            const auto append = [&](const PointSet set, const std::span<const std::uint32_t> order) {
+                for (std::size_t k = 0; k < std::min(half, order.size()); ++k)
+                {
+                    const std::size_t i = order[k];
+                    LandmarkX.push_back(set.X[i]); LandmarkY.push_back(set.Y[i]); LandmarkZ.push_back(set.Z[i]);
+                }
+            };
+            if (schedule == NystromLandmarkSchedule::Resampled)
+            {
+                // Every seed of the sampling methods moves with the draw, and so does the start point.
+                const auto draw = [&](const PointSet set) {
+                    PointSampling::Params params = settings.NystromSampling;
+                    const auto shift = std::uint32_t(NystromDraw);
+                    params.Seed += NystromDraw;
+                    params.FirstIndex = std::uint32_t((std::uint64_t(params.FirstIndex) + NystromDraw) % set.Size());
+                    params.Poisson.GridOriginSeed += shift;
+                    params.Poisson.ShuffleSeed += shift;
+                    params.Poisson.PhaseOrderSeed += shift;
+                    params.GreedySeed += shift;
+                    return SamplePoints(set, half, params);
+                };
+                append(target, draw(target));
+                append(moved, draw(moved));
+                return;
+            }
+            // Mixed and Fixed: progressive orders, a longer request extends the cached target prefix.
+            if (TargetLandmarks.size() < std::min(half, n) && !TargetLandmarksExhausted)
+            {
+                ExtendOrder(TargetLandmarks, SamplePoints(target, half, settings.NystromSampling));
+                TargetLandmarksExhausted = TargetLandmarks.size() < std::min(half, n);
+            }
+            append(target, TargetLandmarks);
+            if (schedule == NystromLandmarkSchedule::Mixed)
+            {
+                append(moved, SamplePoints(moved, half, settings.NystromSampling));
+                return;
+            }
+            // Fixed: identities from the source of the first Nystrom iteration, positions current.
+            if (FixedSourceX.empty())
+            {
+                FixedSourceX.assign(moved.X.begin(), moved.X.end());
+                FixedSourceY.assign(moved.Y.begin(), moved.Y.end());
+                FixedSourceZ.assign(moved.Z.begin(), moved.Z.end());
+                SourceLandmarks = {};
+                SourceLandmarksExhausted = false;
+            }
+            if (SourceLandmarks.size() < std::min(half, m) && !SourceLandmarksExhausted)
+            {
+                ExtendOrder(SourceLandmarks, SamplePoints({FixedSourceX, FixedSourceY, FixedSourceZ}, half, settings.NystromSampling));
+                SourceLandmarksExhausted = SourceLandmarks.size() < std::min(half, m);
+            }
+            append(moved, SourceLandmarks);
+        }
+
         bool NystromRows(const PointSet& moved, const double sigma2, const double logC, const std::size_t landmarks,
-                         const double errorLimit, const PointSampling::Params& sampling, Sums& out,
+                         const double errorLimit, const Settings& settings, Sums& out,
                          const std::uint32_t threads, double& sampledError, std::uint64_t& evaluations)
         {
             const PointSet target = Target();
             const std::size_t n = target.Size(), m = moved.Size();
-            const std::size_t half = std::max<std::size_t>(1u, landmarks / 2u);
-            // Progressive orders: a longer request extends the cached target prefix.
-            if (TargetLandmarks.size() < std::min(half, n) && !TargetLandmarksExhausted)
-            {
-                TargetLandmarks = SamplePoints(target, half, sampling);
-                TargetLandmarksExhausted = TargetLandmarks.size() < std::min(half, n);
-            }
-            const std::vector<std::uint32_t> sourceLandmarks = SamplePoints(moved, half, sampling);
-            LandmarkX.clear(); LandmarkY.clear(); LandmarkZ.clear();
-            for (std::size_t k = 0; k < std::min(half, TargetLandmarks.size()); ++k)
-            {
-                const std::size_t j = TargetLandmarks[k];
-                LandmarkX.push_back(target.X[j]); LandmarkY.push_back(target.Y[j]); LandmarkZ.push_back(target.Z[j]);
-            }
-            for (const std::uint32_t i : sourceLandmarks)
-            {
-                LandmarkX.push_back(moved.X[i]); LandmarkY.push_back(moved.Y[i]); LandmarkZ.push_back(moved.Z[i]);
-            }
+            BuildLandmarks(target, moved, landmarks, sigma2, settings);
             const std::size_t l = LandmarkX.size();
+            if (l == 0u) return false;
             LandmarkZero.assign(l, 0.0);
             const double inverseTwoSigma2 = 0.5 / sigma2;
             const auto kernelRow = [&](const double x, const double y, const double z, double* row)
@@ -1417,6 +1560,11 @@ namespace Geometry::CoherentPointDrift::EStep
     };
 
     Evaluator::Evaluator() : m_Impl(std::make_unique<Impl>()) {}
+
+    PointSet Evaluator::NystromLandmarks() const noexcept
+    {
+        return {m_Impl->LandmarkX, m_Impl->LandmarkY, m_Impl->LandmarkZ};
+    }
     Evaluator::~Evaluator() = default;
     Evaluator::Evaluator(Evaluator&&) noexcept = default;
     Evaluator& Evaluator::operator=(Evaluator&&) noexcept = default;
@@ -1434,6 +1582,7 @@ namespace Geometry::CoherentPointDrift::EStep
         s.HasScales = false;
         s.TargetLandmarks = {};
         s.TargetLandmarksExhausted = false;
+        s.ResetLandmarkVariant();
         s.NystromRejectedSigma2 = 0.0;
         s.NystromLandmarks = 0u;
         static std::atomic<std::uint64_t> generations{0u};
@@ -1480,8 +1629,18 @@ namespace Geometry::CoherentPointDrift::EStep
         }
         if (used == EStepPolicy::Nystrom)
         {
-            if (!(settings.NystromLandmarks >= 2u && std::isfinite(settings.NystromErrorLimit) && settings.NystromErrorLimit > 0.0))
+            if (!(settings.NystromLandmarks >= 2u && std::isfinite(settings.NystromErrorLimit) && settings.NystromErrorLimit > 0.0) ||
+                !ValidNystromVariant(settings.NystromSource, settings.NystromSchedule, settings.NystromPattern,
+                                     settings.NystromSampling.Method))
                 return false;
+            // Another variant (or another source size for Fixed) starts its draws afresh.
+            const std::uint32_t variant = std::uint32_t(settings.NystromSource) | std::uint32_t(settings.NystromSchedule) << 8u |
+                                          std::uint32_t(settings.NystromPattern) << 16u;
+            if (variant != s.NystromVariant)
+            {
+                s.NystromVariant = variant;
+                s.ResetLandmarkVariant();
+            }
             // Landmarks start at the count that last passed (at least the setting) and double while
             // the approximation is rejected, as long as all attempts together stay below half the
             // dense cost: (2M + N) L kernel terms plus the single-threaded landmark
@@ -1499,7 +1658,7 @@ namespace Geometry::CoherentPointDrift::EStep
                 if (spent >= 0.5 * dense) break;
                 std::uint64_t evaluations = 0u;
                 nystrom = s.NystromRows(moved, sigma2, logOutlier, landmarks, settings.NystromErrorLimit,
-                                        settings.NystromSampling, out, threads, sampledError, evaluations);
+                                        settings, out, threads, sampledError, evaluations);
                 nystromEvaluations += evaluations;
                 if (nystrom)
                 {
@@ -1511,7 +1670,9 @@ namespace Geometry::CoherentPointDrift::EStep
                 if (landmarks >= cap) break;
                 count = 2u * landmarks;
             }
-            // Narrower kernels need more landmarks still: do not retry below this sigma^2.
+            ++s.NystromDraw; // one draw per iteration, shared by its doubling attempts
+            // Narrower kernels need more landmarks still: do not retry below this sigma^2 (every
+            // variant, also when a resampled draw might pass).
             if (!nystrom) s.NystromRejectedSigma2 = std::max(s.NystromRejectedSigma2, sigma2);
             if (!nystrom)
             {

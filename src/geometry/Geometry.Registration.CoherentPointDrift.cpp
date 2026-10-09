@@ -226,6 +226,9 @@ namespace Geometry::CoherentPointDrift
                                            .Threads = Config.Threads, .NystromLandmarks = Config.NystromLandmarks,
                                            .NystromErrorLimit = Config.NystromErrorLimit,
                                            .NystromSampling = Config.LandmarkSampling,
+                                           .NystromSource = Config.NystromSource,
+                                           .NystromSchedule = Config.NystromSchedule,
+                                           .NystromPattern = Config.NystromPattern,
                                            .External = Config.EStepExternal};
             if (!Accelerated.Evaluate({Moved.X, Moved.Y, Moved.Z}, Sigma2, LogOutlierConstant(), settings, sums,
                                       SourceLogWeight))
@@ -644,7 +647,9 @@ namespace Geometry::CoherentPointDrift
              !(params.EStepTolerance > 0.0 && params.EStepTolerance < 1.0)) ||
             (params.EStep == EStepPolicy::Nystrom &&
              (params.NystromLandmarks < 2u || params.NystromLandmarks > kMaxNystromLandmarks ||
-              !(params.NystromErrorLimit > 0.0) || !std::isfinite(params.NystromErrorLimit))))
+              !(params.NystromErrorLimit > 0.0) || !std::isfinite(params.NystromErrorLimit) ||
+              !EStep::ValidNystromVariant(params.NystromSource, params.NystromSchedule, params.NystromPattern,
+                                          params.LandmarkSampling.Method))))
             return fail(Status::InvalidParameters);
         const bool deforming = params.Method == Variant::Nonrigid || params.Method == Variant::Bayesian;
         const bool subsampled = params.Method == Variant::Bayesian && params.SubsampleSource > 0u &&

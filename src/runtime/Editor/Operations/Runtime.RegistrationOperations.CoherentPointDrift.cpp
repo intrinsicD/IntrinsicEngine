@@ -71,6 +71,10 @@ namespace Extrinsic::Runtime
     namespace ECSC = ECS::Components;
     namespace GPD = GeometryProcessingDetail;
 
+    static_assert(int(CPD::EStep::NystromLandmarkSource::BoundingBox) == int(CoherentPointDriftNystromSource::BoundingBox) &&
+                  int(CPD::EStep::NystromLandmarkSchedule::Resampled) == int(CoherentPointDriftNystromSchedule::Resampled) &&
+                  int(CPD::EStep::NystromBoxPattern::Halton) == int(CoherentPointDriftNystromBoxPattern::Halton));
+
     struct EditorCoherentPointDriftRun
     {
         CoherentPointDriftConfig Config{};
@@ -286,7 +290,11 @@ namespace Extrinsic::Runtime
                                       .AllowReflection = config.AllowReflection, .Beta = config.Beta, .Lambda = config.Lambda,
                                       .EStep = CPD::EStepPolicy(config.EStep), .EStepTolerance = config.EStepTolerance,
                                       .Threads = config.Threads, .NystromLandmarks = config.NystromLandmarks,
-                                      .NystromErrorLimit = config.NystromErrorLimit, .LowRank = config.LowRank,
+                                      .NystromErrorLimit = config.NystromErrorLimit,
+                                      .NystromSource = CPD::EStep::NystromLandmarkSource(config.NystromSource),
+                                      .NystromSchedule = CPD::EStep::NystromLandmarkSchedule(config.NystromSchedule),
+                                      .NystromPattern = CPD::EStep::NystromBoxPattern(config.NystromBoxPattern),
+                                      .LowRank = config.LowRank,
                                       .Gamma = config.Gamma,
                                       .Kappa = config.Kappa > 0.0 ? config.Kappa : std::numeric_limits<double>::infinity(),
                                       .SubsampleSource = config.Subsample, .SubsampleTarget = config.SubsampleTarget,

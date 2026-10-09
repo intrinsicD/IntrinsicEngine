@@ -103,6 +103,38 @@ export namespace Geometry::CoherentPointDrift::EStep
     // kernel); when they are the majority, the whole iteration runs the CPU dense pass.
     inline constexpr double kExternalErrorLimit = 2.0e-5;
 
+    // Nystrom landmark variants (METHOD-076). Points: half from each set with NystromSampling.
+    // BoundingBox: uniform over the union of the target's and the moved source's axis-aligned
+    // boxes, each padded by sigma (so flat or collinear data still spans a volume).
+    enum class NystromLandmarkSource : std::uint8_t { Points = 0, BoundingBox };
+    // Mixed (METHOD-053): target landmarks drawn once, source landmarks (or the boxes) taken from
+    // the current source every iteration with the same seed. Fixed: drawn once at the first
+    // Nystrom iteration; point landmarks keep their identity and follow their points, box
+    // landmarks keep their coordinates. Resampled: drawn anew every iteration with a new seed.
+    // Each iteration draws once; landmark doubling extends the same draw by its prefix.
+    enum class NystromLandmarkSchedule : std::uint8_t { Mixed = 0, Fixed, Resampled };
+    // Box pattern: uniform random, or a randomly shifted (Cranley-Patterson) Halton sequence.
+    enum class NystromBoxPattern : std::uint8_t { Random = 0, Halton };
+
+    // Whether Resampled point landmarks draw anew with `method`: sample elimination and the
+    // tournament order are fixed by the geometry (seed and start index change at most ties), so
+    // that combination is refused.
+    [[nodiscard]] constexpr bool ResamplesPointLandmarks(const PointSampling::Method method) noexcept
+    {
+        return method != PointSampling::Method::SampleElimination && method != PointSampling::Method::Tournament;
+    }
+
+    // Whether the landmark variant is valid (known enums; Resampled points need a method that redraws).
+    [[nodiscard]] constexpr bool ValidNystromVariant(const NystromLandmarkSource source, const NystromLandmarkSchedule schedule,
+                                                     const NystromBoxPattern pattern,
+                                                     const PointSampling::Method method) noexcept
+    {
+        return source <= NystromLandmarkSource::BoundingBox && schedule <= NystromLandmarkSchedule::Resampled &&
+               pattern <= NystromBoxPattern::Halton &&
+               !(source == NystromLandmarkSource::Points && schedule == NystromLandmarkSchedule::Resampled &&
+                 !ResamplesPointLandmarks(method));
+    }
+
     struct Settings
     {
         EStepPolicy Policy{EStepPolicy::Dense};
@@ -117,8 +149,12 @@ export namespace Geometry::CoherentPointDrift::EStep
         // error of the row denominators and P1 entries.
         std::uint32_t NystromLandmarks{256u};
         double NystromErrorLimit{1.0e-3};
-        // Nystrom: how the landmarks are chosen from each set (default exact farthest point).
+        // Nystrom: how the landmarks are chosen from each set (default exact farthest point), and
+        // the landmark variant; the box seed is NystromSampling.Seed.
         PointSampling::Params NystromSampling{};
+        NystromLandmarkSource NystromSource{NystromLandmarkSource::Points};
+        NystromLandmarkSchedule NystromSchedule{NystromLandmarkSchedule::Mixed};
+        NystromBoxPattern NystromPattern{NystromBoxPattern::Random};
         // Vulkan: the device evaluator (empty: every iteration falls back to the CPU).
         ExternalEvaluator External{};
     };
@@ -181,6 +217,9 @@ export namespace Geometry::CoherentPointDrift::EStep
         // mass went to the outlier term or a value is not finite.
         [[nodiscard]] bool Evaluate(PointSet moved, double sigma2, double logOutlier, const Settings& settings,
                                     Sums& out, std::span<const double> sourceLogWeights = {});
+        // The landmarks of the last accepted or attempted Nystrom evaluation (empty before one);
+        // valid until the next Evaluate or SetTarget (diagnostics and tests).
+        [[nodiscard]] PointSet NystromLandmarks() const noexcept;
 
     private:
         struct Impl;

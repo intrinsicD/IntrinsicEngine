@@ -635,3 +635,337 @@ TEST(CoherentPointDriftAccelerated, InvalidAccelerationSettingsFailClosed)
     EXPECT_FALSE(CPD::EStep::BuildLowRankGaussianKernel(points.View(), 0.0, 5, 1, kernel));
     EXPECT_FALSE(CPD::EStep::BuildLowRankGaussianKernel(points.View(), 1.0, 0, 1, kernel));
 }
+
+// METHOD-076: Nystrom landmark variants (source x schedule x box pattern).
+namespace
+{
+    namespace E = CPD::EStep;
+    using Source = E::NystromLandmarkSource;
+    using Schedule = E::NystromLandmarkSchedule;
+    using Pattern = E::NystromBoxPattern;
+
+    E::Settings Variant(Source source, Schedule schedule, Pattern pattern, std::uint32_t landmarks = 48u)
+    {
+        return {.Policy = CPD::EStepPolicy::Nystrom, .Threads = 2u, .NystromLandmarks = landmarks, .NystromErrorLimit = 1.0,
+                .NystromSource = source, .NystromSchedule = schedule, .NystromPattern = pattern};
+    }
+
+    std::vector<glm::dvec3> Landmarks(const E::Evaluator& evaluator)
+    {
+        const auto l = evaluator.NystromLandmarks();
+        std::vector<glm::dvec3> out;
+        for (std::size_t k = 0; k < l.Size(); ++k) out.push_back({l.X[k], l.Y[k], l.Z[k]});
+        return out;
+    }
+
+    std::vector<glm::vec3> Shifted(std::vector<glm::vec3> points, glm::vec3 offset)
+    {
+        for (auto& p : points) p += offset;
+        return points;
+    }
+
+    bool InPaddedBox(const glm::dvec3& p, const std::vector<glm::vec3>& points, double pad)
+    {
+        glm::dvec3 lo(1e300), hi(-1e300);
+        for (const auto& q : points) { lo = glm::min(lo, glm::dvec3(q)); hi = glm::max(hi, glm::dvec3(q)); }
+        return glm::all(glm::greaterThanEqual(p, lo - pad)) && glm::all(glm::lessThanEqual(p, hi + pad));
+    }
+}
+
+TEST(CoherentPointDriftAccelerated, NystromLandmarkVariantsAreAcceptedAndAccurate)
+{
+    const auto targetPoints = Cloud(1200, 81);
+    const auto movedPoints = Rigid(Cloud(1000, 82), 0.2, {0.1, 0.0, 0.05}, 0.01, 9);
+    const Soa target(targetPoints), moved(movedPoints);
+    E::Evaluator dense;
+    dense.SetTarget(target.View());
+    const double sigma2 = 8.0;
+    E::Sums exact;
+    ASSERT_TRUE(dense.Evaluate(moved.View(), sigma2, std::log(0.05), {.Policy = CPD::EStepPolicy::Dense}, exact));
+    for (const auto source : {Source::Points, Source::BoundingBox})
+        for (const auto schedule : {Schedule::Mixed, Schedule::Fixed, Schedule::Resampled})
+            for (const auto pattern : {Pattern::Random, Pattern::Halton})
+            {
+                if (source == Source::Points && pattern == Pattern::Halton) continue; // points use NystromSampling
+                const std::string name = std::to_string(int(source)) + "/" + std::to_string(int(schedule)) + "/" +
+                                         std::to_string(int(pattern));
+                E::Evaluator nystrom;
+                nystrom.SetTarget(target.View());
+                E::Sums approx;
+                ASSERT_TRUE(nystrom.Evaluate(moved.View(), sigma2, std::log(0.05), Variant(source, schedule, pattern), approx)) << name;
+                ASSERT_EQ(approx.Used, CPD::EStepPolicy::Nystrom) << name;
+                double p1 = 0.0, px = 0.0;
+                for (std::size_t i = 0; i < exact.P1.size(); ++i)
+                {
+                    p1 = std::max(p1, std::abs(exact.P1[i] - approx.P1[i]) / exact.P1[i]);
+                    px = std::max(px, std::abs(exact.PXx[i] - approx.PXx[i]) / exact.P1[i]);
+                }
+                std::printf("variant %s: sampled %.3g, max relative P1 delta %.3g, PX delta %.3g\n", name.c_str(),
+                            approx.SampledError, p1, px);
+                // Predicted <= 1e-4 (points) and <= 1e-3 (box); box Halton measured 1.03e-3 (random 5.3e-4,
+                // points 7.8e-8), so the box bound is 2e-3, and every variant stays within 10x its estimate.
+                EXPECT_LE(p1, source == Source::Points ? 1e-4 : 2e-3) << name;
+                EXPECT_LE(px, source == Source::Points ? 1e-4 : 2e-3) << name;
+                EXPECT_LE(p1, 10.0 * approx.SampledError + 1e-12) << name;
+                const auto landmarks = Landmarks(nystrom);
+                ASSERT_EQ(landmarks.size(), 48u) << name;
+                if (source == Source::BoundingBox)
+                    for (const auto& p : landmarks)
+                        EXPECT_TRUE(InPaddedBox(p, targetPoints, std::sqrt(sigma2)) ||
+                                    InPaddedBox(p, movedPoints, std::sqrt(sigma2))) << name;
+            }
+}
+
+TEST(CoherentPointDriftAccelerated, NystromLandmarkSchedulesFixOrRedrawTheLandmarks)
+{
+    const auto targetPoints = Cloud(1200, 81);
+    const auto first = Rigid(Cloud(1000, 82), 0.2, {0.1, 0.0, 0.05}, 0.01, 9);
+    const glm::vec3 offset{0.05f, -0.02f, 0.01f};
+    const auto second = Shifted(first, offset);
+    const Soa target(targetPoints), a(first), b(second);
+    const auto run = [&](const E::Settings& settings, const Soa& one, const Soa& two) {
+        E::Evaluator evaluator;
+        evaluator.SetTarget(target.View());
+        E::Sums sums;
+        EXPECT_TRUE(evaluator.Evaluate(one.View(), 8.0, std::log(0.05), settings, sums));
+        const auto before = Landmarks(evaluator);
+        EXPECT_TRUE(evaluator.Evaluate(two.View(), 8.0, std::log(0.05), settings, sums));
+        return std::pair{before, Landmarks(evaluator)};
+    };
+    const auto near = [](const glm::dvec3& p, const glm::dvec3& q) { return glm::length(p - q) < 1e-6; };
+    // Points, Fixed: the target half repeats, the source half keeps its identities and moves with them.
+    {
+        const auto [l1, l2] = run(Variant(Source::Points, Schedule::Fixed, Pattern::Random), a, b);
+        ASSERT_EQ(l1.size(), l2.size());
+        for (std::size_t k = 0; k < 24; ++k) EXPECT_TRUE(near(l1[k], l2[k])) << k;
+        for (std::size_t k = 24; k < l1.size(); ++k) EXPECT_TRUE(near(l1[k] + glm::dvec3(offset), l2[k])) << k;
+    }
+    // Points, Mixed: the target half repeats, the source half is drawn on the moved points (here a
+    // rigid shift of farthest points, so the same identities): as for Fixed, and the former code.
+    {
+        const auto [l1, l2] = run(Variant(Source::Points, Schedule::Mixed, Pattern::Random), a, b);
+        for (std::size_t k = 0; k < 24; ++k) EXPECT_TRUE(near(l1[k], l2[k])) << k;
+    }
+    // Points, Resampled: a new draw for the same inputs.
+    {
+        const auto [l1, l2] = run(Variant(Source::Points, Schedule::Resampled, Pattern::Random), a, a);
+        std::size_t same = 0;
+        for (std::size_t k = 0; k < l1.size(); ++k) same += near(l1[k], l2[k]);
+        EXPECT_LT(same, l1.size() / 2) << "resampling repeated the landmarks";
+    }
+    // Box, Fixed: frozen coordinates although the source moved.
+    {
+        const auto [l1, l2] = run(Variant(Source::BoundingBox, Schedule::Fixed, Pattern::Halton), a, b);
+        ASSERT_EQ(l1.size(), l2.size());
+        for (std::size_t k = 0; k < l1.size(); ++k) EXPECT_TRUE(near(l1[k], l2[k])) << k;
+    }
+    // Box, Mixed: the same draw in the current boxes (same inputs: same landmarks; moved: others).
+    {
+        const auto [same1, same2] = run(Variant(Source::BoundingBox, Schedule::Mixed, Pattern::Random), a, a);
+        for (std::size_t k = 0; k < same1.size(); ++k) EXPECT_TRUE(near(same1[k], same2[k])) << k;
+        // Landmarks drawn in the target box stay; those in the moved source box move with it.
+        const auto [l1, l2] = run(Variant(Source::BoundingBox, Schedule::Mixed, Pattern::Random), a, b);
+        std::size_t moved = 0;
+        for (std::size_t k = 0; k < l1.size(); ++k) moved += !near(l1[k], l2[k]);
+        EXPECT_GT(moved, 0u);
+        EXPECT_LT(moved, l1.size());
+    }
+    // Box, Resampled: a new draw for the same inputs; Halton and random differ.
+    for (const auto pattern : {Pattern::Random, Pattern::Halton})
+    {
+        const auto [l1, l2] = run(Variant(Source::BoundingBox, Schedule::Resampled, pattern), a, a);
+        std::size_t same = 0;
+        for (std::size_t k = 0; k < l1.size(); ++k) same += near(l1[k], l2[k]);
+        EXPECT_EQ(same, 0u) << int(pattern);
+    }
+    {
+        const auto [random, unused] = run(Variant(Source::BoundingBox, Schedule::Fixed, Pattern::Random), a, a);
+        const auto [halton, unused2] = run(Variant(Source::BoundingBox, Schedule::Fixed, Pattern::Halton), a, a);
+        EXPECT_FALSE(near(random[0], halton[0]));
+    }
+}
+
+TEST(CoherentPointDriftAccelerated, FixedNystromLandmarksExtendByTheirPrefix)
+{
+    // A larger count after the source moved keeps the first draw's identities (point source) or
+    // coordinates (box source) as its prefix.
+    const auto targetPoints = Cloud(1200, 81);
+    const auto first = Rigid(Cloud(1000, 82), 0.2, {0.1, 0.0, 0.05}, 0.01, 9);
+    const glm::vec3 offset{0.05f, -0.02f, 0.01f};
+    const Soa target(targetPoints), a(first), b(Shifted(Bent(first), offset));
+    for (const auto source : {Source::Points, Source::BoundingBox})
+    {
+        E::Evaluator evaluator;
+        evaluator.SetTarget(target.View());
+        E::Sums sums;
+        ASSERT_TRUE(evaluator.Evaluate(a.View(), 8.0, std::log(0.05), Variant(source, Schedule::Fixed, Pattern::Halton, 16u), sums));
+        const auto small = Landmarks(evaluator);
+        ASSERT_TRUE(evaluator.Evaluate(b.View(), 8.0, std::log(0.05), Variant(source, Schedule::Fixed, Pattern::Halton, 32u), sums));
+        const auto large = Landmarks(evaluator);
+        ASSERT_EQ(large.size(), 32u);
+        if (source == Source::BoundingBox)
+        {
+            for (std::size_t k = 0; k < small.size(); ++k) EXPECT_LT(glm::length(small[k] - large[k]), 1e-12) << k;
+            continue;
+        }
+        // Target halves: 8 then 16, the first 8 equal; source halves: the same identities, now at
+        // their bent and shifted positions.
+        for (std::size_t k = 0; k < 8; ++k) EXPECT_LT(glm::length(small[k] - large[k]), 1e-12) << k;
+        for (std::size_t k = 0; k < 8; ++k)
+        {
+            const glm::dvec3 old = small[8 + k];
+            std::size_t index = 0;
+            for (std::size_t i = 0; i < first.size(); ++i)
+                if (glm::length(glm::dvec3(first[i]) - old) < 1e-9) index = i;
+            const glm::dvec3 expected{b.X[index], b.Y[index], b.Z[index]};
+            EXPECT_LT(glm::length(large[16 + k] - expected), 1e-12) << k;
+        }
+    }
+}
+
+TEST(CoherentPointDriftAccelerated, NystromVariantsAreThreadIndependentAndHandleFlatData)
+{
+    // Flat (z = 0) and collinear inputs still give a volume (boxes padded by sigma); every
+    // variant stays finite, and results do not depend on the thread count.
+    std::vector<glm::vec3> plane = Cloud(1200, 81), line;
+    for (auto& p : plane) p.z = 0.0f;
+    for (int i = 0; i < 1100; ++i) line.push_back({-1.0f + 2.0f * float(i) / 1099.0f, 0.0f, 0.0f});
+    for (const auto* targetPoints : {&plane, &line})
+    {
+        const Soa target(*targetPoints), moved(Shifted(*targetPoints, {0.02f, 0.01f, 0.0f}));
+        for (const auto schedule : {Schedule::Mixed, Schedule::Fixed, Schedule::Resampled})
+        {
+            std::vector<E::Sums> results;
+            for (const std::uint32_t threads : {1u, 4u})
+            {
+                auto settings = Variant(Source::BoundingBox, schedule, Pattern::Halton);
+                settings.Threads = threads;
+                E::Evaluator evaluator;
+                evaluator.SetTarget(target.View());
+                E::Sums sums;
+                ASSERT_TRUE(evaluator.Evaluate(moved.View(), 0.5, std::log(0.05), settings, sums)) << int(schedule);
+                ASSERT_TRUE(evaluator.Evaluate(moved.View(), 0.4, std::log(0.05), settings, sums)) << int(schedule);
+                ASSERT_EQ(sums.Used, CPD::EStepPolicy::Nystrom) << int(schedule);
+                for (const double v : sums.P1) ASSERT_TRUE(std::isfinite(v));
+                // The padded boxes give the flat axes an extent: some landmarks leave z = 0.
+                double spread = 0.0;
+                for (const auto& p : Landmarks(evaluator)) spread = std::max(spread, std::abs(p.z));
+                EXPECT_GT(spread, 0.1) << int(schedule);
+                EXPECT_LE(spread, std::sqrt(0.5) + 1e-12) << int(schedule);
+                results.push_back(sums);
+            }
+            EXPECT_EQ(results[0].P1, results[1].P1) << int(schedule);
+            EXPECT_EQ(results[0].PXx, results[1].PXx) << int(schedule);
+            EXPECT_EQ(results[0].LogDenominatorSum, results[1].LogDenominatorSum) << int(schedule);
+        }
+    }
+}
+
+TEST(CoherentPointDriftAccelerated, InvalidNystromVariantsFailClosed)
+{
+    const auto targetPoints = Cloud(1200, 81);
+    const Soa target(targetPoints), moved(Rigid(Cloud(1000, 82), 0.2, {0.1, 0.0, 0.05}, 0.01, 9));
+    E::Evaluator evaluator;
+    evaluator.SetTarget(target.View());
+    E::Sums sums;
+    for (int which = 0; which < 3; ++which)
+    {
+        auto settings = Variant(Source::Points, Schedule::Mixed, Pattern::Random);
+        if (which == 0) settings.NystromSource = Source(7);
+        if (which == 1) settings.NystromSchedule = Schedule(7);
+        if (which == 2) settings.NystromPattern = Pattern(7);
+        EXPECT_FALSE(evaluator.Evaluate(moved.View(), 8.0, std::log(0.05), settings, sums)) << which;
+        CPD::Params params{.EStep = CPD::EStepPolicy::Nystrom};
+        params.NystromSource = settings.NystromSource;
+        params.NystromSchedule = settings.NystromSchedule;
+        params.NystromPattern = settings.NystromPattern;
+        EXPECT_EQ(CPD::Register(targetPoints, targetPoints, params).State, CPD::Status::InvalidParameters) << which;
+    }
+}
+
+TEST(CoherentPointDriftAccelerated, ResampledPointLandmarksDrawAnewOrAreRefused)
+{
+    namespace PS = Geometry::PointSampling;
+    const auto targetPoints = Cloud(1200, 81);
+    const Soa target(targetPoints), moved(Rigid(Cloud(1000, 82), 0.2, {0.1, 0.0, 0.05}, 0.01, 9));
+    for (const auto method : {PS::Method::Random, PS::Method::FarthestPoint, PS::Method::ProgressivePoisson,
+                              PS::Method::CoupledSieve, PS::Method::FlatGreedy, PS::Method::SampleElimination,
+                              PS::Method::LazyGreedy, PS::Method::Tournament})
+    {
+        auto settings = Variant(Source::Points, Schedule::Resampled, Pattern::Random);
+        settings.NystromSampling.Method = method;
+        E::Evaluator evaluator;
+        evaluator.SetTarget(target.View());
+        E::Sums sums;
+        if (!E::ResamplesPointLandmarks(method))
+        {
+            // Measured: 48 of 48 (sample elimination) and 46 of 48 (tournament) landmarks repeat.
+            EXPECT_FALSE(evaluator.Evaluate(moved.View(), 8.0, std::log(0.05), settings, sums)) << int(method);
+            continue;
+        }
+        ASSERT_TRUE(evaluator.Evaluate(moved.View(), 8.0, std::log(0.05), settings, sums)) << int(method);
+        const auto first = Landmarks(evaluator);
+        ASSERT_TRUE(evaluator.Evaluate(moved.View(), 8.0, std::log(0.05), settings, sums)) << int(method);
+        const auto second = Landmarks(evaluator);
+        std::size_t same = 0;
+        for (std::size_t k = 0; k < std::min(first.size(), second.size()); ++k) same += glm::length(first[k] - second[k]) < 1e-9;
+        EXPECT_LT(same, first.size() / 4) << int(method);
+    }
+}
+
+TEST(CoherentPointDriftAccelerated, FixedPointLandmarksKeepTheirPrefixForEveryMethod)
+{
+    // Sample elimination picks another set for a larger count; the cached identities stay first.
+    namespace PS = Geometry::PointSampling;
+    const auto targetPoints = Cloud(1200, 81);
+    const auto first = Rigid(Cloud(1000, 82), 0.2, {0.1, 0.0, 0.05}, 0.01, 9);
+    const Soa target(targetPoints), a(first), b(Shifted(Bent(first), {0.05f, -0.02f, 0.01f}));
+    for (const auto method : {PS::Method::Random, PS::Method::FarthestPoint, PS::Method::ProgressivePoisson,
+                              PS::Method::CoupledSieve, PS::Method::FlatGreedy, PS::Method::SampleElimination,
+                              PS::Method::LazyGreedy, PS::Method::Tournament})
+    {
+        auto small = Variant(Source::Points, Schedule::Fixed, Pattern::Random, 16u), large = small;
+        large.NystromLandmarks = 32u;
+        small.NystromSampling.Method = large.NystromSampling.Method = method;
+        E::Evaluator evaluator;
+        evaluator.SetTarget(target.View());
+        E::Sums sums;
+        ASSERT_TRUE(evaluator.Evaluate(a.View(), 8.0, std::log(0.05), small, sums)) << int(method);
+        const auto before = Landmarks(evaluator);
+        ASSERT_TRUE(evaluator.Evaluate(b.View(), 8.0, std::log(0.05), large, sums)) << int(method);
+        const auto after = Landmarks(evaluator);
+        ASSERT_EQ(before.size(), 16u) << int(method);
+        ASSERT_EQ(after.size(), 32u) << int(method);
+        for (std::size_t k = 0; k < 8; ++k) EXPECT_LT(glm::length(before[k] - after[k]), 1e-12) << int(method) << " " << k;
+        for (std::size_t k = 0; k < 8; ++k)
+        {
+            std::size_t index = first.size();
+            for (std::size_t i = 0; i < first.size(); ++i)
+                if (glm::length(glm::dvec3(first[i]) - before[8 + k]) < 1e-9) index = i;
+            ASSERT_LT(index, first.size()) << int(method);
+            EXPECT_LT(glm::length(after[16 + k] - glm::dvec3(b.X[index], b.Y[index], b.Z[index])), 1e-12) << int(method) << " " << k;
+        }
+    }
+}
+
+TEST(CoherentPointDriftAccelerated, FixedBoxesFollowANewSource)
+{
+    // A source of another size starts afresh: its frozen boxes are its own, not the last source's.
+    const auto targetPoints = Cloud(1200, 81);
+    const auto far = Shifted(Cloud(900, 83), {20.0f, 0.0f, 0.0f}); // padded boxes do not touch
+    const Soa target(targetPoints), a(Rigid(Cloud(1000, 82), 0.2, {0.1, 0.0, 0.05}, 0.01, 9)), c(far);
+    E::Evaluator evaluator;
+    evaluator.SetTarget(target.View());
+    E::Sums sums;
+    const auto settings = Variant(Source::BoundingBox, Schedule::Fixed, Pattern::Halton);
+    ASSERT_TRUE(evaluator.Evaluate(a.View(), 8.0, std::log(0.05), settings, sums));
+    ASSERT_TRUE(evaluator.Evaluate(c.View(), 8.0, std::log(0.05), settings, sums));
+    std::size_t inNewBox = 0, inOldSourceBox = 0;
+    for (const auto& p : Landmarks(evaluator))
+    {
+        inNewBox += InPaddedBox(p, far, std::sqrt(8.0));
+        inOldSourceBox += !InPaddedBox(p, far, std::sqrt(8.0)) && !InPaddedBox(p, targetPoints, std::sqrt(8.0));
+    }
+    EXPECT_GT(inNewBox, 0u);
+    EXPECT_EQ(inOldSourceBox, 0u);
+}

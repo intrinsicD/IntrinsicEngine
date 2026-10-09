@@ -31,6 +31,10 @@ export namespace Extrinsic::Runtime
     // Vulkan (METHOD-056: dense on the device while wide, truncated on the CPU once narrow; the
     // CPU choice without a framed device). Values match Geometry::CoherentPointDrift::EStepPolicy.
     enum class CoherentPointDriftEStep : std::uint8_t { Reference, Dense, Truncated, Auto, FastGauss, Nystrom, Vulkan };
+    // Nystroem landmark variant (METHOD-076); values match Geometry::CoherentPointDrift::EStep's.
+    enum class CoherentPointDriftNystromSource : std::uint8_t { Points = 0, BoundingBox };
+    enum class CoherentPointDriftNystromSchedule : std::uint8_t { Mixed = 0, Fixed, Resampled };
+    enum class CoherentPointDriftNystromBoxPattern : std::uint8_t { Random = 0, Halton };
 
     inline constexpr std::uint32_t kCoherentPointDriftAutoLowRankPoints = 1024u;
     inline constexpr std::uint32_t kCoherentPointDriftAutoLowRank = 100u;
@@ -61,6 +65,9 @@ export namespace Extrinsic::Runtime
         // Nystrom E-step: landmarks and the largest accepted sampled relative error.
         std::uint32_t NystromLandmarks{256u};
         double NystromErrorLimit{1.0e-3};
+        CoherentPointDriftNystromSource NystromSource{CoherentPointDriftNystromSource::Points};
+        CoherentPointDriftNystromSchedule NystromSchedule{CoherentPointDriftNystromSchedule::Mixed};
+        CoherentPointDriftNystromBoxPattern NystromBoxPattern{CoherentPointDriftNystromBoxPattern::Random};
         std::uint32_t LowRank{0u};  // nonrigid/Bayesian: 0 solves with the full kernel, k > 0 with k eigenpairs
         // With LowRank 0: above kCoherentPointDriftAutoLowRankPoints registered source points use
         // kCoherentPointDriftAutoLowRank eigenpairs, since the full kernel costs O(m^3) per iteration.
