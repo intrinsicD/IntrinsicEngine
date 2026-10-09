@@ -969,3 +969,58 @@ TEST(CoherentPointDriftAccelerated, FixedBoxesFollowANewSource)
     EXPECT_GT(inNewBox, 0u);
     EXPECT_EQ(inOldSourceBox, 0u);
 }
+
+TEST(CoherentPointDriftAccelerated, BoxLandmarksAreUniformOverTheUnionOfTheBoxes)
+{
+    // 100 draws (seeds 0-99, a fresh evaluator each, so no rejection memory repeats a draw) of
+    // 48 landmarks: the shares in A only, B only and A and B match the volume shares of the union
+    // (binomial sd about 0.007 at 4800 samples; tolerance 0.03).
+    const auto targetPoints = Cloud(1200, 81);
+    const auto sourcePoints = Shifted(Cloud(1000, 82), {2.0f, 0.5f, 0.0f});
+    const Soa target(targetPoints), moved(sourcePoints);
+    const double sigma2 = 0.5, pad = std::sqrt(sigma2);
+    const auto box = [&](const std::vector<glm::vec3>& points) {
+        glm::dvec3 lo(1e300), hi(-1e300);
+        for (const auto& q : points) { lo = glm::min(lo, glm::dvec3(q)); hi = glm::max(hi, glm::dvec3(q)); }
+        return std::pair{lo - pad, hi + pad};
+    };
+    const auto [aLo, aHi] = box(targetPoints);
+    const auto [bLo, bHi] = box(sourcePoints);
+    const auto volume = [](glm::dvec3 lo, glm::dvec3 hi) {
+        const glm::dvec3 e = glm::max(hi - lo, glm::dvec3(0.0));
+        return e.x * e.y * e.z;
+    };
+    const double va = volume(aLo, aHi), vb = volume(bLo, bHi), vab = volume(glm::max(aLo, bLo), glm::min(aHi, bHi));
+    const double vu = va + vb - vab;
+    ASSERT_GT(vab, 0.05 * vu) << "the boxes must overlap for this test";
+    const auto inside = [](const glm::dvec3& p, glm::dvec3 lo, glm::dvec3 hi) {
+        return glm::all(glm::greaterThanEqual(p, lo)) && glm::all(glm::lessThanEqual(p, hi));
+    };
+    for (const auto pattern : {Pattern::Random, Pattern::Halton})
+    {
+        double onlyA = 0.0, onlyB = 0.0, both = 0.0, total = 0.0;
+        for (int draw = 0; draw < 100; ++draw)
+        {
+            auto settings = Variant(Source::BoundingBox, Schedule::Mixed, pattern);
+            settings.NystromErrorLimit = 1e300;
+            settings.NystromSampling.Seed = std::uint64_t(draw);
+            E::Evaluator evaluator;
+            evaluator.SetTarget(target.View());
+            E::Sums sums;
+            ASSERT_TRUE(evaluator.Evaluate(moved.View(), sigma2, std::log(0.05), settings, sums)) << draw;
+            for (const auto& p : Landmarks(evaluator))
+            {
+                const bool a = inside(p, aLo, aHi), b = inside(p, bLo, bHi);
+                ASSERT_TRUE(a || b);
+                onlyA += a && !b;
+                onlyB += b && !a;
+                both += a && b;
+                total += 1.0;
+            }
+        }
+        ASSERT_GE(total, 4000.0) << int(pattern);
+        EXPECT_NEAR(onlyA / total, (va - vab) / vu, 0.03) << int(pattern);
+        EXPECT_NEAR(onlyB / total, (vb - vab) / vu, 0.03) << int(pattern);
+        EXPECT_NEAR(both / total, vab / vu, 0.03) << int(pattern);
+    }
+}

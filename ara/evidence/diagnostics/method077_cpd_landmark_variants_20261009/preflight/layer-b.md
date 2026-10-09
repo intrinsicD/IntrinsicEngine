@@ -26,6 +26,16 @@ For Bayesian CPD at 10^5 points, which Nystroem landmark variant (points or boun
 mixed, fixed or resampled; random or Halton boxes) registers fastest (wall time) while the
 result stays equivalent to the exact E-step?
 
+## Configuration choices (not tuned on this data)
+- `Beta 1.0`, `Lambda 2.0`: the values of the repository's Bayesian CPD tests
+  (`Bayesian()` in `tests/unit/geometry/Test.CoherentPointDriftBayesian.cpp`), in normalized
+  units, so the fixture's scale does not change them.
+- `OutlierWeight 0.1`: the clutter share is 5 % (`full`) and about 11 % (`partial`).
+- `LowRank 100`: required above 8192 source points (the full-kernel limit); G is identical in
+  every arm, so the rank cannot favour an arm; its sampled error is reported per cell.
+- `MaxIterations 150`: one budget for every arm; the technical tests reached it, so arms are
+  compared at a fixed iteration budget, and convergence is not required.
+
 ## Hypothesis
 Landmarks on the data (points) approximate the kernel on a 2-D surface far better than
 landmarks spread through the boxes' volume, so box variants pass the sampled-error limit in
@@ -40,16 +50,19 @@ fewer iterations and save less time. Fixing or redrawing point landmarks matters
 
 ## Gates per (fixture, seed) pair (a failed gate: the pair gives no decision)
 - exact: completed; on `full` also `rms_to_truth <= 0.02`.
-- determinism: both passes of every timed arm completed with identical iterations,
-  `nystrom_iterations`, `kernel_evaluations`, `rms_to_exact`, `max_to_exact` and `sigma2`.
+- determinism: both passes of every timed arm have the same recorded outcome, and where both
+  completed, identical iterations, `nystrom_iterations`, `kernel_evaluations`, `rms_to_exact`,
+  `max_to_exact` and `sigma2` (a variant failing in both passes keeps the pair and counts as not
+  equivalent; a one-sided outcome removes the pair).
 - baseline B = `points/mixed/random` (positive control): `nystrom_iterations > 0` and
   `rms_to_exact <= 1e-3`.
 - floor control: completed, `nystrom_iterations = 0`, `rms_to_exact <= 2e-4` (the exact fallback
   alone stays well below the equivalence threshold).
 - negative control: completed, `nystrom_iterations > 0`, `rms_to_exact > 1e-3` (the evaluation
   rejects a poor approximation).
-- perturbation control: completed, `rms_to_exact <= 1e-3` (a tighter approximation of the same
-  scheme is equivalent: path sensitivity alone does not exceed the threshold).
+- perturbation control: completed, `nystrom_iterations > 0` and `rms_to_exact <= 1e-3` (a tighter
+  approximation of the same scheme is equivalent: path sensitivity alone does not exceed the
+  threshold).
 More than 2 of the 6 pairs undecided: no ranking at all.
 
 ## Decision rule (fixed now; implemented in `cpd_landmark_variants.py --analyze`)
@@ -59,12 +72,14 @@ Over the k decided pairs, for each variant V other than B:
 - faster: mean seconds ratio r = s(V) / s(B) <= 0.9 and 1 - r > 2 x noise, where noise is the
   pair's largest relative spread |s@1 - s@2| / mean over its 10 timed arms;
 - V beats B: equivalent and faster in all k pairs;
-- V is worse than B: not equivalent or r > 1.1 in at least ceil(2k/3) pairs;
+- V is worse than B: not equivalent, or r > 1.1 with r - 1 > 2 x noise, in at least ceil(2k/3)
+  pairs;
 - otherwise: no decision.
 Smallest decision-relevant effect: 10 % less wall time at equivalence, and at least twice the
 measured timing spread.
 
-## Predictions (written before the run; evaluated by the analysis)
+## Predictions (written before the run; evaluated by the analysis; "not evaluable" without a
+ranking, a decided pair or anything to compare)
 - P1: In every decided pair every box variant has fewer `nystrom_iterations` than B, and no box
   variant beats B.
 - P2: `points/fixed/random` is within 10 % of B in mean seconds and equivalent in every decided
@@ -78,8 +93,8 @@ measured timing spread.
 - P7: The floor control passes its gate in all 6 pairs.
 
 ## What an ineffective method would show
-If landmark choice did not matter, all 9 variants would have equal `nystrom_iterations` and mean
-seconds within the timing spread. If Nystroem never engaged, every variant would show
+If landmark choice did not matter, all 9 variants would be equivalent with mean seconds within
+twice the timing spread of B (their `nystrom_iterations` may still differ). If Nystroem never engaged, every variant would show
 `nystrom_iterations = 0`; B's gate then fails in every pair and there is no ranking.
 
 ## Controls
@@ -93,8 +108,8 @@ seconds within the timing spread. If Nystroem never engaged, every variant would
 
 ## Replication
 Unit: (fixture, seed) pair, 6 pairs over two overlap regimes; arms are paired (same data, same
-configuration except the variant). The landmark seed follows the fixture seed, so the box draws
-and Halton shifts differ between pairs. Counts and distances repeat bitwise; only wall time
+configuration except the variant). The landmark seed follows the fixture seed, so there are
+three independent box draws and Halton shifts (`full/s` and `partial/s` share seed s). Counts and distances repeat bitwise; only wall time
 varies (two samples per arm). The all-pairs / two-thirds rule needs no p-values.
 
 ## What this run cannot distinguish (stated limits)

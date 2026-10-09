@@ -22,7 +22,7 @@ contract_review: benchmark runner and experiment only; no engine surface or cata
 - [ ] Full-tier pre-flight packet (Layer A, Layer B, manifest) committed; two independent
       reviews (Claude, Codex) PASS on the same digest.
 - [ ] Run plan executed by `tools/benchmark/cpd_landmark_variants.py`; raw outputs kept.
-- [ ] Referee audit from raw outputs: decision per variant, predictions P1-P6, controls.
+- [ ] Referee audit from raw outputs: decision per variant, predictions P1-P7, controls.
 
 ## Verification
 ```bash
@@ -44,3 +44,13 @@ python3 tools/agents/check_task_policy.py --root . --strict
   fixture seed, gates and decision rule implemented in the frozen `--analyze` with its test
   (mutation-checked: noise condition, determinism gate), resume bound to commit, runner and size,
   lock file, accurate descriptions of `exact`, the controls and the kernel counter.
+- 2026-10-09 delta round on digest `b35c9172…af6e`: both "REVISE" (Codex: missing-arm gate,
+  unevaluable predictions counted as passed, analysis provenance, optional pinning, artifact
+  deletion, text; Claude: one-sided outcomes, perturbation engagement, configuration
+  justification, union-distribution test). Fixed: outcome-equality gate, perturbation engagement
+  gate, noise condition for "worse", "not evaluable" predictions, provenance and pinning checks in
+  the analysis, required `taskset`, artifacts moved to `runs/stale/`, analysis versions, kernel
+  rank and error in the runner output, configuration choices in Layer B, a union-uniformity test
+  (a first version counted one draw 100 times through the rejection memory; fixed to independent
+  draws; mutation: dropping the overlap correction fails it). Analysis test: 8 cases, mutations of
+  the outcome gate, perturbation gate and provenance check each fail it.

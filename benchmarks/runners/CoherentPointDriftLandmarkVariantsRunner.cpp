@@ -178,7 +178,8 @@ int main(int argc, char** argv)
          << "\",\"iterations\":" << result.Iterations << ",\"nystrom_iterations\":" << nystromIterations
          << ",\"observed_iterations\":" << iterations << ",\"max_sampled_error\":" << maxSampled
          << ",\"kernel_evaluations\":" << result.KernelEvaluations << ",\"seconds\":" << seconds
-         << ",\"sigma2\":" << result.Sigma2 << ",\"scale\":" << result.Scale << ",\"backend\":\"" << result.Backend << "\"";
+         << ",\"sigma2\":" << result.Sigma2 << ",\"scale\":" << result.Scale << ",\"backend\":\"" << result.Backend << "\""
+         << ",\"kernel_rank\":" << result.KernelRank << ",\"kernel_error\":" << result.KernelApproximationError;
     if (complete)
     {
         double truthSum = 0.0;

@@ -41,16 +41,18 @@ def records(edit=lambda pair, arm, run, r: r):
                     r["seconds"] = r["seconds"] * 1.01  # 1 % timing spread
                 r = edit(pair, arm, run, r)
                 cell = f"{pair}/{arm}" + (f"@{run}" if run else "")
-                out.append({"cell": cell, "outcome": "completed", "result": r})
+                out.append({"cell": cell, "outcome": "completed", "result": r, "commit": "c", "runner_sha256": "r",
+                            "points": TOOL.POINTS, "pinned": True})
     return out
 
 
-def analyze(rows):
+def analyze(rows, expect=0):
     with tempfile.TemporaryDirectory() as directory:
         path = Path(directory)
         (path / "results.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
-        TOOL.analyze(type("Args", (), {"out": str(path)})())
-        return json.loads((path / "analysis.json").read_text())
+        code = TOOL.analyze(type("Args", (), {"out": str(path), "points": TOOL.POINTS})())
+        assert code == expect, code
+        return json.loads((path / "analysis.json").read_text()) if code == 0 else None
 
 
 class Analysis(unittest.TestCase):
@@ -108,7 +110,31 @@ class Analysis(unittest.TestCase):
         self.assertFalse(report["pairs"]["partial/3"]["decided"])
         self.assertTrue(report["ranking"])  # 4 of 6 decided
 
+    def test_one_sided_outcomes_and_idle_perturbation_undecide_their_pairs(self):
+        rows = records(lambda pair, arm, run, r: dict(r, nystrom_iterations=0) if pair == "full/2" and arm == TOOL.PERTURBATION else r)
+        rows = [dict(r, outcome="failed") if r["cell"] == "full/1/box/fixed/halton@2" else r for r in rows]
+        report = analyze(rows)
+        self.assertFalse(report["pairs"]["full/1"]["decided"])  # one pass failed, the other completed
+        self.assertFalse(report["pairs"]["full/2"]["decided"])  # perturbation control never approximated
+        self.assertTrue(report["pairs"]["full/3"]["decided"])
+
+    def test_predictions_without_evidence_are_not_evaluable(self):
+        rows = records(lambda pair, arm, run, r: dict(r, rms_to_exact=5e-3) if arm == TOOL.BASELINE else r)
+        report = analyze(rows)  # the baseline fails its gate everywhere: no ranking
+        self.assertFalse(report["ranking"])
+        for name in ("P1", "P2", "P3", "P4", "P5"):
+            self.assertIsNone(report["predictions"][name], name)
+        self.assertFalse(report["predictions"]["P6"])
+
+    def test_mixed_provenance_is_refused(self):
+        rows = records(lambda pair, arm, run, r: r)
+        rows[5] = dict(rows[5], commit="other")
+        self.assertIsNone(analyze(rows, expect=2))
+        rows = [dict(r, pinned=False) for r in records(lambda pair, arm, run, r: r)]
+        self.assertIsNone(analyze(rows, expect=2))
+
     def test_a_failed_variant_counts_as_not_equivalent(self):
+        # Failed in both passes: the same outcome (deterministic), counted as not equivalent.
         rows = [dict(r, outcome="failed") if r["cell"].split("/", 2)[2].startswith("box/resampled/random") else r
                 for r in records(lambda pair, arm, run, r: r)]
         report = analyze(rows)

@@ -16,7 +16,8 @@
 ## Environment
 AMD Ryzen 9 7950X (16 cores, 32 threads; logical CPUs 0-15 are one per core), 62 GiB RAM,
 Ubuntu clang 23.0.0, preset `ci-release` (Release). One cell at a time, pinned with
-`taskset -c 0-15`, 16 solver threads. Peak memory at 10^5 points about 394 MB (technical test).
+`taskset -c 0-15` (the driver refuses to run without `taskset`), 16 solver threads. The run uses
+this checkout at the frozen commit; nothing is committed while it runs. Peak memory at 10^5 points about 394 MB (technical test).
 
 ## Build
 ```bash
@@ -56,7 +57,9 @@ landmarks do not change with it; box streams, Halton shifts and resampled seeds 
 - `floor_control`: `points/mixed/random` with `NystromErrorLimit 1e-300` (an attempt passes only
   at a sampled error of exactly 0, so practically every iteration takes the exact fallback).
 - `negative_control`: `points/mixed/random` with `NystromLandmarks 2`, `NystromErrorLimit 1e300`
-  (only non-positive sums reject; a rejection doubles the landmarks).
+  (no error rejection; an attempt is still rejected when the landmark eigendecomposition fails,
+  its top eigenvalue is not positive, or a sum is not positive or not finite, and a rejection
+  doubles the landmarks).
 
 ## Run plan (138 cells, enforced by the driver)
 For fixture in (full, partial), seed in (1, 2, 3), in this order:
@@ -75,8 +78,13 @@ otherwise they are recorded as unevaluated without running. Each cell writes its
 and error limit. Every record carries the git commit, the runner's sha256 and the point count;
 a restart refuses records of another commit, runner or size and skips recorded cells; a lock
 file prevents two drivers. A timeout records the cell as unevaluated. Records are appended to
-`runs/results.jsonl`; nothing is overwritten. Exit 0 when every cell completed, else 1.
+`runs/results.jsonl`; an unjournaled cell JSON or reference found before a cell runs is moved to
+`runs/stale/`, never deleted or overwritten. Exit 0 when every cell completed, else 1. The
+analysis refuses records of mixed provenance or unpinned cells and writes `analysis.json`, or
+`analysis.<k>.json` when an earlier analysis exists.
 
+Final-configuration technical test (not evidence; status and time only): `partial`, seed 2,
+`box/resampled/halton` at 10^5 points, pinned: completed, 150 iterations, about 56 s.
 Driver technical test (2000 points, not evidence): 138 cells completed; with every exact cell
 failing (earlier driver revision), all dependent cells unevaluated without running; a restart
 with another point count and an unknown `--only` cell are refused.
@@ -98,7 +106,9 @@ was Nystroem; the final convergence-check E-step is not counted), `max_sampled_e
 `kernel_evaluations` (`CPD::Result::KernelEvaluations`: kernel terms of the E-steps; a Nystroem
 attempt rejected before its last pass is undercounted, only n L of its terms are added; landmark
 selection, the landmark eigendecompositions of about 2 L^3 and the G setup are not counted),
-`seconds` (wall clock of `CPD::Register`), `sigma2`, `scale`, `backend`, `rms_to_truth` (RMS over
+`seconds` (wall clock of `CPD::Register`), `sigma2`, `scale`, `backend`, `kernel_rank` and
+`kernel_error` (the low-rank G's rank and sampled relative error; G is identical in every arm),
+`rms_to_truth` (RMS over
 all source points of |T(y_i) - truth_i|, world units; null for an incomplete result),
 `rms_to_exact` and `max_to_exact` (RMS / max over all source points of the distance to the same
 pair's `exact` result, world units; null with `reference_error` when no comparison was possible).

@@ -72,6 +72,16 @@ def plan(points=POINTS):
     return cells
 
 
+def preserve(out, path):
+    """Moves an unjournaled artifact aside (runs/stale/) instead of deleting or overwriting it."""
+    stale = out / "stale"
+    stale.mkdir(exist_ok=True)
+    k = 0
+    while (stale / f"{k}_{path.name}").exists():
+        k += 1
+    path.rename(stale / f"{k}_{path.name}")
+
+
 def sha256(path):
     return hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
 
@@ -136,7 +146,10 @@ def execute(args, cells, out):
         print(f"{len(foreign)} records of another commit, runner or size (e.g. {foreign[0]}); refusing to resume",
               file=sys.stderr)
         return 2
-    pin = ["taskset", "-c", "0-15"] if shutil.which("taskset") else []
+    if not shutil.which("taskset"):
+        print("taskset is required: the run plan pins every cell to logical CPUs 0-15", file=sys.stderr)
+        return 2
+    pin = ["taskset", "-c", "0-15"]
     for cell, arguments in cells:
         if (args.only and cell != args.only) or cell in records:
             continue
@@ -160,10 +173,10 @@ def execute(args, cells, out):
                 continue
             record["reference_sha256"] = exact["reference_sha256"]
         elif reference.exists():
-            reference.unlink()  # never compare against a reference this run did not write
+            preserve(out, reference)  # never compare against a reference this run did not write
         cell_json = out / "cells" / (cell.replace("/", "_").replace("@", "_") + ".json")
         if cell_json.exists():
-            cell_json.unlink()
+            preserve(out, cell_json)
         command = pin + [args.runner, *arguments, "--out", str(cell_json)]
         command += ["--positions", str(reference)] if is_exact else ["--reference", str(reference)]
         try:
@@ -184,7 +197,7 @@ def execute(args, cells, out):
         except subprocess.TimeoutExpired:
             record.update(outcome="unevaluated", reason=f"timeout after {TIMEOUT_SECONDS} s")
             if is_exact and reference.exists():
-                reference.unlink()
+                preserve(out, reference)
         records[cell] = record
         with results.open("a") as stream:
             stream.write(json.dumps(record) + "\n")
@@ -208,6 +221,11 @@ def same_counts(a, b):
 def analyze(args):
     out = pathlib.Path(args.out)
     records = load(out / "results.jsonl")
+    provenance = {(r.get("commit"), r.get("runner_sha256"), r.get("points"), r.get("pinned")) for r in records.values()}
+    if len(provenance) != 1 or next(iter(provenance))[2] != args.points or next(iter(provenance))[3] is not True:
+        print(f"records of mixed or unexpected provenance {sorted(map(str, provenance))}; refusing to analyze",
+              file=sys.stderr)
+        return 2
     pairs, report = [], {"pairs": {}, "variants": {}, "predictions": {}}
     for fixture in FIXTURES:
         for seed in SEEDS:
@@ -220,6 +238,8 @@ def analyze(args):
             deterministic = True
             for arm in VARIANTS + [PERTURBATION]:
                 first, second = get(f"{arm}@1"), get(f"{arm}@2")
+                outcomes = [(records.get(f"{pair}/{arm}@{k}") or {}).get("outcome") for k in (1, 2)]
+                deterministic &= outcomes[0] == outcomes[1] and outcomes[0] is not None
                 if first and second:
                     deterministic &= same_counts(first, second)
                     arms[arm] = {"first": first, "second": second,
@@ -237,7 +257,8 @@ def analyze(args):
             gates["negative"] = (negative is not None and negative["nystrom_iterations"] > 0
                                  and negative["rms_to_exact"] > EQUIVALENT)
             perturbation = arms[PERTURBATION]
-            gates["perturbation"] = perturbation is not None and perturbation["first"]["rms_to_exact"] <= EQUIVALENT
+            gates["perturbation"] = (perturbation is not None and perturbation["first"]["nystrom_iterations"] > 0
+                                     and perturbation["first"]["rms_to_exact"] <= EQUIVALENT)
             decided = all(gates.values())
             noise = max((a["spread"] for a in arms.values() if a), default=math.inf)
             report["pairs"][pair] = {"gates": gates, "decided": decided, "timing_noise": noise}
@@ -253,7 +274,7 @@ def analyze(args):
             ratio = arm["seconds"] / base["seconds"] if arm else math.inf
             faster = arm is not None and ratio <= FASTER and (1.0 - ratio) > 2.0 * noise
             equivalent_faster += equivalent and faster
-            bad += (not equivalent) or ratio > SLOWER
+            bad += (not equivalent) or (ratio > SLOWER and (ratio - 1.0) > 2.0 * noise)
             rows.append({"pair": pair, "equivalent": equivalent, "seconds_ratio": ratio,
                          "nystrom_iterations": arm["first"]["nystrom_iterations"] if arm else None,
                          "rms_to_exact": arm["first"]["rms_to_exact"] if arm else None})
@@ -268,18 +289,22 @@ def analyze(args):
             decision = "no decision"
         report["variants"][variant] = {"decision": decision, "pairs": rows}
 
+    # None: not evaluable (no ranking, no decided pair, or nothing to compare).
     def all_decided(predicate):
-        return bool(decided_pairs) and all(predicate(p) for p in decided_pairs)
+        return all(predicate(p) for p in decided_pairs) if decided_pairs else None
+
+    def not_beating(variants):
+        return all(report["variants"][v]["decision"] != "beats baseline" for v in variants) if ranking else None
 
     box = [v for v in VARIANTS if v.startswith("box/")]
     report["predictions"] = {
-        "P1": all_decided(lambda p: all(p[2][v] and p[2][v]["first"]["nystrom_iterations"]
-                                        < p[2][BASELINE]["first"]["nystrom_iterations"] for v in box))
-              and all(report["variants"][v]["decision"] != "beats baseline" for v in box),
+        "P1": None if not ranking else (all_decided(lambda p: all(p[2][v] and p[2][v]["first"]["nystrom_iterations"]
+                                                                   < p[2][BASELINE]["first"]["nystrom_iterations"] for v in box))
+                                       and not_beating(box)),
         "P2": all_decided(lambda p: p[2]["points/fixed/random"] is not None
                           and abs(p[2]["points/fixed/random"]["seconds"] / p[2][BASELINE]["seconds"] - 1.0) <= 0.1
                           and p[2]["points/fixed/random"]["first"]["rms_to_exact"] <= EQUIVALENT),
-        "P3": report["variants"]["points/resampled/random"]["decision"] != "beats baseline",
+        "P3": not_beating(["points/resampled/random"]),
         "P4": None,  # filled below
         "P5": all_decided(lambda p: p[4]["rms_to_exact"] >= 10.0 * max(
             p[2][v]["first"]["rms_to_exact"] for v in VARIANTS if p[2][v])),
@@ -293,8 +318,14 @@ def analyze(args):
             h, r = arms[f"box/{schedule}/halton"], arms[f"box/{schedule}/random"]
             if h and r and h["seconds"] != r["seconds"]:
                 signs.add(h["seconds"] < r["seconds"])
-    report["predictions"]["P4"] = len(signs) != 1  # no consistent sign
-    (out / "analysis.json").write_text(json.dumps(report, indent=2) + "\n")
+    report["predictions"]["P4"] = (len(signs) != 1) if signs else None  # no consistent sign
+    target = out / "analysis.json"
+    k = 1
+    while target.exists():  # an earlier analysis stays; this one is a new version
+        target = out / f"analysis.{k}.json"
+        k += 1
+    target.write_text(json.dumps(report, indent=2) + "\n")
+    print(f"written {target}")
     print(json.dumps({"ranking": ranking, "pairs": {p: v["decided"] for p, v in report["pairs"].items()},
                       "decisions": {v: d["decision"] for v, d in report["variants"].items()},
                       "predictions": report["predictions"]}, indent=2))
