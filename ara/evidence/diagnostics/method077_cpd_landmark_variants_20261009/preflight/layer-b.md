@@ -52,8 +52,11 @@ that noise is not interpreted.
 - P3: `points/resampled/random` does not beat B.
 - P4: Within the box variants, Halton versus random shows no consistent sign in
   `kernel_evaluations` across the 6 pairs.
-- P5 (control): the negative control has `rms_to_exact` above 1e-3 and at least 10 times the
-  largest `rms_to_exact` of the 9 variants, in every pair.
+- P5 (control): the negative control approximates some iterations (`nystrom_iterations > 0`)
+  and has `rms_to_exact` above 1e-3 and at least 10 times the largest `rms_to_exact` of the 9
+  variants, in every pair.
+- P7 (control): the floor control has `nystrom_iterations = 0` and `rms_to_exact <= 1e-4` in every
+  pair (the fallback differs from `exact` only by not choosing fast Gauss).
 - P6 (control): B has `nystrom_iterations > 0` and `rms_to_exact <= 1e-3` in every pair
   (METHOD-053 measured equivalence for rigid and low-rank nonrigid CPD).
 
@@ -67,12 +70,19 @@ kernel evaluations within the repeat noise. If Nystroem never engaged, every var
   is broken).
 - B has `nystrom_iterations = 0` in every pair (P6 fails: the setting does not exercise the
   approximation).
-- The negative control is equivalent (`rms_to_exact <= 1e-3`) in any pair: the equivalence
-  metric does not reject a poor approximation.
+- The negative control is equivalent (`rms_to_exact <= 1e-3`) or never approximates
+  (`nystrom_iterations = 0`) in any pair: the evaluation is not shown to reject a poor
+  approximation.
+- The floor control has `rms_to_exact > 2e-4` in any pair: the 1e-3 equivalence threshold is not
+  separated from the difference the exact fallback alone causes.
+- A `#repeat` cell differs from its baseline in any count or distance (determinism broken).
 
 ## Controls
 - Null arm: `exact` (exact E-step choice, `Auto`); reference for `rms_to_exact`.
-- Negative control: 2 landmarks with every approximation accepted (limit 1.0).
+- Floor control: Nystroem never accepted; measures the difference the exact fallback alone
+  makes (it cannot choose fast Gauss, `exact` can).
+- Negative control: 2 landmarks, no error rejection; shows that `rms_to_exact` rejects a poor
+  approximation (valid only if it approximates some iterations).
 - Positive control: B, whose equivalence METHOD-053 measured on other CPD variants.
 - Timing repeat: B run twice.
 
@@ -81,6 +91,18 @@ Unit: (fixture, seed) pair, 6 pairs; arms are paired (same data, same configurat
 the landmark variant; landmark seeds identical). Landmark draws are deterministic, so a repeat
 reproduces every count bitwise; only wall time varies. Six pairs over two overlap regimes are
 enough for the all-pairs / 4-of-6 rule; no p-values are computed.
+
+## What this run cannot distinguish (stated limits)
+- Landmark quality versus acceptance dynamics: the landmark count used per iteration (start at
+  the last passing count, doubling under the cost cap, no retry below a rejected sigma^2) is not
+  recorded; `nystrom_iterations` and kernel evaluations show the combined effect.
+- The clutter cube sets the target box, so box landmarks are partly placed by the clutter; 8 of
+  the 32 sampled target rows of the acceptance check are clutter points in `full`.
+- For point sources `points/resampled` redraws farthest point by shifting the start index with
+  the draw; it is not a random redraw.
+- Wall time: one sample per cell, threads not pinned (16 of 32 hardware threads), fixed cell
+  order; the repeat gives one timing pair per block. Kernel evaluations are the decision metric.
+- One size, one landmark start count (256), one error limit (1e-3), one deformation.
 
 ## Analysis
 One table per fixture: per variant, the 3 seeds' `nystrom_iterations`, `kernel_evaluations`

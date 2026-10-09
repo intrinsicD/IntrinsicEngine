@@ -9,8 +9,9 @@
 // Fixture: N points on a bumpy closed surface (seeded); truth = similarity(bend(source));
 // target = truth + N(0, 0.004^2) noise with every 20th point replaced by uniform clutter;
 // "partial" keeps only target points with truth x < 0.2. "exact" runs the exact E-step (Auto)
-// and may write its registered points (--positions) as the reference other variants are
-// compared with (--reference). Writes one JSON object.
+// and may write its registered points (--positions, only when complete) as the reference other
+// variants are compared with (--reference, exactly N positions). Writes one JSON object; exit 0
+// complete, 1 incomplete result, 2 usage, 3 no comparison with the reference possible.
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -68,9 +69,12 @@ namespace
         return f;
     }
 
+    // A reference of exactly `count` double3 positions (any other size is refused).
     std::optional<std::vector<glm::dvec3>> ReadPositions(const std::string& path, const std::size_t count)
     {
-        std::ifstream in(path, std::ios::binary);
+        std::ifstream in(path, std::ios::binary | std::ios::ate);
+        if (!in || std::size_t(in.tellg()) != count * sizeof(glm::dvec3)) return std::nullopt;
+        in.seekg(0);
         std::vector<glm::dvec3> out(count);
         if (!in.read(reinterpret_cast<char*>(out.data()), std::streamsize(count * sizeof(glm::dvec3)))) return std::nullopt;
         return out;
@@ -160,12 +164,8 @@ int main(int argc, char** argv)
     });
     const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
 
-    double truthSum = 0.0;
-    for (std::size_t i = 0; i < f.Source.size() && i < result.TransformedSource.size(); ++i)
-    {
-        const glm::dvec3 d = result.TransformedSource[i] - glm::dvec3(f.Truth[i]);
-        truthSum += glm::dot(d, d);
-    }
+    // Metrics only for a complete result (every source point registered); otherwise null.
+    const bool complete = result.Succeeded() && result.TransformedSource.size() == f.Source.size();
     std::ostringstream json;
     json.precision(17);
     json << "{\"fixture\":\"" << kind << "\",\"seed\":" << seed << ",\"points\":" << count << ",\"targets\":" << f.Target.size()
@@ -175,27 +175,44 @@ int main(int argc, char** argv)
          << "\",\"iterations\":" << result.Iterations << ",\"nystrom_iterations\":" << nystromIterations
          << ",\"observed_iterations\":" << iterations << ",\"max_sampled_error\":" << maxSampled
          << ",\"kernel_evaluations\":" << result.KernelEvaluations << ",\"seconds\":" << seconds
-         << ",\"sigma2\":" << result.Sigma2 << ",\"scale\":" << result.Scale << ",\"backend\":\"" << result.Backend
-         << "\",\"rms_to_truth\":" << std::sqrt(truthSum / double(f.Source.size()));
+         << ",\"sigma2\":" << result.Sigma2 << ",\"scale\":" << result.Scale << ",\"backend\":\"" << result.Backend << "\"";
+    if (complete)
+    {
+        double truthSum = 0.0;
+        for (std::size_t i = 0; i < f.Source.size(); ++i)
+        {
+            const glm::dvec3 d = result.TransformedSource[i] - glm::dvec3(f.Truth[i]);
+            truthSum += glm::dot(d, d);
+        }
+        json << ",\"rms_to_truth\":" << std::sqrt(truthSum / double(f.Source.size()));
+    }
+    else
+        json << ",\"rms_to_truth\":null";
+    int code = complete ? 0 : 1;
     if (args.contains("--reference"))
     {
         const auto reference = ReadPositions(args.at("--reference"), f.Source.size());
-        if (!reference || result.TransformedSource.size() != f.Source.size())
+        if (!reference || !complete)
         {
-            std::cerr << "cannot compare with the reference\n";
-            return 3;
+            json << ",\"rms_to_exact\":null,\"max_to_exact\":null,\"reference_error\":\""
+                 << (reference ? "incomplete result" : "reference missing or of the wrong size") << "\"";
+            code = 3;
         }
-        double sum = 0.0, worst = 0.0;
-        for (std::size_t i = 0; i < f.Source.size(); ++i)
+        else
         {
-            const double d = glm::length(result.TransformedSource[i] - (*reference)[i]);
-            sum += d * d;
-            worst = std::max(worst, d);
+            double sum = 0.0, worst = 0.0;
+            for (std::size_t i = 0; i < f.Source.size(); ++i)
+            {
+                const double d = glm::length(result.TransformedSource[i] - (*reference)[i]);
+                sum += d * d;
+                worst = std::max(worst, d);
+            }
+            json << ",\"rms_to_exact\":" << std::sqrt(sum / double(f.Source.size())) << ",\"max_to_exact\":" << worst;
         }
-        json << ",\"rms_to_exact\":" << std::sqrt(sum / double(f.Source.size())) << ",\"max_to_exact\":" << worst;
     }
     json << "}";
-    if (args.contains("--positions"))
+    // Only a complete result becomes a reference.
+    if (args.contains("--positions") && complete)
     {
         std::ofstream positions(args.at("--positions"), std::ios::binary);
         positions.write(reinterpret_cast<const char*>(result.TransformedSource.data()),
@@ -203,5 +220,5 @@ int main(int argc, char** argv)
     }
     std::ofstream(out) << json.str() << "\n";
     std::cout << json.str() << "\n";
-    return result.Succeeded() ? 0 : 1;
+    return code;
 }
