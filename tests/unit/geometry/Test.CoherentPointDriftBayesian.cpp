@@ -345,3 +345,27 @@ TEST(CoherentPointDriftBayesian, PrecomputedSubsampleOrdersAreUsedAndValidated)
     EXPECT_EQ(refused(order({0, 1, 2, 3, 4, 5, 6, 7, 9})), CPD::Status::InvalidParameters); // longer than asked
     EXPECT_EQ(refused(order({1, 2, 3, 4}, {INFINITY, 1})), CPD::Status::InvalidParameters); // clearance size
 }
+
+
+// The low-rank posterior weights the differences before projecting them onto the kernel basis
+// (v = Q (lambda L^-1 + Q^T D Q)^-1 Q^T D r). With partial overlap many source points have
+// P1 ~ 0; projecting first (Q^T D Q Q^T r) lets them pull on their neighbours. A rank that
+// approximates the kernel to 2e-10 must then follow the exact run and converge: 6e-6 measured,
+// 0.59 and no convergence (iteration cap) with the projection first.
+TEST(CoherentPointDriftBayesian, LowRankPosteriorMatchesTheExactKernelUnderPartialOverlap)
+{
+    const Fixture f = Deformed(Cloud(250, 13), 0.003, 14);
+    std::vector<glm::vec3> partial;
+    for (const auto& x : f.Target) if (x.x < 0.25f) partial.push_back(x);
+    CPD::Params reference = Bayesian();
+    reference.OutlierWeight = 0.1;
+    const auto exact = CPD::Register(partial, f.Source, reference);
+    CPD::Params lowRank = reference;
+    lowRank.LowRank = 200;
+    const auto approximate = CPD::Register(partial, f.Source, lowRank);
+    ASSERT_TRUE(exact.Succeeded() && approximate.Succeeded());
+    ASSERT_LT(approximate.KernelApproximationError, 1e-8);
+    EXPECT_EQ(exact.Stop, CPD::Termination::Converged);
+    EXPECT_EQ(approximate.Stop, CPD::Termination::Converged);
+    EXPECT_LE(MaxDifference(exact, approximate), 1e-4);
+}
