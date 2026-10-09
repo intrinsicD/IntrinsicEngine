@@ -99,3 +99,7 @@ python3 tools/docs/check_doc_links.py --root .
   region-preserving UV-cut comparison; this task continues to own later native,
   config, UI and publication adoption. No positive atlas-quality or thickness
   segmentation conclusion is inferred from preserving input labels.
+
+## Completion
+Completed 2026-09-07. Commit: `92ca1dd4b`. Bounded CPU observations in ARA C69/C70; adoption
+stays reserved for GEOM-076.

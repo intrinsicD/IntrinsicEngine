@@ -2,7 +2,7 @@
 
 The classical two-stage approach is promising enough to continue. It produces actual usable UV maps, not just segmentation colors, on frog, sculpt and two held-out meshes. It is **not yet a production backend or a proven native speed improvement**. The principal remaining issues are jagged/seed-dependent boundaries and mediocre packing efficiency.
 
-This is the operator-directed [METHOD-044 experiment](../../tasks/active/METHOD-044-feature-aware-atlas-merge-experiment.md), developed with actual Claude CLI design, iteration and source/result reviews. The [campaign record](../../ara/evidence/diagnostics/method044/record.json), [iteration notes](../../ara/evidence/diagnostics/method044/iteration-notes.md) and ARA [C69/C70](../../ara/logic/claims.md#c69-bounded-classical-atlas-patch-and-merge-diagnostic) bind the bounded CPU observations. No deep learning, anatomical labels, production defaults or existing METHOD-039–043 algorithms were changed.
+This is the operator-directed [METHOD-044 experiment](../../tasks/done/METHOD-044-feature-aware-atlas-merge-experiment.md), developed with actual Claude CLI design, iteration and source/result reviews. The [campaign record](../../ara/evidence/diagnostics/method044/record.json), [iteration notes](../../ara/evidence/diagnostics/method044/iteration-notes.md) and ARA [C69/C70](../../ara/logic/claims.md#c69-bounded-classical-atlas-patch-and-merge-diagnostic) bind the bounded CPU observations. No deep learning, anatomical labels, production defaults or existing METHOD-039–043 algorithms were changed.
 
 ## Results to inspect
 

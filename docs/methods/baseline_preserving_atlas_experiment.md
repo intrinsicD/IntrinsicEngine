@@ -7,7 +7,7 @@ split. This addresses losing a good segmentation during atlas construction.
 It does **not** fix the rejected thickness segmentation or establish uniform
 UV-quality superiority over xatlas.
 
-This is [METHOD-045](../../tasks/active/METHOD-045-baseline-preserving-atlas-cuts.md),
+This is [METHOD-045](../../tasks/done/METHOD-045-baseline-preserving-atlas-cuts.md),
 directed by the operator after postponing runtime integration. The
 [campaign record](../../ara/evidence/diagnostics/method045/record.json) and
 ARA [C71/C72](../../ara/logic/claims.md#c71-baseline-regions-and-uv-cuts-can-remain-separate)

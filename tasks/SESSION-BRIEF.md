@@ -8,13 +8,10 @@ picking backlog work; theme priorities and rationale live in
 
 ## Active tasks
 
-- `GEOM-111` — Unified progressive point sampling (`Geometry.PointSampling`) (tasks/active/GEOM-111-unified-progressive-point-sampling.md)
 - `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/active/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
 - `GRAPHICS-153` — GPU methods reuse resident buffers; CPU<->GPU IO only at start and end (tasks/active/GRAPHICS-153-gpu-buffer-reuse-and-minimal-io.md)
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
 - `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)
-- `METHOD-044` — Feature-aware patches and distortion-aware atlas merging (tasks/active/METHOD-044-feature-aware-atlas-merge-experiment.md)
-- `METHOD-045` — Preserve baseline regions while constructing UV charts (tasks/active/METHOD-045-baseline-preserving-atlas-cuts.md)
 - `RUNTIME-274` — Point-cloud subsampling editor workflow (tasks/active/RUNTIME-274-point-cloud-subsampling-workflow.md)
 - `RUNTIME-289` — Selectable point sampling wherever points are chosen (tasks/active/RUNTIME-289-selectable-point-sampling-in-consumers.md)
 - `RUNTIME-294` — Migrate every GPU method to the property residency (tasks/active/RUNTIME-294-migrate-gpu-methods-to-property-residency.md)
@@ -155,7 +152,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `METHOD-006` — Surface cross-field design CPU reference backend (tasks/backlog/methods/METHOD-006-cross-field-design-reference-backend.md)
 - unblocked: `METHOD-007` — Constrained Delaunay tetrahedralization reference backend (tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
 - blocked by `METHOD-007`: `METHOD-007A` — CDT engine-integration intake and ownership (tasks/backlog/methods/METHOD-007A-cdt-engine-integration-intake.md)
-- blocked by `GEOM-111`: `METHOD-014` — Progressive Poisson GPU operational parity (tasks/backlog/methods/METHOD-014-progressive-poisson-gpu-operational-parity.md)
+- unblocked: `METHOD-014` — Progressive Poisson GPU operational parity (tasks/backlog/methods/METHOD-014-progressive-poisson-gpu-operational-parity.md)
 - unblocked: `METHOD-021` — ARAP (local/global) parameterization reference backend (tasks/backlog/methods/METHOD-021-arap-parameterization-reference-backend.md)
 - blocked by `METHOD-021`: `METHOD-022` — SLIM locally-injective parameterization reference backend (tasks/backlog/methods/METHOD-022-slim-injective-parameterization-reference-backend.md)
 - unblocked: `METHOD-024` — Spectral Conformal Parameterization (SCP) reference backend (tasks/backlog/methods/METHOD-024-spectral-conformal-parameterization-reference-backend.md)
@@ -175,7 +172,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `METHOD-048` — Full HKTex mesh authoring, compiled rendering and measured default adoption (tasks/backlog/methods/METHOD-048-hktex-mesh-textures.md)
 - unblocked: `METHOD-052` — Anderson acceleration for Coherent Point Drift EM (tasks/backlog/methods/METHOD-052-coherent-point-drift-anderson-acceleration.md)
 - unblocked: `METHOD-054` — Geodesic Bayesian Coherent Point Drift (GBCPD) (tasks/backlog/methods/METHOD-054-geodesic-bayesian-coherent-point-drift.md)
-- blocked by `GEOM-111`: `METHOD-055` — Vulkan compute port of the hole-sieve farthest-point sampler (tasks/backlog/methods/METHOD-055-vulkan-hole-sieve-farthest-point-sampling.md)
+- unblocked: `METHOD-055` — Vulkan compute port of the hole-sieve farthest-point sampler (tasks/backlog/methods/METHOD-055-vulkan-hole-sieve-farthest-point-sampling.md)
 - unblocked: `METHOD-057` — Vulkan truncated and Nystroem E-steps for Coherent Point Drift (gated) (tasks/backlog/methods/METHOD-057-coherent-point-drift-vulkan-truncated-and-nystrom.md)
 - blocked by `GEOM-060`: `METHOD-058` — Permutohedral-lattice E-step for Coherent Point Drift (FilterReg), CPU (tasks/backlog/methods/METHOD-058-coherent-point-drift-lattice-e-step.md)
 - blocked by `METHOD-058`: `METHOD-059` — Vulkan permutohedral-lattice E-step for Coherent Point Drift (gated) (tasks/backlog/methods/METHOD-059-coherent-point-drift-vulkan-lattice-e-step.md)

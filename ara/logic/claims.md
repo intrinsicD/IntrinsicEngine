@@ -1920,7 +1920,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Replaying the four recorded feature-growth/merge-weight combinations with identical seeds and gates contradicts the reported counts or shows that another uncontrolled input/solver change explains them.
-- **Proof**: [ara/evidence/diagnostics/method044/record.json, tools/diagnostics/atlas/patch_merge.py, tools/diagnostics/atlas/compare_atlases.py, tasks/active/METHOD-044-feature-aware-atlas-merge-experiment.md]
+- **Proof**: [ara/evidence/diagnostics/method044/record.json, tools/diagnostics/atlas/patch_merge.py, tools/diagnostics/atlas/compare_atlases.py, tasks/done/METHOD-044-feature-aware-atlas-merge-experiment.md]
 - **Dependencies**: [C69]
 - **Tags**: geometry, CPU diagnostic, feature ablation, non-universal
 - **From staging**: O194

@@ -133,3 +133,6 @@ python3 tools/repo/check_test_layout.py --root . --strict
 ## Publication and remaining scope
 - The completed protected-atlas, stage-audit and refinement artifacts were published to `origin/main` in `910a1ed36b32dad5d8a6491519a49cd7f1deca77` on 2026-09-08. Portable compressed viewers and frog/sculpt OBJ examples travel with the repository.
 - This note remains active for the uncompleted quality investigations: chart-area balance, remeshing robustness, internal-cut placement and feature-aware merge policy. METHOD-046's bounded reference experiment is complete; METHOD-044 still owns production adoption.
+
+## Completion
+Completed 2026-09-08. Commit: `910a1ed36`. Report: `docs/methods/baseline_preserving_atlas_experiment.md`.

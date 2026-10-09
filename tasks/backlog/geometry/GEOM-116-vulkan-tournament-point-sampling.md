@@ -38,7 +38,7 @@ backlog note, not a speedup claim: nothing was measured.
 - Allocate workspaces device-local, not `HostVisible` (see the GEOM-103 note on the 2026-10-01 finding
   about host-visible iterative workspaces).
 - Owners: the point-sampling runtime module (`src/runtime/Modules/PointSampling`) and
-  [GEOM-111](../../active/GEOM-111-unified-progressive-point-sampling.md); coordinate with GEOM-111 so
+  [GEOM-111](../../done/GEOM-111-unified-progressive-point-sampling.md); coordinate with GEOM-111 so
   the progressive/unified sampler contract is not forked.
 
 Noted, not in scope ("could", from the same audit): weighted sample elimination

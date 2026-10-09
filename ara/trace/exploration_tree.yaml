@@ -11108,7 +11108,7 @@ tree:
     alternatives:
     - Integrate the current offline prototypes immediately.
     evidence:
-    - tasks/active/METHOD-045-baseline-preserving-atlas-cuts.md
+    - tasks/done/METHOD-045-baseline-preserving-atlas-cuts.md
     status: resolved
   - id: N481
     type: experiment
@@ -11165,7 +11165,7 @@ tree:
       follow curvature lines, exact merge rules and scalars, possible surface seed movement,
       destructive distortion merging, and use of available signals at critical decisions.
     evidence:
-    - tasks/active/METHOD-045-baseline-preserving-atlas-cuts.md
+    - tasks/done/METHOD-045-baseline-preserving-atlas-cuts.md
     status: resolved
   - id: N485
     type: experiment

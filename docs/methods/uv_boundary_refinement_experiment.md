@@ -173,5 +173,5 @@ OPENBLAS_NUM_THREADS=1 python3 tests/regression/tooling/Test.AtlasBoundaryRefine
 Anatomical acceptance, arbitrary remeshing, other support scales, chart-area
 balance and independent optimization of internal cuts remain open. The offline
 reference adds no selectable production backend or runtime/UI default.
-[METHOD-044](../../tasks/active/METHOD-044-feature-aware-atlas-merge-experiment.md)
+[METHOD-044](../../tasks/done/METHOD-044-feature-aware-atlas-merge-experiment.md)
 continues to own production adoption after quality acceptance.

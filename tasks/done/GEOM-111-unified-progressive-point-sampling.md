@@ -57,3 +57,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
   low-rank landmarks now use the module. Remaining for retirement: nothing in this slice;
   the task stays active as the umbrella until GEOM-112/113 and RUNTIME-289 land.
 
+
+## Completion
+Completed 2026-09-28. Commit: `7eab15f64`. Follow-ups: GEOM-112 (Poisson port), GEOM-113
+(approximate FPS family), RUNTIME-289, RUNTIME-274, METHOD-055 (Vulkan hole sieve).
