@@ -70,7 +70,7 @@ For fixture in (full, partial), seed in (1, 2, 3), in this order:
 4. pass 2: the same 10 timed arms in reverse order, each `@2`.
 
 Timeout 600 s per cell (technical test: about 90-110 s per cell at 10^5; estimated total about
-4-4.5 hours). The exact cell deletes any old reference first; only a successful, complete exact
+4-4.5 hours). The exact cell moves any old reference to `runs/stale/` first; only a successful, complete exact
 run writes `runs/references/<fixture>_<seed>.bin` (exactly 10^5 double3, size checked) and its
 sha256 is recorded; the other cells of the pair run only against that recorded reference,
 otherwise they are recorded as unevaluated without running. Each cell writes its own JSON
@@ -80,8 +80,9 @@ a restart refuses records of another commit, runner or size and skips recorded c
 file prevents two drivers. A timeout records the cell as unevaluated. Records are appended to
 `runs/results.jsonl`; an unjournaled cell JSON or reference found before a cell runs is moved to
 `runs/stale/`, never deleted or overwritten. Exit 0 when every cell completed, else 1. The
-analysis refuses records of mixed provenance or unpinned cells and writes `analysis.json`, or
-`analysis.<k>.json` when an earlier analysis exists.
+analysis runs at the frozen commit with `--runner`; it refuses unless every record carries that
+commit, that runner's sha256, 10^5 points and pinning, and every planned cell has a record; it
+writes `analysis.json`, or `analysis.<k>.json` when an earlier analysis exists.
 
 Final-configuration technical test (not evidence; status and time only): `partial`, seed 2,
 `box/resampled/halton` at 10^5 points, pinned: completed, 150 iterations, about 56 s.
@@ -95,6 +96,7 @@ python3 tools/benchmark/cpd_landmark_variants.py \
   --runner build/ci-release/bin/IntrinsicCoherentPointDriftLandmarkVariants \
   --out ara/evidence/diagnostics/method077_cpd_landmark_variants_20261009/runs
 python3 tools/benchmark/cpd_landmark_variants.py \
+  --runner build/ci-release/bin/IntrinsicCoherentPointDriftLandmarkVariants \
   --out ara/evidence/diagnostics/method077_cpd_landmark_variants_20261009/runs --analyze
 ```
 Plan listing: the first command with `--plan`. Analysis test:

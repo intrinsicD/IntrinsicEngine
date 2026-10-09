@@ -130,6 +130,7 @@ varies (two samples per arm). The all-pairs / two-thirds rule needs no p-values.
 ## Analysis
 `cpd_landmark_variants.py --analyze` writes `analysis.json`: per pair the gates, whether it is
 decided and its timing noise; per variant the decision and per pair `equivalent`, the seconds
-ratio, `nystrom_iterations` and `rms_to_exact`; predictions P1-P7. The referee audit recomputes
+ratio, `nystrom_iterations`, `rms_to_exact` and `max_to_exact`; predictions P1-P7 (P5 not
+evaluable unless all nine variants were measured in every decided pair). The referee audit recomputes
 these from `results.jsonl` and the cell JSONs, and reports `rms_to_truth` and kernel counts
 beside them. Unevaluated or failed cells are listed.

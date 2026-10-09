@@ -50,7 +50,8 @@ def analyze(rows, expect=0):
     with tempfile.TemporaryDirectory() as directory:
         path = Path(directory)
         (path / "results.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
-        code = TOOL.analyze(type("Args", (), {"out": str(path), "points": TOOL.POINTS})())
+        code = TOOL.analyze(type("Args", (), {"out": str(path), "points": TOOL.POINTS, "expect_commit": "c",
+                                              "expect_runner_sha256": "r"})())
         assert code == expect, code
         return json.loads((path / "analysis.json").read_text()) if code == 0 else None
 
@@ -103,7 +104,7 @@ class Analysis(unittest.TestCase):
 
     def test_a_failed_baseline_or_exact_cell_undecides_its_pair(self):
         rows = records(lambda pair, arm, run, r: r)
-        rows = [r for r in rows if r["cell"] != "partial/2/exact"]
+        rows = [dict(r, outcome="failed") if r["cell"] == "partial/2/exact" else r for r in rows]
         rows = [dict(r, outcome="failed") if r["cell"] == "partial/3/points/mixed/random@2" else r for r in rows]
         report = analyze(rows)
         self.assertFalse(report["pairs"]["partial/2"]["decided"])
@@ -132,6 +133,10 @@ class Analysis(unittest.TestCase):
         self.assertIsNone(analyze(rows, expect=2))
         rows = [dict(r, pinned=False) for r in records(lambda pair, arm, run, r: r)]
         self.assertIsNone(analyze(rows, expect=2))
+        # Uniformly another (or no) commit or runner, and a missing planned cell, are refused too.
+        for field, value in (("commit", "other"), ("commit", None), ("runner_sha256", "other")):
+            self.assertIsNone(analyze([dict(r, **{field: value}) for r in records(lambda pair, arm, run, r: r)], expect=2))
+        self.assertIsNone(analyze(records(lambda pair, arm, run, r: r)[1:], expect=2))
 
     def test_a_failed_variant_counts_as_not_equivalent(self):
         # Failed in both passes: the same outcome (deterministic), counted as not equivalent.
@@ -139,6 +144,7 @@ class Analysis(unittest.TestCase):
                 for r in records(lambda pair, arm, run, r: r)]
         report = analyze(rows)
         self.assertEqual(report["variants"]["box/resampled/random"]["decision"], "worse than baseline")
+        self.assertIsNone(report["predictions"]["P5"])  # a variant without measurements: not evaluable
 
 
 if __name__ == "__main__":

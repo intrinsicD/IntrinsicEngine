@@ -15,7 +15,7 @@ Analyze (--analyze): the decision rule and gates of Layer B, fixed before the ru
 <out>/results.jsonl; writes <out>/analysis.json and prints the tables.
 
   cpd_landmark_variants.py --runner <binary> --out <dir> [--plan] [--only <cell>]
-  cpd_landmark_variants.py --out <dir> --analyze
+  cpd_landmark_variants.py --runner <binary> --out <dir> --analyze   (at the frozen commit)
 """
 import argparse
 import hashlib
@@ -221,10 +221,17 @@ def same_counts(a, b):
 def analyze(args):
     out = pathlib.Path(args.out)
     records = load(out / "results.jsonl")
+    # The records must all come from the frozen commit and runner, at the planned size, pinned,
+    # and every planned cell must have a record (the analysis is of the complete run).
     provenance = {(r.get("commit"), r.get("runner_sha256"), r.get("points"), r.get("pinned")) for r in records.values()}
-    if len(provenance) != 1 or next(iter(provenance))[2] != args.points or next(iter(provenance))[3] is not True:
-        print(f"records of mixed or unexpected provenance {sorted(map(str, provenance))}; refusing to analyze",
+    expected = (args.expect_commit, args.expect_runner_sha256, args.points, True)
+    if not args.expect_commit or not args.expect_runner_sha256 or provenance != {expected}:
+        print(f"records of provenance {sorted(map(str, provenance))}, expected {expected}; refusing to analyze",
               file=sys.stderr)
+        return 2
+    missing = [cell for cell, _ in plan(args.points) if cell not in records]
+    if missing:
+        print(f"{len(missing)} planned cells have no record (e.g. {missing[0]}); refusing to analyze", file=sys.stderr)
         return 2
     pairs, report = [], {"pairs": {}, "variants": {}, "predictions": {}}
     for fixture in FIXTURES:
@@ -277,7 +284,8 @@ def analyze(args):
             bad += (not equivalent) or (ratio > SLOWER and (ratio - 1.0) > 2.0 * noise)
             rows.append({"pair": pair, "equivalent": equivalent, "seconds_ratio": ratio,
                          "nystrom_iterations": arm["first"]["nystrom_iterations"] if arm else None,
-                         "rms_to_exact": arm["first"]["rms_to_exact"] if arm else None})
+                         "rms_to_exact": arm["first"]["rms_to_exact"] if arm else None,
+                         "max_to_exact": arm["first"]["max_to_exact"] if arm else None})
         k = len(decided_pairs)
         if not ranking:
             decision = "no ranking"
@@ -306,8 +314,9 @@ def analyze(args):
                           and p[2]["points/fixed/random"]["first"]["rms_to_exact"] <= EQUIVALENT),
         "P3": not_beating(["points/resampled/random"]),
         "P4": None,  # filled below
-        "P5": all_decided(lambda p: p[4]["rms_to_exact"] >= 10.0 * max(
-            p[2][v]["first"]["rms_to_exact"] for v in VARIANTS if p[2][v])),
+        # P5 needs all nine variants measured in every decided pair.
+        "P5": None if any(p[2][v] is None for p in decided_pairs for v in VARIANTS) else all_decided(
+            lambda p: p[4]["rms_to_exact"] >= 10.0 * max(p[2][v]["first"]["rms_to_exact"] for v in VARIANTS)),
         "P6": all(p[2][BASELINE] is not None and p[2][BASELINE]["first"]["nystrom_iterations"] > 0
                   and p[2][BASELINE]["first"]["rms_to_exact"] <= EQUIVALENT for p in pairs),
         "P7": all(report["pairs"][p[0]]["gates"]["floor"] for p in pairs),
@@ -348,6 +357,11 @@ def main():
         print(f"{len(cells)} cells, timeout {TIMEOUT_SECONDS} s each")
         return 0
     if args.analyze:
+        if not args.runner:
+            parser.error("--analyze needs --runner (its sha256 must match the records)")
+        git = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True)
+        args.expect_commit = git.stdout.strip() if git.returncode == 0 else ""
+        args.expect_runner_sha256 = sha256(args.runner)
         return analyze(args)
     if not args.runner:
         parser.error("--runner is required to run")

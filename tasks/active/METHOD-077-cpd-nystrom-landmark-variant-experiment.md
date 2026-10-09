@@ -15,8 +15,8 @@ contract_review: benchmark runner and experiment only; no engine surface or cata
 
 ## Goal
 - Answer operator question 1 (quoted in the packet's Layer B) for synthetic fixtures at 10^5
-  points with Bayesian CPD: which landmark variant computes P with the fewest kernel
-  evaluations while staying equivalent to the exact E-step.
+  points with Bayesian CPD: which landmark variant registers fastest (wall time, operator
+  decision) while staying equivalent to the exact E-step.
 
 ## Acceptance criteria
 - [ ] Full-tier pre-flight packet (Layer A, Layer B, manifest) committed; two independent
@@ -54,3 +54,8 @@ python3 tools/agents/check_task_policy.py --root . --strict
   (a first version counted one draw 100 times through the rejection memory; fixed to independent
   draws; mutation: dropping the overlap correction fails it). Analysis test: 8 cases, mutations of
   the outcome gate, perturbation gate and provenance check each fail it.
+- 2026-10-09 second delta round on digest `2a83e709…074d`: Claude "PASS"; Codex "REVISE" (P5 with
+  missing variant measurements; analysis not bound to the expected commit and runner). Fixed: P5
+  not evaluable unless all nine variants are measured; the analysis needs `--runner`, compares
+  every record with HEAD and that runner's sha256 and refuses missing planned cells;
+  `max_to_exact` in the analysis rows; wording.
