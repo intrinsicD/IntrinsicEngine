@@ -514,3 +514,84 @@ TEST_F(ResidentPointSampling, WarmWorkspaceKeepsCapacityAndUnbindsPriorRowMap)
     EXPECT_EQ(Device.CreateBufferCount, buffers + 1);
     EXPECT_EQ(Device.CreatePipelineCount, pipelines);
 }
+
+// RUNTIME-289: a Bayesian CPD run orders its target subsample on the device before the first
+// step. The solver registers exactly the device order once its verified prefix (64 samples)
+// matches the CPU: a delivered order that differs only after the prefix is what the run uses.
+// A mismatch inside the prefix leaves the CPU order with the reason, and cancelling the run
+// stops the ordering job. The untouched source set reports no backend.
+TEST_F(ResidentPointSampling, CpdTargetSubsampleIsOrderedOnTheDeviceBeforeTheFirstStep)
+{
+    const auto source = MakeCloud(S, 40);
+    const auto target = MakeCloud(S, 100);
+    std::vector<R::JobDesc> jobs;
+    S.Context.JobCommands.Submit = [&jobs](R::JobDesc desc, R::EditorJobIdentity) {
+        jobs.push_back(std::move(desc));
+        return R::JobToken{std::uint32_t(jobs.size()), 1};
+    };
+    std::optional<Extrinsic::RHI::ReadbackSink> sink;
+    Device.ComputeReadback = [&](auto record, std::uint64_t, auto completion) {
+        EXPECT_TRUE(record(Device.CommandContext).IsValid());
+        sink = std::move(completion);
+        return Extrinsic::RHI::ReadbackToken{1};
+    };
+    constexpr std::uint32_t kCount = 80;
+    const auto points = std::as_const(S.Registry.Raw().get<GS::Vertices>(target).Properties).Get<glm::vec3>("v:position");
+    const auto reference = Geometry::PointSampling::Order(std::span<const glm::vec3>(points.Vector()), {}, kCount);
+    ASSERT_TRUE(reference.Succeeded());
+    R::CoherentPointDriftConfig config{.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target),
+                                       .Method = R::CoherentPointDriftMethod::Bayesian, .OutlierWeight = 0.1,
+                                       .Output = R::CoherentPointDriftOutput::DisplacementProperty,
+                                       .SubsampleTarget = kCount};
+    config.SubsampleBackend = R::PointSamplingBackend::Vulkan;
+    enum class Delivery { AfterPrefix, InsidePrefix, Cancelled, StepCancelled };
+    for (const auto delivery : {Delivery::AfterPrefix, Delivery::InsidePrefix, Delivery::Cancelled, Delivery::StepCancelled})
+    {
+        jobs.clear();
+        sink.reset();
+        R::EditorCoherentPointDriftResult failure;
+        const auto run = R::StartEditorCoherentPointDrift(S.Commands(), config, failure);
+        ASSERT_TRUE(run) << failure.Message;
+        EXPECT_EQ(R::SnapshotEditorCoherentPointDrift(run).Result.SubsampleRequestedBackend, "gpu_vulkan_compute");
+        ASSERT_EQ(R::StepEditorCoherentPointDrift(S.Commands(), run, 1u), R::EditorCommandStatus::Pending);
+        ASSERT_EQ(jobs.size(), 2u) << "the device ordering, then the step job";
+        ASSERT_EQ(jobs[1].DependsOn.size(), 1u);
+        EXPECT_EQ(jobs[1].DependsOn[0].Job, (R::JobToken{1, 1}));
+        auto& ordering = jobs[0];
+        EXPECT_FALSE(ordering.IsReadyToApply());
+        ASSERT_TRUE(sink);
+        if (delivery == Delivery::Cancelled || delivery == Delivery::StepCancelled)
+        {
+            // Through the run, or by cancelling the step job itself (job lane / panel).
+            if (delivery == Delivery::Cancelled) R::CancelEditorCoherentPointDrift(run);
+            else jobs[1].FinalizeUnpublishedOnMainThread();
+            EXPECT_EQ(ordering.ValidateBeforeApply(), R::JobApplyValidation::StaleGeneration);
+            ordering.FinalizeUnpublishedOnMainThread();
+            if (delivery == Delivery::Cancelled) jobs[1].FinalizeUnpublishedOnMainThread();
+            const auto cancelled = R::SnapshotEditorCoherentPointDrift(run);
+            EXPECT_EQ(cancelled.Phase, R::EditorCoherentPointDriftPhase::Cancelled);
+            EXPECT_EQ(cancelled.Result.SubsampleRequestedBackend, "gpu_vulkan_compute");
+            continue;
+        }
+        auto order = reference.Order;
+        if (delivery == Delivery::AfterPrefix) std::swap(order[70], order[71]);
+        else std::swap(order[1], order[2]);
+        std::vector<std::byte> bytes(kCount * 12u);
+        std::memcpy(bytes.data(), reference.Clearance.data(), kCount * sizeof(double));
+        std::memcpy(bytes.data() + kCount * sizeof(double), order.data(), kCount * sizeof(std::uint32_t));
+        sink->Deliver(bytes);
+        ASSERT_TRUE(ordering.IsReadyToApply());
+        ASSERT_EQ(ordering.ValidateBeforeApply(), R::JobApplyValidation::Current);
+        ASSERT_TRUE(ordering.PublishCompletion(Events, R::JobResultEnvelope::Make(true)));
+        auto& step = jobs[1];
+        (void)step.Work(R::JobCancellation{});
+        ASSERT_TRUE(step.PublishCompletion(Events, R::JobResultEnvelope::Make(true)));
+        const auto snapshot = R::SnapshotEditorCoherentPointDrift(run);
+        ASSERT_TRUE(snapshot.TargetSamples);
+        const bool device = delivery == Delivery::AfterPrefix;
+        EXPECT_EQ(*snapshot.TargetSamples, device ? order : reference.Order);
+        EXPECT_EQ(snapshot.Result.SubsampleSourceBackend, "");
+        EXPECT_EQ(snapshot.Result.SubsampleTargetBackend, device ? "gpu_vulkan_compute" : "cpu_reference");
+        EXPECT_EQ(snapshot.Result.SubsampleBackendDiagnostic.empty(), device) << snapshot.Result.SubsampleBackendDiagnostic;
+    }
+}

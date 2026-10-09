@@ -104,6 +104,9 @@ export namespace Geometry::PointCloud::Consolidation
         // PointCloud::RandomSubsample; otherwise the first TargetPointCount points of the
         // Geometry.PointSampling order (a method that returns fewer fails the run).
         std::optional<PointSampling::Params> InitialSampling{};
+        // With InitialSampling: its order computed elsewhere (a Vulkan run, RUNTIME-289), used
+        // instead; it must hold exactly the initial count of distinct indices or the run fails.
+        std::optional<PointSampling::Result> InitialOrder{};
         // Deterministic caller-controlled guard for the serial reference's
         // input-sized allocations. The default preserves the API's natural
         // platform limit; callers with a fixed memory budget can lower it.
@@ -177,11 +180,13 @@ export namespace Geometry::PointCloud::Consolidation
         const Params& params = {});
 
     // The initial sample indices (ascending) of `target` points: the seeded
-    // RandomSubsample without `sampling`, else the first `target` points of its order. Shared
-    // by the CPU reference and the runtime's GPU path so both start from the same samples.
+    // RandomSubsample without `sampling`, else the first `target` points of its order (or of
+    // `precomputed`, that order computed elsewhere). Shared by the CPU reference and the
+    // runtime's GPU path so both start from the same samples.
     [[nodiscard]] bool SelectInitialSamples(std::span<const glm::vec3> positions, std::size_t target,
                                             std::uint32_t seed, const std::optional<PointSampling::Params>& sampling,
-                                            std::vector<std::size_t>& indices);
+                                            std::vector<std::size_t>& indices,
+                                            const std::optional<PointSampling::Result>& precomputed = std::nullopt);
 
     // Authored normals are consumed without mutation. They are normalized on
     // a method-local copy and must match the position count. Isotropic

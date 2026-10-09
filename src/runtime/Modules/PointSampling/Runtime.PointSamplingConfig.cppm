@@ -4,6 +4,7 @@
 // the generated schema and the panel widgets; ToPointSamplingParams maps the block to the
 // geometry parameters (the runtime enums mirror the geometry ones, checked statically).
 module;
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -78,6 +79,8 @@ export namespace Extrinsic::Runtime
     // Where the order is computed (RUNTIME-290). Vulkan runs the methods with a device kernel
     // (exact farthest point today) and falls back to the CPU, saying why, for the rest.
     enum class PointSamplingBackend : std::uint8_t { Cpu = 0, Vulkan };
+    inline constexpr std::array<std::string_view, 2> kPointSamplingBackendNames{
+        "CPU", "Vulkan (falls back to the CPU where unsupported)"};
 
     struct PointSamplingOperationConfig
     {

@@ -187,6 +187,12 @@ export namespace Extrinsic::Runtime
         std::uint32_t EStepDeviceIterations{0u};
         std::uint64_t EStepDeviceCpuRows{0u}; // rows of device iterations evaluated on the CPU
         std::string GpuDiagnostic{};
+        // Bayesian subsamples (RUNTIME-289): the backend asked for, the one that orders each set (for
+        // a run that ends before solving, the one that was to order it; empty: not subsampled), and
+        // why a set asked on Vulkan ran on the CPU.
+        std::string SubsampleRequestedBackend{"cpu_reference"};
+        std::string SubsampleTargetBackend{}, SubsampleSourceBackend{};
+        std::string SubsampleBackendDiagnostic{};
         std::uint32_t KernelRank{0u}; // low-rank nonrigid eigenpairs
         double KernelApproximationError{0.0};
         std::string Message{};

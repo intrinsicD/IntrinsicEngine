@@ -76,6 +76,9 @@ export namespace Extrinsic::Runtime
         // solve and the Nystroem E-step ("landmark_*"). RUNTIME-289.
         std::uint32_t SubsampleTarget{0u};
         PointSamplingConfig SubsampleSampling{};
+        // Where the subsamples are ordered (RUNTIME-289): Vulkan runs exact farthest point on the
+        // device before the first step; landmarks always stay on the CPU.
+        PointSamplingBackend SubsampleBackend{PointSamplingBackend::Cpu};
         PointSamplingConfig LandmarkSampling{};
     };
 

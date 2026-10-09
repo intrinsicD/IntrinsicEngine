@@ -45,19 +45,23 @@ import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
+import Extrinsic.Runtime.PointSamplingGpu;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Vertices.Normals;
+import Geometry.PointSampling;
 import Geometry.Properties;
 import Geometry.Registration.CoherentPointDrift;
 
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/internal/Runtime.EditorTransformHelpers.hpp"
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
+#include "Editor/internal/Runtime.EditorFramedGpuJob.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.hpp"
 
@@ -74,12 +78,21 @@ namespace Extrinsic::Runtime
         GPD::PointInputCapture Source{}, Target{};
         ECSC::Transform::Component SourceBefore{}, TargetBefore{};
         bool SourceHadTransform{false}, TargetHadTransform{false};
-        glm::dmat4 SourceModel{1.0};
+        glm::dmat4 SourceModel{1.0}, TargetModel{1.0};
         std::vector<glm::vec3> SourceWorld{}, TargetWorld{};
         CPD::Params Params{};
         // Vulkan E-step (METHOD-056): the worker-to-main-thread broker, or why there is none.
         std::shared_ptr<CoherentPointDriftGpuEStep> GpuEStep{};
         std::string GpuUnavailable{};
+        // Bayesian subsamples (RUNTIME-289), per set: the backend that ordered it (empty: not
+        // subsampled), why the CPU did, and whether a device run is still to be queued. Written on
+        // the main thread before the first step job, which depends on the device runs.
+        struct SubsampleOrdering
+        {
+            std::string Backend{}, Diagnostic{};
+            bool Pending{false};
+        };
+        SubsampleOrdering TargetOrdering{}, SourceOrdering{};
 
         // Worker-owned; only one step job runs at a time (Busy).
         CPD::Solver Solver{};
@@ -159,6 +172,22 @@ namespace Extrinsic::Runtime
                 return "No operational Vulkan device";
             if (!context.Device->SupportsShaderFloat64()) return "The Vulkan device lacks shader float64";
             return {};
+        }
+
+        // Copies the subsample orderings into the run's result, so every terminal result (failed,
+        // cancelled before a step, applied) carries them; called whenever an ordering changes.
+        void ReportSubsampling(EditorCoherentPointDriftRun& run)
+        {
+            std::scoped_lock lock{run.Mutex};
+            auto& result = run.Snapshot.Result;
+            result.SubsampleRequestedBackend = std::string(run.Config.SubsampleBackend == PointSamplingBackend::Vulkan
+                                                               ? kPointSamplingGpuBackendId : kPointSamplingCpuBackendId);
+            result.SubsampleTargetBackend = run.TargetOrdering.Backend;
+            result.SubsampleSourceBackend = run.SourceOrdering.Backend;
+            result.SubsampleBackendDiagnostic.clear();
+            for (const auto& [name, set] : {std::pair{"Target: ", &run.TargetOrdering}, std::pair{"Source: ", &run.SourceOrdering}})
+                if (!set->Diagnostic.empty())
+                    result.SubsampleBackendDiagnostic += (result.SubsampleBackendDiagnostic.empty() ? "" : " ") + (name + set->Diagnostic);
         }
 
         std::optional<EditorCoherentPointDriftResult> Capture(const EditorProcessingContext& context,
@@ -245,9 +274,9 @@ namespace Extrinsic::Runtime
             run->TargetHadTransform = targetTransform != nullptr;
             if (targetTransform) run->TargetBefore = *targetTransform;
             run->SourceModel = sourceTransform ? ModelMatrix(*sourceTransform) : glm::dmat4(1.0);
-            const glm::dmat4 targetModel = targetTransform ? ModelMatrix(*targetTransform) : glm::dmat4(1.0);
+            run->TargetModel = targetTransform ? ModelMatrix(*targetTransform) : glm::dmat4(1.0);
             for (const auto& p : sourceCapture.Points) run->SourceWorld.push_back(glm::vec3(run->SourceModel * glm::dvec4(glm::dvec3(p), 1.0)));
-            for (const auto& p : targetCapture.Points) run->TargetWorld.push_back(glm::vec3(targetModel * glm::dvec4(glm::dvec3(p), 1.0)));
+            for (const auto& p : targetCapture.Points) run->TargetWorld.push_back(glm::vec3(run->TargetModel * glm::dvec4(glm::dvec3(p), 1.0)));
             run->Source = std::move(sourceCapture);
             run->Target = std::move(targetCapture);
             run->Params = CPD::Params{.Method = ToVariant(config.Method), .OutlierWeight = config.OutlierWeight,
@@ -271,6 +300,19 @@ namespace Extrinsic::Runtime
                 raw->Snapshot.Stage = std::string(CPD::ToString(stage));
                 raw->Snapshot.StageStarted = std::chrono::steady_clock::now();
             };
+            // Subsampled sets as the solver decides them; a device run is queued with the first step.
+            const auto plan = [&](EditorCoherentPointDriftRun::SubsampleOrdering& set, const std::uint32_t count,
+                                  const std::size_t points) {
+                if (config.Method != CoherentPointDriftMethod::Bayesian || count == 0u || count >= points) return;
+                set.Backend = std::string(kPointSamplingCpuBackendId);
+                if (config.SubsampleBackend != PointSamplingBackend::Vulkan) return;
+                set.Diagnostic = !context.JobCommands.Available() || context.SpatialIndices == nullptr
+                    ? std::string("No job lane or spatial compute service; sampling ran on the CPU.")
+                    : PointSamplingGpuUnsupportedReason(run->Params.SubsampleSampling, points, count, context.Device);
+                set.Pending = set.Diagnostic.empty();
+            };
+            plan(run->TargetOrdering, config.SubsampleTarget, run->TargetWorld.size());
+            plan(run->SourceOrdering, config.Subsample, run->SourceWorld.size());
             if (config.EStep == CoherentPointDriftEStep::Vulkan)
             {
                 if (const auto reason = VulkanEStepUnavailable(context); !reason.empty())
@@ -580,6 +622,75 @@ namespace Extrinsic::Runtime
                                                             ? EditorJobDomain::GpuCompute : EditorJobDomain::Cpu};
         }
 
+        // RUNTIME-289: orders one full set on the device (resident positions, captured live rows and
+        // model, so the rows match the world copies the solver samples). The verified order goes to
+        // the solver's params; otherwise the set stays on the CPU with the reason. Returns the job
+        // the first step depends on (invalid when nothing was queued).
+        JobToken SubmitSubsampleOrdering(const EditorProcessingContext& context, const EditorCoherentPointDriftRunHandle& run,
+                                         const bool target)
+        {
+            auto& set = target ? run->TargetOrdering : run->SourceOrdering;
+            set.Pending = false;
+            const auto fallback = [&set, &run](std::string why) {
+                set.Diagnostic = std::move(why) + "; sampling ran on the CPU.";
+                ReportSubsampling(*run);
+                return JobToken{};
+            };
+            auto* residency = context.SpatialIndices ? context.SpatialIndices->PropertyResidency() : nullptr;
+            if (residency == nullptr || context.Scene == nullptr) return fallback("GPU property residency unavailable");
+            const auto& capture = target ? run->Target : run->Source;
+            const auto positions = ResolveGpuPropertyInput(*residency, *context.Scene, context.World,
+                                                           target ? run->TargetEntity : run->SourceEntity,
+                                                           target ? run->Config.TargetPositions : run->Config.SourcePositions);
+            if (!positions) return fallback("Resident sampling input acquisition refused");
+            const std::uint32_t count = target ? run->Params.SubsampleTarget : run->Params.SubsampleSource;
+            Graphics::FarthestPointGpuInput input{.Positions = *positions, .Rows = capture.Slots,
+                                                  .FirstIndex = run->Params.SubsampleSampling.FirstIndex, .Count = count};
+            if (capture.Slots.size() == positions->Layout.Count) input.Rows = {};
+            const glm::dmat4& model = target ? run->TargetModel : run->SourceModel;
+            for (std::size_t column = 0; column < 4; ++column)
+                for (std::size_t row = 0; row < 4; ++row) input.Model[4 * column + row] = model[column][row];
+            auto gpu = std::make_shared<PointSamplingGpuRun>(*context.SpatialIndices, input,
+                                                             target ? run->TargetWorld : run->SourceWorld,
+                                                             run->Params.SubsampleSampling);
+            JobDesc job = EditorFeatureDetail::MakeFramedGpuJobDesc({
+                .DebugName = target ? "Vulkan CPD target subsample" : "Vulkan CPD source subsample",
+                .Scope = context.World,
+                // A cancelled run stops queuing chunks; the dependent step job is cancelled with it.
+                .Current = [context, run] {
+                    std::string why;
+                    return !run->CancelRequested.load() && GPD::EditorProcessingContextWorldCurrent(context) &&
+                           InputsCurrent(context, *run, why);
+                },
+                .Queue = [context, gpu] { return gpu->QueueNext(*context.SpatialIndices); },
+                .Observe = [gpu](const SpatialGpuResult& chunk) { return gpu->Observe(chunk); },
+                .Publish = [run, gpu, target, count](const SpatialGpuResult* chunk) {
+                    auto& done = target ? run->TargetOrdering : run->SourceOrdering;
+                    if (chunk == nullptr || chunk->State != SpatialQueryState::Ready)
+                        done.Diagnostic = (chunk && !chunk->Diagnostic.empty() ? chunk->Diagnostic
+                                                                               : std::string("GPU sampling submission refused")) +
+                                          "; sampling ran on the CPU.";
+                    else if (gpu->Current().Order.size() != count)
+                        done.Diagnostic = "The Vulkan sampler returned an incomplete order; sampling ran on the CPU.";
+                    else if (gpu->VerifyPrefix(done.Diagnostic))
+                    {
+                        done.Backend = std::string(kPointSamplingGpuBackendId);
+                        (target ? run->Params.SubsampleTargetOrder : run->Params.SubsampleSourceOrder) = gpu->Current();
+                    }
+                    ReportSubsampling(*run);
+                    return true;
+                },
+                // Stale or cancelled: the dependent step job is cancelled with it.
+                .Abandon = [] {},
+            });
+            auto identity = Identity(*run);
+            identity.OutputName = target ? "coherent_point_drift.target_subsample" : "coherent_point_drift.source_subsample";
+            identity.RequestedDomain = EditorJobDomain::GpuCompute;
+            const JobToken token = context.JobCommands.Submit(std::move(job), std::move(identity));
+            if (!token.IsValid()) return fallback("The job lane rejected the Vulkan subsample run");
+            return token;
+        }
+
         // Queues one step job; `publish` applies the result when the run ends (one-shot command).
         EditorCommandStatus Submit(const EditorProcessingContext& context, const EditorCoherentPointDriftRunHandle& run,
                                    std::uint32_t iterations,
@@ -601,6 +712,13 @@ namespace Extrinsic::Runtime
             }
             if (!context.JobCommands.Available())
             {
+                for (auto* set : {&run->TargetOrdering, &run->SourceOrdering})
+                    if (set->Pending)
+                    {
+                        set->Pending = false;
+                        set->Diagnostic = "No job lane; sampling ran on the CPU.";
+                    }
+                ReportSubsampling(*run);
                 if (run->GpuEStep) run->GpuEStep->Close("No job lane; the Vulkan E-step ran on the CPU.");
                 RunSteps(*run, iterations, JobCancellation{});
                 run->Busy = false;
@@ -634,6 +752,7 @@ namespace Extrinsic::Runtime
                 .FinalizeUnpublishedOnMainThread = [context, run, publish, delivered] {
                     if (run->GpuEStep) run->GpuEStep->SetWorkerActive(false);
                     run->Busy = false;
+                    run->CancelRequested = true; // also stops a device subsample ordering still in flight
                     {
                         std::scoped_lock lock{run->Mutex};
                         if (run->Snapshot.Phase == Phase::Running) run->Snapshot.Phase = Phase::Cancelled;
@@ -683,11 +802,17 @@ namespace Extrinsic::Runtime
                 if (!context.JobCommands.Submit(std::move(pump), std::move(identity)).IsValid())
                     run->GpuEStep->Close("The job lane rejected the Vulkan E-step pump; the run continues on the CPU.");
             }
+            // The solver orders its subsamples in its first step, after the device runs.
+            for (const bool target : {true, false})
+                if ((target ? run->TargetOrdering : run->SourceOrdering).Pending)
+                    if (const JobToken ordering = SubmitSubsampleOrdering(context, run, target); ordering.IsValid())
+                        desc.DependsOn.push_back({ordering, "Order the subsample on the device first"});
             const JobToken token = context.JobCommands.Submit(std::move(desc), Identity(*run));
             if (!token.IsValid())
             {
                 if (run->GpuEStep) run->GpuEStep->SetWorkerActive(false);
                 run->Busy = false;
+                run->CancelRequested = true; // stops the device subsample orderings queued above
                 std::scoped_lock lock{run->Mutex};
                 run->Snapshot.Phase = Phase::Failed;
                 run->Snapshot.Result.Status = EditorCommandStatus::GeometryProcessingFailed;
@@ -774,6 +899,7 @@ namespace Extrinsic::Runtime
                            .Backend = std::string(CPD::BackendId(run->Params.EStep)),
                            .SourcePointCount = run->SourceWorld.size(), .TargetPointCount = run->TargetWorld.size(),
                            .Message = "Coherent Point Drift is ready."};
+        ReportSubsampling(*run);
         snapshot.SourcePreview = std::make_shared<const std::vector<glm::vec3>>(run->SourceWorld);
         snapshot.Target = std::make_shared<const std::vector<glm::vec3>>(run->TargetWorld);
         snapshot.Revision = 1u;

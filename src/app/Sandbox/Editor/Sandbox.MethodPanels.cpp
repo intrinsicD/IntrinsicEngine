@@ -1050,6 +1050,12 @@ namespace Extrinsic::Sandbox::Editor
                 changed |= DrawPointSamplingControls("ConsolidationInitial", Runtime::PointSamplingFieldSpecs("initial_"),
                                                      "initial_", config.InitialSampling,
                                                      Runtime::PointCloudConsolidationConfig{}.InitialSampling);
+                int initialBackend = int(config.InitialBackend);
+                if (ImGui::Combo("Order on##ConsolidationInitial", &initialBackend, "CPU\0Vulkan (exact farthest point)\0"))
+                {
+                    config.InitialBackend = Runtime::PointSamplingBackend(initialBackend);
+                    changed = true;
+                }
                 ImGui::TreePop();
             }
 
@@ -1136,6 +1142,10 @@ namespace Extrinsic::Sandbox::Editor
                 "Backend: requested %s  actual %s",
                 summary.RequestedBackend.c_str(),
                 summary.ActualBackend.c_str());
+            if (!result->InitialSamplingBackend.empty())
+                ImGui::Text("Initial samples ordered on: %s", result->InitialSamplingBackend.c_str());
+            if (!result->InitialSamplingDiagnostic.empty())
+                ImGui::TextWrapped("%s", result->InitialSamplingDiagnostic.c_str());
             if (!summary.BackendDiagnostic.empty())
             {
                 ImGui::TextWrapped(

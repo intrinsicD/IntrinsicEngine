@@ -682,16 +682,18 @@ namespace Geometry::CoherentPointDrift
         }
         // Subsamples by Params::SubsampleSampling (default: exact farthest point from point 0),
         // cut before the first duplicate of an earlier sample; a method may return fewer.
-        const auto farthest = [&params](const Points& points, const std::size_t count)
+        const auto farthest = [&params](const Points& points, const std::size_t count,
+                                        const std::optional<PointSampling::Result>& precomputed)
         {
-            return EStep::SamplePoints({points.X, points.Y, points.Z}, count, params.SubsampleSampling);
+            return precomputed ? EStep::SamplePoints(*precomputed, points.X.size(), count)
+                               : EStep::SamplePoints({points.X, points.Y, points.Z}, count, params.SubsampleSampling);
         };
         if ((params.Method == Variant::Bayesian && params.SubsampleTarget > 0u && params.SubsampleTarget < n) || subsampled)
             stage(Stage::Subsampling);
         if (params.Method == Variant::Bayesian && params.SubsampleTarget > 0u && params.SubsampleTarget < n)
         {
             const Points full = s.Target;
-            const auto chosen = farthest(full, params.SubsampleTarget);
+            const auto chosen = farthest(full, params.SubsampleTarget, params.SubsampleTargetOrder);
             if (chosen.size() < 4u) return fail(Status::InvalidParameters);
             n = chosen.size();
             s.Target.Resize(n);
@@ -703,7 +705,7 @@ namespace Geometry::CoherentPointDrift
         {
             // Source becomes the samples; FullSource keeps every point for the interpolation.
             s.FullSource = s.Source;
-            s.Samples = farthest(s.FullSource, registered);
+            s.Samples = farthest(s.FullSource, registered, params.SubsampleSourceOrder);
             if (s.Samples.size() < 4u) return fail(Status::InvalidParameters);
             m = s.Samples.size();
             s.Source.Resize(m); s.Moved.Resize(m); s.PX.Resize(m);

@@ -1933,4 +1933,25 @@ TEST(PointCloudConsolidation, InitialSamplesFollowTheSelectedMethod)
     const auto result = Consolidation::Consolidate(points, params);
     EXPECT_NE(result.State, Consolidation::Status::NumericalFailure);
     EXPECT_EQ(result.Positions.size(), 120u);
+
+    // An order computed elsewhere (a Vulkan run) replaces the method's and is validated.
+    Geometry::PointSampling::Result external;
+    for (std::uint32_t i = 0; i < 120; ++i) external.Order.push_back(599u - 3u * i);
+    std::vector<std::size_t> chosen;
+    ASSERT_TRUE(Consolidation::SelectInitialSamples(points, 120, 42u, Geometry::PointSampling::Params{}, chosen, external));
+    EXPECT_EQ(chosen.front(), 599u - 3u * 119u);
+    EXPECT_TRUE(std::is_sorted(chosen.begin(), chosen.end()));
+    auto repeated = external;
+    repeated.Order[5] = repeated.Order[4];
+    auto outside = external;
+    outside.Order[0] = 600u;
+    auto shorter = external;
+    shorter.Order.pop_back();
+    for (const auto* bad : {&repeated, &outside, &shorter})
+        EXPECT_FALSE(Consolidation::SelectInitialSamples(points, 120, 42u, Geometry::PointSampling::Params{}, chosen, *bad));
+    params.InitialOrder = external;
+    const auto seeded = Consolidation::Consolidate(points, params);
+    EXPECT_EQ(seeded.Positions.size(), 120u);
+    params.InitialOrder = repeated;
+    EXPECT_EQ(Consolidation::Consolidate(points, params).State, Consolidation::Status::NumericalFailure);
 }

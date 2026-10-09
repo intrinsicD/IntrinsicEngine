@@ -3158,6 +3158,8 @@ namespace Extrinsic::Sandbox::Editor
             {
                 changed |= DrawPointSamplingControls("CPDSubsample", fields, "subsample_", config.SubsampleSampling,
                                                      defaults.SubsampleSampling);
+                changed |= DrawSpecEnumCombo("Backend##CPDSubsample", fields, "subsample_backend", config.SubsampleBackend,
+                                             defaults.SubsampleBackend);
                 ImGui::TreePop();
             }
         }
@@ -3314,6 +3316,12 @@ namespace Extrinsic::Sandbox::Editor
             if (r.EStepFallbacks > 0u)
                 ImGui::TextWrapped("GPU E-step fell back to the CPU %u time(s)%s%s", r.EStepFallbacks,
                                    r.GpuDiagnostic.empty() ? "" : ": ", r.GpuDiagnostic.c_str());
+            if (!r.SubsampleTargetBackend.empty() || !r.SubsampleSourceBackend.empty())
+                ImGui::Text("Subsamples ordered on: target %s, source %s",
+                            r.SubsampleTargetBackend.empty() ? "-" : r.SubsampleTargetBackend.c_str(),
+                            r.SubsampleSourceBackend.empty() ? "-" : r.SubsampleSourceBackend.c_str());
+            if (!r.SubsampleBackendDiagnostic.empty())
+                ImGui::TextWrapped("%s", r.SubsampleBackendDiagnostic.c_str());
             if (r.KernelRank > 0u)
                 ImGui::Text("Kernel rank: %u   kernel error: %.2g", r.KernelRank, r.KernelApproximationError);
             if (!r.Message.empty() && (snapshot.Phase == Phase::Failed || snapshot.Phase == Phase::Cancelled))

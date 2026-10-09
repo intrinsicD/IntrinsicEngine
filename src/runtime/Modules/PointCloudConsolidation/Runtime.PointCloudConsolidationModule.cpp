@@ -39,7 +39,9 @@ import Extrinsic.RHI.Device;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GeometryAvailability;
+import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.PointSamplingGpu;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldRegistry;
 import Geometry.PointCloud.Consolidation;
@@ -48,11 +50,13 @@ import Geometry.SpatialQueries;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Geometry.PointCloud;
 import Geometry.PointCloud.Utils;
+import Geometry.PointSampling;
 import Geometry.Properties;
 import Geometry.SupportRadius;
 
 #include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
 #include "Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.Internal.hpp"
+#include "Editor/internal/Runtime.EditorFramedGpuJob.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -674,6 +678,8 @@ namespace Extrinsic::Runtime
                 .Config = request.Config,
                 .RequestedBackend = request.Config.Backend,
                 .ActualBackend = PointCloudConsolidationBackend::None,
+                .InitialSamplingRequestedBackend = std::string(request.Config.InitialBackend == PointSamplingBackend::Vulkan
+                                                                   ? kPointSamplingGpuBackendId : kPointSamplingCpuBackendId),
                 .StrategyToken = std::string{StableToken(
                     request.Config.Strategy)},
                 .Error = error,
@@ -1343,13 +1349,36 @@ namespace Extrinsic::Runtime
             // The CPU reference's own selection, so both paths start from the same samples.
             std::vector<std::size_t> indices;
             if (!Consolidation::SelectInitialSamples(snapshot.Positions, target, snapshot.Params.Seed,
-                                                     snapshot.Params.InitialSampling, indices))
+                                                     snapshot.Params.InitialSampling, indices, snapshot.Params.InitialOrder))
                 return false;
             snapshot.GpuSeedRows.assign(indices.begin(), indices.end());
             snapshot.GpuInitialPositions.clear();
             for (const std::size_t i : indices)
                 snapshot.GpuInitialPositions.push_back(snapshot.Positions[i]);
             return true;
+        }
+
+        // RUNTIME-289: the initial ordering a result reports: the device when the solve took (or,
+        // before a worker adopted it, was handed) a device order, else the CPU when the method
+        // orders, else none (the seeded random subsample).
+        void ReportInitialSampling(PointCloudConsolidationResult& result, const PointCloudConsolidationSnapshot& snapshot)
+        {
+            const auto* pending = snapshot.InitialOrdering.get();
+            const bool device = snapshot.Params.InitialOrder.has_value() || (pending && pending->Order.has_value());
+            result.InitialSamplingBackend = device ? std::string(kPointSamplingGpuBackendId)
+                : snapshot.Params.InitialSampling ? std::string(kPointSamplingCpuBackendId) : std::string{};
+            result.InitialSamplingDiagnostic = pending ? pending->Diagnostic : snapshot.InitialSamplingDiagnostic;
+        }
+
+        // The ordering fields alone, for finalizers that must not touch the worker-owned snapshot.
+        [[nodiscard]] PointCloudConsolidationSnapshot InitialSamplingReportOf(const PointCloudConsolidationSnapshot& snapshot)
+        {
+            PointCloudConsolidationSnapshot report{};
+            report.Params.InitialSampling = snapshot.Params.InitialSampling;
+            report.Params.InitialOrder = snapshot.Params.InitialOrder;
+            report.InitialOrdering = snapshot.InitialOrdering;
+            report.InitialSamplingDiagnostic = snapshot.InitialSamplingDiagnostic;
+            return report;
         }
 
         [[nodiscard]] PointCloudConsolidationJobResult
@@ -1407,6 +1436,7 @@ namespace Extrinsic::Runtime
                     PointCloudConsolidationBackend::CpuReference;
             result.Completion.BackendDiagnostic =
                 result.Snapshot.BackendDiagnostic;
+            ReportInitialSampling(result.Completion, result.Snapshot);
 
             if (!publishable)
                 return result;
@@ -1440,7 +1470,7 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        [[nodiscard]] PointCloudConsolidationJobResult RunWorker(
+        [[nodiscard]] PointCloudConsolidationJobResult RunStages(
             PointCloudConsolidationSnapshot snapshot,
             const JobCancellation& cancellation)
         {
@@ -1592,6 +1622,26 @@ namespace Extrinsic::Runtime
                 std::move(consolidated),
                 actualBackend);
         }
+
+        // Every worker entry: adopts a device initial order (RUNTIME-289), runs the stages, and
+        // reports the ordering on whichever completion they return.
+        [[nodiscard]] PointCloudConsolidationJobResult RunWorker(
+            PointCloudConsolidationSnapshot snapshot,
+            const JobCancellation& cancellation)
+        {
+            if (snapshot.InitialOrdering)
+            {
+                // Copied: cancellation finalizers still read the shared state.
+                snapshot.Params.InitialOrder = snapshot.InitialOrdering->Order;
+                snapshot.InitialSamplingDiagnostic = snapshot.InitialOrdering->Diagnostic;
+                snapshot.InitialOrdering.reset();
+                snapshot.InitialOrderJob = {};
+            }
+            auto result = RunStages(std::move(snapshot), cancellation);
+            ReportInitialSampling(result.Completion, result.Snapshot);
+            return result;
+        }
+
 
         struct ConsolidationMutationIdentity
         {
@@ -2302,6 +2352,8 @@ namespace Extrinsic::Runtime
             const PointCloudConsolidationRequest request = snapshot.Request;
             const WorldHandle world = snapshot.World;
             const CommandCorrelationId correlation = snapshot.Correlation;
+            const JobToken ordering = snapshot.InitialOrderJob;
+            auto orderingReport = InitialSamplingReportOf(snapshot);
             using SharedJobResult =
                 std::shared_ptr<PointCloudConsolidationJobResult>;
             JobDesc job = MakeCpuJobDesc<SharedJobResult>(
@@ -2321,19 +2373,20 @@ namespace Extrinsic::Runtime
                         .Result = result};
                 });
             job.FinalizeUnpublishedOnMainThread =
-                [events, request, world, correlation]() mutable
+                [events, request, world, correlation, orderingReport = std::move(orderingReport)]() mutable
                 {
-                    PublishCompletion(
-                        events,
-                        MakeCompletion(
-                            request,
-                            world,
-                            correlation,
-                            PointCloudConsolidationRunStatus::Cancelled,
-                            Core::ErrorCode::InvalidState,
-                            "Point-set consolidation was cancelled before its result could be committed."));
+                    auto completion = MakeCompletion(
+                        request,
+                        world,
+                        correlation,
+                        PointCloudConsolidationRunStatus::Cancelled,
+                        Core::ErrorCode::InvalidState,
+                        "Point-set consolidation was cancelled before its result could be committed.");
+                    ReportInitialSampling(completion, orderingReport);
+                    PublishCompletion(events, std::move(completion));
                 };
             job.CorrelationId = correlation.Value;
+            if (ordering.IsValid()) job.DependsOn.push_back({ordering, "Order the initial samples on the device first"});
             const JobToken token = jobs.Submit(std::move(job));
             if (!token.IsValid())
             {
@@ -2475,14 +2528,21 @@ namespace Extrinsic::Runtime
         CommandOutcome SubmitProjectionGpu(JobService& jobs,KernelEventBus* events,SpatialIndexCache& cache,
             PointCloudConsolidationSnapshot snapshot,PointCloudConsolidationModuleStats& stats)
         {
+            auto orderingReport=InitialSamplingReportOf(snapshot);
             auto w=std::make_shared<ProjectionGpuWork>();w->Snapshot=std::move(snapshot);
             const auto request=w->Snapshot.Request;const auto world=w->Snapshot.World;const auto correlation=w->Snapshot.Correlation;
             const auto fallback=MakeCompletion(request,world,correlation,PointCloudConsolidationRunStatus::Cancelled,
                 Core::ErrorCode::InvalidState,"Consolidation Vulkan sequence cancelled; previous output retained.");
-            auto finalize=[events,w,fallback]()mutable
+            auto finalize=[events,w,fallback,orderingReport=std::move(orderingReport)]()mutable
             {
                 w->Abandoned=true;
-                if(!w->Delivered){w->Delivered=true;PublishCompletion(events,w->Failure?*w->Failure:fallback);}
+                if(!w->Delivered)
+                {
+                    w->Delivered=true;
+                    auto completion=w->Failure?*w->Failure:fallback;
+                    ReportInitialSampling(completion,orderingReport); // the worker may still own w->Snapshot
+                    PublishCompletion(events,std::move(completion));
+                }
             };
             auto validate=[w]{return w->Abandoned?JobApplyValidation::Cancelled:JobApplyValidation::Current;};
             auto check=[w](KernelEventBus&,const JobResultEnvelope&)
@@ -2497,7 +2557,7 @@ namespace Extrinsic::Runtime
                 }
                 return true;
             };
-            JobToken previous{};
+            JobToken previous=w->Snapshot.InitialOrderJob; // RUNTIME-289: a device initial order runs first
             auto submit=[&](JobDesc job)
             {
                 if(previous.IsValid())job.DependsOn.push_back({previous,"Complete previous consolidation stage before using its points"});
@@ -2579,11 +2639,82 @@ namespace Extrinsic::Runtime
             ++stats.GpuRequestsAccepted;return CommandOutcome::Ok();
         }
 
+        // RUNTIME-289: farthest-point initial samples asked on Vulkan are ordered by a framed device
+        // job (resident canonical positions; the snapshot holds the same rows in local space) before
+        // the solve, whose first job depends on it and adopts the verified order in RunWorker.
+        void SubmitInitialOrdering(CommandContext& context, const WorldHandle world, SpatialIndexCache* cache,
+                                   RHI::IDevice* device, PointCloudConsolidationSnapshot& snapshot)
+        {
+            const auto& sampling = snapshot.Params.InitialSampling;
+            if (!sampling) return; // the seeded random subsample is not an order
+            if (snapshot.Request.Config.InitialBackend != PointSamplingBackend::Vulkan) return;
+            const std::size_t points = snapshot.Positions.size();
+            const std::size_t target = snapshot.Params.TargetPointCount == 0u ? points : snapshot.Params.TargetPointCount;
+            const std::size_t count = std::min(target, points);
+            auto& why = snapshot.InitialSamplingDiagnostic;
+            // The seam's reasons already say the CPU ran.
+            why = cache == nullptr ? "No spatial compute service; sampling ran on the CPU."
+                                   : PointSamplingGpuUnsupportedReason(*sampling, points, count, device);
+            auto* residency = why.empty() ? cache->PropertyResidency() : nullptr;
+            if (why.empty() && residency == nullptr) why = "GPU property residency unavailable; sampling ran on the CPU.";
+            std::optional<Graphics::GpuPropertyView> positions;
+            if (why.empty())
+            {
+                positions = ResolveGpuPropertyInput(*residency, context.ActiveWorld, world,
+                                                    ResolveEntity(context.ActiveWorld.Raw(), snapshot.Request.StableEntityId),
+                                                    snapshot.Request.Properties.InputPositions);
+                if (!positions || positions->Layout.Count != points)
+                    why = "Resident sampling input acquisition refused; sampling ran on the CPU.";
+            }
+            if (!why.empty()) return;
+            auto ordering = std::make_shared<PointCloudConsolidationSnapshot::InitialOrderingState>();
+            auto gpu = std::make_shared<PointSamplingGpuRun>(
+                *cache, Graphics::FarthestPointGpuInput{.Positions = *positions, .FirstIndex = sampling->FirstIndex,
+                                                        .Count = std::uint32_t(count)},
+                snapshot.Positions, *sampling);
+            JobDesc job = EditorFeatureDetail::MakeFramedGpuJobDesc({
+                .DebugName = "Consolidation Vulkan initial samples",
+                .Scope = world,
+                .Current = [worlds = context.Worlds, world, id = snapshot.Request.StableEntityId, state = snapshot.SourceState] {
+                    auto* scene = worlds->Get(world);
+                    const auto entity = scene ? ResolveEntity(scene->Raw(), id) : ECS::InvalidEntityHandle;
+                    const auto* properties = entity != ECS::InvalidEntityHandle
+                        ? ResolveGeometryPropertySet(BuildGeometryAvailability(scene->Raw(), entity), state.Domain) : nullptr;
+                    return properties != nullptr && SamePropertyState(*properties, state);
+                },
+                .Queue = [cache, gpu] { return gpu->QueueNext(*cache); },
+                .Observe = [gpu](const SpatialGpuResult& chunk) { return gpu->Observe(chunk); },
+                .Publish = [ordering, gpu, count](const SpatialGpuResult* chunk) {
+                    if (chunk == nullptr || chunk->State != SpatialQueryState::Ready)
+                        ordering->Diagnostic = (chunk && !chunk->Diagnostic.empty() ? chunk->Diagnostic
+                                                                                    : std::string("GPU sampling submission refused")) +
+                                               "; sampling ran on the CPU.";
+                    else if (gpu->Current().Order.size() != count)
+                        ordering->Diagnostic = "The Vulkan sampler returned an incomplete order; sampling ran on the CPU.";
+                    else if (gpu->VerifyPrefix(ordering->Diagnostic))
+                        ordering->Order = gpu->Current();
+                    return true;
+                },
+                // Stale or cancelled: the dependent consolidation job is cancelled with it.
+                .Abandon = [] {},
+            });
+            job.CorrelationId = snapshot.Correlation.Value;
+            const JobToken token = context.Jobs->Submit(std::move(job));
+            if (!token.IsValid())
+            {
+                why = "The job lane rejected the Vulkan initial-sample run; sampling ran on the CPU.";
+                return;
+            }
+            snapshot.InitialOrdering = std::move(ordering);
+            snapshot.InitialOrderJob = token;
+        }
+
         [[nodiscard]] CommandOutcome HandleRunCommand(
             CommandContext& context,
             const PointCloudConsolidationRequest& request,
             PointCloudConsolidationModuleStats& stats,
-            SpatialIndexCache* spatialIndices)
+            SpatialIndexCache* spatialIndices,
+            RHI::IDevice* device)
         {
             stats.CommandsHandled += 1u;
             if (context.Jobs == nullptr || context.Worlds == nullptr ||
@@ -2651,6 +2782,7 @@ namespace Extrinsic::Runtime
                 snapshot->SourceIndex = std::shared_ptr<const Geometry::PointLBVH::Index>(lease, &lease->Index);
                 snapshot->ReusedSpatialIndex = acquired.Reused;
             }
+            SubmitInitialOrdering(context, world, spatialIndices, device, *snapshot);
             if (request.Config.Backend == PointCloudConsolidationBackend::VulkanLBVH)
                 return SubmitProjectionGpu(*context.Jobs,context.Events,*spatialIndices,std::move(*snapshot),stats);
             return SubmitSnapshot(
@@ -2783,7 +2915,7 @@ namespace Extrinsic::Runtime
                 CommandContext& context,
                 const PointCloudConsolidationRequest& request)
             {
-                return HandleRunCommand(context, request, m_Stats, m_SpatialIndices);
+                return HandleRunCommand(context, request, m_Stats, m_SpatialIndices, m_Device);
             });
         m_JobCompletedSubscription =
             setup.Subscribe<PointCloudConsolidationJobCompleted>(

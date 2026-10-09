@@ -22,6 +22,7 @@ module;
 #include <functional>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -137,6 +138,9 @@ export namespace Geometry::CoherentPointDrift
         // are chosen (RUNTIME-289); the default is exact farthest point from point 0.
         PointSampling::Params SubsampleSampling{};
         PointSampling::Params LandmarkSampling{};
+        // Bayesian: orders of the full target/source computed elsewhere (a Vulkan run, RUNTIME-289),
+        // used instead of SubsampleSampling; an invalid order fails with InvalidParameters.
+        std::optional<PointSampling::Result> SubsampleTargetOrder{}, SubsampleSourceOrder{};
         // Vulkan E-step: the device evaluator (METHOD-056); empty runs every iteration on the CPU.
         EStep::ExternalEvaluator EStepExternal{};
         // UI-067: polled (from several threads) during the kernel builds, every E-step chunk and

@@ -458,10 +458,11 @@ namespace Geometry::PointCloud::Consolidation
             const std::size_t target,
             const std::uint32_t seed,
             const std::optional<PointSampling::Params>& sampling,
+            const std::optional<PointSampling::Result>& precomputed,
             std::vector<glm::vec3>& projected,
             std::vector<std::size_t>& selectedIndices)
         {
-            if (!SelectInitialSamples(positions, target, seed, sampling, selectedIndices))
+            if (!SelectInitialSamples(positions, target, seed, sampling, selectedIndices, precomputed))
                 return false;
             projected.clear();
             projected.reserve(selectedIndices.size());
@@ -1965,7 +1966,7 @@ namespace Geometry::PointCloud::Consolidation
 
     bool SelectInitialSamples(const std::span<const glm::vec3> positions, const std::size_t target,
                               const std::uint32_t seed, const std::optional<PointSampling::Params>& sampling,
-                              std::vector<std::size_t>& indices)
+                              std::vector<std::size_t>& indices, const std::optional<PointSampling::Result>& precomputed)
     {
         indices.clear();
         if (target == 0u || target > positions.size())
@@ -1982,11 +1983,16 @@ namespace Geometry::PointCloud::Consolidation
             indices = sample->SelectedIndices;
             return indices.size() == target;
         }
-        const auto order = PointSampling::Order(positions, *sampling, target);
+        const auto order = precomputed ? *precomputed : PointSampling::Order(positions, *sampling, target);
         if (!order.Succeeded() || order.Order.size() != target)
             return false;
         indices.assign(order.Order.begin(), order.Order.end());
         std::sort(indices.begin(), indices.end());
+        if (indices.back() >= positions.size() || std::adjacent_find(indices.begin(), indices.end()) != indices.end())
+        {
+            indices.clear();
+            return false;
+        }
         return true;
     }
 
@@ -2095,7 +2101,7 @@ namespace Geometry::PointCloud::Consolidation
         std::vector<glm::vec3> projected{};
         std::vector<std::size_t> selectedIndices{};
         if (!InitializeProjected(
-                positions, initialTarget, params.Seed, params.InitialSampling,
+                positions, initialTarget, params.Seed, params.InitialSampling, params.InitialOrder,
                 projected, selectedIndices))
         {
             result.State = Status::NumericalFailure;
@@ -2369,7 +2375,7 @@ namespace Geometry::PointCloud::Consolidation
                 : params.TargetPointCount;
             std::vector<std::size_t> selectedIndices{};
             if (!InitializeProjected(
-                    source, std::min(target, source.size()), params.Seed, params.InitialSampling,
+                    source, std::min(target, source.size()), params.Seed, params.InitialSampling, params.InitialOrder,
                     Projected, selectedIndices))
             {
                 Fail(Status::NumericalFailure);
@@ -2604,7 +2610,7 @@ namespace Geometry::PointCloud::Consolidation
         if (!result.Succeeded()) return result;
         std::vector<std::size_t> selected;
         if (!InitializeProjected(source, params.TargetPointCount ? params.TargetPointCount : source.size(),
-            params.Seed, params.InitialSampling, result.Positions, selected)) result.State = Status::NumericalFailure;
+            params.Seed, params.InitialSampling, params.InitialOrder, result.Positions, selected)) result.State = Status::NumericalFailure;
         result.Diagnostics.OutputPointCount = result.Positions.size();
         return result;
     }

@@ -24,6 +24,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <gtest/gtest.h>
 
+import Geometry.PointSampling;
 import Geometry.Registration.CoherentPointDrift;
 
 namespace CPD = Geometry::CoherentPointDrift;
@@ -308,4 +309,39 @@ TEST(CoherentPointDriftBayesian, InvalidSettingsFailClosedAndRunsAreDeterministi
     ASSERT_TRUE(first.Succeeded());
     for (std::size_t i = 0; i < first.TransformedSource.size(); ++i)
         ASSERT_EQ(first.TransformedSource[i], second.TransformedSource[i]);
+}
+
+// RUNTIME-289: orders computed elsewhere (a Vulkan run) replace the solver's own sampling, are cut
+// before the first duplicate like it, and fail closed when malformed.
+TEST(CoherentPointDriftBayesian, PrecomputedSubsampleOrdersAreUsedAndValidated)
+{
+    const Fixture f = Deformed(Cloud(120, 15), 0.003, 16);
+    CPD::Params params = Bayesian();
+    params.SubsampleSource = 8;
+    params.SubsampleTarget = 10;
+    params.MaxIterations = 2;
+    const auto order = [](std::vector<std::uint32_t> indices, std::vector<double> clearance = {}) {
+        Geometry::PointSampling::Result r;
+        r.Order = std::move(indices);
+        r.Clearance = std::move(clearance);
+        return r;
+    };
+    params.SubsampleSourceOrder = order({7, 3, 99, 0, 11, 54, 21, 8});
+    // A zero clearance marks a duplicate: the target subsample stops before it.
+    params.SubsampleTargetOrder = order({5, 6, 7, 8, 9, 10, 11, 12, 13, 14},
+                                        {INFINITY, 1, 1, 1, 1, 1, 0, 1, 1, 1});
+    const auto run = CPD::Register(f.Target, f.Source, params);
+    ASSERT_TRUE(run.Succeeded());
+    EXPECT_EQ(run.SourceSamples, (std::vector<std::uint32_t>{7, 3, 99, 0, 11, 54, 21, 8}));
+    EXPECT_EQ(run.TargetSamples, (std::vector<std::uint32_t>{5, 6, 7, 8, 9, 10}));
+
+    const auto refused = [&](Geometry::PointSampling::Result bad) {
+        CPD::Params p = params;
+        p.SubsampleSourceOrder = std::move(bad);
+        return CPD::Register(f.Target, f.Source, p).State;
+    };
+    EXPECT_EQ(refused(order({1, 2, 3, 3, 4, 5})), CPD::Status::InvalidParameters);    // repeated index
+    EXPECT_EQ(refused(order({1, 2, 3, 4, 120})), CPD::Status::InvalidParameters);     // out of range
+    EXPECT_EQ(refused(order({0, 1, 2, 3, 4, 5, 6, 7, 9})), CPD::Status::InvalidParameters); // longer than asked
+    EXPECT_EQ(refused(order({1, 2, 3, 4}, {INFINITY, 1})), CPD::Status::InvalidParameters); // clearance size
 }

@@ -1744,7 +1744,7 @@ namespace Extrinsic::Runtime
             json plain = json::object();
             json sampling = json::object();
             for (const auto& [key, value] : object->items())
-                (key.starts_with("initial_") ? sampling : plain)[key] = value;
+                (key.starts_with("initial_") && key != "initial_backend" ? sampling : plain)[key] = value;
             if (!sampling.empty())
             {
                 json merged = json::object();
@@ -1773,6 +1773,7 @@ namespace Extrinsic::Runtime
                 context,
                 plain,
                 {"backend",
+                 "initial_backend",
                  "strategy",
                  "support_radius_mode",
                  "support_radius",
@@ -1806,6 +1807,19 @@ namespace Extrinsic::Runtime
                 CountParsed(context);
             }
 
+            if (ReadEnum(
+                    context,
+                    *object,
+                    "initial_backend",
+                    [](std::string_view text) -> std::optional<PointSamplingBackend> {
+                        if (text == "cpu") return PointSamplingBackend::Cpu;
+                        if (text == "vulkan") return PointSamplingBackend::Vulkan;
+                        return std::nullopt;
+                    },
+                    config.InitialBackend))
+            {
+                CountParsed(context);
+            }
             if (ReadEnum(
                     context,
                     *object,
@@ -2944,6 +2958,7 @@ namespace Extrinsic::Runtime
             {"gpu_query_batch_size", config.GpuQueryBatchSize},
             {"gpu_radius_capacity", config.GpuRadiusCapacity},
             {"backend", std::string{ToConfigString(config.Backend)}},
+            {"initial_backend", config.InitialBackend == PointSamplingBackend::Vulkan ? "vulkan" : "cpu"},
             {"strategy", std::string{ToConfigString(config.Strategy)}},
             {"support_radius_mode",
              std::string{ToConfigString(config.SupportRadiusMode)}},

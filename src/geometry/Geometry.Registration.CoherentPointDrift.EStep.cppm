@@ -211,4 +211,8 @@ export namespace Geometry::CoherentPointDrift::EStep
     // of an earlier sample (zero clearance) for the farthest-point family.
     [[nodiscard]] std::vector<std::uint32_t> SamplePoints(PointSet points, std::size_t count,
                                                           const PointSampling::Params& params);
+    // The same cut of an order computed elsewhere (a device run, RUNTIME-289) over `points`
+    // points; empty when it failed, is longer than `count`, or repeats or exceeds an index.
+    [[nodiscard]] std::vector<std::uint32_t> SamplePoints(const PointSampling::Result& order, std::size_t points,
+                                                          std::size_t count);
 }

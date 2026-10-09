@@ -39,6 +39,17 @@ namespace Extrinsic::Runtime
         bool ReusedSpatialIndex{false};
         std::uint64_t GpuSourceHandle{};
         std::string BackendDiagnostic{};
+        // RUNTIME-289: why a Vulkan initial order ran on the CPU. A device order arrives through
+        // InitialOrdering from the job InitialOrderJob, which the worker job depends on; RunWorker
+        // moves it into Params.InitialOrder, from which results report the backend.
+        std::string InitialSamplingDiagnostic{};
+        struct InitialOrderingState
+        {
+            std::optional<Geometry::PointSampling::Result> Order{};
+            std::string Diagnostic{};
+        };
+        std::shared_ptr<InitialOrderingState> InitialOrdering{};
+        JobToken InitialOrderJob{};
     };
 
     struct PointCloudConsolidationJobResult

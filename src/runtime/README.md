@@ -822,6 +822,19 @@ selectable: `subsample_*` chooses how the Bayesian source and target subsamples
 landmarks are picked (every `Geometry.PointSampling` method; exact farthest point by default). Point
 cloud consolidation takes the same block as `initial_*` for its initial samples (Random keeps
 the seeded legacy subsample; CPU and Vulkan paths share `SelectInitialSamples`).
+`subsample_backend` (CPD) and `initial_backend` (consolidation, `"cpu"` / `"vulkan"`) order
+those samples on the device: a framed job runs exact farthest point through
+`Extrinsic.Runtime.PointSamplingGpu` on the resident positions (CPD: captured live rows and
+model; consolidation: local rows) before the solver job, which depends on it and takes the
+verified order (`CPD::Params::SubsampleTargetOrder` / `SubsampleSourceOrder`,
+`Consolidation::Params::InitialOrder`; the geometry rejects orders that repeat or exceed an
+index). Any other case orders on the CPU and says why. CPD reports
+`subsample_requested_backend`, `subsample_target_backend`, `subsample_source_backend` (empty
+when that set is not subsampled) and `subsample_backend_diagnostic`; consolidation reports
+`initial_sampling_requested_backend`, `initial_sampling_backend` (empty for the random
+subsample) and `initial_sampling_diagnostic`, apart from its solve backend. A run that ends
+before solving (cancelled, rejected input) reports the backend that was to order its samples.
+CPD landmarks always stay on the CPU.
 
 ### Point Sampling Operation
 

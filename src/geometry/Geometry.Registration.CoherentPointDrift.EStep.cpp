@@ -1617,9 +1617,23 @@ namespace Geometry::CoherentPointDrift::EStep
     std::vector<std::uint32_t> SamplePoints(const PointSet points, const std::size_t count,
                                             const PointSampling::Params& params)
     {
-        const auto order = PointSampling::Order(PointSampling::PointView{points.X, points.Y, points.Z}, params, count);
+        return SamplePoints(PointSampling::Order(PointSampling::PointView{points.X, points.Y, points.Z}, params, count),
+                            points.Size(), count);
+    }
+
+    std::vector<std::uint32_t> SamplePoints(const PointSampling::Result& order, const std::size_t points,
+                                            const std::size_t count)
+    {
         std::vector<std::uint32_t> out;
-        if (!order.Succeeded()) return out;
+        if (!order.Succeeded() || order.Order.size() > count ||
+            (!order.Clearance.empty() && order.Clearance.size() != order.Order.size()))
+            return out;
+        std::vector<bool> seen(points, false);
+        for (const std::uint32_t i : order.Order)
+        {
+            if (i >= points || seen[i]) return out;
+            seen[i] = true;
+        }
         for (std::size_t k = 0; k < order.Order.size(); ++k)
         {
             if (k > 0 && !order.Clearance.empty() && !(order.Clearance[k] > 0.0)) break;

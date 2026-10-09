@@ -1404,3 +1404,89 @@ TEST(PointCloudConsolidationGpuParity, ResidentLopMultipleProjectionAndReducePag
     EXPECT_EQ(Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot().VulkanValidationErrorCount,
         validation.VulkanValidationErrorCount);
 }
+
+namespace
+{
+    // RUNTIME-289: the same CPU consolidation with its farthest-point initial samples ordered on
+    // the CPU (entity 0), then on Vulkan (entity 1).
+    class InitialOrderingApp final : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        std::vector<glm::vec3> Input = MakePlane(16u, 12u, 1.7);
+        std::vector<Runtime::PointCloudConsolidationResult> Results;
+        std::array<ECS::EntityHandle, 2> Entities{};
+        ECS::Scene::Registry* Scene{};
+        bool TimedOut{};
+        std::vector<glm::vec3> Rows(std::size_t k) const
+        {
+            return std::as_const(Scene->Raw().get<GS::Vertices>(Entities[k]).Properties).Get<glm::vec3>("v:position").Vector();
+        }
+    private:
+        Runtime::PointCloudConsolidationService* Service{};
+        Runtime::KernelEventSubscription Subscription{};
+        std::chrono::steady_clock::time_point Started{std::chrono::steady_clock::now()};
+        bool Waiting{};
+        void Resolve() override
+        {
+            Service = Kernel().Services().Find<Runtime::PointCloudConsolidationService>();
+            Scene = Kernel().Worlds().Get(Kernel().ActiveWorld());
+            ASSERT_NE(Service, nullptr);
+            for (auto& entity : Entities)
+            {
+                entity = Scene->Create();
+                SetPositions(Scene->Raw().emplace<GS::Vertices>(entity), Input);
+            }
+            Subscription = Service->SubscribeCompleted([this](const auto& r) {
+                if (r.Status == Runtime::PointCloudConsolidationRunStatus::Queued) return;
+                Results.push_back(r);
+                Waiting = false;
+            });
+        }
+        void Frame(double, double) override
+        {
+            if (std::chrono::steady_clock::now() - Started > std::chrono::seconds(120)) { TimedOut = true; Kernel().RequestExit(); return; }
+            if (!Kernel().GetDevice().IsOperational() || Waiting) return;
+            if (Results.size() == 2u) { Kernel().RequestExit(); return; }
+            const std::size_t k = Results.size();
+            auto config = MakeConfig(Runtime::PointCloudConsolidationStrategy::Lop, 0.35, 70u, 42u);
+            config.Backend = Runtime::PointCloudConsolidationBackend::CpuReference;
+            config.MaxIterations = 3u;
+            config.InitialSampling.Method = Runtime::PointSamplingMethod::FarthestPoint;
+            config.InitialBackend = k == 0u ? Runtime::PointSamplingBackend::Cpu : Runtime::PointSamplingBackend::Vulkan;
+            Waiting = true;
+            (void)Service->Run({.StableEntityId = Runtime::SelectionController::ToStableEntityId(Entities[k]),
+                .Properties = Runtime::MakePointCloudConsolidationPropertyRefs(Runtime::GeometryElementDomain::PointCloudPoint, "v:position"),
+                .Config = config});
+        }
+        void Shutdown() override { if (Service) Service->Unsubscribe(Subscription); }
+    };
+}
+
+TEST(PointCloudConsolidationGpuParity, VulkanOrderedInitialSamplesMatchTheCpuOrder)
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize()) GTEST_SKIP() << "Requires the opt-in Vulkan display.";
+    auto config = Runtime::CreateReferenceEngineConfig();
+    config.Window.Width = config.Window.Height = 64;
+    config.Render.EnableValidation = true;
+    config.Render.EnableVSync = false;
+    config.ReferenceScene.Enabled = false;
+    auto app = std::make_unique<InitialOrderingApp>();
+    auto* view = app.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.Initialize();
+    if (!engine.GetDevice().SupportsShaderFloat64()) { engine.Shutdown(); GTEST_SKIP() << "Shader float64 unavailable"; }
+    engine.Run();
+    EXPECT_FALSE(view->TimedOut);
+    ASSERT_EQ(view->Results.size(), 2u);
+    for (const auto& r : view->Results) ASSERT_TRUE(r.Succeeded()) << r.Message;
+    EXPECT_EQ(view->Results[0].InitialSamplingBackend, "cpu_reference");
+    EXPECT_EQ(view->Results[1].InitialSamplingRequestedBackend, "gpu_vulkan_compute");
+    EXPECT_EQ(view->Results[1].InitialSamplingBackend, "gpu_vulkan_compute") << view->Results[1].InitialSamplingDiagnostic;
+    EXPECT_EQ(view->Results[1].OutputPointCount, 70u);
+    // The device order equals the CPU order bitwise on the same rows, so the runs are identical.
+    EXPECT_EQ(view->Rows(1), view->Rows(0));
+    engine.Shutdown();
+}

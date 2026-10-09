@@ -552,6 +552,57 @@ TEST(CoherentPointDriftOperations, SamplingMethodsAreSelectableForSubsamplesAndL
     EXPECT_GT(result.KernelRank, 0u);
 }
 
+// RUNTIME-289: a subsample asked on Vulkan without a framed device is ordered on the CPU, per
+// set, with the reason; sets that are not subsampled report no backend.
+TEST(CoherentPointDriftOperations, VulkanSubsamplesWithoutADeviceRunOnTheCpuAndSayWhy)
+{
+    R::CoherentPointDriftConfig roundTrip{.Method = M::Bayesian, .Output = O::Positions};
+    roundTrip.SubsampleBackend = R::PointSamplingBackend::Vulkan;
+    const auto decoded = R::DecodeCoherentPointDriftConfig(R::SerializeCoherentPointDriftConfig(roundTrip));
+    ASSERT_TRUE(decoded.has_value());
+    EXPECT_EQ(decoded->SubsampleBackend, R::PointSamplingBackend::Vulkan);
+
+    Scene s;
+    const auto points = Cloud(300, 61);
+    std::vector<glm::vec3> moved;
+    for (const auto& p : points) moved.push_back(p + glm::vec3(0.05f, -0.02f, 0.03f));
+    const auto source = Make(s.Registry, D::PointCloudPoint, points);
+    const auto target = Make(s.Registry, D::PointCloudPoint, moved);
+    R::CoherentPointDriftConfig config{.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target),
+                                       .Method = M::Bayesian, .OutlierWeight = 0.1, .MaxIterations = 5,
+                                       .Output = O::DisplacementProperty, .DisplacementName = "bcpd", .Subsample = 100};
+    config.SubsampleBackend = R::PointSamplingBackend::Vulkan;
+    const auto immediate = R::ApplyEditorCoherentPointDriftCommand(s.Commands(), config);
+    ASSERT_TRUE(immediate.Succeeded()) << immediate.Message;
+    EXPECT_EQ(immediate.SubsampleRequestedBackend, "gpu_vulkan_compute");
+    EXPECT_EQ(immediate.SubsampleSourceBackend, "cpu_reference");
+    EXPECT_EQ(immediate.SubsampleTargetBackend, "");
+    EXPECT_EQ(immediate.SubsampleBackendDiagnostic, "Source: No job lane or spatial compute service; sampling ran on the CPU.");
+
+    auto plainConfig = config;
+    plainConfig.Method = M::Nonrigid;
+    plainConfig.DisplacementName = "warp";
+    const auto plain = R::ApplyEditorCoherentPointDriftCommand(s.Commands(), plainConfig);
+    ASSERT_TRUE(plain.Succeeded()) << plain.Message;
+    EXPECT_EQ(plain.SubsampleSourceBackend, "");
+    EXPECT_EQ(plain.SubsampleTargetBackend, "");
+    EXPECT_EQ(plain.SubsampleBackendDiagnostic, "");
+
+    Extrinsic::Tests::EditorJobHarness jobs;
+    jobs.Attach(s.Context);
+    config.SubsampleTarget = 120;
+    config.DisplacementName = "bcpd_queued";
+    R::EditorCoherentPointDriftResult queued;
+    (void)R::ApplyEditorCoherentPointDriftCommand(s.Commands(), config,
+        [&](R::EditorCoherentPointDriftResult result) { queued = std::move(result); });
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    ASSERT_TRUE(queued.Succeeded()) << queued.Message;
+    EXPECT_EQ(queued.SubsampleSourceBackend, "cpu_reference");
+    EXPECT_EQ(queued.SubsampleTargetBackend, "cpu_reference");
+    EXPECT_NE(queued.SubsampleBackendDiagnostic.find("Target: No job lane or spatial compute service"), std::string::npos)
+        << queued.SubsampleBackendDiagnostic;
+}
+
 TEST(CoherentPointDriftOperations, VulkanEStepBrokerFailsClosedAndTimesOut)
 {
     // METHOD-056 review: the worker/main-thread handoff without a framed device. A refused

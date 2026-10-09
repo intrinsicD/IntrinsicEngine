@@ -197,6 +197,13 @@ TEST(PointCloudConsolidationConfig, InitialSamplingRoundTripsAndInvalidBlocksKee
     EXPECT_FALSE(result.Diagnostics.empty()) << "eta 1 with a cap of 8 is rejected with a warning";
     const auto bad = R::ValidatePointCloudConsolidationConfigSection(R"({"initial_beta": 0.5})", {}, "test");
     EXPECT_FALSE(bad.Diagnostics.empty());
+
+    // The ordering backend sits beside the block, not in it.
+    value.InitialBackend = R::PointSamplingBackend::Vulkan;
+    R::SetPointCloudConsolidationConfig(engine, value);
+    EXPECT_EQ(R::GetPointCloudConsolidationConfig(engine)->InitialBackend, R::PointSamplingBackend::Vulkan);
+    EXPECT_TRUE(R::ValidatePointCloudConsolidationConfigSection(R"({"initial_backend": "vulkan"})", {}, "test").Diagnostics.empty());
+    EXPECT_FALSE(R::ValidatePointCloudConsolidationConfigSection(R"({"initial_backend": "metal"})", {}, "test").Diagnostics.empty());
 }
 
 TEST(PointCloudConsolidationConfig, ShortLopPreservesUnusedNormalSettings)

@@ -71,6 +71,9 @@ export namespace Extrinsic::Runtime
         // How the initial samples are picked ("initial_*", RUNTIME-289); Random keeps the
         // seeded legacy subsample driven by `Seed`.
         PointSamplingConfig InitialSampling{.Method = PointSamplingMethod::Random};
+        // Where a farthest-point initial order is computed ("initial_backend": "cpu" or "vulkan",
+        // RUNTIME-289); results report it apart from the consolidation backend.
+        PointSamplingBackend InitialBackend{PointSamplingBackend::Cpu};
 
         std::uint32_t GpuPreviewInterval{5u};
         std::uint32_t GpuQueryBatchSize{4096u};

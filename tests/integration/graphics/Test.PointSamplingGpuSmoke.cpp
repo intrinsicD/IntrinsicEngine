@@ -2,6 +2,7 @@
 // several chunks, of which only the last reads the order back (GRAPHICS-153; earlier observed
 // prefixes are empty), which equals the CPU reference bitwise (order and clearances, duplicates included). Editor: the
 // Vulkan backend of the point-sampling command against its CPU backend, three runs equal.
+// RUNTIME-289: a Bayesian CPD run with both subsamples ordered on the device equals its CPU run.
 #include "RuntimeTestModule.hpp"
 #include <algorithm>
 #include <chrono>
@@ -27,6 +28,7 @@ import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.PointSamplingGpu;
 import Extrinsic.Runtime.PointSamplingOperations;
+import Extrinsic.Runtime.RegistrationOperations;
 import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -210,6 +212,116 @@ namespace
         bool Verified{false}, Waiting{false};
         int Phase{0};
     };
+}
+
+namespace
+{
+    // RUNTIME-289: the same Bayesian CPD run with its subsamples ordered on the CPU, then on Vulkan.
+    class CpdSubsampleApp final : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        void Resolve() override
+        {
+            Started = std::chrono::steady_clock::now();
+            Context.Scene = Kernel().Worlds().Get(Kernel().ActiveWorld());
+            Context.World = Kernel().ActiveWorld();
+            Context.SpatialIndices = Kernel().Services().Find<Runtime::SpatialIndexCache>();
+            Context.Device = &Kernel().GetDevice();
+            Context.CommandHistory = &History;
+            Context.JobCommands.Submit = [this](Runtime::JobDesc desc, Runtime::EditorJobIdentity) {
+                return Kernel().Jobs().Submit(std::move(desc));
+            };
+            const auto make = [this](const std::vector<glm::vec3>& points, glm::vec3 position) {
+                const auto entity = Context.Scene->Create();
+                auto& transform = Context.Scene->Raw().emplace<T::Component>(entity);
+                transform.Position = position;
+                transform.Rotation = glm::angleAxis(0.21f, glm::normalize(glm::vec3(2, 1, 3)));
+                auto& vertices = Context.Scene->Raw().emplace<GS::Vertices>(entity).Properties;
+                vertices.Resize(points.size());
+                vertices.GetOrAdd<glm::vec3>("v:position").Vector() = points;
+                auto deleted = vertices.GetOrAdd<bool>("v:deleted", false);
+                for (std::size_t i = 0; i < points.size(); i += 13) deleted[i] = true;
+                return entity;
+            };
+            const auto points = Cloud(2500, 0, 21u);
+            std::vector<glm::vec3> moved;
+            for (const auto& p : points) moved.push_back(p + glm::vec3(0.04f * std::sin(3.0f * p.y), 0.02f, -0.03f));
+            Source = make(points, {0.5f, 0.0f, 0.0f});
+            Target = make(moved, {0.55f, -0.05f, 0.02f});
+        }
+
+        std::vector<glm::vec3> Displacement(const std::string& name) const
+        {
+            return std::as_const(Context.Scene->Raw().get<GS::Vertices>(Source).Properties).Get<glm::vec3>(name).Vector();
+        }
+
+        void Frame(double, double) override
+        {
+            if (std::chrono::steady_clock::now() - Started > std::chrono::seconds(180))
+            {
+                ADD_FAILURE() << "RUNTIME-289 timeout in phase " << Phase;
+                Kernel().RequestExit();
+                return;
+            }
+            if (!Kernel().GetDevice().IsOperational() || Waiting) return;
+            if (Phase == 2) { Kernel().RequestExit(); return; }
+            const bool vulkan = Phase == 1;
+            Runtime::CoherentPointDriftConfig config{
+                .SourceStableEntityId = Runtime::SelectionController::ToStableEntityId(Source),
+                .TargetStableEntityId = Runtime::SelectionController::ToStableEntityId(Target),
+                .Method = Runtime::CoherentPointDriftMethod::Bayesian, .OutlierWeight = 0.1, .MaxIterations = 4,
+                .Output = Runtime::CoherentPointDriftOutput::DisplacementProperty,
+                .DisplacementName = vulkan ? "v:vulkan_bcpd" : "v:cpu_bcpd", .Subsample = 300, .SubsampleTarget = 400};
+            config.SubsampleBackend = vulkan ? Runtime::PointSamplingBackend::Vulkan : Runtime::PointSamplingBackend::Cpu;
+            Waiting = true;
+            (void)Runtime::ApplyEditorCoherentPointDriftCommand(Runtime::BindEditorProcessingCommands(Context), config,
+                [this, vulkan](Runtime::EditorCoherentPointDriftResult result) {
+                    (vulkan ? Vulkan : Cpu) = std::move(result);
+                    Waiting = false;
+                    ++Phase;
+                });
+        }
+
+        void Shutdown() override { Context = {}; }
+
+        Runtime::EditorProcessingContext Context{};
+        Runtime::EditorCommandHistory History{};
+        entt::entity Source{entt::null}, Target{entt::null};
+        std::optional<Runtime::EditorCoherentPointDriftResult> Cpu{}, Vulkan{};
+        std::chrono::steady_clock::time_point Started{};
+        bool Waiting{false};
+        int Phase{0};
+    };
+}
+
+TEST(RUNTIME289VulkanCpdSubsamples, DeviceOrderedSubsamplesRegisterLikeTheCpu)
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize()) GTEST_SKIP() << "GLFW unavailable";
+    auto config = Runtime::CreateReferenceEngineConfig();
+    config.Window.Width = 64;
+    config.Window.Height = 64;
+    config.Render.EnableValidation = true;
+    config.Render.EnableVSync = false;
+    config.ReferenceScene.Enabled = false;
+    auto app = std::make_unique<CpdSubsampleApp>();
+    auto* run = app.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.Initialize();
+    Shutdown shutdown{engine};
+    if (!engine.GetDevice().SupportsShaderFloat64()) GTEST_SKIP() << "Shader float64 unavailable";
+    engine.Run();
+    ASSERT_EQ(run->Phase, 2);
+    ASSERT_TRUE(run->Cpu && run->Vulkan);
+    ASSERT_TRUE(run->Cpu->Succeeded()) << run->Cpu->Message;
+    ASSERT_TRUE(run->Vulkan->Succeeded()) << run->Vulkan->Message;
+    EXPECT_EQ(run->Cpu->SubsampleTargetBackend, "cpu_reference");
+    EXPECT_EQ(run->Vulkan->SubsampleRequestedBackend, "gpu_vulkan_compute");
+    EXPECT_EQ(run->Vulkan->SubsampleTargetBackend, "gpu_vulkan_compute") << run->Vulkan->SubsampleBackendDiagnostic;
+    EXPECT_EQ(run->Vulkan->SubsampleSourceBackend, "gpu_vulkan_compute") << run->Vulkan->SubsampleBackendDiagnostic;
+    EXPECT_EQ(run->Vulkan->Iterations, run->Cpu->Iterations);
+    // Prediction: no rounding ties in this fixture, so both backends choose the same samples.
+    EXPECT_EQ(run->Displacement("v:vulkan_bcpd"), run->Displacement("v:cpu_bcpd"));
 }
 
 TEST(RUNTIME290VulkanPointSampling, FarthestPointMatchesTheCpuAcrossChunksAndThroughTheEditor)

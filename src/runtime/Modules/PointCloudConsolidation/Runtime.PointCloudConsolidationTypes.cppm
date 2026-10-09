@@ -110,6 +110,12 @@ export namespace Extrinsic::Runtime
         std::uint64_t GpuInputUploadBytes{}, GpuInputCacheHits{}, CpuStageUploadBytes{}, CpuStageReadbackBytes{};
         std::uint32_t GpuSubmissions{}, GpuPreviews{};
         std::string BackendDiagnostic{};
+        // Initial samples (RUNTIME-289): the backend asked for, the one that orders them (for a run
+        // that ends before solving, the one that was to order them; empty: the seeded random
+        // subsample, no order), and why a Vulkan request ran on the CPU.
+        std::string InitialSamplingRequestedBackend{"cpu_reference"};
+        std::string InitialSamplingBackend{};
+        std::string InitialSamplingDiagnostic{};
         std::string ImplementationId{"cpu_reference"};
         std::string StrategyToken{"wlop"};
         std::string SupportRadiusAnalysisStatus{"not_run"};

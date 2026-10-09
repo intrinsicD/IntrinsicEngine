@@ -687,6 +687,10 @@ namespace Extrinsic::Runtime
                     {"e_step_sampled_error", r.EStepSampledError},
                     {"e_step_fallbacks", r.EStepFallbacks}, {"e_step_device_iterations", r.EStepDeviceIterations},
                     {"e_step_device_cpu_rows", r.EStepDeviceCpuRows}, {"gpu_diagnostic", r.GpuDiagnostic},
+                    {"subsample_requested_backend", r.SubsampleRequestedBackend},
+                    {"subsample_target_backend", r.SubsampleTargetBackend},
+                    {"subsample_source_backend", r.SubsampleSourceBackend},
+                    {"subsample_backend_diagnostic", r.SubsampleBackendDiagnostic},
                     {"kernel_rank", r.KernelRank}, {"kernel_approximation_error", r.KernelApproximationError}};
         }
         // RUNTIME-274: the standalone sampling operation on the sandbox.point_sampling section.
@@ -881,6 +885,9 @@ namespace Extrinsic::Runtime
                     return Json{{"status", ToString(r.Status)}, {"message", r.Message}, {"succeeded", r.Succeeded()},
                                 {"requested_backend", StableToken(r.RequestedBackend)}, {"actual_backend", StableToken(r.ActualBackend)},
                                 {"backend_diagnostic", r.BackendDiagnostic}, {"fell_back_to_cpu", r.FellBackToCpu},
+                                {"initial_sampling_requested_backend", r.InitialSamplingRequestedBackend},
+                                {"initial_sampling_backend", r.InitialSamplingBackend},
+                                {"initial_sampling_diagnostic", r.InitialSamplingDiagnostic},
                                 {"gpu_input_upload_bytes", r.GpuInputUploadBytes}, {"gpu_input_cache_hits", r.GpuInputCacheHits},
                                 {"cpu_stage_upload_bytes", r.CpuStageUploadBytes},
                                 {"cpu_stage_readback_bytes", r.CpuStageReadbackBytes},

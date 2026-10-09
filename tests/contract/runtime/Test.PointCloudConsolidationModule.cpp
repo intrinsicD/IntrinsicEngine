@@ -10,6 +10,7 @@
 #include <exception>
 #include <memory>
 #include <limits>
+#include <functional>
 #include <optional>
 #include <string>
 #include <thread>
@@ -506,6 +507,7 @@ namespace
             request.Config.ConvergenceTolerance = ConvergenceTolerance;
             request.Config.SupportRadiusMode = Runtime::
                 PointCloudConsolidationSupportRadiusMode::Manual;
+            if (Edit) Edit(request);
             Correlation = Service->Run(std::move(request));
         }
 
@@ -546,6 +548,7 @@ namespace
         Runtime::PointCloudConsolidationBackend Backend{
             Runtime::PointCloudConsolidationBackend::CpuReference};
         double ConvergenceTolerance{1.0};
+        std::function<void(Runtime::PointCloudConsolidationRequest&)> Edit{};
     };
 
     class ConsolidationStaleSourceApp final
@@ -1165,6 +1168,34 @@ TEST(PointCloudConsolidationModule,
     EXPECT_FALSE(anisotropicVulkan.Available);
     EXPECT_NE(anisotropicVulkan.Message.find("ordinary LOP and isotropic WLOP"),
               std::string::npos);
+}
+
+// RUNTIME-289: a farthest-point initial order asked on Vulkan without a spatial compute service
+// runs on the CPU and says why; the seeded random subsample reports no ordering backend.
+TEST(PointCloudConsolidationModule, VulkanInitialSamplesWithoutADeviceRunOnTheCpuAndSayWhy)
+{
+    for (const bool farthest : {true, false})
+    {
+        auto app = std::make_unique<ConsolidationSuccessApp>();
+        ConsolidationSuccessApp* appPtr = app.get();
+        app->Edit = [farthest](Runtime::PointCloudConsolidationRequest& request) {
+            request.Config.InitialBackend = Runtime::PointSamplingBackend::Vulkan;
+            if (farthest) request.Config.InitialSampling.Method = Runtime::PointSamplingMethod::FarthestPoint;
+        };
+        Intrinsic::Tests::RuntimeTestKernel engine{HeadlessConfig(), std::move(app)};
+        engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
+        engine.EmplaceModule<Runtime::SceneDocumentModule>();
+        engine.Initialize();
+        engine.Run();
+        ASSERT_TRUE(appPtr->Completion.has_value());
+        ASSERT_TRUE(appPtr->Completion->Succeeded()) << appPtr->Completion->Message;
+        EXPECT_EQ(appPtr->Completion->OutputPointCount, 16u);
+        EXPECT_EQ(appPtr->Completion->InitialSamplingRequestedBackend, "gpu_vulkan_compute");
+        EXPECT_EQ(appPtr->Completion->InitialSamplingBackend, farthest ? "cpu_reference" : "");
+        EXPECT_EQ(appPtr->Completion->InitialSamplingDiagnostic,
+                  farthest ? "No spatial compute service; sampling ran on the CPU." : "");
+        engine.Shutdown();
+    }
 }
 
 TEST(PointCloudConsolidationModule,

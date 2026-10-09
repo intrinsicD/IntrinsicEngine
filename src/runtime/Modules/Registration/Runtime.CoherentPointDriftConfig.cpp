@@ -65,6 +65,7 @@ namespace Extrinsic::Runtime
             ConfigFieldSpec{.Name = "gamma", .Type = FT::Float, .Description = "Bayesian: factor on the data-derived initial sigma^2.", .Min = 0, .Max = 100, .ExclusiveMin = true},
             ConfigFieldSpec{.Name = "kappa", .Type = FT::Float, .Description = "Bayesian: Dirichlet concentration of the mixing weights; small values adapt them to uneven density, 0 keeps them equal.", .Min = 0, .Max = 1e6},
             ConfigFieldSpec{.Name = "subsample", .Type = FT::UInt, .Description = "Bayesian: register this many source samples (subsample_method) and interpolate the deformation to every point (0 = all points, else at least 4).", .Min = 0, .Max = 1000000},
+            ConfigFieldSpec{.Name = "subsample_backend", .Type = FT::Enum, .Description = "Bayesian: where the subsamples are ordered: CPU, or Vulkan for exact farthest point; results report the backend per set and why the CPU ran.", .EnumNames = kPointSamplingBackendNames},
             ConfigFieldSpec{.Name = "subsample_target", .Type = FT::UInt, .Description = "Bayesian: register against this many target samples (0 = all points, else at least 4); with omega = 0 unmatched samples bias the fit.", .Min = 0, .Max = 1000000},
         };
 
@@ -97,7 +98,8 @@ namespace Extrinsic::Runtime
                         {"e_step", unsigned(c.EStep)}, {"e_step_tolerance", c.EStepTolerance},
                         {"threads", c.Threads}, {"nystrom_landmarks", c.NystromLandmarks},
                         {"nystrom_error_limit", c.NystromErrorLimit}, {"low_rank", c.LowRank}, {"auto_low_rank", c.AutoLowRank}, {"gamma", c.Gamma}, {"kappa", c.Kappa},
-                        {"subsample", c.Subsample}, {"subsample_target", c.SubsampleTarget}};
+                        {"subsample", c.Subsample}, {"subsample_target", c.SubsampleTarget},
+                        {"subsample_backend", unsigned(c.SubsampleBackend)}};
         }
 
         Json EncodeAll(const CoherentPointDriftConfig& c)
@@ -139,6 +141,7 @@ namespace Extrinsic::Runtime
             c.Kappa = doc.at("kappa").get<double>();
             c.Subsample = doc.at("subsample").get<std::uint32_t>();
             c.SubsampleTarget = doc.at("subsample_target").get<std::uint32_t>();
+            c.SubsampleBackend = PointSamplingBackend(doc.at("subsample_backend").get<unsigned>());
             ConfigDetail::DecodePointSampling(doc, "subsample_", c.SubsampleSampling);
             ConfigDetail::DecodePointSampling(doc, "landmark_", c.LandmarkSampling);
             return c;
