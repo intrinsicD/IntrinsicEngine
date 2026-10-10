@@ -33,6 +33,9 @@ parameter tuning. Threads are 8 because this host has 8 physical cores (0-7), no
 ## Metrics, controls and predeclared verdict
 - Attempts, accepted iterations and cached suppressions: counts; attempt rejection classified as
   numerical intermediate, sampled-error limit, cost cap, or cached suppression. Raw traces retained.
+  The report counts attempts/suppression/cost stops; numerical versus sampled-error reasons are
+  audited from its raw per-draw events. NaN without an invalid-source/target event means an earlier
+  landmark/eigendecomposition rejection; no unrecorded subreason is inferred.
 - Native registration-call `seconds` includes preparation, all E/M work and diagnostic output, excluding
   report generation. Two cold-start passes in reverse order expose order/noise; no population CI
   or generalization claim from one seed. Candidate must beat the fastest baseline repeat by at
@@ -59,7 +62,8 @@ The analysis self-check covers missing cells, a timing failure, a passing pilot 
 parity failure, missing comparison values, and a timeout with partial trace output. Removing
 the timing rejection, stage parsing, or failure verdict makes the self-check fail. Numerical
 positive/negative controls of the pilot are reviewed prospectively, not assumed passed.
-Before freeze, technical-only calls of both binaries for both variants and the Auto reference
+Before freeze, technical-only calls of both binaries for both variants, the Auto reference,
+and both controls
 use the final point count/threads/iteration cap and assert successful execution, finite trace
 values, and complete position buffers. Their efficacy and timing numbers are not inspected or
 used as results. Memory and wall limits are enforced for the evidence calls. The native code is
@@ -73,3 +77,8 @@ The driver generates HTML from raw output after each completed cell; it includes
 stage boundaries, NLL and objective/prior curves and before/after views. BCPD has no additional
 weighted loss in its implemented stopping objective; full variational ELBO is not claimed.
 The original METHOD-077 evidence and its analysis are not changed. Any follow-up gets a new packet.
+
+The 3600-second total budget covers eleven 300-second native limits plus report/manifest overhead;
+this is a resource bound, not a speed prediction. Auto time is descriptive, not a timing comparator.
+An INVALID comparison remains invalid; a candidate failing equivalence is not an instrument pass.
+All failed controls and baseline failures remain separately identifiable in the raw cell outputs.

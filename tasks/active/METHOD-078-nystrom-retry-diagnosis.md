@@ -72,3 +72,7 @@ python3 tools/docs/check_doc_links.py --root . --strict
   exposed during blind reconstruction. Both corrected; fresh blind sessions required.
   SIGALRM child termination/failure-before-report verified by `verification/test-timeout.py`;
   code delta independently approved. No scientific run has started.
+- Both control configurations now pass technical-only execution with full size/configuration;
+  no efficacy/timing values inspected. Pilot total resource bound revised from 1800 to 3600
+  seconds to accommodate eleven per-cell 300-second limits plus report overhead. No cells,
+  numerical gates, input data or native binaries changed; new digest requires both reviews.

@@ -235,10 +235,10 @@ def run():
     assert approved['digest'] == digest and approved['claude'] == approved['codex'] == 'PASS'
     OUT.mkdir(exist_ok=False)
     def expired(signum, frame):
-        raise TimeoutError('total 1800-second budget exhausted')
+        raise TimeoutError('total 3600-second budget exhausted')
     signal.signal(signal.SIGALRM, expired)
     signal.signal(signal.SIGTERM, expired)
-    signal.alarm(1800)
+    signal.alarm(3600)
     start = time.monotonic()
     name = 'before-first-cell'
     try:
@@ -246,8 +246,8 @@ def run():
             name = cell[0]
             live = subprocess.check_output(MANIFEST, cwd=ROOT)
             assert live == frozen, 'manifest drift'
-            remaining = 1800 - (time.monotonic() - start)
-            if remaining <= 0: raise TimeoutError('total 1800-second budget exhausted')
+            remaining = 3600 - (time.monotonic() - start)
+            if remaining <= 0: raise TimeoutError('total 3600-second budget exhausted')
             args = command(cell, OUT)
             (OUT / (name + '.command.json')).write_text(json.dumps(args))
             print('Starting', name, flush=True)
