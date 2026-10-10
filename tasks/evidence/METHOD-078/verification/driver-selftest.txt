@@ -5,3 +5,5 @@ Starting timeout
 PASS: actual process-wide alarm kills child, persists failure before recovery report, and raises TimeoutError
 floor: PASS technical execution, complete positions, finite traces; no efficacy or timing values inspected
 negative: PASS technical execution, complete positions, finite traces; no efficacy or timing values inspected
+floor: PASS with 8 GiB RLIMIT_AS and 300s wall limit; technical execution, complete positions, finite traces; no efficacy or timing values inspected
+negative: PASS with 8 GiB RLIMIT_AS and 300s wall limit; technical execution, complete positions, finite traces; no efficacy or timing values inspected

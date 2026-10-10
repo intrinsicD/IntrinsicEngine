@@ -66,7 +66,10 @@ Before freeze, technical-only calls of both binaries for both variants, the Auto
 and both controls
 use the final point count/threads/iteration cap and assert successful execution, finite trace
 values, and complete position buffers. Their efficacy and timing numbers are not inspected or
-used as results. Memory and wall limits are enforced for the evidence calls. The native code is
+used as results. The scientific driver enforces memory and wall limits. Both controls additionally passed
+technical-only execution with the same 8-GiB address-space and 300-second wall limits
+(`verification/test-controls.py`); the earlier five technical calls used the same numerical
+configuration and wall limit but did not set an address-space limit. The native code is
 CPU-only, no other builds or benchmark jobs are started during measurement.
 
 ## Stop and reporting rules
