@@ -1,0 +1,27 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+    Start 2424: CoherentPointDriftAccelerated.NystromSampledErrorTracksTheActualExpectationError
+1/8 Test #2424: CoherentPointDriftAccelerated.NystromSampledErrorTracksTheActualExpectationError .....   Passed    0.12 sec
+    Start 2425: CoherentPointDriftAccelerated.NystromRunsExactlyWhereItWouldNotPay
+2/8 Test #2425: CoherentPointDriftAccelerated.NystromRunsExactlyWhereItWouldNotPay ...................   Passed    0.06 sec
+    Start 2426: CoherentPointDriftAccelerated.NystromRegistrationMatchesTheReference
+3/8 Test #2426: CoherentPointDriftAccelerated.NystromRegistrationMatchesTheReference .................   Passed    2.18 sec
+    Start 2437: CoherentPointDriftAccelerated.NystromLandmarkVariantsAreAcceptedAndAccurate
+4/8 Test #2437: CoherentPointDriftAccelerated.NystromLandmarkVariantsAreAcceptedAndAccurate ..........   Passed    0.18 sec
+    Start 2438: CoherentPointDriftAccelerated.NystromLandmarkSchedulesFixOrRedrawTheLandmarks
+5/8 Test #2438: CoherentPointDriftAccelerated.NystromLandmarkSchedulesFixOrRedrawTheLandmarks ........   Passed    0.33 sec
+    Start 2439: CoherentPointDriftAccelerated.FixedNystromLandmarksExtendByTheirPrefix
+6/8 Test #2439: CoherentPointDriftAccelerated.FixedNystromLandmarksExtendByTheirPrefix ...............   Passed    0.04 sec
+    Start 2440: CoherentPointDriftAccelerated.NystromVariantsAreThreadIndependentAndHandleFlatData
+7/8 Test #2440: CoherentPointDriftAccelerated.NystromVariantsAreThreadIndependentAndHandleFlatData ...   Passed    0.43 sec
+    Start 2441: CoherentPointDriftAccelerated.InvalidNystromVariantsFailClosed
+8/8 Test #2441: CoherentPointDriftAccelerated.InvalidNystromVariantsFailClosed .......................   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 8
+
+Label Time Summary:
+geometry    =   3.35 sec*proc (8 tests)
+slow        =   3.35 sec*proc (8 tests)
+unit        =   3.35 sec*proc (8 tests)
+
+Total Test time (real) =   4.13 sec

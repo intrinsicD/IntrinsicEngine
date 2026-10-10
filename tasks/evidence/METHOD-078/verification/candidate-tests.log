@@ -1,0 +1,69 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start 2418: CoherentPointDriftAccelerated.DenseParallelMatchesTheReferenceForEveryVariant
+ 1/29 Test #2418: CoherentPointDriftAccelerated.DenseParallelMatchesTheReferenceForEveryVariant ........   Passed    3.49 sec
+      Start 2419: CoherentPointDriftAccelerated.ResultsAreBitwiseIdenticalAcrossThreadCounts
+ 2/29 Test #2419: CoherentPointDriftAccelerated.ResultsAreBitwiseIdenticalAcrossThreadCounts ...........   Passed    2.92 sec
+      Start 2420: CoherentPointDriftAccelerated.TruncatedStaysWithinToleranceOfTheReference
+ 3/29 Test #2420: CoherentPointDriftAccelerated.TruncatedStaysWithinToleranceOfTheReference ............   Passed    0.49 sec
+      Start 2421: CoherentPointDriftAccelerated.TruncationBoundCoversTheActualExpectationError
+ 4/29 Test #2421: CoherentPointDriftAccelerated.TruncationBoundCoversTheActualExpectationError .........   Passed    0.05 sec
+      Start 2422: CoherentPointDriftAccelerated.FastGaussBoundCoversTheActualExpectationError
+ 5/29 Test #2422: CoherentPointDriftAccelerated.FastGaussBoundCoversTheActualExpectationError ..........   Passed    0.56 sec
+      Start 2423: CoherentPointDriftAccelerated.FastGaussRegistrationMatchesTheReference
+ 6/29 Test #2423: CoherentPointDriftAccelerated.FastGaussRegistrationMatchesTheReference ...............   Passed    5.71 sec
+      Start 2424: CoherentPointDriftAccelerated.NystromSampledErrorTracksTheActualExpectationError
+ 7/29 Test #2424: CoherentPointDriftAccelerated.NystromSampledErrorTracksTheActualExpectationError .....   Passed    0.13 sec
+      Start 2425: CoherentPointDriftAccelerated.NystromRunsExactlyWhereItWouldNotPay
+ 8/29 Test #2425: CoherentPointDriftAccelerated.NystromRunsExactlyWhereItWouldNotPay ...................   Passed    0.06 sec
+      Start 2426: CoherentPointDriftAccelerated.NystromRegistrationMatchesTheReference
+ 9/29 Test #2426: CoherentPointDriftAccelerated.NystromRegistrationMatchesTheReference .................   Passed    3.08 sec
+      Start 2427: CoherentPointDriftAccelerated.WeightedRowsShiftByTheirLargestWeightedTerm
+10/29 Test #2427: CoherentPointDriftAccelerated.WeightedRowsShiftByTheirLargestWeightedTerm ............   Passed    0.00 sec
+      Start 2428: CoherentPointDriftAccelerated.TwoPassFallbackMatchesTheBlockedSinglePass
+11/29 Test #2428: CoherentPointDriftAccelerated.TwoPassFallbackMatchesTheBlockedSinglePass .............   Passed    0.01 sec
+      Start 2429: CoherentPointDriftAccelerated.AutoUsesDenseForWideAndTruncatedForNarrowKernels
+12/29 Test #2429: CoherentPointDriftAccelerated.AutoUsesDenseForWideAndTruncatedForNarrowKernels .......   Passed    0.36 sec
+      Start 2430: CoherentPointDriftAccelerated.VulkanPolicyRunsWideKernelsOnTheExternalEvaluator
+13/29 Test #2430: CoherentPointDriftAccelerated.VulkanPolicyRunsWideKernelsOnTheExternalEvaluator ......   Passed    0.01 sec
+      Start 2431: CoherentPointDriftAccelerated.VulkanPolicyKeepsKernelsTooNarrowForFp32OnTheCpu
+14/29 Test #2431: CoherentPointDriftAccelerated.VulkanPolicyKeepsKernelsTooNarrowForFp32OnTheCpu .......   Passed    0.01 sec
+      Start 2432: CoherentPointDriftAccelerated.VulkanPolicyEvaluatesRowsTooNarrowForFp32OnTheCpu
+15/29 Test #2432: CoherentPointDriftAccelerated.VulkanPolicyEvaluatesRowsTooNarrowForFp32OnTheCpu ......   Passed    0.00 sec
+      Start 2433: CoherentPointDriftAccelerated.VulkanPolicyFallsBackToTheCpuAndSaysSo
+16/29 Test #2433: CoherentPointDriftAccelerated.VulkanPolicyFallsBackToTheCpuAndSaysSo .................   Passed    0.22 sec
+      Start 2434: CoherentPointDriftAccelerated.LowRankNonrigidConvergesToTheFullSolution
+17/29 Test #2434: CoherentPointDriftAccelerated.LowRankNonrigidConvergesToTheFullSolution ..............   Passed    5.27 sec
+      Start 2435: CoherentPointDriftAccelerated.LowRankLiftsTheNonrigidSizeLimit
+18/29 Test #2435: CoherentPointDriftAccelerated.LowRankLiftsTheNonrigidSizeLimit .......................   Passed    1.66 sec
+      Start 2436: CoherentPointDriftAccelerated.InvalidAccelerationSettingsFailClosed
+19/29 Test #2436: CoherentPointDriftAccelerated.InvalidAccelerationSettingsFailClosed ..................   Passed    0.01 sec
+      Start 2437: CoherentPointDriftAccelerated.NystromCanRetryAfterTheSourceMovesCloser
+20/29 Test #2437: CoherentPointDriftAccelerated.NystromCanRetryAfterTheSourceMovesCloser ...............   Passed    0.16 sec
+      Start 2438: CoherentPointDriftAccelerated.NystromLandmarkVariantsAreAcceptedAndAccurate
+21/29 Test #2438: CoherentPointDriftAccelerated.NystromLandmarkVariantsAreAcceptedAndAccurate ..........   Passed    0.18 sec
+      Start 2439: CoherentPointDriftAccelerated.NystromLandmarkSchedulesFixOrRedrawTheLandmarks
+22/29 Test #2439: CoherentPointDriftAccelerated.NystromLandmarkSchedulesFixOrRedrawTheLandmarks ........   Passed    0.36 sec
+      Start 2440: CoherentPointDriftAccelerated.FixedNystromLandmarksExtendByTheirPrefix
+23/29 Test #2440: CoherentPointDriftAccelerated.FixedNystromLandmarksExtendByTheirPrefix ...............   Passed    0.04 sec
+      Start 2441: CoherentPointDriftAccelerated.NystromVariantsAreThreadIndependentAndHandleFlatData
+24/29 Test #2441: CoherentPointDriftAccelerated.NystromVariantsAreThreadIndependentAndHandleFlatData ...   Passed    0.46 sec
+      Start 2442: CoherentPointDriftAccelerated.InvalidNystromVariantsFailClosed
+25/29 Test #2442: CoherentPointDriftAccelerated.InvalidNystromVariantsFailClosed .......................   Passed    0.00 sec
+      Start 2443: CoherentPointDriftAccelerated.ResampledPointLandmarksDrawAnewOrAreRefused
+26/29 Test #2443: CoherentPointDriftAccelerated.ResampledPointLandmarksDrawAnewOrAreRefused ............   Passed    0.33 sec
+      Start 2444: CoherentPointDriftAccelerated.FixedPointLandmarksKeepTheirPrefixForEveryMethod
+27/29 Test #2444: CoherentPointDriftAccelerated.FixedPointLandmarksKeepTheirPrefixForEveryMethod .......   Passed    1.04 sec
+      Start 2445: CoherentPointDriftAccelerated.FixedBoxesFollowANewSource
+28/29 Test #2445: CoherentPointDriftAccelerated.FixedBoxesFollowANewSource .............................   Passed    0.06 sec
+      Start 2446: CoherentPointDriftAccelerated.BoxLandmarksAreUniformOverTheUnionOfTheBoxes
+29/29 Test #2446: CoherentPointDriftAccelerated.BoxLandmarksAreUniformOverTheUnionOfTheBoxes ...........   Passed    7.36 sec
+
+100% tests passed, 0 tests failed out of 29
+
+Label Time Summary:
+geometry    =  34.03 sec*proc (29 tests)
+slow        =  34.03 sec*proc (29 tests)
+unit        =  34.03 sec*proc (29 tests)
+
+Total Test time (real) =  34.22 sec

@@ -6,6 +6,7 @@ module;
 #include <bit>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <functional>
 #include <limits>
 #include <memory>
@@ -1494,7 +1495,7 @@ namespace Geometry::CoherentPointDrift::EStep
                     }
                 }
             });
-            if (!valid) return false;
+            if (!valid) { std::fprintf(stderr, "NYSTROM_DIAG invalid_target %llu %zu\n", (unsigned long long)NystromDraw, l); return false; }
             Eigen::MatrixXd h = Eigen::MatrixXd::Zero(Eigen::Index(l), 4);
             for (std::size_t c = 0; c < targetChunks; ++c)
                 for (Eigen::Index column = 0; column < 4; ++column)
@@ -1517,7 +1518,7 @@ namespace Geometry::CoherentPointDrift::EStep
                     out.P1[i] = weight * v[0]; out.PXx[i] = weight * v[1]; out.PXy[i] = weight * v[2]; out.PXz[i] = weight * v[3];
                 }
             });
-            if (!valid) return false;
+            if (!valid) { std::fprintf(stderr, "NYSTROM_DIAG invalid_source %llu %zu\n", (unsigned long long)NystromDraw, l); return false; }
 
             // A-posteriori check on exact rows spread over both sets.
             const std::size_t samples = 32u;
@@ -1650,15 +1651,19 @@ namespace Geometry::CoherentPointDrift::EStep
             const double dense = double(n) * double(m);
             double spent = 0.0;
             std::size_t count = std::max<std::size_t>(settings.NystromLandmarks, s.NystromLandmarks);
-            while (sigma2 > s.NystromRejectedSigma2)
+            // Temporary METHOD-078 diagnostic probes; removed before a production fix is delivered.
+            std::fprintf(stderr, "NYSTROM_DIAG begin %llu %.17g %.17g\n", (unsigned long long)s.NystromDraw, sigma2, s.NystromRejectedSigma2);
+            while (true) // METHOD-078 candidate: retry under the unchanged per-call budget.
             {
                 const std::size_t landmarks = std::min(count, cap);
                 const double l = double(landmarks);
                 spent += (2.0 * double(m) + double(n)) * l + 2.0 * l * l * l;
-                if (spent >= 0.5 * dense) break;
+                if (spent >= 0.5 * dense) { std::fprintf(stderr, "NYSTROM_DIAG cost %llu %zu %.17g %.17g\n", (unsigned long long)s.NystromDraw, landmarks, spent, 0.5 * dense); break; }
                 std::uint64_t evaluations = 0u;
+                sampledError = std::numeric_limits<double>::quiet_NaN();
                 nystrom = s.NystromRows(moved, sigma2, logOutlier, landmarks, settings.NystromErrorLimit,
                                         settings, out, threads, sampledError, evaluations);
+                std::fprintf(stderr, "NYSTROM_DIAG attempt %llu %zu %d %.17g\n", (unsigned long long)s.NystromDraw, landmarks, int(nystrom), sampledError);
                 nystromEvaluations += evaluations;
                 if (nystrom)
                 {

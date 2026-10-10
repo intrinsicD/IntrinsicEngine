@@ -1,0 +1,3 @@
+PASS
+Mutation checks: removing timing rejection, stage parsing, or failure verdict each caused AssertionError.
+Technical-only final-configuration check: PASS for Auto reference and baseline/candidate points/fixed/random and box/resampled/random; each with full fixture, seed 1, 100000 points, 8 threads on CPUs 0-7, 20 iterations, timeout 300 seconds. Assertions: success, complete positions, finite iteration traces. Efficacy and timing values not inspected.

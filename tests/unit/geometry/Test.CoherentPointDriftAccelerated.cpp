@@ -672,6 +672,53 @@ namespace
     }
 }
 
+TEST(CoherentPointDriftAccelerated, NystromCanRetryAfterTheSourceMovesCloser)
+{
+    const auto targetPoints = Cloud(1200, 81), sourcePoints = Cloud(1000, 82);
+    const Soa target(targetPoints), moved(sourcePoints), separated(Shifted(sourcePoints, {1000.0f, 0.0f, 0.0f}));
+    constexpr double logOutlier = -std::numeric_limits<double>::infinity();
+    E::Evaluator dense;
+    dense.SetTarget(target.View());
+    E::Sums exact;
+    ASSERT_TRUE(dense.Evaluate(moved.View(), 4.0, logOutlier, {.Policy = CPD::EStepPolicy::Dense}, exact));
+    for (const auto schedule : {Schedule::Mixed, Schedule::Fixed, Schedule::Resampled})
+    {
+        SCOPED_TRACE(int(schedule));
+        auto settings = Variant(Source::Points, schedule, Pattern::Random);
+        settings.NystromErrorLimit = 1e-3;
+        E::Evaluator reused, fresh;
+        reused.SetTarget(target.View());
+        fresh.SetTarget(target.View());
+        E::Sums rejected, recovered, control;
+        // At this separation all cross-kernel terms underflow; the shifted exact path still works.
+        ASSERT_TRUE(reused.Evaluate(separated.View(), 8.0, logOutlier, settings, rejected));
+        ASSERT_NE(rejected.Used, CPD::EStepPolicy::Nystrom);
+        ASSERT_FALSE(Landmarks(reused).empty()) << "the first approximation must actually be attempted";
+        ASSERT_TRUE(fresh.Evaluate(moved.View(), 4.0, logOutlier, settings, control));
+        ASSERT_EQ(control.Used, CPD::EStepPolicy::Nystrom);
+        ASSERT_TRUE(reused.Evaluate(moved.View(), 4.0, logOutlier, settings, recovered));
+        ASSERT_EQ(recovered.Used, CPD::EStepPolicy::Nystrom);
+        EXPECT_LT(recovered.SampledError, settings.NystromErrorLimit / 10.0);
+        for (std::size_t i = 0; i < exact.P1.size(); ++i)
+        {
+            EXPECT_NEAR(recovered.P1[i], exact.P1[i], 1e-3);
+            EXPECT_NEAR(recovered.PXx[i], exact.PXx[i], 1e-3);
+            EXPECT_NEAR(recovered.PXy[i], exact.PXy[i], 1e-3);
+            EXPECT_NEAR(recovered.PXz[i], exact.PXz[i], 1e-3);
+        }
+        for (std::size_t j = 0; j < exact.Pt1.size(); ++j)
+            EXPECT_NEAR(recovered.Pt1[j], exact.Pt1[j], 1e-3);
+        if (schedule == Schedule::Mixed)
+        {
+            EXPECT_EQ(recovered.P1, control.P1);
+            EXPECT_EQ(recovered.PXx, control.PXx);
+            EXPECT_EQ(recovered.PXy, control.PXy);
+            EXPECT_EQ(recovered.PXz, control.PXz);
+            EXPECT_EQ(recovered.Pt1, control.Pt1);
+        }
+    }
+}
+
 TEST(CoherentPointDriftAccelerated, NystromLandmarkVariantsAreAcceptedAndAccurate)
 {
     const auto targetPoints = Cloud(1200, 81);
