@@ -33,7 +33,7 @@ parameter tuning. Threads are 8 because this host has 8 physical cores (0-7), no
 ## Metrics, controls and predeclared verdict
 - Attempts, accepted iterations and cached suppressions: counts; attempt rejection classified as
   numerical intermediate, sampled-error limit, cost cap, or cached suppression. Raw traces retained.
-- Native process `seconds` includes preparation, all E/M work and diagnostic output, excluding
+- Native registration-call `seconds` includes preparation, all E/M work and diagnostic output, excluding
   report generation. Two cold-start passes in reverse order expose order/noise; no population CI
   or generalization claim from one seed. Candidate must beat the fastest baseline repeat by at
   least 10% with its slowest repeat, in BOTH variants; otherwise do not adopt. This conservative

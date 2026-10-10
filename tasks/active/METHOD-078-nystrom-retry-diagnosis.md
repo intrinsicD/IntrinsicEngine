@@ -68,3 +68,7 @@ python3 tools/docs/check_doc_links.py --root . --strict
   This approves preparation only, not the experiment or production selection.
 - Strict task policy passes. Strict doc links retain the pre-existing METHOD-077 review-link
   defect tracked by BUG-241; frozen review evidence was not rewritten.
+- First full preflight returned REVISE: external-timeout recovery and an old-result statement
+  exposed during blind reconstruction. Both corrected; fresh blind sessions required.
+  SIGALRM child termination/failure-before-report verified by `verification/test-timeout.py`;
+  code delta independently approved. No scientific run has started.

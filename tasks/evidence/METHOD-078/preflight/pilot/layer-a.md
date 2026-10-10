@@ -19,7 +19,7 @@ answers. Reconstruct the measurement before assessing its intent. No delegation;
 ## Exact execution
 From `/home/alex/Documents/IntrinsicEngine`:
 ```
-timeout --signal=TERM 1800s python3 tasks/evidence/METHOD-078/diagnose.py run
+python3 tasks/evidence/METHOD-078/diagnose.py run
 ```
 `diagnose.py plan` prints every resolved native command. No other cells or seeds are permitted.
 11 sequential cold-start processes: Auto reference; cost-ineligible landmark control (4096);
@@ -37,8 +37,9 @@ write final positions and compare against this pilot's own 20-iteration Auto-ref
 
 `diagnose.py` enforces an exclusive new output directory, live manifest equality before each
 cell, both named review approvals on that digest, 300 seconds per native process, 1800 seconds
-for the plan, and 8 GiB address space per native process. Failed native execution or a timeout
-stops the remaining plan as a technical failure; scientific negative outcomes do not.
+for the plan (process-wide alarm; SIGTERM also records a timeout), and 8 GiB address space per native process. Failed native execution or a timeout
+stops the remaining plan as a technical failure; failure status is written before recovery HTML
+generation, including when every result JSON exists. Recovery reporting is outside the run budget; scientific negative outcomes do not.
 
 ## Outputs and analysis code
 Outputs are under `tasks/evidence/METHOD-078/runs/`; no previous outputs are overwritten.

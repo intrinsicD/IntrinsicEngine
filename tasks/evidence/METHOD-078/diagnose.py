@@ -7,6 +7,7 @@ import json
 import math
 import re
 import resource
+import signal
 import struct
 from pathlib import Path
 import subprocess
@@ -65,7 +66,8 @@ def traces(path):
             stages.append((p[1], float(p[2])))
     return iterations, attempts, begins, costs, stages
 
-def assessed(rows):
+def assessed(rows, failure=False):
+    if failure: return 'UNEVALUATED: execution failed or timed out'
     expected = {c[0] for c in plan()}
     if set(rows) != expected:
         return 'INCOMPLETE: no comparison'
@@ -117,9 +119,9 @@ def report():
         match = re.match(r'(source|target|truth)\[(\d+)\] (.*)', line)
         if match:
             preview[match[1]].append((int(match[2]), tuple(map(float, match[3].split()))))
-    body = ['<h1>METHOD-078 Nyström retry diagnostic pilot</h1>', '<p>' + html.escape(assessed(rows)) + '</p>',
+    body = ['<h1>METHOD-078 Nyström retry diagnostic pilot</h1>', '<p>' + html.escape(assessed(rows, bool(failure))) + '</p>',
             '<p>One synthetic full-overlap fixture, seed 1, 100,000 points; 20 iterations; eight physical cores. '
-            'This is not a completed-registration ranking. The original METHOD-077 exact arm did not recover the truth. '
+            'This is not a completed-registration ranking. Truth error is reported, not gated. '
             'Attempt timings include identical diagnostic logging in both binaries. No performance claim is eligible.</p>']
     for cell in plan():
         name = cell[0]
@@ -203,6 +205,7 @@ def self_test():
         if name.startswith('candidate'):
             rows[name].update(seconds=8.0, nystrom_iterations=2)
     assert assessed(rows).startswith('FOLLOW-UP REQUIRED')
+    assert assessed(rows, failure=True).startswith('UNEVALUATED')
     rows['candidate_box_1']['rms_to_exact'] = .1
     assert assessed(rows).startswith('INVALID')
     rows['candidate_box_1']['rms_to_exact'] = None
@@ -231,27 +234,36 @@ def run():
     digest = hashlib.sha256(frozen).hexdigest()
     assert approved['digest'] == digest and approved['claude'] == approved['codex'] == 'PASS'
     OUT.mkdir(exist_ok=False)
+    def expired(signum, frame):
+        raise TimeoutError('total 1800-second budget exhausted')
+    signal.signal(signal.SIGALRM, expired)
+    signal.signal(signal.SIGTERM, expired)
+    signal.alarm(1800)
     start = time.monotonic()
-    for cell in plan():
-        name = cell[0]
-        args = command(cell, OUT)
-        (OUT / (name + '.command.json')).write_text(json.dumps(args))
-        print('Starting', name, flush=True)
-        try:
+    name = 'before-first-cell'
+    try:
+        for cell in plan():
+            name = cell[0]
             live = subprocess.check_output(MANIFEST, cwd=ROOT)
             assert live == frozen, 'manifest drift'
             remaining = 1800 - (time.monotonic() - start)
             if remaining <= 0: raise TimeoutError('total 1800-second budget exhausted')
+            args = command(cell, OUT)
+            (OUT / (name + '.command.json')).write_text(json.dumps(args))
+            print('Starting', name, flush=True)
             with (OUT / (name + '.stdout')).open('w') as stdout, (OUT / (name + '.stderr')).open('w') as stderr:
                 result = subprocess.run(args, cwd=ROOT, stdout=stdout, stderr=stderr, timeout=min(300, remaining), check=False, preexec_fn=limit_memory)
             (OUT / (name + '.resources.json')).write_text(json.dumps({'max_completed_child_rss_kib_so_far': resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss}))
             if result.returncode: raise RuntimeError(f'{name}: runner exit {result.returncode}; preserved incomplete output')
             if not report(): raise RuntimeError(f'{name}: invalid diagnostic output')
-        except Exception as error:
-            (OUT / 'failure.json').write_text(json.dumps({'cell': name, 'error': f'{type(error).__name__}: {error}'}))
-            report()
-            raise
-    print(assessed({c[0]: json.loads((OUT / (c[0]+'.json')).read_text()) for c in plan()}), flush=True)
+        print(assessed({c[0]: json.loads((OUT / (c[0]+'.json')).read_text()) for c in plan()}), flush=True)
+    except Exception as error:
+        signal.alarm(0)
+        (OUT / 'failure.json').write_text(json.dumps({'cell': name, 'error': f'{type(error).__name__}: {error}'}))
+        report()
+        raise
+    finally:
+        signal.alarm(0)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(); parser.add_argument('mode', choices=['plan', 'self-test', 'run', 'report'])

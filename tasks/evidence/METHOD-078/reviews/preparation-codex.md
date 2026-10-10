@@ -22,3 +22,16 @@ Endgültige SHA256-Bindung:
 Keine Builds, Tests oder wissenschaftlichen Läufe selbst ausgeführt; Review schreibgeschützt. Ein äußerer Prozessabbruch kann weiterhin die Berichtserstellung unterbrechen; erhaltene Rohdaten benötigen dann eine erneute Berichtserstellung.
 
 Link formatting in the quoted source locations was normalized to plain locations for the repository doc validator; answer wording is unchanged.
+
+## Delta — timeout handling, same reviewer, final answer verbatim
+
+**Verdikt: APPROVE für diesen Vorbereitungscode-Diff.** Keine offenen Korrektheits- oder Komplexitätsbefunde gegenüber `96c21108f2831a86b290db3a6374d3e75ea37fc0`.
+
+- `SIGALRM` und `SIGTERM` gelangen in den gemeinsamen Fehlerpfad; `failure.json` wird vor dem Wiederherstellungsbericht geschrieben.
+- Der Fehlerstatus übersteuert die Bewertung auch bei vollständig vorhandenen Ergebniszeilen mit `UNEVALUATED`.
+- Der Alarm wird vor der Wiederherstellung und abschließend deaktiviert.
+- Die Änderungen bleiben klein und zweckgebunden. Die historische Ergebnisbehauptung wurde entfernt.
+
+Geprüfter Driver-SHA256: `8460d6374f281c6b0506447303b4dd7b9525841cfd536d78958237c3639a01bb`.
+
+Keine Tests selbst ausgeführt; insbesondere Signalzustellung nicht praktisch geprüft. Ein erzwungenes `SIGKILL` bleibt unbehandelbar. Keine Experimentfreigabe.
