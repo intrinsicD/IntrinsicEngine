@@ -1,5 +1,6 @@
 # Retirement Log
 
+- 2026-10-11 — **METHOD-081**: exact replacement of invalid Nyström target rows; implementation `ba11fce6b`, frozen diagnostic `7c49f5f14`. Independent code and raw-results reviews accept all criteria; bounded result and limits are ARA C122. [Task](METHOD-081-nystrom-exact-row-repair.md).
 - 2026-10-11 — **METHOD-079**: approved first-invalid-target Nyström diagnosis completed and independently audited; C120 and raw evidence retained, temporary probes removed, 28/28 focused tests pass. No production remedy adopted. [Task](METHOD-079-nystrom-first-invalid-target.md).
 - 2026-10-11 — **METHOD-078**: bounded Nyström retry diagnosis completed at frozen run `0efb7e48f`; candidate rejected, original production code restored. Independent reviewer accepted all criteria; evidence and remaining scope are in the [task](METHOD-078-nystrom-retry-diagnosis.md).
 

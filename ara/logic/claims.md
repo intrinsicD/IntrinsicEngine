@@ -2498,3 +2498,14 @@
 - **Dependencies**: []
 - **Tags**: Bayesian CPD, Nyström, CPU, complete invalid-row census, signed affinity approximation
 - **From staging**: O266
+
+## C122: Exact-row-repair candidate rescues one fixed-FPS Nyström step in the bounded retest
+- **Statement**: In METHOD-081's frozen CPU diagnostic at 7c49f5f14 (full synthetic fixture, seed 1, 100000 source/target points, eight pinned threads, seven/two-iteration prefixes and two reversed-order repeats), the candidate accepts 7/7 Nyström steps for fixed FPS versus baseline 6/7; resampled union-box remains at 1/2. All cells complete with success/iteration_cap and matching Auto outcomes. Candidate endpoint RMS/max distances to the corresponding Auto prefix are 4.4841976296e-5/2.6024277048e-4 world units for FPS and 6.9987941877e-5/2.4626368170e-4 for boxes; all baseline/candidate comparisons pass the frozen .001/.01 bounds. Repeats have identical position buffers and non-time trace values, and box positions are identical across arms. FPS disagreement increases from baseline RMS 3.9085501126e-7, within the same bounds. Observed registration times are 15.450–15.718 s versus 2.239–2.288 s for FPS and 12.883–13.038 s versus 12.942–13.057 s for boxes; these are descriptive local observations, not claim-eligible general performance results. Auto used dense E-steps, while all arms retained rank-100 deformation approximation.
+- **Status**: supported — one synthetic CPU fixture and bounded prefixes only; no full convergence, universal affinity positivity, repair-frequency or general runtime claim
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Independent raw recomputation changes accepted counts or endpoint distances, any frozen outcome/accuracy/repeat gate fails, or binary/source/command bindings differ from the approved packet.
+- **Proof**: [tasks/evidence/METHOD-081/runs/summary.json, tasks/evidence/METHOD-081/runs/report.html, tasks/evidence/METHOD-081/preflight/manifest.txt, tasks/evidence/METHOD-081/reviews/approval.json, tasks/evidence/METHOD-081/reviews/execution-binding.json]
+- **Dependencies**: []
+- **Tags**: Bayesian CPD, Nyström, CPU, exact row repair, bounded retest, Auto comparison
+- **From staging**: O269

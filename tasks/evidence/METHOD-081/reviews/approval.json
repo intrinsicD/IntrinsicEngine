@@ -1,0 +1,10 @@
+{
+  "digest": "ee85badee6a622851efaa2e0e036889516b596f2a250471a9dd3a97e0c896008",
+  "codex_a": "PASS",
+  "codex_b": "PASS",
+  "reviewers": {
+    "codex_a": {"session": "/root/method081_preflight_a", "record": "preflight-a-r3.txt"},
+    "codex_b": {"session": "/root/method081_preflight_b", "record": "preflight-b-r3.txt"}
+  },
+  "operator_exception": "Ok ohne Claude — 2026-10-11, explicit approval of two independent Codex reviews after Claude weekly quota exhaustion"
+}

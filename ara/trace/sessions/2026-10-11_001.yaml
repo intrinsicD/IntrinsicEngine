@@ -2,9 +2,9 @@ session:
   id: "2026-10-11_001"
   date: "2026-10-11"
   started: "2026-10-11T00:00+02:00"
-  last_turn: "2026-10-11T11:41+02:00"
-  turn_count: 5
-  summary: "METHOD-078 rejects unconditional retries; METHOD-079 diagnoses first-row sign errors; METHOD-080 completes the bounded invalid-row census and exact affinities; production probes removed."
+  last_turn: "2026-10-11T15:56+02:00"
+  turn_count: 6
+  summary: "METHOD-078 rejects unconditional retries; METHOD-079/080 diagnose signs and all invalid rows; METHOD-081's exact-row repair rescues one fixed-FPS step in the bounded retest."
 events_logged:
   - turn: 1
     type: experiment
@@ -96,6 +96,24 @@ events_logged:
     routing: staged
     provenance: ai-suggested
     summary: "Recommend consistent exact row replacement with existing fallback; unimplemented and not adopted."
+  - turn: 6
+    type: experiment
+    id: N661
+    routing: direct
+    provenance: ai-executed
+    summary: "Ten frozen METHOD-081 cells complete; independent raw audit confirms the bounded prediction."
+  - turn: 6
+    type: decision
+    id: N662
+    routing: direct
+    provenance: ai-executed
+    summary: "Retain the tested candidate and bounded result; do not infer universal positivity or expand box diagnosis."
+  - turn: 6
+    type: observation
+    id: O269
+    routing: crystallized
+    provenance: ai-executed
+    summary: "C122 records one extra fixed-FPS acceptance, unchanged box acceptance and passing endpoint/replay gates."
 ai_actions:
   - turn: 1
     action: "Built bound Release binaries, completed reviewed pilot, audited raw outputs, restored production files; retained candidate patch and reports."
@@ -115,6 +133,10 @@ ai_actions:
   - turn: 5
     action: "Inspected the positive-spectrum construction and existing exact-row merge; rechecked the known-answer Gaussian counterexample and consulted primary Nyström/BCPD sources. No production edit or results-bearing run."
     provenance: ai-executed
+  - turn: 6
+    action: "Ran the reviewed baseline/candidate prefix comparison, preserved all raw outputs and HTML, obtained independent raw and claim-wording audits, and recorded C122."
+    provenance: ai-executed
+    files_changed: [tasks/evidence/METHOD-081, ara/logic/claims.md]
 claims_touched:
   - id: C119
     action: created
@@ -125,12 +147,17 @@ claims_touched:
   - id: C121
     action: created
     turn: 4
+  - id: C122
+    action: created
+    turn: 6
 key_context:
   - turn: 1
     excerpt: "Dann bitte nyström Nutzung untersuchen und verbessern"
+  - turn: 6
+    excerpt: "Dann versuchen wir es damit mal. Mach dann nochmal einen Test bitte"
 open_threads:
-  - "N655: C120 covers selected first-row arithmetic; C121 covers all invalid rows in the bounded prefixes. A general mechanism and production remedy remain open."
+  - "N655: C120/C121 diagnose the bounded sign failures; C122 validates the exact-row-repair candidate on the fixed-FPS prefix. Broader mechanism and sampler behavior remain open."
   - "O264 remains a tentative user mechanism; no user affirmation or global refutation is inferred from this bounded result."
-  - "N660: O268 proposes a bounded exact-row repair; validation, cost and residual negative entries remain open."
+  - "N660: O268's candidate has bounded evidence in C122; box fallback, later convergence and residual negative entries remain unresolved."
 ai_suggestions_pending:
-  - "O268: exact row replacement is the recommended first candidate, pending a production scope decision; no blanket positivity or speed guarantee."
+  - "Further box-fallback diagnosis or full-registration evaluation needs a new scope decision; C122 is not a blanket positivity or speed guarantee."

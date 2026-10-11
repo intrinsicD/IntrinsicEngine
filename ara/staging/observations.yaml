@@ -4461,3 +4461,23 @@ observations:
     bound_to: [N660]
     promoted: false
     stale: false
+
+  - id: O269
+    timestamp: "2026-10-11T15:56+02:00"
+    provenance: ai-executed
+    content: >
+      METHOD-081's exact-row-repair candidate accepts 7/7 fixed-FPS Nyström steps versus
+      the baseline's 6/7; resampled union-box stays at 1/2. All full-buffer endpoint,
+      outcome and repeat gates pass. Candidate FPS has greater disagreement with Auto,
+      still within the frozen bounds. Box positions are unchanged across arms.
+    context: >
+      Frozen CPU diagnostic at 7c49f5f14, one synthetic 100000-point fixture, seed 1,
+      eight pinned threads, two reversed-order repeats. Independent raw audit accepts
+      the bounded prediction. Timing ranges are descriptive; neither full convergence,
+      universal affinity positivity nor a general performance result is established.
+    potential_type: claim
+    bound_to: [N661, N662]
+    promoted: true
+    promoted_to: logic/claims.md:C122
+    crystallized_via: artifact-commitment
+    stale: false

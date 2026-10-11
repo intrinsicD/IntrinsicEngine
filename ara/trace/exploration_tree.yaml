@@ -13976,3 +13976,31 @@ tree:
       - src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cpp
       - tasks/evidence/METHOD-080/verification/test-controls.py
     status: open
+
+  - id: N661
+    type: experiment
+    title: Test exact replacement of invalid Nyström target rows
+    provenance: ai-executed
+    timestamp: "2026-10-11T15:56+02:00"
+    result: >
+      All ten frozen METHOD-081 CPU cells completed. Independent raw recomputation
+      confirms the supported bounded predicate: fixed FPS gains one accepted step,
+      resampled boxes gain none, endpoint/outcome gates and deterministic replay pass.
+      Auto executes dense E-steps; every arm retains rank-100 deformation approximation.
+    also_depends_on: [N660, N658]
+    evidence: [tasks/evidence/METHOD-081/runs/summary.json, tasks/evidence/METHOD-081/runs/report.html, tasks/evidence/METHOD-081/preflight/manifest.txt]
+    status: resolved
+
+  - id: N662
+    type: decision
+    title: Retain the bounded repair result without claiming universal positivity
+    provenance: ai-executed
+    timestamp: "2026-10-11T15:56+02:00"
+    choice: >
+      Record the tested candidate and C122 with the unchanged accuracy/cost/fallback
+      guards. The FPS prefix improves acceptance within the frozen accuracy bounds;
+      the box prefix still falls back. Further box diagnosis, convergence tests and
+      general performance or entrywise-positivity claims remain outside this slice.
+    alternatives: [Infer that repairing invalid sums guarantees a nonnegative approximate affinity matrix or solves every sampler.]
+    evidence: [O269, N661]
+    status: resolved

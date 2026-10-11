@@ -1,0 +1,18 @@
+2026-10-11 | Codex -> Codex B delta | session /root/method081_preflight_b
+Requested gpt-6-astra/xhigh; actual model/effort independently unavailable.
+Read-only and no delegation: instruction-only. Verbatim response:
+
+**PASS** for commit `7c49f5f147203265d9027605738559289b65065c`, digest `ee85badee6a622851efaa2e0e036889516b596f2a250471a9dd3a97e0c896008`.
+
+The revised packet remains aligned with the user’s bounded request: repeat the two diagnosed prefixes after exact row replacement, without adding scientific cells or broadening the claim.
+
+Both blocking findings are resolved:
+
+- Successful, internally consistent early termination now passes input validation, fails the scientific prefix/outcome gate, and allows subsequent cells to continue. The saved before/after controls demonstrate the correction.
+- Complete ten-cell controls now exercise the actual read/report/verdict path. The positive comparison passes; displacement, collapse, no-op, mixed gain/regression, and early termination are rejected. Removing the final quality, mechanism, or prefix guard makes its corresponding control fail.
+
+Budget wording now accurately excludes final/failure rendering. Native binaries, runner, E-step implementation, scientific cells and thresholds remain unchanged; their hashes match the previous review. I read the other reviewer’s exact verdict for the permitted exchange and found no unresolved disagreement. No blocking findings remain.
+
+This PASS covers the frozen diagnostic only. Both reviewers’ PASS records and the per-cell manifest checks remain required before execution.
+
+I ran no tests or experiments and inspected no scientific native outcomes. Remaining limits are unchanged: one fixture and short prefixes cannot establish general convergence, posterior positivity, or runtime benefit; baseline Auto lacks a separately supplied final-size technical check.

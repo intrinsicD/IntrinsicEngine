@@ -682,8 +682,8 @@ sessions:
 
 - id: 2026-10-11_001
   date: '2026-10-11'
-  summary: METHOD-078 rejects retries; METHOD-079 diagnoses first-row signs; METHOD-080 completes the bounded invalid-row census and exact affinities, with source restored.
-  turn_count: 5
-  events_count: 15
-  claims_touched: [C119, C120, C121]
+  summary: METHOD-078 rejects retries; METHOD-079/080 diagnose invalid rows; METHOD-081 rescues one fixed-FPS step with exact-row repair in the bounded retest.
+  turn_count: 6
+  events_count: 18
+  claims_touched: [C119, C120, C121, C122]
   open_threads: 3

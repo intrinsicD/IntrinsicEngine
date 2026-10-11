@@ -23,7 +23,7 @@ implements the agreed complete-row repair and tests it on analytic controls and 
 ## Acceptance criteria
 - [x] Invalid target rows are replaced consistently in every E-step statistic, with weighted shifts, deterministic reduction, existing accuracy checks and bounded repair cost.
 - [x] Focused accelerated/Bayesian tests pass; new regression and mechanism-removal checks demonstrate the repair and retained guards.
-- [ ] Independently reviewed bounded comparison, raw HTML report and audit state accepted iterations, accuracy, timing and remaining limits without claiming universal positivity.
+- [x] Independently reviewed bounded comparison, raw HTML report and audit state accepted iterations, accuracy, timing and remaining limits without claiming universal positivity.
 
 ## Contract matrix
 | Contract | Scope |
@@ -50,17 +50,20 @@ python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/agents/check_ara_claims.py --root . --strict
 ```
 
-## Context
-Existing dirty ARA notes record the preceding PSD/remedy discussion. Baseline is `a93dcb8c7`.
-Main CI is already red; BUG-240/BUG-241 retain the prior failure evidence. No broader CI repair here.
+## Completion — 2026-10-11
+Implementation commit: `ba11fce6b`; frozen comparison: `7c49f5f14`; baseline: `a93dcb8c7`.
+Canonical result and limits: [ARA C122](../../ara/logic/claims.md),
+[raw report](../evidence/METHOD-081/runs/report.html).
 
 Independent code reviewer `/root/nystrom_repair_code` accepted the first two criteria on
 diff SHA256 `a2f0d3daa82a58f116b1982a478ea241d57e26220114cdfdab0f8c60c8b3af4b`.
-Experimental approval and audit remain pending.
+Referee `/root/method081_results` decided: **“approve — I accept METHOD-081’s third acceptance
+criterion for this bounded CPU comparison.”** Its [actual answer](../evidence/METHOD-081/reviews/results-review.txt)
+and [claim wording verdict](../evidence/METHOD-081/reviews/claim-review.txt) bind the raw audit.
+Two fresh Codex reviewers approved preflight after the operator's explicit Claude substitution.
 
-Focused verification: 41/41 tests; both new regressions fail before repair and four
-mechanism-removal mutations fail. Structural checks pass except the unchanged 24 METHOD-077
-review links owned by BUG-241. Two 100000-point technical checks passed without inspecting
-their method outcomes. Full experiment preflight is pending. After Claude's weekly quota
-prevented its review, the operator authorized two independent Codex reviews ("Ok ohne Claude",
-2026-10-11). No results-bearing comparison has started.
+Focused evidence is 41/41 tests, two before-fix regression failures and four rejected
+implementation mutations. Complete report controls also reject bypassed verdict guards.
+All ten scientific cells completed. Box fallback diagnosis, longer prefixes, full CPU,
+sanitizer and GPU checks remain outside this slice. Main CI and the unchanged 24 METHOD-077
+review-link failures remain owned by BUG-240/BUG-241; no broader CI repair was attempted.
