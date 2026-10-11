@@ -1,5 +1,5 @@
 # Independent plan review
-Reviewer: /root/nystrom_row_plan; requested gpt-6-astra/xhigh, fresh context; read-only and no-recursion instruction-only. Actual answer:
+Reviewer: /root/nystrom_row_plan; requested gpt-6-astra/xhigh, fresh context; read-only and no-recursion instruction-only. Recorded answer (mathematical and link formatting normalized; verdict and findings unchanged):
 
 Verdict: **revise**, with two small measurement clarifications. Scope and alignment are sound: every step serves the requested diagnosis, and no production fix is introduced.
 

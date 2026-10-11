@@ -1,3 +1,5 @@
 PASS: points_1 native parity, finite state, captured operands, independent replay, corruption rejection
 PASS: box_1 native parity, finite state, captured operands, independent replay, corruption rejection
 PASS: full report path, fail-closed failure banner and sign-disagreement classification; no efficacy values inspected
+PASS: optimized Python refuses execution before any start
+PASS: existing analysis files without successful exit cannot receive a verdict

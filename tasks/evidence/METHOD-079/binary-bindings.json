@@ -4,7 +4,7 @@
     "src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cpp": "f865605d92e8ffe3c68cebf4f020e9df753a2944cb6d26daebaa6cb73bb5c56d",
     "benchmarks/runners/CoherentPointDriftLandmarkVariantsRunner.cpp": "b28bac1214fcff5a6aa51614aedadb532c1c5f244a696b6ac5e65a8102ba9813",
     "tasks/evidence/METHOD-079/analyze.cpp": "e3ebccfb5ce00b40fa930dd2a76c1387edb9c3b037786bce921c04ae3af67cde",
-    "tasks/evidence/METHOD-079/diagnose.py": "99003cedafec5bdc66970eb47fd1390d0a6750438385395ff86a393598f367d2"
+    "tasks/evidence/METHOD-079/diagnose.py": "832a97d8332ebaa1d82245ff5d20e7e79108dd97c99d087a575f3d8a69688ffb"
   },
   "binaries": {
     "analyze": "47a844037ce72c328f1ca2197fd3bc5f8d7eb5ee0bb457d4ac96a896a27c333c",
