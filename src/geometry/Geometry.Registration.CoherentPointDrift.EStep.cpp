@@ -6,11 +6,14 @@ module;
 #include <bit>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <functional>
 #include <limits>
 #include <memory>
 #include <random>
 #include <span>
+#include <string>
 #include <string_view>
 #include <thread>
 #include <utility>
@@ -741,6 +744,7 @@ namespace Geometry::CoherentPointDrift::EStep
         std::array<std::array<Eigen::Vector3d, 2>, 2> Boxes{};
         bool BoxesFrozen{false};
         std::uint64_t NystromDraw{0u};
+        bool DiagnosticCaptured{false};
         std::uint32_t NystromVariant{0u}; // source | schedule << 8 | pattern << 16 of the cached state
         std::size_t NystromSourceSize{0u}; // source size of the cached state
 
@@ -751,6 +755,7 @@ namespace Geometry::CoherentPointDrift::EStep
             SourceLandmarksExhausted = false;
             BoxesFrozen = false;
             NystromDraw = 0u;
+            DiagnosticCaptured = false;
         }
         std::vector<double> LandmarkX{}, LandmarkY{}, LandmarkZ{}, LandmarkZero{};
         double NystromRejectedSigma2{0.0};
@@ -1444,6 +1449,19 @@ namespace Geometry::CoherentPointDrift::EStep
                 eigen.eigenvalues().unaryExpr([&](const double v) { return v > kCutoff * top ? 1.0 / v : 0.0; });
             const Eigen::MatrixXd pseudoInverse = eigen.eigenvectors() * inverse.asDiagonal() * eigen.eigenvectors().transpose();
 
+            const auto kept = (inverse.array() > 0.0).count();
+            const Eigen::Index mode = Eigen::Index(l) - kept;
+            std::size_t first = 0, second = 0;
+            for (std::size_t k = 0; k < l; ++k)
+                if (std::abs(eigen.eigenvectors()(k, mode)) > std::abs(eigen.eigenvectors()(first, mode))) first = k;
+            second = first == 0 && l > 1 ? 1 : 0;
+            for (std::size_t k = 0; k < l; ++k)
+                if (k != first && std::abs(eigen.eigenvectors()(k, mode)) > std::abs(eigen.eigenvectors()(second, mode))) second = k;
+            const double pairSigma = std::sqrt(Squared(LandmarkX[first], LandmarkY[first], LandmarkZ[first],
+                LandmarkX[second], LandmarkY[second], LandmarkZ[second]) / sigma2);
+            std::fprintf(stderr, "NYSTROM_SPECTRUM %llu %zu %.17g %lld %.17g %.17g %zu %zu %.17g\n",
+                (unsigned long long)NystromDraw, l, sigma2, (long long)kept, top, eigen.eigenvalues()[mode], first, second, pairSigma);
+
             constexpr std::size_t kGrain = 1024;
             // Pass 1 (sources): a = sum_m w_m k(Z, y_m).
             const std::size_t sourceChunks = (m + kGrain - 1) / kGrain, targetChunks = (n + kGrain - 1) / kGrain;
@@ -1469,6 +1487,10 @@ namespace Geometry::CoherentPointDrift::EStep
             std::fill(partial.begin(), partial.end(), 0.0);
             std::vector<double> scale(n, 0.0);
             std::atomic<bool> valid{true};
+            std::atomic<std::size_t> firstInvalid{n};
+            std::vector<double> failedSums(n, 0.0);
+            std::vector<std::uint8_t> visited(n, 0u);
+            const char* capturePath = std::getenv("INTRINSIC_NYSTROM_CAPTURE");
             ParallelFor(n, kGrain, threads, [&](const std::size_t begin, const std::size_t end)
             {
                 std::vector<double> row(l);
@@ -1478,7 +1500,16 @@ namespace Geometry::CoherentPointDrift::EStep
                     kernelRow(target.X[j], target.Y[j], target.Z[j], row.data());
                     double shifted = 0.0;
                     for (std::size_t k = 0; k < l; ++k) shifted += row[k] * g[Eigen::Index(k)];
-                    if (!(shifted > 0.0) || !std::isfinite(shifted)) { valid = false; return; }
+                    failedSums[j] = shifted;
+                    ++visited[j];
+                    if (!(shifted > 0.0) || !std::isfinite(shifted))
+                    {
+                        auto first = firstInvalid.load();
+                        while (j < first && !firstInvalid.compare_exchange_weak(first, j)) {}
+                        valid = false;
+                        if (capturePath) continue; // METHOD-080: collect the rest, then reject the attempt.
+                        return;
+                    }
                     LogDenominator[j] = LogSumWithOutlier(LogWeightShift, shifted, logC);
                     const double d = std::exp(LogWeightShift - LogDenominator[j]);
                     scale[j] = d;
@@ -1494,7 +1525,66 @@ namespace Geometry::CoherentPointDrift::EStep
                     }
                 }
             });
-            if (!valid) return false;
+            std::string attemptPath;
+            if (capturePath)
+            {
+                attemptPath = std::string(capturePath) + ".draw" + std::to_string(NystromDraw) + ".L" + std::to_string(l);
+                const auto fail = [] { std::fputs("METHOD-080 census IO failure\n", stderr); std::exit(80); };
+                std::unique_ptr<std::FILE, decltype(&std::fclose)> census(std::fopen((attemptPath + ".rows").c_str(), "wb"), &std::fclose);
+                if (!census) fail();
+                const std::uint64_t header[]{80u, n, NystromDraw, l};
+                const double meta[]{sigma2, logC, LogWeightShift};
+                if (std::fwrite(header, sizeof(header), 1, census.get()) != 1 ||
+                    std::fwrite(meta, sizeof(meta), 1, census.get()) != 1 ||
+                    std::fwrite(failedSums.data(), sizeof(double), n, census.get()) != n ||
+                    std::fwrite(visited.data(), sizeof(std::uint8_t), n, census.get()) != n ||
+                    std::fflush(census.get()) != 0) fail();
+                if (!DiagnosticCaptured)
+                {
+                    std::unique_ptr<std::FILE, decltype(&std::fclose)> coords(std::fopen((std::string(capturePath) + ".targets").c_str(), "wb"), &std::fclose);
+                    if (!coords || std::fwrite(target.X.data(), sizeof(double), n, coords.get()) != n ||
+                        std::fwrite(target.Y.data(), sizeof(double), n, coords.get()) != n ||
+                        std::fwrite(target.Z.data(), sizeof(double), n, coords.get()) != n || std::fflush(coords.get()) != 0) fail();
+                }
+            }
+            if (!valid)
+            {
+                std::fprintf(stderr, "NYSTROM_DIAG invalid_target %llu %zu\n", (unsigned long long)NystromDraw, l);
+                // METHOD-080: retain the established first-row format for each failing attempt.
+                const char* path = capturePath;
+                if (path)
+                {
+                    const auto fail = [] { std::fputs("METHOD-079 snapshot IO failure\n", stderr); std::exit(79); };
+                    const auto j = firstInvalid.load();
+                    std::vector<double> row(l), mask(l);
+                    kernelRow(target.X[j], target.Y[j], target.Z[j], row.data());
+                    double shifted = 0.0;
+                    for (std::size_t k = 0; k < l; ++k)
+                    {
+                        shifted += row[k] * g[Eigen::Index(k)];
+                        mask[k] = eigen.eigenvalues()[Eigen::Index(k)] > kCutoff * top ? 1.0 : 0.0;
+                    }
+                    std::unique_ptr<std::FILE, decltype(&std::fclose)> file(std::fopen((attemptPath + ".snapshot").c_str(), "wb"), &std::fclose);
+                    if (!file) fail();
+                    const std::uint64_t header[]{79u, l, m, j, NystromDraw};
+                    if (std::fwrite(header, sizeof(header), 1, file.get()) != 1)
+                        fail();
+                    const auto write = [&](const double* data, std::size_t size) {
+                        if (std::fwrite(data, sizeof(double), size, file.get()) != size)
+                            fail();
+                    };
+                    if (std::bit_cast<std::uint64_t>(shifted) != std::bit_cast<std::uint64_t>(failedSums[j])) fail();
+                    const double values[]{sigma2, logC, LogWeightShift, target.X[j], target.Y[j], target.Z[j], failedSums[j]};
+                    write(values, 7);
+                    write(LandmarkX.data(), l); write(LandmarkY.data(), l); write(LandmarkZ.data(), l);
+                    write(moved.X.data(), m); write(moved.Y.data(), m); write(moved.Z.data(), m); write(LogWeight.data(), m);
+                    write(gram.data(), l*l); write(eigen.eigenvalues().data(), l); write(eigen.eigenvectors().data(), l*l);
+                    write(mask.data(), l); write(row.data(), l); write(a.data(), l); write(g.data(), l); write(pseudoInverse.data(), l*l);
+                    if (std::fclose(file.release()) != 0) fail();
+                    DiagnosticCaptured = true;
+                }
+                return false;
+            }
             Eigen::MatrixXd h = Eigen::MatrixXd::Zero(Eigen::Index(l), 4);
             for (std::size_t c = 0; c < targetChunks; ++c)
                 for (Eigen::Index column = 0; column < 4; ++column)
@@ -1517,7 +1607,7 @@ namespace Geometry::CoherentPointDrift::EStep
                     out.P1[i] = weight * v[0]; out.PXx[i] = weight * v[1]; out.PXy[i] = weight * v[2]; out.PXz[i] = weight * v[3];
                 }
             });
-            if (!valid) return false;
+            if (!valid) { std::fprintf(stderr, "NYSTROM_DIAG invalid_source %llu %zu\n", (unsigned long long)NystromDraw, l); return false; }
 
             // A-posteriori check on exact rows spread over both sets.
             const std::size_t samples = 32u;
@@ -1650,15 +1740,19 @@ namespace Geometry::CoherentPointDrift::EStep
             const double dense = double(n) * double(m);
             double spent = 0.0;
             std::size_t count = std::max<std::size_t>(settings.NystromLandmarks, s.NystromLandmarks);
+            // Temporary METHOD-078 diagnostic probes; removed before a production fix is delivered.
+            std::fprintf(stderr, "NYSTROM_DIAG begin %llu %.17g %.17g\n", (unsigned long long)s.NystromDraw, sigma2, s.NystromRejectedSigma2);
             while (sigma2 > s.NystromRejectedSigma2)
             {
                 const std::size_t landmarks = std::min(count, cap);
                 const double l = double(landmarks);
                 spent += (2.0 * double(m) + double(n)) * l + 2.0 * l * l * l;
-                if (spent >= 0.5 * dense) break;
+                if (spent >= 0.5 * dense) { std::fprintf(stderr, "NYSTROM_DIAG cost %llu %zu %.17g %.17g\n", (unsigned long long)s.NystromDraw, landmarks, spent, 0.5 * dense); break; }
                 std::uint64_t evaluations = 0u;
+                sampledError = std::numeric_limits<double>::quiet_NaN();
                 nystrom = s.NystromRows(moved, sigma2, logOutlier, landmarks, settings.NystromErrorLimit,
                                         settings, out, threads, sampledError, evaluations);
+                std::fprintf(stderr, "NYSTROM_DIAG attempt %llu %zu %d %.17g\n", (unsigned long long)s.NystromDraw, landmarks, int(nystrom), sampledError);
                 nystromEvaluations += evaluations;
                 if (nystrom)
                 {

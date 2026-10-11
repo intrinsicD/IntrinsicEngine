@@ -1,0 +1,3 @@
+PASS: points_1 endpoint/trace parity, full census coverage, rejection preserved, exact first-row oracle, analysis budget 8.9 seconds
+PASS: box_1 endpoint/trace parity, full census coverage, rejection preserved, exact first-row oracle, analysis budget 7.9 seconds
+PASS: report path, failure and missing-exit gates; no efficacy outcomes inspected

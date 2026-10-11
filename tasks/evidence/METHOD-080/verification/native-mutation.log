@@ -1,0 +1,2 @@
+PASS: early-return mutant preserves rejection/endpoint but fails completeness (later same-chunk rows unvisited)
+PASS: exact original probe source and binary restored
