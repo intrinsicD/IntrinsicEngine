@@ -1,0 +1,37 @@
+2026-10-11 | Codex -> fresh Codex A | session /root/method081_preflight_a
+Requested gpt-6-astra/xhigh; actual model/effort independently unavailable.
+Read-only, blind staging and no delegation: instruction-only. Verbatim response:
+
+Round 2 verdict: REVISE on fd47197d9b7a58cdeb2c44ccccd05f99d8fc30ed7fef3766032e54ae46b33789. Independent, read-only, no delegation/runs, and no other review inspected. I used experiment-preflight/SKILL.md; model/effort remain independently unavailable.
+
+Alignment first: Layer B faithfully retains the three German user requests, identifies operator-directed work outside Framework24 P0, and makes the shortest-path claim credible: rerun the two diagnosed prefixes with the reviewed repair and matching Auto endpoints. No new sampler search or broad success claim is proposed. My blind reconstruction matches the stated bounded count/endpoint/replay experiment. Auto-versus-dense, short prefixes, shared-reference failure, absent repair counts and undecomposed Bayesian objective are disclosed scope limitations, not reasons to expand this experiment.
+
+Blocking revisions:
+1. Scientific outcome/stop mismatch. compare.py:58 asserts d['iterations']==k and len(trace)==k, although Params::Tolerance remains 1e-5 and valid early convergence is possible. A complete successful registration that legitimately stops early is a changed iteration/outcome result under Layer B's hypothesis, not a malformed trace. It currently raises and aborts remaining cells as UNEVALUATED. Accept self-consistent successful early results, record the frozen outcome gate as failed, and continue the unchanged cell plan. Keep true missing/inconsistent/nonfinite data and enforced resource/process failures technical. Add a known-answer check for this classification and continued plan behavior. This is required by the packet and the global instruction to retain scientific surprises and continue.
+2. Whole-evaluation controls are missing. compare.py::self_test directly tests distances/quality/improved on three artificial points; report-check.py only creates one incomplete exact reference cell. Consequently neither saved test reaches report()'s completed comparison verdict or shows that bad quality/no-op/regression cannot receive BOUNDED PREDICTION SUPPORTED through that path. Checklist 16 requires evaluation-as-a-whole evidence. Add a deterministic synthetic complete ten-cell fixture driving report/read through a positive result and relevant negative quality/count controls; demonstrate those checks fail when the corresponding final verdict guard is removed. This needs no native experiment or additional scientific cell.
+
+Checklist coverage:
+1–3: PASS for the bounded diagnostic. Inherited fixture/settings/tolerances are identified and justified by repeating the diagnosed case; implementation confirms normalized Bayesian settings and NLL semantics. World-coordinate examples show O(1) scale; noise is 0.004 and endpoint tolerances are explicit. Objective equals NLL, so there is no additional logged weighted term to decompose; a full Bayesian ELBO is not claimed.
+4: PASS—analytic cases separate weights/outliers, negative affinity/underflow and coordinate components.
+5: n/a—no new-data prediction; explicitly reused diagnosed fixture.
+6: PASS—I inspected first/last source, truth and target preview values; all 100000 points feed metrics.
+7–8: PASS—new analytic regressions fail before repair, pass afterward; mutation evidence rejects missing PXy, stable-row bypass, cost guard and accuracy guard. Forty-one focused tests pass.
+9–10: n/a to learned teacher/target leakage; Auto is a numerical comparator, and truth is an independent evaluation output, not a fitting input.
+11: PASS for scoped mechanisms—focused tests cover fixed points, resampled boxes, draw schedules and repair/fallback branches.
+12–13: PARTIAL at evaluation level (revision 2); mechanism mutations genuinely remove their intended paths. Common-mode wrong Auto behavior remains outside the bounded parity claim.
+14: PASS for missing outputs, except the scientific/technical classification bug in revision 1.
+15: PASS—fixed world units, full endpoint coverage, RMS plus maximum; unsigned distances suffice for this closeness question. Native and Python distances are cross-checked.
+16: REVISE as above.
+17: PASS—one-iteration effect resolution, two deterministic repetitions, exact replay gate; no population or timing-significance claim.
+18: PASS—source/binary bindings and commands freeze both arms; later state/draw divergence is explicitly part of the intervention. Kernel-count accounting also changes, so it cannot support a matched count-based speed claim.
+19: n/a to learning completion—matched finite prefixes directly answer the scoped question, with no full-convergence claim.
+20–21: PASS for diagnostic reuse and fixed selection; not a held-out generalization experiment.
+22: PASS—saved focused suite includes union-box distribution checks, not just shapes.
+23: Candidate final-size points/box technical paths are evidenced by technical.json, technical.py and technical.log; I did not inspect native numeric outcomes. Baseline/Auto technical execution at final size is not separately evidenced; same-runner binding and unchanged Auto code support reuse, but do not claim that path was independently checked here.
+24: PASS for native limits: 240s/cell, 1200s signal budget, 3GiB address space, largest-size RSS recorded. Final/failure report rendering occurs after alarm cancellation; qualify the budget as scientific execution/inter-cell reporting, or keep final rendering within it.
+25: n/a—timing descriptive; no speed prediction/adoption threshold.
+26: PASS—CPU pinning/threads fixed, serial plan, fresh output directory refuses overwrite.
+
+Start gate/freeze are correctly source-and-binary bound and require both PASS records. No run is authorized by this REVISE. Optional improvements are actual repair/landmark/rejection diagnostics and clearer 'Auto reference' labels; neither is necessary for the bounded claim. No separate LESSONS/goal file was supplied or found by coordinator inventory.
+
+Skipped all executions and scientific technical-output numbers. Residual risks: one known fixture/prefix cannot establish convergence, posterior positivity or runtime benefit.

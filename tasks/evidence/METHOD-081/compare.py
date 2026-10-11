@@ -26,7 +26,8 @@ def manifest_command():
             str(BINS),'tasks/evidence/METHOD-081/preflight/layer-a.md','tasks/evidence/METHOD-081/preflight/layer-b.md',
             'tasks/evidence/METHOD-081/verification/mutations.py','tasks/evidence/METHOD-081/verification/mutations.log',
             'tasks/evidence/METHOD-081/verification/focused-tests.log',
-            'tasks/evidence/METHOD-081/verification/report-check.py','tasks/evidence/METHOD-081/verification/report-check.log']
+            'tasks/evidence/METHOD-081/verification/report-check.py','tasks/evidence/METHOD-081/verification/report-check.log',
+            'tasks/evidence/METHOD-081/verification/full-controls-before.log']
 
 def positions(path):
     data=np.fromfile(path,dtype='<f8');assert data.size in (300000,400000),'position shape'
@@ -55,8 +56,9 @@ def read(cell,folder):
     name,arm,variant,k=cell
     d=json.loads((folder/(name+'.json')).read_text());p=positions(folder/(name+'.bin'))
     t,stages=traces(folder/(name+'.stderr'))
-    assert d['status']=='success' and d['iterations']==k and len(t)==k
-    assert [int(r[0]) for r in t]==list(range(k)) or [int(r[0]) for r in t]==list(range(1,k+1))
+    assert d['status']=='success' and 0<d['iterations']<=k and len(t)==d['iterations']
+    d['prefix_complete']=d['iterations']==k
+    assert [int(r[0]) for r in t]==list(range(d['iterations'])) or [int(r[0]) for r in t]==list(range(1,d['iterations']+1))
     assert sum(r[5]==5 for r in t)==d['nystrom_iterations']
     assert math.isfinite(d['seconds']) and d['seconds']>0 and stages
     if variant!='exact':
@@ -113,7 +115,7 @@ def report():
     summary={'complete':len(entries)==len(cells()),'rows':entries,'invalid_cells':invalid}
     if (OUT/'failure.json').exists():summary['failure']=json.loads((OUT/'failure.json').read_text());summary['complete']=False
     if summary['complete']:
-        summary['quality_pass']=all(d.get('quality_pass',True) and d.get('outcome_match',True) for d in entries.values())
+        summary['quality_pass']=all(d['prefix_complete'] and d.get('quality_pass',True) and d.get('outcome_match',True) for d in entries.values())
         summary['repeat_identity']=all((OUT/(a+'_'+v+'_1.bin')).read_bytes()==(OUT/(a+'_'+v+'_2.bin')).read_bytes() and [r[:8] for r in traces(OUT/(a+'_'+v+'_1.stderr'))[0]]==[r[:8] for r in traces(OUT/(a+'_'+v+'_2.stderr'))[0]] for a in ('baseline','candidate') for v in ('points','box'))
         summary['accepted_delta']={v:entries['candidate_'+v+'_1']['nystrom_iterations']-entries['baseline_'+v+'_1']['nystrom_iterations'] for v in ('points','box')}
         delta=summary['accepted_delta'];summary['mechanism_prediction']=improved(delta)

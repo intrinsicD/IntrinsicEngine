@@ -13,7 +13,8 @@ Full preflight tier: the result informs whether the candidate addresses the obse
 Hypothesis/prediction: complete exact replacement rescues at least one additional accepted
 Nyström iteration across the two prefixes, without reducing the other's accepted count, while
 endpoint displacement from Auto stays RMS <= .001 and max <= .01 world units and
-status/termination/iteration count stay equal. These are the previous diagnostic tolerances.
+status/termination/iteration count stay equal and each planned prefix is completed.
+These are the previous diagnostic tolerances.
 An ineffective method gives zero gain, worsens one variant, or fails any endpoint gate.
 The bounded prediction is not supported in those cases. No automatic tuning or additional
 failure-layer repair follows. The implementation may remain as a reviewed candidate; this
@@ -39,6 +40,12 @@ positive reference arms. No separate disabled-update run is needed: collapsed/id
 null probes cover the stated endpoint and accepted-count false successes. No visual-only gate.
 The synthetic report check also rejects a missing trace and preserves an unevaluated HTML
 report with a named failure when a completed-looking cell has invalid data.
+Complete synthetic ten-cell controls pass through the real read/report/verdict path: a
+positive comparison is supported, while displacement, collapse, no accepted-count gain and
+gain paired with regression are not. Removing the final quality or mechanism conjunction
+makes these controls fail. A successful early stop remains a valid observed result with a
+failed planned-prefix/outcome gate; all ten cells, including subsequent cells, remain in the
+completed NOT SUPPORTED report. That control fails before the early-stop classification fix.
 
 Two repetitions in reverse order per arm/variant test replay and expose timing variation;
 they are not independent seeds and carry no population CI. Require byte-identical endpoints

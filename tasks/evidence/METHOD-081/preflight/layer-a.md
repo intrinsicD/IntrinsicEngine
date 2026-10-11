@@ -42,11 +42,15 @@ normalized inputs, outlier weight .1, beta 1, lambda 2, low rank 100; no subsamp
 Each process starts fresh without warmup. Timing is the runner's registration-only wall clock;
 fixture generation, output writing, Python analysis and process startup are excluded.
 
-Native cell timeout 240 seconds; total driver budget 1200 seconds including reports between
-cells, enforced by SIGALRM and checked before each start; child address-space limit 3 GiB. No changed configuration,
+Native cell timeout 240 seconds; controller budget 1200 seconds for native execution and
+reports between cells, enforced by SIGALRM and checked before each start. Final/failure
+report rendering after alarm cancellation is outside that execution budget. Child address-space
+limit 3 GiB. No changed configuration,
 seed, repeat count or adaptive cell is permitted. A technical failure/timeout leaves the
 comparison unevaluated. Completed outputs persist. Scientific discrepancies do not cancel
-remaining cells. Peak child RSS is recorded as a cumulative high-water mark, not per-cell RSS.
+remaining cells: internally consistent successful early termination is read and reported with
+a failed planned-prefix gate, and the unchanged remaining cells continue. Missing, malformed
+or nonfinite output remains a technical failure. Peak child RSS is recorded as a cumulative high-water mark, not per-cell RSS.
 `technical.json` records final-size pass/fail checks; numeric method outcomes from those checks
 are neither read nor reported as scientific results. `fixture-preview.txt` is only a display subset.
 

@@ -1,0 +1,48 @@
+2026-10-11 | Codex -> fresh Codex B | session /root/method081_preflight_b
+Requested gpt-6-astra/xhigh; actual model/effort independently unavailable.
+Read-only, blind staging and no delegation: instruction-only. Verbatim response:
+
+**REVISE** on digest `fd47197d9b7a58cdeb2c44ccccd05f99d8fc30ed7fef3766032e54ae46b33789`, commit `77fdd0df7407e081127a9e229b2623cdfdf54a36`. No experiment approval.
+
+The run serves the quoted questions: Q1/Q2 receive analytic regression evidence, and Q3 receives the smallest bounded comparison of the two diagnosed prefixes. The operator-directed scope and absence of a separate goal file are consistent with the packet. My reconstruction matches the intended acceptance-count and Auto-endpoint comparison, with one execution-policy mismatch below.
+
+Two revisions block approval:
+
+1. **Valid early termination incorrectly aborts the sweep.** [compare.py:58](/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-081/compare.py:58) requires exactly the requested iterations and trace length. A valid earlier `Converged` or `SigmaFloor` result therefore raises an exception and cancels remaining cells, although changed termination is a scientific outcome and Layer B requires continuation. Separate internally consistent successful early termination from malformed/incomplete output. Preserve the frozen prefix/outcome requirement as a failed scientific comparison, record it, and continue the remaining cells.
+
+2. **The complete evaluation lacks positive/negative control evidence.** `self_test()` tests `distances`, `quality`, and `improved` separately. [report-check.py](/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-081/verification/report-check.py) constructs only one reference cell, so neither a complete supported verdict nor complete negative comparisons are exercised. Add deterministic full-comparison fixtures through `read()`/`report()`: a supported positive, displaced/collapsed outputs, zero accepted-count gain, and gain in one variant with regression in the other. Demonstrate rejection still depends on the final verdict’s quality and mechanism conjunctions. This validates the existing decision rule; it adds no scientific gate or native experiment.
+
+Checklist assessment:
+
+| Items | Evidence or disposition |
+|---|---|
+| 1 | Prefixes and inherited settings are justified by the diagnosed failures; no sampler search. |
+| 2 | Normalized algorithm parameters and world-space output thresholds are distinguished. Fixed prior diagnostic tolerances are stated. |
+| 3 | Implementation inspected: Bayesian posterior-variance terms are off; objective equals NLL because `Coherence()` returns zero for Bayesian. |
+| 4 | Analytic tests separate weighted/unweighted, outliers/no outliers, serial/parallel, accuracy rejection and repair-budget rejection. |
+| 5 | No new dataset prediction: this is the already diagnosed fixture. |
+| 6 | Source, target and truth examples from both ends inspected; generator and stated clutter/noise construction agree. |
+| 7 | Before-fix regressions fail, after-fix regressions pass; analytic negative-affinity and underflow cases check sufficient statistics. |
+| 8 | Exact-PXy removal fails the regression; stronger hidden/future-information checks are inapplicable. |
+| 9 | No teacher/student estimate substitution. |
+| 10 | No learned prediction task or answer-bearing input shortcut. |
+| 11 | Focused evidence includes landmark variants, schedules, prefix extension, thread independence and box distribution. |
+| 12 | Relative endpoint gates address candidate collapse/displacement against a fixed reference. Shared Auto errors remain outside the bounded claim; do not infer absolute registration correctness. Complete false-success control evidence needs revision 2. |
+| 13 | Four implementation mutations remove their named mechanisms and are rejected. |
+| 14 | Missing/inconsistent technical data produces unevaluated output; valid early scientific outcomes need revision 1. |
+| 15 | Full endpoint coverage and maximum alongside RMS avoid subset averaging; units and visualization subset size are explicit. |
+| 16 | **Incomplete:** isolated helper controls do not demonstrate complete verdict behavior; revision 2. |
+| 17 | Two deterministic repeats support replay/timing spread only. One accepted iteration is the stated detectable effect; no population uncertainty claim. |
+| 18 | Same fixture, seed, runner and starting settings; trajectory/draw-size divergence is disclosed as intervention behavior. Binary/source hashes match recorded bindings. |
+| 19 | Budgets match within each variant. Full learning/convergence is expressly outside this prefix diagnostic. |
+| 20 | No tuning or training/evaluation split is involved. |
+| 21 | Prefixes, counts, thresholds, ordering and verdict are frozen prospectively. |
+| 22 | Existing landmark distribution/schedule tests pass; no new random sampler is introduced. |
+| 23 | Both changed native variant paths have final-size pass-only technical evidence, including finite complete outputs/traces. |
+| 24 | Native timeout, total budget, address-space limit and largest-size memory evidence exist. Early-termination handling needs revision 1. |
+| 25 | No runtime improvement prediction or speed ranking; timings are descriptive. |
+| 26 | CPU-only serial cells, fixed affinity and fresh output-directory creation; no GPU contention or output overwrite. |
+
+The 41 focused tests and four mutation rejections support the implementation mechanism. Full Bayesian ELBO instrumentation and direct repair-row telemetry are **optional for this bounded claim**. Current traces cannot establish posterior positivity, general convergence, or the precise repair fraction responsible for acceptance gains. Kernel-count accounting changed between binaries, so counts should not support a cross-arm work-saving claim.
+
+I read neither scientific native outcomes nor the other review, and ran no tests or experiments. Exact model/effort are not independently exposed; the manifest was not regenerated, though its digest and the cited binary/source hashes were checked.
