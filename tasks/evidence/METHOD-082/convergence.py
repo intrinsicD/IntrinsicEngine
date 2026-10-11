@@ -40,7 +40,8 @@ def manifest_command():
             *sum((['--exclude', f'tasks/evidence/METHOD-082/{p}'] for p in ('preflight', 'reviews', 'runs', 'verification')), []),
             str(BINS), str(HERE / 'preflight/layer-a.md'), str(HERE / 'preflight/layer-b.md'),
             str(HERE / 'verification/check.log'), str(HERE / 'verification/technical.py'),
-            str(HERE / 'verification/technical.log')]
+            str(HERE / 'verification/technical.log'), str(HERE / 'verification/native-failure-shape.py'),
+            str(HERE / 'verification/native-failure-before.log'), str(HERE / 'verification/native-failure-after.log')]
 
 
 def load_positions(path):
@@ -54,18 +55,20 @@ def load_cell(cell, folder):
     assert all(d[k] == v for k, v in dict(fixture=cell['fixture'], seed=cell['seed'], points=N,
                threads=8, variant=VARIANTS[cell['variant']], landmarks=256, error_limit=.001).items()), 'configuration mismatch'
     t, stages = traces(folder / (cell['name'] + '.stderr'))
-    assert len(t) == d['iterations'] == d['observed_iterations'] and 0 <= len(t) <= CAP
+    assert len(t) == d['observed_iterations'] and 0 <= len(t) <= CAP
     assert [r[0] for r in t] == list(range(len(t)))
     assert sum(r[5] == 5 for r in t) == d['nystrom_iterations']
     assert stages and math.isfinite(d['seconds']) and d['seconds'] > 0
     assert all(t[i][8] >= t[i - 1][8] for i in range(1, len(t)))
     p = None
     if d['status'] == 'success':
+        assert d['iterations'] == len(t)
         assert d['termination'] in ('converged', 'iteration_cap', 'sigma_floor') and len(t) > 0
         assert d['termination'] != 'iteration_cap' or len(t) == CAP
         assert all(math.isfinite(d[k]) for k in ('sigma2', 'scale', 'rms_to_truth', 'max_sampled_error'))
         p = load_positions(folder / (cell['name'] + '.bin'))
     else:
+        assert d['iterations'] == 0, 'failed Result must retain its default iteration count'
         assert not (folder / (cell['name'] + '.bin')).exists(), 'failed registration published endpoint'
     return d, t, stages, p
 
@@ -74,7 +77,7 @@ def measure(d, p, data, reference):
     assert len(data['target']) == d['targets'] and len(data['source']) == len(data['truth']) == N
     row = dict(d)
     row['regular_convergence'] = d['status'] == 'success' and d['termination'] == 'converged'
-    row['nystrom_fraction'] = d['nystrom_iterations'] / max(1, d['iterations'])
+    row['nystrom_fraction'] = d['nystrom_iterations'] / max(1, d['observed_iterations'])
     row['auto_agreement'] = None
     row['truth_improvement'] = False
     if p is None:

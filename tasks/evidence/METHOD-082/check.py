@@ -35,7 +35,7 @@ def controls():
                 if status != 'success': term = 'none'
                 d = dict(fixture=cell['fixture'], seed=cell['seed'], points=c.N, targets=c.N, threads=8,
                     variant=c.VARIANTS[cell['variant']], landmarks=256, error_limit=.001,
-                    status=status, termination=term, iterations=count, observed_iterations=count,
+                    status=status, termination=term, iterations=count if status == 'success' else 0, observed_iterations=count,
                     nystrom_iterations=0 if cell['variant'] == 'auto' else count,
                     seconds=1., sigma2=.01, scale=1., max_sampled_error=.0001,
                     rms_to_truth=c.distances(p, truth)[0] if status == 'success' else None)
@@ -110,6 +110,7 @@ MUTATIONS = {
     'learning': ("learning = all_success and all(d['truth_improvement'] for d in rows.values())", 'learning = all_success'),
     'replay': ('comparison = regular and agreement and replay', 'comparison = regular and agreement'),
     'invalid_report': ("assert not result['invalid_cells'], 'invalid measurement report'", "assert True, 'invalid measurement report'"),
+    'failure_history': ("assert len(t) == d['observed_iterations']", "assert len(t) == d['iterations'] == d['observed_iterations']"),
 }
 
 if __name__ == '__main__':

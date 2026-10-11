@@ -7,3 +7,4 @@ REJECTED mutation: agreement AssertionError: displaced
 REJECTED mutation: learning AssertionError: identity
 REJECTED mutation: replay AssertionError: different_replay
 REJECTED mutation: invalid_report AssertionError: truth mismatch did not stop the driver
+REJECTED mutation: failure_history AssertionError: numerical

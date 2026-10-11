@@ -24,6 +24,9 @@ Nyström arms for full/seed1. Total 34 cells, one process at a time. Every cell 
 source points, 8 threads pinned to logical CPUs0–7, 5000 maximum iterations, 256 landmarks,
 sampled relative error limit .001. `points` is `points/fixed/random` (FPS; pattern unused);
 `box` is `box/resampled/random`; Auto is runner variant `exact`.
+The256 landmark setting is an initial/minimum request: accepted counts persist and failed
+attempts can double up to4096 under the work budget. Actual landmark and repaired-row counts
+are not exposed by the retained runner.
 
 Resolved remaining config: Bayesian, input normalization on, outlier weight .1, beta1,
 lambda2, low rank100, objective relative tolerance1e-5, initial sigma² derived from mean
@@ -48,7 +51,10 @@ Measurement owners: `load_cell`, `measure`, `summarize`, `report`. Reused METHOD
 `traces`, `distances`, `quality`; current experiment has its own termination/report logic.
 Endpoint positions are little-endian packed double3 (N*24 bytes), checked finite and exact
 shape. Native exit1 with a failure status is retained without requiring positions; success
-without valid positions is technical invalidity. Final convergence-check E-step emits no
+without valid positions is technical invalidity. On native failure, Result.Iterations
+defaults to0 while observed_iterations and the trace retain earlier completed steps;
+the validator preserves this shape and uses observed_iterations for Nyström fractions.
+Final convergence-check E-step emits no
 iteration record: the engine's returned termination is authoritative, trace contains only
 completed M-steps. NLL/objective/mass precede update; sigma² follows update. Actual policy
 enum:0Reference,1Dense,2Truncated,3Auto(request),4FastGauss,5Nyström,6Vulkan.

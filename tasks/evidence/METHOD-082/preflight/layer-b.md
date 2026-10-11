@@ -38,8 +38,9 @@ never reporting the user's answer.
 Frozen broader registration screen P2: P1 plus RMS to known truth ≤90% of the unregistered
 source's truth RMS and centered RMS radius between .5 and2times truth for EVERY arm.
 The10% improvement margin dwarfs the1e-5 dump error; this is a coarse improvement/collapse
-check, not an absolute registration-accuracy claim. Truth RMS/max and reduction remain
-reported continuously even when the screen fails. Full/partial observed, hidden and
+check, not an absolute registration-accuracy claim. Shared imperfect local minima can pass
+this coarse screen. Truth RMS/max and reduction are reported continuously even when it
+fails. Full/partial observed, hidden and
 clutter-replaced source-point subsets are disjoint, with counts; rounding-boundary-ambiguous
 nonclutter points are a fourth group. All-point metrics keep every source point. Pointwise
 truth assumes known synthetic correspondence; it need not coincide with the density objective.
@@ -65,6 +66,9 @@ P2 learning. Bypassing convergence, endpoint agreement, learning or replay indiv
 breaks its counterexample test. A fifth mutation proves invalid measurement reports stop
 the next native start. A real rendering check recovers the before/after picture after an
 interrupted image pair. One boundary-ambiguous point tests subset accounting.
+A native-shaped failure control (zero result iterations, retained observer history) fails
+before the reader correction and passes after it. Reinstating the old equality also breaks
+the complete-report numerical-failure control as the sixth mutation.
 `null-probes.json` computes identity, centered collapse and displaced-truth
 probes cheaply on all six actual fixtures before execution, with a known truth positive.
 Existing METHOD-081 analytic tests/mutations establish exact repaired sufficient statistics
