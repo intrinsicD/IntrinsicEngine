@@ -1,0 +1,20 @@
+2026-10-11, Codex -> fresh Codex, /root/method082_plan.
+Requested gpt-6-astra / xhigh; actual model/effort not independently reported.
+Read-only and no-delegation restrictions instruction-only. Object: proposed 34-cell
+METHOD-082 convergence plan, supplied before controller implementation. Actual answer:
+
+**Verdict: approve the implementation plan.** It answers “Dann bitte einmal testen, vollständige Konvergenz usw” without changing the algorithm or making a successful outcome a prerequisite for reporting.
+
+No blocking plan findings. Reusing the retained binaries and only the parsing/plotting helpers is the smallest sound approach. Their hashes match METHOD-081’s recorded bindings. The source confirms that normal convergence is distinct from iteration cap and sigma floor, and that the final convergence-check E-step is untraced.
+
+Points to carry into the frozen packet and driver:
+
+1. **Separate mechanism counts from convergence length.** Accepted Nyström totals can rise simply because an arm takes more iterations. Report accepted/observed counts and fractions; treat unequal-length count deltas as descriptive rather than isolated proof of repair efficacy.
+2. **Handle scientific failure before demanding endpoints.** The retained runner legitimately omits positions after numerical failure. That should remain a recorded scientific outcome, whereas missing positions after reported success are technical invalidity.
+3. **Freeze the learning/collapse thresholds explicitly.** The promised wrong-but-consistent and collapsed controls need to fail the complete verdict under those same thresholds. Three seeds support bounded casewise conclusions; reversed repeats establish replay consistency, not population uncertainty.
+4. **Protect partial-subset classification from rounding.** The native visibility test uses unrounded `q.x < 0.2`, while dumps round coordinates. Count or exclude boundary-ambiguous points within the declared dump error budget; show subset counts.
+5. **Label trace timing correctly.** NLL/objective/mass describe the E-step before the update; logged sigma² is after the M-step. This matters when interpreting plots.
+
+The 34-cell scope is bounded and defensible; the four replay cells are the first optional cut if simplifying further. Budget exhaustion must leave later cells explicitly unevaluated.
+
+Not checked: the unwritten driver, controls, final frozen packet, CI, or convergence outcomes. This is plan approval, not experiment-start approval.
