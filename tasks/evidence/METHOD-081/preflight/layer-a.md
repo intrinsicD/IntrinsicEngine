@@ -3,6 +3,9 @@
 Repository: /home/alex/Documents/IntrinsicEngine. CPU-only local diagnostic, identifier
 `method081_exact_row_repair_prefix`; native outputs are the existing diagnostic runner's
 JSON format, not schema-v2 performance benchmark results. No claim-eligible performance ranking.
+Review composition: two fresh independent Codex reviewers. The operator explicitly authorized
+this substitution after Claude's weekly quota prevented its review ("Ok ohne Claude", 2026-10-11).
+The start gate requires truthful `codex_a` and `codex_b` PASS records on the same digest.
 
 Sources: baseline engine is commit a93dcb8c7; candidate is the current frozen engine.
 `../reviews/code.patch` shows the four implementation/test/doc changes. The runner in both

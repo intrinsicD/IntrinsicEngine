@@ -61,6 +61,6 @@ Experimental approval and audit remain pending.
 Focused verification: 41/41 tests; both new regressions fail before repair and four
 mechanism-removal mutations fail. Structural checks pass except the unchanged 24 METHOD-077
 review links owned by BUG-241. Two 100000-point technical checks passed without inspecting
-their method outcomes. Full experiment preflight is pending: Claude's weekly quota prevented
-its review; the operator has been asked whether a second independent Codex reviewer may
-substitute. No results-bearing comparison has started.
+their method outcomes. Full experiment preflight is pending. After Claude's weekly quota
+prevented its review, the operator authorized two independent Codex reviews ("Ok ohne Claude",
+2026-10-11). No results-bearing comparison has started.

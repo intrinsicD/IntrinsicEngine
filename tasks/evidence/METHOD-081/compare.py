@@ -137,7 +137,7 @@ def self_test():
 
 def run():
     approval=json.loads((HERE/'reviews/approval.json').read_text());expected=hashlib.sha256((PACKET/'manifest.txt').read_bytes()).hexdigest()
-    assert approval['digest']==expected and approval['claude']=='PASS' and approval['codex']=='PASS'
+    assert approval['digest']==expected and approval['codex_a']=='PASS' and approval['codex_b']=='PASS'
     OUT.mkdir(exist_ok=False);start=time.monotonic()
     def expired(signum,frame): raise TimeoutError('total driver budget')
     signal.signal(signal.SIGALRM,expired);signal.alarm(1200)
