@@ -1,1 +1,2 @@
 PASS: maximum three-attempt exact-sample workload within 180s and 8 GiB; every analytic sum matched
+MEASURED: cap peak_rss_kib=90744

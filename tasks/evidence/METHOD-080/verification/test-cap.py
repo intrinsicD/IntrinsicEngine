@@ -13,3 +13,4 @@ for i in range(3*(1024+2+256)):
     assert abs(float(c.exact([i%10,0,0],y,lw,1))-answers[i%10])<1e-13
 signal.alarm(0)
 print('PASS: maximum three-attempt exact-sample workload within 180s and 8 GiB; every analytic sum matched')
+print('MEASURED: cap peak_rss_kib='+str(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss))

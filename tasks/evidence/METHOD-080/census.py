@@ -2,9 +2,10 @@
 """Bounded descriptive census; complete native IDs, explicitly sampled exact row diagnostics."""
 if not __debug__:
     raise RuntimeError('Optimized Python is forbidden')
-import csv, hashlib, html, importlib.util, json, math, os, re, resource, signal, struct, subprocess, sys, time
+import csv, hashlib, html, importlib.util, json, math, os, platform, re, resource, signal, struct, subprocess, sys, time
 from pathlib import Path
 import numpy as np
+import scipy, matplotlib
 from scipy.spatial import cKDTree
 HERE=Path(__file__).resolve().parent
 ROOT=HERE.parents[2]
@@ -148,7 +149,7 @@ def report(folder):
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
-    body=['<h1>METHOD-080: all invalid target rows in the observed prefixes</h1><p>Descriptive CPU census; no causal sampler comparison, production remedy or speed claim. Points use farthest-point sampling, fixed identities; boxes use uniform random sampling, resampled each draw. All coordinates are normalized. Injected clutter is a fixture label, distinct from posterior inlier mass.</p>']
+    body=['<h1>METHOD-080: all invalid target rows in the observed prefixes</h1><p>Descriptive CPU census; no causal sampler comparison, production remedy or speed claim. Points use farthest-point sampling, fixed identities; boxes use uniform random sampling, resampled each draw. Census coordinates are normalized; before/after registration views use world coordinates. Injected clutter is a fixture label, distinct from posterior inlier mass.</p>']
     failed=(folder/'failure.json').exists();complete=(folder/'completion.json').exists()
     body+=[f'<p>{"UNEVALUATED: technical failure" if failed else "Complete" if complete else "INCOMPLETE: pending cells"}</p>']
     if failed:body+=['<pre>'+html.escape((folder/'failure.json').read_text())+'</pre>']
@@ -177,7 +178,7 @@ def report(folder):
         for pos,(pts,title) in enumerate([(before,'Before'),(after,'After bounded prefix')],1):
             ax=fig.add_subplot(1,2,pos,projection='3d')
             for data,label in [(target,'target'),(truth,'truth'),(pts,'source')]:ax.scatter(*data.T,s=2,label=label)
-            ax.set(xlim=(lo[0],hi[0]),ylim=(lo[1],hi[1]),zlim=(lo[2],hi[2]),title=title);ax.legend(fontsize=7)
+            ax.set(xlim=(lo[0],hi[0]),ylim=(lo[1],hi[1]),zlim=(lo[2],hi[2]),title=title,xlabel='world x',ylabel='world y',zlabel='world z');ax.legend(fontsize=7)
         fig.tight_layout();fig.savefig(folder/(name+'-positions.png'));plt.close(fig);body+=[f'<img src="{name}-positions.png">']
     if complete and not failed:
         for stem in ['points','box']:
@@ -189,6 +190,7 @@ def report(folder):
 def run():
     packet=HERE/'packet.md';approved=json.loads((HERE/'reviews/approval.json').read_text());head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
     assert approved['verdict']=='PASS' and approved['commit']==head and approved['packet_sha256']==hashlib.sha256(packet.read_bytes()).hexdigest()
+    assert approved['versions']==dict(python=platform.python_version(),numpy=np.__version__,scipy=scipy.__version__,matplotlib=matplotlib.__version__),'environment version mismatch'
     OUT.mkdir(exist_ok=False);dump(OUT/'started.json',approved)
     (OUT/'report.html').write_text('<h1>METHOD-080</h1><p>INCOMPLETE: raw outputs retained, no completed analysis.</p>')
     def expired(signum,frame):raise TimeoutError('1200-second total budget or termination')

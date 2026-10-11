@@ -94,7 +94,8 @@ recomputed eigensystem's sign or exact-arithmetic truth.
 
 Each cell's HTML includes all attempts and rejection causes, full-ID CSV links, sample counts,
 geometry plots, every recorded objective/NLL/sigma/policy value over iterations, stage events,
-and before/after fixture views. The implemented stopping objective has NLL weight/share 1 and
+and before/after fixture views. Census geometry uses normalized coordinates; before/after
+views use world coordinates. The implemented stopping objective has NLL weight/share 1 and
 extra prior weight/share 0; no full ELBO is claimed. E-step sigma and post-M-step sigma are
 distinct. All comparisons are within an attempt. Repeats report raw-buffer byte equality and
 numerical-summary equality without interpreting timing as a result.
@@ -116,7 +117,8 @@ comparison incorrectly included wall time and was corrected to compare the eight
 fields only; the reuse initially assumed two parser results and was corrected to its actual
 five-value API. No scientific outcome was exposed by these preparation repairs.
 `verification/test-cap.py`: maximum 3×1282 exact rows on a 100000-source analytic fixture pass
-the 180s/8 GiB resource limits; every exact value has a known assertion. Logs are retained.
+the 180s/8 GiB resource limits; every exact value has a known assertion. Logs retain measured
+peak RSS for native/analysis children at both final configurations and the cap control.
 Null/collapse controls for registration adoption are not applicable: no method efficacy,
 convergence, quality or ranking verdict is made. Missing capture, erased signs, wrong scaling
 and accepted invalid attempts are the relevant false successes and are directly controlled.
@@ -126,8 +128,9 @@ and accepted invalid attempts are the relevant false successes and are directly 
 Commit packet/status/code first. Review record outside packet contains commit, packet SHA256,
 actual reviewer/session/verdict and hashes of all loaded code/data/binary inputs. Before every
 native/analysis start the driver verifies reviewed commit, clean tracked tree and all input
-hashes (including this packet); concrete cells come only from the committed PLAN. Native90s,
-analysis180s per cell, child address space8GiB, total1200s including report generation, enforced
+hashes (including this packet); concrete cells come only from the committed PLAN.
+The initial gate also checks the four recorded Python/library versions against the environment.
+Native90s, analysis180s per cell, child address space8GiB, total1200s including report generation, enforced
 in code. No adaptation/rerun after a scientific surprise; continue the four authorized cells.
 Timeout, crash, IO/shape/replay/coverage failure stops with UNEVALUATED report and retained raw
 outputs. Changing the plan needs a new review. Technical preparation outputs are not evidence.

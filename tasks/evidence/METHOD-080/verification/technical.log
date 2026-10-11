@@ -1,3 +1,7 @@
 PASS: points_1 endpoint/trace parity, full census coverage, rejection preserved, exact first-row oracle, analysis budget 8.9 seconds
-PASS: box_1 endpoint/trace parity, full census coverage, rejection preserved, exact first-row oracle, analysis budget 7.9 seconds
+MEASURED: points_1 native peak_rss_kib=248148
+MEASURED: points_1 analysis peak_rss_kib=161192
+PASS: box_1 endpoint/trace parity, full census coverage, rejection preserved, exact first-row oracle, analysis budget 7.6 seconds
+MEASURED: box_1 native peak_rss_kib=245740
+MEASURED: box_1 analysis peak_rss_kib=157252
 PASS: report path, failure and missing-exit gates; no efficacy outcomes inspected

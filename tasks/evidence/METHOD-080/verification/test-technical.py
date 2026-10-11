@@ -12,7 +12,7 @@ for cell in c.PLAN[:2]:
         current=dict(env)
         if entry==cell:current['INTRINSIC_NYSTROM_CAPTURE']=str(out/(name+'.snapshot'))
         with (out/(entry[0]+'.stdout')).open('w') as stdout,(out/(entry[0]+'.stderr')).open('w') as stderr:
-            p=subprocess.run(c.native_command(entry,out,binary),env=current,stdout=stdout,stderr=stderr,preexec_fn=c.limits,timeout=90)
+            p=subprocess.run(['/usr/bin/time','-f','peak_rss_kib=%M','-o',str(out/(entry[0]+'.native.resources.txt'))]+c.native_command(entry,out,binary),env=current,stdout=stdout,stderr=stderr,preexec_fn=c.limits,timeout=90)
         assert p.returncode==0
     assert (out/(name+'.bin')).read_bytes()==(out/(base[0]+'.bin')).read_bytes()
     a=json.loads((out/(name+'.json')).read_text());b=json.loads((out/(base[0]+'.json')).read_text())
@@ -21,10 +21,14 @@ for cell in c.PLAN[:2]:
     c.dump(out/(name+'.native.exit.json'),{'returncode':0})
     start=time.monotonic()
     with (out/(name+'.analysis.stdout')).open('w') as stdout,(out/(name+'.analysis.stderr')).open('w') as stderr:
-        p=subprocess.run(['taskset','-c','0-7',sys.executable,str(SOURCE),'analyze',str(out),name],env=env,stdout=stdout,stderr=stderr,preexec_fn=c.limits,timeout=180)
+        p=subprocess.run(['/usr/bin/time','-f','peak_rss_kib=%M','-o',str(out/(name+'.analysis.resources.txt')),'taskset','-c','0-7',sys.executable,str(SOURCE),'analyze',str(out),name],env=env,stdout=stdout,stderr=stderr,preexec_fn=c.limits,timeout=180)
     assert p.returncode==0,(out/(name+'.analysis.stderr')).read_text()
     c.dump(out/(name+'.analysis.exit.json'),{'returncode':0})
     print('PASS:',name,'endpoint/trace parity, full census coverage, rejection preserved, exact first-row oracle, analysis budget',round(time.monotonic()-start,1),'seconds',flush=True)
+    for phase in ['native','analysis']:
+        evidence=(out/(name+'.'+phase+'.resources.txt')).read_text().strip()
+        assert evidence.startswith('peak_rss_kib=') and int(evidence.split('=')[1])>0
+        print('MEASURED:',name,phase,evidence,flush=True)
 c.report(out)
 assert (out/'report.html').exists() and len(list(out.glob('*-trace.png')))==2
 c.dump(out/'failure.json',{'cell':'control','error':'known technical failure'});c.report(out)

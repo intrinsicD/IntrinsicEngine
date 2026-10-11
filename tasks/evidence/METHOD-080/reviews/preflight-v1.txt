@@ -1,0 +1,27 @@
+What this change does: it captures every reached target-row affinity sum in four fixed registration prefixes, preserves native rejection, and describes invalid rows using within-attempt geometry and bounded exact-affinity samples. It does not compare sampler efficacy.
+
+**Verdict: REVISE**, bound to commit `42696fd94c06f3747aa540ef91c2d6541320af4a` and packet SHA256 `f25fbafd1f3c364f14dec0149225af3e20c3a552cb118028690f603425315bec`.
+
+Ponytail complexity: no mandatory simplification. Reusing the existing runner, snapshot format, trace parser and installed numerical libraries is proportionate. The captured eigensystem supports immutable replay; removing it would weaken the evidence.
+
+**Must fix:**
+
+1. **The report mislabels world coordinates as normalized coordinates.**
+   `tasks/evidence/METHOD-080/census.py:151` states “All coordinates are normalized,” but lines 175–181 plot the original fixture preview and returned positions in world coordinates. `Geometry.Registration.CoherentPointDrift.cpp:984` explicitly converts those positions back to world coordinates. Change the introductory sentence to distinguish normalized census geometry from world-coordinate before/after views. Otherwise readers can compare incompatible coordinate scales.
+
+2. **Peak-memory measurement is missing from the retained preparation evidence.**
+   `verification/test-cap.py` enforces the address-space limit and asserts known answers, but never records peak RSS; `test-technical.py` likewise records elapsed analysis time without peak memory. The logs therefore establish completion under an 8 GiB address-space ceiling, not checklist item 24’s measured peak at the largest configuration. Retain measured peak RSS from the final-configuration technical path, including native and analysis children; keep its numerical outputs unexposed. No scientific census or additional parameter search is needed.
+
+**Optional:** `census.py:200–202` verifies approved file hashes but does not enforce the Python/NumPy/SciPy/Matplotlib version metadata in `binary-bindings.json`. An environment upgrade could pass those checks. Comparing those four versions before starting would make the claimed environment binding explicit. I independently verified that the current versions match.
+
+Correctness and alignment findings:
+
+- Q1/Q4 align with source: point landmarks use default FarthestPoint, fixed identities and current source positions; box landmarks use the union-box random sampler with draw-dependent seeds. Negativity is observed in `k(x,Z)g`, after pseudoinverse mixing, before posterior normalization.
+- Complete capture is sound: per-index writes have exclusive ownership, invalid rows continue only under capture, and the attempt returns false before the subsequent `h/q` reduction and source pass. The retained early-return mutation demonstrates that the visit gate detects missing later rows.
+- The exact calculation correctly uses shifted log weights, restores `LogWeightShift` for unshifted affinity, and applies `logC` to obtain inlier mass. Known-answer weight/shift controls and their mutations address relevant false successes.
+- First-invalid oracle lookup is correct for all four cell names. Sorted selection plus mandatory inclusion makes `records[0]` the first invalid row. All referenced input hashes and oracle keys verified.
+- Selection, labels, denominators, self-excluded neighbor distances, signed categories and sample limits match the packet. Repeated seeds establish replay only; no population or causal inference is justified.
+- LIGHT tier is appropriate under the supplied synthetic-known-truth rule and explicit exclusion of adoption/tuning decisions. Training, teacher/student, gradients, train/test leakage and matched learning-budget checks are inapplicable.
+- Native/analysis timeouts, total timeout, exclusive output-directory creation, rejection/coverage gates and failure reporting are implemented. Missing approval currently prevents execution.
+
+No scientific census, production tests or post-run acceptance audit was performed; preparation outcome values were not inspected. Read-only and no-delegation restrictions were instruction-only.
