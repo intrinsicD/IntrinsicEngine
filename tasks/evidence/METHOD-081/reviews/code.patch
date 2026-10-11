@@ -1,0 +1,299 @@
+diff --git a/methods/geometry/coherent_point_drift/README.md b/methods/geometry/coherent_point_drift/README.md
+index 0223c4097..b3ccd9d6b 100644
+--- a/methods/geometry/coherent_point_drift/README.md
++++ b/methods/geometry/coherent_point_drift/README.md
+@@ -48,6 +48,11 @@ per iteration; landmark doubling keeps the cached landmarks as the prefix. A new
+ starts the draws afresh. The variants are selectable for measurement; no comparison between
+ them is claimed.
+ 
++Nonpositive or nonfinite Nyström target sums are recomputed as complete exact rows,
++including their contributions to every E-step statistic, while the existing cost budget
++allows it. The sampled accuracy checks and Truncated/Dense fallback remain active.
++Positive row sums alone do not guarantee nonnegative individual approximated affinities.
++
+ `LowRank = k` replaces the nonrigid/Bayesian Gram matrix by k Nystroem eigenpairs (O(M k^2)
+ per iteration, up to 1,000,000 source points) and reports its sampled kernel error.
+ Measured (claim C113, 16 threads, Release, medians): rigid auto 19.9x the reference at
+diff --git a/src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cpp b/src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cpp
+index dd0569a20..bd00ede0d 100644
+--- a/src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cpp
++++ b/src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cpp
+@@ -828,6 +828,21 @@ namespace Geometry::CoherentPointDrift::EStep
+             std::vector<std::uint32_t> rows;
+             for (std::uint32_t j = 0; j < n; ++j)
+                 if (cpuRows[j] != 0u) rows.push_back(j);
++            AddExactRows(moved, sigma2, logC, rows, threads, out);
++            out.ExternalCpuRows = std::uint32_t(rows.size());
++            return true;
++        }
++
++        // The approximate pass omits these rows from both target and source statistics.
++        void AddExactRows(const PointSet& moved, const double sigma2, const double logC,
++                          const std::vector<std::uint32_t>& rows, const std::uint32_t threads, Sums& out)
++        {
++            if (!SourceTreeCurrent)
++            {
++                SourceTree.Build(moved);
++                SourceTreeCurrent = true;
++            }
++            const std::size_t m = moved.Size();
+             const double twoSigma2 = 2.0 * sigma2;
+             ParallelFor(rows.size(), 1u, threads, [&](const std::size_t begin, const std::size_t end)
+             {
+@@ -862,8 +877,6 @@ namespace Geometry::CoherentPointDrift::EStep
+                     }
+                 }
+             });
+-            out.ExternalCpuRows = std::uint32_t(rows.size());
+-            return true;
+         }
+ 
+         void UpdateScales(const std::vector<double>& p1)
+@@ -1417,7 +1430,7 @@ namespace Geometry::CoherentPointDrift::EStep
+ 
+         bool NystromRows(const PointSet& moved, const double sigma2, const double logC, const std::size_t landmarks,
+                          const double errorLimit, const Settings& settings, Sums& out,
+-                         const std::uint32_t threads, double& sampledError, std::uint64_t& evaluations)
++                         const std::uint32_t threads, double& sampledError, std::uint64_t& evaluations, double& spent)
+         {
+             const PointSet target = Target();
+             const std::size_t n = target.Size(), m = moved.Size();
+@@ -1434,6 +1447,7 @@ namespace Geometry::CoherentPointDrift::EStep
+             Eigen::MatrixXd gram{Eigen::Index(l), Eigen::Index(l)};
+             for (std::size_t a = 0; a < l; ++a)
+                 kernelRow(LandmarkX[a], LandmarkY[a], LandmarkZ[a], gram.col(Eigen::Index(a)).data());
++            evaluations += std::uint64_t(l) * l;
+             const Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigen(gram);
+             if (eigen.info() != Eigen::Success) return false;
+             const double top = eigen.eigenvalues().maxCoeff();
+@@ -1460,6 +1474,7 @@ namespace Geometry::CoherentPointDrift::EStep
+                 }
+             });
+             Eigen::VectorXd a = Eigen::VectorXd::Zero(Eigen::Index(l));
++            evaluations += std::uint64_t(m) * l;
+             for (std::size_t c = 0; c < sourceChunks; ++c)
+                 for (std::size_t k = 0; k < l; ++k) a[Eigen::Index(k)] += partial[c * l + k];
+             const Eigen::VectorXd g = pseudoInverse * a;
+@@ -1467,8 +1482,7 @@ namespace Geometry::CoherentPointDrift::EStep
+             // Pass 2 (targets): shifted sums S_n = k(x_n, Z) g, denominators, Pt1, and
+             // h = sum_n d_n k(Z, x_n) (1, x_n) with d_n = e^{shift} / den_n.
+             std::fill(partial.begin(), partial.end(), 0.0);
+-            std::vector<double> scale(n, 0.0);
+-            std::atomic<bool> valid{true};
++            std::vector<std::uint8_t> repair(n, 0u);
+             ParallelFor(n, kGrain, threads, [&](const std::size_t begin, const std::size_t end)
+             {
+                 std::vector<double> row(l);
+@@ -1478,12 +1492,10 @@ namespace Geometry::CoherentPointDrift::EStep
+                     kernelRow(target.X[j], target.Y[j], target.Z[j], row.data());
+                     double shifted = 0.0;
+                     for (std::size_t k = 0; k < l; ++k) shifted += row[k] * g[Eigen::Index(k)];
+-                    if (!(shifted > 0.0) || !std::isfinite(shifted)) { valid = false; return; }
++                    if (!(shifted > 0.0) || !std::isfinite(shifted)) { repair[j] = 1u; continue; }
+                     LogDenominator[j] = LogSumWithOutlier(LogWeightShift, shifted, logC);
+                     const double d = std::exp(LogWeightShift - LogDenominator[j]);
+-                    scale[j] = d;
+                     out.Pt1[j] = shifted * d;
+-                    RowEvaluations[j] = l;
+                     for (std::size_t k = 0; k < l; ++k)
+                     {
+                         const double t = d * row[k];
+@@ -1494,7 +1506,12 @@ namespace Geometry::CoherentPointDrift::EStep
+                     }
+                 }
+             });
+-            if (!valid) return false;
++            evaluations += std::uint64_t(n) * l;
++            std::vector<std::uint32_t> exactRows;
++            for (std::uint32_t j = 0; j < n; ++j)
++                if (repair[j] != 0u) exactRows.push_back(j);
++            const double repairCost = 2.0 * double(m) * double(exactRows.size());
++            if (spent + repairCost >= 0.5 * double(n) * double(m)) return false;
+             Eigen::MatrixXd h = Eigen::MatrixXd::Zero(Eigen::Index(l), 4);
+             for (std::size_t c = 0; c < targetChunks; ++c)
+                 for (Eigen::Index column = 0; column < 4; ++column)
+@@ -1513,11 +1530,20 @@ namespace Geometry::CoherentPointDrift::EStep
+                     for (std::size_t k = 0; k < l; ++k)
+                         for (Eigen::Index column = 0; column < 4; ++column) v[column] += row[k] * q(Eigen::Index(k), column);
+                     const double weight = std::exp(LogWeight[i]);
+-                    if (!(v[0] >= 0.0) || !std::isfinite(v[1] + v[2] + v[3])) { valid = false; return; }
+                     out.P1[i] = weight * v[0]; out.PXx[i] = weight * v[1]; out.PXy[i] = weight * v[2]; out.PXz[i] = weight * v[3];
+                 }
+             });
+-            if (!valid) return false;
++            evaluations += std::uint64_t(m) * l;
++            if (!exactRows.empty())
++            {
++                spent += repairCost;
++                AddExactRows(moved, sigma2, logC, exactRows, threads, out);
++                evaluations += 2u * std::uint64_t(m) * exactRows.size();
++                for (const auto j : exactRows) RowEvaluations[j] = 0u; // counted above, also on rejection
++            }
++            for (std::size_t i = 0; i < m; ++i)
++                if (!(out.P1[i] >= 0.0) || !std::isfinite(out.P1[i]) || !std::isfinite(out.PXx[i]) ||
++                    !std::isfinite(out.PXy[i]) || !std::isfinite(out.PXz[i])) return false;
+ 
+             // A-posteriori check on exact rows spread over both sets.
+             const std::size_t samples = 32u;
+@@ -1531,6 +1557,7 @@ namespace Geometry::CoherentPointDrift::EStep
+                     if (r < targetSamples)
+                     {
+                         const std::size_t j = r * n / targetSamples;
++                        if (repair[j] != 0u) continue; // ExactRow already used a stable exponent shift.
+                         const double exact = DenseRowTerms(moved.X.data(), moved.Y.data(), moved.Z.data(), LogWeight.data(),
+                                                            m, target.X[j], target.Y[j], target.Z[j], 0.0, inverseTwoSigma2,
+                                                            buffer.data());
+@@ -1553,8 +1580,9 @@ namespace Geometry::CoherentPointDrift::EStep
+             sampledError = 0.0;
+             for (const double e : errors) sampledError = std::isnan(e) ? std::numeric_limits<double>::infinity()
+                                                                        : std::max(sampledError, e);
+-            evaluations = std::uint64_t(l) * (2u * std::uint64_t(m) + std::uint64_t(l)) +
+-                          std::uint64_t(targetSamples) * m + std::uint64_t(sourceSamples) * n;
++            for (std::size_t r = 0; r < targetSamples; ++r)
++                if (repair[r * n / targetSamples] == 0u) evaluations += m;
++            evaluations += std::uint64_t(sourceSamples) * n;
+             return sampledError <= errorLimit;
+         }
+     };
+@@ -1658,14 +1686,13 @@ namespace Geometry::CoherentPointDrift::EStep
+                 if (spent >= 0.5 * dense) break;
+                 std::uint64_t evaluations = 0u;
+                 nystrom = s.NystromRows(moved, sigma2, logOutlier, landmarks, settings.NystromErrorLimit,
+-                                        settings, out, threads, sampledError, evaluations);
++                                        settings, out, threads, sampledError, evaluations, spent);
+                 nystromEvaluations += evaluations;
+                 if (nystrom)
+                 {
+                     s.NystromLandmarks = landmarks;
+                     break;
+                 }
+-                nystromEvaluations += std::uint64_t(n) * landmarks; // the rejected target pass
+                 s.Resize(n, m, out);
+                 if (landmarks >= cap) break;
+                 count = 2u * landmarks;
+diff --git a/src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cppm b/src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cppm
+index 67fb1cf60..dd32b1887 100644
+--- a/src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cppm
++++ b/src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cppm
+@@ -22,6 +22,8 @@
+ //                and an iteration whose estimate exceeds Settings::NystromErrorLimit is redone
+ //                exactly with the Auto choice between truncated and dense. Skipped (exact) where
+ //                its planned cost is not below half the dense cost, i.e. for small inputs.
++//                Nonpositive/nonfinite target sums trigger exact replacement of those rows in
++//                all statistics, within the same cost budget; sampled checks remain required.
+ //   - Vulkan:    the dense two-pass form on a device through Settings::External (METHOD-056;
+ //                fp32 kernel terms, fp64 sums, so not exact). Iterations where Auto would truncate
+ //                stay on the CPU truncated path; rows whose first-order fp32 error estimate
+diff --git a/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp b/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp
+index 9857dbf47..0555b9f91 100644
+--- a/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp
++++ b/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp
+@@ -272,6 +272,108 @@ TEST(CoherentPointDriftAccelerated, NystromSampledErrorTracksTheActualExpectatio
+     EXPECT_EQ(exact.P1, fallback.P1);
+ }
+ 
++TEST(CoherentPointDriftAccelerated, NystromRepairsInvalidRowsWithAllWeightedStatistics)
++{
++    // Scalar landmarks 0/1: k(-1,Z) W^-1 k(Z,2) < 0. The other targets are landmarks.
++    // Embed the line in 3-D so every PX component matters; sigma^2 = |(1,2,-2)|^2.
++    constexpr std::size_t count = 1056;
++    std::vector<glm::vec3> targetPoints(count, glm::vec3(0.0f));
++    targetPoints[1] = {-1.0f, -2.0f, 2.0f};
++    targetPoints[33] = {-1000.0f, -2000.0f, 2000.0f}; // sampled row, raw kernel underflows
++    std::vector<glm::vec3> sourcePoints(count, glm::vec3(2.0f, 4.0f, -4.0f));
++    sourcePoints[0] = {1.0f, 2.0f, -2.0f};
++    const Soa target(targetPoints), moved(sourcePoints);
++    const double r = std::exp(-0.5);
++    ASSERT_LT((2.0 * std::pow(r, 5) - std::pow(r, 3) - std::pow(r, 9)) / (1.0 - r * r), 0.0);
++    ASSERT_EQ(std::exp(-0.5 * 1001.0 * 1001.0), 0.0);
++    std::vector<double> weights(count);
++    for (std::size_t i = 0; i < count; ++i) weights[i] = 300.0 - double(i % 3);
++    weights[0] = 293.0;
++    for (const bool weighted : {false, true})
++        for (const bool outliers : {false, true})
++        {
++            const auto logWeights = weighted ? std::span<const double>(weights) : std::span<const double>{};
++            const double logC = outliers ? std::log(0.1) + (weighted ? 300.0 : 0.0)
++                                         : -std::numeric_limits<double>::infinity();
++            CPD::EStep::Evaluator dense;
++            dense.SetTarget(target.View());
++            CPD::EStep::Sums exact, serial;
++            ASSERT_TRUE(dense.Evaluate(moved.View(), 9.0, logC, {.Policy = CPD::EStepPolicy::Dense}, exact, logWeights));
++            for (const std::uint32_t threads : {1u, 4u})
++            {
++                CPD::EStep::Evaluator evaluator;
++                evaluator.SetTarget(target.View());
++                CPD::EStep::Sums result;
++                ASSERT_TRUE(evaluator.Evaluate(moved.View(), 9.0, logC,
++                    {.Policy = CPD::EStepPolicy::Nystrom, .Threads = threads, .NystromLandmarks = 2u}, result, logWeights));
++                ASSERT_EQ(result.Used, CPD::EStepPolicy::Nystrom);
++                // Two exact rows; one target sample is already exact and is not repeated.
++                EXPECT_EQ(result.KernelEvaluations, 4u + 6u * count + 4u * count + 63u * count);
++                EXPECT_NEAR(result.LogDenominatorSum, exact.LogDenominatorSum, 1e-7);
++                EXPECT_NEAR(result.Matched, exact.Matched, 1e-8);
++                for (std::size_t i = 0; i < count; ++i)
++                {
++                    EXPECT_NEAR(result.Pt1[i], exact.Pt1[i], 1e-9);
++                    EXPECT_NEAR(result.P1[i], exact.P1[i], 1e-9);
++                    EXPECT_NEAR(result.PXx[i], exact.PXx[i], 1e-7);
++                    EXPECT_NEAR(result.PXy[i], exact.PXy[i], 1e-7);
++                    EXPECT_NEAR(result.PXz[i], exact.PXz[i], 1e-7);
++                }
++                if (threads == 1u) serial = result;
++                else
++                {
++                    EXPECT_EQ(result.Pt1, serial.Pt1);
++                    EXPECT_EQ(result.P1, serial.P1);
++                    EXPECT_EQ(result.PXx, serial.PXx);
++                    EXPECT_EQ(result.PXy, serial.PXy);
++                    EXPECT_EQ(result.PXz, serial.PXz);
++                    EXPECT_EQ(result.LogDenominatorSum, serial.LogDenominatorSum);
++                }
++            }
++        }
++}
++
++TEST(CoherentPointDriftAccelerated, NystromRepairsStillRespectAccuracyAndCostGuards)
++{
++    constexpr std::size_t count = 32;
++    std::vector<glm::vec3> sources(count, glm::vec3(2.0f, 0.0f, 0.0f));
++    sources[0].x = 1.0f;
++    const Soa moved(sources);
++    for (const bool excessiveRepair : {false, true})
++    {
++        std::vector<glm::vec3> points(count, glm::vec3(excessiveRepair ? -1.0f : 0.5f, 0.0f, 0.0f));
++        points[0].x = 0.0f;
++        points[1].x = -1.0f;
++        const Soa target(points);
++        CPD::EStep::Evaluator dense;
++        dense.SetTarget(target.View());
++        CPD::EStep::Sums exact;
++        ASSERT_TRUE(dense.Evaluate(moved.View(), 1.0, 0.0, {.Policy = CPD::EStepPolicy::Dense}, exact));
++        for (const double limit : {1.0, 1e-8})
++        {
++            CPD::EStep::Evaluator evaluator;
++            evaluator.SetTarget(target.View());
++            CPD::EStep::Sums result;
++            ASSERT_TRUE(evaluator.Evaluate(moved.View(), 1.0, 0.0,
++                {.Policy = CPD::EStepPolicy::Nystrom, .NystromLandmarks = 2u, .NystromErrorLimit = limit}, result));
++            if (!excessiveRepair && limit == 1.0)
++            {
++                EXPECT_EQ(result.Used, CPD::EStepPolicy::Nystrom);
++                EXPECT_GT(result.SampledError, 1e-8);
++                EXPECT_EQ(result.KernelEvaluations, 2276u);
++            }
++            else
++            {
++                EXPECT_EQ(result.Used, CPD::EStepPolicy::Dense);
++                EXPECT_EQ(result.Pt1, exact.Pt1);
++                EXPECT_EQ(result.P1, exact.P1);
++                EXPECT_EQ(result.PXx, exact.PXx);
++                EXPECT_EQ(result.KernelEvaluations, exact.KernelEvaluations + (excessiveRepair ? 132u : 2276u));
++            }
++        }
++    }
++}
++
+ TEST(CoherentPointDriftAccelerated, NystromRunsExactlyWhereItWouldNotPay)
+ {
+     const auto source = Cloud(300, 93);

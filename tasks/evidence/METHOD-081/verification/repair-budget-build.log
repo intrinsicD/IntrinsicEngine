@@ -1,0 +1,14 @@
+[0/2] Re-checking globbed directories...
+[1/8] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cppm for CXX dependencies
+[2/8] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cpp for CXX dependencies
+[3/8] Generating CXX dyndep file src/geometry/CMakeFiles/IntrinsicGeometry.dir/CXX.dd
+[4/10] Generating CXX dyndep file tests/CMakeFiles/GeometryRegistrationSlowTestObjs.dir/CXX.dd
+[5/13] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Registration.CoherentPointDrift.EStep.cppm.o
+[6/13] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Registration.CoherentPointDrift.cppm.o
+[7/13] Building CXX object tests/CMakeFiles/GeometryRegistrationSlowTestObjs.dir/unit/geometry/Test.CoherentPointDriftBayesian.cpp.o
+[8/13] Building CXX object tests/CMakeFiles/GeometryRegistrationSlowTestObjs.dir/unit/geometry/Test.CoherentPointDrift.cpp.o
+[9/13] Building CXX object tests/CMakeFiles/GeometryRegistrationSlowTestObjs.dir/unit/geometry/Test.CoherentPointDriftAccelerated.cpp.o
+[10/13] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Registration.CoherentPointDrift.EStep.cpp.o
+[11/13] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Registration.CoherentPointDrift.cpp.o
+[12/13] Linking CXX static library lib/libIntrinsicGeometry.a
+[13/13] Linking CXX executable bin/IntrinsicGeometryRegistrationSlowTests

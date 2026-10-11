@@ -1,0 +1,5 @@
+[0/2] Re-checking globbed directories...
+[1/4] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp for CXX dependencies
+[2/4] Generating CXX dyndep file tests/CMakeFiles/GeometryRegistrationSlowTestObjs.dir/CXX.dd
+[3/4] Building CXX object tests/CMakeFiles/GeometryRegistrationSlowTestObjs.dir/unit/geometry/Test.CoherentPointDriftAccelerated.cpp.o
+[4/4] Linking CXX executable bin/IntrinsicGeometryRegistrationSlowTests

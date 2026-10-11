@@ -1,0 +1,99 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+    Start 2425: CoherentPointDriftAccelerated.NystromRepairsInvalidRowsWithAllWeightedStatistics
+1/2 Test #2425: CoherentPointDriftAccelerated.NystromRepairsInvalidRowsWithAllWeightedStatistics ...***Failed    0.06 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = CoherentPointDriftAccelerated.NystromRepairsInvalidRowsWithAllWeightedStatistics
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from CoherentPointDriftAccelerated
+[ RUN      ] CoherentPointDriftAccelerated.NystromRepairsInvalidRowsWithAllWeightedStatistics
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:309: Failure
+Expected equality of these values:
+  result.Used
+    Which is: 1-byte object <01>
+  CPD::EStepPolicy::Nystrom
+    Which is: 1-byte object <05>
+
+[  FAILED  ] CoherentPointDriftAccelerated.NystromRepairsInvalidRowsWithAllWeightedStatistics (60 ms)
+[----------] 1 test from CoherentPointDriftAccelerated (60 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (60 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] CoherentPointDriftAccelerated.NystromRepairsInvalidRowsWithAllWeightedStatistics
+
+ 1 FAILED TEST
+
+    Start 2426: CoherentPointDriftAccelerated.NystromRepairsStillRespectAccuracyAndCostGuards
+2/2 Test #2426: CoherentPointDriftAccelerated.NystromRepairsStillRespectAccuracyAndCostGuards ......***Failed    0.00 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = CoherentPointDriftAccelerated.NystromRepairsStillRespectAccuracyAndCostGuards
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from CoherentPointDriftAccelerated
+[ RUN      ] CoherentPointDriftAccelerated.NystromRepairsStillRespectAccuracyAndCostGuards
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:361: Failure
+Expected equality of these values:
+  result.Used
+    Which is: 1-byte object <01>
+  CPD::EStepPolicy::Nystrom
+    Which is: 1-byte object <05>
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:362: Failure
+Expected: (result.SampledError) > (1e-8), actual: 0 vs 1e-08
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:363: Failure
+Expected equality of these values:
+  result.KernelEvaluations
+    Which is: 1088
+  2276u
+    Which is: 2276
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:371: Failure
+Expected equality of these values:
+  result.KernelEvaluations
+    Which is: 1088
+  exact.KernelEvaluations + (excessiveRepair ? 132u : 2276u)
+    Which is: 3300
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:371: Failure
+Expected equality of these values:
+  result.KernelEvaluations
+    Which is: 1088
+  exact.KernelEvaluations + (excessiveRepair ? 132u : 2276u)
+    Which is: 1156
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:371: Failure
+Expected equality of these values:
+  result.KernelEvaluations
+    Which is: 1088
+  exact.KernelEvaluations + (excessiveRepair ? 132u : 2276u)
+    Which is: 1156
+
+[  FAILED  ] CoherentPointDriftAccelerated.NystromRepairsStillRespectAccuracyAndCostGuards (0 ms)
+[----------] 1 test from CoherentPointDriftAccelerated (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] CoherentPointDriftAccelerated.NystromRepairsStillRespectAccuracyAndCostGuards
+
+ 1 FAILED TEST
+
+
+0% tests passed, 2 tests failed out of 2
+
+Label Time Summary:
+geometry    =   0.07 sec*proc (2 tests)
+slow        =   0.07 sec*proc (2 tests)
+unit        =   0.07 sec*proc (2 tests)
+
+Total Test time (real) =   0.22 sec
+
+The following tests FAILED:
+	2425 - CoherentPointDriftAccelerated.NystromRepairsInvalidRowsWithAllWeightedStatistics (Failed)
+	2426 - CoherentPointDriftAccelerated.NystromRepairsStillRespectAccuracyAndCostGuards (Failed)
+Errors while running CTest

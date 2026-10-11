@@ -1,0 +1,3 @@
+[source-documentation] files=1 interfaces=1 cpp=1 readmes=0 errors=0 review=15
+[source-documentation] rules: declaration-comment=14, file-synopsis-long=1
+HOTSPOT src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cppm findings=15 errors=0 review=15

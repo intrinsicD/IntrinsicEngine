@@ -1,0 +1,23 @@
+Reviewer: /root/nystrom_repair_plan; requested gpt-6-astra/xhigh; actual model is not independently reported by the collaboration tool.
+Object: plan.md b429875bfc890d1fd608b5d95e3a215f6ae6eb0552da222b0f0ea2bc477dfca9 plus agreed amendments below.
+Read-only and recursion protection: instruction-only.
+
+Verbatim verdict:
+**approve**, for plan SHA256 `b429875bfc890d1fd608b5d95e3a215f6ae6eb0552da222b0f0ea2bc477dfca9` plus the coordinator’s agreed amendments.
+
+The plan answers Q1–Q3 and uses the smallest existing shared seam: `ExactRow` and the CPU merge currently inside `ExternalRows`. No new public API or diagnostic field is needed.
+
+The original blocking gap is resolved by the agreed delta: repaired target samples receive exact error zero. The existing check at EStep.cpp:1534 otherwise recomputes raw, unshifted kernels; an underflowed row yields `logExact=-inf` and falsely rejects its successful stable repair. Keep the source and unrepaired-target checks.
+
+Implementation and regression requirements:
+
+- Omit invalid rows from `h`; merge their complete exact contributions before validating final weighted `P1/PX`. Preserve ExternalRows’ prevalidation.
+- Ensure `SourceTree` indexes this call’s moved points before `ExactRow`.
+- Charge performed repair work across rejected attempts; reject excessive repair before performing or counting it.
+- Assert kernel totals for accepted repair, repair followed by accuracy rejection, and budget rejection before repair.
+- Exercise multiple actual chunks, all PX components, weighted shifts, and a sampled underflow row with no outlier component.
+
+The proposed `N=M=32, L=2` budget fixture is sound: first-attempt cost `208`, half-dense limit `512`, next cumulative attempt `720`; five repairs add `320` and exceed the remaining budget. The separate loose/tight accuracy fixture distinguishes successful repair from preserved accuracy rejection.
+
+Skipped: no files changed, tests executed, or experimental packet reviewed; read-only and recursion restrictions were instruction-only.
+Risk: sampled accuracy remains an estimate; this repair alone establishes neither entrywise positivity nor improved runtime.

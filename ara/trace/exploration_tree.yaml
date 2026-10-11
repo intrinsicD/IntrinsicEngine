@@ -13959,3 +13959,20 @@ tree:
     alternatives: [Treat all invalid clutter rows as negligible and relax the guard without validating all E-step statistics.]
     evidence: [O266, N658]
     status: resolved
+
+  - id: N660
+    type: question
+    title: "Separate PSD from nonnegative affinities and identify a repair"
+    provenance: user
+    timestamp: "2026-10-11T11:41+02:00"
+    description: >
+      1. Und wie lösen wir das Problem?
+      2. Liegt das daran dass W^+ nicht PSD ist?
+      The current positive-spectrum construction and the existing analytic Gaussian
+      counterexample distinguish PSD from entrywise positivity. A validated production
+      remedy remains open; proposed row repair is staged, not adopted.
+    also_depends_on: [N655, N658]
+    evidence:
+      - src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cpp
+      - tasks/evidence/METHOD-080/verification/test-controls.py
+    status: open

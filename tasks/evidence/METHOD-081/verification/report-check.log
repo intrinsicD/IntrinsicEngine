@@ -1,0 +1,4 @@
+PASS: identity positive control; zero/collapse/displacement/nonfinite negative controls; fixed cells and pinning
+PASS: incomplete known-answer report, embedded charts and trace rejection
+PASS: control rejects quality mutation
+PASS: control rejects mechanism mutation

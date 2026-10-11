@@ -1,0 +1,9 @@
+CPD_STAGE preparing 4.9438999999999999e-05
+CPD_STAGE building_kernel 0.022534970000000001
+CPD_STAGE expectation_step 0.35563607800000002
+CPD_STAGE maximization_step 0.62889003300000001
+CPD_ITER 0 0.23463150628548757 310427.17574668943 310427.17574668943 93509.431666592442 5 0.00034381493022044214 243527680 0.80742411199999997
+CPD_STAGE expectation_step 0.80743098000000002
+CPD_STAGE maximization_step 12.351207906999999
+CPD_ITER 1 0.2040234786088701 253665.19494250364 253665.19494250364 94656.092849913388 1 0 20508310720 12.517041568
+{"fixture":"full","seed":1,"points":100000,"targets":100000,"variant":"box/resampled/random","landmarks":256,"error_limit":0.001,"threads":8,"status":"success","termination":"iteration_cap","iterations":2,"nystrom_iterations":1,"observed_iterations":2,"max_sampled_error":0.00034381493022044214,"kernel_evaluations":20751838400,"seconds":12.522307933,"sigma2":0.2040234786088701,"scale":0.99966937994931138,"backend":"cpu_nystrom","kernel_rank":100,"kernel_error":9.2694429292998779e-09,"rms_to_truth":0.50083737939474504}

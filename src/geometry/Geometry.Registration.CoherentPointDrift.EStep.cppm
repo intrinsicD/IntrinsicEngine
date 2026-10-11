@@ -22,6 +22,8 @@
 //                and an iteration whose estimate exceeds Settings::NystromErrorLimit is redone
 //                exactly with the Auto choice between truncated and dense. Skipped (exact) where
 //                its planned cost is not below half the dense cost, i.e. for small inputs.
+//                Nonpositive/nonfinite target sums trigger exact replacement of those rows in
+//                all statistics, within the same cost budget; sampled checks remain required.
 //   - Vulkan:    the dense two-pass form on a device through Settings::External (METHOD-056;
 //                fp32 kernel terms, fp64 sums, so not exact). Iterations where Auto would truncate
 //                stay on the CPU truncated path; rows whose first-order fp32 error estimate

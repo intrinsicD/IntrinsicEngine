@@ -1,0 +1,21 @@
+Reviewer: /root/nystrom_repair_code, requested gpt-6-astra/xhigh. Actual model/effort not independently reported by collaboration tool. Read-only/no-delegation instruction-only.
+
+What this change does: It detects nonpositive or nonfinite Nyström target sums and replaces those complete rows with exact contributions to every E-step statistic. It retains the existing accuracy checks, repair budget, and fallback behavior.
+
+**Verdict: approve.** No required correctness or ponytail complexity findings.
+
+Reviewed object: `code.patch`, SHA256 `a2f0d3daa82a58f116b1982a478ea241d57e26220114cdfdab0f8c60c8b3af4b`, against `a93dcb8c7`. I independently verified that the current four-file diff matches that digest.
+
+The implementation aligns with the user’s request to identify problematic rows, recompute them exactly, and test the result. The shared `AddExactRows` helper has two present callers and avoids duplicating the existing external-evaluator repair mechanism. No public API, configuration, dependency, or layer changes were added.
+
+I accept these engineering acceptance criteria:
+
+- **Complete-row replacement:** repaired rows contribute neither approximate denominators nor approximate `h` terms. Their exact denominators, `Pt1`, `P1`, and all three `PX` components are restored consistently.
+- **Numerical and concurrency behavior:** exact evaluation retains the weighted exponent shifts; source validation occurs after merging repairs; repaired sampled rows avoid the unstable unshifted comparison. Fixed chunk reductions and ordered per-source additions preserve thread-count determinism. `SourceTreeCurrent` is correctly scoped to the current evaluation and safely reused during retries.
+- **Guards and accounting:** repair cost accumulates across attempts; over-budget repairs and failed accuracy checks retain fallback. Completed kernel passes and repairs are counted on both acceptance and rejection, without double-counting repaired rows.
+- **Verification:** the supplied logs show both new regressions failing before the change and passing afterward, all four mechanism-removal mutations rejected, a restored build, and **41/41 focused accelerated/Bayesian tests passing**. Existing external-row merge coverage also passes. The layering log reports no violations.
+
+The bounded comparison, resulting HTML report, and experiment audit acceptance criterion remain **pending**. This engineering verdict supplies no experiment preflight approval or performance conclusion.
+
+Review was read-only with no delegation; those restrictions were instruction-only.
+Not checked: fresh test execution, sanitizer or real Vulkan runs, and the pending experiment. Positive row sums still do not guarantee nonnegative individual approximate affinities.

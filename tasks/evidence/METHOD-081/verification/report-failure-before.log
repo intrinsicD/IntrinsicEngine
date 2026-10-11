@@ -1,0 +1,12 @@
+PASS: identity positive control; zero/collapse/displacement/nonfinite negative controls; fixed cells and pinning
+Traceback (most recent call last):
+  File "/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-081/verification/report-check.py", line 24, in <module>
+    result=c.report()
+           ^^^^^^^^^^
+  File "/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-081/compare.py", line 90, in report
+    d,t,stages,p=read(cell,OUT);entries[name]=d
+                 ^^^^^^^^^^^^^^
+  File "/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-081/compare.py", line 57, in read
+    assert d['status']=='success' and d['iterations']==k and len(t)==k
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

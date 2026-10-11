@@ -2,8 +2,8 @@ session:
   id: "2026-10-11_001"
   date: "2026-10-11"
   started: "2026-10-11T00:00+02:00"
-  last_turn: "2026-10-11T11:12+02:00"
-  turn_count: 4
+  last_turn: "2026-10-11T11:41+02:00"
+  turn_count: 5
   summary: "METHOD-078 rejects unconditional retries; METHOD-079 diagnoses first-row sign errors; METHOD-080 completes the bounded invalid-row census and exact affinities; production probes removed."
 events_logged:
   - turn: 1
@@ -78,6 +78,24 @@ events_logged:
     routing: crystallized
     provenance: ai-executed
     summary: "C121 records the bounded complete census; no universal mechanism, sampler ranking or production remedy is inferred."
+  - turn: 5
+    type: question
+    id: N660
+    routing: direct
+    provenance: user
+    summary: "User asks for a remedy and whether a non-PSD pseudoinverse causes the failure."
+  - turn: 5
+    type: observation
+    id: O267
+    routing: staged
+    provenance: ai-suggested
+    summary: "Distinguish PSD from nonnegative cross-affinities; no new engine result."
+  - turn: 5
+    type: observation
+    id: O268
+    routing: staged
+    provenance: ai-suggested
+    summary: "Recommend consistent exact row replacement with existing fallback; unimplemented and not adopted."
 ai_actions:
   - turn: 1
     action: "Built bound Release binaries, completed reviewed pilot, audited raw outputs, restored production files; retained candidate patch and reports."
@@ -94,6 +112,9 @@ ai_actions:
     action: "Collected every target sum in the observed prefixes, evaluated all invalid rows exactly and sampled valid rows, preserved reviewed report, restored source and ran focused tests."
     provenance: ai-executed
     files_changed: [tasks/evidence/METHOD-080, ara/logic/claims.md]
+  - turn: 5
+    action: "Inspected the positive-spectrum construction and existing exact-row merge; rechecked the known-answer Gaussian counterexample and consulted primary Nyström/BCPD sources. No production edit or results-bearing run."
+    provenance: ai-executed
 claims_touched:
   - id: C119
     action: created
@@ -110,5 +131,6 @@ key_context:
 open_threads:
   - "N655: C120 covers selected first-row arithmetic; C121 covers all invalid rows in the bounded prefixes. A general mechanism and production remedy remain open."
   - "O264 remains a tentative user mechanism; no user affirmation or global refutation is inferred from this bounded result."
+  - "N660: O268 proposes a bounded exact-row repair; validation, cost and residual negative entries remain open."
 ai_suggestions_pending:
-  - "A production repair must preserve all E-step statistics and pass accuracy controls; next diagnostic or implementation layer needs the operator's scope decision."
+  - "O268: exact row replacement is the recommended first candidate, pending a production scope decision; no blanket positivity or speed guarantee."

@@ -48,6 +48,11 @@ per iteration; landmark doubling keeps the cached landmarks as the prefix. A new
 starts the draws afresh. The variants are selectable for measurement; no comparison between
 them is claimed.
 
+Nonpositive or nonfinite Nyström target sums are recomputed as complete exact rows,
+including their contributions to every E-step statistic, while the existing cost budget
+allows it. The sampled accuracy checks and Truncated/Dense fallback remain active.
+Positive row sums alone do not guarantee nonnegative individual approximated affinities.
+
 `LowRank = k` replaces the nonrigid/Bayesian Gram matrix by k Nystroem eigenpairs (O(M k^2)
 per iteration, up to 1,000,000 source points) and reports its sampled kernel error.
 Measured (claim C113, 16 threads, Release, medians): rigid auto 19.9x the reference at

@@ -4425,3 +4425,39 @@ observations:
     promoted_to: logic/claims.md:C121
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O267
+    timestamp: "2026-10-11T11:41+02:00"
+    provenance: ai-suggested
+    content: >
+      PSD of the positive-spectrum landmark pseudoinverse does not guarantee nonnegative
+      cross-affinities. Distinct positive kernel vectors can have a negative bilinear
+      product through a PSD inverse; further PSD projection alone is not a general remedy.
+    context: >
+      Current code inspection and a recheck of the existing two-landmark analytic control,
+      not a new engine experiment. This mathematical distinction does not establish exact
+      arithmetic PSD of a stored floating-point matrix or diagnose every observed row.
+    potential_type: concept
+    bound_to: [N660]
+    promoted: false
+    stale: false
+
+  - id: O268
+    timestamp: "2026-10-11T11:41+02:00"
+    provenance: ai-suggested
+    content: >
+      Candidate next slice: recompute invalid target rows exactly, exclude them from the
+      approximate reverse accumulation and insert their exact contributions into Pt1,
+      denominators, P1 and PX. Reuse the existing ExternalRows/ExactRow pattern and retain
+      accuracy checks and full Truncated/Dense fallback. This may salvage otherwise rejected
+      attempts but does not guarantee nonnegative entries in every remaining approximate row.
+    context: >
+      Recommendation only; no implementation, benchmark, speed claim or user adoption.
+      Full entrywise nonnegativity would require direct positive Gaussian contributions
+      or a separately validated nonnegative feature approximation. Conditioning changes
+      alone are insufficient. First bounded correctness check should compare all hybrid
+      sufficient statistics with an explicitly assembled row-replaced kernel.
+    potential_type: heuristic
+    bound_to: [N660]
+    promoted: false
+    stale: false
