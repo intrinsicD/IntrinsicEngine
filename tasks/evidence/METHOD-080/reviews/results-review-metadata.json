@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-11",
+  "session": "/root/nystrom_census_results",
+  "requested_model": "gpt-6-astra",
+  "requested_effort": "xhigh",
+  "reported_model": null,
+  "reported_effort": null,
+  "restrictions": "read-only/no-delegation instruction-only",
+  "verdict": "approve. All three task acceptance criteria are met.",
+  "raw_manifest_sha256": "0877477f9075a1bc6f0537dafc5cbe121dd6fbf2cdf9b71a1eb751f0c6930567",
+  "actual_answer": "results-review.txt"
+}

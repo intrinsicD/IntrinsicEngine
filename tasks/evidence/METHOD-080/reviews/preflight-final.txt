@@ -1,0 +1,12 @@
+**PASS** — LIGHT preflight and implementation delta review for commit `37c2a0e0a35ab4f9e1f03588ab4b3fb50758ba7b`, packet SHA256 `9548de02e04f65e7a9e0e1dc3a96fbb576eb7462c8791c2b771e3ae47fcc3e79`.
+
+Both mandatory findings are resolved:
+
+- The report distinguishes normalized census geometry from world-coordinate before/after views and labels the latter’s axes.
+- Retained technical logs now record peak RSS for native and analysis children under both final configurations, plus the maximum exact-row workload. Existing parity, coverage, rejection, oracle and report controls still pass.
+
+The optional environment-version check is implemented. I independently verified the clean frozen checkout, all recorded input hashes and current runtime versions.
+
+The delta does not change native instrumentation, census arithmetic, selection rules or the four-cell plan. No remaining mandatory or optional findings. This PASS covers the bounded descriptive census only; post-run conclusions and task acceptance still require the planned raw-output audit.
+
+No experiments were run or new technical outcome values inspected. Read-only and no-delegation restrictions remained instruction-only.

@@ -1,0 +1,19 @@
+{
+  "frozen_commit": "37c2a0e0a35ab4f9e1f03588ab4b3fb50758ba7b",
+  "packet_sha256": "9548de02e04f65e7a9e0e1dc3a96fbb576eb7462c8791c2b771e3ae47fcc3e79",
+  "scope": "Complete invalid-row census of the frozen prefixes; all invalid rows fit the exact-evaluation cap. No general sampler, numerical-stability or performance claim.",
+  "repeat_checks": {
+    "points": {
+      "all_capture_bytes_identical": true,
+      "census_summaries_identical": true,
+      "all_invalid_exactly_evaluated": true
+    },
+    "box": {
+      "all_capture_bytes_identical": true,
+      "census_summaries_identical": true,
+      "all_invalid_exactly_evaluated": true
+    }
+  },
+  "raw_manifest": "raw-sha256.txt",
+  "preflight": "reviews/approval.json"
+}

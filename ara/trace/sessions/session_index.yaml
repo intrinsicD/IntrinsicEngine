@@ -682,8 +682,8 @@ sessions:
 
 - id: 2026-10-11_001
   date: '2026-10-11'
-  summary: METHOD-078 rejects unconditional retries; METHOD-079 identifies persistent first-row Nyström sign errors, with production source restored.
-  turn_count: 3
-  events_count: 9
-  claims_touched: [C119, C120]
+  summary: METHOD-078 rejects retries; METHOD-079 diagnoses first-row signs; METHOD-080 completes the bounded invalid-row census and exact affinities, with source restored.
+  turn_count: 4
+  events_count: 12
+  claims_touched: [C119, C120, C121]
   open_threads: 2

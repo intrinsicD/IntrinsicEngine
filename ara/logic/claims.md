@@ -2487,3 +2487,14 @@
 - **Dependencies**: []
 - **Tags**: Bayesian CPD, Nyström, CPU, first-row diagnosis, signed affinity approximation
 - **From staging**: O265
+
+## C121: Complete invalid-row census in the two observed Nyström configurations
+- **Statement**: METHOD-080's frozen full synthetic 100000-point CPU fixture (seed 1, eight threads; fixed FarthestPoint prefixes of seven iterations and resampled uniform union-box prefixes of two, each repeated) contains 2/3/13 negative target sums at points draws 3/4/6 with 256/512/1024 landmarks and 140/27 at box draw 1 with 512/1024 landmarks. Every invalid row is injected clutter; no regular row, zero or nonfinite sum occurs among the 26 captured attempts. All 185 invalid row occurrences fit the exact-evaluation cap and have positive exact Gaussian sums. Median nearest-source distances are 5.94/6.20/6.30/4.07/4.69 sigma versus 2.75/2.82/2.91/2.42/2.44 for positive clutter in the same attempts; nearby landmarks exist and none of the invalid rows is a landmark. Box/L512 exact posterior inlier mass reaches 0.07633084484, so the invalid population is not uniformly negligible. Repeated capture buffers and summaries are identical. This descriptive census establishes neither sampler ranking nor a causal numerical mechanism or safe guard relaxation.
+- **Status**: supported — bounded synthetic CPU prefixes only
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Independent decoding changes invalid counts, IDs or labels; any exact invalid-row sum is nonpositive; geometry or posterior masses contradict the bound operands; repeated buffers differ or a target-pass attempt lacks a complete visit buffer.
+- **Proof**: [tasks/evidence/METHOD-080/audit-record.json, tasks/evidence/METHOD-080/raw-sha256.txt, tasks/evidence/METHOD-080/runs/report.html, tasks/evidence/METHOD-080/reviews/results-review.txt, tasks/evidence/METHOD-080/packet.md, tasks/evidence/METHOD-080/reviews/approval.json]
+- **Dependencies**: []
+- **Tags**: Bayesian CPD, Nyström, CPU, complete invalid-row census, signed affinity approximation
+- **From staging**: O266

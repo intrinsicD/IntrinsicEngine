@@ -13938,3 +13938,24 @@ tree:
     alternatives: [Relax the positivity guard based only on the two selected clutter rows.]
     evidence: [O265, N656]
     status: resolved
+
+  - id: N658
+    type: experiment
+    title: Census all invalid target rows in the observed Nyström failures
+    provenance: ai-executed
+    timestamp: "2026-10-11T11:12+02:00"
+    result: >
+      Four reviewed METHOD-080 cells completed. Full row coverage, native rejection, immutable first-row oracles and repeat identity pass. Independent audit confirms all invalid counts, fixture labels, geometry and exact affinities. C121 records the bounded descriptive result.
+    evidence: [tasks/evidence/METHOD-080/audit-record.json, tasks/evidence/METHOD-080/reviews/results-review.txt]
+    status: resolved
+
+  - id: N659
+    type: decision
+    title: Preserve the validity guard after the complete bounded census
+    provenance: ai-executed
+    timestamp: "2026-10-11T11:12+02:00"
+    choice: >
+      Preserve the complete row evidence and remove temporary production probes. The label and small mass of selected clutter rows do not authorize dropping every invalid row: Box/L512 includes exact posterior mass up to 7.633 percent. Production repair remains a separate scope decision.
+    alternatives: [Treat all invalid clutter rows as negligible and relax the guard without validating all E-step statistics.]
+    evidence: [O266, N658]
+    status: resolved

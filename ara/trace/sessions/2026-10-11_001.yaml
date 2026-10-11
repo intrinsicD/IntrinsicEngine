@@ -2,9 +2,9 @@ session:
   id: "2026-10-11_001"
   date: "2026-10-11"
   started: "2026-10-11T00:00+02:00"
-  last_turn: "2026-10-11T09:38+02:00"
-  turn_count: 3
-  summary: "METHOD-078 rejects unconditional retries; METHOD-079 diagnoses persistent first-row approximation sign errors with exact raw-snapshot checks; production probes removed."
+  last_turn: "2026-10-11T11:12+02:00"
+  turn_count: 4
+  summary: "METHOD-078 rejects unconditional retries; METHOD-079 diagnoses first-row sign errors; METHOD-080 completes the bounded invalid-row census and exact affinities; production probes removed."
 events_logged:
   - turn: 1
     type: experiment
@@ -60,6 +60,24 @@ events_logged:
     routing: crystallized
     provenance: ai-executed
     summary: "C120 records the bounded measured sign failures; O264 remains the user's unpromoted tentative hypothesis."
+  - turn: 4
+    type: experiment
+    id: N658
+    routing: direct
+    provenance: ai-executed
+    summary: "Four reviewed census cells and independent raw audit establish complete invalid IDs, sampling semantics, geometry and exact weighted affinities."
+  - turn: 4
+    type: decision
+    id: N659
+    routing: direct
+    provenance: ai-executed
+    summary: "Preserve the guard and remove probes; clutter labels alone do not make all negative rows negligible."
+  - turn: 4
+    type: observation
+    id: O266
+    routing: crystallized
+    provenance: ai-executed
+    summary: "C121 records the bounded complete census; no universal mechanism, sampler ranking or production remedy is inferred."
 ai_actions:
   - turn: 1
     action: "Built bound Release binaries, completed reviewed pilot, audited raw outputs, restored production files; retained candidate patch and reports."
@@ -72,6 +90,10 @@ ai_actions:
     action: "Completed frozen first-row diagnostic, independently audited exact sums and significance, removed probes; C120 and raw evidence retained."
     provenance: ai-executed
     files_changed: [tasks/evidence/METHOD-079, ara/logic/claims.md]
+  - turn: 4
+    action: "Collected every target sum in the observed prefixes, evaluated all invalid rows exactly and sampled valid rows, preserved reviewed report, restored source and ran focused tests."
+    provenance: ai-executed
+    files_changed: [tasks/evidence/METHOD-080, ara/logic/claims.md]
 claims_touched:
   - id: C119
     action: created
@@ -79,11 +101,14 @@ claims_touched:
   - id: C120
     action: created
     turn: 3
+  - id: C121
+    action: created
+    turn: 4
 key_context:
   - turn: 1
     excerpt: "Dann bitte nyström Nutzung untersuchen und verbessern"
 open_threads:
-  - "N655: first-row approximation sign failures resolved in C120; prevalence and production remedy remain outside the approved scope."
+  - "N655: C120 covers selected first-row arithmetic; C121 covers all invalid rows in the bounded prefixes. A general mechanism and production remedy remain open."
   - "O264 remains a tentative user mechanism; no user affirmation or global refutation is inferred from this bounded result."
 ai_suggestions_pending:
   - "A production repair must preserve all E-step statistics and pass accuracy controls; next diagnostic or implementation layer needs the operator's scope decision."

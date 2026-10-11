@@ -4411,3 +4411,17 @@ observations:
     promoted_to: logic/claims.md:C120
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O266
+    timestamp: "2026-10-11T11:12+02:00"
+    provenance: ai-executed
+    content: >
+      The complete METHOD-080 census finds 2/3/13 finite-negative target sums in fixed FarthestPoint draws 3/4/6 and 140/27 in resampled union-box draw 1. All invalid rows carry the fixture clutter label, all exact sums are positive, and each repeated buffer is identical. Invalid rows are farther from the current source than the positive-clutter median within the same attempt, but nearby landmarks exist. Box/L512 exact inlier mass reaches 7.633 percent.
+    context: >
+      One synthetic 100000-point fixture, seed 1, eight CPU threads; seven/two-iteration prefixes repeated in reverse order. Independent audit recomputes all 185 invalid and 1280 sampled valid row occurrences and all geometry quantiles. Descriptive only; no sampler ranking, safe clamping, production fix or new full eigensystem sensitivity claim.
+    potential_type: claim
+    bound_to: [N658, N659]
+    promoted: true
+    promoted_to: logic/claims.md:C121
+    crystallized_via: artifact-commitment
+    stale: false

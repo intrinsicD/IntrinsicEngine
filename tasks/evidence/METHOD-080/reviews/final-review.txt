@@ -1,0 +1,11 @@
+**Verdict: Ship.** No required correctness, complexity or narrative corrections.
+
+This approval binds to final-content manifest SHA256 `688466a39aaf58d3997b00d6741667edfcb4e61e2daa0d8a6b00d10b14004d53`. All **168 content hashes** verify; raw evidence and census code remain unchanged.
+
+The [audit narrative](/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-080/audit.md), C121, O266, N658/N659 and session record agree with the independently checked evidence. Counts, IDs, rates, distance ranges, exact masses and the two numerical examples are correct. Sampler semantics and the location of the negative sum are accurately described. The NaN explanation matches the deliberate sentinel initialization and early return.
+
+The text preserves the material limits: one fixture and bounded prefixes; valid exact rows remain sampled; saved-`g` replay does not establish every eigensystem’s arithmetic stability; no sampler ranking, causal mechanism, negligible-clutter assumption, performance claim or safe guard relaxation follows. O264 remains tentative.
+
+The retired task quotes my actual acceptance verdict correctly. Source restoration and **28/28** focused tests support closure. The ARA strict check passes with **121 claims**. Previously recorded BUG-241 link failures remain explicitly disclosed.
+
+Not rerun: experiments, full CPU, sanitizer or GPU suites. No additional risk beyond the documented diagnostic scope.
