@@ -13871,3 +13871,39 @@ tree:
     - ara/evidence/diagnostics/graphics150_low_latency_compute_20260929/record.json
     - ara/evidence/diagnostics/graphics150_low_latency_compute_20260929/sealed-result.json
     status: resolved
+
+  - id: N652
+    type: experiment
+    title: Diagnose repeated Nyström rejection under METHOD-077 parameters
+    provenance: ai-executed
+    timestamp: "2026-10-11T02:00+02:00"
+    result: >
+      All eleven frozen METHOD-078 cells completed. Controls pass; both repeats match. Independent complete-position recomputation and trace audit confirms no added accepted iterations, identical endpoints, and the frozen DO NOT ADOPT decision. C119 is bounded to this pilot.
+    evidence:
+      - tasks/evidence/METHOD-078/audit-record.json
+      - tasks/evidence/METHOD-078/raw-sha256.txt
+      - tasks/evidence/METHOD-078/runs/report.html
+    status: resolved
+
+  - id: N653
+    type: dead_end
+    title: Unconditional retry does not improve the bounded Nyström pilot
+    provenance: ai-executed
+    timestamp: "2026-10-11T02:00+02:00"
+    hypothesis: Removing sigma-only suppression produces useful later approximations at lower registration cost in the two pilot variants.
+    failure_mode: All additional attempts fail target-intermediate validity; accepted counts and positions are unchanged, and the timing screen fails.
+    lesson: Diagnose the first rejection and retain accuracy/cost controls before increasing attempt frequency; greater utilization is not itself a benefit. This pilot does not test larger landmark budgets or a numerical stabilization change.
+    evidence:
+      - tasks/evidence/METHOD-078/audit-record.json
+    status: resolved
+
+  - id: N654
+    type: decision
+    title: Restore production selection after the rejected retry candidate
+    provenance: ai-executed
+    timestamp: "2026-10-11T02:00+02:00"
+    choice: Restore the three production source/test files exactly to bbdf1af79; preserve candidate patch and raw evidence; require a new scoped decision before changing numerical approximation behavior.
+    alternatives:
+      - Keep unconditionally retrying despite the failed frozen screen.
+    evidence: [O263, N652, N653]
+    status: resolved

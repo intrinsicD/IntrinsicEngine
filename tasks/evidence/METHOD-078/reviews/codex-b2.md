@@ -1,0 +1,56 @@
+**PASS — pilot execution only**, for commit `1f12c58a6` and digest:
+
+`f8584a958eddaf8f1811a2a01c4b72a02e12f9e6456bb01d32e15a0656bd42f9`
+
+I independently regenerated the manifest: its contents and digest match the frozen packet. This verdict permits the named pilot; it does not establish successful registration, authorize production adoption, or support a performance claim.
+
+Question 1: **“Dann bitte nyström Nutzung untersuchen und verbessern”**
+
+The pilot serves that question as a bounded investigative step: remove one rejection-memory condition, retain the numerical machinery, and observe whether retries yield accepted approximations with equivalent endpoints and lower registration-call time. That is a reasonable shortest next step toward investigating and improving usage; it does not complete the requested production improvement. The operator-directed goal and limitations are explicit in [Layer B](/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-078/preflight/pilot/layer-b.md).
+
+My Layer A reconstruction agrees with the frozen intent. The apparent weaknesses—an Auto reference, possibly incorrect shared registration, an unchanged sampled oracle, inherited fallback asymmetry, and two same-seed repeats—are explicitly bounded rather than presented as accuracy or generalization evidence. Floor parity and the negative control remain prospective requirements. No blocking intent/configuration mismatch remains.
+
+In the checklist below, **Satisfied** means supported by inspected code, inputs or recorded assertions—not experiments rerun here. **Prospective** means acceptable for this pilot’s execution, with success still unestablished.
+
+| # | Assessment | Evidence or limitation |
+|---|---|---|
+| 1 | Satisfied | Inherited solver settings hold the comparison fixed; the changed variable is cached suppression. No parameter tuning. |
+| 2 | Satisfied | Normalized solver quantities and world-unit endpoint tolerances are distinguished. RMS tolerance `.001` is one-quarter of fixture coordinate-noise SD `.004`; this is equivalence tolerance, not registration accuracy. |
+| 3 | Satisfied | Inspected the actual guard, doubling, cost cap, positivity checks and sampled oracle. Approximate denominators and unchecked PX moments limit oracle interpretation. |
+| 4 | Satisfied | The deterministic counterexample changes geometry while reducing sigma²; it separates recoverable geometry from a sigma-only rejection assumption. |
+| 5 | Prospective | Fixture generation and scale are known; actual rejection mix and retry usefulness are observations this pilot will produce, not assumed outcomes. |
+| 6 | Satisfied | Inspected first/last 64 source, target and truth points, including clutter examples. |
+| 7 | Satisfied | Retry counterexample fails on baseline and passes on candidate; recovered sufficient statistics are compared with dense evaluation. Gradients are inapplicable. |
+| 8 | Satisfied | Separated versus nearby source inputs change acceptance; fresh/reused evaluators expose the retained-state effect. Hidden/future information is inapplicable. |
+| 9 | N/A | No teacher/student estimator. Auto is an equivalence comparator, not a claimed superior truth estimate. |
+| 10 | Satisfied | Truth and reference positions are used for post-registration evaluation, not supplied to the solver as answers. |
+| 11 | Satisfied | Commands exercise both named landmark variants and controls. Other variants, partial overlap and convergence are expressly outside scope. |
+| 12 | Satisfied within scope | Shared collapse/wrong Auto cannot establish registration success. No additional accepted iterations fails the screen; endpoint divergence is gated. |
+| 13 | Satisfied | The candidate removes the rejection-memory guard while retaining numerical checks and the per-call cost limit. |
+| 14 | Prospective | Missing/non-finite results, failed controls, invalid traces or missing positions cannot establish completion. Execution failure overrides complete rows as unevaluated. |
+| 15 | Satisfied | Endpoint RMS and maximum cover every source point in fixed world units. Sparse relative-error checks are reported as estimates, not global bounds. |
+| 16 | Prospective | Auto/floor require zero approximation use; floor parity and negative discrepancy must pass. Their numerical success has not been presumed. |
+| 17 | Prospective | Two reversed-order executions screen same-host variability. The conservative 10% separation is a follow-up screen, without population uncertainty or shipping inference. |
+| 18 | Satisfied | Same fixture, seed, solver defaults, thread placement and instrumentation. Draw numbering advances even through suppression; later geometry differences are consequences of treatment. |
+| 19 | Satisfied within scope | Equal iteration caps and matching termination/iteration counts bound comparison. Learning/convergence is not asserted or required for this diagnostic question. |
+| 20 | N/A | No tuning or learned-model evaluation split; the fixed exposed fixture cannot support unseen-data claims. |
+| 21 | Satisfied | Cells, repeats, endpoints, tolerances and decision ordering are frozen in `assessed`. No adaptive selection is authorized. |
+| 22 | Satisfied | Existing box-landmark test checks observed regional frequencies against union-volume probabilities across seeds, beyond shape validation. |
+| 23 | Satisfied | Assertion record covers Auto and both binaries × both variants at final point count, threads and iteration cap. Control behavior remains prospective. |
+| 24 | Satisfied / prospective | Native and total timeouts, address-space cap and failure-first recovery are implemented. Recorded alarm test exercises child interruption/recovery ordering; cumulative RSS bounds completed-child peaks. |
+| 25 | Prospective | No quantitative speedup prediction is asserted. Registration timing and stage traces test benefit; the inherited cost heuristic is not treated as measured runtime. |
+| 26 | Satisfied | Sequential CPU execution, eight pinned threads, exclusive output directory and no concurrent benchmark/build work are specified. Existing outputs cannot be overwritten. |
+
+Key evidence: [retry test](/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp), [baseline failure](/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-078/verification/repro-before.log), [candidate passes](/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-078/verification/candidate-tests.log), [distribution test](/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp), [technical assertions](/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-078/verification/driver-selftest.txt), [timeout test](/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-078/verification/test-timeout.py), and [execution guards](/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-078/diagnose.py). The repository mapping explicitly permits prospective pilot review; no LESSONS filename applies. ([Mapping](/home/alex/Documents/IntrinsicEngine/docs/agent/ara-evidence-policy.md))
+
+**Blocking issues: none for this frozen pilot.** Three interpretation details remain:
+
+- H1’s specific later-acceptance prediction requires examining acceptance/suppression chronology. The aggregate accepted-count gate alone does not establish that prediction or an identical-state counterfactual.
+- The negative control is explicitly **discrepancy-gated**, not acceptance-count-gated. Ineffective complete fallback is screened through floor parity plus required negative discrepancy. Adding a rule that *any* fallback iteration invalidates it would require packet revision; that stronger clarification is not automatically authorized.
+- Code requires separation **strictly greater than 10%**; exactly 10% is rejected. This is slightly more conservative than “at least 10%,” and Layer B explicitly makes `assessed` authoritative. ([Frozen assessment](/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-078/diagnose.py))
+
+The supplied clarifications otherwise preserve the frozen scope. The other independent review and per-start manifest checks remain required; I have not inspected or presumed that reviewer’s verdict.
+
+Skipped technical result metrics, prior scientific outputs and other reviewer answers; no writes, delegation or experiments occurred. Blindness/recursion restrictions were instruction-only; pilot outcomes and report completeness remain unestablished.
+
+Rendering note: source-line suffixes were removed from file links for the repository validator. [Verbatim answer](codex-b2.txt).

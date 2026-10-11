@@ -1,0 +1,53 @@
+**REVISE — pilot execution only.**  
+Commit: `96c21108f`  
+Packet SHA256: `2d51234c6d506b829a7e11837b741f2eb206782d4206a205ca5d84f7ea90cadc`
+
+The verbatim question, **“Dann bitte nyström Nutzung untersuchen und verbessern”**, is served by this bounded pilot: distinguish cached suppression from numerical/error/cost rejection, then test whether removing suppression improves runtime while preserving endpoints. The declared operator-directed goal and shortest-next-step rationale are reasonable. This investigates a possible improvement; it does not establish successful registration or justify shipping. [Layer B](/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-078/preflight/pilot/layer-b.md:3)
+
+My reconstruction agrees with that intent. Shared collapse, the partial sampled oracle, inherited Auto/fallback asymmetry, and two same-host repeats are explicit limitations—not unresolved demands for a broader experiment. The supplied clarifications preserve the frozen scope except for the timeout recovery procedure described below.
+
+Two issues prevent an unqualified FULL preflight pass:
+
+1. **Timeout recovery can produce a success verdict.** Outer `timeout` can terminate Python after all eleven result files exist, before `failure.json` is written. There is no SIGTERM handler. A subsequent `diagnose.py report` then evaluates complete rows and can display “pilot passed” without an incomplete-execution warning. This contradicts the frozen total-timeout rule. [Failure handling](/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-078/diagnose.py:228), [report status](/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-078/diagnose.py:113)
+
+   Freeze a recovery procedure that durably records the launcher timeout before regenerating HTML and makes the effective verdict incomplete/unevaluated. Verify the specific case **all result files present + timeout**. Merely rerunning `report` is insufficient. This needs a packet revision and new digest; it is not automatically covered by the current clarification.
+
+2. **Strict Layer A blindness was compromised.** The permitted [report source](/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-078/diagnose.py:122) disclosed a historical scientific outcome before Layer B. I excluded it from reasoning, but cannot certify an unexposed reconstruction. To satisfy the repository’s strict [FULL blind-review requirement](/home/alex/Documents/IntrinsicEngine/docs/agent/ara-evidence-policy.md:142), sanitize the permitted Layer A material and obtain a fresh blind reconstruction, or obtain an explicit user exception. I have not inferred that exception.
+
+All 26 checklist items follow. “Prospective” means acceptable for this pilot’s plan, not demonstrated experimental success.
+
+| # | Assessment | Evidence or limitation |
+|---|---|---|
+| 1 | Satisfied | Inherited configuration is justified by isolating retry suppression; no tuning. |
+| 2 | Satisfied within scope | Normalized solver parameters and world-unit endpoint tolerances are explicit. No new weighted objective is introduced. |
+| 3 | Satisfied | Implementation inspected: Bayesian stopping objective is NLL; no full ELBO claim. |
+| 4 | Satisfied | Fresh/reused evaluators receive the same later input, separating current geometry from rejection history. |
+| 5 | N/A new-data prediction | One fixed synthetic fixture; no new-data efficacy forecast. Numerical signatures remain prospective. |
+| 6 | Satisfied | First/last 64 source, target and truth points inspected. |
+| 7 | Satisfied | Regression fails before the change and passes afterward; checks responsibilities and `PX`. Gradients are inapplicable. |
+| 8 | Satisfied | Changed source geometry demonstrably reaches evaluation; fresh/reused comparison exercises retained state. No hidden/future-data path. |
+| 9 | N/A | No teacher/student target replacement. Auto is a comparator. |
+| 10 | Satisfied | Truth and reference positions are used for reporting, not supplied to registration. |
+| 11 | Satisfied within scope | Frozen cells cover both declared variants and controls; excluded shapes/variants remain excluded from conclusions. |
+| 12 | Satisfied within scope | No additional accepted iterations prevents a positive screen. Shared collapse is explicitly not registration success. |
+| 13 | Satisfied | Source bindings isolate the guard change; floor and permissive-error controls retain their stated mechanisms. |
+| 14 | **Revision needed** | Ordinary missing/invalid outputs fail closed; outer-timeout recovery has the gap above. |
+| 15 | Satisfied within scope | Endpoint RMS **and maximum** cover every source point in fixed world units. Sampled-oracle limitations remain explicit. |
+| 16 | Prospective | Auto/floor controls and discrepancy-producing negative control must pass; missing/failed controls invalidate comparison. |
+| 17 | Prospective | Two reversed-order process repeats and conservative separation screen host noise only; no population inference. |
+| 18 | Satisfied | Same fixture, seed, parameters and instrumentation; guard-only change. Resampling draw index advances even on suppressed calls. |
+| 19 | Satisfied within scope | Matched iteration caps measure early retry behavior; complete registration is expressly outside scope. |
+| 20 | N/A | No training or tuning; no held-out generalization claim. |
+| 21 | Satisfied | Cells, summaries, equivalence thresholds and decision logic are frozen. |
+| 22 | Satisfied | Box-union distribution test checks observed region shares against volume shares and appears in passing candidate logs. |
+| 23 | Satisfied by recorded assertions | Final five reference/comparison configurations have successful-execution, finite-trace and complete-buffer assertions. Numerical controls remain prospective. |
+| 24 | **Revision needed** | Native time/address-space limits exist; outer-timeout status must survive report recovery. RSS is a cumulative completed-child peak. |
+| 25 | N/A predictive speed claim | No speedup forecast is approved. The unchanged estimated-cost cap is being diagnosed, not validated as an optimal timing model. |
+| 26 | Satisfied as planned | Sequential CPU runs, eight pinned threads, exclusive output directory and no concurrent builds/benchmarks. |
+
+Technical evidence inspected: [regression failure](/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-078/verification/repro-before.log), [29 passing candidate tests](/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-078/verification/candidate-tests.log), [distribution assertions](/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:1020), and [driver/technical assertion record](/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-078/verification/driver-selftest.txt). These files match their frozen manifest entries; I did not rerun them.
+
+Optional clarifications: describe `seconds` as **registration-call time**, and note that `assessed` requires **strictly more than 10%** separation. The sampled oracle’s 8/32 clutter-target coverage remains a documented limitation, not a request to change this pilot.
+
+No writes, delegation, experiments, technical result metrics, prior scientific-output files or other reviewer answers were used.  
+Remaining risks are timeout misclassification and the recorded blindness breach; no production adoption or performance claim is approved.

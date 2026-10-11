@@ -1,0 +1,48 @@
+session:
+  id: "2026-10-11_001"
+  date: "2026-10-11"
+  started: "2026-10-11T00:00+02:00"
+  last_turn: "2026-10-11T02:00+02:00"
+  turn_count: 1
+  summary: "METHOD-078 frozen eleven-cell pilot rejects unconditional Nyström retries; production source restored and evidence preserved."
+events_logged:
+  - turn: 1
+    type: experiment
+    id: N652
+    routing: direct
+    provenance: ai-executed
+    summary: "Complete CPU pilot and independent raw-position/trace audit; controls and repeat determinism pass."
+  - turn: 1
+    type: dead_end
+    id: N653
+    routing: direct
+    provenance: ai-executed
+    summary: "Additional retries yield only target-intermediate rejection; no added accepted iterations."
+  - turn: 1
+    type: decision
+    id: N654
+    routing: direct
+    provenance: ai-executed
+    summary: "Restore production source according to the frozen DO NOT ADOPT rule."
+  - turn: 1
+    type: observation
+    id: O263
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Bounded pilot observation recorded as C119 through the source-restoration decision, without general performance claims."
+ai_actions:
+  - turn: 1
+    action: "Built bound Release binaries, completed reviewed pilot, audited raw outputs, restored production files; retained candidate patch and reports."
+    provenance: ai-executed
+    files_changed: [tasks/evidence/METHOD-078, ara/logic/claims.md]
+claims_touched:
+  - id: C119
+    action: created
+    turn: 1
+key_context:
+  - turn: 1
+    excerpt: "Dann bitte nyström Nutzung untersuchen und verbessern"
+open_threads:
+  - "Numerical target-sum positivity/finiteness is the next diagnostic layer; no stabilization or larger-landmark experiment approved by this packet."
+ai_suggestions_pending:
+  - "Investigate failed shifted target sums before changing retry policy, landmark budget or accuracy threshold."

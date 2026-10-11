@@ -4371,3 +4371,17 @@ observations:
     promoted_to: logic/claims.md:C118
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O263
+    timestamp: "2026-10-11T02:00+02:00"
+    provenance: ai-executed
+    content: >
+      METHOD-078's eleven-cell CPU pilot finds no additional accepted Nyström iterations after removing rejection memory; added attempts fail target-intermediate validity. Baseline/candidate positions are identical within each variant and the frozen timing screen rejects adoption.
+    context: >
+      One full synthetic fixture, seed 1, 100000 points, eight physical cores, 20 iterations; points/fixed and box/resampled, two reversed-order repeats. Both preflight reviewers passed digest e75cf4c61d104b0529f5f1ba1e24a0e8eed6728d1c55053e6ef396aae2f2f229. Independent raw-data audit passed; production candidate removed according to the frozen decision.
+    potential_type: claim
+    bound_to: [N652, N653, N654]
+    promoted: true
+    promoted_to: logic/claims.md:C119
+    crystallized_via: artifact-commitment
+    stale: false

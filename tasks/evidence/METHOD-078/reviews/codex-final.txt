@@ -1,0 +1,23 @@
+**REVISE — one remaining evidence gap for pilot execution.**
+
+Commit: `5ab84bc1b`  
+Digest: `64675d797b137b35e8f8f25db6017943ad61fc69e466fd070b3d99c7ce9ee197`
+
+The regenerated live manifest matches the frozen manifest exactly. Native binary hashes, runner and EStep hashes are unchanged. The driver diff changes only the total budget from 1,800 to 3,600 seconds; cells, ordering, numerical gates and per-process limits remain unchanged. My earlier reconstruction and alignment judgment still apply.
+
+**Blocking: the control technical tests do not demonstrate the promised memory limit.** [Layer B](/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-078/preflight/pilot/layer-b.md:65) says memory and wall limits were enforced for these evidence calls. However, [test-controls.py](/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-078/verification/test-controls.py:7) supplies `timeout=300` without setting `RLIMIT_AS` or invoking the driver’s memory limiter. The [assertion record](/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-078/verification/driver-selftest.txt:6) also does not record an inherited limit. The actual pilot sets an 8-GiB limit through `preexec_fn=limit_memory`. ([Driver](/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-078/diagnose.py:255))
+
+This is an evidence gap, not proof that the controls exceeded memory. I asked whether an external launcher supplied the limit; no supporting invocation record was available before this verdict. An existing record demonstrating inherited 8-GiB enforcement could resolve it without changing numerical scope. Otherwise, enforce the same limit for the two technical calls, repeat only their assertions, and freeze the resulting revision. No waiver is implied.
+
+The peer exchange resolves as follows:
+
+- **B1: agreed, with a correction to my earlier review.** Treating both unexecuted control configurations as prospective was too permissive. The new script and records now establish successful execution, complete position buffers and finite emitted iteration values for both controls. Their scientific sensitivity remains prospective. The memory-limit evidence above is the remaining final-configuration gap.
+- **M1: resolved.** The packet now distinguishes generated counts from manual rejection classification using raw per-draw events. An unexplained NaN remains the broader early landmark/eigendecomposition rejection category; no unavailable subreason is inferred. This matches the report implementation. ([Clarification](/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-078/preflight/pilot/layer-b.md:34))
+- **M2: agreed terminology limitation, nonblocking.** Auto’s zero Nyström count checks wiring. Floor parity supplies the substantive equivalence control; the negative control tests discrepancy sensitivity.
+- **M3/c11: resolved for interpretation.** INVALID remains an invalid comparison. Cell-specific raw outputs identify whether a control, baseline or candidate failed. The withdrawn blanket interpretation is neither assumed nor required. ([Frozen wording](/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-078/preflight/pilot/layer-b.md:81))
+
+On the peer’s stronger H1 argument, I accept that rejected attempts reset the numerical buffers before fallback. For the exercised variants, this supports identical numerical trajectories until the first accepted retry that baseline suppression prevented. That strengthens the accepted-count inference. It does **not** guarantee later candidate fallback endpoints match the floor after an accepted retry changes the trajectory; the all-point endpoint gates remain necessary. ([Reset](/home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cpp:1205), [rejection path](/home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cpp:1673))
+
+The 3,600-second budget consistently updates the alarm, remaining-time calculation and packet. It leaves 300 seconds beyond eleven native maxima for overhead, without guaranteeing completion. Failure-before-recovery ordering remains intact. Auto timing is now explicitly descriptive. Extra gate self-tests and clearer cell-specific verdict messages remain optional; moving the negative control to another binary would require a new packet.
+
+Skipped scientific/technical result metrics and unrelated code; no writes, delegation or experiments occurred. The unresolved memory-limit evidence prevents PASS on this digest; no production or performance conclusion is authorized.

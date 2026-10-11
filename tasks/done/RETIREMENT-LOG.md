@@ -1,5 +1,7 @@
 # Retirement Log
 
+- 2026-10-11 — **METHOD-078**: bounded Nyström retry diagnosis completed at frozen run `0efb7e48f`; candidate rejected, original production code restored. Independent reviewer accepted all criteria; evidence and remaining scope are in the [task](METHOD-078-nystrom-retry-diagnosis.md).
+
 Append-only narrative record of retired tasks, newest first. When retiring a
 task, append its summary block here (see `docs/agent/task-format.md`,
 "Retiring a task") instead of editing `tasks/active/README.md`. Links are

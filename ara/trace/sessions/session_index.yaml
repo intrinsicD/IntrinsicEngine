@@ -679,3 +679,11 @@ sessions:
   events_count: 9
   claims_touched: []
   open_threads: 2
+
+- id: 2026-10-11_001
+  date: '2026-10-11'
+  summary: Bounded METHOD-078 pilot rejects unconditional Nyström retries; production source restored.
+  turn_count: 1
+  events_count: 4
+  claims_touched: [C119]
+  open_threads: 1

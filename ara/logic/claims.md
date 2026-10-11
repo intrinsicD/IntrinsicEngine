@@ -2465,3 +2465,14 @@
 - **Dependencies**: []
 - **Tags**: Vulkan, Operational, editor gizmo, ImGuizmo, input ownership, pixel readback
 - **From staging**: O261, O262
+
+## C119: Removing rejection memory adds no accepted Nyström steps in the METHOD-078 pilot
+- **Statement**: In the frozen METHOD-078 CPU pilot at 0efb7e48f (full synthetic fixture, seed 1, 100000 points, eight physical cores, 20 iterations, two reversed-order repeats), removing the sigma-only rejection guard leaves accepted Nyström iterations at 6 for points/fixed and 1 for box/resampled. Attempts increase from 9 to 22 and 4 to 40 respectively; every added attempt is rejected by the target-intermediate validity check. Baseline and candidate position buffers are identical within each variant. Registration-call times are 151.221–151.399 s versus 159.070–160.567 s for points, and 201.525–202.195 s versus 216.216–216.727 s for boxes. The frozen decision is DO NOT ADOPT; this is diagnostic pilot evidence, not a sealed benchmark improvement, completed-registration claim, or general result across shapes/variants.
+- **Status**: supported
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: The bound raw traces show an additional accepted candidate iteration, recomputed complete position buffers differ within a variant, or the frozen acceptance rule passes on these eleven recorded cells.
+- **Proof**: [tasks/evidence/METHOD-078/audit-record.json, tasks/evidence/METHOD-078/raw-sha256.txt, tasks/evidence/METHOD-078/runs/report.html, tasks/evidence/METHOD-078/preflight/pilot/manifest.txt, tasks/evidence/METHOD-078/reviews/approvals.json]
+- **Dependencies**: []
+- **Tags**: Bayesian CPD, Nyström, CPU, bounded pilot, rejected optimization
+- **From staging**: O263
