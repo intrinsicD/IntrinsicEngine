@@ -22,9 +22,9 @@ invalid target sum with an exact sum, landmark distances / sigma and the retaine
 No production stabilization, changed tolerance, retry policy or larger budget is selected here.
 
 ## Acceptance criteria
-- [ ] Capture the deterministic first invalid target row and its actual operands in both bounded variants.
-- [ ] Independently recompute exact/approximate sums, spectrum and coverage; retain controls, uncertainty and any unresolved mechanism.
-- [ ] Publish the reviewed raw-output report and remove temporary production probes; original focused tests pass.
+- [x] Capture the deterministic first invalid target row and its actual operands in both bounded variants.
+- [x] Independently recompute exact/approximate sums, spectrum and coverage; retain controls, uncertainty and any unresolved mechanism.
+- [x] Publish the reviewed raw-output report and remove temporary production probes; original focused tests pass.
 
 ## Engine integration
 | Field | Disposition |
@@ -46,6 +46,18 @@ python3 tools/docs/check_doc_links.py --root . --strict
 python3 tools/agents/check_ara_claims.py --root . --strict
 ```
 
-## State
-Independent plan reviews and their scoped dispositions are in the evidence directory.
-Preparation is implemented; scientific execution requires the new frozen packet's two passing reviews. Existing red main CI and BUG-241 are pre-existing; no gates are weakened.
+## Completion — 2026-10-11
+
+Canonical result and limits: [audit](../evidence/METHOD-079/audit.md), ARA C120.
+Frozen execution commit: `cae9a475690c5b5285d523403ba71689b6d21007`.
+The frozen four-cell diagnostic completed; no production fix or guard relaxation was adopted.
+Both temporary production files are restored exactly to `0631ef12c`.
+
+Independent reviewer `/root/nystrom_first_row_audit` decided:
+**“PASS — bounded first-row diagnosis. Mandatory findings: none.”**
+Its [actual answer](../evidence/METHOD-079/reviews/results-review.txt) explicitly finds
+acceptance criteria 1–3 met. The `ci` cleanup build and 28/28 original Accelerated cases pass.
+Strict doc links retain pre-existing BUG-241; full CPU/sanitizer/Vulkan were not rerun.
+
+A production remedy and any wider census are the next scope decision under the global drift
+rule. Existing METHOD-077 variants/evidence remain unchanged.

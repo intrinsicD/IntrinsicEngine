@@ -1,0 +1,345 @@
+<!doctype html><meta charset="utf-8"><style>body{font-family:system-ui;max-width:1250px;margin:auto}pre{white-space:pre-wrap}img{max-width:100%}</style><h1>METHOD-079: first invalid Nyström target sum</h1><p>CPU diagnostic, full synthetic fixture, seed 1; 4 points/fixed or 2 box/resampled iterations. No production change, performance claim or complete-registration verdict. Long double is a sensitivity check. Selected row: lowest invalid target index in the first failing attempt. Internal normalized coordinates and sigma are kept separate from world-space iteration traces.</p><p>Recorded completed cells: points_1, box_1, box_2, points_2; pending: .</p><p>Plan completion recorded.</p><h2>points_1</h2><p><b>Negative sum persists across arithmetic/operand checks (spread &lt;=1%, above accumulation-scale heuristic); no exact-arithmetic proof</b></p><pre>{
+  &quot;long_double_digits&quot;: 64.0,
+  &quot;landmarks&quot;: 256.0,
+  &quot;sources&quot;: 100000.0,
+  &quot;target_index&quot;: 83500.0,
+  &quot;draw&quot;: 3.0,
+  &quot;sigma2_internal&quot;: 0.20081942872187458,
+  &quot;logC&quot;: -5.468257381928407,
+  &quot;log_weight_shift&quot;: -11.512925464970229,
+  &quot;native_sum&quot;: -0.0006214047402079574,
+  &quot;native_class&quot;: &quot;negative&quot;,
+  &quot;native_replay_bitwise&quot;: 1.0,
+  &quot;native_g_max_abs&quot;: 3097.4239501953125,
+  &quot;native_pinv_max_abs&quot;: 42929206.94056182,
+  &quot;native_g_extended_dot&quot;: -0.0006214047402079574,
+  &quot;native_factors_extended_sum&quot;: -0.0006214047522939277,
+  &quot;native_eigen_relative_residual&quot;: 4.133261927064707e-15,
+  &quot;native_rank&quot;: 243.0,
+  &quot;native_negative_eigenvalues&quot;: 0.0,
+  &quot;native_top&quot;: 53.34280858115539,
+  &quot;native_smallest&quot;: 1.4235264677970548e-10,
+  &quot;native_smallest_retained&quot;: 7.290515918630249e-09,
+  &quot;native_retained_condition&quot;: 7316739881.857017,
+  &quot;native_cutoff_relative_margin&quot;: 0.16414933002370194,
+  &quot;native_gram_extended_eigen_sum&quot;: -0.000621404832417505,
+  &quot;native_gram_extended_rank&quot;: 243.0,
+  &quot;native_gram_extended_negative_eigenvalues&quot;: 0.0,
+  &quot;native_gram_extended_top&quot;: 53.34280858115528,
+  &quot;native_gram_extended_smallest&quot;: 1.4235263856768717e-10,
+  &quot;native_gram_extended_smallest_retained&quot;: 7.290516025262389e-09,
+  &quot;native_gram_extended_retained_condition&quot;: 7316739774.841309,
+  &quot;native_gram_extended_cutoff_relative_margin&quot;: 0.16414933839127066,
+  &quot;gram_reconstruction_max_abs&quot;: 1.674821305946983e-16,
+  &quot;kernel_row_reconstruction_max_abs&quot;: 4.025100565352435e-17,
+  &quot;target_kernel_zero_count&quot;: 0.0,
+  &quot;source_aggregate_zero_count&quot;: 0.0,
+  &quot;target_nearest_landmark_sigma&quot;: 0.6371741835249798,
+  &quot;target_projection_residual&quot;: 0.22165258163439344,
+  &quot;rebuilt_rank&quot;: 243.0,
+  &quot;rebuilt_negative_eigenvalues&quot;: 0.0,
+  &quot;rebuilt_top&quot;: 53.34280858115528,
+  &quot;rebuilt_smallest&quot;: 1.4235260552191207e-10,
+  &quot;rebuilt_smallest_retained&quot;: 7.290516111211455e-09,
+  &quot;rebuilt_retained_condition&quot;: 7316739688.583088,
+  &quot;rebuilt_cutoff_relative_margin&quot;: 0.16414934919484156,
+  &quot;rebuilt_sorted_mask_changes&quot;: 0.0,
+  &quot;exact_log_sum_shifted&quot;: -9.654086119703791,
+  &quot;exact_sum_shifted&quot;: 6.416285356034986e-05,
+  &quot;exact_log_affinity_unshifted&quot;: -21.167011584674018,
+  &quot;exact_target_inlier_mass&quot;: 1.5209593637418815e-07,
+  &quot;log_outlier_component_shifted&quot;: 6.044668083041822,
+  &quot;rebuilt_matched_rank_sum&quot;: -0.0006214045814511945,
+  &quot;rebuilt_component_abs_sum&quot;: 884.4259777715855,
+  &quot;rebuilt_accumulation_scale&quot;: 2.4547752102465778e-14,
+  &quot;matched_accumulation_scale&quot;: 2.4547752102465778e-14,
+  &quot;rebuilt_sum&quot;: -0.0006214045814511982,
+  &quot;rebuilt_source_contribution_sum&quot;: -0.0006214045880422579,
+  &quot;rebuilt_positive_mass&quot;: 0.0019822923047155467,
+  &quot;rebuilt_negative_mass&quot;: -0.0026036968927578047,
+  &quot;rebuilt_negative_source_count&quot;: 50077.0,
+  &quot;rebuilt_cancellation_ratio&quot;: 7.380037556403569,
+  &quot;source_kernel_below_native_cutoff_count&quot;: 0.0,
+  &quot;source_aggregate_reconstruction_max_abs&quot;: 3.0460967082035495e-11,
+  &quot;target_is_injected_clutter&quot;: true
+}</pre><img width="1200" src="points_1-diagnostic.png" alt="Spectrum, signed source affinities and exact-mass-weighted coverage"><pre>source_index,exact_mass_share,nearest_landmark_sigma,projection_residual
+58255,0.000171447929201969737044,0.11966203250553062675,1.66923743520164084841e-07
+65328,0.000171437828229571929797,0.111272799201725412871,1.52369837242490469703e-07
+89582,0.000171436390605592499223,0.122254842937321874342,1.7585446869013013696e-07
+10391,0.00017128467451255575721,0.135555903292880461852,1.99124072068363605625e-07
+49882,0.000171238801720334981722,0.13782579204861989014,2.03794762373748963163e-07
+59363,0.000171056859659853705627,0.115996026830272437725,1.55567666750304391815e-07
+93646,0.000171045289563710160309,0.109067755872683216737,1.45887199319333533964e-07
+43728,0.000171028090616341041694,0.112032431696591420744,1.47860701865123404103e-07
+</pre><img width="1100" src="points_1-attempts.png" alt="Spectrum diagnostics over all attempts"><pre>draw landmarks sigma² rank top smallest-kept pair-a pair-b pair-distance/sigma
+NYSTROM_SPECTRUM 0 256 0.57711465895922498 256 57.780100071648071 1.1881350880280196e-08 139 68 0.17452739935406389
+NYSTROM_SPECTRUM 1 256 0.25616681459080709 238 72.128700110067271 8.2551015988865035e-09 128 225 1.4241575095198689
+NYSTROM_SPECTRUM 2 256 0.22274837648900192 240 62.871647087968832 6.9513871915097047e-09 237 236 1.1639202960754176
+NYSTROM_SPECTRUM 3 256 0.20081942872187458 243 53.342808581155388 7.2905159186302491e-09 192 250 0.24078594472373704
+NYSTROM_SPECTRUM 3 512 0.20081942872187458 386 108.13705720604332 1.2775181588900838e-08 404 440 0.73771758494221873</pre><img width="1100" src="points_1-trace.png" alt="Every observed iteration and stage boundary"><p>NLL has weight 1 and share 1 in the implemented Bayesian stopping objective; extra prior contribution is zero. No full variational ELBO is claimed.</p><pre>NYSTROM_DIAG begin 0 0.57711465895922498 0
+NYSTROM_DIAG attempt 0 256 1 8.0808410772277691e-07
+NYSTROM_DIAG begin 1 0.25616681459080709 0
+NYSTROM_DIAG attempt 1 256 1 3.1049520965317213e-06
+NYSTROM_DIAG begin 2 0.22274837648900192 0
+NYSTROM_DIAG attempt 2 256 1 9.1297584198765854e-06
+NYSTROM_DIAG begin 3 0.20081942872187458 0
+NYSTROM_DIAG invalid_target 3 256
+NYSTROM_DIAG attempt 3 256 0 nan
+NYSTROM_DIAG attempt 3 512 1 9.1391861119136805e-07</pre><img width="1000" src="points_1-positions.png" alt="Before and after, same axes and source subset"><p><a href="points_1.snapshot">Raw operands</a> · <a href="points_1.analysis.tsv">Raw analysis</a> · <a href="points_1.components.csv">Eigencomponent terms</a> · <a href="points_1.stderr">Native trace</a></p><h2>box_1</h2><p><b>Negative sum persists across arithmetic/operand checks (spread &lt;=1%, above accumulation-scale heuristic); no exact-arithmetic proof</b></p><pre>{
+  &quot;long_double_digits&quot;: 64.0,
+  &quot;landmarks&quot;: 512.0,
+  &quot;sources&quot;: 100000.0,
+  &quot;target_index&quot;: 220.0,
+  &quot;draw&quot;: 1.0,
+  &quot;sigma2_internal&quot;: 0.2561776987282044,
+  &quot;logC&quot;: -5.103059582504582,
+  &quot;log_weight_shift&quot;: -11.512925464970229,
+  &quot;native_sum&quot;: -7.7884962308086765,
+  &quot;native_class&quot;: &quot;negative&quot;,
+  &quot;native_replay_bitwise&quot;: 1.0,
+  &quot;native_g_max_abs&quot;: 35669.000122162615,
+  &quot;native_pinv_max_abs&quot;: 1330.4772103082728,
+  &quot;native_g_extended_dot&quot;: -7.788496230808663,
+  &quot;native_factors_extended_sum&quot;: -7.788496230756229,
+  &quot;native_eigen_relative_residual&quot;: 4.15547784743417e-14,
+  &quot;native_rank&quot;: 512.0,
+  &quot;native_negative_eigenvalues&quot;: 0.0,
+  &quot;native_top&quot;: 13.293532663675649,
+  &quot;native_smallest&quot;: 0.0003327206689609143,
+  &quot;native_smallest_retained&quot;: 0.0003327206689609143,
+  &quot;native_retained_condition&quot;: 39954.03322910871,
+  &quot;native_cutoff_relative_margin&quot;: 250286.6228454065,
+  &quot;native_gram_extended_eigen_sum&quot;: -7.7884962307938626,
+  &quot;native_gram_extended_rank&quot;: 512.0,
+  &quot;native_gram_extended_negative_eigenvalues&quot;: 0.0,
+  &quot;native_gram_extended_top&quot;: 13.29353266367557,
+  &quot;native_gram_extended_smallest&quot;: 0.00033272066896082624,
+  &quot;native_gram_extended_smallest_retained&quot;: 0.00033272066896082624,
+  &quot;native_gram_extended_retained_condition&quot;: 39954.03322911905,
+  &quot;native_gram_extended_cutoff_relative_margin&quot;: 250286.6228453417,
+  &quot;gram_reconstruction_max_abs&quot;: 1.3536264123481523e-16,
+  &quot;kernel_row_reconstruction_max_abs&quot;: 7.207233941597391e-17,
+  &quot;target_kernel_zero_count&quot;: 0.0,
+  &quot;source_aggregate_zero_count&quot;: 0.0,
+  &quot;target_nearest_landmark_sigma&quot;: 0.6254055946806522,
+  &quot;target_projection_residual&quot;: 0.07497496507878437,
+  &quot;rebuilt_rank&quot;: 512.0,
+  &quot;rebuilt_negative_eigenvalues&quot;: 0.0,
+  &quot;rebuilt_top&quot;: 13.29353266367557,
+  &quot;rebuilt_smallest&quot;: 0.0003327206689608038,
+  &quot;rebuilt_smallest_retained&quot;: 0.0003327206689608038,
+  &quot;rebuilt_retained_condition&quot;: 39954.03322912174,
+  &quot;rebuilt_cutoff_relative_margin&quot;: 250286.62284532486,
+  &quot;rebuilt_sorted_mask_changes&quot;: 0.0,
+  &quot;exact_log_sum_shifted&quot;: -1.1170766397661034,
+  &quot;exact_sum_shifted&quot;: 0.3272350235586218,
+  &quot;exact_log_affinity_unshifted&quot;: -12.630002104736333,
+  &quot;exact_target_inlier_mass&quot;: 0.000538092134262014,
+  &quot;log_outlier_component_shifted&quot;: 6.409865882465646,
+  &quot;rebuilt_matched_rank_sum&quot;: -7.788496230791659,
+  &quot;rebuilt_component_abs_sum&quot;: 32505.438527680624,
+  &quot;rebuilt_accumulation_scale&quot;: 9.022071569742169e-13,
+  &quot;matched_accumulation_scale&quot;: 9.022071569742169e-13,
+  &quot;rebuilt_sum&quot;: -7.788496230791659,
+  &quot;rebuilt_source_contribution_sum&quot;: -7.788496230791672,
+  &quot;rebuilt_positive_mass&quot;: 1.5679223518090066,
+  &quot;rebuilt_negative_mass&quot;: -9.356418582600678,
+  &quot;rebuilt_negative_source_count&quot;: 80211.0,
+  &quot;rebuilt_cancellation_ratio&quot;: 1.402625180868742,
+  &quot;source_kernel_below_native_cutoff_count&quot;: 0.0,
+  &quot;source_aggregate_reconstruction_max_abs&quot;: 2.5703883466121624e-11,
+  &quot;target_is_injected_clutter&quot;: true
+}</pre><img width="1200" src="box_1-diagnostic.png" alt="Spectrum, signed source affinities and exact-mass-weighted coverage"><pre>source_index,exact_mass_share,nearest_landmark_sigma,projection_residual
+4917,0.000120281769256981009596,0.43169426441519667418,0.00698503166657635986237
+15898,0.000120274029537878220532,0.432103091169562603027,0.00698715904831037658892
+95562,0.00012024573704355374213,0.425327542510773791927,0.00686181883797297881853
+67554,0.000120225358718384114505,0.424298933238448080748,0.00683999888738347683239
+93133,0.000120216409046000082553,0.433458766702779240733,0.00700734589847563894231
+58578,0.000120212073089900671729,0.433259425020303739638,0.00701632067726667209588
+68982,0.000120176363179005496277,0.435804246852023246931,0.00705205289337584921528
+36639,0.000120122556343981539667,0.42152917174061295779,0.00678269346936399202073
+</pre><img width="1100" src="box_1-attempts.png" alt="Spectrum diagnostics over all attempts"><pre>draw landmarks sigma² rank top smallest-kept pair-a pair-b pair-distance/sigma
+NYSTROM_SPECTRUM 0 256 0.57711465895922498 256 13.776629744208654 1.2836931497752734e-05 28 246 0.12863518965861673
+NYSTROM_SPECTRUM 0 512 0.57711465895922498 512 25.795336441896435 1.0806538833937894e-06 28 246 0.12863518965861673
+NYSTROM_SPECTRUM 1 512 0.25617769872820439 512 13.293532663675649 0.00033272066896091428 273 367 0.392575825825002
+NYSTROM_SPECTRUM 1 1024 0.25617769872820439 1024 24.360746486003364 3.3281190335377116e-06 377 967 0.3605616800466363</pre><img width="1100" src="box_1-trace.png" alt="Every observed iteration and stage boundary"><p>NLL has weight 1 and share 1 in the implemented Bayesian stopping objective; extra prior contribution is zero. No full variational ELBO is claimed.</p><pre>NYSTROM_DIAG begin 0 0.57711465895922498 0
+NYSTROM_DIAG attempt 0 256 0 0.014027211379406488
+NYSTROM_DIAG attempt 0 512 1 0.00034381493022044214
+NYSTROM_DIAG begin 1 0.25617769872820439 0
+NYSTROM_DIAG invalid_target 1 512
+NYSTROM_DIAG attempt 1 512 0 nan
+NYSTROM_DIAG invalid_target 1 1024
+NYSTROM_DIAG attempt 1 1024 0 nan
+NYSTROM_DIAG cost 1 2048 20670988288 5000000000</pre><img width="1000" src="box_1-positions.png" alt="Before and after, same axes and source subset"><p><a href="box_1.snapshot">Raw operands</a> · <a href="box_1.analysis.tsv">Raw analysis</a> · <a href="box_1.components.csv">Eigencomponent terms</a> · <a href="box_1.stderr">Native trace</a></p><h2>box_2</h2><p><b>Negative sum persists across arithmetic/operand checks (spread &lt;=1%, above accumulation-scale heuristic); no exact-arithmetic proof</b></p><pre>{
+  &quot;long_double_digits&quot;: 64.0,
+  &quot;landmarks&quot;: 512.0,
+  &quot;sources&quot;: 100000.0,
+  &quot;target_index&quot;: 220.0,
+  &quot;draw&quot;: 1.0,
+  &quot;sigma2_internal&quot;: 0.2561776987282044,
+  &quot;logC&quot;: -5.103059582504582,
+  &quot;log_weight_shift&quot;: -11.512925464970229,
+  &quot;native_sum&quot;: -7.7884962308086765,
+  &quot;native_class&quot;: &quot;negative&quot;,
+  &quot;native_replay_bitwise&quot;: 1.0,
+  &quot;native_g_max_abs&quot;: 35669.000122162615,
+  &quot;native_pinv_max_abs&quot;: 1330.4772103082728,
+  &quot;native_g_extended_dot&quot;: -7.788496230808663,
+  &quot;native_factors_extended_sum&quot;: -7.788496230756229,
+  &quot;native_eigen_relative_residual&quot;: 4.15547784743417e-14,
+  &quot;native_rank&quot;: 512.0,
+  &quot;native_negative_eigenvalues&quot;: 0.0,
+  &quot;native_top&quot;: 13.293532663675649,
+  &quot;native_smallest&quot;: 0.0003327206689609143,
+  &quot;native_smallest_retained&quot;: 0.0003327206689609143,
+  &quot;native_retained_condition&quot;: 39954.03322910871,
+  &quot;native_cutoff_relative_margin&quot;: 250286.6228454065,
+  &quot;native_gram_extended_eigen_sum&quot;: -7.7884962307938626,
+  &quot;native_gram_extended_rank&quot;: 512.0,
+  &quot;native_gram_extended_negative_eigenvalues&quot;: 0.0,
+  &quot;native_gram_extended_top&quot;: 13.29353266367557,
+  &quot;native_gram_extended_smallest&quot;: 0.00033272066896082624,
+  &quot;native_gram_extended_smallest_retained&quot;: 0.00033272066896082624,
+  &quot;native_gram_extended_retained_condition&quot;: 39954.03322911905,
+  &quot;native_gram_extended_cutoff_relative_margin&quot;: 250286.6228453417,
+  &quot;gram_reconstruction_max_abs&quot;: 1.3536264123481523e-16,
+  &quot;kernel_row_reconstruction_max_abs&quot;: 7.207233941597391e-17,
+  &quot;target_kernel_zero_count&quot;: 0.0,
+  &quot;source_aggregate_zero_count&quot;: 0.0,
+  &quot;target_nearest_landmark_sigma&quot;: 0.6254055946806522,
+  &quot;target_projection_residual&quot;: 0.07497496507878437,
+  &quot;rebuilt_rank&quot;: 512.0,
+  &quot;rebuilt_negative_eigenvalues&quot;: 0.0,
+  &quot;rebuilt_top&quot;: 13.29353266367557,
+  &quot;rebuilt_smallest&quot;: 0.0003327206689608038,
+  &quot;rebuilt_smallest_retained&quot;: 0.0003327206689608038,
+  &quot;rebuilt_retained_condition&quot;: 39954.03322912174,
+  &quot;rebuilt_cutoff_relative_margin&quot;: 250286.62284532486,
+  &quot;rebuilt_sorted_mask_changes&quot;: 0.0,
+  &quot;exact_log_sum_shifted&quot;: -1.1170766397661034,
+  &quot;exact_sum_shifted&quot;: 0.3272350235586218,
+  &quot;exact_log_affinity_unshifted&quot;: -12.630002104736333,
+  &quot;exact_target_inlier_mass&quot;: 0.000538092134262014,
+  &quot;log_outlier_component_shifted&quot;: 6.409865882465646,
+  &quot;rebuilt_matched_rank_sum&quot;: -7.788496230791659,
+  &quot;rebuilt_component_abs_sum&quot;: 32505.438527680624,
+  &quot;rebuilt_accumulation_scale&quot;: 9.022071569742169e-13,
+  &quot;matched_accumulation_scale&quot;: 9.022071569742169e-13,
+  &quot;rebuilt_sum&quot;: -7.788496230791659,
+  &quot;rebuilt_source_contribution_sum&quot;: -7.788496230791672,
+  &quot;rebuilt_positive_mass&quot;: 1.5679223518090066,
+  &quot;rebuilt_negative_mass&quot;: -9.356418582600678,
+  &quot;rebuilt_negative_source_count&quot;: 80211.0,
+  &quot;rebuilt_cancellation_ratio&quot;: 1.402625180868742,
+  &quot;source_kernel_below_native_cutoff_count&quot;: 0.0,
+  &quot;source_aggregate_reconstruction_max_abs&quot;: 2.5703883466121624e-11,
+  &quot;target_is_injected_clutter&quot;: true
+}</pre><img width="1200" src="box_2-diagnostic.png" alt="Spectrum, signed source affinities and exact-mass-weighted coverage"><pre>source_index,exact_mass_share,nearest_landmark_sigma,projection_residual
+4917,0.000120281769256981009596,0.43169426441519667418,0.00698503166657635986237
+15898,0.000120274029537878220532,0.432103091169562603027,0.00698715904831037658892
+95562,0.00012024573704355374213,0.425327542510773791927,0.00686181883797297881853
+67554,0.000120225358718384114505,0.424298933238448080748,0.00683999888738347683239
+93133,0.000120216409046000082553,0.433458766702779240733,0.00700734589847563894231
+58578,0.000120212073089900671729,0.433259425020303739638,0.00701632067726667209588
+68982,0.000120176363179005496277,0.435804246852023246931,0.00705205289337584921528
+36639,0.000120122556343981539667,0.42152917174061295779,0.00678269346936399202073
+</pre><img width="1100" src="box_2-attempts.png" alt="Spectrum diagnostics over all attempts"><pre>draw landmarks sigma² rank top smallest-kept pair-a pair-b pair-distance/sigma
+NYSTROM_SPECTRUM 0 256 0.57711465895922498 256 13.776629744208654 1.2836931497752734e-05 28 246 0.12863518965861673
+NYSTROM_SPECTRUM 0 512 0.57711465895922498 512 25.795336441896435 1.0806538833937894e-06 28 246 0.12863518965861673
+NYSTROM_SPECTRUM 1 512 0.25617769872820439 512 13.293532663675649 0.00033272066896091428 273 367 0.392575825825002
+NYSTROM_SPECTRUM 1 1024 0.25617769872820439 1024 24.360746486003364 3.3281190335377116e-06 377 967 0.3605616800466363</pre><img width="1100" src="box_2-trace.png" alt="Every observed iteration and stage boundary"><p>NLL has weight 1 and share 1 in the implemented Bayesian stopping objective; extra prior contribution is zero. No full variational ELBO is claimed.</p><pre>NYSTROM_DIAG begin 0 0.57711465895922498 0
+NYSTROM_DIAG attempt 0 256 0 0.014027211379406488
+NYSTROM_DIAG attempt 0 512 1 0.00034381493022044214
+NYSTROM_DIAG begin 1 0.25617769872820439 0
+NYSTROM_DIAG invalid_target 1 512
+NYSTROM_DIAG attempt 1 512 0 nan
+NYSTROM_DIAG invalid_target 1 1024
+NYSTROM_DIAG attempt 1 1024 0 nan
+NYSTROM_DIAG cost 1 2048 20670988288 5000000000</pre><img width="1000" src="box_2-positions.png" alt="Before and after, same axes and source subset"><p><a href="box_2.snapshot">Raw operands</a> · <a href="box_2.analysis.tsv">Raw analysis</a> · <a href="box_2.components.csv">Eigencomponent terms</a> · <a href="box_2.stderr">Native trace</a></p><h2>points_2</h2><p><b>Negative sum persists across arithmetic/operand checks (spread &lt;=1%, above accumulation-scale heuristic); no exact-arithmetic proof</b></p><pre>{
+  &quot;long_double_digits&quot;: 64.0,
+  &quot;landmarks&quot;: 256.0,
+  &quot;sources&quot;: 100000.0,
+  &quot;target_index&quot;: 83500.0,
+  &quot;draw&quot;: 3.0,
+  &quot;sigma2_internal&quot;: 0.20081942872187458,
+  &quot;logC&quot;: -5.468257381928407,
+  &quot;log_weight_shift&quot;: -11.512925464970229,
+  &quot;native_sum&quot;: -0.0006214047402079574,
+  &quot;native_class&quot;: &quot;negative&quot;,
+  &quot;native_replay_bitwise&quot;: 1.0,
+  &quot;native_g_max_abs&quot;: 3097.4239501953125,
+  &quot;native_pinv_max_abs&quot;: 42929206.94056182,
+  &quot;native_g_extended_dot&quot;: -0.0006214047402079574,
+  &quot;native_factors_extended_sum&quot;: -0.0006214047522939277,
+  &quot;native_eigen_relative_residual&quot;: 4.133261927064707e-15,
+  &quot;native_rank&quot;: 243.0,
+  &quot;native_negative_eigenvalues&quot;: 0.0,
+  &quot;native_top&quot;: 53.34280858115539,
+  &quot;native_smallest&quot;: 1.4235264677970548e-10,
+  &quot;native_smallest_retained&quot;: 7.290515918630249e-09,
+  &quot;native_retained_condition&quot;: 7316739881.857017,
+  &quot;native_cutoff_relative_margin&quot;: 0.16414933002370194,
+  &quot;native_gram_extended_eigen_sum&quot;: -0.000621404832417505,
+  &quot;native_gram_extended_rank&quot;: 243.0,
+  &quot;native_gram_extended_negative_eigenvalues&quot;: 0.0,
+  &quot;native_gram_extended_top&quot;: 53.34280858115528,
+  &quot;native_gram_extended_smallest&quot;: 1.4235263856768717e-10,
+  &quot;native_gram_extended_smallest_retained&quot;: 7.290516025262389e-09,
+  &quot;native_gram_extended_retained_condition&quot;: 7316739774.841309,
+  &quot;native_gram_extended_cutoff_relative_margin&quot;: 0.16414933839127066,
+  &quot;gram_reconstruction_max_abs&quot;: 1.674821305946983e-16,
+  &quot;kernel_row_reconstruction_max_abs&quot;: 4.025100565352435e-17,
+  &quot;target_kernel_zero_count&quot;: 0.0,
+  &quot;source_aggregate_zero_count&quot;: 0.0,
+  &quot;target_nearest_landmark_sigma&quot;: 0.6371741835249798,
+  &quot;target_projection_residual&quot;: 0.22165258163439344,
+  &quot;rebuilt_rank&quot;: 243.0,
+  &quot;rebuilt_negative_eigenvalues&quot;: 0.0,
+  &quot;rebuilt_top&quot;: 53.34280858115528,
+  &quot;rebuilt_smallest&quot;: 1.4235260552191207e-10,
+  &quot;rebuilt_smallest_retained&quot;: 7.290516111211455e-09,
+  &quot;rebuilt_retained_condition&quot;: 7316739688.583088,
+  &quot;rebuilt_cutoff_relative_margin&quot;: 0.16414934919484156,
+  &quot;rebuilt_sorted_mask_changes&quot;: 0.0,
+  &quot;exact_log_sum_shifted&quot;: -9.654086119703791,
+  &quot;exact_sum_shifted&quot;: 6.416285356034986e-05,
+  &quot;exact_log_affinity_unshifted&quot;: -21.167011584674018,
+  &quot;exact_target_inlier_mass&quot;: 1.5209593637418815e-07,
+  &quot;log_outlier_component_shifted&quot;: 6.044668083041822,
+  &quot;rebuilt_matched_rank_sum&quot;: -0.0006214045814511945,
+  &quot;rebuilt_component_abs_sum&quot;: 884.4259777715855,
+  &quot;rebuilt_accumulation_scale&quot;: 2.4547752102465778e-14,
+  &quot;matched_accumulation_scale&quot;: 2.4547752102465778e-14,
+  &quot;rebuilt_sum&quot;: -0.0006214045814511982,
+  &quot;rebuilt_source_contribution_sum&quot;: -0.0006214045880422579,
+  &quot;rebuilt_positive_mass&quot;: 0.0019822923047155467,
+  &quot;rebuilt_negative_mass&quot;: -0.0026036968927578047,
+  &quot;rebuilt_negative_source_count&quot;: 50077.0,
+  &quot;rebuilt_cancellation_ratio&quot;: 7.380037556403569,
+  &quot;source_kernel_below_native_cutoff_count&quot;: 0.0,
+  &quot;source_aggregate_reconstruction_max_abs&quot;: 3.0460967082035495e-11,
+  &quot;target_is_injected_clutter&quot;: true
+}</pre><img width="1200" src="points_2-diagnostic.png" alt="Spectrum, signed source affinities and exact-mass-weighted coverage"><pre>source_index,exact_mass_share,nearest_landmark_sigma,projection_residual
+58255,0.000171447929201969737044,0.11966203250553062675,1.66923743520164084841e-07
+65328,0.000171437828229571929797,0.111272799201725412871,1.52369837242490469703e-07
+89582,0.000171436390605592499223,0.122254842937321874342,1.7585446869013013696e-07
+10391,0.00017128467451255575721,0.135555903292880461852,1.99124072068363605625e-07
+49882,0.000171238801720334981722,0.13782579204861989014,2.03794762373748963163e-07
+59363,0.000171056859659853705627,0.115996026830272437725,1.55567666750304391815e-07
+93646,0.000171045289563710160309,0.109067755872683216737,1.45887199319333533964e-07
+43728,0.000171028090616341041694,0.112032431696591420744,1.47860701865123404103e-07
+</pre><img width="1100" src="points_2-attempts.png" alt="Spectrum diagnostics over all attempts"><pre>draw landmarks sigma² rank top smallest-kept pair-a pair-b pair-distance/sigma
+NYSTROM_SPECTRUM 0 256 0.57711465895922498 256 57.780100071648071 1.1881350880280196e-08 139 68 0.17452739935406389
+NYSTROM_SPECTRUM 1 256 0.25616681459080709 238 72.128700110067271 8.2551015988865035e-09 128 225 1.4241575095198689
+NYSTROM_SPECTRUM 2 256 0.22274837648900192 240 62.871647087968832 6.9513871915097047e-09 237 236 1.1639202960754176
+NYSTROM_SPECTRUM 3 256 0.20081942872187458 243 53.342808581155388 7.2905159186302491e-09 192 250 0.24078594472373704
+NYSTROM_SPECTRUM 3 512 0.20081942872187458 386 108.13705720604332 1.2775181588900838e-08 404 440 0.73771758494221873</pre><img width="1100" src="points_2-trace.png" alt="Every observed iteration and stage boundary"><p>NLL has weight 1 and share 1 in the implemented Bayesian stopping objective; extra prior contribution is zero. No full variational ELBO is claimed.</p><pre>NYSTROM_DIAG begin 0 0.57711465895922498 0
+NYSTROM_DIAG attempt 0 256 1 8.0808410772277691e-07
+NYSTROM_DIAG begin 1 0.25616681459080709 0
+NYSTROM_DIAG attempt 1 256 1 3.1049520965317213e-06
+NYSTROM_DIAG begin 2 0.22274837648900192 0
+NYSTROM_DIAG attempt 2 256 1 9.1297584198765854e-06
+NYSTROM_DIAG begin 3 0.20081942872187458 0
+NYSTROM_DIAG invalid_target 3 256
+NYSTROM_DIAG attempt 3 256 0 nan
+NYSTROM_DIAG attempt 3 512 1 9.1391861119136805e-07</pre><img width="1000" src="points_2-positions.png" alt="Before and after, same axes and source subset"><p><a href="points_2.snapshot">Raw operands</a> · <a href="points_2.analysis.tsv">Raw analysis</a> · <a href="points_2.components.csv">Eigencomponent terms</a> · <a href="points_2.stderr">Native trace</a></p><p>points: repeated snapshots and metrics identical = True</p><p>box: repeated snapshots and metrics identical = True</p>

@@ -13917,3 +13917,24 @@ tree:
       User asks whether narrow Gaussian affinities make the middle inverse explode and prevent information transport, and what precisely explains the observed target-sum failures. Existing pilot logs do not separate negative, zero and nonfinite values or record the spectrum.
     evidence: [tasks/evidence/METHOD-078/audit.md]
     status: open
+
+  - id: N656
+    type: experiment
+    title: Compare exact and approximate sums at the first invalid Nyström target
+    provenance: ai-executed
+    timestamp: "2026-10-11T09:38+02:00"
+    result: >
+      All four frozen METHOD-079 cells completed. Six evaluation paths preserve the negative approximated sum against the positive exact sum in each variant. Independent raw-snapshot audit passes; repeat snapshots are byte-identical. C120 records the bounded result and limits.
+    evidence: [tasks/evidence/METHOD-079/audit-record.json, tasks/evidence/METHOD-079/reviews/results-review.txt]
+    status: resolved
+
+  - id: N657
+    type: decision
+    title: Retain the validity guard after first-row diagnosis
+    provenance: ai-executed
+    timestamp: "2026-10-11T09:38+02:00"
+    choice: >
+      Preserve evidence, remove the temporary production probes and restore production source. Record the observed approximation sign failures without treating isolated low-inlier-mass rows as permission to accept a whole attempt. Any production repair is a new scoped operator decision.
+    alternatives: [Relax the positivity guard based only on the two selected clutter rows.]
+    evidence: [O265, N656]
+    status: resolved

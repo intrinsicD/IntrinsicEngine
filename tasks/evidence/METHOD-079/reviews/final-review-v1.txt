@@ -1,0 +1,16 @@
+**Fix — one factual wording correction.**
+
+Bound to content digest `3c4c1483bf28afc9c5b64f01c7d41db7c5ce716ed4fe59425b347d96016f7f9d`. I recomputed that digest and verified all **124 manifest entries** without mismatches.
+
+In `ara/trace/exploration_tree.yaml`, N657 says **“restore the temporary production probes.”** The corresponding session summary says **“Restore probes.”** Both describe the opposite of the verified cleanup. Change them to **“remove the temporary production probes and restore production source.”** This is a recording correction; no implementation or experiment change is needed.
+
+Everything else passes:
+
+- **Scientific correctness and claims:** `audit.md`, C120, O265, and N656 accurately preserve the first-row scope, persistent negative signs, coverage qualification, rounding-scale residuals, and uncertainty. No population conclusion, production remedy, accuracy result, or performance claim is introduced.
+- **Derived arithmetic:** independently verified aggregate maxima `47346.90176554844` and `57714.21784753989`, and corresponding relative differences `6.433571352328728e-16` and `4.453648411908137e-16`.
+- **Closure:** the done task correctly attributes criteria 1–3 to my preserved PASS; the retirement note and source cleanup agree with the evidence. Both production files still match `0631ef12c`.
+- **Complexity:** PASS. The final change adds the required evidence and bounded interpretation without new production machinery.
+
+After correcting those two phrases and rebinding the content manifest, no further experiment or broader diagnostic work is required.
+
+Not rerun: tests or structural validators; their reported pre-existing failures remain separate. The substantive first-row scientific limits remain unchanged.

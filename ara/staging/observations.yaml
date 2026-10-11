@@ -4397,3 +4397,17 @@ observations:
     bound_to: [N655]
     promoted: false
     stale: false
+
+  - id: O265
+    timestamp: "2026-10-11T09:38+02:00"
+    provenance: ai-executed
+    content: >
+      The selected first invalid Nyström target row in each METHOD-079 variant has a positive exact Gaussian sum but a negative approximation across all six frozen arithmetic/operand checks. Repeats are byte-identical; native truncation-to-zero does not explain these rows, and the frozen weak-coverage flag is absent for the targets and top eight contributors.
+    context: >
+      Full synthetic fixture, seed 1, 100000 points, eight CPU threads; points/fixed prefix four iterations and box/resampled prefix two. Both selected targets are injected clutter. Points retained condition is about 7.32e9 and box about 4.00e4; relative arithmetic spreads are about 4.04e-7 and 6.73e-12. This is no exact-arithmetic proof, census, stabilization result or performance claim.
+    potential_type: claim
+    bound_to: [N655, N656, N657]
+    promoted: true
+    promoted_to: logic/claims.md:C120
+    crystallized_via: artifact-commitment
+    stale: false

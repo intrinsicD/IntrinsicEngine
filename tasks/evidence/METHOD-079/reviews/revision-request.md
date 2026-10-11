@@ -1,0 +1,9 @@
+Re-review the amended SAME first-invalid-target measurement, read-only, no delegation, no network or experiments. Prior blind reconstruction and intent questions remain applicable; no scientific output has been inspected. No other reviewer's verdict is supplied.
+
+Frozen commit: cae9a475690c5b5285d523403ba71689b6d21007
+Manifest: tasks/evidence/METHOD-079/preflight/pilot/manifest.txt
+SHA256: 63fd1b25f9224df84c4419214aa769221f73e22b945c940606e7f0f804aca565
+
+Please inspect the diff from aeb05205bdf69d96f77bef3bd332f0cc7de92df0, the current layer-a.md / layer-b.md and verification logs. Native/analyzer sources and binaries are unchanged. Scientific cells, metrics, hypotheses, thresholds and scope are unchanged. Driver amendments: refuse optimized Python before imports; record native/analyzer exit statuses; refuse cell verdict without successful analysis exit; suppress verdict after failure; enumerate missing cells/overall completion; allow successful early convergence within maximum. Tests repeat real-path parity/report assertions and add optimized-execution rejection plus a no-run import mutation demonstrating removal defeats the rejection, and failure after output creation. Timeout test passes again. Packets qualify native -708 model control and controlled-parser scope; generic early rejection stages remain unresolved; |S|/c is derived in the post-run audit. CoherentPointDrift.cpp::Coherence/Step is explicitly readable to check trace semantics. Raw Codex A/B answers moved unchanged to .txt because repository link checker mistakes editor :line suffixes for paths.
+
+Return PASS | REVISE | BLOCK bound to this exact digest, any mandatory findings, and code correctness/ponytail verdict. Preserve any post-run audit conditions. At most 650 words. Do not open /tmp/cpd-nystrom-row-20261011/technical scientific values. No new scope or all-row census gate: the human approved the FIRST-row diagnosis.

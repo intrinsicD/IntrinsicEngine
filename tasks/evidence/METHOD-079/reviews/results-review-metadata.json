@@ -1,0 +1,16 @@
+{
+  "reviewer": "/root/nystrom_first_row_audit",
+  "model": "gpt-6-astra",
+  "reasoning_effort": "xhigh",
+  "read_only": "instruction-only",
+  "no_recursion": "instruction-only",
+  "actual_answer": "results-review.txt",
+  "verdict": "PASS",
+  "acceptance_criteria": [
+    1,
+    2,
+    3
+  ],
+  "frozen_commit": "cae9a475690c5b5285d523403ba71689b6d21007",
+  "digest": "63fd1b25f9224df84c4419214aa769221f73e22b945c940606e7f0f804aca565"
+}

@@ -2,9 +2,9 @@ session:
   id: "2026-10-11_001"
   date: "2026-10-11"
   started: "2026-10-11T00:00+02:00"
-  last_turn: "2026-10-11T08:25+02:00"
-  turn_count: 2
-  summary: "METHOD-078 frozen eleven-cell pilot rejects unconditional Nyström retries; production source restored and evidence preserved."
+  last_turn: "2026-10-11T09:38+02:00"
+  turn_count: 3
+  summary: "METHOD-078 rejects unconditional retries; METHOD-079 diagnoses persistent first-row approximation sign errors with exact raw-snapshot checks; production probes removed."
 events_logged:
   - turn: 1
     type: experiment
@@ -42,6 +42,24 @@ events_logged:
     routing: staged
     provenance: user
     summary: "User's proposed numerical mechanism remains unconfirmed for the actual failing rows."
+  - turn: 3
+    type: experiment
+    id: N656
+    routing: direct
+    provenance: ai-executed
+    summary: "Four approved cells and independent raw-snapshot audit distinguish persistent signed approximation from tested arithmetic and hard-zero effects."
+  - turn: 3
+    type: decision
+    id: N657
+    routing: direct
+    provenance: ai-executed
+    summary: "Remove the temporary production probes and restore production source; preserve validity guard; no production repair inferred from selected clutter rows."
+  - turn: 3
+    type: observation
+    id: O265
+    routing: crystallized
+    provenance: ai-executed
+    summary: "C120 records the bounded measured sign failures; O264 remains the user's unpromoted tentative hypothesis."
 ai_actions:
   - turn: 1
     action: "Built bound Release binaries, completed reviewed pilot, audited raw outputs, restored production files; retained candidate patch and reports."
@@ -50,15 +68,22 @@ ai_actions:
   - turn: 2
     action: "Read current E-step and existing failure logs; consulted Nyström stability literature; checked an analytic two-landmark sign counterexample with assertions. No engine experiment or production change."
     provenance: ai-executed
+  - turn: 3
+    action: "Completed frozen first-row diagnostic, independently audited exact sums and significance, removed probes; C120 and raw evidence retained."
+    provenance: ai-executed
+    files_changed: [tasks/evidence/METHOD-079, ara/logic/claims.md]
 claims_touched:
   - id: C119
     action: created
     turn: 1
+  - id: C120
+    action: created
+    turn: 3
 key_context:
   - turn: 1
     excerpt: "Dann bitte nyström Nutzung untersuchen und verbessern"
 open_threads:
-  - "N655: distinguish inverse sensitivity, approximation sign error and underflow using exact failed-row diagnostics; mechanism unresolved."
-  - "Numerical target-sum positivity/finiteness is the next diagnostic layer; no stabilization or larger-landmark experiment approved by this packet."
+  - "N655: first-row approximation sign failures resolved in C120; prevalence and production remedy remain outside the approved scope."
+  - "O264 remains a tentative user mechanism; no user affirmation or global refutation is inferred from this bounded result."
 ai_suggestions_pending:
-  - "Investigate failed shifted target sums before changing retry policy, landmark budget or accuracy threshold."
+  - "A production repair must preserve all E-step statistics and pass accuracy controls; next diagnostic or implementation layer needs the operator's scope decision."

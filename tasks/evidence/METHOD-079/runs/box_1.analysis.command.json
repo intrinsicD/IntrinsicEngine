@@ -1,0 +1,1 @@
+{"argv": ["taskset", "-c", "0-7", "/tmp/cpd-nystrom-row-20261011/bin/analyze", "/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-079/runs/box_1.snapshot", "/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-079/runs/box_1"], "capture_env": "/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-079/runs/box_1.snapshot"}

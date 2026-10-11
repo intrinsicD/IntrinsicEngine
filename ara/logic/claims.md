@@ -2476,3 +2476,14 @@
 - **Dependencies**: []
 - **Tags**: Bayesian CPD, Nyström, CPU, bounded pilot, rejected optimization
 - **From staging**: O263
+
+## C120: First-row Nyström sign failures persist under the bounded arithmetic checks
+- **Statement**: In METHOD-079's full synthetic 100000-point CPU fixture (seed 1, eight threads), the first invalid target row is index 83500 at draw 3 with 256 points/fixed landmarks, and index 220 at draw 1 with 512 box/resampled landmarks. Exact shifted weighted Gaussian sums are respectively +6.416285356e-5 and +0.3272350236; native Nyström sums are -6.214047402e-4 and -7.788496231. All six frozen arithmetic/operand paths remain negative (relative spreads 4.04e-7 and 6.73e-12); retained ranks/masks agree, and repeated snapshots are byte-identical. Native target kernels contain no zero entries and reconstructed source exponents never cross the native -708 cutoff. Target residuals (0.22165, 0.074975) and the top eight source residuals do not trigger the frozen >0.9 weak-coverage flag. Both selected rows are injected clutter. These observations support a persistent sign error of the low-rank affinity approximation at those rows; they neither prove exact-arithmetic signs nor establish the mechanism or prevalence for other rows, a safe guard relaxation, registration accuracy or speed.
+- **Status**: supported — bounded CPU first-row diagnostic only
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Independent recomputation from the bound snapshots changes the exact sign or scale, any frozen evaluation becomes nonnegative, repeats differ, or retained masks/zero counts contradict the recorded observations.
+- **Proof**: [tasks/evidence/METHOD-079/audit-record.json, tasks/evidence/METHOD-079/raw-sha256.txt, tasks/evidence/METHOD-079/runs/report.html, tasks/evidence/METHOD-079/preflight/pilot/manifest.txt, tasks/evidence/METHOD-079/reviews/approvals.json]
+- **Dependencies**: []
+- **Tags**: Bayesian CPD, Nyström, CPU, first-row diagnosis, signed affinity approximation
+- **From staging**: O265
