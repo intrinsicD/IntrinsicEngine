@@ -2,8 +2,8 @@ session:
   id: "2026-10-11_001"
   date: "2026-10-11"
   started: "2026-10-11T00:00+02:00"
-  last_turn: "2026-10-11T02:00+02:00"
-  turn_count: 1
+  last_turn: "2026-10-11T08:25+02:00"
+  turn_count: 2
   summary: "METHOD-078 frozen eleven-cell pilot rejects unconditional Nyström retries; production source restored and evidence preserved."
 events_logged:
   - turn: 1
@@ -30,11 +30,26 @@ events_logged:
     routing: crystallized
     provenance: ai-executed
     summary: "Bounded pilot observation recorded as C119 through the source-restoration decision, without general performance claims."
+  - turn: 2
+    type: question
+    id: N655
+    routing: direct
+    provenance: user
+    summary: "Separate inverse conditioning from missing landmark-mediated local affinities."
+  - turn: 2
+    type: observation
+    id: O264
+    routing: staged
+    provenance: user
+    summary: "User's proposed numerical mechanism remains unconfirmed for the actual failing rows."
 ai_actions:
   - turn: 1
     action: "Built bound Release binaries, completed reviewed pilot, audited raw outputs, restored production files; retained candidate patch and reports."
     provenance: ai-executed
     files_changed: [tasks/evidence/METHOD-078, ara/logic/claims.md]
+  - turn: 2
+    action: "Read current E-step and existing failure logs; consulted Nyström stability literature; checked an analytic two-landmark sign counterexample with assertions. No engine experiment or production change."
+    provenance: ai-executed
 claims_touched:
   - id: C119
     action: created
@@ -43,6 +58,7 @@ key_context:
   - turn: 1
     excerpt: "Dann bitte nyström Nutzung untersuchen und verbessern"
 open_threads:
+  - "N655: distinguish inverse sensitivity, approximation sign error and underflow using exact failed-row diagnostics; mechanism unresolved."
   - "Numerical target-sum positivity/finiteness is the next diagnostic layer; no stabilization or larger-landmark experiment approved by this packet."
 ai_suggestions_pending:
   - "Investigate failed shifted target sums before changing retry policy, landmark budget or accuracy threshold."

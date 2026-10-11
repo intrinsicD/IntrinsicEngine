@@ -1,0 +1,3 @@
+PASS: points_1 native parity, finite state, captured operands, independent replay, corruption rejection
+PASS: box_1 native parity, finite state, captured operands, independent replay, corruption rejection
+PASS: full report path, fail-closed failure banner and sign-disagreement classification; no efficacy values inspected

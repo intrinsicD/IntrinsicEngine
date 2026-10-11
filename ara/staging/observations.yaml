@@ -4385,3 +4385,15 @@ observations:
     promoted_to: logic/claims.md:C119
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O264
+    timestamp: "2026-10-11T08:25+02:00"
+    provenance: user
+    content: >
+      User hypothesizes that weak Gaussian affinities and the critical middle inverse prevent correct information transport in the current Nyström path.
+    context: >
+      Tentative question, not an affirmed diagnosis. Explained that isolated landmarks give W approximately I, while near-dependent landmark kernels cause inverse sensitivity; missing landmark coverage and negative approximated affinities are distinct mechanisms. No new engine run or measured root-cause resolution in this turn.
+    potential_type: claim
+    bound_to: [N655]
+    promoted: false
+    stale: false

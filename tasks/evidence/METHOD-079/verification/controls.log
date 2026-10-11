@@ -1,0 +1,4 @@
+PASS: positive, negative/well-conditioned, missing coverage and truncated near-dependence; classifier boundaries
+PASS: self-test rejects no-truncation
+PASS: self-test rejects lose-sign
+PASS: self-test rejects miss-hard-zero

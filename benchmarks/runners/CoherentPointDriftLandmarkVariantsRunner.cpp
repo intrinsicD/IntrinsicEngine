@@ -18,6 +18,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <iomanip>
 #include <map>
 #include <optional>
 #include <random>
@@ -142,7 +143,7 @@ int main(int argc, char** argv)
     params.OutlierWeight = 0.1;
     params.Beta = 1.0;
     params.Lambda = 2.0;
-    params.MaxIterations = 150;
+    params.MaxIterations = std::uint32_t(std::stoul(get("--iterations", "150")));
     params.LowRank = 100;
     params.EStep = CPD::EStepPolicy::Auto;
     params.Threads = std::uint32_t(std::stoul(get("--threads", "16")));
@@ -160,7 +161,17 @@ int main(int argc, char** argv)
     std::uint32_t nystromIterations = 0u, iterations = 0u;
     double maxSampled = 0.0;
     const auto start = std::chrono::steady_clock::now();
+    if (args.contains("--trace"))
+        params.StageObserver = [&](CPD::Stage stage) {
+            std::cerr << std::setprecision(17) << "CPD_STAGE " << CPD::ToString(stage) << " "
+                      << std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() << "\n";
+        };
     const CPD::Result result = CPD::Register(f.Target, f.Source, params, [&](const CPD::IterationTrace& t) {
+        if (args.contains("--trace"))
+            std::cerr << std::setprecision(17) << "CPD_ITER " << t.Iteration << " " << t.Sigma2 << " "
+                      << t.NegativeLogLikelihood << " " << t.Objective << " " << t.MatchedWeight << " "
+                      << int(t.EStep) << " " << t.EStepSampledError << " " << t.KernelEvaluations << " "
+                      << std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() << "\n";
         ++iterations;
         nystromIterations += t.EStep == CPD::EStepPolicy::Nystrom;
         maxSampled = std::max(maxSampled, t.EStepSampledError);

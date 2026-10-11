@@ -13907,3 +13907,13 @@ tree:
       - Keep unconditionally retrying despite the failed frozen screen.
     evidence: [O263, N652, N653]
     status: resolved
+
+  - id: N655
+    type: question
+    title: Distinguish Nyström inverse instability from missing local affinity coverage
+    provenance: user
+    timestamp: "2026-10-11T08:25+02:00"
+    description: >
+      User asks whether narrow Gaussian affinities make the middle inverse explode and prevent information transport, and what precisely explains the observed target-sum failures. Existing pilot logs do not separate negative, zero and nonfinite values or record the spectrum.
+    evidence: [tasks/evidence/METHOD-078/audit.md]
+    status: open

@@ -2843,3 +2843,8 @@ entries:
       - "Recorded the frozen pilot and rejected candidate; omitted routine preparation/CI activity from research events."
       - "O263 crystallized by the source-restoration decision N654; no user affirmation or general method failure inferred."
       - "C119 is limited to two variants, one seed and 20 iterations; existing CPD/GPU performance claims and METHOD-077 evidence remain unchanged."
+
+  - turn: "2026-10-11_001#2"
+    notes:
+      - "N655 records the new causal question; O264 preserves the user's tentative mechanism without promotion."
+      - "Algebraic examples explain possibilities, not the measured root cause. Existing C119 and frozen pilot evidence remain unchanged; no closure signal or implementation authorization inferred."
