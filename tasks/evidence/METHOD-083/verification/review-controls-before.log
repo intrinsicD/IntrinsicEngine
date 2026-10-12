@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-083/check.py", line 121, in <module>
+    if __name__=='__main__':check()
+                            ^^^^^^^
+  File "/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-083/check.py", line 75, in check
+    r=whole(mode);assert r['adapted_convergence_and_auto']=='SUPPORTED' and all(x=='REFUTED' for x in r['truth_screen_by_arm'].values()),mode
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: native_noop

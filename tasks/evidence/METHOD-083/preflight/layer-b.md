@@ -24,8 +24,10 @@ truth recovery. An ineffective/unstable adaptation can still use Nyström while 
 these limits, exhausting the cap or failing numerically.
 
 P2: a separate stronger registration screen asks whether each full native variant learns
-the fixture. Truth RMS must improve at least10% over the original unregistered source, and
-centered spread ratio to truth must stay in[.5,2]. Previous METHOD-082 already refuted this
+the fixture. Truth RMS must improve at least10% over both the original unregistered source and
+the unchanged serialized native source mapped into the target world frame. Thus the
+threshold is .9 times the smaller baseline RMS. Centered spread ratio to truth must
+stay in[.5,2]. This excludes improvement from centering alone. Previous METHOD-082 already refuted this
 for partial overlap, including Auto; improvement is not assumed from numerical convergence.
 A no-op, collapsed or consistently wrong registration must fail this screen even if all
 variants agree. All observed, hidden, clutter-replaced and boundary-ambiguous points are
@@ -47,11 +49,19 @@ must be included in the post-run audit, never silently normalized away.
 
 ## Controls and measurement checks
 `../check.py` tests the actual report pipeline with known endpoint/trace files. It asserts
-positive endpoints pass; no-op, collapse and wrong-but-consistent fail learning; caps,
+positive endpoints pass; raw and native-frame no-op, collapse and wrong-but-consistent fail learning; caps,
 explicit numerical failures and shifted adapted endpoints fail P1; missing/nonfinite data
 and malformed original history are invalid; censored/unstarted cells remain unevaluated;
-replay drift is detected. Removing the agreement gate lets its negative control escape.
-Real engine and upstream report figures are rendered in this control. The original
+replay endpoint, final-state and planned-local-flag drift is detected. Missing Auto
+endpoints are unevaluated unless another observed condition refutes convergence.
+Nonfinite original sigma, scale and mass are rejected before reporting. Removing the agreement gate lets its negative control escape.
+Real engine, upstream and stage-event report figures are rendered in this control.
+Round1 found that centering alone passed P2 on all three full cases, that missing Auto
+was treated as disagreement, and that original final nonfinite metadata could pass the
+reader. The new synthetic test failed before the fix on native_noop; all six actual
+frame-aware null probes must now be rejected. Removing each repaired control must fail
+the assert-based check. These are prospective measurement repairs, with no solver
+outcomes examined or thresholds calibrated from a new run. The original
 incorrect parser reuse was caught because the new trace has one more field; the old frozen
 parser was retained and a strict new schema reader used. A first regression control moved
 Auto too, correctly passing consistency; the corrected control shifts only approximated

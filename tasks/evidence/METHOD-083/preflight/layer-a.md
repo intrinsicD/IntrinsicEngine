@@ -91,7 +91,8 @@ different stopping rules; no shared global-optimum/convergence guarantee is asse
 
 Engine trace logs iteration, sigma² after update, NLL/objective/mass before update,
 actual backend, sampled error, kernel evaluations, elapsed seconds and planned-local flag.
-Stage events are retained. Bayesian stopping objective equals its logged NLL (weight1,
+Stage events are retained and rendered against elapsed time. The planned-local flag
+is counted as local iterations, not transition events. Bayesian stopping objective equals its logged NLL (weight1,
 raw=weighted; share100% of this logged objective). A full ELBO breakdown is not exposed.
 Upstream logs sigma, mass and backend at six decimal places, time/sigma profiles, info,
 transform and six-decimal endpoint positions. It does not expose NLL/ELBO or complete
@@ -116,7 +117,9 @@ all prefixes were below the memory bound. Numerical outputs were not evidence.
 
 Every completed attempt produces refreshed HTML from raw logs, endpoints and metadata:
 curves with observed backend transitions, before/after pictures, all-point/subset metrics,
-native stop labels, frozen verdicts and replay results. Missing measures remain unavailable.
+native stop labels, frozen verdicts and replay results. Missing measures remain unavailable, including agreement when the Auto endpoint is
+censored. Original final sigma/scale/matched mass must be finite. Replay compares all
+observed non-timing trace fields and final status/termination/iterations/sigma²/scale/mass.
 Scientific failures/counterexamples do not cancel the remaining fixed plan. Changed inputs,
 unexpected process failures or invalid measurement output stop the campaign and retain a
 partial report; remaining cells are unevaluated. No adaptive tuning, extra seeds or retries.

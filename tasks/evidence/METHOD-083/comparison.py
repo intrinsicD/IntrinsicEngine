@@ -24,7 +24,7 @@ def command(c,folder,slot=0):
 
 def manifest_command():
     extras=[str(BIN),str(INPUT),str(HERE/'preflight/layer-a.md'),str(HERE/'preflight/layer-b.md')]
-    extras += [str(HERE/'verification'/p) for p in ('adapter-check.py','adapter-check.log','input-check.log','technical.py','technical.log','check.log','baseline-binding.json','adapted-binding.json')]
+    extras += [str(HERE/'verification'/p) for p in ('adapter-check.py','adapter-check.log','input-check.log','technical.py','technical.log','check.log','review-controls-before.log','review-mutations.py','review-mutations.log','baseline-binding.json','adapted-binding.json')]
     extras += json.loads((HERE/'environment.json').read_text())['runtime_library_paths']
     return ['/usr/bin/python3','/home/alex/.codex/skills/experiment-preflight/manifest.py',*sum((['--exclude',str(HERE/p)] for p in ('preflight','reviews','runs','verification')),[]),*extras]
 
@@ -50,6 +50,7 @@ def load(c,folder,outcome):
         pattern=r'loop=(\d+)\s+acc.P=\[([^]]+)\]\s+N_hat=([-\d.e+]+)\s+sigma=([-\d.e+]+)'
         t=[]
         for k,policy,mass,sigma in re.findall(pattern,text):
+            assert math.isfinite(float(mass)) and math.isfinite(float(sigma)**2)
             t.append([int(k)-1,float(sigma)**2,float('nan'),float('nan'),float(mass),{'KDtree':2,'Nystrom':5,'None':1}[policy.strip()],float('nan'),float('nan'),float('nan'),0])
         stages=[]
         d=dict(status=outcome['kind'],termination='none',observed_iterations=len(t),nystrom_iterations=sum(r[5]==5 for r in t))
@@ -58,6 +59,8 @@ def load(c,folder,outcome):
             loops=int(info['loops']);assert len(t)==loops and loops<=CAP
             regular=loops<CAP;assert not regular or loops>30
             d.update(status='success',termination='converged' if regular else 'iteration_cap',iterations=loops+int(regular),sigma2=float(info['sigma'])**2,scale=float(np.loadtxt(folder/(name+'_s.txt'))),kernel_rank=100)
+            d['final_matched_mass']=float(info['N_hat'])
+            assert all(math.isfinite(d[k]) for k in ('sigma2','scale','final_matched_mass'))
             p=np.loadtxt(folder/(name+'_y.txt'))
         d['loss_observation']='upstream does not expose NLL/ELBO; sigma and matched mass only'
     else:
@@ -83,19 +86,20 @@ def load(c,folder,outcome):
     assert [r[0] for r in t]==list(range(len(t))) and len(t)<=CAP
     if p is not None: assert p.shape==(N,3) and np.isfinite(p).all()
     d['regular_convergence']=d['status']=='success' and d['termination']=='converged'
-    d['local_transitions']=sum(bool(r[9]) for r in t if len(r)>9) if not upstream else None
+    d['local_iterations']=sum(bool(r[9]) for r in t) if not upstream else None
     d['policy_counts']={str(policy):sum(r[5]==policy for r in t) for policy in (1,2,4,5)}
     d['endpoint_available']=p is not None
     rss=folder/(name+'.rss')
     d['peak_rss_kib']=int(rss.read_text().splitlines()[-1]) if rss.exists() and rss.read_text().splitlines() and rss.read_text().splitlines()[-1].isdigit() else None
     return d,t,stages,p
 
-def metrics(p,data,reference=None):
+def metrics(p,data,initial,reference=None):
     source,truth=data['source'].astype(float),data['truth'].astype(float)
     rms,maximum=distances(p,truth);identity=distances(source,truth)[0]
+    initialized=distances(initial,truth)[0]
     spread=lambda x:float(np.sqrt(np.mean(np.sum((x-x.mean(0))**2,axis=1))))
     ratio=spread(p)/spread(truth)
-    row=dict(truth_rms=rms,truth_max=maximum,identity_rms=identity,truth_reduction=1-rms/identity,spread_ratio=ratio,truth_screen=rms<=.9*identity and .5<=ratio<=2)
+    row=dict(truth_rms=rms,truth_max=maximum,identity_rms=identity,initialized_rms=initialized,truth_reduction=1-rms/identity,initialized_reduction=1-rms/initialized,spread_ratio=ratio,truth_screen=rms<=.9*min(identity,initialized) and .5<=ratio<=2)
     if reference is not None:
         a,b=distances(p,reference);row.update(rms_to_auto=a,max_to_auto=b,auto_agreement=quality(a,b))
     return row
@@ -122,7 +126,8 @@ def report(folder=None,plan=None):
             if p is not None:
                 p=world(p);refname=f"{c['fixture']}_{c['seed']}_"+('adapted_auto' if c['arm'].startswith('adapted') else 'baseline_auto')
                 ref=loaded.get(refname);ref=world(ref[3]) if ref and ref[3] is not None else None
-                row.update(metrics(p,raw,ref))
+                initial=world(np.loadtxt(INPUT/f"{c['fixture']}_{c['seed']}_source.txt"))
+                row.update(metrics(p,raw,initial,ref))
                 truth=raw['truth'].astype(float);clutter=np.arange(N)%20==0;partial=c['fixture']=='partial'
                 ambiguous=(np.abs(truth[:,0]-.2)<=1e-5)&~clutter if partial else np.zeros(N,dtype=bool)
                 observed=~clutter&~ambiguous;hidden=np.zeros(N,dtype=bool)
@@ -139,8 +144,9 @@ def report(folder=None,plan=None):
                 if name.endswith('_repeat'):
                     first=loaded.get(name.removesuffix('_repeat'))
                     # Upstream has six-decimal endpoints; compare every observed non-timing field including NaN placeholders.
-                    equal_trace=bool(first and np.array_equal(np.asarray(t)[:,:8],np.asarray(first[1])[:,:8],equal_nan=True))
-                    replays[name]=bool(first and first[3] is not None and np.array_equal(loaded[name][3],first[3]) and equal_trace and d['termination']==first[0]['termination'])
+                    equal_trace=bool(first and np.array_equal(np.asarray(t)[:,[0,1,2,3,4,5,6,7,9]],np.asarray(first[1])[:,[0,1,2,3,4,5,6,7,9]],equal_nan=True))
+                    equal_final=bool(first and all(d.get(k)==first[0].get(k) for k in ('status','termination','iterations','sigma2','scale','final_matched_mass')))
+                    replays[name]=bool(first and first[3] is not None and np.array_equal(loaded[name][3],first[3]) and equal_trace and equal_final)
             rows[name]=row
             image=folder/(name+'.png');points_image=folder/(name+'-positions.png')
             if not image.exists():
@@ -155,6 +161,12 @@ def report(folder=None,plan=None):
                     if not c['arm'].startswith('upstream'):
                         axes[2,0].plot(a[:,0],a[:,3],label='objective');axes[2,0].plot(a[:,0],a[:,3]-a[:,2],label='objective minus NLL');axes[2,0].legend()
                 fig.tight_layout();fig.savefig(image,dpi=100);plt.close(fig)
+            stage_image=folder/(name+'-stages.png')
+            if stages and not stage_image.exists():
+                fig,ax=plt.subplots(figsize=(12,3));labels=list(dict.fromkeys(s[0] for s in stages))
+                ax.scatter([s[1] for s in stages],[labels.index(s[0]) for s in stages],s=3)
+                ax.set(yticks=range(len(labels)),yticklabels=labels,xlabel='Elapsed wall seconds',title='Observed stage events')
+                fig.tight_layout();fig.savefig(stage_image,dpi=100);plt.close(fig)
             if p is not None and not points_image.exists():
                 ids=np.r_[0:100,N-100:N];fig=plt.figure(figsize=(12,5));target=raw['target'][np.r_[0:100,len(raw['target'])-100:len(raw['target'])]]
                 clouds=[raw['source'][ids],p[ids],raw['truth'][ids],target];lo=np.vstack(clouds).min(0);hi=np.vstack(clouds).max(0)
@@ -164,10 +176,11 @@ def report(folder=None,plan=None):
                     ax.set(title=label,xlim=(lo[0],hi[0]),ylim=(lo[1],hi[1]),zlim=(lo[2],hi[2]));ax.legend()
                 fig.tight_layout();fig.savefig(points_image,dpi=100);plt.close(fig)
         parts += [f'<h2>{name}</h2><pre>{html.escape(json.dumps(row,indent=2))}</pre><img src="{image.name}">']
+        if stages:parts += [f'<img src="{stage_image.name}">']
         if p is not None:parts += [f'<img src="{points_image.name}">']
     primary=[c for c in plan if not c['name'].endswith('_repeat')]
     adapted=[rows.get(c['name'],{}) for c in primary if c['arm'].startswith('adapted_')]
-    agreement=[False if r.get('status')=='numerical_failure' else (r['regular_convergence'] and r.get('auto_agreement',False)) if r.get('endpoint_available') else None for r in adapted]
+    agreement=[False if r.get('status')=='numerical_failure' else (r['regular_convergence'] and r.get('auto_agreement')) if r.get('endpoint_available') else None for r in adapted]
     summary=dict(complete=len(outcomes)==len(plan),claim_eligible=False,adapted_convergence_and_auto=verdict(agreement),truth_screen_by_arm={a:verdict([rows.get(c['name'],{}).get('truth_screen') for c in primary if c['arm']==a]) for a in ARMS},adapted_union_vs_upstream=verdict([rows.get(c['name'],{}).get('truth_vs_upstream') for c in primary if c['arm']=='adapted_union']),replays=replays,invalid_cells=invalid,technical_errors={k:v['reason'] for k,v in outcomes.items() if v['kind']=='technical_failure'},rows=rows,outcomes=outcomes)
     grouped={}
     for fixture in ('full','partial'):
@@ -182,7 +195,7 @@ def report(folder=None,plan=None):
         table+=f"<tr><td>{label}</td><td>{g['converged']}/{g['cases']}</td><td>{g['endpoints']}</td><td>{metric}</td></tr>"
     table+='</table>'
     (folder/'summary.json').write_text(json.dumps(summary,indent=2,allow_nan=False)+'\n')
-    intro='''<!doctype html><meta charset="utf-8"><title>METHOD-083 original comparison</title><style>body{font:15px system-ui;max-width:1200px;margin:30px auto}img{max-width:100%}pre{white-space:pre-wrap}td,th{padding:5px;border-bottom:1px solid #ccc;text-align:left}</style><h1>Original-inspired Nyström: full solver comparison</h1><p>100k sources; full/partial, three paired fixture seeds. Old/adapted Auto, FPS and box; adapted union-random; unmodified upstream Nyström+KD and direct+KD. All endpoints use the same target world frame. Native stops differ: engine relative objective 1e-5, upstream absolute sigma/change 1e-5 after its minimum loop count. Both cap5000. No trajectory-equivalence or timing claim.</p><p>Frozen screens: adapted regular convergence and RMS/max distance to same-version Auto ≤.001/.01 world units; registration truth RMS improves ≥10% over original unregistered source and spread ratio is .5–2; adapted union truth RMS ≤1.01× upstream Nyström RMS +2e-6 rounding margin. Failures and timeouts remain distinct; a known counterexample refutes a universal screen even when other cells are unevaluated.</p><p>Engine NLL/objective/mass precede M-step, sigma follows it; final convergence-only E-step is unobserved. Upstream prints sigma/mass/backend only and omits its final converging step; info.txt contains its endpoint sigma. NLL/ELBO decomposition, loss shares and original trajectory coordinates are unavailable from this unmodified command and are not reconstructed or treated as passes. For Bayesian runs the engine logs NLL with weight1 (raw=weighted, share100% of the logged stopping objective); objective minus NLL is zero. No full variational loss decomposition is exposed. Stage logs are retained. Upstream J changes consume random draws before its G basis is sampled, so its direct and Nyström arms are complete native variants, not an isolated E-step ablation. Red lines mark observed backend transitions. Pictures show first/last100 points; metrics use all points. Three seeds are cases, not population confidence; replays check repeatability only.</p>'''
+    intro='''<!doctype html><meta charset="utf-8"><title>METHOD-083 original comparison</title><style>body{font:15px system-ui;max-width:1200px;margin:30px auto}img{max-width:100%}pre{white-space:pre-wrap}td,th{padding:5px;border-bottom:1px solid #ccc;text-align:left}</style><h1>Original-inspired Nyström: full solver comparison</h1><p>100k sources; full/partial, three paired fixture seeds. Old/adapted Auto, FPS and box; adapted union-random; unmodified upstream Nyström+KD and direct+KD. All endpoints use the same target world frame. Native stops differ: engine relative objective 1e-5, upstream absolute sigma/change 1e-5 after its minimum loop count. Both cap5000. No trajectory-equivalence or timing claim.</p><p>Frozen screens: adapted regular convergence and RMS/max distance to same-version Auto ≤.001/.01 world units; registration truth RMS improves ≥10% over both original source and the separately centered native initialization, and spread ratio is .5–2; adapted union truth RMS ≤1.01× upstream Nyström RMS +2e-6 rounding margin. Failures and timeouts remain distinct; a known counterexample refutes a universal screen even when other cells are unevaluated.</p><p>Engine NLL/objective/mass precede M-step, sigma follows it; final convergence-only E-step is unobserved. Upstream prints sigma/mass/backend only and omits its final converging step; info.txt contains its endpoint sigma. NLL/ELBO decomposition, loss shares and original trajectory coordinates are unavailable from this unmodified command and are not reconstructed or treated as passes. For Bayesian runs the engine logs NLL with weight1 (raw=weighted, share100% of the logged stopping objective); objective minus NLL is zero. No full variational loss decomposition is exposed. Stage-event timelines show all exposed phase events; upstream phase events are unavailable. Upstream J changes consume random draws before its G basis is sampled, so its direct and Nyström arms are complete native variants, not an isolated E-step ablation. Red lines mark observed backend transitions. Pictures show first/last100 points; metrics use all points. Three seeds are cases, not population confidence; replays check repeatability only.</p>'''
     (folder/'report.html').write_text(intro+table+'<pre>'+html.escape(json.dumps({k:v for k,v in summary.items() if k not in ('rows','outcomes','groups')},indent=2))+'</pre>'+''.join(parts))
     return summary
 
