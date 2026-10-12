@@ -1,0 +1,21 @@
+{
+  "checked_utc": "2026-10-11T23:58:05.261037+00:00",
+  "frozen_head": "8c3ffaaa7b396a5c875ca32b77c34d3b1abbc60e",
+  "packet_digest": "209972fb7ccbbaa3fd83549805d04b54f2ce5ee6888b417829f56293bb461c9e",
+  "live_manifest_matches": true,
+  "tracked_worktree_unchanged": true,
+  "raw_files": 233,
+  "raw_manifest_sha256": "7d068d3dec21450834cd82ccc906be6a97f0a6dfce0f2232dc0e8fa19b25731d",
+  "outcomes": 34,
+  "native_results": 32,
+  "repeats": {
+    "full_1_candidate_box_repeat": true,
+    "full_1_candidate_points_repeat": true,
+    "full_1_baseline_box_repeat": true,
+    "full_1_baseline_points_repeat": true
+  },
+  "controller_start_done_pairs": 34,
+  "final_controller_summary_matches": true,
+  "exec_session_exit_code_reported": 143,
+  "exit_note": "Final exec-session retrieval reported143 although the controller log contains all34 START/DONE pairs and its matching final summary; no experiment process remains. Cause of the session exit indication is unknown. Per-cell results and two timeout dispositions are retained without alteration."
+}

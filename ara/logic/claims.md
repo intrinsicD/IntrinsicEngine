@@ -2509,3 +2509,25 @@
 - **Dependencies**: []
 - **Tags**: Bayesian CPD, Nyström, CPU, exact row repair, bounded retest, Auto comparison
 - **From staging**: O269
+
+## C123: METHOD-082's all-cell convergence and Auto-endpoint prediction is refuted
+- **Statement**: Frozen P1 predicted regular convergence and RMS/max endpoint distances to same-seed Auto no greater than .001/.01 world units for all 34 CPU Bayesian CPD cells, with identical full/seed-1 replays. At frozen input commit 8c3ffaaa7, 32 cells regularly converge and two partial/seed-2 Box cells time out at 900 seconds with unknown endpoints. Four converged partial cells violate both endpoint bounds: candidate FPS seed 2 (.011448527/.039638711), candidate FPS seed 3 (.015753930/.055001672), and baseline/candidate Box seed 3 (.015762064/.055028790 each). All 15 original full-overlap cells pass, with maximum RMS/max disagreements 6.83233e-6/7.56731e-5; all four full/seed-1 replays match. Repaired FPS accepts 16/16/15 Nyström steps versus 6/4/4 on full seeds 1/2/3, below one percent of each complete trace. These bounded observations do not support the all-cell preservation prediction or a general speed/positivity claim.
+- **Status**: refuted — endpoint counterexamples exist independently of two censored timeout outcomes
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Independent recomputation from the bound raw endpoints removes the four threshold violations, or the evidence fails its frozen source/configuration or raw-file binding.
+- **Proof**: [tasks/evidence/METHOD-082/runs/summary.json, tasks/evidence/METHOD-082/preflight/manifest.txt, tasks/evidence/METHOD-082/reviews/raw-sha256.txt, tasks/evidence/METHOD-082/reviews/execution-binding.json, tasks/evidence/METHOD-082/reviews/final-raw-results-audit.txt]
+- **Dependencies**: []
+- **Tags**: Bayesian CPD, Nyström, CPU, exact row repair, convergence, negative result
+- **From staging**: O270
+
+## C124: METHOD-082's broader registration prediction fails on partial overlap
+- **Statement**: Frozen P2 required P1 plus at least ten percent truth-RMS improvement over the unregistered source and centered-radius/truth ratio in [.5,2] for every arm. All 13 completed partial-overlap cells, including all three Auto references, fail truth improvement: truth RMS .788114–.795272 is 58.03–59.79 percent worse than their unregistered sources. Their radius ratios .77754–.78391 pass the spread screen. All 15 original full-overlap cells pass the local truth/spread screen. The common partial-overlap failure is therefore not attributable solely to the new repair; no causal diagnosis or global optimum follows. Two partial/seed-2 Box endpoints remain unavailable. Regular native termination and decreasing observed NLL are insufficient evidence of good registration on these fixtures.
+- **Status**: refuted — bounded synthetic CPU registration-quality prediction
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Bound raw-input/endpoint recomputation makes every completed partial cell satisfy the frozen truth-improvement criterion, or invalidates the retained metric/configuration bindings.
+- **Proof**: [tasks/evidence/METHOD-082/runs/summary.json, tasks/evidence/METHOD-082/fixtures, tasks/evidence/METHOD-082/reviews/final-raw-results-audit.txt, tasks/evidence/METHOD-082/reviews/execution-binding.json]
+- **Dependencies**: []
+- **Tags**: Bayesian CPD, CPU, partial overlap, ground truth, negative result
+- **From staging**: O271

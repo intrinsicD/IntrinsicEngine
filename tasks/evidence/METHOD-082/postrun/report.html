@@ -1,0 +1,133 @@
+<!doctype html><html lang="en"><meta charset="utf-8">
+<title>METHOD-082: final interpretation and interrupted traces</title>
+<style>body{font:16px system-ui;max-width:1200px;margin:32px auto;padding:0 16px;line-height:1.5}img{max-width:100%}pre{white-space:pre-wrap;overflow-wrap:anywhere}td,th{padding:8px;text-align:left;border-bottom:1px solid #ccc}table{border-collapse:collapse}aside{border-left:4px solid #b45;padding:12px;background:#fff5f5}</style>
+<h1>Nyström repair: complete-termination test</h1>
+<p>Post-run interpretation and timeout appendix, version1, 2026-10-12.
+Question 1 (verbatim): “Dann bitte einmal testen, vollständige Konvergenz usw”.
+Operator-directed test beyond METHOD-081's short prefixes; no engine change.</p>
+<p><a href="../runs/report.html">Unchanged frozen report: all32 completed cells, curves and before/after figures</a> ·
+<a href="../runs/summary.json">Original summary</a> ·
+<a href="../preflight/layer-a.md">Resolved configuration and command</a> ·
+<a href="../preflight/layer-b.md">Frozen predictions and controls</a> ·
+<a href="../../../../ara/logic/claims.md#c123-method-082s-all-cell-convergence-and-auto-endpoint-prediction-is-refuted">ARA C123/C124</a></p>
+<p>CPU Bayesian CPD; 100000 source points; full/partial overlap; seeds1–3;
+5000 M-step cap, relative objective tolerance1e-5, 900-second per-cell process limit.
+FPS is points/fixed; Box is union-box/resampled. Auto is a policy selector, not an all-dense oracle.
+Every arm retains the rank100 deformation approximation.</p>
+<h2>Frozen verdicts and observed counterexamples</h2>
+<p><strong>All34 planned attempts ended: 32 native success/converged, two timeouts.
+P1 and P2: refuted on retained cases.</strong> The original aggregate label remains
+<strong>INCOMPLETE / UNEVALUATED</strong> because two native endpoints are missing.
+Missing evidence does not erase the direct counterexamples in completed cells.</p>
+<p>P1 required regular convergence of all34 cells, RMS/max agreement with same-seed
+Auto ≤.001/.01 world units and four identical replays. P2 additionally required ≥10%
+truth-RMS improvement from unregistered source and centered-radius/truth in [.5,2]
+for every arm. No thresholds or analysis of the original report were changed.</p>
+<aside><strong>Execution-wrapper anomaly:</strong> final shell retrieval reported exit143,
+unknown cause. The controller retained all34 ordered START/DONE pairs and a matching
+final summary; independent raw audit verified every available endpoint and all233 original
+file hashes. This supports completed attempts and their individual dispositions, not a
+clean exit0. <a href="../reviews/execution-binding.json">Execution binding</a> ·
+<a href="../reviews/final-raw-results-audit.txt">Independent raw audit</a></aside>
+<h2>Full overlap</h2>
+<p>All15 original cells converge regularly and pass endpoint, truth-improvement and
+spread checks. Largest RMS/max disagreement with Auto: 6.83233e-6/7.56731e-5 world units.
+FPS accepts 6/4/4 Nyström steps before repair versus 16/16/15 after repair across seeds1/2/3;
+even the repaired totals are below1% of complete traces. Box accepts one step in each
+full-overlap cell, with identical baseline/candidate endpoints. All four full/seed1
+replays are identical in positions and non-time trace values; other replay regimes
+were not tested. Counts at unequal trace lengths are descriptive, not speed evidence.</p>
+<h2>Partial overlap</h2>
+<p>All13 available native endpoints converge regularly yet fail P2's truth improvement,
+including all three Auto references. Truth RMS is .788114–.795272, 58.03–59.79% worse
+than unregistered source; radius ratios .77754–.78391 pass the spread screen.
+Four completed endpoints fail both P1 distance bounds:</p>
+<table><tr><th>Cell</th><th>RMS to Auto (world)</th><th>Maximum (world)</th></tr>
+<tr><td>partial_2_candidate_points</td><td>0.011448527</td><td>0.039638711</td></tr>
+<tr><td>partial_3_baseline_box</td><td>0.015762064</td><td>0.055028790</td></tr>
+<tr><td>partial_3_candidate_points</td><td>0.015753930</td><td>0.055001672</td></tr>
+<tr><td>partial_3_candidate_box</td><td>0.015762064</td><td>0.055028790</td></tr>
+</table><p>These are counterexamples to the all-cell preservation prediction.
+Baseline Box already fails at seed3, and Auto already fails truth quality: the common
+partial-overlap failure cannot be attributed solely to the repair. Its cause remains
+undiagnosed. A decreasing observed objective and a native convergence flag do not
+establish accurate correspondence. No new diagnosis, rollback or algorithm change
+was made from this test; the earlier bounded prefix result retains its narrow scope.</p>
+<h2>Interrupted-trace appendix</h2>
+<p>The two partial/seed2 Box runs hit the external900-second process limit. No native
+termination result was returned. Endpoints and before/after positions unavailable;
+Native convergence status unavailable. Final truth/Auto distances are unavailable.
+These are censored outcomes, neither demonstrated nonconvergence nor native cap/floor stops.</p>
+<p>Curves below use every retained iteration record. NLL, objective and matched mass
+precede the M-step; sigma² follows it. Logged NLL is raw=weighted, weight1 and share100%
+of logged NLL; objective equals NLL, not the full variational ELBO. Red dotted lines mark
+policy changes. The black dashed line marks the last retained iteration/event before
+the timeout, not the exact kill time; native elapsed time and the external process
+deadline have different origins. The final regular-convergence-only E-step is unlogged
+in completed runs. Repaired-row counts, accepted landmark counts and a full ELBO
+decomposition are not exposed. Kernel counters have different accounting across versions.</p>
+<section id="partial_2_baseline_box"><h3>partial_2_baseline_box</h3><p>3726 completed M-steps; accepted 1 Nyström, 16 Dense, 3709 Truncated. Last recorded stage: maximization_step, native elapsed 899.959516s.</p><p><a href="../runs/partial_2_baseline_box.stderr">Original trace</a> · <a href="../runs/partial_2_baseline_box.command.json">Original command</a></p><details><summary>Exact recorded argv</summary><pre>[
+  &quot;taskset&quot;,
+  &quot;-c&quot;,
+  &quot;0-7&quot;,
+  &quot;/tmp/cpd-nystrom-repair-20261011/bin/baseline&quot;,
+  &quot;--fixture&quot;,
+  &quot;partial&quot;,
+  &quot;--seed&quot;,
+  &quot;2&quot;,
+  &quot;--points&quot;,
+  &quot;100000&quot;,
+  &quot;--threads&quot;,
+  &quot;8&quot;,
+  &quot;--iterations&quot;,
+  &quot;5000&quot;,
+  &quot;--trace&quot;,
+  &quot;1&quot;,
+  &quot;--variant&quot;,
+  &quot;box/resampled/random&quot;,
+  &quot;--landmarks&quot;,
+  &quot;256&quot;,
+  &quot;--error-limit&quot;,
+  &quot;0.001&quot;,
+  &quot;--out&quot;,
+  &quot;/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-082/runs/partial_2_baseline_box.json&quot;,
+  &quot;--positions&quot;,
+  &quot;/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-082/runs/partial_2_baseline_box.bin&quot;
+]</pre></details><img src="partial_2_baseline_box.png" alt="All retained iteration metrics, policy changes and stage boundaries before timeout"></section>
+<section id="partial_2_candidate_box"><h3>partial_2_candidate_box</h3><p>3728 completed M-steps; accepted 1 Nyström, 16 Dense, 3711 Truncated. Last recorded stage: maximization_step, native elapsed 899.858906s.</p><p><a href="../runs/partial_2_candidate_box.stderr">Original trace</a> · <a href="../runs/partial_2_candidate_box.command.json">Original command</a></p><details><summary>Exact recorded argv</summary><pre>[
+  &quot;taskset&quot;,
+  &quot;-c&quot;,
+  &quot;0-7&quot;,
+  &quot;/tmp/cpd-nystrom-repair-20261011/bin/candidate&quot;,
+  &quot;--fixture&quot;,
+  &quot;partial&quot;,
+  &quot;--seed&quot;,
+  &quot;2&quot;,
+  &quot;--points&quot;,
+  &quot;100000&quot;,
+  &quot;--threads&quot;,
+  &quot;8&quot;,
+  &quot;--iterations&quot;,
+  &quot;5000&quot;,
+  &quot;--trace&quot;,
+  &quot;1&quot;,
+  &quot;--variant&quot;,
+  &quot;box/resampled/random&quot;,
+  &quot;--landmarks&quot;,
+  &quot;256&quot;,
+  &quot;--error-limit&quot;,
+  &quot;0.001&quot;,
+  &quot;--out&quot;,
+  &quot;/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-082/runs/partial_2_candidate_box.json&quot;,
+  &quot;--positions&quot;,
+  &quot;/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-082/runs/partial_2_candidate_box.bin&quot;
+]</pre></details><img src="partial_2_candidate_box.png" alt="All retained iteration metrics, policy changes and stage boundaries before timeout"></section>
+<h2>Limits and evidence</h2><p>This is a local synthetic CPU Bayesian CPD diagnostic,
+not classical CPD, real-data, GPU, global-optimum, universal positivity or performance evidence.
+Three seeds are individual cases, not a population estimate. Input text dumps are rounded;
+independently recomputed truth RMS agrees with native results within7.88e-9. All distance
+metrics use complete endpoint buffers; original before/after figures show first/last100
+points only. Unknown endpoints stay unknown. The code and thresholds need no change to
+retain these negative results.</p><p>Frozen input commit: 8c3ffaaa7b396a5c875ca32b77c34d3b1abbc60e.<br>
+<a href="../preflight/manifest.txt">Packet digest</a>: 209972fb7ccbbaa3fd83549805d04b54f2ce5ee6888b417829f56293bb461c9e.<br>
+<a href="../reviews/raw-sha256.txt">Original233-file manifest</a>: 7d068d3dec21450834cd82ccc906be6a97f0a6dfce0f2232dc0e8fa19b25731d.</p></html>

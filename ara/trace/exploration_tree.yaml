@@ -14004,3 +14004,59 @@ tree:
     alternatives: [Infer that repairing invalid sums guarantees a nonnegative approximate affinity matrix or solves every sampler.]
     evidence: [O269, N661]
     status: resolved
+
+  - id: N663
+    type: question
+    title: "Dann bitte einmal testen, vollständige Konvergenz usw"
+    provenance: user
+    timestamp: "2026-10-12T02:02+02:00"
+    description: >
+      Continue the exact-row-repair trial to native termination on the existing full
+      and partial synthetic fixtures. Earlier instruction "Ok ohne Claude" remains
+      applicable. Recorded at completion of the experiment crossing midnight.
+    also_depends_on: [N661, N662]
+    status: resolved
+
+  - id: N664
+    type: experiment
+    title: Test Nyström exact-row repair through complete solver termination
+    provenance: ai-executed
+    timestamp: "2026-10-12T02:02+02:00"
+    result: >
+      All 34 frozen attempts retained: 32 regular native convergences, two 900-second
+      Box timeouts. Independent endpoint/trace audit finds four P1 endpoint failures
+      and truth-improvement failure in every completed partial arm; four full/seed-1
+      repeats match. Full-overlap checks pass. C123 and C124 preserve the negative
+      predictions with their restricted scope and missing endpoints.
+    also_depends_on: [N663]
+    evidence: [tasks/evidence/METHOD-082/runs/summary.json, tasks/evidence/METHOD-082/reviews/final-raw-results-audit.txt, tasks/evidence/METHOD-082/reviews/execution-binding.json]
+    status: resolved
+
+  - id: N665
+    type: dead_end
+    title: Short-prefix repair success does not establish complete-registration preservation
+    provenance: ai-executed
+    timestamp: "2026-10-12T02:02+02:00"
+    result: >
+      P1 and P2 have direct counterexamples. Full-overlap FPS gains accepted steps
+      but remains below one percent of its trace; partial endpoint and truth failures
+      block extending C122 into an all-cell convergence or registration-quality claim.
+      Baseline Box and Auto failures prevent a repair-only causal conclusion.
+    also_depends_on: [N664]
+    evidence: [O270, O271]
+    status: resolved
+
+  - id: N666
+    type: decision
+    title: Preserve the negative convergence test and leave causal changes outside scope
+    provenance: ai-executed
+    timestamp: "2026-10-12T02:02+02:00"
+    choice: >
+      Retain the original raw report and aggregate verdict unchanged; add a separately
+      versioned report for the censored traces and audited interpretation. Record the
+      unexplained wrapper exit 143. Do not alter the engine, thresholds or frozen plan,
+      infer general repair adoption, or automatically roll back the bounded candidate.
+      A diagnosis of the shared partial-overlap failure requires a new scope decision.
+    alternatives: [Treat regular termination as registration success, hide censored outcomes, or infer a repair-only cause.]
+    evidence: [O270, O271, N664, N665]
+    status: resolved

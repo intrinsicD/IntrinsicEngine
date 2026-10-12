@@ -1,0 +1,47 @@
+Reviewer: /root/method082_results
+Requested model: gpt-6-astra, xhigh; actual model identity not exposed.
+Read-only, no delegation and blindness restrictions are instruction-enforced.
+Actual answer, verbatim (24 outcomes at review time):
+
+**Interim audit: the new partial-overlap results contain genuine counterexamples to P1 and P2, plus one reporting defect.** Execution remains incomplete; I do not accept criteria 2/3.
+
+Frozen HEAD/digest remain unchanged. All nine new command records match the frozen configurations. I independently recomputed the eight completed cells from endpoints, fixtures and traces; their summary and HTML metrics agree.
+
+| Completed cell | M-steps | Accepted Nyström | RMS / maximum to Auto | Endpoint gate |
+|---|---:|---:|---:|---|
+| Partial 1 Auto | 2,771 | 0 | 0 / 0 | Reference |
+| Partial 1 baseline FPS | 2,739 | 2 | 0.000066790 / 0.000292015 | Pass |
+| Partial 1 baseline Box | 2,771 | 0 | 0 / 0 | Pass |
+| Partial 1 candidate FPS | 2,786 | 10 | 0.000044155 / 0.000244361 | Pass |
+| Partial 1 candidate Box | 2,771 | 0 | 0 / 0 | Pass |
+| Partial 2 Auto | 1,588 | 0 | 0 / 0 | Reference |
+| Partial 2 baseline FPS | 1,589 | 2 | 0.000073732 / 0.000444674 | Pass |
+| **Partial 2 candidate FPS** | **2,171** | **9** | **0.011448527 / 0.039638711** | **Fails both** |
+
+All eight return native `success/converged`. Partial-2 candidate FPS nevertheless exceeds the frozen `.001` RMS and `.01` maximum thresholds. This is already a retained counterexample to the all-cases P1 endpoint prediction, independently of the outstanding timeout and replay results.
+
+**All eight fail the P2 truth-improvement condition.** Their truth RMS is **0.788114–0.789693**, versus unregistered RMS **0.498478–0.498876**: approximately **58.0–58.4% worse**, despite regularly stopping. Centered-radius ratios **0.77917–0.78391** pass the coarse spread screen; therefore the P2 failure is not a collapse-screen failure.
+
+Subset accounting is consistent and disjoint:
+
+- Partial 1: 42,355 observed, 52,645 hidden, 5,000 clutter-replaced, zero boundary-ambiguous.
+- Partial 2: 42,122 observed, 52,878 hidden, 5,000 clutter-replaced, zero boundary-ambiguous.
+- Observed-point truth RMS is approximately **0.29665–0.29773**; hidden-point RMS is **1.02291–1.02512**.
+
+Native-versus-dump truth-RMS differences remain below **4.02 × 10⁻⁹**. All eight have one additional untraced final E-step. Their observed objectives decrease and equal NLL; that does not establish correct pointwise registration. Representative partial-overlap metric and before/after figures corroborate the bounded interpretation.
+
+**Reporting defect:** [convergence.py:133](/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-082/convergence.py:133) loads only `native_result` outcomes; the subsequent skip omits interrupted traces entirely from cell reports.
+
+`partial_2_baseline_box` is correctly marked `unevaluated/native timeout`, with no native JSON or endpoint. Its retained stderr nevertheless contains:
+
+- **3,726 completed M-steps**, contiguous and finite.
+- **1 Nyström, 16 Dense, 3,709 Truncated** completed steps.
+- Last completed trace at **899.911984 s**.
+- The next maximization stage starts at **899.959516 s**; its completion is not recorded.
+- No metric PNG or HTML cell section. The timeout appears only in the aggregate outcome text.
+
+This is a report-coverage gap, not a completed convergence failure or endpoint measurement.
+
+**Smallest post-run remedy:** generate a separately identified HTML appendix from the existing interrupted stderr and command record. Include available metric curves, policy/stage events and the timeout boundary; state that endpoint, truth/Auto distances and native termination are unavailable. Preserve the frozen report/raw outputs and `unevaluated` disposition; no rerun or scientific threshold change is needed.
+
+Skipped: no modifications, tests/native runs, technical-run numeric outputs or other reviewers’ conclusions. Remaining risk: outstanding cells/replays and the interrupted-trace reporting gap prevent final evidence-completeness acceptance.

@@ -687,3 +687,11 @@ sessions:
   events_count: 18
   claims_touched: [C119, C120, C121, C122]
   open_threads: 3
+
+- id: 2026-10-12_001
+  date: '2026-10-12'
+  summary: METHOD-082 retains32 native convergences and two timeouts; four endpoint counterexamples and shared partial-overlap truth failures refute the broader predictions.
+  turn_count: 1
+  events_count: 6
+  claims_touched: [C123, C124]
+  open_threads: 3

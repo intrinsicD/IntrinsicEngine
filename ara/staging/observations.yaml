@@ -4481,3 +4481,48 @@ observations:
     promoted_to: logic/claims.md:C122
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O270
+    timestamp: "2026-10-12T02:02+02:00"
+    provenance: ai-executed
+    content: >
+      METHOD-082 attempted all 34 frozen cells; 32 regularly converged and two Box
+      partial/seed-2 cells hit 900-second timeouts. Four converged partial endpoints
+      violate P1; all 15 original full-overlap cells and all four full/seed-1 replays
+      pass their endpoint/replay checks. FPS repair accepts more early Nyström steps,
+      still below one percent of full traces. P1 is refuted by direct counterexamples.
+    context: >
+      CPU Bayesian CPD, 100000 points, seeds 1–3, frozen input commit 8c3ffaaa7.
+      Independent audit verifies 233 original outputs. Original aggregate remains
+      INCOMPLETE / UNEVALUATED because two endpoints are missing; timeout is not proof
+      of nonconvergence. Execution wrapper reports 143 with unknown cause, despite
+      all 34 controller START/DONE pairs and the matching final summary. No clean-exit,
+      general positivity, timing or population claim. C122's shorter scope is unchanged.
+    potential_type: claim
+    bound_to: [N663, N664, N665, N666]
+    promoted: true
+    promoted_to: logic/claims.md:C123
+    crystallized_via: artifact-commitment
+    stale: false
+
+  - id: O271
+    timestamp: "2026-10-12T02:02+02:00"
+    provenance: ai-executed
+    content: >
+      All 13 completed partial-overlap arms, including Auto, fail frozen truth
+      improvement despite regular native termination. Truth RMS is .788114–.795272,
+      58.03–59.79 percent worse than unregistered source; centered spread passes.
+      All 15 original full-overlap arms pass truth/spread. P2 is refuted.
+    context: >
+      Same bounded experiment and audit as O270. Cause remains undiagnosed; the
+      shared failure cannot be assigned solely to exact-row repair. Reusable lesson
+      and safeguard: keep known-truth/identity and spread controls beside native
+      termination and Auto agreement; solver convergence alone is not registration
+      success. Do not reinterpret timeout as a native convergence result or accept
+      an optimization from its short prefix alone. No new method fix is authorized.
+    potential_type: claim
+    bound_to: [N664, N665, N666]
+    promoted: true
+    promoted_to: logic/claims.md:C124
+    crystallized_via: artifact-commitment
+    stale: false

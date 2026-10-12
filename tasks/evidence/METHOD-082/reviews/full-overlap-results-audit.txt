@@ -1,0 +1,41 @@
+Reviewer: /root/method082_results
+Requested model: gpt-6-astra, xhigh; actual model identity not exposed.
+Read-only, no delegation and blindness restrictions are instruction-enforced.
+Actual answer, verbatim:
+
+**Interim raw audit: all 15 full-overlap cells are internally consistent; no defect found.** This does **not** accept criteria 2/3 or the complete 34-cell P1/P2 predicates.
+
+Frozen HEAD and packet digest remain unchanged. Eighteen selected source, fixture, packet and binary hashes match the manifest; tracked files have no working-tree diff.
+
+I independently parsed all 15 native results, recorded commands, traces and stage events; recomputed endpoints against truth and same-seed Auto; and compared those calculations with both summary and HTML rows.
+
+| Full-overlap finding | Independently verified result |
+|---|---|
+| Native termination | All 15 `success/converged`; no cap/floor |
+| Completed M-steps | 2,142–2,221 |
+| Largest RMS distance to Auto | **6.8323274 × 10⁻⁶**, below .001 |
+| Largest point distance to Auto | **7.5673042 × 10⁻⁵**, below .01 |
+| Truth RMS range | **0.000315172–0.000329160** |
+| Truth RMS reduction | **99.933967–99.936673%** |
+| Centered radius / truth | **0.99995759–1.00001428** |
+| Largest native/dump truth-RMS discrepancy | **4.82 × 10⁻⁹**, below 1e-5 |
+
+Thus every completed full-overlap cell satisfies the local regular-stop, Auto-agreement and truth/spread conditions. Full P1 still requires partial-overlap and replay results.
+
+Actual accepted Nyström counts, from policy `5`:
+
+| Seed | Baseline FPS | Candidate FPS | Baseline / candidate Box |
+|---|---:|---:|---:|
+| 1 | 6/2,213 | 16/2,215 | 1/2,213 each |
+| 2 | 4/2,221 | 16/2,221 | 1/2,221 each |
+| 3 | 4/2,142 | 15/2,142 | 1/2,142 each |
+
+Candidate FPS acceptance fractions are **0.7003–0.7223%**, versus baseline **0.1801–0.2711%**. These remain descriptive counts, not a runtime or general mechanism-gain claim. Actual landmark and repaired-row counts remain unavailable. All Auto references execute 20 Dense steps followed by Truncated steps.
+
+For each seed, baseline and candidate Box endpoints are element-for-element identical, as are trace columns through sampled error; kernel accounting differs. Candidate FPS truth accuracy changes in both directions across seeds, so these data support bounded preservation, not uniformly improved registration accuracy.
+
+All 15 traces have one additional final E-step without an M-step/iteration record. Last *observable* relative objective changes remain above `1e-5`; the native stopping decision belongs to the unobserved final check. Observed objectives decrease throughout and equal NLL; this is not evidence about unlogged full-ELBO terms.
+
+All 15 eligible results have matching HTML/summary rows and 30 linked valid PNGs. Representative FPS/Box metric figures and before/after views were visually inspected. No invalid cells were reported; the aggregate verdict appropriately remains `INCOMPLETE / UNEVALUATED`.
+
+Skipped: no tests, native runs, writes, delegation, other reviewers’ conclusions or technical-run numeric outputs. Remaining risk: partial-overlap behavior and replay equality are unaudited; final acceptance remains pending.
