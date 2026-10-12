@@ -147,6 +147,7 @@ export namespace Extrinsic::Runtime
         std::string EStep{"reference"};    // E-step policy that ran this iteration
         double EStepErrorBound{0.0};       // its max relative responsibility error (0: exact)
         double EStepSampledError{0.0};     // Nystrom: sampled relative error (estimate, not a bound)
+        bool NystromLocal{false};        // planned transition to bounded neighbor sums
         std::uint64_t KernelEvaluations{0u};
         double Seconds{0.0};               // UI-067: since the run's first step began
         double IterationSeconds{0.0};      // this iteration's wall time

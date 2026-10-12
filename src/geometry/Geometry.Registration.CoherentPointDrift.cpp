@@ -182,6 +182,7 @@ namespace Geometry::CoherentPointDrift
         std::uint64_t Revision{0u};
         mutable std::uint64_t CachedRevision{~std::uint64_t{0}};
         mutable std::vector<glm::dvec3> CachedFullSource{};
+        bool LastNystromLocal{false};
         double LastErrorBound{0.0}, MaxErrorBound{0.0}, LastSampledError{0.0}, MaxSampledError{0.0};
         std::uint64_t LastKernelEvaluations{0u}, TotalKernelEvaluations{0u};
 
@@ -225,6 +226,7 @@ namespace Geometry::CoherentPointDrift
             const EStep::Settings settings{.Policy = Config.EStep, .Tolerance = Config.EStepTolerance,
                                            .Threads = Config.Threads, .NystromLandmarks = Config.NystromLandmarks,
                                            .NystromErrorLimit = Config.NystromErrorLimit,
+                                           .NystromLocalSigma = Config.NystromLocalSigma,
                                            .NystromSampling = Config.LandmarkSampling,
                                            .NystromSource = Config.NystromSource,
                                            .NystromSchedule = Config.NystromSchedule,
@@ -240,6 +242,7 @@ namespace Geometry::CoherentPointDrift
             LastPolicy = sums.Used;
             LastErrorBound = sums.ErrorBound;
             LastSampledError = sums.SampledError;
+            LastNystromLocal = sums.NystromLocal;
             if (sums.ExternalFallback) ++EStepFallbacks;
             EStepDeviceCpuRows += sums.ExternalCpuRows;
             MaxSampledError = std::max(MaxSampledError, LastSampledError);
@@ -648,6 +651,7 @@ namespace Geometry::CoherentPointDrift
             (params.EStep == EStepPolicy::Nystrom &&
              (params.NystromLandmarks < 2u || params.NystromLandmarks > kMaxNystromLandmarks ||
               !(params.NystromErrorLimit > 0.0) || !std::isfinite(params.NystromErrorLimit) ||
+              !(params.NystromLocalSigma >= 0.0) || !std::isfinite(params.NystromLocalSigma) ||
               !EStep::ValidNystromVariant(params.NystromSource, params.NystromSchedule, params.NystromPattern,
                                           params.LandmarkSampling.Method))))
             return fail(Status::InvalidParameters);
@@ -877,7 +881,7 @@ namespace Geometry::CoherentPointDrift
                                     .MatchedWeight = matched,
                                     .Transform = s.Config.Method == Variant::Nonrigid ? glm::dmat4(1.0) : s.WorldTransform(),
                                     .EStep = s.LastPolicy, .EStepErrorBound = s.LastErrorBound,
-                                    .EStepSampledError = s.LastSampledError,
+                                    .EStepSampledError = s.LastSampledError, .NystromLocal = s.LastNystromLocal,
                                     .KernelEvaluations = s.LastKernelEvaluations});
         }
         if (floor) s.Stop = Termination::SigmaFloor;

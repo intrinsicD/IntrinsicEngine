@@ -1,0 +1,1 @@
+PASS: six fixtures exported with separate centers, shared RMS-radius scale, exact float serialization and inverse-frame assertions

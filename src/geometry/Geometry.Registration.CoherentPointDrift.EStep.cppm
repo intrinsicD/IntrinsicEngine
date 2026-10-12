@@ -16,14 +16,15 @@
 //                back to dense when no plan meets the bound. Pays off for wide kernels.
 //   - Auto:      truncated while its radius stays below the extent, otherwise the fast Gauss
 //                transform when its planned cost is well below the dense cost, else dense.
-//   - Nystrom:   approximate (METHOD-053): K ~= K(Y, Z) K(Z, Z)^+ K(Z, X) on farthest-point
-//                landmarks Z of both sets, O((2M + N) L) kernel terms. Its error has no a-priori
+//   - Nystrom:   approximate (METHOD-053): K ~= K(Y, Z) (K(Z, Z) + 1e-6 I)^-1 K(Z, X),
+//                using Cholesky solves on landmarks Z, O((2M + N) L) kernel terms. Its error has no a-priori
 //                bound; it is measured on exact sampled rows (Sums::SampledError, an estimate)
 //                and an iteration whose estimate exceeds Settings::NystromErrorLimit is redone
 //                exactly with the Auto choice between truncated and dense. Skipped (exact) where
 //                its planned cost is not below half the dense cost, i.e. for small inputs.
 //                Nonpositive/nonfinite target sums trigger exact replacement of those rows in
 //                all statistics, within the same cost budget; sampled checks remain required.
+//                Below NystromLocalSigma, bounded neighbor sums run without a landmark attempt.
 //   - Vulkan:    the dense two-pass form on a device through Settings::External (METHOD-056;
 //                fp32 kernel terms, fp64 sums, so not exact). Iterations where Auto would truncate
 //                stay on the CPU truncated path; rows whose first-order fp32 error estimate
@@ -106,9 +107,11 @@ export namespace Geometry::CoherentPointDrift::EStep
     inline constexpr double kExternalErrorLimit = 2.0e-5;
 
     // Nystrom landmark variants (METHOD-076). Points: half from each set with NystromSampling.
+    // UnionRandom: uniform random identities from both sets (no per-set quota), using the
+    // sampling seed only; Mixed equals Fixed, Resampled draws again.
     // BoundingBox: uniform over the union of the target's and the moved source's axis-aligned
     // boxes, each padded by sigma (so flat or collinear data still spans a volume).
-    enum class NystromLandmarkSource : std::uint8_t { Points = 0, BoundingBox };
+    enum class NystromLandmarkSource : std::uint8_t { Points = 0, BoundingBox, UnionRandom };
     // Mixed (METHOD-053): target landmarks drawn once, source landmarks (or the boxes) taken from
     // the current source every iteration with the same seed. Fixed: drawn once at the first
     // Nystrom iteration; point landmarks keep their identity and follow their points, box
@@ -131,7 +134,7 @@ export namespace Geometry::CoherentPointDrift::EStep
                                                      const NystromBoxPattern pattern,
                                                      const PointSampling::Method method) noexcept
     {
-        return source <= NystromLandmarkSource::BoundingBox && schedule <= NystromLandmarkSchedule::Resampled &&
+        return source <= NystromLandmarkSource::UnionRandom && schedule <= NystromLandmarkSchedule::Resampled &&
                pattern <= NystromBoxPattern::Halton &&
                !(source == NystromLandmarkSource::Points && schedule == NystromLandmarkSchedule::Resampled &&
                  !ResamplesPointLandmarks(method));
@@ -147,10 +150,12 @@ export namespace Geometry::CoherentPointDrift::EStep
         // fixed block count does not fit, a two-pass evaluation (twice the kernel terms, no
         // partial sums) is used instead.
         std::size_t PartialBudgetBytes{std::size_t{128} << 20};
-        // Nystrom: landmarks (half from each set) and the largest accepted sampled relative
+        // Nystrom: landmark count and the largest accepted sampled relative
         // error of the row denominators and P1 entries.
         std::uint32_t NystromLandmarks{256u};
         double NystromErrorLimit{1.0e-3};
+        // Switch to bounded neighbor sums below this sigma in solver units; 0 disables.
+        double NystromLocalSigma{0.2};
         // Nystrom: how the landmarks are chosen from each set (default exact farthest point), and
         // the landmark variant; the box seed is NystromSampling.Seed.
         PointSampling::Params NystromSampling{};
@@ -175,6 +180,7 @@ export namespace Geometry::CoherentPointDrift::EStep
         // Nystrom: largest relative error of the sampled exact rows (an estimate, not a bound;
         // 0 when the iteration ran exactly).
         double SampledError{0.0};
+        bool NystromLocal{false}; // planned sigma transition, not approximation rejection
         std::uint64_t KernelEvaluations{0u};
         // Vulkan: the external evaluator was wanted (Auto would not truncate) but was absent or failed.
         bool ExternalFallback{false};

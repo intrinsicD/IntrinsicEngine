@@ -1,0 +1,6 @@
+START full_1_baseline_auto
+START full_1_baseline_points
+DONE full_1_baseline_auto native_result
+DONE full_1_baseline_points native_result
+START full_1_baseline_auto
+PASS: full report rejects no-op, collapse, wrong-but-consistent, cap, numerical failure, endpoint regression, missing/nonfinite data, malformed original trace and replay drift; censored/unstarted cells stay unevaluated; real engine/upstream figures render; agreement-gate mutation escapes the regression control as predicted; real controller starts valid cells and stops before the next native launch on changed digest or invalid output

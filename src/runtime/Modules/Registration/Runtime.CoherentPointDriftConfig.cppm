@@ -32,7 +32,7 @@ export namespace Extrinsic::Runtime
     // CPU choice without a framed device). Values match Geometry::CoherentPointDrift::EStepPolicy.
     enum class CoherentPointDriftEStep : std::uint8_t { Reference, Dense, Truncated, Auto, FastGauss, Nystrom, Vulkan };
     // Nystroem landmark variant (METHOD-076); values match Geometry::CoherentPointDrift::EStep's.
-    enum class CoherentPointDriftNystromSource : std::uint8_t { Points = 0, BoundingBox };
+    enum class CoherentPointDriftNystromSource : std::uint8_t { Points = 0, BoundingBox, UnionRandom };
     enum class CoherentPointDriftNystromSchedule : std::uint8_t { Mixed = 0, Fixed, Resampled };
     enum class CoherentPointDriftNystromBoxPattern : std::uint8_t { Random = 0, Halton };
 
@@ -65,6 +65,8 @@ export namespace Extrinsic::Runtime
         // Nystrom E-step: landmarks and the largest accepted sampled relative error.
         std::uint32_t NystromLandmarks{256u};
         double NystromErrorLimit{1.0e-3};
+        // Switch to bounded neighbor sums below this sigma in solver units; 0 disables.
+        double NystromLocalSigma{0.2};
         CoherentPointDriftNystromSource NystromSource{CoherentPointDriftNystromSource::Points};
         CoherentPointDriftNystromSchedule NystromSchedule{CoherentPointDriftNystromSchedule::Mixed};
         CoherentPointDriftNystromBoxPattern NystromBoxPattern{CoherentPointDriftNystromBoxPattern::Random};

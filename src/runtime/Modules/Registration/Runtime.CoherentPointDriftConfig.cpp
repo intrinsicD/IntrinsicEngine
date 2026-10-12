@@ -37,8 +37,9 @@ namespace Extrinsic::Runtime
                                                               "Fast Gauss transform (bounded error, parallel)",
                                                               "Nystroem (approximate while wide, then exact)",
                                                               "Vulkan (dense on the GPU while wide, fp32 terms)"};
-        constexpr std::array<std::string_view, 2> kNystromSourceNames{"Points of both sets (landmark_method)",
-                                                                      "Union of both bounding boxes (padded by sigma)"};
+        constexpr std::array<std::string_view, 3> kNystromSourceNames{"Points of both sets (landmark_method)",
+                                                                      "Union of both bounding boxes (padded by sigma)",
+                                                                      "Uniform random points from both sets"};
         constexpr std::array<std::string_view, 3> kNystromScheduleNames{
             "Mixed (target drawn once, source every iteration)", "Fixed (drawn once)", "Resampled (new draw every iteration)"};
         constexpr std::array<std::string_view, 2> kNystromBoxPatternNames{"Uniform random", "Halton (randomly shifted)"};
@@ -63,10 +64,11 @@ namespace Extrinsic::Runtime
             ConfigFieldSpec{.Name = "e_step", .Type = FT::Enum, .Description = "How responsibilities are evaluated each iteration; every option reports its backend and error bound.", .EnumNames = kEStepNames},
             ConfigFieldSpec{.Name = "e_step_tolerance", .Type = FT::Float, .Description = "Truncated, fast Gauss and Auto: bound on each point's relative responsibility error.", .Min = 0, .Max = 1, .ExclusiveMin = true, .ExclusiveMax = true},
             ConfigFieldSpec{.Name = "threads", .Type = FT::UInt, .Description = "Worker threads for the parallel E-step; 0 uses all cores.", .Min = 0, .Max = 256},
-            ConfigFieldSpec{.Name = "nystrom_landmarks", .Type = FT::UInt, .Description = "Nystroem: landmark points (half from each set); more landmarks keep the approximation accurate for narrower kernels.", .Min = 2, .Max = 4096},
+            ConfigFieldSpec{.Name = "nystrom_landmarks", .Type = FT::UInt, .Description = "Nystroem: landmark points; more landmarks keep the approximation accurate for narrower kernels.", .Min = 2, .Max = 4096},
             ConfigFieldSpec{.Name = "nystrom_landmark_source", .Type = FT::Enum, .Description = "Nystroem: where the landmarks come from.", .EnumNames = kNystromSourceNames},
             ConfigFieldSpec{.Name = "nystrom_landmark_schedule", .Type = FT::Enum, .Description = "Nystroem: when the landmarks are drawn; fixed point landmarks follow their points, fixed box landmarks keep their coordinates.", .EnumNames = kNystromScheduleNames},
             ConfigFieldSpec{.Name = "nystrom_box_pattern", .Type = FT::Enum, .Description = "Nystroem, bounding-box landmarks: random or structured sampling (seed: landmark_seed).", .EnumNames = kNystromBoxPatternNames},
+            ConfigFieldSpec{.Name = "nystrom_local_sigma", .Type = FT::Float, .Description = "Nystroem: switch to bounded neighbor sums below this sigma in solver units; 0 disables.", .Min = 0},
             ConfigFieldSpec{.Name = "nystrom_error_limit", .Type = FT::Float, .Description = "Nystroem: largest sampled relative responsibility error accepted; iterations above it run exactly. An estimate from exact sample rows, not a bound.", .Min = 0, .Max = 1, .ExclusiveMin = true},
             ConfigFieldSpec{.Name = "low_rank", .Type = FT::UInt, .Description = "Nonrigid and Bayesian: 0 solves with the full kernel (at most 8192 source points; see auto_low_rank); k > 0 uses k kernel eigenpairs and allows large sources.", .Min = 0, .Max = 2000},
             ConfigFieldSpec{.Name = "auto_low_rank", .Type = FT::Bool, .Description = "Nonrigid and Bayesian with low_rank 0: above 1024 registered source points use 100 kernel eigenpairs, since the full kernel costs O(m^3) per iteration; off keeps the exact full kernel."},
@@ -105,7 +107,7 @@ namespace Extrinsic::Runtime
                         {"output", unsigned(c.Output)}, {"displacement_name", c.DisplacementName},
                         {"e_step", unsigned(c.EStep)}, {"e_step_tolerance", c.EStepTolerance},
                         {"threads", c.Threads}, {"nystrom_landmarks", c.NystromLandmarks},
-                        {"nystrom_error_limit", c.NystromErrorLimit},
+                        {"nystrom_error_limit", c.NystromErrorLimit}, {"nystrom_local_sigma", c.NystromLocalSigma},
                         {"nystrom_landmark_source", unsigned(c.NystromSource)},
                         {"nystrom_landmark_schedule", unsigned(c.NystromSchedule)},
                         {"nystrom_box_pattern", unsigned(c.NystromBoxPattern)}, {"low_rank", c.LowRank}, {"auto_low_rank", c.AutoLowRank}, {"gamma", c.Gamma}, {"kappa", c.Kappa},
@@ -146,6 +148,7 @@ namespace Extrinsic::Runtime
             c.Threads = doc.at("threads").get<std::uint32_t>();
             c.NystromLandmarks = doc.at("nystrom_landmarks").get<std::uint32_t>();
             c.NystromErrorLimit = doc.at("nystrom_error_limit").get<double>();
+            c.NystromLocalSigma = doc.at("nystrom_local_sigma").get<double>();
             c.NystromSource = CoherentPointDriftNystromSource(doc.at("nystrom_landmark_source").get<unsigned>());
             c.NystromSchedule = CoherentPointDriftNystromSchedule(doc.at("nystrom_landmark_schedule").get<unsigned>());
             c.NystromBoxPattern = CoherentPointDriftNystromBoxPattern(doc.at("nystrom_box_pattern").get<unsigned>());

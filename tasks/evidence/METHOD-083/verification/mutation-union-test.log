@@ -1,0 +1,3058 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+    Start 2432: CoherentPointDriftAccelerated.UnionRandomUsesOnePermutationAndFollowsMovingIdentities
+1/1 Test #2432: CoherentPointDriftAccelerated.UnionRandomUsesOnePermutationAndFollowsMovingIdentities ...***Failed    1.28 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = CoherentPointDriftAccelerated.UnionRandomUsesOnePermutationAndFollowsMovingIdentities
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from CoherentPointDriftAccelerated
+[ RUN      ] CoherentPointDriftAccelerated.UnionRandomUsesOnePermutationAndFollowsMovingIdentities
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.098390102386474609
+  double(p.x)
+    Which is: -0.94780540466308594
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.0071641802787780762
+  double(p.y)
+    Which is: 0.18129479885101318
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.014006209559738636
+  double(p.z)
+    Which is: -0.40430086851119995
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.6258929967880249
+  double(p.x)
+    Which is: 0.77929222583770752
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.98981690406799316
+  double(p.y)
+    Which is: -0.23186731338500977
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.092905789613723755
+  double(p.z)
+    Which is: 0.14118669927120209
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.99181103706359863
+  double(p.x)
+    Which is: -0.4021613597869873
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.064793705940246582
+  double(p.y)
+    Which is: -0.28203171491622925
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.42011177539825439
+  double(p.z)
+    Which is: 0.16720154881477356
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.34719276428222656
+  double(p.x)
+    Which is: -0.58668792247772217
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.99347066879272461
+  double(p.y)
+    Which is: -0.93300992250442505
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.18331329524517059
+  double(p.z)
+    Which is: -0.22676779329776764
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.0709037184715271
+  double(p.x)
+    Which is: 0.07346343994140625
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.069579780101776123
+  double(p.y)
+    Which is: -0.23245000839233398
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.34892120957374573
+  double(p.z)
+    Which is: -0.38872227072715759
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.94822204113006592
+  double(p.x)
+    Which is: -0.85235607624053955
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.17092025279998779
+  double(p.y)
+    Which is: -0.7212754487991333
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: 0.025365257635712624
+  double(p.z)
+    Which is: 0.44064167141914368
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.24609476327896118
+  double(p.x)
+    Which is: -0.48133814334869385
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.99971115589141846
+  double(p.y)
+    Which is: -0.42497462034225464
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.059084344655275345
+  double(p.z)
+    Which is: 0.09446447342634201
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.14912337064743042
+  double(p.x)
+    Which is: 0.80743980407714844
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.9638742208480835
+  double(p.y)
+    Which is: -0.72669249773025513
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: 0.11696427315473557
+  double(p.z)
+    Which is: -0.58065122365951538
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.95247495174407959
+  double(p.x)
+    Which is: -0.24406391382217407
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.0025591850280761719
+  double(p.y)
+    Which is: -0.81096833944320679
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.30173543095588684
+  double(p.z)
+    Which is: 0.57342314720153809
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.13395476341247559
+  double(p.x)
+    Which is: 0.88430988788604736
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.99335086345672607
+  double(p.y)
+    Which is: 0.18286693096160889
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.22056467831134796
+  double(p.z)
+    Which is: -0.53173977136611938
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.097321450710296631
+  double(p.x)
+    Which is: -0.56728672981262207
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.25173842906951904
+  double(p.y)
+    Which is: -0.48051106929779053
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.14120522141456604
+  double(p.z)
+    Which is: -0.26553162932395935
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.95387077331542969
+  double(p.x)
+    Which is: -0.83221960067749023
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.99320864677429199
+  double(p.y)
+    Which is: -0.40710574388504028
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.289693683385849
+  double(p.z)
+    Which is: 0.011293817311525345
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.031269848346710205
+  double(p.x)
+    Which is: -0.81433236598968506
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.30374789237976074
+  double(p.y)
+    Which is: -0.1800190806388855
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.099725142121315002
+  double(p.z)
+    Which is: 0.38127738237380981
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.058943569660186768
+  double(p.x)
+    Which is: 0.52679133415222168
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.010060966014862061
+  double(p.y)
+    Which is: 0.079286813735961914
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.029162587597966194
+  double(p.z)
+    Which is: 0.24454265832901001
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.018745958805084229
+  double(p.x)
+    Which is: 0.94580304622650146
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.18806958198547363
+  double(p.y)
+    Which is: -0.12418997287750244
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.084922604262828827
+  double(p.z)
+    Which is: 0.57054221630096436
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.1442563533782959
+  double(p.x)
+    Which is: 0.15619146823883057
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.0055873990058898926
+  double(p.y)
+    Which is: 0.31896734237670898
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.14653308689594269
+  double(p.z)
+    Which is: -0.57674980163574219
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.098390102386474609
+  double(p.x)
+    Which is: -0.84780538082122803
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.0071641802787780762
+  double(p.y)
+    Which is: 0.18129479885101318
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.014006209559738636
+  double(p.z)
+    Which is: -0.40430086851119995
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.6258929967880249
+  double(p.x)
+    Which is: 0.87929224967956543
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.98981690406799316
+  double(p.y)
+    Which is: -0.23186731338500977
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.092905789613723755
+  double(p.z)
+    Which is: 0.14118669927120209
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.99181103706359863
+  double(p.x)
+    Which is: -0.30216136574745178
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.064793705940246582
+  double(p.y)
+    Which is: -0.28203171491622925
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.42011177539825439
+  double(p.z)
+    Which is: 0.16720154881477356
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.34719276428222656
+  double(p.x)
+    Which is: -0.48668792843818665
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.99347066879272461
+  double(p.y)
+    Which is: -0.93300992250442505
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.18331329524517059
+  double(p.z)
+    Which is: -0.22676779329776764
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.0709037184715271
+  double(p.x)
+    Which is: 0.17346343398094177
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.069579780101776123
+  double(p.y)
+    Which is: -0.23245000839233398
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.34892120957374573
+  double(p.z)
+    Which is: -0.38872227072715759
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.94822204113006592
+  double(p.x)
+    Which is: -0.75235605239868164
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.17092025279998779
+  double(p.y)
+    Which is: -0.7212754487991333
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: 0.025365257635712624
+  double(p.z)
+    Which is: 0.44064167141914368
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.24609476327896118
+  double(p.x)
+    Which is: -0.38133814930915833
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.99971115589141846
+  double(p.y)
+    Which is: -0.42497462034225464
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.059084344655275345
+  double(p.z)
+    Which is: 0.09446447342634201
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.14912337064743042
+  double(p.x)
+    Which is: 0.80743980407714844
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.9638742208480835
+  double(p.y)
+    Which is: -0.72669249773025513
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: 0.11696427315473557
+  double(p.z)
+    Which is: -0.58065122365951538
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.82087373733520508
+  double(p.x)
+    Which is: -0.24406391382217407
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.15406274795532227
+  double(p.y)
+    Which is: -0.81096833944320679
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.11356319487094879
+  double(p.z)
+    Which is: 0.57342314720153809
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.66562074422836304
+  double(p.x)
+    Which is: 0.98430991172790527
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.76665163040161133
+  double(p.y)
+    Which is: 0.18286693096160889
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.033621776849031448
+  double(p.z)
+    Which is: -0.53173977136611938
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.87987446784973145
+  double(p.x)
+    Which is: -0.56728672981262207
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.84130275249481201
+  double(p.y)
+    Which is: -0.48051106929779053
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: 0.3728850781917572
+  double(p.z)
+    Which is: -0.26553162932395935
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.17032867670059204
+  double(p.x)
+    Which is: -0.73221957683563232
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.027448654174804688
+  double(p.y)
+    Which is: -0.40710574388504028
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.55579614639282227
+  double(p.z)
+    Which is: 0.011293817311525345
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.10262042284011841
+  double(p.x)
+    Which is: -0.81433236598968506
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.11666566133499146
+  double(p.y)
+    Which is: -0.1800190806388855
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: 0.11868124455213547
+  double(p.z)
+    Which is: 0.38127738237380981
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.85988128185272217
+  double(p.x)
+    Which is: 0.52679133415222168
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.074263036251068115
+  double(p.y)
+    Which is: 0.079286813735961914
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: 0.51126313209533691
+  double(p.z)
+    Which is: 0.24454265832901001
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.75108969211578369
+  double(p.x)
+    Which is: 1.0458030700683594
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.50726819038391113
+  double(p.y)
+    Which is: -0.12418997287750244
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.13424932956695557
+  double(p.z)
+    Which is: 0.57054221630096436
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.014850139617919922
+  double(p.x)
+    Which is: 0.15619146823883057
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.4115828275680542
+  double(p.y)
+    Which is: 0.31896734237670898
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.012832618318498135
+  double(p.z)
+    Which is: -0.57674980163574219
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 1.0524749755859375
+  double(p.x)
+    Which is: 0.02191615104675293
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.0025591850280761719
+  double(p.y)
+    Which is: -0.20398241281509399
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.30173543095588684
+  double(p.z)
+    Which is: -0.16166529059410095
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.033954761922359467
+  double(p.x)
+    Which is: -0.6818804144859314
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.99335086345672607
+  double(p.y)
+    Which is: -0.72898423671722412
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.22056467831134796
+  double(p.z)
+    Which is: -0.52179664373397827
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.0026785507798194885
+  double(p.x)
+    Which is: 0.39438948035240173
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.25173842906951904
+  double(p.y)
+    Which is: -0.21441155672073364
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.14120522141456604
+  double(p.z)
+    Which is: 0.0026072503533214331
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 1.0538707971572876
+  double(p.x)
+    Which is: 0.11464238166809082
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.99320864677429199
+  double(p.y)
+    Which is: 0.68470335006713867
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.289693683385849
+  double(p.z)
+    Which is: -0.35457977652549744
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.068730153143405914
+  double(p.x)
+    Which is: 0.40193149447441101
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.30374789237976074
+  double(p.y)
+    Which is: -0.75774073600769043
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.099725142121315002
+  double(p.z)
+    Which is: 0.42222577333450317
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.041056431829929352
+  double(p.x)
+    Which is: -0.87748348712921143
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.010060966014862061
+  double(p.y)
+    Which is: -0.916969895362854
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.029162587597966194
+  double(p.z)
+    Which is: -0.069527439773082733
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.081254042685031891
+  double(p.x)
+    Which is: -0.23291671276092529
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.18806958198547363
+  double(p.y)
+    Which is: 0.21188592910766602
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.084922604262828827
+  double(p.z)
+    Which is: 0.267505943775177
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.044256351888179779
+  double(p.x)
+    Which is: 0.44444569945335388
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.0055873990058898926
+  double(p.y)
+    Which is: 0.067167758941650391
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.14653308689594269
+  double(p.z)
+    Which is: 0.2563934326171875
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.034290648996829987
+  double(p.x)
+    Which is: 0.77617275714874268
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.58025789260864258
+  double(p.y)
+    Which is: 0.76155853271484375
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.031216265633702278
+  double(p.z)
+    Which is: -0.391786128282547
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.067454494535923004
+  double(p.x)
+    Which is: -0.63717544078826904
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.78679180145263672
+  double(p.y)
+    Which is: 0.094627857208251953
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.046978965401649475
+  double(p.z)
+    Which is: -0.13758194446563721
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.89883542060852051
+  double(p.x)
+    Which is: 0.94979763031005859
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.22945523262023926
+  double(p.y)
+    Which is: -0.43707752227783203
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.05850527435541153
+  double(p.z)
+    Which is: -0.23957689106464386
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.99198508262634277
+  double(p.x)
+    Which is: -0.87748128175735474
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.90219807624816895
+  double(p.y)
+    Which is: -0.83409565687179565
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.032141625881195068
+  double(p.z)
+    Which is: -0.15328305959701538
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.96364486217498779
+  double(p.x)
+    Which is: 0.1540515124797821
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.91498327255249023
+  double(p.y)
+    Which is: -0.88207995891571045
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.072759822010993958
+  double(p.z)
+    Which is: 0.41063955426216125
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.85100424289703369
+  double(p.x)
+    Which is: 0.34063896536827087
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.26023811101913452
+  double(p.y)
+    Which is: 0.93230295181274414
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.11436056345701218
+  double(p.z)
+    Which is: 0.20033477246761322
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.064366020262241364
+  double(p.x)
+    Which is: 0.50948643684387207
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.75720036029815674
+  double(p.y)
+    Which is: -0.10077923536300659
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.28482893109321594
+  double(p.z)
+    Which is: 0.36494660377502441
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.96229922771453857
+  double(p.x)
+    Which is: -0.55303108692169189
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.84861469268798828
+  double(p.y)
+    Which is: 0.051503896713256836
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.056476879864931107
+  double(p.z)
+    Which is: 0.061216879636049271
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.098390102386474609
+  double(p.x)
+    Which is: -0.94780540466308594
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.0071641802787780762
+  double(p.y)
+    Which is: 0.18129479885101318
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.014006209559738636
+  double(p.z)
+    Which is: -0.40430086851119995
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.6258929967880249
+  double(p.x)
+    Which is: 0.77929222583770752
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.98981690406799316
+  double(p.y)
+    Which is: -0.23186731338500977
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.092905789613723755
+  double(p.z)
+    Which is: 0.14118669927120209
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.99181103706359863
+  double(p.x)
+    Which is: -0.4021613597869873
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.064793705940246582
+  double(p.y)
+    Which is: -0.28203171491622925
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.42011177539825439
+  double(p.z)
+    Which is: 0.16720154881477356
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.34719276428222656
+  double(p.x)
+    Which is: -0.58668792247772217
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.99347066879272461
+  double(p.y)
+    Which is: -0.93300992250442505
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.18331329524517059
+  double(p.z)
+    Which is: -0.22676779329776764
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.0709037184715271
+  double(p.x)
+    Which is: 0.07346343994140625
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.069579780101776123
+  double(p.y)
+    Which is: -0.23245000839233398
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.34892120957374573
+  double(p.z)
+    Which is: -0.38872227072715759
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.94822204113006592
+  double(p.x)
+    Which is: -0.85235607624053955
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.17092025279998779
+  double(p.y)
+    Which is: -0.7212754487991333
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: 0.025365257635712624
+  double(p.z)
+    Which is: 0.44064167141914368
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.24609476327896118
+  double(p.x)
+    Which is: -0.48133814334869385
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.99971115589141846
+  double(p.y)
+    Which is: -0.42497462034225464
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.059084344655275345
+  double(p.z)
+    Which is: 0.09446447342634201
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.14912337064743042
+  double(p.x)
+    Which is: 0.80743980407714844
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.9638742208480835
+  double(p.y)
+    Which is: -0.72669249773025513
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: 0.11696427315473557
+  double(p.z)
+    Which is: -0.58065122365951538
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.95247495174407959
+  double(p.x)
+    Which is: -0.24406391382217407
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.0025591850280761719
+  double(p.y)
+    Which is: -0.81096833944320679
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.30173543095588684
+  double(p.z)
+    Which is: 0.57342314720153809
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.13395476341247559
+  double(p.x)
+    Which is: 0.88430988788604736
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.99335086345672607
+  double(p.y)
+    Which is: 0.18286693096160889
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.22056467831134796
+  double(p.z)
+    Which is: -0.53173977136611938
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.097321450710296631
+  double(p.x)
+    Which is: -0.56728672981262207
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.25173842906951904
+  double(p.y)
+    Which is: -0.48051106929779053
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.14120522141456604
+  double(p.z)
+    Which is: -0.26553162932395935
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.95387077331542969
+  double(p.x)
+    Which is: -0.83221960067749023
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.99320864677429199
+  double(p.y)
+    Which is: -0.40710574388504028
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.289693683385849
+  double(p.z)
+    Which is: 0.011293817311525345
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.031269848346710205
+  double(p.x)
+    Which is: -0.81433236598968506
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.30374789237976074
+  double(p.y)
+    Which is: -0.1800190806388855
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.099725142121315002
+  double(p.z)
+    Which is: 0.38127738237380981
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.058943569660186768
+  double(p.x)
+    Which is: 0.52679133415222168
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.010060966014862061
+  double(p.y)
+    Which is: 0.079286813735961914
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.029162587597966194
+  double(p.z)
+    Which is: 0.24454265832901001
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.018745958805084229
+  double(p.x)
+    Which is: 0.94580304622650146
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.18806958198547363
+  double(p.y)
+    Which is: -0.12418997287750244
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.084922604262828827
+  double(p.z)
+    Which is: 0.57054221630096436
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.1442563533782959
+  double(p.x)
+    Which is: 0.15619146823883057
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.0055873990058898926
+  double(p.y)
+    Which is: 0.31896734237670898
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.14653308689594269
+  double(p.z)
+    Which is: -0.57674980163574219
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.098390102386474609
+  double(p.x)
+    Which is: -0.84780538082122803
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.0071641802787780762
+  double(p.y)
+    Which is: 0.18129479885101318
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.014006209559738636
+  double(p.z)
+    Which is: -0.40430086851119995
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.6258929967880249
+  double(p.x)
+    Which is: 0.87929224967956543
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.98981690406799316
+  double(p.y)
+    Which is: -0.23186731338500977
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.092905789613723755
+  double(p.z)
+    Which is: 0.14118669927120209
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.99181103706359863
+  double(p.x)
+    Which is: -0.30216136574745178
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.064793705940246582
+  double(p.y)
+    Which is: -0.28203171491622925
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.42011177539825439
+  double(p.z)
+    Which is: 0.16720154881477356
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.34719276428222656
+  double(p.x)
+    Which is: -0.48668792843818665
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.99347066879272461
+  double(p.y)
+    Which is: -0.93300992250442505
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.18331329524517059
+  double(p.z)
+    Which is: -0.22676779329776764
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.0709037184715271
+  double(p.x)
+    Which is: 0.17346343398094177
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.069579780101776123
+  double(p.y)
+    Which is: -0.23245000839233398
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.34892120957374573
+  double(p.z)
+    Which is: -0.38872227072715759
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.94822204113006592
+  double(p.x)
+    Which is: -0.75235605239868164
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.17092025279998779
+  double(p.y)
+    Which is: -0.7212754487991333
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: 0.025365257635712624
+  double(p.z)
+    Which is: 0.44064167141914368
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.24609476327896118
+  double(p.x)
+    Which is: -0.38133814930915833
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.99971115589141846
+  double(p.y)
+    Which is: -0.42497462034225464
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.059084344655275345
+  double(p.z)
+    Which is: 0.09446447342634201
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.14912337064743042
+  double(p.x)
+    Which is: 0.80743980407714844
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.9638742208480835
+  double(p.y)
+    Which is: -0.72669249773025513
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: 0.11696427315473557
+  double(p.z)
+    Which is: -0.58065122365951538
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.82087373733520508
+  double(p.x)
+    Which is: -0.24406391382217407
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.15406274795532227
+  double(p.y)
+    Which is: -0.81096833944320679
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.11356319487094879
+  double(p.z)
+    Which is: 0.57342314720153809
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.66562074422836304
+  double(p.x)
+    Which is: 0.98430991172790527
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.76665163040161133
+  double(p.y)
+    Which is: 0.18286693096160889
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.033621776849031448
+  double(p.z)
+    Which is: -0.53173977136611938
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.87987446784973145
+  double(p.x)
+    Which is: -0.56728672981262207
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.84130275249481201
+  double(p.y)
+    Which is: -0.48051106929779053
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: 0.3728850781917572
+  double(p.z)
+    Which is: -0.26553162932395935
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.17032867670059204
+  double(p.x)
+    Which is: -0.73221957683563232
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.027448654174804688
+  double(p.y)
+    Which is: -0.40710574388504028
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.55579614639282227
+  double(p.z)
+    Which is: 0.011293817311525345
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.10262042284011841
+  double(p.x)
+    Which is: -0.81433236598968506
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.11666566133499146
+  double(p.y)
+    Which is: -0.1800190806388855
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: 0.11868124455213547
+  double(p.z)
+    Which is: 0.38127738237380981
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.85988128185272217
+  double(p.x)
+    Which is: 0.52679133415222168
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.074263036251068115
+  double(p.y)
+    Which is: 0.079286813735961914
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: 0.51126313209533691
+  double(p.z)
+    Which is: 0.24454265832901001
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.75108969211578369
+  double(p.x)
+    Which is: 1.0458030700683594
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.50726819038391113
+  double(p.y)
+    Which is: -0.12418997287750244
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.13424932956695557
+  double(p.z)
+    Which is: 0.57054221630096436
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.014850139617919922
+  double(p.x)
+    Which is: 0.15619146823883057
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.4115828275680542
+  double(p.y)
+    Which is: 0.31896734237670898
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.012832618318498135
+  double(p.z)
+    Which is: -0.57674980163574219
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.78586840629577637
+  double(p.x)
+    Which is: 0.02191615104675293
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.353645920753479
+  double(p.y)
+    Which is: -0.20398241281509399
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.039620842784643173
+  double(p.z)
+    Which is: -0.16166529059410095
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.12483813613653183
+  double(p.x)
+    Which is: -0.6818804144859314
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.92587161064147949
+  double(p.y)
+    Which is: -0.72898423671722412
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.019615817815065384
+  double(p.z)
+    Which is: -0.52179664373397827
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.99198508262634277
+  double(p.x)
+    Which is: 0.39438948035240173
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.90219807624816895
+  double(p.y)
+    Which is: -0.21441155672073364
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.032141625881195068
+  double(p.z)
+    Which is: 0.0026072503533214331
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.044256351888179779
+  double(p.x)
+    Which is: 0.11464238166809082
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.0055873990058898926
+  double(p.y)
+    Which is: 0.68470335006713867
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.14653308689594269
+  double(p.z)
+    Which is: -0.35457977652549744
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.015070997178554535
+  double(p.x)
+    Which is: 0.40193149447441101
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.57347261905670166
+  double(p.y)
+    Which is: -0.75774073600769043
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.10416129976511002
+  double(p.z)
+    Which is: 0.42222577333450317
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.96364486217498779
+  double(p.x)
+    Which is: -0.87748348712921143
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.91498327255249023
+  double(p.y)
+    Which is: -0.916969895362854
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.072759822010993958
+  double(p.z)
+    Which is: -0.069527439773082733
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.15917059779167175
+  double(p.x)
+    Which is: -0.23291671276092529
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.80774593353271484
+  double(p.y)
+    Which is: 0.21188592910766602
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.22692680358886719
+  double(p.z)
+    Which is: 0.267505943775177
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.91385006904602051
+  double(p.x)
+    Which is: 0.44444569945335388
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.80180001258850098
+  double(p.y)
+    Which is: 0.067167758941650391
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.0124085433781147
+  double(p.z)
+    Which is: 0.2563934326171875
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.03430851548910141
+  double(p.x)
+    Which is: 0.77617275714874268
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.43642514944076538
+  double(p.y)
+    Which is: 0.76155853271484375
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.0069541814737021923
+  double(p.z)
+    Which is: -0.391786128282547
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.074666403234004974
+  double(p.x)
+    Which is: -0.63717544078826904
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.81038689613342285
+  double(p.y)
+    Which is: 0.094627857208251953
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.24852877855300903
+  double(p.z)
+    Which is: -0.13758194446563721
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.94098448753356934
+  double(p.x)
+    Which is: 0.94979763031005859
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.91422200202941895
+  double(p.y)
+    Which is: -0.43707752227783203
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.098717816174030304
+  double(p.z)
+    Which is: -0.23957689106464386
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.86526882648468018
+  double(p.x)
+    Which is: -0.87748128175735474
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.8423459529876709
+  double(p.y)
+    Which is: -0.83409565687179565
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.17030861973762512
+  double(p.z)
+    Which is: -0.15328305959701538
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.96229922771453857
+  double(p.x)
+    Which is: 0.1540515124797821
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.84861469268798828
+  double(p.y)
+    Which is: -0.88207995891571045
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.056476879864931107
+  double(p.z)
+    Which is: 0.41063955426216125
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.8506699800491333
+  double(p.x)
+    Which is: 0.34063896536827087
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.88257372379302979
+  double(p.y)
+    Which is: 0.93230295181274414
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.054082777351140976
+  double(p.z)
+    Which is: 0.20033477246761322
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.83318686485290527
+  double(p.x)
+    Which is: 0.50948643684387207
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.85877907276153564
+  double(p.y)
+    Which is: -0.10077923536300659
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.20626349747180939
+  double(p.z)
+    Which is: 0.36494660377502441
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.75413811206817627
+  double(p.x)
+    Which is: -0.55303108692169189
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.85246551036834717
+  double(p.y)
+    Which is: 0.051503896713256836
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.23516719043254852
+  double(p.z)
+    Which is: 0.061216879636049271
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.098390102386474609
+  double(p.x)
+    Which is: -0.94780540466308594
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.0071641802787780762
+  double(p.y)
+    Which is: 0.18129479885101318
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.014006209559738636
+  double(p.z)
+    Which is: -0.40430086851119995
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.6258929967880249
+  double(p.x)
+    Which is: 0.77929222583770752
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.98981690406799316
+  double(p.y)
+    Which is: -0.23186731338500977
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.092905789613723755
+  double(p.z)
+    Which is: 0.14118669927120209
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.99181103706359863
+  double(p.x)
+    Which is: -0.4021613597869873
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.064793705940246582
+  double(p.y)
+    Which is: -0.28203171491622925
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.42011177539825439
+  double(p.z)
+    Which is: 0.16720154881477356
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.34719276428222656
+  double(p.x)
+    Which is: -0.58668792247772217
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.99347066879272461
+  double(p.y)
+    Which is: -0.93300992250442505
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.18331329524517059
+  double(p.z)
+    Which is: -0.22676779329776764
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.0709037184715271
+  double(p.x)
+    Which is: 0.07346343994140625
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.069579780101776123
+  double(p.y)
+    Which is: -0.23245000839233398
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.34892120957374573
+  double(p.z)
+    Which is: -0.38872227072715759
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.94822204113006592
+  double(p.x)
+    Which is: -0.85235607624053955
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.17092025279998779
+  double(p.y)
+    Which is: -0.7212754487991333
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: 0.025365257635712624
+  double(p.z)
+    Which is: 0.44064167141914368
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.24609476327896118
+  double(p.x)
+    Which is: -0.48133814334869385
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.99971115589141846
+  double(p.y)
+    Which is: -0.42497462034225464
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.059084344655275345
+  double(p.z)
+    Which is: 0.09446447342634201
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.14912337064743042
+  double(p.x)
+    Which is: 0.80743980407714844
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.9638742208480835
+  double(p.y)
+    Which is: -0.72669249773025513
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: 0.11696427315473557
+  double(p.z)
+    Which is: -0.58065122365951538
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.95247495174407959
+  double(p.x)
+    Which is: -0.24406391382217407
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.0025591850280761719
+  double(p.y)
+    Which is: -0.81096833944320679
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.30173543095588684
+  double(p.z)
+    Which is: 0.57342314720153809
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.13395476341247559
+  double(p.x)
+    Which is: 0.88430988788604736
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.99335086345672607
+  double(p.y)
+    Which is: 0.18286693096160889
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.22056467831134796
+  double(p.z)
+    Which is: -0.53173977136611938
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.097321450710296631
+  double(p.x)
+    Which is: -0.56728672981262207
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.25173842906951904
+  double(p.y)
+    Which is: -0.48051106929779053
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.14120522141456604
+  double(p.z)
+    Which is: -0.26553162932395935
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.95387077331542969
+  double(p.x)
+    Which is: -0.83221960067749023
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.99320864677429199
+  double(p.y)
+    Which is: -0.40710574388504028
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.289693683385849
+  double(p.z)
+    Which is: 0.011293817311525345
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.031269848346710205
+  double(p.x)
+    Which is: -0.81433236598968506
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.30374789237976074
+  double(p.y)
+    Which is: -0.1800190806388855
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.099725142121315002
+  double(p.z)
+    Which is: 0.38127738237380981
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.058943569660186768
+  double(p.x)
+    Which is: 0.52679133415222168
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.010060966014862061
+  double(p.y)
+    Which is: 0.079286813735961914
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.029162587597966194
+  double(p.z)
+    Which is: 0.24454265832901001
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.018745958805084229
+  double(p.x)
+    Which is: 0.94580304622650146
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.18806958198547363
+  double(p.y)
+    Which is: -0.12418997287750244
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.084922604262828827
+  double(p.z)
+    Which is: 0.57054221630096436
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.1442563533782959
+  double(p.x)
+    Which is: 0.15619146823883057
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.0055873990058898926
+  double(p.y)
+    Which is: 0.31896734237670898
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.14653308689594269
+  double(p.z)
+    Which is: -0.57674980163574219
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.82087373733520508
+  double(p.x)
+    Which is: -0.12354221194982529
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.15406274795532227
+  double(p.y)
+    Which is: 0.52335131168365479
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.11356319487094879
+  double(p.z)
+    Which is: -0.41461947560310364
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.66562074422836304
+  double(p.x)
+    Which is: 0.82421064376831055
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.76665163040161133
+  double(p.y)
+    Which is: 0.68537545204162598
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.033621776849031448
+  double(p.z)
+    Which is: 0.23193283379077911
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.87987446784973145
+  double(p.x)
+    Which is: -0.098390102386474609
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.84130275249481201
+  double(p.y)
+    Which is: -0.0071641802787780762
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: 0.3728850781917572
+  double(p.z)
+    Which is: -0.014006209559738636
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.17032867670059204
+  double(p.x)
+    Which is: -0.36456510424613953
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.027448654174804688
+  double(p.y)
+    Which is: 0.86669468879699707
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.55579614639282227
+  double(p.z)
+    Which is: -0.44626709818840027
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.10262042284011841
+  double(p.x)
+    Which is: 0.80743980407714844
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.11666566133499146
+  double(p.y)
+    Which is: -0.72669249773025513
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: 0.11868124455213547
+  double(p.z)
+    Which is: -0.58065122365951538
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.85988128185272217
+  double(p.x)
+    Which is: -0.41052538156509399
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.074263036251068115
+  double(p.y)
+    Which is: -0.95779162645339966
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: 0.51126313209533691
+  double(p.z)
+    Which is: -0.020414579659700394
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.75108969211578369
+  double(p.x)
+    Which is: -0.23328444361686707
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.50726819038391113
+  double(p.y)
+    Which is: 0.38985252380371094
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.13424932956695557
+  double(p.z)
+    Which is: 0.52621781826019287
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.014850139617919922
+  double(p.x)
+    Which is: 0.15260419249534607
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.4115828275680542
+  double(p.y)
+    Which is: 0.097409725189208984
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.012832618318498135
+  double(p.z)
+    Which is: 0.23546941578388214
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.18559658527374268
+  double(p.x)
+    Which is: -0.79727447032928467
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.93030428886413574
+  double(p.y)
+    Which is: 0.98870480060577393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.06904388964176178
+  double(p.z)
+    Which is: -0.37552273273468018
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.92642307281494141
+  double(p.x)
+    Which is: 0.62553286552429199
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.068720877170562744
+  double(p.y)
+    Which is: 0.76251757144927979
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: 0.49144658446311951
+  double(p.z)
+    Which is: 0.52161109447479248
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.82587218284606934
+  double(p.x)
+    Which is: -0.14912337064743042
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.2383989691734314
+  double(p.y)
+    Which is: 0.9638742208480835
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.021947337314486504
+  double(p.z)
+    Which is: 0.11696427315473557
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.038680493831634521
+  double(p.x)
+    Which is: -0.63951802253723145
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.44777166843414307
+  double(p.y)
+    Which is: 0.79579257965087891
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.082110181450843811
+  double(p.z)
+    Which is: 0.21604686975479126
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.0709037184715271
+  double(p.x)
+    Which is: -0.31500360369682312
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.069579780101776123
+  double(p.y)
+    Which is: -0.30352634191513062
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.34892120957374573
+  double(p.z)
+    Which is: 0.34981393814086914
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.042648494243621826
+  double(p.x)
+    Which is: -0.58861488103866577
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.79601669311523438
+  double(p.y)
+    Which is: 0.47045814990997314
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: 0.0031307460740208626
+  double(p.z)
+    Which is: -0.23528750240802765
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.74868404865264893
+  double(p.x)
+    Which is: -0.52226901054382324
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.14126008749008179
+  double(p.y)
+    Which is: 0.021443605422973633
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: 0.056754831224679947
+  double(p.z)
+    Which is: 0.36654382944107056
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.098390102386474609
+  double(p.x)
+    Which is: -0.094592832028865814
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.0071641802787780762
+  double(p.y)
+    Which is: -0.077531635761260986
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.014006209559738636
+  double(p.z)
+    Which is: 0.57347148656845093
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.78586840629577637
+  double(p.x)
+    Which is: 0.59108102321624756
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.353645920753479
+  double(p.y)
+    Which is: 0.8272855281829834
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.039620842784643173
+  double(p.z)
+    Which is: -0.57370173931121826
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.12483813613653183
+  double(p.x)
+    Which is: 0.28825995326042175
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.92587161064147949
+  double(p.y)
+    Which is: 0.53238034248352051
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.019615817815065384
+  double(p.z)
+    Which is: -0.26228317618370056
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.99198508262634277
+  double(p.x)
+    Which is: -0.85395443439483643
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.90219807624816895
+  double(p.y)
+    Which is: 0.56592690944671631
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.032141625881195068
+  double(p.z)
+    Which is: -0.246731236577034
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.044256351888179779
+  double(p.x)
+    Which is: 0.63760161399841309
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.0055873990058898926
+  double(p.y)
+    Which is: 0.34253215789794922
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.14653308689594269
+  double(p.z)
+    Which is: -0.32816576957702637
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.015070997178554535
+  double(p.x)
+    Which is: 0.32351800799369812
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.57347261905670166
+  double(p.y)
+    Which is: 0.219551682472229
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.10416129976511002
+  double(p.z)
+    Which is: 0.21401990950107574
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.96364486217498779
+  double(p.x)
+    Which is: 0.088579036295413971
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.91498327255249023
+  double(p.y)
+    Which is: -0.87122410535812378
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.072759822010993958
+  double(p.z)
+    Which is: -0.59467041492462158
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.15917059779167175
+  double(p.x)
+    Which is: 0.68797743320465088
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.80774593353271484
+  double(p.y)
+    Which is: 0.94794726371765137
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.22692680358886719
+  double(p.z)
+    Which is: -0.074534088373184204
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.91385006904602051
+  double(p.x)
+    Which is: 0.28274473547935486
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.80180001258850098
+  double(p.y)
+    Which is: 0.97647058963775635
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.0124085433781147
+  double(p.z)
+    Which is: 0.37435007095336914
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.03430851548910141
+  double(p.x)
+    Which is: -0.79087501764297485
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: -0.43642514944076538
+  double(p.y)
+    Which is: 0.8146672248840332
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.0069541814737021923
+  double(p.z)
+    Which is: 0.56259500980377197
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: -0.074666403234004974
+  double(p.x)
+    Which is: 0.35118147730827332
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.81038689613342285
+  double(p.y)
+    Which is: -0.53266680240631104
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.24852877855300903
+  double(p.z)
+    Which is: 0.5203244686126709
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.94098448753356934
+  double(p.x)
+    Which is: 0.58933770656585693
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.91422200202941895
+  double(p.y)
+    Which is: -0.63661861419677734
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.098717816174030304
+  double(p.z)
+    Which is: 0.33537805080413818
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.86526882648468018
+  double(p.x)
+    Which is: 0.82198286056518555
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.8423459529876709
+  double(p.y)
+    Which is: -0.71546876430511475
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.17030861973762512
+  double(p.z)
+    Which is: 0.5213625431060791
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.96229922771453857
+  double(p.x)
+    Which is: -0.81859064102172852
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.84861469268798828
+  double(p.y)
+    Which is: 0.43580961227416992
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.056476879864931107
+  double(p.z)
+    Which is: 0.20940786600112915
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.8506699800491333
+  double(p.x)
+    Which is: 0.73372745513916016
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.88257372379302979
+  double(p.y)
+    Which is: 0.16112542152404785
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.054082777351140976
+  double(p.z)
+    Which is: 0.32622027397155762
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.83318686485290527
+  double(p.x)
+    Which is: 0.68440616130828857
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.85877907276153564
+  double(p.y)
+    Which is: 0.045195817947387695
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.20626349747180939
+  double(p.z)
+    Which is: -0.21743293106555939
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:378: Failure
+Expected equality of these values:
+  landmarks.X[k]
+    Which is: 0.75413811206817627
+  double(p.x)
+    Which is: -0.039887987077236176
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:379: Failure
+Expected equality of these values:
+  landmarks.Y[k]
+    Which is: 0.85246551036834717
+  double(p.y)
+    Which is: -0.5908663272857666
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:380: Failure
+Expected equality of these values:
+  landmarks.Z[k]
+    Which is: -0.23516719043254852
+  double(p.z)
+    Which is: 0.22834096848964691
+
+[  FAILED  ] CoherentPointDriftAccelerated.UnionRandomUsesOnePermutationAndFollowsMovingIdentities (1273 ms)
+[----------] 1 test from CoherentPointDriftAccelerated (1273 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (1273 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] CoherentPointDriftAccelerated.UnionRandomUsesOnePermutationAndFollowsMovingIdentities
+
+ 1 FAILED TEST
+
+
+0% tests passed, 1 tests failed out of 1
+
+Label Time Summary:
+geometry    =   1.28 sec*proc (1 test)
+slow        =   1.28 sec*proc (1 test)
+unit        =   1.28 sec*proc (1 test)
+
+Total Test time (real) =   1.43 sec
+
+The following tests FAILED:
+	2432 - CoherentPointDriftAccelerated.UnionRandomUsesOnePermutationAndFollowsMovingIdentities (Failed)
+Errors while running CTest

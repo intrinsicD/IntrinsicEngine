@@ -3189,6 +3189,8 @@ namespace Extrinsic::Sandbox::Editor
                 if (config.NystromSource == Runtime::CoherentPointDriftNystromSource::BoundingBox)
                     changed |= DrawSpecEnumCombo("Box pattern##CPD", fields, "nystrom_box_pattern", config.NystromBoxPattern,
                                                  defaults.NystromBoxPattern);
+                changed |= DrawSpecInputDouble("Local sigma##CPD", fields, "nystrom_local_sigma", config.NystromLocalSigma,
+                                               defaults.NystromLocalSigma, "%.3g");
                 changed |= DrawSpecInputDouble("Error limit##CPD", fields, "nystrom_error_limit", config.NystromErrorLimit,
                                                defaults.NystromErrorLimit, "%.1e");
             }
@@ -3407,11 +3409,11 @@ namespace Extrinsic::Sandbox::Editor
                     const auto path = directory / ("cpd-trace-" + std::string(stamp) + ".csv");
                     std::ofstream csv(path);
                     csv << "iteration,seconds,iteration_seconds,sigma2,negative_log_likelihood,objective,matched_weight,e_step,"
-                           "e_step_error_bound,e_step_sampled_error,kernel_evaluations\n";
+                           "e_step_error_bound,e_step_sampled_error,kernel_evaluations,nystrom_local\n";
                     for (const auto& t : snapshot.Trace)
                         csv << t.Iteration << ',' << t.Seconds << ',' << t.IterationSeconds << ',' << t.Sigma2 << ','
                             << t.NegativeLogLikelihood << ',' << t.Objective << ',' << t.MatchedWeight << ',' << t.EStep << ','
-                            << t.EStepErrorBound << ',' << t.EStepSampledError << ',' << t.KernelEvaluations << '\n';
+                            << t.EStepErrorBound << ',' << t.EStepSampledError << ',' << t.KernelEvaluations << ',' << t.NystromLocal << '\n';
                     state.ExportMessage = csv ? "Saved " + path.string() : "Could not write " + path.string();
                 }
                 if (!state.ExportMessage.empty()) ImGui::TextWrapped("%s", state.ExportMessage.c_str());

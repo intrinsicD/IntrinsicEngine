@@ -35,18 +35,24 @@ and failure states: [paper.md](paper.md).
 | `Truncated` | per-row relative error <= `EStepTolerance`, reported | narrow kernels (late iterations) |
 | `FastGauss` | same bound, exact fixups | measured slower than dense in 3-D; kept for completeness |
 | `Auto` (editor default) | dense or truncated per iteration from a 64-row probe | general use |
-| `Nystrom` | approximate while the kernel is wide (sampled error estimate, not a bound), then exact as `Auto` | large inputs (>= 10^4 points); results report `EStepSampledError` |
+| `Nystrom` | approximate while the kernel is wide (sampled error estimate, not a bound), then bounded neighbor sums or guarded `Auto` fallback | large inputs (>= 10^4 points); results report `EStepSampledError` |
 
 Nystrom landmarks (METHOD-076; `nystrom_landmark_source`, `nystrom_landmark_schedule`,
-`nystrom_box_pattern`) come from the points of both sets (half each, `landmark_*` method) or
+`nystrom_box_pattern`) come from the points of both sets (half each, `landmark_*` method), a uniform random
+permutation of their union (`UnionRandom`, no per-set quota), or
 uniformly from the union of both bounding boxes padded by sigma (random or randomly shifted
 Halton, seed `landmark_seed`). Mixed (default, METHOD-053) draws the target landmarks once and
 the source landmarks every iteration; Fixed draws once (point landmarks follow their points,
 box landmarks keep their coordinates); Resampled draws anew every iteration (refused for point
 landmarks by sample elimination or the tournament order, which the geometry fixes). One draw
 per iteration; landmark doubling keeps the cached landmarks as the prefix. A new source size
-starts the draws afresh. The variants are selectable for measurement; no comparison between
+starts the draws afresh. For `UnionRandom`, Mixed equals Fixed and only the sampling seed
+is used; the separate deformation-kernel sampling method stays unchanged. The variants are selectable for measurement; no comparison between
 them is claimed.
+
+The E-step solves with `W + 1e-6 I` by Cholesky. Below `nystrom_local_sigma` (default 0.2,
+solver coordinate units; 0 disables), it switches directly to the bounded neighbor evaluator.
+`IterationTrace::NystromLocal` distinguishes this planned transition from rejected approximations.
 
 Nonpositive or nonfinite Nyström target sums are recomputed as complete exact rows,
 including their contributions to every E-step statistic, while the existing cost budget

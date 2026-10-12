@@ -1,0 +1,740 @@
+diff --git a/methods/geometry/coherent_point_drift/README.md b/methods/geometry/coherent_point_drift/README.md
+index b3ccd9d6b..ff2ea6d6d 100644
+--- a/methods/geometry/coherent_point_drift/README.md
++++ b/methods/geometry/coherent_point_drift/README.md
+@@ -35,19 +35,25 @@ and failure states: [paper.md](paper.md).
+ | `Truncated` | per-row relative error <= `EStepTolerance`, reported | narrow kernels (late iterations) |
+ | `FastGauss` | same bound, exact fixups | measured slower than dense in 3-D; kept for completeness |
+ | `Auto` (editor default) | dense or truncated per iteration from a 64-row probe | general use |
+-| `Nystrom` | approximate while the kernel is wide (sampled error estimate, not a bound), then exact as `Auto` | large inputs (>= 10^4 points); results report `EStepSampledError` |
++| `Nystrom` | approximate while the kernel is wide (sampled error estimate, not a bound), then bounded neighbor sums or guarded `Auto` fallback | large inputs (>= 10^4 points); results report `EStepSampledError` |
+ 
+ Nystrom landmarks (METHOD-076; `nystrom_landmark_source`, `nystrom_landmark_schedule`,
+-`nystrom_box_pattern`) come from the points of both sets (half each, `landmark_*` method) or
++`nystrom_box_pattern`) come from the points of both sets (half each, `landmark_*` method), a uniform random
++permutation of their union (`UnionRandom`, no per-set quota), or
+ uniformly from the union of both bounding boxes padded by sigma (random or randomly shifted
+ Halton, seed `landmark_seed`). Mixed (default, METHOD-053) draws the target landmarks once and
+ the source landmarks every iteration; Fixed draws once (point landmarks follow their points,
+ box landmarks keep their coordinates); Resampled draws anew every iteration (refused for point
+ landmarks by sample elimination or the tournament order, which the geometry fixes). One draw
+ per iteration; landmark doubling keeps the cached landmarks as the prefix. A new source size
+-starts the draws afresh. The variants are selectable for measurement; no comparison between
++starts the draws afresh. For `UnionRandom`, Mixed equals Fixed and only the sampling seed
++is used; the separate deformation-kernel sampling method stays unchanged. The variants are selectable for measurement; no comparison between
+ them is claimed.
+ 
++The E-step solves with `W + 1e-6 I` by Cholesky. Below `nystrom_local_sigma` (default 0.2,
++solver coordinate units; 0 disables), it switches directly to the bounded neighbor evaluator.
++`IterationTrace::NystromLocal` distinguishes this planned transition from rejected approximations.
++
+ Nonpositive or nonfinite Nyström target sums are recomputed as complete exact rows,
+ including their contributions to every E-step statistic, while the existing cost budget
+ allows it. The sampled accuracy checks and Truncated/Dense fallback remain active.
+diff --git a/methods/geometry/coherent_point_drift/paper.md b/methods/geometry/coherent_point_drift/paper.md
+index e657ae967..3b935d14a 100644
+--- a/methods/geometry/coherent_point_drift/paper.md
++++ b/methods/geometry/coherent_point_drift/paper.md
+@@ -170,29 +170,35 @@ absolutely, by that bound times max |x| P1. Measured on the scaling fixture at t
+ therefore rarely selects it in 3-D, and the explicit policy is slower than dense there
+ (`geometry.coherent_point_drift.accelerated`).
+ 
+-**Nystroem E-step (`Nystrom`, METHOD-053; approximate).** The kernel matrix K_mn =
+-exp(-|x_n - y_m|^2 / 2 sigma^2) is approximated as k(y_m, Z) W^+ k(Z, x_n) on L landmarks Z
+-(farthest points, half from the fixed target, cached, and half from the moving source),
+-W = K(Z, Z) pseudo-inverted on its spectrum above 1e-10 of the largest eigenvalue, as
+-Hirose's BCPD implementation does for wide kernels. Everything runs in landmark space: a =
+-sum_m w_m k(Z, y_m), S_n = k(x_n, Z) W^+ a gives the denominators e^{shift} S_n + c and Pt1;
+-h = sum_n d_n k(Z, x_n) (1, x_n) with d_n = e^{shift} / den_n gives P1_m and PX_m = w_m k(y_m,
+-Z) W^+ h, i.e. (2M + N) L kernel terms plus one L x L eigendecomposition per iteration,
+-reduced over fixed chunks (thread-count independent). The error has no a-priori bound. It
+-is estimated a posteriori on exact rows (32 target denominators, 32 source P1 entries
+-against the approximate denominators) and reported as `EStepSampledError`; on the test
+-fixtures the worst row is within about 3x of the estimate. An iteration whose estimate
+-exceeds `NystromErrorLimit` (default 1e-3), or with a non-positive denominator or P1
+-entry, is retried with twice the landmarks while all attempts stay below half the dense
+-cost (the eigendecomposition counted as 2 L^3 kernel terms), and otherwise redone exactly
+-with the Auto choice between truncated and dense; narrower kernels are then not retried.
+-Small inputs never pay (300 points: exact throughout). Wide kernels are nearly low rank,
+-so the approximation covers the early iterations that dominate the dense cost: at 10^5
+-points the landmarks grow to 1024 and rigid registration takes 128 s instead of 198 s
+-(auto), the low-rank nonrigid solve 30 s instead of 170 s, with the same RMS to the
+-ground truth. The middle phase (kernels too narrow for a few thousand landmarks, too wide
+-for truncation) stays dense; the permutohedral lattice (GEOM-060) remains the candidate
+-there.
++**Nystroem E-step (`Nystrom`; approximate).** The kernel matrix is approximated as
++`K(Y,Z) (W + 1e-6 I)^-1 K(Z,X)`, with `W = K(Z,Z)`. Cholesky factorization and solves
++apply the middle operator without materializing its inverse, as in the
++[author's Gaussian product](https://github.com/ohirose/bcpd/blob/b7b6d01bb703e154f652b6a798c1eacd39b83ca3/base/gaussprod.c).
++Three passes accumulate the source-weighted landmark vector, target denominators and
++reverse sufficient statistics in fixed chunk order. The low-rank deformation kernel G
++uses its separate existing eigendecomposition; this regularization changes only the E-step.
++
++`UnionRandom` samples one uniform permutation over source and target together. Fixed
++identities follow moving points; Mixed is equivalent for this coordinate-independent
++sampler, and Resampled changes the seed once per attempted iteration. The existing
++per-cloud point sampling and box choices remain available. All doubling attempts share
++the draw's prefix. Matching a seed with a different program's RNG does not match identities.
++
++Nonpositive or nonfinite target sums are replaced by complete exact rows within the
++cost budget. Negative/nonfinite source masses reject the approximation. Accuracy is
++estimated on 32 target denominators and 32 source masses; it is not a bound on every
++entry. Failed checks double the landmark count within half the dense cost, conservatively
++budgeting `2 L^3` for the factorization/solves, then fall back to bounded Truncated or Dense.
++Rejection suppresses retries for narrower kernels.
++
++Before attempting Nyström, `sqrt(sigma2) < NystromLocalSigma` selects Truncated
++(default 0.2 in solver units; zero disables), matching the author's sigma trigger.
++`IterationTrace::NystromLocal` marks this transition. Our neighbor evaluator retains its
++relative tail bound and nearest-point shift. Upstream instead uses a hard radius
++`min(7 sigma, 0.15)` by default; it also floors source mass at `1e-20` and takes the absolute
++variance before its square root. Those shortcuts are not used here. Our row repair,
++accuracy guards and native objective-based stopping also remain distinct. Thus this
++adaptation is not a claim of full implementation or trajectory parity with upstream.
+ 
+ **Vulkan E-step (`Vulkan`, METHOD-056; fp32 terms).** Where the Auto choice would run dense
+ (truncation would keep more than a quarter of the pairs), the two-pass form runs on the
+diff --git a/src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp b/src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+index 04cd96792..e49bd0e4f 100644
+--- a/src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
++++ b/src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+@@ -3189,6 +3189,8 @@ namespace Extrinsic::Sandbox::Editor
+                 if (config.NystromSource == Runtime::CoherentPointDriftNystromSource::BoundingBox)
+                     changed |= DrawSpecEnumCombo("Box pattern##CPD", fields, "nystrom_box_pattern", config.NystromBoxPattern,
+                                                  defaults.NystromBoxPattern);
++                changed |= DrawSpecInputDouble("Local sigma##CPD", fields, "nystrom_local_sigma", config.NystromLocalSigma,
++                                               defaults.NystromLocalSigma, "%.3g");
+                 changed |= DrawSpecInputDouble("Error limit##CPD", fields, "nystrom_error_limit", config.NystromErrorLimit,
+                                                defaults.NystromErrorLimit, "%.1e");
+             }
+@@ -3407,11 +3409,11 @@ namespace Extrinsic::Sandbox::Editor
+                     const auto path = directory / ("cpd-trace-" + std::string(stamp) + ".csv");
+                     std::ofstream csv(path);
+                     csv << "iteration,seconds,iteration_seconds,sigma2,negative_log_likelihood,objective,matched_weight,e_step,"
+-                           "e_step_error_bound,e_step_sampled_error,kernel_evaluations\n";
++                           "e_step_error_bound,e_step_sampled_error,kernel_evaluations,nystrom_local\n";
+                     for (const auto& t : snapshot.Trace)
+                         csv << t.Iteration << ',' << t.Seconds << ',' << t.IterationSeconds << ',' << t.Sigma2 << ','
+                             << t.NegativeLogLikelihood << ',' << t.Objective << ',' << t.MatchedWeight << ',' << t.EStep << ','
+-                            << t.EStepErrorBound << ',' << t.EStepSampledError << ',' << t.KernelEvaluations << '\n';
++                            << t.EStepErrorBound << ',' << t.EStepSampledError << ',' << t.KernelEvaluations << ',' << t.NystromLocal << '\n';
+                     state.ExportMessage = csv ? "Saved " + path.string() : "Could not write " + path.string();
+                 }
+                 if (!state.ExportMessage.empty()) ImGui::TextWrapped("%s", state.ExportMessage.c_str());
+diff --git a/src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cpp b/src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cpp
+index bd00ede0d..834e5719b 100644
+--- a/src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cpp
++++ b/src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cpp
+@@ -1332,12 +1332,6 @@ namespace Geometry::CoherentPointDrift::EStep
+             });
+         }
+ 
+-        // Nystroem E-step (METHOD-053): K_mn ~= k(y_m, Z) W^+ k(Z, x_n) with W = K(Z, Z) on
+-        // landmarks Z (farthest points, half from each set), evaluated in landmark space in three
+-        // passes (sources, targets, sources), each reduced over fixed chunks in chunk order so
+-        // the result does not depend on the thread count. Returns false when a denominator or
+-        // P1 entry is not positive, or when the sampled relative error (exact rows: 32 target
+-        // denominators and 32 source P1 entries) exceeds the limit; `out` is then unspecified.
+         // Extends a cached order by a longer one, keeping the cached identities as the prefix (for
+         // progressive orders the result equals the longer order; sample elimination picks another set
+         // for a larger count).
+@@ -1373,6 +1367,25 @@ namespace Geometry::CoherentPointDrift::EStep
+                 UnionBoxPoints(Boxes[0], Boxes[1], landmarks, settings.NystromPattern, seed, LandmarkX, LandmarkY, LandmarkZ);
+                 return;
+             }
++            if (settings.NystromSource == NystromLandmarkSource::UnionRandom)
++            {
++                // Random orders depend only on count and seed; redrawing preserves their prefix
++                // and follows moving source identities without changing G's sampling settings.
++                std::vector<double> x(moved.X.begin(), moved.X.end()), y(moved.Y.begin(), moved.Y.end()),
++                                    z(moved.Z.begin(), moved.Z.end());
++                x.insert(x.end(), target.X.begin(), target.X.end());
++                y.insert(y.end(), target.Y.begin(), target.Y.end());
++                z.insert(z.end(), target.Z.begin(), target.Z.end());
++                PointSampling::Params sampling;
++                sampling.Method = PointSampling::Method::Random;
++                sampling.Seed = settings.NystromSampling.Seed +
++                    (schedule == NystromLandmarkSchedule::Resampled ? NystromDraw : 0u);
++                for (const auto i : SamplePoints({x, y, z}, landmarks, sampling))
++                {
++                    LandmarkX.push_back(x[i]); LandmarkY.push_back(y[i]); LandmarkZ.push_back(z[i]);
++                }
++                return;
++            }
+             const std::size_t half = std::max<std::size_t>(1u, landmarks / 2u);
+             const auto append = [&](const PointSet set, const std::span<const std::uint32_t> order) {
+                 for (std::size_t k = 0; k < std::min(half, order.size()); ++k)
+@@ -1448,15 +1461,10 @@ namespace Geometry::CoherentPointDrift::EStep
+             for (std::size_t a = 0; a < l; ++a)
+                 kernelRow(LandmarkX[a], LandmarkY[a], LandmarkZ[a], gram.col(Eigen::Index(a)).data());
+             evaluations += std::uint64_t(l) * l;
+-            const Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigen(gram);
+-            if (eigen.info() != Eigen::Success) return false;
+-            const double top = eigen.eigenvalues().maxCoeff();
+-            if (!(top > 0.0)) return false;
+-            // Pseudo-inverse on the numerically positive spectrum.
+-            constexpr double kCutoff = 1.0e-10;
+-            const Eigen::VectorXd inverse =
+-                eigen.eigenvalues().unaryExpr([&](const double v) { return v > kCutoff * top ? 1.0 / v : 0.0; });
+-            const Eigen::MatrixXd pseudoInverse = eigen.eigenvectors() * inverse.asDiagonal() * eigen.eigenvectors().transpose();
++            // The ridge bounds the solve even for duplicate or nearly dependent landmarks.
++            gram.diagonal().array() += 1e-6;
++            const Eigen::LLT<Eigen::MatrixXd> factor(gram);
++            if (factor.info() != Eigen::Success) return false;
+ 
+             constexpr std::size_t kGrain = 1024;
+             // Pass 1 (sources): a = sum_m w_m k(Z, y_m).
+@@ -1477,7 +1485,7 @@ namespace Geometry::CoherentPointDrift::EStep
+             evaluations += std::uint64_t(m) * l;
+             for (std::size_t c = 0; c < sourceChunks; ++c)
+                 for (std::size_t k = 0; k < l; ++k) a[Eigen::Index(k)] += partial[c * l + k];
+-            const Eigen::VectorXd g = pseudoInverse * a;
++            const Eigen::VectorXd g = factor.solve(a);
+ 
+             // Pass 2 (targets): shifted sums S_n = k(x_n, Z) g, denominators, Pt1, and
+             // h = sum_n d_n k(Z, x_n) (1, x_n) with d_n = e^{shift} / den_n.
+@@ -1517,7 +1525,7 @@ namespace Geometry::CoherentPointDrift::EStep
+                 for (Eigen::Index column = 0; column < 4; ++column)
+                     for (std::size_t k = 0; k < l; ++k)
+                         h(Eigen::Index(k), column) += partial[(c * 4u + std::size_t(column)) * l + k];
+-            const Eigen::MatrixXd q = pseudoInverse * h;
++            const Eigen::MatrixXd q = factor.solve(h);
+ 
+             // Pass 3 (sources): P1 and PX.
+             ParallelFor(m, kGrain, threads, [&](const std::size_t begin, const std::size_t end)
+@@ -1658,9 +1666,15 @@ namespace Geometry::CoherentPointDrift::EStep
+         if (used == EStepPolicy::Nystrom)
+         {
+             if (!(settings.NystromLandmarks >= 2u && std::isfinite(settings.NystromErrorLimit) && settings.NystromErrorLimit > 0.0) ||
++                !(settings.NystromLocalSigma >= 0.0) || !std::isfinite(settings.NystromLocalSigma) ||
+                 !ValidNystromVariant(settings.NystromSource, settings.NystromSchedule, settings.NystromPattern,
+                                      settings.NystromSampling.Method))
+                 return false;
++        }
++        const bool nystromLocal = used == EStepPolicy::Nystrom && std::sqrt(sigma2) < settings.NystromLocalSigma;
++        if (nystromLocal) used = EStepPolicy::Truncated;
++        if (used == EStepPolicy::Nystrom)
++        {
+             // Another variant (or another source size for Fixed) starts its draws afresh.
+             const std::uint32_t variant = std::uint32_t(settings.NystromSource) | std::uint32_t(settings.NystromSchedule) << 8u |
+                                           std::uint32_t(settings.NystromPattern) << 16u;
+@@ -1672,7 +1686,7 @@ namespace Geometry::CoherentPointDrift::EStep
+             // Landmarks start at the count that last passed (at least the setting) and double while
+             // the approximation is rejected, as long as all attempts together stay below half the
+             // dense cost: (2M + N) L kernel terms plus the single-threaded landmark
+-            // eigendecomposition (measured at about 2 L^3 kernel terms). Small inputs run exactly.
++            // factorization/solves (conservative 2 L^3 budget). Small inputs run exactly.
+             constexpr std::size_t kLandmarkCap = 4096u;
+             const std::size_t cap = std::min(kLandmarkCap, n + m);
+             const double dense = double(n) * double(m);
+@@ -1796,6 +1810,7 @@ namespace Geometry::CoherentPointDrift::EStep
+         if (blocks == 0u && used != EStepPolicy::FastGauss && !nystrom) out.KernelEvaluations *= 2u;
+         out.KernelEvaluations += s.ExtraEvaluations + nystromEvaluations;
+         out.SampledError = nystrom ? sampledError : 0.0;
++        out.NystromLocal = nystromLocal;
+         out.ExternalFallback = externalFallback;
+         s.SourceTreeCurrent = false;
+         s.UpdateScales(out.P1);
+diff --git a/src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cppm b/src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cppm
+index dd32b1887..7136dbe4c 100644
+--- a/src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cppm
++++ b/src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cppm
+@@ -16,14 +16,15 @@
+ //                back to dense when no plan meets the bound. Pays off for wide kernels.
+ //   - Auto:      truncated while its radius stays below the extent, otherwise the fast Gauss
+ //                transform when its planned cost is well below the dense cost, else dense.
+-//   - Nystrom:   approximate (METHOD-053): K ~= K(Y, Z) K(Z, Z)^+ K(Z, X) on farthest-point
+-//                landmarks Z of both sets, O((2M + N) L) kernel terms. Its error has no a-priori
++//   - Nystrom:   approximate (METHOD-053): K ~= K(Y, Z) (K(Z, Z) + 1e-6 I)^-1 K(Z, X),
++//                using Cholesky solves on landmarks Z, O((2M + N) L) kernel terms. Its error has no a-priori
+ //                bound; it is measured on exact sampled rows (Sums::SampledError, an estimate)
+ //                and an iteration whose estimate exceeds Settings::NystromErrorLimit is redone
+ //                exactly with the Auto choice between truncated and dense. Skipped (exact) where
+ //                its planned cost is not below half the dense cost, i.e. for small inputs.
+ //                Nonpositive/nonfinite target sums trigger exact replacement of those rows in
+ //                all statistics, within the same cost budget; sampled checks remain required.
++//                Below NystromLocalSigma, bounded neighbor sums run without a landmark attempt.
+ //   - Vulkan:    the dense two-pass form on a device through Settings::External (METHOD-056;
+ //                fp32 kernel terms, fp64 sums, so not exact). Iterations where Auto would truncate
+ //                stay on the CPU truncated path; rows whose first-order fp32 error estimate
+@@ -106,9 +107,11 @@ export namespace Geometry::CoherentPointDrift::EStep
+     inline constexpr double kExternalErrorLimit = 2.0e-5;
+ 
+     // Nystrom landmark variants (METHOD-076). Points: half from each set with NystromSampling.
++    // UnionRandom: uniform random identities from both sets (no per-set quota), using the
++    // sampling seed only; Mixed equals Fixed, Resampled draws again.
+     // BoundingBox: uniform over the union of the target's and the moved source's axis-aligned
+     // boxes, each padded by sigma (so flat or collinear data still spans a volume).
+-    enum class NystromLandmarkSource : std::uint8_t { Points = 0, BoundingBox };
++    enum class NystromLandmarkSource : std::uint8_t { Points = 0, BoundingBox, UnionRandom };
+     // Mixed (METHOD-053): target landmarks drawn once, source landmarks (or the boxes) taken from
+     // the current source every iteration with the same seed. Fixed: drawn once at the first
+     // Nystrom iteration; point landmarks keep their identity and follow their points, box
+@@ -131,7 +134,7 @@ export namespace Geometry::CoherentPointDrift::EStep
+                                                      const NystromBoxPattern pattern,
+                                                      const PointSampling::Method method) noexcept
+     {
+-        return source <= NystromLandmarkSource::BoundingBox && schedule <= NystromLandmarkSchedule::Resampled &&
++        return source <= NystromLandmarkSource::UnionRandom && schedule <= NystromLandmarkSchedule::Resampled &&
+                pattern <= NystromBoxPattern::Halton &&
+                !(source == NystromLandmarkSource::Points && schedule == NystromLandmarkSchedule::Resampled &&
+                  !ResamplesPointLandmarks(method));
+@@ -147,10 +150,12 @@ export namespace Geometry::CoherentPointDrift::EStep
+         // fixed block count does not fit, a two-pass evaluation (twice the kernel terms, no
+         // partial sums) is used instead.
+         std::size_t PartialBudgetBytes{std::size_t{128} << 20};
+-        // Nystrom: landmarks (half from each set) and the largest accepted sampled relative
++        // Nystrom: landmark count and the largest accepted sampled relative
+         // error of the row denominators and P1 entries.
+         std::uint32_t NystromLandmarks{256u};
+         double NystromErrorLimit{1.0e-3};
++        // Switch to bounded neighbor sums below this sigma in solver units; 0 disables.
++        double NystromLocalSigma{0.2};
+         // Nystrom: how the landmarks are chosen from each set (default exact farthest point), and
+         // the landmark variant; the box seed is NystromSampling.Seed.
+         PointSampling::Params NystromSampling{};
+@@ -175,6 +180,7 @@ export namespace Geometry::CoherentPointDrift::EStep
+         // Nystrom: largest relative error of the sampled exact rows (an estimate, not a bound;
+         // 0 when the iteration ran exactly).
+         double SampledError{0.0};
++        bool NystromLocal{false}; // planned sigma transition, not approximation rejection
+         std::uint64_t KernelEvaluations{0u};
+         // Vulkan: the external evaluator was wanted (Auto would not truncate) but was absent or failed.
+         bool ExternalFallback{false};
+diff --git a/src/geometry/Geometry.Registration.CoherentPointDrift.cpp b/src/geometry/Geometry.Registration.CoherentPointDrift.cpp
+index a4f14d84a..edfe7837b 100644
+--- a/src/geometry/Geometry.Registration.CoherentPointDrift.cpp
++++ b/src/geometry/Geometry.Registration.CoherentPointDrift.cpp
+@@ -182,6 +182,7 @@ namespace Geometry::CoherentPointDrift
+         std::uint64_t Revision{0u};
+         mutable std::uint64_t CachedRevision{~std::uint64_t{0}};
+         mutable std::vector<glm::dvec3> CachedFullSource{};
++        bool LastNystromLocal{false};
+         double LastErrorBound{0.0}, MaxErrorBound{0.0}, LastSampledError{0.0}, MaxSampledError{0.0};
+         std::uint64_t LastKernelEvaluations{0u}, TotalKernelEvaluations{0u};
+ 
+@@ -225,6 +226,7 @@ namespace Geometry::CoherentPointDrift
+             const EStep::Settings settings{.Policy = Config.EStep, .Tolerance = Config.EStepTolerance,
+                                            .Threads = Config.Threads, .NystromLandmarks = Config.NystromLandmarks,
+                                            .NystromErrorLimit = Config.NystromErrorLimit,
++                                           .NystromLocalSigma = Config.NystromLocalSigma,
+                                            .NystromSampling = Config.LandmarkSampling,
+                                            .NystromSource = Config.NystromSource,
+                                            .NystromSchedule = Config.NystromSchedule,
+@@ -240,6 +242,7 @@ namespace Geometry::CoherentPointDrift
+             LastPolicy = sums.Used;
+             LastErrorBound = sums.ErrorBound;
+             LastSampledError = sums.SampledError;
++            LastNystromLocal = sums.NystromLocal;
+             if (sums.ExternalFallback) ++EStepFallbacks;
+             EStepDeviceCpuRows += sums.ExternalCpuRows;
+             MaxSampledError = std::max(MaxSampledError, LastSampledError);
+@@ -648,6 +651,7 @@ namespace Geometry::CoherentPointDrift
+             (params.EStep == EStepPolicy::Nystrom &&
+              (params.NystromLandmarks < 2u || params.NystromLandmarks > kMaxNystromLandmarks ||
+               !(params.NystromErrorLimit > 0.0) || !std::isfinite(params.NystromErrorLimit) ||
++              !(params.NystromLocalSigma >= 0.0) || !std::isfinite(params.NystromLocalSigma) ||
+               !EStep::ValidNystromVariant(params.NystromSource, params.NystromSchedule, params.NystromPattern,
+                                           params.LandmarkSampling.Method))))
+             return fail(Status::InvalidParameters);
+@@ -877,7 +881,7 @@ namespace Geometry::CoherentPointDrift
+                                     .MatchedWeight = matched,
+                                     .Transform = s.Config.Method == Variant::Nonrigid ? glm::dmat4(1.0) : s.WorldTransform(),
+                                     .EStep = s.LastPolicy, .EStepErrorBound = s.LastErrorBound,
+-                                    .EStepSampledError = s.LastSampledError,
++                                    .EStepSampledError = s.LastSampledError, .NystromLocal = s.LastNystromLocal,
+                                     .KernelEvaluations = s.LastKernelEvaluations});
+         }
+         if (floor) s.Stop = Termination::SigmaFloor;
+diff --git a/src/geometry/Geometry.Registration.CoherentPointDrift.cppm b/src/geometry/Geometry.Registration.CoherentPointDrift.cppm
+index f0232a7ac..8a39593d7 100644
+--- a/src/geometry/Geometry.Registration.CoherentPointDrift.cppm
++++ b/src/geometry/Geometry.Registration.CoherentPointDrift.cppm
+@@ -111,10 +111,12 @@ export namespace Geometry::CoherentPointDrift
+         double EStepTolerance{1.0e-6};
+         // Worker threads for the optimized E-step and kernel setup; 0 uses all cores.
+         std::uint32_t Threads{0u};
+-        // Nystrom E-step: landmarks (half from each set) and the largest accepted sampled
++        // Nystrom E-step: landmark count and the largest accepted sampled
+         // relative error; iterations above it run exactly (truncated or dense).
+         std::uint32_t NystromLandmarks{256u};
+         double NystromErrorLimit{1.0e-3};
++        // Switch to bounded neighbor sums below this sigma in solver units; 0 disables.
++        double NystromLocalSigma{0.2};
+         // Nystrom landmark variant (METHOD-076; see EStep::NystromLandmarkSchedule).
+         EStep::NystromLandmarkSource NystromSource{EStep::NystromLandmarkSource::Points};
+         EStep::NystromLandmarkSchedule NystromSchedule{EStep::NystromLandmarkSchedule::Mixed};
+@@ -165,6 +167,7 @@ export namespace Geometry::CoherentPointDrift
+         EStepPolicy EStep{EStepPolicy::Reference}; // policy that evaluated this iteration's E-step
+         double EStepErrorBound{0.0};           // max relative row-denominator error (0: exact)
+         double EStepSampledError{0.0};         // Nystrom: sampled relative error (estimate, not a bound)
++        bool NystromLocal{false};             // planned sigma transition to bounded neighbor sums
+         std::uint64_t KernelEvaluations{0u};
+     };
+ 
+diff --git a/src/runtime/Editor/Operations/Runtime.RegistrationOperations.CoherentPointDrift.cpp b/src/runtime/Editor/Operations/Runtime.RegistrationOperations.CoherentPointDrift.cpp
+index 520eae787..be9dbf621 100644
+--- a/src/runtime/Editor/Operations/Runtime.RegistrationOperations.CoherentPointDrift.cpp
++++ b/src/runtime/Editor/Operations/Runtime.RegistrationOperations.CoherentPointDrift.cpp
+@@ -71,7 +71,7 @@ namespace Extrinsic::Runtime
+     namespace ECSC = ECS::Components;
+     namespace GPD = GeometryProcessingDetail;
+ 
+-    static_assert(int(CPD::EStep::NystromLandmarkSource::BoundingBox) == int(CoherentPointDriftNystromSource::BoundingBox) &&
++    static_assert(int(CPD::EStep::NystromLandmarkSource::UnionRandom) == int(CoherentPointDriftNystromSource::UnionRandom) &&
+                   int(CPD::EStep::NystromLandmarkSchedule::Resampled) == int(CoherentPointDriftNystromSchedule::Resampled) &&
+                   int(CPD::EStep::NystromBoxPattern::Halton) == int(CoherentPointDriftNystromBoxPattern::Halton));
+ 
+@@ -291,6 +291,7 @@ namespace Extrinsic::Runtime
+                                       .EStep = CPD::EStepPolicy(config.EStep), .EStepTolerance = config.EStepTolerance,
+                                       .Threads = config.Threads, .NystromLandmarks = config.NystromLandmarks,
+                                       .NystromErrorLimit = config.NystromErrorLimit,
++                                      .NystromLocalSigma = config.NystromLocalSigma,
+                                       .NystromSource = CPD::EStep::NystromLandmarkSource(config.NystromSource),
+                                       .NystromSchedule = CPD::EStep::NystromLandmarkSchedule(config.NystromSchedule),
+                                       .NystromPattern = CPD::EStep::NystromBoxPattern(config.NystromBoxPattern),
+@@ -431,6 +432,7 @@ namespace Extrinsic::Runtime
+                                               .EStep = std::string(CPD::ToString(trace.EStep)),
+                                               .EStepErrorBound = trace.EStepErrorBound,
+                                               .EStepSampledError = trace.EStepSampledError,
++                                              .NystromLocal = trace.NystromLocal,
+                                               .KernelEvaluations = trace.KernelEvaluations,
+                                               .Seconds = std::chrono::duration<double>(at - run.Started).count(),
+                                               .IterationSeconds = iterationSeconds});
+diff --git a/src/runtime/Editor/Operations/Runtime.RegistrationOperations.cppm b/src/runtime/Editor/Operations/Runtime.RegistrationOperations.cppm
+index e82fceee6..22cc665d0 100644
+--- a/src/runtime/Editor/Operations/Runtime.RegistrationOperations.cppm
++++ b/src/runtime/Editor/Operations/Runtime.RegistrationOperations.cppm
+@@ -147,6 +147,7 @@ export namespace Extrinsic::Runtime
+         std::string EStep{"reference"};    // E-step policy that ran this iteration
+         double EStepErrorBound{0.0};       // its max relative responsibility error (0: exact)
+         double EStepSampledError{0.0};     // Nystrom: sampled relative error (estimate, not a bound)
++        bool NystromLocal{false};        // planned transition to bounded neighbor sums
+         std::uint64_t KernelEvaluations{0u};
+         double Seconds{0.0};               // UI-067: since the run's first step began
+         double IterationSeconds{0.0};      // this iteration's wall time
+diff --git a/src/runtime/Modules/Registration/Runtime.CoherentPointDriftConfig.cpp b/src/runtime/Modules/Registration/Runtime.CoherentPointDriftConfig.cpp
+index c40a3b824..decccc3bd 100644
+--- a/src/runtime/Modules/Registration/Runtime.CoherentPointDriftConfig.cpp
++++ b/src/runtime/Modules/Registration/Runtime.CoherentPointDriftConfig.cpp
+@@ -37,8 +37,9 @@ namespace Extrinsic::Runtime
+                                                               "Fast Gauss transform (bounded error, parallel)",
+                                                               "Nystroem (approximate while wide, then exact)",
+                                                               "Vulkan (dense on the GPU while wide, fp32 terms)"};
+-        constexpr std::array<std::string_view, 2> kNystromSourceNames{"Points of both sets (landmark_method)",
+-                                                                      "Union of both bounding boxes (padded by sigma)"};
++        constexpr std::array<std::string_view, 3> kNystromSourceNames{"Points of both sets (landmark_method)",
++                                                                      "Union of both bounding boxes (padded by sigma)",
++                                                                      "Uniform random points from both sets"};
+         constexpr std::array<std::string_view, 3> kNystromScheduleNames{
+             "Mixed (target drawn once, source every iteration)", "Fixed (drawn once)", "Resampled (new draw every iteration)"};
+         constexpr std::array<std::string_view, 2> kNystromBoxPatternNames{"Uniform random", "Halton (randomly shifted)"};
+@@ -63,10 +64,11 @@ namespace Extrinsic::Runtime
+             ConfigFieldSpec{.Name = "e_step", .Type = FT::Enum, .Description = "How responsibilities are evaluated each iteration; every option reports its backend and error bound.", .EnumNames = kEStepNames},
+             ConfigFieldSpec{.Name = "e_step_tolerance", .Type = FT::Float, .Description = "Truncated, fast Gauss and Auto: bound on each point's relative responsibility error.", .Min = 0, .Max = 1, .ExclusiveMin = true, .ExclusiveMax = true},
+             ConfigFieldSpec{.Name = "threads", .Type = FT::UInt, .Description = "Worker threads for the parallel E-step; 0 uses all cores.", .Min = 0, .Max = 256},
+-            ConfigFieldSpec{.Name = "nystrom_landmarks", .Type = FT::UInt, .Description = "Nystroem: landmark points (half from each set); more landmarks keep the approximation accurate for narrower kernels.", .Min = 2, .Max = 4096},
++            ConfigFieldSpec{.Name = "nystrom_landmarks", .Type = FT::UInt, .Description = "Nystroem: landmark points; more landmarks keep the approximation accurate for narrower kernels.", .Min = 2, .Max = 4096},
+             ConfigFieldSpec{.Name = "nystrom_landmark_source", .Type = FT::Enum, .Description = "Nystroem: where the landmarks come from.", .EnumNames = kNystromSourceNames},
+             ConfigFieldSpec{.Name = "nystrom_landmark_schedule", .Type = FT::Enum, .Description = "Nystroem: when the landmarks are drawn; fixed point landmarks follow their points, fixed box landmarks keep their coordinates.", .EnumNames = kNystromScheduleNames},
+             ConfigFieldSpec{.Name = "nystrom_box_pattern", .Type = FT::Enum, .Description = "Nystroem, bounding-box landmarks: random or structured sampling (seed: landmark_seed).", .EnumNames = kNystromBoxPatternNames},
++            ConfigFieldSpec{.Name = "nystrom_local_sigma", .Type = FT::Float, .Description = "Nystroem: switch to bounded neighbor sums below this sigma in solver units; 0 disables.", .Min = 0},
+             ConfigFieldSpec{.Name = "nystrom_error_limit", .Type = FT::Float, .Description = "Nystroem: largest sampled relative responsibility error accepted; iterations above it run exactly. An estimate from exact sample rows, not a bound.", .Min = 0, .Max = 1, .ExclusiveMin = true},
+             ConfigFieldSpec{.Name = "low_rank", .Type = FT::UInt, .Description = "Nonrigid and Bayesian: 0 solves with the full kernel (at most 8192 source points; see auto_low_rank); k > 0 uses k kernel eigenpairs and allows large sources.", .Min = 0, .Max = 2000},
+             ConfigFieldSpec{.Name = "auto_low_rank", .Type = FT::Bool, .Description = "Nonrigid and Bayesian with low_rank 0: above 1024 registered source points use 100 kernel eigenpairs, since the full kernel costs O(m^3) per iteration; off keeps the exact full kernel."},
+@@ -105,7 +107,7 @@ namespace Extrinsic::Runtime
+                         {"output", unsigned(c.Output)}, {"displacement_name", c.DisplacementName},
+                         {"e_step", unsigned(c.EStep)}, {"e_step_tolerance", c.EStepTolerance},
+                         {"threads", c.Threads}, {"nystrom_landmarks", c.NystromLandmarks},
+-                        {"nystrom_error_limit", c.NystromErrorLimit},
++                        {"nystrom_error_limit", c.NystromErrorLimit}, {"nystrom_local_sigma", c.NystromLocalSigma},
+                         {"nystrom_landmark_source", unsigned(c.NystromSource)},
+                         {"nystrom_landmark_schedule", unsigned(c.NystromSchedule)},
+                         {"nystrom_box_pattern", unsigned(c.NystromBoxPattern)}, {"low_rank", c.LowRank}, {"auto_low_rank", c.AutoLowRank}, {"gamma", c.Gamma}, {"kappa", c.Kappa},
+@@ -146,6 +148,7 @@ namespace Extrinsic::Runtime
+             c.Threads = doc.at("threads").get<std::uint32_t>();
+             c.NystromLandmarks = doc.at("nystrom_landmarks").get<std::uint32_t>();
+             c.NystromErrorLimit = doc.at("nystrom_error_limit").get<double>();
++            c.NystromLocalSigma = doc.at("nystrom_local_sigma").get<double>();
+             c.NystromSource = CoherentPointDriftNystromSource(doc.at("nystrom_landmark_source").get<unsigned>());
+             c.NystromSchedule = CoherentPointDriftNystromSchedule(doc.at("nystrom_landmark_schedule").get<unsigned>());
+             c.NystromBoxPattern = CoherentPointDriftNystromBoxPattern(doc.at("nystrom_box_pattern").get<unsigned>());
+diff --git a/src/runtime/Modules/Registration/Runtime.CoherentPointDriftConfig.cppm b/src/runtime/Modules/Registration/Runtime.CoherentPointDriftConfig.cppm
+index f9d04f4c4..c04b05f84 100644
+--- a/src/runtime/Modules/Registration/Runtime.CoherentPointDriftConfig.cppm
++++ b/src/runtime/Modules/Registration/Runtime.CoherentPointDriftConfig.cppm
+@@ -32,7 +32,7 @@ export namespace Extrinsic::Runtime
+     // CPU choice without a framed device). Values match Geometry::CoherentPointDrift::EStepPolicy.
+     enum class CoherentPointDriftEStep : std::uint8_t { Reference, Dense, Truncated, Auto, FastGauss, Nystrom, Vulkan };
+     // Nystroem landmark variant (METHOD-076); values match Geometry::CoherentPointDrift::EStep's.
+-    enum class CoherentPointDriftNystromSource : std::uint8_t { Points = 0, BoundingBox };
++    enum class CoherentPointDriftNystromSource : std::uint8_t { Points = 0, BoundingBox, UnionRandom };
+     enum class CoherentPointDriftNystromSchedule : std::uint8_t { Mixed = 0, Fixed, Resampled };
+     enum class CoherentPointDriftNystromBoxPattern : std::uint8_t { Random = 0, Halton };
+ 
+@@ -65,6 +65,8 @@ export namespace Extrinsic::Runtime
+         // Nystrom E-step: landmarks and the largest accepted sampled relative error.
+         std::uint32_t NystromLandmarks{256u};
+         double NystromErrorLimit{1.0e-3};
++        // Switch to bounded neighbor sums below this sigma in solver units; 0 disables.
++        double NystromLocalSigma{0.2};
+         CoherentPointDriftNystromSource NystromSource{CoherentPointDriftNystromSource::Points};
+         CoherentPointDriftNystromSchedule NystromSchedule{CoherentPointDriftNystromSchedule::Mixed};
+         CoherentPointDriftNystromBoxPattern NystromBoxPattern{CoherentPointDriftNystromBoxPattern::Random};
+diff --git a/tests/contract/runtime/Test.CoherentPointDriftOperations.cpp b/tests/contract/runtime/Test.CoherentPointDriftOperations.cpp
+index 567eb46c9..6ba5ccd26 100644
+--- a/tests/contract/runtime/Test.CoherentPointDriftOperations.cpp
++++ b/tests/contract/runtime/Test.CoherentPointDriftOperations.cpp
+@@ -106,7 +106,7 @@ TEST(CoherentPointDriftOperations, ConfigRoundTripsAndRejectsUnstorableOutputs)
+                                        .OutlierWeight = 0.2, .Beta = 1.5, .Output = O::DisplacementProperty,
+                                        .DisplacementName = "warp", .EStep = R::CoherentPointDriftEStep::Truncated,
+                                        .EStepTolerance = 1e-4, .Threads = 3, .NystromLandmarks = 128,
+-                                       .NystromErrorLimit = 1e-4, .LowRank = 40, .AutoLowRank = false};
++                                       .NystromErrorLimit = 1e-4, .NystromLocalSigma = 0.35, .LowRank = 40, .AutoLowRank = false};
+     const auto decoded = R::DecodeCoherentPointDriftConfig(R::SerializeCoherentPointDriftConfig(config));
+     ASSERT_TRUE(decoded.has_value());
+     EXPECT_EQ(decoded->Method, M::Nonrigid);
+@@ -119,6 +119,7 @@ TEST(CoherentPointDriftOperations, ConfigRoundTripsAndRejectsUnstorableOutputs)
+     EXPECT_FALSE(decoded->AutoLowRank);
+     EXPECT_EQ(decoded->NystromLandmarks, 128u);
+     EXPECT_EQ(decoded->NystromErrorLimit, 1e-4);
++    EXPECT_EQ(decoded->NystromLocalSigma, 0.35);
+     const auto invalid = [&](R::CoherentPointDriftConfig c) {
+         return !registration.Validate(R::SerializeCoherentPointDriftConfig(c), {}, "test").Usable();
+     };
+@@ -133,6 +134,8 @@ TEST(CoherentPointDriftOperations, ConfigRoundTripsAndRejectsUnstorableOutputs)
+     EXPECT_TRUE(invalid({.NystromLandmarks = 1}));
+     EXPECT_TRUE(invalid({.NystromLandmarks = 5000}));
+     EXPECT_TRUE(invalid({.NystromErrorLimit = 0.0}));
++    EXPECT_TRUE(invalid({.NystromLocalSigma = -0.1}));
++    EXPECT_TRUE(invalid({.NystromLocalSigma = std::numeric_limits<double>::infinity()}));
+     EXPECT_FALSE(registration.Validate(R"({"no_such_field":1})", {}, "test").Usable());
+ }
+ 
+@@ -465,19 +468,38 @@ TEST(CoherentPointDriftOperations, NystromEStepReportsItsBackendAndSampledError)
+ 
+ // METHOD-076: the landmark variant is part of the section and reaches the solver: the same run
+ // with box landmarks reports a different sampled error than with point landmarks.
++TEST(CoherentPointDriftOperations, NystromLocalSigmaReachesTheSolverTrace)
++{
++    Scene s;
++    const auto points = Cloud(150, 11);
++    const auto source = Make(s.Registry, D::PointCloudPoint, points);
++    const auto target = Make(s.Registry, D::PointCloudPoint, points);
++    R::EditorCoherentPointDriftResult failure;
++    const auto run = R::StartEditorCoherentPointDrift(s.Commands(), {.SourceStableEntityId = Id(source),
++        .TargetStableEntityId = Id(target), .EStep = R::CoherentPointDriftEStep::Nystrom,
++        .NystromLocalSigma = 10.0}, failure);
++    ASSERT_TRUE(run) << failure.Message;
++    (void)R::StepEditorCoherentPointDrift(s.Commands(), run, 1);
++    const auto snapshot = R::SnapshotEditorCoherentPointDrift(run);
++    ASSERT_EQ(snapshot.Trace.size(), 1u);
++    EXPECT_EQ(snapshot.Trace[0].EStep, "truncated");
++    EXPECT_TRUE(snapshot.Trace[0].NystromLocal);
++}
++
+ TEST(CoherentPointDriftOperations, NystromLandmarkVariantRoundTripsAndReachesTheSolver)
+ {
+     R::CoherentPointDriftConfig roundTrip{};
+-    roundTrip.NystromSource = R::CoherentPointDriftNystromSource::BoundingBox;
++    roundTrip.NystromSource = R::CoherentPointDriftNystromSource::UnionRandom;
+     roundTrip.NystromSchedule = R::CoherentPointDriftNystromSchedule::Resampled;
+     roundTrip.NystromBoxPattern = R::CoherentPointDriftNystromBoxPattern::Halton;
+     const auto decoded = R::DecodeCoherentPointDriftConfig(R::SerializeCoherentPointDriftConfig(roundTrip));
+     ASSERT_TRUE(decoded.has_value());
+-    EXPECT_EQ(decoded->NystromSource, R::CoherentPointDriftNystromSource::BoundingBox);
++    EXPECT_EQ(decoded->NystromSource, R::CoherentPointDriftNystromSource::UnionRandom);
+     EXPECT_EQ(decoded->NystromSchedule, R::CoherentPointDriftNystromSchedule::Resampled);
+     EXPECT_EQ(decoded->NystromBoxPattern, R::CoherentPointDriftNystromBoxPattern::Halton);
+     const auto registration = R::MakeCoherentPointDriftConfigSectionRegistration();
+     EXPECT_FALSE(registration.Validate(R"({"nystrom_landmark_schedule": 3})", {}, "test").Usable());
++    EXPECT_FALSE(registration.Validate(R"({"nystrom_landmark_source": 3})", {}, "test").Usable());
+ 
+     Scene s;
+     const auto points = Cloud(1500, 23);
+@@ -500,7 +522,8 @@ TEST(CoherentPointDriftOperations, NystromLandmarkVariantRoundTripsAndReachesThe
+     for (const Choice choice : {Choice{Src::Points, Sch::Mixed, Pat::Random, "cpd_points"},
+                                 Choice{Src::BoundingBox, Sch::Mixed, Pat::Random, "cpd_box"},
+                                 Choice{Src::BoundingBox, Sch::Resampled, Pat::Random, "cpd_box_resampled"},
+-                                Choice{Src::BoundingBox, Sch::Mixed, Pat::Halton, "cpd_box_halton"}})
++                                Choice{Src::BoundingBox, Sch::Mixed, Pat::Halton, "cpd_box_halton"},
++                                Choice{Src::UnionRandom, Sch::Fixed, Pat::Random, "cpd_union"}})
+     {
+         R::CoherentPointDriftConfig config{.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target),
+                                            .OutlierWeight = 0.0, .EStep = R::CoherentPointDriftEStep::Nystrom,
+diff --git a/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp b/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp
+index 0555b9f91..0646f82a2 100644
+--- a/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp
++++ b/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp
+@@ -272,6 +272,118 @@ TEST(CoherentPointDriftAccelerated, NystromSampledErrorTracksTheActualExpectatio
+     EXPECT_EQ(exact.P1, fallback.P1);
+ }
+ 
++TEST(CoherentPointDriftAccelerated, NystromRegularizesDependentLandmarks)
++{
++    constexpr std::size_t count = 128;
++    const Soa points(std::vector<glm::vec3>(count, glm::vec3(0.0f)));
++    CPD::EStep::Evaluator evaluator;
++    evaluator.SetTarget(points.View());
++    CPD::EStep::Sums result;
++    std::vector<double> weights(count, std::log(0.5));
++    weights[0] = 0.0;
++    ASSERT_TRUE(evaluator.Evaluate(points.View(), 1.0, std::log(0.3),
++        {.Policy = CPD::EStepPolicy::Nystrom, .NystromLandmarks = 2u, .NystromLocalSigma = 0.0}, result, weights));
++    ASSERT_EQ(result.Used, CPD::EStepPolicy::Nystrom);
++    // Two identical landmarks: 1^T (11^T + ridge I)^-1 1 = 2 / (2 + ridge).
++    const double affinity = 2.0 / (2.0 + 1e-6), mass = affinity * (1.0 + 0.5 * (count - 1));
++    EXPECT_NEAR(result.LogDenominatorSum, count * std::log(mass + 0.3), 1e-11);
++    for (std::size_t i = 0; i < count; ++i)
++    {
++        EXPECT_NEAR(result.Pt1[i], mass / (mass + 0.3), 1e-13);
++        EXPECT_NEAR(result.P1[i], count * std::exp(weights[i]) * affinity / (mass + 0.3), 1e-13);
++        EXPECT_EQ(result.PXx[i], 0.0);
++    }
++}
++
++TEST(CoherentPointDriftAccelerated, NystromLocalTransitionUsesSigmaAndValidatesBeforeSwitch)
++{
++    const Soa points(std::vector<glm::vec3>(128, glm::vec3(0.0f)));
++    for (const double sigma2 : {0.125, 0.25, 0.5})
++        for (const double threshold : {0.0, 0.5})
++        {
++            CPD::EStep::Evaluator evaluator;
++            evaluator.SetTarget(points.View());
++            CPD::EStep::Sums sums;
++            const CPD::EStep::Settings settings{.Policy = CPD::EStepPolicy::Nystrom,
++                .NystromLandmarks = 2u, .NystromLocalSigma = threshold};
++            ASSERT_TRUE(evaluator.Evaluate(points.View(), sigma2, 0.0, settings, sums));
++            const bool local = threshold > 0.0 && sigma2 < 0.25;
++            EXPECT_EQ(sums.NystromLocal, local);
++            EXPECT_EQ(sums.Used, local ? CPD::EStepPolicy::Truncated : CPD::EStepPolicy::Nystrom);
++            if (local) EXPECT_EQ(sums.SampledError, 0.0);
++        }
++    CPD::EStep::Evaluator evaluator;
++    evaluator.SetTarget(points.View());
++    CPD::EStep::Sums sums;
++    for (const double invalid : {-1.0, std::numeric_limits<double>::infinity(),
++                                 std::numeric_limits<double>::quiet_NaN()})
++        EXPECT_FALSE(evaluator.Evaluate(points.View(), 0.01, 0.0,
++            {.Policy = CPD::EStepPolicy::Nystrom, .NystromLocalSigma = invalid}, sums));
++    EXPECT_FALSE(evaluator.Evaluate(points.View(), 0.01, 0.0,
++        {.Policy = CPD::EStepPolicy::Nystrom, .NystromLandmarks = 1u}, sums));
++    for (const auto policy : {CPD::EStepPolicy::Dense, CPD::EStepPolicy::Auto})
++    {
++        ASSERT_TRUE(evaluator.Evaluate(points.View(), 0.01, 0.0, {.Policy = policy}, sums));
++        CPD::EStep::Evaluator disabled;
++        disabled.SetTarget(points.View());
++        CPD::EStep::Sums reference;
++        ASSERT_TRUE(disabled.Evaluate(points.View(), 0.01, 0.0,
++            {.Policy = policy, .NystromLocalSigma = 0.0}, reference));
++        EXPECT_EQ(sums.Used, reference.Used);
++        EXPECT_EQ(sums.P1, reference.P1);
++        EXPECT_FALSE(sums.NystromLocal);
++    }
++}
++
++TEST(CoherentPointDriftAccelerated, UnionRandomUsesOnePermutationAndFollowsMovingIdentities)
++{
++    namespace E = CPD::EStep;
++    namespace P = Geometry::PointSampling;
++    const auto targets = Cloud(400, 172), sources = Cloud(1200, 173);
++    auto displaced = sources;
++    for (auto& point : displaced) point.x += 0.1f;
++    const Soa target(targets), moved(sources), shifted(displaced);
++    auto joint = sources;
++    joint.insert(joint.end(), targets.begin(), targets.end());
++    const Soa joined(joint);
++    for (const auto schedule : {E::NystromLandmarkSchedule::Fixed, E::NystromLandmarkSchedule::Mixed,
++                                E::NystromLandmarkSchedule::Resampled})
++    {
++        E::Evaluator evaluator;
++        evaluator.SetTarget(target.View());
++        E::Settings settings{.Policy = CPD::EStepPolicy::Nystrom, .NystromLandmarks = 16u,
++            .NystromErrorLimit = 1.0, .NystromLocalSigma = 0.0};
++        settings.NystromSource = E::NystromLandmarkSource::UnionRandom;
++        settings.NystromSchedule = schedule;
++        settings.NystromSampling.Method = P::Method::SampleElimination; // ignored by union-random
++        settings.NystromSampling.Seed = 19;
++        for (std::uint64_t draw = 0; draw < 2; ++draw)
++        {
++            settings.NystromLandmarks = draw == 0 ? 16u : 32u;
++            E::Sums sums;
++            ASSERT_TRUE(evaluator.Evaluate(draw == 0 ? moved.View() : shifted.View(), 8.0, 0.0, settings, sums));
++            ASSERT_EQ(sums.Used, CPD::EStepPolicy::Nystrom);
++            const auto landmarks = evaluator.NystromLandmarks();
++            P::Params sampling;
++            sampling.Method = P::Method::Random;
++            sampling.Seed = 19 + (schedule == E::NystromLandmarkSchedule::Resampled ? draw : 0);
++            const auto order = E::SamplePoints(joined.View(), settings.NystromLandmarks, sampling);
++            ASSERT_EQ(landmarks.Size(), order.size());
++            std::size_t sourceCount = 0;
++            for (std::size_t k = 0; k < order.size(); ++k)
++            {
++                const auto i = order[k];
++                sourceCount += i < sources.size();
++                const auto p = i < sources.size() ? (draw == 0 ? sources[i] : displaced[i]) : targets[i - sources.size()];
++                EXPECT_EQ(landmarks.X[k], double(p.x));
++                EXPECT_EQ(landmarks.Y[k], double(p.y));
++                EXPECT_EQ(landmarks.Z[k], double(p.z));
++            }
++            EXPECT_NE(sourceCount, order.size() / 2) << "this seed distinguishes the union draw from a per-cloud quota";
++        }
++    }
++}
++
+ TEST(CoherentPointDriftAccelerated, NystromRepairsInvalidRowsWithAllWeightedStatistics)
+ {
+     // Scalar landmarks 0/1: k(-1,Z) W^-1 k(Z,2) < 0. The other targets are landmarks.
+@@ -299,13 +411,33 @@ TEST(CoherentPointDriftAccelerated, NystromRepairsInvalidRowsWithAllWeightedStat
+             dense.SetTarget(target.View());
+             CPD::EStep::Sums exact, serial;
+             ASSERT_TRUE(dense.Evaluate(moved.View(), 9.0, logC, {.Policy = CPD::EStepPolicy::Dense}, exact, logWeights));
++            // Unrepaired rows at 0 use the regularized 2x2 kernel; the two invalid
++            // rows retain their dense contributions to every sufficient statistic.
++            const double diagonal = 1.0 + 1e-6, determinant = diagonal * diagonal - r * r;
++            std::vector<double> oldMass(count), newMass(count);
++            double oldSum = 0.0, newSum = 0.0;
++            for (std::size_t i = 0; i < count; ++i)
++            {
++                const double w = weighted ? std::exp(weights[i]) : 1.0;
++                const double a = i == 0 ? r : std::pow(r, 4), b = i == 0 ? 1.0 : r;
++                oldSum += oldMass[i] = w * a;
++                newSum += newMass[i] = w * ((diagonal - r * r) * a + (diagonal * r - r) * b) / determinant;
++            }
++            const double c = std::exp(logC), oldDen = oldSum + c, newDen = newSum + c;
++            exact.LogDenominatorSum += (count - 2) * std::log(newDen / oldDen);
++            exact.Matched += (count - 2) * (newSum / newDen - oldSum / oldDen);
++            for (std::size_t i = 0; i < count; ++i)
++            {
++                exact.P1[i] += (count - 2) * (newMass[i] / newDen - oldMass[i] / oldDen);
++                if (i != 1 && i != 33) exact.Pt1[i] = newSum / newDen;
++            }
+             for (const std::uint32_t threads : {1u, 4u})
+             {
+                 CPD::EStep::Evaluator evaluator;
+                 evaluator.SetTarget(target.View());
+                 CPD::EStep::Sums result;
+                 ASSERT_TRUE(evaluator.Evaluate(moved.View(), 9.0, logC,
+-                    {.Policy = CPD::EStepPolicy::Nystrom, .Threads = threads, .NystromLandmarks = 2u}, result, logWeights));
++                    {.Policy = CPD::EStepPolicy::Nystrom, .Threads = threads, .NystromLandmarks = 2u, .NystromLocalSigma = 0.0}, result, logWeights));
+                 ASSERT_EQ(result.Used, CPD::EStepPolicy::Nystrom);
+                 // Two exact rows; one target sample is already exact and is not repeated.
+                 EXPECT_EQ(result.KernelEvaluations, 4u + 6u * count + 4u * count + 63u * count);
+@@ -355,7 +487,7 @@ TEST(CoherentPointDriftAccelerated, NystromRepairsStillRespectAccuracyAndCostGua
+             evaluator.SetTarget(target.View());
+             CPD::EStep::Sums result;
+             ASSERT_TRUE(evaluator.Evaluate(moved.View(), 1.0, 0.0,
+-                {.Policy = CPD::EStepPolicy::Nystrom, .NystromLandmarks = 2u, .NystromErrorLimit = limit}, result));
++                {.Policy = CPD::EStepPolicy::Nystrom, .NystromLandmarks = 2u, .NystromErrorLimit = limit, .NystromLocalSigma = 0.0}, result));
+             if (!excessiveRepair && limit == 1.0)
+             {
+                 EXPECT_EQ(result.Used, CPD::EStepPolicy::Nystrom);
+@@ -728,7 +860,7 @@ TEST(CoherentPointDriftAccelerated, InvalidAccelerationSettingsFailClosed)
+                   CPD::Status::InvalidParameters);
+     for (const double limit : {0.0, -1.0, std::numeric_limits<double>::quiet_NaN()})
+         EXPECT_EQ(CPD::Register(source, source, CPD::Params{.EStep = CPD::EStepPolicy::Nystrom,
+-                                                            .NystromErrorLimit = limit}).State,
++                                                            .NystromErrorLimit = limit, .NystromLocalSigma = 0.0}).State,
+                   CPD::Status::InvalidParameters);
+     // The tolerance is ignored by the reference path.
+     EXPECT_TRUE(CPD::Register(source, source, CPD::Params{.EStepTolerance = 0.0}).Succeeded());

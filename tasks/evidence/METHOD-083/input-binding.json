@@ -1,0 +1,200 @@
+{
+  "full_1": {
+    "frame": {
+      "source_mean": [
+        -0.0044556378024934295,
+        -0.002356496906335009,
+        0.0004655171684780339
+      ],
+      "target_mean": [
+        0.30219202130559336,
+        -0.2040259615986641,
+        0.17682656941281416
+      ],
+      "scale": 0.9570232881770707
+    },
+    "original_sha256": "9834f1c6cd7c3ea1c3a34b9f719cb1f724f98d22b6bdbd8b0c383e8f0a312856",
+    "files": {
+      "source": {
+        "path": "/tmp/method083/inputs/full_1_source.txt",
+        "count": 100000,
+        "sha256": "06772902076e487a865aaf7aef911b65830a45b3381cdf79804777577ca4d87d"
+      },
+      "target": {
+        "path": "/tmp/method083/inputs/full_1_target.txt",
+        "count": 100000,
+        "sha256": "ea141d79995a81bdbbae5180c3be3d8ae10211a29dbb31e4fcd03391a84b5e82"
+      },
+      "truth": {
+        "path": "/tmp/method083/inputs/full_1_truth.txt",
+        "count": 100000,
+        "sha256": "d03f9b29077bc9b11a5fc538aa7d2be923b1fff1cc062a3b96da4952dbe18795"
+      }
+    }
+  },
+  "full_2": {
+    "frame": {
+      "source_mean": [
+        -0.0007885043128731559,
+        -0.00038302742045465496,
+        0.0014003794597877482
+      ],
+      "target_mean": [
+        0.3066536900648988,
+        -0.20096380210436007,
+        0.17820432405845976
+      ],
+      "scale": 0.9578304829751381
+    },
+    "original_sha256": "12caf6e6f2c156e880aeef70298679325b2d6b385e31c294b6d7feb85d87c118",
+    "files": {
+      "source": {
+        "path": "/tmp/method083/inputs/full_2_source.txt",
+        "count": 100000,
+        "sha256": "9e9e862d02a29ce46c9b858dcc0deffd52181dd32123a673efe49f502d452488"
+      },
+      "target": {
+        "path": "/tmp/method083/inputs/full_2_target.txt",
+        "count": 100000,
+        "sha256": "c89e352337b7b27423de34680e065890c8da2ab15a181e8fca820bb79bc145d6"
+      },
+      "truth": {
+        "path": "/tmp/method083/inputs/full_2_truth.txt",
+        "count": 100000,
+        "sha256": "ffc701fb0051717763c8b7a38b72a6b3dc58486b2c345f867d753fcf8e956f57"
+      }
+    }
+  },
+  "full_3": {
+    "frame": {
+      "source_mean": [
+        0.0013802285075578675,
+        0.000646040041386799,
+        -0.00020131762606364647
+      ],
+      "target_mean": [
+        0.3068324122606924,
+        -0.1997296609453504,
+        0.17565187529332957
+      ],
+      "scale": 0.9582420674545397
+    },
+    "original_sha256": "02ed4715efffa6d6210443491b22a98f37f4b6ef17a50b13f8d30e903d0ce260",
+    "files": {
+      "source": {
+        "path": "/tmp/method083/inputs/full_3_source.txt",
+        "count": 100000,
+        "sha256": "8ecc83cbd0b06a6752bd099a75457b5594f5477ac8922e3a6084947428869e85"
+      },
+      "target": {
+        "path": "/tmp/method083/inputs/full_3_target.txt",
+        "count": 100000,
+        "sha256": "c41bc6d99cbb6e04ba6420ec0b2aabb7bb2509b69f447bce64e9819f1daf9542"
+      },
+      "truth": {
+        "path": "/tmp/method083/inputs/full_3_truth.txt",
+        "count": 100000,
+        "sha256": "55b1e309da4c25acd5e535268d330dd9c16bd3ffbf857a3fee681325daa8d847"
+      }
+    }
+  },
+  "partial_1": {
+    "frame": {
+      "source_mean": [
+        -0.0044556378024934295,
+        -0.002356496906335009,
+        0.0004655171684780339
+      ],
+      "target_mean": [
+        -0.24216560748515065,
+        -0.29750809860201893,
+        0.24116589107996303
+      ],
+      "scale": 0.8468742841367569
+    },
+    "original_sha256": "41a867b05d31322d2a6c78f51796995d2834da7cfa6a990e4afe85341aa2bf86",
+    "files": {
+      "source": {
+        "path": "/tmp/method083/inputs/partial_1_source.txt",
+        "count": 100000,
+        "sha256": "2b3d3b0402b937efe4514bdd92f7d9f2eb19395ffe972479b36acfc9ecbfbce5"
+      },
+      "target": {
+        "path": "/tmp/method083/inputs/partial_1_target.txt",
+        "count": 47355,
+        "sha256": "f79800821b2e064a70e2f7f99a481789857ed73ca640049db74d5eb38bf575ea"
+      },
+      "truth": {
+        "path": "/tmp/method083/inputs/partial_1_truth.txt",
+        "count": 100000,
+        "sha256": "36f341d68873aecddce7b5a02fdf0e565a6fea58f191932f3fdc2f1d39dc9d69"
+      }
+    }
+  },
+  "partial_2": {
+    "frame": {
+      "source_mean": [
+        -0.0007885043128731559,
+        -0.00038302742045465496,
+        0.0014003794597877482
+      ],
+      "target_mean": [
+        -0.24280390044658087,
+        -0.29439392441582174,
+        0.24539132371418834
+      ],
+      "scale": 0.8487340725114515
+    },
+    "original_sha256": "d83f37c55182c8bb976ed69a5b318b9b0bd4abd58cf1ac1465d2a2ebec1282f6",
+    "files": {
+      "source": {
+        "path": "/tmp/method083/inputs/partial_2_source.txt",
+        "count": 100000,
+        "sha256": "4604192f425c3b86c5ce0ae3f76b671e796033cfa55fa9978e3710037864a7ef"
+      },
+      "target": {
+        "path": "/tmp/method083/inputs/partial_2_target.txt",
+        "count": 47122,
+        "sha256": "b4103dfcfe26487c5746b99e42bd0b0dae5777d46b364f0582abda654801eade"
+      },
+      "truth": {
+        "path": "/tmp/method083/inputs/partial_2_truth.txt",
+        "count": 100000,
+        "sha256": "119da12d08f09bb6a4f4951c65a838f0b681c3105711b8dad0ed7ec7096595b4"
+      }
+    }
+  },
+  "partial_3": {
+    "frame": {
+      "source_mean": [
+        0.0013802285075578675,
+        0.000646040041386799,
+        -0.00020131762606364647
+      ],
+      "target_mean": [
+        -0.24362421373559784,
+        -0.29242253003749424,
+        0.24303005631408606
+      ],
+      "scale": 0.8487208645023284
+    },
+    "original_sha256": "bd9d425c17acb8f5be604c8dc5650fc371f558a81a81845d84a945d6c448fcbc",
+    "files": {
+      "source": {
+        "path": "/tmp/method083/inputs/partial_3_source.txt",
+        "count": 100000,
+        "sha256": "e84e2d74556ecbb56a47ba0182eca4b3891a46e8b5687eb782eea2c7d8b579fa"
+      },
+      "target": {
+        "path": "/tmp/method083/inputs/partial_3_target.txt",
+        "count": 47080,
+        "sha256": "f21207672324e19e55b6ea27e9567215d369f7a3c353db65326d4a9bb4aabf2c"
+      },
+      "truth": {
+        "path": "/tmp/method083/inputs/partial_3_truth.txt",
+        "count": 100000,
+        "sha256": "e0980de932223ec31cf7b5df56bd3b88a78d46f4fb285061d8e73cbbf0227572"
+      }
+    }
+  }
+}

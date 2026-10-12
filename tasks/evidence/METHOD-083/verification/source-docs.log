@@ -1,0 +1,6 @@
+[source-documentation] files=4 interfaces=4 cpp=4 readmes=0 errors=0 review=41
+[source-documentation] rules: declaration-comment=39, file-synopsis-long=2
+HOTSPOT src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cppm findings=15 errors=0 review=15
+HOTSPOT src/runtime/Editor/Operations/Runtime.RegistrationOperations.cppm findings=12 errors=0 review=12
+HOTSPOT src/geometry/Geometry.Registration.CoherentPointDrift.cppm findings=9 errors=0 review=9
+HOTSPOT src/runtime/Modules/Registration/Runtime.CoherentPointDriftConfig.cppm findings=5 errors=0 review=5

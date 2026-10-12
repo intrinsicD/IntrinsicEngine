@@ -1,0 +1,11 @@
+{
+  "arm": "baseline",
+  "runner_sha256": "45dac2a54bd5bb6d84ed063aeffb0b3d5e1ed9e6b60702628222b017b5c4a7a9",
+  "binary_sha256": "b9cf377f2a18fe89b0585848082dce255262c43c4636bf84fc8942d04bb7bc1a",
+  "geometry": {
+    "src/geometry/Geometry.Registration.CoherentPointDrift.cpp": "34346e59d0634310202807f7d277e72d90bce3319e05759400222a332eb965ba",
+    "src/geometry/Geometry.Registration.CoherentPointDrift.cppm": "ead29eaf3bed5350ebbf788b735c539276c0b0c004c6d6ab3a67a4d0f47642f0",
+    "src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cpp": "31ca94589984270b014eb6072cd56eda5cfb11309e46c5b101f8e68ffacd97c0",
+    "src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cppm": "e1b31ab5c9b5506d94db64308be1c27141b6578cc642de6ee7158a326f0f6e4e"
+  }
+}

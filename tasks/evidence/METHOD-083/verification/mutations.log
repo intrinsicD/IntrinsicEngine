@@ -1,0 +1,3 @@
+PASS: union mutation rejected by its contract test
+PASS: switch mutation rejected by its contract test
+PASS: repair mutation rejected by its contract test

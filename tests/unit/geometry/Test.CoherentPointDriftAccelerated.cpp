@@ -272,6 +272,118 @@ TEST(CoherentPointDriftAccelerated, NystromSampledErrorTracksTheActualExpectatio
     EXPECT_EQ(exact.P1, fallback.P1);
 }
 
+TEST(CoherentPointDriftAccelerated, NystromRegularizesDependentLandmarks)
+{
+    constexpr std::size_t count = 128;
+    const Soa points(std::vector<glm::vec3>(count, glm::vec3(0.0f)));
+    CPD::EStep::Evaluator evaluator;
+    evaluator.SetTarget(points.View());
+    CPD::EStep::Sums result;
+    std::vector<double> weights(count, std::log(0.5));
+    weights[0] = 0.0;
+    ASSERT_TRUE(evaluator.Evaluate(points.View(), 1.0, std::log(0.3),
+        {.Policy = CPD::EStepPolicy::Nystrom, .NystromLandmarks = 2u, .NystromLocalSigma = 0.0}, result, weights));
+    ASSERT_EQ(result.Used, CPD::EStepPolicy::Nystrom);
+    // Two identical landmarks: 1^T (11^T + ridge I)^-1 1 = 2 / (2 + ridge).
+    const double affinity = 2.0 / (2.0 + 1e-6), mass = affinity * (1.0 + 0.5 * (count - 1));
+    EXPECT_NEAR(result.LogDenominatorSum, count * std::log(mass + 0.3), 1e-11);
+    for (std::size_t i = 0; i < count; ++i)
+    {
+        EXPECT_NEAR(result.Pt1[i], mass / (mass + 0.3), 1e-13);
+        EXPECT_NEAR(result.P1[i], count * std::exp(weights[i]) * affinity / (mass + 0.3), 1e-13);
+        EXPECT_EQ(result.PXx[i], 0.0);
+    }
+}
+
+TEST(CoherentPointDriftAccelerated, NystromLocalTransitionUsesSigmaAndValidatesBeforeSwitch)
+{
+    const Soa points(std::vector<glm::vec3>(128, glm::vec3(0.0f)));
+    for (const double sigma2 : {0.125, 0.25, 0.5})
+        for (const double threshold : {0.0, 0.5})
+        {
+            CPD::EStep::Evaluator evaluator;
+            evaluator.SetTarget(points.View());
+            CPD::EStep::Sums sums;
+            const CPD::EStep::Settings settings{.Policy = CPD::EStepPolicy::Nystrom,
+                .NystromLandmarks = 2u, .NystromLocalSigma = threshold};
+            ASSERT_TRUE(evaluator.Evaluate(points.View(), sigma2, 0.0, settings, sums));
+            const bool local = threshold > 0.0 && sigma2 < 0.25;
+            EXPECT_EQ(sums.NystromLocal, local);
+            EXPECT_EQ(sums.Used, local ? CPD::EStepPolicy::Truncated : CPD::EStepPolicy::Nystrom);
+            if (local) EXPECT_EQ(sums.SampledError, 0.0);
+        }
+    CPD::EStep::Evaluator evaluator;
+    evaluator.SetTarget(points.View());
+    CPD::EStep::Sums sums;
+    for (const double invalid : {-1.0, std::numeric_limits<double>::infinity(),
+                                 std::numeric_limits<double>::quiet_NaN()})
+        EXPECT_FALSE(evaluator.Evaluate(points.View(), 0.01, 0.0,
+            {.Policy = CPD::EStepPolicy::Nystrom, .NystromLocalSigma = invalid}, sums));
+    EXPECT_FALSE(evaluator.Evaluate(points.View(), 0.01, 0.0,
+        {.Policy = CPD::EStepPolicy::Nystrom, .NystromLandmarks = 1u}, sums));
+    for (const auto policy : {CPD::EStepPolicy::Dense, CPD::EStepPolicy::Auto})
+    {
+        ASSERT_TRUE(evaluator.Evaluate(points.View(), 0.01, 0.0, {.Policy = policy}, sums));
+        CPD::EStep::Evaluator disabled;
+        disabled.SetTarget(points.View());
+        CPD::EStep::Sums reference;
+        ASSERT_TRUE(disabled.Evaluate(points.View(), 0.01, 0.0,
+            {.Policy = policy, .NystromLocalSigma = 0.0}, reference));
+        EXPECT_EQ(sums.Used, reference.Used);
+        EXPECT_EQ(sums.P1, reference.P1);
+        EXPECT_FALSE(sums.NystromLocal);
+    }
+}
+
+TEST(CoherentPointDriftAccelerated, UnionRandomUsesOnePermutationAndFollowsMovingIdentities)
+{
+    namespace E = CPD::EStep;
+    namespace P = Geometry::PointSampling;
+    const auto targets = Cloud(400, 172), sources = Cloud(1200, 173);
+    auto displaced = sources;
+    for (auto& point : displaced) point.x += 0.1f;
+    const Soa target(targets), moved(sources), shifted(displaced);
+    auto joint = sources;
+    joint.insert(joint.end(), targets.begin(), targets.end());
+    const Soa joined(joint);
+    for (const auto schedule : {E::NystromLandmarkSchedule::Fixed, E::NystromLandmarkSchedule::Mixed,
+                                E::NystromLandmarkSchedule::Resampled})
+    {
+        E::Evaluator evaluator;
+        evaluator.SetTarget(target.View());
+        E::Settings settings{.Policy = CPD::EStepPolicy::Nystrom, .NystromLandmarks = 16u,
+            .NystromErrorLimit = 1.0, .NystromLocalSigma = 0.0};
+        settings.NystromSource = E::NystromLandmarkSource::UnionRandom;
+        settings.NystromSchedule = schedule;
+        settings.NystromSampling.Method = P::Method::SampleElimination; // ignored by union-random
+        settings.NystromSampling.Seed = 19;
+        for (std::uint64_t draw = 0; draw < 2; ++draw)
+        {
+            settings.NystromLandmarks = draw == 0 ? 16u : 32u;
+            E::Sums sums;
+            ASSERT_TRUE(evaluator.Evaluate(draw == 0 ? moved.View() : shifted.View(), 8.0, 0.0, settings, sums));
+            ASSERT_EQ(sums.Used, CPD::EStepPolicy::Nystrom);
+            const auto landmarks = evaluator.NystromLandmarks();
+            P::Params sampling;
+            sampling.Method = P::Method::Random;
+            sampling.Seed = 19 + (schedule == E::NystromLandmarkSchedule::Resampled ? draw : 0);
+            const auto order = E::SamplePoints(joined.View(), settings.NystromLandmarks, sampling);
+            ASSERT_EQ(landmarks.Size(), order.size());
+            std::size_t sourceCount = 0;
+            for (std::size_t k = 0; k < order.size(); ++k)
+            {
+                const auto i = order[k];
+                sourceCount += i < sources.size();
+                const auto p = i < sources.size() ? (draw == 0 ? sources[i] : displaced[i]) : targets[i - sources.size()];
+                EXPECT_EQ(landmarks.X[k], double(p.x));
+                EXPECT_EQ(landmarks.Y[k], double(p.y));
+                EXPECT_EQ(landmarks.Z[k], double(p.z));
+            }
+            EXPECT_NE(sourceCount, order.size() / 2) << "this seed distinguishes the union draw from a per-cloud quota";
+        }
+    }
+}
+
 TEST(CoherentPointDriftAccelerated, NystromRepairsInvalidRowsWithAllWeightedStatistics)
 {
     // Scalar landmarks 0/1: k(-1,Z) W^-1 k(Z,2) < 0. The other targets are landmarks.
@@ -299,13 +411,33 @@ TEST(CoherentPointDriftAccelerated, NystromRepairsInvalidRowsWithAllWeightedStat
             dense.SetTarget(target.View());
             CPD::EStep::Sums exact, serial;
             ASSERT_TRUE(dense.Evaluate(moved.View(), 9.0, logC, {.Policy = CPD::EStepPolicy::Dense}, exact, logWeights));
+            // Unrepaired rows at 0 use the regularized 2x2 kernel; the two invalid
+            // rows retain their dense contributions to every sufficient statistic.
+            const double diagonal = 1.0 + 1e-6, determinant = diagonal * diagonal - r * r;
+            std::vector<double> oldMass(count), newMass(count);
+            double oldSum = 0.0, newSum = 0.0;
+            for (std::size_t i = 0; i < count; ++i)
+            {
+                const double w = weighted ? std::exp(weights[i]) : 1.0;
+                const double a = i == 0 ? r : std::pow(r, 4), b = i == 0 ? 1.0 : r;
+                oldSum += oldMass[i] = w * a;
+                newSum += newMass[i] = w * ((diagonal - r * r) * a + (diagonal * r - r) * b) / determinant;
+            }
+            const double c = std::exp(logC), oldDen = oldSum + c, newDen = newSum + c;
+            exact.LogDenominatorSum += (count - 2) * std::log(newDen / oldDen);
+            exact.Matched += (count - 2) * (newSum / newDen - oldSum / oldDen);
+            for (std::size_t i = 0; i < count; ++i)
+            {
+                exact.P1[i] += (count - 2) * (newMass[i] / newDen - oldMass[i] / oldDen);
+                if (i != 1 && i != 33) exact.Pt1[i] = newSum / newDen;
+            }
             for (const std::uint32_t threads : {1u, 4u})
             {
                 CPD::EStep::Evaluator evaluator;
                 evaluator.SetTarget(target.View());
                 CPD::EStep::Sums result;
                 ASSERT_TRUE(evaluator.Evaluate(moved.View(), 9.0, logC,
-                    {.Policy = CPD::EStepPolicy::Nystrom, .Threads = threads, .NystromLandmarks = 2u}, result, logWeights));
+                    {.Policy = CPD::EStepPolicy::Nystrom, .Threads = threads, .NystromLandmarks = 2u, .NystromLocalSigma = 0.0}, result, logWeights));
                 ASSERT_EQ(result.Used, CPD::EStepPolicy::Nystrom);
                 // Two exact rows; one target sample is already exact and is not repeated.
                 EXPECT_EQ(result.KernelEvaluations, 4u + 6u * count + 4u * count + 63u * count);
@@ -355,7 +487,7 @@ TEST(CoherentPointDriftAccelerated, NystromRepairsStillRespectAccuracyAndCostGua
             evaluator.SetTarget(target.View());
             CPD::EStep::Sums result;
             ASSERT_TRUE(evaluator.Evaluate(moved.View(), 1.0, 0.0,
-                {.Policy = CPD::EStepPolicy::Nystrom, .NystromLandmarks = 2u, .NystromErrorLimit = limit}, result));
+                {.Policy = CPD::EStepPolicy::Nystrom, .NystromLandmarks = 2u, .NystromErrorLimit = limit, .NystromLocalSigma = 0.0}, result));
             if (!excessiveRepair && limit == 1.0)
             {
                 EXPECT_EQ(result.Used, CPD::EStepPolicy::Nystrom);
@@ -728,7 +860,7 @@ TEST(CoherentPointDriftAccelerated, InvalidAccelerationSettingsFailClosed)
                   CPD::Status::InvalidParameters);
     for (const double limit : {0.0, -1.0, std::numeric_limits<double>::quiet_NaN()})
         EXPECT_EQ(CPD::Register(source, source, CPD::Params{.EStep = CPD::EStepPolicy::Nystrom,
-                                                            .NystromErrorLimit = limit}).State,
+                                                            .NystromErrorLimit = limit, .NystromLocalSigma = 0.0}).State,
                   CPD::Status::InvalidParameters);
     // The tolerance is ignored by the reference path.
     EXPECT_TRUE(CPD::Register(source, source, CPD::Params{.EStepTolerance = 0.0}).Succeeded());

@@ -1332,12 +1332,6 @@ namespace Geometry::CoherentPointDrift::EStep
             });
         }
 
-        // Nystroem E-step (METHOD-053): K_mn ~= k(y_m, Z) W^+ k(Z, x_n) with W = K(Z, Z) on
-        // landmarks Z (farthest points, half from each set), evaluated in landmark space in three
-        // passes (sources, targets, sources), each reduced over fixed chunks in chunk order so
-        // the result does not depend on the thread count. Returns false when a denominator or
-        // P1 entry is not positive, or when the sampled relative error (exact rows: 32 target
-        // denominators and 32 source P1 entries) exceeds the limit; `out` is then unspecified.
         // Extends a cached order by a longer one, keeping the cached identities as the prefix (for
         // progressive orders the result equals the longer order; sample elimination picks another set
         // for a larger count).
@@ -1371,6 +1365,25 @@ namespace Geometry::CoherentPointDrift::EStep
                 const std::uint64_t seed =
                     settings.NystromSampling.Seed + (schedule == NystromLandmarkSchedule::Resampled ? NystromDraw : 0u);
                 UnionBoxPoints(Boxes[0], Boxes[1], landmarks, settings.NystromPattern, seed, LandmarkX, LandmarkY, LandmarkZ);
+                return;
+            }
+            if (settings.NystromSource == NystromLandmarkSource::UnionRandom)
+            {
+                // Random orders depend only on count and seed; redrawing preserves their prefix
+                // and follows moving source identities without changing G's sampling settings.
+                std::vector<double> x(moved.X.begin(), moved.X.end()), y(moved.Y.begin(), moved.Y.end()),
+                                    z(moved.Z.begin(), moved.Z.end());
+                x.insert(x.end(), target.X.begin(), target.X.end());
+                y.insert(y.end(), target.Y.begin(), target.Y.end());
+                z.insert(z.end(), target.Z.begin(), target.Z.end());
+                PointSampling::Params sampling;
+                sampling.Method = PointSampling::Method::Random;
+                sampling.Seed = settings.NystromSampling.Seed +
+                    (schedule == NystromLandmarkSchedule::Resampled ? NystromDraw : 0u);
+                for (const auto i : SamplePoints({x, y, z}, landmarks, sampling))
+                {
+                    LandmarkX.push_back(x[i]); LandmarkY.push_back(y[i]); LandmarkZ.push_back(z[i]);
+                }
                 return;
             }
             const std::size_t half = std::max<std::size_t>(1u, landmarks / 2u);
@@ -1448,15 +1461,10 @@ namespace Geometry::CoherentPointDrift::EStep
             for (std::size_t a = 0; a < l; ++a)
                 kernelRow(LandmarkX[a], LandmarkY[a], LandmarkZ[a], gram.col(Eigen::Index(a)).data());
             evaluations += std::uint64_t(l) * l;
-            const Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigen(gram);
-            if (eigen.info() != Eigen::Success) return false;
-            const double top = eigen.eigenvalues().maxCoeff();
-            if (!(top > 0.0)) return false;
-            // Pseudo-inverse on the numerically positive spectrum.
-            constexpr double kCutoff = 1.0e-10;
-            const Eigen::VectorXd inverse =
-                eigen.eigenvalues().unaryExpr([&](const double v) { return v > kCutoff * top ? 1.0 / v : 0.0; });
-            const Eigen::MatrixXd pseudoInverse = eigen.eigenvectors() * inverse.asDiagonal() * eigen.eigenvectors().transpose();
+            // The ridge bounds the solve even for duplicate or nearly dependent landmarks.
+            gram.diagonal().array() += 1e-6;
+            const Eigen::LLT<Eigen::MatrixXd> factor(gram);
+            if (factor.info() != Eigen::Success) return false;
 
             constexpr std::size_t kGrain = 1024;
             // Pass 1 (sources): a = sum_m w_m k(Z, y_m).
@@ -1477,7 +1485,7 @@ namespace Geometry::CoherentPointDrift::EStep
             evaluations += std::uint64_t(m) * l;
             for (std::size_t c = 0; c < sourceChunks; ++c)
                 for (std::size_t k = 0; k < l; ++k) a[Eigen::Index(k)] += partial[c * l + k];
-            const Eigen::VectorXd g = pseudoInverse * a;
+            const Eigen::VectorXd g = factor.solve(a);
 
             // Pass 2 (targets): shifted sums S_n = k(x_n, Z) g, denominators, Pt1, and
             // h = sum_n d_n k(Z, x_n) (1, x_n) with d_n = e^{shift} / den_n.
@@ -1517,7 +1525,7 @@ namespace Geometry::CoherentPointDrift::EStep
                 for (Eigen::Index column = 0; column < 4; ++column)
                     for (std::size_t k = 0; k < l; ++k)
                         h(Eigen::Index(k), column) += partial[(c * 4u + std::size_t(column)) * l + k];
-            const Eigen::MatrixXd q = pseudoInverse * h;
+            const Eigen::MatrixXd q = factor.solve(h);
 
             // Pass 3 (sources): P1 and PX.
             ParallelFor(m, kGrain, threads, [&](const std::size_t begin, const std::size_t end)
@@ -1658,9 +1666,15 @@ namespace Geometry::CoherentPointDrift::EStep
         if (used == EStepPolicy::Nystrom)
         {
             if (!(settings.NystromLandmarks >= 2u && std::isfinite(settings.NystromErrorLimit) && settings.NystromErrorLimit > 0.0) ||
+                !(settings.NystromLocalSigma >= 0.0) || !std::isfinite(settings.NystromLocalSigma) ||
                 !ValidNystromVariant(settings.NystromSource, settings.NystromSchedule, settings.NystromPattern,
                                      settings.NystromSampling.Method))
                 return false;
+        }
+        const bool nystromLocal = used == EStepPolicy::Nystrom && std::sqrt(sigma2) < settings.NystromLocalSigma;
+        if (nystromLocal) used = EStepPolicy::Truncated;
+        if (used == EStepPolicy::Nystrom)
+        {
             // Another variant (or another source size for Fixed) starts its draws afresh.
             const std::uint32_t variant = std::uint32_t(settings.NystromSource) | std::uint32_t(settings.NystromSchedule) << 8u |
                                           std::uint32_t(settings.NystromPattern) << 16u;
@@ -1672,7 +1686,7 @@ namespace Geometry::CoherentPointDrift::EStep
             // Landmarks start at the count that last passed (at least the setting) and double while
             // the approximation is rejected, as long as all attempts together stay below half the
             // dense cost: (2M + N) L kernel terms plus the single-threaded landmark
-            // eigendecomposition (measured at about 2 L^3 kernel terms). Small inputs run exactly.
+            // factorization/solves (conservative 2 L^3 budget). Small inputs run exactly.
             constexpr std::size_t kLandmarkCap = 4096u;
             const std::size_t cap = std::min(kLandmarkCap, n + m);
             const double dense = double(n) * double(m);
@@ -1796,6 +1810,7 @@ namespace Geometry::CoherentPointDrift::EStep
         if (blocks == 0u && used != EStepPolicy::FastGauss && !nystrom) out.KernelEvaluations *= 2u;
         out.KernelEvaluations += s.ExtraEvaluations + nystromEvaluations;
         out.SampledError = nystrom ? sampledError : 0.0;
+        out.NystromLocal = nystromLocal;
         out.ExternalFallback = externalFallback;
         s.SourceTreeCurrent = false;
         s.UpdateScales(out.P1);

@@ -106,7 +106,7 @@ TEST(CoherentPointDriftOperations, ConfigRoundTripsAndRejectsUnstorableOutputs)
                                        .OutlierWeight = 0.2, .Beta = 1.5, .Output = O::DisplacementProperty,
                                        .DisplacementName = "warp", .EStep = R::CoherentPointDriftEStep::Truncated,
                                        .EStepTolerance = 1e-4, .Threads = 3, .NystromLandmarks = 128,
-                                       .NystromErrorLimit = 1e-4, .LowRank = 40, .AutoLowRank = false};
+                                       .NystromErrorLimit = 1e-4, .NystromLocalSigma = 0.35, .LowRank = 40, .AutoLowRank = false};
     const auto decoded = R::DecodeCoherentPointDriftConfig(R::SerializeCoherentPointDriftConfig(config));
     ASSERT_TRUE(decoded.has_value());
     EXPECT_EQ(decoded->Method, M::Nonrigid);
@@ -119,6 +119,7 @@ TEST(CoherentPointDriftOperations, ConfigRoundTripsAndRejectsUnstorableOutputs)
     EXPECT_FALSE(decoded->AutoLowRank);
     EXPECT_EQ(decoded->NystromLandmarks, 128u);
     EXPECT_EQ(decoded->NystromErrorLimit, 1e-4);
+    EXPECT_EQ(decoded->NystromLocalSigma, 0.35);
     const auto invalid = [&](R::CoherentPointDriftConfig c) {
         return !registration.Validate(R::SerializeCoherentPointDriftConfig(c), {}, "test").Usable();
     };
@@ -133,6 +134,8 @@ TEST(CoherentPointDriftOperations, ConfigRoundTripsAndRejectsUnstorableOutputs)
     EXPECT_TRUE(invalid({.NystromLandmarks = 1}));
     EXPECT_TRUE(invalid({.NystromLandmarks = 5000}));
     EXPECT_TRUE(invalid({.NystromErrorLimit = 0.0}));
+    EXPECT_TRUE(invalid({.NystromLocalSigma = -0.1}));
+    EXPECT_TRUE(invalid({.NystromLocalSigma = std::numeric_limits<double>::infinity()}));
     EXPECT_FALSE(registration.Validate(R"({"no_such_field":1})", {}, "test").Usable());
 }
 
@@ -465,19 +468,38 @@ TEST(CoherentPointDriftOperations, NystromEStepReportsItsBackendAndSampledError)
 
 // METHOD-076: the landmark variant is part of the section and reaches the solver: the same run
 // with box landmarks reports a different sampled error than with point landmarks.
+TEST(CoherentPointDriftOperations, NystromLocalSigmaReachesTheSolverTrace)
+{
+    Scene s;
+    const auto points = Cloud(150, 11);
+    const auto source = Make(s.Registry, D::PointCloudPoint, points);
+    const auto target = Make(s.Registry, D::PointCloudPoint, points);
+    R::EditorCoherentPointDriftResult failure;
+    const auto run = R::StartEditorCoherentPointDrift(s.Commands(), {.SourceStableEntityId = Id(source),
+        .TargetStableEntityId = Id(target), .EStep = R::CoherentPointDriftEStep::Nystrom,
+        .NystromLocalSigma = 10.0}, failure);
+    ASSERT_TRUE(run) << failure.Message;
+    (void)R::StepEditorCoherentPointDrift(s.Commands(), run, 1);
+    const auto snapshot = R::SnapshotEditorCoherentPointDrift(run);
+    ASSERT_EQ(snapshot.Trace.size(), 1u);
+    EXPECT_EQ(snapshot.Trace[0].EStep, "truncated");
+    EXPECT_TRUE(snapshot.Trace[0].NystromLocal);
+}
+
 TEST(CoherentPointDriftOperations, NystromLandmarkVariantRoundTripsAndReachesTheSolver)
 {
     R::CoherentPointDriftConfig roundTrip{};
-    roundTrip.NystromSource = R::CoherentPointDriftNystromSource::BoundingBox;
+    roundTrip.NystromSource = R::CoherentPointDriftNystromSource::UnionRandom;
     roundTrip.NystromSchedule = R::CoherentPointDriftNystromSchedule::Resampled;
     roundTrip.NystromBoxPattern = R::CoherentPointDriftNystromBoxPattern::Halton;
     const auto decoded = R::DecodeCoherentPointDriftConfig(R::SerializeCoherentPointDriftConfig(roundTrip));
     ASSERT_TRUE(decoded.has_value());
-    EXPECT_EQ(decoded->NystromSource, R::CoherentPointDriftNystromSource::BoundingBox);
+    EXPECT_EQ(decoded->NystromSource, R::CoherentPointDriftNystromSource::UnionRandom);
     EXPECT_EQ(decoded->NystromSchedule, R::CoherentPointDriftNystromSchedule::Resampled);
     EXPECT_EQ(decoded->NystromBoxPattern, R::CoherentPointDriftNystromBoxPattern::Halton);
     const auto registration = R::MakeCoherentPointDriftConfigSectionRegistration();
     EXPECT_FALSE(registration.Validate(R"({"nystrom_landmark_schedule": 3})", {}, "test").Usable());
+    EXPECT_FALSE(registration.Validate(R"({"nystrom_landmark_source": 3})", {}, "test").Usable());
 
     Scene s;
     const auto points = Cloud(1500, 23);
@@ -500,7 +522,8 @@ TEST(CoherentPointDriftOperations, NystromLandmarkVariantRoundTripsAndReachesThe
     for (const Choice choice : {Choice{Src::Points, Sch::Mixed, Pat::Random, "cpd_points"},
                                 Choice{Src::BoundingBox, Sch::Mixed, Pat::Random, "cpd_box"},
                                 Choice{Src::BoundingBox, Sch::Resampled, Pat::Random, "cpd_box_resampled"},
-                                Choice{Src::BoundingBox, Sch::Mixed, Pat::Halton, "cpd_box_halton"}})
+                                Choice{Src::BoundingBox, Sch::Mixed, Pat::Halton, "cpd_box_halton"},
+                                Choice{Src::UnionRandom, Sch::Fixed, Pat::Random, "cpd_union"}})
     {
         R::CoherentPointDriftConfig config{.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target),
                                            .OutlierWeight = 0.0, .EStep = R::CoherentPointDriftEStep::Nystrom,

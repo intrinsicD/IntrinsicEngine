@@ -1,0 +1,11 @@
+{
+  "arm": "adapted",
+  "runner_sha256": "45dac2a54bd5bb6d84ed063aeffb0b3d5e1ed9e6b60702628222b017b5c4a7a9",
+  "binary_sha256": "fd25e025df23ede7d5b76c6e8bccfd81323e53ae05fe26c40e8c1dfadb21a329",
+  "geometry": {
+    "src/geometry/Geometry.Registration.CoherentPointDrift.cpp": "0397748b1b42f0e21afe9bc76f3afe88130ff78ff6b4c57da4c9fa1a5b182a12",
+    "src/geometry/Geometry.Registration.CoherentPointDrift.cppm": "b479f69b05bbf671c91bf39d1add00cba225235528642ad4c805db6b2f85d0bb",
+    "src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cpp": "dcc7ab67f7c6da2f99a92c97fbde0ae6e66f0604c2a4991c7e3c681e4bda91d9",
+    "src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cppm": "7b6dee15c38982439012886ca5afed70ec0d27525ae6032fb26e6aa1c874b199"
+  }
+}

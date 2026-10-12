@@ -1,0 +1,98 @@
+[0/2] Re-checking globbed directories...
+[1/23] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cppm for CXX dependencies
+[2/23] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Registration.CoherentPointDrift.cppm for CXX dependencies
+[3/23] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp for CXX dependencies
+[4/23] Generating CXX dyndep file src/geometry/CMakeFiles/IntrinsicGeometry.dir/CXX.dd
+[5/25] Generating CXX dyndep file src/physics/CMakeFiles/ExtrinsicPhysics.dir/CXX.dd
+[6/25] Generating CXX dyndep file tests/CMakeFiles/GeometryRegistrationSlowTestObjs.dir/CXX.dd
+[7/27] Generating CXX dyndep file src/ecs/CMakeFiles/ExtrinsicECS.dir/CXX.dd
+[8/27] Generating CXX dyndep file src/runtime/CMakeFiles/ExtrinsicRuntime.dir/CXX.dd
+[9/34] Generating CXX dyndep file tests/CMakeFiles/RuntimeTestModuleSupportObjs.dir/CXX.dd
+[10/34] Generating CXX dyndep file tests/CMakeFiles/EditorFeatureTestSupportObjs.dir/CXX.dd
+[11/34] Generating CXX dyndep file tests/CMakeFiles/RuntimeContractTestObjs.dir/CXX.dd
+[12/38] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.RegistrationOperations.cpp.o
+[13/38] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Registration.CoherentPointDrift.EStep.cppm.o
+[14/38] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.RegistrationOperations.Frame.cpp.o
+[15/38] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Registration.CoherentPointDrift.cppm.o
+[16/38] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RegistrationDomains.cpp.o
+[17/38] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Registration.cpp.o
+[18/38] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/Registration/Runtime.CoherentPointDriftGpuEStep.cppm.o
+[19/38] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.PointSamplingOperations.cpp.o
+[20/38] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Registration.CoherentPointDrift.EStep.cpp.o
+[21/38] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/Registration/Runtime.CoherentPointDriftGpuEStep.cpp.o
+[22/38] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Registration.CoherentPointDrift.cpp.o
+[23/38] Linking CXX static library lib/libIntrinsicGeometry.a
+[24/38] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorWorkspaceSession.cpp.o
+/home/alex/Documents/IntrinsicEngine/src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp:518:19: warning: missing field 'BeforeReplace' initializer [-Wmissing-designated-field-initializers]
+  518 |                  }});
+      |                   ^
+/home/alex/Documents/IntrinsicEngine/src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp:639:48: warning: lambda capture 'this' is not used [-Wunused-lambda-capture]
+  639 |                                        [epoch, this] { return AttachmentEpochIsActive(epoch); });
+      |                                              ~~^~~~
+2 warnings generated.
+[25/38] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.RegistrationOperations.CoherentPointDrift.cpp.o
+[26/38] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.CoherentPointDriftOperations.cpp.o
+[27/38] Building CXX object tests/CMakeFiles/GeometryRegistrationSlowTestObjs.dir/unit/geometry/Test.CoherentPointDrift.cpp.o
+[28/38] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Agent/Runtime.AgentOperations.Editor.cpp.o
+/home/alex/Documents/IntrinsicEngine/src/runtime/Agent/Runtime.AgentOperations.Editor.cpp:189:36: warning: ISO C++ requires field designators to be specified in declaration order; field 'ErrorCode' will be initialized after field 'Text' [-Wreorder-init-list]
+  189 |                            .Text = "The scene file job ended without a result for this call (a later scene file operation replaced it, or "
+      |                            ~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  190 |                                    "the document changed while it ran); check the file and the scene."};
+      |                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/alex/Documents/IntrinsicEngine/src/runtime/Agent/Runtime.AgentOperations.Editor.cpp:188:58: note: previous initialization for field 'ErrorCode' is here
+  188 |                     out = {.IsError = true, .ErrorCode = "result_unavailable",
+      |                            ~~~~~~~~~~~~~~~  ~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~
+      |                            .IsError = true
+  189 |                            .Text = "The scene file job ended without a result for this call (a later scene file operation replaced it, or "
+      |                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                            .ErrorCode = "result_unavailable"
+  190 |                                    "the document changed while it ran); check the file and the scene."};
+      |                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/alex/Documents/IntrinsicEngine/src/runtime/Agent/Runtime.AgentOperations.Editor.cpp:751:83: warning: missing field 'Canonical' initializer [-Wmissing-designated-field-initializers]
+  751 |             SectionUpdate update{.Section = *section, .Registration = registration};
+      |                                                                                   ^
+2 warnings generated.
+[29/38] Building CXX object tests/CMakeFiles/GeometryRegistrationSlowTestObjs.dir/unit/geometry/Test.CoherentPointDriftBayesian.cpp.o
+[30/38] Building CXX object tests/CMakeFiles/GeometryRegistrationSlowTestObjs.dir/unit/geometry/Test.CoherentPointDriftAccelerated.cpp.o
+[31/38] Linking CXX executable bin/IntrinsicGeometryRegistrationSlowTests
+[32/38] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.ClusteringModule.cpp.o
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.ClusteringModule.cpp:1285:13: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+ 1285 |             props.GetOrAdd<std::uint64_t>("labels", 9223372036854775809ull);
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.ClusteringModule.cpp:1286:13: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+ 1286 |             props.GetOrAdd<glm::vec4>("colors", glm::vec4(0.25f));
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.ClusteringModule.cpp:1287:35: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+ 1287 |             if (RejectConversion) props.GetOrAdd<bool>("scalar_labels", true);
+      |                                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.ClusteringModule.cpp:1288:18: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+ 1288 |             else props.GetOrAdd<double>("scalar_labels", -3.0);
+      |                  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+4 warnings generated.
+[33/38] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Agent/Runtime.AgentOperations.Operations.cpp.o
+[34/38] Linking CXX static library lib/libExtrinsicRuntime.a
+[35/38] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.PointCloudConsolidationModule.cpp.o
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.PointCloudConsolidationModule.cpp:561:15: warning: field 'Domain' will be initialized after field 'Backend' [-Wreorder-ctor]
+  561 |             : Domain(domain), Backend(backend)
+      |               ^~~~~~~~~~~~~~  ~~~~~~~~~~~~~~~~
+      |               Backend(backend)Domain(domain)
+1 warning generated.
+[36/38] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorClusteringMethods.cpp.o
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp:3491:9: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+ 3491 |         props.GetOrAdd<std::int32_t>("levels", -9);
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp:3492:9: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+ 3492 |         props.GetOrAdd<double>("ranks", -8.0);
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp:3493:9: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+ 3493 |         props.GetOrAdd<double>("radii", -7.0);
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp:3494:9: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+ 3494 |         props.GetOrAdd<bool>("visible", true);
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp:3495:9: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+ 3495 |         props.GetOrAdd<std::uint64_t>("unrelated", 9223372036854775809ull);
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+5 warnings generated.
+[37/38] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp.o
+[38/38] Linking CXX executable bin/IntrinsicRuntimeContractTests

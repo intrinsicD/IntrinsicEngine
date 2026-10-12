@@ -71,7 +71,7 @@ namespace Extrinsic::Runtime
     namespace ECSC = ECS::Components;
     namespace GPD = GeometryProcessingDetail;
 
-    static_assert(int(CPD::EStep::NystromLandmarkSource::BoundingBox) == int(CoherentPointDriftNystromSource::BoundingBox) &&
+    static_assert(int(CPD::EStep::NystromLandmarkSource::UnionRandom) == int(CoherentPointDriftNystromSource::UnionRandom) &&
                   int(CPD::EStep::NystromLandmarkSchedule::Resampled) == int(CoherentPointDriftNystromSchedule::Resampled) &&
                   int(CPD::EStep::NystromBoxPattern::Halton) == int(CoherentPointDriftNystromBoxPattern::Halton));
 
@@ -291,6 +291,7 @@ namespace Extrinsic::Runtime
                                       .EStep = CPD::EStepPolicy(config.EStep), .EStepTolerance = config.EStepTolerance,
                                       .Threads = config.Threads, .NystromLandmarks = config.NystromLandmarks,
                                       .NystromErrorLimit = config.NystromErrorLimit,
+                                      .NystromLocalSigma = config.NystromLocalSigma,
                                       .NystromSource = CPD::EStep::NystromLandmarkSource(config.NystromSource),
                                       .NystromSchedule = CPD::EStep::NystromLandmarkSchedule(config.NystromSchedule),
                                       .NystromPattern = CPD::EStep::NystromBoxPattern(config.NystromBoxPattern),
@@ -431,6 +432,7 @@ namespace Extrinsic::Runtime
                                               .EStep = std::string(CPD::ToString(trace.EStep)),
                                               .EStepErrorBound = trace.EStepErrorBound,
                                               .EStepSampledError = trace.EStepSampledError,
+                                              .NystromLocal = trace.NystromLocal,
                                               .KernelEvaluations = trace.KernelEvaluations,
                                               .Seconds = std::chrono::duration<double>(at - run.Started).count(),
                                               .IterationSeconds = iterationSeconds});

@@ -1,0 +1,1 @@
+PASS: both adapters reject failed JSON/binary writes and malformed rows; truth cannot change solver output; exact old/adapted update bit-identical; upstream full-rank update agrees within its output precision budget

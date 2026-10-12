@@ -1,0 +1,34 @@
+{
+  "platform": "Linux-6.14.0-37-generic-x86_64-with-glibc2.39",
+  "logical_cpus": 16,
+  "runtime_library_paths": [
+    "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+    "/usr/lib/x86_64-linux-gnu/libc.so.6",
+    "/usr/lib/x86_64-linux-gnu/libgcc_s.so.1",
+    "/usr/lib/x86_64-linux-gnu/libgfortran.so.5.0.0",
+    "/usr/lib/x86_64-linux-gnu/libgomp.so.1.0.0",
+    "/usr/lib/x86_64-linux-gnu/libm.so.6",
+    "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.33",
+    "/usr/lib/x86_64-linux-gnu/openblas-pthread/libopenblasp-r0.3.26.so"
+  ],
+  "runtime_library_sha256": {
+    "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2": "c20a2dc8917c755f02b94049356320fe1f62ac7d9f8994731f807d9df39302da",
+    "/usr/lib/x86_64-linux-gnu/libc.so.6": "3a15d66867d83762c7f2f1e37359cb8f6c5743edb369c65285cb0b1c4f7498bf",
+    "/usr/lib/x86_64-linux-gnu/libgcc_s.so.1": "d93224d2b0dab4247598be683adca02f5cf00586f99c187579cd7e92058fb7cb",
+    "/usr/lib/x86_64-linux-gnu/libgfortran.so.5.0.0": "342618ccfebe840446e4ef2b7893f4161b2084845e570f42d68a70bfde58a58d",
+    "/usr/lib/x86_64-linux-gnu/libgomp.so.1.0.0": "135f3c8f006d2fe5e68e51281c7974cb991a03de3bfb3593d68d174dfcf854d1",
+    "/usr/lib/x86_64-linux-gnu/libm.so.6": "fce00b6f25f459cf4ae0b7fae4257909a1a8a86f9149e7c029a5d617baf1ccd0",
+    "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.33": "1fd75fe70354a416d75aef22bcae68c47bd25d20e2d0568c30b1a9838cf62f11",
+    "/usr/lib/x86_64-linux-gnu/openblas-pthread/libopenblasp-r0.3.26.so": "bfc7492adbf84a8f567720a9e1fae2afc18f3d817da233e7f4d453683485308e"
+  },
+  "ldd": {
+    "upstream": "\tlinux-vdso.so.1 (0x00007a2936190000)\n\tlibopenblas.so.0 => /lib/x86_64-linux-gnu/libopenblas.so.0 (0x00007a2933d60000)\n\tlibm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007a2933c77000)\n\tlibgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007a2933c21000)\n\tlibc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007a2933a00000)\n\tlibgfortran.so.5 => /lib/x86_64-linux-gnu/libgfortran.so.5 (0x00007a2933600000)\n\t/lib64/ld-linux-x86-64.so.2 (0x00007a2936192000)\n\tlibgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007a29339d2000)\n",
+    "baseline": "\tlinux-vdso.so.1 (0x00007f7ad81be000)\n\tlibstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f7ad7e00000)\n\tlibm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f7ad7d17000)\n\tlibgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f7ad80d0000)\n\tlibc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f7ad7a00000)\n\t/lib64/ld-linux-x86-64.so.2 (0x00007f7ad81c0000)\n",
+    "adapted": "\tlinux-vdso.so.1 (0x00007d7538648000)\n\tlibstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007d7538200000)\n\tlibm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007d753849f000)\n\tlibgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007d75381d2000)\n\tlibc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007d7537e00000)\n\t/lib64/ld-linux-x86-64.so.2 (0x00007d753864a000)\n"
+  },
+  "clang": "Ubuntu clang version 23.0.0 (++20260614081921+80b1dddb5a24-1~exp1~20260614202044.1664)",
+  "gcc": "gcc (Ubuntu 14.2.0-4ubuntu2~24.04.1) 14.2.0",
+  "python": "3.12.9",
+  "openblas_num_threads": 1,
+  "omp_num_threads": 8
+}

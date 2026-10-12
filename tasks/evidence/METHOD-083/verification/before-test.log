@@ -1,0 +1,1576 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+    Start 2425: CoherentPointDriftAccelerated.NystromRegularizesDependentLandmarks
+1/1 Test #2425: CoherentPointDriftAccelerated.NystromRegularizesDependentLandmarks ...***Failed    0.01 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = CoherentPointDriftAccelerated.NystromRegularizesDependentLandmarks
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from CoherentPointDriftAccelerated
+[ RUN      ] CoherentPointDriftAccelerated.NystromRegularizesDependentLandmarks
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:289: Failure
+The difference between result.LogDenominatorSum and count * std::log(mass + 0.3) is 6.3703687942506804e-05, which exceeds 1e-11, where
+result.LogDenominatorSum evaluates to 533.92711722985359,
+count * std::log(mass + 0.3) evaluates to 533.92705352616565, and
+1e-11 evaluates to 9.9999999999999994e-12.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 4.5724770636468293e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 1.9753086419753121,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 1.975308637402835, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:292: Failure
+The difference between result.Pt1[i] and mass / (mass + 0.3) is 2.3040985785982571e-09, which exceeds 1e-13, where
+result.Pt1[i] evaluates to 0.9953703703703709,
+mass / (mass + 0.3) evaluates to 0.99537036806627233, and
+1e-13 evaluates to 1e-13.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp:293: Failure
+The difference between result.P1[i] and count * std::exp(weights[i]) * affinity / (mass + 0.3) is 2.2862385318234146e-09, which exceeds 1e-13, where
+result.P1[i] evaluates to 0.98765432098765604,
+count * std::exp(weights[i]) * affinity / (mass + 0.3) evaluates to 0.98765431870141751, and
+1e-13 evaluates to 1e-13.
+
+[  FAILED  ] CoherentPointDriftAccelerated.NystromRegularizesDependentLandmarks (4 ms)
+[----------] 1 test from CoherentPointDriftAccelerated (4 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (4 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] CoherentPointDriftAccelerated.NystromRegularizesDependentLandmarks
+
+ 1 FAILED TEST
+
+
+0% tests passed, 1 tests failed out of 1
+
+Label Time Summary:
+geometry    =   0.01 sec*proc (1 test)
+slow        =   0.01 sec*proc (1 test)
+unit        =   0.01 sec*proc (1 test)
+
+Total Test time (real) =   0.19 sec
+
+The following tests FAILED:
+	2425 - CoherentPointDriftAccelerated.NystromRegularizesDependentLandmarks (Failed)
+Errors while running CTest

@@ -111,10 +111,12 @@ export namespace Geometry::CoherentPointDrift
         double EStepTolerance{1.0e-6};
         // Worker threads for the optimized E-step and kernel setup; 0 uses all cores.
         std::uint32_t Threads{0u};
-        // Nystrom E-step: landmarks (half from each set) and the largest accepted sampled
+        // Nystrom E-step: landmark count and the largest accepted sampled
         // relative error; iterations above it run exactly (truncated or dense).
         std::uint32_t NystromLandmarks{256u};
         double NystromErrorLimit{1.0e-3};
+        // Switch to bounded neighbor sums below this sigma in solver units; 0 disables.
+        double NystromLocalSigma{0.2};
         // Nystrom landmark variant (METHOD-076; see EStep::NystromLandmarkSchedule).
         EStep::NystromLandmarkSource NystromSource{EStep::NystromLandmarkSource::Points};
         EStep::NystromLandmarkSchedule NystromSchedule{EStep::NystromLandmarkSchedule::Mixed};
@@ -165,6 +167,7 @@ export namespace Geometry::CoherentPointDrift
         EStepPolicy EStep{EStepPolicy::Reference}; // policy that evaluated this iteration's E-step
         double EStepErrorBound{0.0};           // max relative row-denominator error (0: exact)
         double EStepSampledError{0.0};         // Nystrom: sampled relative error (estimate, not a bound)
+        bool NystromLocal{false};             // planned sigma transition to bounded neighbor sums
         std::uint64_t KernelEvaluations{0u};
     };
 

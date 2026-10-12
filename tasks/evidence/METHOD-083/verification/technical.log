@@ -1,0 +1,12 @@
+PASS: full_1_baseline_auto first completed native step; memory bound checked
+PASS: full_1_baseline_points first completed native step; memory bound checked
+PASS: full_1_baseline_box first completed native step; memory bound checked
+PASS: full_1_adapted_auto first completed native step; memory bound checked
+PASS: full_1_adapted_points first completed native step; memory bound checked
+PASS: full_1_adapted_box first completed native step; memory bound checked
+PASS: full_1_adapted_union first completed native step; memory bound checked
+PASS: full_1_upstream_nystrom first completed native step; memory bound checked
+PASS: full_1_upstream_direct first completed native step; memory bound checked
+PASS: partial_1_adapted_union first completed native step; memory bound checked
+PASS: partial_1_upstream_nystrom first completed native step; memory bound checked
+PASS: all final configurations execute; numerical outputs were not treated as results

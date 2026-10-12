@@ -1,0 +1,137 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start  996: CoherentPointDriftOperations.ConfigRoundTripsAndRejectsUnstorableOutputs
+ 1/62 Test  #996: CoherentPointDriftOperations.ConfigRoundTripsAndRejectsUnstorableOutputs .......................   Passed    0.01 sec
+      Start  997: CoherentPointDriftOperations.RigidPublishesTheSourceTransformOnEveryPointDomain
+ 2/62 Test  #997: CoherentPointDriftOperations.RigidPublishesTheSourceTransformOnEveryPointDomain ................   Passed    0.08 sec
+      Start  998: CoherentPointDriftOperations.AffineWritesPositionsAndNonrigidWritesADisplacementProperty
+ 3/62 Test  #998: CoherentPointDriftOperations.AffineWritesPositionsAndNonrigidWritesADisplacementProperty .......   Passed    0.45 sec
+      Start  999: CoherentPointDriftOperations.StepModeTracesEachIterationAndAppliesTheCurrentEstimate
+ 4/62 Test  #999: CoherentPointDriftOperations.StepModeTracesEachIterationAndAppliesTheCurrentEstimate ...........   Passed    0.02 sec
+      Start 1000: CoherentPointDriftOperations.StaleInputsAndCancelledRunsPublishNothing
+ 5/62 Test #1000: CoherentPointDriftOperations.StaleInputsAndCancelledRunsPublishNothing .........................   Passed    0.03 sec
+      Start 1001: CoherentPointDriftOperations.ReadinessExplainsWhyARunCannotStart
+ 6/62 Test #1001: CoherentPointDriftOperations.ReadinessExplainsWhyARunCannotStart ...............................   Passed    0.02 sec
+      Start 1002: CoherentPointDriftOperations.LargeDeformingRunsUseTheAutomaticLowRankUnlessExactIsAsked
+ 7/62 Test #1002: CoherentPointDriftOperations.LargeDeformingRunsUseTheAutomaticLowRankUnlessExactIsAsked ........   Passed    6.17 sec
+      Start 1003: CoherentPointDriftOperations.QueuedRunsCompleteOnTheJobServiceAndDeliverOneResult
+ 8/62 Test #1003: CoherentPointDriftOperations.QueuedRunsCompleteOnTheJobServiceAndDeliverOneResult ..............   Passed    0.05 sec
+      Start 1004: CoherentPointDriftOperations.DeformedMeshesGetRecomputedNormalsAndParentedEntitiesAreRefused
+ 9/62 Test #1004: CoherentPointDriftOperations.DeformedMeshesGetRecomputedNormalsAndParentedEntitiesAreRefused ...   Passed    0.01 sec
+      Start 1005: CoherentPointDriftOperations.NystromEStepReportsItsBackendAndSampledError
+10/62 Test #1005: CoherentPointDriftOperations.NystromEStepReportsItsBackendAndSampledError ......................   Passed    0.45 sec
+      Start 1006: CoherentPointDriftOperations.NystromLocalSigmaReachesTheSolverTrace
+11/62 Test #1006: CoherentPointDriftOperations.NystromLocalSigmaReachesTheSolverTrace ............................   Passed    0.01 sec
+      Start 1007: CoherentPointDriftOperations.NystromLandmarkVariantRoundTripsAndReachesTheSolver
+12/62 Test #1007: CoherentPointDriftOperations.NystromLandmarkVariantRoundTripsAndReachesTheSolver ...............   Passed    2.42 sec
+      Start 1008: CoherentPointDriftOperations.VulkanEStepWithoutADeviceRunsOnTheCpuAndSaysWhy
+13/62 Test #1008: CoherentPointDriftOperations.VulkanEStepWithoutADeviceRunsOnTheCpuAndSaysWhy ...................   Passed    0.13 sec
+      Start 1009: CoherentPointDriftOperations.SamplingMethodsAreSelectableForSubsamplesAndLandmarks
+14/62 Test #1009: CoherentPointDriftOperations.SamplingMethodsAreSelectableForSubsamplesAndLandmarks .............   Passed    5.24 sec
+      Start 1010: CoherentPointDriftOperations.VulkanSubsamplesWithoutADeviceRunOnTheCpuAndSayWhy
+15/62 Test #1010: CoherentPointDriftOperations.VulkanSubsamplesWithoutADeviceRunOnTheCpuAndSayWhy ................   Passed    0.49 sec
+      Start 1011: CoherentPointDriftOperations.VulkanEStepBrokerFailsClosedAndTimesOut
+16/62 Test #1011: CoherentPointDriftOperations.VulkanEStepBrokerFailsClosedAndTimesOut ...........................   Passed    0.03 sec
+      Start 1012: CoherentPointDriftOperations.CancelAnswersAtOnceAndTraceRowsCarryElapsedTime
+17/62 Test #1012: CoherentPointDriftOperations.CancelAnswersAtOnceAndTraceRowsCarryElapsedTime ...................   Passed    0.03 sec
+      Start 1013: CoherentPointDriftOperations.BayesianSubsamplesReachTheSnapshotForThePreview
+18/62 Test #1013: CoherentPointDriftOperations.BayesianSubsamplesReachTheSnapshotForThePreview ...................   Passed    0.02 sec
+      Start 2423: CoherentPointDriftAccelerated.DenseParallelMatchesTheReferenceForEveryVariant
+19/62 Test #2423: CoherentPointDriftAccelerated.DenseParallelMatchesTheReferenceForEveryVariant ..................   Passed    3.16 sec
+      Start 2424: CoherentPointDriftAccelerated.ResultsAreBitwiseIdenticalAcrossThreadCounts
+20/62 Test #2424: CoherentPointDriftAccelerated.ResultsAreBitwiseIdenticalAcrossThreadCounts .....................   Passed    2.54 sec
+      Start 2425: CoherentPointDriftAccelerated.TruncatedStaysWithinToleranceOfTheReference
+21/62 Test #2425: CoherentPointDriftAccelerated.TruncatedStaysWithinToleranceOfTheReference ......................   Passed    0.46 sec
+      Start 2426: CoherentPointDriftAccelerated.TruncationBoundCoversTheActualExpectationError
+22/62 Test #2426: CoherentPointDriftAccelerated.TruncationBoundCoversTheActualExpectationError ...................   Passed    0.05 sec
+      Start 2427: CoherentPointDriftAccelerated.FastGaussBoundCoversTheActualExpectationError
+23/62 Test #2427: CoherentPointDriftAccelerated.FastGaussBoundCoversTheActualExpectationError ....................   Passed    0.40 sec
+      Start 2428: CoherentPointDriftAccelerated.FastGaussRegistrationMatchesTheReference
+24/62 Test #2428: CoherentPointDriftAccelerated.FastGaussRegistrationMatchesTheReference .........................   Passed    4.50 sec
+      Start 2429: CoherentPointDriftAccelerated.NystromSampledErrorTracksTheActualExpectationError
+25/62 Test #2429: CoherentPointDriftAccelerated.NystromSampledErrorTracksTheActualExpectationError ...............   Passed    0.11 sec
+      Start 2430: CoherentPointDriftAccelerated.NystromRegularizesDependentLandmarks
+26/62 Test #2430: CoherentPointDriftAccelerated.NystromRegularizesDependentLandmarks .............................   Passed    0.00 sec
+      Start 2431: CoherentPointDriftAccelerated.NystromLocalTransitionUsesSigmaAndValidatesBeforeSwitch
+27/62 Test #2431: CoherentPointDriftAccelerated.NystromLocalTransitionUsesSigmaAndValidatesBeforeSwitch ..........   Passed    0.01 sec
+      Start 2432: CoherentPointDriftAccelerated.UnionRandomUsesOnePermutationAndFollowsMovingIdentities
+28/62 Test #2432: CoherentPointDriftAccelerated.UnionRandomUsesOnePermutationAndFollowsMovingIdentities ..........   Passed    0.04 sec
+      Start 2433: CoherentPointDriftAccelerated.NystromRepairsInvalidRowsWithAllWeightedStatistics
+29/62 Test #2433: CoherentPointDriftAccelerated.NystromRepairsInvalidRowsWithAllWeightedStatistics ...............   Passed    0.07 sec
+      Start 2434: CoherentPointDriftAccelerated.NystromRepairsStillRespectAccuracyAndCostGuards
+30/62 Test #2434: CoherentPointDriftAccelerated.NystromRepairsStillRespectAccuracyAndCostGuards ..................   Passed    0.00 sec
+      Start 2435: CoherentPointDriftAccelerated.NystromRunsExactlyWhereItWouldNotPay
+31/62 Test #2435: CoherentPointDriftAccelerated.NystromRunsExactlyWhereItWouldNotPay .............................   Passed    0.06 sec
+      Start 2436: CoherentPointDriftAccelerated.NystromRegistrationMatchesTheReference
+32/62 Test #2436: CoherentPointDriftAccelerated.NystromRegistrationMatchesTheReference ...........................   Passed    2.23 sec
+      Start 2437: CoherentPointDriftAccelerated.WeightedRowsShiftByTheirLargestWeightedTerm
+33/62 Test #2437: CoherentPointDriftAccelerated.WeightedRowsShiftByTheirLargestWeightedTerm ......................   Passed    0.00 sec
+      Start 2438: CoherentPointDriftAccelerated.TwoPassFallbackMatchesTheBlockedSinglePass
+34/62 Test #2438: CoherentPointDriftAccelerated.TwoPassFallbackMatchesTheBlockedSinglePass .......................   Passed    0.01 sec
+      Start 2439: CoherentPointDriftAccelerated.AutoUsesDenseForWideAndTruncatedForNarrowKernels
+35/62 Test #2439: CoherentPointDriftAccelerated.AutoUsesDenseForWideAndTruncatedForNarrowKernels .................   Passed    0.34 sec
+      Start 2440: CoherentPointDriftAccelerated.VulkanPolicyRunsWideKernelsOnTheExternalEvaluator
+36/62 Test #2440: CoherentPointDriftAccelerated.VulkanPolicyRunsWideKernelsOnTheExternalEvaluator ................   Passed    0.01 sec
+      Start 2441: CoherentPointDriftAccelerated.VulkanPolicyKeepsKernelsTooNarrowForFp32OnTheCpu
+37/62 Test #2441: CoherentPointDriftAccelerated.VulkanPolicyKeepsKernelsTooNarrowForFp32OnTheCpu .................   Passed    0.00 sec
+      Start 2442: CoherentPointDriftAccelerated.VulkanPolicyEvaluatesRowsTooNarrowForFp32OnTheCpu
+38/62 Test #2442: CoherentPointDriftAccelerated.VulkanPolicyEvaluatesRowsTooNarrowForFp32OnTheCpu ................   Passed    0.00 sec
+      Start 2443: CoherentPointDriftAccelerated.VulkanPolicyFallsBackToTheCpuAndSaysSo
+39/62 Test #2443: CoherentPointDriftAccelerated.VulkanPolicyFallsBackToTheCpuAndSaysSo ...........................   Passed    0.21 sec
+      Start 2444: CoherentPointDriftAccelerated.LowRankNonrigidConvergesToTheFullSolution
+40/62 Test #2444: CoherentPointDriftAccelerated.LowRankNonrigidConvergesToTheFullSolution ........................   Passed    5.04 sec
+      Start 2445: CoherentPointDriftAccelerated.LowRankLiftsTheNonrigidSizeLimit
+41/62 Test #2445: CoherentPointDriftAccelerated.LowRankLiftsTheNonrigidSizeLimit .................................   Passed    1.52 sec
+      Start 2446: CoherentPointDriftAccelerated.InvalidAccelerationSettingsFailClosed
+42/62 Test #2446: CoherentPointDriftAccelerated.InvalidAccelerationSettingsFailClosed ............................   Passed    0.01 sec
+      Start 2447: CoherentPointDriftAccelerated.NystromLandmarkVariantsAreAcceptedAndAccurate
+43/62 Test #2447: CoherentPointDriftAccelerated.NystromLandmarkVariantsAreAcceptedAndAccurate ....................   Passed    0.15 sec
+      Start 2448: CoherentPointDriftAccelerated.NystromLandmarkSchedulesFixOrRedrawTheLandmarks
+44/62 Test #2448: CoherentPointDriftAccelerated.NystromLandmarkSchedulesFixOrRedrawTheLandmarks ..................   Passed    0.27 sec
+      Start 2449: CoherentPointDriftAccelerated.FixedNystromLandmarksExtendByTheirPrefix
+45/62 Test #2449: CoherentPointDriftAccelerated.FixedNystromLandmarksExtendByTheirPrefix .........................   Passed    0.04 sec
+      Start 2450: CoherentPointDriftAccelerated.NystromVariantsAreThreadIndependentAndHandleFlatData
+46/62 Test #2450: CoherentPointDriftAccelerated.NystromVariantsAreThreadIndependentAndHandleFlatData .............   Passed    0.35 sec
+      Start 2451: CoherentPointDriftAccelerated.InvalidNystromVariantsFailClosed
+47/62 Test #2451: CoherentPointDriftAccelerated.InvalidNystromVariantsFailClosed .................................   Passed    0.00 sec
+      Start 2452: CoherentPointDriftAccelerated.ResampledPointLandmarksDrawAnewOrAreRefused
+48/62 Test #2452: CoherentPointDriftAccelerated.ResampledPointLandmarksDrawAnewOrAreRefused ......................   Passed    0.28 sec
+      Start 2453: CoherentPointDriftAccelerated.FixedPointLandmarksKeepTheirPrefixForEveryMethod
+49/62 Test #2453: CoherentPointDriftAccelerated.FixedPointLandmarksKeepTheirPrefixForEveryMethod .................   Passed    0.95 sec
+      Start 2454: CoherentPointDriftAccelerated.FixedBoxesFollowANewSource
+50/62 Test #2454: CoherentPointDriftAccelerated.FixedBoxesFollowANewSource .......................................   Passed    0.05 sec
+      Start 2455: CoherentPointDriftAccelerated.BoxLandmarksAreUniformOverTheUnionOfTheBoxes
+51/62 Test #2455: CoherentPointDriftAccelerated.BoxLandmarksAreUniformOverTheUnionOfTheBoxes .....................   Passed    7.78 sec
+      Start 2456: CoherentPointDriftBayesian.RecoversASimilarityUnderAStrongDeformationPrior
+52/62 Test #2456: CoherentPointDriftBayesian.RecoversASimilarityUnderAStrongDeformationPrior .....................   Passed    0.26 sec
+      Start 2457: CoherentPointDriftBayesian.FollowsASimilarityWithASmoothDeformation
+53/62 Test #2457: CoherentPointDriftBayesian.FollowsASimilarityWithASmoothDeformation ............................   Passed    0.64 sec
+      Start 2458: CoherentPointDriftBayesian.OutlierWeightHandlesClutter
+54/62 Test #2458: CoherentPointDriftBayesian.OutlierWeightHandlesClutter .........................................   Passed    1.94 sec
+      Start 2459: CoherentPointDriftBayesian.FiniteKappaHandlesNonUniformDensity
+55/62 Test #2459: CoherentPointDriftBayesian.FiniteKappaHandlesNonUniformDensity .................................   Passed    0.57 sec
+      Start 2460: CoherentPointDriftBayesian.SubsampledRunsUpsampleTheDeformationToEveryPoint
+56/62 Test #2460: CoherentPointDriftBayesian.SubsampledRunsUpsampleTheDeformationToEveryPoint ....................   Passed    9.04 sec
+      Start 2461: CoherentPointDriftBayesian.MatchesAnIndependentImplementationOfAlgorithmOne
+57/62 Test #2461: CoherentPointDriftBayesian.MatchesAnIndependentImplementationOfAlgorithmOne ....................   Passed    0.03 sec
+      Start 2462: CoherentPointDriftBayesian.SubsampledLowRankResultIsValidBeforeTheFirstIteration
+58/62 Test #2462: CoherentPointDriftBayesian.SubsampledLowRankResultIsValidBeforeTheFirstIteration ...............   Passed    0.09 sec
+      Start 2463: CoherentPointDriftBayesian.AcceleratedPathsMatchTheReference
+59/62 Test #2463: CoherentPointDriftBayesian.AcceleratedPathsMatchTheReference ...................................   Passed    2.28 sec
+      Start 2464: CoherentPointDriftBayesian.InvalidSettingsFailClosedAndRunsAreDeterministic
+60/62 Test #2464: CoherentPointDriftBayesian.InvalidSettingsFailClosedAndRunsAreDeterministic ....................   Passed    0.19 sec
+      Start 2465: CoherentPointDriftBayesian.PrecomputedSubsampleOrdersAreUsedAndValidated
+61/62 Test #2465: CoherentPointDriftBayesian.PrecomputedSubsampleOrdersAreUsedAndValidated .......................   Passed    0.00 sec
+      Start 2466: CoherentPointDriftBayesian.LowRankPosteriorMatchesTheExactKernelUnderPartialOverlap
+62/62 Test #2466: CoherentPointDriftBayesian.LowRankPosteriorMatchesTheExactKernelUnderPartialOverlap ............   Passed    4.97 sec
+
+100% tests passed, 0 tests failed out of 62
+
+Label Time Summary:
+contract    =  15.66 sec*proc (18 tests)
+geometry    =  50.68 sec*proc (44 tests)
+runtime     =  15.66 sec*proc (18 tests)
+slow        =  50.68 sec*proc (44 tests)
+unit        =  50.68 sec*proc (44 tests)
+
+Total Test time (real) =  67.30 sec

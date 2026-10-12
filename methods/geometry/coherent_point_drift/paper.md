@@ -170,29 +170,35 @@ absolutely, by that bound times max |x| P1. Measured on the scaling fixture at t
 therefore rarely selects it in 3-D, and the explicit policy is slower than dense there
 (`geometry.coherent_point_drift.accelerated`).
 
-**Nystroem E-step (`Nystrom`, METHOD-053; approximate).** The kernel matrix K_mn =
-exp(-|x_n - y_m|^2 / 2 sigma^2) is approximated as k(y_m, Z) W^+ k(Z, x_n) on L landmarks Z
-(farthest points, half from the fixed target, cached, and half from the moving source),
-W = K(Z, Z) pseudo-inverted on its spectrum above 1e-10 of the largest eigenvalue, as
-Hirose's BCPD implementation does for wide kernels. Everything runs in landmark space: a =
-sum_m w_m k(Z, y_m), S_n = k(x_n, Z) W^+ a gives the denominators e^{shift} S_n + c and Pt1;
-h = sum_n d_n k(Z, x_n) (1, x_n) with d_n = e^{shift} / den_n gives P1_m and PX_m = w_m k(y_m,
-Z) W^+ h, i.e. (2M + N) L kernel terms plus one L x L eigendecomposition per iteration,
-reduced over fixed chunks (thread-count independent). The error has no a-priori bound. It
-is estimated a posteriori on exact rows (32 target denominators, 32 source P1 entries
-against the approximate denominators) and reported as `EStepSampledError`; on the test
-fixtures the worst row is within about 3x of the estimate. An iteration whose estimate
-exceeds `NystromErrorLimit` (default 1e-3), or with a non-positive denominator or P1
-entry, is retried with twice the landmarks while all attempts stay below half the dense
-cost (the eigendecomposition counted as 2 L^3 kernel terms), and otherwise redone exactly
-with the Auto choice between truncated and dense; narrower kernels are then not retried.
-Small inputs never pay (300 points: exact throughout). Wide kernels are nearly low rank,
-so the approximation covers the early iterations that dominate the dense cost: at 10^5
-points the landmarks grow to 1024 and rigid registration takes 128 s instead of 198 s
-(auto), the low-rank nonrigid solve 30 s instead of 170 s, with the same RMS to the
-ground truth. The middle phase (kernels too narrow for a few thousand landmarks, too wide
-for truncation) stays dense; the permutohedral lattice (GEOM-060) remains the candidate
-there.
+**Nystroem E-step (`Nystrom`; approximate).** The kernel matrix is approximated as
+`K(Y,Z) (W + 1e-6 I)^-1 K(Z,X)`, with `W = K(Z,Z)`. Cholesky factorization and solves
+apply the middle operator without materializing its inverse, as in the
+[author's Gaussian product](https://github.com/ohirose/bcpd/blob/b7b6d01bb703e154f652b6a798c1eacd39b83ca3/base/gaussprod.c).
+Three passes accumulate the source-weighted landmark vector, target denominators and
+reverse sufficient statistics in fixed chunk order. The low-rank deformation kernel G
+uses its separate existing eigendecomposition; this regularization changes only the E-step.
+
+`UnionRandom` samples one uniform permutation over source and target together. Fixed
+identities follow moving points; Mixed is equivalent for this coordinate-independent
+sampler, and Resampled changes the seed once per attempted iteration. The existing
+per-cloud point sampling and box choices remain available. All doubling attempts share
+the draw's prefix. Matching a seed with a different program's RNG does not match identities.
+
+Nonpositive or nonfinite target sums are replaced by complete exact rows within the
+cost budget. Negative/nonfinite source masses reject the approximation. Accuracy is
+estimated on 32 target denominators and 32 source masses; it is not a bound on every
+entry. Failed checks double the landmark count within half the dense cost, conservatively
+budgeting `2 L^3` for the factorization/solves, then fall back to bounded Truncated or Dense.
+Rejection suppresses retries for narrower kernels.
+
+Before attempting Nyström, `sqrt(sigma2) < NystromLocalSigma` selects Truncated
+(default 0.2 in solver units; zero disables), matching the author's sigma trigger.
+`IterationTrace::NystromLocal` marks this transition. Our neighbor evaluator retains its
+relative tail bound and nearest-point shift. Upstream instead uses a hard radius
+`min(7 sigma, 0.15)` by default; it also floors source mass at `1e-20` and takes the absolute
+variance before its square root. Those shortcuts are not used here. Our row repair,
+accuracy guards and native objective-based stopping also remain distinct. Thus this
+adaptation is not a claim of full implementation or trajectory parity with upstream.
 
 **Vulkan E-step (`Vulkan`, METHOD-056; fp32 terms).** Where the Auto choice would run dense
 (truncation would keep more than a quarter of the pairs), the two-pass form runs on the
