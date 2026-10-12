@@ -113,13 +113,20 @@ Per-process timeout1800s and address-space cap8GiB; total launch/runtime budget5
 /usr/bin/time when available. Technical final-config tests ran the largest/full input for
 all nine native configurations and partial union/original configurations through their first
 completed-step marker, then killed them deliberately without inspecting result metrics;
-all prefixes were below the memory bound. Numerical outputs were not evidence.
+all prefixes were below the memory bound. `../verification/terminal.py` additionally
+checks normal terminal execution for baseline FPS, adapted union and upstream Nyström
+on full/seed1 with the final100k/rank100/5000cap commands. It asserts exit success,
+finite endpoints, native counts and output schema via the unchanged reader; no scientific
+metrics are printed or interpreted. Raw technical files are retained with SHA256 bindings.
+These three terminal paths plus all-nine configuration prefixes cover execution; they are
+not quality results. No numerical technical outputs enter conclusions.
 
 Every completed attempt produces refreshed HTML from raw logs, endpoints and metadata:
 curves with observed backend transitions, before/after pictures, all-point/subset metrics,
 native stop labels, frozen verdicts and replay results. Missing measures remain unavailable, including agreement when the Auto endpoint is
 censored. Original final sigma/scale/matched mass must be finite. Replay compares all
 observed non-timing trace fields and final status/termination/iterations/sigma²/scale/mass.
+If either endpoint is missing, replay is null/unevaluated before any trace comparison.
 Scientific failures/counterexamples do not cancel the remaining fixed plan. Changed inputs,
 unexpected process failures or invalid measurement output stop the campaign and retain a
 partial report; remaining cells are unevaluated. No adaptive tuning, extra seeds or retries.

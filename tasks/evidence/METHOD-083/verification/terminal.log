@@ -1,0 +1,4 @@
+PASS: adapted_union final-configuration terminal execution, finite endpoint, native counts and output schema
+PASS: baseline_points final-configuration terminal execution, finite endpoint, native counts and output schema
+PASS: upstream_nystrom final-configuration terminal execution, finite endpoint, native counts and output schema
+PASS: three executable terminal paths; scientific metrics not printed or interpreted

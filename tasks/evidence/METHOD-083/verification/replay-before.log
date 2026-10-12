@@ -1,0 +1,19 @@
+Traceback (most recent call last):
+  File "/tmp/method083/check-replay-delta.py", line 7, in <module>
+    runpy.run_path('/tmp/method083/replay-check.py',run_name='__main__')
+  File "<frozen runpy>", line 287, in run_path
+  File "<frozen runpy>", line 98, in _run_module_code
+  File "<frozen runpy>", line 88, in _run_code
+  File "/tmp/method083/replay-check.py", line 133, in <module>
+    if __name__=='__main__':check()
+                            ^^^^^^^
+  File "/tmp/method083/replay-check.py", line 91, in check
+    r=whole(mode);assert r['replays']['full_1_adapted_union_repeat'] is None and not r['invalid_cells'],mode
+      ^^^^^^^^^^^
+  File "/tmp/method083/replay-check.py", line 79, in whole
+    return c.report()
+           ^^^^^^^^^^
+  File "/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-083/comparison.py", line 147, in report
+    equal_trace=bool(first and np.array_equal(np.asarray(t)[:,[0,1,2,3,4,5,6,7,9]],np.asarray(first[1])[:,[0,1,2,3,4,5,6,7,9]],equal_nan=True))
+                                                                                   ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+IndexError: too many indices for array: array is 1-dimensional, but 2 were indexed

@@ -52,14 +52,16 @@ must be included in the post-run audit, never silently normalized away.
 positive endpoints pass; raw and native-frame no-op, collapse and wrong-but-consistent fail learning; caps,
 explicit numerical failures and shifted adapted endpoints fail P1; missing/nonfinite data
 and malformed original history are invalid; censored/unstarted cells remain unevaluated;
-replay endpoint, final-state and planned-local-flag drift is detected. Missing Auto
+replay endpoint, final-state and planned-local-flag drift is detected. Censoring the
+first attempt (empty or nonempty trace) or the replay yields null, never false drift. Missing Auto
 endpoints are unevaluated unless another observed condition refutes convergence.
 Nonfinite original sigma, scale and mass are rejected before reporting. Removing the agreement gate lets its negative control escape.
 Real engine, upstream and stage-event report figures are rendered in this control.
 Round1 found that centering alone passed P2 on all three full cases, that missing Auto
 was treated as disagreement, and that original final nonfinite metadata could pass the
 reader. The new synthetic test failed before the fix on native_noop; all six actual
-frame-aware null probes must now be rejected. Removing each repaired control must fail
+frame-aware null probes must now be rejected. Round2 identified empty censored original
+traces crashing replay analysis; the new control reproduced IndexError before the repair. Removing each repaired control must fail
 the assert-based check. These are prospective measurement repairs, with no solver
 outcomes examined or thresholds calibrated from a new run. The original
 incorrect parser reuse was caught because the new trace has one more field; the old frozen
@@ -81,7 +83,10 @@ The fixtures and raw views were already inspected during METHOD-082; the actual 
 first/last-point before/after views are retained. Normalization/export/inverse-frame checks
 are asserted before any run. No new-data calibration or thresholds inferred from this run.
 The largest real configurations pass the prefix technical test with the final5000-step
-setting; observed values are not read as registration results. No new result-bearing pilot.
+setting. The three executable paths additionally undergo complete terminal technical
+checks on full/seed1 at the final100k/rank100/5000cap configuration, including the real
+endpoint output and reader. Numerical scientific outputs remain unread and do not enter
+results or threshold choices. No new result-bearing pilot.
 
 ## Replication, interpretation, limits
 Replication units are six fixed fixture cases, paired across nine arms. Three seeds per

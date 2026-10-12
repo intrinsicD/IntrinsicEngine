@@ -66,6 +66,11 @@ def check():
    if mode=='missing':(c.OUT/(name+'.bin')).unlink()
    if mode=='nonfinite':
     p=truth.copy();p[0,0]=np.nan;p.tofile(c.OUT/(name+'.bin'))
+   if mode in ('censored_original_empty','censored_original_prefix','censored_replay'):
+    first=next(x['name'] for x in c.cells() if x['arm']=='adapted_union' and x['fixture']=='full' and x['seed']==1)
+    censored=first+'_repeat' if mode=='censored_replay' else first
+    outcomes[censored]=dict(kind='unevaluated',reason='native timeout')
+    if mode=='censored_original_empty':(c.OUT/(censored+'.stderr')).write_text('')
    if mode=='upstream_bad_trace':(c.OUT/(c.cells()[7]['name']+'.stderr')).write_text('')
    if mode in ('upstream_nan_sigma','upstream_nan_mass'):
     path=c.OUT/(c.cells()[7]['name']+'_info.txt');text=path.read_text();path.write_text(text.replace('sigma\t.1','sigma\tnan') if mode.endswith('sigma') else text.replace('N_hat\t100','N_hat\tnan'))
@@ -82,6 +87,8 @@ def check():
    r=whole(mode);assert not r['invalid_cells'] and r['adapted_convergence_and_auto']=='UNEVALUATED',mode
   for mode in ('missing','nonfinite','upstream_bad_trace','upstream_nan_sigma','upstream_nan_scale','upstream_nan_mass'):
    assert whole(mode)['invalid_cells'],mode
+  for mode in ('censored_original_empty','censored_original_prefix','censored_replay'):
+   r=whole(mode);assert r['replays']['full_1_adapted_union_repeat'] is None and not r['invalid_cells'],mode
   for mode in ('different_replay','different_final','different_local'):
    r=whole(mode);assert not all(r['replays'].values()),mode
   whole('positive')
@@ -121,6 +128,6 @@ def check():
     else:assert mode=='positive'
    assert len(calls)==(2 if mode=='positive' else 1 if mode=='invalid_output' else 0)
    summary=json.loads((c.OUT/'summary.json').read_text());assert bool(summary['technical_errors'])==(mode!='positive')
- print('PASS: full report rejects raw/frame-aware no-op, collapse, wrong-but-consistent, cap, numerical failure, endpoint regression, missing/nonfinite data including upstream metadata, malformed original trace and replay endpoint/final-state/local-flag drift; censored/unstarted/missing-Auto comparisons stay unevaluated unless an observed failure refutes them; real engine/upstream/stage figures render; agreement-gate mutation escapes the regression control as predicted; real controller starts valid cells and stops before the next native launch on changed digest or invalid output')
+ print('PASS: full report rejects raw/frame-aware no-op, collapse, wrong-but-consistent, cap, numerical failure, endpoint regression, missing/nonfinite data including upstream metadata, malformed original trace and replay endpoint/final-state/local-flag drift; censored original/replay pairs remain null, and censored/unstarted/missing-Auto comparisons stay unevaluated unless an observed failure refutes them; real engine/upstream/stage figures render; agreement-gate mutation escapes the regression control as predicted; real controller starts valid cells and stops before the next native launch on changed digest or invalid output')
 
 if __name__=='__main__':check()

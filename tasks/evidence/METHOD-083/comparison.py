@@ -24,7 +24,7 @@ def command(c,folder,slot=0):
 
 def manifest_command():
     extras=[str(BIN),str(INPUT),str(HERE/'preflight/layer-a.md'),str(HERE/'preflight/layer-b.md')]
-    extras += [str(HERE/'verification'/p) for p in ('adapter-check.py','adapter-check.log','input-check.log','technical.py','technical.log','check.log','review-controls-before.log','review-mutations.py','review-mutations.log','baseline-binding.json','adapted-binding.json')]
+    extras += [str(HERE/'verification'/p) for p in ('adapter-check.py','adapter-check.log','input-check.log','technical.py','technical.log','check.log','review-controls-before.log','review-mutations.py','review-mutations.log','replay-before.log','terminal.py','terminal.log','terminal-raw/sha256.json','baseline-binding.json','adapted-binding.json')]
     extras += json.loads((HERE/'environment.json').read_text())['runtime_library_paths']
     return ['/usr/bin/python3','/home/alex/.codex/skills/experiment-preflight/manifest.py',*sum((['--exclude',str(HERE/p)] for p in ('preflight','reviews','runs','verification')),[]),*extras]
 
@@ -141,12 +141,14 @@ def report(folder=None,plan=None):
                         original_rms=distances(world(ref[3]),truth)[0]
                         row['truth_vs_upstream']=row['truth_rms'] <= 1.01*original_rms+2e-6
                         row['upstream_truth_rms']=original_rms
-                if name.endswith('_repeat'):
-                    first=loaded.get(name.removesuffix('_repeat'))
-                    # Upstream has six-decimal endpoints; compare every observed non-timing field including NaN placeholders.
-                    equal_trace=bool(first and np.array_equal(np.asarray(t)[:,[0,1,2,3,4,5,6,7,9]],np.asarray(first[1])[:,[0,1,2,3,4,5,6,7,9]],equal_nan=True))
-                    equal_final=bool(first and all(d.get(k)==first[0].get(k) for k in ('status','termination','iterations','sigma2','scale','final_matched_mass')))
-                    replays[name]=bool(first and first[3] is not None and np.array_equal(loaded[name][3],first[3]) and equal_trace and equal_final)
+            if name.endswith('_repeat'):
+                first=loaded.get(name.removesuffix('_repeat'));replays[name]=None
+                if p is not None and first and first[3] is not None:
+                    # Six-decimal upstream endpoints; compare all observed fields except elapsed time.
+                    columns=[0,1,2,3,4,5,6,7,9]
+                    equal_trace=np.array_equal(np.asarray(t).reshape(-1,10)[:,columns],np.asarray(first[1]).reshape(-1,10)[:,columns],equal_nan=True)
+                    equal_final=all(d.get(k)==first[0].get(k) for k in ('status','termination','iterations','sigma2','scale','final_matched_mass'))
+                    replays[name]=bool(np.array_equal(loaded[name][3],first[3]) and equal_trace and equal_final)
             rows[name]=row
             image=folder/(name+'.png');points_image=folder/(name+'-positions.png')
             if not image.exists():

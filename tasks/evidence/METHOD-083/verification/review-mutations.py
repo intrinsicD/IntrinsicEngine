@@ -9,6 +9,7 @@ mutations={
  'finite-original':("assert all(math.isfinite(d[k]) for k in ('sigma2','scale','final_matched_mass'))","pass"),
  'replay-local':('[0,1,2,3,4,5,6,7,9]','[0,1,2,3,4,5,6,7]'),
  'replay-final':("and equal_trace and equal_final)","and equal_trace)"),
+ 'replay-censoring':("if p is not None and first and first[3] is not None:","if p is not None and first:"),
 }
 for name,(old,new) in mutations.items():
  script="""import runpy,sys,types

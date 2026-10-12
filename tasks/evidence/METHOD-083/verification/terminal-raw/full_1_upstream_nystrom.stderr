@@ -1,0 +1,238 @@
+
+  BCPD/DET/DLD version 0.98 (2026/01/02). OpenMP: Turned on.
+
+  Input Data:
+    Point Set 1 (target): [/tmp/method083/inputs/full_1_target.txt]
+    Point Set 2 (source): [/tmp/method083/inputs/full_1_source.txt]
+    Size of Point Set 1:  [100000, 3]
+    Size of Point Set 2:  [100000, 3]
+
+  Parameters: 
+    omega   =  0.10
+    lambda  =  2.00  --> the expected drift length = 1.225
+    gamma   =  1.00
+    kappa   =  inf
+    eta     =  1.00
+
+  Algorithm: BCPD
+
+  Transformation Model:
+    sR(y+v)+t (nonrigid + rigid + scale)
+
+  Kernel:
+    [Gaussian] with beta = 1.00
+
+  Acceleration: 
+    Fast G:  K = 100
+    Fast P:  
+      Nystrom: J = 256
+      KD Tree: r = min(0.15,7.0*sigma) if sigma < 0.20
+    Rand Seed: 1
+
+  Convergence: 
+    tolerance   =  1.0e-05
+    max #loops  =  5000
+    min #loops  =  30
+
+  Output: 
+    [/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-083/verification/terminal-raw/full_1_upstream_nystrom_*.txt]; * = y,s,R,t
+
+  Normalization: [skipped]
+    Bounding boxes that cover point sets:
+    Before:
+      Target: x=[-1.99,1.36], y=[-1.46,1.88], z=[-1.86,1.49]
+      Source: x=[-1.15,1.16], y=[-0.82,0.96], z=[-0.72,0.72]
+    After:
+      Target: x=[-1.99,1.36], y=[-1.46,1.88], z=[-1.86,1.49]
+      Source: x=[-1.15,1.16], y=[-0.82,0.96], z=[-0.72,0.72]
+
+  loop=001  acc.P=[Nystrom]  N_hat=93509.773325  sigma=0.506129          
+  loop=002  acc.P=[Nystrom]  N_hat=94656.082659  sigma=0.471961  diff=0.034168
+  loop=003  acc.P=[Nystrom]  N_hat=94649.740739  sigma=0.448127  diff=0.023834
+  loop=004  acc.P=[Nystrom]  N_hat=94658.363834  sigma=0.427438  diff=0.020690
+  loop=005  acc.P=[Nystrom]  N_hat=94648.769038  sigma=0.408578  diff=0.018859
+  loop=006  acc.P=[Nystrom]  N_hat=94628.064384  sigma=0.391265  diff=0.017313
+  loop=007  acc.P=[Nystrom]  N_hat=94590.428747  sigma=0.375736  diff=0.015529
+  loop=008  acc.P=[Nystrom]  N_hat=94546.993272  sigma=0.361348  diff=0.014388
+  loop=009  acc.P=[Nystrom]  N_hat=94522.685871  sigma=0.346488  diff=0.014861
+  loop=010  acc.P=[Nystrom]  N_hat=94526.372662  sigma=0.329856  diff=0.016631
+  loop=011  acc.P=[Nystrom]  N_hat=94543.204342  sigma=0.311327  diff=0.018529
+  loop=012  acc.P=[Nystrom]  N_hat=94564.036413  sigma=0.291171  diff=0.020156
+  loop=013  acc.P=[Nystrom]  N_hat=94592.191063  sigma=0.269624  diff=0.021547
+  loop=014  acc.P=[Nystrom]  N_hat=94628.372345  sigma=0.246958  diff=0.022666
+  loop=015  acc.P=[Nystrom]  N_hat=94671.892866  sigma=0.223884  diff=0.023074
+  loop=016  acc.P=[Nystrom]  N_hat=94716.507200  sigma=0.201500  diff=0.022384
+  loop=017  acc.P=[Nystrom]  N_hat=94748.981525  sigma=0.180831  diff=0.020669
+  loop=018  acc.P=[KDtree ]  N_hat=79544.088355  sigma=0.060579  diff=0.120252
+  loop=019  acc.P=[KDtree ]  N_hat=93637.161718  sigma=0.050291  diff=0.010287
+  loop=020  acc.P=[KDtree ]  N_hat=94517.691525  sigma=0.044622  diff=0.005669
+  loop=021  acc.P=[KDtree ]  N_hat=94632.298601  sigma=0.040571  diff=0.004050
+  loop=022  acc.P=[KDtree ]  N_hat=94651.784154  sigma=0.037400  diff=0.003171
+  loop=023  acc.P=[KDtree ]  N_hat=94639.254004  sigma=0.034797  diff=0.002604
+  loop=024  acc.P=[KDtree ]  N_hat=94608.539622  sigma=0.032601  diff=0.002196
+  loop=025  acc.P=[KDtree ]  N_hat=94565.861006  sigma=0.030715  diff=0.001886
+  loop=026  acc.P=[KDtree ]  N_hat=94515.862544  sigma=0.029073  diff=0.001642
+  loop=027  acc.P=[KDtree ]  N_hat=94461.992831  sigma=0.027626  diff=0.001447
+  loop=028  acc.P=[KDtree ]  N_hat=94406.906574  sigma=0.026336  diff=0.001289
+  loop=029  acc.P=[KDtree ]  N_hat=94352.695934  sigma=0.025177  diff=0.001159
+  loop=030  acc.P=[KDtree ]  N_hat=94300.752504  sigma=0.024126  diff=0.001051
+  loop=031  acc.P=[KDtree ]  N_hat=94251.803837  sigma=0.023167  diff=0.000959
+  loop=032  acc.P=[KDtree ]  N_hat=94205.872869  sigma=0.022289  diff=0.000878
+  loop=033  acc.P=[KDtree ]  N_hat=94162.486525  sigma=0.021482  diff=0.000807
+  loop=034  acc.P=[KDtree ]  N_hat=94121.344159  sigma=0.020740  diff=0.000742
+  loop=035  acc.P=[KDtree ]  N_hat=94082.661228  sigma=0.020057  diff=0.000683
+  loop=036  acc.P=[KDtree ]  N_hat=94046.611141  sigma=0.019428  diff=0.000629
+  loop=037  acc.P=[KDtree ]  N_hat=94012.842593  sigma=0.018847  diff=0.000580
+  loop=038  acc.P=[KDtree ]  N_hat=93981.029384  sigma=0.018311  diff=0.000536
+  loop=039  acc.P=[KDtree ]  N_hat=93951.192589  sigma=0.017815  diff=0.000496
+  loop=040  acc.P=[KDtree ]  N_hat=93923.256457  sigma=0.017355  diff=0.000460
+  loop=041  acc.P=[KDtree ]  N_hat=93897.130942  sigma=0.016926  diff=0.000428
+  loop=042  acc.P=[KDtree ]  N_hat=93873.003333  sigma=0.016527  diff=0.000399
+  loop=043  acc.P=[KDtree ]  N_hat=93851.057921  sigma=0.016154  diff=0.000373
+  loop=044  acc.P=[KDtree ]  N_hat=93831.111870  sigma=0.015804  diff=0.000349
+  loop=045  acc.P=[KDtree ]  N_hat=93812.767706  sigma=0.015477  diff=0.000328
+  loop=046  acc.P=[KDtree ]  N_hat=93795.504543  sigma=0.015170  diff=0.000307
+  loop=047  acc.P=[KDtree ]  N_hat=93778.594217  sigma=0.014881  diff=0.000288
+  loop=048  acc.P=[KDtree ]  N_hat=93761.531967  sigma=0.014611  diff=0.000271
+  loop=049  acc.P=[KDtree ]  N_hat=93744.554380  sigma=0.014356  diff=0.000254
+  loop=050  acc.P=[KDtree ]  N_hat=93728.267825  sigma=0.014117  diff=0.000240
+  loop=051  acc.P=[KDtree ]  N_hat=93712.800913  sigma=0.013890  diff=0.000226
+  loop=052  acc.P=[KDtree ]  N_hat=93697.918677  sigma=0.013676  diff=0.000214
+  loop=053  acc.P=[KDtree ]  N_hat=93683.409980  sigma=0.013474  diff=0.000203
+  loop=054  acc.P=[KDtree ]  N_hat=93669.011383  sigma=0.013282  diff=0.000192
+  loop=055  acc.P=[KDtree ]  N_hat=93654.595317  sigma=0.013099  diff=0.000183
+  loop=056  acc.P=[KDtree ]  N_hat=93640.428795  sigma=0.012924  diff=0.000174
+  loop=057  acc.P=[KDtree ]  N_hat=93626.875520  sigma=0.012758  diff=0.000166
+  loop=058  acc.P=[KDtree ]  N_hat=93613.788061  sigma=0.012599  diff=0.000159
+  loop=059  acc.P=[KDtree ]  N_hat=93601.352594  sigma=0.012447  diff=0.000152
+  loop=060  acc.P=[KDtree ]  N_hat=93589.976386  sigma=0.012302  diff=0.000145
+  loop=061  acc.P=[KDtree ]  N_hat=93579.560173  sigma=0.012162  diff=0.000139
+  loop=062  acc.P=[KDtree ]  N_hat=93570.095044  sigma=0.012029  diff=0.000133
+  loop=063  acc.P=[KDtree ]  N_hat=93561.972441  sigma=0.011901  diff=0.000128
+  loop=064  acc.P=[KDtree ]  N_hat=93555.195386  sigma=0.011779  diff=0.000122
+  loop=065  acc.P=[KDtree ]  N_hat=93549.275828  sigma=0.011663  diff=0.000116
+  loop=066  acc.P=[KDtree ]  N_hat=93543.836986  sigma=0.011553  diff=0.000110
+  loop=067  acc.P=[KDtree ]  N_hat=93538.768253  sigma=0.011448  diff=0.000105
+  loop=068  acc.P=[KDtree ]  N_hat=93534.054409  sigma=0.011347  diff=0.000100
+  loop=069  acc.P=[KDtree ]  N_hat=93529.675274  sigma=0.011251  diff=0.000096
+  loop=070  acc.P=[KDtree ]  N_hat=93525.610410  sigma=0.011160  diff=0.000092
+  loop=071  acc.P=[KDtree ]  N_hat=93521.846669  sigma=0.011072  diff=0.000088
+  loop=072  acc.P=[KDtree ]  N_hat=93518.391518  sigma=0.010987  diff=0.000085
+  loop=073  acc.P=[KDtree ]  N_hat=93515.215912  sigma=0.010906  diff=0.000082
+  loop=074  acc.P=[KDtree ]  N_hat=93512.232434  sigma=0.010827  diff=0.000079
+  loop=075  acc.P=[KDtree ]  N_hat=93509.416727  sigma=0.010751  diff=0.000076
+  loop=076  acc.P=[KDtree ]  N_hat=93506.898707  sigma=0.010678  diff=0.000073
+  loop=077  acc.P=[KDtree ]  N_hat=93504.844228  sigma=0.010608  diff=0.000070
+  loop=078  acc.P=[KDtree ]  N_hat=93503.306810  sigma=0.010541  diff=0.000067
+  loop=079  acc.P=[KDtree ]  N_hat=93502.231067  sigma=0.010476  diff=0.000065
+  loop=080  acc.P=[KDtree ]  N_hat=93501.523788  sigma=0.010414  diff=0.000062
+  loop=081  acc.P=[KDtree ]  N_hat=93501.081658  sigma=0.010354  diff=0.000060
+  loop=082  acc.P=[KDtree ]  N_hat=93500.765301  sigma=0.010297  diff=0.000057
+  loop=083  acc.P=[KDtree ]  N_hat=93500.446738  sigma=0.010242  diff=0.000055
+  loop=084  acc.P=[KDtree ]  N_hat=93500.055064  sigma=0.010189  diff=0.000053
+  loop=085  acc.P=[KDtree ]  N_hat=93499.560532  sigma=0.010138  diff=0.000051
+  loop=086  acc.P=[KDtree ]  N_hat=93498.935247  sigma=0.010088  diff=0.000050
+  loop=087  acc.P=[KDtree ]  N_hat=93498.146072  sigma=0.010039  diff=0.000048
+  loop=088  acc.P=[KDtree ]  N_hat=93497.173884  sigma=0.009992  diff=0.000047
+  loop=089  acc.P=[KDtree ]  N_hat=93496.023470  sigma=0.009946  diff=0.000046
+  loop=090  acc.P=[KDtree ]  N_hat=93494.711684  sigma=0.009901  diff=0.000045
+  loop=091  acc.P=[KDtree ]  N_hat=93493.269652  sigma=0.009857  diff=0.000044
+  loop=092  acc.P=[KDtree ]  N_hat=93491.729411  sigma=0.009814  diff=0.000043
+  loop=093  acc.P=[KDtree ]  N_hat=93490.122069  sigma=0.009772  diff=0.000042
+  loop=094  acc.P=[KDtree ]  N_hat=93488.476717  sigma=0.009731  diff=0.000041
+  loop=095  acc.P=[KDtree ]  N_hat=93486.816448  sigma=0.009691  diff=0.000040
+  loop=096  acc.P=[KDtree ]  N_hat=93485.162229  sigma=0.009652  diff=0.000039
+  loop=097  acc.P=[KDtree ]  N_hat=93483.528490  sigma=0.009614  diff=0.000038
+  loop=098  acc.P=[KDtree ]  N_hat=93481.929971  sigma=0.009577  diff=0.000037
+  loop=099  acc.P=[KDtree ]  N_hat=93480.374538  sigma=0.009542  diff=0.000036
+  loop=100  acc.P=[KDtree ]  N_hat=93478.872080  sigma=0.009507  diff=0.000035
+  loop=101  acc.P=[KDtree ]  N_hat=93477.432854  sigma=0.009473  diff=0.000034
+  loop=102  acc.P=[KDtree ]  N_hat=93476.069049  sigma=0.009441  diff=0.000033
+  loop=103  acc.P=[KDtree ]  N_hat=93474.786705  sigma=0.009409  diff=0.000032
+  loop=104  acc.P=[KDtree ]  N_hat=93473.591966  sigma=0.009378  diff=0.000031
+  loop=105  acc.P=[KDtree ]  N_hat=93472.492541  sigma=0.009348  diff=0.000030
+  loop=106  acc.P=[KDtree ]  N_hat=93471.488546  sigma=0.009319  diff=0.000029
+  loop=107  acc.P=[KDtree ]  N_hat=93470.584242  sigma=0.009290  diff=0.000029
+  loop=108  acc.P=[KDtree ]  N_hat=93469.777036  sigma=0.009262  diff=0.000028
+  loop=109  acc.P=[KDtree ]  N_hat=93469.059719  sigma=0.009235  diff=0.000028
+  loop=110  acc.P=[KDtree ]  N_hat=93468.418171  sigma=0.009208  diff=0.000027
+  loop=111  acc.P=[KDtree ]  N_hat=93467.834441  sigma=0.009181  diff=0.000027
+  loop=112  acc.P=[KDtree ]  N_hat=93467.293920  sigma=0.009155  diff=0.000026
+  loop=113  acc.P=[KDtree ]  N_hat=93466.786330  sigma=0.009130  diff=0.000026
+  loop=114  acc.P=[KDtree ]  N_hat=93466.305277  sigma=0.009105  diff=0.000025
+  loop=115  acc.P=[KDtree ]  N_hat=93465.846396  sigma=0.009080  diff=0.000024
+  loop=116  acc.P=[KDtree ]  N_hat=93465.397656  sigma=0.009057  diff=0.000024
+  loop=117  acc.P=[KDtree ]  N_hat=93464.948730  sigma=0.009033  diff=0.000023
+  loop=118  acc.P=[KDtree ]  N_hat=93464.498583  sigma=0.009011  diff=0.000022
+  loop=119  acc.P=[KDtree ]  N_hat=93464.059771  sigma=0.008989  diff=0.000022
+  loop=120  acc.P=[KDtree ]  N_hat=93463.657906  sigma=0.008968  diff=0.000021
+  loop=121  acc.P=[KDtree ]  N_hat=93463.330944  sigma=0.008948  diff=0.000020
+  loop=122  acc.P=[KDtree ]  N_hat=93463.123277  sigma=0.008928  diff=0.000020
+  loop=123  acc.P=[KDtree ]  N_hat=93463.079104  sigma=0.008909  diff=0.000019
+  loop=124  acc.P=[KDtree ]  N_hat=93463.235618  sigma=0.008890  diff=0.000019
+  loop=125  acc.P=[KDtree ]  N_hat=93463.617206  sigma=0.008872  diff=0.000018
+  loop=126  acc.P=[KDtree ]  N_hat=93464.228993  sigma=0.008854  diff=0.000018
+  loop=127  acc.P=[KDtree ]  N_hat=93465.057043  sigma=0.008837  diff=0.000017
+  loop=128  acc.P=[KDtree ]  N_hat=93466.074008  sigma=0.008820  diff=0.000017
+  loop=129  acc.P=[KDtree ]  N_hat=93467.244769  sigma=0.008803  diff=0.000017
+  loop=130  acc.P=[KDtree ]  N_hat=93468.536283  sigma=0.008787  diff=0.000016
+  loop=131  acc.P=[KDtree ]  N_hat=93469.916689  sigma=0.008771  diff=0.000016
+  loop=132  acc.P=[KDtree ]  N_hat=93471.365712  sigma=0.008755  diff=0.000016
+  loop=133  acc.P=[KDtree ]  N_hat=93472.873193  sigma=0.008739  diff=0.000016
+  loop=134  acc.P=[KDtree ]  N_hat=93474.438879  sigma=0.008724  diff=0.000016
+  loop=135  acc.P=[KDtree ]  N_hat=93476.066016  sigma=0.008708  diff=0.000015
+  loop=136  acc.P=[KDtree ]  N_hat=93477.760134  sigma=0.008693  diff=0.000015
+  loop=137  acc.P=[KDtree ]  N_hat=93479.525051  sigma=0.008678  diff=0.000015
+  loop=138  acc.P=[KDtree ]  N_hat=93481.362638  sigma=0.008663  diff=0.000015
+  loop=139  acc.P=[KDtree ]  N_hat=93483.272554  sigma=0.008648  diff=0.000015
+  loop=140  acc.P=[KDtree ]  N_hat=93485.252329  sigma=0.008633  diff=0.000015
+  loop=141  acc.P=[KDtree ]  N_hat=93487.296468  sigma=0.008619  diff=0.000014
+  loop=142  acc.P=[KDtree ]  N_hat=93489.403950  sigma=0.008605  diff=0.000014
+  loop=143  acc.P=[KDtree ]  N_hat=93491.575046  sigma=0.008590  diff=0.000014
+  loop=144  acc.P=[KDtree ]  N_hat=93493.816054  sigma=0.008576  diff=0.000014
+  loop=145  acc.P=[KDtree ]  N_hat=93496.132325  sigma=0.008563  diff=0.000014
+  loop=146  acc.P=[KDtree ]  N_hat=93498.532731  sigma=0.008549  diff=0.000014
+  loop=147  acc.P=[KDtree ]  N_hat=93501.027252  sigma=0.008535  diff=0.000014
+  loop=148  acc.P=[KDtree ]  N_hat=93503.623409  sigma=0.008522  diff=0.000013
+  loop=149  acc.P=[KDtree ]  N_hat=93506.327913  sigma=0.008509  diff=0.000013
+  loop=150  acc.P=[KDtree ]  N_hat=93509.140385  sigma=0.008496  diff=0.000013
+  loop=151  acc.P=[KDtree ]  N_hat=93512.062072  sigma=0.008483  diff=0.000013
+  loop=152  acc.P=[KDtree ]  N_hat=93515.087321  sigma=0.008470  diff=0.000013
+  loop=153  acc.P=[KDtree ]  N_hat=93518.209371  sigma=0.008458  diff=0.000013
+  loop=154  acc.P=[KDtree ]  N_hat=93521.421049  sigma=0.008445  diff=0.000012
+  loop=155  acc.P=[KDtree ]  N_hat=93524.718661  sigma=0.008433  diff=0.000012
+  loop=156  acc.P=[KDtree ]  N_hat=93528.095845  sigma=0.008421  diff=0.000012
+  loop=157  acc.P=[KDtree ]  N_hat=93531.549577  sigma=0.008409  diff=0.000012
+  loop=158  acc.P=[KDtree ]  N_hat=93535.073626  sigma=0.008398  diff=0.000012
+  loop=159  acc.P=[KDtree ]  N_hat=93538.660029  sigma=0.008386  diff=0.000011
+  loop=160  acc.P=[KDtree ]  N_hat=93542.306099  sigma=0.008375  diff=0.000011
+  loop=161  acc.P=[KDtree ]  N_hat=93546.006516  sigma=0.008364  diff=0.000011
+  loop=162  acc.P=[KDtree ]  N_hat=93549.755632  sigma=0.008353  diff=0.000011
+  loop=163  acc.P=[KDtree ]  N_hat=93553.547520  sigma=0.008342  diff=0.000011
+  loop=164  acc.P=[KDtree ]  N_hat=93557.384100  sigma=0.008331  diff=0.000011
+  loop=165  acc.P=[KDtree ]  N_hat=93561.267212  sigma=0.008320  diff=0.000011
+  loop=166  acc.P=[KDtree ]  N_hat=93565.207140  sigma=0.008310  diff=0.000011
+  loop=167  acc.P=[KDtree ]  N_hat=93569.207102  sigma=0.008299  diff=0.000011
+  loop=168  acc.P=[KDtree ]  N_hat=93573.266931  sigma=0.008288  diff=0.000011
+  loop=169  acc.P=[KDtree ]  N_hat=93577.380611  sigma=0.008277  diff=0.000011
+  loop=170  acc.P=[KDtree ]  N_hat=93581.535984  sigma=0.008267  diff=0.000011
+  loop=171  acc.P=[KDtree ]  N_hat=93585.718353  sigma=0.008256  diff=0.000011
+  loop=172  acc.P=[KDtree ]  N_hat=93589.917964  sigma=0.008245  diff=0.000011
+  loop=173  acc.P=[KDtree ]  N_hat=93594.119812  sigma=0.008235  diff=0.000010
+  loop=174  acc.P=[KDtree ]  N_hat=93598.307662  sigma=0.008225  diff=0.000010
+  loop=175  acc.P=[KDtree ]  N_hat=93602.463097  sigma=0.008214  diff=0.000010
+  loop=176  acc.P=[KDtree ]  N_hat=93606.563820  sigma=0.008204  diff=0.000010
+  loop=177  acc.P=[KDtree ]  N_hat=93610.592996  sigma=0.008194  diff=0.000010
+  loop=178  acc.P=[KDtree ]  N_hat=93614.529034  sigma=0.008183  diff=0.000010
+  loop=179  acc.P=[KDtree ]  N_hat=93618.354832  sigma=0.008173  diff=0.000010
+  loop=180  acc.P=[KDtree ]  N_hat=93622.059705  sigma=0.008163  diff=0.000010
+  loop=181  acc.P=[KDtree ]  N_hat=93625.632790  sigma=0.008152  diff=0.000010
+  loop=182  acc.P=[KDtree ]  N_hat=93629.067772  sigma=0.008142  diff=0.000010
+  loop=183  acc.P=[KDtree ]  N_hat=93632.364306  sigma=0.008132  diff=0.000010
+  loop=184  acc.P=[KDtree ]  N_hat=93635.529607  sigma=0.008122  diff=0.000010
+  loop=185  acc.P=[KDtree ]  N_hat=93638.577810  sigma=0.008112  diff=0.000010
+  Computing Time:
+    VB Optimization: 103.902 s (real) / 677.361 s (cpu)
+    File reading:    0.107 s
+    File writing:    0.040 s
+
