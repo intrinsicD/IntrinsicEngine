@@ -42,12 +42,12 @@ analytic regression evidence remains applicable; new Python controls cover this 
 Plan counter-review: `/root/method082_plan`, approved with interpretation/validation notes.
 
 ## Result record
-The [version1 report](../evidence/METHOD-082/postrun/report.html) owns the final interpretation,
+The [version1 report](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-082/postrun/report.html) owns the final interpretation,
 including the interrupted traces and uncertainties; ARA C123/C124 retain the refuted
 predictions. Original raw outputs/report stay unchanged, bound by
-[execution binding](../evidence/METHOD-082/reviews/execution-binding.json).
-The [independent raw audit](../evidence/METHOD-082/reviews/final-raw-results-audit.txt)
-accepts the scientific interpretation; the [final report review](../evidence/METHOD-082/reviews/final-report-review.txt)
+[execution binding](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-082/reviews/execution-binding.json).
+The [independent raw audit](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-082/reviews/final-raw-results-audit.txt)
+accepts the scientific interpretation; the [final report review](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-082/reviews/final-report-review.txt)
 accepts all three criteria and the closure-only updates.
 This task ends at a bounded diagnostic result, with no new engine maturity claim.
 Diagnosis of the shared partial-overlap failure is outside this test's scope.

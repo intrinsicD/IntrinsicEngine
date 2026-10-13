@@ -59,11 +59,11 @@ data structure or a named method extension.
 - Executable manifest:
   [`../../../../benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml`](../../../../benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml)
 - Claim-eligible schema-v2 result:
-  [`../../../../tasks/evidence/METHOD-019/experiment/inputs/benchmark_result.json`](../../../../tasks/evidence/METHOD-019/experiment/inputs/benchmark_result.json)
+  [`../../../../tasks/evidence/METHOD-019/experiment/inputs/benchmark_result.json`](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-019/experiment/inputs/benchmark_result.json)
 - Auditable per-strategy rows:
-  [`../../../../tasks/evidence/METHOD-019/experiment/inputs/strategy_rows.jsonl`](../../../../tasks/evidence/METHOD-019/experiment/inputs/strategy_rows.jsonl)
+  [`../../../../tasks/evidence/METHOD-019/experiment/inputs/strategy_rows.jsonl`](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-019/experiment/inputs/strategy_rows.jsonl)
 - Portable custody bundle:
-  [`../../../../tasks/evidence/METHOD-019/experiment/runs/run-001/bundle.yaml`](../../../../tasks/evidence/METHOD-019/experiment/runs/run-001/bundle.yaml)
+  [`../../../../tasks/evidence/METHOD-019/experiment/runs/run-001/bundle.yaml`](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-019/experiment/runs/run-001/bundle.yaml)
 
 Replay uses the exact command recorded by the custody protocol. The clean
 singleton is sealed with source state `clean_commit`, the implementation

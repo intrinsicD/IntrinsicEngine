@@ -161,8 +161,8 @@ edits were normal-result edits. Original artifacts remain unchanged beside a
 metadata-only reseal declaring `normals` and Sandbox ON. The two executions,
 source/footprint hashes, Claude packet and review, final diff, test results and
 limitations are recorded in the
-[report](../../ara/evidence/tables/runtime235_normals_compile_locality.md) and
-[diagnostic](../../ara/evidence/diagnostics/runtime235_normals_compile_locality.json).
+[report](../../docs/results/runtime235_normals_compile_locality.md) and
+[diagnostic](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/runtime235_normals_compile_locality.json).
 The full raw archive is local ignored output at
 `build/analysis/normal-processing-locality-2026-09-13/`.
 
@@ -427,5 +427,5 @@ exceptions remain unchanged. P1 uses existing generic commands and borrowed
 plain data; P3 retains the common validated config path; P5 frame recipes are
 unchanged. There are no compatibility bridges, new library targets or layering
 exceptions. Review packets, failed attempts, repairs, source hashes and full gate
-records are bound in the [report](../../ara/evidence/tables/runtime235_remaining_compile_locality.md)
-and [diagnostic](../../ara/evidence/diagnostics/runtime235_remaining_compile_locality.json).
+records are bound in the [report](../../docs/results/runtime235_remaining_compile_locality.md)
+and [diagnostic](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/runtime235_remaining_compile_locality.json).

@@ -37,7 +37,7 @@ ctest --test-dir build/ci --show-only=json-v1
 ctest --test-dir build/ci --output-on-failure -R '^ClusteringModule\.(EveryPointDomainPreservesDeletedSlotsAndExactScalarUndo|UnrepresentableScalarLabelRejectsAllOutputPublication)$' --timeout 60 -j1
 ```
 
-The [original regression failure](../evidence/BUG-212/workflow-concurrency-before.log)
+The [original regression failure](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-212/workflow-concurrency-before.log)
 records the missing declarations. Only scheduling metadata and its exact test
 inventory change; the engine and C++ test sources remain unchanged.
 
@@ -49,8 +49,8 @@ the enclosing CI prerequisite and scheduling repair commit.
 
 The exact inventory regression passes all 20 cases. The ci preset configured and rebuilt IntrinsicRuntimeContractTests successfully; generated CTest metadata assigns three slots to both cases and both tests pass. Actual Claude Opus 5.5 reviewed the source/table correspondence and unchanged guards. No C++ source or test behavior changed.
 
-[Generated budgets](../evidence/BUG-212/generated-processor-budgets.json),
-[CTest result](../evidence/BUG-212/ctest.log), and
-[final Claude review](../evidence/BUG-212/claude-ci-final-review.md) retain the proof.
+[Generated budgets](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-212/generated-processor-budgets.json),
+[CTest result](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-212/ctest.log), and
+[final Claude review](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-212/claude-ci-final-review.md) retain the proof.
 The review preceded the final local build/test completion; the subsequent
 metadata and execution records close those pending local items.

@@ -33,7 +33,7 @@ remain four distinct selected-analysis cache misses.
 - Hosted pr-fast
   [run 35851119431](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/35851119431)
   at `4cdf626f0` failed `SelectedAnalysisCacheMisses >= 4` (actual 3). The test
-  predates this branch; see the [retained evidence](../evidence/BUG-219/failure-evidence.txt).
+  predates this branch; see the [retained evidence](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-219/failure-evidence.txt).
 - Mechanism:
   - `JobService::DispatchJob` stores `Queued` and dispatches to the harness's two workers immediately.
   - `DerivedJobStateSignatureForEntity` mixes each job's `State` and progress into the cache key.

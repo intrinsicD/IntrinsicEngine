@@ -40,7 +40,7 @@ Set `RUN_SERIAL` on that single case.
   - one CPU, all 10 cases at `--parallel 4`: reproduces the timeout (30.01 s) while the other 9 pass
   - one CPU, case alone: 17.10 s
   - two CPUs, all 10 at `--parallel 4`: passes in 23.36 s
-- See the [retained evidence](../evidence/BUG-217/timeout-evidence.txt).
+- See the [retained evidence](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-217/timeout-evidence.txt).
 - The retired [BUG-216](BUG-216-curvature-refinement-timeout-during-concurrent-builds.md),
   [BUG-190](BUG-190-curvature-refinement-timeout-during-compilation.md) and
   [BUG-207](BUG-207-loaded-ubsan-curvature-timeout.md) attributed earlier

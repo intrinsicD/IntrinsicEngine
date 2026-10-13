@@ -186,11 +186,11 @@ evidence:
   non-finite scalar or direction values.
 
 The retained UI evidence is
-[`bunny-curvature-applied.png`](../evidence/BUG-153/artifacts/bunny-curvature-applied.png)
+[`bunny-curvature-applied.png`](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-153/artifacts/bunny-curvature-applied.png)
 and
-[`armadillo-curvature-applied.png`](../evidence/BUG-153/artifacts/armadillo-curvature-applied.png);
+[`armadillo-curvature-applied.png`](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-153/artifacts/armadillo-curvature-applied.png);
 the matching process log is
-[`live-sandbox.log`](../evidence/BUG-153/artifacts/live-sandbox.log).
+[`live-sandbox.log`](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-153/artifacts/live-sandbox.log).
 
 ## Forbidden changes
 - Mixing the numerical repair with source moves or unrelated refactors.

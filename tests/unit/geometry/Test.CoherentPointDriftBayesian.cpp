@@ -171,7 +171,8 @@ TEST(CoherentPointDriftBayesian, SubsampledRunsUpsampleTheDeformationToEveryPoin
 
 TEST(CoherentPointDriftBayesian, MatchesAnIndependentImplementationOfAlgorithmOne)
 {
-    // Per-iteration sigma^2 and scale of ara/evidence/diagnostics/method050_bcpd_numpy_20260928/
+    // Per-iteration sigma^2 and scale from the historical oracle at Git commit
+    // 36a7b5062d9be3239d667efd9e41c4d4028ba249: ara/evidence/diagnostics/method050_bcpd_numpy_20260928/
     // bcpd_reference.py (lambda 2, beta 1, scale estimated, omega 0, kappa infinity, gamma 1, no
     // normalization) on its 60-point bend, without and with the posterior-variance terms. With them
     // the scale collapses toward 0 in both implementations (C114).

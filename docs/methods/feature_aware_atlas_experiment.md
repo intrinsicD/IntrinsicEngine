@@ -2,7 +2,7 @@
 
 The classical two-stage approach is promising enough to continue. It produces actual usable UV maps, not just segmentation colors, on frog, sculpt and two held-out meshes. It is **not yet a production backend or a proven native speed improvement**. The principal remaining issues are jagged/seed-dependent boundaries and mediocre packing efficiency.
 
-This is the operator-directed [METHOD-044 experiment](../../tasks/done/METHOD-044-feature-aware-atlas-merge-experiment.md), developed with actual Claude CLI design, iteration and source/result reviews. The [campaign record](../../ara/evidence/diagnostics/method044/record.json), [iteration notes](../../ara/evidence/diagnostics/method044/iteration-notes.md) and ARA [C69/C70](../../ara/logic/claims.md#c69-bounded-classical-atlas-patch-and-merge-diagnostic) bind the bounded CPU observations. No deep learning, anatomical labels, production defaults or existing METHOD-039–043 algorithms were changed.
+This is the operator-directed [METHOD-044 experiment](../../tasks/done/METHOD-044-feature-aware-atlas-merge-experiment.md), developed with actual Claude CLI design, iteration and source/result reviews. The [campaign record](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method044/record.json), [iteration notes](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method044/iteration-notes.md) and ARA [C69/C70](../../ara/logic/claims.md#c69-bounded-classical-atlas-patch-and-merge-diagnostic) bind the bounded CPU observations. No deep learning, anatomical labels, production defaults or existing METHOD-039–043 algorithms were changed.
 
 ## Results to inspect
 
@@ -13,11 +13,11 @@ These examples use the intermediate **1.35 stretch limit**, followed by xatlas u
 | Frog | 19,106 | 15 | 1.347 | 1.070 | 1.180 |
 | Sculpt | 7,342 | 5 | 1.301 | 1.071 | 1.173 |
 
-![Frog chart decomposition and actual packed UVs](../../ara/evidence/diagnostics/method044/examples/frog_stretch135_final/packed.png)
+[Frog chart decomposition and actual packed UVs](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method044/examples/frog_stretch135_final/packed.png)
 
-![Sculpt chart decomposition and actual packed UVs](../../ara/evidence/diagnostics/method044/examples/sculpt_stretch135_final/packed.png)
+[Sculpt chart decomposition and actual packed UVs](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method044/examples/sculpt_stretch135_final/packed.png)
 
-Importable, source-derived OBJ examples: [frog](../../ara/evidence/diagnostics/method044/examples/frog_stretch135_final/packed.obj), [sculpt](../../ara/evidence/diagnostics/method044/examples/sculpt_stretch135_final/packed.obj). Keep each OBJ beside its supplied MTL and checker PNG. The source triangle geometry is unchanged; per-corner UVs and chart groups are added. The neighboring NPZ contains the numeric source-face labels and UV arrays. This is an offline export, not ECS/UI publication.
+Importable, source-derived OBJ examples: [frog](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method044/examples/frog_stretch135_final/packed.obj), [sculpt](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method044/examples/sculpt_stretch135_final/packed.obj). Keep each OBJ beside its supplied MTL and checker PNG. The source triangle geometry is unchanged; per-corner UVs and chart groups are added. The neighboring NPZ contains the numeric source-face labels and UV arrays. This is an offline export, not ECS/UI publication.
 
 ### What “stretch” means here
 
@@ -96,7 +96,7 @@ Use `--arms feature blind growth-only merge-only xatlas` for the ablation/native
 
 ## Decision and remaining work
 
-Claude's [final focused source/evidence review](../../ara/evidence/diagnostics/method044/reviews/atlas-final-claude-focused.md) found no blocking error in the shown numerical/topology/audit code and recommended retaining the two-stage direction. The larger full-source request timed out; this is not presented as a full independent repository audit. The normalization question in that review was checked directly: `geometry` divides every face area by total area. The pinned NumPy/SciPy versions are in the campaign record.
+Claude's [final focused source/evidence review](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method044/reviews/atlas-final-claude-focused.md) found no blocking error in the shown numerical/topology/audit code and recommended retaining the two-stage direction. The larger full-source request timed out; this is not presented as a full independent repository audit. The normalization question in that review was checked directly: `geometry` divides every face area by total area. The pinned NumPy/SciPy versions are in the campaign record.
 
 Continue with **feature-aware connected initialization + distortion-validated merging**. It is better aligned with the atlas objective than the earlier thickness/anatomical parts experiments. Do not add expensive full crease-curve reconstruction until it fixes a demonstrated failure.
 

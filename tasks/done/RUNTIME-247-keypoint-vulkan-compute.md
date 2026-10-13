@@ -155,9 +155,9 @@ Completed 2026-09-14 at **Operational**, bounded by the fixtures and supported
 input envelope in [C93](../../ara/logic/claims.md#c93-full-vulkan-keypoint-computation-executes-the-bounded-reference-fixtures).
 Commit reference: the enclosing RUNTIME-247 retirement commit; exact changed
 source hashes and command receipts are retained in the
-[verification record](../../ara/evidence/diagnostics/keypoint_compute_2026-09-14/record.json).
+[verification record](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/keypoint_compute_2026-09-14/record.json).
 
-[Verification table](../../ara/evidence/tables/keypoint_compute_verification_2026-09-14.md):
+[Verification table](../../docs/results/keypoint_compute_verification_2026-09-14.md):
 4,622 distinct native CPU passes with one expected unsanitized leak-control skip;
 1,450 geometry and 37 affected runtime cases per isolated sanitizer; seven actual
 Vulkan cases, no skips. The developer sandbox and shaders rebuild successfully.

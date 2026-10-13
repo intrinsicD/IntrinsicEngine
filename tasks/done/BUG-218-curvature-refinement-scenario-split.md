@@ -41,7 +41,7 @@ refinement case and give it a case-only 60 s `TIMEOUT`.
 - Measured scenario cost on the existing Debug binary:
   - `Grid(40, alternate)` Extract: 3.55 s
   - `Grid(60)` Extract: 15.49 s (81% of the case)
-  - See the [retained evidence](../evidence/BUG-218/split-evidence.txt).
+  - See the [retained evidence](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-218/split-evidence.txt).
 - Change in `Test.CurvatureExtrema.cpp`:
   - `RetriangulationRetainsCenterCurve`: `Grid(40, false, true)`.
   - `RefinementRetainsCenterCurve`: `Grid(60, false, false)`.

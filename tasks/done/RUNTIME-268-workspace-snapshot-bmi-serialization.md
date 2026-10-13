@@ -20,7 +20,7 @@ serialization, then make the smallest beneficial ownership/export change.
 - Explicit operator-directed continuation of compile-time cleanup. RUNTIME-266
   already removed the complete registry from pointer/reference consumers; keep
   that verified boundary and do not count its work again.
-- Its [report](../../ara/evidence/tables/runtime266_registry_borrow_measurement.md)
+- Its [report](../../docs/results/runtime266_registry_borrow_measurement.md)
   retains a diagnostic snapshot trace: WriteAST dominates. A synthetic control
   keeps every direct import and global-fragment include while replacing the own
   declarations with a trivial export; its serialization footprint is much smaller.
@@ -140,7 +140,7 @@ Retired at CPUContracted, the intended compile-locality refactor endpoint.
 Commit reference: implementation `ca164c10c`; frozen manifest `01e92cdf6`; this retirement/evidence
 commit records the reviewed result. No further backend maturity is implied.
 
-[Report, all ten local samples and raw evidence](../../ara/evidence/tables/runtime268_snapshot_std_measurement.md)
+[Report, all ten local samples and raw evidence](../../docs/results/runtime268_snapshot_std_measurement.md)
 record the final five-sample-per-arm comparison. Including the new owner, snapshot
 compilation median changes from 15.183 to 1.646 seconds; the runtime producer
 subtotal changes from 42.715 to 29.120 seconds. Consumer ranges overlap; no consumer,

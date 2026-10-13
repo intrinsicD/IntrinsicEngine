@@ -32,7 +32,7 @@ combined-source gates at `33f6e4427c9ba3dbb050c5d81fe0e5d177ebf46a`: CPU 4,880
 selected, ASan 3,231 and UBSan 3,231, all with zero failures. CPU and UBSan each
 have one expected GLFW lifetime skip; ASan runs every selected entry. All task
 code/build files remain byte-identical to the reviewed source. The
-[combined verification and source hashes](../evidence/GRAPHICS-146/measurements.md)
+[combined verification and source hashes](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/GRAPHICS-146/measurements.md)
 preserve that reuse basis. BUG-206 remains open; this refactor does not fix it
 or promote any engine capability's maturity.
 
@@ -156,7 +156,7 @@ git diff --check
 ## Planning review
 
 Codex and Claude Code reached consensus on 2026-09-21 before this task was
-filed. The [shared planning review](../evidence/GEOM-099/claude-planning-review.md)
+filed. The [shared planning review](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/GEOM-099/claude-planning-review.md)
 records the agreed scope, corrections, rejected job-lifecycle candidate and
 compile-regression stop rules. Implementation and timing evidence are recorded in the completion section above.
 
@@ -198,8 +198,8 @@ property-access consumers now share the compiled fixture; all differing test
 inputs and assertions remain local. The complete affected code footprint is
 7,099 → 6,923 lines (-176), with no added regression tests.
 
-The [independent implementation review](../evidence/RUNTIME-272/implementation-review.md)
-found no actionable defects. The [six-sample compile comparison](../evidence/RUNTIME-272/measurements.md)
+The [independent implementation review](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/RUNTIME-272/implementation-review.md)
+found no actionable defects. The [six-sample compile comparison](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/RUNTIME-272/measurements.md)
 passes every original frozen limit: clean wall -0.08%, compiler sum -0.02%;
 consumer edit wall -0.73%, compiler sum -2.28%; declaration scope rebuilds
 20 → 10 compiler jobs. No-op compiler work stays zero. The new helper edit

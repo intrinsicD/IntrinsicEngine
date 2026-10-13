@@ -1,2 +1,0 @@
-PASS: original: optimized import rejection=True; no run invoked
-PASS: remove optimization guard: optimized import rejection=False; no run invoked

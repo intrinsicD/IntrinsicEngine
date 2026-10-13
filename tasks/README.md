@@ -25,7 +25,9 @@ New or changed tasks use workflow schema v1 from the templates. Untouched
 pre-policy task hashes are prospectively grandfathered; historical tasks are
 not backfilled. Active work uses one writer per worktree and an atomic
 Git-common-dir claim (`tools/agents/task_claim.py`). Completion evidence and
-risk profiles are defined in
+risk profiles apply before retirement cleanup; new raw evidence is ignored and
+removed after durable lessons/results are extracted. See
+[task retirement](../docs/agent/task-format.md#retiring-a-task). Profiles are defined in
 [`docs/agent/workflow-evidence.md`](../docs/agent/workflow-evidence.md).
 
 The generated [`SESSION-BRIEF.md`](SESSION-BRIEF.md) is the authoritative

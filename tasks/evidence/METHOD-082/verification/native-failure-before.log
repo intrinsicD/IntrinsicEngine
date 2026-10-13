@@ -1,8 +1,0 @@
-Traceback (most recent call last):
-  File "/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-082/verification/native-failure-shape.py", line 10, in <module>
-    row,trace,stages,positions=c.load_cell(cell,folder)
-                               ^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/alex/Documents/IntrinsicEngine/tasks/evidence/METHOD-082/convergence.py", line 57, in load_cell
-    assert len(t) == d['iterations'] == d['observed_iterations'] and 0 <= len(t) <= CAP
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-AssertionError

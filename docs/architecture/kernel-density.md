@@ -113,7 +113,7 @@ The [consumer inventory](spatial-index-consumers.md) tracks remaining candidates
 [RUNTIME-220](../../tasks/done/RUNTIME-220-kernel-density-spatial-backends.md)
 records this slice.
 
-The [2026-09-09 verification record](../../ara/evidence/tables/density_vulkan_verification_2026-09-09.md)
+The [2026-09-09 verification record](../results/density_vulkan_verification_2026-09-09.md)
 binds the bounded CPU/Vulkan result to C82. It reports zero observed GPU density
 delta at 1e-5 tolerance, with CPU bandwidth and evaluation retained.
 

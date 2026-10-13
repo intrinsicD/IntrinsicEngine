@@ -17,7 +17,7 @@ Static analysis and performance analysis tooling.
   map scenario paths and expected consumers by arm (`before`/`after`); missing
   arm entries fail closed. See
   `benchmarks/ci/manifests/engine_compile_iteration_overnight.yaml` and the
-  [matched overnight measurements](../../ara/evidence/tables/build007_overnight_compile_measurement.md).
+  [matched overnight measurements](../../docs/results/build007_overnight_compile_measurement.md).
 
 - `tools/analysis/compile_hotspots.py`: normalizes the latest Ninja records
   into physical compiler invocations, resolves their sources through the

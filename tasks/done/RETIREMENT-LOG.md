@@ -455,7 +455,7 @@ objectives, validated source-corner UVs, raw property bakes and the actual
 left/right atlas workspace. Five fixed-source Opus 5.5 reviews and a numerical
 audit drove fixes, including exact bake extents and nested undo/redo. Focused and
 full CPU, separate ASan/UBSan, the final Vulkan selection and visual inspection
-pass; [C109/C110 evidence](../../ara/evidence/diagnostics/method047_property_atlas/report.md)
+pass; [C109/C110 evidence](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method047_property_atlas/report.md)
 bounds numerical and device claims without universal or speed guarantees.
 
 [BUG-209](BUG-209-atlas-vulkan-stale-module-recovery.md) retires after regenerating
@@ -569,7 +569,7 @@ compile allowance. All three fixed implementations pass independent Claude Sonne
 medium review; bounded review limitations remain in their evidence records.
 The final combined source `33f6e4427` passes full CPU, ASan and UBSan gates, resolving
 the earlier geometry/runtime verification obligations through unchanged-source
-identity checks. [Final measurements and gates](../evidence/GRAPHICS-146/measurements.md)
+identity checks. [Final measurements and gates](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/GRAPHICS-146/measurements.md)
 preserve the evidence. BUG-206 remains open; no lifecycle fix or new capability
 maturity is claimed. GEOIO-004 remains separately retired as rejected below.
 
@@ -581,7 +581,7 @@ The reviewed shared-parser candidate `478e32e0` preserves its 224 focused IO
 cases, but private-header compiler work rises 4.967 → 6.174 seconds (+24.30%)
 against a frozen 2% allowance, with separated sample ranges. All source and
 regression-test changes are restored; retained code delta is zero. The
-[negative evidence](../evidence/GEOIO-004/measurements.md) preserves the full
+[negative evidence](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/GEOIO-004/measurements.md) preserves the full
 experiment, attempted -74 implementation-line change and +150 test lines.
 BUG-206 continues to own the unrelated full-ci/UBSan phase-string race. No
 shared parser implementation or new capability claim landed.
@@ -595,7 +595,7 @@ header-probe consumer accounting with positive and negative regression coverage.
 
 Integrated the previously measured fixture batch in `e804afc24`: compiled shared
 fixture/mock lifetime ownership and unused consumer dependencies; C103/C104
-[reports](../../ara/evidence/tables/runtime270_fixture_batch_measurement.md) retain
+[reports](../../docs/results/runtime270_fixture_batch_measurement.md) retain
 all gains, owner regressions and negligible clean-build results. Separate
 SessionLifecycle cleanup `8affd8dcc` makes no target-build timing claim.
 Canonical ci build and CPU gate pass (4,861 passes, zero failures, one expected
@@ -611,7 +611,7 @@ CPUContracted: shell-owned prepared frame, draw-scoped context borrow and existi
 method implementation owner remove three unrelated config importers. Canonical full
 CPU and fresh Clang20 caller compilation pass. Six matched editor-target samples
 observe 34.245 → 27.372 s median locally; receiver cost and non-improving controls
-remain explicit in the [report](../../ara/evidence/tables/runtime267_processing_config_measurement.md).
+remain explicit in the [report](../../docs/results/runtime267_processing_config_measurement.md).
 One private header, +34 C++ lines; no new module/state owner or broader speed claim.
 [BUG-199](BUG-199-compile-benchmark-cmake-glob-output.md) repairs shared CMake glob
 metadata accounting, with regression tests and both rejected attempts retained.
@@ -640,7 +640,7 @@ Settled graphics-target implementation rebuild median 12.896 → 9.474 seconds
 linking. One renderer compile per edit; unchanged prerequisites and commands.
 No whole-engine, clean-build, runtime/GPU or statistical claim; ten canonical
 records remain claim_eligible:false. Full CPU 4,664 passes, one expected skip;
-347 focused passes. [Report and raw evidence](../../ara/evidence/tables/graphics145_renderer_frontend_measurement.md).
+347 focused passes. [Report and raw evidence](../../docs/results/graphics145_renderer_frontend_measurement.md).
 RUNTIME-267 and independent UI/material/cache tasks remain open.
 
 
@@ -659,7 +659,7 @@ ranges overlap. Isolated snapshot owner+interface costs 1.690 → 1.753 seconds.
 All 20 records remain claim_eligible:false; no whole-engine/runtime/GPU claim.
 Full CPU: 4,664 passes, one expected skip; 444 focused passes; fresh Clang 20
 editor closure plus
-final contract objects compile. [Report and raw evidence](../../ara/evidence/tables/graphics144_shared_std_measurement.md).
+final contract objects compile. [Report and raw evidence](../../docs/results/graphics144_shared_std_measurement.md).
 GRAPHICS-145 owns the separately traced implementation frontend cost; RUNTIME-267
 remains open. Independent UI/material/cache tasks retain their scope.
 
@@ -677,7 +677,7 @@ subtotal 42.715 → 29.120 seconds. Consumer ranges overlap; no whole-engine, ru
 or general speedup claim. Canonical full CPU: 4,664 passes, zero failures, one
 expected skip. Focused 271 passes; fresh cache-off Clang20 compiles the Sandbox
 editor/engine closure and contract object. Additional import and re-export faults
-are rejected. [Report and raw evidence](../../ara/evidence/tables/runtime268_snapshot_std_measurement.md).
+are rejected. [Report and raw evidence](../../docs/results/runtime268_snapshot_std_measurement.md).
 RUNTIME-267 and GRAPHICS-144 retain their own scoped measurements and implementation.
 
 
@@ -695,7 +695,7 @@ Clang20 Sandbox editor/engine compilation pass. Original eleven boundary witness
 reject the dependency; both final compiler graphs pass. C98 retains the noisy
 four-sample observations without a stable timing-gain claim. The diagnostic
 serialization finding is owned next by RUNTIME-268; config work stays RUNTIME-267.
-[Report and raw evidence](../../ara/evidence/tables/runtime266_registry_borrow_measurement.md).
+[Report and raw evidence](../../docs/results/runtime266_registry_borrow_measurement.md).
 
 
 ## 2026-09-15 — BUILD-009: refreshed compile baseline
@@ -706,7 +706,7 @@ three samples per arm, Clang23 Debug Null/headless libraries and four jobs.
 All six results validate; shared compiler commands and installed dependencies match.
 C97 records the local clean/interface observations and overlapping implementation
 populations. Claude reviewed calculations and scope; raw accounting was recomputed.
-[Report and evidence](../../ara/evidence/tables/build009_current_compile_measurement.md).
+[Report and evidence](../../docs/results/build009_current_compile_measurement.md).
 Owned timed build storage was removed. RUNTIME-266, RUNTIME-267 and GRAPHICS-144
 retain their implementation ownership; BUILD-006 remains separately gated.
 
@@ -725,7 +725,7 @@ installation and strengthened identity checks; excluded and retained the first
 incomplete cohort. C95 records the restarted local comparison: interface-touch
 rebuilds 61 → 22 compiler units, 84.131–84.456 → 39.179–39.477 seconds. No established
 clean-build speedup, general performance or GPU/sanitizer runtime claim.
-[Report and raw evidence](../../ara/evidence/tables/runtime265_service_borrow_compile_measurement.md).
+[Report and raw evidence](../../docs/results/runtime265_service_borrow_compile_measurement.md).
 
 Canonical ci rebuild and full CPU reconciliation pass: 4,640 passes, zero failures,
 one expected skip; 335 focused and 26 tooling tests pass. Compiler boundary guards

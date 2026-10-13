@@ -154,10 +154,10 @@ METHOD-038 records:
 
 - [`tasks/done/METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md`](../../../tasks/done/METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md)
   is the retired task contract;
-- [`tasks/evidence/METHOD-038/experiment/protocol.yaml`](../../../tasks/evidence/METHOD-038/experiment/protocol.yaml)
+- [`tasks/evidence/METHOD-038/experiment/protocol.yaml`](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-038/experiment/protocol.yaml)
   fixes the final experiment protocol;
-- [`tasks/evidence/METHOD-038/experiment/runs/scratch-011/bundle.yaml`](../../../tasks/evidence/METHOD-038/experiment/runs/scratch-011/bundle.yaml)
-  and [`audit.json`](../../../tasks/evidence/METHOD-038/experiment/runs/scratch-011/audit.json)
+- [`tasks/evidence/METHOD-038/experiment/runs/scratch-011/bundle.yaml`](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-038/experiment/runs/scratch-011/bundle.yaml)
+  and [`audit.json`](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-038/experiment/runs/scratch-011/audit.json)
   are the accepted portable non-claim replay and independent audit; and
 - ARA claims C40--C43 in
   [`ara/logic/claims.md`](../../../ara/logic/claims.md) bound the narrow

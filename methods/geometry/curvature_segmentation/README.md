@@ -235,44 +235,44 @@ runner through `BoundaryCurveCoverageProfileV1`.
   bound by the deliberately narrow ARA claim C54.
 
 The historical non-claim-eligible
-[`METHOD-038` scratch replay](../../../tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/protocol.yaml)
+[`METHOD-038` scratch replay](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/protocol.yaml)
 selected four Automatic components on the paired 10k fixture, failing the
 exact-two gate while passing the `0.02` label-error bound; the matched Fixed
 control selected two. The independent
-[`audit`](../../../tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/runs/scratch-002/audit.json)
+[`audit`](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/runs/scratch-002/audit.json)
 rejected claim authorization as intended. This is bounded negative evidence
 (ARA C40), not a reason to retune or change the production default.
 
 The historical non-claim-eligible
-[`scratch-003` protocol](../../../tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/protocol.yaml)
+[`scratch-003` protocol](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/protocol.yaml)
 extends that screen across the new fixture lanes. Fixed selected the expected
 two planar-transition components and one sphere component in both cold and
 reusable lanes; its maximum label error was `0.005`, and the planar continuous-
 boundary upper bound was `0.007071061` against the frozen `0.02` tolerance.
 Automatic selected four components in all three lanes and reached `0.656`
 maximum label error on the sphere pair. The independent
-[`audit`](../../../tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/runs/scratch-003/audit.json)
+[`audit`](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/runs/scratch-003/audit.json)
 accepted the bundle derivation while leaving `claim_authorized: false` (ARA
 C41). This is a bounded negative fixture result, not a curved-surface geodesic,
 refinement-convergence, performance, or candidate-v2 result.
 
 The final checkpoint-3 non-claim-eligible
-[`scratch-006` fold protocol](../../../tasks/evidence/METHOD-038/superseded/20260811-fold-screening-final-task-bound/experiment/protocol.yaml),
-[`sealed result`](../../../tasks/evidence/METHOD-038/superseded/20260811-fold-screening-final-task-bound/experiment/inputs/fold_controls_benchmark_result.json),
-[`bundle`](../../../tasks/evidence/METHOD-038/superseded/20260811-fold-screening-final-task-bound/experiment/runs/scratch-006/bundle.yaml),
+[`scratch-006` fold protocol](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-038/superseded/20260811-fold-screening-final-task-bound/experiment/protocol.yaml),
+[`sealed result`](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-038/superseded/20260811-fold-screening-final-task-bound/experiment/inputs/fold_controls_benchmark_result.json),
+[`bundle`](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-038/superseded/20260811-fold-screening-final-task-bound/experiment/runs/scratch-006/bundle.yaml),
 and independent
-[`audit`](../../../tasks/evidence/METHOD-038/superseded/20260811-fold-screening-final-task-bound/experiment/runs/scratch-006/audit.json)
+[`audit`](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-038/superseded/20260811-fold-screening-final-task-bound/experiment/runs/scratch-006/audit.json)
 remain fixture/oracle integrity evidence only. The earlier `scratch-004`
 schema rejection and accepted pre-status `scratch-005` replay are preserved
 separately; neither historical run is reinterpreted against the final task
 hash.
 
 The accepted pre-status checkpoint-4 non-claim-eligible
-[`scratch-007` surface-control protocol](../../../tasks/evidence/METHOD-038/superseded/20260811-surface-screening-task-status-advance/experiment/protocol.yaml),
-[`sealed result`](../../../tasks/evidence/METHOD-038/superseded/20260811-surface-screening-task-status-advance/experiment/inputs/surface_controls_benchmark_result.json),
-[`bundle`](../../../tasks/evidence/METHOD-038/superseded/20260811-surface-screening-task-status-advance/experiment/runs/scratch-007/bundle.yaml),
+[`scratch-007` surface-control protocol](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-038/superseded/20260811-surface-screening-task-status-advance/experiment/protocol.yaml),
+[`sealed result`](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-038/superseded/20260811-surface-screening-task-status-advance/experiment/inputs/surface_controls_benchmark_result.json),
+[`bundle`](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-038/superseded/20260811-surface-screening-task-status-advance/experiment/runs/scratch-007/bundle.yaml),
 and independent
-[`audit`](../../../tasks/evidence/METHOD-038/superseded/20260811-surface-screening-task-status-advance/experiment/runs/scratch-007/audit.json)
+[`audit`](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-038/superseded/20260811-surface-screening-task-status-advance/experiment/runs/scratch-007/audit.json)
 passed all seventeen frozen gates. Both cylinder phases recorded zero hard
 features, exact v1 payload parity, at most `0.000000008` normalized radial
 error, and at most `0.000000015` paired-edge delta. Both smooth diagonal phases
@@ -283,11 +283,11 @@ fixture/oracle integrity evidence only; custody retains
 `claim_authorized: false`.
 
 The final retirement-task-bound
-[`scratch-011` protocol](../../../tasks/evidence/METHOD-038/experiment/protocol.yaml),
-[`sealed result`](../../../tasks/evidence/METHOD-038/experiment/inputs/surface_controls_benchmark_result.json),
-[`bundle`](../../../tasks/evidence/METHOD-038/experiment/runs/scratch-011/bundle.yaml),
+[`scratch-011` protocol](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-038/experiment/protocol.yaml),
+[`sealed result`](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-038/experiment/inputs/surface_controls_benchmark_result.json),
+[`bundle`](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-038/experiment/runs/scratch-011/bundle.yaml),
 and independent
-[`audit`](../../../tasks/evidence/METHOD-038/experiment/runs/scratch-011/audit.json)
+[`audit`](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-038/experiment/runs/scratch-011/audit.json)
 repeat the same scientific row after the task split and bind the completed
 evidence-only task bytes. All seventeen gates pass and
 `claim_authorized: false` remains unchanged; scratch-011 does not broaden C43.

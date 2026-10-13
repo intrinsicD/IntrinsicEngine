@@ -14,7 +14,7 @@ including all ten new extremum cases. Separate `ci-asan` and `ci-ubsan` runs
 pass both test producers: 48 existing feature/partition cases and ten extremum
 cases in each sanitizer. These are focused CPU checks, not a full-engine or
 Vulkan verification. Raw logs and per-case sanitizer XML are in
-[`tasks/evidence/METHOD-041`](../../../tasks/evidence/METHOD-041).
+[`tasks/evidence/METHOD-041`](https://github.com/intrinsicD/IntrinsicEngine/tree/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-041).
 
 The analytic fixtures check the known central crease of a Gaussian extrusion,
 orientation reversal, retriangulation/refinement, scale/translation, bounded
@@ -40,7 +40,7 @@ its adjacent cohort and native exports remain local, including the previous
 METHOD-040 comparison where identical geometry is available. There is no
 METHOD-040 comparison for trim-star in the retained comparison cohort.
 
-[Six schema-v2 measurements](../../../tasks/evidence/METHOD-041/measurements)
+[Six schema-v2 measurements](https://github.com/intrinsicD/IntrinsicEngine/tree/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-041/measurements)
 pass the canonical validator. They use the frozen defaults and CPU reference
 implementation. Source state is explicitly dirty and `claim_eligible: false`:
 one cold extraction per mesh is an exploratory profile, with no comparable
@@ -48,7 +48,7 @@ performance baseline or speedup claim. The earlier Debug and intermediate
 sharp-barrier inspections remain separate local artifacts; their timings must
 not be mixed with the final Release run.
 
-The [cohort summary](../../../tasks/evidence/METHOD-041/cohort-summary.json)
+The [cohort summary](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-041/cohort-summary.json)
 records support counts. On frog the finest radius supports substantially fewer
 vertices than the middle radius. This motivates showing sampling support beside
 the curves; it does not establish why any particular desired part seam is
@@ -67,15 +67,15 @@ principal and mean-curvature candidates.
 - Adding the extremum fixtures to the previous pure test producer exceeded its
   fixed 120-second ASan timeout. The new producer keeps all assertions and the
   same timeout; both final groups pass. The initial
-  [timeout log](../../../tasks/evidence/METHOD-041/asan-group-timeout.log) remains
+  [timeout log](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-041/asan-group-timeout.log) remains
   available. Routing and replacement-only grouped registration include the new
-  producer. The [whole-registry comparison](../../../tasks/evidence/METHOD-041/grouped-registration.json) confirms identical logical cases in individual and grouped plans after refreshing the stale ASan runtime contract executable.
+  producer. The [whole-registry comparison](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-041/grouped-registration.json) confirms identical logical cases in individual and grouped plans after refreshing the stale ASan runtime contract executable.
 - Export validation independently recomputes connected components, endpoint and
   junction counts, lengths, signal/scale identities and source-face incidence.
   Browser checks found and fixed a `Set.size` call error and stale inspection
   counters when switching back to a partition view.
 
-Claude's [bounded public-mathematics critique](../../../tasks/evidence/METHOD-041/claude-math-review.json)
+Claude's [bounded public-mathematics critique](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-041/claude-math-review.json)
 raised sign ambiguity, unreliable umbilic directions and derivative fitting
 bias. These concerns inform the line-field rejection and analytic controls.
 The critique did not inspect repository source or private meshes. Two proposed
@@ -125,5 +125,6 @@ cmake --build --preset ci-ubsan --target IntrinsicGeometryCurvatureExtremaTests 
 ctest --test-dir build/ci-ubsan --output-on-failure -R '^IntrinsicGeometry(CurvatureExtrema|FeaturePartition)Tests.Grouped$' --no-tests=error --parallel 1
 python3 tests/regression/tooling/Test.CurvatureExtremaViewer.py
 python3 tests/regression/tooling/Test.CurvatureBoundaryViewer.py
-python3 tools/benchmark/validate_benchmark_results.py --root tasks/evidence/METHOD-041/measurements --manifests-root benchmarks --strict
+# Historical measurements were retired; this command belongs to the original checkout.
+# python3 tools/benchmark/validate_benchmark_results.py --root tasks/evidence/METHOD-041/measurements --manifests-root benchmarks --strict
 ```

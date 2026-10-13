@@ -82,6 +82,6 @@ audited the raw measurements and accepted the accounting. All 1,157 configured
 commands and dependency fingerprints match. Source/test verification above covers
 the exact integrated C++ diff; only evidence/task/docs changed afterward.
 
-[Report and limits](../../ara/evidence/tables/build010_canonical_property_measurement.md)
+[Report and limits](../../docs/results/build010_canonical_property_measurement.md)
 (C106). No deferred work or new follow-up task. Other executables, Release,
 sanitizer/GPU and runtime timing are outside this bounded task.

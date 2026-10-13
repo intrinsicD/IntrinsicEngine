@@ -258,7 +258,7 @@ source log-weights log alpha_m - s^2 D sigma_m^2 / (2 sigma^2), then:
 deformation absorb scale while sigma_bar^2 inflates tr(S_uu), which lowers s, which lowers
 the precision and raises the variances again: on a 60-point bend (beta 1, lambda 2) the
 scale falls from 1 to 0.002 in eight iterations. An independent NumPy implementation of
-Algorithm 1 (`ara/evidence/diagnostics/method050_bcpd_numpy_20260928/`) reproduces this to
+Algorithm 1 (`36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method050_bcpd_numpy_20260928/` (historical Git evidence)) reproduces this to
 relative 1e-7, and the run without the terms to 1e-9 (sigma^2 and s per iteration;
 replayed by `Test.CoherentPointDriftBayesian.cpp`), so it is the update, not a coding error. Hirose's reference implementation also enables these terms only on request
 (option `-a`) and starts from zero variances; `Params::PosteriorVarianceTerms` does the same.

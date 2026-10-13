@@ -22,7 +22,7 @@ params:
   warmup_iterations: 1  # one untimed rigid and low-rank nonrigid run at 1000 points per process
   measured_iterations: 3  # per configuration up to 10000 points, 2 above (CPD_SCALING_REPETITIONS overrides)
   timing_statistic: median_wall_clock  # runtime_ms_min / runtime_ms_max reported per run
-  evidence: ara/evidence/diagnostics/method049_cpd_accelerated_20260928/
+  evidence: methods/geometry/coherent_point_drift/README.md  # durable historical summary
 metrics: [runtime_ms, quality_error_l2, quality_error_linf]
 thresholds:
   # quality_error_l2: RMS distance of the registered source to its ground-truth image.

@@ -88,7 +88,7 @@ def run(mesh, source, output, *, band_hops=6, rounds=3, beta=.8, curve_scale=2):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('mesh'); parser.add_argument('output', type=Path)
-    parser.add_argument('--source', type=Path, default=Path('ara/evidence/diagnostics/method045'))
+    parser.add_argument('--source', type=Path, default=Path('tests/data/atlas'))
     parser.add_argument('--band-hops', type=int, default=6); parser.add_argument('--rounds', type=int, default=3)
     parser.add_argument('--beta', type=float, default=.8); parser.add_argument('--curve-scale', type=int, default=2)
     args = parser.parse_args()

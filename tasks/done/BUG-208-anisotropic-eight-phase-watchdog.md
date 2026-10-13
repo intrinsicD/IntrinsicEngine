@@ -22,7 +22,7 @@ RUNTIME-270's full serial Vulkan selector reproduced an overall watchdog exit
 in `VulkanLbvhAnisotropicWlopAcrossDomainsAndFailures`: phases zero through six
 took about 266 seconds, leaving only 35 seconds for the unfinished eighth phase.
 The registered CTest limit was 360 seconds, but the fixture itself exited at 300.
-See [failure output](../evidence/BUG-208/anisotropic-eight-phase-timeout.log).
+See [failure output](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-208/anisotropic-eight-phase-timeout.log).
 The existing fixture gives EAR's eight phases 480 seconds internally and 540 in
 CTest, while anisotropic WLOP incorrectly shares the seven-phase 300/360 budget.
 `UsesNormals()` governs the eighth phase for both variants and is the correct
@@ -60,7 +60,7 @@ with all eight phases and the original completion, numerical, history and backen
 assertions. This exceeds the old 300-second fixture limit and fits the existing
 480-second eight-phase allowance. CTest retains its 60-second shutdown margin.
 The run was serial after compilation, alongside no CPU test suite, using the
-recorded RTX 3050/display-off configuration. See [final execution](../evidence/RUNTIME-270/gpu-final-run.log)
-and [GPU state](../evidence/RUNTIME-270/gpu-host.csv). Independent review found no
+recorded RTX 3050/display-off configuration. See [final execution](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/RUNTIME-270/gpu-final-run.log)
+and [GPU state](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/RUNTIME-270/gpu-host.csv). Independent review found no
 blockers. BUG-193 retains the separate pacing investigation; no further work is
 required for this finite-work budget correction.

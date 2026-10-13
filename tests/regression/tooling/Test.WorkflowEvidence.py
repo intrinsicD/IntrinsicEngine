@@ -91,6 +91,101 @@ true
 """
 
 
+class EvidenceRetentionTests(unittest.TestCase):
+    def test_retired_missing_report_is_allowed_but_explicit_completion_is_not(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = Fixture(Path(tmp))
+            destination = fixture.repo / "tasks/done" / fixture.task.name
+            destination.parent.mkdir()
+            fixture.task.rename(destination)
+            result = run(fixture.repo, "validate", "--root", str(fixture.repo))
+            self.assertEqual(result.returncode, 0, result.stdout)
+            required = fixture.validate()
+            self.assertEqual(required.returncode, 1, required.stdout)
+            self.assertIn("required completion report is missing", required.stdout)
+
+    def test_clean_source_ignored_artifact_is_hash_checked_locally(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = Fixture(Path(tmp))
+            (fixture.repo / ".gitignore").write_text("/tasks/evidence/\n")
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "source ready")
+            self.assertEqual(fixture.receipt(), 0)
+            artifact = fixture.repo / "tasks/evidence/TEST-001/result.txt"
+            artifact.write_text("temporary result\n")
+            fixture.generate(artifact=str(artifact.relative_to(fixture.repo)))
+            self.assertFalse(fixture.report_data()["source"]["dirty"])
+            result = fixture.validate()
+            self.assertEqual(result.returncode, 0, result.stdout)
+            artifact.write_text("changed result\n")
+            result = fixture.validate()
+            self.assertEqual(result.returncode, 1, result.stdout)
+            self.assertIn("artifact hash mismatch", result.stdout)
+
+    def test_clean_source_cannot_use_ignored_artifacts_outside_own_evidence(self):
+        for name in ("build/result.txt", "tasks/evidence/OTHER-002/result.txt"):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp:
+                fixture = Fixture(Path(tmp))
+                (fixture.repo / ".gitignore").write_text("/tasks/evidence/\n/build/\n")
+                git(fixture.repo, "add", ".")
+                git(fixture.repo, "commit", "-qm", "source ready")
+                self.assertEqual(fixture.receipt(), 0)
+                artifact = fixture.repo / name
+                artifact.parent.mkdir(parents=True, exist_ok=True)
+                artifact.write_text("not part of source or task evidence\n")
+                result = fixture.generate(artifact=name, expected=None)
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+
+    def test_existing_retired_draft_report_still_fails_completion(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = Fixture(Path(tmp))
+            fixture.receipt()
+            fixture.generate(complete=False)
+            destination = fixture.repo / "tasks/done" / fixture.task.name
+            destination.parent.mkdir()
+            fixture.task.rename(destination)
+            result = run(fixture.repo, "validate", "--root", str(fixture.repo))
+            self.assertNotEqual(result.returncode, 0, result.stdout)
+            self.assertIn("complete", result.stdout)
+
+    def test_later_ignore_rule_does_not_rebind_a_committed_artifact(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = Fixture(Path(tmp))
+            name = "tasks/evidence/TEST-001/legacy.txt"
+            artifact = fixture.repo / name
+            artifact.parent.mkdir(parents=True)
+            artifact.write_text("original\n")
+            (fixture.repo / ".gitignore").write_text(
+                "/tasks/evidence/TEST-001/report.yaml\n/tasks/evidence/TEST-001/commands/\n"
+            )
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "source and historical artifact")
+            fixture.receipt()
+            fixture.generate(artifact=name)
+            git(fixture.repo, "rm", name)
+            (fixture.repo / ".gitignore").write_text("/tasks/evidence/\n")
+            git(fixture.repo, "add", ".gitignore")
+            git(fixture.repo, "commit", "-qm", "later evidence cleanup")
+            artifact.write_text("new ignored bytes\n")
+            result = fixture.validate()
+            self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_clean_source_rejects_ignored_symlink_artifact(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = Fixture(Path(tmp))
+            (fixture.repo / ".gitignore").write_text("/tasks/evidence/\n/build/\n")
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "source ready")
+            fixture.receipt()
+            target = fixture.repo / "build/result.txt"
+            target.parent.mkdir()
+            target.write_text("unbound target bytes\n")
+            artifact = fixture.repo / "tasks/evidence/TEST-001/result.txt"
+            artifact.symlink_to("../../../build/result.txt")
+            result = fixture.generate(artifact=str(artifact.relative_to(fixture.repo)), expected=None)
+            self.assertNotEqual(result.returncode, 0, result.stdout)
+
+
 class Fixture:
     def __init__(self, root: Path, profile: str = "standard", checked: bool = True):
         self.repo = root

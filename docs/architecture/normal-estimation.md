@@ -286,7 +286,7 @@ rejection. The [runtime smoke manifest](../../benchmarks/geometry/manifests/poin
 records cold/warm method cost and separate CPU reference timing; this small
 fixture does not establish a performance advantage.
 
-The [2026-09-09 verification record](../../ara/evidence/tables/normal_vulkan_verification_2026-09-09.md)
+The [2026-09-09 verification record](../results/normal_vulkan_verification_2026-09-09.md)
 binds the historical CPU and Vulkan neighborhood/CPU-fit fixtures to source
 hashes and C80. The local Clang 23 `ci` gate passed 4,376 tests with one expected
 unsanitized LSan-control skip; the Sandbox built. Two corrected `ci-vulkan`

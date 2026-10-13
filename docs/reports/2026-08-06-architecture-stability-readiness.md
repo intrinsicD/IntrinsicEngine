@@ -23,7 +23,7 @@ nor does it claim fresh GPU/Vulkan or sanitizer evidence.
 | Host | Linux `alex-home`, kernel 6.14.0-37-generic, x86_64 |
 | Build tools | CMake 3.28.3; Clang, clang++, and clang-scan-deps 23.0.0 |
 | Build identity | fresh `ci` preset, Null/headless default capability lane |
-| Evidence | [`tasks/evidence/REVIEW-003/`](../../tasks/evidence/REVIEW-003/) |
+| Evidence | [`tasks/evidence/REVIEW-003/`](https://github.com/intrinsicD/IntrinsicEngine/tree/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/REVIEW-003) |
 
 The rejected REVIEW-003 baseline at `fcbb2fee` and all partial evidence from
 that run were discarded. Every command and manual judgment below was rerun or
@@ -33,7 +33,7 @@ re-read against the fresh commit named above.
 
 All 47 static front-matter dependencies resolve to `tasks/done/` or
 `tasks/archive/`; the exact ID-to-path receipt is
-[`dependency-retirement.stdout.log`](../../tasks/evidence/REVIEW-003/commands/dependency-retirement.stdout.log).
+[`dependency-retirement.stdout.log`](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/REVIEW-003/commands/dependency-retirement.stdout.log).
 This includes every blocker opened by prior re-gates and the rejected audit.
 
 The retired [`ARCH-014`](../../tasks/done/ARCH-014-kernel-convergence-tracking.md)

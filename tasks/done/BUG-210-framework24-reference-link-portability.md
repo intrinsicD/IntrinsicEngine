@@ -39,8 +39,8 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
 The nine distinct source blobs are pinned to Framework24 revision
 `81c54ad4294280fc034d39e46eafc1a29d598b81`.
-[Target verification](../evidence/BUG-210/verified-framework24-targets.json) and
-the [CI failure](../evidence/BUG-210/ci-doc-links-failure.log) preserve the evidence.
+[Target verification](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-210/verified-framework24-targets.json) and
+the [CI failure](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-210/ci-doc-links-failure.log) preserve the evidence.
 
 
 ## Completion
@@ -49,6 +49,6 @@ Retired 2026-09-23 at the documentation-maintenance endpoint.
 PR/commit: [PR #1044](https://github.com/intrinsicD/IntrinsicEngine/pull/1044),
 the enclosing portable-reference repair commit. The unchanged strict checker
 passes in a tracked-files-only export with no optional Framework24 checkout;
-[output](../evidence/BUG-210/tracked-export-doc-check.log) is retained. All nine
+[output](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-210/tracked-export-doc-check.log) is retained. All nine
 upstream blobs were verified at the pinned revision. No code was imported and
 no check was skipped or weakened. Remote CI reruns with the repair.

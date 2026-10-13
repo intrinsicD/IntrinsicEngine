@@ -18,7 +18,7 @@ It does not reuse the rejected REVIEW-003 baseline or its partial evidence.
 - Toolchain: Linux 6.14 x86_64, CMake 3.28.3, Clang/clang++/clang-scan-deps
   23.0.0, fresh `ci` preset.
 - Durable command receipts:
-  [`tasks/evidence/REVIEW-003/commands/`](../../tasks/evidence/REVIEW-003/commands/).
+  [`tasks/evidence/REVIEW-003/commands/`](https://github.com/intrinsicD/IntrinsicEngine/tree/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/REVIEW-003/commands).
 
 ## Findings
 

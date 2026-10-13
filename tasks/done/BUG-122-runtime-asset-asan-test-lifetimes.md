@@ -75,7 +75,7 @@ contract_review: Reviewed the contract catalog; this change records supersession
   All three snapshot-pointer regressions named above are absent from the
   current test tree; they were not repaired or recreated under BUG-122.
 - RUNTIME-200 records a cache-disabled clean rebuild and revised-surface
-  verification. Its [serial ASan receipt](../evidence/RUNTIME-200/commands/review-v2-asan-full-cpu-retry.json)
+  verification. Its [serial ASan receipt](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/RUNTIME-200/commands/review-v2-asan-full-cpu-retry.json)
   records exit code zero on 2026-07-31 for the unchanged full CPU selector;
   its retirement record reports 2,667/2,667 selected tests. This is historical
   implementation evidence, not verification rerun for this closure.

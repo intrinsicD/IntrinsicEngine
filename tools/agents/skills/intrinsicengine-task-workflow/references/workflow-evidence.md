@@ -4,6 +4,15 @@ This document defines the prospective, versioned evidence and custody workflow
 introduced by `PROC-028`. It extends the existing task, review, benchmark, and
 ARA authorities; it does not replace them.
 
+## Retention
+
+[Task retirement](../../../../../docs/agent/task-format.md#retiring-a-task) owns retention. Reports,
+receipts, run bundles and reviews are temporary, ignored working files. The
+profile gates below follow the canonical retirement procedure while the task
+is open. Durable summaries are reviewed against raw evidence before cleanup. A missing retired
+report is expected; it does not prove that a historical gate passed. Existing
+open-task evidence remains intact until completion, including shared inputs.
+
 ## Scope
 
 This machinery serves two situations:
@@ -305,9 +314,10 @@ python3 tools/agents/workflow_evidence.py validate \
   --root . --require-complete PROC-999
 ```
 
-The ordinary repository scan requires complete evidence for enrolled tasks in
-`tasks/done/`. `--require-complete` applies the same retirement gate while a
-task remains active. Missing or failed required receipts, unchecked or
+The ordinary repository scan validates reports that remain, including complete
+reports for `tasks/done/`. It does not require removed retired reports.
+`--require-complete` requires the report and applies the retirement gate while a
+task remains active, before cleanup. Missing or failed required receipts, unchecked or
 unaddressed acceptance criteria, task/profile mismatch, changed source
 surface, stale artifact hashes, missing reasons, and absent profile-specific
 records are blocking errors. A justified skipped check is an explicit warning
@@ -328,11 +338,25 @@ review. Resolution walks components and expands each symlink before applying a
 following parent-directory component; it never pre-normalizes across a symlink
 or permits an intermediate target to leave and re-enter the repository.
 
-For a report with `source.dirty: false`, validation reads the recorded surface
-and referenced artifact blobs from the exact `source.head_revision` commit and
+For a report with `source.dirty: false`, validation reads the recorded source
+surface and tracked artifact blobs from the exact `source.head_revision` commit and
 compares `source.base_revision..source.head_revision`. This keeps a
 fixed-revision draft auditable after unrelated work lands on the current
 branch, including later edits to a shared artifact path.
+
+Ignored artifacts under the report task's own `tasks/evidence/<ID>/` are hashed from local bytes,
+even when source is clean. Changed bytes invalidate their frozen hashes. They
+must be supplied explicitly to a reviewer in another worktree; CI cannot see
+local evidence. Artifacts already present in the recorded Git revision retain that binding even
+if a later ignore rule covers their path. Clean-source local artifact paths may
+not traverse symlinks. Files outside the task directory retain revision checks.
+Clean-source experiment inputs still must exist in the source commit; temporary
+inputs use a non-claim-eligible dirty-source protocol. Post-run outputs stay local.
+
+### Legacy historical seals
+
+The following commands describe retained legacy reports only. New work validates
+before cleanup and must not commit raw evidence merely to create a seal.
 
 An active report with `source.dirty: true` remains bound to the current
 worktree and is invalidated by any subsequent worktree or referenced-artifact

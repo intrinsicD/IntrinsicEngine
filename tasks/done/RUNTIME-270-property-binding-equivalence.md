@@ -270,7 +270,7 @@ also passes 87 focused ci cases and 47 cases in each sanitizer build.
 The full Vulkan run passed 89 of 95 cases before final fixes; all six diagnosed
 failures and adjacent consumers pass in the final rebuilt 15-case selection.
 The full run includes the passing Vulkan shutdown LeakSanitizer contract.
-See [retained verification and exact commands](../evidence/RUNTIME-270/verification.md).
+See [retained verification and exact commands](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/RUNTIME-270/verification.md).
 
 Blocking verification defects [BUG-206](BUG-206-uv-duplicate-submit-phase-race.md),
 [BUG-207](BUG-207-loaded-ubsan-curvature-timeout.md) and
@@ -298,8 +298,8 @@ commit: `e804afc24`. C103 closes the earlier four-commit measurement obligation;
 C104 closes the accumulated fixture batch. The exact ten-file tree matches local
 snapshot `887415fb7e6df4c04caa154f06f64f04a422b731`.
 
-See the [recent-locality report](../../ara/evidence/tables/runtime270_recent_locality_measurement.md)
-and [fixture-batch report](../../ara/evidence/tables/runtime270_fixture_batch_measurement.md)
+See the [recent-locality report](../../docs/results/runtime270_recent_locality_measurement.md)
+and [fixture-batch report](../../docs/results/runtime270_fixture_batch_measurement.md)
 for raw results, source identities and all regressions. C104 runtime-contract target
 medians: clean 428.676 → 426.548 s (negligible); Models edit 23.748 → 17.723 s;
 Visualization edit 21.253 → 16.787 s; fixture header 67.902 → 58.503 s; mock header

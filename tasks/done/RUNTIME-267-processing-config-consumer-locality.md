@@ -67,7 +67,7 @@ python3 tools/docs/check_doc_links.py --root .
 ```
 
 ## Refreshed baseline
-BUILD-009 is complete. Use its [matched source comparison](../../ara/evidence/tables/build009_current_compile_measurement.md)
+BUILD-009 is complete. Use its [matched source comparison](../../docs/results/build009_current_compile_measurement.md)
 and retained producer/critical-path records; the old BUILD-007 costs are historical.
 Freeze this task's immediate-before source before attributing its own changes.
 
@@ -139,7 +139,7 @@ isolates consumers. No implementation or no-change closure is claimed by this au
 Retired at CPUContracted, the intended compile-refactor endpoint. Source commit:
 `6fb0807f49a8d660d820470e82613c1ad1a9c424`; accompanying evidence/retirement commit
 binds the six retained samples and Claude reviews. See the
-[matched comparison](../../ara/evidence/tables/runtime267_processing_config_measurement.md):
+[matched comparison](../../docs/results/runtime267_processing_config_measurement.md):
 local config-interface editor-target median 34.245 → 27.372 s (20.1% lower),
 19 → 16 compilers. Receiving MethodPanels cost rises 8.132 → 8.238 s; included
 in target timing. Implementation/no-op ranges overlap; no improvement claimed.

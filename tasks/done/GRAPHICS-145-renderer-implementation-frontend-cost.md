@@ -20,7 +20,7 @@ an operator-directed compile/reuse follow-up outside the standing product focus.
 ## Starting evidence and scope
 - GRAPHICS-144 already shares standard declarations and narrows GLM at the interface.
   Preserve that work; do not repeat its whole-target improvement as this task's gain.
-- Its [report and retained implementation trace](../../ara/evidence/tables/graphics144_shared_std_measurement.md)
+- Its [report and retained implementation trace](../../docs/results/graphics144_shared_std_measurement.md)
   bind source `5537a4dda`. Implementation-edit medians remain around 12.9 seconds.
   A separate trace records 13.554 seconds Frontend versus 0.906 Backend; parsing
   NullRenderer occupies 6.374 seconds and constraint checking totals 5.495 seconds.
@@ -103,7 +103,7 @@ Retired at CPUContracted, the intended endpoint for this compile refactor.
 Commit reference: verified implementation `51bdc9b65`, manifest freeze `f73dcbd39`;
 the evidence/retirement commit binds the accepted results.
 
-[Report and all raw evidence](../../ara/evidence/tables/graphics145_renderer_frontend_measurement.md)
+[Report and all raw evidence](../../docs/results/graphics145_renderer_frontend_measurement.md)
 retain all ten matched settled graphics-target rebuilds, five per arm: median
 12.896 → 9.474 seconds (26.5% lower), including the real archive link. Before
 range 12.793–12.968 s; after 9.441–9.616 s. One compiler invocation per edit,

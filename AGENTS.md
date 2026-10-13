@@ -235,6 +235,20 @@ from the conversation before loading research-manager references or ARA ledgers.
 Ordinary engineering exits without a research epilogue; research events and
 explicit ARA work still follow the required evidence/recording path.
 
+### Temporary evidence and durable knowledge
+
+Implementation and experiment evidence is temporary. New logs, packets, raw
+results, snapshots, receipts and review transcripts stay in ignored
+`tasks/evidence/<ID>/` (standalone legacy diagnostics use
+`ara/evidence/diagnostics/`). Do not force-add them. Preserve existing open-task
+and live-consumer evidence until its last owning task completes. At completion,
+extract useful lessons, negative results and limitations into maintained docs,
+tests or result summaries, then remove the temporary files. Git history is not
+rewritten. [Task retirement](docs/agent/task-format.md#retiring-a-task) owns the
+procedure, including claim/reference repair and the active-consumer exception.
+This operator-selected retention policy replaces permanent raw-evidence and
+packet-commit requirements; it does not remove review or experiment pre-flight.
+
 ## 9. Documentation sync protocol
 
 When code, structure, or policy changes:
@@ -292,7 +306,7 @@ independent counter-review → scoped implementation/tests/docs → verification
 review → commit/push → report.
 Unattended work accepts only fully specified night-ready tasks and observes its
 stop conditions. Audits are on demand, not an ambient duty; offer deferred hints
-before filing them. Preserve frozen task/evidence history.
+before filing them. Preserve frozen task history; temporary evidence follows §8b and the task retirement procedure.
 
 ### Standing Claude Code authorization
 

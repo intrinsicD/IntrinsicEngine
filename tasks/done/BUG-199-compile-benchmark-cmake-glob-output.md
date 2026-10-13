@@ -36,5 +36,5 @@ Retired as a tested harness repair, with no engine maturity change. Fix commit:
 Claude found no concrete defect. Full build wall still includes glob checking;
 unexplained non-meta outputs still fail. The original failure and reviewed fix
 are retained in RUNTIME-267's
-[raw evidence](../../ara/evidence/diagnostics/runtime267_processing_config/raw-evidence.tar.gz).
+[raw evidence](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/runtime267_processing_config/raw-evidence.tar.gz).
 No deferred work.

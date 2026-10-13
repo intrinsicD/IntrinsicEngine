@@ -91,7 +91,7 @@ python3 tools/repo/check_test_layout.py --root . --strict
 ## Current result
 - The bounded implementation and report are in
   [baseline_preserving_atlas_experiment.md](../../docs/methods/baseline_preserving_atlas_experiment.md),
-  with [record](../../ara/evidence/diagnostics/method045/record.json) and C71/C72.
+  with [record](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method045/record.json) and C71/C72.
   Region preservation is supported on the recorded CPU controls. Uniform UV
   superiority and packing improvement are not established; jagged extra UV cuts,
   arbitrary remeshing, native cost, and METHOD-043 parts quality remain open.

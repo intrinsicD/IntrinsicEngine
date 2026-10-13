@@ -118,4 +118,4 @@ source's local space. Agents use `preview_registration` and `run_registration`
   `geometry.coherent_point_drift.accelerated`
   ([manifest](../../../benchmarks/geometry/manifests/coherent_point_drift_accelerated.yaml)),
   the opt-in scaling profile behind C113
-  (`ara/evidence/diagnostics/method049_cpd_accelerated_20260928/`).
+  (`36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method049_cpd_accelerated_20260928/` (historical Git evidence)).

@@ -100,3 +100,6 @@ Scaffolded, CPUContracted, Operational, ParityProven, Retired. Example:
 - This slice closes Scaffolded → CPUContracted. Operational owned by <TASK-ID>.
 - If CPUContracted is the intended endpoint, state: no Operational follow-up is owed.
 -->
+
+<!-- Retirement follows docs/agent/task-format.md#retiring-a-task.
+New raw evidence stays ignored; durable summaries need review before cleanup. -->

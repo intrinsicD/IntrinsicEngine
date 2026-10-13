@@ -112,8 +112,8 @@ Commit reference: the enclosing local commit containing this retirement and its 
 All four acceptance criteria are complete for the explicitly selected overnight
 comparison. Three retained samples per clean source revision establish descriptive
 local results; the broader C92 processing-family hypothesis remains unchanged.
-See [the measured comparison](../../ara/evidence/tables/build007_overnight_compile_measurement.md)
-and [the evidence inventory](../../ara/evidence/diagnostics/build007_20260915/evidence-index.json).
+See [the measured comparison](../../docs/results/build007_overnight_compile_measurement.md)
+and [the evidence inventory](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/build007_20260915/evidence-index.json).
 The report includes full/no-op/implementation/interface/reconfigure results,
 compiler counts, CPU work, dependency paths, peak single-process RSS, dominant
 producers, all ranges and measured increases.

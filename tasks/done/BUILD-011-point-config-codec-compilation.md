@@ -81,5 +81,5 @@ are in the enclosing commit. C108's four matched samples pass every frozen gate:
 shared-header 15.079 → 10.413 s, clean 407.035 → 402.482 s, and individual
 codec edits 3.15–9.89% slower. Clean improvement is small and local; no broader
 speedup claim. Full costs, regressions, raw samples, final checks and Claude's
-independent results audit are in the [measurement report](../../ara/evidence/tables/build011_point_config_codecs_measurement.md).
+independent results audit are in the [measurement report](../../docs/results/build011_point_config_codecs_measurement.md).
 No deferred work in this scope; BUILD-006 and RUNTIME-270 remain independent.

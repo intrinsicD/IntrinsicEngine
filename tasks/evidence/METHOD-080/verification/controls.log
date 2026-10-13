@@ -1,4 +1,0 @@
-PASS: control rejects weights mutation
-PASS: control rejects shift mutation
-PASS: control rejects visits mutation
-PASS: exact log sums, shift/outlier mass, signed Gaussian approximation, self exclusion, row categories, seeded samples and optimization guard

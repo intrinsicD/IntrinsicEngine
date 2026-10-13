@@ -51,15 +51,15 @@ and custody path became fail-closed; its independent audit was accepted.
 ## Evidence and replay
 
 - Frozen protocol:
-  [`../../../../tasks/evidence/METHOD-020/experiment/protocols/v4/protocol.yaml`](../../../../tasks/evidence/METHOD-020/experiment/protocols/v4/protocol.yaml)
+  [`../../../../tasks/evidence/METHOD-020/experiment/protocols/v4/protocol.yaml`](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-020/experiment/protocols/v4/protocol.yaml)
 - Executable manifest:
   [`../../../../benchmarks/geometry/manifests/lop_family_gpu_vulkan_smoke_v3.yaml`](../../../../benchmarks/geometry/manifests/lop_family_gpu_vulkan_smoke_v3.yaml)
 - Claim-eligible schema-v2 result:
-  [`../../../../tasks/evidence/METHOD-020/experiment/inputs/run-002/benchmark_result.json`](../../../../tasks/evidence/METHOD-020/experiment/inputs/run-002/benchmark_result.json)
+  [`../../../../tasks/evidence/METHOD-020/experiment/inputs/run-002/benchmark_result.json`](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-020/experiment/inputs/run-002/benchmark_result.json)
 - Portable custody bundle:
-  [`../../../../tasks/evidence/METHOD-020/experiment/runs/run-002/bundle.yaml`](../../../../tasks/evidence/METHOD-020/experiment/runs/run-002/bundle.yaml)
+  [`../../../../tasks/evidence/METHOD-020/experiment/runs/run-002/bundle.yaml`](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-020/experiment/runs/run-002/bundle.yaml)
 - Accepted independent audit:
-  [`../../../../tasks/evidence/METHOD-020/experiment/runs/run-002/audit.json`](../../../../tasks/evidence/METHOD-020/experiment/runs/run-002/audit.json)
+  [`../../../../tasks/evidence/METHOD-020/experiment/runs/run-002/audit.json`](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-020/experiment/runs/run-002/audit.json)
 
 Replay and view commands are recorded verbatim in the frozen protocol and
 portable bundle. The accepted result uses append-only identities

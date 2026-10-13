@@ -90,4 +90,4 @@ A final test-only rebuild attempted CMake regeneration inside the sandbox and hi
 **Completed:** 2026-09-10
 **Commit:** `caa85ce781be772faf30de920322010825413afa`
 
-C90 and [bound verification](../../ara/evidence/tables/lop_vulkan_lbvh_verification_2026-09-10.md) record 48 focused cases, 4465 distinct CPU passes and 3 actual Vulkan checks. Partial-submission safety is statically reviewed only. WLOP/CLOP/EAR remain separate spatial-inventory follow-ups.
+C90 and [bound verification](../../docs/results/lop_vulkan_lbvh_verification_2026-09-10.md) record 48 focused cases, 4465 distinct CPU passes and 3 actual Vulkan checks. Partial-submission safety is statically reviewed only. WLOP/CLOP/EAR remain separate spatial-inventory follow-ups.

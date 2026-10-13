@@ -1,3 +1,0 @@
-PASS: ARA strict (121 claims); task policy strict (0 findings).
-Doc links: FAIL with exactly the same 24 pre-existing BUG-241 METHOD-077 links as METHOD-079; no new failure.
-PASS: native files byte-identical to dcbb0e599; original focused ci tests 28/28.

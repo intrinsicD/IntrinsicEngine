@@ -93,7 +93,7 @@ python3 tools/docs/check_doc_links.py --root .
   interface is deliberately a transitive regression consumer in the new guard.
 
 ## Refreshed baseline
-BUILD-009 is complete. Use its [matched source comparison](../../ara/evidence/tables/build009_current_compile_measurement.md)
+BUILD-009 is complete. Use its [matched source comparison](../../docs/results/build009_current_compile_measurement.md)
 and retained producer/critical-path records; the old BUILD-007 costs are historical.
 Freeze this task's immediate-before source before attributing its own changes.
 
@@ -120,8 +120,8 @@ Freeze this task's immediate-before source before attributing its own changes.
 ## Completion — 2026-09-15
 - CPUContracted, the intended refactor endpoint. Commit reference: implementation
   `08728e2e1`; frozen timing protocol `cc3a8ea86`.
-- [Report](../../ara/evidence/tables/runtime266_registry_borrow_measurement.md) and
-  [evidence index](../../ara/evidence/diagnostics/runtime266_registry_borrows/evidence-index.json)
+- [Report](../../docs/results/runtime266_registry_borrow_measurement.md) and
+  [evidence index](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/runtime266_registry_borrows/evidence-index.json)
   retain all four canonical samples, exact source/command/dependency identities,
   compiler guards, CPU/minimum-compiler verification and Claude reviews.
 - Retain the dependency cut with no stable timing-gain claim; the slower final

@@ -8,7 +8,7 @@ No production default, native algorithm or UI selector was changed.
 
 This is an interactive Codex/Claude experiment, not an accepted new backend.
 Codex implemented and executed the tools; Claude supplied design and source
-critique. The [record](../../ara/evidence/diagnostics/method042/record.json)
+critique. The [record](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method042/record.json)
 retains all final control cells, initial failed configurations, native comparison
 records, source/input/output hashes and exact commands. Large meshes and full
 geometry/label exports remain local. All measurements are exploratory and
@@ -143,9 +143,9 @@ loosened numeric tolerance. No algorithm-level rotation invariance is claimed.
 
 ## Review and next decision
 
-Claude's [source critique](../../ara/evidence/diagnostics/method042/claude-source-review.md)
+Claude's [source critique](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method042/claude-source-review.md)
 contains findings later withdrawn in the
-[corrected verdict](../../ara/evidence/diagnostics/method042/claude-audit-corrections.md):
+[corrected verdict](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method042/claude-audit-corrections.md):
 lengths were already normalized, negative costs were intentional, and unchanged
 diagonal-flip outcomes did not prove a flip-based failure mechanism. Codex ran
 the rotation test; Claude's wording attributing that test to itself is not an
@@ -218,4 +218,4 @@ validation of raw payloads and an initial shared run-ID seal were rejected;
 the raw data were not edited to pass. Method/benchmark manifests and the
 task/ARA/link/layout/docs-sync checks passed. Root hygiene retains its known
 non-fatal local `.agents/` warning. See the
-[verification record](../../ara/evidence/diagnostics/method042/verification.json).
+[verification record](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method042/verification.json).

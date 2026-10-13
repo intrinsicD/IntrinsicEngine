@@ -29,8 +29,8 @@ Fix commit: `defaafeac`; all acceptance criteria closed. This is a measurement
 harness repair with executable positive and negative checks; no engine capability
 or performance claim. No follow-up implementation remains.
 
-The [recent-locality report](../../ara/evidence/tables/runtime270_recent_locality_measurement.md)
-and [fixture-batch report](../../ara/evidence/tables/runtime270_fixture_batch_measurement.md)
+The [recent-locality report](../../docs/results/runtime270_recent_locality_measurement.md)
+and [fixture-batch report](../../docs/results/runtime270_fixture_batch_measurement.md)
 retain all eight accepted results plus the initial rejected header attempt.
 Original measured runner bytes and hashes remain in those bundles. The canonical
 runner extracts the unchanged predicate for tests, so its hash differs; the

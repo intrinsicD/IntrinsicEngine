@@ -120,8 +120,8 @@ python3 tools/docs/check_doc_links.py --root .
 - Six retained samples, three per arm, pass source/command/dependency checks and
   canonical result validation. All 775 shared compiler commands and all installed
   dependency fingerprints match. No failed measured population was discarded.
-- [Report](../../ara/evidence/tables/build009_current_compile_measurement.md) and
-  [evidence index](../../ara/evidence/diagnostics/build009_compile_followup/evidence-index.json)
+- [Report](../../docs/results/build009_current_compile_measurement.md) and
+  [evidence index](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/build009_compile_followup/evidence-index.json)
   contain raw samples, producer ranking, accounting, scope and controls. C97
   records the bounded observations; implementation/no-op overlap is retained.
 - Claude's results and accounting reviews are resolved. Recomputed 24 raw Ninja

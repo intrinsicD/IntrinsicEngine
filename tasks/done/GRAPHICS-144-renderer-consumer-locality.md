@@ -83,7 +83,7 @@ a new UV contract split; a split that leaves the same transitive dependencies
 does not establish a benefit. This is a planning lead, not a measured change.
 
 ## Refreshed baseline
-BUILD-009 is complete. Use its [matched source comparison](../../ara/evidence/tables/build009_current_compile_measurement.md)
+BUILD-009 is complete. Use its [matched source comparison](../../docs/results/build009_current_compile_measurement.md)
 and retained producer/critical-path records; the old BUILD-007 costs are historical.
 Freeze this task's immediate-before source before attributing its own changes.
 
@@ -95,7 +95,7 @@ renderer first: source splitting, Pimpl and a shared textual prelude need not
 address that mechanism. Graphics must not import the runtime helper. Compare
 existing lower-layer ownership and the cost of any proposed declaration owner,
 including its producer and real consumers, before selecting an analogous change.
-[RUNTIME-268 evidence](../../ara/evidence/tables/runtime268_snapshot_std_measurement.md)
+[RUNTIME-268 evidence](../../docs/results/runtime268_snapshot_std_measurement.md)
 is a diagnostic lead, not a measured renderer improvement.
 
 ## Selected slice — 2026-09-16
@@ -150,7 +150,7 @@ Retired at CPUContracted, the intended compile-locality refactor endpoint.
 Commit reference: implementation `5537a4dda`; manifest checkpoints `7061e4e8a` and `70fb1222c`;
 this evidence/retirement commit binds the accepted result.
 
-[Report, all twenty records and raw evidence](../../ara/evidence/tables/graphics144_shared_std_measurement.md)
+[Report, all twenty records and raw evidence](../../docs/results/graphics144_shared_std_measurement.md)
 retain two five-sample-per-arm cohorts. Clean graphics-library median changes
 79.403 → 71.319 seconds; renderer-interface edit plus implementation consumer
 24.523 → 14.071 seconds. All candidates pay the added Core.Std producer in the

@@ -18,7 +18,7 @@ contracts: [method.engine-integration]
 
 Operator authorizes the next diagnostic layer proposed after METHOD-078: compare the first
 invalid target sum with an exact sum, landmark distances / sigma and the retained spectrum.
-[Full question and plan](../evidence/METHOD-079/plan.md). All steps serve these questions.
+[Full question and plan](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-079/plan.md). All steps serve these questions.
 No production stabilization, changed tolerance, retry policy or larger budget is selected here.
 
 ## Acceptance criteria
@@ -48,14 +48,14 @@ python3 tools/agents/check_ara_claims.py --root . --strict
 
 ## Completion — 2026-10-11
 
-Canonical result and limits: [audit](../evidence/METHOD-079/audit.md), ARA C120.
+Canonical result and limits: [audit](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-079/audit.md), ARA C120.
 Frozen execution commit: `cae9a475690c5b5285d523403ba71689b6d21007`.
 The frozen four-cell diagnostic completed; no production fix or guard relaxation was adopted.
 Both temporary production files are restored exactly to `0631ef12c`.
 
 Independent reviewer `/root/nystrom_first_row_audit` decided:
 **“PASS — bounded first-row diagnosis. Mandatory findings: none.”**
-Its [actual answer](../evidence/METHOD-079/reviews/results-review.txt) explicitly finds
+Its [actual answer](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-079/reviews/results-review.txt) explicitly finds
 acceptance criteria 1–3 met. The `ci` cleanup build and 28/28 original Accelerated cases pass.
 Strict doc links retain pre-existing BUG-241; full CPU/sanitizer/Vulkan were not rerun.
 

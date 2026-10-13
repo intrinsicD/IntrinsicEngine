@@ -47,12 +47,12 @@ python3 tools/docs/check_doc_links.py --root . --strict
 
 Bounded diagnosis completed; no production improvement adopted. Frozen execution commit:
 `0efb7e48f87ee57fd5cb34f2c5d072fb71391d3e`; production files restored to `bbdf1af79`.
-Canonical findings and limits: [audit](../evidence/METHOD-078/audit.md), ARA C119.
+Canonical findings and limits: [audit](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-078/audit.md), ARA C119.
 The existing METHOD-077 experiment remains separate and unchanged.
 
 Independent reviewer `/root/nystrom_results_review` decided:
 **“Verdict: Ship. All three METHOD-078 acceptance criteria PASS.”**
-[Actual answer and exact artifact bindings](../evidence/METHOD-078/reviews/cleanup-review.md).
+[Actual answer and exact artifact bindings](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-078/reviews/cleanup-review.md).
 Cleanup build and 28/28 original Accelerated tests pass; strict doc links retain
 pre-existing BUG-241. Candidate, raw results and frozen report remain preserved.
 

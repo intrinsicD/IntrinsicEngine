@@ -41,7 +41,7 @@ or a regression. Do not change the test, its assertions, its label or its timeou
   - build-free focused recheck: 18.12 s
   - full CPU selector recheck: 5,012 tests, 0 failures, 1 expected unsanitized LSan skip, 47.98 s; the timestamps show the ASan/UBSan suites still running
   - isolated case after all builds and suites finished: passed in 18.29 s
-- See the [timing summary](../evidence/BUG-216/full-cpu-timing-summary.txt).
+- See the [timing summary](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-216/full-cpu-timing-summary.txt).
   [BUG-190](BUG-190-curvature-refinement-timeout-during-compilation.md) and
   [BUG-207](BUG-207-loaded-ubsan-curvature-timeout.md) record the same
   load-dependent pattern.

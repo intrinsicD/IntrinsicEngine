@@ -147,7 +147,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
   remains in the rebuild. Clean graphics builds still compile 266 producers,
   with observed times 89.402–89.877 → 85.373–86.213 seconds. Two observations per
   arm establish no general/statistical or clean-build speedup.
-- C96 and the [measurement report](../../ara/evidence/tables/graphics138_renderer_compile_measurement.md)
+- C96 and the [measurement report](../../docs/results/graphics138_renderer_compile_measurement.md)
   retain raw values, ranges, commands, immutable dependency identity, source
   checks and all review/test logs. Every result is claim_eligible false.
 - Claude's final reporting findings are resolved: seven removed renderer-import

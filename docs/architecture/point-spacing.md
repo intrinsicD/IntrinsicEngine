@@ -112,7 +112,7 @@ no scaling or performance improvement claim. [RUNTIME-221](../../tasks/done/RUNT
 tracks the slice; the [consumer inventory](spatial-index-consumers.md) tracks
 remaining spatial integrations.
 
-The [2026-09-10 verification record](../../ara/evidence/tables/spacing_vulkan_verification_2026-09-10.md)
+The [2026-09-10 verification record](../results/spacing_vulkan_verification_2026-09-10.md)
 binds the bounded CPU/Vulkan result to C83. The recorded maximum radius/spacing
 error is zero at a 1e-5 tolerance, with CPU distance reduction retained.
 

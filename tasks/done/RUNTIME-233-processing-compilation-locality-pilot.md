@@ -277,8 +277,8 @@ file splits as code reduction.
 - All nine selected actual Vulkan processing smoke tests pass with no skips,
   including density/spacing cross-domain publication and cancellation after GPU
   submission. The CPU, separate ASan/UBSan and Vulkan gates are complete.
-- [Final diagnostic report](../../ara/evidence/tables/runtime233_compile_locality.md)
-  and [machine-readable record](../../ara/evidence/diagnostics/runtime233_compile_locality.json)
+- [Final diagnostic report](../../docs/results/runtime233_compile_locality.md)
+  and [machine-readable record](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/runtime233_compile_locality.json)
   bind the exact manifest/results, compiler counts, build/link endpoints, source
   hashes, footprint and verification log hashes. C92 remains a performance
   hypothesis; dirty one-sample timings are not claim-eligible.

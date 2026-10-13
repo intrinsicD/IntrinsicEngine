@@ -26,7 +26,7 @@ atlas, property baking, and actual mesh/atlas split-view workflow. Operator
 direction on 2026-09-22 explicitly selects this work ahead of the standing P0.
 Claude Opus 5.5 participates in implementation and revision-bound reviews;
 Codex owns integration and final verification. The historical design discussion
-is [preserved as evidence](../../ara/evidence/diagnostics/property_guided_atlas_design_20260922/proposal.md).
+is [preserved as evidence](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/property_guided_atlas_design_20260922/proposal.md).
 
 ## Acceptance criteria
 
@@ -135,7 +135,7 @@ Retired 2026-09-23 at Operational for the bounded triangle-mesh CPU atlas and
 recorded Vulkan bake/editor path. The enclosing METHOD-047 implementation commit
 records retirement. All acceptance criteria are closed; implementation, five
 fixed-source Opus 5.5 reviews, a numerical audit and corrections are retained in
-the [evidence report](../../ara/evidence/diagnostics/method047_property_atlas/report.md).
+the [evidence report](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method047_property_atlas/report.md).
 The final nested-history correction follows the last source review's prescribed
 fix and passes the extended undo/redo regression. BUG-209 records unchanged-source
 recovery of an outdated incremental Vulkan module view.

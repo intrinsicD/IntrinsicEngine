@@ -19,7 +19,7 @@ Rejected candidate commit: `478e32e0a27b9f7569710d8ddd0f503c5840d60a` passed ind
 Claude Sonnet review and focused behavioral checks, but fails the frozen
 private-header compiler-work allowance: 4.967 → 6.174 seconds (+24.30%).
 All three candidate samples exceed the entire baseline range plus 2%; no
-threshold was changed. The [negative decision and raw evidence](../evidence/GEOIO-004/measurements.md)
+threshold was changed. The [negative decision and raw evidence](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/GEOIO-004/measurements.md)
 retain the six matched samples, exact source commits and rejected patch.
 
 All task source, CMake, owner-route and regression-test changes are restored.
@@ -153,7 +153,7 @@ git diff --check
 ## Planning review
 
 Codex and Claude Code reached consensus on 2026-09-21 before this task was
-filed. The [shared planning review](../evidence/GEOM-099/claude-planning-review.md)
+filed. The [shared planning review](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/GEOM-099/claude-planning-review.md)
 records the agreed scope, corrections, rejected job-lifecycle candidate and
 compile-regression stop rules. Implementation and timing evidence remain due.
 

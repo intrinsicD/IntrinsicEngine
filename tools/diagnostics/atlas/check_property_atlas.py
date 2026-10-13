@@ -39,7 +39,7 @@ def controls():
 
 
 def corpus():
-    directory = ROOT / "ara/evidence/diagnostics/method045/baselines"
+    directory = ROOT / "tests/data/atlas/baselines"
     for name in ("sculpt", "frog", "fandisk", "dolphin"):
         source = json.loads(gzip.decompress((directory / (name + ".geometry.json.gz")).read_bytes()))
         yield name, np.asarray(source["positions"]), np.asarray(source["triangles"]), np.loadtxt(

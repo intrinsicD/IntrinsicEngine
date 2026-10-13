@@ -1072,6 +1072,20 @@ def record_command(args: argparse.Namespace) -> int:
     return result.returncode
 
 
+def is_temporary_evidence(repo_root: Path, task_id: str, value: object) -> bool:
+    """Ignored task artifacts bind local bytes even when source is committed."""
+    if not isinstance(value, str) or not value.startswith(
+        f"tasks/evidence/{task_id}/"
+    ):
+        return False
+    try:
+        if resolve_repo_path(repo_root, value) != repo_root / value:
+            return False
+    except ValueError:
+        return False
+    return bool(git(repo_root, "check-ignore", "--", value, check=False))
+
+
 def generate_report(args: argparse.Namespace) -> int:
     repo_root = repo_root_from(args.root)
     task_path = find_task(repo_root, args.task_id)
@@ -1103,7 +1117,7 @@ def generate_report(args: argparse.Namespace) -> int:
     dirty = bool(git(repo_root, "status", "--porcelain"))
     artifacts: list[dict[str, Any]] = []
     for value in args.artifact:
-        if dirty:
+        if dirty or is_temporary_evidence(repo_root, args.task_id, value):
             artifact_hash = sha256_worktree_artifact(repo_root, value)
         else:
             artifact_hash = sha256_artifact_at_revision(repo_root, head_revision, value)
@@ -1701,7 +1715,13 @@ def validate_report(
         try:
             if entry.get("kind") != "file":
                 raise ValueError("artifact kind must equal file")
-            if clean_head is not None:
+            # A later ignore rule cannot rebind a committed artifact to local bytes.
+            if is_temporary_evidence(repo_root, task_id, entry.get("path")) and (
+                clean_head is None
+                or artifact_entry_at_revision(repo_root, clean_head, entry.get("path")) is None
+            ):
+                actual_hash = sha256_worktree_artifact(repo_root, entry.get("path"))
+            elif clean_head is not None:
                 actual_hash = sha256_artifact_at_revision(
                     repo_root, clean_head, entry.get("path")
                 )
@@ -2043,7 +2063,7 @@ def validate_repository(args: argparse.Namespace) -> int:
         lifecycle = {part.lower() for part in task_path.parts}
         report_path = evidence_root(repo_root, task_id) / "report.yaml"
         force_complete = task_id in required or "done" in lifecycle
-        if evidence == "required" and force_complete and not report_path.is_file():
+        if evidence == "required" and task_id in required and not report_path.is_file():
             findings.append(
                 Finding(
                     "error",

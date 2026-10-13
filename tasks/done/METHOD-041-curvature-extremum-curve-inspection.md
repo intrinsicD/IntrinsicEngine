@@ -62,7 +62,7 @@ python3 tools/docs/check_doc_links.py --root . --strict
 ```
 
 ## Result
-CPUContracted detector and standalone inspector. See the [inspection record](../../methods/geometry/curvature_segmentation/curvature_extrema_report.md) and [evidence](../evidence/METHOD-041). UI-053 owns deferred engine integration; partition adoption remains an explicit later experiment.
+CPUContracted detector and standalone inspector. See the [inspection record](../../methods/geometry/curvature_segmentation/curvature_extrema_report.md) and [evidence](https://github.com/intrinsicD/IntrinsicEngine/tree/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-041). UI-053 owns deferred engine integration; partition adoption remains an explicit later experiment.
 
 ## Completion
 - Completed 2026-09-07 at CPUContracted maturity for the detector and standalone inspector.

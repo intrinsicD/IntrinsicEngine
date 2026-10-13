@@ -12,7 +12,7 @@ import patch_merge as pm
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('results', type=Path)
-    parser.add_argument('--source', type=Path, default=Path('ara/evidence/diagnostics/method045/stages/stages.json.gz'))
+    parser.add_argument('--source', type=Path, default=Path('tests/data/atlas/stages/stages.json.gz'))
     args = parser.parse_args()
     with gzip.open(args.source, 'rt') as stream:
         data = json.load(stream)

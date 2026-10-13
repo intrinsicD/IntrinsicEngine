@@ -1,5 +1,10 @@
 # Claims
 
+Retention: completed raw artifacts referenced as `36a7b5062d9be3239d667efd9e41c4d4028ba249:path`
+are historical Git objects, not files retained in this checkout. Statements,
+statuses and limitations below describe the original observations; cleanup did
+not rerun or revalidate them. See [evidence retirement](../../docs/lessons/evidence-retirement.md).
+
 ## C01: PR-fast ccache provides a material same-shape latency reduction
 - **Statement**: For the CI-007 `pr-fast` gate shape at commit `5394e51b`, five
   warm ccache samples reduced build median/p95 by 56.7%/58.3% and total
@@ -620,7 +625,7 @@
   controls, changes topology/cardinality, or publishes properties directly;
   or result-channel/backend-fallback status differs by registration.
 - **Proof**: [tasks/done/UI-038-progressive-poisson-multi-domain-panel.md,
-  tasks/evidence/UI-038/report.yaml,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/UI-038/report.yaml,
   src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp,
   src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp,
   src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm,
@@ -654,8 +659,8 @@
   src/geometry/Geometry.PointCloud.Consolidation.cpp,
   tests/unit/geometry/Test.PointCloudConsolidation.cpp,
   benchmarks/geometry/manifests/locally_optimal_projection_reference_smoke.yaml,
-  tasks/evidence/METHOD-016/experiment/inputs/benchmark_result.json,
-  tasks/evidence/METHOD-016/experiment/runs/run-001/bundle.yaml]
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-016/experiment/inputs/benchmark_result.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-016/experiment/runs/run-001/bundle.yaml]
 - **Dependencies**: []
 - **Tags**: geometry, point cloud, LOP, WLOP, CPU reference, deterministic
 - **From staging**: O104
@@ -683,9 +688,9 @@
   src/geometry/Geometry.PointCloud.Consolidation.cpp,
   tests/unit/geometry/Test.PointCloudConsolidation.cpp,
   benchmarks/geometry/manifests/continuous_lop_reference_smoke.yaml,
-  tasks/evidence/METHOD-017/experiment/inputs/benchmark_result.json,
-  tasks/evidence/METHOD-017/experiment/runs/run-001/bundle.yaml,
-  tasks/evidence/METHOD-017/experiment/runs/run-001/audit.json]
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-017/experiment/inputs/benchmark_result.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-017/experiment/runs/run-001/bundle.yaml,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-017/experiment/runs/run-001/audit.json]
 - **Dependencies**: [C22]
 - **Tags**: geometry, point cloud, CLOP, Gaussian mixture, CPU reference,
   deterministic
@@ -716,9 +721,9 @@
   src/geometry/Geometry.PointCloud.Kernels.cpp,
   tests/unit/geometry/Test.PointCloudConsolidation.cpp,
   benchmarks/geometry/manifests/edge_aware_resampling_reference_smoke.yaml,
-  tasks/evidence/METHOD-018/experiment/inputs/benchmark_result.json,
-  tasks/evidence/METHOD-018/experiment/runs/run-001/bundle.yaml,
-  tasks/evidence/METHOD-018/experiment/runs/run-001/audit.json]
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-018/experiment/inputs/benchmark_result.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-018/experiment/runs/run-001/bundle.yaml,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-018/experiment/runs/run-001/audit.json]
 - **Dependencies**: [C22]
 - **Tags**: geometry, point cloud, EAR, anisotropic WLOP, CPU reference,
   deterministic
@@ -742,9 +747,9 @@
   on the fixed confirmation suite.
 - **Proof**: [methods/geometry/locally_optimal_projection/reports/METHOD-019-result.md,
   benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml,
-  tasks/evidence/METHOD-019/experiment/inputs/benchmark_result.json,
-  tasks/evidence/METHOD-019/experiment/inputs/strategy_rows.jsonl,
-  tasks/evidence/METHOD-019/experiment/runs/run-001/bundle.yaml]
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-019/experiment/inputs/benchmark_result.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-019/experiment/inputs/strategy_rows.jsonl,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-019/experiment/runs/run-001/bundle.yaml]
 - **Dependencies**: [C22, C23, C24]
 - **Tags**: geometry, point cloud, LOP, WLOP, CLOP, EAR, optimized CPU,
   negative result
@@ -776,10 +781,10 @@
   src/geometry/Geometry.Parameterization.Optimize.cppm,
   src/geometry/Geometry.Parameterization.Optimize.cpp,
   tests/unit/geometry/Test.ParameterizationOptimize.cpp,
-  tasks/evidence/GEOM-064/commands/revision4-parameterization-tests.json,
-  tasks/evidence/GEOM-064/commands/revision4-cpu-tests.json,
-  tasks/evidence/GEOM-064/commands/revision4-asan-parameterization-tests.json,
-  tasks/evidence/GEOM-064/commands/revision4-ubsan-parameterization-tests.json]
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/GEOM-064/commands/revision4-parameterization-tests.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/GEOM-064/commands/revision4-cpu-tests.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/GEOM-064/commands/revision4-asan-parameterization-tests.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/GEOM-064/commands/revision4-ubsan-parameterization-tests.json]
 - **Dependencies**: []
 - **Tags**: geometry, parameterization, ARAP, SLIM, CPU, deterministic,
   local injectivity
@@ -816,9 +821,9 @@
   tests/integration/runtime/Test.PhysicsModule.cpp,
   tests/integration/runtime/Test.SandboxConfigSections.cpp,
   tests/contract/runtime/Test.RuntimeEngineLayering.cpp,
-  tasks/evidence/PHYSICS-004/commands/final-ci-tests.json,
-  tasks/evidence/PHYSICS-004/commands/final-ci-asan-tests.json,
-  tasks/evidence/PHYSICS-004/commands/final-ci-ubsan-tests.json]
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/PHYSICS-004/commands/final-ci-tests.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/PHYSICS-004/commands/final-ci-asan-tests.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/PHYSICS-004/commands/final-ci-ubsan-tests.json]
 - **Dependencies**: []
 - **Tags**: runtime, physics, ECS, fixed step, config, CPU, Null, Operational
 - **From staging**: O113
@@ -849,10 +854,10 @@
   src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm,
   src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp,
   tests/contract/runtime/Test.PointCloudConsolidationModule.cpp,
-  tasks/evidence/RUNTIME-206/commands/focused-module-tests-r3.json,
-  tasks/evidence/RUNTIME-206/commands/cpu-tests-r2.json,
-  tasks/evidence/RUNTIME-206/commands/asan-tests-r2.json,
-  tasks/evidence/RUNTIME-206/commands/ubsan-tests-r2.json]
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/RUNTIME-206/commands/focused-module-tests-r3.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/RUNTIME-206/commands/cpu-tests-r2.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/RUNTIME-206/commands/asan-tests-r2.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/RUNTIME-206/commands/ubsan-tests-r2.json]
 - **Dependencies**: [C18, C22, C23, C24]
 - **Tags**: runtime, geometry, point set, property domains, LOP, WLOP, CLOP,
   EAR, CPU, undo, stale writeback
@@ -894,9 +899,9 @@
   tests/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp,
   tests/integration/runtime/Test.SandboxEditorPresentation.cpp,
   tests/unit/geometry/Test_MeshQuantities.cpp,
-  tasks/evidence/UI-039/commands/review-repair-focused-tests.json,
-  tasks/evidence/UI-039/commands/review-repair-presentation-tests.json,
-  tasks/evidence/UI-039/commands/review-repair-cpu-tests-r2.json]
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/UI-039/commands/review-repair-focused-tests.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/UI-039/commands/review-repair-presentation-tests.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/UI-039/commands/review-repair-cpu-tests-r2.json]
 - **Dependencies**: [C18, C28]
 - **Tags**: app, runtime, geometry, point set, property domains, LOP, WLOP,
   CLOP, EAR, UI, CPU, float properties
@@ -1019,10 +1024,10 @@
   tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp,
   benchmarks/geometry/manifests/lop_family_gpu_vulkan_smoke_v3.yaml,
   methods/geometry/locally_optimal_projection/reports/METHOD-020-result.md,
-  tasks/evidence/METHOD-020/experiment/protocols/v4/protocol.yaml,
-  tasks/evidence/METHOD-020/experiment/inputs/run-002/benchmark_result.json,
-  tasks/evidence/METHOD-020/experiment/runs/run-002/bundle.yaml,
-  tasks/evidence/METHOD-020/experiment/runs/run-002/audit.json]
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-020/experiment/protocols/v4/protocol.yaml,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-020/experiment/inputs/run-002/benchmark_result.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-020/experiment/runs/run-002/bundle.yaml,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-020/experiment/runs/run-002/audit.json]
 - **Dependencies**: [C22, C23, C24, C33]
 - **Tags**: geometry, LOP, WLOP, Vulkan, GPU, parity, bounded result
 - **From staging**: O127
@@ -1082,12 +1087,12 @@
   tests/contract/runtime/Test.VisualizationRecipes.cpp,
   tests/integration/graphics/Test.GpuTransferFacadeGpuSmoke.cpp,
   tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp,
-  tasks/evidence/RUNTIME-214/commands/ci-final-cpu-tests.json,
-  tasks/evidence/RUNTIME-214/commands/ci-asan-tests.json,
-  tasks/evidence/RUNTIME-214/commands/ci-ubsan-tests.json,
-  tasks/evidence/RUNTIME-214/commands/ci-vulkan-coherence-tests-final.json,
-  tasks/evidence/RUNTIME-214/report.yaml,
-  tasks/evidence/RUNTIME-214/reviews.jsonl]
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/RUNTIME-214/commands/ci-final-cpu-tests.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/RUNTIME-214/commands/ci-asan-tests.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/RUNTIME-214/commands/ci-ubsan-tests.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/RUNTIME-214/commands/ci-vulkan-coherence-tests-final.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/RUNTIME-214/report.yaml,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/RUNTIME-214/reviews.jsonl]
 - **Dependencies**: [C30, C34, C35]
 - **Tags**: geometry, runtime, rendering, property revisions, Vulkan, staging,
   LOP, coherence, bounded result
@@ -1140,11 +1145,11 @@
 - **Proof**: [tests/unit/geometry/Test.Segmentation.cpp,
   tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp,
   tests/integration/runtime/Test.SandboxCurvatureSegmentationPanel.cpp,
-  tasks/evidence/METHOD-037/commands/focused-tests.json,
-  tasks/evidence/METHOD-037/commands/cpu-tests.json,
-  tasks/evidence/METHOD-037/previews/sandbox-sculpt-curvature-segmentation.png,
-  tasks/evidence/METHOD-037/superseded/20260810-method038-timing-instrumentation/experiment/runs/run-002/bundle.yaml,
-  tasks/evidence/METHOD-037/superseded/20260810-method038-timing-instrumentation/experiment/runs/run-002/audit.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-037/commands/focused-tests.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-037/commands/cpu-tests.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-037/previews/sandbox-sculpt-curvature-segmentation.png,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-037/superseded/20260810-method038-timing-instrumentation/experiment/runs/run-002/bundle.yaml,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-037/superseded/20260810-method038-timing-instrumentation/experiment/runs/run-002/audit.json,
   tasks/done/METHOD-037-signed-curvature-mesh-segmentation.md]
 - **Dependencies**: []
 - **Tags**: geometry, runtime, config, UI, CPU reference, visualization,
@@ -1177,8 +1182,8 @@
   src/geometry/Geometry.HalfedgeMesh.Features.cpp,
   tests/unit/geometry/Test.HalfedgeMeshFeatures.cpp,
   tests/unit/geometry/Test_Simplification.cpp,
-  tasks/evidence/GEOM-071/commands/focused-feature-simplification-tests.json,
-  tasks/evidence/GEOM-071/commands/cpu-tests.json]
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/GEOM-071/commands/focused-feature-simplification-tests.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/GEOM-071/commands/cpu-tests.json]
 - **Dependencies**: []
 - **Tags**: geometry, halfedge mesh, sharp features, properties, FA-QEM, CPU,
   bounded result
@@ -1198,12 +1203,12 @@
 - **Falsification criteria**: Repeating the exact frozen protocol and source
   selects exactly two components on both paired variants while preserving the
   declared `quality_error_l2 <= 0.02` gate.
-- **Proof**: [tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/protocol.yaml,
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/protocol.yaml,
   benchmarks/geometry/manifests/curvature_segmentation_reference_profile_10k_automatic.yaml,
-  tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/inputs/automatic_benchmark_result.json,
-  tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/inputs/fixed_benchmark_result.json,
-  tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/runs/scratch-002/bundle.yaml,
-  tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/runs/scratch-002/audit.json]
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/inputs/automatic_benchmark_result.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/inputs/fixed_benchmark_result.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/runs/scratch-002/bundle.yaml,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/runs/scratch-002/audit.json]
 - **Dependencies**: [C38]
 - **Tags**: geometry, curvature segmentation, automatic selection, CPU reference,
   negative result, scratch
@@ -1232,15 +1237,15 @@
   benchmarks/geometry/manifests/curvature_segmentation_reference_remeshing_10k_fixed.yaml,
   benchmarks/geometry/manifests/curvature_segmentation_reference_profile_10k_cold_fixed.yaml,
   benchmarks/geometry/manifests/curvature_segmentation_reference_profile_10k_reuse_fixed.yaml,
-  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/protocol.yaml,
-  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/inputs/remeshing_fixed_benchmark_result.json,
-  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/inputs/remeshing_automatic_benchmark_result.json,
-  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/inputs/cold_fixed_benchmark_result.json,
-  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/inputs/cold_automatic_benchmark_result.json,
-  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/inputs/reuse_fixed_benchmark_result.json,
-  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/inputs/reuse_automatic_benchmark_result.json,
-  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/runs/scratch-003/bundle.yaml,
-  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/runs/scratch-003/audit.json]
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/protocol.yaml,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/inputs/remeshing_fixed_benchmark_result.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/inputs/remeshing_automatic_benchmark_result.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/inputs/cold_fixed_benchmark_result.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/inputs/cold_automatic_benchmark_result.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/inputs/reuse_fixed_benchmark_result.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/inputs/reuse_automatic_benchmark_result.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/runs/scratch-003/bundle.yaml,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/runs/scratch-003/audit.json]
 - **Dependencies**: [C38, C40]
 - **Tags**: geometry, curvature segmentation, cold descriptors, remeshing
   fixture, continuous boundary, automatic selection, CPU reference, negative
@@ -1269,10 +1274,10 @@
   component/region/boundary/payload control.
 - **Proof**: [benchmarks/runners/CurvatureSegmentationProfileRunner.cpp,
   benchmarks/geometry/manifests/curvature_segmentation_screening_fold_controls.yaml,
-  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-final-task-bound/experiment/protocol.yaml,
-  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-final-task-bound/experiment/inputs/fold_controls_benchmark_result.json,
-  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-final-task-bound/experiment/runs/scratch-006/bundle.yaml,
-  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-final-task-bound/experiment/runs/scratch-006/audit.json]
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-038/superseded/20260811-fold-screening-final-task-bound/experiment/protocol.yaml,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-038/superseded/20260811-fold-screening-final-task-bound/experiment/inputs/fold_controls_benchmark_result.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-038/superseded/20260811-fold-screening-final-task-bound/experiment/runs/scratch-006/bundle.yaml,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-038/superseded/20260811-fold-screening-final-task-bound/experiment/runs/scratch-006/audit.json]
 - **Dependencies**: [C38, C39]
 - **Tags**: geometry, curvature segmentation, sharp features, isometric fold,
   CPU reference, fixture control, scratch, bounded result
@@ -1303,10 +1308,10 @@
   of the seventeen preregistered gates.
 - **Proof**: [benchmarks/runners/CurvatureSegmentationProfileRunner.cpp,
   benchmarks/geometry/manifests/curvature_segmentation_screening_surface_controls.yaml,
-  tasks/evidence/METHOD-038/experiment/protocol.yaml,
-  tasks/evidence/METHOD-038/experiment/inputs/surface_controls_benchmark_result.json,
-  tasks/evidence/METHOD-038/experiment/runs/scratch-011/bundle.yaml,
-  tasks/evidence/METHOD-038/experiment/runs/scratch-011/audit.json]
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-038/experiment/protocol.yaml,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-038/experiment/inputs/surface_controls_benchmark_result.json,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-038/experiment/runs/scratch-011/bundle.yaml,
+  36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-038/experiment/runs/scratch-011/audit.json]
 - **Dependencies**: [C38, C39, C42]
 - **Tags**: geometry, curvature segmentation, cylinder, smooth transition,
   continuous boundary, CPU reference, fixture control, scratch, bounded result
@@ -1821,7 +1826,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Replaying the bound source and unchanged fixtures violates their geometric or failure assertions, or the retained logs/XML disagree with the stated selected/passed case counts.
-- **Proof**: [N476, tests/unit/geometry/Test.ScalarfieldExtrema.cpp, tasks/evidence/METHOD-041/source-hashes.json, tasks/evidence/METHOD-041/cpu.log, tasks/evidence/METHOD-041/asan.log, tasks/evidence/METHOD-041/ubsan.log, tasks/evidence/METHOD-041/asan-IntrinsicGeometryCurvatureExtremaTests.xml, tasks/evidence/METHOD-041/ubsan-IntrinsicGeometryCurvatureExtremaTests.xml]
+- **Proof**: [N476, tests/unit/geometry/Test.ScalarfieldExtrema.cpp, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-041/source-hashes.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-041/cpu.log, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-041/asan.log, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-041/ubsan.log, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-041/asan-IntrinsicGeometryCurvatureExtremaTests.xml, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-041/ubsan-IntrinsicGeometryCurvatureExtremaTests.xml]
 - **Dependencies**: []
 - **Tags**: geometry, curvature extrema, CPU, ASan, UBSan, bounded fixtures
 - **From staging**: O181
@@ -1832,7 +1837,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Recomputing the retained cohort/measurement/view counts disagrees with the record, their source/output bindings fail, or the browser record contains an error or fails its stated filter checks.
-- **Proof**: [N477, tasks/evidence/METHOD-041/cohort-summary.json, tasks/evidence/METHOD-041/browser.json, tasks/evidence/METHOD-041/benchmark-validation.log, tasks/evidence/METHOD-041/measurements/0-frog.extrema.benchmark.json, methods/geometry/curvature_segmentation/curvature_extrema_report.md]
+- **Proof**: [N477, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-041/cohort-summary.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-041/browser.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-041/benchmark-validation.log, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-041/measurements/0-frog.extrema.benchmark.json, methods/geometry/curvature_segmentation/curvature_extrema_report.md]
 - **Dependencies**: []
 - **Tags**: geometry, local observation, CPU, non-publication evidence
 - **From staging**: O182
@@ -1843,7 +1848,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Replaying the bound native inputs/outputs and frozen specification changes feasibility, the signs of the energy differences, or violates the native replay tolerance; independently computed curve distances fall outside the recorded bounds.
-- **Proof**: [ara/evidence/diagnostics/method042/record.json, tools/diagnostics/curvature/evaluate_part_seams.py, tools/diagnostics/curvature/frog_parts_pilot.json, tests/regression/tooling/Test.PartSeamOracle.py]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method042/record.json, tools/diagnostics/curvature/evaluate_part_seams.py, tools/diagnostics/curvature/frog_parts_pilot.json, tests/regression/tooling/Test.PartSeamOracle.py]
 - **Dependencies**: []
 - **Tags**: geometry, CPU, exploratory observation, objective, representation
 - **From staging**: O188
@@ -1854,7 +1859,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: The unchanged implementation/configuration and synthetic geometry generation reproduce identical split decisions across all five samplings; a revised method is a new experiment, not reversal by changing this gate.
-- **Proof**: [ara/evidence/diagnostics/method042/record.json, tools/diagnostics/curvature/neck_sweep.py, tools/diagnostics/curvature/neck_sweep_controls.py, tools/diagnostics/curvature/neck_sweep_v4.json, tests/regression/tooling/Test.NeckSweep.py]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method042/record.json, tools/diagnostics/curvature/neck_sweep.py, tools/diagnostics/curvature/neck_sweep_controls.py, tools/diagnostics/curvature/neck_sweep_v4.json, tests/regression/tooling/Test.NeckSweep.py]
 - **Dependencies**: []
 - **Tags**: geometry, CPU, negative result, sampling, unadopted diagnostic
 - **From staging**: O187
@@ -1865,7 +1870,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Recomputing the frozen dense-neck partitions changes either delta sign or finds a lower delta within the recorded proposal bank; fixed-partition scaling/translation changes energy beyond the tested tolerance or rotation disagrees with the predicted length-term difference.
-- **Proof**: [ara/evidence/diagnostics/method042/record.json, tools/diagnostics/curvature/neck_sweep_controls.py, tests/regression/tooling/Test.NeckSweep.py]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method042/record.json, tools/diagnostics/curvature/neck_sweep_controls.py, tests/regression/tooling/Test.NeckSweep.py]
 - **Dependencies**: []
 - **Tags**: geometry, CPU, bounded diagnostic, proposal limitation
 - **From staging**: O189
@@ -1909,7 +1914,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Replaying the recorded input hashes/configurations changes the stated counts or independent source-face/UV audit finds a bound breach, missing face, mixed chart orientation or positive-area intersection above the declared tolerance in those prototype cells.
-- **Proof**: [ara/evidence/diagnostics/method044/record.json, ara/evidence/diagnostics/method044/iteration-notes.md, ara/evidence/diagnostics/method044/atlas-round2-controls.json, tools/diagnostics/atlas/patch_merge.py, tools/diagnostics/atlas/compare_atlases.py, tools/diagnostics/atlas/repack.py, tests/regression/tooling/Test.AtlasPatchMerge.py, benchmarks/geometry/manifests/geometry_uv_atlas_patch_merge_diagnostic.yaml]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method044/record.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method044/iteration-notes.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method044/atlas-round2-controls.json, tools/diagnostics/atlas/patch_merge.py, tools/diagnostics/atlas/compare_atlases.py, tools/diagnostics/atlas/repack.py, tests/regression/tooling/Test.AtlasPatchMerge.py, benchmarks/geometry/manifests/geometry_uv_atlas_patch_merge_diagnostic.yaml]
 - **Dependencies**: []
 - **Tags**: geometry, CPU diagnostic, UV atlas, unadopted, local evidence
 - **From staging**: O193
@@ -1920,7 +1925,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Replaying the four recorded feature-growth/merge-weight combinations with identical seeds and gates contradicts the reported counts or shows that another uncontrolled input/solver change explains them.
-- **Proof**: [ara/evidence/diagnostics/method044/record.json, tools/diagnostics/atlas/patch_merge.py, tools/diagnostics/atlas/compare_atlases.py, tasks/done/METHOD-044-feature-aware-atlas-merge-experiment.md]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method044/record.json, tools/diagnostics/atlas/patch_merge.py, tools/diagnostics/atlas/compare_atlases.py, tasks/done/METHOD-044-feature-aware-atlas-merge-experiment.md]
 - **Dependencies**: [C69]
 - **Tags**: geometry, CPU diagnostic, feature ablation, non-universal
 - **From staging**: O194
@@ -1932,9 +1937,9 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Replaying the retained source/label inputs produces a missing face, changed protected region, lost baseline boundary, UV intersection at the stated tolerance or post-pack bound violation in these candidate cells.
-- **Proof**: [ara/evidence/diagnostics/method045/record.json, tools/diagnostics/atlas/baseline_atlas.py, tools/diagnostics/atlas/compare_baseline_atlases.py, tests/regression/tooling/Test.BaselineAtlas.py, benchmarks/geometry/manifests/geometry_baseline_atlas_diagnostic.yaml]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method045/record.json, tools/diagnostics/atlas/baseline_atlas.py, tools/diagnostics/atlas/compare_baseline_atlases.py, tests/regression/tooling/Test.BaselineAtlas.py, benchmarks/geometry/manifests/geometry_baseline_atlas_diagnostic.yaml]
 - **Dependencies**: []
-- **Review clarification**: [Claude source review and resolution](../evidence/diagnostics/method045/reviews/resolution.md) distinguish correspondence checks from segmentation quality, per-chart stretch from texel-density variation, and whole-chart mirroring from mixed orientation. This review is not an independent rerun or visual acceptance.
+- **Review clarification**: [Claude source review and resolution](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method045/reviews/resolution.md) distinguish correspondence checks from segmentation quality, per-chart stretch from texel-density variation, and whole-chart mirroring from mixed orientation. This review is not an independent rerun or visual acceptance.
 - **Tags**: geometry, CPU diagnostic, region preservation, UV cuts, offline
 - **From staging**: O195
 
@@ -1944,7 +1949,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Recomputing the sum of triangle areas in the exported square UV domain contradicts the recorded decrease on sculpt with the same frozen chart UVs, resolution and padding.
-- **Proof**: [ara/evidence/diagnostics/method045/packing/sculpt.json, ara/evidence/diagnostics/method045/packing/frog.json, ara/evidence/diagnostics/method045/cells/round2/comparison.json, benchmarks/runners/UvChartPackDiagnosticRunner.cpp, tools/diagnostics/atlas/repack.py]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method045/packing/sculpt.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method045/packing/frog.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method045/cells/round2/comparison.json, benchmarks/runners/UvChartPackDiagnosticRunner.cpp, tools/diagnostics/atlas/repack.py]
 - **Dependencies**: [C71]
 - **Tags**: geometry, CPU diagnostic, packing, negative result, metric accounting
 - **From staging**: O196
@@ -1955,7 +1960,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Recomputing boundary loss from the retained initial/pre-merge/final arrays or native edge flags contradicts these counts, or observed atlas final labels differ from their retained references.
-- **Proof**: [ara/evidence/diagnostics/method045/stages/record.json, ara/evidence/diagnostics/method045/stages/boundary-reconciliation.json, ara/evidence/diagnostics/method045/stages/frog-decisions.json, ara/evidence/diagnostics/method045/stages/sculpt-decisions.json, tools/diagnostics/atlas/trace_atlas.py, tests/regression/tooling/Test.BaselineAtlas.py]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method045/stages/record.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method045/stages/boundary-reconciliation.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method045/stages/frog-decisions.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method045/stages/sculpt-decisions.json, tools/diagnostics/atlas/trace_atlas.py, tests/regression/tooling/Test.BaselineAtlas.py]
 - **Dependencies**: [C71]
 - **Tags**: geometry, CPU diagnostic, stage audit, boundary preservation, offline
 - **From staging**: O197
@@ -1967,7 +1972,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Replaying the retained inputs and frozen parameters contradicts the stated measurements, changes source/region identity or chart count, loses an original border, violates a recorded post-pack bound, or reveals an accepted non-decreasing full seam-energy move.
-- **Proof**: [ara/evidence/diagnostics/method046/record.json, ara/evidence/diagnostics/method046/benchmarks/frog-curves.json, ara/evidence/diagnostics/method046/benchmarks/sculpt-curves.json, ara/evidence/diagnostics/method046/reviews/resolution.md, tools/diagnostics/atlas/boundary_refine.py, tools/diagnostics/atlas/collect_boundary_refinement.py, tests/regression/tooling/Test.AtlasBoundaryRefine.py, benchmarks/geometry/manifests/geometry_uv_boundary_refinement_diagnostic.yaml]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method046/record.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method046/benchmarks/frog-curves.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method046/benchmarks/sculpt-curves.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method046/reviews/resolution.md, tools/diagnostics/atlas/boundary_refine.py, tools/diagnostics/atlas/collect_boundary_refinement.py, tests/regression/tooling/Test.AtlasBoundaryRefine.py, benchmarks/geometry/manifests/geometry_uv_boundary_refinement_diagnostic.yaml]
 - **Dependencies**: [C71, C73]
 - **Tags**: geometry, CPU diagnostic, constrained boundary refinement, feature ablation, offline
 - **From staging**: O199
@@ -2011,7 +2016,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Replaying the recorded source and fixtures produces a wrong neighbor ID/order/distance/count, excludes coincident peers by position, accepts a stale queued target, rebuilds contrary to reuse assertions, or changes normal components beyond the stated tolerance.
-- **Proof**: [ara/evidence/diagnostics/point_lbvh_knn_2026-09-08/record.json, ara/evidence/diagnostics/point_lbvh_knn_2026-09-08/cpu-tests.txt, ara/evidence/diagnostics/point_lbvh_knn_2026-09-08/vulkan-first-run.txt, ara/evidence/diagnostics/point_lbvh_knn_2026-09-08/vulkan-final-focused.txt, ara/evidence/tables/point_lbvh_knn_verification_2026-09-08.md, tests/unit/geometry/Test.PointLBVH.cpp, tests/contract/runtime/Test.SpatialIndexCache.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/point_lbvh_knn_2026-09-08/record.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/point_lbvh_knn_2026-09-08/cpu-tests.txt, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/point_lbvh_knn_2026-09-08/vulkan-first-run.txt, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/point_lbvh_knn_2026-09-08/vulkan-final-focused.txt, docs/results/point_lbvh_knn_verification_2026-09-08.md, tests/unit/geometry/Test.PointLBVH.cpp, tests/contract/runtime/Test.SpatialIndexCache.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp]
 - **Dependencies**: [C76, C77]
 - **Tags**: geometry, LBVH, kNN, exclusion, normals, CPU, Vulkan, bounded parity, runtime
 - **From staging**: O207
@@ -2022,7 +2027,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Replaying the recorded sources and fixtures rejects a compatible domain, violates a normal/error or reuse assertion, changes unrelated/deleted rows, accepts a stale job/history write, or breaks configured execution, shared normal-window/result routing or canonical vector-recipe bindings.
-- **Proof**: [ara/evidence/diagnostics/normal_estimation_2026-09-08/record.json, ara/evidence/diagnostics/normal_estimation_2026-09-08/focused-tests.txt, ara/evidence/diagnostics/normal_estimation_2026-09-08/cpu-gate.txt, ara/evidence/tables/normal_estimation_verification_2026-09-08.md, tests/contract/runtime/Test.NormalEstimation.cpp, tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp, tests/integration/runtime/Test.SandboxEditorPresentation.cpp]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/normal_estimation_2026-09-08/record.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/normal_estimation_2026-09-08/focused-tests.txt, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/normal_estimation_2026-09-08/cpu-gate.txt, docs/results/normal_estimation_verification_2026-09-08.md, tests/contract/runtime/Test.NormalEstimation.cpp, tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp, tests/integration/runtime/Test.SandboxEditorPresentation.cpp]
 - **Dependencies**: [C78, H20]
 - **Tags**: normals, canonical domains, CPU, PCA, LBVH, runtime, editor, bounded integration
 - **From staging**: O209
@@ -2033,7 +2038,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Replaying the recorded source and fixtures produces an output error above the stated tolerance, domain rejection, changed deleted/unrelated rows, history/reuse failure, stale or cancelled publication, silent radius truncation, or incorrect radius count/exclusion mapping.
-- **Proof**: [ara/evidence/diagnostics/normal_vulkan_2026-09-09/record.json, ara/evidence/diagnostics/normal_vulkan_2026-09-09/vulkan-final.txt, ara/evidence/diagnostics/normal_vulkan_2026-09-09/focused-cpu.txt, ara/evidence/diagnostics/normal_vulkan_2026-09-09/cpu-summary.txt, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp, tests/unit/geometry/Test.PointLBVH.cpp, tests/contract/runtime/Test.NormalEstimation.cpp]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/normal_vulkan_2026-09-09/record.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/normal_vulkan_2026-09-09/vulkan-final.txt, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/normal_vulkan_2026-09-09/focused-cpu.txt, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/normal_vulkan_2026-09-09/cpu-summary.txt, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp, tests/unit/geometry/Test.PointLBVH.cpp, tests/contract/runtime/Test.NormalEstimation.cpp]
 - **Dependencies**: [C78, C79, H21]
 - **Tags**: normals, LBVH, canonical domains, Vulkan, CPU fitting, bounded parity, runtime
 - **From staging**: O211
@@ -2055,7 +2060,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Replaying the recorded sources and fixtures exceeds the density tolerance, rejects a compatible domain, changes the specified nearest candidate/bandwidth policy, mutates unrelated/deleted rows, accepts stale/cancelled publication or breaks the declared cache/history/config/window/recipe assertions.
-- **Proof**: [ara/evidence/diagnostics/density_vulkan_2026-09-09/record.json, ara/evidence/diagnostics/density_vulkan_2026-09-09/vulkan.txt, ara/evidence/diagnostics/density_vulkan_2026-09-09/focused-cpu.txt, ara/evidence/diagnostics/density_vulkan_2026-09-09/cpu-summary.txt, ara/evidence/diagnostics/density_vulkan_2026-09-09/native-cpu.txt, tests/contract/runtime/Test.KernelDensityOperations.cpp, tests/unit/geometry/Test.KernelDensity.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/density_vulkan_2026-09-09/record.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/density_vulkan_2026-09-09/vulkan.txt, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/density_vulkan_2026-09-09/focused-cpu.txt, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/density_vulkan_2026-09-09/cpu-summary.txt, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/density_vulkan_2026-09-09/native-cpu.txt, tests/contract/runtime/Test.KernelDensityOperations.cpp, tests/unit/geometry/Test.KernelDensity.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp]
 - **Dependencies**: [C78]
 - **Tags**: density, local Gaussian, LBVH, canonical domains, CPU, Vulkan, bounded parity, runtime
 - **From staging**: O214
@@ -2066,7 +2071,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Replaying the recorded sources/fixtures exceeds the radius or spacing tolerance, changes candidate/self/scale/sampling policy, rejects a compatible domain, corrupts deleted/unrelated rows, accepts stale/cancelled publication or breaks the declared cache/history/config/window/recipe assertions.
-- **Proof**: [ara/evidence/diagnostics/spacing_vulkan_2026-09-10/record.json, ara/evidence/diagnostics/spacing_vulkan_2026-09-10/vulkan.txt, ara/evidence/diagnostics/spacing_vulkan_2026-09-10/focused-cpu.txt, ara/evidence/diagnostics/spacing_vulkan_2026-09-10/cpu-summary.txt, ara/evidence/diagnostics/spacing_vulkan_2026-09-10/native-cpu.txt, tests/unit/geometry/Test.PointSpacing.cpp, tests/contract/runtime/Test.PointSpacingOperations.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/spacing_vulkan_2026-09-10/record.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/spacing_vulkan_2026-09-10/vulkan.txt, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/spacing_vulkan_2026-09-10/focused-cpu.txt, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/spacing_vulkan_2026-09-10/cpu-summary.txt, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/spacing_vulkan_2026-09-10/native-cpu.txt, tests/unit/geometry/Test.PointSpacing.cpp, tests/contract/runtime/Test.PointSpacingOperations.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp]
 - **Dependencies**: [C78]
 - **Tags**: point spacing, splat radii, LBVH, canonical domains, CPU, Vulkan, bounded parity, runtime
 - **From staging**: O215
@@ -2077,7 +2082,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Replaying the recorded source/fixtures exceeds the score tolerance, changes a mask or the specified candidate/self policy, rejects a compatible domain, corrupts unrelated/deleted rows, accepts stale/cancelled publication or fails the declared config/cache/history assertions.
-- **Proof**: [ara/evidence/diagnostics/distance_ratio_vulkan_2026-09-10/record.json, ara/evidence/tables/distance_ratio_verification_2026-09-10.md, tasks/evidence/RUNTIME-223/commands/actual-vulkan.stdout.log, tasks/evidence/RUNTIME-223/commands/full-cpu.stdout.log, tests/unit/geometry/Test.LocalDistanceRatio.cpp, tests/contract/runtime/Test.OutlierAnalysis.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/distance_ratio_vulkan_2026-09-10/record.json, docs/results/distance_ratio_verification_2026-09-10.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/RUNTIME-223/commands/actual-vulkan.stdout.log, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/RUNTIME-223/commands/full-cpu.stdout.log, tests/unit/geometry/Test.LocalDistanceRatio.cpp, tests/contract/runtime/Test.OutlierAnalysis.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp]
 - **Dependencies**: [C81]
 - **Tags**: local distance ratio, outliers, LBVH, CPU, Vulkan, bounded integration
 - **From staging**: O216
@@ -2088,7 +2093,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Replaying the recorded source and fixtures exceeds the position tolerance, uses stale neighborhoods after a moving pass, corrupts unrelated/deleted rows, publishes an intermediate/stale/cancelled result, or fails the declared domain/config/workspace/history assertions.
-- **Proof**: [ara/evidence/diagnostics/bilateral_vulkan_2026-09-10/record.json, ara/evidence/tables/bilateral_verification_2026-09-10.md, tasks/evidence/RUNTIME-224/commands/actual-vulkan-verified.stdout.log, tasks/evidence/RUNTIME-224/commands/full-cpu-final.stdout.log, tests/unit/geometry/Test.BilateralPointFilter.cpp, tests/contract/runtime/Test.BilateralFilterOperations.cpp, tests/contract/runtime/Test.SpatialIndexCache.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/bilateral_vulkan_2026-09-10/record.json, docs/results/bilateral_verification_2026-09-10.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/RUNTIME-224/commands/actual-vulkan-verified.stdout.log, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/RUNTIME-224/commands/full-cpu-final.stdout.log, tests/unit/geometry/Test.BilateralPointFilter.cpp, tests/contract/runtime/Test.BilateralFilterOperations.cpp, tests/contract/runtime/Test.SpatialIndexCache.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp]
 - **Dependencies**: [C80]
 - **Tags**: bilateral point filtering, LBVH, moving positions, CPU, Vulkan, bounded integration
 - **From staging**: O217
@@ -2099,7 +2104,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Replaying the recorded source and fixtures changes masks or exceeds saliency tolerance, silently truncates complete support, corrupts unrelated/deleted rows, publishes a stale/cancelled/partially submitted job, or fails the declared domain/config/history assertions.
-- **Proof**: [ara/evidence/diagnostics/keypoint_vulkan_2026-09-10/record.json, ara/evidence/tables/keypoint_verification_2026-09-10.md, tasks/evidence/RUNTIME-225/commands/actual-vulkan.stdout.log, tasks/evidence/RUNTIME-225/commands/full-cpu.stdout.log, tests/unit/geometry/Test.KeypointAnalysis.cpp, tests/contract/runtime/Test.KeypointAnalysisOperations.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/keypoint_vulkan_2026-09-10/record.json, docs/results/keypoint_verification_2026-09-10.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/RUNTIME-225/commands/actual-vulkan.stdout.log, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/RUNTIME-225/commands/full-cpu.stdout.log, tests/unit/geometry/Test.KeypointAnalysis.cpp, tests/contract/runtime/Test.KeypointAnalysisOperations.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp]
 - **Dependencies**: [C80]
 - **Tags**: keypoints, centroid PCA, complete radius support, LBVH, CPU, Vulkan, bounded integration
 - **From staging**: O218
@@ -2110,7 +2115,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Replaying the recorded source and fixtures exceeds histogram tolerance, loses required radius/prefix support, corrupts unrelated/deleted properties, publishes stale/cancelled/partially submitted work, or fails declared domain/config/history assertions.
-- **Proof**: [ara/evidence/diagnostics/descriptor_vulkan_2026-09-10/record.json, ara/evidence/tables/descriptor_verification_2026-09-10.md, tasks/evidence/RUNTIME-226/commands/actual-vulkan-corrected.stdout.log, tasks/evidence/RUNTIME-226/commands/full-cpu.stdout.log, tests/unit/geometry/Test.DescriptorAnalysis.cpp, tests/contract/runtime/Test.DescriptorAnalysisOperations.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/descriptor_vulkan_2026-09-10/record.json, docs/results/descriptor_verification_2026-09-10.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/RUNTIME-226/commands/actual-vulkan-corrected.stdout.log, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/RUNTIME-226/commands/full-cpu.stdout.log, tests/unit/geometry/Test.DescriptorAnalysis.cpp, tests/contract/runtime/Test.DescriptorAnalysisOperations.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp]
 - **Dependencies**: [C86]
 - **Tags**: FPFH, descriptors, radius support, lowest-ID prefix, LBVH, CPU, Vulkan, bounded integration
 - **From staging**: O219
@@ -2121,7 +2126,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Replaying the bound source/fixtures loses strict-support contributors, exceeds weight tolerance, mutates deleted/unrelated rows, publishes stale/cancelled/partially submitted results, breaks history/domain/config assertions or regresses the keypoint/descriptor GPU cases.
-- **Proof**: [ara/evidence/diagnostics/density_weight_vulkan_2026-09-10/record.json, ara/evidence/tables/density_weight_verification_2026-09-10.md, tasks/evidence/RUNTIME-227/commands/actual-vulkan.stdout.log, tasks/evidence/RUNTIME-227/commands/actual-vulkan-corrected.stdout.log, tasks/evidence/RUNTIME-227/commands/full-cpu.stdout.log, tests/unit/geometry/Test.PointCloudKernels.cpp, tests/unit/geometry/Test.PointCloudConsolidation.cpp, tests/contract/runtime/Test.DensityWeightOperations.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/density_weight_vulkan_2026-09-10/record.json, docs/results/density_weight_verification_2026-09-10.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/RUNTIME-227/commands/actual-vulkan.stdout.log, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/RUNTIME-227/commands/actual-vulkan-corrected.stdout.log, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/RUNTIME-227/commands/full-cpu.stdout.log, tests/unit/geometry/Test.PointCloudKernels.cpp, tests/unit/geometry/Test.PointCloudConsolidation.cpp, tests/contract/runtime/Test.DensityWeightOperations.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp]
 - **Dependencies**: [C87]
 - **Tags**: compact density weights, conservative radius, LBVH, CPU, Vulkan, bounded integration
 - **From staging**: O220
@@ -2132,7 +2137,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Replaying the bound fixtures changes reference positions/contribution counts, accepts malformed rows or stale sources, loses cache/domain/history behavior, or regresses the existing grid cases.
-- **Proof**: [ara/evidence/diagnostics/lop_cpu_lbvh_2026-09-10/record.json, ara/evidence/tables/lop_cpu_lbvh_verification_2026-09-10.md, tests/unit/geometry/Test.PointCloudConsolidation.cpp, tests/contract/runtime/Test.PointCloudConsolidationModule.cpp]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/lop_cpu_lbvh_2026-09-10/record.json, docs/results/lop_cpu_lbvh_verification_2026-09-10.md, tests/unit/geometry/Test.PointCloudConsolidation.cpp, tests/contract/runtime/Test.PointCloudConsolidationModule.cpp]
 - **Dependencies**: [C88]
 - **Tags**: LOP, CPU LBVH, supplied neighborhoods, bounded integration
 - **From staging**: O221
@@ -2143,7 +2148,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Replaying the bound fixture exceeds 1e-6 CPU position error, changes source/query identity or iteration behavior, loses cache/history behavior, publishes failed work, or regresses the existing grid cases.
-- **Proof**: [ara/evidence/diagnostics/lop_vulkan_lbvh_2026-09-10/record.json, ara/evidence/tables/lop_vulkan_lbvh_verification_2026-09-10.md, tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/lop_vulkan_lbvh_2026-09-10/record.json, docs/results/lop_vulkan_lbvh_verification_2026-09-10.md, tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp]
 - **Dependencies**: [C89]
 - **Tags**: LOP, Vulkan LBVH, moving neighborhoods, bounded integration
 - **From staging**: O222
@@ -2154,7 +2159,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Replaying the bound fixtures changes the required candidate membership, exceeds 1e-4 position error, changes graph/surface topology, fails generated-pixel checks, alters source properties, loses guarded history or publishes failed work.
-- **Proof**: [ara/evidence/diagnostics/point_construction_2026-09-10/record.json, ara/evidence/tables/point_construction_verification_2026-09-10.md, tests/unit/geometry/Test.PointConstruction.cpp, tests/contract/runtime/Test.PointConstructionOperations.cpp, tests/integration/graphics/Test.PointConstructionGpuSmoke.cpp]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/point_construction_2026-09-10/record.json, docs/results/point_construction_verification_2026-09-10.md, tests/unit/geometry/Test.PointConstruction.cpp, tests/contract/runtime/Test.PointConstructionOperations.cpp, tests/integration/graphics/Test.PointConstructionGpuSmoke.cpp]
 - **Dependencies**: []
 - **Tags**: Hoppe-style field, kNN graph, CPU LBVH, Vulkan LBVH, generated geometry, bounded integration
 - **From staging**: O223
@@ -2165,18 +2170,18 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Repeated matched clean-commit or approved sealed-source cohorts fail to reduce the declared family-edit build latency, or the compiler boundary permits unrelated numerical adapters to recompile. Timing qualification must preserve the same targets, toolchain and cache conditions.
-- **Proof**: [ara/evidence/diagnostics/runtime233_compile_locality.json, ara/evidence/tables/runtime233_compile_locality.md, tools/analysis/compile_hotspots.py, tests/regression/tooling/Test.CompileHotspots.py, tests/CMakeLists.txt, tasks/done/RUNTIME-233-processing-compilation-locality-pilot.md]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime233_compile_locality.json, docs/results/runtime233_compile_locality.md, tools/analysis/compile_hotspots.py, tests/regression/tooling/Test.CompileHotspots.py, tests/CMakeLists.txt, tasks/done/RUNTIME-233-processing-compilation-locality-pilot.md]
 - **Dependencies**: []
 - **Tags**: compilation, prototype iteration, C++23 modules, local diagnostic, unqualified performance hypothesis
 - **From staging**: O224
 
 - **Follow-up review diagnostic (2026-09-13)**: After removing complete family records from shared private workspace bindings, the same local public-record probe took 61.906 s / 14 compiler invocations. Nine sibling command/workspace producers no longer rebuilt. This additional dirty single sample does not change the hypothesis disposition or qualify a repeatable speedup. See N543 and the existing proof record.
 
-- **Second-family diagnostic (2026-09-13)**: Applying the boundary to weights/keypoints/outliers changed a public density-weight result edit from 351.986 s / 60 compiler invocations to 70.610 s / 16. The density/spacing and shared capture/radius implementations did not rebuild. This remains one dirty sample per variant, not a qualified speedup; production footprint is +30 physical lines across 32 changed files. See N544, [ara/evidence/diagnostics/runtime234_compile_locality.json](../evidence/diagnostics/runtime234_compile_locality.json) and [ara/evidence/tables/runtime234_compile_locality.md](../evidence/tables/runtime234_compile_locality.md). C92 remains a hypothesis.
+- **Second-family diagnostic (2026-09-13)**: Applying the boundary to weights/keypoints/outliers changed a public density-weight result edit from 351.986 s / 60 compiler invocations to 70.610 s / 16. The density/spacing and shared capture/radius implementations did not rebuild. This remains one dirty sample per variant, not a qualified speedup; production footprint is +30 physical lines across 32 changed files. See N544, [ara/evidence/diagnostics/runtime234_compile_locality.json](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/runtime234_compile_locality.json) and [docs/results/runtime234_compile_locality.md](../../docs/results/runtime234_compile_locality.md). C92 remains a hypothesis.
 
-- **Normal-family diagnostic (2026-09-13)**: Isolating the configured normal operation and deleting three obsolete normal APIs changed the matched normal-result edit from 334.094 s / 57 compiler invocations to 59.089 s / 12. The complete changed native production footprint is −2,408 physical lines, including five new owner files. Full CPU, separate sanitizers and 22 affected actual Vulkan cases have zero failures. This remains one dirty sample per variant; original mislabeled manifest/results and metadata-only corrected reseals are both retained, with no extra execution inferred. See N545, [ara/evidence/diagnostics/runtime235_normals_compile_locality.json](../evidence/diagnostics/runtime235_normals_compile_locality.json) and [ara/evidence/tables/runtime235_normals_compile_locality.md](../evidence/tables/runtime235_normals_compile_locality.md). C92 remains a hypothesis; this establishes neither repeatable timing nor whole-engine completion.
+- **Normal-family diagnostic (2026-09-13)**: Isolating the configured normal operation and deleting three obsolete normal APIs changed the matched normal-result edit from 334.094 s / 57 compiler invocations to 59.089 s / 12. The complete changed native production footprint is −2,408 physical lines, including five new owner files. Full CPU, separate sanitizers and 22 affected actual Vulkan cases have zero failures. This remains one dirty sample per variant; original mislabeled manifest/results and metadata-only corrected reseals are both retained, with no extra execution inferred. See N545, [ara/evidence/diagnostics/runtime235_normals_compile_locality.json](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/runtime235_normals_compile_locality.json) and [docs/results/runtime235_normals_compile_locality.md](../../docs/results/runtime235_normals_compile_locality.md). C92 remains a hypothesis; this establishes neither repeatable timing nor whole-engine completion.
 
-- **Remaining mesh-family diagnostic (2026-09-13)**: After Claude's implementation and reviewed reconciliation, the matched curvature-result edit changed 344.537 s / 57 physical compiler invocations to 74.229 s / 16. Complete changed production footprint is −138 physical lines, with net +15 files. This is one dirty sample per variant; other migrated families have compiler-metadata checks but no independent timing. See N546, [ara/evidence/diagnostics/runtime235_remaining_compile_locality.json](../evidence/diagnostics/runtime235_remaining_compile_locality.json) and [ara/evidence/tables/runtime235_remaining_compile_locality.md](../evidence/tables/runtime235_remaining_compile_locality.md). C92 remains a hypothesis; no repeatable or whole-engine performance conclusion follows.
+- **Remaining mesh-family diagnostic (2026-09-13)**: After Claude's implementation and reviewed reconciliation, the matched curvature-result edit changed 344.537 s / 57 physical compiler invocations to 74.229 s / 16. Complete changed production footprint is −138 physical lines, with net +15 files. This is one dirty sample per variant; other migrated families have compiler-metadata checks but no independent timing. See N546, [ara/evidence/diagnostics/runtime235_remaining_compile_locality.json](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/runtime235_remaining_compile_locality.json) and [docs/results/runtime235_remaining_compile_locality.md](../../docs/results/runtime235_remaining_compile_locality.md). C92 remains a hypothesis; no repeatable or whole-engine performance conclusion follows.
 
 ## C93: Full Vulkan keypoint computation executes the bounded reference fixtures
 - **Statement**: The source-bound 2026-09-14 RTX 3050 runs execute spacing, double reduction, centroid covariance/eigenvalue scoring and immutable-score suppression through `vulkan_compute`, with final-result-only readback. The explicit/automatic-radius eight-domain fixtures preserve exact CPU masks and saliency within 1e-5 (observed error 0.0), publication/history and stale/cancelled/overflow guards. Analytic fixtures cover planar zero scores and the reference isotropic floor. The separate 151,486-position dragon diagnostic produces 644 keypoints and exact CPU scores/masks.
@@ -2184,7 +2189,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Replaying the bound fixtures fails actual Vulkan execution, changes required mask membership, exceeds 1e-5 score error, publishes stale/cancelled/overflowing results or loses property/history preservation. The diagnostic timing is not a performance acceptance predicate.
-- **Proof**: [ara/evidence/diagnostics/keypoint_compute_2026-09-14/record.json, ara/evidence/diagnostics/keypoint_compute_2026-09-14/benchmark/runtime-smoke.json, ara/evidence/tables/keypoint_compute_verification_2026-09-14.md, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp, tests/unit/geometry/Test.KeypointAnalysis.cpp, tests/unit/geometry/Test_PcaPrimitives.cpp, tests/contract/runtime/Test.KeypointAnalysisOperations.cpp]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/keypoint_compute_2026-09-14/record.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/keypoint_compute_2026-09-14/benchmark/runtime-smoke.json, docs/results/keypoint_compute_verification_2026-09-14.md, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp, tests/unit/geometry/Test.KeypointAnalysis.cpp, tests/unit/geometry/Test_PcaPrimitives.cpp, tests/contract/runtime/Test.KeypointAnalysisOperations.cpp]
 - **Dependencies**: [A47]
 - **Tags**: centroid PCA, keypoints, Vulkan compute, bounded parity, no performance claim
 - **From staging**: O226
@@ -2195,7 +2200,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: empirical-resolution
 - **Falsification criteria**: Recalculation from the preserved six execution/result records disagrees with the stated medians or counts, or source/toolchain/dependency/target checks reveal unmatched conditions. These recorded observations do not predict a future host's speedup. Original rejected and repaired records must remain distinguishable from new execution.
-- **Proof**: [ara/evidence/tables/build007_overnight_compile_measurement.md, ara/evidence/diagnostics/build007_20260915/evidence-index.json, ara/evidence/diagnostics/build007_20260915/summary.json, ara/evidence/diagnostics/build007_20260915/raw-evidence.tar.gz, benchmarks/ci/manifests/engine_compile_iteration_overnight.yaml, tasks/done/BUILD-007-engine-compile-time-reconciliation.md]
+- **Proof**: [docs/results/build007_overnight_compile_measurement.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/build007_20260915/evidence-index.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/build007_20260915/summary.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/build007_20260915/raw-evidence.tar.gz, benchmarks/ci/manifests/engine_compile_iteration_overnight.yaml, tasks/done/BUILD-007-engine-compile-time-reconciliation.md]
 - **Dependencies**: []
 - **Tags**: compilation, C++23 modules, matched local measurements, CPU build, limited performance observation
 - **From staging**: O227
@@ -2206,7 +2211,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Recalculation from the retained four execution records disagrees with the stated ranges/counts, or source/runner/toolchain/dependency checks reveal unmatched inputs. The excluded incomplete dependency-mutating attempt must remain distinguishable and must not enter this cohort.
-- **Proof**: [ara/evidence/tables/runtime265_service_borrow_compile_measurement.md, ara/evidence/diagnostics/runtime265_20260915/evidence-index.json, ara/evidence/diagnostics/runtime265_20260915/summary.json, ara/evidence/diagnostics/runtime265_20260915/inputs.json, ara/evidence/diagnostics/runtime265_20260915/raw-evidence.tar.gz, benchmarks/ci/manifests/engine_compile_iteration_service_borrows.yaml, tests/CMakeLists.txt]
+- **Proof**: [docs/results/runtime265_service_borrow_compile_measurement.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime265_20260915/evidence-index.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime265_20260915/summary.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime265_20260915/inputs.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime265_20260915/raw-evidence.tar.gz, benchmarks/ci/manifests/engine_compile_iteration_service_borrows.yaml, tests/CMakeLists.txt]
 - **Dependencies**: []
 - **Tags**: compilation, service borrows, C++23 modules, matched local measurements, CPU build, bounded observation
 - **From staging**: O228
@@ -2217,7 +2222,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Recomputing the retained four records disagrees with the stated ranges/counts or removed producer, or exact source/runner/toolchain/dependency checks reveal unmatched conditions. Removed interface dependencies must not be counted as removed clean-build producers.
-- **Proof**: [ara/evidence/tables/graphics138_renderer_compile_measurement.md, ara/evidence/diagnostics/graphics138_20260915/evidence-index.json, ara/evidence/diagnostics/graphics138_20260915/summary.json, ara/evidence/diagnostics/graphics138_20260915/inputs.json, ara/evidence/diagnostics/graphics138_20260915/raw-evidence.tar.gz, benchmarks/ci/manifests/engine_compile_iteration_renderer_surface.yaml, tests/CMakeLists.txt]
+- **Proof**: [docs/results/graphics138_renderer_compile_measurement.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/graphics138_20260915/evidence-index.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/graphics138_20260915/summary.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/graphics138_20260915/inputs.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/graphics138_20260915/raw-evidence.tar.gz, benchmarks/ci/manifests/engine_compile_iteration_renderer_surface.yaml, tests/CMakeLists.txt]
 - **Dependencies**: []
 - **Tags**: compilation, renderer interface, C++23 modules, matched local observations, CPU build
 - **From staging**: O229
@@ -2228,7 +2233,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Recalculation from the retained six exact-source execution records disagrees with stated medians, ranges or counts, or compiler/manifest/dependency fingerprints show unmatched conditions. Fewer rebuilt sources must not be conflated with faster individual compilation or fewer clean-build units.
-- **Proof**: [ara/evidence/tables/build009_current_compile_measurement.md, ara/evidence/diagnostics/build009_compile_followup/evidence-index.json, ara/evidence/diagnostics/build009_compile_followup/summary.json, ara/evidence/diagnostics/build009_compile_followup/raw-evidence.tar.gz, ara/evidence/diagnostics/build009_compile_followup/recomputed-accounting.json, benchmarks/ci/manifests/engine_compile_iteration_followup.yaml]
+- **Proof**: [docs/results/build009_current_compile_measurement.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/build009_compile_followup/evidence-index.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/build009_compile_followup/summary.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/build009_compile_followup/raw-evidence.tar.gz, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/build009_compile_followup/recomputed-accounting.json, benchmarks/ci/manifests/engine_compile_iteration_followup.yaml]
 - **Dependencies**: []
 - **Tags**: compilation, C++23 modules, matched local observations, CPU build, editor, renderer
 - **From staging**: O230
@@ -2239,7 +2244,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Recomputed raw records disagree with the stated ranges/counts/trace totals or source/flag/dependency identities differ. The synthetic control must remain distinguishable from feature-complete source; the overwritten full-BMI backend-only trace must not be used as whole-driver timing.
-- **Proof**: [ara/evidence/tables/runtime266_registry_borrow_measurement.md, ara/evidence/diagnostics/runtime266_registry_borrows/evidence-index.json, ara/evidence/diagnostics/runtime266_registry_borrows/summary.json, ara/evidence/diagnostics/runtime266_registry_borrows/snapshot-trace-summary.json, ara/evidence/diagnostics/runtime266_registry_borrows/snapshot-imports-trace-summary.json, ara/evidence/diagnostics/runtime266_registry_borrows/raw-evidence.tar.gz, benchmarks/ci/manifests/engine_compile_iteration_registry_borrow.yaml]
+- **Proof**: [docs/results/runtime266_registry_borrow_measurement.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime266_registry_borrows/evidence-index.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime266_registry_borrows/summary.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime266_registry_borrows/snapshot-trace-summary.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime266_registry_borrows/snapshot-imports-trace-summary.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime266_registry_borrows/raw-evidence.tar.gz, benchmarks/ci/manifests/engine_compile_iteration_registry_borrow.yaml]
 - **Dependencies**: []
 - **Tags**: compilation, C++23 modules, snapshot serialization, matched local observations, diagnostic control
 - **From staging**: O231
@@ -2250,7 +2255,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Recalculation from the ten retained results disagrees with the stated medians/ranges/bytes, candidate ownership cost is omitted, or source/compiler/flag/dependency checks reveal unmatched inputs or a frozen prerequisite importing the obsolete snapshot. The pre-compiler preflight failure and rejected diagnostic prototypes must remain outside the successful timing population.
-- **Proof**: [ara/evidence/tables/runtime268_snapshot_std_measurement.md, ara/evidence/diagnostics/runtime268_snapshot_std/summary.json, ara/evidence/diagnostics/runtime268_snapshot_std/evidence-index.json, ara/evidence/diagnostics/runtime268_snapshot_std/raw-evidence.tar.gz, ara/evidence/diagnostics/runtime268_snapshot_std/verification.json, benchmarks/ci/manifests/workspace_snapshot_std.yaml, tasks/done/RUNTIME-268-workspace-snapshot-bmi-serialization.md]
+- **Proof**: [docs/results/runtime268_snapshot_std_measurement.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime268_snapshot_std/summary.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime268_snapshot_std/evidence-index.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime268_snapshot_std/raw-evidence.tar.gz, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime268_snapshot_std/verification.json, benchmarks/ci/manifests/workspace_snapshot_std.yaml, tasks/done/RUNTIME-268-workspace-snapshot-bmi-serialization.md]
 - **Dependencies**: []
 - **Tags**: compilation, C++23 modules, snapshot serialization, matched local observations, added owner charged
 - **From staging**: O232
@@ -2261,7 +2266,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Recalculation of retained samples disagrees with the medians/counts, added owner cost is omitted, source/compiler/flag/dependency identities are unmatched, or a focused replay prerequisite imports an obsolete owner or consumer. Single traces, separate BMI artifacts and controlled-owner flags must remain distinguishable from the complete graphics-target cohort.
-- **Proof**: [ara/evidence/tables/graphics144_shared_std_measurement.md, ara/evidence/diagnostics/graphics144_shared_std/summary.json, ara/evidence/diagnostics/graphics144_shared_std/evidence-index.json, ara/evidence/diagnostics/graphics144_shared_std/verification.json, ara/evidence/diagnostics/graphics144_shared_std/raw-evidence.tar.gz, benchmarks/ci/manifests/graphics_standard_declarations.yaml, benchmarks/ci/manifests/snapshot_shared_std.yaml, tasks/done/GRAPHICS-144-renderer-consumer-locality.md]
+- **Proof**: [docs/results/graphics144_shared_std_measurement.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/graphics144_shared_std/summary.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/graphics144_shared_std/evidence-index.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/graphics144_shared_std/verification.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/graphics144_shared_std/raw-evidence.tar.gz, benchmarks/ci/manifests/graphics_standard_declarations.yaml, benchmarks/ci/manifests/snapshot_shared_std.yaml, tasks/done/GRAPHICS-144-renderer-consumer-locality.md]
 - **Dependencies**: []
 - **Tags**: compilation, C++23 modules, renderer serialization, shared standard declarations, local matched observations
 - **From staging**: O233
@@ -2272,7 +2277,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Recalculation from the ten retained records disagrees with the medians, ranges or counts; exact source/command/prerequisite/dependency checks reveal unmatched inputs; or target walls omit actual compilation/linking. Untimed setup and single diagnostic controls must remain outside the matched cohort, and previous GRAPHICS-144 gains must not be counted again.
-- **Proof**: [ara/evidence/tables/graphics145_renderer_frontend_measurement.md, ara/evidence/diagnostics/graphics145_renderer_frontend/summary.json, ara/evidence/diagnostics/graphics145_renderer_frontend/evidence-index.json, ara/evidence/diagnostics/graphics145_renderer_frontend/verification.json, ara/evidence/diagnostics/graphics145_renderer_frontend/raw-evidence.tar.gz, benchmarks/ci/manifests/renderer_frontend.yaml, tasks/done/GRAPHICS-145-renderer-implementation-frontend-cost.md]
+- **Proof**: [docs/results/graphics145_renderer_frontend_measurement.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/graphics145_renderer_frontend/summary.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/graphics145_renderer_frontend/evidence-index.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/graphics145_renderer_frontend/verification.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/graphics145_renderer_frontend/raw-evidence.tar.gz, benchmarks/ci/manifests/renderer_frontend.yaml, tasks/done/GRAPHICS-145-renderer-implementation-frontend-cost.md]
 - **Dependencies**: []
 - **Tags**: compilation, C++23 modules, renderer frontend, standard-library reuse, local matched observations
 - **From staging**: O234
@@ -2283,7 +2288,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Recalculation disagrees with medians/counts, receiving-helper compile cost is omitted, source/command/package identities do not match, setup compilations leak into timed windows, or missing consumers change functionality. Both rejected attempts must remain separate from all six retained corrected samples. Prior runtime-only targets cannot be combined.
-- **Proof**: [ara/evidence/tables/runtime267_processing_config_measurement.md, ara/evidence/diagnostics/runtime267_processing_config/summary.json, ara/evidence/diagnostics/runtime267_processing_config/verification.json, ara/evidence/diagnostics/runtime267_processing_config/evidence-index.json, ara/evidence/diagnostics/runtime267_processing_config/raw-evidence.tar.gz, benchmarks/ci/manifests/processing_config_editor.yaml, tasks/done/RUNTIME-267-processing-config-consumer-locality.md]
+- **Proof**: [docs/results/runtime267_processing_config_measurement.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime267_processing_config/summary.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime267_processing_config/verification.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime267_processing_config/evidence-index.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime267_processing_config/raw-evidence.tar.gz, benchmarks/ci/manifests/processing_config_editor.yaml, tasks/done/RUNTIME-267-processing-config-consumer-locality.md]
 - **Dependencies**: []
 - **Tags**: compilation, C++23 modules, editor dependencies, prepared-frame lifetime, local matched observations
 - **From staging**: O235
@@ -2294,7 +2299,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Recomputed retained samples disagree with the medians/counts, source/compiler/dependency identities differ, or the new shared fixture implementation cost is omitted. Single-file target walls include relinking and must not be reported as compiler-only durations.
-- **Proof**: [ara/evidence/tables/runtime270_recent_locality_measurement.md, ara/evidence/diagnostics/runtime270_recent_locality/summary.json, ara/evidence/diagnostics/runtime270_recent_locality/evidence-index.json, ara/evidence/diagnostics/runtime270_recent_locality/raw-evidence.tar.gz, benchmarks/ci/manifests/engine_compile_iteration_recent_locality.yaml]
+- **Proof**: [docs/results/runtime270_recent_locality_measurement.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime270_recent_locality/summary.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime270_recent_locality/evidence-index.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime270_recent_locality/raw-evidence.tar.gz, benchmarks/ci/manifests/engine_compile_iteration_recent_locality.yaml]
 - **Dependencies**: []
 - **Tags**: compilation, local matched observations, shared fixtures, mesh-field helpers
 - **From staging**: O236
@@ -2305,7 +2310,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Recalculation disagrees with retained medians or source sets; source, compiler, cache, parallelism or package controls differ; shared-owner costs are omitted; or source changes invalidate the behavior checks. Target wall times include scanning/linking and are not compiler-only durations.
-- **Proof**: [ara/evidence/tables/runtime270_fixture_batch_measurement.md, ara/evidence/diagnostics/runtime270_fixture_batch/summary.json, ara/evidence/diagnostics/runtime270_fixture_batch/verification.json, ara/evidence/diagnostics/runtime270_fixture_batch/evidence-index.json, ara/evidence/diagnostics/runtime270_fixture_batch/raw-evidence.tar.gz, benchmarks/ci/manifests/engine_compile_iteration_fixture_batch.yaml]
+- **Proof**: [docs/results/runtime270_fixture_batch_measurement.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime270_fixture_batch/summary.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime270_fixture_batch/verification.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime270_fixture_batch/evidence-index.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime270_fixture_batch/raw-evidence.tar.gz, benchmarks/ci/manifests/engine_compile_iteration_fixture_batch.yaml]
 - **Dependencies**: []
 - **Tags**: compilation, local matched observations, shared test fixtures, header invalidation
 - **From staging**: O237
@@ -2316,7 +2321,7 @@
 - **Provenance**: ai-suggested
 - **Crystallized via**: topic-abandonment
 - **Falsification criteria**: Fresh traces show insufficient removable work or the pilot shows no useful consumer reduction; otherwise require matched target rebuilds improving at least 5% and 0.5 seconds with clean cost regressing at most 2%, including the shared owner. The first gate rejected this candidate; later gates were not run.
-- **Proof**: [ara/evidence/diagnostics/mock_lifetime_rejected/README.md, ara/evidence/diagnostics/mock_lifetime_rejected/summary.json, ara/evidence/diagnostics/mock_lifetime_rejected/evidence-index.json, ara/evidence/diagnostics/mock_lifetime_rejected/raw-evidence.tar.gz]
+- **Proof**: [docs/lessons/engineering.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/mock_lifetime_rejected/README.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/mock_lifetime_rejected/summary.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/mock_lifetime_rejected/evidence-index.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/mock_lifetime_rejected/raw-evidence.tar.gz]
 - **Dependencies**: []
 - **Tags**: compilation, rejected hypothesis, diagnostic-only, shared test mocks
 - **From staging**: O238
@@ -2327,7 +2332,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: empirical-resolution
 - **Falsification criteria**: Recomputed raw medians/ranges/counts disagree, source/config/command/package identities are unmatched, relinking or receiving-owner cost is omitted, or final source differs from the verified implementation. The frozen consumer gate requires at least 3% and 0.5 seconds with non-overlapping ranges and at most 2% clean regression.
-- **Proof**: [ara/evidence/tables/build010_canonical_property_measurement.md, ara/evidence/diagnostics/build010_canonical_properties/summary.json, ara/evidence/diagnostics/build010_canonical_properties/protocol.json, ara/evidence/diagnostics/build010_canonical_properties/source-identity.json, ara/evidence/diagnostics/build010_canonical_properties/evidence-index.json, ara/evidence/diagnostics/build010_canonical_properties/raw-evidence.tar.gz, benchmarks/ci/manifests/engine_compile_iteration_canonical_properties.yaml, tasks/done/BUILD-010-canonical-property-instantiation.md]
+- **Proof**: [docs/results/build010_canonical_property_measurement.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/build010_canonical_properties/summary.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/build010_canonical_properties/protocol.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/build010_canonical_properties/source-identity.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/build010_canonical_properties/evidence-index.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/build010_canonical_properties/raw-evidence.tar.gz, benchmarks/ci/manifests/engine_compile_iteration_canonical_properties.yaml, tasks/done/BUILD-010-canonical-property-instantiation.md]
 - **Dependencies**: []
 - **Tags**: compilation, named modules, canonical property storage, local matched observations
 - **From staging**: O239
@@ -2338,7 +2343,7 @@
 - **Provenance**: ai-suggested
 - **Crystallized via**: topic-abandonment
 - **Falsification criteria**: Candidate consumer still instantiates assure and allocate_shared/storage construction after the extern declaration. Both tested variants do; no target-speed claim follows from diagnostic durations.
-- **Proof**: [ara/evidence/diagnostics/entt_storage_rejected/README.md, ara/evidence/diagnostics/entt_storage_rejected/summary.json, ara/evidence/diagnostics/entt_storage_rejected/evidence-index.json, ara/evidence/diagnostics/entt_storage_rejected/raw-evidence.tar.gz]
+- **Proof**: [docs/lessons/engineering.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/entt_storage_rejected/README.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/entt_storage_rejected/summary.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/entt_storage_rejected/evidence-index.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/entt_storage_rejected/raw-evidence.tar.gz]
 - **Dependencies**: []
 - **Tags**: compilation, rejected hypothesis, diagnostic-only, EnTT
 - **From staging**: O240
@@ -2349,7 +2354,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Recalculation disagrees with retained raw samples or gate predicates, source/toolchain/dependency/cache/job/path identities differ, or shared-owner/archive/link costs were omitted. Compiler-duration sums must not be described as CPU time or end-to-end target wall time.
-- **Proof**: [ara/evidence/diagnostics/build011_point_config_codecs/summary.json, ara/evidence/diagnostics/build011_point_config_codecs/evidence-index.json, ara/evidence/diagnostics/build011_point_config_codecs/raw-evidence.tar.gz, ara/evidence/diagnostics/build011_point_config_codecs/claude-results-final.txt, benchmarks/ci/manifests/engine_compile_iteration_point_config_codecs.yaml]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/build011_point_config_codecs/summary.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/build011_point_config_codecs/evidence-index.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/build011_point_config_codecs/raw-evidence.tar.gz, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/build011_point_config_codecs/claude-results-final.txt, benchmarks/ci/manifests/engine_compile_iteration_point_config_codecs.yaml]
 - **Dependencies**: []
 - **Tags**: compilation, JSON codecs, local matched observations, edit regression
 - **From staging**: O241
@@ -2361,7 +2366,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: empirical-resolution
 - **Falsification criteria**: Retained outputs fail coverage, positive area, bounds, region preservation or independent metric thresholds; actual runner identity differs from requests; hashes/source binding differ; or recomputed reported maxima disagree. Python accepts maxima at most the configured limit times (1+1e-6), not native/Python agreement within that tolerance.
-- **Proof**: [ara/evidence/diagnostics/method047_property_atlas/report.md, ara/evidence/diagnostics/method047_property_atlas/final-corpus-summary.json, ara/evidence/diagnostics/method047_property_atlas/final-child-audit.json, ara/evidence/diagnostics/method047_property_atlas/backend-audit.json, ara/evidence/diagnostics/method047_property_atlas/final-numerical-runs.tar.gz, ara/evidence/diagnostics/method047_property_atlas/source-provenance.json, ara/evidence/diagnostics/method047_property_atlas/post-corpus-source-binding.json, ara/evidence/diagnostics/method047_property_atlas/claude-results-audit.md, ara/evidence/diagnostics/method047_property_atlas/review-resolution.md]
+- **Proof**: [docs/methods/property_guided_atlas.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method047_property_atlas/report.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method047_property_atlas/final-corpus-summary.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method047_property_atlas/final-child-audit.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method047_property_atlas/backend-audit.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method047_property_atlas/final-numerical-runs.tar.gz, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method047_property_atlas/source-provenance.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method047_property_atlas/post-corpus-source-binding.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method047_property_atlas/claude-results-audit.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method047_property_atlas/review-resolution.md]
 - **Dependencies**: []
 - **Tags**: UV atlas, property guidance, independent Jacobians, finite corpus, CPU reference
 - **From staging**: O244
@@ -2372,7 +2377,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Named Vulkan cases skip/fall back, fail operational checks or readbacks, the real workspace does not claim the split scene rectangle, raw data is confused with coverage/alpha, or final source differs from the tested artifacts. Float bake comparisons use 1e-4 and encoded 8-bit comparisons at most one quantization step.
-- **Proof**: [ara/evidence/diagnostics/method047_property_atlas/verification.json, ara/evidence/diagnostics/method047_property_atlas/verification-runs.tar.gz, ara/evidence/diagnostics/method047_property_atlas/environment.json, ara/evidence/diagnostics/method047_property_atlas/atlas-workspace.png, ara/evidence/diagnostics/method047_property_atlas/post-corpus-source-binding.json, tests/integration/graphics/Test.PropertyTextureBakeGpuSmoke.cpp, tests/integration/graphics/Test.UvViewGpuSmoke.cpp, tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method047_property_atlas/verification.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method047_property_atlas/verification-runs.tar.gz, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method047_property_atlas/environment.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method047_property_atlas/atlas-workspace.png, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method047_property_atlas/post-corpus-source-binding.json, tests/integration/graphics/Test.PropertyTextureBakeGpuSmoke.cpp, tests/integration/graphics/Test.UvViewGpuSmoke.cpp, tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp]
 - **Dependencies**: [C109]
 - **Tags**: Vulkan, Operational, property baking, raw values, UV workspace, bounded pixel readback
 - **From staging**: O245
@@ -2383,7 +2388,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Any GEOM081Vulkan case skips, falls back, times out, reports a backend other than `vulkan_compute`, exceeds `1e-12 * max(1, max |input|)` absolute difference, or publishes after a stale input; or the source differs from the tested revision.
-- **Proof**: [ara/evidence/diagnostics/geom081_vulkan_property_filters_20260926/record.json, ara/evidence/diagnostics/geom081_vulkan_property_filters_20260926/sealed-result.json, tests/integration/graphics/Test.PropertySmoothingGpuSmoke.cpp, assets/shaders/property_filter.comp, src/graphics/renderer/Graphics.PropertyFilter.cpp]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/geom081_vulkan_property_filters_20260926/record.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/geom081_vulkan_property_filters_20260926/sealed-result.json, tests/integration/graphics/Test.PropertySmoothingGpuSmoke.cpp, assets/shaders/property_filter.comp, src/graphics/renderer/Graphics.PropertyFilter.cpp]
 - **Dependencies**: []
 - **Tags**: Vulkan, Operational, property smoothing, CPU-reference parity, double precision
 - **From staging**: O251
@@ -2394,7 +2399,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: A RUNTIME269Vulkan or GEOM089Vulkan case skips, falls back, times out, loses the device, reports a status or iteration count different from the CPU oracle (gap above 2), exceeds 1e-6 relative solution difference on the well-conditioned systems or 1e-9 on implicit smoothing, or publishes after non-convergence or stale input.
-- **Proof**: [ara/evidence/diagnostics/runtime269_vulkan_sparse_cg_20260927/record.json, ara/evidence/diagnostics/runtime269_vulkan_sparse_cg_20260927/sealed-result.json, tests/integration/graphics/Test.SparseSolveGpuSmoke.cpp, tests/integration/graphics/Test.PropertySmoothingGpuSmoke.cpp, assets/shaders/sparse_cg.comp, src/graphics/renderer/Graphics.SparseConjugateGradient.cpp]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime269_vulkan_sparse_cg_20260927/record.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/runtime269_vulkan_sparse_cg_20260927/sealed-result.json, tests/integration/graphics/Test.SparseSolveGpuSmoke.cpp, tests/integration/graphics/Test.PropertySmoothingGpuSmoke.cpp, assets/shaders/sparse_cg.comp, src/graphics/renderer/Graphics.SparseConjugateGradient.cpp]
 - **Dependencies**: [C111]
 - **Tags**: Vulkan, Operational, conjugate gradient, implicit smoothing, CPU-reference parity, double precision
 - **From staging**: O252
@@ -2405,7 +2410,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: A rerun of `IntrinsicCoherentPointDriftScaling` at the recorded revision on the recorded host shows median auto/reference below 10x at 10^4 points or auto/dense below 1.5x at 10^5, a rigid parity delta above 1e-4 at the sizes where it is measured, a reported truncation bound above tol or fast-Gauss bound above 2 tol, or thread-count-dependent results in `Test.CoherentPointDriftAccelerated.cpp`.
-- **Proof**: [ara/evidence/diagnostics/method049_cpd_accelerated_20260928/record.json, ara/evidence/diagnostics/method049_cpd_accelerated_20260928/sealed-result.json, ara/evidence/diagnostics/method049_cpd_accelerated_20260928/run-progress.log, benchmarks/geometry/manifests/coherent_point_drift_accelerated.yaml, tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp, src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cpp]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method049_cpd_accelerated_20260928/record.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method049_cpd_accelerated_20260928/sealed-result.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method049_cpd_accelerated_20260928/run-progress.log, benchmarks/geometry/manifests/coherent_point_drift_accelerated.yaml, tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp, src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cpp]
 - **Dependencies**: []
 - **Tags**: registration, Coherent Point Drift, CPU optimized, bounded approximation, performance
 - **From staging**: O253
@@ -2416,7 +2421,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: empirical-resolution
 - **Falsification criteria**: `Test.CoherentPointDriftBayesian.cpp` fails (its `MatchesAnIndependentImplementationOfAlgorithmOne` case replays the recorded NumPy traces), or an independent implementation of Algorithm 1 with the variance terms converges to the true scale on the documented bend fixture.
-- **Proof**: [tests/unit/geometry/Test.CoherentPointDriftBayesian.cpp, ara/evidence/diagnostics/method050_bcpd_numpy_20260928/record.json, ara/evidence/diagnostics/method050_bcpd_numpy_20260928/bcpd_reference.py, ara/evidence/diagnostics/method050_bcpd_numpy_20260928/trace-variance-terms-0.txt, ara/evidence/diagnostics/method050_bcpd_numpy_20260928/trace-variance-terms-1.txt, tests/data/cpd/bcpd_bend_source.txt, tests/data/cpd/bcpd_bend_target.txt, methods/geometry/coherent_point_drift/paper.md, src/geometry/Geometry.Registration.CoherentPointDrift.cpp]
+- **Proof**: [tests/unit/geometry/Test.CoherentPointDriftBayesian.cpp, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method050_bcpd_numpy_20260928/record.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method050_bcpd_numpy_20260928/bcpd_reference.py, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method050_bcpd_numpy_20260928/trace-variance-terms-0.txt, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method050_bcpd_numpy_20260928/trace-variance-terms-1.txt, tests/data/cpd/bcpd_bend_source.txt, tests/data/cpd/bcpd_bend_target.txt, methods/geometry/coherent_point_drift/paper.md, src/geometry/Geometry.Registration.CoherentPointDrift.cpp]
 - **Dependencies**: []
 - **Tags**: registration, Bayesian CPD, variational Bayes, CPU reference
 - **From staging**: O254
@@ -2427,7 +2432,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: A rerun of `IntrinsicCoherentPointDriftScaling` at the recorded revision on the recorded host shows Nystroem/Auto above 0.8 for rigid or above 0.4 for nonrigid low rank at 10^5 points, a registered-point delta above 1e-4 against the exact run, or thread-count-dependent results in `Test.CoherentPointDriftAccelerated.cpp`.
-- **Proof**: [ara/evidence/diagnostics/method053_cpd_nystrom_20260928/record.json, ara/evidence/diagnostics/method053_cpd_nystrom_20260928/sealed-result.json, ara/evidence/diagnostics/method053_cpd_nystrom_20260928/run-progress.log, ara/evidence/diagnostics/method053_cpd_nystrom_20260928/single-run-trace.log.gz, tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp, src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cpp]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method053_cpd_nystrom_20260928/record.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method053_cpd_nystrom_20260928/sealed-result.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method053_cpd_nystrom_20260928/run-progress.log, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method053_cpd_nystrom_20260928/single-run-trace.log.gz, tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp, src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cpp]
 - **Dependencies**: [C113]
 - **Tags**: registration, Coherent Point Drift, Nystroem, approximate E-step, performance
 - **From staging**: O255
@@ -2438,7 +2443,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: A rerun of `IntrinsicPointSamplingComparison` at the recorded revision on the recorded host reports a guarantee violation (quality_error_l2 > 0), exact farthest point slower than 50 ms for 4096 of 20000 points, or another method with a coverage radius more than 1% below exact farthest point at any measured prefix; or `Test.PointSampling.cpp` finds the sieve order differing from the brute-force scan.
-- **Proof**: [ara/evidence/diagnostics/geom113_point_sampling_comparison_20260928/record.json, ara/evidence/diagnostics/geom113_point_sampling_comparison_20260928/sealed-result.json, ara/evidence/diagnostics/geom113_point_sampling_comparison_20260928/run-progress.log, tests/unit/geometry/Test.PointSampling.cpp, src/geometry/Geometry.PointSampling.cpp, src/geometry/Geometry.PointSampling.Approximate.cpp]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/geom113_point_sampling_comparison_20260928/record.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/geom113_point_sampling_comparison_20260928/sealed-result.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/geom113_point_sampling_comparison_20260928/run-progress.log, tests/unit/geometry/Test.PointSampling.cpp, src/geometry/Geometry.PointSampling.cpp, src/geometry/Geometry.PointSampling.Approximate.cpp]
 - **Dependencies**: []
 - **Tags**: point sampling, farthest point, Poisson disk, sample elimination, CPU reference
 - **From staging**: O256
@@ -2449,7 +2454,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: A rerun of `METHOD056VulkanCpdEStep.ScalingProfile` at the recorded revision on the recorded host shows Vulkan/CPU-twin above 0.2 at 10^5 points or a registered-point delta above 1e-4; or `METHOD056VulkanCpdEStep.DenseStatisticsAndRegistrationMatchTheCpu` finds a denominator, Pt1, P1 or PX error above 1e-5 relative or two device runs differing; or a device-evaluated row shows a relative denominator error above its 2e-5 estimate.
-- **Proof**: [ara/evidence/diagnostics/graphics150_low_latency_compute_20260929/record.json, ara/evidence/diagnostics/graphics150_low_latency_compute_20260929/sealed-result.json, ara/evidence/diagnostics/graphics150_low_latency_compute_20260929/run-progress.log, tests/integration/graphics/Test.LowLatencyComputeSmoke.cpp, ara/evidence/diagnostics/method063_cpd_vulkan_per_row_20260929/record.json, ara/evidence/diagnostics/method063_cpd_vulkan_per_row_20260929/sealed-result.json, ara/evidence/diagnostics/method063_cpd_vulkan_per_row_20260929/run-progress.log, ara/evidence/diagnostics/method056_cpd_vulkan_e_step_review_20260929/record.json, ara/evidence/diagnostics/method056_cpd_vulkan_e_step_20260929/record.json, tests/integration/graphics/Test.CoherentPointDriftGpuEStepSmoke.cpp, tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp, assets/shaders/cpd_estep_target_pass.comp, assets/shaders/cpd_estep_source_pass.comp]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/graphics150_low_latency_compute_20260929/record.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/graphics150_low_latency_compute_20260929/sealed-result.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/graphics150_low_latency_compute_20260929/run-progress.log, tests/integration/graphics/Test.LowLatencyComputeSmoke.cpp, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method063_cpd_vulkan_per_row_20260929/record.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method063_cpd_vulkan_per_row_20260929/sealed-result.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method063_cpd_vulkan_per_row_20260929/run-progress.log, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method056_cpd_vulkan_e_step_review_20260929/record.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method056_cpd_vulkan_e_step_20260929/record.json, tests/integration/graphics/Test.CoherentPointDriftGpuEStepSmoke.cpp, tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp, assets/shaders/cpd_estep_target_pass.comp, assets/shaders/cpd_estep_source_pass.comp]
 - **Dependencies**: [C113, C115]
 - **Tags**: registration, Coherent Point Drift, Vulkan, GPU E-step, performance
 - **From staging**: O257
@@ -2472,7 +2477,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: The bound raw traces show an additional accepted candidate iteration, recomputed complete position buffers differ within a variant, or the frozen acceptance rule passes on these eleven recorded cells.
-- **Proof**: [tasks/evidence/METHOD-078/audit-record.json, tasks/evidence/METHOD-078/raw-sha256.txt, tasks/evidence/METHOD-078/runs/report.html, tasks/evidence/METHOD-078/preflight/pilot/manifest.txt, tasks/evidence/METHOD-078/reviews/approvals.json]
+- **Proof**: [docs/lessons/registration-and-atlas.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-078/audit-record.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-078/raw-sha256.txt, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-078/runs/report.html, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-078/preflight/pilot/manifest.txt, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-078/reviews/approvals.json]
 - **Dependencies**: []
 - **Tags**: Bayesian CPD, Nyström, CPU, bounded pilot, rejected optimization
 - **From staging**: O263
@@ -2483,7 +2488,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Independent recomputation from the bound snapshots changes the exact sign or scale, any frozen evaluation becomes nonnegative, repeats differ, or retained masks/zero counts contradict the recorded observations.
-- **Proof**: [tasks/evidence/METHOD-079/audit-record.json, tasks/evidence/METHOD-079/raw-sha256.txt, tasks/evidence/METHOD-079/runs/report.html, tasks/evidence/METHOD-079/preflight/pilot/manifest.txt, tasks/evidence/METHOD-079/reviews/approvals.json]
+- **Proof**: [docs/lessons/registration-and-atlas.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-079/audit-record.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-079/raw-sha256.txt, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-079/runs/report.html, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-079/preflight/pilot/manifest.txt, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-079/reviews/approvals.json]
 - **Dependencies**: []
 - **Tags**: Bayesian CPD, Nyström, CPU, first-row diagnosis, signed affinity approximation
 - **From staging**: O265
@@ -2494,7 +2499,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Independent decoding changes invalid counts, IDs or labels; any exact invalid-row sum is nonpositive; geometry or posterior masses contradict the bound operands; repeated buffers differ or a target-pass attempt lacks a complete visit buffer.
-- **Proof**: [tasks/evidence/METHOD-080/audit-record.json, tasks/evidence/METHOD-080/raw-sha256.txt, tasks/evidence/METHOD-080/runs/report.html, tasks/evidence/METHOD-080/reviews/results-review.txt, tasks/evidence/METHOD-080/packet.md, tasks/evidence/METHOD-080/reviews/approval.json]
+- **Proof**: [docs/lessons/registration-and-atlas.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-080/audit-record.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-080/raw-sha256.txt, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-080/runs/report.html, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-080/reviews/results-review.txt, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-080/packet.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-080/reviews/approval.json]
 - **Dependencies**: []
 - **Tags**: Bayesian CPD, Nyström, CPU, complete invalid-row census, signed affinity approximation
 - **From staging**: O266
@@ -2505,7 +2510,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Independent raw recomputation changes accepted counts or endpoint distances, any frozen outcome/accuracy/repeat gate fails, or binary/source/command bindings differ from the approved packet.
-- **Proof**: [tasks/evidence/METHOD-081/runs/summary.json, tasks/evidence/METHOD-081/runs/report.html, tasks/evidence/METHOD-081/preflight/manifest.txt, tasks/evidence/METHOD-081/reviews/approval.json, tasks/evidence/METHOD-081/reviews/execution-binding.json]
+- **Proof**: [docs/lessons/registration-and-atlas.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-081/runs/summary.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-081/runs/report.html, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-081/preflight/manifest.txt, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-081/reviews/approval.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-081/reviews/execution-binding.json]
 - **Dependencies**: []
 - **Tags**: Bayesian CPD, Nyström, CPU, exact row repair, bounded retest, Auto comparison
 - **From staging**: O269
@@ -2516,7 +2521,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Independent recomputation from the bound raw endpoints removes the four threshold violations, or the evidence fails its frozen source/configuration or raw-file binding.
-- **Proof**: [tasks/evidence/METHOD-082/runs/summary.json, tasks/evidence/METHOD-082/preflight/manifest.txt, tasks/evidence/METHOD-082/reviews/raw-sha256.txt, tasks/evidence/METHOD-082/reviews/execution-binding.json, tasks/evidence/METHOD-082/reviews/final-raw-results-audit.txt]
+- **Proof**: [docs/lessons/registration-and-atlas.md, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-082/runs/summary.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-082/preflight/manifest.txt, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-082/reviews/raw-sha256.txt, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-082/reviews/execution-binding.json, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-082/reviews/final-raw-results-audit.txt]
 - **Dependencies**: []
 - **Tags**: Bayesian CPD, Nyström, CPU, exact row repair, convergence, negative result
 - **From staging**: O270
@@ -2527,7 +2532,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Bound raw-input/endpoint recomputation makes every completed partial cell satisfy the frozen truth-improvement criterion, or invalidates the retained metric/configuration bindings.
-- **Proof**: [tasks/evidence/METHOD-082/runs/summary.json, tasks/evidence/METHOD-082/fixtures, tasks/evidence/METHOD-082/reviews/final-raw-results-audit.txt, tasks/evidence/METHOD-082/reviews/execution-binding.json]
+- **Proof**: [36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-082/runs/summary.json, tasks/evidence/METHOD-082/fixtures, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-082/reviews/final-raw-results-audit.txt, 36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/METHOD-082/reviews/execution-binding.json]
 - **Dependencies**: []
 - **Tags**: Bayesian CPD, CPU, partial overlap, ground truth, negative result
 - **From staging**: O271

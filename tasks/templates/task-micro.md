@@ -35,5 +35,7 @@ contract declarations, method integration fields, and research-claim evidence
 still apply when relevant; add a maturity stop-state when ambiguous.
 Unattended non-mechanical work uses the full template and its evidence profile;
 publication custody is opt-in. Retirement rules are unchanged: checkboxes
-closed, completion date, commit/PR reference, retirement-log entry.
+closed, completion date, commit/PR reference, retirement-log entry. Extract
+useful lessons/results into maintained docs/tests, then remove temporary
+evidence after checking live consumers (docs/agent/task-format.md).
 -->

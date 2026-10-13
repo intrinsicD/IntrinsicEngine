@@ -41,7 +41,7 @@ python3 tests/regression/tooling/Test.WorkflowRouting.py
 python3 tests/regression/tooling/Test.WorkflowConcurrency.py
 ```
 
-The original [CI failure](../evidence/BUG-211/ci-pr-fast-failure.log) is retained.
+The original [CI failure](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-211/ci-pr-fast-failure.log) is retained.
 Local verification uses the installed Vulkan SDK compiler; the clean GitHub
 runner verifies Ubuntu package provisioning after the repair is pushed.
 
@@ -53,7 +53,7 @@ the enclosing CI prerequisite and scheduling repair commit.
 
 The ci-fast shader producer built all 114 shader outputs; all three existing modified entry points passed explicit output checks. Touched-scope (37), prerequisite (7), routing (11) and concurrency (20, retained under BUG-212) regressions passed. Actual Claude Opus 5.5 reviewed the package repair and corrected local proof. Clean-runner package provisioning remains for the pushed remote CI run.
 
-[Shader output check](../evidence/BUG-211/shader-outputs.log),
-[final Claude review](../evidence/BUG-212/claude-ci-final-review.md), and
-[concurrency regression](../evidence/BUG-212/workflow-concurrency-after.log)
+[Shader output check](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-211/shader-outputs.log),
+[final Claude review](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-212/claude-ci-final-review.md), and
+[concurrency regression](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-212/workflow-concurrency-after.log)
 retain the results.

@@ -279,39 +279,58 @@ deferred to a named task.
 
 ## Retiring a task
 
-When a task completes:
+Temporary evidence is collected while work is open, inspected during review,
+and removed when the task completes. New files in `tasks/evidence/<TASK-ID>/`
+are Git-ignored. Do not force-add raw outputs, command logs, packets or review
+transcripts. Legacy tracked evidence stays unchanged while its owner is open.
+Standalone diagnostics follow the same lifecycle in `ara/evidence/diagnostics/`.
+Before removing a worktree, inspect and preserve open-task ignored evidence;
+Git history and worktree snapshots do not guarantee recovery of ignored files.
 
-1. Mark all checkbox todos `- [x]` (unresolved work moves to a follow-up
-   task) and add a completion note with the date (`YYYY-MM-DD`) and a
-   commit/PR reference.
-2. `git mv` the file to `tasks/done/`. Remove it from open-member lists,
-   update its category README, append a short narrative (what landed,
-   maturity, what remains owned elsewhere) to the top of
-   [`tasks/done/RETIREMENT-LOG.md`](../../tasks/done/RETIREMENT-LOG.md), and
-   regenerate `tasks/SESSION-BRIEF.md`. Do **not** leave a done-task link in
-   `tasks/active/README.md` or an open backlog section.
-3. For enrolled non-micro work, generate the final
-   `tasks/evidence/<TASK-ID>/report.yaml` after the retirement surface is
-   stable. `high-risk` and higher profiles also require the final handoff and
-   accepted independent review bound to that exact content digest. Run:
+Before retiring a task:
+
+1. Prepare the durable record while raw evidence is still available. Extract
+   regression safeguards into tests, design rationale into owning docs, reusable
+   lessons into `docs/lessons/`, and experiment conclusions into the owning
+   method/result note or ARA claim. Preserve negative results, limitations,
+   source revision, important measurements and available reproduction recipes.
+   A summary is not raw proof or a rerun.
+2. Search all live consumers, including scripts inside active evidence trees
+   and paths constructed from task IDs. Promote reusable code, required fixtures
+   and benchmark baselines into their normal maintained homes. A frozen open
+   task's inputs cannot move: preserve their exact paths/bytes until its last
+   consumer completes and name that consumer in the cleanup record. Backlog,
+   unknown ownership and unrelated untracked user files are not deletion targets.
+   Prepare the exact deletion list, repair current links and ARA `Proof`, and
+   identify retired raw evidence in current summaries. Historical links may use
+   verified exact Git objects; frozen task text remains otherwise unchanged.
+3. Run required checks and obtain independent review of the final implementation,
+   durable summaries, reference repairs and proposed deletions **against the raw
+   evidence before it is removed**. Resolve acceptance checkboxes from the
+   reviewer's decisions, move unresolved work to follow-ups, and add completion
+   date and commit/PR reference. For enrolled non-micro work, generate the report
+   after this open-task surface is stable, obtain the profile's digest-bound
+   handoff/review, and run:
 
    ```bash
-   python3 tools/agents/workflow_evidence.py validate \
-     --root . --require-complete <TASK-ID>
+   python3 tools/agents/workflow_evidence.py validate --root . --require-complete <TASK-ID>
    ```
 
-   If review requests a revision, change the source, regenerate the report,
-   append a new handoff/review round, and validate again.
-
-   If the final completed report records `source.dirty: true`, commit the
-   retirement surface and evidence first, run `workflow_evidence.py
-   seal-report --task-id <TASK-ID> --revision HEAD --reason <why>`, and commit
-   the generated `tasks/evidence/<TASK-ID>/seal.yaml` before the final
-   validation. Active dirty reports remain live-worktree-bound; the seal is the
-   post-commit identity that lets a retired report validate against its own
-   immutable source/artifact tree after later tasks update shared files. See
-   [`workflow-evidence.md`](workflow-evidence.md#completion-evidence) for the
-   migration and tamper rules.
+   Source/summary changes invalidate affected reviews: regenerate and re-review
+   before cleanup. Record the source revision/diff digest, actual verdict and
+   checks in the short completion note; CI cannot reconstruct a deleted local
+   report. Do not downgrade a profile to bypass its completion gate.
+4. Only after acceptance, remove the temporary files in the reviewed deletion
+   list, preserving live-consumer exceptions. Tracked removals are ordinary Git
+   deletions; ignored files are deleted locally. Never rewrite Git history or
+   create a replacement raw-output archive. Do not force-add raw evidence.
+5. Move the task to `tasks/done/`, remove it from open-member lists, update its
+   category README, append the short completion narrative to
+   [`tasks/done/RETIREMENT-LOG.md`](../../tasks/done/RETIREMENT-LOG.md), and regenerate
+   `tasks/SESSION-BRIEF.md`. Run strict task/link/claim checks and applicable
+   mirror checks on the final tree. Do not leave done links in open task lists.
+   The repository evidence scan validates reports that remain; it does not
+   demand deleted retired reports. `--require-complete` is the pre-cleanup gate.
 
 Category READMEs describe current task state only. Remove retired entries from
 open lists and use `tasks/done/RETIREMENT-LOG.md`, the retired task file, and the

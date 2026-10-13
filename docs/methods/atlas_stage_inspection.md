@@ -6,7 +6,7 @@ not visualized every atlas partition change, and the atlas decisions did not use
 the available curvature-extremum curves. The new trace observes existing decisions;
 it does not change growth, splitting, merging or their parameters.
 
-The [stage record](../../ara/evidence/diagnostics/method045/stages/record.json)
+The [stage record](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method045/stages/record.json)
 and [C73](../../ara/logic/claims.md#c73-atlas-boundary-loss-occurs-at-different-stages)
 bind the local CPU findings. The original
 [baseline-preserving experiment](baseline_preserving_atlas_experiment.md) remains
@@ -28,9 +28,9 @@ refinements without a common event order. A curve overlay is not a quantified
 alignment test. Final-stage colors identify UV charts; internal cuts within one
 chart are separate from those colored borders.
 
-![Frog stages](../../ara/evidence/diagnostics/method045/stages/frog-stages.png)
+[Frog stages](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method045/stages/frog-stages.png)
 
-![Sculpt stages](../../ara/evidence/diagnostics/method045/stages/sculpt-stages.png)
+[Sculpt stages](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method045/stages/sculpt-stages.png)
 
 These figures use depth-tested WebGL captures so hidden curves do not appear
 through the surface. Curve scale is medium for frog and large for sculpt;
@@ -99,14 +99,14 @@ The protected arm loses no baseline edge. Its frog merges nevertheless remove
 64 other edges with nonzero native soft-feature evidence. That is a diagnostic
 fact, **not proof of destroying 64 good anatomical boundaries**. These scores
 are neither probabilities nor an established ground-truth partition.
-The [saved-array reconciliation](../../ara/evidence/diagnostics/method045/stages/boundary-reconciliation.json)
+The [saved-array reconciliation](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method045/stages/boundary-reconciliation.json)
 and per-mesh decision JSON retain the distinction.
 
 ## Available scalars and whether decisions use them
 
-![Frog scalar fields](../../ara/evidence/diagnostics/method045/stages/frog-scalars.png)
+[Frog scalar fields](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method045/stages/frog-scalars.png)
 
-[Sculpt scalar fields](../../ara/evidence/diagnostics/method045/stages/sculpt-scalars.png)
+[Sculpt scalar fields](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method045/stages/sculpt-scalars.png)
 use the same definitions. Scalars are unlit; display ranges are clipped to the
 2nd–98th percentiles except fixed confidence/stretch limits. Gray indicates no
 curve segment in that face, not zero confidence.
@@ -156,7 +156,7 @@ observations. Existing protected original borders remain the sculpt quality floo
 ## Review, verification and replay
 
 Claude reviewed code and aggregate counts. The
-[review resolution](../../ara/evidence/diagnostics/method045/stages/review-resolution.md)
+[review resolution](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method045/stages/review-resolution.md)
 corrects its stale statement that no ordered atlas trace exists and its unsupported
 characterization of every soft flag as low confidence. It did not inspect meshes
 or images, execute the pipelines, or approve visual quality.
@@ -205,12 +205,12 @@ port 9348, then run `capture_atlas_trace.py /tmp/new-stage-trace` followed by
 
 ## Portable viewer
 
-The exact inspected self-contained viewer is retained as
-[viewer.html.gz](../../ara/evidence/diagnostics/method045/stages/viewer.html.gz).
-Unpack it after pulling the repository; no native rerun or external dataset is
-needed to inspect the recorded stages:
+The exact inspected self-contained viewer is available in Git history as
+[viewer.html.gz](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method045/stages/viewer.html.gz).
+Restore the archived viewer from its exact revision; no native rerun or external
+dataset is needed to inspect those historical stages:
 
 ```bash
-gzip -dc ara/evidence/diagnostics/method045/stages/viewer.html.gz > /tmp/intrinsic-atlas-stages.html
+git show 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method045/stages/viewer.html.gz | gzip -dc > /tmp/intrinsic-atlas-stages.html
 xdg-open /tmp/intrinsic-atlas-stages.html
 ```

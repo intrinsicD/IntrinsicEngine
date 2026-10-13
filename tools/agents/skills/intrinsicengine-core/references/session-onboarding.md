@@ -109,7 +109,7 @@ Framework24 convergence (`REVIEW-004`; inventory and golden workflows in `docs/p
 
 Task files under `tasks/` are shared memory between sessions, not process contracts. Single-session work needs no task file. Work that outlives the session gets a note in `tasks/active/` seeded from `tasks/templates/task-micro.md` — the interactive lane (`template: micro`, `workflow_profile: micro`, `evidence: not_applicable`, concrete `evidence_skip_reason`, e.g. "interactive session; evidence is the PR diff and CI"). Keep it honest and short: goal, checkbox acceptance criteria, exact verification commands; add context, slice plan, or a decision log only when they earn their lines. Use the maturity vocabulary (`Scaffolded` → `CPUContracted` → `Operational` → `ParityProven`) when the stop-state is ambiguous.
 
-The full `tasks/templates/task.md` and the `standard`/`high-risk` profiles are the unattended lane (§Unattended overnight mode). Retire finished tasks to `tasks/done/` with completion date and commit/PR reference, append the narrative to `tasks/done/RETIREMENT-LOG.md`, and regenerate `tasks/SESSION-BRIEF.md`.
+The full `tasks/templates/task.md` and the `standard`/`high-risk` profiles are the unattended lane (§Unattended overnight mode). Follow the canonical [task retirement](../../../../../docs/agent/task-format.md#retiring-a-task) procedure. Retire finished tasks to `tasks/done/` with completion date and commit/PR reference, append the narrative to `tasks/done/RETIREMENT-LOG.md`, and regenerate `tasks/SESSION-BRIEF.md`.
 
 # Verification
 
@@ -160,7 +160,7 @@ python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/check_test_layout.py --root . --strict
 ```
 
-If the task note lists additional or stricter verification commands, run those too — note-level verification supersedes these defaults. `workflow_evidence.py validate` and `experiment_custody.py validate` apply when overnight evidence or custody state is touched. Retiring a task enrolled as `standard` or higher needs its completion report; interactive work without one switches the task to the micro profile with an `evidence_skip_reason` before it retires.
+If the task note lists additional or stricter verification commands, run those too — note-level verification supersedes these defaults. `workflow_evidence.py validate` and `experiment_custody.py validate` apply when overnight evidence or custody state is touched. An enrolled `standard` or higher task validates its completion report with `--require-complete` while open, before the temporary report is deleted under the retirement procedure. Do not downgrade a profile to bypass that check.
 
 Hygiene: preserve noisy output and exit status using [Tool output and waits](#tool-output-and-waits). Do not trust non-default build trees unless their compiler satisfies the C++23 requirement. `Testing/Temporary/LastTestsFailed.log` is historical; current state comes from the CTest run you just executed. Only the labels `gpu|vulkan|slow|flaky-quarantine` are exempt by default policy.
 

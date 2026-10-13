@@ -69,7 +69,7 @@ python3 tools/repo/check_layering.py --root src --strict
 ```
 
 ## Review and current evidence
-- CPU: Clang 23 preset `ci`; `IntrinsicTests`, `ExtrinsicSandbox` and `IntrinsicBenchmarkSmoke` built. The focused run passed 45/45; the exclusion-only full CPU gate passed 4,376 tests with one expected unsanitized LSan-control skip (4,377 selected). Durable logs and source hashes are in the [verification record](../../ara/evidence/tables/normal_vulkan_verification_2026-09-09.md).
+- CPU: Clang 23 preset `ci`; `IntrinsicTests`, `ExtrinsicSandbox` and `IntrinsicBenchmarkSmoke` built. The focused run passed 45/45; the exclusion-only full CPU gate passed 4,376 tests with one expected unsanitized LSan-control skip (4,377 selected). Durable logs and source hashes are in the [verification record](../../docs/results/normal_vulkan_verification_2026-09-09.md).
 - Structural: strict layering/task/test-layout, method/benchmark manifests, skill mirrors and documentation links passed. Root hygiene reports the existing local `.agents/` metadata finding owned by BUG-177.
 - Verification triage: an initial CPU selector accidentally included opt-in Vulkan fixtures; the unavailable-device framed kNN timeout is recorded as BUG-182. The corrected CPU selector excludes capability labels.
 - Architecture sweep: no new dependency edge, module, service or shader pass. The existing cache owns buffer lifetime; CPU geometry sees spans only. Both dependent jobs identify the same output; cancellation/staleness prevents publication and submitted buffers remain leased through readback.

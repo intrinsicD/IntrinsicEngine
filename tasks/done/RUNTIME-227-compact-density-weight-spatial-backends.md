@@ -96,4 +96,4 @@ CCACHE_DISABLE=1 under BUG-178. Existing vcpkg sandbox constraint BUG-065 requir
 **Completed:** 2026-09-10
 **Commit:** `618a8c54aa07d4754cbb6a18ab60fb248cfd8ded` (implementation; retirement/review seal follows).
 
-[Bounded verification](../../ara/evidence/tables/density_weight_verification_2026-09-10.md) and ARA C88 bind 4455 distinct CPU passes and eight actual Vulkan cases, three for density weights. Complete conservative candidates preserve double kernel support; explicit range/subnormal/overflow limitations apply. No speedup or projection GPU-grid replacement is claimed.
+[Bounded verification](../../docs/results/density_weight_verification_2026-09-10.md) and ARA C88 bind 4455 distinct CPU passes and eight actual Vulkan cases, three for density weights. Complete conservative candidates preserve double kernel support; explicit range/subnormal/overflow limitations apply. No speedup or projection GPU-grid replacement is claimed.

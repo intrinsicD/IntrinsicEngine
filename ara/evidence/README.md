@@ -1,5 +1,12 @@
 # Evidence Index
 
+Temporary diagnostics remain here for open work or unresolved ownership. New
+raw files are ignored and removed under [task retirement](../../docs/agent/task-format.md#retiring-a-task).
+Completed result summaries live in [docs/results](../../docs/results/) and
+reusable lessons in [docs/lessons](../../docs/lessons/README.md). Historical
+raw references resolve at the revision documented in the
+[retirement record](../../docs/lessons/evidence-retirement.md).
+
 - [Point LBVH verification](tables/point_lbvh_verification_2026-09-08.md) — source-bound CPU and Vulkan readback checks, shared entity cache and k-means consumption; bounded C76, no speedup claim.
 
 - [Virtual-source geodesics intake](tables/geodesics_virtual_source_intake_2026-09-08.md)
@@ -39,10 +46,10 @@
 
 - [ICP spatial integration verification](tables/registration_spatial_verification_2026-09-08.md) — canonical-domain/config/UI and cached CPU/Vulkan correctness; failed display-off timing qualification retained separately from passing assertions, plus unresolved leak-enabled shutdown retention.
 
-- [Point LBVH kNN and PCA verification](tables/point_lbvh_knn_verification_2026-09-08.md) — bounded C78 CPU/Vulkan queries, framed reuse and supplied CPU PCA; defaults unchanged.
+- [Point LBVH kNN and PCA verification](../../docs/results/point_lbvh_knn_verification_2026-09-08.md) — bounded C78 CPU/Vulkan queries, framed reuse and supplied CPU PCA; defaults unchanged.
 
-- [Normal estimation verification](tables/normal_estimation_verification_2026-09-08.md) — canonical-domain CPU PCA/topology methods, cached LBVH, shared config/window and guarded publication.
+- [Normal estimation verification](../../docs/results/normal_estimation_verification_2026-09-08.md) — canonical-domain CPU PCA/topology methods, cached LBVH, shared config/window and guarded publication.
 
-- [Editor service-borrow compile measurement](tables/runtime265_service_borrow_compile_measurement.md) — four bounded local Clang 23 samples, immutable dependencies, rejected-attempt retention and full CPU reconciliation; C95.
+- [Editor service-borrow compile measurement](../../docs/results/runtime265_service_borrow_compile_measurement.md) — four bounded local Clang 23 samples, immutable dependencies, rejected-attempt retention and full CPU reconciliation; C95.
 
-- [Renderer surface measurement](tables/graphics138_renderer_compile_measurement.md) — C96 bounded graphics-library observations; one omitted interface-touch producer, unchanged clean compilation count, no general speedup claim.
+- [Renderer surface measurement](../../docs/results/graphics138_renderer_compile_measurement.md) — C96 bounded graphics-library observations; one omitted interface-touch producer, unchanged clean compilation count, no general speedup claim.

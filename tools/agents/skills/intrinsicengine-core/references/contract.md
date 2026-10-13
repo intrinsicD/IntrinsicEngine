@@ -436,7 +436,8 @@ eligible research and explicit ARA work retain the requirements below.
 Research, performance, parity, and capability statements are tracked in the Agent-Native Research
 Artifact under `ara/`. `ara/logic/claims.md` is the claim ledger: each `C<NN>` row carries a
 statement, a disposition, a falsification criterion, and a `Proof` binding to artifacts that exist
-in the tree. `ara/staging/observations.yaml` holds `O<NN>` observations awaiting closure;
+in the tree, or explicit historical Git evidence plus a durable summary. Temporary
+evidence follows [task retirement](../../../../../docs/agent/task-format.md#retiring-a-task). `ara/staging/observations.yaml` holds `O<NN>` observations awaiting closure;
 `ara/logic/solution/` crystallizes constraints (`K<NN>`), architecture statements (`A<NN>`), and
 heuristics (`H<NN>`).
 
@@ -573,9 +574,10 @@ overnight runs — where it substitutes for the absent human — and to opt-in
 custody profiles; interactive sessions owe none of it. Unattended runs accept
 only night-ready tasks (complete goal, checkbox acceptance criteria, exact
 verification commands, no open questions or loose ends) and retire their
-enrolled tasks with the completion evidence their profile requires, including
-the `seal.yaml` step for dirty-source reports and independent fixed-surface
-review for `high-risk` and higher (`docs/agent/workflow-evidence.md`).
+enrolled tasks using [task retirement](../../../../../docs/agent/task-format.md#retiring-a-task), including
+the profile-specific completion checks and independent fixed-surface review for
+`high-risk` and higher. Historical seals apply only to
+legacy retained reports; new raw evidence and packets are ignored, not committed.
 Historical tasks are not backfilled; the prospective inventory
 deterministically enrolls new or changed open work.
 
@@ -588,7 +590,8 @@ from `tasks/done/` to `tasks/archive/` (frozen read-only history; IDs stay
 authoritative for dependency resolution). The sole maintenance exception is a
 task-link directory repair under `tasks/archive/README.md`: the validator pins
 the original text, task filename and fragment and requires an existing target
-inside a task lifecycle directory. Keep roadmap details in those files
+inside a task lifecycle directory. Enrolled task records may repair evidence
+links to verified historical Git objects without rewriting their conclusions. Keep roadmap details in those files
 rather than expanding this contract with task-specific plans.
 
 ### Standing Claude Code authorization

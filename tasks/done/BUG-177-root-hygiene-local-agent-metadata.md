@@ -25,7 +25,7 @@ this retirement is not a publication or whole-engine completion verdict.
 
 ## Evidence
 - During METHOD-044 final checks, `python3 tools/repo/check_root_hygiene.py --root . --strict` exited 1 with `.agents/` as the sole unexpected entry. `git ls-files .agents` emitted nothing. The atlas task did not create or edit that directory and left it untouched.
-- [Recorded observation](../../ara/evidence/diagnostics/method044/root-hygiene-observation.json). Atlas-specific tests, task/ARA/manifest checks and documentation links pass; this is a separate local-workshop issue, not an atlas failure.
+- [Recorded observation](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method044/root-hygiene-observation.json). Atlas-specific tests, task/ARA/manifest checks and documentation links pass; this is a separate local-workshop issue, not an atlas failure.
 
 ## Acceptance criteria
 - [x] Identify whether `.agents/` is expected session tooling state or an unintended local artifact, with a reproduction.

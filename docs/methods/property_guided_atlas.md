@@ -116,7 +116,7 @@ These are CPU reference solvers. There is no GPU parameterization backend,
 general mesh repair, UDIM packing or unrestricted mip-chain guarantee. Property
 bakes retain one mip and an explicit coverage policy; padding must match the
 intended filtering footprint. The bounded CPU and Vulkan results are recorded as C109/C110 in the
-[evidence report](../../ara/evidence/diagnostics/method047_property_atlas/report.md),
+[evidence report](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method047_property_atlas/report.md),
 with exact test counts, source identity and readback scope.
 Generated bake records and GPU texels are session state and must be recomputed
 after loading a scene; UVs and their accepted atlas dimensions are persisted.
@@ -137,3 +137,25 @@ enrichment reports the absence of usable UVs. Explicit materialization callers
 can still require UV success. Missing UVs cannot be used for a bake; users must
 repair the input or generate an accepted atlas first. No synthetic UVs or dropped
 faces conceal a rejected atlas.
+
+## Historical correctness observations
+
+METHOD-047's completed dirty Debug campaign covered three procedural controls
+and four frozen surfaces. Native None met the configured distortion bounds by
+using 431–2,434 charts on the surfaces, versus 18–40 for optimized objectives;
+fragmentation is part of this tradeoff. Across seven cases, maximum conformal /
+area ratios were None 9.987581 / 9.650857, Angle 1.741859 / 4.559267,
+Area 7.622930 / 1.068254, and Both 1.637081 / 1.353008. The 100,000-triangle
+child case at 4096² used 260 charts, with Both ratios 1.578208 / 1.373161.
+These are finite-cohort observations, not a universal ranking or speed claim.
+
+The Python audit independently recomputed Jacobian metrics but relied on the
+native exact binary32 overlap validator; it was not a second independent
+all-pairs overlap audit. Fixed input labels do not prove runtime GMM integration.
+GPU bake comparisons used 1e-4 raw-float tolerance and one 8-bit quantization
+step on the recorded NVIDIA device, not a hardware-independent guarantee.
+
+The original [report](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method047_property_atlas/report.md)
+and ARA C109/C110 retain the historical provenance. Raw files were retired
+under the [evidence lifecycle](../agent/task-format.md#retiring-a-task); no
+campaign was rerun for that cleanup.

@@ -78,7 +78,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - The harness now clears that variable for its two subprocesses. Twenty required
   harness repetitions pass, including the clean GLFW lifetime check without a
   capability skip; the independent source review found no issue.
-- [Isolated evidence](../evidence/BUG-174/summary.md) retains the failing
+- [Isolated evidence](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-174/summary.md) retains the failing
   process states and both discriminating environment probes. No caches were
   cleared; this establishes fresh-process reliability, not cold-cache timing.
 - Independent source review accepted the exact harness change at SHA-256
@@ -86,7 +86,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Verification: `ctest --test-dir build/ci-asan --output-on-failure -R
   '^GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl$' --repeat until-fail:20
   --timeout 60 --parallel 1` passed all twenty runs in 2.81 seconds. The retained
-  log is [harness-repeat.log](../evidence/BUG-174/harness-repeat.log).
+  log is [harness-repeat.log](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-174/harness-repeat.log).
 
 ## Completion
 - Completed 2026-09-06.

@@ -99,4 +99,4 @@ The first dense capped Vulkan test received a result but then waited for every s
 **Completed:** 2026-09-10
 **Commit:** `2e6353df1ca9c2500bc6509ab93a71476399eef1` (implementation; retirement/review seal follows).
 
-[Bounded verification](../../ara/evidence/tables/descriptor_verification_2026-09-10.md) and ARA C87 bind 4443 distinct CPU passes and three actual Vulkan cases. The dense cap=1 path reuses existing lowest-ID retention. Uncapped overflow and failed job chains preserve all outputs. No performance improvement or PCL interchangeability is claimed.
+[Bounded verification](../../docs/results/descriptor_verification_2026-09-10.md) and ARA C87 bind 4443 distinct CPU passes and three actual Vulkan cases. The dense cap=1 path reuses existing lowest-ID retention. Uncapped overflow and failed job chains preserve all outputs. No performance improvement or PCL interchangeability is claimed.

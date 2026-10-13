@@ -77,7 +77,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Canonical ci configure, full IntrinsicTests build and CPU reconciliation pass:
   4,640 passes, zero failures, one expected ASan-only skip. The restored dependency
   digest also agrees after reconfiguration. Four canonical results validate.
-- [Retained evidence and limitations](../../ara/evidence/tables/runtime265_service_borrow_compile_measurement.md)
+- [Retained evidence and limitations](../../docs/results/runtime265_service_borrow_compile_measurement.md)
   distinguish the excluded incomplete attempt, exact runner/source provenance and
   accepted cohort. Stability checks do not prove package correctness before the
   first check; no earlier known-good package digest exists.

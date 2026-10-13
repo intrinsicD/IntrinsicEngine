@@ -12,7 +12,9 @@ Documentation updates are required in the same PR when code/structure/policy cha
   - Update `tasks/*` records and `docs/agent/*` where process rules are affected.
   - For enrolled work, keep `tasks/evidence/<TASK-ID>/report.yaml` bound to the
     final changed-source digest. Generate it only after task, documentation,
-    and generated-mirror changes are stable.
+    and generated-mirror changes are stable. Validate before retirement cleanup;
+    remove temporary evidence after extracting durable knowledge as specified in
+    [task retirement](task-format.md#retiring-a-task).
 - **Method or benchmark infrastructure changes**
   - Update `docs/methods/*` or `docs/benchmarking/*` plus validators and manifests.
 - **CI/workflow changes**
@@ -37,8 +39,8 @@ Documentation updates are required in the same PR when code/structure/policy cha
   skill mirror (`python3 tools/agents/sync_skills.py --write`) after `docs/agent/*` or
   `tasks/templates/task.md` changes.
 - Enrolled task evidence is validated with
-  `python3 tools/agents/workflow_evidence.py validate --root .`. Retirement
-  requires a complete report; high-risk and higher profiles also require a
+  `python3 tools/agents/workflow_evidence.py validate --root .`. Before cleanup, retirement
+  requires a complete report validated with `--require-complete`; high-risk and higher profiles also require a
   current revision-bound handoff and accepted independent review.
 
 ## Automation

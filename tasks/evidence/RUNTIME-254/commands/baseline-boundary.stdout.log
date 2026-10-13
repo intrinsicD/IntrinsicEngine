@@ -1,1 +1,0 @@
-Forbidden module dependency: src/runtime/Rendering/Runtime.RenderExtraction.Internal.cpp -> Extrinsic.Graphics.Renderer

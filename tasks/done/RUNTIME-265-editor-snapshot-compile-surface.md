@@ -116,7 +116,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Completed 2026-09-15. Commit reference: `ee647ec91b677fc1051be3b97405e3cd07b06aaf` for the engine change; the enclosing commit records measurement and retirement.
 - Maturity: CPUContracted, the intended refactor endpoint. No GPU or sanitizer
   runtime capability is promoted.
-- [C95 measurement report](../../ara/evidence/tables/runtime265_service_borrow_compile_measurement.md)
+- [C95 measurement report](../../docs/results/runtime265_service_borrow_compile_measurement.md)
   retains two exact-source samples per arm: spatial-interface rebuilds
   84.131–84.456 → 39.179–39.477 seconds, 61 → 22 compiler units. No new source
   enters that rebuild. Full clean count stays 775; the small observed clean-time

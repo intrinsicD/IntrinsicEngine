@@ -7,7 +7,7 @@ edges, and its distortion quality. Guidance, chart area and packing still trade
 off; this is not an anatomical segmentation result or a production default. The
 bounded observations are recorded in C74 in the [claim ledger](../../ara/logic/claims.md).
 
-![Frog starting atlas, shortening control and curve-guided candidate](../../ara/evidence/diagnostics/method046/frog-comparison.png)
+[Frog starting atlas, shortening control and curve-guided candidate](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method046/frog-comparison.png)
 
 ## What changed
 
@@ -111,14 +111,14 @@ an additional border. Its original semantic segmentation is unchanged. The
 slightly worse packing is retained, rather than selecting a favorable placement
 or claiming uniform baseline-quality improvement.
 
-![Sculpt preservation comparison](../../ara/evidence/diagnostics/method046/sculpt-comparison.png)
+[Sculpt preservation comparison](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method046/sculpt-comparison.png)
 
 ## Review and verification
 
-Actual [Claude planning](../../ara/evidence/diagnostics/method046/reviews/plan.md)
-preceded implementation. Its [source/result review](../../ara/evidence/diagnostics/method046/reviews/review.md)
+Actual [Claude planning](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method046/reviews/plan.md)
+preceded implementation. Its [source/result review](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method046/reviews/review.md)
 found no refinement-core blocker and requested better diagnostics and numerical
-tests. The [resolution](../../ara/evidence/diagnostics/method046/reviews/resolution.md)
+tests. The [resolution](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method046/reviews/resolution.md)
 records implemented fixes and disagreements with unsupported interpretations.
 Claude received source and mesh-free aggregates; its review was not an independent
 rerun or visual anatomical acceptance.
@@ -136,25 +136,25 @@ and the packer. Focused CTest: 136 entries, zero failures. Full CPU gate: 4308
 entries, zero failures, one expected unsanitized leak-check skip. All 185 viewer
 modes rendered without WebGL errors. No sanitizer or GPU-method result is claimed.
 
-The [record](../../ara/evidence/diagnostics/method046/record.json) binds source,
+The [record](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method046/record.json) binds source,
 inputs, arrays, canonical diagnostic results, negative attempts and reviews.
 Dirty local results are not publication-claim-eligible. The numerical audits are
 not exact-predicate certificates.
 
 ## Inspect and replay
 
-A portable self-contained viewer is retained as
-[viewer.html.gz](../../ara/evidence/diagnostics/method046/viewer.html.gz).
-After pulling the repository, unpack and open it without rerunning the experiment:
+A portable self-contained viewer is available in Git history as
+[viewer.html.gz](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method046/viewer.html.gz).
+Restore and open the historical viewer without rerunning the experiment:
 
 ```bash
-gzip -dc ara/evidence/diagnostics/method046/viewer.html.gz > /tmp/intrinsic-atlas-refinement.html
+git show 36a7b5062d9be3239d667efd9e41c4d4028ba249:ara/evidence/diagnostics/method046/viewer.html.gz | gzip -dc > /tmp/intrinsic-atlas-refinement.html
 xdg-open /tmp/intrinsic-atlas-refinement.html
 ```
 
 The importable curve-guided examples are
-[frog](../../ara/evidence/diagnostics/method046/examples/frog/packed.obj) and
-[sculpt](../../ara/evidence/diagnostics/method046/examples/sculpt/packed.obj), each
+[frog](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method046/examples/frog/packed.obj) and
+[sculpt](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method046/examples/sculpt/packed.obj), each
 with its neighboring material and checker texture.
 
 The generated local viewer is `build/method046/verified/index.html`.

@@ -54,8 +54,8 @@ The isolated 3.31.6 binary reproduced all three original failures. The final
 probe passes all three cases on 3.28.3 and 3.31.6, including intentional unlocked
 corruption, serialized discovery with nested CTest, and genuine duplicates.
 Aggregate (8) and prerequisite (7) regressions pass. Actual Opus 5.5 approved the
-[final routing delta](../evidence/BUG-214/claude-final-review.md). Both the private
+[final routing delta](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-214/claude-final-review.md). Both the private
 write-site instrumentation and the generated fixture include now bind the
 executed probe; neither installed CMake nor production discovery locking changes.
-The [versioned archive binding](../evidence/BUG-214/cmake-source.json) and the
+The [versioned archive binding](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-214/cmake-source.json) and the
 before/intermediate/after logs preserve the diagnosis. Remote CI reruns after push.

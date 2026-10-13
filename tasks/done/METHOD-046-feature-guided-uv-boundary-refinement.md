@@ -68,7 +68,7 @@ python3 tools/repo/check_test_layout.py --root . --strict
 - Internal cut accounting compares both edge endpoints and is independently reconciled against corner-UV discontinuities. A cylinder control checks the complete cut chain.
 
 ## Result and review
-- The bounded implementation and renewed actual Claude review are complete; [report](../../docs/methods/uv_boundary_refinement_experiment.md), [source-bound record](../../ara/evidence/diagnostics/method046/record.json), C74.
+- The bounded implementation and renewed actual Claude review are complete; [report](../../docs/methods/uv_boundary_refinement_experiment.md), [source-bound record](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method046/record.json), C74.
 - All original region labels and borders remain fixed. Frog extra seams shorten, with distinct native/curve/length/packing tradeoffs; sculpt changes twelve faces along an extra chart border and retains its distortion quality, with a small square-occupancy decrease. No anatomical/default acceptance is inferred.
 - Review findings added per-move area ratios, fixed-face contact counts, failed-chart IDs, wide-range capacity and evidence-field tests. Exact replay preserves all labels, UVs and accepted stages across the ten final cells.
 - Verification: twelve new and ten existing Python controls; ten packed cells; ci build; 136 focused CTest entries and 4308 full CPU entries with zero failures, one expected unsanitized leak-check skip; all 185 browser modes. No GPU-method or sanitizer result claimed.

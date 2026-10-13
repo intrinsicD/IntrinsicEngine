@@ -57,7 +57,7 @@ passes 20 cases and the task validator passes 25. The full selected structural
 route passes; the docs workflow's remaining evidence/custody/claim/work-graph
 suites pass 32, 40, 9 and 29 cases respectively. Actual Opus 5.5 reviewed the
 manifest restoration and final inventory-selected frozen fixtures; its
-[final review](../evidence/BUG-213/claude-final-review.md) passes.
-[Binding proof](../evidence/BUG-213/frozen-binding.json) records the unchanged
+[final review](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-213/claude-final-review.md) passes.
+[Binding proof](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-213/frozen-binding.json) records the unchanged
 baseline and restored manifest hash. No C++ source, validator, recorded
 scientific result or acceptance threshold changes. Remote CI reruns after push.

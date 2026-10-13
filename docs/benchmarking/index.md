@@ -19,7 +19,7 @@ This section defines how IntrinsicEngine benchmarks are authored, executed, vali
 
 ## Local compilation measurements
 
-- [Canonical property instantiation: consumer savings and owner cost](../../ara/evidence/tables/build010_canonical_property_measurement.md)
+- [Canonical property instantiation: consumer savings and owner cost](../results/build010_canonical_property_measurement.md)
 
 ## Related process docs
 

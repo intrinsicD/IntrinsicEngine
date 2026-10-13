@@ -1,6 +1,0 @@
-[check_layering] Scan root: /home/alex/Documents/IntrinsicEngine/src
-[check_layering] Files scanned: 958
-[check_layering] References scanned: 10232 import/include, 89 CMake link
-[check_layering] Allowlist entries: 0
-[check_layering] Allowlisted violations: 0
-[check_layering] No layering violations found.

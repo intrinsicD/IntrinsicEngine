@@ -11,3 +11,7 @@ __pycache__/
 
 # Sandbox screenshots (File > Save Screenshot, F12, agent view_capture)
 /screenshots/
+
+# Temporary implementation/experiment evidence; existing open-task files stay tracked.
+/tasks/evidence/*/
+/ara/evidence/diagnostics/*

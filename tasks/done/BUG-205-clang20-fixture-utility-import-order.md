@@ -47,6 +47,6 @@ and sandbox-integration targets link; 193 focused runtime and 25 config integrat
 cases pass. Canonical ci IntrinsicTests builds and the CPU gate has 4,863 passes,
 zero failures and one expected GLFW/LSan skip. Both repaired fixture files have
 identical bytes in both arms. Claude reviewed the source correction. The
-[BUILD-011 evidence report](../../ara/evidence/tables/build011_point_config_codecs_measurement.md)
+[BUILD-011 evidence report](../../docs/results/build011_point_config_codecs_measurement.md)
 retains the failing and passing commands; the enclosing evidence commit records
 retirement. No deferred work or claim about an upstream compiler root cause.

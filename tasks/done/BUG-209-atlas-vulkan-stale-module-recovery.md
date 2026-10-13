@@ -53,5 +53,5 @@ pass afterward. Source-tree identity is unchanged across recovery. This establis
 an outdated incremental artifact as the failure mechanism, without proving whether
 Ninja timestamps, a copied artifact or ccache originally supplied it. No source
 workaround, compiler suppression, relaxed assertion or reduced test selection was
-used. The [verification archive](../../ara/evidence/diagnostics/method047_property_atlas/verification-runs.tar.gz)
+used. The [verification archive](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method047_property_atlas/verification-runs.tar.gz)
 retains both build attempts, the refreshed-input list and final execution logs.

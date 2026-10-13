@@ -9,7 +9,7 @@ UV-quality superiority over xatlas.
 
 This is [METHOD-045](../../tasks/done/METHOD-045-baseline-preserving-atlas-cuts.md),
 directed by the operator after postponing runtime integration. The
-[campaign record](../../ara/evidence/diagnostics/method045/record.json) and
+[campaign record](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method045/record.json) and
 ARA [C71/C72](../../ara/logic/claims.md#c71-baseline-regions-and-uv-cuts-can-remain-separate)
 bind the local CPU observations. Production methods, defaults and editor menus
 are unchanged. The older METHOD-042/043/044 results remain historical evidence.
@@ -21,9 +21,9 @@ An internal UV seam duplicates corners without changing a semantic region.
 If a cut region still violates the distortion limit, UV subdivision is explicit;
 the source triangle geometry and original region labels remain unchanged.
 
-![Original sculpt regions retained, with candidate UV maps](../../ara/evidence/diagnostics/method045/examples/sculpt/regions.png)
+[Original sculpt regions retained, with candidate UV maps](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method045/examples/sculpt/regions.png)
 
-![Six candidate UV charts](../../ara/evidence/diagnostics/method045/examples/sculpt/comparison.png)
+[Six candidate UV charts](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method045/examples/sculpt/comparison.png)
 
 All rows below use the same freshly exported native source geometry. The two
 prototype rows use the same UV-only xatlas packer, resolution 1024, padding 2
@@ -41,8 +41,8 @@ prototype while retaining all original borders. Native xatlas still has lower
 mean and p95 distortion and better occupancy. Six charts instead of seventeen
 does not establish a better atlas. New intra-region chart edges remain jagged.
 
-Importable [sculpt OBJ](../../ara/evidence/diagnostics/method045/examples/sculpt/packed.obj)
-and [frog OBJ](../../ara/evidence/diagnostics/method045/examples/frog/packed.obj)
+Importable [sculpt OBJ](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method045/examples/sculpt/packed.obj)
+and [frog OBJ](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method045/examples/frog/packed.obj)
 have corner UVs and UV-chart groups; keep their neighboring MTL/checker PNGs.
 The adjacent `result.npz` preserves both `region_labels` and UV `labels`, along
 with exact source geometry and packed corner UVs. Semantic region colors are
@@ -50,11 +50,11 @@ shown separately above; OBJ chart groups are not replacement segmentation.
 
 ## Frog after the fix
 
-![Candidate frog UV charts](../../ara/evidence/diagnostics/method045/examples/frog/comparison.png)
+[Candidate frog UV charts](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method045/examples/frog/comparison.png)
 
 The geometry is unchanged. Colored UV patches remain jagged and fragmented:
-23 charts versus the [earlier prototype's 15](../../ara/evidence/diagnostics/method045/examples/frog/feature.png).
-The [original five labels](../../ara/evidence/diagnostics/method045/examples/frog/regions.png)
+23 charts versus the [earlier prototype's 15](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method045/examples/frog/feature.png).
+The [original five labels](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method045/examples/frog/regions.png)
 are preserved, including all 55 boundary edges, but largely consist of one big
 region plus tiny islands. This is not a clean head/body/leg segmentation.
 
@@ -162,23 +162,23 @@ correspondence, retained region labels and the internal seam.
 
 Native packing can mirror a whole chart by swapping its UV axes. The audit
 counts these as `global_chart_reflections`, accepts uniform chart orientation
-and rejects mixed signs. A [saved-array check](../../ara/evidence/diagnostics/method045/verification/packed-orientation-audit.json)
+and rejects mixed signs. A [saved-array check](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method045/verification/packed-orientation-audit.json)
 confirms five mirrored sculpt charts and nine frog charts, with no mixed-or-zero
 chart in the four candidate outputs. This is not a foldover or a guarantee of
 orientation-preserving packing; the earlier Python shelf packer preserves winding.
 
 ## Collaboration, verification and remaining work
 
-Claude supplied an [initial design review](../../ara/evidence/diagnostics/method045/reviews/claude-design.md)
-and a [corrected review](../../ara/evidence/diagnostics/method045/reviews/claude-correction.md)
+Claude supplied an [initial design review](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method045/reviews/claude-design.md)
+and a [corrected review](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method045/reviews/claude-correction.md)
 that accepted the distinction between the original five-region baseline and
 the newer five-chart atlas. The second review recommended the topology probe
 before building the integration. Codex implemented and ran the experiments.
 After operator sharing approval, Claude completed a
-[source/result review](../../ara/evidence/diagnostics/method045/reviews/claude-source.md)
+[source/result review](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method045/reviews/claude-source.md)
 of the new code and mesh-free aggregate measurements. It supported the inspected
 preservation logic and requested clearer reflection, normalization and chart-count
-reporting. The [resolution](../../ara/evidence/diagnostics/method045/reviews/resolution.md)
+reporting. The [resolution](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method045/reviews/resolution.md)
 checks those points against source and retained arrays. Claude did not rerun the
 experiments, inspect input geometry, or accept anatomical visual quality.
 
@@ -186,7 +186,7 @@ Verification: Clang 23 `ci` configure and `IntrinsicTests` build; full CPU gate
 4308 selected entries, zero failures and one environment skip; 9 new standalone
 tests and 11 existing atlas tests, including native adapters, pass. Final focused
 atlas/parameterization CTest and structural/manifest/result validation are recorded
-under [verification](../../ara/evidence/diagnostics/method045/verification/).
+under [verification](https://github.com/intrinsicD/IntrinsicEngine/tree/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/method045/verification).
 Thirty diagnostic cells validate against one stable benchmark identity; these
 remain dirty-source, non-publication-grade observations. The manifest was
 consolidated after the initial probe, so the campaign is exploratory.

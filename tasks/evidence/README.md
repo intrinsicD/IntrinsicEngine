@@ -1,6 +1,10 @@
 # Task evidence
 
-Enrolled non-trivial tasks store completion evidence at:
+This is temporary working storage. Follow [task retirement](../../docs/agent/task-format.md#retiring-a-task)
+for extraction, review and removal; new raw evidence stays ignored. Existing
+open-task files and shared inputs remain until their last consumer completes.
+
+Enrolled non-trivial tasks collect completion evidence at:
 
 ```text
 tasks/evidence/<TASK-ID>/

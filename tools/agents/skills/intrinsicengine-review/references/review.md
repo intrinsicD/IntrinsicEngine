@@ -58,6 +58,9 @@ work does not.
 
 ## Retirement closure
 
+Before a task moves to `tasks/done/`, apply the canonical
+[retirement procedure](../../../../../docs/agent/task-format.md#retiring-a-task).
+
 When a task moves to `tasks/done/`:
 
 - Acceptance boxes reflect the reviewer's decision; the implementer may record

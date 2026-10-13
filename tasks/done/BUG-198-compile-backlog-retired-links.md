@@ -37,5 +37,5 @@ python3 tools/agents/check_task_policy.py --root . --strict
 ## Completion — 2026-09-16
 Retired as a documentation repair; engine maturity is unchanged. Commit reference:
 the accompanying retirement/evidence commit; reproduced after checkpoint `f73dcbd39`.
-[Failing check](../../ara/evidence/diagnostics/graphics145_renderer_frontend/first-final-checks.txt)
+[Failing check](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/graphics145_renderer_frontend/first-final-checks.txt)
 and the adjacent final checks record the correction. No deferred work.

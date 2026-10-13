@@ -149,8 +149,8 @@ and was subsequently resolved in RUNTIME-237 without deleting agent metadata.
 ## Final verification and handoff
 
 Implementation and review are complete and locally integrated.
-The [local diagnostic report](../../ara/evidence/tables/runtime234_compile_locality.md)
-and [machine-readable record](../../ara/evidence/diagnostics/runtime234_compile_locality.json)
+The [local diagnostic report](../../docs/results/runtime234_compile_locality.md)
+and [machine-readable record](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/ara/evidence/diagnostics/runtime234_compile_locality.json)
 bind source hashes, footprint, matched edit probes, review and final test logs.
 Full local artifacts are under
 `build/analysis/point-analysis-locality-2026-09-13/`.

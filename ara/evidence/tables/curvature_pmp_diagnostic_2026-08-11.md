@@ -79,7 +79,7 @@ either smoothing path.
   boundary handling, and full-neighbor smoothing.
 - `/home/alex/Documents/Engine24/ext/pmp-library/src/pmp/algorithms/curvature.cpp`:
   reference tensor eigensystem, boundary interpolation, and damped smoothing.
-- `tasks/evidence/BUG-153/artifacts/live-sandbox.log`: the accepted bunny run
+- `36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/BUG-153/artifacts/live-sandbox.log` (historical Git evidence): the accepted bunny run
   records 1485 source vertices for 495 faces.
 
 ## Repair verification

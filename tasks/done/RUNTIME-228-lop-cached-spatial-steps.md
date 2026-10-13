@@ -81,4 +81,4 @@ No new GPU token, silent fallback, altered projection formula, layer exception o
 **Completed:** 2026-09-10
 **Commit:** `020622c844d1809e4614d5ed120925e63aa3bdad`
 
-C89 and [bound verification](../../ara/evidence/tables/lop_cpu_lbvh_verification_2026-09-10.md) record 46 focused cases, 4463 distinct CPU passes and two existing Vulkan grid checks. CPU LBVH is explicit; framed GPU LBVH remains RUNTIME-229.
+C89 and [bound verification](../../docs/results/lop_cpu_lbvh_verification_2026-09-10.md) record 46 focused cases, 4463 distinct CPU passes and two existing Vulkan grid checks. CPU LBVH is explicit; framed GPU LBVH remains RUNTIME-229.

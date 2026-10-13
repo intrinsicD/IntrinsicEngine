@@ -50,8 +50,8 @@ the enclosing owning-module import repair commit.
 
 The complete Clang 20 toolchain configured the ci preset in its isolated tree,
 built IntrinsicGraphicsRendererCpuUnitTests and passed all five focused cases.
-[CTest output](../evidence/BUG-215/ctest.log) and the
-[actual Opus 5.5 review](../evidence/BUG-215/claude-review.md) retain the proof;
+[CTest output](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-215/ctest.log) and the
+[actual Opus 5.5 review](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/BUG-215/claude-review.md) retain the proof;
 the review preceded build completion, which the subsequent build/test logs close.
 The exact failing CI compile is retained compressed. Only the missing test import
 changed; production exports, comparison operators and assertions are untouched.

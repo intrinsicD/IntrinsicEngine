@@ -47,6 +47,11 @@ This page is the canonical entry point for repository documentation.
 - [Benchmark result JSON schema](benchmarking/result-json-schema.md)
 - [Agent benchmark workflow](agent/benchmark-workflow.md)
 
+## Lessons and results
+
+- [Reusable lessons](lessons/README.md)
+- [Historical result summaries](results/)
+
 ## Agent workflow
 
 - [How IntrinsicEngine is built](agent/how-this-repo-is-built.md)

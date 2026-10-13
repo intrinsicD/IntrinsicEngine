@@ -77,7 +77,7 @@ checks and all eight domains. BUG-180 owns the existing GPU leak exclusion.
 
 The dirty schema-v2 smoke validates. Warm framed GPU wall time is 9903.50 ms
 versus 95.18 ms CPU reference on the tiny fixture; CPU remains the default.
-C83 and the [verification record](../../ara/evidence/tables/spacing_vulkan_verification_2026-09-10.md)
+C83 and the [verification record](../../docs/results/spacing_vulkan_verification_2026-09-10.md)
 bind the numerical scope. No renderer-size or speedup claim is made.
 
 Scope/layering/tests/docs and clean-workshop review pass. Public surfaces remain

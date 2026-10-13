@@ -32,7 +32,7 @@ combined-source gates at `33f6e4427c9ba3dbb050c5d81fe0e5d177ebf46a`: CPU 4,880
 selected, ASan 3,231 and UBSan 3,231, all with zero failures. CPU and UBSan each
 have one expected GLFW lifetime skip; ASan runs every selected entry. Every
 code/build file affected by this task is byte-identical to its reviewed source.
-The [combined verification and source hashes](../evidence/GRAPHICS-146/measurements.md)
+The [combined verification and source hashes](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/GRAPHICS-146/measurements.md)
 retain the exact evidence. This was verification of the new graphics diff,
 not an unchanged retry. BUG-206 remains open and is not claimed fixed.
 No new capability or maturity promotion is claimed by this refactor.
@@ -158,7 +158,7 @@ git diff --check
 ## Planning review
 
 Codex and Claude Code reached consensus on 2026-09-21 before this task was
-filed. The [shared planning review](../evidence/GEOM-099/claude-planning-review.md)
+filed. The [shared planning review](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/GEOM-099/claude-planning-review.md)
 records the agreed scope, corrections, rejected job-lifecycle candidate and
 compile-regression stop rules. Implementation and timing evidence are recorded in the completion section above.
 
@@ -197,8 +197,8 @@ seconds (+0.28%). The Harmonic implementation probe rises 2.320 → 2.787 second
 wall and 0.863 → 1.325 seconds compiler duration; the Utils interface probe is
 90.406 → 90.767 seconds wall with 84 → 85 compiler jobs. This is accepted under
 the operator's prior qualitative amendment, not reported as a compile win.
-See [measurements](../evidence/GEOM-099/measurements.md) and the
-[implementation review](../evidence/GEOM-099/implementation-review.md).
+See [measurements](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/GEOM-099/measurements.md) and the
+[implementation review](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/GEOM-099/implementation-review.md).
 
 At this stage, retirement was pending the required full UBSan gate: the unchanged
 `SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob` compares

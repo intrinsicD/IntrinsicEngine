@@ -50,6 +50,21 @@ This matters most for negative and bounded results. A `refuted` claim with a cle
 record is worth more than a vague positive, because it stops the next agent from re-running work
 that has already failed a gate.
 
+## Evidence lifetime
+
+[Task retirement](../../../../../docs/agent/task-format.md#retiring-a-task) owns evidence cleanup. Keep new
+raw artifacts and review packets in ignored temporary storage. Before removing
+completed evidence, preserve conclusions, negative results, limitations and
+useful reproduction details in maintained docs or the claim ledger. Current
+claim rows retain their Statement and Status; a ledger-level retention note
+identifies retired raw evidence. `Proof` may bind an exact `commit:path` plus a durable
+repository summary. This preserves a historical observation, not current raw
+proof or a new verification. Future local-only result summaries record the
+source commit, command, packet digest, every planned cell disposition (including
+negative, failed and unknown outcomes), uncertainty and the decision limits.
+Future local-only raw evidence cannot be recovered from Git after cleanup.
+Tests and maintained fixtures are durable assets.
+
 ## Layout
 
 | Path | Holds | IDs |
@@ -63,7 +78,7 @@ that has already failed a gate.
 | `ara/staging/observations.yaml` | observations awaiting closure | `O<NN>` |
 | `ara/trace/exploration_tree.yaml` | the research journey | `N<NN>` |
 | `ara/trace/sessions/` | per-session records, indexed by `session_index.yaml` | — |
-| `ara/evidence/` | raw proof references and tables | — |
+| `ara/evidence/` | temporary open/legacy diagnostics and remaining summaries | — |
 
 ## Claim record format
 
@@ -88,9 +103,12 @@ Every claim is a `## C<NN>: <title>` section carrying nine fields:
   `unavailable`, `superseded`, `withdrawn` — and may carry a scope qualifier after it. A
   `supported` or `refuted` claim must cite at least one repository path in `Proof` that exists on
   disk; a `hypothesis` may cite only an exploration node and the task that would test it.
-- **`Proof`** entries are repository paths (`src/`, `tests/`, `tasks/`, `methods/`, `docs/`,
+- **`Proof`** entries are exact historical `commit:path` bindings or repository paths (`src/`, `tests/`, `tasks/`, `methods/`, `docs/`,
   `benchmarks/`, `tools/`, `ara/`), `N<NN>` exploration nodes, or a commit hash. Paths are checked
   for existence, so moving a cited file means updating the claim in the same change.
+  Historical `commit:path` entries are not checked by this validator; verify
+  them with `git cat-file -e <commit>:<path>` when creating/migrating the citation
+  (shallow CI clones need not contain the historical object).
 - **`Dependencies`** resolve by prefix: `C` in the claim ledger, `K` in `constraints.md`, `A` in
   `architecture.md`, `H` in `heuristics.md`. A dependency on an ID nobody crystallized is an error.
 - **`From staging`** must name an `O<NN>` that exists in `staging/observations.yaml`.
@@ -148,10 +166,16 @@ conversational pre-merge sweep does not replace it. Repository mapping:
 
 - Packet and verbatim verdicts live with the run's evidence:
   `tasks/evidence/<ID>/preflight/<run>/` for task work, otherwise next to the
-  run's raw outputs (under `ara/evidence/` when a claim row will cite them). A
+  run's raw outputs under ignored `ara/evidence/diagnostics/<run>/`. A
   micro task's `evidence: not_applicable` exempts it from completion
   artifacts, not from the pre-flight; no task file is created only to hold a
   packet.
+- Freeze committed source identity and the exact local packet/input hashes after
+  the last source change. Packets remain ignored; reviewers receive the actual
+  files explicitly. The manifest tool skips ignored files by default, so pass
+  the packet and ignored inputs as explicit extra paths. The operator-selected
+  retention policy replaces the older requirement to commit raw packets, not the independent pre-run review or
+  start checks. A file/hash change outside the reviewed plan needs re-review.
 - Pilot and calibration packets are reviewed prospectively; a confirmation run
   needs the pilot's measurement checks passed (the skill's §Stages). Custody
   profiles: [Experiment pre-flight under custody](../../../../../docs/agent/workflow-evidence.md#experiment-pre-flight-under-custody).
@@ -207,7 +231,9 @@ truth is already known, the less of this loop is owed.
 - Promoting a `hypothesis` to `supported` without adding the artifact that justifies it.
 - Promoting `hypothesis` to `supported` on the confirming run alone while a staged observation
   contradicts it. Backtest the claim against the campaign's full observation record first.
-- Citing a `build/` or otherwise untracked path as proof — a fresh clone cannot resolve it.
+- Citing a `build/` or otherwise untracked path as durable proof — a fresh clone
+  cannot resolve it. Local packets may cite ignored bytes during open work;
+  published claims cite the tracked result summary after retirement.
 - Rewriting or deleting a `refuted` claim to tidy the ledger. Dispositions are append-only in
   spirit: supersede, do not erase.
 - Recording a benchmark number in a claim without the manifest and baseline the benchmarking

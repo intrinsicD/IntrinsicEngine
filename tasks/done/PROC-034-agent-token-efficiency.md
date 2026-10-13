@@ -163,7 +163,7 @@ For live profile validation, start `codex --profile intrinsic-routine --strict-c
 in this repository, confirm the status shows `gpt-6-astra medium`, then exit
 without submitting a prompt. `app-server` does not accept this profile selector;
 `debug prompt-input` ignores it and is not valid evidence of profile resolution.
-The [measurement bundle](../evidence/PROC-034/reasoning-trial.json) retains exact
+The [measurement bundle](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/PROC-034/reasoning-trial.json) retains exact
 prompts, run order, commands, evaluator source, every candidate, usage, and checks.
 Its runner can be extracted into a fresh temporary directory with the manifest
 and workspace instructions to repeat the paid/model portion deliberately.

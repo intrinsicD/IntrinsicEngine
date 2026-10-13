@@ -25,7 +25,7 @@ additional regression test adds 33, for a total code decrease of 169.
 All six matched samples pass the frozen limits. Clean wall and compiler sum
 both change by -0.17%; the shared-header probe is +0.80% wall and +0.64%
 compiler work, including 50 → 51 jobs for the added regression consumer.
-No-op compiler work remains zero. [Measurements and raw evidence](../evidence/GRAPHICS-146/measurements.md)
+No-op compiler work remains zero. [Measurements and raw evidence](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/GRAPHICS-146/measurements.md)
 preserve exact source identities, dependency hashes and all results.
 
 The original eleven focused cases pass before extraction; the twelve final
@@ -34,7 +34,7 @@ fresh ASan (3,231) and fresh UBSan (3,231) gates have zero failures. CPU/UBSan
 each skip the expected GLFW lifetime case; ASan runs every selected entry.
 Claude Sonnet medium found no actionable defects in the fixed diff. Its reliance
 on the supplied unmodified-pass stream audit is explicit in the
-[review](../evidence/GRAPHICS-146/implementation-review.md); exact-stream tests
+[review](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/GRAPHICS-146/implementation-review.md); exact-stream tests
 and the local eleven-file source audit retain independent verification.
 No production code, Vulkan execution or capability-maturity claim is added.
 
@@ -167,7 +167,7 @@ git diff --check
 ## Planning review
 
 Codex and Claude Code reached consensus on 2026-09-21 before this task was
-filed. The [shared planning review](../evidence/GEOM-099/claude-planning-review.md)
+filed. The [shared planning review](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/GEOM-099/claude-planning-review.md)
 records the agreed scope, corrections, rejected job-lifecycle candidate and
 compile-regression stop rules. Implementation and timing evidence are recorded in the completion section above.
 ## Execution plan — 2026-09-21

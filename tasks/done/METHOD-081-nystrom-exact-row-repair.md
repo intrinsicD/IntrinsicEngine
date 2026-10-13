@@ -17,7 +17,7 @@ contracts: [method.engine-integration]
 2. "Dann versuchen wir es damit mal."
 3. "Mach dann nochmal einen Test bitte"
 
-Operator-directed work outside Framework24 P0. [Plan](../evidence/METHOD-081/plan.md)
+Operator-directed work outside Framework24 P0. [Plan](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-081/plan.md)
 implements the agreed complete-row repair and tests it on analytic controls and the known fixture.
 
 ## Acceptance criteria
@@ -53,13 +53,13 @@ python3 tools/agents/check_ara_claims.py --root . --strict
 ## Completion — 2026-10-11
 Implementation commit: `ba11fce6b`; frozen comparison: `7c49f5f14`; baseline: `a93dcb8c7`.
 Canonical result and limits: [ARA C122](../../ara/logic/claims.md),
-[raw report](../evidence/METHOD-081/runs/report.html).
+[raw report](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-081/runs/report.html).
 
 Independent code reviewer `/root/nystrom_repair_code` accepted the first two criteria on
 diff SHA256 `a2f0d3daa82a58f116b1982a478ea241d57e26220114cdfdab0f8c60c8b3af4b`.
 Referee `/root/method081_results` decided: **“approve — I accept METHOD-081’s third acceptance
-criterion for this bounded CPU comparison.”** Its [actual answer](../evidence/METHOD-081/reviews/results-review.txt)
-and [claim wording verdict](../evidence/METHOD-081/reviews/claim-review.txt) bind the raw audit.
+criterion for this bounded CPU comparison.”** Its [actual answer](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-081/reviews/results-review.txt)
+and [claim wording verdict](https://github.com/intrinsicD/IntrinsicEngine/blob/36a7b5062d9be3239d667efd9e41c4d4028ba249/tasks/evidence/METHOD-081/reviews/claim-review.txt) bind the raw audit.
 Two fresh Codex reviewers approved preflight after the operator's explicit Claude substitution.
 
 Focused evidence is 41/41 tests, two before-fix regression failures and four rejected

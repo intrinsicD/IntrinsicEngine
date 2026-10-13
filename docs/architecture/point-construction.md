@@ -68,4 +68,4 @@ the sample-anchored field, tie semantics and numerical limits. The
 [consumer inventory](spatial-index-consumers.md) tracks other spatial uses.
 
 Bounded CPU/Vulkan execution, generated-pixel checks and current limitations are
-recorded in [C91 verification](../../ara/evidence/tables/point_construction_verification_2026-09-10.md).
+recorded in [C91 verification](../results/point_construction_verification_2026-09-10.md).
