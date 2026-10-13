@@ -102,17 +102,22 @@ namespace Geometry::Mesh::Conversion
     ToHalfedgeMeshResult ToHalfedgeMesh(MeshSoup::IndexedMeshView view,
                                         const MeshSoup::ValidationOptions& options)
     {
+        MeshSoup::ValidationContext context(view, options);
+        return ToHalfedgeMesh(context);
+    }
+
+    ToHalfedgeMeshResult ToHalfedgeMesh(MeshSoup::ValidationContext& context)
+    {
+        const auto view = context.View();
         ToHalfedgeMeshResult result;
-        const MeshSoup::ValidationResult validation = MeshSoup::Validate(view, options);
+        const auto& validation = context.Validate();
         AppendValidationDiagnostics(result.Diagnostics, validation);
         if (HasErrors(result.Diagnostics))
         {
             return result;
         }
 
-        std::size_t cornerCount = 0u;
-        for (const auto& face : view.Faces)
-            cornerCount += face.Indices.size();
+        const std::size_t cornerCount = validation.CornerCount;
         // Interior edges have two corners. Boundary edges can grow the estimate.
         result.Mesh.Reserve(view.Positions.size(), cornerCount / 2u, view.Faces.size());
         std::vector<VertexHandle> vertices;

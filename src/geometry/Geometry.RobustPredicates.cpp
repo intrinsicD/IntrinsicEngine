@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 #include <glm/glm.hpp>
@@ -9,6 +10,57 @@ module Geometry.RobustPredicates;
 
 namespace Geometry::RobustPredicates
 {
+    namespace {
+// Knuth two-sum: a + b == sum + error exactly under IEEE round-to-nearest.
+void TwoSum(const double a, const double b, double &sum,
+            double &error) noexcept {
+  sum = a + b;
+  const double bVirtual = sum - a;
+  const double aVirtual = sum - bVirtual;
+  error = (a - aVirtual) + (b - bVirtual);
+}
+
+    }
+
+int ExactOrientation2D(const glm::vec2 a, const glm::vec2 b,
+                       const glm::vec2 c) noexcept {
+  // (b-a) x (c-a) expanded into six float products, each exact in double.
+  const std::array<double, 6u> terms{
+      static_cast<double>(b.x) * static_cast<double>(c.y),
+      -(static_cast<double>(b.x) * static_cast<double>(a.y)),
+      -(static_cast<double>(a.x) * static_cast<double>(c.y)),
+      -(static_cast<double>(b.y) * static_cast<double>(c.x)),
+      static_cast<double>(a.x) * static_cast<double>(b.y),
+      static_cast<double>(c.x) * static_cast<double>(a.y),
+  };
+  // Shewchuk grow-expansion: components stay nonoverlapping and ordered by
+  // magnitude, so the most significant nonzero component carries the sign.
+  std::array<double, 6u> expansion{};
+  std::size_t length = 0u;
+  for (const double term : terms) {
+    double carry = term;
+    for (std::size_t i = 0u; i < length; ++i) {
+      double sum = 0.0;
+      double error = 0.0;
+      TwoSum(carry, expansion[i], sum, error);
+      expansion[i] = error;
+      carry = sum;
+    }
+    expansion[length++] = carry;
+  }
+  for (std::size_t i = length; i > 0u; --i) {
+    if (expansion[i - 1u] > 0.0) {
+      return 1;
+    }
+    if (expansion[i - 1u] < 0.0) {
+      return -1;
+    }
+  }
+  return 0;
+}
+
+
+
 [[nodiscard]] SignedResult ApproxZeroSqDiagnostic(double valueSq,
                                                              double scale,
                                                              double relative) noexcept

@@ -6,6 +6,7 @@ target_sources(${target_name}
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Asset.EventBus.cppm
         Asset.GeometryPayload.cppm
+        Asset.ImportValidation.cppm
         Asset.ImportRouter.cppm
         Asset.LoadPipeline.cppm
         Asset.ModelTexturePayload.cppm
@@ -16,6 +17,7 @@ target_sources(${target_name}
         Asset.TypePool.cppm
         PRIVATE
         Asset.EventBus.cpp
+        Asset.ImportValidation.cpp
         Asset.ImportRouter.cpp
         Asset.LoadPipeline.cpp
         Asset.ModelTexturePayload.cpp

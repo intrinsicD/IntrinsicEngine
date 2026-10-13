@@ -1,5 +1,7 @@
+// Indexed polygon staging and composable validation for import and conversion.
 module;
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -148,12 +150,27 @@ export namespace Geometry::MeshSoup
         NonManifoldEdge,
         InconsistentWinding,
         AttributeArityMismatch,
+        NonFinitePosition,
+        InvalidFaceSize,
+        RepeatedFaceIndex,
+        PoorFaceQuality,
+        DuplicateFace,
+        Count,
+    };
+
+    struct ValidationChecks
+    {
+        bool DuplicateVertices{true};
+        bool FaceGeometry{true};
+        bool Topology{true};
+        bool Attributes{true};
     };
 
     struct ValidationOptions
     {
         float DuplicateVertexTolerance{0.0f};
-        float DegenerateAreaTolerance{1.0e-12f};
+        ValidationChecks Checks{};
+        bool AllowZeroAreaFaces{false};
     };
 
     struct ValidationDiagnostic
@@ -165,7 +182,7 @@ export namespace Geometry::MeshSoup
         Index OtherVertexIndex{static_cast<Index>(-1)};
         Index EdgeStart{static_cast<Index>(-1)};
         Index EdgeEnd{static_cast<Index>(-1)};
-        std::string AttributeName;
+        std::string AttributeName{};
         AttributeDomain AttributeDomainValue{AttributeDomain::Vertex};
         std::size_t ExpectedCount{0u};
         std::size_t ActualCount{0u};
@@ -174,11 +191,43 @@ export namespace Geometry::MeshSoup
     struct ValidationResult
     {
         std::vector<ValidationDiagnostic> Diagnostics;
+        std::array<std::size_t, static_cast<std::size_t>(ValidationDiagnosticKind::Count)> Counts{};
+        ValidationChecks Executed{false, false, false, false};
+        bool StructureChecked{false};
+        std::size_t CornerCount{0};
+        std::size_t BoundaryEdgeCount{0};
 
         [[nodiscard]] bool HasErrors() const noexcept;
         [[nodiscard]] std::size_t Count(ValidationDiagnosticKind kind) const noexcept;
+        // Retains a bounded sample per kind; Counts includes every observation.
+        void AddDiagnostic(ValidationDiagnostic diagnostic);
     };
 
+    // Borrows an unchanged view for one validation session. Recreate after any
+    // input mutation; no result is reusable against a different data state.
+    class ValidationContext
+    {
+    public:
+        explicit ValidationContext(IndexedMeshView view, ValidationOptions options = {});
+        [[nodiscard]] IndexedMeshView View() const noexcept { return m_View; }
+        void CheckStructure();
+        void CheckDuplicateVertices();
+        void CheckFaceGeometry();
+        void CheckTopology();
+        void CheckAttributes();
+        [[nodiscard]] const ValidationResult& Validate();
+        [[nodiscard]] const ValidationResult& Result() const noexcept { return m_Result; }
+
+    private:
+        IndexedMeshView m_View;
+        ValidationOptions m_Options;
+        ValidationResult m_Result{};
+        std::vector<std::uint8_t> m_UsableFaces{};
+    };
+
+    // Squared doubled area / longest-edge^4; unitless for finite input.
+    [[nodiscard]] double RelativeTriangleAreaSquared(glm::vec3 a, glm::vec3 b, glm::vec3 c) noexcept;
+    [[nodiscard]] bool IsNearlyDegenerateTriangle(glm::vec3 a, glm::vec3 b, glm::vec3 c) noexcept;
     [[nodiscard]] IndexedMeshView BorrowView(const IndexedMesh& mesh) noexcept;
     [[nodiscard]] std::string_view ToString(AttributeDomain domain) noexcept;
     [[nodiscard]] std::string_view ToString(ValidationDiagnosticKind kind) noexcept;

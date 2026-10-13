@@ -19,6 +19,7 @@ module;
 #include <string>
 #include <string_view>
 #include <utility>
+#include <unordered_map>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -28,6 +29,7 @@ module Extrinsic.Runtime.AssetWorkflowModelTextureDecode;
 import Extrinsic.Asset.GeometryPayload;
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.ModelTexturePayload;
+import Extrinsic.Asset.ImportValidation;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.IOBackend;
 import Geometry.HalfedgeMesh.IO;
@@ -38,6 +40,8 @@ namespace Extrinsic::Runtime
     namespace
     {
         namespace Assets = Extrinsic::Assets;
+        using Check = Assets::ImportCheck;
+        using Status = Assets::ImportCheckStatus;
 
         struct ExternalResourceRead
         {
@@ -47,7 +51,7 @@ namespace Extrinsic::Runtime
         };
 
         using ExternalResourceReader = std::function<
-            Core::Expected<ExternalResourceRead>(std::string_view)>;
+            Core::Expected<ExternalResourceRead>(std::string_view, std::size_t)>;
 
         struct ModelTextureDecodeRequest
         {
@@ -56,6 +60,8 @@ namespace Extrinsic::Runtime
             std::string BasePath{};
             std::span<const std::byte> SourceBytes{};
             ExternalResourceReader ReadExternalResource{};
+            Assets::ImportValidationOptions ValidationOptions{};
+            Assets::ImportValidationReport* Report{nullptr};
         };
 
         [[nodiscard]] std::string ResolveExternalPath(
@@ -72,11 +78,13 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] Core::Expected<std::vector<std::byte>> ReadBytes(
             Core::IO::IIOBackend& backend,
-            const std::string_view path)
+            const std::string_view path, const std::size_t maxBytes)
         {
-            auto read = backend.Read(Core::IO::IORequest{.Path = std::string(path)});
+            auto read = backend.Read(Core::IO::IORequest{.Path = std::string(path), .MaxBytes = maxBytes});
             if (!read.has_value())
                 return std::unexpected(read.error());
+            if (read->Data.size() > maxBytes)
+                return Core::Err<std::vector<std::byte>>(Core::ErrorCode::OutOfRange);
             return std::move(read->Data);
         }
 
@@ -84,7 +92,7 @@ namespace Extrinsic::Runtime
         ReadExternalResource(
             Core::IO::IIOBackend& backend,
             const std::string_view basePath,
-            const std::string_view uri)
+            const std::string_view uri, const std::size_t maxBytes)
         {
             if (uri.empty())
             {
@@ -93,7 +101,7 @@ namespace Extrinsic::Runtime
             }
             const std::string resolvedPath =
                 ResolveExternalPath(basePath, uri);
-            auto bytes = ReadBytes(backend, resolvedPath);
+            auto bytes = ReadBytes(backend, resolvedPath, maxBytes);
             if (!bytes.has_value())
                 return std::unexpected(bytes.error());
             return ExternalResourceRead{
@@ -107,7 +115,9 @@ namespace Extrinsic::Runtime
             const Assets::AssetImportRoute& route,
             const std::string_view path,
             const std::span<const std::byte> sourceBytes,
-            Core::IO::IIOBackend& backend)
+            Core::IO::IIOBackend& backend,
+            Assets::ImportValidationOptions options,
+            Assets::ImportValidationReport* report)
         {
             const std::string pathString{path};
             std::string basePath =
@@ -119,11 +129,13 @@ namespace Extrinsic::Runtime
                 .SourceBytes = sourceBytes,
                 .ReadExternalResource =
                     [&backend, basePath = std::move(basePath)](
-                        const std::string_view uri)
+                        const std::string_view uri, const std::size_t maxBytes)
                         -> Core::Expected<ExternalResourceRead>
                     {
-                        return ReadExternalResource(backend, basePath, uri);
+                        return ReadExternalResource(backend, basePath, uri, maxBytes);
                     },
+                .ValidationOptions = options,
+                .Report = report,
             };
         }
 
@@ -252,7 +264,46 @@ namespace Extrinsic::Runtime
         {
             const ModelTextureDecodeRequest* Request{nullptr};
             std::vector<Assets::AssetModelExternalResourceDiagnostic>* Diagnostics{nullptr};
+            mutable std::unordered_map<std::string, Core::Expected<ExternalResourceRead>> Reads{};
+            mutable std::size_t ExternalBytes{0};
+            std::size_t DecodedImageBytes{0};
         };
+
+        const Core::Expected<ExternalResourceRead>& ReadGltfResource(
+            const GltfFsContext& context, const std::string& path)
+        {
+            if (const auto found = context.Reads.find(path); found != context.Reads.end())
+                return found->second;
+            const auto used = context.Request->SourceBytes.size() + context.ExternalBytes;
+            const auto limit = context.Request->ValidationOptions.MaxSourceBytes;
+            auto read = context.Request->ReadExternalResource(path, used < limit ? limit - used : 0);
+            if (read) context.ExternalBytes += read->Bytes.size();
+            else if (read.error() == Core::ErrorCode::OutOfRange)
+                context.Request->Report->Record(Check::Resources, Status::Failed,
+                    "Source-byte budget exceeded: " + path);
+            return context.Reads.emplace(path, std::move(read)).first->second;
+        }
+
+        bool LoadBoundedGltfImage(tinygltf::Image* image, int index, std::string* error,
+            std::string* warning, int width, int height, const unsigned char* bytes, int size, void* user)
+        {
+            auto& context = *static_cast<GltfFsContext*>(user);
+            int w = 0, h = 0, channels = 0;
+            const auto remaining = context.Request->ValidationOptions.MaxDecodedImageBytes - context.DecodedImageBytes;
+            const std::size_t pixelBytes = stbi_is_16_bit_from_memory(bytes, size) ? 8u : 4u;
+            if (!stbi_info_from_memory(bytes, size, &w, &h, &channels) || w <= 0 || h <= 0 ||
+                static_cast<std::size_t>(w) > remaining / pixelBytes / static_cast<std::size_t>(h))
+            {
+                if (error) *error = "Invalid image header or decoded-image budget exceeded";
+                context.Request->Report->Record(Check::Resources, Status::Failed,
+                    "Invalid image header or decoded-image budget exceeded", -1, index);
+                return false;
+            }
+            if (!tinygltf::LoadImageData(image, index, error, warning, width, height, bytes, size, nullptr))
+                return false;
+            context.DecodedImageBytes += image->image.size();
+            return true;
+        }
 
         bool GltfFileExists(const std::string& filename, void* userData)
         {
@@ -264,7 +315,7 @@ namespace Extrinsic::Runtime
             }
 
             const std::string resolved = ResolveExternalPath(context->Request->BasePath, filename);
-            auto read = context->Request->ReadExternalResource(resolved);
+            const auto& read = ReadGltfResource(*context, resolved);
             if (!read.has_value() && context->Diagnostics != nullptr)
             {
                 RecordExternalReadDiagnostic(
@@ -305,7 +356,7 @@ namespace Extrinsic::Runtime
             }
 
             const std::string resolved = ResolveExternalPath(context->Request->BasePath, filename);
-            auto read = context->Request->ReadExternalResource(resolved);
+            const auto& read = ReadGltfResource(*context, resolved);
             if (!read.has_value())
             {
                 if (err != nullptr)
@@ -358,7 +409,7 @@ namespace Extrinsic::Runtime
             }
 
             const std::string resolved = ResolveExternalPath(context->Request->BasePath, filename);
-            auto read = context->Request->ReadExternalResource(resolved);
+            const auto& read = ReadGltfResource(*context, resolved);
             if (!read.has_value())
             {
                 if (err != nullptr)
@@ -452,6 +503,7 @@ namespace Extrinsic::Runtime
                 || request.SourceBytes.size()
                     > static_cast<std::size_t>(std::numeric_limits<unsigned int>::max()))
             {
+                request.Report->Record(Check::Format, Status::Failed, "Empty glTF source or source exceeds decoder size range");
                 return Core::Err<tinygltf::Model>(Core::ErrorCode::AssetInvalidData);
             }
 
@@ -469,6 +521,7 @@ namespace Extrinsic::Runtime
             callbacks.GetFileSizeInBytes = GltfGetFileSizeInBytes;
             callbacks.user_data = &context;
             loader.SetFsCallbacks(callbacks);
+            loader.SetImageLoader(LoadBoundedGltfImage, &context);
 
             bool loaded = false;
             const auto* bytes = reinterpret_cast<const unsigned char*>(request.SourceBytes.data());
@@ -501,10 +554,15 @@ namespace Extrinsic::Runtime
                     baseDir);
             }
 
+            if (!warning.empty()) request.Report->Record(Check::Format, Status::Warning, warning);
             if (!loaded)
             {
+                request.Report->Record(Check::Format, Status::Failed, error.empty() ? "glTF decoder rejected input" : error);
                 return Core::Err<tinygltf::Model>(Core::ErrorCode::AssetDecodeFailed);
             }
+            request.Report->Record(Check::Format, Status::Passed);
+            if (request.Report->HasErrors())
+                return Core::Err<tinygltf::Model>(Core::ErrorCode::AssetInvalidData);
             return model;
         }
 
@@ -519,6 +577,8 @@ namespace Extrinsic::Runtime
                 return Core::Err<AccessorView>(Core::ErrorCode::OutOfRange);
             }
             const tinygltf::Accessor& accessor = model.accessors[accessorIndex];
+            if (accessor.sparse.isSparse)
+                return Core::Err<AccessorView>(Core::ErrorCode::AssetUnsupportedFormat);
             if (requiredType != 0 && accessor.type != requiredType)
             {
                 return Core::Err<AccessorView>(Core::ErrorCode::InvalidFormat);
@@ -549,20 +609,17 @@ namespace Extrinsic::Runtime
             const std::size_t componentCount = static_cast<std::size_t>(componentCountSigned);
             const std::size_t packedStride = componentSize * componentCount;
             const std::size_t stride = view.byteStride == 0u ? packedStride : view.byteStride;
-            const std::size_t start = view.byteOffset + accessor.byteOffset;
-            if (stride < packedStride || start > buffer.data.size())
-            {
+            if (stride < packedStride || stride % componentSize != 0u ||
+                view.byteOffset > buffer.data.size() ||
+                view.byteLength > buffer.data.size() - view.byteOffset ||
+                accessor.byteOffset > view.byteLength ||
+                accessor.byteOffset % componentSize != 0u || view.byteOffset % componentSize != 0u)
                 return Core::Err<AccessorView>(Core::ErrorCode::InvalidFormat);
-            }
-            if (accessor.count > 0u)
-            {
-                const std::size_t lastOffset = start + stride * (accessor.count - 1u);
-                if (lastOffset < start || lastOffset + packedStride < lastOffset
-                    || lastOffset + packedStride > buffer.data.size())
-                {
-                    return Core::Err<AccessorView>(Core::ErrorCode::OutOfRange);
-                }
-            }
+            const std::size_t available = view.byteLength - accessor.byteOffset;
+            if (accessor.count > 0u && (packedStride > available ||
+                accessor.count - 1u > (available - packedStride) / stride))
+                return Core::Err<AccessorView>(Core::ErrorCode::OutOfRange);
+            const std::size_t start = view.byteOffset + accessor.byteOffset;
 
             return AccessorView{
                 .Data = buffer.data.data() + start,
@@ -805,7 +862,8 @@ namespace Extrinsic::Runtime
             const tinygltf::Model& model,
             const tinygltf::Primitive& primitive,
             const std::string& sourcePath,
-            const std::string& basePath)
+            const std::string& basePath,
+            const ModelTextureDecodeRequest& request, const std::size_t primitiveIndex)
         {
             const auto positionIt = primitive.attributes.find("POSITION");
             if (positionIt == primitive.attributes.end())
@@ -813,9 +871,30 @@ namespace Extrinsic::Runtime
                 return Core::Err<Geometry::MeshIO::MeshIOResult>(Core::ErrorCode::AssetInvalidData);
             }
 
+            // Structural checks remain mandatory even when optional attribute-quality checks are skipped.
+            for (const auto& [name, accessorIndex] : primitive.attributes)
+            {
+                if (name != "POSITION" && name != "NORMAL" && name != "TEXCOORD_0") continue;
+                if (accessorIndex >= 0 && static_cast<std::size_t>(accessorIndex) < model.accessors.size() &&
+                    model.accessors[accessorIndex].sparse.isSparse)
+                {
+                    request.Report->Record(Check::Attributes, Status::Failed,
+                        "Consumed sparse accessor is unsupported: " + name, primitiveIndex, accessorIndex);
+                    return Core::Err<Geometry::MeshIO::MeshIOResult>(Core::ErrorCode::AssetInvalidData);
+                }
+            }
+            if (primitive.indices >= 0 && static_cast<std::size_t>(primitive.indices) < model.accessors.size() &&
+                model.accessors[primitive.indices].sparse.isSparse)
+            {
+                request.Report->Record(Check::References, Status::Failed,
+                    "Consumed sparse index accessor is unsupported", primitiveIndex, primitive.indices);
+                return Core::Err<Geometry::MeshIO::MeshIOResult>(Core::ErrorCode::AssetInvalidData);
+            }
             auto positions = LoadVec3Accessor(model, positionIt->second);
             if (!positions.has_value() || positions->empty())
             {
+                request.Report->Record(Check::References, Status::Failed,
+                    "POSITION accessor is empty or has invalid type, stride or bufferView range", primitiveIndex, positionIt->second);
                 return Core::Err<Geometry::MeshIO::MeshIOResult>(
                     positions.has_value() ? Core::ErrorCode::AssetInvalidData : positions.error());
             }
@@ -823,6 +902,8 @@ namespace Extrinsic::Runtime
             auto indices = PrimitiveIndices(model, primitive, positions->size());
             if (!indices.has_value())
             {
+                request.Report->Record(Check::References, Status::Failed,
+                    "Index accessor has invalid type, stride or bufferView range", primitiveIndex, primitive.indices);
                 return Core::Err<Geometry::MeshIO::MeshIOResult>(indices.error());
             }
             auto faces = BuildTriangleFaces(primitive, std::move(*indices));
@@ -832,6 +913,11 @@ namespace Extrinsic::Runtime
                     faces.has_value() ? Core::ErrorCode::AssetInvalidData : faces.error());
             }
 
+            if (request.ValidationOptions.Attributes)
+                for (const auto& [name, accessorIndex] : primitive.attributes)
+                    if (name != "POSITION" && name != "NORMAL" && name != "TEXCOORD_0")
+                        request.Report->Record(Check::Attributes, Status::Unsupported,
+                            "Attribute is not imported: " + name, primitiveIndex, accessorIndex);
             Geometry::MeshIO::MeshIOResult result{};
             result.SourcePath = sourcePath;
             result.BasePath = basePath;
@@ -846,7 +932,19 @@ namespace Extrinsic::Runtime
             if (normalIt != primitive.attributes.end())
             {
                 auto normals = LoadVec3Accessor(model, normalIt->second);
-                if (normals.has_value() && normals->size() == positions->size())
+                if (!normals)
+                {
+                    request.Report->Record(Check::Attributes, Status::Failed,
+                        "NORMAL accessor has invalid type, stride or bufferView range", primitiveIndex, normalIt->second);
+                    return Core::Err<Geometry::MeshIO::MeshIOResult>(normals.error());
+                }
+                const bool validNormals = normals.has_value() && normals->size() == positions->size() &&
+                    std::ranges::all_of(*normals, [](glm::vec3 n) {
+                        return std::isfinite(n.x) && std::isfinite(n.y) && std::isfinite(n.z) && glm::dot(glm::dvec3{n}, glm::dvec3{n}) > 0.0;
+                    });
+                if (!validNormals) request.Report->Record(Check::Attributes, Status::Warning,
+                    "Invalid NORMAL accessor omitted; normals will be generated", primitiveIndex, normalIt->second);
+                if (validNormals)
                 {
                     auto normalProperty = result.Vertices.GetOrAdd<glm::vec3>(
                         "v:normal",
@@ -862,7 +960,17 @@ namespace Extrinsic::Runtime
             if (uvIt != primitive.attributes.end())
             {
                 auto uvs = LoadVec2Accessor(model, uvIt->second);
-                if (uvs.has_value() && uvs->size() == positions->size())
+                if (!uvs)
+                {
+                    request.Report->Record(Check::Attributes, Status::Failed,
+                        "TEXCOORD_0 accessor has invalid type, stride or bufferView range", primitiveIndex, uvIt->second);
+                    return Core::Err<Geometry::MeshIO::MeshIOResult>(uvs.error());
+                }
+                const bool validUvs = uvs.has_value() && uvs->size() == positions->size() &&
+                    std::ranges::all_of(*uvs, [](glm::vec2 uv) { return std::isfinite(uv.x) && std::isfinite(uv.y); });
+                if (!validUvs) request.Report->Record(Check::Attributes, Status::Warning,
+                    "Invalid TEXCOORD_0 accessor omitted; UV generation may be deferred", primitiveIndex, uvIt->second);
+                if (validUvs)
                 {
                     auto uvProperty = result.Vertices.GetOrAdd<glm::vec2>(
                         "v:texcoord",
@@ -1163,7 +1271,7 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] Core::Expected<RawNodeContract> ReadRawNodeContract(
             const nlohmann::json& sourceDocument,
-            const std::size_t nodeIndex)
+            const std::size_t nodeIndex, Assets::ImportValidationReport& report)
         {
             const auto nodesIt = sourceDocument.find("nodes");
             if (nodesIt == sourceDocument.end() || !nodesIt->is_array()
@@ -1197,6 +1305,7 @@ namespace Extrinsic::Runtime
                 ValidateRawNumericArray(rawNode, "scale", 3u));
             if (!transformResult.has_value())
             {
+                report.Record(Check::Transforms, Status::Failed, "Invalid or non-finite node transform", -1, nodeIndex);
                 return Core::Err<RawNodeContract>(transformResult.error());
             }
 
@@ -1412,11 +1521,14 @@ namespace Extrinsic::Runtime
                     model,
                     primitive,
                     request.Path,
-                    request.BasePath);
+                    request.BasePath, request, payload.Primitives.size());
                 if (!meshPayload.has_value())
                 {
                     if (meshPayload.error() == Core::ErrorCode::AssetUnsupportedFormat)
                     {
+                        request.Report->Record(Check::Resources, Status::Unsupported,
+                            "Skipped unsupported primitive mode " + std::to_string(primitive.mode) +
+                            " in mesh " + std::to_string(meshIndex), primitiveIndex);
                         cached.State = PrimitiveCacheState::Skipped;
                         continue;
                     }
@@ -1585,7 +1697,7 @@ namespace Extrinsic::Runtime
 
                 auto rawNode = ReadRawNodeContract(
                     *sourceDocument,
-                    sourceNodeIndex);
+                    sourceNodeIndex, *request.Report);
                 if (!rawNode.has_value())
                 {
                     return Core::Err<std::uint32_t>(rawNode.error());
@@ -1601,6 +1713,7 @@ namespace Extrinsic::Runtime
                 auto localTransform = BuildNodeLocalTransform(sourceNode);
                 if (!localTransform.has_value())
                 {
+                    request.Report->Record(Check::Transforms, Status::Failed, "Invalid node transform", -1, sourceNodeIndex);
                     return Core::Err<std::uint32_t>(localTransform.error());
                 }
 
@@ -1742,6 +1855,20 @@ namespace Extrinsic::Runtime
             int components = 0;
             const auto* source = reinterpret_cast<const stbi_uc*>(request.SourceBytes.data());
             const int sourceSize = static_cast<int>(request.SourceBytes.size());
+            int infoWidth = 0, infoHeight = 0, infoComponents = 0;
+            const std::size_t pixelBytes = request.Route.Format == Assets::AssetFileFormat::HDR ? 16u : 4u;
+            if (!stbi_info_from_memory(source, sourceSize, &infoWidth, &infoHeight, &infoComponents) ||
+                infoWidth <= 0 || infoHeight <= 0)
+            {
+                request.Report->Record(Check::Format, Status::Failed, "Invalid image header");
+                return Core::Err<Assets::AssetTexture2DPayload>(Core::ErrorCode::AssetInvalidData);
+            }
+            if (static_cast<std::size_t>(infoWidth) > request.ValidationOptions.MaxDecodedImageBytes /
+                    pixelBytes / static_cast<std::size_t>(infoHeight))
+            {
+                request.Report->Record(Check::Resources, Status::Failed, "Decoded-image budget exceeded");
+                return Core::Err<Assets::AssetTexture2DPayload>(Core::ErrorCode::AssetInvalidData);
+            }
             if (request.Route.Format == Assets::AssetFileFormat::HDR)
             {
                 float* pixels = stbi_loadf_from_memory(
@@ -1819,6 +1946,58 @@ namespace Extrinsic::Runtime
             };
         }
 
+        [[nodiscard]] Core::Result CheckGltfFeatures(const tinygltf::Model& model,
+                                                         Assets::ImportValidationReport& report)
+        {
+            bool unsupportedRequired = false;
+            for (const auto& extension : model.extensionsRequired)
+                if (extension != "KHR_mesh_quantization")
+                {
+                    unsupportedRequired = true;
+                    report.Record(Check::Resources, Status::Failed, "Required extension is unsupported: " + extension);
+                }
+            for (const auto& extension : model.extensionsUsed)
+                if (extension != "KHR_mesh_quantization" &&
+                    std::ranges::find(model.extensionsRequired, extension) == model.extensionsRequired.end())
+                    report.Record(Check::Resources, Status::Unsupported, "Optional extension is unsupported: " + extension);
+            if (!model.skins.empty() || !model.animations.empty())
+                report.Record(Check::Resources, Status::Unsupported, "Skinning/animation is not imported; only the static scene is materialized");
+            for (const auto& mesh : model.meshes)
+                for (const auto& primitive : mesh.primitives)
+                    if (!primitive.targets.empty())
+                        report.Record(Check::Resources, Status::Unsupported, "Morph targets are not imported");
+            for (std::size_t i = 0; i < model.accessors.size(); ++i)
+                if (model.accessors[i].sparse.isSparse)
+                    report.Record(Check::Resources, Status::Unsupported, "Sparse accessors are unsupported; consumed sparse data is rejected", -1, i);
+            return !unsupportedRequired ? Core::Ok() : Core::Err(Core::ErrorCode::AssetUnsupportedFormat);
+        }
+
+        void CheckModelTransforms(const Assets::AssetModelScenePayload& model,
+                                  Assets::ImportValidationReport& report)
+        {
+            report.Record(Check::Transforms, Status::Passed);
+            for (std::size_t i = 0; i < model.Nodes.size(); ++i)
+            {
+                const auto& m = model.Nodes[i].LocalTransform;
+                glm::dmat3 linear{glm::dvec3{m[0], m[1], m[2]}, glm::dvec3{m[4], m[5], m[6]}, glm::dvec3{m[8], m[9], m[10]}};
+                const double determinant = glm::determinant(linear);
+                if (determinant == 0.0)
+                    report.Record(Check::Transforms, Status::Warning, "Singular node transform collapses geometry", -1, i);
+                else if (determinant < 0.0)
+                    report.Record(Check::Transforms, Status::Warning, "Reflected transform requires world-winding handling; not verified by CPU import", -1, i);
+            }
+        }
+
+        void CheckModelResources(const Assets::AssetModelScenePayload& model,
+                                 Assets::ImportValidationReport& report)
+        {
+            report.Record(Check::Resources, Status::Passed);
+            for (const auto& resource : model.ExternalResourceDiagnostics)
+                if (resource.Status != Assets::AssetModelResourceStatus::Ready)
+                    report.Record(Check::Resources, Status::Warning, resource.Uri + ": " + resource.Message);
+
+        }
+
         [[nodiscard]] Core::Expected<Assets::AssetModelScenePayload> DecodeGltfScene(
             const ModelTextureDecodeRequest& request)
         {
@@ -1828,14 +2007,19 @@ namespace Extrinsic::Runtime
             {
                 return Core::Err<Assets::AssetModelScenePayload>(model.error());
             }
+            if (auto features = CheckGltfFeatures(*model, *request.Report); !features)
+                return Core::Err<Assets::AssetModelScenePayload>(features.error());
             return BuildScenePayload(std::move(*model), request, std::move(diagnostics));
         }
     }
 
     Core::Expected<Assets::AssetModelScenePayload> DecodeModelSceneAsset(
         const std::string_view path,
-        Core::IO::IIOBackend& backend)
+        Core::IO::IIOBackend& backend,
+        const Assets::ImportValidationOptions options,
+        std::shared_ptr<Assets::ImportValidationReport> report)
     {
+        if (!report) report = std::make_shared<Assets::ImportValidationReport>();
         auto route = Assets::ResolveAssetImportRoute(
             path,
             Assets::AssetRouteOperation::Import,
@@ -1850,27 +2034,45 @@ namespace Extrinsic::Runtime
                 Core::ErrorCode::AssetUnsupportedFormat);
         }
 
-        auto bytes = ReadBytes(backend, path);
+        auto bytes = ReadBytes(backend, path, options.MaxSourceBytes);
         if (!bytes.has_value())
+        {
+            report->Record(Check::Resources, Status::Failed, "Source read failed or source-byte budget exceeded");
             return std::unexpected(bytes.error());
+        }
         auto decoded = DecodeGltfScene(MakeDecodeRequest(
             *route,
             path,
             std::span<const std::byte>(*bytes),
-            backend));
+            backend, options, report.get()));
         if (!decoded.has_value())
+        {
+            if (!report->HasErrors()) report->Record(Check::References, Status::Failed,
+                "Scene, transform or primitive validation failed: " + std::string{Core::Error::ToString(decoded.error())});
             return std::unexpected(decoded.error());
-        const Core::Result valid =
-            Assets::ValidateAssetModelScenePayload(*decoded);
+        }
+        const Core::Result valid = Assets::ValidateAssetModelScenePayload(*decoded);
         if (!valid.has_value())
+        {
+            report->Record(Check::References, Status::Failed, "Decoded scene payload references or attributes are invalid");
             return std::unexpected(valid.error());
+        }
+        report->Record(Check::References, Status::Passed);
+        report->Record(Check::Attributes, options.Attributes ? Status::Passed : Status::Skipped);
+        CheckModelTransforms(*decoded, *report);
+        CheckModelResources(*decoded, *report);
+        decoded->ValidationOptions = options;
+        decoded->ValidationReport = std::move(report);
         return decoded;
     }
 
     Core::Expected<Assets::AssetTexture2DPayload> DecodeTextureAsset(
         const std::string_view path,
-        Core::IO::IIOBackend& backend)
+        Core::IO::IIOBackend& backend,
+        const Assets::ImportValidationOptions options,
+        std::shared_ptr<Assets::ImportValidationReport> report)
     {
+        if (!report) report = std::make_shared<Assets::ImportValidationReport>();
         auto route = Assets::ResolveAssetImportRoute(
             path,
             Assets::AssetRouteOperation::Import,
@@ -1890,19 +2092,33 @@ namespace Extrinsic::Runtime
                 Core::ErrorCode::AssetLoaderMissing);
         }
 
-        auto bytes = ReadBytes(backend, path);
+        auto bytes = ReadBytes(backend, path, options.MaxSourceBytes);
         if (!bytes.has_value())
+        {
+            report->Record(Check::Resources, Status::Failed, "Source read failed or source-byte budget exceeded");
             return std::unexpected(bytes.error());
+        }
         auto decoded = DecodeStbTexture(MakeDecodeRequest(
             *route,
             path,
             std::span<const std::byte>(*bytes),
-            backend));
+            backend, options, report.get()));
         if (!decoded.has_value())
+        {
+            if (!report->HasErrors()) report->Record(Check::Format, Status::Failed, "Texture decoder rejected input: " + std::string{Core::Error::ToString(decoded.error())});
             return std::unexpected(decoded.error());
+        }
         const Core::Result valid = Assets::ValidateAssetTexture2DPayload(*decoded);
         if (!valid.has_value())
+        {
+            report->Record(Check::Resources, Status::Failed, "Invalid decoded image dimensions, format or byte count");
             return std::unexpected(valid.error());
+        }
+        report->Record(Check::Format, Status::Passed);
+        report->Record(Check::Resources, Status::Passed);
+        for (const auto check : {Check::References, Check::NumericData, Check::Attributes, Check::FaceGeometry,
+                                 Check::Topology, Check::DuplicateVertices, Check::Transforms})
+            report->Record(check, Status::NotApplicable);
         return decoded;
     }
 }

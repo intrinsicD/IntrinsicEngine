@@ -8,6 +8,7 @@ module;
 export module Extrinsic.Runtime.AssetWorkflowGeometryMaterialization;
 
 import Extrinsic.Core.Error;
+import Extrinsic.Asset.ImportValidation;
 export import Geometry.HalfedgeMesh;
 export import Geometry.HalfedgeMesh.IO;
 export import Geometry.UvAtlas;
@@ -76,11 +77,17 @@ struct RuntimeMeshMaterializationResult {
 
 struct RuntimeMeshMaterializationOptions {
   bool AllowDisconnectedRenderableFallback{false};
+  Assets::ImportValidationOptions ValidationOptions{};
+  Assets::ImportValidationReport* ValidationReport{nullptr};
+  std::size_t PrimitiveIndex{static_cast<std::size_t>(-1)};
   RuntimeMeshUvResolutionOptions UvResolution{};
 };
 
 struct RuntimeMeshGeometryOnlyOptions {
   bool AllowDisconnectedRenderableFallback{false};
+  Assets::ImportValidationOptions ValidationOptions{};
+  Assets::ImportValidationReport* ValidationReport{nullptr};
+  std::size_t PrimitiveIndex{static_cast<std::size_t>(-1)};
 };
 
 // Uses the existing topology and normals; only missing UV attributes are added.

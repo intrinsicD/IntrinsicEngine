@@ -14,6 +14,7 @@
 
 #include <glm/glm.hpp>
 
+import Geometry.RobustPredicates;
 import Geometry.UvAtlas;
 import Geometry.HalfedgeMesh.Utils;
 import Geometry.Properties;
@@ -218,7 +219,7 @@ void ExpectAcceptedAtlas(const IndexedMesh &mesh,
   }
   for (std::size_t f = 0u; f < mesh.FaceCount(); ++f) {
     EXPECT_LT(result.SourceFaceChart[f], result.Charts.size());
-    EXPECT_GT(Atlas::ExactUvOrientation(result.SourceCornerUvs[3u * f],
+    EXPECT_GT(Geometry::RobustPredicates::ExactOrientation2D(result.SourceCornerUvs[3u * f],
                                         result.SourceCornerUvs[3u * f + 1u],
                                         result.SourceCornerUvs[3u * f + 2u]),
               0);
@@ -723,14 +724,14 @@ TEST(UvAtlasValidation, ExactOrientationResolvesNearlyCollinearFloats) {
   const glm::vec2 on{0.5f, 0.5f};
   const glm::vec2 above{0.5f, std::nextafter(0.5f, 1.0f)};
   const glm::vec2 below{0.5f, std::nextafter(0.5f, 0.0f)};
-  EXPECT_EQ(Atlas::ExactUvOrientation(a, b, on), 0);
-  EXPECT_EQ(Atlas::ExactUvOrientation(a, b, above), 1);
-  EXPECT_EQ(Atlas::ExactUvOrientation(a, b, below), -1);
+  EXPECT_EQ(Geometry::RobustPredicates::ExactOrientation2D(a, b, on), 0);
+  EXPECT_EQ(Geometry::RobustPredicates::ExactOrientation2D(a, b, above), 1);
+  EXPECT_EQ(Geometry::RobustPredicates::ExactOrientation2D(a, b, below), -1);
   // Large and tiny magnitudes mixed.
   const glm::vec2 far{1.0e20f, 1.0e20f};
   const glm::vec2 tiny{1.0e-20f, 0.0f};
-  EXPECT_EQ(Atlas::ExactUvOrientation(glm::vec2{0.0f}, far, tiny), -1);
-  EXPECT_EQ(Atlas::ExactUvOrientation(glm::vec2{0.0f}, tiny, far), 1);
+  EXPECT_EQ(Geometry::RobustPredicates::ExactOrientation2D(glm::vec2{0.0f}, far, tiny), -1);
+  EXPECT_EQ(Geometry::RobustPredicates::ExactOrientation2D(glm::vec2{0.0f}, tiny, far), 1);
 }
 
 TEST(UvAtlasValidation, SharedEdgesAreNotOverlapsButFoldsAre) {

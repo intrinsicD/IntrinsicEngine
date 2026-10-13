@@ -5,6 +5,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <limits>
 #include <span>
 #include <string>
 #include <vector>
@@ -20,6 +21,7 @@ export namespace Extrinsic::Core::IO
         std::string Path;       // Logical path / container locator.
         std::size_t Offset = 0; // Byte offset; 0 = start of file.
         std::size_t Size   = 0; // Bytes to read; 0 = entire file.
+        std::size_t MaxBytes = std::numeric_limits<std::size_t>::max(); // Read allocation limit.
         uint8_t Priority   = 128; // 0 = highest priority (camera-driven streaming).
     };
 
@@ -39,7 +41,8 @@ export namespace Extrinsic::Core::IO
         IIOBackend(IIOBackend&&) = delete;
         IIOBackend& operator=(IIOBackend&&) = delete;
 
-        // Synchronous read. Safe to call from any thread.
+        // Synchronous read. Reject reads exceeding MaxBytes before allocating.
+        // Safe to call from any thread.
         [[nodiscard]] virtual Core::Expected<IOReadResult> Read(
             const IORequest& request) = 0;
 

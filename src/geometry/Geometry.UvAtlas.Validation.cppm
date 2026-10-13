@@ -20,17 +20,7 @@ export namespace Geometry::UvAtlas {
 inline constexpr std::uint32_t kInvalidUvAtlasIndex =
     std::numeric_limits<std::uint32_t>::max();
 
-/// Exact sign (-1, 0, +1) of the doubled signed area of the float triangle
-/// (a, b, c). Float products are exact in double and the six-term sum is
-/// evaluated as a nonoverlapping expansion, so no filter band is involved.
-[[nodiscard]] int ExactUvOrientation(glm::vec2 a, glm::vec2 b,
-                                     glm::vec2 c) noexcept;
 
-/// Scale-free degeneracy test shared by atlas input validation and the
-/// validator: |(p1-p0) x (p2-p0)| <= 1e-12 * (longest edge)^2, or any
-/// non-finite coordinate. Unit changes do not alter the classification.
-[[nodiscard]] bool IsDegenerateAtlasTriangle(glm::vec3 p0, glm::vec3 p1,
-                                             glm::vec3 p2) noexcept;
 
 struct UvFaceDistortion {
   bool Valid{false};

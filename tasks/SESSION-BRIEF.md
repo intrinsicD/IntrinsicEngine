@@ -244,6 +244,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-228` — Vulkan smoke timeout depends on the display environment (tasks/backlog/bugs/BUG-228-desktop-display-vulkan-smoke-timeouts.md)
 - unblocked: `BUG-229` — NVIDIA shutdown retention on a nested Xephyr display (tasks/backlog/bugs/BUG-229-nvidia-xephyr-shutdown-retention.md)
 - unblocked: `BUG-232` — A failed frame submit loses an accepted position copy (tasks/backlog/bugs/BUG-232-gpuworld-commit-copy-lost-on-failed-submit.md)
+- unblocked: `BUG-243` — Local strict doc-link check scans temporary review evidence (tasks/backlog/bugs/BUG-243-local-doc-link-check-scans-temporary-review-evidence.md)
 - unblocked: `BUILD-012` — Evaluate replacing the ImGui vcpkg overlay port with the registry port (tasks/backlog/process/BUILD-012-imgui-registry-port-evaluation.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 - unblocked: `GRAPHICS-147` — Refine shared Morton cells in the GPU point LBVH (tasks/backlog/rendering/GRAPHICS-147-gpu-lbvh-shared-cell-refinement.md)

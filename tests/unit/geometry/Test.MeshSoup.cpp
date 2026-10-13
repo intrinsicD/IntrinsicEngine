@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <limits>
 
 #include <utility>
 #include <vector>
@@ -122,6 +123,20 @@ TEST(MeshSoup, InvalidIndicesAreErrors)
     EXPECT_EQ(result.Diagnostics.back().VertexIndex, 7u);
 }
 
+TEST(MeshSoup, SmallValidTrianglesRemainValidAtDifferentScales)
+{
+    for (const float scale : {1.0e-12f, 1.0e-4f, 1.0f, 1.0e12f})
+    {
+        SCOPED_TRACE(scale);
+        IndexedMesh mesh = MakeTriangleSoup();
+        for (glm::vec3& position : mesh.Positions())
+            position *= scale;
+        const auto result = Geometry::MeshSoup::Validate(mesh);
+        EXPECT_FALSE(result.HasErrors());
+        EXPECT_EQ(result.Count(ValidationDiagnosticKind::DegenerateFace), 0u);
+    }
+}
+
 TEST(MeshSoup, DegenerateFacesAreErrors)
 {
     IndexedMesh duplicateIndex;
@@ -131,7 +146,7 @@ TEST(MeshSoup, DegenerateFacesAreErrors)
 
     const auto duplicateResult = Geometry::MeshSoup::Validate(duplicateIndex);
     EXPECT_TRUE(duplicateResult.HasErrors());
-    EXPECT_EQ(duplicateResult.Count(ValidationDiagnosticKind::DegenerateFace), 1u);
+    EXPECT_EQ(duplicateResult.Count(ValidationDiagnosticKind::RepeatedFaceIndex), 1u);
 
     IndexedMesh collinear;
     AddVertex(collinear, {0.0f, 0.0f, 0.0f});
@@ -247,3 +262,84 @@ TEST(MeshSoup, AttributeArityMismatchesUsePropertySetDomainCardinality)
     EXPECT_EQ(result.Diagnostics.back().ActualCount, 2u);
 }
 
+
+TEST(MeshSoup, ValidationContextReusesCompletedChecks)
+{
+    auto mesh = MakeTriangleSoup();
+    AddVertex(mesh, {0.0f, 0.0f, 0.0f});
+    Geometry::MeshSoup::ValidationContext context(Geometry::MeshSoup::BorrowView(mesh));
+    context.CheckDuplicateVertices();
+    context.CheckDuplicateVertices();
+    context.CheckTopology();
+    context.CheckTopology();
+    const auto& result = context.Validate();
+    EXPECT_EQ(result.Count(ValidationDiagnosticKind::DuplicateVertex), 1u);
+    EXPECT_EQ(result.CornerCount, 3u);
+    EXPECT_EQ(result.BoundaryEdgeCount, 3u);
+    EXPECT_TRUE(result.StructureChecked);
+    EXPECT_TRUE(result.Executed.FaceGeometry);
+    EXPECT_TRUE(result.Executed.Attributes);
+}
+
+TEST(MeshSoup, SkippingOptionalChecksNeverSkipsStructuralSafety)
+{
+    auto mesh = MakeTriangleSoup();
+    mesh.Position(0).x = std::numeric_limits<float>::infinity();
+    mesh.Face(0).Indices[2] = 42u;
+    const auto result = Geometry::MeshSoup::Validate(mesh, {.Checks = {false, false, false, false}});
+    EXPECT_TRUE(result.HasErrors());
+    EXPECT_EQ(result.Count(ValidationDiagnosticKind::NonFinitePosition), 1u);
+    EXPECT_EQ(result.Count(ValidationDiagnosticKind::InvalidIndex), 1u);
+    EXPECT_TRUE(result.StructureChecked);
+    EXPECT_FALSE(result.Executed.DuplicateVertices);
+    EXPECT_FALSE(result.Executed.FaceGeometry);
+    EXPECT_FALSE(result.Executed.Topology);
+    EXPECT_FALSE(result.Executed.Attributes);
+}
+
+TEST(MeshSoup, ZeroAreaAndThinFacesHaveDifferentPolicies)
+{
+    auto mesh = MakeTriangleSoup();
+    mesh.Position(2) = {1.0f, 1.0e-14f, 0.0f};
+    const auto thin = Geometry::MeshSoup::Validate(mesh);
+    EXPECT_FALSE(thin.HasErrors());
+    EXPECT_EQ(thin.Count(ValidationDiagnosticKind::PoorFaceQuality), 1u);
+    EXPECT_EQ(thin.Count(ValidationDiagnosticKind::DegenerateFace), 0u);
+    mesh.Position(2) = {2.0f, 0.0f, 0.0f};
+    EXPECT_TRUE(Geometry::MeshSoup::Validate(mesh).HasErrors());
+    const auto render = Geometry::MeshSoup::Validate(mesh, {.AllowZeroAreaFaces = true});
+    EXPECT_FALSE(render.HasErrors());
+    EXPECT_EQ(render.Count(ValidationDiagnosticKind::DegenerateFace), 1u);
+    EXPECT_EQ(render.BoundaryEdgeCount, 3u);
+}
+
+TEST(MeshSoup, SmallDetailsDoNotDependOnWholeMeshBounds)
+{
+    auto mesh = MakeTriangleSoup();
+    for (auto& p : mesh.Positions()) p *= 1.0e-8f;
+    AddVertex(mesh, {1.0e15f, 0.0f, 0.0f});
+    EXPECT_FALSE(Geometry::MeshSoup::Validate(mesh).HasErrors());
+}
+
+TEST(MeshSoup, DiagnosticsKeepCountsBeyondRepresentativeSample)
+{
+    IndexedMesh mesh;
+    for (std::size_t i = 0; i < 100; ++i)
+        AddVertex(mesh, {std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f});
+    const auto result = Geometry::MeshSoup::Validate(mesh);
+    EXPECT_TRUE(result.HasErrors());
+    EXPECT_EQ(result.Count(ValidationDiagnosticKind::NonFinitePosition), 100u);
+    EXPECT_EQ(result.Diagnostics.size(), 16u);
+}
+
+TEST(MeshSoup, DuplicateFacesAndDegenerateTopologyAreReported)
+{
+    auto mesh = MakeTriangleSoup();
+    mesh.Position(2) = {2.0f, 0.0f, 0.0f};
+    AddTriangle(mesh, 0u, 1u, 2u);
+    AddTriangle(mesh, 0u, 1u, 2u);
+    const auto result = Geometry::MeshSoup::Validate(mesh, {.AllowZeroAreaFaces = true});
+    EXPECT_EQ(result.Count(ValidationDiagnosticKind::DuplicateFace), 2u);
+    EXPECT_EQ(result.Count(ValidationDiagnosticKind::NonManifoldEdge), 3u);
+    EXPECT_EQ(result.Count(ValidationDiagnosticKind::InconsistentWinding), 3u);
+}

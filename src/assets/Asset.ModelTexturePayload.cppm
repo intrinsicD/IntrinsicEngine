@@ -6,6 +6,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <memory>
 #include <vector>
 
 export module Extrinsic.Asset.ModelTexturePayload;
@@ -13,6 +14,7 @@ export module Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Core.Error;
 import Extrinsic.Asset.GeometryPayload;
 import Extrinsic.Asset.ImportRouter;
+export import Extrinsic.Asset.ImportValidation;
 
 export namespace Extrinsic::Assets
 {
@@ -147,6 +149,8 @@ export namespace Extrinsic::Assets
         std::vector<AssetTexture2DPayload> EmbeddedImages{};
         std::vector<AssetModelMaterialPayload> Materials{};
         std::vector<AssetModelExternalResourceDiagnostic> ExternalResourceDiagnostics{};
+        ImportValidationOptions ValidationOptions{};
+        std::shared_ptr<ImportValidationReport> ValidationReport{};
     };
 
     [[nodiscard]] bool IsSupportedTextureImportFormat(AssetFileFormat format) noexcept;

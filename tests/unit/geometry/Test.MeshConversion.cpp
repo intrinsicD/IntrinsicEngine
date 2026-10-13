@@ -130,3 +130,18 @@ TEST(MeshConversion, MeshReservePreallocatesConstructionArraysWithoutChangingCou
         (void)mesh.AddVertex({static_cast<float>(i), 0.0f, 0.0f});
     EXPECT_EQ(points.Vector().data(), data);
 }
+
+TEST(MeshConversion, ReusesValidationContextAndPreservesZeroAreaRenderTopology)
+{
+    auto soup = MakeTriangleSoup();
+    soup.Position(2) = {2.0f, 0.0f, 0.0f};
+    Geometry::MeshSoup::ValidationContext context(Geometry::MeshSoup::BorrowView(soup),
+        {.AllowZeroAreaFaces = true});
+    context.CheckFaceGeometry();
+    auto converted = Geometry::Mesh::Conversion::ToHalfedgeMesh(context);
+    ASSERT_TRUE(converted.Succeeded());
+    EXPECT_EQ(converted.Mesh.VertexCount(), 3u);
+    EXPECT_EQ(converted.Mesh.FaceCount(), 1u);
+    EXPECT_EQ(context.Result().Count(ValidationDiagnosticKind::DegenerateFace), 1u);
+    EXPECT_EQ(context.Result().CornerCount, 3u);
+}

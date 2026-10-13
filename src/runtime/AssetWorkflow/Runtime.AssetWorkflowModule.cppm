@@ -16,6 +16,7 @@ module;
 export module Extrinsic.Runtime.AssetWorkflowModule;
 
 import Extrinsic.Asset.ImportRouter;
+export import Extrinsic.Asset.ImportValidation;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.IOBackend;
@@ -65,6 +66,8 @@ namespace Extrinsic::Runtime
         AssetImportPostprocessPolicy Postprocess{
             AssetImportPostprocessPolicy::PrepareRenderableGeometry};
         AssetImportCompletionRecipe Completion{};
+        Assets::ImportValidationOptions ValidationOptions{};
+        std::shared_ptr<Assets::ImportValidationReport> ValidationReport{};
     };
 
     export struct AssetImportExecutionIdentity
@@ -156,6 +159,7 @@ namespace Extrinsic::Runtime
         AssetImportExecutionIdentity Identity{};
         std::vector<AssetImportStageResult> Results{};
         bool Terminal{false};
+        std::shared_ptr<Assets::ImportValidationReport> ValidationReport{};
     };
 
     export [[nodiscard]] bool AssetImportStagePayloadMatches(
@@ -171,6 +175,8 @@ namespace Extrinsic::Runtime
     {
         std::string Path{};
         Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
+        Assets::ImportValidationOptions ValidationOptions{};
+        std::shared_ptr<Assets::ImportValidationReport> ValidationReport{};
     };
 
     export struct RuntimeAssetReimportRequest

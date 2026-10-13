@@ -599,6 +599,7 @@ namespace Extrinsic::Runtime
             const Assets::AssetId existingAsset,
             Assets::AssetModelScenePayload decoded)
         {
+            if (request.ValidationReport) request.ValidationReport->MaterializationAttempted = true;
             auto payload =
                 std::make_shared<Assets::AssetModelScenePayload>(
                     std::move(decoded));
@@ -741,6 +742,7 @@ namespace Extrinsic::Runtime
             const Assets::AssetId existingAsset,
             Assets::AssetTexture2DPayload decoded)
         {
+            if (request.ValidationReport) request.ValidationReport->MaterializationAttempted = true;
             auto payload =
                 std::make_shared<Assets::AssetTexture2DPayload>(
                     std::move(decoded));
@@ -1024,7 +1026,9 @@ namespace Extrinsic::Runtime
                 if (prepareGeometry)
                 {
                     auto mesh = BuildRuntimeHalfedgeMeshGeometryOnly(
-                        *meshPayload, {.AllowDisconnectedRenderableFallback = true});
+                        *meshPayload, {.AllowDisconnectedRenderableFallback = true,
+                                       .ValidationOptions = request.ValidationOptions,
+                                       .ValidationReport = request.ValidationReport.get()});
                     if (!mesh.has_value())
                         decoded.PreparationError = mesh.error();
                     else
@@ -1147,6 +1151,7 @@ namespace Extrinsic::Runtime
             const AssetImportRecipe& recipe,
             const DecodedGeometryImport& decoded)
         {
+            if (recipe.ValidationReport) recipe.ValidationReport->MaterializationAttempted = true;
             return std::visit(
                 [&](const auto& payload) -> Core::Expected<MaterializedGeometryImport>
                 {
@@ -1601,6 +1606,8 @@ namespace Extrinsic::Runtime
         return QueueAssetImport(AssetImportRecipe{
             .Path = std::move(request.Path),
             .PayloadKind = request.PayloadKind,
+            .ValidationOptions = request.ValidationOptions,
+            .ValidationReport = request.ValidationReport,
         });
     }
 
@@ -1610,12 +1617,15 @@ namespace Extrinsic::Runtime
         return QueueAssetImport(AssetImportRecipe{
             .Path = std::move(request.Path),
             .PayloadKind = request.PayloadKind,
+            .ValidationOptions = request.ValidationOptions,
+            .ValidationReport = request.ValidationReport,
         });
     }
 
     Core::Expected<RuntimeQueuedAssetImport> AssetWorkflowImportExecutor::QueueAssetImport(
         AssetImportRecipe recipe)
     {
+        recipe.ValidationReport = std::make_shared<Assets::ImportValidationReport>();
         auto route = Assets::ResolveAssetImportRoute(
             recipe.Path,
             Assets::AssetRouteOperation::Import,
@@ -2114,10 +2124,14 @@ namespace Extrinsic::Runtime
         AssetImportRecipe recipe,
         std::vector<Assets::AssetPayloadKind> payloadKinds)
     {
+        if (!recipe.ValidationReport)
+            recipe.ValidationReport = std::make_shared<Assets::ImportValidationReport>();
         const RuntimeAssetIngestSource source = recipe.Source;
         RuntimeAssetImportRequest request{
             .Path = recipe.Path,
             .PayloadKind = recipe.PayloadKind,
+            .ValidationOptions = recipe.ValidationOptions,
+            .ValidationReport = recipe.ValidationReport,
         };
         if (!payloadKinds.empty())
             request.PayloadKind = payloadKinds.front();
@@ -2208,6 +2222,8 @@ namespace Extrinsic::Runtime
                         RuntimeAssetImportRequest request{
                             .Path = path,
                             .PayloadKind = payloadKind,
+                            .ValidationOptions = state->Request.ValidationOptions,
+                            .ValidationReport = state->Request.ValidationReport,
                         };
                         auto decoded = DecodeGeometryImport(request, !state->Recipe.ExistingAsset.IsValid());
                         state->Request = request;
@@ -2478,11 +2494,15 @@ namespace Extrinsic::Runtime
     AssetWorkflowImportExecutor::QueueModelTextureImportWithIngest(
         AssetImportRecipe recipe)
     {
+        if (!recipe.ValidationReport)
+            recipe.ValidationReport = std::make_shared<Assets::ImportValidationReport>();
         const RuntimeAssetIngestSource source = recipe.Source;
         const Assets::AssetId existingAsset = recipe.ExistingAsset;
         RuntimeAssetImportRequest request{
             .Path = recipe.Path,
             .PayloadKind = recipe.PayloadKind,
+            .ValidationOptions = recipe.ValidationOptions,
+            .ValidationReport = recipe.ValidationReport,
         };
         auto route = Assets::ResolveAssetImportRoute(
             request.Path,
@@ -2597,7 +2617,7 @@ namespace Extrinsic::Runtime
 
                     if (payloadKind == Assets::AssetPayloadKind::ModelScene)
                     {
-                        auto decoded = DecodeModelSceneAsset(path, *backend);
+                        auto decoded = DecodeModelSceneAsset(path, *backend, state->Request.ValidationOptions, state->Request.ValidationReport);
                         if (!decoded.has_value())
                         {
                             state->Error = decoded.error();
@@ -2612,7 +2632,7 @@ namespace Extrinsic::Runtime
                     }
                     else
                     {
-                        auto decoded = DecodeTextureAsset(path, *backend);
+                        auto decoded = DecodeTextureAsset(path, *backend, state->Request.ValidationOptions, state->Request.ValidationReport);
                         if (!decoded.has_value())
                         {
                             state->Error = decoded.error();
@@ -2867,6 +2887,7 @@ namespace Extrinsic::Runtime
         const RuntimeAssetIngestSource source,
         const Assets::AssetId existingAsset)
     {
+        request.ValidationReport = std::make_shared<Assets::ImportValidationReport>();
         RuntimeAssetIngestTransition submit =
             m_AssetIngestStateMachine.Submit(
                 MakeRuntimeAssetIngestRequest(request, source, existingAsset));
@@ -2884,6 +2905,8 @@ namespace Extrinsic::Runtime
             .PayloadKind = request.PayloadKind,
             .Source = source,
             .ExistingAsset = existingAsset,
+            .ValidationOptions = request.ValidationOptions,
+            .ValidationReport = request.ValidationReport,
         };
         AssetImportStageTrace stageTrace{
             .Identity = AssetImportExecutionIdentity{
@@ -3212,6 +3235,42 @@ namespace Extrinsic::Runtime
         event.IngestDiagnostic = ingestDiagnostic;
         if (stageTrace != nullptr)
             event.StageTrace = *stageTrace;
+        if (!event.StageTrace) event.StageTrace.emplace();
+        if (request.ValidationReport)
+            event.StageTrace->ValidationReport = request.ValidationReport;
+        // A cancelled worker may still be writing its private report. Only
+        // completion callbacks publish it; early cancellation gets an empty report.
+        if (!event.StageTrace->ValidationReport)
+            event.StageTrace->ValidationReport = std::make_shared<Assets::ImportValidationReport>();
+        if (event.StageTrace->ValidationReport)
+        {
+            auto& report = *event.StageTrace->ValidationReport;
+            if (!report.HasErrors() && report.Checks[static_cast<std::size_t>(Assets::ImportCheck::Format)].Status == Assets::ImportCheckStatus::NotRun &&
+                stageTrace && std::ranges::any_of(stageTrace->Results, [](const auto& stage) {
+                    return stage.Stage == AssetImportStage::Decode && stage.Succeeded();
+                }))
+                report.Record(Assets::ImportCheck::Format, Assets::ImportCheckStatus::Passed);
+            if (result.has_value() || report.MaterializationAttempted)
+                report.Record(Assets::ImportCheck::Materialization,
+                result.has_value() ? Assets::ImportCheckStatus::Passed : Assets::ImportCheckStatus::Failed,
+                result.has_value() ? "CPU publication completed; GPU visibility is not tested by import validation" : std::string{Core::Error::ToString(result.error())});
+            std::string summary;
+            for (std::size_t i = 0; i < report.Checks.size(); ++i) {
+                if (!summary.empty()) summary += " ";
+                summary += Assets::ToString(static_cast<Assets::ImportCheck>(i));
+                summary += "=";
+                summary += Assets::ToString(report.Checks[i].Status);
+            }
+            Core::Log::Info("[Runtime] Import validation summary: path='{}' {}", request.Path, summary);
+            for (const auto& diagnostic : report.Diagnostics)
+            {
+                if (diagnostic.Status < Assets::ImportCheckStatus::Warning) continue;
+                Core::Log::Warn("[Runtime] Import validation: path='{}' check={} status={} primitive={} element={} detail={}",
+                    request.Path, Assets::ToString(diagnostic.Check), Assets::ToString(diagnostic.Status),
+                    diagnostic.PrimitiveIndex == static_cast<std::size_t>(-1) ? "-" : std::to_string(diagnostic.PrimitiveIndex),
+                    diagnostic.ElementIndex == static_cast<std::size_t>(-1) ? "-" : std::to_string(diagnostic.ElementIndex), diagnostic.Message);
+            }
+        }
         if (result.has_value())
         {
             event.Result = *result;
@@ -3279,11 +3338,15 @@ namespace Extrinsic::Runtime
                 .Path = request.Path,
                 .PayloadKind = route->PayloadKind,
                 .ExistingAsset = existingAsset,
+                .ValidationOptions = request.ValidationOptions,
+                .ValidationReport = request.ValidationReport,
             };
             auto decoded = DecodeGeometryImport(
                 RuntimeAssetImportRequest{
                     .Path = request.Path,
                     .PayloadKind = route->PayloadKind,
+                    .ValidationOptions = request.ValidationOptions,
+                    .ValidationReport = request.ValidationReport,
                 }, !existingAsset.IsValid());
             if (!decoded.has_value())
             {
@@ -3344,7 +3407,7 @@ namespace Extrinsic::Runtime
                 .PayloadKind = route->PayloadKind,
                 .ExistingAsset = existingAsset,
             };
-            auto decoded = DecodeModelSceneAsset(request.Path, backend);
+            auto decoded = DecodeModelSceneAsset(request.Path, backend, request.ValidationOptions, request.ValidationReport);
             if (!decoded.has_value())
             {
                 return Core::Err<RuntimeAssetImportResult>(decoded.error());
@@ -3363,7 +3426,7 @@ namespace Extrinsic::Runtime
                 std::move(*decoded));
         }
 
-        auto decoded = DecodeTextureAsset(request.Path, backend);
+        auto decoded = DecodeTextureAsset(request.Path, backend, request.ValidationOptions, request.ValidationReport);
         if (!decoded.has_value())
         {
             return Core::Err<RuntimeAssetImportResult>(decoded.error());

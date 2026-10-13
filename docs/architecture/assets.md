@@ -56,3 +56,49 @@ markers and non-finite values with `InvalidFormat`, never a partial cloud. For
 its accepted 3/4/6/7-column layouts it produces the same positions and colors as
 the former XYZ routing (see the geometry architecture note); other column counts
 (for example 8, which `LoadXYZ` accepts) are rejected.
+
+## Import validation reports
+
+`Asset.ImportValidation` defines the report shared by runtime decode and CPU
+publication. `RuntimeAssetImportEvent::StageTrace::ValidationReport` retains it
+on both success and failure, for synchronous and queued model imports. Each
+check area has a status: `NotRun`, `NotApplicable`, `Skipped`, `Passed`, `Warning`,
+`Unsupported`, or `Failed`. Counts include every finding; diagnostic examples
+are bounded per check and status. Unsupported optional glTF features remain
+visible; unsupported required extensions and consumed sparse accessors fail.
+
+Model imports report format/buffer checks, references, numeric data, attributes,
+face shape, topology, duplicate vertices, transforms, resources, and CPU
+materialization. Other import routes populate the checks they actually execute;
+`NotRun` does not mean passed. A cancellation before report publication retains
+an independent empty report; an unfinished worker cannot update that event.
+`MaterializationAttempted` separates decoder failures from CPU publication failures.
+CPU publication does not prove GPU visibility.
+Reflected transforms are reported as requiring world-winding verification.
+
+Per-call `ImportValidationOptions` on the import request/recipe select duplicate
+vertex, face-quality, topology and attribute-quality checks. Mandatory index,
+finite-position and consumed-accessor storage checks cannot be disabled.
+Supplied normals must also be finite and nonzero, and supplied UVs finite;
+unusable data is omitted with a warning even when optional attribute-quality
+checks are disabled. The
+same options reach queued and synchronous model imports. Duplicate-vertex
+checks default off: coincident positions commonly represent authored seams.
+No welding or face deletion is performed. Distinct-index zero-area faces remain
+in the render mesh with warnings; repeated-index or non-manifold topology can
+use the existing disconnected-corner fallback, recorded in the report. Strict
+geometry conversions can still reject zero-area faces in later editor operations.
+Fallback normal generation still uses absolute thresholds: very small geometry
+without authored normals can receive zero normals. That separate render-path
+limitation is not repaired by import validation.
+
+Model/texture source-byte and decoded-image budgets are opt-in per-call limits;
+defaults impose no additional byte cap. An explicitly configured source limit
+counts the primary file plus unique external resources. Exceeding either budget
+fails the import. These limits do not bound total process memory or decoder
+scratch allocations.
+`IORequest::MaxBytes` rejects oversized file reads before allocation. Image
+headers are checked before decompression. External glTF resource existence,
+size and data callbacks share one per-import read cache; failed reads are cached
+too, and no cache survives a new import. Geometry-format readers have their own
+format-specific limits; the model/texture budgets do not apply to them.

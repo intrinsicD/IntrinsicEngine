@@ -442,3 +442,19 @@ TEST(AssetModelTexturePayload, KtxRouteIsRecognizedButPayloadIsUnsupported)
         ValidateAssetTexture2DPayload(payload).error(),
         ErrorCode::AssetUnsupportedFormat);
 }
+
+TEST(AssetModelTexturePayload, ImportReportRetainsFailuresBeyondWarningSample)
+{
+    ImportValidationReport report;
+    for (std::size_t i = 0; i < 100; ++i)
+        report.Record(ImportCheck::Attributes, ImportCheckStatus::Warning, "invalid optional attribute", 0, i);
+    report.Record(ImportCheck::Attributes, ImportCheckStatus::Failed, "invalid storage", 0, 101);
+    report.Record(ImportCheck::Attributes, ImportCheckStatus::Passed);
+    const auto& check = report.Checks[static_cast<std::size_t>(ImportCheck::Attributes)];
+    EXPECT_TRUE(report.HasErrors());
+    EXPECT_EQ(check.Status, ImportCheckStatus::Failed);
+    EXPECT_EQ(check.WarningCount, 100u);
+    EXPECT_EQ(check.ErrorCount, 1u);
+    ASSERT_EQ(report.Diagnostics.size(), 9u);
+    EXPECT_EQ(report.Diagnostics.back().Message, "invalid storage");
+}

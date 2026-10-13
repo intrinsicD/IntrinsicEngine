@@ -22,6 +22,7 @@ module;
 
 module Geometry.UvAtlas;
 
+import Geometry.RobustPredicates;
 import Geometry.Validation;
 import Geometry.Properties;
 import Geometry.MeshSoup;
@@ -201,7 +202,7 @@ PreflightGeneration(const UvAtlasInput &input, const UvAtlasOptions &options,
   std::vector<std::uint32_t> degenerate;
   for (std::size_t f = 0u; f < input.Faces.size(); ++f) {
     const MeshSoup::PolygonFace &face = input.Faces[f];
-    if (IsDegenerateAtlasTriangle(input.Positions[face.Indices[0]],
+    if (Geometry::MeshSoup::IsNearlyDegenerateTriangle(input.Positions[face.Indices[0]],
                                   input.Positions[face.Indices[1]],
                                   input.Positions[face.Indices[2]])) {
       degenerate.push_back(static_cast<std::uint32_t>(f));
@@ -783,7 +784,7 @@ struct ChartGate {
       corners[c] = glm::vec2{(uvs[mesh.Triangles[c]] - lo) * scale};
     }
     for (std::size_t t = 0u; t < count; ++t) {
-      if (ExactUvOrientation(corners[3u * t], corners[3u * t + 1u],
+      if (Geometry::RobustPredicates::ExactOrientation2D(corners[3u * t], corners[3u * t + 1u],
                              corners[3u * t + 2u]) <= 0) {
         gate.Rejection = ChartRejection::Overlap;
         gate.Reason = "triangle collapses in float precision";
@@ -2241,7 +2242,7 @@ UvAtlasDiagnostics ValidateUvAtlasInput(const UvAtlasInput &input) {
     if (faceOutOfRange || faceNonFinite) {
       continue;
     }
-    if (IsDegenerateAtlasTriangle(input.Positions[face.Indices[0]],
+    if (Geometry::MeshSoup::IsNearlyDegenerateTriangle(input.Positions[face.Indices[0]],
                                   input.Positions[face.Indices[1]],
                                   input.Positions[face.Indices[2]])) {
       ++diagnostics.DegenerateFaceCount;

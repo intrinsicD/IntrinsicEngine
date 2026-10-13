@@ -1,3 +1,4 @@
+// Explicit mesh conversions with validation diagnostics and attribute ownership boundaries.
 module;
 
 #include <cstddef>
@@ -56,6 +57,8 @@ export namespace Geometry::Mesh::Conversion
     };
 
     [[nodiscard]] std::string_view ToString(ConversionDiagnosticKind kind) noexcept;
+
+    [[nodiscard]] ToHalfedgeMeshResult ToHalfedgeMesh(MeshSoup::ValidationContext& context);
 
     [[nodiscard]] ToHalfedgeMeshResult ToHalfedgeMesh(MeshSoup::IndexedMeshView view,
                                                       const MeshSoup::ValidationOptions& options = {});

@@ -23,6 +23,7 @@ module;
 
 module Extrinsic.Runtime.TextureBakeModule;
 
+import Geometry.RobustPredicates;
 import Geometry.Validation;
 import Extrinsic.Asset.Service;
 import Extrinsic.Core.Error;
@@ -1535,7 +1536,7 @@ namespace Extrinsic::Runtime
                  index < geometry.CornerUv.size();
                  index += 3u)
             {
-                if (Geometry::UvAtlas::ExactUvOrientation(
+                if (Geometry::RobustPredicates::ExactOrientation2D(
                         geometry.CornerUv[index], geometry.CornerUv[index + 1u],
                         geometry.CornerUv[index + 2u]) == 0)
                 {

@@ -508,7 +508,11 @@ namespace Extrinsic::Runtime
 
                 if (progressiveRawGeometryFirst)
                 {
-                    auto mesh = BuildRuntimeHalfedgeMeshGeometryOnly(**meshPayload);
+                    auto mesh = BuildRuntimeHalfedgeMeshGeometryOnly(**meshPayload, {
+                        .AllowDisconnectedRenderableFallback = true,
+                        .ValidationOptions = model.ValidationOptions,
+                        .ValidationReport = model.ValidationReport.get(),
+                        .PrimitiveIndex = primitiveIndex});
                     if (!mesh.has_value())
                     {
                         return Core::Err<std::vector<PreparedPrimitive>>(mesh.error());
@@ -548,6 +552,10 @@ namespace Extrinsic::Runtime
                 // An unusable atlas must not discard otherwise renderable geometry.
                 auto materialized = BuildRuntimeHalfedgeMeshMaterialization(
                     **meshPayload, RuntimeMeshMaterializationOptions{
+                        .AllowDisconnectedRenderableFallback = true,
+                        .ValidationOptions = model.ValidationOptions,
+                        .ValidationReport = model.ValidationReport.get(),
+                        .PrimitiveIndex = primitiveIndex,
                         .UvResolution = {.FailurePolicy = RuntimeMeshUvFailurePolicy::Optional}});
                 if (!materialized.has_value())
                 {

@@ -1195,9 +1195,29 @@ algorithms and import/reconstruction stages that need positions plus indexed
 triangle or polygon faces but do not require halfedge connectivity. The
 container stores canonical vertex positions in the `v:point` `PropertySet`
 entry and owns separate `PropertySet` domains for vertices, faces, and corners.
-`Geometry::MeshSoup::Validate` returns structured diagnostics for duplicate
-vertices, invalid indices, degenerate faces, non-manifold edges, inconsistent
-winding, and property-domain arity mismatches.
+`Geometry::MeshSoup::Validate` bundles individually callable checks on a borrowed
+`ValidationContext`. The context fixes the view and options for an unchanged
+input during one validation session. Completed checks reuse their results;
+structural face validity and corner counts are shared. Recreate the
+context after any source mutation; it is not a persistent revision cache.
+`ToHalfedgeMesh(ValidationContext&)` consumes those same results without a
+second validation pass.
+
+Structural checks always run. Optional checks cover duplicate vertices, face
+quality, topology (including duplicate faces and a boundary-edge count), and
+property-domain arity. Reports distinguish executed checks and preserve full
+counts with bounded diagnostic examples. Non-finite coordinates, invalid
+indices, undersized faces and repeated face indices are structural errors.
+
+Triangle quality uses squared doubled area divided by longest-edge length to
+the fourth power, computed in double; no whole-mesh AABB controls admission.
+`Geometry.RobustPredicates::ExactOrientation2D` supplies exact finite-float signs
+on three coordinate projections for collinearity. Nonzero slivers are quality
+warnings at squared relative area <= 1e-24, sharing the atlas's local metric.
+Strict validation rejects exact-zero faces; render-import options may retain
+them with warnings. Polygon quality uses a translated fan area vector, while
+collinearity checks a line through two distinct source positions against all vertices; this is not a
+polygon simplicity or self-intersection test.
 
 No-copy adaptation must be named as borrowing, such as
 `Geometry::MeshSoup::BorrowView`, while topology-changing or lifetime-owning

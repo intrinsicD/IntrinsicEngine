@@ -17,6 +17,7 @@ module;
 module Extrinsic.Runtime.AssetWorkflowGeometryMaterialization;
 
 import Geometry.Validation;
+import Extrinsic.Asset.ImportValidation;
 import Extrinsic.Core.Error;
 import Extrinsic.Runtime.MeshSurfaceTopology;
 import Geometry.HalfedgeMesh.Utils;
@@ -325,7 +326,9 @@ HasValidTexcoords(const Geometry::MeshIO::MeshIOResult &meshPayload) noexcept {
     if (diagnostic.ValidationKind ==
             Geometry::MeshSoup::ValidationDiagnosticKind::NonManifoldEdge ||
         diagnostic.ValidationKind ==
-            Geometry::MeshSoup::ValidationDiagnosticKind::InconsistentWinding) {
+            Geometry::MeshSoup::ValidationDiagnosticKind::InconsistentWinding ||
+        diagnostic.ValidationKind ==
+            Geometry::MeshSoup::ValidationDiagnosticKind::RepeatedFaceIndex) {
       hasRenderableTopologyFailure = true;
       continue;
     }
@@ -343,10 +346,14 @@ struct TriangulatedSourceMesh {
 [[nodiscard]] Core::Expected<TriangulatedSourceMesh>
 BuildTriangulatedSourceMesh(
     const std::vector<glm::vec3> &positions,
-    const std::vector<std::vector<std::uint32_t>> &faces) {
+    const std::vector<std::vector<std::uint32_t>> &faces,
+    Assets::ImportValidationReport* report, std::size_t primitive) {
+  if (report) report->MaterializationAttempted = true;
   TriangulatedSourceMesh source{};
   for (const glm::vec3 position : positions) {
     if (!IsFinite(position)) {
+      if (report) report->Record(Assets::ImportCheck::NumericData, Assets::ImportCheckStatus::Failed,
+          "Non-finite position", primitive, source.Mesh.VertexCount());
       return Core::Err<TriangulatedSourceMesh>(
           Core::ErrorCode::AssetInvalidData);
     }
@@ -356,10 +363,14 @@ BuildTriangulatedSourceMesh(
   for (std::size_t faceIndex = 0u; faceIndex < faces.size(); ++faceIndex) {
     const std::vector<std::uint32_t> &face = faces[faceIndex];
     if (face.size() < 3u) {
+      if (report) report->Record(Assets::ImportCheck::FaceGeometry, Assets::ImportCheckStatus::Failed,
+          "Face has fewer than three indices", primitive, faceIndex);
       return Core::Err<TriangulatedSourceMesh>(Core::ErrorCode::InvalidFormat);
     }
     for (const std::uint32_t index : face) {
       if (index >= positions.size()) {
+        if (report) report->Record(Assets::ImportCheck::References, Assets::ImportCheckStatus::Failed,
+            "Face vertex index is out of range", primitive, faceIndex);
         return Core::Err<TriangulatedSourceMesh>(Core::ErrorCode::OutOfRange);
       }
     }
@@ -686,14 +697,66 @@ struct ResolvedHalfedgeMesh {
   bool UsedDisconnectedFallback{false};
 };
 
+void RecordMeshValidation(const Geometry::MeshSoup::ValidationResult& validation,
+                          const Assets::ImportValidationOptions checks,
+                          Assets::ImportValidationReport* report,
+                          const std::size_t primitive, const bool usedFallback) {
+  if (!report) return;
+  using Check = Assets::ImportCheck;
+  using Status = Assets::ImportCheckStatus;
+  using Kind = Geometry::MeshSoup::ValidationDiagnosticKind;
+  report->Record(Check::NumericData, Status::Passed);
+  report->Record(Check::References, Status::Passed);
+  report->Record(Check::FaceGeometry, checks.FaceGeometry ? Status::Passed : Status::Skipped);
+  report->Record(Check::Topology, checks.Topology ? Status::Passed : Status::Skipped);
+  report->Record(Check::Attributes, checks.Attributes ? Status::Passed : Status::Skipped);
+  report->Record(Check::DuplicateVertices, checks.DuplicateVertices ? Status::Passed : Status::Skipped);
+  report->BoundaryEdgeCount += validation.BoundaryEdgeCount;
+  for (std::size_t k = 0; k < static_cast<std::size_t>(Kind::Count); ++k) {
+    const auto kind = static_cast<Kind>(k);
+    const auto count = validation.Count(kind);
+    if (!count) continue;
+    const auto diagnostic = std::ranges::find_if(validation.Diagnostics,
+        [kind](const auto& d) { return d.Kind == kind; });
+    Check check = Check::FaceGeometry;
+    if (kind == Kind::NonFinitePosition) check = Check::NumericData;
+    if (kind == Kind::InvalidIndex) check = Check::References;
+    if (kind == Kind::AttributeArityMismatch) check = Check::Attributes;
+    if (kind == Kind::DuplicateVertex) check = Check::DuplicateVertices;
+    if (kind == Kind::NonManifoldEdge || kind == Kind::InconsistentWinding || kind == Kind::DuplicateFace)
+      check = Check::Topology;
+    const bool repaired = usedFallback && (kind == Kind::RepeatedFaceIndex ||
+        kind == Kind::NonManifoldEdge || kind == Kind::InconsistentWinding);
+    const auto status = repaired || diagnostic->Severity == Geometry::MeshSoup::ValidationSeverity::Warning
+        ? Status::Warning : Status::Failed;
+    std::string detail{Geometry::MeshSoup::ToString(kind)};
+    if (repaired) detail += "; source corners preserved in disconnected render mesh";
+    if (kind == Kind::DegenerateFace) detail += "; strict geometry operations may reject zero-area faces";
+    report->Record(check, status, std::move(detail), primitive, diagnostic->FaceIndex, count);
+  }
+  if (usedFallback) {
+    ++report->DisconnectedFallbackCount;
+    report->Record(Check::Topology, Status::Warning,
+        "Halfedge topology required disconnected corners; source faces and attributes preserved", primitive);
+  }
+}
+
 [[nodiscard]] Core::Expected<ResolvedHalfedgeMesh>
 ConvertResolvedMeshToHalfedge(
     const Geometry::MeshSoup::IndexedMesh &resolved,
     const std::span<const std::uint32_t> sourceVertexForOutputVertex,
     const std::span<const std::uint32_t> originalFaceForOutputFace,
     const std::vector<glm::vec3> &normals,
-    const bool allowDisconnectedRenderableFallback) {
-  auto converted = Geometry::Mesh::Conversion::ToHalfedgeMesh(resolved);
+    const bool allowDisconnectedRenderableFallback,
+    const Assets::ImportValidationOptions validationOptions,
+    Assets::ImportValidationReport* report, const std::size_t primitive) {
+  Geometry::MeshSoup::ValidationContext validation(Geometry::MeshSoup::BorrowView(resolved), {
+      .Checks = {.DuplicateVertices = validationOptions.DuplicateVertices,
+                 .FaceGeometry = validationOptions.FaceGeometry,
+                 .Topology = validationOptions.Topology,
+                 .Attributes = validationOptions.Attributes},
+      .AllowZeroAreaFaces = allowDisconnectedRenderableFallback});
+  auto converted = Geometry::Mesh::Conversion::ToHalfedgeMesh(validation);
   if (!converted.Succeeded()) {
     if (allowDisconnectedRenderableFallback &&
         CanUseDisconnectedRenderableFallback(converted)) {
@@ -701,14 +764,17 @@ ConvertResolvedMeshToHalfedge(
               BuildDisconnectedRenderableMesh(
                   resolved, sourceVertexForOutputVertex,
                   originalFaceForOutputFace, normals)) {
+        RecordMeshValidation(validation.Result(), validationOptions, report, primitive, true);
         return ResolvedHalfedgeMesh{
             .Mesh = std::move(*fallback),
             .UsedDisconnectedFallback = true,
         };
       }
     }
+    RecordMeshValidation(validation.Result(), validationOptions, report, primitive, false);
     return Core::Err<ResolvedHalfedgeMesh>(Core::ErrorCode::InvalidFormat);
   }
+  RecordMeshValidation(validation.Result(), validationOptions, report, primitive, false);
 
   CopySupportedVertexProperties(resolved.VertexProperties(), converted.Mesh,
                                 resolved.VertexCount());
@@ -746,7 +812,7 @@ BuildRuntimeHalfedgeMeshMaterialization(
         Core::ErrorCode::AssetInvalidData);
   }
 
-  auto source = BuildTriangulatedSourceMesh(positions.Vector(), faces.Vector());
+  auto source = BuildTriangulatedSourceMesh(positions.Vector(), faces.Vector(), options.ValidationReport, options.PrimitiveIndex);
   if (!source.has_value()) {
     return Core::Err<RuntimeMeshMaterializationResult>(source.error());
   }
@@ -825,7 +891,8 @@ BuildRuntimeHalfedgeMeshMaterialization(
 
   auto resolved = ConvertResolvedMeshToHalfedge(
       entityMesh, identityVertexXrefs, source->OriginalFaceForTriangle, normals,
-      options.AllowDisconnectedRenderableFallback);
+      options.AllowDisconnectedRenderableFallback, options.ValidationOptions,
+      options.ValidationReport, options.PrimitiveIndex);
   if (!resolved.has_value()) {
     return Core::Err<RuntimeMeshMaterializationResult>(resolved.error());
   }
@@ -923,7 +990,7 @@ BuildRuntimeHalfedgeMeshGeometryOnly(
         Core::ErrorCode::AssetInvalidData);
   }
 
-  auto source = BuildTriangulatedSourceMesh(positions.Vector(), faces.Vector());
+  auto source = BuildTriangulatedSourceMesh(positions.Vector(), faces.Vector(), options.ValidationReport, options.PrimitiveIndex);
   if (!source.has_value()) {
     return Core::Err<Geometry::HalfedgeMesh::Mesh>(source.error());
   }
@@ -947,7 +1014,8 @@ BuildRuntimeHalfedgeMeshGeometryOnly(
   auto resolved = ConvertResolvedMeshToHalfedge(
       source->Mesh, identityVertexXrefs, source->OriginalFaceForTriangle,
       ResolveVertexNormals(meshPayload, positions.Vector(), faces.Vector()),
-      options.AllowDisconnectedRenderableFallback);
+      options.AllowDisconnectedRenderableFallback, options.ValidationOptions,
+      options.ValidationReport, options.PrimitiveIndex);
   if (!resolved.has_value()) {
     return Core::Err<Geometry::HalfedgeMesh::Mesh>(resolved.error());
   }
@@ -995,7 +1063,7 @@ GenerateRuntimeMeshTexcoords(Geometry::HalfedgeMesh::Mesh mesh,
   const auto faces = payload.Faces.Get<std::vector<std::uint32_t>>(kFaceVerticesProperty);
   if (!positions || !faces)
     return Core::Err<RuntimeMeshMaterializationResult>(Core::ErrorCode::AssetInvalidData);
-  auto source = BuildTriangulatedSourceMesh(positions.Vector(), faces.Vector());
+  auto source = BuildTriangulatedSourceMesh(positions.Vector(), faces.Vector(), nullptr, static_cast<std::size_t>(-1));
   if (!source.has_value())
     return Core::Err<RuntimeMeshMaterializationResult>(source.error());
   // Atlas adjacency belongs to the original source, even when display topology

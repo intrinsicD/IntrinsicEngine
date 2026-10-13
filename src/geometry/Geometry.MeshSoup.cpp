@@ -3,6 +3,7 @@ module;
 #include <algorithm>
 #include <bit>
 #include <cmath>
+#include <map>
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -17,7 +18,9 @@ module;
 
 module Geometry.MeshSoup;
 
+import Geometry.RobustPredicates;
 import Geometry.Properties;
+import Geometry.Validation;
 
 namespace Geometry::MeshSoup
 {
@@ -136,11 +139,31 @@ namespace Geometry::MeshSoup
         });
     }
 
-    std::size_t ValidationResult::Count(ValidationDiagnosticKind kind) const noexcept // NOLINT(readability-convert-member-functions-to-static)
+    std::size_t ValidationResult::Count(ValidationDiagnosticKind kind) const noexcept
     {
-        return static_cast<std::size_t>(std::ranges::count_if(Diagnostics, [kind](const ValidationDiagnostic& diagnostic) {
-            return diagnostic.Kind == kind;
-        }));
+        return Counts[static_cast<std::size_t>(kind)];
+    }
+
+    void ValidationResult::AddDiagnostic(ValidationDiagnostic diagnostic)
+    {
+        auto& count = Counts[static_cast<std::size_t>(diagnostic.Kind)];
+        if (count++ < 16u)
+            Diagnostics.push_back(std::move(diagnostic));
+    }
+
+    double RelativeTriangleAreaSquared(glm::vec3 a, glm::vec3 b, glm::vec3 c) noexcept
+    {
+        const glm::dvec3 ab = glm::dvec3{b} - glm::dvec3{a};
+        const glm::dvec3 ac = glm::dvec3{c} - glm::dvec3{a};
+        const glm::dvec3 bc = glm::dvec3{c} - glm::dvec3{b};
+        const auto normal = glm::cross(ab, ac);
+        const double longestSquared = std::max({glm::dot(ab, ab), glm::dot(ac, ac), glm::dot(bc, bc)});
+        return longestSquared == 0.0 ? 0.0 : glm::dot(normal, normal) / (longestSquared * longestSquared);
+    }
+
+    bool IsNearlyDegenerateTriangle(glm::vec3 a, glm::vec3 b, glm::vec3 c) noexcept
+    {
+        return !(RelativeTriangleAreaSquared(a, b, c) > 1.0e-24);
     }
 
     IndexedMeshView BorrowView(const IndexedMesh& mesh) noexcept
@@ -178,6 +201,18 @@ namespace Geometry::MeshSoup
             return "InconsistentWinding";
         case ValidationDiagnosticKind::AttributeArityMismatch:
             return "AttributeArityMismatch";
+        case ValidationDiagnosticKind::NonFinitePosition:
+            return "NonFinitePosition";
+        case ValidationDiagnosticKind::InvalidFaceSize:
+            return "InvalidFaceSize";
+        case ValidationDiagnosticKind::RepeatedFaceIndex:
+            return "RepeatedFaceIndex";
+        case ValidationDiagnosticKind::PoorFaceQuality:
+            return "PoorFaceQuality";
+        case ValidationDiagnosticKind::DuplicateFace:
+            return "DuplicateFace";
+        case ValidationDiagnosticKind::Count:
+            break;
         }
         return "Unknown";
     }
@@ -222,16 +257,6 @@ namespace Geometry::MeshSoup
             }
         };
 
-        [[nodiscard]] std::size_t CornerCount(IndexedMeshView view) noexcept
-        {
-            std::size_t count = 0u;
-            for (const PolygonFace& face : view.Faces)
-            {
-                count += face.Indices.size();
-            }
-            return count;
-        }
-
         [[nodiscard]] bool NearlySame(const glm::vec3& a, const glm::vec3& b, const float tolerance) noexcept
         {
             if (tolerance <= 0.0f)
@@ -261,20 +286,6 @@ namespace Geometry::MeshSoup
             };
         }
 
-        [[nodiscard]] glm::vec3 NewellNormal(const PolygonFace& face, std::span<const glm::vec3> positions) noexcept
-        {
-            glm::vec3 normal{0.0f};
-            for (std::size_t i = 0u; i < face.Indices.size(); ++i)
-            {
-                const glm::vec3& current = positions[face.Indices[i]];
-                const glm::vec3& next = positions[face.Indices[(i + 1u) % face.Indices.size()]];
-                normal.x += (current.y - next.y) * (current.z + next.z);
-                normal.y += (current.z - next.z) * (current.x + next.x);
-                normal.z += (current.x - next.x) * (current.y + next.y);
-            }
-            return normal;
-        }
-
         [[nodiscard]] bool ContainsDuplicateIndex(const PolygonFace& face) noexcept
         {
             for (std::size_t i = 0u; i < face.Indices.size(); ++i)
@@ -290,30 +301,55 @@ namespace Geometry::MeshSoup
             return false;
         }
 
-        [[nodiscard]] bool HasOnlyValidIndices(const PolygonFace& face, const std::size_t vertexCount) noexcept
+        struct FaceMeasure
         {
-            return std::ranges::all_of(face.Indices, [vertexCount](const Index index) {
-                return static_cast<std::size_t>(index) < vertexCount;
-            });
-        }
+            double RelativeAreaSquared{0.0};
+            bool ZeroArea{true};
+        };
 
-        [[nodiscard]] bool IsDegenerateFace(const PolygonFace& face,
-                                            std::span<const glm::vec3> positions,
-                                            const ValidationOptions& options) noexcept
+        [[nodiscard]] FaceMeasure MeasureFace(const PolygonFace& face,
+                                              std::span<const glm::vec3> positions)
         {
-            if (face.Indices.size() < 3u || ContainsDuplicateIndex(face))
+            const glm::vec3 first = positions[face.Indices[0]];
+            if (face.Indices.size() == 3u)
             {
-                return true;
+                const auto b = positions[face.Indices[1]];
+                const auto c = positions[face.Indices[2]];
+                const bool zero = RobustPredicates::ExactOrientation2D({first.x, first.y}, {b.x, b.y}, {c.x, c.y}) == 0 &&
+                    RobustPredicates::ExactOrientation2D({first.y, first.z}, {b.y, b.z}, {c.y, c.z}) == 0 &&
+                    RobustPredicates::ExactOrientation2D({first.z, first.x}, {b.z, b.x}, {c.z, c.x}) == 0;
+                return {RelativeTriangleAreaSquared(first, b, c), zero};
             }
-            const glm::vec3 normal = NewellNormal(face, positions);
-            return glm::dot(normal, normal) <= options.DegenerateAreaTolerance;
+            glm::dvec3 normal{0.0};
+            double longestSquared = 0.0;
+            bool collinear = true;
+            glm::vec3 second = first;
+            for (const Index index : face.Indices)
+                if (positions[index] != first) { second = positions[index]; break; }
+            for (std::size_t i = 0; i < face.Indices.size(); ++i)
+            {
+                const glm::vec3 a = positions[face.Indices[i]];
+                const glm::vec3 b = positions[face.Indices[(i + 1) % face.Indices.size()]];
+                const glm::dvec3 edge = glm::dvec3{b} - glm::dvec3{a};
+                longestSquared = std::max(longestSquared, glm::dot(edge, edge));
+                normal += glm::cross(glm::dvec3{a} - glm::dvec3{first},
+                                     glm::dvec3{b} - glm::dvec3{first});
+                collinear = collinear &&
+                    RobustPredicates::ExactOrientation2D({first.x, first.y}, {second.x, second.y}, {a.x, a.y}) == 0 &&
+                    RobustPredicates::ExactOrientation2D({first.y, first.z}, {second.y, second.z}, {a.y, a.z}) == 0 &&
+                    RobustPredicates::ExactOrientation2D({first.z, first.x}, {second.z, second.x}, {a.z, a.x}) == 0;
+            }
+            // Non-collinear polygons with cancelling area vectors are quality
+            // warnings, not proofs of zero area or a simplicity test.
+            const bool zero = collinear;
+            return {longestSquared > 0.0 ? glm::dot(normal, normal) / (longestSquared * longestSquared) : 0.0, zero};
         }
 
         void AppendDuplicateVertexDiagnostic(ValidationResult& result,
                                              const std::size_t vertexIndex,
                                              const std::size_t otherVertexIndex)
         {
-            result.Diagnostics.push_back(ValidationDiagnostic{
+            result.AddDiagnostic(ValidationDiagnostic{
                 .Kind = ValidationDiagnosticKind::DuplicateVertex,
                 .Severity = ValidationSeverity::Warning,
                 .VertexIndex = static_cast<Index>(vertexIndex),
@@ -368,50 +404,47 @@ namespace Geometry::MeshSoup
             }
         }
 
-        void AppendFaceDiagnostics(ValidationResult& result,
-                                   IndexedMeshView view,
-                                   const ValidationOptions& options,
-                                   std::vector<std::uint8_t>& validForTopology)
+        void CheckStructure(ValidationResult& result, IndexedMeshView view,
+                            std::vector<std::uint8_t>& usable)
         {
-            validForTopology.assign(view.Faces.size(), false);
-            for (std::size_t faceIndex = 0u; faceIndex < view.Faces.size(); ++faceIndex)
+            std::vector<std::uint8_t> finite(view.Positions.size());
+            for (std::size_t i = 0; i < view.Positions.size(); ++i)
             {
-                const PolygonFace& face = view.Faces[faceIndex];
-                bool hasInvalidIndex = false;
+                finite[i] = Validation::IsFinite(view.Positions[i]);
+                if (!finite[i])
+                    result.AddDiagnostic({.Kind = ValidationDiagnosticKind::NonFinitePosition,
+                                          .VertexIndex = static_cast<Index>(i)});
+            }
+            usable.assign(view.Faces.size(), false);
+            for (std::size_t f = 0; f < view.Faces.size(); ++f)
+            {
+                const auto& face = view.Faces[f];
+                result.CornerCount += face.Indices.size();
+                bool valid = true;
                 for (const Index index : face.Indices)
                 {
-                    if (static_cast<std::size_t>(index) >= view.Positions.size())
+                    if (index >= view.Positions.size())
                     {
-                        hasInvalidIndex = true;
-                        result.Diagnostics.push_back(ValidationDiagnostic{
-                            .Kind = ValidationDiagnosticKind::InvalidIndex,
-                            .Severity = ValidationSeverity::Error,
-                            .FaceIndex = faceIndex,
-                            .VertexIndex = index,
-                            .AttributeName = {},
-                            .AttributeDomainValue = AttributeDomain::Vertex,
-                            .ExpectedCount = view.Positions.size(),
-                            .ActualCount = static_cast<std::size_t>(index),
-                        });
+                        result.AddDiagnostic({.Kind = ValidationDiagnosticKind::InvalidIndex,
+                                              .FaceIndex = f, .VertexIndex = index,
+                                              .ExpectedCount = view.Positions.size(), .ActualCount = index});
+                        valid = false;
                     }
+                    else if (!finite[index]) valid = false;
                 }
-
-                if (!hasInvalidIndex && IsDegenerateFace(face, view.Positions, options))
+                if (face.Indices.size() < 3u)
                 {
-                    result.Diagnostics.push_back(ValidationDiagnostic{
-                        .Kind = ValidationDiagnosticKind::DegenerateFace,
-                        .Severity = ValidationSeverity::Error,
-                        .FaceIndex = faceIndex,
-                        .AttributeName = {},
-                        .AttributeDomainValue = AttributeDomain::Face,
-                        .ExpectedCount = 0u,
-                        .ActualCount = 0u,
-                    });
+                    result.AddDiagnostic({.Kind = ValidationDiagnosticKind::InvalidFaceSize, .FaceIndex = f});
+                    valid = false;
                 }
-
-                validForTopology[faceIndex] = !hasInvalidIndex && !IsDegenerateFace(face, view.Positions, options) &&
-                                              HasOnlyValidIndices(face, view.Positions.size());
+                if (ContainsDuplicateIndex(face))
+                {
+                    result.AddDiagnostic({.Kind = ValidationDiagnosticKind::RepeatedFaceIndex, .FaceIndex = f});
+                    valid = false;
+                }
+                usable[f] = valid;
             }
+            result.StructureChecked = true;
         }
 
         [[nodiscard]] std::uint64_t MakeUndirectedEdgeKey(const Index a, const Index b) noexcept
@@ -426,9 +459,9 @@ namespace Geometry::MeshSoup
                                        std::span<const std::uint8_t> validForTopology)
         {
             std::vector<EdgeObservation> observations;
-            observations.reserve(CornerCount(view));
+            observations.reserve(result.CornerCount);
             std::unordered_map<std::uint64_t, std::size_t> observationByEdge;
-            observationByEdge.reserve(CornerCount(view));
+            observationByEdge.reserve(result.CornerCount);
             for (std::size_t faceIndex = 0u; faceIndex < view.Faces.size(); ++faceIndex)
             {
                 if (!validForTopology[faceIndex])
@@ -464,7 +497,7 @@ namespace Geometry::MeshSoup
                     if (edge.IncidentCount > 2u && !edge.NonManifoldReported)
                     {
                         edge.NonManifoldReported = true;
-                        result.Diagnostics.push_back(ValidationDiagnostic{
+                        result.AddDiagnostic(ValidationDiagnostic{
                             .Kind = ValidationDiagnosticKind::NonManifoldEdge,
                             .Severity = ValidationSeverity::Error,
                             .FaceIndex = faceIndex,
@@ -480,7 +513,7 @@ namespace Geometry::MeshSoup
                     if (edge.SameDirectedEdgeSeen && !edge.WindingReported)
                     {
                         edge.WindingReported = true;
-                        result.Diagnostics.push_back(ValidationDiagnostic{
+                        result.AddDiagnostic(ValidationDiagnostic{
                             .Kind = ValidationDiagnosticKind::InconsistentWinding,
                             .Severity = ValidationSeverity::Error,
                             .FaceIndex = faceIndex,
@@ -493,6 +526,21 @@ namespace Geometry::MeshSoup
                         });
                     }
                 }
+            }
+            result.BoundaryEdgeCount = static_cast<std::size_t>(std::ranges::count_if(
+                observations, [](const EdgeObservation& edge) { return edge.IncidentCount == 1u; }));
+            std::map<std::vector<Index>, std::size_t> faces;
+            for (std::size_t f = 0; f < view.Faces.size(); ++f)
+            {
+                if (!validForTopology[f]) continue;
+                auto key = view.Faces[f].Indices;
+                std::rotate(key.begin(), std::min_element(key.begin(), key.end()), key.end());
+                auto reversed = key;
+                std::reverse(reversed.begin() + 1, reversed.end());
+                if (reversed < key) key = std::move(reversed);
+                if (!faces.emplace(std::move(key), f).second)
+                    result.AddDiagnostic({.Kind = ValidationDiagnosticKind::DuplicateFace,
+                                          .Severity = ValidationSeverity::Warning, .FaceIndex = f});
             }
         }
 
@@ -507,7 +555,7 @@ namespace Geometry::MeshSoup
                 return;
             }
 
-            result.Diagnostics.push_back(ValidationDiagnostic{
+            result.AddDiagnostic(ValidationDiagnostic{
                 .Kind = ValidationDiagnosticKind::AttributeArityMismatch,
                 .Severity = ValidationSeverity::Error,
                 .AttributeName = std::string{name},
@@ -519,7 +567,7 @@ namespace Geometry::MeshSoup
 
         void AppendAttributeDiagnostics(ValidationResult& result, IndexedMeshView view)
         {
-            const std::size_t corners = CornerCount(view);
+            const std::size_t corners = result.CornerCount;
             if (view.VertexProperties != nullptr)
             {
                 AppendAttributeArityDiagnostic(result,
@@ -547,16 +595,72 @@ namespace Geometry::MeshSoup
         }
     }
 
+    ValidationContext::ValidationContext(IndexedMeshView view, ValidationOptions options)
+        : m_View(view), m_Options(options) {}
+
+    void ValidationContext::CheckStructure()
+    {
+        if (!m_Result.StructureChecked)
+            MeshSoup::CheckStructure(m_Result, m_View, m_UsableFaces);
+    }
+
+    void ValidationContext::CheckDuplicateVertices()
+    {
+        CheckStructure();
+        if (m_Result.Executed.DuplicateVertices) return;
+        AppendDuplicateVertexDiagnostics(m_Result, m_View, m_Options);
+        m_Result.Executed.DuplicateVertices = true;
+    }
+
+    void ValidationContext::CheckFaceGeometry()
+    {
+        CheckStructure();
+        if (m_Result.Executed.FaceGeometry) return;
+        for (std::size_t f = 0; f < m_View.Faces.size(); ++f)
+        {
+            if (!m_UsableFaces[f]) continue;
+            const auto measure = MeasureFace(m_View.Faces[f], m_View.Positions);
+            if (measure.ZeroArea)
+                m_Result.AddDiagnostic({.Kind = ValidationDiagnosticKind::DegenerateFace,
+                    .Severity = m_Options.AllowZeroAreaFaces ? ValidationSeverity::Warning : ValidationSeverity::Error,
+                    .FaceIndex = f});
+            else if (measure.RelativeAreaSquared <= 1.0e-24)
+                m_Result.AddDiagnostic({.Kind = ValidationDiagnosticKind::PoorFaceQuality,
+                    .Severity = ValidationSeverity::Warning, .FaceIndex = f});
+        }
+        m_Result.Executed.FaceGeometry = true;
+    }
+
+    void ValidationContext::CheckTopology()
+    {
+        CheckStructure();
+        if (m_Result.Executed.Topology) return;
+        AppendTopologyDiagnostics(m_Result, m_View, m_UsableFaces);
+        m_Result.Executed.Topology = true;
+    }
+
+    void ValidationContext::CheckAttributes()
+    {
+        CheckStructure();
+        if (m_Result.Executed.Attributes) return;
+        AppendAttributeDiagnostics(m_Result, m_View);
+        m_Result.Executed.Attributes = true;
+    }
+
+    const ValidationResult& ValidationContext::Validate()
+    {
+        CheckStructure();
+        if (m_Options.Checks.DuplicateVertices) CheckDuplicateVertices();
+        if (m_Options.Checks.FaceGeometry) CheckFaceGeometry();
+        if (m_Options.Checks.Topology) CheckTopology();
+        if (m_Options.Checks.Attributes) CheckAttributes();
+        return m_Result;
+    }
+
     ValidationResult Validate(IndexedMeshView view, const ValidationOptions& options)
     {
-        ValidationResult result;
-        AppendDuplicateVertexDiagnostics(result, view, options);
-
-        std::vector<std::uint8_t> validForTopology;
-        AppendFaceDiagnostics(result, view, options, validForTopology);
-        AppendTopologyDiagnostics(result, view, validForTopology);
-        AppendAttributeDiagnostics(result, view);
-        return result;
+        ValidationContext context(view, options);
+        return context.Validate();
     }
 
     ValidationResult Validate(const IndexedMesh& mesh, const ValidationOptions& options)

@@ -16,6 +16,7 @@ module;
 
 module Geometry.UvAtlas.Validation;
 
+import Geometry.RobustPredicates;
 import Geometry.Validation;
 import Geometry.AABB;
 import Geometry.BVH;
@@ -24,7 +25,6 @@ import Geometry.UvAtlas.Types;
 
 namespace Geometry::UvAtlas {
 namespace {
-constexpr double kRelativeDegenerateEpsilon = 1.0e-12;
 // Relative slack for float round-off on bounds that are met exactly by
 // construction (for example an isometric single triangle at bound 1).
 constexpr double kLimitTolerance = 1.0e-6;
@@ -78,15 +78,6 @@ constexpr double kLimitTolerance = 1.0e-6;
   return false;
 }
 
-// Knuth two-sum: a + b == sum + error exactly under IEEE round-to-nearest.
-void TwoSum(const double a, const double b, double &sum,
-            double &error) noexcept {
-  sum = a + b;
-  const double bVirtual = sum - a;
-  const double aVirtual = sum - bVirtual;
-  error = (a - aVirtual) + (b - bVirtual);
-}
-
 // Two triangles with positive orientation have disjoint open interiors iff
 // the supporting line of one of their six edges weakly separates them (the
 // edge normals are the face normals of the Minkowski difference).
@@ -97,7 +88,7 @@ void TwoSum(const double a, const double b, double &sum,
     const glm::vec2 q = owner[(edge + 1u) % 3u];
     bool allOutside = true;
     for (const glm::vec2 point : other) {
-      if (ExactUvOrientation(p, q, point) > 0) {
+      if (Geometry::RobustPredicates::ExactOrientation2D(p, q, point) > 0) {
         allOutside = false;
         break;
       }
@@ -182,59 +173,6 @@ void Fail(UvAtlasValidationReport &report, const UvAtlasStatus status,
 }
 } // namespace
 
-int ExactUvOrientation(const glm::vec2 a, const glm::vec2 b,
-                       const glm::vec2 c) noexcept {
-  // (b-a) x (c-a) expanded into six float products, each exact in double.
-  const std::array<double, 6u> terms{
-      static_cast<double>(b.x) * static_cast<double>(c.y),
-      -(static_cast<double>(b.x) * static_cast<double>(a.y)),
-      -(static_cast<double>(a.x) * static_cast<double>(c.y)),
-      -(static_cast<double>(b.y) * static_cast<double>(c.x)),
-      static_cast<double>(a.x) * static_cast<double>(b.y),
-      static_cast<double>(c.x) * static_cast<double>(a.y),
-  };
-  // Shewchuk grow-expansion: components stay nonoverlapping and ordered by
-  // magnitude, so the most significant nonzero component carries the sign.
-  std::array<double, 6u> expansion{};
-  std::size_t length = 0u;
-  for (const double term : terms) {
-    double carry = term;
-    for (std::size_t i = 0u; i < length; ++i) {
-      double sum = 0.0;
-      double error = 0.0;
-      TwoSum(carry, expansion[i], sum, error);
-      expansion[i] = error;
-      carry = sum;
-    }
-    expansion[length++] = carry;
-  }
-  for (std::size_t i = length; i > 0u; --i) {
-    if (expansion[i - 1u] > 0.0) {
-      return 1;
-    }
-    if (expansion[i - 1u] < 0.0) {
-      return -1;
-    }
-  }
-  return 0;
-}
-
-bool IsDegenerateAtlasTriangle(const glm::vec3 p0, const glm::vec3 p1,
-                               const glm::vec3 p2) noexcept {
-  if (!Geometry::Validation::IsFinite(p0) || !Geometry::Validation::IsFinite(p1) || !Geometry::Validation::IsFinite(p2)) {
-    return true;
-  }
-  const glm::dvec3 a{p0};
-  const glm::dvec3 b{p1};
-  const glm::dvec3 c{p2};
-  const double doubleArea = glm::length(glm::cross(b - a, c - a));
-  const double longestSq =
-      std::max({glm::dot(b - a, b - a), glm::dot(c - b, c - b),
-                glm::dot(a - c, a - c)});
-  return !(longestSq > 0.0) ||
-         !(doubleArea > kRelativeDegenerateEpsilon * longestSq);
-}
-
 UvFaceDistortion MeasureUvFaceDistortion(const glm::dvec3 p0,
                                          const glm::dvec3 p1,
                                          const glm::dvec3 p2,
@@ -293,7 +231,7 @@ FindUvTriangleOverlaps(const std::span<const glm::vec2> corners,
     const glm::vec2 b = corners[3u * t + 1u];
     const glm::vec2 c = corners[3u * t + 2u];
     if (!Geometry::Validation::IsFinite(a) || !Geometry::Validation::IsFinite(b) || !Geometry::Validation::IsFinite(c) ||
-        ExactUvOrientation(a, b, c) <= 0) {
+        Geometry::RobustPredicates::ExactOrientation2D(a, b, c) <= 0) {
       // Unusable triangles get an empty point box far from any query.
       bounds[t].Min = bounds[t].Max = glm::vec3{0.0f, 0.0f, 1.0f};
       continue;
@@ -391,7 +329,7 @@ ValidateUvAtlasCorners(const UvAtlasValidationInput &input,
       }
     }
     if (sourceValid) {
-      sourceValid = !IsDegenerateAtlasTriangle(
+      sourceValid = !Geometry::MeshSoup::IsNearlyDegenerateTriangle(
           input.Positions[face.Indices[0]], input.Positions[face.Indices[1]],
           input.Positions[face.Indices[2]]);
     }
@@ -410,7 +348,7 @@ ValidateUvAtlasCorners(const UvAtlasValidationInput &input,
       }
     }
     const int orientation =
-        uvValid ? ExactUvOrientation(input.CornerUvs[3u * f],
+        uvValid ? Geometry::RobustPredicates::ExactOrientation2D(input.CornerUvs[3u * f],
                                      input.CornerUvs[3u * f + 1u],
                                      input.CornerUvs[3u * f + 2u])
                 : 1;

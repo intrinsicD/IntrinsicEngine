@@ -26,12 +26,8 @@ export module Geometry.RobustPredicates;
 //   `Certainty::Uncertain` rather than coerced into a hard sign. Callers
 //   choosing to treat uncertain results as a particular sign must do so
 //   explicitly; the module never silently picks a side.
-// - This is a filtered double-precision implementation. Exact / adaptive
-//   Shewchuk-style escalation is a Slice 4 follow-up (see
-//   `tasks/active/GEOM-007-robust-predicates-intersection-classification.md`).
-//   Until then, callers requiring guaranteed signs (e.g. mesh boolean kernels)
-//   must add their own snap-rounding / perturbation pre-pass or wait for
-//   Slice 4.
+// - ExactOrientation2D supplies an exact sign for finite float coordinates.
+//   The other predicates retain their explicit filtered uncertainty.
 //
 // Diagnostics:
 // - `Sign` distinguishes `Negative` / `Zero` / `Positive`. `Zero` means the
@@ -46,6 +42,10 @@ export module Geometry.RobustPredicates;
 
 export namespace Geometry::RobustPredicates
 {
+    // Exact orientation sign for finite float coordinates, using expansion arithmetic.
+    [[nodiscard]] int ExactOrientation2D(glm::vec2 a, glm::vec2 b, glm::vec2 c) noexcept;
+
+
     // -----------------------------------------------------------------------
     // Diagnostic enums.
     // -----------------------------------------------------------------------

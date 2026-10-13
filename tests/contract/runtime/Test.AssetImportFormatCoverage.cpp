@@ -7,6 +7,7 @@
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -4127,5 +4128,358 @@ TEST(RuntimeAssetImportFormatCoverage, DeferredUvUsesSourceAdjacencyForNonManifo
     // render vertices. Atlasing display topology would separate all triangles.
     EXPECT_EQ(uv.Vector()[1], uv.Vector()[3]);
     EXPECT_EQ(uv.Vector()[2], uv.Vector()[5]);
+    engine.Shutdown();
+}
+
+namespace
+{
+    std::vector<std::byte> ValidationGlb(float scale, bool collinear = false,
+                                         bool repeatedIndex = false,
+                                         bool unsupportedExtension = false)
+    {
+        auto bytes = TriangleBufferBytes();
+        const float positions[]{0, 0, 0, scale, 0, 0,
+                                collinear ? 2 * scale : 0, collinear ? 0 : scale, 0};
+        std::memcpy(bytes.data(), positions, sizeof(positions));
+        if (repeatedIndex)
+        {
+            const std::uint16_t index = 1;
+            std::memcpy(bytes.data() + 40, &index, sizeof(index));
+        }
+        auto json = TriangleGltfJson("", false);
+        const auto uri = json.find("\"uri\": \"\", ");
+        json.erase(uri, std::string_view{"\"uri\": \"\", "}.size());
+        const auto bounds = json.find("\"max\": [1, 1, 0]");
+        json.replace(bounds, std::string_view{"\"max\": [1, 1, 0]"}.size(),
+            "\"max\": [" + std::to_string(collinear ? 2 * scale : scale) + ", " +
+            std::to_string(collinear ? 0 : scale) + ", 0]");
+        if (unsupportedExtension)
+            json.insert(1, "\"extensionsRequired\":[\"EXT_test_unsupported\"],\"extensionsUsed\":[\"EXT_test_unsupported\"],");
+        while (json.size() % 4) json.push_back(' ');
+        std::vector<std::byte> glb;
+        AppendScalar(glb, std::uint32_t{0x46546C67});
+        AppendScalar(glb, std::uint32_t{2});
+        AppendScalar(glb, static_cast<std::uint32_t>(28 + json.size() + bytes.size()));
+        AppendScalar(glb, static_cast<std::uint32_t>(json.size()));
+        AppendScalar(glb, std::uint32_t{0x4E4F534A});
+        for (char c : json) glb.push_back(static_cast<std::byte>(c));
+        AppendScalar(glb, static_cast<std::uint32_t>(bytes.size()));
+        AppendScalar(glb, std::uint32_t{0x004E4942});
+        glb.insert(glb.end(), bytes.begin(), bytes.end());
+        return glb;
+    }
+}
+
+TEST(RuntimeAssetImportFormatCoverage, SmallGlbRetainsValidationReportForSyncAndQueuedImport)
+{
+    for (const bool queued : {false, true})
+    {
+        SCOPED_TRACE(queued);
+        auto bytes = ValidationGlb(1.0e-4f);
+        TempAssetFile file(queued ? "validation_small_queued.glb" : "validation_small_sync.glb",
+                           std::span<const std::byte>{bytes});
+        auto app = std::make_unique<WaitForConditionApplication>([](Runtime::Engine& engine) {
+            return RequiredEngineService<Runtime::AssetWorkflowModule>(engine).GetLastAssetImportEvent().has_value();
+        }, 300);
+        Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(app));
+        InitializeAssetImportEngine(engine);
+        InstallSandboxDefaultRuntimePolicies(engine);
+        auto& pipeline = RequiredEngineService<Runtime::AssetWorkflowModule>(engine);
+        if (queued)
+        {
+            ASSERT_TRUE(pipeline.QueueModelTextureImport({.Path = file.Path.string()}).has_value());
+            engine.Run();
+        }
+        else ASSERT_TRUE(pipeline.ImportAssetFromPath({.Path = file.Path.string()}).has_value());
+        const auto& event = pipeline.GetLastAssetImportEvent();
+        ASSERT_TRUE(event.has_value());
+        ASSERT_TRUE(event->Succeeded());
+        ASSERT_TRUE(event->StageTrace.has_value());
+        const auto report = event->StageTrace->ValidationReport;
+        ASSERT_TRUE(report);
+        EXPECT_FALSE(report->HasErrors());
+        EXPECT_EQ(report->Checks[static_cast<std::size_t>(Assets::ImportCheck::FaceGeometry)].Status,
+                  Assets::ImportCheckStatus::Passed);
+        EXPECT_EQ(report->Checks[static_cast<std::size_t>(Assets::ImportCheck::DuplicateVertices)].Status,
+                  Assets::ImportCheckStatus::Skipped);
+        EXPECT_EQ(report->Checks[static_cast<std::size_t>(Assets::ImportCheck::Materialization)].Status,
+                  Assets::ImportCheckStatus::Passed);
+        EXPECT_EQ(report->BoundaryEdgeCount, 3u);
+        EXPECT_EQ(report->DisconnectedFallbackCount, 0u);
+        const auto entity = FindFirstEntityWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
+        ASSERT_TRUE(entity.has_value());
+        EXPECT_TRUE((engine.Worlds().Get(engine.ActiveWorld())->Raw().all_of<G::RenderSurface, Sel::SelectableTag>(*entity)));
+        engine.Shutdown();
+    }
+}
+
+TEST(RuntimeAssetImportFormatCoverage, GlbZeroAreaKeepsTopologyAndRepeatedIndexUsesExplicitFallback)
+{
+    for (const bool repeated : {false, true})
+    {
+        auto bytes = ValidationGlb(1.0f, !repeated, repeated);
+        TempAssetFile file(repeated ? "validation_repeated.glb" : "validation_collinear.glb",
+                           std::span<const std::byte>{bytes});
+        Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+        InitializeAssetImportEngine(engine);
+        auto& pipeline = RequiredEngineService<Runtime::AssetWorkflowModule>(engine);
+        ASSERT_TRUE(pipeline.ImportAssetFromPath({.Path = file.Path.string()}).has_value());
+        const auto report = pipeline.GetLastAssetImportEvent()->StageTrace->ValidationReport;
+        ASSERT_TRUE(report);
+        EXPECT_FALSE(report->HasErrors());
+        EXPECT_EQ(report->Checks[static_cast<std::size_t>(Assets::ImportCheck::FaceGeometry)].Status,
+                  Assets::ImportCheckStatus::Warning);
+        EXPECT_EQ(report->DisconnectedFallbackCount, repeated ? 1u : 0u);
+        EXPECT_EQ(pipeline.GetLastAssetImportEvent()->Result->PrimitiveEntitiesCreated, 1u);
+        engine.Shutdown();
+    }
+}
+
+TEST(RuntimeAssetImportFormatCoverage, UnsupportedRequiredGlbExtensionFailsWithRetainedReport)
+{
+    auto bytes = ValidationGlb(1.0f, false, false, true);
+    TempAssetFile file("validation_unsupported.glb", std::span<const std::byte>{bytes});
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    InitializeAssetImportEngine(engine);
+    auto& pipeline = RequiredEngineService<Runtime::AssetWorkflowModule>(engine);
+    EXPECT_FALSE(pipeline.ImportAssetFromPath({.Path = file.Path.string()}).has_value());
+    const auto& event = pipeline.GetLastAssetImportEvent();
+    ASSERT_TRUE(event.has_value());
+    ASSERT_TRUE(event->StageTrace.has_value());
+    const auto report = event->StageTrace->ValidationReport;
+    ASSERT_TRUE(report);
+    EXPECT_TRUE(report->HasErrors());
+    EXPECT_EQ(report->Checks[static_cast<std::size_t>(Assets::ImportCheck::Resources)].Status,
+              Assets::ImportCheckStatus::Failed);
+    EXPECT_EQ(report->Checks[static_cast<std::size_t>(Assets::ImportCheck::Materialization)].Status,
+              Assets::ImportCheckStatus::NotRun);
+    engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, ImportValidationSelectionSkipsOnlyOptionalChecks)
+{
+    auto bytes = ValidationGlb(1.0e-4f);
+    TempAssetFile file("validation_skips.glb", std::span<const std::byte>{bytes});
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    InitializeAssetImportEngine(engine);
+    auto& pipeline = RequiredEngineService<Runtime::AssetWorkflowModule>(engine);
+    ASSERT_TRUE(pipeline.ImportAssetFromPath({.Path = file.Path.string(),
+        .ValidationOptions = {false, false, false, false}}).has_value());
+    const auto report = pipeline.GetLastAssetImportEvent()->StageTrace->ValidationReport;
+    ASSERT_TRUE(report);
+    for (const auto check : {Assets::ImportCheck::FaceGeometry, Assets::ImportCheck::Topology,
+                            Assets::ImportCheck::Attributes, Assets::ImportCheck::DuplicateVertices})
+        EXPECT_EQ(report->Checks[static_cast<std::size_t>(check)].Status, Assets::ImportCheckStatus::Skipped);
+    EXPECT_EQ(report->Checks[static_cast<std::size_t>(Assets::ImportCheck::NumericData)].Status,
+              Assets::ImportCheckStatus::Passed);
+    engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, ValidationRejectsAccessorOverrunAndSparseData)
+{
+    for (const bool sparse : {false, true})
+    {
+        const auto bytes = TriangleBufferBytes();
+        const std::string stem = sparse ? "validation_sparse" : "validation_view_bounds";
+        TempAssetFile bin(stem + ".bin", std::span<const std::byte>{bytes});
+        auto json = TriangleGltfJson(stem + ".bin", false);
+        if (sparse)
+        {
+            const auto accessor = json.find("\"bufferView\": 0, \"byteOffset\": 0");
+            json.insert(accessor, "\"sparse\":{\"count\":1,\"indices\":{\"bufferView\":1,\"componentType\":5123},\"values\":{\"bufferView\":0}},");
+        }
+        else
+        {
+            const auto size = json.find("\"byteLength\": 36");
+            json.replace(size, std::string_view{"\"byteLength\": 36"}.size(), "\"byteLength\": 12");
+        }
+        TempAssetFile file(stem + ".gltf", json);
+        Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+        InitializeAssetImportEngine(engine);
+        auto& pipeline = RequiredEngineService<Runtime::AssetWorkflowModule>(engine);
+        EXPECT_FALSE(pipeline.ImportAssetFromPath({.Path = file.Path.string(),
+            .ValidationOptions = {false, false, false, false}}).has_value());
+        const auto report = pipeline.GetLastAssetImportEvent()->StageTrace->ValidationReport;
+        ASSERT_TRUE(report);
+        EXPECT_TRUE(report->HasErrors());
+        EXPECT_EQ(report->Checks[static_cast<std::size_t>(sparse ? Assets::ImportCheck::Attributes : Assets::ImportCheck::References)].Status,
+                  Assets::ImportCheckStatus::Failed);
+        engine.Shutdown();
+    }
+}
+
+TEST(RuntimeAssetImportFormatCoverage, ValidationEnforcesFileAndImageBudgets)
+{
+    auto bytes = ValidationGlb(1.0f);
+    TempAssetFile file("validation_budget.glb", std::span<const std::byte>{bytes});
+    Core::IO::FileIOBackend backend;
+    EXPECT_FALSE(backend.Read({.Path = file.Path.string(), .MaxBytes = bytes.size() - 1}).has_value());
+    EXPECT_TRUE(backend.Read({.Path = file.Path.string(), .MaxBytes = bytes.size()}).has_value());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    InitializeAssetImportEngine(engine);
+    auto& pipeline = RequiredEngineService<Runtime::AssetWorkflowModule>(engine);
+    EXPECT_FALSE(pipeline.ImportAssetFromPath({.Path = file.Path.string(),
+        .ValidationOptions = {.MaxSourceBytes = bytes.size() - 1}}).has_value());
+    auto report = pipeline.GetLastAssetImportEvent()->StageTrace->ValidationReport;
+    ASSERT_TRUE(report);
+    EXPECT_EQ(report->Checks[static_cast<std::size_t>(Assets::ImportCheck::Resources)].Status,
+              Assets::ImportCheckStatus::Failed);
+    auto png = TinyPngBytes();
+    TempAssetFile image("validation_image_budget.png", std::span<const std::byte>{png});
+    EXPECT_FALSE(pipeline.ImportAssetFromPath({.Path = image.Path.string(),
+        .ValidationOptions = {.MaxDecodedImageBytes = 3}}).has_value());
+    report = pipeline.GetLastAssetImportEvent()->StageTrace->ValidationReport;
+    ASSERT_TRUE(report);
+    EXPECT_EQ(report->Checks[static_cast<std::size_t>(Assets::ImportCheck::Resources)].Status,
+              Assets::ImportCheckStatus::Failed);
+    EXPECT_EQ(report->Checks[static_cast<std::size_t>(Assets::ImportCheck::Format)].Status,
+              Assets::ImportCheckStatus::NotRun);
+    engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, ValidationReusesExternalResourceReadsWithinOneImport)
+{
+    struct CountingBackend final : Core::IO::IIOBackend
+    {
+        explicit CountingBackend(std::shared_ptr<std::unordered_map<std::string, std::size_t>> counts)
+            : Counts(std::move(counts)) {}
+        Core::Expected<Core::IO::IOReadResult> Read(const Core::IO::IORequest& request) override
+        {
+            ++(*Counts)[request.Path];
+            return Backend.Read(request);
+        }
+        Core::Result Write(const Core::IO::IORequest& request, std::span<const std::byte> bytes) override
+        { return Backend.Write(request, bytes); }
+        Core::IO::FileIOBackend Backend;
+        std::shared_ptr<std::unordered_map<std::string, std::size_t>> Counts;
+    };
+    const auto bytes = TriangleBufferBytes();
+    TempAssetFile bin("validation_read_cache.bin", std::span<const std::byte>{bytes});
+    TempAssetFile file("validation_read_cache.gltf", TriangleGltfJson("validation_read_cache.bin", false));
+    auto counts = std::make_shared<std::unordered_map<std::string, std::size_t>>();
+    auto app = std::make_unique<WaitForConditionApplication>([](Runtime::Engine& engine) {
+        return RequiredEngineService<Runtime::AssetWorkflowModule>(engine).GetLastAssetImportEvent().has_value();
+    });
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(app));
+    InitializeAssetImportEngine(engine);
+    auto& pipeline = RequiredEngineService<Runtime::AssetWorkflowModule>(engine);
+    pipeline.SetModelTextureImportIOBackendFactoryForTest([counts]() {
+        return std::make_unique<CountingBackend>(counts);
+    });
+    ASSERT_TRUE(pipeline.QueueModelTextureImport({.Path = file.Path.string()}).has_value());
+    engine.Run();
+    ASSERT_TRUE(pipeline.GetLastAssetImportEvent().has_value());
+    EXPECT_TRUE(pipeline.GetLastAssetImportEvent()->Succeeded());
+    EXPECT_EQ((*counts)[file.Path.string()], 1u);
+    EXPECT_EQ((*counts)[bin.Path.string()], 1u);
+    engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, CancelledModelReportIsIndependentOfRunningDecoder)
+{
+    const auto bytes = ValidationGlb(1.0f);
+    TempAssetFile file("cancelled_validation.glb", std::span<const std::byte>{bytes});
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    InitializeAssetImportEngine(engine);
+    auto& pipeline = RequiredEngineService<Runtime::AssetWorkflowModule>(engine);
+    auto readState = std::make_shared<BlockingReadBackendState>();
+    pipeline.SetModelTextureImportIOBackendFactoryForTest([readState]() {
+        return std::make_unique<BlockingReadIOBackend>(readState);
+    });
+    const auto queued = pipeline.QueueModelTextureImport({.Path = file.Path.string()});
+    ASSERT_TRUE(queued.has_value());
+    WaitUntilTrue(readState->ReadStarted);
+    ASSERT_TRUE(readState->ReadStarted.load(std::memory_order_acquire));
+    ASSERT_TRUE(pipeline.CancelAssetImport(queued->Operation).has_value());
+    const auto report = pipeline.GetLastAssetImportEvent()->StageTrace->ValidationReport;
+    ASSERT_TRUE(report);
+    readState->ReleaseRead.store(true, std::memory_order_release);
+    Core::Tasks::Scheduler::WaitForAll();
+    (void)engine.Jobs().DrainCompletions(engine.Events());
+    for (const auto& check : report->Checks)
+        EXPECT_EQ(check.Status, Assets::ImportCheckStatus::NotRun);
+    EXPECT_TRUE(report->Diagnostics.empty());
+    engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, TextureDecodeFailureRetainsFailedReport)
+{
+    auto bytes = TinyPngBytes();
+    bytes.resize(33); // Keep the PNG header and IHDR, but remove the pixel stream.
+    TempAssetFile file("validation_truncated.png", std::span<const std::byte>{bytes});
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    InitializeAssetImportEngine(engine);
+    auto& pipeline = RequiredEngineService<Runtime::AssetWorkflowModule>(engine);
+    EXPECT_FALSE(pipeline.ImportAssetFromPath({.Path = file.Path.string()}).has_value());
+    const auto report = pipeline.GetLastAssetImportEvent()->StageTrace->ValidationReport;
+    ASSERT_TRUE(report);
+    EXPECT_TRUE(report->HasErrors());
+    EXPECT_EQ(report->Checks[static_cast<std::size_t>(Assets::ImportCheck::Format)].Status,
+              Assets::ImportCheckStatus::Failed);
+    EXPECT_EQ(report->Checks[static_cast<std::size_t>(Assets::ImportCheck::Materialization)].Status,
+              Assets::ImportCheckStatus::NotRun);
+    engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, QuantizedPositionsWithRequiredExtensionImport)
+{
+    std::vector<std::byte> bytes;
+    for (const std::int16_t value : {0, 0, 0, 0, 100, 0, 0, 0, 0, 100, 0, 0})
+        AppendScalar(bytes, value);
+    for (const std::uint16_t index : {0, 1, 2}) AppendScalar(bytes, index);
+    TempAssetFile bin("validation_quantized.bin", std::span<const std::byte>{bytes});
+    TempAssetFile file("validation_quantized.gltf", R"json({
+        "asset":{"version":"2.0"},
+        "extensionsUsed":["KHR_mesh_quantization"],"extensionsRequired":["KHR_mesh_quantization"],
+        "buffers":[{"uri":"validation_quantized.bin","byteLength":30}],
+        "bufferViews":[{"buffer":0,"byteLength":24,"byteStride":8},{"buffer":0,"byteOffset":24,"byteLength":6}],
+        "accessors":[{"bufferView":0,"componentType":5122,"count":3,"type":"VEC3","min":[0,0,0],"max":[100,100,0]},
+                     {"bufferView":1,"componentType":5123,"count":3,"type":"SCALAR"}],
+        "meshes":[{"primitives":[{"attributes":{"POSITION":0},"indices":1}]}],
+        "nodes":[{"mesh":0}],"scenes":[{"nodes":[0]}],"scene":0
+    })json");
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    InitializeAssetImportEngine(engine);
+    auto& pipeline = RequiredEngineService<Runtime::AssetWorkflowModule>(engine);
+    ASSERT_TRUE(pipeline.ImportAssetFromPath({.Path = file.Path.string()}).has_value());
+    const auto report = pipeline.GetLastAssetImportEvent()->StageTrace->ValidationReport;
+    ASSERT_TRUE(report);
+    EXPECT_EQ(report->Checks[static_cast<std::size_t>(Assets::ImportCheck::Resources)].Status,
+              Assets::ImportCheckStatus::Passed);
+    engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, SkippedPrimitiveModesAreReported)
+{
+    auto bytes = TriangleBufferBytes();
+    TempAssetFile bin("validation_modes.bin", std::span<const std::byte>{bytes});
+    auto json = TriangleGltfJson("validation_modes.bin", false);
+    const auto start = json.find("\"primitives\": [") + std::string_view{"\"primitives\": ["}.size();
+    json.insert(start, "{\"attributes\":{\"POSITION\":0},\"mode\":0},");
+    TempAssetFile file("validation_modes.gltf", json);
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    InitializeAssetImportEngine(engine);
+    auto& pipeline = RequiredEngineService<Runtime::AssetWorkflowModule>(engine);
+    ASSERT_TRUE(pipeline.ImportAssetFromPath({.Path = file.Path.string()}).has_value());
+    const auto report = pipeline.GetLastAssetImportEvent()->StageTrace->ValidationReport;
+    ASSERT_TRUE(report);
+    EXPECT_EQ(report->Checks[static_cast<std::size_t>(Assets::ImportCheck::Resources)].Status,
+              Assets::ImportCheckStatus::Unsupported);
+    engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, EmptyGlbReportsFormatFailureBeforeMaterialization)
+{
+    TempAssetFile file("validation_empty.glb", std::string_view{});
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    InitializeAssetImportEngine(engine);
+    auto& pipeline = RequiredEngineService<Runtime::AssetWorkflowModule>(engine);
+    EXPECT_FALSE(pipeline.ImportAssetFromPath({.Path = file.Path.string()}).has_value());
+    const auto report = pipeline.GetLastAssetImportEvent()->StageTrace->ValidationReport;
+    ASSERT_TRUE(report);
+    EXPECT_EQ(report->Checks[static_cast<std::size_t>(Assets::ImportCheck::Format)].Status,
+              Assets::ImportCheckStatus::Failed);
+    EXPECT_EQ(report->Checks[static_cast<std::size_t>(Assets::ImportCheck::Materialization)].Status,
+              Assets::ImportCheckStatus::NotRun);
     engine.Shutdown();
 }

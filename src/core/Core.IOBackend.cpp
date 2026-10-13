@@ -34,7 +34,7 @@ namespace Extrinsic::Core::IO
 
         const std::size_t readSize =
             (request.Size == 0) ? (fileSize - offset) : request.Size;
-        if (offset + readSize > fileSize)
+        if (readSize > request.MaxBytes || readSize > fileSize - offset)
             return std::unexpected(Core::ErrorCode::OutOfRange);
 
         file.seekg(static_cast<std::streamoff>(offset), std::ios::beg);
