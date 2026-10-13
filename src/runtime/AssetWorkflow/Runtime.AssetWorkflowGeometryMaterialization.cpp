@@ -183,7 +183,8 @@ void WriteSourceFaceXrefs(
 [[nodiscard]] std::vector<glm::vec3> ComputeAreaWeightedVertexNormals(
     const std::vector<glm::vec3> &positions,
     const std::vector<std::vector<std::uint32_t>> &faces) {
-  std::vector<glm::vec3> normals(positions.size(), glm::vec3{0.0f});
+  // Float area vectors and their lengths can underflow or overflow at valid source scales.
+  std::vector<glm::dvec3> sums(positions.size(), glm::dvec3{0.0});
 
   for (const std::vector<std::uint32_t> &face : faces) {
     if (face.size() < 3u) {
@@ -200,25 +201,20 @@ void WriteSourceFaceXrefs(
         continue;
       }
 
-      const glm::vec3 weightedNormal =
-          glm::cross(positions[b] - positions[a], positions[c] - positions[a]);
-      const float length = glm::length(weightedNormal);
-      if (!std::isfinite(length) || length <= 1.0e-12f) {
-        continue;
-      }
-
-      normals[a] += weightedNormal;
-      normals[b] += weightedNormal;
-      normals[c] += weightedNormal;
+      const glm::dvec3 weightedNormal = glm::cross(
+          glm::dvec3{positions[b]} - glm::dvec3{positions[a]},
+          glm::dvec3{positions[c]} - glm::dvec3{positions[a]});
+      sums[a] += weightedNormal;
+      sums[b] += weightedNormal;
+      sums[c] += weightedNormal;
     }
   }
 
-  for (glm::vec3 &normal : normals) {
-    const float length = glm::length(normal);
-    if (std::isfinite(length) && length > 1.0e-6f) {
-      normal /= length;
-    } else {
-      normal = glm::vec3{0.0f};
+  std::vector<glm::vec3> normals(sums.size(), glm::vec3{0.0f});
+  for (std::size_t i = 0; i < sums.size(); ++i) {
+    const double length = glm::length(sums[i]);
+    if (length > 0.0) {
+      normals[i] = glm::vec3{sums[i] / length};
     }
   }
 

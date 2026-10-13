@@ -88,9 +88,11 @@ No welding or face deletion is performed. Distinct-index zero-area faces remain
 in the render mesh with warnings; repeated-index or non-manifold topology can
 use the existing disconnected-corner fallback, recorded in the report. Strict
 geometry conversions can still reject zero-area faces in later editor operations.
-Fallback normal generation still uses absolute thresholds: very small geometry
-without authored normals can receive zero normals. That separate render-path
-limitation is not repaired by import validation.
+When normals are absent, runtime import generates area-weighted vertex normals
+with double-precision cross products, accumulation and normalization, without
+absolute length cutoffs. Authored normals remain unchanged. Isolated vertices
+and exactly zero accumulated area vectors retain zero normals; near-cancelling
+contributions can still leave a direction determined by rounding.
 
 Model/texture source-byte and decoded-image budgets are opt-in per-call limits;
 defaults impose no additional byte cap. An explicitly configured source limit

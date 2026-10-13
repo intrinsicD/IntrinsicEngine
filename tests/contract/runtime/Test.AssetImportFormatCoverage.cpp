@@ -4209,6 +4209,8 @@ TEST(RuntimeAssetImportFormatCoverage, SmallGlbRetainsValidationReportForSyncAnd
         const auto entity = FindFirstEntityWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
         ASSERT_TRUE(entity.has_value());
         EXPECT_TRUE((engine.Worlds().Get(engine.ActiveWorld())->Raw().all_of<G::RenderSurface, Sel::SelectableTag>(*entity)));
+        ExpectMeshVertexNormals(*engine.Worlds().Get(engine.ActiveWorld()), *entity,
+                                std::vector<glm::vec3>(3, glm::vec3{0.0f, 0.0f, 1.0f}));
         engine.Shutdown();
     }
 }
@@ -4482,4 +4484,76 @@ TEST(RuntimeAssetImportFormatCoverage, EmptyGlbReportsFormatFailureBeforeMateria
     EXPECT_EQ(report->Checks[static_cast<std::size_t>(Assets::ImportCheck::Materialization)].Status,
               Assets::ImportCheckStatus::NotRun);
     engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, GeneratedNormalsPreserveAreaWeightsAcrossScales)
+{
+    for (const bool objImport : {false, true})
+    for (const float scale : {1.0e-20f, 1.0e-4f, 1.0f, 1.0e10f})
+    {
+        SCOPED_TRACE(objImport);
+        SCOPED_TRACE(scale);
+        std::vector<std::byte> bytes;
+        std::ostringstream obj;
+        obj << std::scientific;
+        for (const glm::vec3 position : std::vector<glm::vec3>{
+            {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 2},
+            {0, 0, 3}, {1, 0, 3}, {2, 0, 3}, {3, 3, 3}})
+        {
+            obj << "v";
+            for (int axis = 0; axis < 3; ++axis)
+            {
+                AppendScalar(bytes, position[axis] * scale);
+                obj << ' ' << position[axis] * scale;
+            }
+            obj << '\n';
+        }
+        obj << "f 1 2 3\nf 2 1 4\nf 5 6 7\n";
+        for (std::size_t i = 0; i < 8; ++i)
+        {
+            AppendScalar(bytes, static_cast<float>(i % 2));
+            AppendScalar(bytes, static_cast<float>((i / 2) % 2));
+        }
+        for (const std::uint16_t index : {0, 1, 2, 1, 0, 3, 4, 5, 6}) AppendScalar(bytes, index);
+        TempAssetFile bin("generated_normals.bin", std::span<const std::byte>{bytes});
+        std::ostringstream bound;
+        bound << std::scientific << 3.0f * scale;
+        const std::string maximum = bound.str();
+        const std::string json = R"json({
+            "asset":{"version":"2.0"},
+            "buffers":[{"uri":"generated_normals.bin","byteLength":178}],
+            "bufferViews":[{"buffer":0,"byteLength":96},{"buffer":0,"byteOffset":96,"byteLength":64},
+                           {"buffer":0,"byteOffset":160,"byteLength":18}],
+            "accessors":[{"bufferView":0,"componentType":5126,"count":8,"type":"VEC3","min":[0,0,0],"max":[)json"
+            + maximum + "," + maximum + "," + maximum + R"json(]},
+                         {"bufferView":1,"componentType":5126,"count":8,"type":"VEC2"},
+                         {"bufferView":2,"componentType":5123,"count":9,"type":"SCALAR"}],
+            "meshes":[{"primitives":[{"attributes":{"POSITION":0,"TEXCOORD_0":1},"indices":2}]}],
+            "nodes":[{"mesh":0}],"scenes":[{"nodes":[0]}],"scene":0
+        })json";
+        TempAssetFile file(objImport ? "generated_normals.obj" : "generated_normals.gltf",
+                           objImport ? obj.str() : json);
+        Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+        InitializeAssetImportEngine(engine);
+        auto& pipeline = RequiredEngineService<Runtime::AssetWorkflowModule>(engine);
+        ASSERT_TRUE(pipeline.ImportAssetFromPath({.Path = file.Path.string()}).has_value());
+        auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+        const auto entity = FindFirstEntityWithDomain(scene, GS::Domain::Mesh);
+        ASSERT_TRUE(entity.has_value());
+        const auto view = GS::BuildConstView(scene.Raw(), *entity);
+        ASSERT_NE(view.VertexSource, nullptr);
+        const auto normals = view.VertexSource->Properties.Get<glm::vec3>("v:normal");
+        ASSERT_TRUE(normals.IsValid());
+        const std::vector<glm::vec3> expected{
+            glm::normalize(glm::vec3{0, 2, 1}), glm::normalize(glm::vec3{0, 2, 1}),
+            {0, 0, 1}, {0, 1, 0}, {}, {}, {}, {}};
+        ASSERT_EQ(normals.Vector().size(), expected.size());
+        for (std::size_t i = 0; i < expected.size(); ++i)
+        {
+            SCOPED_TRACE(i);
+            for (int axis = 0; axis < 3; ++axis)
+                EXPECT_NEAR(normals.Vector()[i][axis], expected[i][axis], 1.0e-6f);
+        }
+        engine.Shutdown();
+    }
 }
