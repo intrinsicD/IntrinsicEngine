@@ -1,11 +1,14 @@
-// Shared path, text parsing and PLY scalar decoding for geometry IO implementations.
+// Shared path, text parsing, PLY scalar decoding and scalar writing for geometry IO implementations.
 #pragma once
 
 #include <array>
+#include <bit>
 #include <charconv>
+#include <cstdarg>
 #include <cstdint>
 #include <cstring>
 #include <cstddef>
+#include <cstdio>
 #include <expected>
 #include <fstream>
 #include <optional>
@@ -13,6 +16,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <type_traits>
 #include <vector>
 
 namespace Geometry::IOText
@@ -311,4 +315,46 @@ namespace Geometry::IOText
         return T{};
     }
 
+    // Writes the object representation of `value` in little-endian byte order.
+    template <typename T>
+    [[nodiscard]] bool WriteLittleEndian(std::ostream& stream, T value)
+    {
+        static_assert(std::is_arithmetic_v<T>, "pass the exact on-disk scalar type");
+        std::array<std::byte, sizeof(T)> bytes{};
+        std::memcpy(bytes.data(), &value, sizeof(T));
+        if constexpr (std::endian::native == std::endian::big)
+        {
+            ByteSwap(bytes.data(), bytes.size());
+        }
+        stream.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+        return stream.good();
+    }
+
+    // Quantizes a unit-range color channel to the 8-bit value stored by PLY writers.
+    [[nodiscard]] inline std::uint8_t EncodeUnitColorByte(float channel)
+    {
+        const float clamped = channel < 0.0f ? 0.0f : (channel > 1.0f ? 1.0f : channel);
+        const auto rounded = static_cast<unsigned int>(clamped * 255.0f + 0.5f);
+        return static_cast<std::uint8_t>(rounded > 255u ? 255u : rounded);
+    }
+
+    // Formats into the caller's buffer and appends the text. Encoding errors and
+    // truncation return false, so values too long for the format fail closed.
+    [[gnu::format(printf, 4, 5)]] inline bool AppendFormatted(std::ostream& stream,
+                                                              char* buffer,
+                                                              std::size_t size,
+                                                              const char* format,
+                                                              ...)
+    {
+        std::va_list args;
+        va_start(args, format);
+        const int written = std::vsnprintf(buffer, size, format, args);
+        va_end(args);
+        if (written <= 0 || static_cast<std::size_t>(written) >= size)
+        {
+            return false;
+        }
+        stream.write(buffer, written);
+        return stream.good();
+    }
 }

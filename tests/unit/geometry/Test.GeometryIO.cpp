@@ -2900,6 +2900,30 @@ TEST(GeometryIO_MeshIO, WriteOBJReportsFailureOnUnformattableVertexColor)
     EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::FileWriteError);
 }
 
+TEST(GeometryIO_MeshIO, WriteOBJReportsFailureOnUnformattableVertexNormal)
+{
+    // A finite FLT_MAX normal line exceeds the OBJ format buffer; it must fail
+    // closed like vertex colors instead of writing past the formatted text.
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const float huge = std::numeric_limits<float>::max();
+    const std::array<glm::vec3, 3> normals{
+        glm::vec3{huge, huge, huge},
+        glm::vec3{0.0f, 0.0f, 1.0f},
+        glm::vec3{0.0f, 0.0f, 1.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces, normals);
+
+    TempFile file(".obj", "");
+    EXPECT_EQ(Geometry::MeshIO::WriteOBJ(file.Path, mesh),
+              Geometry::MeshIO::MeshIOWriteStatus::FileWriteError);
+}
+
 TEST(GeometryIO_MeshIO, WriteOBJOmitsTexcoordsWhenAbsent)
 {
     Geometry::MeshIO::MeshIOResult mesh;

@@ -48,6 +48,8 @@ namespace Geometry::PointCloudIO
         using Geometry::IOText::PlyProperty;
         using Geometry::IOText::PlyElement;
         using Geometry::IOText::ReadScalarAs;
+        using Geometry::IOText::EncodeUnitColorByte;
+        using Geometry::IOText::WriteLittleEndian;
 
         [[nodiscard]] Extrinsic::Core::ErrorCode ToCoreError(TextFileError error)
         {
@@ -1934,13 +1936,6 @@ namespace Geometry::PointCloudIO
         }
         stream << "end_header\n";
 
-        auto encodeColorChannel = [](float channel) -> unsigned int {
-            const float clamped = channel < 0.0f ? 0.0f : (channel > 1.0f ? 1.0f : channel);
-            const float scaled = clamped * 255.0f + 0.5f;
-            const unsigned int rounded = static_cast<unsigned int>(scaled);
-            return rounded > 255u ? 255u : rounded;
-        };
-
         for (std::size_t i = 0; i < pointCount; ++i)
         {
             const auto& p = positions[i];
@@ -1975,9 +1970,9 @@ namespace Geometry::PointCloudIO
                 const auto& c = colors[i];
                 written = std::snprintf(buffer, sizeof(buffer),
                                         " %u %u %u",
-                                        encodeColorChannel(c.x),
-                                        encodeColorChannel(c.y),
-                                        encodeColorChannel(c.z));
+                                        static_cast<unsigned int>(EncodeUnitColorByte(c.x)),
+                                        static_cast<unsigned int>(EncodeUnitColorByte(c.y)),
+                                        static_cast<unsigned int>(EncodeUnitColorByte(c.z)));
                 if (written <= 0)
                 {
                     return PointCloudIOWriteStatus::FileWriteError;
@@ -2079,36 +2074,11 @@ namespace Geometry::PointCloudIO
         }
         stream << "end_header\n";
 
-        auto encodeColorChannel = [](float channel) -> std::uint8_t {
-            const float clamped = channel < 0.0f ? 0.0f : (channel > 1.0f ? 1.0f : channel);
-            const float scaled = clamped * 255.0f + 0.5f;
-            const unsigned int rounded = static_cast<unsigned int>(scaled);
-            return static_cast<std::uint8_t>(rounded > 255u ? 255u : rounded);
-        };
-
-        constexpr bool hostBigEndian = std::endian::native == std::endian::big;
-
-        auto writeFloatLE = [&](float value) -> bool {
-            std::array<std::byte, 4> bytes{};
-            std::memcpy(bytes.data(), &value, 4);
-            if constexpr (hostBigEndian)
-            {
-                std::swap(bytes[0], bytes[3]);
-                std::swap(bytes[1], bytes[2]);
-            }
-            stream.write(reinterpret_cast<const char*>(bytes.data()), 4);
-            return stream.good();
-        };
-
-        auto writeUInt8 = [&](std::uint8_t value) -> bool {
-            stream.write(reinterpret_cast<const char*>(&value), 1);
-            return stream.good();
-        };
-
         for (std::size_t i = 0; i < pointCount; ++i)
         {
             const auto& p = positions[i];
-            if (!writeFloatLE(p.x) || !writeFloatLE(p.y) || !writeFloatLE(p.z))
+            if (!WriteLittleEndian(stream, p.x) || !WriteLittleEndian(stream, p.y) ||
+                !WriteLittleEndian(stream, p.z))
             {
                 return PointCloudIOWriteStatus::FileWriteError;
             }
@@ -2116,7 +2086,8 @@ namespace Geometry::PointCloudIO
             if (hasNormals)
             {
                 const auto& n = normals[i];
-                if (!writeFloatLE(n.x) || !writeFloatLE(n.y) || !writeFloatLE(n.z))
+                if (!WriteLittleEndian(stream, n.x) || !WriteLittleEndian(stream, n.y) ||
+                    !WriteLittleEndian(stream, n.z))
                 {
                     return PointCloudIOWriteStatus::FileWriteError;
                 }
@@ -2125,9 +2096,9 @@ namespace Geometry::PointCloudIO
             if (hasColors)
             {
                 const auto& c = colors[i];
-                if (!writeUInt8(encodeColorChannel(c.x)) ||
-                    !writeUInt8(encodeColorChannel(c.y)) ||
-                    !writeUInt8(encodeColorChannel(c.z)))
+                if (!WriteLittleEndian(stream, EncodeUnitColorByte(c.x)) ||
+                    !WriteLittleEndian(stream, EncodeUnitColorByte(c.y)) ||
+                    !WriteLittleEndian(stream, EncodeUnitColorByte(c.z)))
                 {
                     return PointCloudIOWriteStatus::FileWriteError;
                 }
@@ -2135,7 +2106,7 @@ namespace Geometry::PointCloudIO
 
             if (hasRadii)
             {
-                if (!writeFloatLE(radii[i]))
+                if (!WriteLittleEndian(stream, radii[i]))
                 {
                     return PointCloudIOWriteStatus::FileWriteError;
                 }
@@ -2390,24 +2361,11 @@ namespace Geometry::PointCloudIO
             }
             else
             {
-                constexpr bool hostBigEndian = std::endian::native == std::endian::big;
-
-                auto writeFloatLE = [&](float value) -> bool {
-                    std::array<std::byte, 4> bytes{};
-                    std::memcpy(bytes.data(), &value, 4);
-                    if constexpr (hostBigEndian)
-                    {
-                        std::swap(bytes[0], bytes[3]);
-                        std::swap(bytes[1], bytes[2]);
-                    }
-                    stream.write(reinterpret_cast<const char*>(bytes.data()), 4);
-                    return stream.good();
-                };
-
                 for (std::size_t i = 0; i < pointCount; ++i)
                 {
                     const auto& p = positions[i];
-                    if (!writeFloatLE(p.x) || !writeFloatLE(p.y) || !writeFloatLE(p.z))
+                    if (!WriteLittleEndian(stream, p.x) || !WriteLittleEndian(stream, p.y) ||
+                        !WriteLittleEndian(stream, p.z))
                     {
                         return PointCloudIOWriteStatus::FileWriteError;
                     }
@@ -2415,7 +2373,8 @@ namespace Geometry::PointCloudIO
                     if (hasNormals)
                     {
                         const auto& n = normals[i];
-                        if (!writeFloatLE(n.x) || !writeFloatLE(n.y) || !writeFloatLE(n.z))
+                        if (!WriteLittleEndian(stream, n.x) || !WriteLittleEndian(stream, n.y) ||
+                            !WriteLittleEndian(stream, n.z))
                         {
                             return PointCloudIOWriteStatus::FileWriteError;
                         }
@@ -2424,9 +2383,9 @@ namespace Geometry::PointCloudIO
                     if (hasColors)
                     {
                         const auto& c = colors[i];
-                        if (!writeFloatLE(clampUnit(c.x)) ||
-                            !writeFloatLE(clampUnit(c.y)) ||
-                            !writeFloatLE(clampUnit(c.z)))
+                        if (!WriteLittleEndian(stream, clampUnit(c.x)) ||
+                            !WriteLittleEndian(stream, clampUnit(c.y)) ||
+                            !WriteLittleEndian(stream, clampUnit(c.z)))
                         {
                             return PointCloudIOWriteStatus::FileWriteError;
                         }
