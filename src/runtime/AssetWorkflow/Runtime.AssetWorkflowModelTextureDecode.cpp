@@ -34,6 +34,7 @@ import Extrinsic.Core.Error;
 import Extrinsic.Core.IOBackend;
 import Geometry.HalfedgeMesh.IO;
 import Geometry.Properties;
+import Geometry.Validation;
 
 namespace Extrinsic::Runtime
 {
@@ -940,7 +941,7 @@ namespace Extrinsic::Runtime
                 }
                 const bool validNormals = normals.has_value() && normals->size() == positions->size() &&
                     std::ranges::all_of(*normals, [](glm::vec3 n) {
-                        return std::isfinite(n.x) && std::isfinite(n.y) && std::isfinite(n.z) && glm::dot(glm::dvec3{n}, glm::dvec3{n}) > 0.0;
+                        return Geometry::Validation::IsFinite(n) && glm::dot(glm::dvec3{n}, glm::dvec3{n}) > 0.0;
                     });
                 if (!validNormals) request.Report->Record(Check::Attributes, Status::Warning,
                     "Invalid NORMAL accessor omitted; normals will be generated", primitiveIndex, normalIt->second);
@@ -967,7 +968,7 @@ namespace Extrinsic::Runtime
                     return Core::Err<Geometry::MeshIO::MeshIOResult>(uvs.error());
                 }
                 const bool validUvs = uvs.has_value() && uvs->size() == positions->size() &&
-                    std::ranges::all_of(*uvs, [](glm::vec2 uv) { return std::isfinite(uv.x) && std::isfinite(uv.y); });
+                    std::ranges::all_of(*uvs, [](glm::vec2 uv) { return Geometry::Validation::IsFinite(uv); });
                 if (!validUvs) request.Report->Record(Check::Attributes, Status::Warning,
                     "Invalid TEXCOORD_0 accessor omitted; UV generation may be deferred", primitiveIndex, uvIt->second);
                 if (validUvs)
