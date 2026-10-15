@@ -186,7 +186,10 @@ export namespace Geometry::PointCloud::Consolidation
     [[nodiscard]] bool SelectInitialSamples(std::span<const glm::vec3> positions, std::size_t target,
                                             std::uint32_t seed, const std::optional<PointSampling::Params>& sampling,
                                             std::vector<std::size_t>& indices,
-                                            const std::optional<PointSampling::Result>& precomputed = std::nullopt);
+                                            const std::optional<PointSampling::Result>& precomputed);
+    [[nodiscard]] bool SelectInitialSamples(std::span<const glm::vec3> positions, std::size_t target,
+                                            std::uint32_t seed, const std::optional<PointSampling::Params>& sampling,
+                                            std::vector<std::size_t>& indices);
 
     // Authored normals are consumed without mutation. They are normalized on
     // a method-local copy and must match the position count. Isotropic

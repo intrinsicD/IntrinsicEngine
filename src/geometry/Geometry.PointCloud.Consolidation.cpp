@@ -1966,6 +1966,13 @@ namespace Geometry::PointCloud::Consolidation
 
     bool SelectInitialSamples(const std::span<const glm::vec3> positions, const std::size_t target,
                               const std::uint32_t seed, const std::optional<PointSampling::Params>& sampling,
+                              std::vector<std::size_t>& indices)
+    {
+        return SelectInitialSamples(positions, target, seed, sampling, indices, std::nullopt);
+    }
+
+    bool SelectInitialSamples(const std::span<const glm::vec3> positions, const std::size_t target,
+                              const std::uint32_t seed, const std::optional<PointSampling::Params>& sampling,
                               std::vector<std::size_t>& indices, const std::optional<PointSampling::Result>& precomputed)
     {
         indices.clear();
