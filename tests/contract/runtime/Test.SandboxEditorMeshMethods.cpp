@@ -6429,7 +6429,8 @@ TEST(SandboxEditorUi, MeshFieldAdmissionSharesValidationAndMetadata)
         ASSERT_TRUE(preview().Enabled);
         const auto firstPosition = custom.Vector().front();
         custom.Vector().front().x = std::numeric_limits<float>::infinity();
-        EXPECT_TRUE(preview().Enabled); // Metadata admission does not scan positions.
+        // The cached bound-input verdict converts the mesh, and conversion rejects non-finite positions.
+        EXPECT_FALSE(preview().Enabled);
         if (segmentation)
             EXPECT_FALSE(Runtime::ApplyEditorCurvatureSegmentationCommand(context, segments).Succeeded());
         else

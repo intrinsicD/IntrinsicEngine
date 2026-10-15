@@ -660,8 +660,16 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             auto converted = Geometry::Mesh::Conversion::ToHalfedgeMesh(soup.Mesh);
             if (!converted.Succeeded())
             {
-                fail(EditorCommandStatus::GeometryProcessingFailed,
-                     "could not convert selected GeometrySources to halfedge topology.");
+                // Conversion validation rejects non-finite positions; that is
+                // an input defect, not a processing failure.
+                const bool nonFinite = std::ranges::any_of(converted.Diagnostics, [](const auto& d) {
+                    return d.ValidationKind == Geometry::MeshSoup::ValidationDiagnosticKind::NonFinitePosition;
+                });
+                if (nonFinite)
+                    fail(EditorCommandStatus::InvalidProcessingParameters, "requires finite vertex positions.");
+                else
+                    fail(EditorCommandStatus::GeometryProcessingFailed,
+                         "could not convert selected GeometrySources to halfedge topology.");
                 return result;
             }
             if (converted.Mesh.VerticesSize() != result.BeforePositions.size())
