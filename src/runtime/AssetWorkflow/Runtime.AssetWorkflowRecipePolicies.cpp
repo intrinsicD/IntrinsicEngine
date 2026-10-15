@@ -1107,7 +1107,7 @@ namespace Extrinsic::Runtime
         return Core::Ok();
     }
 
-    Core::Result ApplyAssetImportCompletionRecipe(
+    void ApplyAssetImportCompletionRecipe(
         const bool selectFirstCreatedEntity,
         const bool focusCameraOnCreatedGeometry,
         const std::span<const ECS::EntityHandle> createdEntities,
@@ -1128,7 +1128,7 @@ namespace Extrinsic::Runtime
         }
 
         if (!selectFirstCreatedEntity)
-            return Core::Ok();
+            return;
         for (const ECS::EntityHandle entity : createdEntities)
         {
             if (!scene.IsValid(entity))
@@ -1137,7 +1137,6 @@ namespace Extrinsic::Runtime
                 (void)selection->SetSelectedEntity(scene, entity);
             break;
         }
-        return Core::Ok();
     }
 
     void QueueAssetImportDirectMeshPostprocess(

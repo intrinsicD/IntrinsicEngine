@@ -563,19 +563,15 @@ namespace Extrinsic::Runtime
                 }
             }
 
-            if (Core::Result completed = ApplyAssetImportCompletionRecipe(
-                    completion.SelectFirstCreatedEntity,
-                    completion.FocusCameraOnCreatedGeometry,
-                    std::span<const ECS::EntityHandle>{primitiveEntities},
-                    ComputeFocusTargetForEntities(scene, primitiveEntities),
-                    scene,
-                    selection,
-                    config,
-                    cameraControllers);
-                !completed.has_value())
-            {
-                return Core::Err<RuntimeAssetImportResult>(completed.error());
-            }
+            ApplyAssetImportCompletionRecipe(
+                completion.SelectFirstCreatedEntity,
+                completion.FocusCameraOnCreatedGeometry,
+                std::span<const ECS::EntityHandle>{primitiveEntities},
+                ComputeFocusTargetForEntities(scene, primitiveEntities),
+                scene,
+                selection,
+                config,
+                cameraControllers);
             return result;
         }
 
@@ -2256,32 +2252,10 @@ namespace Extrinsic::Runtime
                     if (done == nullptr || done->Ingest != state->IngestHandle)
                         return false;
 
-                    Core::Expected<RuntimeAssetImportResult> result =
-                        Core::Err<RuntimeAssetImportResult>(state->Error);
-                    RuntimeAssetIngestDiagnostic eventDiagnostic =
-                        DiagnosticForImportError(result.error());
-
                     if (!state->Decoded.has_value())
                     {
-                        RuntimeAssetIngestTransition failed =
-                            result.error() == Core::ErrorCode::FileNotFound
-                                ? m_AssetIngestStateMachine.MarkMissingFile(
-                                      state->IngestHandle)
-                                : m_AssetIngestStateMachine.FailDecode(
-                                      state->IngestHandle,
-                                      state->IngestHandle.Generation,
-                                      result.error());
-                        eventDiagnostic = failed.Diagnostic;
-                        AppendImportStage(
-                            *state->StageTrace,
-                            AssetImportStage::Decode,
-                            result.error(),
-                            eventDiagnostic);
-                        RecordAssetImportEvent(
-                            state->Request,
-                            result,
-                            eventDiagnostic,
-                            state->StageTrace.get());
+                        FailQueuedImportDecode(
+                            state->Request, state->IngestHandle, state->Error, *state->StageTrace);
                         return true;
                     }
 
@@ -2321,101 +2295,28 @@ namespace Extrinsic::Runtime
                             state->Recipe,
                             *state->Decoded);
                     }();
-                    if (materialized.has_value())
+                    if (materialized.has_value() &&
+                        materialized->Entity != ECS::InvalidEntityHandle)
                     {
-                        const ECS::EntityHandle createdEntity =
-                            materialized->Entity;
-                        result = materialized->Result;
-                        if (createdEntity != ECS::InvalidEntityHandle)
-                        {
-                            if (Core::Result completed =
-                                    ApplyAssetImportCompletionRecipe(
-                                        state->Recipe.Completion
-                                            .SelectFirstCreatedEntity,
-                                        state->Recipe.Completion
-                                            .FocusCameraOnCreatedGeometry,
-                                        std::span<const ECS::EntityHandle>(
-                                            &createdEntity,
-                                            1u),
-                                        materialized->FocusTarget,
-                                        *submissionScene,
-                                        m_Dependencies.Selection,
-                                        m_Dependencies.Config,
-                                        m_Dependencies.CameraControllers);
-                                !completed.has_value())
-                            {
-                                result = Core::Err<RuntimeAssetImportResult>(
-                                    completed.error());
-                            }
-                        }
-                        if (result.has_value() && RequestsGpuUpload(*result))
-                        {
-                            RuntimeAssetIngestTransition upload =
-                                m_AssetIngestStateMachine.BeginGpuUpload(
-                                    state->IngestHandle);
-                            eventDiagnostic = upload.Diagnostic;
-                            if (!upload.Succeeded())
-                            {
-                                result = Core::Err<RuntimeAssetImportResult>(
-                                    ErrorFromIngestTransition(upload));
-                            }
-                        }
-                        RuntimeAssetIngestTransition complete =
-                            result.has_value()
-                                ? m_AssetIngestStateMachine.CompleteApply(
-                                      state->IngestHandle,
-                                      state->IngestHandle.Generation,
-                                      ToRuntimeAssetIngestResult(*result))
-                                : RuntimeAssetIngestTransition{};
-                        if (result.has_value())
-                        {
-                            eventDiagnostic = complete.Diagnostic;
-                            if (!complete.Succeeded())
-                            {
-                                result = Core::Err<RuntimeAssetImportResult>(
-                                    ErrorFromIngestTransition(complete));
-                            }
-                            else if (CreatesOrChangesScene(*result))
-                            {
-                                (void)m_Dependencies.CommandHistory->MarkDirty("Import Asset");
-                            }
-                        }
-                        if (result.has_value())
-                        {
-                            AppendSuccessfulApplyStages(
-                                *state->StageTrace,
-                                state->Recipe,
-                                *result);
-                        }
-                        else
-                        {
-                            AppendNextFailedStage(
-                                *state->StageTrace,
-                                result.error(),
-                                eventDiagnostic);
-                        }
+                        const ECS::EntityHandle createdEntity = materialized->Entity;
+                        ApplyAssetImportCompletionRecipe(
+                            state->Recipe.Completion.SelectFirstCreatedEntity,
+                            state->Recipe.Completion.FocusCameraOnCreatedGeometry,
+                            std::span<const ECS::EntityHandle>(&createdEntity, 1u),
+                            materialized->FocusTarget,
+                            *submissionScene,
+                            m_Dependencies.Selection,
+                            m_Dependencies.Config,
+                            m_Dependencies.CameraControllers);
                     }
-                    else
-                    {
-                        result = Core::Err<RuntimeAssetImportResult>(
-                            materialized.error());
-                        RuntimeAssetIngestTransition failed =
-                            m_AssetIngestStateMachine.FailApply(
-                                state->IngestHandle,
-                                state->IngestHandle.Generation,
-                                materialized.error());
-                        eventDiagnostic = failed.Diagnostic;
-                        AppendImportStage(
-                            *state->StageTrace,
-                            AssetImportStage::CpuMaterialize,
-                            materialized.error(),
-                            eventDiagnostic);
-                    }
-                    RecordAssetImportEvent(
+                    FinishQueuedImportApply(
                         state->Request,
-                        result,
-                        eventDiagnostic,
-                        state->StageTrace.get());
+                        state->IngestHandle,
+                        state->Recipe,
+                        materialized.has_value()
+                            ? Core::Expected<RuntimeAssetImportResult>(materialized->Result)
+                            : Core::Err<RuntimeAssetImportResult>(materialized.error()),
+                        *state->StageTrace);
                     return true;
                 },
                 .FinalizeUnpublishedOnMainThread = [
@@ -2662,43 +2563,10 @@ namespace Extrinsic::Runtime
                     if (done == nullptr || done->Ingest != state->IngestHandle)
                         return false;
 
-                    Core::Expected<RuntimeAssetImportResult> result =
-                        Core::Err<RuntimeAssetImportResult>(state->Error);
-                    RuntimeAssetIngestDiagnostic eventDiagnostic =
-                        DiagnosticForImportError(result.error());
-
                     if (!state->Decoded.has_value())
                     {
-                        RuntimeAssetIngestTransition failed{};
-                        if (result.error() == Core::ErrorCode::FileNotFound)
-                        {
-                            failed = m_AssetIngestStateMachine.MarkMissingFile(
-                                state->IngestHandle);
-                        }
-                        else if (result.error() == Core::ErrorCode::AssetLoaderMissing)
-                        {
-                            failed = m_AssetIngestStateMachine.FailCallback(
-                                state->IngestHandle,
-                                result.error());
-                        }
-                        else
-                        {
-                            failed = m_AssetIngestStateMachine.FailDecode(
-                                state->IngestHandle,
-                                state->IngestHandle.Generation,
-                                result.error());
-                        }
-                        eventDiagnostic = failed.Diagnostic;
-                        AppendImportStage(
-                            *state->StageTrace,
-                            AssetImportStage::Decode,
-                            result.error(),
-                            eventDiagnostic);
-                        RecordAssetImportEvent(
-                            state->Request,
-                            result,
-                            eventDiagnostic,
-                            state->StageTrace.get());
+                        FailQueuedImportDecode(
+                            state->Request, state->IngestHandle, state->Error, *state->StageTrace);
                         return true;
                     }
 
@@ -2708,10 +2576,12 @@ namespace Extrinsic::Runtime
                         return true;
                     }
 
+                    Core::Expected<RuntimeAssetImportResult> applied =
+                        Core::Err<RuntimeAssetImportResult>(Core::ErrorCode::Unknown);
                     if (state->Decoded->PayloadKind ==
                         Assets::AssetPayloadKind::ModelScene)
                     {
-                        result = MaterializeDecodedModelSceneImport(
+                        applied = MaterializeDecodedModelSceneImport(
                             *m_Dependencies.AssetService,
                             *m_Dependencies.ModelMaterializer,
                             *submissionScene,
@@ -2726,7 +2596,7 @@ namespace Extrinsic::Runtime
                     }
                     else
                     {
-                        result = MaterializeDecodedTextureImport(
+                        applied = MaterializeDecodedTextureImport(
                             *m_Dependencies.AssetService,
                             *m_Dependencies.GpuAssetCache,
                             *m_Dependencies.TextureResidency,
@@ -2735,77 +2605,12 @@ namespace Extrinsic::Runtime
                             std::move(std::get<Assets::AssetTexture2DPayload>(
                                 state->Decoded->Payload)));
                     }
-
-                    if (result.has_value())
-                    {
-                        if (RequestsGpuUpload(*result))
-                        {
-                            RuntimeAssetIngestTransition upload =
-                                m_AssetIngestStateMachine.BeginGpuUpload(
-                                    state->IngestHandle);
-                            eventDiagnostic = upload.Diagnostic;
-                            if (!upload.Succeeded())
-                            {
-                                result = Core::Err<RuntimeAssetImportResult>(
-                                    ErrorFromIngestTransition(upload));
-                            }
-                        }
-
-                        RuntimeAssetIngestTransition complete =
-                            result.has_value()
-                                ? m_AssetIngestStateMachine.CompleteApply(
-                                      state->IngestHandle,
-                                      state->IngestHandle.Generation,
-                                      ToRuntimeAssetIngestResult(*result))
-                                : RuntimeAssetIngestTransition{};
-                        if (result.has_value())
-                        {
-                            eventDiagnostic = complete.Diagnostic;
-                            if (!complete.Succeeded())
-                            {
-                                result = Core::Err<RuntimeAssetImportResult>(
-                                    ErrorFromIngestTransition(complete));
-                            }
-                            else if (CreatesOrChangesScene(*result))
-                            {
-                                (void)m_Dependencies.CommandHistory->MarkDirty("Import Asset");
-                            }
-                        }
-                        if (result.has_value())
-                        {
-                            AppendSuccessfulApplyStages(
-                                *state->StageTrace,
-                                state->Recipe,
-                                *result);
-                        }
-                        else
-                        {
-                            AppendNextFailedStage(
-                                *state->StageTrace,
-                                result.error(),
-                                eventDiagnostic);
-                        }
-                    }
-                    else
-                    {
-                        RuntimeAssetIngestTransition failed =
-                            m_AssetIngestStateMachine.FailApply(
-                                state->IngestHandle,
-                                state->IngestHandle.Generation,
-                                result.error());
-                        eventDiagnostic = failed.Diagnostic;
-                        AppendImportStage(
-                            *state->StageTrace,
-                            AssetImportStage::CpuMaterialize,
-                            result.error(),
-                            eventDiagnostic);
-                    }
-
-                    RecordAssetImportEvent(
+                    FinishQueuedImportApply(
                         state->Request,
-                        result,
-                        eventDiagnostic,
-                        state->StageTrace.get());
+                        state->IngestHandle,
+                        state->Recipe,
+                        std::move(applied),
+                        *state->StageTrace);
                     return true;
                 },
 
@@ -3219,6 +3024,91 @@ namespace Extrinsic::Runtime
         return result;
     }
 
+    void AssetWorkflowImportExecutor::FailQueuedImportDecode(
+        const RuntimeAssetImportRequest& request,
+        const RuntimeAssetIngestHandle operation,
+        const Core::ErrorCode error,
+        AssetImportStageTrace& stageTrace)
+    {
+        // Mirrors DiagnosticForImportError: a missing loader is a callback
+        // failure, not a decode failure.
+        RuntimeAssetIngestTransition failed{};
+        if (error == Core::ErrorCode::FileNotFound)
+        {
+            failed = m_AssetIngestStateMachine.MarkMissingFile(operation);
+        }
+        else if (error == Core::ErrorCode::AssetLoaderMissing)
+        {
+            failed = m_AssetIngestStateMachine.FailCallback(operation, error);
+        }
+        else
+        {
+            failed = m_AssetIngestStateMachine.FailDecode(
+                operation, operation.Generation, error);
+        }
+        AppendImportStage(stageTrace, AssetImportStage::Decode, error, failed.Diagnostic);
+        RecordAssetImportEvent(
+            request,
+            Core::Err<RuntimeAssetImportResult>(error),
+            failed.Diagnostic,
+            &stageTrace);
+    }
+
+    void AssetWorkflowImportExecutor::FinishQueuedImportApply(
+        const RuntimeAssetImportRequest& request,
+        const RuntimeAssetIngestHandle operation,
+        const AssetImportRecipe& recipe,
+        Core::Expected<RuntimeAssetImportResult> result,
+        AssetImportStageTrace& stageTrace)
+    {
+        RuntimeAssetIngestDiagnostic eventDiagnostic = RuntimeAssetIngestDiagnostic::None;
+        if (!result.has_value())
+        {
+            const RuntimeAssetIngestTransition failed =
+                m_AssetIngestStateMachine.FailApply(
+                    operation, operation.Generation, result.error());
+            eventDiagnostic = failed.Diagnostic;
+            AppendImportStage(
+                stageTrace, AssetImportStage::CpuMaterialize, result.error(), eventDiagnostic);
+            RecordAssetImportEvent(request, result, eventDiagnostic, &stageTrace);
+            return;
+        }
+
+        if (RequestsGpuUpload(*result))
+        {
+            const RuntimeAssetIngestTransition upload =
+                m_AssetIngestStateMachine.BeginGpuUpload(operation);
+            eventDiagnostic = upload.Diagnostic;
+            if (!upload.Succeeded())
+            {
+                result = Core::Err<RuntimeAssetImportResult>(
+                    ErrorFromIngestTransition(upload));
+            }
+        }
+        if (result.has_value())
+        {
+            const RuntimeAssetIngestTransition complete =
+                m_AssetIngestStateMachine.CompleteApply(
+                    operation, operation.Generation, ToRuntimeAssetIngestResult(*result));
+            eventDiagnostic = complete.Diagnostic;
+            if (!complete.Succeeded())
+            {
+                result = Core::Err<RuntimeAssetImportResult>(
+                    ErrorFromIngestTransition(complete));
+            }
+            else if (CreatesOrChangesScene(*result))
+            {
+                (void)m_Dependencies.CommandHistory->MarkDirty("Import Asset");
+            }
+        }
+
+        if (result.has_value())
+            AppendSuccessfulApplyStages(stageTrace, recipe, *result);
+        else
+            AppendNextFailedStage(stageTrace, result.error(), eventDiagnostic);
+        RecordAssetImportEvent(request, result, eventDiagnostic, &stageTrace);
+    }
+
     void AssetWorkflowImportExecutor::RecordAssetImportEvent(
         const RuntimeAssetImportRequest& request,
         const Core::Expected<RuntimeAssetImportResult>& result,
@@ -3377,19 +3267,15 @@ namespace Extrinsic::Runtime
                     materialized.error());
             }
             const ECS::EntityHandle createdEntity = materialized->Entity;
-            if (Core::Result completed = ApplyAssetImportCompletionRecipe(
-                    recipe.Completion.SelectFirstCreatedEntity,
-                    recipe.Completion.FocusCameraOnCreatedGeometry,
-                    std::span<const ECS::EntityHandle>(&createdEntity, 1u),
-                    materialized->FocusTarget,
-                    *m_Dependencies.Scene,
-                    m_Dependencies.Selection,
-                    m_Dependencies.Config,
-                    m_Dependencies.CameraControllers);
-                !completed.has_value())
-            {
-                return Core::Err<RuntimeAssetImportResult>(completed.error());
-            }
+            ApplyAssetImportCompletionRecipe(
+                recipe.Completion.SelectFirstCreatedEntity,
+                recipe.Completion.FocusCameraOnCreatedGeometry,
+                std::span<const ECS::EntityHandle>(&createdEntity, 1u),
+                materialized->FocusTarget,
+                *m_Dependencies.Scene,
+                m_Dependencies.Selection,
+                m_Dependencies.Config,
+                m_Dependencies.CameraControllers);
             return materialized->Result;
         }
         if (route->PayloadKind != Assets::AssetPayloadKind::ModelScene &&

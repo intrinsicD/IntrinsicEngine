@@ -107,6 +107,18 @@ namespace Extrinsic::Runtime
             RuntimeAssetIngestHandle operation,
             RuntimeAssetImportRequest request,
             AssetImportStageTrace* stageTrace);
+        // Queued geometry and model/texture completions; each records the import event.
+        void FailQueuedImportDecode(
+            const RuntimeAssetImportRequest& request,
+            RuntimeAssetIngestHandle operation,
+            Core::ErrorCode error,
+            AssetImportStageTrace& stageTrace);
+        void FinishQueuedImportApply(
+            const RuntimeAssetImportRequest& request,
+            RuntimeAssetIngestHandle operation,
+            const AssetImportRecipe& recipe,
+            Core::Expected<RuntimeAssetImportResult> result,
+            AssetImportStageTrace& stageTrace);
         void RecordAssetImportEvent(
             const RuntimeAssetImportRequest& request,
             const Core::Expected<RuntimeAssetImportResult>& result,

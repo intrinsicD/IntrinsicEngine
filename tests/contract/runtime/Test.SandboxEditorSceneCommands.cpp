@@ -3292,6 +3292,8 @@ TEST(SandboxEditorUi, DroppedFileImportFailureLogsDiagnostics)
     EXPECT_FALSE(lastEvent->Succeeded());
     EXPECT_EQ(lastEvent->RequestedPayloadKind, Assets::AssetPayloadKind::Mesh);
     EXPECT_EQ(lastEvent->Error, Core::ErrorCode::FileNotFound);
+    EXPECT_EQ(lastEvent->IngestDiagnostic,
+              Runtime::RuntimeAssetIngestDiagnostic::MissingFile);
 
     const Core::Log::LogSnapshot completedLogs = Core::Log::TakeSnapshot();
     EXPECT_TRUE(LogSnapshotContains(completedLogs, "Asset import failed"));

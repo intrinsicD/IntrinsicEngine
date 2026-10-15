@@ -42,7 +42,7 @@ export namespace Extrinsic::Runtime
         ECS::EntityHandle entity,
         ECS::Scene::Registry& scene);
 
-    [[nodiscard]] Core::Result ApplyAssetImportCompletionRecipe(
+    void ApplyAssetImportCompletionRecipe(
         bool selectFirstCreatedEntity,
         bool focusCameraOnCreatedGeometry,
         std::span<const ECS::EntityHandle> createdEntities,
