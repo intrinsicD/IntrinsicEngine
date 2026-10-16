@@ -64,8 +64,7 @@ namespace Geometry::PointCloud::Features
         // Simplified Point Feature Histogram of point p against its neighbors,
         // packed as three concatenated kFpfhBins-bin sub-histograms (alpha, phi,
         // theta of the Darboux frame), each normalized to sum 100.
-        [[nodiscard]] std::array<float, kFpfhDimension> ComputeSpfh(
-            glm::vec3 p,
+        [[nodiscard]] std::array<float, kFpfhDimension> ComputeSpfh(glm::vec3 p,
             glm::vec3 np,
             std::span<const glm::vec3> positions,
             std::span<const glm::vec3> normals,
@@ -97,11 +96,11 @@ namespace Geometry::PointCloud::Features
                 const double phi = std::clamp(glm::dot(u, dir), -1.0, 1.0);
                 const double theta = std::atan2(glm::dot(w, nq), glm::dot(u, nq));
 
-                const auto bin = [&](double value, double lo, double hi) -> std::uint32_t {
+                const auto bin = [&](double value, double lo, double hi) -> std::uint32_t
+                {
                     const double t = (value - lo) / (hi - lo);
                     const auto idx = static_cast<std::int32_t>(std::floor(t * kFpfhBins));
-                    return static_cast<std::uint32_t>(
-                        std::clamp(idx, 0, static_cast<std::int32_t>(kFpfhBins) - 1));
+                    return static_cast<std::uint32_t>(std::clamp(idx, 0, static_cast<std::int32_t>(kFpfhBins) - 1));
                 };
 
                 hist[bin(alpha, -1.0, 1.0)] += 1.0f;
@@ -124,8 +123,7 @@ namespace Geometry::PointCloud::Features
                         const double scale = 100.0 / sum;
                         for (std::uint32_t b = 0; b < kFpfhBins; ++b)
                         {
-                            hist[block * kFpfhBins + b] =
-                                static_cast<float>(hist[block * kFpfhBins + b] * scale);
+                            hist[block * kFpfhBins + b] = static_cast<float>(hist[block * kFpfhBins + b] * scale);
                         }
                     }
                 }
@@ -136,8 +134,7 @@ namespace Geometry::PointCloud::Features
         // Closed-form rigid alignment (Kabsch/Umeyama, no scale) of paired point
         // sets. Returns nullopt for fewer than three pairs or degenerate spans.
         [[nodiscard]] std::optional<glm::dmat4> KabschRigid(
-            std::span<const glm::dvec3> src,
-            std::span<const glm::dvec3> dst)
+            std::span<const glm::dvec3> src, std::span<const glm::dvec3> dst)
         {
             const std::size_t n = src.size();
             if (n < 3 || dst.size() != n)
@@ -198,19 +195,27 @@ namespace Geometry::PointCloud::Features
     {
         bool ValidKeypointInput(std::span<const glm::vec3> points, const KeypointParams& p)
         {
-            return points.size()>=2 && points.size()<=std::numeric_limits<std::uint32_t>::max() &&
-                p.MinNeighbors<points.size() && std::ranges::all_of(points,[](const glm::vec3& v) { return Geometry::Validation::IsFinite(v); }) &&
-                std::isfinite(p.SalientRadius) && std::isfinite(p.NonMaxRadius) &&
-                std::isfinite(p.Gamma21) && p.Gamma21>=0 && p.Gamma21<=1 &&
-                std::isfinite(p.Gamma32) && p.Gamma32>=0 && p.Gamma32<=1;
+            return points.size() >= 2 && points.size() <= std::numeric_limits<std::uint32_t>::max() &&
+                p.MinNeighbors < points.size() &&
+                std::ranges::all_of(
+                    points,
+                    [](const glm::vec3& v)
+                    {
+                        return Geometry::Validation::IsFinite(v);
+                    }) &&
+                std::isfinite(p.SalientRadius) && std::isfinite(p.NonMaxRadius) && std::isfinite(p.Gamma21) &&
+                p.Gamma21 >= 0 && p.Gamma21 <= 1 && std::isfinite(p.Gamma32) && p.Gamma32 >= 0 && p.Gamma32 <= 1;
         }
-        bool ValidKeypointScale(const KeypointParams& p,const KeypointScale& s)
+        bool ValidKeypointScale(const KeypointParams& p, const KeypointScale& s)
         {
-            const auto validRadius=[](float r){return std::isfinite(r) && r>0 && std::isfinite(r*r) && r*r>0;};
-            return std::isfinite(s.MeanSpacing) && s.MeanSpacing>0 &&
-                validRadius(s.SalientRadius) && validRadius(s.NonMaxRadius) &&
-                s.SalientRadius==(p.SalientRadius>0?p.SalientRadius:6.f*s.MeanSpacing) &&
-                s.NonMaxRadius==(p.NonMaxRadius>0?p.NonMaxRadius:4.f*s.MeanSpacing);
+            const auto validRadius = [](float r)
+            {
+                return std::isfinite(r) && r > 0 && std::isfinite(r * r) && r * r > 0;
+            };
+            return std::isfinite(s.MeanSpacing) && s.MeanSpacing > 0 && validRadius(s.SalientRadius) &&
+                validRadius(s.NonMaxRadius) &&
+                s.SalientRadius == (p.SalientRadius > 0 ? p.SalientRadius : 6.f * s.MeanSpacing) &&
+                s.NonMaxRadius == (p.NonMaxRadius > 0 ? p.NonMaxRadius : 4.f * s.MeanSpacing);
         }
         struct LiveFeaturePoints
         {
@@ -220,54 +225,83 @@ namespace Geometry::PointCloud::Features
         LiveFeaturePoints CompactFeaturePoints(const Cloud& cloud)
         {
             LiveFeaturePoints result;
-            const auto live=BuildLiveMask(cloud);
-            const auto positions=cloud.Positions();
-            for(std::size_t i=0;i<positions.size();++i)
-                if(live[i]){result.Points.push_back(positions[i]);result.Slots.push_back(std::uint32_t(i));}
+            const auto live = BuildLiveMask(cloud);
+            const auto positions = cloud.Positions();
+            for (std::size_t i = 0; i < positions.size(); ++i)
+                if (live[i])
+                {
+                    result.Points.push_back(positions[i]);
+                    result.Slots.push_back(std::uint32_t(i));
+                }
             return result;
         }
-        template<class Query>
+        template <class Query>
         std::optional<KeypointAnalysis> AnalyzeKeypointRows(std::span<const glm::vec3> positions,
-            const KeypointParams& params,const KeypointScale& scale,Query&& query)
+            const KeypointParams& params,
+            const KeypointScale& scale,
+            Query&& query)
         {
             KeypointAnalysis result;
-            result.Scale=scale;result.Saliency.resize(positions.size());result.Mask.resize(positions.size());
-            std::vector<double> scores(positions.size(),std::numeric_limits<double>::quiet_NaN());
+            result.Scale = scale;
+            result.Saliency.resize(positions.size());
+            result.Mask.resize(positions.size());
+            std::vector<double> scores(positions.size(), std::numeric_limits<double>::quiet_NaN());
             std::vector<glm::vec3> local;
-            for(std::uint32_t i=0;i<positions.size();++i)
+            for (std::uint32_t i = 0; i < positions.size(); ++i)
             {
-                const auto neighbors=query(i,scale.SalientRadius);
-                if(!neighbors)return std::nullopt;
-                if(neighbors->size()<params.MinNeighbors)continue;
-                local.clear();local.push_back(positions[i]);
-                for(auto j:*neighbors)local.push_back(positions[j]);
+                const auto neighbors = query(i, scale.SalientRadius);
+                if (!neighbors)
+                    return std::nullopt;
+                if (neighbors->size() < params.MinNeighbors)
+                    continue;
+                local.clear();
+                local.push_back(positions[i]);
+                for (auto j : *neighbors)
+                    local.push_back(positions[j]);
                 // Preserve the existing centroid covariance and float eigenvalue
                 // publication of ToPCA; the full ISS weighted scatter differs.
-                const auto pca=Geometry::ToPCA(local);
-                if(!pca.Valid)return std::nullopt;
-                if(!Geometry::Validation::IsFinite(pca.Eigenvalues))return std::nullopt;
-                std::array<double,3> eigen{pca.Eigenvalues.x,pca.Eigenvalues.y,pca.Eigenvalues.z};
-                std::sort(eigen.begin(),eigen.end(),std::greater<double>());
+                const auto pca = Geometry::ToPCA(local);
+                if (!pca.Valid)
+                    return std::nullopt;
+                if (!Geometry::Validation::IsFinite(pca.Eigenvalues))
+                    return std::nullopt;
+                std::array<double, 3> eigen{pca.Eigenvalues.x, pca.Eigenvalues.y, pca.Eigenvalues.z};
+                std::sort(eigen.begin(), eigen.end(), std::greater<double>());
                 // Analytic eigensolvers can leave tiny positive residuals on a
                 // plane. They must not create saliency or change zero-score ties.
-                const double roundoff=64*std::numeric_limits<double>::epsilon()*eigen[0];
-                if(eigen[1]<=roundoff)eigen[1]=0;
-                if(eigen[2]<=roundoff)eigen[2]=0;
-                if(eigen[0]<=0 || eigen[1]<=0)continue;
-                if(eigen[1]/eigen[0]<=params.Gamma21 && eigen[2]/eigen[1]<=params.Gamma32)
-                {scores[i]=eigen[2];result.Saliency[i]=float(eigen[2]);}
+                const double roundoff = 64 * std::numeric_limits<double>::epsilon() * eigen[0];
+                if (eigen[1] <= roundoff)
+                    eigen[1] = 0;
+                if (eigen[2] <= roundoff)
+                    eigen[2] = 0;
+                if (eigen[0] <= 0 || eigen[1] <= 0)
+                    continue;
+                if (eigen[1] / eigen[0] <= params.Gamma21 && eigen[2] / eigen[1] <= params.Gamma32)
+                {
+                    scores[i] = eigen[2];
+                    result.Saliency[i] = float(eigen[2]);
+                }
             }
-            for(std::uint32_t i=0;i<positions.size();++i)
+            for (std::uint32_t i = 0; i < positions.size(); ++i)
             {
-                if(std::isnan(scores[i]))continue;
-                const auto neighbors=query(i,scale.NonMaxRadius);
-                if(!neighbors)return std::nullopt;
-                bool maximum=true;
-                for(auto j:*neighbors)
-                    if(!std::isnan(scores[j]) && (scores[j]>scores[i] || (scores[j]==scores[i] && j<i)))
-                    {maximum=false;break;}
-                if(maximum)
-                {result.Mask[i]=1;result.Keypoints.Indices.push_back(i);result.Keypoints.Saliency.push_back(scores[i]);}
+                if (std::isnan(scores[i]))
+                    continue;
+                const auto neighbors = query(i, scale.NonMaxRadius);
+                if (!neighbors)
+                    return std::nullopt;
+                bool maximum = true;
+                for (auto j : *neighbors)
+                    if (!std::isnan(scores[j]) && (scores[j] > scores[i] || (scores[j] == scores[i] && j < i)))
+                    {
+                        maximum = false;
+                        break;
+                    }
+                if (maximum)
+                {
+                    result.Mask[i] = 1;
+                    result.Keypoints.Indices.push_back(i);
+                    result.Keypoints.Saliency.push_back(scores[i]);
+                }
             }
             return result;
         }
@@ -275,95 +309,127 @@ namespace Geometry::PointCloud::Features
 
     std::optional<float> EstimateSpacing(std::span<const glm::vec3> positions)
     {
-        if(positions.size()<2 || positions.size()>std::numeric_limits<std::uint32_t>::max() ||
-            !std::ranges::all_of(positions,[](const glm::vec3& v) { return Geometry::Validation::IsFinite(v); }))return std::nullopt;
+        if (positions.size() < 2 || positions.size() > std::numeric_limits<std::uint32_t>::max() ||
+            !std::ranges::all_of(positions,
+                [](const glm::vec3& v)
+                {
+                    return Geometry::Validation::IsFinite(v);
+                }))
+            return std::nullopt;
         KDTree tree;
-        if(!tree.BuildFromPoints(positions))return std::nullopt;
+        if (!tree.BuildFromPoints(positions))
+            return std::nullopt;
         std::vector<std::uint32_t> neighbors;
-        double sum=0;
-        for(std::uint32_t i=0;i<positions.size();++i)
+        double sum = 0;
+        for (std::uint32_t i = 0; i < positions.size(); ++i)
         {
             neighbors.clear();
-            if(!tree.QueryKNN(positions[i],2,neighbors))return std::nullopt;
-            const auto other=std::ranges::find_if(neighbors,[&](auto j){return j!=i;});
-            if(other==neighbors.end())return std::nullopt;
-            const auto distance=glm::distance(positions[i],positions[*other]);
-            if(!std::isfinite(distance))return std::nullopt;
-            sum+=distance;
+            if (!tree.QueryKNN(positions[i], 2, neighbors))
+                return std::nullopt;
+            const auto other = std::ranges::find_if(neighbors,
+                [&](auto j)
+                {
+                    return j != i;
+                });
+            if (other == neighbors.end())
+                return std::nullopt;
+            const auto distance = glm::distance(positions[i], positions[*other]);
+            if (!std::isfinite(distance))
+                return std::nullopt;
+            sum += distance;
         }
-        const auto mean=float(sum/double(positions.size()));
-        return std::isfinite(mean)?std::optional<float>(mean):std::nullopt;
+        const auto mean = float(sum / double(positions.size()));
+        return std::isfinite(mean) ? std::optional<float>(mean) : std::nullopt;
     }
     std::optional<float> EstimateSpacing(const Cloud& cloud)
     {
         return EstimateSpacing(CompactFeaturePoints(cloud).Points);
     }
-    std::optional<KeypointScale> ResolveKeypointScale(
-        std::span<const glm::vec3> positions,const KeypointParams& p)
+    std::optional<KeypointScale> ResolveKeypointScale(std::span<const glm::vec3> positions, const KeypointParams& p)
     {
-        if(!ValidKeypointInput(positions,p))return std::nullopt;
-        const auto spacing=EstimateSpacing(positions);
-        if(!spacing || *spacing<=0)return std::nullopt;
-        KeypointScale scale{*spacing,p.SalientRadius>0?p.SalientRadius:6.f * *spacing,
-            p.NonMaxRadius>0?p.NonMaxRadius:4.f * *spacing};
-        return ValidKeypointScale(p,scale)?std::optional(scale):std::nullopt;
+        if (!ValidKeypointInput(positions, p))
+            return std::nullopt;
+        const auto spacing = EstimateSpacing(positions);
+        if (!spacing || *spacing <= 0)
+            return std::nullopt;
+        KeypointScale scale{*spacing,
+            p.SalientRadius > 0 ? p.SalientRadius : 6.f * *spacing,
+            p.NonMaxRadius > 0 ? p.NonMaxRadius : 4.f * *spacing};
+        return ValidKeypointScale(p, scale) ? std::optional(scale) : std::nullopt;
     }
-    std::optional<KeypointAnalysis> AnalyzeKeypoints(
-        std::span<const glm::vec3> positions,const KeypointParams& p)
+    std::optional<KeypointAnalysis> AnalyzeKeypoints(std::span<const glm::vec3> positions, const KeypointParams& p)
     {
-        const auto scale=ResolveKeypointScale(positions,p);
-        if(!scale)return std::nullopt;
+        const auto scale = ResolveKeypointScale(positions, p);
+        if (!scale)
+            return std::nullopt;
         KDTree tree;
-        if(!tree.BuildFromPoints(positions))return std::nullopt;
+        if (!tree.BuildFromPoints(positions))
+            return std::nullopt;
         std::vector<std::uint32_t> row;
-        return AnalyzeKeypointRows(positions,p,*scale,[&](std::uint32_t i,float radius)
-            ->std::optional<std::span<const std::uint32_t>>
-        {
-            row.clear();
-            if(!tree.QueryRadius(positions[i],radius,row))return std::nullopt;
-            std::erase(row,i);std::sort(row.begin(),row.end());
-            return std::span<const std::uint32_t>(row);
-        });
-    }
-    std::optional<KeypointAnalysis> AnalyzeKeypointsFromNeighbors(
-        std::span<const glm::vec3> positions,const KeypointParams& p,
-        const KeypointScale& scale,Geometry::PointNeighborhoods rows)
-    {
-        if(!ValidKeypointInput(positions,p) || !ValidKeypointScale(p,scale) ||
-            rows.Offsets.size()!=positions.size()+1 || rows.Offsets.front()!=0 ||
-            rows.Offsets.back()!=rows.Indices.size())return std::nullopt;
-        const float radius=std::max(scale.SalientRadius,scale.NonMaxRadius);
-        for(std::uint32_t i=0;i<positions.size();++i)
-        {
-            const auto first=rows.Offsets[i],last=rows.Offsets[i+1];
-            if(first>last || last>rows.Indices.size())return std::nullopt;
-            for(auto k=first;k<last;++k)
+        return AnalyzeKeypointRows(positions,
+            p,
+            *scale,
+            [&](std::uint32_t i, float radius) -> std::optional<std::span<const std::uint32_t>>
             {
-                const auto j=rows.Indices[k];
-                if(j>=positions.size() || j==i || (k>first && rows.Indices[k-1]>=j))return std::nullopt;
-                const auto delta=positions[j]-positions[i];const float distance=glm::dot(delta,delta);
-                if(!std::isfinite(distance) || distance>radius*radius)return std::nullopt;
+                row.clear();
+                if (!tree.QueryRadius(positions[i], radius, row))
+                    return std::nullopt;
+                std::erase(row, i);
+                std::sort(row.begin(), row.end());
+                return std::span<const std::uint32_t>(row);
+            });
+    }
+    std::optional<KeypointAnalysis> AnalyzeKeypointsFromNeighbors(std::span<const glm::vec3> positions,
+        const KeypointParams& p,
+        const KeypointScale& scale,
+        Geometry::PointNeighborhoods rows)
+    {
+        if (!ValidKeypointInput(positions, p) || !ValidKeypointScale(p, scale) ||
+            rows.Offsets.size() != positions.size() + 1 || rows.Offsets.front() != 0 ||
+            rows.Offsets.back() != rows.Indices.size())
+            return std::nullopt;
+        const float radius = std::max(scale.SalientRadius, scale.NonMaxRadius);
+        for (std::uint32_t i = 0; i < positions.size(); ++i)
+        {
+            const auto first = rows.Offsets[i], last = rows.Offsets[i + 1];
+            if (first > last || last > rows.Indices.size())
+                return std::nullopt;
+            for (auto k = first; k < last; ++k)
+            {
+                const auto j = rows.Indices[k];
+                if (j >= positions.size() || j == i || (k > first && rows.Indices[k - 1] >= j))
+                    return std::nullopt;
+                const auto delta = positions[j] - positions[i];
+                const float distance = glm::dot(delta, delta);
+                if (!std::isfinite(distance) || distance > radius * radius)
+                    return std::nullopt;
             }
         }
         std::vector<std::uint32_t> row;
-        return AnalyzeKeypointRows(positions,p,scale,[&](std::uint32_t i,float r)
-            ->std::optional<std::span<const std::uint32_t>>
-        {
-            row.clear();
-            for(auto k=rows.Offsets[i];k<rows.Offsets[i+1];++k)
+        return AnalyzeKeypointRows(positions,
+            p,
+            scale,
+            [&](std::uint32_t i, float r) -> std::optional<std::span<const std::uint32_t>>
             {
-                const auto j=rows.Indices[k];const auto delta=positions[j]-positions[i];
-                if(glm::dot(delta,delta)<=r*r)row.push_back(j);
-            }
-            return std::span<const std::uint32_t>(row);
-        });
+                row.clear();
+                for (auto k = rows.Offsets[i]; k < rows.Offsets[i + 1]; ++k)
+                {
+                    const auto j = rows.Indices[k];
+                    const auto delta = positions[j] - positions[i];
+                    if (glm::dot(delta, delta) <= r * r)
+                        row.push_back(j);
+                }
+                return std::span<const std::uint32_t>(row);
+            });
     }
-    std::optional<KeypointSet> DetectKeypoints(const Cloud& cloud,const KeypointParams& params)
+    std::optional<KeypointSet> DetectKeypoints(const Cloud& cloud, const KeypointParams& params)
     {
-        const auto compact=CompactFeaturePoints(cloud);
-        auto result=AnalyzeKeypoints(compact.Points,params);
-        if(!result)return std::nullopt;
-        for(auto& i:result->Keypoints.Indices)i=compact.Slots[i];
+        const auto compact = CompactFeaturePoints(cloud);
+        auto result = AnalyzeKeypoints(compact.Points, params);
+        if (!result)
+            return std::nullopt;
+        for (auto& i : result->Keypoints.Indices)
+            i = compact.Slots[i];
         return std::move(result->Keypoints);
     }
 
@@ -371,195 +437,250 @@ namespace Geometry::PointCloud::Features
     {
         bool ValidDescriptorNormals(std::span<const glm::vec3> positions, std::span<const glm::vec3> normals)
         {
-            return positions.size()==normals.size() && std::ranges::all_of(normals,[](glm::vec3 n)
-                {return Geometry::Validation::IsFinite(n) && glm::dot(glm::dvec3(n),glm::dvec3(n))>0;});
+            return positions.size() == normals.size() &&
+                std::ranges::all_of(normals,
+                    [](glm::vec3 n)
+                    {
+                        return Geometry::Validation::IsFinite(n) && glm::dot(glm::dvec3(n), glm::dvec3(n)) > 0;
+                    });
         }
-        bool ValidDescriptorScale(std::span<const glm::vec3> positions,const DescriptorParams& p,const DescriptorScale& s)
+        bool ValidDescriptorScale(
+            std::span<const glm::vec3> positions, const DescriptorParams& p, const DescriptorScale& s)
         {
-            const float radius=s.FeatureRadius;
-            return positions.size()>=2 && positions.size()<=std::numeric_limits<std::uint32_t>::max() &&
-                std::ranges::all_of(positions,[](const glm::vec3& v) { return Geometry::Validation::IsFinite(v); }) && p.Kind==DescriptorKind::FPFH && std::isfinite(p.FeatureRadius) &&
-                std::isfinite(s.MeanSpacing) && s.MeanSpacing>0 && std::isfinite(radius) && radius>0 &&
-                std::isfinite(radius*radius) && radius*radius>0 && radius==(p.FeatureRadius>0?p.FeatureRadius:5.f*s.MeanSpacing);
+            const float radius = s.FeatureRadius;
+            return positions.size() >= 2 && positions.size() <= std::numeric_limits<std::uint32_t>::max() &&
+                std::ranges::all_of(positions,
+                    [](const glm::vec3& v)
+                    {
+                        return Geometry::Validation::IsFinite(v);
+                    }) &&
+                p.Kind == DescriptorKind::FPFH && std::isfinite(p.FeatureRadius) && std::isfinite(s.MeanSpacing) &&
+                s.MeanSpacing > 0 && std::isfinite(radius) && radius > 0 && std::isfinite(radius * radius) &&
+                radius * radius > 0 && radius == (p.FeatureRadius > 0 ? p.FeatureRadius : 5.f * s.MeanSpacing);
         }
-        template<class Query>
+        template <class Query>
         std::optional<DescriptorSet> ComputeDescriptorRows(std::span<const glm::vec3> positions,
-            std::span<const glm::vec3> normals,std::span<const std::uint32_t> indices,Query&& query)
+            std::span<const glm::vec3> normals,
+            std::span<const std::uint32_t> indices,
+            Query&& query)
         {
-        if(indices.size()>std::numeric_limits<std::uint32_t>::max() ||
-            std::ranges::any_of(indices,[&](auto i){return i>=positions.size();}))return std::nullopt;
-        std::vector<std::array<float,kFpfhDimension>> spfh(positions.size());
-        for(std::uint32_t i=0;i<positions.size();++i)
-        {
-            const auto neighbors=query(i);
-            if(!neighbors)return std::nullopt;
-            spfh[i]=ComputeSpfh(positions[i],normals[i],positions,normals,*neighbors);
-        }
+            if (indices.size() > std::numeric_limits<std::uint32_t>::max() ||
+                std::ranges::any_of(indices,
+                    [&](auto i)
+                    {
+                        return i >= positions.size();
+                    }))
+                return std::nullopt;
+            std::vector<std::array<float, kFpfhDimension>> spfh(positions.size());
+            for (std::uint32_t i = 0; i < positions.size(); ++i)
+            {
+                const auto neighbors = query(i);
+                if (!neighbors)
+                    return std::nullopt;
+                spfh[i] = ComputeSpfh(positions[i], normals[i], positions, normals, *neighbors);
+            }
         // Stage 2: FPFH at the requested indices (empty => all live points).
-        std::vector<std::uint32_t> queryIndices;
-        if (indices.empty())
-        {
-            for (std::size_t i = 0; i < positions.size(); ++i)
+            std::vector<std::uint32_t> queryIndices;
+            if (indices.empty())
             {
-                queryIndices.push_back(static_cast<std::uint32_t>(i));
-            }
-        }
-        else
-        {
-            queryIndices.assign(indices.begin(), indices.end());
-        }
-
-        DescriptorSet out;
-        out.Kind = DescriptorKind::FPFH;
-        out.Dimension = kFpfhDimension;
-        out.Count = static_cast<std::uint32_t>(queryIndices.size());
-        out.Data.resize(queryIndices.size() * kFpfhDimension, 0.0f);
-        out.SourceIndices = queryIndices;
-
-        for (std::size_t row = 0; row < queryIndices.size(); ++row)
-        {
-            const std::uint32_t i = queryIndices[row];
-            if (i >= positions.size())
-            {
-                return std::nullopt; // invalid query index
-            }
-            std::array<double, kFpfhDimension> fpfh{};
-            for (std::uint32_t b = 0; b < kFpfhDimension; ++b)
-            {
-                fpfh[b] = spfh[i][b];
-            }
-            const auto neighbors = query(i);
-            if (!neighbors) return std::nullopt;
-            const auto nb = *neighbors;
-            if (!nb.empty())
-            {
-                double weightSum = 0.0;
-                for (const std::uint32_t j : nb)
+                for (std::size_t i = 0; i < positions.size(); ++i)
                 {
-                    const double dist = glm::distance(positions[i], positions[j]);
-                    if (dist < 1e-9)
-                    {
-                        continue;
-                    }
-                    const double w = 1.0 / dist;
-                    weightSum += w;
-                    for (std::uint32_t b = 0; b < kFpfhDimension; ++b)
-                    {
-                        fpfh[b] += w * spfh[j][b];
-                    }
+                    queryIndices.push_back(static_cast<std::uint32_t>(i));
                 }
-                if (weightSum > 0.0)
+            }
+            else
+            {
+                queryIndices.assign(indices.begin(), indices.end());
+            }
+
+            DescriptorSet out;
+            out.Kind = DescriptorKind::FPFH;
+            out.Dimension = kFpfhDimension;
+            out.Count = static_cast<std::uint32_t>(queryIndices.size());
+            out.Data.resize(queryIndices.size() * kFpfhDimension, 0.0f);
+            out.SourceIndices = queryIndices;
+
+            for (std::size_t row = 0; row < queryIndices.size(); ++row)
+            {
+                const std::uint32_t i = queryIndices[row];
+                if (i >= positions.size())
                 {
+                    return std::nullopt; // invalid query index
+                }
+                std::array<double, kFpfhDimension> fpfh{};
+                for (std::uint32_t b = 0; b < kFpfhDimension; ++b)
+                {
+                    fpfh[b] = spfh[i][b];
+                }
+                const auto neighbors = query(i);
+                if (!neighbors)
+                    return std::nullopt;
+                const auto nb = *neighbors;
+                if (!nb.empty())
+                {
+                    double weightSum = 0.0;
+                    for (const std::uint32_t j : nb)
+                    {
+                        const double dist = glm::distance(positions[i], positions[j]);
+                        if (dist < 1e-9)
+                        {
+                            continue;
+                        }
+                        const double w = 1.0 / dist;
+                        weightSum += w;
+                        for (std::uint32_t b = 0; b < kFpfhDimension; ++b)
+                        {
+                            fpfh[b] += w * spfh[j][b];
+                        }
+                    }
+                    if (weightSum > 0.0)
+                    {
                     // SPFH(i) already counted once; average the weighted neighbor
                     // contribution as in Rusu et al. (1/k sum).
-                    const double inv = 1.0 / static_cast<double>(nb.size());
-                    for (std::uint32_t b = 0; b < kFpfhDimension; ++b)
-                    {
-                        fpfh[b] = spfh[i][b] + inv * (fpfh[b] - spfh[i][b]);
+                        const double inv = 1.0 / static_cast<double>(nb.size());
+                        for (std::uint32_t b = 0; b < kFpfhDimension; ++b)
+                        {
+                            fpfh[b] = spfh[i][b] + inv * (fpfh[b] - spfh[i][b]);
+                        }
                     }
                 }
-            }
 
             // Renormalize each sub-histogram to sum 100 for consistent block mass.
-            for (std::uint32_t block = 0; block < 3; ++block)
-            {
-                double sum = 0.0;
-                for (std::uint32_t b = 0; b < kFpfhBins; ++b)
+                for (std::uint32_t block = 0; block < 3; ++block)
                 {
-                    sum += fpfh[block * kFpfhBins + b];
-                }
-                const std::size_t base = row * kFpfhDimension + block * kFpfhBins;
-                if (sum > 0.0)
-                {
-                    const double scale = 100.0 / sum;
+                    double sum = 0.0;
                     for (std::uint32_t b = 0; b < kFpfhBins; ++b)
                     {
-                        out.Data[base + b] = static_cast<float>(fpfh[block * kFpfhBins + b] * scale);
+                        sum += fpfh[block * kFpfhBins + b];
+                    }
+                    const std::size_t base = row * kFpfhDimension + block * kFpfhBins;
+                    if (sum > 0.0)
+                    {
+                        const double scale = 100.0 / sum;
+                        for (std::uint32_t b = 0; b < kFpfhBins; ++b)
+                        {
+                            out.Data[base + b] = static_cast<float>(fpfh[block * kFpfhBins + b] * scale);
+                        }
                     }
                 }
             }
-        }
-        return out;
+            return out;
         }
 
     }
 
-    std::optional<DescriptorScale> ResolveDescriptorScale(std::span<const glm::vec3> positions,const DescriptorParams& p)
+    std::optional<DescriptorScale> ResolveDescriptorScale(
+        std::span<const glm::vec3> positions, const DescriptorParams& p)
     {
-        if(p.Kind!=DescriptorKind::FPFH || !std::isfinite(p.FeatureRadius))return std::nullopt;
-        const auto spacing=EstimateSpacing(positions);
-        if(!spacing || *spacing<=0)return std::nullopt;
-        const DescriptorScale scale{*spacing,p.FeatureRadius>0?p.FeatureRadius:5.f * *spacing};
-        return ValidDescriptorScale(positions,p,scale)?std::optional(scale):std::nullopt;
+        if (p.Kind != DescriptorKind::FPFH || !std::isfinite(p.FeatureRadius))
+            return std::nullopt;
+        const auto spacing = EstimateSpacing(positions);
+        if (!spacing || *spacing <= 0)
+            return std::nullopt;
+        const DescriptorScale scale{*spacing, p.FeatureRadius > 0 ? p.FeatureRadius : 5.f * *spacing};
+        return ValidDescriptorScale(positions, p, scale) ? std::optional(scale) : std::nullopt;
     }
     std::optional<DescriptorSet> ComputeDescriptors(std::span<const glm::vec3> positions,
-        std::span<const glm::vec3> normals,std::span<const std::uint32_t> indices,const DescriptorParams& p)
+        std::span<const glm::vec3> normals,
+        std::span<const std::uint32_t> indices,
+        const DescriptorParams& p)
     {
-        if(!ValidDescriptorNormals(positions,normals))return std::nullopt;
-        const auto scale=ResolveDescriptorScale(positions,p);
-        if(!scale)return std::nullopt;
-        KDTree tree;if(!tree.BuildFromPoints(positions))return std::nullopt;
+        if (!ValidDescriptorNormals(positions, normals))
+            return std::nullopt;
+        const auto scale = ResolveDescriptorScale(positions, p);
+        if (!scale)
+            return std::nullopt;
+        KDTree tree;
+        if (!tree.BuildFromPoints(positions))
+            return std::nullopt;
         std::vector<std::uint32_t> row;
-        auto result=ComputeDescriptorRows(positions,normals,indices,[&](std::uint32_t i)->std::optional<std::span<const std::uint32_t>>
-        {
-            row.clear();if(!tree.QueryRadius(positions[i],scale->FeatureRadius,row))return std::nullopt;
-            std::erase(row,i);std::sort(row.begin(),row.end());
-            if(p.MaxNeighbors && row.size()>p.MaxNeighbors)row.resize(p.MaxNeighbors);
-            return std::span<const std::uint32_t>(row);
-        });
-        if(result)result->Scale=*scale;
+        auto result = ComputeDescriptorRows(positions,
+            normals,
+            indices,
+            [&](std::uint32_t i) -> std::optional<std::span<const std::uint32_t>>
+            {
+                row.clear();
+                if (!tree.QueryRadius(positions[i], scale->FeatureRadius, row))
+                    return std::nullopt;
+                std::erase(row, i);
+                std::sort(row.begin(), row.end());
+                if (p.MaxNeighbors && row.size() > p.MaxNeighbors)
+                    row.resize(p.MaxNeighbors);
+                return std::span<const std::uint32_t>(row);
+            });
+        if (result)
+            result->Scale = *scale;
         return result;
     }
     std::optional<DescriptorSet> ComputeDescriptorsFromNeighbors(std::span<const glm::vec3> positions,
-        std::span<const glm::vec3> normals,std::span<const std::uint32_t> indices,const DescriptorParams& p,
-        const DescriptorScale& scale,Geometry::PointNeighborhoods rows)
+        std::span<const glm::vec3> normals,
+        std::span<const std::uint32_t> indices,
+        const DescriptorParams& p,
+        const DescriptorScale& scale,
+        Geometry::PointNeighborhoods rows)
     {
-        if(!ValidDescriptorNormals(positions,normals) || !ValidDescriptorScale(positions,p,scale) ||
-            rows.Offsets.size()!=positions.size()+1 || rows.Offsets.front()!=0 || rows.Offsets.back()!=rows.Indices.size())return std::nullopt;
-        for(std::uint32_t i=0;i<positions.size();++i)
+        if (!ValidDescriptorNormals(positions, normals) || !ValidDescriptorScale(positions, p, scale) ||
+            rows.Offsets.size() != positions.size() + 1 || rows.Offsets.front() != 0 ||
+            rows.Offsets.back() != rows.Indices.size())
+            return std::nullopt;
+        for (std::uint32_t i = 0; i < positions.size(); ++i)
         {
-            const auto first=rows.Offsets[i],last=rows.Offsets[i+1];
-            if(first>last || last>rows.Indices.size())return std::nullopt;
-            for(auto k=first;k<last;++k)
+            const auto first = rows.Offsets[i], last = rows.Offsets[i + 1];
+            if (first > last || last > rows.Indices.size())
+                return std::nullopt;
+            for (auto k = first; k < last; ++k)
             {
-                const auto j=rows.Indices[k];
-                if(j>=positions.size() || j==i || (k>first && rows.Indices[k-1]>=j))return std::nullopt;
-                const auto delta=positions[j]-positions[i];const float distance=glm::dot(delta,delta);
-                if(!std::isfinite(distance) || distance>scale.FeatureRadius*scale.FeatureRadius)return std::nullopt;
+                const auto j = rows.Indices[k];
+                if (j >= positions.size() || j == i || (k > first && rows.Indices[k - 1] >= j))
+                    return std::nullopt;
+                const auto delta = positions[j] - positions[i];
+                const float distance = glm::dot(delta, delta);
+                if (!std::isfinite(distance) || distance > scale.FeatureRadius * scale.FeatureRadius)
+                    return std::nullopt;
             }
         }
-        auto result=ComputeDescriptorRows(positions,normals,indices,[&](std::uint32_t i)->std::optional<std::span<const std::uint32_t>>
-        {
-            auto row=rows.Indices.subspan(rows.Offsets[i],rows.Offsets[i+1]-rows.Offsets[i]);
-            if(p.MaxNeighbors && row.size()>p.MaxNeighbors)row=row.first(p.MaxNeighbors);
-            return row;
-        });
-        if(result)result->Scale=scale;
+        auto result = ComputeDescriptorRows(positions,
+            normals,
+            indices,
+            [&](std::uint32_t i) -> std::optional<std::span<const std::uint32_t>>
+            {
+                auto row = rows.Indices.subspan(rows.Offsets[i], rows.Offsets[i + 1] - rows.Offsets[i]);
+                if (p.MaxNeighbors && row.size() > p.MaxNeighbors)
+                    row = row.first(p.MaxNeighbors);
+                return row;
+            });
+        if (result)
+            result->Scale = scale;
         return result;
     }
-    std::optional<DescriptorSet> ComputeDescriptors(const Cloud& cloud,
-        std::span<const std::uint32_t> indices,const DescriptorParams& params)
+    std::optional<DescriptorSet> ComputeDescriptors(
+        const Cloud& cloud, std::span<const std::uint32_t> indices, const DescriptorParams& params)
     {
-        if(!cloud.HasNormals() || cloud.Normals().size()!=cloud.Positions().size())return std::nullopt;
-        const auto compact=CompactFeaturePoints(cloud);
-        std::vector<glm::vec3> normals;normals.reserve(compact.Slots.size());
-        for(auto i:compact.Slots)normals.push_back(cloud.Normals()[i]);
-        std::vector<std::uint32_t> queries;queries.reserve(indices.size());
-        for(auto i:indices)
+        if (!cloud.HasNormals() || cloud.Normals().size() != cloud.Positions().size())
+            return std::nullopt;
+        const auto compact = CompactFeaturePoints(cloud);
+        std::vector<glm::vec3> normals;
+        normals.reserve(compact.Slots.size());
+        for (auto i : compact.Slots)
+            normals.push_back(cloud.Normals()[i]);
+        std::vector<std::uint32_t> queries;
+        queries.reserve(indices.size());
+        for (auto i : indices)
         {
-            const auto found=std::lower_bound(compact.Slots.begin(),compact.Slots.end(),i);
-            if(found==compact.Slots.end() || *found!=i)return std::nullopt;
-            queries.push_back(std::uint32_t(found-compact.Slots.begin()));
+            const auto found = std::lower_bound(compact.Slots.begin(), compact.Slots.end(), i);
+            if (found == compact.Slots.end() || *found != i)
+                return std::nullopt;
+            queries.push_back(std::uint32_t(found - compact.Slots.begin()));
         }
-        auto result=ComputeDescriptors(compact.Points,normals,queries,params);
-        if(result)for(auto& i:result->SourceIndices)i=compact.Slots[i];
+        auto result = ComputeDescriptors(compact.Points, normals, queries, params);
+        if (result)
+            for (auto& i : result->SourceIndices)
+                i = compact.Slots[i];
         return result;
     }
 
     std::optional<CorrespondenceSet> MatchDescriptors(
-        const DescriptorSet& source,
-        const DescriptorSet& target,
-        const CorrespondenceParams& params)
+        const DescriptorSet& source, const DescriptorSet& target, const CorrespondenceParams& params)
     {
         if (source.Dimension == 0 || source.Dimension != target.Dimension)
         {
@@ -571,7 +692,8 @@ namespace Geometry::PointCloud::Features
         }
         const std::uint32_t dim = source.Dimension;
 
-        const auto distanceSquared = [dim](std::span<const float> a, std::span<const float> b) -> double {
+        const auto distanceSquared = [dim](std::span<const float> a, std::span<const float> b) -> double
+        {
             double acc = 0.0;
             for (std::uint32_t d = 0; d < dim; ++d)
             {
@@ -582,9 +704,12 @@ namespace Geometry::PointCloud::Features
         };
 
         // best[i] = (targetRow, dist^2) for each source row, deterministic ties.
-        const auto bestMatch = [&](const DescriptorSet& from, std::uint32_t fromRow,
+        const auto bestMatch = [&](const DescriptorSet& from,
+                                   std::uint32_t fromRow,
                                    const DescriptorSet& to,
-                                   double& outBest, double& outSecond) -> std::uint32_t {
+                                   double& outBest,
+                                   double& outSecond) -> std::uint32_t
+        {
             outBest = std::numeric_limits<double>::infinity();
             outSecond = std::numeric_limits<double>::infinity();
             std::uint32_t bestRow = 0;
@@ -650,8 +775,7 @@ namespace Geometry::PointCloud::Features
         return result;
     }
 
-    CoarseAlignmentResult EstimateCoarseAlignment(
-        std::span<const glm::vec3> sourcePoints,
+    CoarseAlignmentResult EstimateCoarseAlignment(std::span<const glm::vec3> sourcePoints,
         std::span<const glm::vec3> targetPoints,
         const CorrespondenceSet& correspondences,
         const CoarseAlignmentParams& params)
@@ -787,7 +911,8 @@ namespace Geometry::PointCloud::Features
                     sse += d2;
                 }
             }
-            const double rmse = inliers > 0 ? std::sqrt(sse / static_cast<double>(inliers)) : std::numeric_limits<double>::infinity();
+            const double rmse =
+                inliers > 0 ? std::sqrt(sse / static_cast<double>(inliers)) : std::numeric_limits<double>::infinity();
             if (inliers > bestInliers || (inliers == bestInliers && rmse < bestRmse))
             {
                 bestInliers = inliers;
