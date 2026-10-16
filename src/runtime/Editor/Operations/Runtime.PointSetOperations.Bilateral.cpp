@@ -68,45 +68,67 @@ namespace Extrinsic::Runtime
         bool CurrentInput(const EditorProcessingContext& context, const BilateralWork& w)
         {
             const std::array outputs{w.OutputWatch};
-            return GeometryPropertiesCurrent(context, w.Entity, w.Inputs) && GeometryPropertiesCurrent(context, w.Entity, outputs);
+            return GeometryPropertiesCurrent(context, w.Entity, w.Inputs) &&
+                GeometryPropertiesCurrent(context, w.Entity, outputs);
         }
-        enum class CapturePurpose { Execute, Readiness };
-        std::shared_ptr<BilateralWork> Capture(const EditorProcessingContext& context,
-            BilateralFilterConfig c, std::string& diagnostic, CapturePurpose purpose = CapturePurpose::Execute)
+        enum class CapturePurpose
         {
-            auto fail = [&](std::string why) -> std::shared_ptr<BilateralWork> { diagnostic = std::move(why); return {}; };
+            Execute,
+            Readiness
+        };
+        std::shared_ptr<BilateralWork> Capture(const EditorProcessingContext& context,
+            BilateralFilterConfig c,
+            std::string& diagnostic,
+            CapturePurpose purpose = CapturePurpose::Execute)
+        {
+            auto fail = [&](std::string why) -> std::shared_ptr<BilateralWork>
+            {
+                diagnostic = std::move(why);
+                return {};
+            };
             const auto validation = ValidateBilateralFilterConfigSection(
                 SerializeBilateralFilterConfig(c), {}, kBilateralFilterConfigSectionName);
-            if (!validation.Usable()) return fail(validation.Diagnostics.front().Message);
-            if (!context.Scene) return fail("Scene is unavailable.");
+            if (!validation.Usable())
+                return fail(validation.Diagnostics.front().Message);
+            if (!context.Scene)
+                return fail("Scene is unavailable.");
             const auto entity = EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(), c.StableEntityId);
-            if (!entity) return fail("Bilateral target entity is stale or missing.");
+            if (!entity)
+                return fail("Bilateral target entity is stale or missing.");
             const auto a = BuildGeometryAvailability(context.Scene->Raw(), *entity);
-            if (c.Positions.Domain == D::Unknown) c.Positions.Domain = PrimaryPointDomain(a);
-            if (c.Output.Domain == D::Unknown) c.Output.Domain = c.Positions.Domain;
-            if (c.Normals.Domain == D::Unknown) c.Normals.Domain = c.Positions.Domain;
+            if (c.Positions.Domain == D::Unknown)
+                c.Positions.Domain = PrimaryPointDomain(a);
+            if (c.Output.Domain == D::Unknown)
+                c.Output.Domain = c.Positions.Domain;
+            if (c.Normals.Domain == D::Unknown)
+                c.Normals.Domain = c.Positions.Domain;
             const auto* props = ResolveGeometryPropertySet(a, c.Positions.Domain);
             if (!props || !ResolveGeometryProperty(a, c.Positions, props->Size(), false).Resolved())
                 return fail("Choose a count-matched vec3 position property on a resolved element domain.");
             for (const auto& output : {c.Output})
             {
-                if (output.Domain != c.Positions.Domain || (output.Name == c.Normals.Name && c.Normals.Name != c.Positions.Name))
-                    return fail("Filtered positions must share the input domain and cannot overwrite a distinct normal input.");
-                if (IsTopologyProperty(output.Domain, output.Name)) return fail("Filtered positions cannot replace topology/deletion properties.");
+                if (output.Domain != c.Positions.Domain ||
+                    (output.Name == c.Normals.Name && c.Normals.Name != c.Positions.Name))
+                    return fail(
+                        "Filtered positions must share the input domain and cannot overwrite a distinct normal input.");
+                if (IsTopologyProperty(output.Domain, output.Name))
+                    return fail("Filtered positions cannot replace topology/deletion properties.");
                 if (props->Exists(output.Name) && !ResolveGeometryProperty(a, output, props->Size(), false).Resolved())
                     return fail("Filtered positions must be absent or count-matched vec3 position properties.");
             }
             auto w = std::make_shared<BilateralWork>();
             if (!GeometryProcessingDetail::CapturePointNormalInput(
-                    context, *entity, a, c.Positions, c.Normals,
-                    purpose == CapturePurpose::Execute, *w, diagnostic)) return {};
-            w->Config = c; w->Entity = *entity;
+                    context, *entity, a, c.Positions, c.Normals, purpose == CapturePurpose::Execute, *w, diagnostic))
+                return {};
+            w->Config = c;
+            w->Entity = *entity;
             w->Result.RequestedBackend = c.Backend;
             w->Result.Output = c.Output;
             w->OutputWatch = ObserveGeometryProperty(a, c.Output.Domain, c.Output.Name);
             w->Result.SlotCount = w->SlotCount;
             w->Result.LiveCount = w->LiveCount;
-            if (w->Result.LiveCount < 2) return fail("Bilateral filtering requires at least two live samples.");
+            if (w->Result.LiveCount < 2)
+                return fail("Bilateral filtering requires at least two live samples.");
             if (c.Backend != BilateralFilterBackend::CpuOctree)
             {
                 if (!context.SpatialIndices || !w->ValidLbvh || w->Result.LiveCount > (1u << 24))
@@ -114,127 +136,197 @@ namespace Extrinsic::Runtime
                 if (c.Backend == BilateralFilterBackend::VulkanLBVH)
                 {
                     if (!context.JobCommands.Available() || !context.SpatialIndices->GpuQueriesAvailable())
-                        return fail("Vulkan bilateral filter neighborhoods require the framed spatial cache and job service.");
-                    if (w->Result.LiveCount > (1u << 20) ||
-                        c.KNeighbors > 63)
-                        return fail("Vulkan bilateral filter queries support at most 2^20 live samples and k<=63 (64 candidates including self).");
+                        return fail(
+                            "Vulkan bilateral filter neighborhoods require the framed spatial cache and job service.");
+                    if (w->Result.LiveCount > (1u << 20) || c.KNeighbors > 63)
+                        return fail(
+                            "Vulkan bilateral filter queries support at most 2^20 live samples and k<=63 (64 candidates including self).");
                 }
             }
             if (purpose == CapturePurpose::Execute)
             {
-                if (w->OutputWatch.Revision) w->BeforeOutput = props->Get<glm::vec3>(c.Output.Name).Vector();
-                w->AfterOutput = w->OutputWatch.Revision ? w->BeforeOutput : props->Get<glm::vec3>(c.Positions.Name).Vector();
+                if (w->OutputWatch.Revision)
+                    w->BeforeOutput = props->Get<glm::vec3>(c.Output.Name).Vector();
+                w->AfterOutput =
+                    w->OutputWatch.Revision ? w->BeforeOutput : props->Get<glm::vec3>(c.Positions.Name).Vector();
             }
             return w;
         }
         bool Prepare(BilateralWork& w)
         {
-            const auto& c=w.Config;
-            w.Params={.KNeighbors=c.KNeighbors,.SpatialSigma=c.SpatialSigma,.NormalSigma=c.NormalSigma,.Iterations=1};
-            w.Result.ActualBackend=ToString(c.Backend);
-            if(c.Iterations && w.Params.SpatialSigma<=0)
+            const auto& c = w.Config;
+            w.Params = {.KNeighbors = c.KNeighbors,
+                .SpatialSigma = c.SpatialSigma,
+                .NormalSigma = c.NormalSigma,
+                .Iterations = 1};
+            w.Result.ActualBackend = ToString(c.Backend);
+            if (c.Iterations && w.Params.SpatialSigma <= 0)
             {
-                const auto stats=PC::ComputeStatistics(w.Points,{.SpacingSampleCount=std::min(w.Points.size(),std::size_t{500})});
-                if(!stats){w.Result.Status=EditorCommandStatus::GeometryProcessingFailed;w.Result.Message="Automatic bilateral bandwidth failed.";return false;}
-                w.Params.SpatialSigma=stats->AverageSpacing>0?2.f*stats->AverageSpacing:.01f;
+                const auto stats = PC::ComputeStatistics(
+                    w.Points, {.SpacingSampleCount = std::min(w.Points.size(), std::size_t{500})});
+                if (!stats)
+                {
+                    w.Result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                    w.Result.Message = "Automatic bilateral bandwidth failed.";
+                    return false;
+                }
+                w.Params.SpatialSigma = stats->AverageSpacing > 0 ? 2.f * stats->AverageSpacing : .01f;
             }
-            w.Result.SpatialSigmaUsed=w.Params.SpatialSigma;
-            w.Result.Status=EditorCommandStatus::Applied;
+            w.Result.SpatialSigmaUsed = w.Params.SpatialSigma;
+            w.Result.Status = EditorCommandStatus::Applied;
             return true;
         }
         void ComputeStep(BilateralWork& w)
         {
-            const auto started=std::chrono::steady_clock::now();
-            auto& r=w.Result;
+            const auto started = std::chrono::steady_clock::now();
+            auto& r = w.Result;
             std::optional<PC::BilateralFilterOutput> filtered;
-            if(w.Config.Backend==BilateralFilterBackend::CpuOctree)
-                filtered=PC::BilateralFilter(w.Points,w.Normals,w.Params);
+            if (w.Config.Backend == BilateralFilterBackend::CpuOctree)
+                filtered = PC::BilateralFilter(w.Points, w.Normals, w.Params);
             else
             {
-                if(w.Config.Backend==BilateralFilterBackend::CpuLBVH)
+                if (w.Config.Backend == BilateralFilterBackend::CpuLBVH)
                 {
                     Geometry::PointLBVH::Index rebuilt;
-                    const auto* index=w.Index?&w.Index->Index:nullptr;
-                    if(r.CompletedIterations)
+                    const auto* index = w.Index ? &w.Index->Index : nullptr;
+                    if (r.CompletedIterations)
                     {
-                        if(!rebuilt.Build(w.Points)){r.Status=EditorCommandStatus::GeometryProcessingFailed;r.Message="Moving points exceed LBVH limits.";return;}
-                        index=&rebuilt;++r.WorkspaceBuilds;
+                        if (!rebuilt.Build(w.Points))
+                        {
+                            r.Status = EditorCommandStatus::GeometryProcessingFailed;
+                            r.Message = "Moving points exceed LBVH limits.";
+                            return;
+                        }
+                        index = &rebuilt;
+                        ++r.WorkspaceBuilds;
                     }
-                    const auto width=std::min(w.Points.size()-1,std::size_t(w.Config.KNeighbors))+1;
-                    w.NeighborIds.clear();w.NeighborIds.reserve(w.Points.size()*width);
-                    if(!index){r.Status=EditorCommandStatus::GeometryProcessingFailed;r.Message="Bilateral CPU index is unavailable.";return;}
-                    for(auto point:w.Points)
+                    const auto width = std::min(w.Points.size() - 1, std::size_t(w.Config.KNeighbors)) + 1;
+                    w.NeighborIds.clear();
+                    w.NeighborIds.reserve(w.Points.size() * width);
+                    if (!index)
                     {
-                        const auto row=index->KNearest(point,std::uint32_t(width));
-                        if(row.size()!=width){r.Status=EditorCommandStatus::GeometryProcessingFailed;r.Message="Incomplete CPU bilateral neighborhood.";return;}
-                        for(const auto& n:row)w.NeighborIds.push_back(n.Index);
+                        r.Status = EditorCommandStatus::GeometryProcessingFailed;
+                        r.Message = "Bilateral CPU index is unavailable.";
+                        return;
+                    }
+                    for (auto point : w.Points)
+                    {
+                        const auto row = index->KNearest(point, std::uint32_t(width));
+                        if (row.size() != width)
+                        {
+                            r.Status = EditorCommandStatus::GeometryProcessingFailed;
+                            r.Message = "Incomplete CPU bilateral neighborhood.";
+                            return;
+                        }
+                        for (const auto& n : row)
+                            w.NeighborIds.push_back(n.Index);
                     }
                 }
-                filtered=PC::BilateralFilterStepFromNeighbors(w.Points,w.Normals,w.NeighborIds,w.Params);
+                filtered = PC::BilateralFilterStepFromNeighbors(w.Points, w.Normals, w.NeighborIds, w.Params);
             }
-            if(!filtered){r.Status=EditorCommandStatus::GeometryProcessingFailed;r.Message="Bilateral filtering failed: invalid neighborhoods or unrepresentable float updates.";return;}
-            w.Points=std::move(filtered->Positions);
-            r.PointsFiltered=filtered->Diagnostics.PointsFiltered;
-            r.DegenerateNormals=filtered->Diagnostics.DegenerateNormals;
-            r.AverageDisplacement=filtered->Diagnostics.AverageDisplacement;
-            r.MaxDisplacement=filtered->Diagnostics.MaxDisplacement;
-            ++r.CompletedIterations;r.Status=EditorCommandStatus::Applied;
-            r.CpuComputeMilliseconds+=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
+            if (!filtered)
+            {
+                r.Status = EditorCommandStatus::GeometryProcessingFailed;
+                r.Message = "Bilateral filtering failed: invalid neighborhoods or unrepresentable float updates.";
+                return;
+            }
+            w.Points = std::move(filtered->Positions);
+            r.PointsFiltered = filtered->Diagnostics.PointsFiltered;
+            r.DegenerateNormals = filtered->Diagnostics.DegenerateNormals;
+            r.AverageDisplacement = filtered->Diagnostics.AverageDisplacement;
+            r.MaxDisplacement = filtered->Diagnostics.MaxDisplacement;
+            ++r.CompletedIterations;
+            r.Status = EditorCommandStatus::Applied;
+            r.CpuComputeMilliseconds +=
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
         }
         void CompleteOutput(BilateralWork& w)
         {
-            if(w.Result.Status!=EditorCommandStatus::Applied)return;
-            for(std::size_t i=0;i<w.Slots.size();++i)w.AfterOutput[w.Slots[i]]=w.Points[i];
-            w.Result.WrittenCount=w.Slots.size();
-            w.Result.Message="Bilateral point filtering completed using "+w.Result.ActualBackend+" neighborhoods and CPU updates with fixed normals.";
+            if (w.Result.Status != EditorCommandStatus::Applied)
+                return;
+            for (std::size_t i = 0; i < w.Slots.size(); ++i)
+                w.AfterOutput[w.Slots[i]] = w.Points[i];
+            w.Result.WrittenCount = w.Slots.size();
+            w.Result.Message = "Bilateral point filtering completed using " + w.Result.ActualBackend +
+                " neighborhoods and CPU updates with fixed normals.";
         }
         void Compute(BilateralWork& w)
         {
-            if(!Prepare(w))return;
-            for(std::uint32_t i=0;i<w.Config.Iterations;++i)
-            {ComputeStep(w);if(w.Result.Status!=EditorCommandStatus::Applied)return;}
+            if (!Prepare(w))
+                return;
+            for (std::uint32_t i = 0; i < w.Config.Iterations; ++i)
+            {
+                ComputeStep(w);
+                if (w.Result.Status != EditorCommandStatus::Applied)
+                    return;
+            }
             CompleteOutput(w);
         }
         // Iteration 0 decodes source rows; later iterations query a private workspace
         // whose IDs are already compact. Neighborhood time accumulates across iterations.
         bool AdvanceGpu(const EditorProcessingContext& context, BilateralWork& w)
         {
-            auto fail=[&](std::string why, EditorCommandStatus status=EditorCommandStatus::GeometryProcessingFailed)
-            {w.Result.Status=status; w.Result.Message=std::move(why); w.MainFailure=w.Result; w.Pages.Batch.reset(); return true;};
-            if (w.Abandoned || !CurrentInput(context,w))
-                return fail("Bilateral inputs changed or the job was cancelled.",EditorCommandStatus::StaleEntity);
-            if (w.Pages.Finished) return true;
+            auto fail = [&](std::string why, EditorCommandStatus status = EditorCommandStatus::GeometryProcessingFailed)
+            {
+                w.Result.Status = status;
+                w.Result.Message = std::move(why);
+                w.MainFailure = w.Result;
+                w.Pages.Batch.reset();
+                return true;
+            };
+            if (w.Abandoned || !CurrentInput(context, w))
+                return fail("Bilateral inputs changed or the job was cancelled.", EditorCommandStatus::StaleEntity);
+            if (w.Pages.Finished)
+                return true;
             if (!w.GpuIndex.Value)
             {
-                if(!w.Moving.Ready() || !context.SpatialIndices->UpdateWorkspace(w.Moving,w.Points))
+                if (!w.Moving.Ready() || !context.SpatialIndices->UpdateWorkspace(w.Moving, w.Points))
                 {
-                    w.Moving=context.SpatialIndices->CreateWorkspace(w.Points);
-                    if(!w.Moving.Ready())return fail(w.Moving.Diagnostic);
+                    w.Moving = context.SpatialIndices->CreateWorkspace(w.Points);
+                    if (!w.Moving.Ready())
+                        return fail(w.Moving.Diagnostic);
                     ++w.Result.WorkspaceBuilds;
                 }
-                w.GpuIndex=w.Moving.Handle;w.Index=w.Moving.Snapshot;
+                w.GpuIndex = w.Moving.Handle;
+                w.Index = w.Moving.Snapshot;
             }
-            const auto width=std::min<std::size_t>(w.Points.size()-1,w.Config.KNeighbors)+1;
+            const auto width = std::min<std::size_t>(w.Points.size() - 1, w.Config.KNeighbors) + 1;
             std::string diagnostic;
-            const auto state=GeometryProcessingDetail::AdvanceGpuRowPages(w.Pages,w.Points.size(),w.Config.GpuQueryBatchSize,diagnostic,
+            const auto state = GeometryProcessingDetail::AdvanceGpuRowPages(
+                w.Pages,
+                w.Points.size(),
+                w.Config.GpuQueryBatchSize,
+                diagnostic,
                 [&](const SpatialNearestBatch& batch, std::string& why)
                 {
-                    for (std::size_t row=0;row<batch.Counts.size();++row)
+                    for (std::size_t row = 0; row < batch.Counts.size(); ++row)
                     {
-                        if(batch.Counts[row]!=width){why="Incomplete Vulkan kNN neighborhood.";return false;}
-                        for(std::size_t j=0;j<width;++j)
+                        if (batch.Counts[row] != width)
                         {
-                            const auto id=batch.Neighbors[row*batch.Capacity+j].Index;
-                            if(w.Result.CompletedIterations)
+                            why = "Incomplete Vulkan kNN neighborhood.";
+                            return false;
+                        }
+                        for (std::size_t j = 0; j < width; ++j)
+                        {
+                            const auto id = batch.Neighbors[row * batch.Capacity + j].Index;
+                            if (w.Result.CompletedIterations)
                             {
-                                if(id>=w.Points.size()){why="Invalid private Vulkan neighbor row.";return false;}
+                                if (id >= w.Points.size())
+                                {
+                                    why = "Invalid private Vulkan neighbor row.";
+                                    return false;
+                                }
                                 w.NeighborIds.push_back(id);
                             }
                             else
                             {
-                                const auto found=std::lower_bound(w.Slots.begin(),w.Slots.end(),id);
-                                if(found==w.Slots.end() || *found!=id){why="Invalid Vulkan source row.";return false;}
-                                w.NeighborIds.push_back(std::uint32_t(found-w.Slots.begin()));
+                                const auto found = std::lower_bound(w.Slots.begin(), w.Slots.end(), id);
+                                if (found == w.Slots.end() || *found != id)
+                                {
+                                    why = "Invalid Vulkan source row.";
+                                    return false;
+                                }
+                                w.NeighborIds.push_back(std::uint32_t(found - w.Slots.begin()));
                             }
                         }
                     }
@@ -242,53 +334,89 @@ namespace Extrinsic::Runtime
                 },
                 [&](std::size_t first, std::size_t count, std::shared_ptr<SpatialNearestBatch> reuse)
                 {
-                    return context.SpatialIndices->QueueGpuKNearest(w.GpuIndex,std::span(w.Points).subspan(first,count),
-                        std::uint32_t(width),{},std::move(reuse));
+                    return context.SpatialIndices->QueueGpuKNearest(w.GpuIndex,
+                        std::span(w.Points).subspan(first, count),
+                        std::uint32_t(width),
+                        {},
+                        std::move(reuse));
                 });
-            w.Result.GpuQueryBatches=w.Pages.QueryBatches;
-            if (state==GeometryProcessingDetail::RowsState::Failed) return fail(std::move(diagnostic));
-            if (state==GeometryProcessingDetail::RowsState::Pending) return false;
-            w.Result.GpuNeighborhoodMilliseconds+=w.Pages.Milliseconds;
+            w.Result.GpuQueryBatches = w.Pages.QueryBatches;
+            if (state == GeometryProcessingDetail::RowsState::Failed)
+                return fail(std::move(diagnostic));
+            if (state == GeometryProcessingDetail::RowsState::Pending)
+                return false;
+            w.Result.GpuNeighborhoodMilliseconds += w.Pages.Milliseconds;
             return true;
         }
-        EditorBilateralFilterResult Publish(const EditorProcessingContext& context,
-                                            const std::shared_ptr<BilateralWork>& w)
+        EditorBilateralFilterResult Publish(
+            const EditorProcessingContext& context, const std::shared_ptr<BilateralWork>& w)
         {
-            auto& r=w->Result;
-            if (!CurrentInput(context,*w))
-            {r.Status=EditorCommandStatus::StaleEntity; r.Message="Bilateral input or output changed before publication."; return r;}
-            if (r.Status!=EditorCommandStatus::Applied) return r;
-            struct State { bool Exists{};std::vector<glm::vec3> Values{}; };
-            auto before=std::make_shared<State>(State{bool(w->OutputWatch.Revision),w->BeforeOutput});
-            auto after=std::make_shared<State>(State{true,w->AfterOutput});
-            auto revisions=std::make_shared<std::array<PointPropertyWatch,1>>(std::array{w->OutputWatch});
-            auto inputs=w->Inputs;
-            std::erase_if(inputs,[&](const auto& input){return input.Domain==w->Config.Output.Domain && input.Name==w->Config.Output.Name;});
-            const auto mutate=[context,entity=w->Entity,inputs=std::move(inputs),c=w->Config,revisions](const State& target)
+            auto& r = w->Result;
+            if (!CurrentInput(context, *w))
             {
-                if (!GeometryPropertiesCurrent(context,entity,inputs) || !GeometryPropertiesCurrent(context,entity,*revisions))
+                r.Status = EditorCommandStatus::StaleEntity;
+                r.Message = "Bilateral input or output changed before publication.";
+                return r;
+            }
+            if (r.Status != EditorCommandStatus::Applied)
+                return r;
+            struct State
+            {
+                bool Exists{};
+                std::vector<glm::vec3> Values{};
+            };
+            auto before = std::make_shared<State>(State{bool(w->OutputWatch.Revision), w->BeforeOutput});
+            auto after = std::make_shared<State>(State{true, w->AfterOutput});
+            auto revisions = std::make_shared<std::array<PointPropertyWatch, 1>>(std::array{w->OutputWatch});
+            auto inputs = w->Inputs;
+            std::erase_if(inputs,
+                [&](const auto& input)
+                {
+                    return input.Domain == w->Config.Output.Domain && input.Name == w->Config.Output.Name;
+                });
+            const auto mutate = [context, entity = w->Entity, inputs = std::move(inputs), c = w->Config, revisions](
+                                    const State& target)
+            {
+                if (!GeometryPropertiesCurrent(context, entity, inputs) ||
+                    !GeometryPropertiesCurrent(context, entity, *revisions))
                     return EditorCommandHistoryStatus::StaleEntity;
-                auto* props=MutableGeometryProperties(context.Scene->Raw(),entity,c.Positions.Domain);
+                auto* props = MutableGeometryProperties(context.Scene->Raw(), entity, c.Positions.Domain);
                 const auto historyBefore = *revisions;
-                if (target.Exists) props->GetOrAdd<glm::vec3>(c.Output.Name).Vector()=target.Values;
-                else if (auto p=props->Get<glm::vec3>(c.Output.Name)) props->Remove(p);
-                const auto a=BuildGeometryAvailability(context.Scene->Raw(),entity);
-                *revisions={ObserveGeometryProperty(a,c.Output.Domain,c.Output.Name)};
+                if (target.Exists)
+                    props->GetOrAdd<glm::vec3>(c.Output.Name).Vector() = target.Values;
+                else if (auto p = props->Get<glm::vec3>(c.Output.Name))
+                    props->Remove(p);
+                const auto a = BuildGeometryAvailability(context.Scene->Raw(), entity);
+                *revisions = {ObserveGeometryProperty(a, c.Output.Domain, c.Output.Name)};
                 GeometryProcessingDetail::RebasePointPropertyHistory(context, entity, historyBefore);
-                ECS::Components::DirtyTags::MarkGpuDirty(context.Scene->Raw(),entity);
-                ECS::Components::DirtyTags::MarkVertexPositionsDirty(context.Scene->Raw(),entity);
-                if (context.InvalidateWorkspaceSnapshotCache) context.InvalidateWorkspaceSnapshotCache();
+                ECS::Components::DirtyTags::MarkGpuDirty(context.Scene->Raw(), entity);
+                ECS::Components::DirtyTags::MarkVertexPositionsDirty(context.Scene->Raw(), entity);
+                if (context.InvalidateWorkspaceSnapshotCache)
+                    context.InvalidateWorkspaceSnapshotCache();
                 return EditorCommandHistoryStatus::Applied;
             };
-            const auto status=context.CommandHistory ? context.CommandHistory->Execute({.Label="Bilateral point filter",
-                .Redo=[mutate,after]{return mutate(*after);},.Undo=[mutate,before]{return mutate(*before);}}).Status : mutate(*after);
-            r.Status=EditorFeatureDetail::ToEditorCommandStatus(status);
-            if (!r.Succeeded()) r.Message="Bilateral publication rejected by history checks.";
+            const auto status = context.CommandHistory ? context.CommandHistory
+                                                             ->Execute({.Label = "Bilateral point filter",
+                                                                 .Redo =
+                                                                     [mutate, after]
+                                                                 {
+                                                                     return mutate(*after);
+                                                                 },
+                                                                 .Undo =
+                                                                     [mutate, before]
+                                                                 {
+                                                                     return mutate(*before);
+                                                                 }})
+                                                             .Status
+                                                       : mutate(*after);
+            r.Status = EditorFeatureDetail::ToEditorCommandStatus(status);
+            if (!r.Succeeded())
+                r.Message = "Bilateral publication rejected by history checks.";
             return r;
         }
     }
     ActionReadiness PreviewEditorBilateralFilterCommand(
-        const EditorProcessingCommands& commands,const BilateralFilterConfig& config)
+        const EditorProcessingCommands& commands, const BilateralFilterConfig& config)
     {
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
         std::string diagnostic;
@@ -296,19 +424,20 @@ namespace Extrinsic::Runtime
         return {bool(work), std::move(diagnostic)};
     }
     GeometryPropertyCatalogSnapshot GetEditorBilateralFilterInputCatalog(
-        const EditorProcessingCommands& commands,std::uint32_t id)
+        const EditorProcessingCommands& commands, std::uint32_t id)
     {
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
         return GeometryProcessingDetail::BuildPointInputCatalog(context, id, 2);
     }
-    EditorBilateralFilterResult ApplyEditorBilateralFilterCommand(
-        const EditorProcessingCommands& commands, const BilateralFilterConfig &config,
+    EditorBilateralFilterResult ApplyEditorBilateralFilterCommand(const EditorProcessingCommands& commands,
+        const BilateralFilterConfig& config,
         std::function<void(EditorBilateralFilterResult)> onComplete)
     {
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
         std::string diagnostic;
         auto w = Capture(context, config, diagnostic);
-        const auto report = [&config, &w](EditorCommandStatus status, std::string message) {
+        const auto report = [&config, &w](EditorCommandStatus status, std::string message)
+        {
             auto result = w ? w->Result
                             : EditorBilateralFilterResult{.RequestedBackend = config.Backend, .Output = config.Output};
             result.Status = status;
@@ -319,14 +448,21 @@ namespace Extrinsic::Runtime
             return report(EditorCommandStatus::InvalidProcessingParameters, std::move(diagnostic));
         if (w->Config.Iterations && w->Config.Backend != BilateralFilterBackend::CpuOctree)
         {
-            const auto indexState = GeometryProcessingDetail::AcquirePointIndex(
-                *context.SpatialIndices, context.World, w->Entity, w->Config.Positions,
-                w->Slots, w->Points, w->GpuIndex, w->Index, w->Result.IndexReused, diagnostic);
+            const auto indexState = GeometryProcessingDetail::AcquirePointIndex(*context.SpatialIndices,
+                context.World,
+                w->Entity,
+                w->Config.Positions,
+                w->Slots,
+                w->Points,
+                w->GpuIndex,
+                w->Index,
+                w->Result.IndexReused,
+                diagnostic);
             if (indexState == GeometryProcessingDetail::PointIndexState::Unavailable)
                 return report(EditorCommandStatus::InvalidProcessingParameters, diagnostic);
             if (indexState == GeometryProcessingDetail::PointIndexState::Mismatched)
-                return report(EditorCommandStatus::StaleEntity,
-                              "Bilateral index snapshot does not match the selected samples.");
+                return report(
+                    EditorCommandStatus::StaleEntity, "Bilateral index snapshot does not match the selected samples.");
         }
         if (!context.JobCommands.Available())
         {
@@ -334,10 +470,10 @@ namespace Extrinsic::Runtime
             return Publish(context, w);
         }
         EditorJobIdentity identity{.EntityId = config.StableEntityId,
-                                         .Scope = ToEditorJobScope(w->Config.Output.Domain),
-                                         .OutputSemantic = GeometryPresentationSlotSemantic::Displacement,
-                                         .OutputName = w->Config.Output.Name,
-                                         .RequestedDomain = EditorJobDomainOfBackend(ToString(config.Backend))};
+            .Scope = ToEditorJobScope(w->Config.Output.Domain),
+            .OutputSemantic = GeometryPresentationSlotSemantic::Displacement,
+            .OutputName = w->Config.Output.Name,
+            .RequestedDomain = EditorJobDomainOfBackend(ToString(config.Backend))};
         namespace MS = GeometryProcessingDetail::MeshSupport;
         if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Bilateral filter"))
             return report(EditorCommandStatus::Pending, std::move(busy->Message));
@@ -345,95 +481,176 @@ namespace Extrinsic::Runtime
         queued.Message = "Bilateral filtering queued.";
         const MS::QueuedJobDelivery<EditorBilateralFilterResult> delivery{
             context, std::move(onComplete), std::move(queued), "Bilateral filter"};
-        auto finalize=[w,delivery]{w->Abandoned=true;delivery.Finalize(w->MainFailure);};
-        auto validate=[context,w]{return MS::ValidateQueuedJob(w->Abandoned,CurrentInput(context,*w));};
+        auto finalize = [w, delivery]
+        {
+            w->Abandoned = true;
+            delivery.Finalize(w->MainFailure);
+        };
+        auto validate = [context, w]
+        {
+            return MS::ValidateQueuedJob(w->Abandoned, CurrentInput(context, *w));
+        };
         // ValidateQueuedJob refuses an abandoned run, so publication never sees one.
-        auto publish=[context,w,delivery](KernelEventBus&,const JobResultEnvelope&)
-        {CompleteOutput(*w);return delivery.Publish(Publish(context,w));};
+        auto publish = [context, w, delivery](KernelEventBus&, const JobResultEnvelope&)
+        {
+            CompleteOutput(*w);
+            return delivery.Publish(Publish(context, w));
+        };
         JobToken previous{};
         std::string rejectedStage;
-        auto submit=[&](JobDesc desc)
+        auto submit = [&](JobDesc desc)
         {
-            if(previous.IsValid())desc.DependsOn.push_back({previous,"Complete the previous bilateral stage before this stage"});
-            std::string stage=desc.DebugName;
-            previous=context.JobCommands.Submit(std::move(desc),identity);
-            if(!previous.IsValid())rejectedStage=std::move(stage);
-            else if(!identity.Run.IsValid())identity.Run=previous; // later stages join the run
+            if (previous.IsValid())
+                desc.DependsOn.push_back({previous, "Complete the previous bilateral stage before this stage"});
+            std::string stage = desc.DebugName;
+            previous = context.JobCommands.Submit(std::move(desc), identity);
+            if (!previous.IsValid())
+                rejectedStage = std::move(stage);
+            else if (!identity.Run.IsValid())
+                identity.Run = previous; // later stages join the run
             return previous.IsValid();
         };
-        bool submitted=true;
-        if(w->Config.Backend!=BilateralFilterBackend::VulkanLBVH || !w->Config.Iterations)
+        bool submitted = true;
+        if (w->Config.Backend != BilateralFilterBackend::VulkanLBVH || !w->Config.Iterations)
         {
-            submitted=submit({.DebugName="Bilateral point filter",.Scope=context.World,
-                .Work=[w](const JobCancellation&){Compute(*w);return JobResultEnvelope::Make(true);},
-                .ValidateBeforeApply=validate,.PublishCompletion=publish,.FinalizeUnpublishedOnMainThread=finalize});
+            submitted = submit({.DebugName = "Bilateral point filter",
+                .Scope = context.World,
+                .Work =
+                    [w](const JobCancellation&)
+                {
+                    Compute(*w);
+                    return JobResultEnvelope::Make(true);
+                },
+                .ValidateBeforeApply = validate,
+                .PublishCompletion = publish,
+                .FinalizeUnpublishedOnMainThread = finalize});
         }
         else
         {
-            submitted=submit({.DebugName="Bilateral bandwidth",.Scope=context.World,
-                .Work=[w](const JobCancellation&){return JobResultEnvelope::Make(Prepare(*w));},
-                .ValidateBeforeApply=validate,
-                .PublishCompletion=[w](KernelEventBus&,const JobResultEnvelope&){if(w->Result.Status!=EditorCommandStatus::Applied){w->MainFailure=w->Result;return false;}return true;},
-                .FinalizeUnpublishedOnMainThread=[w]{w->Abandoned=true;}});
-            for(std::uint32_t i=0;submitted && i<w->Config.Iterations;++i)
+            submitted = submit({.DebugName = "Bilateral bandwidth",
+                .Scope = context.World,
+                .Work =
+                    [w](const JobCancellation&)
+                {
+                    return JobResultEnvelope::Make(Prepare(*w));
+                },
+                .ValidateBeforeApply = validate,
+                .PublishCompletion =
+                    [w](KernelEventBus&, const JobResultEnvelope&)
+                {
+                    if (w->Result.Status != EditorCommandStatus::Applied)
+                    {
+                        w->MainFailure = w->Result;
+                        return false;
+                    }
+                    return true;
+                },
+                .FinalizeUnpublishedOnMainThread =
+                    [w]
+                {
+                    w->Abandoned = true;
+                }});
+            for (std::uint32_t i = 0; submitted && i < w->Config.Iterations; ++i)
             {
-                submitted=submit({.DebugName="Bilateral neighborhoods (Vulkan)",.Scope=context.World,
-                    .Work=[](const JobCancellation&){return JobResultEnvelope::Make(true);},
-                    .IsReadyToApply=[context,w]{return AdvanceGpu(context,*w);},.ValidateBeforeApply=validate,
-                    .PublishCompletion=[w](KernelEventBus&,const JobResultEnvelope&){return w->Pages.Finished;},
-                    .FinalizeUnpublishedOnMainThread=[w]{w->Abandoned=true;}});
-                if(!submitted)break;
-                const bool last=i+1==w->Config.Iterations;
-                JobDesc step{.DebugName="Bilateral position update",.Scope=context.World,
-                    .Work=[w](const JobCancellation&){ComputeStep(*w);return JobResultEnvelope::Make(true);},
-                    .ValidateBeforeApply=validate};
-                if(last){step.PublishCompletion=publish;step.FinalizeUnpublishedOnMainThread=finalize;}
+                submitted = submit({.DebugName = "Bilateral neighborhoods (Vulkan)",
+                    .Scope = context.World,
+                    .Work =
+                        [](const JobCancellation&)
+                    {
+                        return JobResultEnvelope::Make(true);
+                    },
+                    .IsReadyToApply =
+                        [context, w]
+                    {
+                        return AdvanceGpu(context, *w);
+                    },
+                    .ValidateBeforeApply = validate,
+                    .PublishCompletion =
+                        [w](KernelEventBus&, const JobResultEnvelope&)
+                    {
+                        return w->Pages.Finished;
+                    },
+                    .FinalizeUnpublishedOnMainThread =
+                        [w]
+                    {
+                        w->Abandoned = true;
+                    }});
+                if (!submitted)
+                    break;
+                const bool last = i + 1 == w->Config.Iterations;
+                JobDesc step{.DebugName = "Bilateral position update",
+                    .Scope = context.World,
+                    .Work =
+                        [w](const JobCancellation&)
+                    {
+                        ComputeStep(*w);
+                        return JobResultEnvelope::Make(true);
+                    },
+                    .ValidateBeforeApply = validate};
+                if (last)
+                {
+                    step.PublishCompletion = publish;
+                    step.FinalizeUnpublishedOnMainThread = finalize;
+                }
                 else
                 {
-                    step.PublishCompletion=[w](KernelEventBus&,const JobResultEnvelope&){
-                        if(w->Result.Status!=EditorCommandStatus::Applied){w->MainFailure=w->Result;return false;}
+                    step.PublishCompletion = [w](KernelEventBus&, const JobResultEnvelope&)
+                    {
+                        if (w->Result.Status != EditorCommandStatus::Applied)
+                        {
+                            w->MainFailure = w->Result;
+                            return false;
+                        }
                         // Restart pagination for the moved points; the batch count stays cumulative.
-                        w->GpuIndex={};w->Index.reset();w->NeighborIds.clear();
-                        w->Pages.Restart();return true;};
-                    step.FinalizeUnpublishedOnMainThread=[w]{w->Abandoned=true;};
+                        w->GpuIndex = {};
+                        w->Index.reset();
+                        w->NeighborIds.clear();
+                        w->Pages.Restart();
+                        return true;
+                    };
+                    step.FinalizeUnpublishedOnMainThread = [w]
+                    {
+                        w->Abandoned = true;
+                    };
                 }
-                submitted=submit(std::move(step));
+                submitted = submit(std::move(step));
             }
         }
-        if(!submitted)
+        if (!submitted)
         {
-            w->Abandoned=true;
+            w->Abandoned = true;
             return delivery.Rejected(rejectedStage);
         }
         return delivery.Pending();
     }
     EditorBilateralFilterResult ApplyEditorConfiguredBilateralFilter(
-        const EditorProcessingCommands& commands,
-        std::function<void(EditorBilateralFilterResult)> onComplete)
+        const EditorProcessingCommands& commands, std::function<void(EditorBilateralFilterResult)> onComplete)
     {
         const auto config = GetEditorBilateralFilterConfig(commands);
         if (!config)
             return {.Status = EditorCommandStatus::InvalidProcessingParameters,
-                    .Message = "Bilateral filtering config is unavailable."};
+                .Message = "Bilateral filtering config is unavailable."};
         return ApplyEditorBilateralFilterCommand(commands, *config, std::move(onComplete));
     }
 
     RuntimeEngineConfigApplyResult ApplyEditorBilateralFilterConfig(
-        const EditorProcessingCommands& commands, const BilateralFilterConfig& config,
-        std::string sourceId)
+        const EditorProcessingCommands& commands, const BilateralFilterConfig& config, std::string sourceId)
     {
         return ApplyEditorProcessingConfig(commands,
-            ValidateBilateralFilterConfigSection(SerializeBilateralFilterConfig(config), {},
-                                                 kBilateralFilterConfigSectionName),
+            ValidateBilateralFilterConfigSection(
+                SerializeBilateralFilterConfig(config), {}, kBilateralFilterConfigSectionName),
             sourceId.empty() ? std::string{kBilateralFilterConfigSectionName} : sourceId,
-            [&](Core::Config::EngineConfig& candidate) { SetBilateralFilterConfig(candidate, config); });
+            [&](Core::Config::EngineConfig& candidate)
+            {
+                SetBilateralFilterConfig(candidate, config);
+            });
     }
 
-    std::optional<BilateralFilterConfig> GetEditorBilateralFilterConfig(
-        const EditorProcessingCommands& commands)
+    std::optional<BilateralFilterConfig> GetEditorBilateralFilterConfig(const EditorProcessingCommands& commands)
     {
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        if (!context.EngineConfigControlState) return std::nullopt;
+        if (!context.EngineConfigControlState)
+            return std::nullopt;
         return GetBilateralFilterConfig(context.EngineConfigControlState->ActiveConfig);
     }
 } // namespace Extrinsic::Runtime

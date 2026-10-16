@@ -51,10 +51,10 @@ namespace Extrinsic::Runtime
         {
             DescriptorAnalysisConfig Config{};
             entt::entity Entity{};
-            std::array<PointPropertyWatch,33> OutputWatches{};
+            std::array<PointPropertyWatch, 33> OutputWatches{};
             GeometryProcessingDetail::PointRadiusRows Rows{};
-            std::array<GeometryScalarPropertySnapshot,33> BeforeOutputs{};
-            std::array<std::vector<float>,33> AfterOutputs{};
+            std::array<GeometryScalarPropertySnapshot, 33> BeforeOutputs{};
+            std::array<std::vector<float>, 33> AfterOutputs{};
             std::shared_ptr<const SpatialIndexSnapshot> Index{};
             SpatialIndexHandle GpuIndex{};
             bool Abandoned{};
@@ -63,63 +63,88 @@ namespace Extrinsic::Runtime
         };
         bool CurrentInput(const EditorProcessingContext& context, const DescriptorWork& w)
         {
-            return GeometryPropertiesCurrent(context, w.Entity, w.Inputs) && GeometryPropertiesCurrent(context, w.Entity, w.OutputWatches);
+            return GeometryPropertiesCurrent(context, w.Entity, w.Inputs) &&
+                GeometryPropertiesCurrent(context, w.Entity, w.OutputWatches);
         }
-        enum class CapturePurpose { Execute, Readiness };
-        std::shared_ptr<DescriptorWork> Capture(const EditorProcessingContext& context,
-            DescriptorAnalysisConfig c, std::string& diagnostic, CapturePurpose purpose = CapturePurpose::Execute)
+        enum class CapturePurpose
         {
-            auto fail = [&](std::string why) -> std::shared_ptr<DescriptorWork> { diagnostic = std::move(why); return {}; };
+            Execute,
+            Readiness
+        };
+        std::shared_ptr<DescriptorWork> Capture(const EditorProcessingContext& context,
+            DescriptorAnalysisConfig c,
+            std::string& diagnostic,
+            CapturePurpose purpose = CapturePurpose::Execute)
+        {
+            auto fail = [&](std::string why) -> std::shared_ptr<DescriptorWork>
+            {
+                diagnostic = std::move(why);
+                return {};
+            };
             const auto validation = ValidateDescriptorAnalysisConfigSection(
                 SerializeDescriptorAnalysisConfig(c), {}, kDescriptorAnalysisConfigSectionName);
-            if (!validation.Usable()) return fail(validation.Diagnostics.front().Message);
-            if (!context.Scene) return fail("Scene is unavailable.");
+            if (!validation.Usable())
+                return fail(validation.Diagnostics.front().Message);
+            if (!context.Scene)
+                return fail("Scene is unavailable.");
             const auto entity = EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(), c.StableEntityId);
-            if (!entity) return fail("Descriptor target entity is stale or missing.");
+            if (!entity)
+                return fail("Descriptor target entity is stale or missing.");
             const auto a = BuildGeometryAvailability(context.Scene->Raw(), *entity);
-            if (c.Positions.Domain == D::Unknown) c.Positions.Domain = PrimaryPointDomain(a);
-            if(c.Normals.Domain==D::Unknown)c.Normals.Domain=c.Positions.Domain;
-            for(auto& output:c.Outputs)if(output.Domain==D::Unknown)output.Domain=c.Positions.Domain;
+            if (c.Positions.Domain == D::Unknown)
+                c.Positions.Domain = PrimaryPointDomain(a);
+            if (c.Normals.Domain == D::Unknown)
+                c.Normals.Domain = c.Positions.Domain;
+            for (auto& output : c.Outputs)
+                if (output.Domain == D::Unknown)
+                    output.Domain = c.Positions.Domain;
             const auto* props = ResolveGeometryPropertySet(a, c.Positions.Domain);
             if (!props || !ResolveGeometryProperty(a, c.Positions, props->Size(), false).Resolved())
                 return fail("Choose a count-matched vec3 position property on a resolved element domain.");
             for (const auto& output : c.Outputs)
             {
-                if (output.Domain != c.Positions.Domain || (output.Name == c.Positions.Name || output.Name == c.Normals.Name))
+                if (output.Domain != c.Positions.Domain ||
+                    (output.Name == c.Positions.Name || output.Name == c.Normals.Name))
                     return fail("Descriptor outputs must be distinct properties on the input domain.");
-                if (IsTopologyProperty(output.Domain, output.Name)) return fail("Descriptor outputs cannot replace topology/deletion properties.");
+                if (IsTopologyProperty(output.Domain, output.Name))
+                    return fail("Descriptor outputs cannot replace topology/deletion properties.");
                 if (props->Exists(output.Name) && !ResolveGeometryProperty(a, output, props->Size(), false).Resolved())
                     return fail("Descriptor outputs must be absent or count-matched float histogram properties.");
             }
             auto w = std::make_shared<DescriptorWork>();
             if (!GeometryProcessingDetail::CapturePointNormalInput(
-                    context, *entity, a, c.Positions, c.Normals,
-                    purpose == CapturePurpose::Execute, *w, diagnostic)) return {};
+                    context, *entity, a, c.Positions, c.Normals, purpose == CapturePurpose::Execute, *w, diagnostic))
+                return {};
             if (w->HasZeroNormals)
                 return fail("Live positions must be finite and normals finite and nonzero.");
-            w->Config = c; w->Entity = *entity;
+            w->Config = c;
+            w->Entity = *entity;
             w->Result.RequestedBackend = c.Backend;
             w->Result.Outputs = c.Outputs;
-            for(unsigned i=0;i<33;++i)w->OutputWatches[i]=ObserveGeometryProperty(a,c.Outputs[i].Domain,c.Outputs[i].Name);
+            for (unsigned i = 0; i < 33; ++i)
+                w->OutputWatches[i] = ObserveGeometryProperty(a, c.Outputs[i].Domain, c.Outputs[i].Name);
             w->Result.SlotCount = w->SlotCount;
             w->Result.LiveCount = w->LiveCount;
-            if (!w->Result.LiveCount) return fail("Descriptor analysis requires live input samples.");
-            if(w->Result.LiveCount<2)
+            if (!w->Result.LiveCount)
+                return fail("Descriptor analysis requires live input samples.");
+            if (w->Result.LiveCount < 2)
                 return fail("Descriptor analysis requires at least two live samples and positive spacing.");
-            if(c.Backend!=DescriptorAnalysisBackend::CpuKDTree)
+            if (c.Backend != DescriptorAnalysisBackend::CpuKDTree)
             {
-                if(!context.SpatialIndices || !w->ValidLbvh || w->Result.LiveCount>(1u<<24) ||
-                   c.FeatureRadius>Geometry::PointLBVH::CoordinateLimit)
-                    return fail("LBVH needs the spatial cache, at most 2^24 samples and coordinates/radii within 1e18.");
-                if(c.Backend==DescriptorAnalysisBackend::VulkanLBVH &&
-                   (!context.JobCommands.Available() || !context.SpatialIndices->GpuQueriesAvailable() || w->Result.LiveCount>(1u<<20)))
+                if (!context.SpatialIndices || !w->ValidLbvh || w->Result.LiveCount > (1u << 24) ||
+                    c.FeatureRadius > Geometry::PointLBVH::CoordinateLimit)
+                    return fail(
+                        "LBVH needs the spatial cache, at most 2^24 samples and coordinates/radii within 1e18.");
+                if (c.Backend == DescriptorAnalysisBackend::VulkanLBVH &&
+                    (!context.JobCommands.Available() || !context.SpatialIndices->GpuQueriesAvailable() ||
+                        w->Result.LiveCount > (1u << 20)))
                     return fail("Vulkan descriptors require framed GPU queries/jobs and at most 2^20 samples.");
             }
             if (purpose == CapturePurpose::Execute)
             {
-                for(unsigned i=0;i<33;++i)
+                for (unsigned i = 0; i < 33; ++i)
                 {
-                    w->BeforeOutputs[i]=CaptureGeometryScalarProperty(*props,c.Outputs[i]);
+                    w->BeforeOutputs[i] = CaptureGeometryScalarProperty(*props, c.Outputs[i]);
                     w->AfterOutputs[i].resize(props->Size());
                 }
             }
@@ -127,192 +152,329 @@ namespace Extrinsic::Runtime
         }
         Features::DescriptorParams Parameters(const DescriptorAnalysisConfig& c)
         {
-            return {.FeatureRadius=c.FeatureRadius,.MaxNeighbors=c.MaxNeighbors};
+            return {.FeatureRadius = c.FeatureRadius, .MaxNeighbors = c.MaxNeighbors};
         }
         void Prepare(DescriptorWork& w)
         {
-            const auto started=std::chrono::steady_clock::now();
-            w.Result.Status=EditorCommandStatus::GeometryProcessingFailed;
-            const auto scale=Features::ResolveDescriptorScale(w.Points,Parameters(w.Config));
-            if(!scale) {w.Result.Message="Descriptor scale requires positive spacing and representable radius.";return;}
-            if(w.Config.Backend!=DescriptorAnalysisBackend::CpuKDTree &&
-               scale->FeatureRadius>Geometry::PointLBVH::CoordinateLimit)
-            {w.Result.Message="Resolved descriptor radius exceeds the LBVH range.";return;}
-            w.Result.MeanSpacing=scale->MeanSpacing;
-            w.Result.FeatureRadius=scale->FeatureRadius;
-            w.Result.CpuComputeMilliseconds=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
-            w.Result.Status=EditorCommandStatus::Pending;
+            const auto started = std::chrono::steady_clock::now();
+            w.Result.Status = EditorCommandStatus::GeometryProcessingFailed;
+            const auto scale = Features::ResolveDescriptorScale(w.Points, Parameters(w.Config));
+            if (!scale)
+            {
+                w.Result.Message = "Descriptor scale requires positive spacing and representable radius.";
+                return;
+            }
+            if (w.Config.Backend != DescriptorAnalysisBackend::CpuKDTree &&
+                scale->FeatureRadius > Geometry::PointLBVH::CoordinateLimit)
+            {
+                w.Result.Message = "Resolved descriptor radius exceeds the LBVH range.";
+                return;
+            }
+            w.Result.MeanSpacing = scale->MeanSpacing;
+            w.Result.FeatureRadius = scale->FeatureRadius;
+            w.Result.CpuComputeMilliseconds =
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+            w.Result.Status = EditorCommandStatus::Pending;
         }
-        bool AppendRow(DescriptorWork& w,std::vector<std::uint32_t>& row)
+        bool AppendRow(DescriptorWork& w, std::vector<std::uint32_t>& row)
         {
-            const bool appended=GeometryProcessingDetail::AppendPointRadiusRow(w.Rows,row,w.Result.Message);
-            w.Result.MaximumNeighbors=std::max(w.Result.MaximumNeighbors,w.Rows.MaximumNeighbors);
+            const bool appended = GeometryProcessingDetail::AppendPointRadiusRow(w.Rows, row, w.Result.Message);
+            w.Result.MaximumNeighbors = std::max(w.Result.MaximumNeighbors, w.Rows.MaximumNeighbors);
             return appended;
         }
         void Compute(DescriptorWork& w)
         {
-            const auto started=std::chrono::steady_clock::now();
-            auto& r=w.Result;const auto& c=w.Config;
-            r.ActualBackend=ToString(c.Backend);
-            if(c.Backend==DescriptorAnalysisBackend::CpuLBVH) Prepare(w);
-            if(r.Status==EditorCommandStatus::GeometryProcessingFailed)return;
-            r.Status=EditorCommandStatus::GeometryProcessingFailed;
+            const auto started = std::chrono::steady_clock::now();
+            auto& r = w.Result;
+            const auto& c = w.Config;
+            r.ActualBackend = ToString(c.Backend);
+            if (c.Backend == DescriptorAnalysisBackend::CpuLBVH)
+                Prepare(w);
+            if (r.Status == EditorCommandStatus::GeometryProcessingFailed)
+                return;
+            r.Status = EditorCommandStatus::GeometryProcessingFailed;
             std::optional<Features::DescriptorSet> analysis;
-            if(c.Backend==DescriptorAnalysisBackend::CpuKDTree)
-                analysis=Features::ComputeDescriptors(w.Points,w.Normals,{},Parameters(c));
+            if (c.Backend == DescriptorAnalysisBackend::CpuKDTree)
+                analysis = Features::ComputeDescriptors(w.Points, w.Normals, {}, Parameters(c));
             else
             {
-                if(c.Backend==DescriptorAnalysisBackend::CpuLBVH)
+                if (c.Backend == DescriptorAnalysisBackend::CpuLBVH)
                 {
                     std::vector<std::uint32_t> row;
-                    const auto radius=r.FeatureRadius;
-                    for(std::uint32_t i=0;i<w.Points.size();++i)
+                    const auto radius = r.FeatureRadius;
+                    for (std::uint32_t i = 0; i < w.Points.size(); ++i)
                     {
-                        const auto capacity=c.MaxNeighbors?std::min(c.MaxNeighbors,std::uint32_t(w.Points.size()-1)):std::uint32_t(w.Points.size()-1);
-                        const auto neighbors=w.Index->Index.Radius(w.Points[i],radius,capacity,i);
-                        r.MaximumNeighbors=std::max(r.MaximumNeighbors,std::size_t(neighbors.TotalCount));
-                        const auto required=c.MaxNeighbors?std::min(c.MaxNeighbors,neighbors.TotalCount):neighbors.TotalCount;
-                        if(neighbors.Neighbors.size()<required)
-                        {r.Message="Incomplete CPU descriptor radius support.";return;}
-                        row.clear();for(const auto& n:neighbors.Neighbors)row.push_back(n.Index);
-                        if(!AppendRow(w,row))return;
+                        const auto capacity = c.MaxNeighbors
+                            ? std::min(c.MaxNeighbors, std::uint32_t(w.Points.size() - 1))
+                            : std::uint32_t(w.Points.size() - 1);
+                        const auto neighbors = w.Index->Index.Radius(w.Points[i], radius, capacity, i);
+                        r.MaximumNeighbors = std::max(r.MaximumNeighbors, std::size_t(neighbors.TotalCount));
+                        const auto required =
+                            c.MaxNeighbors ? std::min(c.MaxNeighbors, neighbors.TotalCount) : neighbors.TotalCount;
+                        if (neighbors.Neighbors.size() < required)
+                        {
+                            r.Message = "Incomplete CPU descriptor radius support.";
+                            return;
+                        }
+                        row.clear();
+                        for (const auto& n : neighbors.Neighbors)
+                            row.push_back(n.Index);
+                        if (!AppendRow(w, row))
+                            return;
                     }
                 }
-                analysis=Features::ComputeDescriptorsFromNeighbors(w.Points,w.Normals,{},Parameters(c),{.MeanSpacing=r.MeanSpacing, .FeatureRadius=r.FeatureRadius},
-                    {w.Rows.Offsets,w.Rows.Indices});
+                analysis = Features::ComputeDescriptorsFromNeighbors(w.Points,
+                    w.Normals,
+                    {},
+                    Parameters(c),
+                    {.MeanSpacing = r.MeanSpacing, .FeatureRadius = r.FeatureRadius},
+                    {w.Rows.Offsets, w.Rows.Indices});
             }
-            if(!analysis) {r.Message="Descriptor analysis rejected invalid support or invalid normals.";return;}
-            for(std::size_t i=0;i<w.Slots.size();++i)for(unsigned b=0;b<33;++b)
-                w.AfterOutputs[b][w.Slots[i]]=analysis->Row(std::uint32_t(i))[b];
-            r.WrittenCount=w.Slots.size();
-            r.MeanSpacing=analysis->Scale.MeanSpacing;
-            r.FeatureRadius=analysis->Scale.FeatureRadius;
-            r.Status=EditorCommandStatus::Applied;
-            r.CpuComputeMilliseconds=(c.Backend==DescriptorAnalysisBackend::VulkanLBVH?r.CpuComputeMilliseconds:0)+
-                std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
-            r.Message="FPFH histogram columns computed with "+r.ActualBackend+" neighborhoods; scale, SPFH and FPFH run on CPU.";
-        }
-        bool AdvanceGpu(const EditorProcessingContext& context,DescriptorWork& w)
-        {
-            if(w.Abandoned || !CurrentInput(context,w))
+            if (!analysis)
             {
-                w.Result.Status=EditorCommandStatus::StaleEntity;
-                w.Result.Message="Descriptor input changed or the job was cancelled.";
-                w.MainFailure=w.Result;w.Rows.Batch.reset();return true;
+                r.Message = "Descriptor analysis rejected invalid support or invalid normals.";
+                return;
+            }
+            for (std::size_t i = 0; i < w.Slots.size(); ++i)
+                for (unsigned b = 0; b < 33; ++b)
+                    w.AfterOutputs[b][w.Slots[i]] = analysis->Row(std::uint32_t(i))[b];
+            r.WrittenCount = w.Slots.size();
+            r.MeanSpacing = analysis->Scale.MeanSpacing;
+            r.FeatureRadius = analysis->Scale.FeatureRadius;
+            r.Status = EditorCommandStatus::Applied;
+            r.CpuComputeMilliseconds =
+                (c.Backend == DescriptorAnalysisBackend::VulkanLBVH ? r.CpuComputeMilliseconds : 0) +
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+            r.Message = "FPFH histogram columns computed with " + r.ActualBackend +
+                " neighborhoods; scale, SPFH and FPFH run on CPU.";
+        }
+        bool AdvanceGpu(const EditorProcessingContext& context, DescriptorWork& w)
+        {
+            if (w.Abandoned || !CurrentInput(context, w))
+            {
+                w.Result.Status = EditorCommandStatus::StaleEntity;
+                w.Result.Message = "Descriptor input changed or the job was cancelled.";
+                w.MainFailure = w.Result;
+                w.Rows.Batch.reset();
+                return true;
             }
             std::string diagnostic;
-            const auto state=GeometryProcessingDetail::AdvancePointRadiusRows(*context.SpatialIndices,w.GpuIndex,
-                w.Points,w.Slots,w.Result.FeatureRadius,w.Config.GpuQueryBatchSize,w.Config.GpuRadiusCapacity,w.Config.MaxNeighbors,w.Rows,diagnostic);
-            w.Result.MaximumNeighbors=w.Rows.MaximumNeighbors;w.Result.GpuQueryBatches=w.Rows.QueryBatches;
-            w.Result.GpuNeighborhoodMilliseconds=w.Rows.Milliseconds;
-            if(w.Rows.Queried)w.Result.ActualBackend="vulkan_lbvh";
-            if(state==GeometryProcessingDetail::RowsState::Failed)
-            {w.Result.Status=EditorCommandStatus::GeometryProcessingFailed;w.Result.Message=std::move(diagnostic);w.MainFailure=w.Result;}
-            return state!=GeometryProcessingDetail::RowsState::Pending;
+            const auto state = GeometryProcessingDetail::AdvancePointRadiusRows(*context.SpatialIndices,
+                w.GpuIndex,
+                w.Points,
+                w.Slots,
+                w.Result.FeatureRadius,
+                w.Config.GpuQueryBatchSize,
+                w.Config.GpuRadiusCapacity,
+                w.Config.MaxNeighbors,
+                w.Rows,
+                diagnostic);
+            w.Result.MaximumNeighbors = w.Rows.MaximumNeighbors;
+            w.Result.GpuQueryBatches = w.Rows.QueryBatches;
+            w.Result.GpuNeighborhoodMilliseconds = w.Rows.Milliseconds;
+            if (w.Rows.Queried)
+                w.Result.ActualBackend = "vulkan_lbvh";
+            if (state == GeometryProcessingDetail::RowsState::Failed)
+            {
+                w.Result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                w.Result.Message = std::move(diagnostic);
+                w.MainFailure = w.Result;
+            }
+            return state != GeometryProcessingDetail::RowsState::Pending;
         }
-        EditorDescriptorAnalysisResult Publish(const EditorProcessingContext& context,
-                                            const std::shared_ptr<DescriptorWork>& w)
+        EditorDescriptorAnalysisResult Publish(
+            const EditorProcessingContext& context, const std::shared_ptr<DescriptorWork>& w)
         {
-            auto& r=w->Result;
-            if (w->Abandoned || !CurrentInput(context,*w))
-            {r.Status=EditorCommandStatus::StaleEntity; r.Message="Descriptor input or output changed before publication."; return r;}
-            if (r.Status!=EditorCommandStatus::Applied) return r;
-            std::array<GeometryProcessingDetail::PointScalarOutput,33> outputs{};
-            for(unsigned i=0;i<33;++i)
-                outputs[i]={.Output=w->Config.Outputs[i],.Watch=w->OutputWatches[i],.Before=&w->BeforeOutputs[i],.After=w->AfterOutputs[i]};
-            const auto status=GeometryProcessingDetail::PublishPointScalarField(context,w->Entity,*w,outputs,"Compute FPFH descriptors");
+            auto& r = w->Result;
+            if (w->Abandoned || !CurrentInput(context, *w))
+            {
+                r.Status = EditorCommandStatus::StaleEntity;
+                r.Message = "Descriptor input or output changed before publication.";
+                return r;
+            }
+            if (r.Status != EditorCommandStatus::Applied)
+                return r;
+            std::array<GeometryProcessingDetail::PointScalarOutput, 33> outputs{};
+            for (unsigned i = 0; i < 33; ++i)
+                outputs[i] = {.Output = w->Config.Outputs[i],
+                    .Watch = w->OutputWatches[i],
+                    .Before = &w->BeforeOutputs[i],
+                    .After = w->AfterOutputs[i]};
+            const auto status = GeometryProcessingDetail::PublishPointScalarField(
+                context, w->Entity, *w, outputs, "Compute FPFH descriptors");
             r.Status = status == EditorCommandHistoryStatus::InvalidCommand
                 ? EditorCommandStatus::InvalidProcessingParameters
                 : EditorFeatureDetail::ToEditorCommandStatus(status);
-            if (!r.Succeeded()) r.Message = status == EditorCommandHistoryStatus::InvalidCommand
-                ? "Descriptor output cannot be represented exactly in the selected scalar storage."
-                : "Descriptor publication rejected by history checks.";
+            if (!r.Succeeded())
+                r.Message = status == EditorCommandHistoryStatus::InvalidCommand
+                    ? "Descriptor output cannot be represented exactly in the selected scalar storage."
+                    : "Descriptor publication rejected by history checks.";
             return r;
         }
     }
     ActionReadiness PreviewEditorDescriptorAnalysisCommand(
-        const EditorProcessingCommands& commands,const DescriptorAnalysisConfig& config)
+        const EditorProcessingCommands& commands, const DescriptorAnalysisConfig& config)
     {
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
         std::string diagnostic;
         const auto work = Capture(context, config, diagnostic, CapturePurpose::Readiness);
         return {bool(work), std::move(diagnostic)};
     }
-    EditorDescriptorAnalysisResult ApplyEditorDescriptorAnalysisCommand(
-        const EditorProcessingCommands& commands,const DescriptorAnalysisConfig& config,
+    EditorDescriptorAnalysisResult ApplyEditorDescriptorAnalysisCommand(const EditorProcessingCommands& commands,
+        const DescriptorAnalysisConfig& config,
         std::function<void(EditorDescriptorAnalysisResult)> onComplete)
     {
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
         std::string diagnostic;
-        auto w=Capture(context,config,diagnostic);
-        const auto report=[&](EditorCommandStatus status,std::string message)
+        auto w = Capture(context, config, diagnostic);
+        const auto report = [&](EditorCommandStatus status, std::string message)
         {
-            auto result=w?w->Result:EditorDescriptorAnalysisResult{.RequestedBackend=config.Backend,.Outputs=config.Outputs};
-            result.Status=status;result.Message=std::move(message);return result;
+            auto result = w
+                ? w->Result
+                : EditorDescriptorAnalysisResult{.RequestedBackend = config.Backend, .Outputs = config.Outputs};
+            result.Status = status;
+            result.Message = std::move(message);
+            return result;
         };
-        if(!w)return report(EditorCommandStatus::InvalidProcessingParameters,diagnostic);
-        if(w->Config.Backend!=DescriptorAnalysisBackend::CpuKDTree)
+        if (!w)
+            return report(EditorCommandStatus::InvalidProcessingParameters, diagnostic);
+        if (w->Config.Backend != DescriptorAnalysisBackend::CpuKDTree)
         {
-            const auto indexState = GeometryProcessingDetail::AcquirePointIndex(
-                *context.SpatialIndices, context.World, w->Entity, w->Config.Positions,
-                w->Slots, w->Points, w->GpuIndex, w->Index, w->Result.IndexReused, diagnostic);
+            const auto indexState = GeometryProcessingDetail::AcquirePointIndex(*context.SpatialIndices,
+                context.World,
+                w->Entity,
+                w->Config.Positions,
+                w->Slots,
+                w->Points,
+                w->GpuIndex,
+                w->Index,
+                w->Result.IndexReused,
+                diagnostic);
             if (indexState == GeometryProcessingDetail::PointIndexState::Unavailable)
                 return report(EditorCommandStatus::InvalidProcessingParameters, diagnostic);
             if (indexState == GeometryProcessingDetail::PointIndexState::Mismatched)
-                return report(EditorCommandStatus::StaleEntity,
-                              "Descriptor index does not match the selected samples.");
+                return report(
+                    EditorCommandStatus::StaleEntity, "Descriptor index does not match the selected samples.");
         }
-        if(!context.JobCommands.Available()){Compute(*w);return Publish(context,w);}
-        EditorJobIdentity identity{.EntityId=config.StableEntityId,.Scope=ToEditorJobScope(w->Config.Outputs[0].Domain),
-            .OutputSemantic=GeometryPresentationSlotSemantic::ScalarField,.OutputName=w->Config.Outputs[0].Name,
-            .RequestedDomain=EditorJobDomainOfBackend(ToString(config.Backend))};
+        if (!context.JobCommands.Available())
+        {
+            Compute(*w);
+            return Publish(context, w);
+        }
+        EditorJobIdentity identity{.EntityId = config.StableEntityId,
+            .Scope = ToEditorJobScope(w->Config.Outputs[0].Domain),
+            .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField,
+            .OutputName = w->Config.Outputs[0].Name,
+            .RequestedDomain = EditorJobDomainOfBackend(ToString(config.Backend))};
         namespace MS = GeometryProcessingDetail::MeshSupport;
         if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Descriptor analysis"))
             return report(EditorCommandStatus::Pending, std::move(busy->Message));
         // Once submitted, Result belongs to the running stage. Submission failures
         // report from the delivery's immutable snapshot while earlier stages wind down.
-        const MS::QueuedJobDelivery<EditorDescriptorAnalysisResult> delivery{
-            context, std::move(onComplete), report(EditorCommandStatus::Pending, "Descriptor analysis queued."), "Descriptor analysis"};
-        const auto validate=[context,w]{return MS::ValidateQueuedJob(w->Abandoned,CurrentInput(context,*w));};
-        JobDesc desc{
-            .DebugName="FPFH histograms",.Scope=context.World,
-            .Work=[w](const JobCancellation&){Compute(*w);return JobResultEnvelope::Make(true);},
-            .ValidateBeforeApply=validate,
-            .PublishCompletion=[context,w,delivery](KernelEventBus&,const JobResultEnvelope&){return delivery.Publish(Publish(context,w));},
-            .FinalizeUnpublishedOnMainThread=[w,delivery]{w->Abandoned=true;delivery.Finalize(w->MainFailure);}};
-        if(w->Config.Backend==DescriptorAnalysisBackend::VulkanLBVH)
+        const MS::QueuedJobDelivery<EditorDescriptorAnalysisResult> delivery{context,
+            std::move(onComplete),
+            report(EditorCommandStatus::Pending, "Descriptor analysis queued."),
+            "Descriptor analysis"};
+        const auto validate = [context, w]
         {
-            JobDesc prepare{
-                .DebugName="Descriptor scale",.Scope=context.World,
-                .Work=[w](const JobCancellation&){Prepare(*w);return JobResultEnvelope::Make(true);},
-                .ValidateBeforeApply=validate,
-                .PublishCompletion=[w](KernelEventBus&,const JobResultEnvelope&)
-                {if(w->Result.Status==EditorCommandStatus::GeometryProcessingFailed){w->MainFailure=w->Result;return false;}return true;},
-                .FinalizeUnpublishedOnMainThread=[w]{w->Abandoned=true;}};
-            const auto scale=context.JobCommands.Submit(std::move(prepare),identity);
-            identity.Run=scale; // later stages join the run
-            if(!scale.IsValid())return delivery.Rejected("scale");
-            JobDesc gpu{
-                .DebugName="Descriptor radius support (Vulkan)",.Scope=context.World,
-                .Work=[](const JobCancellation&){return JobResultEnvelope::Make(true);},
-                .IsReadyToApply=[context,w]{return AdvanceGpu(context,*w);},
-                .PublishCompletion=[w](KernelEventBus&,const JobResultEnvelope&){return w->Rows.Finished;},
-                .FinalizeUnpublishedOnMainThread=[w]{w->Abandoned=true;}};
-            gpu.DependsOn.push_back({scale,"Resolve descriptor radius before complete Vulkan support"});
-            const auto support=context.JobCommands.Submit(std::move(gpu),identity);
-            if(!support.IsValid()){w->Abandoned=true;return delivery.Rejected("Vulkan radius support");}
-            desc.DependsOn.push_back({support,"Required radius prefix before SPFH and FPFH histograms"});
+            return MS::ValidateQueuedJob(w->Abandoned, CurrentInput(context, *w));
+        };
+        JobDesc desc{.DebugName = "FPFH histograms",
+            .Scope = context.World,
+            .Work =
+                [w](const JobCancellation&)
+            {
+                Compute(*w);
+                return JobResultEnvelope::Make(true);
+            },
+            .ValidateBeforeApply = validate,
+            .PublishCompletion =
+                [context, w, delivery](KernelEventBus&, const JobResultEnvelope&)
+            {
+                return delivery.Publish(Publish(context, w));
+            },
+            .FinalizeUnpublishedOnMainThread =
+                [w, delivery]
+            {
+                w->Abandoned = true;
+                delivery.Finalize(w->MainFailure);
+            }};
+        if (w->Config.Backend == DescriptorAnalysisBackend::VulkanLBVH)
+        {
+            JobDesc prepare{.DebugName = "Descriptor scale",
+                .Scope = context.World,
+                .Work =
+                    [w](const JobCancellation&)
+                {
+                    Prepare(*w);
+                    return JobResultEnvelope::Make(true);
+                },
+                .ValidateBeforeApply = validate,
+                .PublishCompletion =
+                    [w](KernelEventBus&, const JobResultEnvelope&)
+                {
+                    if (w->Result.Status == EditorCommandStatus::GeometryProcessingFailed)
+                    {
+                        w->MainFailure = w->Result;
+                        return false;
+                    }
+                    return true;
+                },
+                .FinalizeUnpublishedOnMainThread =
+                    [w]
+                {
+                    w->Abandoned = true;
+                }};
+            const auto scale = context.JobCommands.Submit(std::move(prepare), identity);
+            identity.Run = scale; // later stages join the run
+            if (!scale.IsValid())
+                return delivery.Rejected("scale");
+            JobDesc gpu{.DebugName = "Descriptor radius support (Vulkan)",
+                .Scope = context.World,
+                .Work =
+                    [](const JobCancellation&)
+                {
+                    return JobResultEnvelope::Make(true);
+                },
+                .IsReadyToApply =
+                    [context, w]
+                {
+                    return AdvanceGpu(context, *w);
+                },
+                .PublishCompletion =
+                    [w](KernelEventBus&, const JobResultEnvelope&)
+                {
+                    return w->Rows.Finished;
+                },
+                .FinalizeUnpublishedOnMainThread =
+                    [w]
+                {
+                    w->Abandoned = true;
+                }};
+            gpu.DependsOn.push_back({scale, "Resolve descriptor radius before complete Vulkan support"});
+            const auto support = context.JobCommands.Submit(std::move(gpu), identity);
+            if (!support.IsValid())
+            {
+                w->Abandoned = true;
+                return delivery.Rejected("Vulkan radius support");
+            }
+            desc.DependsOn.push_back({support, "Required radius prefix before SPFH and FPFH histograms"});
         }
-        const auto token=context.JobCommands.Submit(std::move(desc),identity);
-        if(!token.IsValid()){w->Abandoned=true;return delivery.Rejected();}
+        const auto token = context.JobCommands.Submit(std::move(desc), identity);
+        if (!token.IsValid())
+        {
+            w->Abandoned = true;
+            return delivery.Rejected();
+        }
         return delivery.Pending();
     }
     EditorDescriptorAnalysisResult ApplyEditorConfiguredDescriptorAnalysis(
-        const EditorProcessingCommands& commands,
-        std::function<void(EditorDescriptorAnalysisResult)> onComplete)
+        const EditorProcessingCommands& commands, std::function<void(EditorDescriptorAnalysisResult)> onComplete)
     {
-        const auto config=GetEditorDescriptorAnalysisConfig(commands);
-        if(!config)return {.Status=EditorCommandStatus::InvalidProcessingParameters,.Message="Descriptor config is unavailable."};
-        return ApplyEditorDescriptorAnalysisCommand(commands,*config,std::move(onComplete));
+        const auto config = GetEditorDescriptorAnalysisConfig(commands);
+        if (!config)
+            return {.Status = EditorCommandStatus::InvalidProcessingParameters,
+                .Message = "Descriptor config is unavailable."};
+        return ApplyEditorDescriptorAnalysisCommand(commands, *config, std::move(onComplete));
     }
 } // namespace Extrinsic::Runtime
