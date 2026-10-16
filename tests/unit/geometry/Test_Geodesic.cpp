@@ -13,9 +13,9 @@
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
-import Geometry.Subdivision;
-import Geometry.Geodesic;
-import Geometry.CatmullClark;
+import Geometry.HalfedgeMesh.Subdivision;
+import Geometry.HalfedgeMesh.Geodesic;
+import Geometry.HalfedgeMesh.CatmullClark;
 
 #include "Test_MeshBuilders.h"
 

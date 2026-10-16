@@ -85,7 +85,7 @@ surface:
   concrete task; ECS owns only transform data, dirty markers, and the promoted
   transform hierarchy/render-sync systems.
 - Legacy `ECS::Components::DEC` operator caches are not canonical ECS state.
-  `Geometry.DEC` remains the operator implementation owner, while methods,
+  `Geometry.HalfedgeMesh.DEC` remains the operator implementation owner, while methods,
   runtime tools, or editor workflows that need cached operators must hold their
   own sidecars keyed by ECS identity.
 - Shared system-feature tokens and catalogs are not promoted into ECS.

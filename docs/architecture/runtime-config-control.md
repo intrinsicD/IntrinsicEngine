@@ -310,7 +310,7 @@ invalid values; the configured command reads
 the registered `sandbox.parameterization` record, so editor, agent/CLI, and
 programmatic applies drive identical strategy conversion and geometry
 execution. Stable config tokens are converted at the runtime boundary to the
-typed `Geometry.Parameterization` variant. Runtime does not serialize variant
+typed `Geometry.HalfedgeMesh.Parameterization` variant. Runtime does not serialize variant
 indices or add a backend-policy layer for the one available CPU family.
 
 On success the command writes one UV per stored vertex to the selected mesh's

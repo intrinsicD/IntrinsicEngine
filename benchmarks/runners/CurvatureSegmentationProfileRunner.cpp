@@ -27,7 +27,7 @@
 
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Features;
-import Geometry.Curvature;
+import Geometry.HalfedgeMesh.Curvature;
 import Geometry.HalfedgeMesh.Segmentation;
 import Geometry.Properties;
 

@@ -19,7 +19,7 @@ module Geometry.UvAtlas.ChartSolve;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Utils;
 import Geometry.Properties;
-import Geometry.Parameterization;
+import Geometry.HalfedgeMesh.Parameterization;
 import Geometry.Parameterization.Optimize;
 import Geometry.Sparse;
 import Geometry.UvAtlas.Types;

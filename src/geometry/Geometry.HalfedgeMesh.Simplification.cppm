@@ -4,7 +4,7 @@ module;
 #include <optional>
 #include <string>
 
-export module Geometry.Simplification;
+export module Geometry.HalfedgeMesh.Simplification;
 
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;

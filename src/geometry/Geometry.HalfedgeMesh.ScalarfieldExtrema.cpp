@@ -18,7 +18,7 @@ module;
 #include <vector>
 module Geometry.HalfedgeMesh.ScalarfieldExtrema;
 import Geometry.HalfedgeMesh;
-import Geometry.Curvature;
+import Geometry.HalfedgeMesh.Curvature;
 import Geometry.Properties;
 namespace Geometry::ScalarfieldExtrema
 {

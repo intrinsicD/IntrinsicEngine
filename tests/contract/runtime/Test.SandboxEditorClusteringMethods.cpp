@@ -98,7 +98,7 @@ import Geometry.HalfedgeMesh.Vertices.Normals;
 import Geometry.KMeans;
 import Geometry.PointCloud.Normals;
 import Geometry.Properties;
-import Geometry.Smoothing;
+import Geometry.HalfedgeMesh.Smoothing;
 import Geometry.UvAtlas;
 
 #include "MockRHI.hpp"

@@ -14,7 +14,7 @@ import Geometry.MeshSoup;
 import Geometry.HalfedgeMesh.Boundary;
 import Geometry.Parameterization.Diagnostics;
 import Geometry.Parameterization.Harmonic;
-import Geometry.Parameterization;
+import Geometry.HalfedgeMesh.Parameterization;
 import Geometry.Properties;
 
 #include "Test_MeshBuilders.h"

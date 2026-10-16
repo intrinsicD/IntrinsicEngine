@@ -12,12 +12,12 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Geometry.Smoothing;
+export module Geometry.HalfedgeMesh.Smoothing;
 
 export import Geometry.Smoothing.Types;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
-import Geometry.DEC;
+import Geometry.HalfedgeMesh.DEC;
 export import Geometry.Sparse;
 
 export namespace Geometry::Smoothing

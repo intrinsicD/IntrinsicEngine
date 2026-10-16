@@ -15,11 +15,11 @@ This document splits parameterization, atlas, distortion, and surface-map work i
 
 The current promoted geometry layer already provides useful parameterization and mapping foundations:
 
-- `Geometry.Parameterization` provides LSCM for disk-topology triangle meshes, including pinned-vertex selection, UV output, conformal distortion summaries, flipped-triangle counts, and optional mesh-backed `v:texcoord` / `v:lscm_pinned` properties.
+- `Geometry.HalfedgeMesh.Parameterization` provides LSCM for disk-topology triangle meshes, including pinned-vertex selection, UV output, conformal distortion summaries, flipped-triangle counts, and optional mesh-backed `v:texcoord` / `v:lscm_pinned` properties.
 - `Geometry.Parameterization.Diagnostics` provides the reusable diagnostics record for mesh positions plus per-vertex UVs, including evaluated/skipped counts, invalid-input classification, flipped elements, mean/RMS/max conformal error, area/symmetric-Dirichlet/stretch metrics, deterministic boundary length distortion, and seam-discontinuity placeholders.
 - `Geometry.UvAtlas` provides the backend-neutral UV atlas seam with authored-UV preservation, source xrefs for seam splits, chart/seam-cut records, GEOM-018 quality diagnostics, a method selector for `FastStaged` versus `XAtlas`, and `FastStaged` as the default concrete CPU backend. `FastStaged` grows connected planar multi-face charts, attempts existing LSCM then harmonic/Tutte parameterization per chart where topology allows, records per-chart quality diagnostics, and shelf-packs finite non-overlapping UVs; the repository-pinned `jpcy/xatlas` overlay remains available through explicit `XAtlas` requests and as compatibility fallback when enabled.
 - `Extrinsic.Runtime.AssetWorkflowModule` privately composes `Geometry.UvAtlas` for the recipe's imported-mesh postprocess stage, preserving valid authored UVs or generating atlas UVs before generated texture bakes. Geometry stays independent of assets, ECS, graphics, runtime, platform, and app layers.
-- `Geometry.DEC` and the reusable `Geometry.Sparse` seam provide sparse matrix and conjugate-gradient infrastructure that future parameterization solvers can share.
+- `Geometry.HalfedgeMesh.DEC` and the reusable `Geometry.Sparse` seam provide sparse matrix and conjugate-gradient infrastructure that future parameterization solvers can share.
 - `Geometry.Linalg` provides dense decomposition, covariance, least-squares, and GLM/Eigen adapter utilities behind an explicit geometry-owned numerical module.
 - `Geometry.HalfedgeMesh.Boundary`, `Geometry.HalfedgeMesh.Analysis`, `Geometry.HalfedgeMesh.Quality`, and mesh/soup conversion contracts provide topology and fixture utilities for disk topology, boundary loops, degenerate faces, and validation.
 - `GEOM-005` through `GEOM-009` provide the style/numeric policy, mesh/soup conversion contracts, robust predicates, reusable numerical infrastructure, and benchmark manifest groundwork future packs should use.
@@ -37,7 +37,7 @@ lands; runtime config uses explicit stable tokens and converts them to those
 typed payloads. Backend selection stays at the runtime/method boundary until a
 second implementation exists.
 
-- Family surface: retired [`GEOM-063`](../../tasks/done/GEOM-063-unified-cpu-parameterization-strategy-dispatch.md) — `Geometry.Parameterization::ParameterizeMesh(mesh, strategy)` with `ParameterizationStrategy = std::variant<ParameterizationParams, HarmonicParams, BffParams>`, normalized status, and the GEOM-018 diagnostics in every successful result. Tutte is selected through `HarmonicParams::Weights = Uniform`. No unimplemented strategy or backend token is reserved; each method/backend owner extends the surface when its implementation lands.
+- Family surface: retired [`GEOM-063`](../../tasks/done/GEOM-063-unified-cpu-parameterization-strategy-dispatch.md) — `Geometry.HalfedgeMesh.Parameterization::ParameterizeMesh(mesh, strategy)` with `ParameterizationStrategy = std::variant<ParameterizationParams, HarmonicParams, BffParams>`, normalized status, and the GEOM-018 diagnostics in every successful result. Tutte is selected through `HarmonicParams::Weights = Uniform`. No unimplemented strategy or backend token is reserved; each method/backend owner extends the surface when its implementation lands.
 - Shared optimization seam: retired [`GEOM-064`](../../tasks/done/GEOM-064-parameterization-optimization-kernels.md) — `Geometry.Parameterization.Optimize` provides precomputed reference frames, signed-SVD/proper-rotation fits, orientation-aware symmetric-Dirichlet energy/gradient, ARAP/SLIM least-squares proxy assembly, and the locally-injective line search that ARAP (Pack 3), SLIM (Pack 4), and the optimized backend (Pack 7) share, so no variant re-derives the nonlinear-solve core privately. Its CPU-contract tests cover analytic-gradient agreement, proxy gradient matching and PSD structure, ratio-preserving exact flip roots across extreme coefficient scales, deterministic repetition, and fail-closed invalid inputs. Because the reference and fit records are intentionally plain public data, every consumer revalidates their storage cardinalities, active domains, indices, and finite numerical invariants before allocation or indexing; proxy assembly additionally binds each fit back to the current-UV Jacobian, determinant, SO(2) rotation, orthogonal left frame, and signed-SVD reconstruction with quantity-relative comparisons that preserve sign near the supported singular threshold. Method-owned outer loops and global-boundary barriers remain outside the seam.
 
 The rendering/interaction decision for the interactive UV view is recorded in [ADR-0025](../adr/0025-parameterization-uv-view-and-split-view.md): the UV layout is a derived second view of the mesh entity (shared topology/`StableId`/`v:texcoord`), not a separate ECS entity.
@@ -56,7 +56,7 @@ Primary home: `src/geometry`.
 
 Required structures and dependencies:
 
-- `Geometry.Parameterization` result records and mesh-backed `v:texcoord` data.
+- `Geometry.HalfedgeMesh.Parameterization` result records and mesh-backed `v:texcoord` data.
 - `Geometry.HalfedgeMesh` face/edge traversal and boundary-loop helpers.
 - `Geometry.RobustPredicates` for scale-aware degenerate triangle and signed-area classification where predicates are sufficient.
 - `Geometry.Linalg` only behind geometry-owned APIs for small Jacobian/SVD helpers; do not expose Eigen types through public diagnostics.
@@ -100,9 +100,9 @@ Primary home: `src/geometry`.
 
 Required structures and dependencies:
 
-- `Geometry.Parameterization` module or a narrow sibling module if the public surface grows beyond LSCM.
+- `Geometry.HalfedgeMesh.Parameterization` module or a narrow sibling module if the public surface grows beyond LSCM.
 - `Geometry.HalfedgeMesh.Boundary` for boundary-loop extraction and disk-topology checks.
-- `Geometry.Sparse` / `Geometry.DEC` for Laplacian assembly and sparse solves.
+- `Geometry.Sparse` / `Geometry.HalfedgeMesh.DEC` for Laplacian assembly and sparse solves.
 - `Geometry.RobustPredicates` for boundary degeneracy and signed-area checks.
 - Pack 1 diagnostics for acceptance tests and benchmark quality metrics.
 
@@ -138,7 +138,7 @@ Scope:
 - Define local/global iteration records, rotation-fit diagnostics, and convergence status.
 - Paper: Liu, Zhang, Xu, Gotsman & Gortler, "A Local/Global Approach to Mesh Parameterization" (SGP 2008).
 
-Primary home: `src/geometry` — the `Arap` strategy on the `Geometry.Parameterization` family surface (Pack "Family surface"), with the paper claim capture under `methods/geometry/arap_parameterization`.
+Primary home: `src/geometry` — the `Arap` strategy on the `Geometry.HalfedgeMesh.Parameterization` family surface (Pack "Family surface"), with the paper claim capture under `methods/geometry/arap_parameterization`.
 
 Dependencies:
 
@@ -162,7 +162,7 @@ Scope:
 - Treat SLIM paper-specific claims as method-workflow work with parity against the ARAP reference on developable input.
 - Paper: Rabinovich, Poranne, Panozzo & Sorkine-Hornung, "Scalable Locally Injective Mappings" (TOG 2017).
 
-Primary home: the `Slim` strategy on the `Geometry.Parameterization` family surface, with paper claim capture under `methods/geometry/slim_parameterization`. The reusable energy/proxy/line-search records live in the `GEOM-064` seam, shared with ARAP.
+Primary home: the `Slim` strategy on the `Geometry.HalfedgeMesh.Parameterization` family surface, with paper claim capture under `methods/geometry/slim_parameterization`. The reusable energy/proxy/line-search records live in the `GEOM-064` seam, shared with ARAP.
 
 Dependencies:
 

@@ -15,12 +15,12 @@ import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
 import Geometry.Graph;
-import Geometry.Curvature;
-import Geometry.Geodesic;
+import Geometry.HalfedgeMesh.Curvature;
+import Geometry.HalfedgeMesh.Geodesic;
 import Geometry.MeshSoup;
 import Geometry.Parameterization.Diagnostics;
 import Geometry.Parameterization.Harmonic;
-import Geometry.Parameterization;
+import Geometry.HalfedgeMesh.Parameterization;
 
 #include "Test_MeshBuilders.h"
 

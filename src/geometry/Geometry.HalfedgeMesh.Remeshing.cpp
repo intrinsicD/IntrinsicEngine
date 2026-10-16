@@ -10,7 +10,7 @@ module;
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-module Geometry.Remeshing;
+module Geometry.HalfedgeMesh.Remeshing;
 
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;

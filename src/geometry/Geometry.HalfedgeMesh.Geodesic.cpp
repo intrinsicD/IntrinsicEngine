@@ -11,11 +11,11 @@ module;
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-module Geometry.Geodesic;
+module Geometry.HalfedgeMesh.Geodesic;
 
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
-import Geometry.DEC;
+import Geometry.HalfedgeMesh.DEC;
 import Geometry.HalfedgeMesh.Utils;
 
 namespace Geometry::Geodesic

@@ -153,7 +153,7 @@ export namespace Geometry::Segmentation
         std::span<const double> minPrincipal,
         const SegmentationParams& params = {});
 
-    // Convenience path using Geometry.Curvature's signed per-vertex estimate.
+    // Convenience path using Geometry.HalfedgeMesh.Curvature's signed per-vertex estimate.
     // Curvature properties are materialized only on the supplied mesh object;
     // runtime calls this on its detached snapshot and publishes selected output
     // properties explicitly after the solve.

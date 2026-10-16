@@ -13,12 +13,12 @@ module;
 
 #include <glm/glm.hpp>
 
-module Geometry.ModalAnalysis;
+module Geometry.HalfedgeMesh.ModalAnalysis;
 
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Utils;
-import Geometry.DEC;
+import Geometry.HalfedgeMesh.DEC;
 import Geometry.Sparse;
 
 namespace Geometry::ModalAnalysis

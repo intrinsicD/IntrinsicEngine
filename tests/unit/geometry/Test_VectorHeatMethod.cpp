@@ -16,10 +16,10 @@ import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
 import Geometry.Graph;
-import Geometry.Subdivision;
-import Geometry.CatmullClark;
+import Geometry.HalfedgeMesh.Subdivision;
+import Geometry.HalfedgeMesh.CatmullClark;
 import Geometry.MeshSoup;
-import Geometry.VectorHeatMethod;
+import Geometry.HalfedgeMesh.VectorHeatMethod;
 
 #include "Test_MeshBuilders.h"
 

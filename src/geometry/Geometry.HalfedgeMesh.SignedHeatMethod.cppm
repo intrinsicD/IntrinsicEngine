@@ -4,7 +4,7 @@ module;
 #include <cstdint>
 #include <span>
 
-export module Geometry.SignedHeatMethod;
+export module Geometry.HalfedgeMesh.SignedHeatMethod;
 
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;

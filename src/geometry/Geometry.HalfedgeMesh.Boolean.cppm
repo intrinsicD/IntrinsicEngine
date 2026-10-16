@@ -2,7 +2,7 @@ module;
 
 #include <optional>
 
-export module Geometry.Boolean;
+export module Geometry.HalfedgeMesh.Boolean;
 
 import Geometry.HalfedgeMesh;
 

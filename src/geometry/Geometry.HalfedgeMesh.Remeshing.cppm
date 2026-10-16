@@ -3,7 +3,7 @@ module;
 #include <cstddef>
 #include <optional>
 
-export module Geometry.Remeshing;
+export module Geometry.HalfedgeMesh.Remeshing;
 
 import Geometry.MeshOperator;
 import Geometry.Properties;

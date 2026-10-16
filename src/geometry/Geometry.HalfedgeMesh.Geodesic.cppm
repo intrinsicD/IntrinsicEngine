@@ -9,7 +9,7 @@ module;
 #include <vector>
 #include <glm/glm.hpp>
 
-export module Geometry.Geodesic;
+export module Geometry.HalfedgeMesh.Geodesic;
 
 export import Geometry.Geodesic.Types;
 

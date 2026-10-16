@@ -906,7 +906,7 @@ choices and diagnostics retain their separate kernel-module contract.
 Geodesic status and complete owned distance results live in
 `Geometry.Geodesic.Types`, shared by the algorithm and runtime reports. Mesh-field
 interfaces, config adapters and prepared frames import that data-only module;
-only the geodesic execution unit imports `Geometry.Geodesic`. Parameter choices
+only the geodesic execution unit imports `Geometry.HalfedgeMesh.Geodesic`. Parameter choices
 and status-string conversion remain with the algorithm. Segmentation
 status and diagnostic records live in `Geometry.Segmentation.Diagnostics`,
 shared by the GMM, feature, patch and boundary algorithms and runtime reports.
@@ -1224,7 +1224,7 @@ to visualization. Forward feature-context construction remains shared.
 The shared Smooth Property window is registered under View and redirected from
 Mesh, Graph and PointCloud processing menus. `Runtime.MeshFieldOperations` owns
 validated `sandbox.property_smoothing` configuration, typed domain capture and
-guarded publication; `Geometry.Smoothing` owns the filters. With the Vulkan
+guarded publication; `Geometry.HalfedgeMesh.Smoothing` owns the filters. With the Vulkan
 backend the window starts a GPU property transaction (ADR 0030): the viewport
 shows the device result as the colormap scalar and the window offers Stop,
 Accept (the undoable publication) and Discard; a stale result disables Accept

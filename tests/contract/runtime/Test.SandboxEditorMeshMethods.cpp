@@ -115,7 +115,7 @@ import Geometry.HalfedgeMesh.Vertices.Normals;
 import Geometry.KMeans;
 import Geometry.PointCloud.Normals;
 import Geometry.Properties;
-import Geometry.Smoothing;
+import Geometry.HalfedgeMesh.Smoothing;
 import Geometry.UvAtlas;
 
 #include "MockRHI.hpp"
@@ -3151,7 +3151,7 @@ TEST(SandboxEditorUi, FailedQueuedMeshJobKeepsItsOwnDiagnosticAndPublishesOnce)
     EXPECT_EQ(deliveries, 1u) << "exactly one terminal result, never two";
     EXPECT_EQ(delivered->Status,
               Runtime::EditorCommandStatus::GeometryProcessingFailed);
-    EXPECT_NE(delivered->Message.find("Geometry.Subdivision"),
+    EXPECT_NE(delivered->Message.find("Geometry.HalfedgeMesh.Subdivision"),
               std::string::npos)
         << delivered->Message;
     EXPECT_EQ(delivered->Message.find("did not apply"), std::string::npos)
@@ -3194,7 +3194,7 @@ TEST(SandboxEditorUi, FailedQueuedCurvatureKeepsItsOwnDiagnosticAndPublishesOnce
     ASSERT_TRUE(delivered.has_value());
     EXPECT_EQ(deliveries, 1u);
     EXPECT_EQ(delivered->Status, Runtime::EditorCommandStatus::GeometryProcessingFailed);
-    EXPECT_NE(delivered->Message.find("Geometry.Curvature"), std::string::npos)
+    EXPECT_NE(delivered->Message.find("Geometry.HalfedgeMesh.Curvature"), std::string::npos)
         << delivered->Message;
     EXPECT_EQ(delivered->Message.find("did not apply"), std::string::npos)
         << delivered->Message;

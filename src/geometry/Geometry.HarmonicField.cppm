@@ -11,7 +11,7 @@ module;
 
 export module Geometry.HarmonicField;
 
-export import Geometry.Smoothing;
+export import Geometry.HalfedgeMesh.Smoothing;
 export import Geometry.HarmonicField.Types;
 
 export namespace Geometry::HarmonicField

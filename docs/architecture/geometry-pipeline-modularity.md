@@ -354,7 +354,7 @@ Every family already shares the reference skeleton (`Params → std::optional<Re
 
 - **Smoothing / denoising** = the non-rigid skeleton with correspondence fixed to
   identity: a deformation model (which Laplacian/operator) + a regularizer/strength
-  + an iteration/annealing schedule. `Geometry.Smoothing` already exposes
+  + an iteration/annealing schedule. `Geometry.HalfedgeMesh.Smoothing` already exposes
   `FilterProperty` for averaging, spectral heat, Taubin, bilateral and implicit
   diffusion with selectable weighted operators and fixed rows. Mesh positions
   are ordinary vector properties; `DenoiseBilateral` separately owns face-normal

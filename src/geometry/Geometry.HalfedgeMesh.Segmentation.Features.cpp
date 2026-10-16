@@ -19,7 +19,7 @@ module;
 module Geometry.HalfedgeMesh.Segmentation.Features;
 
 import Geometry.Validation;
-import Geometry.Curvature;
+import Geometry.HalfedgeMesh.Curvature;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Features;
 import Geometry.Properties;

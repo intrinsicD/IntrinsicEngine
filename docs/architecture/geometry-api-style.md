@@ -386,7 +386,7 @@ containers or other public modules without a separate API-review task.
 import for the current small fixed-size solver helper, not as the canonical public
 solver infrastructure.
 
-Reusable sparse solver work lives in `Geometry.Sparse`, with `Geometry.DEC`
+Reusable sparse solver work lives in `Geometry.Sparse`, with `Geometry.HalfedgeMesh.DEC`
 aliases preserving the existing DEC names. Do not broaden or remove
 `Geometry.LinearSolver` as part of unrelated algorithm changes.
 

@@ -13,7 +13,7 @@
 import Geometry.HalfedgeMesh;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh.ScalarfieldExtrema;
-import Geometry.Curvature;
+import Geometry.HalfedgeMesh.Curvature;
 namespace
 {
     namespace C = Geometry::ScalarfieldExtrema;

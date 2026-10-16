@@ -8,7 +8,7 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Geometry.Curvature;
+export module Geometry.HalfedgeMesh.Curvature;
 
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;

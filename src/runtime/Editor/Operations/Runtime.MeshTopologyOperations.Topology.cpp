@@ -46,17 +46,17 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldHandle;
-import Geometry.CatmullClark;
+import Geometry.HalfedgeMesh.CatmullClark;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.AdaptiveRemeshing;
 import Geometry.HalfedgeMesh.SubdivisionSqrt3;
 import Geometry.HalfedgeMesh.Utils;
 import Geometry.MeshOperator;
 import Geometry.Properties;
-import Geometry.Remeshing;
-import Geometry.Simplification;
-import Geometry.Smoothing;
-import Geometry.Subdivision;
+import Geometry.HalfedgeMesh.Remeshing;
+import Geometry.HalfedgeMesh.Simplification;
+import Geometry.HalfedgeMesh.Smoothing;
+import Geometry.HalfedgeMesh.Subdivision;
 
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
@@ -1440,7 +1440,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             {
                 result.Status =
                     EditorCommandStatus::GeometryProcessingFailed;
-                result.Message = "Geometry.Smoothing denoise failed with ";
+                result.Message = "Geometry.HalfedgeMesh.Smoothing denoise failed with ";
                 result.Message += std::string(Smooth::DebugName(denoise.Status));
                 result.Message += ".";
                 return false;
@@ -1457,7 +1457,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                     EditorCommandStatus::GeometryProcessingFailed;
                 result.DenoiseStatus = Smooth::DenoiseStatus::NonFiniteInput;
                 result.Error = Core::ErrorCode::InvalidArgument;
-                result.Message       = "Geometry.Smoothing denoise produced invalid or "
+                result.Message       = "Geometry.HalfedgeMesh.Smoothing denoise produced invalid or "
                                        "count-mismatched positions.";
                 return false;
             }
@@ -1676,7 +1676,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                     result.Status =
                         EditorCommandStatus::GeometryProcessingFailed;
                     result.Error = Core::ErrorCode::InvalidArgument;
-                    result.Message = "Geometry.Subdivision Loop subdivision failed for the "
+                    result.Message = "Geometry.HalfedgeMesh.Subdivision Loop subdivision failed for the "
                                      "selected mesh and parameters.";
                     return false;
                 }
@@ -1707,7 +1707,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                     result.Status =
                         EditorCommandStatus::GeometryProcessingFailed;
                     result.Error = Core::ErrorCode::InvalidArgument;
-                    result.Message = "Geometry.CatmullClark subdivision failed for the "
+                    result.Message = "Geometry.HalfedgeMesh.CatmullClark subdivision failed for the "
                                      "selected mesh and parameters.";
                     return false;
                 }
@@ -1790,7 +1790,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                     EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message =
-                    "Geometry.Simplification failed for the selected mesh and parameters.";
+                    "Geometry.HalfedgeMesh.Simplification failed for the selected mesh and parameters.";
                 return false;
             }
 
@@ -2482,7 +2482,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 result.Status = EditorCommandStatus::GeometryProcessingFailed;
                 result.DenoiseStatus = Smooth::DenoiseStatus::InvalidParams;
                 result.Error = Core::ErrorCode::InvalidState;
-                result.Message       = "Geometry.Smoothing mesh denoiser is unavailable in this "
+                result.Message       = "Geometry.HalfedgeMesh.Smoothing mesh denoiser is unavailable in this "
                                        "runtime configuration.";
                 return std::nullopt;
             }
@@ -2565,7 +2565,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 result.Status = EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidState;
                 result.Message =
-                    "Geometry.Simplification is unavailable in this runtime configuration.";
+                    "Geometry.HalfedgeMesh.Simplification is unavailable in this runtime configuration.";
                 return std::nullopt;
             }
 
@@ -2623,7 +2623,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             {
                 result.Status = EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidState;
-                result.Message = "Geometry.Remeshing uniform remesher is unavailable in "
+                result.Message = "Geometry.HalfedgeMesh.Remeshing uniform remesher is unavailable in "
                                  "this runtime configuration.";
                 return std::nullopt;
             }
@@ -2703,7 +2703,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             {
                 result.Status = EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidState;
-                result.Message = "Geometry.Subdivision Loop subdivision is unavailable in "
+                result.Message = "Geometry.HalfedgeMesh.Subdivision Loop subdivision is unavailable in "
                                  "this runtime configuration.";
                 return std::nullopt;
             }
@@ -2713,7 +2713,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             {
                 result.Status = EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidState;
-                result.Message = "Geometry.CatmullClark subdivision is unavailable in this "
+                result.Message = "Geometry.HalfedgeMesh.CatmullClark subdivision is unavailable in this "
                                  "runtime configuration.";
                 return std::nullopt;
             }

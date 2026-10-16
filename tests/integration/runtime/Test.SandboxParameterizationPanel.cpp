@@ -60,7 +60,7 @@ import Extrinsic.Sandbox.ConfigSections;
 import Extrinsic.Sandbox.Editor.MethodPanels;
 import Extrinsic.Sandbox.Editor.Shell;
 import Geometry.HalfedgeMesh;
-import Geometry.Parameterization;
+import Geometry.HalfedgeMesh.Parameterization;
 import Geometry.Properties;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.TextureBakeModule;

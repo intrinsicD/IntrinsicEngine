@@ -81,7 +81,7 @@ import Extrinsic.Sandbox.Editor.MethodPanels;
 import Extrinsic.Sandbox.Editor.Shell;
 import Geometry.Graph;
 import Geometry.HalfedgeMesh;
-import Geometry.Curvature;
+import Geometry.HalfedgeMesh.Curvature;
 import Geometry.PointCloud;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.TextureBakeModule;

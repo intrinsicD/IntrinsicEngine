@@ -1,6 +1,6 @@
 # Property smoothing
 
-`Geometry.Smoothing` filters scalar or vector signals on a nonnegative weighted
+`Geometry.HalfedgeMesh.Smoothing` filters scalar or vector signals on a nonnegative weighted
 graph. Runtime binds `float`, `double`, `vec2`, `vec3`, or `vec4` properties on
 mesh vertices, edges, halfedges and faces; graph nodes, edges and halfedges; and
 point-cloud points. Values need no prescribed name or provenance. Vector
@@ -143,7 +143,7 @@ Variational fitting is one filter entry rather than separate TV, robust or
 bounded methods because all of them are this energy; IRLS and the active set are
 its solvers, not user-facing methods. It lives in `Geometry.HarmonicField`
 because it is built on the constrained solve, which already depends on
-`Geometry.Smoothing`; runtime dispatches `VariationalFit` there.
+`Geometry.HalfedgeMesh.Smoothing`; runtime dispatches `VariationalFit` there.
 The two-stage face-normal bilateral denoiser remains a distinct reconstruction
 algorithm. Runtime reuses property resolution, deletion mapping, config codecs,
 face-center construction and guarded editor history.

@@ -9,7 +9,7 @@ module;
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-module Geometry.CatmullClark;
+module Geometry.HalfedgeMesh.CatmullClark;
 
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;

@@ -46,7 +46,7 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldHandle;
-import Geometry.Curvature;
+import Geometry.HalfedgeMesh.Curvature;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Segmentation;
 import Geometry.HalfedgeMesh.Segmentation.Features;
@@ -1499,7 +1499,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                 result.Status =
                     EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
-                result.Message = "Geometry.Curvature produced missing or count-mismatched "
+                result.Message = "Geometry.HalfedgeMesh.Curvature produced missing or count-mismatched "
                                  "scalar properties.";
                 return JobResultEnvelope::Make<EditorJobResult>(
                     EditorJobResult{
@@ -1514,7 +1514,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                     EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message =
-                    "Geometry.Curvature found no reliable curvature support "
+                    "Geometry.HalfedgeMesh.Curvature found no reliable curvature support "
                     "(degenerate faces=" +
                     std::to_string(result.DegenerateFaceCount) +
                     ", ill-conditioned faces=" +
@@ -1535,7 +1535,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                     EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message =
-                    "Geometry.Curvature produced non-finite scalar curvature values.";
+                    "Geometry.HalfedgeMesh.Curvature produced non-finite scalar curvature values.";
                 return JobResultEnvelope::Make<EditorJobResult>(
                     EditorJobResult{
                         .Diagnostic = result.Message,
@@ -1559,7 +1559,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                     result.Status =
                         EditorCommandStatus::GeometryProcessingFailed;
                     result.Error = Core::ErrorCode::InvalidArgument;
-                    result.Message = "Geometry.Curvature produced missing or "
+                    result.Message = "Geometry.HalfedgeMesh.Curvature produced missing or "
                                      "count-mismatched principal-direction properties.";
                     return JobResultEnvelope::Make<EditorJobResult>(
                         EditorJobResult{
@@ -1582,7 +1582,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                         EditorCommandStatus::GeometryProcessingFailed;
                     result.Error = Core::ErrorCode::InvalidArgument;
                     result.Message =
-                        "Geometry.Curvature produced non-finite principal directions.";
+                        "Geometry.HalfedgeMesh.Curvature produced non-finite principal directions.";
                     return JobResultEnvelope::Make<EditorJobResult>(
                         EditorJobResult{
                             .Diagnostic = result.Message,
@@ -1840,7 +1840,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             {
                 result.Status = EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidState;
-                result.Message = "Geometry.Curvature mesh curvature is unavailable in this "
+                result.Message = "Geometry.HalfedgeMesh.Curvature mesh curvature is unavailable in this "
                                  "runtime configuration.";
                 return std::nullopt;
             }
@@ -2127,7 +2127,7 @@ ApplyEditorMeshCurvatureCommand(
         {
             result.Status = EditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message = "Geometry.Curvature produced missing or count-mismatched "
+            result.Message = "Geometry.HalfedgeMesh.Curvature produced missing or count-mismatched "
                              "scalar properties.";
             return result;
         }
@@ -2138,7 +2138,7 @@ ApplyEditorMeshCurvatureCommand(
             result.Status = EditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidArgument;
             result.Message =
-                "Geometry.Curvature found no reliable curvature support "
+                "Geometry.HalfedgeMesh.Curvature found no reliable curvature support "
                 "(degenerate faces=" +
                 std::to_string(result.DegenerateFaceCount) +
                 ", ill-conditioned faces=" +
@@ -2155,7 +2155,7 @@ ApplyEditorMeshCurvatureCommand(
             result.Status = EditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidArgument;
             result.Message =
-                "Geometry.Curvature produced non-finite scalar curvature values.";
+                "Geometry.HalfedgeMesh.Curvature produced non-finite scalar curvature values.";
             return result;
         }
 
@@ -2175,7 +2175,7 @@ ApplyEditorMeshCurvatureCommand(
                 result.Status =
                     EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
-                result.Message = "Geometry.Curvature produced missing or "
+                result.Message = "Geometry.HalfedgeMesh.Curvature produced missing or "
                                  "count-mismatched principal-direction properties.";
                 return result;
             }
@@ -2195,7 +2195,7 @@ ApplyEditorMeshCurvatureCommand(
                     EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message =
-                    "Geometry.Curvature produced non-finite principal directions.";
+                    "Geometry.HalfedgeMesh.Curvature produced non-finite principal directions.";
                 return result;
             }
 

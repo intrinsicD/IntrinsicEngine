@@ -16,7 +16,7 @@ module Geometry.HalfedgeMesh.AdaptiveRemeshing;
 
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
-import Geometry.Curvature;
+import Geometry.HalfedgeMesh.Curvature;
 import Geometry.HalfedgeMesh.Utils;
 import Geometry.MeshClosestFace;
 

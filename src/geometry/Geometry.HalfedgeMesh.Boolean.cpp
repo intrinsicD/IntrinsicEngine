@@ -9,7 +9,7 @@ module;
 
 #include <glm/glm.hpp>
 
-module Geometry.Boolean;
+module Geometry.HalfedgeMesh.Boolean;
 
 import Geometry.AABB;
 import Geometry.HalfedgeMesh;

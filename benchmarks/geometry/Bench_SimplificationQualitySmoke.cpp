@@ -15,7 +15,7 @@
 import Geometry.HalfedgeMesh;
 import Geometry.MeshClosestFace;
 import Geometry.Properties;
-import Geometry.Simplification;
+import Geometry.HalfedgeMesh.Simplification;
 
 namespace Intrinsic::Bench::Geometry
 {

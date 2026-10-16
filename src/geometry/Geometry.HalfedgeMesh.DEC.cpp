@@ -14,7 +14,7 @@ module;
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-module Geometry.DEC;
+module Geometry.HalfedgeMesh.DEC;
 
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;

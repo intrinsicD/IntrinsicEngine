@@ -18,7 +18,7 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
-import Geometry.Curvature;
+import Geometry.HalfedgeMesh.Curvature;
 namespace R = Extrinsic::Runtime;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
 namespace S = Geometry::Smoothing;

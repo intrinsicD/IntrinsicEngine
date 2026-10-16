@@ -29,7 +29,7 @@ import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Graphics.SparseConjugateGradient;
 import Geometry.HalfedgeMesh;
-import Geometry.DEC;
+import Geometry.HalfedgeMesh.DEC;
 import Geometry.Sparse;
 
 namespace

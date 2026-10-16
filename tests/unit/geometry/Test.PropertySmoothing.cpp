@@ -6,7 +6,7 @@
 #include <vector>
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
-import Geometry.Smoothing;
+import Geometry.HalfedgeMesh.Smoothing;
 namespace S = Geometry::Smoothing;
 TEST(PropertySmoothing, AnalyticHeatSpectrumAndDisconnectedConstants)
 {

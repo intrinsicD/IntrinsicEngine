@@ -15,12 +15,12 @@ module;
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-module Geometry.Smoothing;
+module Geometry.HalfedgeMesh.Smoothing;
 
 import Geometry.Validation;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
-import Geometry.DEC;
+import Geometry.HalfedgeMesh.DEC;
 import Geometry.HalfedgeMesh.Utils;
 
 namespace Geometry::Smoothing

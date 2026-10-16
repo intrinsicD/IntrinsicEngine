@@ -43,7 +43,7 @@ import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.MeshSurfaceTopology;
 import Extrinsic.Runtime.ParameterizationConfig;
 import Geometry.HalfedgeMesh;
-import Geometry.Parameterization;
+import Geometry.HalfedgeMesh.Parameterization;
 import Geometry.Properties;
 
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"

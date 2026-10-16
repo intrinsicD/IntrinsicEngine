@@ -19,7 +19,7 @@
 
 #include <glm/glm.hpp>
 
-import Geometry.Curvature;
+import Geometry.HalfedgeMesh.Curvature;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.IO;
 import Geometry.HalfedgeMesh.Utils;

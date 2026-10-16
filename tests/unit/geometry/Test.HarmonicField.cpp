@@ -7,7 +7,7 @@
 #include <gtest/gtest.h>
 import Geometry.HarmonicField;
 import Geometry.HalfedgeMesh;
-import Geometry.DEC;
+import Geometry.HalfedgeMesh.DEC;
 import Geometry.Properties;
 namespace H = Geometry::HarmonicField;
 using Edge = Geometry::Smoothing::PropertyEdge;

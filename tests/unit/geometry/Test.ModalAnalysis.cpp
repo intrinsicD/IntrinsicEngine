@@ -10,10 +10,10 @@
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
-import Geometry.Subdivision;
-import Geometry.DEC;
+import Geometry.HalfedgeMesh.Subdivision;
+import Geometry.HalfedgeMesh.DEC;
 import Geometry.Sparse;
-import Geometry.ModalAnalysis;
+import Geometry.HalfedgeMesh.ModalAnalysis;
 #include "Test_MeshBuilders.h"
 
 namespace MA = Geometry::ModalAnalysis;

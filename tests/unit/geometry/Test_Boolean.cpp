@@ -7,7 +7,7 @@ import Geometry.AABB;
 import Geometry.OBB;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
-import Geometry.Boolean;
+import Geometry.HalfedgeMesh.Boolean;
 import Geometry.Properties;
 
 static Geometry::HalfedgeMesh::Mesh MakeCube(float halfExtent, glm::vec3 center)

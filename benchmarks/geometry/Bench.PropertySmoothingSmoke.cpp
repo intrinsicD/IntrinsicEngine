@@ -4,7 +4,7 @@
 #include <cmath>
 #include <numbers>
 #include <vector>
-import Geometry.Smoothing;
+import Geometry.HalfedgeMesh.Smoothing;
 namespace Intrinsic::Bench::Geometry
 {
     PropertySmoothingSmokeMetrics RunPropertySmoothingSmoke()

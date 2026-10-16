@@ -7,7 +7,7 @@ module;
 #include <limits>
 #include <span>
 #include <vector>
-module Geometry.Geodesic;
+module Geometry.HalfedgeMesh.Geodesic;
 import Geometry.HalfedgeMesh;
 import Geometry.Properties;
 

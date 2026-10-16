@@ -28,7 +28,7 @@ import Geometry.Properties;
 import Geometry.MeshSoup;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Utils;
-import Geometry.Parameterization;
+import Geometry.HalfedgeMesh.Parameterization;
 import Geometry.Parameterization.Diagnostics;
 import Geometry.UvAtlas.ChartSolve;
 import Geometry.UvAtlas.Validation;

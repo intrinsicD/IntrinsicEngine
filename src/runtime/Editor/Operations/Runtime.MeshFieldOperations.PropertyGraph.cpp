@@ -27,8 +27,8 @@ import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.MeshSurfaceTopology;
 import Geometry.HalfedgeMesh;
-import Geometry.Smoothing;
-import Geometry.DEC;
+import Geometry.HalfedgeMesh.Smoothing;
+import Geometry.HalfedgeMesh.DEC;
 import Geometry.Properties;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"

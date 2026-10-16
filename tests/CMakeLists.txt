@@ -224,9 +224,9 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.MeshTopologyCon
         --check-source src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.cpp
         --check-source src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.Frame.cpp
-        --forbid-module Geometry.Smoothing
+        --forbid-module Geometry.HalfedgeMesh.Smoothing
         --forbid-module Geometry.HalfedgeMesh
-        --forbid-module Geometry.DEC)
+        --forbid-module Geometry.HalfedgeMesh.DEC)
 set_tests_properties(ProcessingCompilationLocality.MeshTopologyContracts
     PROPERTIES LABELS "contract;build;runtime" TIMEOUT 30)
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.ParameterizationContracts
@@ -234,7 +234,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Parameterizatio
         --check-source src/geometry/Geometry.UvAtlas.Types.cppm
         --check-source src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.ParameterizationOperations.Frame.cpp
-        --forbid-module Geometry.Parameterization
+        --forbid-module Geometry.HalfedgeMesh.Parameterization
         --forbid-module Geometry.Parameterization.Diagnostics
         --forbid-module Geometry.UvAtlas
         --forbid-module Geometry.HalfedgeMesh
@@ -451,7 +451,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.GeodesicResults
         --check-source src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cpp
         --check-source src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Frame.cpp
         --check-source src/geometry/Geometry.Geodesic.Types.cppm
-        --forbid-module Geometry.Geodesic)
+        --forbid-module Geometry.HalfedgeMesh.Geodesic)
 set_tests_properties(ProcessingCompilationLocality.GeodesicResults
     PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.SegmentationDiagnostics

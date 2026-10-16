@@ -11,7 +11,7 @@ module;
 #include <utility>
 #include <vector>
 #include <glm/glm.hpp>
-module Geometry.Smoothing;
+module Geometry.HalfedgeMesh.Smoothing;
 import Geometry.PointLBVH;
 import Geometry.Sparse;
 

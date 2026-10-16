@@ -15,9 +15,9 @@ import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
 import Geometry.Graph;
-import Geometry.Subdivision;
+import Geometry.HalfedgeMesh.Subdivision;
 import Geometry.HalfedgeMesh.SubdivisionSqrt3;
-import Geometry.CatmullClark;
+import Geometry.HalfedgeMesh.CatmullClark;
 import Geometry.MeshSoup;
 import Geometry.PointCloud;
 

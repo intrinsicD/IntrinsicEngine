@@ -120,7 +120,7 @@ export namespace Geometry::Segmentation
         std::span<const double> minPrincipal,
         const FeatureEvidenceParams &params = {});
 
-    // Convenience path using Geometry.Curvature's signed per-vertex estimate.
+    // Convenience path using Geometry.HalfedgeMesh.Curvature's signed per-vertex estimate.
     // Curvature properties are materialized on the supplied mesh; feature
     // evidence itself remains an owning result and is not auto-published.
     [[nodiscard]] FeatureEvidenceResult ComputeFeatureEvidence(

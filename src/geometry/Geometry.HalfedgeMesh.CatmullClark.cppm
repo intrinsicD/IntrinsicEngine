@@ -3,7 +3,7 @@ module;
 #include <cstddef>
 #include <optional>
 
-export module Geometry.CatmullClark;
+export module Geometry.HalfedgeMesh.CatmullClark;
 
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;

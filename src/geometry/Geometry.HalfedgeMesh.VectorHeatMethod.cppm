@@ -7,7 +7,7 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Geometry.VectorHeatMethod;
+export module Geometry.HalfedgeMesh.VectorHeatMethod;
 
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;

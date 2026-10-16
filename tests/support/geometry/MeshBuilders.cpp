@@ -9,7 +9,7 @@
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
 import Geometry.Properties;
-import Geometry.Subdivision;
+import Geometry.HalfedgeMesh.Subdivision;
 
 #include "Test_MeshBuilders.h"
 

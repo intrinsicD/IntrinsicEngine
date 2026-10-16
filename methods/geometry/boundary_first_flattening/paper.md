@@ -73,7 +73,7 @@ stable output convention.
 ## Implementation notes
 
 - `METHOD-023` owns the deterministic `cpu_reference` implementation on the
-  shared `Geometry.Parameterization` strategy surface.
+  shared `Geometry.HalfedgeMesh.Parameterization` strategy surface.
 - The implementation uses geometry-owned cotangent assembly,
   `Geometry.Sparse::SparseLDLT`, boundary-loop extraction, and shared
   parameterization diagnostics. Eigen types must not cross the public API.

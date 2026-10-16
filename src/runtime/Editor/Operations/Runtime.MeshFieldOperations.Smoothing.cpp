@@ -35,7 +35,7 @@ import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.MeshSurfaceTopology;
 import Geometry.HalfedgeMesh;
-import Geometry.Smoothing;
+import Geometry.HalfedgeMesh.Smoothing;
 import Geometry.HarmonicField;
 import Extrinsic.Graphics.PropertyFilter;
 import Extrinsic.Graphics.SparseConjugateGradient;
@@ -47,7 +47,7 @@ import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Runtime.GeometryPresentation;
-import Geometry.DEC;
+import Geometry.HalfedgeMesh.DEC;
 import Geometry.Properties;
 #include "Config/internal/Runtime.PointConfigJson.hpp"
 #include "Config/internal/Runtime.ConfigFieldJson.hpp"

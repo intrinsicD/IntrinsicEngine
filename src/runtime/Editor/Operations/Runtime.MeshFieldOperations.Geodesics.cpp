@@ -30,7 +30,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GeometryAvailability;
-import Geometry.Geodesic;
+import Geometry.HalfedgeMesh.Geodesic;
 import Geometry.HalfedgeMesh;
 import Geometry.Properties;
 

@@ -156,12 +156,12 @@
   deterministic path. Single-RHS calls use span-based engine storage; multi-RHS
   direct and BiCGSTAB solves expose `EigenDenseBlockRef` aliases as a narrow
   solver bridge for dense RHS blocks, not as a geometry container storage
-  convention. `Geometry.DEC` aliases these sparse records so existing
+  convention. `Geometry.HalfedgeMesh.DEC` aliases these sparse records so existing
   DEC/geodesic/parameterization callers keep their names while sharing the
   common implementation.
-- `Geometry.SignedHeatMethod` is the CPU reference surface backend for Feng &
+- `Geometry.HalfedgeMesh.SignedHeatMethod` is the CPU reference surface backend for Feng &
   Crane's Signed Heat Method. It consumes an oriented halfedge curve on a
-  triangle mesh, assembles `Geometry.DEC` vertex mass/cotan operators, diffuses
+  triangle mesh, assembles `Geometry.HalfedgeMesh.DEC` vertex mass/cotan operators, diffuses
   boundary-normal impulses with `Geometry.Sparse::SparseLDLT`, solves a
   regularized Poisson recovery, and writes `v:signed_heat_distance` plus
   `v:is_signed_heat_source`. The current backend is a deterministic
@@ -182,7 +182,7 @@
   explicit shift (`NumericalIssue` otherwise). Spectra (MPL-2.0, like Eigen) was
   evaluated for GEOM-024 and rejected because it throws in 65 places and cannot
   build under the project-wide `-fno-exceptions` policy.
-- `Geometry.ModalAnalysis` assembles the operators of Hildebrandt et al., "Modal
+- `Geometry.HalfedgeMesh.ModalAnalysis` assembles the operators of Hildebrandt et al., "Modal
   shape analysis beyond Laplacian" (CAGD 2012) over mesh vertex slots: the modified
   Dirichlet energy `A_ij = <N_i, N_j> S_ij` (exact cotan `S`, area-weighted unit
   normals) and the rest-state Hessian `sum_i w_i grad f_i grad f_i^T` of the
@@ -319,7 +319,7 @@ geometry reader or writer.
 frozen-surface nearest-face projector backed by `Geometry.MeshClosestFace`, and
 supports both mean-curvature sizing and `SizingLaw::ErrorBoundedTaubin`.
 Reference projection is also available to uniform remeshing through
-`Geometry.Remeshing::RemeshingParams::ProjectToSurface` and related projection
+`Geometry.HalfedgeMesh.Remeshing::RemeshingParams::ProjectToSurface` and related projection
 limits.
 
 `Geometry.MeshClosestFaceIndex` is the shared CPU exact nearest-face query for
@@ -333,7 +333,7 @@ implicit plane-field closest-point evaluation, simplification Hausdorff
 redistribution, and `Geometry.HalfedgeMesh.Utils::NearestFace` all consume this
 packaged query instead of private brute-force face scans.
 
-`Geometry.Subdivision` implements Loop subdivision with optional feature-edge
+`Geometry.HalfedgeMesh.Subdivision` implements Loop subdivision with optional feature-edge
 preservation from a caller-selected boolean edge property, defaulting to
 `e:feature`. Feature split edges remain tagged on output. `Geometry.SubdivisionSqrt3`
 adds Kobbelt sqrt(3) subdivision for triangle meshes, including centroid split,
@@ -576,7 +576,7 @@ frequency radius. Inputs with non-planar `z` values are rejected as
 
 ### Curvature tensor and principal directions
 
-`Geometry.Curvature` estimates per-vertex discrete curvature on triangle meshes.
+`Geometry.HalfedgeMesh.Curvature` estimates per-vertex discrete curvature on triangle meshes.
 The standalone `ComputeMeanCurvature` and `ComputeGaussianCurvature` functions
 retain the Meyer et al. (2003) cotan-Laplacian and angle-defect operators.
 `ComputeCurvature` and `ComputeCurvatureTensor` instead share one signed
@@ -733,7 +733,7 @@ limitations live in
 
 ### Discrete Laplacian edge-weight modes
 
-`Geometry.DEC` assembles the stiffness (edge-weight) matrix `⋆1` and the weak
+`Geometry.HalfedgeMesh.DEC` assembles the stiffness (edge-weight) matrix `⋆1` and the weak
 Laplacian `L = d0ᵀ ⋆1 d0` under a selectable `EdgeWeightMode`:
 
 - `Cotan` (default) — `(cot α + cot β)/2`, the standard DEC weights.
@@ -851,7 +851,7 @@ of scope.
 
 ### Unified CPU parameterization dispatch
 
-`Geometry.Parameterization::ParameterizeMesh` is the typed family entry point
+`Geometry.HalfedgeMesh.Parameterization::ParameterizeMesh` is the typed family entry point
 for the CPU solvers that exist today. `ParameterizationStrategy` is a
 `std::variant<ParameterizationParams, HarmonicParams, BffParams>`: the first
 alternative selects LSCM, the second selects cotangent Harmonic or uniform-
@@ -920,7 +920,7 @@ are excluded;
 unsupported topology and inconsistent data fail closed without UV output.
 
 `METHOD-023` owns the `cpu_reference` payload and dispatch branch in
-`Geometry.Parameterization`. Retired `RUNTIME-176` delivered stable config
+`Geometry.HalfedgeMesh.Parameterization`. Retired `RUNTIME-176` delivered stable config
 tokens, typed payload conversion, selected-mesh `v:texcoord` writeback, dirty
 marking, undo, and the pointer-free UV view model. Geometry retains no config,
 ECS, runtime, graphics, platform, or app dependency, and this package makes no

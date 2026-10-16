@@ -5,7 +5,7 @@
 #include <cmath>
 #include <limits>
 #include <glm/glm.hpp>
-import Geometry.Geodesic;
+import Geometry.HalfedgeMesh.Geodesic;
 import Geometry.HalfedgeMesh;
 import Geometry.Properties;
 namespace Intrinsic::Bench::Geometry

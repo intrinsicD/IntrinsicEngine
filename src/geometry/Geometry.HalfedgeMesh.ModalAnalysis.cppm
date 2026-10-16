@@ -15,7 +15,7 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Geometry.ModalAnalysis;
+export module Geometry.HalfedgeMesh.ModalAnalysis;
 
 import Geometry.HalfedgeMesh;
 import Geometry.Sparse;

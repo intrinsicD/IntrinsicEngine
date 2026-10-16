@@ -434,7 +434,7 @@ publication, history and backend contracts.
 `EditorMeshDenoiseResult`, and
 `ApplyEditorMeshDenoiseCommand(...)`. Runtime validates the selected
 mesh `GeometrySources`, converts the current CPU data to a scratch halfedge
-mesh, calls the geometry-owned `Geometry.Smoothing::DenoiseBilateral` kernel
+mesh, calls the geometry-owned `Geometry.HalfedgeMesh.Smoothing::DenoiseBilateral` kernel
 from `GEOM-042`, and publishes count-matched finite positions back to canonical
 `v:position` only after the geometry result succeeds. The UI exposes the
 full-bilateral stage, normal/vertex iteration counts, auto-or-explicit spatial
@@ -707,7 +707,7 @@ succeeds.
 
 The remesh window exposes uniform/adaptive mode, target edge length, iteration
 count, project-to-surface, and mean-curvature versus error-bounded Taubin sizing
-selection. Uniform mode calls `Geometry.Remeshing`; adaptive mode calls
+selection. Uniform mode calls `Geometry.HalfedgeMesh.Remeshing`; adaptive mode calls
 `Geometry.HalfedgeMesh.AdaptiveRemeshing`, mapping the editor target length to a
 bounded adaptive sizing range. The subdivide window exposes Loop, Catmull-Clark,
 and Sqrt(3) operators, iteration count, and Loop feature-edge preservation with

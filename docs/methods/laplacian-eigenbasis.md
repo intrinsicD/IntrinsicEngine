@@ -22,7 +22,7 @@ Laplacian on planar meshes, and its constant function no longer lies in the kern
 on curved surfaces (the extra term approximates `½∫u²(κ1² + κ2²)`, paper eq. 11), so
 low modes vanish near high curvature. The thin-shell Hessian is 3#V × 3#V and has the
 six rigid motions in its nullspace; its modes are the linearized vibration modes of
-the shell. Kernels live in `Geometry.ModalAnalysis`; the mass `M` is the lumped vertex
+the shell. Kernels live in `Geometry.HalfedgeMesh.ModalAnalysis`; the mass `M` is the lumped vertex
 area (mesh operators: barycentric thirds as in the paper, replicated per coordinate
 for the shell; graph Laplacian: the DEC lumped area) or unit.
 

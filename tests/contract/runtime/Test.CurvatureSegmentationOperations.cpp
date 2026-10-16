@@ -25,7 +25,7 @@ import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Segmentation.Patches;
 import Geometry.HalfedgeMesh.Builder;
 import Geometry.Properties;
-import Geometry.Subdivision;
+import Geometry.HalfedgeMesh.Subdivision;
 
 namespace Dirty = Extrinsic::ECS::Components::DirtyTags;
 namespace ECS = Extrinsic::ECS;

@@ -1,7 +1,7 @@
 # Curvature corpus differential
 
 This directory contains local-development diagnostics for comparing
-`Geometry.Curvature` with actual Framework24 and explicitly supplied PMP
+`Geometry.HalfedgeMesh.Curvature` with actual Framework24 and explicitly supplied PMP
 checkouts on OBJ corpora. The shipped implementation targets Framework24
 `CurvatureTaubin(mesh, 0, false, Policy::Sequential)` directly; PMP is a useful
 different estimator, not the parity oracle. These harnesses are not registered

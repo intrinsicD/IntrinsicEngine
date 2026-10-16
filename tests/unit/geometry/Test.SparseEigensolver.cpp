@@ -6,7 +6,7 @@
 #include <Eigen/Dense>
 #include <gtest/gtest.h>
 import Geometry.Sparse;
-import Geometry.DEC;
+import Geometry.HalfedgeMesh.DEC;
 import Geometry.HalfedgeMesh;
 import Geometry.Properties;
 namespace Sp = Geometry::Sparse;

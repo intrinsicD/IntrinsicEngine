@@ -4,7 +4,7 @@ Method ID: `geometry.signed_heat`. Status: **reference**.
 
 This package records the paper intake and reference-backend contract for Feng
 and Crane's signed heat method. The executable backend lives in the geometry
-layer as module `Geometry.SignedHeatMethod`, because it is a reusable
+layer as module `Geometry.HalfedgeMesh.SignedHeatMethod`, because it is a reusable
 halfedge-mesh operator rather than a standalone runtime subsystem.
 
 ## Scope And Backend Status

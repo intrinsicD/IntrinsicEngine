@@ -1,6 +1,6 @@
 // METHOD-002 — signed heat CPU reference smoke benchmark declaration.
 //
-// Exercises the repo-native Geometry.SignedHeatMethod cpu_reference backend on a
+// Exercises the repo-native Geometry.HalfedgeMesh.SignedHeatMethod cpu_reference backend on a
 // deterministic flat-grid workload with an oriented square source curve. The
 // companion manifest lives at
 // benchmarks/geometry/manifests/signed_heat_reference_smoke.yaml.

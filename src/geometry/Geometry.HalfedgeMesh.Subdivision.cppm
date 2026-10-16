@@ -4,7 +4,7 @@ module;
 #include <optional>
 #include <string>
 
-export module Geometry.Subdivision;
+export module Geometry.HalfedgeMesh.Subdivision;
 
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;

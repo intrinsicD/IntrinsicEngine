@@ -20,7 +20,7 @@ import Geometry.Graph;
 import Geometry.MeshSoup;
 import Geometry.Parameterization.Diagnostics;
 import Geometry.Parameterization.Harmonic;
-import Geometry.Parameterization;
+import Geometry.HalfedgeMesh.Parameterization;
 import Geometry.KMeans;
 
 #include "Test_MeshBuilders.h"

@@ -18,7 +18,7 @@ import Geometry.MeshSoup;
 import Geometry.HalfedgeMesh.Boundary;
 import Geometry.Parameterization.Diagnostics;
 import Geometry.Parameterization.Harmonic;
-import Geometry.Parameterization;
+import Geometry.HalfedgeMesh.Parameterization;
 
 namespace {
 struct FakeBackendState {

@@ -19,7 +19,7 @@ module Geometry.HalfedgeMesh.Builder;
 
 import Geometry.Validation;
 import Geometry.HalfedgeMesh;
-import Geometry.Subdivision;
+import Geometry.HalfedgeMesh.Subdivision;
 import Geometry.Properties;
 
 namespace Geometry::HalfedgeMesh

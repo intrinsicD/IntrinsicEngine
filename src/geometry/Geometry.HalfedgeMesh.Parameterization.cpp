@@ -16,11 +16,11 @@ module;
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-module Geometry.Parameterization;
+module Geometry.HalfedgeMesh.Parameterization;
 
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
-import Geometry.DEC;
+import Geometry.HalfedgeMesh.DEC;
 import Geometry.HalfedgeMesh.Repair;
 import Geometry.HalfedgeMesh.Utils;
 import Geometry.Parameterization.Diagnostics;

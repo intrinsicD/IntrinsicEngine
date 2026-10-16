@@ -20,7 +20,7 @@ module;
 module Geometry.HalfedgeMesh.Segmentation;
 
 import Geometry.Validation;
-import Geometry.Curvature;
+import Geometry.HalfedgeMesh.Curvature;
 import Geometry.GaussianMixture;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Utils;

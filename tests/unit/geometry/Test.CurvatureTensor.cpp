@@ -20,7 +20,7 @@ import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
 import Geometry.HalfedgeMesh.IO;
 import Geometry.Graph;
-import Geometry.Curvature;
+import Geometry.HalfedgeMesh.Curvature;
 import Geometry.MeshSoup;
 import Geometry.HalfedgeMesh.Segmentation.Features;
 import Geometry.HalfedgeMesh.Segmentation.Patches;

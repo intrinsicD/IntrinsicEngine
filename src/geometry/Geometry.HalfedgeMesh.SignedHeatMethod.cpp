@@ -10,12 +10,12 @@ module;
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-module Geometry.SignedHeatMethod;
+module Geometry.HalfedgeMesh.SignedHeatMethod;
 
 import Geometry.Validation;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
-import Geometry.DEC;
+import Geometry.HalfedgeMesh.DEC;
 import Geometry.HalfedgeMesh.Utils;
 import Geometry.Sparse;
 

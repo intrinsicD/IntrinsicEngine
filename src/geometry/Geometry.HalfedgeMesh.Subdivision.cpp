@@ -11,7 +11,7 @@ module;
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-module Geometry.Subdivision;
+module Geometry.HalfedgeMesh.Subdivision;
 
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;

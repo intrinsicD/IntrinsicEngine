@@ -44,7 +44,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Component.StableId;
 import Geometry.Properties;
-import Geometry.Smoothing;
+import Geometry.HalfedgeMesh.Smoothing;
 
 namespace
 {

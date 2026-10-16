@@ -17,10 +17,10 @@ import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
 import Geometry.Graph;
 import Geometry.Sparse;
-import Geometry.DEC;
-import Geometry.Smoothing;
-import Geometry.Subdivision;
-import Geometry.CatmullClark;
+import Geometry.HalfedgeMesh.DEC;
+import Geometry.HalfedgeMesh.Smoothing;
+import Geometry.HalfedgeMesh.Subdivision;
+import Geometry.HalfedgeMesh.CatmullClark;
 import Geometry.MeshSoup;
 
 #include "Test_MeshBuilders.h"

@@ -14,7 +14,7 @@ module;
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-module Geometry.Curvature;
+module Geometry.HalfedgeMesh.Curvature;
 
 import Geometry.Validation;
 import Geometry.Properties;

@@ -12,8 +12,8 @@ import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
 import Geometry.Graph;
-import Geometry.Simplification;
-import Geometry.CatmullClark;
+import Geometry.HalfedgeMesh.Simplification;
+import Geometry.HalfedgeMesh.CatmullClark;
 import Geometry.MeshSoup;
 import Geometry.Quadric;
 

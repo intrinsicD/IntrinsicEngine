@@ -1,5 +1,5 @@
 // Spectral modes: the k smallest eigenpairs of the shared sample-graph Laplacian, or on mesh
-// vertices of the modified Dirichlet energy or the discrete-shells Hessian (Geometry.ModalAnalysis),
+// vertices of the modified Dirichlet energy or the discrete-shells Hessian (Geometry.HalfedgeMesh.ModalAnalysis),
 // with unit or lumped-area mass (Geometry.Sparse eigensolver). Modes, the optional modal signature
 // and the multi-scale distance publish in one guarded history transaction.
 module;
@@ -34,9 +34,9 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.JobService;
 import Geometry.HalfedgeMesh;
-import Geometry.DEC;
-import Geometry.ModalAnalysis;
-import Geometry.Smoothing;
+import Geometry.HalfedgeMesh.DEC;
+import Geometry.HalfedgeMesh.ModalAnalysis;
+import Geometry.HalfedgeMesh.Smoothing;
 import Geometry.Sparse;
 import Geometry.Properties;
 #include "Config/internal/Runtime.PointConfigJson.hpp"

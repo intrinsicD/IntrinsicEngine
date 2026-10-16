@@ -6,7 +6,7 @@ module;
 #include <span>
 #include <vector>
 
-export module Geometry.DEC;
+export module Geometry.HalfedgeMesh.DEC;
 
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;

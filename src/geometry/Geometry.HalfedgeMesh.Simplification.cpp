@@ -14,7 +14,7 @@ module;
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-module Geometry.Simplification;
+module Geometry.HalfedgeMesh.Simplification;
 
 import Geometry.Quadric;
 import Geometry.Properties;
