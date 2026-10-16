@@ -1,3 +1,4 @@
+// Harmonic/Tutte parameterization with shared input admission and copied CPU results.
 module;
 
 #include <cstddef>
@@ -97,6 +98,9 @@ export namespace Geometry::Parameterization
     };
 
     [[nodiscard]] const char* ToString(HarmonicStatus status) noexcept;
+
+    // Shared input admission; performs no sparse assembly or solve.
+    [[nodiscard]] HarmonicStatus ValidateHarmonicInput(const HalfedgeMesh::Mesh& mesh, const HarmonicParams& params);
 
     [[nodiscard]] std::optional<HarmonicResult> ComputeHarmonic(
         const HalfedgeMesh::Mesh& mesh, const HarmonicParams& params = {});

@@ -620,6 +620,79 @@ namespace Geometry::Parameterization
                 diagnostics.TargetAngleMaxError = maximum;
             }
         }
+
+        [[nodiscard]] BffStatus PrepareBffInput(
+            const HalfedgeMesh::Mesh& mesh, const BffParams& params, PreparedDisk& disk, BffDiagnostics& diagnostics)
+        {
+            if (!std::isfinite(params.AngleSumTolerance) || !std::isfinite(params.DegeneracyTolerance))
+            {
+                return BffStatus::InvalidTolerance;
+            }
+            if (params.AngleSumTolerance <= 0.0 || params.DegeneracyTolerance <= 0.0)
+            {
+                return BffStatus::InvalidTolerance;
+            }
+
+            switch (params.Mode)
+            {
+            case BffBoundaryMode::AutomaticConformal:
+            case BffBoundaryMode::TargetLengths:
+            case BffBoundaryMode::TargetAngles:       break;
+            default:                                  return BffStatus::InvalidBoundaryMode;
+            }
+
+            const BffStatus prepared = PrepareDisk(mesh, params.DegeneracyTolerance, disk);
+            if (prepared != BffStatus::Success)
+                return prepared;
+
+            diagnostics.BoundaryVertexCount = disk.Boundary.size();
+            diagnostics.InteriorVertexCount = disk.Interior.size();
+            const std::size_t boundaryCount = disk.Boundary.size();
+            if (params.Mode == BffBoundaryMode::AutomaticConformal)
+            {
+                if (!params.BoundaryData.empty())
+                    return BffStatus::MismatchedBoundaryArray;
+            }
+            else if (params.BoundaryData.size() != boundaryCount)
+            {
+                return BffStatus::MismatchedBoundaryArray;
+            }
+
+            if (params.Mode != BffBoundaryMode::AutomaticConformal)
+            {
+                if (!std::all_of(params.BoundaryData.begin(),
+                        params.BoundaryData.end(),
+                        [](const double value)
+                        {
+                            return std::isfinite(value);
+                        }))
+                {
+                    return BffStatus::NonFiniteBoundaryData;
+                }
+            }
+            if (params.Mode == BffBoundaryMode::TargetLengths &&
+                !std::all_of(params.BoundaryData.begin(),
+                    params.BoundaryData.end(),
+                    [](const double value)
+                    {
+                        return value > 0.0;
+                    }))
+            {
+                return BffStatus::NonPositiveTargetLength;
+            }
+            if (params.Mode == BffBoundaryMode::TargetAngles)
+            {
+                diagnostics.TargetAngleSum =
+                    std::accumulate(params.BoundaryData.begin(), params.BoundaryData.end(), 0.0);
+                if (!std::isfinite(diagnostics.TargetAngleSum) ||
+                    std::abs(diagnostics.TargetAngleSum - 2.0 * std::numbers::pi) > params.AngleSumTolerance)
+                {
+                    return BffStatus::InconsistentAngleSum;
+                }
+            }
+
+            return BffStatus::Success;
+        }
     } // namespace
 
     const char* ToString(const BffStatus status) noexcept
@@ -651,6 +724,13 @@ namespace Geometry::Parameterization
         return "Unknown";
     }
 
+    BffStatus ValidateBffInput(const HalfedgeMesh::Mesh& mesh, const BffParams& params)
+    {
+        PreparedDisk disk{};
+        BffDiagnostics diagnostics{};
+        return PrepareBffInput(mesh, params, disk, diagnostics);
+    }
+
     BffResult ComputeBFF(
         const HalfedgeMesh::Mesh& mesh,
         const BffParams& params)
@@ -663,73 +743,11 @@ namespace Geometry::Parameterization
             return result;
         };
 
-        if (!std::isfinite(params.AngleSumTolerance)
-            || !std::isfinite(params.DegeneracyTolerance))
-        {
-            return fail(BffStatus::InvalidTolerance);
-        }
-        if (params.AngleSumTolerance <= 0.0
-            || params.DegeneracyTolerance <= 0.0)
-        {
-            return fail(BffStatus::InvalidTolerance);
-        }
-
-        switch (params.Mode)
-        {
-        case BffBoundaryMode::AutomaticConformal:
-        case BffBoundaryMode::TargetLengths:
-        case BffBoundaryMode::TargetAngles:
-            break;
-        default:
-            return fail(BffStatus::InvalidBoundaryMode);
-        }
-
         PreparedDisk disk{};
-        const BffStatus prepared = PrepareDisk(
-            mesh, params.DegeneracyTolerance, disk);
+        const auto prepared = PrepareBffInput(mesh, params, disk, result.Diagnostics);
         if (prepared != BffStatus::Success)
             return fail(prepared);
-
-        result.Diagnostics.BoundaryVertexCount = disk.Boundary.size();
-        result.Diagnostics.InteriorVertexCount = disk.Interior.size();
         const std::size_t boundaryCount = disk.Boundary.size();
-        if (params.Mode == BffBoundaryMode::AutomaticConformal)
-        {
-            if (!params.BoundaryData.empty())
-                return fail(BffStatus::MismatchedBoundaryArray);
-        }
-        else if (params.BoundaryData.size() != boundaryCount)
-        {
-            return fail(BffStatus::MismatchedBoundaryArray);
-        }
-
-        if (params.Mode != BffBoundaryMode::AutomaticConformal)
-        {
-            if (!std::all_of(
-                    params.BoundaryData.begin(), params.BoundaryData.end(),
-                    [](const double value) { return std::isfinite(value); }))
-            {
-                return fail(BffStatus::NonFiniteBoundaryData);
-            }
-        }
-        if (params.Mode == BffBoundaryMode::TargetLengths
-            && !std::all_of(
-                params.BoundaryData.begin(), params.BoundaryData.end(),
-                [](const double value) { return value > 0.0; }))
-        {
-            return fail(BffStatus::NonPositiveTargetLength);
-        }
-        if (params.Mode == BffBoundaryMode::TargetAngles)
-        {
-            result.Diagnostics.TargetAngleSum = std::accumulate(
-                params.BoundaryData.begin(), params.BoundaryData.end(), 0.0);
-            if (!std::isfinite(result.Diagnostics.TargetAngleSum)
-                || std::abs(result.Diagnostics.TargetAngleSum - 2.0 * std::numbers::pi)
-                    > params.AngleSumTolerance)
-            {
-                return fail(BffStatus::InconsistentAngleSum);
-            }
-        }
 
         Sparse::SparseLDLT dirichletSolver{};
         const Sparse::SparseLDLT* dirichlet = nullptr;

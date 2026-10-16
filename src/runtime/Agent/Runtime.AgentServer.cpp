@@ -325,7 +325,15 @@ namespace Extrinsic::Runtime
                     lock.unlock();
                     bool failed = false;
                     for (auto& line : pending)
-                        failed |= client.SendAll(line + "\n") != Platform::LocalSocketStatus::Ok;
+                    {
+                        if (Stop.load())
+                            break;
+                        if (client.SendAll(line + "\n") != Platform::LocalSocketStatus::Ok)
+                        {
+                            failed = true;
+                            break;
+                        }
+                    }
                     if (failed) { dropClient(); continue; }
                 }
                 const auto received = client.Receive(buffer, 20);

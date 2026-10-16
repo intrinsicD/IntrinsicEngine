@@ -2,6 +2,8 @@
 
 #include <array>
 #include <bit>
+#include <clocale>
+#include <locale>
 #include <cstdio>
 #include <cstdlib>
 #include <cstdint>
@@ -2274,7 +2276,7 @@ TEST(GeometryIO_GraphIO, WritesEdgeListEmitsWeightWhenLabelOnly)
     std::ostringstream buffer;
     buffer << in.rdbuf();
     const std::string contents = buffer.str();
-    EXPECT_NE(contents.find(" 1.000000 "), std::string::npos);
+    EXPECT_NE(contents.find(" 1 "), std::string::npos);
     EXPECT_NE(contents.find("named"), std::string::npos);
 
     const auto loaded = Geometry::GraphIO::LoadEdgeList(file.Path);
@@ -2566,7 +2568,7 @@ TEST(GeometryIO_MeshIO, WritesOBJTriangleWithNormals)
     EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
 
     const std::string contents = ReadFileContents(file.Path);
-    EXPECT_NE(contents.find("vn 0.000000 0.000000 1.000000\n"), std::string::npos);
+    EXPECT_NE(contents.find("vn 0 0 1\n"), std::string::npos);
     EXPECT_NE(contents.find("f 1//1 2//2 3//3\n"), std::string::npos);
 
     const auto loaded = Geometry::MeshIO::LoadOBJ(file.Path);
@@ -2603,9 +2605,9 @@ TEST(GeometryIO_MeshIO, WritesOBJTriangleWithTexcoords)
     EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
 
     const std::string contents = ReadFileContents(file.Path);
-    EXPECT_NE(contents.find("vt 0.000000 0.000000\n"), std::string::npos);
-    EXPECT_NE(contents.find("vt 1.000000 0.000000\n"), std::string::npos);
-    EXPECT_NE(contents.find("vt 0.000000 1.000000\n"), std::string::npos);
+    EXPECT_NE(contents.find("vt 0 0\n"), std::string::npos);
+    EXPECT_NE(contents.find("vt 1 0\n"), std::string::npos);
+    EXPECT_NE(contents.find("vt 0 1\n"), std::string::npos);
     EXPECT_NE(contents.find("f 1/1 2/2 3/3\n"), std::string::npos);
     EXPECT_EQ(contents.find("//"), std::string::npos);
 
@@ -2648,8 +2650,8 @@ TEST(GeometryIO_MeshIO, WritesOBJTriangleWithTexcoordsAndNormals)
     EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
 
     const std::string contents = ReadFileContents(file.Path);
-    EXPECT_NE(contents.find("vt 0.250000 0.750000\n"), std::string::npos);
-    EXPECT_NE(contents.find("vn 0.000000 0.000000 1.000000\n"), std::string::npos);
+    EXPECT_NE(contents.find("vt 0.25 0.75\n"), std::string::npos);
+    EXPECT_NE(contents.find("vn 0 0 1\n"), std::string::npos);
     EXPECT_NE(contents.find("f 1/1/1 2/2/2 3/3/3\n"), std::string::npos);
     EXPECT_EQ(contents.find("//"), std::string::npos);
 
@@ -2700,12 +2702,9 @@ TEST(GeometryIO_MeshIO, WritesOBJTriangleWithVertexColors)
     EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
 
     const std::string contents = ReadFileContents(file.Path);
-    EXPECT_NE(contents.find("v 0.000000 0.000000 0.000000 1.000000 0.000000 0.000000\n"),
-              std::string::npos);
-    EXPECT_NE(contents.find("v 1.000000 0.000000 0.000000 0.000000 1.000000 0.000000\n"),
-              std::string::npos);
-    EXPECT_NE(contents.find("v 0.000000 1.000000 0.000000 0.000000 0.000000 1.000000\n"),
-              std::string::npos);
+    EXPECT_NE(contents.find("v 0 0 0 1 0 0\n"), std::string::npos);
+    EXPECT_NE(contents.find("v 1 0 0 0 1 0\n"), std::string::npos);
+    EXPECT_NE(contents.find("v 0 1 0 0 0 1\n"), std::string::npos);
     EXPECT_NE(contents.find("f 1 2 3\n"), std::string::npos);
 
     const auto loaded = Geometry::MeshIO::LoadOBJ(file.Path);
@@ -2752,9 +2751,8 @@ TEST(GeometryIO_MeshIO, WritesOBJTriangleWithColorsAndNormals)
     EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
 
     const std::string contents = ReadFileContents(file.Path);
-    EXPECT_NE(contents.find("v 0.000000 0.000000 0.000000 0.250000 0.500000 0.750000\n"),
-              std::string::npos);
-    EXPECT_NE(contents.find("vn 0.000000 0.000000 1.000000\n"), std::string::npos);
+    EXPECT_NE(contents.find("v 0 0 0 0.25 0.5 0.75\n"), std::string::npos);
+    EXPECT_NE(contents.find("vn 0 0 1\n"), std::string::npos);
     EXPECT_NE(contents.find("f 1//1 2//2 3//3\n"), std::string::npos);
 
     const auto loaded = Geometry::MeshIO::LoadOBJ(file.Path);
@@ -2809,9 +2807,8 @@ TEST(GeometryIO_MeshIO, WritesOBJTriangleWithColorsAndTexcoords)
     EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
 
     const std::string contents = ReadFileContents(file.Path);
-    EXPECT_NE(contents.find("v 0.000000 0.000000 0.000000 1.000000 0.000000 0.000000\n"),
-              std::string::npos);
-    EXPECT_NE(contents.find("vt 0.000000 0.000000\n"), std::string::npos);
+    EXPECT_NE(contents.find("v 0 0 0 1 0 0\n"), std::string::npos);
+    EXPECT_NE(contents.find("vt 0 0\n"), std::string::npos);
     EXPECT_NE(contents.find("f 1/1 2/2 3/3\n"), std::string::npos);
 
     const auto loaded = Geometry::MeshIO::LoadOBJ(file.Path);
@@ -2851,9 +2848,9 @@ TEST(GeometryIO_MeshIO, WriteOBJOmitsColorsWhenAbsent)
     EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
 
     const std::string contents = ReadFileContents(file.Path);
-    EXPECT_NE(contents.find("v 0.000000 0.000000 0.000000\n"), std::string::npos);
-    EXPECT_NE(contents.find("v 1.000000 0.000000 0.000000\n"), std::string::npos);
-    EXPECT_NE(contents.find("v 0.000000 1.000000 0.000000\n"), std::string::npos);
+    EXPECT_NE(contents.find("v 0 0 0\n"), std::string::npos);
+    EXPECT_NE(contents.find("v 1 0 0\n"), std::string::npos);
+    EXPECT_NE(contents.find("v 0 1 0\n"), std::string::npos);
 
     const auto loaded = Geometry::MeshIO::LoadOBJ(file.Path);
     ASSERT_TRUE(loaded.has_value());
@@ -2880,11 +2877,11 @@ TEST(GeometryIO_MeshIO, WriteOBJOmitsColorsWhenMismatchedCount)
     EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
 
     const std::string contents = ReadFileContents(file.Path);
-    EXPECT_NE(contents.find("v 0.000000 0.000000 0.000000\n"), std::string::npos);
-    EXPECT_EQ(contents.find("v 0.000000 0.000000 0.000000 "), std::string::npos);
+    EXPECT_NE(contents.find("v 0 0 0\n"), std::string::npos);
+    EXPECT_EQ(contents.find("v 0 0 0 "), std::string::npos);
 }
 
-TEST(GeometryIO_MeshIO, WriteOBJReportsFailureOnUnformattableVertexColor)
+TEST(GeometryIO_MeshIO, WriteOBJRoundTripsLargestFiniteVertexColor)
 {
     Geometry::MeshIO::MeshIOResult mesh;
     const std::array<glm::vec3, 3> positions{
@@ -2902,13 +2899,16 @@ TEST(GeometryIO_MeshIO, WriteOBJReportsFailureOnUnformattableVertexColor)
 
     TempFile file(".obj", "");
     const auto status = Geometry::MeshIO::WriteOBJ(file.Path, mesh);
-    EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::FileWriteError);
+    ASSERT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
+    const auto loaded = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    const auto colors = loaded->Vertices.Get<glm::vec4>("v:color");
+    ASSERT_TRUE(colors.IsValid());
+    EXPECT_EQ(colors[0], colorProperty[0]);
 }
 
-TEST(GeometryIO_MeshIO, WriteOBJReportsFailureOnUnformattableVertexNormal)
+TEST(GeometryIO_MeshIO, WriteOBJRoundTripsLargestFiniteVertexNormal)
 {
-    // A finite FLT_MAX normal line exceeds the OBJ format buffer; it must fail
-    // closed like vertex colors instead of writing past the formatted text.
     Geometry::MeshIO::MeshIOResult mesh;
     const std::array<glm::vec3, 3> positions{
         glm::vec3{0.0f, 0.0f, 0.0f},
@@ -2925,8 +2925,12 @@ TEST(GeometryIO_MeshIO, WriteOBJReportsFailureOnUnformattableVertexNormal)
     PopulateTriangleMesh(mesh, positions, faces, normals);
 
     TempFile file(".obj", "");
-    EXPECT_EQ(Geometry::MeshIO::WriteOBJ(file.Path, mesh),
-              Geometry::MeshIO::MeshIOWriteStatus::FileWriteError);
+    ASSERT_EQ(Geometry::MeshIO::WriteOBJ(file.Path, mesh), Geometry::MeshIO::MeshIOWriteStatus::Success);
+    const auto loaded = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    const auto actualNormals = loaded->Vertices.Get<glm::vec3>("v:normal");
+    ASSERT_TRUE(actualNormals.IsValid());
+    EXPECT_EQ(actualNormals[0], normals[0]);
 }
 
 TEST(GeometryIO_MeshIO, WriteOBJOmitsTexcoordsWhenAbsent)
@@ -3079,8 +3083,7 @@ TEST(GeometryIO_MeshIO, WritesPLYTriangleWithNormals)
     EXPECT_NE(contents.find("property float nx\n"), std::string::npos);
     EXPECT_NE(contents.find("property float ny\n"), std::string::npos);
     EXPECT_NE(contents.find("property float nz\n"), std::string::npos);
-    EXPECT_NE(contents.find("0.000000 0.000000 0.000000 0.000000 0.000000 1.000000\n"),
-              std::string::npos);
+    EXPECT_NE(contents.find("0 0 0 0 0 1\n"), std::string::npos);
 
     const auto loaded = Geometry::MeshIO::LoadPLY(file.Path);
     ASSERT_TRUE(loaded.has_value());
@@ -3136,12 +3139,9 @@ TEST(GeometryIO_MeshIO, WritesPLYTriangleWithVertexColors)
     ASSERT_NE(nzPos, std::string::npos);
     ASSERT_NE(redPos, std::string::npos);
     EXPECT_LT(nzPos, redPos);
-    EXPECT_NE(contents.find("0.000000 0.000000 0.000000 0.000000 0.000000 1.000000 255 0 0\n"),
-              std::string::npos);
-    EXPECT_NE(contents.find("1.000000 0.000000 0.000000 0.000000 0.000000 1.000000 0 255 0\n"),
-              std::string::npos);
-    EXPECT_NE(contents.find("0.000000 1.000000 0.000000 0.000000 0.000000 1.000000 0 0 255\n"),
-              std::string::npos);
+    EXPECT_NE(contents.find("0 0 0 0 0 1 255 0 0\n"), std::string::npos);
+    EXPECT_NE(contents.find("1 0 0 0 0 1 0 255 0\n"), std::string::npos);
+    EXPECT_NE(contents.find("0 1 0 0 0 1 0 0 255\n"), std::string::npos);
 
     const auto loaded = Geometry::MeshIO::LoadPLY(file.Path);
     ASSERT_TRUE(loaded.has_value());
@@ -3178,8 +3178,7 @@ TEST(GeometryIO_MeshIO, WritesPLYTriangleWithVertexTexcoords)
     const std::string contents = ReadFileContents(file.Path);
     EXPECT_NE(contents.find("property float s\n"), std::string::npos);
     EXPECT_NE(contents.find("property float t\n"), std::string::npos);
-    EXPECT_NE(contents.find("0.000000 0.000000 0.000000 0.125000 0.875000\n"),
-              std::string::npos);
+    EXPECT_NE(contents.find("0 0 0 0.125 0.875\n"), std::string::npos);
 
     const auto loaded = Geometry::MeshIO::LoadPLY(file.Path);
     ASSERT_TRUE(loaded.has_value());
@@ -3689,8 +3688,7 @@ TEST(GeometryIO_MeshIO, WritesSTLTriangleEmitsFacetNormal)
     EXPECT_NE(contents.find("endsolid IntrinsicEngine\n"), std::string::npos);
     EXPECT_NE(contents.find("    outer loop\n"), std::string::npos);
     EXPECT_NE(contents.find("    endloop\n"), std::string::npos);
-    EXPECT_NE(contents.find("  facet normal 0.000000e+00 0.000000e+00 1.000000e+00\n"),
-              std::string::npos);
+    EXPECT_NE(contents.find("  facet normal 0 0 1\n"), std::string::npos);
 }
 
 TEST(GeometryIO_MeshIO, WritesSTLBinaryTriangleRoundTrip)
@@ -5399,8 +5397,8 @@ TEST(GeometryIO_PointCloudIO, WritesPLYPointCloudWithRadiiEmitsRadiusProperty)
 
     const std::string contents = ReadFileContents(file.Path);
     EXPECT_NE(contents.find("property float radius\n"), std::string::npos);
-    EXPECT_NE(contents.find("0.000000 0.000000 0.000000 0.250000\n"), std::string::npos);
-    EXPECT_NE(contents.find("1.000000 0.000000 0.000000 0.500000\n"), std::string::npos);
+    EXPECT_NE(contents.find("0 0 0 0.25\n"), std::string::npos);
+    EXPECT_NE(contents.find("1 0 0 0.5\n"), std::string::npos);
 }
 
 TEST(GeometryIO_PointCloudIO, PointCloudWritersFailClosed)
@@ -5537,10 +5535,7 @@ TEST(GeometryIO_PointCloudIO, WritesXYZPositionsOnly)
     EXPECT_EQ(status, Geometry::PointCloudIO::PointCloudIOWriteStatus::Success);
 
     const std::string contents = ReadFileContents(file.Path);
-    EXPECT_EQ(contents,
-              std::string("0.000000 0.000000 0.000000\n") +
-              "1.000000 0.000000 0.000000\n" +
-              "0.000000 1.000000 0.000000\n");
+    EXPECT_EQ(contents, std::string("0 0 0\n") + "1 0 0\n" + "0 1 0\n");
 
     const auto loaded = Geometry::PointCloudIO::LoadXYZ(file.Path);
     ASSERT_TRUE(loaded.has_value());
@@ -5568,10 +5563,8 @@ TEST(GeometryIO_PointCloudIO, WritesXYZWithColorsRoundTrips)
     EXPECT_EQ(status, Geometry::PointCloudIO::PointCloudIOWriteStatus::Success);
 
     const std::string contents = ReadFileContents(file.Path);
-    EXPECT_NE(contents.find("0.000000 0.000000 0.000000 1.000000 0.000000 0.000000\n"),
-              std::string::npos);
-    EXPECT_NE(contents.find("1.000000 0.500000 0.000000 0.000000 0.500000 1.000000\n"),
-              std::string::npos);
+    EXPECT_NE(contents.find("0 0 0 1 0 0\n"), std::string::npos);
+    EXPECT_NE(contents.find("1 0.5 0 0 0.5 1\n"), std::string::npos);
 
     const auto loaded = Geometry::PointCloudIO::LoadXYZ(file.Path);
     ASSERT_TRUE(loaded.has_value());
@@ -5598,7 +5591,7 @@ TEST(GeometryIO_PointCloudIO, WritesXYZIgnoresRadiiAndNormals)
     EXPECT_EQ(status, Geometry::PointCloudIO::PointCloudIOWriteStatus::Success);
 
     const std::string contents = ReadFileContents(file.Path);
-    EXPECT_EQ(contents, std::string("2.000000 3.000000 4.000000\n"));
+    EXPECT_EQ(contents, std::string("2 3 4\n"));
 
     const auto loaded = Geometry::PointCloudIO::LoadXYZ(file.Path);
     ASSERT_TRUE(loaded.has_value());
@@ -5658,9 +5651,7 @@ TEST(GeometryIO_PointCloudIO, PCDEncodingsPreserveSingleAttributeBytes)
             (normals ? "FIELDS x y z normal_x normal_y normal_z\n" : "FIELDS x y z r g b\n") +
             "SIZE 4 4 4 4 4 4\nTYPE F F F F F F\nCOUNT 1 1 1 1 1 1\n"
             "WIDTH 1\nHEIGHT 1\nVIEWPOINT 0 0 0 1 0 0 0\nPOINTS 1\n";
-        const std::string asciiRow = normals
-            ? "1.000000 -2.000000 0.500000 0.000000 1.000000 0.000000\n"
-            : "1.000000 -2.000000 0.500000 0.000000 0.500000 1.000000\n";
+        const std::string asciiRow = normals ? "1 -2 0.5 0 1 0\n" : "1 -2 0.5 0 0.5 1\n";
         const std::string binaryRow = std::string("\x00\x00\x80\x3f\x00\x00\x00\xc0\x00\x00\x00\x3f", 12) +
             (normals ? std::string("\x00\x00\x00\x00\x00\x00\x80\x3f\x00\x00\x00\x00", 12)
                      : std::string("\x00\x00\x00\x00\x00\x00\x00\x3f\x00\x00\x80\x3f", 12));
@@ -6034,8 +6025,8 @@ TEST(GeometryIO_PointCloudIO, WritersOmitDeletedRowsAndPreserveLiveAttributes)
                     }
                     else
                     {
-                        EXPECT_NE(contents.find("255 0 0 0.250000\n"), std::string::npos);
-                        EXPECT_NE(contents.find("0 255 0 0.500000\n"), std::string::npos);
+                        EXPECT_NE(contents.find("255 0 0 0.25\n"), std::string::npos);
+                        EXPECT_NE(contents.find("0 255 0 0.5\n"), std::string::npos);
                     }
                 }
             }
@@ -6061,4 +6052,196 @@ TEST(GeometryIO_PointCloudIO, AllDeletedWritersPreserveDestinationAndReportEmpty
         EXPECT_EQ(write(file.Path, cloud), PointCloudIOWriteStatus::EmptyCloud);
         EXPECT_EQ(ReadFileContents(file.Path), "existing document");
     }
+}
+
+TEST(GeometryIO_MeshIO, TextWritersRoundTripFloatRangeAndAttributes)
+{
+    using namespace Geometry::MeshIO;
+    struct Format
+    {
+        const char* Extension;
+        decltype(&WriteOBJ) Write;
+        decltype(&LoadOBJ) Read;
+        bool Attributes;
+    };
+    const std::array<Format, 4> formats{{
+        {".obj", WriteOBJ, LoadOBJ, true},
+        {".off", WriteOFF, LoadOFF, false},
+        {".ply", WritePLY, LoadPLY, true},
+        {".stl", WriteSTL, LoadSTL, false},
+    }};
+    for (const auto& format : formats)
+    {
+        SCOPED_TRACE(format.Extension);
+        for (const float scale : {1e-7f, 1e38f, 1.2345678e-7f})
+        {
+            SCOPED_TRACE(scale);
+            MeshIOResult mesh;
+            const std::array<glm::vec3, 3> positions{
+                {{scale, scale, scale}, {-scale, scale, scale}, {scale, -scale, scale}}};
+            const std::array<std::vector<std::uint32_t>, 1> faces{{{0, 1, 2}}};
+            PopulateTriangleMesh(mesh, positions, faces);
+            if (format.Attributes)
+            {
+                auto normals = mesh.Vertices.GetOrAdd<glm::vec3>("v:normal", glm::vec3{scale});
+                auto uv = mesh.Vertices.GetOrAdd<glm::vec2>("v:texcoord", glm::vec2{scale});
+                (void)normals;
+                (void)uv;
+                if (format.Write == WriteOBJ)
+                    (void)mesh.Vertices.GetOrAdd<glm::vec4>("v:color", glm::vec4{scale, scale, scale, 1});
+            }
+            TempFile file(format.Extension, "previous contents");
+            ASSERT_EQ(format.Write(file.Path, mesh), MeshIOWriteStatus::Success);
+            const auto loaded = format.Read(file.Path);
+            ASSERT_TRUE(loaded.has_value());
+            const auto actual = loaded->Vertices.Get<glm::vec3>("v:point");
+            ASSERT_TRUE(actual.IsValid());
+            ASSERT_EQ(actual.Vector().size(), positions.size());
+            for (std::size_t i = 0; i < positions.size(); ++i)
+                EXPECT_EQ(actual[i], positions[i]);
+            if (format.Attributes)
+            {
+                const auto normals = loaded->Vertices.Get<glm::vec3>("v:normal");
+                const auto uv = loaded->Vertices.Get<glm::vec2>("v:texcoord");
+                ASSERT_TRUE(normals.IsValid());
+                ASSERT_TRUE(uv.IsValid());
+                EXPECT_EQ(normals[0], glm::vec3(scale));
+                EXPECT_EQ(uv[0], glm::vec2(scale));
+                if (format.Write == WriteOBJ)
+                {
+                    const auto colors = loaded->Vertices.Get<glm::vec4>("v:color");
+                    ASSERT_TRUE(colors.IsValid());
+                    EXPECT_EQ(colors[0], glm::vec4(scale, scale, scale, 1));
+                }
+            }
+            const auto first = ReadFileContents(file.Path);
+            ASSERT_EQ(format.Write(file.Path, mesh), MeshIOWriteStatus::Success);
+            EXPECT_EQ(ReadFileContents(file.Path), first);
+        }
+    }
+}
+
+TEST(GeometryIO_PointCloudIO, TextWritersRoundTripFloatRangeAndAttributes)
+{
+    using namespace Geometry::PointCloudIO;
+    struct Format
+    {
+        const char* Extension;
+        decltype(&WritePLY) Write;
+        decltype(&LoadPLY) Read;
+    };
+    const std::array<Format, 3> formats{{
+        {".ply", WritePLY, LoadPLY},
+        {".xyz", WriteXYZ, LoadXYZ},
+        {".pcd", WritePCD, LoadPCD},
+    }};
+    for (const auto& format : formats)
+    {
+        SCOPED_TRACE(format.Extension);
+        for (const float scale : {1e-7f, 1e38f, 1.2345678e-7f})
+        {
+            SCOPED_TRACE(scale);
+            PointCloudIOResult source;
+            source.Cloud.EnableNormals();
+            source.Cloud.EnableColors();
+            source.Cloud.EnableRadii();
+            const auto v = source.Cloud.AddPoint({scale, -scale, scale});
+            source.Cloud.Normal(v) = {scale, -scale, scale};
+            source.Cloud.Color(v) = {1e-7f, 1.2345678e-7f, 0.5f, 1};
+            source.Cloud.Radius(v) = scale;
+            TempFile file(format.Extension, "");
+            ASSERT_EQ(format.Write(file.Path, source), PointCloudIOWriteStatus::Success);
+            const auto loaded = format.Read(file.Path);
+            ASSERT_TRUE(loaded.has_value());
+            ASSERT_EQ(loaded->Cloud.VertexCount(), 1u);
+            EXPECT_EQ(loaded->Cloud.Position(v), source.Cloud.Position(v));
+            if (format.Write != WriteXYZ)
+            {
+                ASSERT_TRUE(loaded->Cloud.HasNormals());
+                EXPECT_EQ(loaded->Cloud.Normal(v), source.Cloud.Normal(v));
+            }
+            ASSERT_TRUE(loaded->Cloud.HasColors());
+            if (format.Write != WritePLY)
+                EXPECT_EQ(loaded->Cloud.Color(v), source.Cloud.Color(v));
+            if (format.Write == WritePLY)
+            {
+                // The reader does not expose radius yet; check the writer's declared scalar directly.
+                const auto text = ReadFileContents(file.Path);
+                const auto headerEnd = text.find("end_header\n");
+                ASSERT_NE(headerEnd, std::string::npos);
+                std::istringstream body(text.substr(headerEnd + 11));
+                body.imbue(std::locale::classic());
+                float scalar = 0;
+                for (int field = 0; field < 10; ++field)
+                    ASSERT_TRUE(body >> scalar);
+                EXPECT_EQ(scalar, scale);
+            }
+        }
+    }
+}
+
+TEST(GeometryIO_GraphIO, TextWritersRoundTripFloatRangeAndWeights)
+{
+    using namespace Geometry::GraphIO;
+    for (const float scale : {1e-7f, 1e38f, 1.2345678e-7f})
+    {
+        SCOPED_TRACE(scale);
+        GraphIOResult source;
+        const auto a = source.Graph.AddVertex({scale, -scale, scale});
+        const auto b = source.Graph.AddVertex({-scale, scale, -scale});
+        const auto edge = source.Graph.AddEdge(a, b);
+        ASSERT_TRUE(edge.has_value());
+        auto weights = source.Graph.GetOrAddEdgeProperty<float>("e:weight", scale);
+        weights[*edge] = scale;
+        for (const bool tgf : {true, false})
+        {
+            SCOPED_TRACE(tgf);
+            TempFile file(tgf ? ".tgf" : ".edges", "");
+            ASSERT_EQ(
+                tgf ? WriteTGF(file.Path, source) : WriteEdgeList(file.Path, source), GraphIOWriteStatus::Success);
+            const auto loaded = tgf ? LoadTGF(file.Path) : LoadEdgeList(file.Path);
+            ASSERT_TRUE(loaded.has_value());
+            const auto actualWeights = loaded->Graph.EdgeProperties().Get<float>("e:weight");
+            ASSERT_TRUE(actualWeights.IsValid());
+            EXPECT_EQ(actualWeights[0], scale);
+            if (tgf)
+                EXPECT_EQ(loaded->Graph.VertexPosition(a), source.Graph.VertexPosition(a));
+        }
+    }
+}
+
+TEST(GeometryIO_MeshIO, TextWritersIgnoreNumericLocale)
+{
+    struct RestoreLocale
+    {
+        std::string Previous{std::setlocale(LC_NUMERIC, nullptr)};
+        ~RestoreLocale()
+        {
+            std::setlocale(LC_NUMERIC, Previous.c_str());
+        }
+    } restore;
+    if (std::setlocale(LC_NUMERIC, "de_DE.UTF-8") == nullptr && std::setlocale(LC_NUMERIC, "de_DE.utf8") == nullptr)
+        GTEST_SKIP() << "A comma-decimal locale is unavailable";
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{{{0.125f, 0, 0}, {1.25f, 0, 0}, {0, 2.5f, 0}}};
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0, 1, 2}}};
+    PopulateTriangleMesh(mesh, positions, faces);
+    TempFile file(".obj", "");
+    ASSERT_EQ(Geometry::MeshIO::WriteOBJ(file.Path, mesh), Geometry::MeshIO::MeshIOWriteStatus::Success);
+    const auto loaded = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    EXPECT_EQ(loaded->Vertices.Get<glm::vec3>("v:point")[0], positions[0]);
+    Geometry::PointCloudIO::PointCloudIOResult cloud;
+    cloud.Cloud.AddPoint(positions[0]);
+    ASSERT_EQ(
+        Geometry::PointCloudIO::WriteXYZ(file.Path, cloud), Geometry::PointCloudIO::PointCloudIOWriteStatus::Success);
+    const auto points = Geometry::PointCloudIO::LoadXYZ(file.Path);
+    ASSERT_TRUE(points.has_value());
+    EXPECT_EQ(points->Cloud.Position(Geometry::VertexHandle{0}), positions[0]);
+    Geometry::GraphIO::GraphIOResult graph;
+    graph.Graph.AddVertex(positions[0]);
+    ASSERT_EQ(Geometry::GraphIO::WriteTGF(file.Path, graph), Geometry::GraphIO::GraphIOWriteStatus::Success);
+    const auto vertices = Geometry::GraphIO::LoadTGF(file.Path);
+    ASSERT_TRUE(vertices.has_value());
+    EXPECT_EQ(vertices->Graph.VertexPosition(Geometry::VertexHandle{0}), positions[0]);
 }

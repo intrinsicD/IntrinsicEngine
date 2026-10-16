@@ -414,7 +414,10 @@ the user applies or reloads the draft. Applying routes through the validated
 registered `sandbox.parameterization` preview/apply lane, and running the
 configured strategy writes `v:texcoord` through the runtime command-history
 path, with undo and redo controls in the same window. No panel-only solver or
-configuration path exists.
+configuration path exists. The Run button validates the current draft's bindings,
+strategy, pins and boundary through the same runtime admission used by Apply.
+Readiness caches depend on source revisions and the resolved configuration; preview
+does not run the numerical solver. Agent preview uses the active configuration.
 
 The same window's atlas controls accept a scalar vertex/face guide and choose
 native None, Angle, Area or Both objectives, or the xatlas Angle backend.
@@ -675,3 +678,12 @@ optional Poisson source (harmonic, biharmonic or triharmonic; zero-mean Neumann
 for unconstrained parts), or propagates Int32 seed labels (random walker) with
 optional confidence and per-label weight fields; settings round-trip in
 `sandbox.harmonic_field`. See [harmonic fields](../../../docs/methods/harmonic-field.md).
+
+Geometry export is available under **File / Export** for the first selected mesh,
+graph or point cloud. The format list comes from the shared geometry capability
+catalog; unsupported choices show their reason. Enter a destination with the
+chosen extension. Export writes committed canonical geometry in object space,
+so accept GPU previews first. The result lists omitted properties and format
+losses (for example, STL shared vertex identity or edge-list positions). Existing
+destinations are replaced only after a successful staged write. Native destination
+dialogs remain under UI-047.

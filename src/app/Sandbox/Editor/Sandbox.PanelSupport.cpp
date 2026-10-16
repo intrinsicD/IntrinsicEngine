@@ -43,6 +43,7 @@ import Extrinsic.Runtime.EditorJobProjection;
 // `ToString(JobState)` for the queued UV-job readout.
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
@@ -61,6 +62,148 @@ extern "C++"
 namespace Extrinsic::Sandbox::Editor
 {
     using namespace Extrinsic::Runtime;
+
+    namespace
+    {
+        void ExecuteSceneReplacement(SceneReplacementState& state, const Runtime::EditorSceneEditingCommands& commands)
+        {
+            if (!state.Pending)
+                return;
+            switch (*state.Pending)
+            {
+            case Runtime::EditorSceneFileOperation::New:
+                state.LastResult = Runtime::ApplyEditorNewSceneCommand(commands);
+                break;
+            case Runtime::EditorSceneFileOperation::Close:
+                state.LastResult = Runtime::ApplyEditorCloseSceneCommand(commands);
+                break;
+            case Runtime::EditorSceneFileOperation::Load:
+                state.LastResult = Runtime::ApplyEditorSceneLoadCommand(commands, {.Path = state.OpenPath});
+                break;
+            case Runtime::EditorSceneFileOperation::Save: return;
+            }
+            state.Pending.reset();
+            state.AwaitingSave = false;
+        }
+    }
+
+    void RequestSceneReplacement(SceneReplacementState& state,
+        const Runtime::EditorSceneFileOperation operation,
+        const std::string& openPath,
+        const Runtime::EditorSceneEditingCommands& commands,
+        const Runtime::EditorDocumentModel& document,
+        const std::uint64_t epoch)
+    {
+        if (state.Pending || operation == Runtime::EditorSceneFileOperation::Save)
+            return;
+        state = {};
+        state.Pending = operation;
+        state.OpenPath = openPath;
+        state.Epoch = epoch;
+        state.Revision = document.Revision;
+        if (!document.Dirty)
+        {
+            ExecuteSceneReplacement(state, commands);
+            return;
+        }
+        const std::string& path = document.ActivePath;
+        if (document.HasActivePath && path.size() < state.SavePath.size())
+            std::copy(path.begin(), path.end(), state.SavePath.begin());
+    }
+
+    void ResolveSceneReplacement(SceneReplacementState& state,
+        const SceneReplacementDecision decision,
+        const Runtime::EditorSceneEditingCommands& commands,
+        const Runtime::EditorDocumentModel& document,
+        const std::uint64_t epoch)
+    {
+        if (!state.Pending)
+            return;
+        if (decision == SceneReplacementDecision::Cancel || state.Epoch != epoch)
+        {
+            state.Pending.reset();
+            state.AwaitingSave = false;
+            return;
+        }
+        if (state.AwaitingSave)
+            return;
+        if (decision == SceneReplacementDecision::Discard)
+        {
+            ExecuteSceneReplacement(state, commands);
+            return;
+        }
+        state.Revision = document.Revision;
+        state.LastResult = Runtime::ApplyEditorSceneSaveCommand(commands, {.Path = state.SavePath.data()});
+        state.AwaitingSave =
+            state.LastResult->Succeeded() || state.LastResult->Status == Runtime::EditorCommandStatus::Pending;
+        state.SaveTask = state.LastResult->Task;
+        state.Message = state.LastResult->Message;
+    }
+
+    void ObserveSceneReplacement(SceneReplacementState& state,
+        const Runtime::EditorSceneEditingCommands& commands,
+        const Runtime::EditorDocumentModel& document,
+        const std::uint64_t epoch,
+        const std::optional<Runtime::EditorSceneFileResult>& completion)
+    {
+        if (state.LastResult && state.LastResult->Task.IsValid() && completion &&
+            state.LastResult->Task == completion->Task && state.LastResult->Operation == completion->Operation)
+            state.LastResult = completion;
+        if (!state.Pending)
+            return;
+        if (state.Epoch != epoch)
+        {
+            state.Pending.reset();
+            state.AwaitingSave = false;
+            state.Message = "The scene changed; the pending action was cancelled.";
+            return;
+        }
+        if (!state.AwaitingSave)
+            return;
+        if (state.SaveTask.IsValid())
+        {
+            if (!completion || completion->Operation != Runtime::EditorSceneFileOperation::Save ||
+                completion->Task != state.SaveTask || completion->Status == Runtime::EditorCommandStatus::Pending)
+            {
+                if (!Runtime::IsEditorSceneFilePending(commands, state.SaveTask))
+                {
+                    state.AwaitingSave = false;
+                    state.LastResult.reset();
+                    state.Message =
+                        "The save result is unavailable. Check the saved file, then save again, discard, or cancel.";
+                }
+                return;
+            }
+            state.LastResult = completion;
+        }
+        state.AwaitingSave = false;
+        if (!state.LastResult->Succeeded())
+        {
+            state.Message = state.LastResult->Message;
+            return;
+        }
+        if (document.Dirty || document.Revision != state.Revision)
+        {
+            state.Message = "The scene changed while saving. Save again, discard the changes, or cancel.";
+            return;
+        }
+        ExecuteSceneReplacement(state, commands);
+    }
+
+    std::string ApplyEditorHistoryCommand(const Runtime::EditorDocumentCommandSurface& commands, const bool undo)
+    {
+        if (!commands.Available())
+            return "Document history is unavailable.";
+        const auto result = undo ? commands.Undo() : commands.Redo();
+        return std::string("History: ") + DebugNameForEditorCommandHistoryStatus(result.Status) +
+            (result.Label.empty() ? "" : " — " + result.Label);
+    }
+
+    void DrawEditorHistoryResult(const std::string& result)
+    {
+        if (!result.empty())
+            ImGui::TextWrapped("%s", result.c_str());
+    }
 
     extern "C++"
     {

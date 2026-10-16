@@ -1787,18 +1787,17 @@ namespace
             AssetWorkflowModule* const assetWorkflow = services.Find<AssetWorkflowModule>();
             TextureBakeService* const textureBake          = services.Find<TextureBakeService>();
             EditorFeatureBindings context{
-                .Scene          = activeScene,
-                .World          = activeWorld,
-                .Selection      = selection,
+                .Scene = activeScene,
+                .World = activeWorld,
+                .Selection = selection,
                 .CommandHistory = commandHistory,
-                .LastRefinedPrimitive =
-                    interaction != nullptr ? &interaction->LastRefinedPrimitive() : nullptr,
+                .LastRefinedPrimitive = interaction != nullptr ? &interaction->LastRefinedPrimitive() : nullptr,
                 .LastRefinedPrimitiveGeneration =
                     interaction != nullptr ? interaction->LastRefinedPrimitiveGeneration() : 0u,
                 .CameraControllers = services.Find<CameraControllerRegistry>(),
-                .CameraViewport    = PresentedSceneViewportExtent(window, services.Find<EditorUiHost>()),
-                .Device            = device,
-                .TextureBake       = textureBake,
+                .CameraViewport = PresentedSceneViewportExtent(window, services.Find<EditorUiHost>()),
+                .Device = device,
+                .TextureBake = textureBake,
                 .AssetImportCommands =
                     EditorAssetImportCommandSurface{
                         .Import =
@@ -1890,34 +1889,24 @@ namespace
                             return result;
                         },
                     },
-                .AssetImportQueueCommands =
-                    EditorAssetImportQueueCommandSurface{
-                        .ClearCompleted =
-                            [assetWorkflow]()
-                        {
-                            return assetWorkflow != nullptr
-                                ? assetWorkflow->
-                                      ClearCompletedAssetImports()
-                                : std::size_t{0u};
-                        },
-                        .Cancel =
-                            [assetWorkflow](const RuntimeAssetIngestHandle operation)
-                        {
-                            return assetWorkflow != nullptr
-                                ? assetWorkflow->
-                                      CancelAssetImport(operation)
-                                : Core::Err(
-                                      Core::ErrorCode::InvalidState);
-                        },
-                        .Find =
-                            [assetWorkflow](const RuntimeAssetIngestHandle operation)
-                            -> std::optional<RuntimeAssetIngestRecord>
-                        {
-                            return assetWorkflow != nullptr
-                                ? assetWorkflow->GetAssetIngestRecord(operation)
-                                : std::nullopt;
-                        },
+                .AssetImportQueueCommands = EditorAssetImportQueueCommandSurface{
+                    .ClearCompleted =
+                        [assetWorkflow]()
+                    {
+                        return assetWorkflow != nullptr ? assetWorkflow->ClearCompletedAssetImports() : std::size_t{0u};
                     },
+                    .Cancel =
+                        [assetWorkflow](const RuntimeAssetIngestHandle operation)
+                    {
+                        return assetWorkflow != nullptr ? assetWorkflow->CancelAssetImport(operation)
+                                                        : Core::Err(Core::ErrorCode::InvalidState);
+                    },
+                    .Find = [assetWorkflow](
+                                const RuntimeAssetIngestHandle operation) -> std::optional<RuntimeAssetIngestRecord>
+                    {
+                        return assetWorkflow != nullptr ? assetWorkflow->GetAssetIngestRecord(operation) : std::nullopt;
+                    },
+                },
                 .SceneFileCommands =
                     EditorSceneFileCommandSurface{
                         .New =
@@ -2066,51 +2055,47 @@ namespace
                             result.Message = BuildSceneFileSuccessMessage({}, result);
                             return result;
                         },
-                    },
-                .VisualizationRecipes =
-                    EditorVisualizationRecipeCommandSurface{
-                        .GetRecipe =
-                            [renderExtraction](const std::uint32_t stableEntityId)
+                        .IsPending =
+                            [jobs = services.Find<JobService>()](const JobToken task)
                         {
-                            return renderExtraction != nullptr
-                                       ? renderExtraction->GetVisualizationRecipe(
-                                             stableEntityId)
-                                       : std::optional<VisualizationRecipe>{};
-                        },
-                        .SetRecipe =
-                            [renderExtraction](
-                                const std::uint32_t stableEntityId,
-                                VisualizationRecipe recipe)
-                        {
-                            if (renderExtraction != nullptr)
-                                renderExtraction->SetVisualizationRecipe(
-                                    stableEntityId, std::move(recipe));
-                        },
-                        .ClearRecipe =
-                            [renderExtraction](const std::uint32_t stableEntityId)
-                        {
-                            if (renderExtraction != nullptr)
-                                renderExtraction->ClearVisualizationRecipe(stableEntityId);
+                            return jobs != nullptr && jobs->GetState(task) != JobState::Invalid &&
+                                !jobs->IsComplete(task);
                         },
                     },
+                .VisualizationRecipes = EditorVisualizationRecipeCommandSurface{
+                    .GetRecipe =
+                        [renderExtraction](const std::uint32_t stableEntityId)
+                    {
+                        return renderExtraction != nullptr ? renderExtraction->GetVisualizationRecipe(stableEntityId)
+                                                           : std::optional<VisualizationRecipe>{};
+                    },
+                    .SetRecipe =
+                        [renderExtraction](const std::uint32_t stableEntityId, VisualizationRecipe recipe)
+                    {
+                        if (renderExtraction != nullptr)
+                            renderExtraction->SetVisualizationRecipe(stableEntityId, std::move(recipe));
+                    },
+                    .ClearRecipe =
+                        [renderExtraction](const std::uint32_t stableEntityId)
+                    {
+                        if (renderExtraction != nullptr)
+                            renderExtraction->ClearVisualizationRecipe(stableEntityId);
+                    },
+                },
                 .VisualizationRecipeRevision =
-                    renderExtraction != nullptr
-                        ? renderExtraction->GetVisualizationRecipeRevision()
-                        : 0u,
-                .AssetImportQueue   = assetWorkflow != nullptr
-                                          ? assetWorkflow->GetAssetImportQueueSnapshot()
-                                          : RuntimeAssetImportQueueSnapshot{},
-                .RenderGraphStats =
-                    renderer != nullptr ? &renderer->GetLastRenderGraphStats() : nullptr,
+                    renderExtraction != nullptr ? renderExtraction->GetVisualizationRecipeRevision() : 0u,
+                .AssetImportQueue = assetWorkflow != nullptr ? assetWorkflow->GetAssetImportQueueSnapshot()
+                                                             : RuntimeAssetImportQueueSnapshot{},
+                .RenderGraphStats = renderer != nullptr ? &renderer->GetLastRenderGraphStats() : nullptr,
                 .ImGuiAdapterAvailable =
                     [&services]
                 {
                     const EditorUiHost* host = services.Find<EditorUiHost>();
                     return host != nullptr && host->IsOperational();
                 }(),
-                .AssetImportCommandsAvailable   = assetWorkflow != nullptr,
-                .SceneFileCommandsAvailable     = true,
-                .CameraRenderCommandsAvailable  = true,
+                .AssetImportCommandsAvailable = assetWorkflow != nullptr,
+                .SceneFileCommandsAvailable = true,
+                .CameraRenderCommandsAvailable = true,
                 .VisualizationCommandsAvailable = true,
             };
             if (configControl != nullptr)

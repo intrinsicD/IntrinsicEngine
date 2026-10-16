@@ -283,6 +283,7 @@ TEST(HarmonicParameterization, CustomBoundaryNotFullyPinnedIsRejected)
     const auto result = Param::ComputeHarmonic(mesh, params);
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result->Status, Param::HarmonicStatus::InvalidPins);
+    EXPECT_EQ(result->BoundaryVertexCount, 4u);
 }
 
 // --- LSCM remains reachable (not replaced by GEOM-019) ---

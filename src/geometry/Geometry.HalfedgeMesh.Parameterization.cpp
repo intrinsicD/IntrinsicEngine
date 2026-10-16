@@ -9,6 +9,7 @@ module;
 #include <numeric>
 #include <optional>
 #include <span>
+#include <string_view>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -197,6 +198,65 @@ namespace Geometry::Parameterization
 
             return {boundaryVerts[0], boundaryVerts[bestIdx]};
         }
+
+        // Shared admission and pin selection; no matrix assembly or solve.
+        [[nodiscard]] std::string_view PrepareLscmInput(
+            const HalfedgeMesh::Mesh& mesh, const ParameterizationParams& params, std::size_t& pin0, std::size_t& pin1)
+        {
+            if (!HasValidNumericParams(params) || mesh.IsEmpty() || mesh.FaceCount() == 0 || mesh.VertexCount() < 3)
+                return "LSCM requires valid numeric settings and a mesh with at least three vertices and faces.";
+
+            const std::size_t nV = mesh.VerticesSize();
+            const std::size_t nF = mesh.FacesSize();
+
+            // ------------------------------------------------------------------
+            // Step 1: Validate topology — must be triangle mesh with disk topology
+            // ------------------------------------------------------------------
+            // Check all faces are triangles
+            for (std::size_t fi = 0; fi < nF; ++fi)
+            {
+                FaceHandle fh{static_cast<PropertyIndex>(fi)};
+                if (mesh.IsDeleted(fh))
+                    continue;
+                if (mesh.Valence(fh) != 3)
+                    return "LSCM requires triangular faces.";
+            }
+
+            auto boundary = FindBoundaryLoops(mesh);
+            if (boundary.LoopCount != 1 || boundary.LoopVertices.empty() ||
+                !MeshUtils::IsConnectedManifoldWithEulerOne(
+                    mesh, VertexHandle{static_cast<PropertyIndex>(boundary.LoopVertices.front())}))
+            {
+                return "LSCM requires a connected manifold with disk topology.";
+            }
+
+            // ------------------------------------------------------------------
+            // Step 2: Select pin vertices
+            // ------------------------------------------------------------------
+
+            if (params.PinVertex0 != std::numeric_limits<std::size_t>::max() &&
+                params.PinVertex1 != std::numeric_limits<std::size_t>::max())
+            {
+                pin0 = params.PinVertex0;
+                pin1 = params.PinVertex1;
+                if (pin0 >= nV || pin1 >= nV || pin0 == pin1)
+                    return "LSCM pins must identify distinct in-range vertices.";
+                VertexHandle v0{static_cast<PropertyIndex>(pin0)};
+                VertexHandle v1{static_cast<PropertyIndex>(pin1)};
+                if (mesh.IsDeleted(v0) || mesh.IsDeleted(v1))
+                    return "LSCM pins must identify live vertices.";
+            }
+            else
+            {
+                auto [autoPin0, autoPin1] = SelectPinVertices(mesh, boundary.LoopVertices);
+                pin0 = autoPin0;
+                pin1 = autoPin1;
+                if (pin0 == pin1)
+                    return "LSCM requires two distinct automatic pins.";
+            }
+
+            return {};
+        }
     }
 
     // =========================================================================
@@ -207,59 +267,13 @@ namespace Geometry::Parameterization
         const HalfedgeMesh::Mesh& mesh,
         const ParameterizationParams& params)
     {
-        if (!HasValidNumericParams(params)
-            || mesh.IsEmpty() || mesh.FaceCount() == 0 || mesh.VertexCount() < 3)
-            return std::nullopt;
-
         const std::size_t nV = mesh.VerticesSize();
         const std::size_t nF = mesh.FacesSize();
-
-        // ------------------------------------------------------------------
-        // Step 1: Validate topology — must be triangle mesh with disk topology
-        // ------------------------------------------------------------------
-        // Check all faces are triangles
-        for (std::size_t fi = 0; fi < nF; ++fi)
-        {
-            FaceHandle fh{static_cast<PropertyIndex>(fi)};
-            if (mesh.IsDeleted(fh)) continue;
-            if (mesh.Valence(fh) != 3) return std::nullopt;
-        }
-
-        auto boundary = FindBoundaryLoops(mesh);
-        if (boundary.LoopCount != 1
-            || boundary.LoopVertices.empty()
-            || !MeshUtils::IsConnectedManifoldWithEulerOne(mesh,
-                VertexHandle{static_cast<PropertyIndex>(boundary.LoopVertices.front())}))
-        {
+        std::size_t pin0{}, pin1{};
+        if (!PrepareLscmInput(mesh, params, pin0, pin1).empty())
             return std::nullopt;
-        }
-
-        // ------------------------------------------------------------------
-        // Step 2: Select pin vertices
-        // ------------------------------------------------------------------
-        std::size_t pin0, pin1;
-        glm::vec2 pinUV0, pinUV1;
-
-        if (params.PinVertex0 != std::numeric_limits<std::size_t>::max() &&
-            params.PinVertex1 != std::numeric_limits<std::size_t>::max())
-        {
-            pin0 = params.PinVertex0;
-            pin1 = params.PinVertex1;
-            if (pin0 >= nV || pin1 >= nV || pin0 == pin1) return std::nullopt;
-            VertexHandle v0{static_cast<PropertyIndex>(pin0)};
-            VertexHandle v1{static_cast<PropertyIndex>(pin1)};
-            if (mesh.IsDeleted(v0) || mesh.IsDeleted(v1)) return std::nullopt;
-        }
-        else
-        {
-            auto [autoPin0, autoPin1] = SelectPinVertices(mesh, boundary.LoopVertices);
-            pin0 = autoPin0;
-            pin1 = autoPin1;
-            if (pin0 == pin1) return std::nullopt;
-        }
-
-        pinUV0 = params.PinUV0;
-        pinUV1 = params.PinUV1;
+        const glm::vec2 pinUV0 = params.PinUV0;
+        const glm::vec2 pinUV1 = params.PinUV1;
 
         // ------------------------------------------------------------------
         // Step 3: Build vertex index mapping (global → free-variable index)
@@ -586,6 +600,43 @@ namespace Geometry::Parameterization
             }
         }
 
+        [[nodiscard]] std::string_view ValidateStrategyInput(
+            const HalfedgeMesh::Mesh& mesh, const ParameterizationParams& params)
+        {
+            std::size_t pin0{}, pin1{};
+            return PrepareLscmInput(mesh, params, pin0, pin1);
+        }
+
+        [[nodiscard]] std::string_view ValidateStrategyInput(
+            const HalfedgeMesh::Mesh& mesh, const HarmonicParams& params)
+        {
+            const auto status = ValidateHarmonicInput(mesh, params);
+            switch (status)
+            {
+            case HarmonicStatus::Success: return {};
+            case HarmonicStatus::InvalidPins:
+                return "Harmonic pins must be unique live vertices; Custom must pin every boundary vertex.";
+            case HarmonicStatus::MismatchedBoundaryArray:
+                return "Harmonic pins require one UV coordinate per pinned vertex.";
+            case HarmonicStatus::NotDiskTopology:
+                return "Harmonic parameterization requires a connected manifold with disk topology.";
+            default: return ToString(status);
+            }
+        }
+
+        [[nodiscard]] std::string_view ValidateStrategyInput(const HalfedgeMesh::Mesh& mesh, const BffParams& params)
+        {
+            const auto status = ValidateBffInput(mesh, params);
+            switch (status)
+            {
+            case BffStatus::Success: return {};
+            case BffStatus::MismatchedBoundaryArray:
+                return "BFF requires one target per boundary vertex, or no targets in automatic mode.";
+            case BffStatus::NotDiskTopology: return "BFF requires a connected manifold with disk topology.";
+            default:                         return ToString(status);
+            }
+        }
+
         // Only ever called on the failure path, so the flood fill and the
         // boundary walk stay off the success path entirely.
         [[nodiscard]] ParameterizationRejection SummarizeRejection(
@@ -603,6 +654,21 @@ namespace Geometry::Parameterization
             };
         }
     } // namespace
+
+    ParameterizationInputValidation ValidateParameterizationInput(
+        const HalfedgeMesh::Mesh& mesh, const ParameterizationStrategy& strategy)
+    {
+        ParameterizationInputValidation result;
+        result.Diagnostic = std::visit(
+            [&mesh](const auto& params)
+            {
+                return ValidateStrategyInput(mesh, params);
+            },
+            strategy);
+        if (!result.Succeeded())
+            result.Rejection = SummarizeRejection(mesh);
+        return result;
+    }
 
     ParameterizeResult ParameterizeMesh(
         const HalfedgeMesh::Mesh& mesh,

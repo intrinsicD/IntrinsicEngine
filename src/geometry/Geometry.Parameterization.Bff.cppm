@@ -1,3 +1,4 @@
+// Boundary-first flattening input admission, CPU solver parameters and diagnostics.
 module;
 
 #include <cstddef>
@@ -95,6 +96,9 @@ export namespace Geometry::Parameterization
     };
 
     [[nodiscard]] const char* ToString(BffStatus status) noexcept;
+
+    // Shared input admission; performs no sparse assembly or solve.
+    [[nodiscard]] BffStatus ValidateBffInput(const HalfedgeMesh::Mesh& mesh, const BffParams& params);
 
     [[nodiscard]] BffResult ComputeBFF(
         const HalfedgeMesh::Mesh& mesh,

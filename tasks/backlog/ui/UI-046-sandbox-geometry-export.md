@@ -3,12 +3,10 @@ id: UI-046
 theme: J
 depends_on: []
 workflow_schema: 1
-workflow_profile: standard
-evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+template: micro
+workflow_profile: micro
+evidence: not_applicable
+evidence_skip_reason: completed interactively under HARDEN-091; reviewed source and actual CPU evidence replace a custody report, retaining the task full-CPU requirement
 contract_schema: 1
 contracts:
   - geometry.element-domain-sources
@@ -29,8 +27,7 @@ contracts:
 - No batch/scripted export pipeline.
 
 ## Context
-- Symptom: `grep -rn 'Export' src/app/Sandbox/Editor/` returns nothing. There is
-  no export affordance anywhere in the editor.
+- Original symptom: no geometry-export affordance in the editor.
 - The geometry writers already exist. `Geometry.IO` and `Asset.ImportRouter`
   derive exportability from `src/core/Core.GeometryFormatCatalog.inc`, including
   OFF mesh export. Reuse those queries for available format/domain choices;

@@ -1916,9 +1916,7 @@ namespace Geometry::PointCloudIO
         stream << "format ascii 1.0\n";
         stream << "comment Exported by IntrinsicEngine\n";
         {
-            const int written = std::snprintf(buffer, sizeof(buffer),
-                                              "element vertex %zu\n",
-                                              pointCount);
+            const int written = Geometry::IOText::FormatText(buffer, sizeof(buffer), "element vertex {}\n", pointCount);
             if (written <= 0)
             {
                 return PointCloudIOWriteStatus::FileWriteError;
@@ -1949,11 +1947,7 @@ namespace Geometry::PointCloudIO
         for (const std::size_t i : rows)
         {
             const auto& p = positions[i];
-            int written = std::snprintf(buffer, sizeof(buffer),
-                                        "%.6f %.6f %.6f",
-                                        static_cast<double>(p.x),
-                                        static_cast<double>(p.y),
-                                        static_cast<double>(p.z));
+            int written = Geometry::IOText::FormatText(buffer, sizeof(buffer), "{} {} {}", p.x, p.y, p.z);
             if (written <= 0)
             {
                 return PointCloudIOWriteStatus::FileWriteError;
@@ -1963,11 +1957,7 @@ namespace Geometry::PointCloudIO
             if (hasNormals)
             {
                 const auto& n = normals[i];
-                written = std::snprintf(buffer, sizeof(buffer),
-                                        " %.6f %.6f %.6f",
-                                        static_cast<double>(n.x),
-                                        static_cast<double>(n.y),
-                                        static_cast<double>(n.z));
+                written = Geometry::IOText::FormatText(buffer, sizeof(buffer), " {} {} {}", n.x, n.y, n.z);
                 if (written <= 0)
                 {
                     return PointCloudIOWriteStatus::FileWriteError;
@@ -1978,11 +1968,12 @@ namespace Geometry::PointCloudIO
             if (hasColors)
             {
                 const auto& c = colors[i];
-                written = std::snprintf(buffer, sizeof(buffer),
-                                        " %u %u %u",
-                                        static_cast<unsigned int>(EncodeUnitColorByte(c.x)),
-                                        static_cast<unsigned int>(EncodeUnitColorByte(c.y)),
-                                        static_cast<unsigned int>(EncodeUnitColorByte(c.z)));
+                written = Geometry::IOText::FormatText(buffer,
+                    sizeof(buffer),
+                    " {} {} {}",
+                    static_cast<unsigned int>(EncodeUnitColorByte(c.x)),
+                    static_cast<unsigned int>(EncodeUnitColorByte(c.y)),
+                    static_cast<unsigned int>(EncodeUnitColorByte(c.z)));
                 if (written <= 0)
                 {
                     return PointCloudIOWriteStatus::FileWriteError;
@@ -1992,9 +1983,7 @@ namespace Geometry::PointCloudIO
 
             if (hasRadii)
             {
-                written = std::snprintf(buffer, sizeof(buffer),
-                                        " %.6f",
-                                        static_cast<double>(radii[i]));
+                written = Geometry::IOText::FormatText(buffer, sizeof(buffer), " {}", radii[i]);
                 if (written <= 0)
                 {
                     return PointCloudIOWriteStatus::FileWriteError;
@@ -2055,9 +2044,8 @@ namespace Geometry::PointCloudIO
         stream << "format binary_little_endian 1.0\n";
         stream << "comment Exported by IntrinsicEngine\n";
         {
-            const int written = std::snprintf(headerBuffer, sizeof(headerBuffer),
-                                              "element vertex %zu\n",
-                                              pointCount);
+            const int written =
+                Geometry::IOText::FormatText(headerBuffer, sizeof(headerBuffer), "element vertex {}\n", pointCount);
             if (written <= 0)
             {
                 return PointCloudIOWriteStatus::FileWriteError;
@@ -2173,22 +2161,12 @@ namespace Geometry::PointCloudIO
                 const float r = c.x < 0.0f ? 0.0f : (c.x > 1.0f ? 1.0f : c.x);
                 const float g = c.y < 0.0f ? 0.0f : (c.y > 1.0f ? 1.0f : c.y);
                 const float b = c.z < 0.0f ? 0.0f : (c.z > 1.0f ? 1.0f : c.z);
-                written = std::snprintf(buffer, sizeof(buffer),
-                                        "%.6f %.6f %.6f %.6f %.6f %.6f\n",
-                                        static_cast<double>(p.x),
-                                        static_cast<double>(p.y),
-                                        static_cast<double>(p.z),
-                                        static_cast<double>(r),
-                                        static_cast<double>(g),
-                                        static_cast<double>(b));
+                written =
+                    Geometry::IOText::FormatText(buffer, sizeof(buffer), "{} {} {} {} {} {}\n", p.x, p.y, p.z, r, g, b);
             }
             else
             {
-                written = std::snprintf(buffer, sizeof(buffer),
-                                        "%.6f %.6f %.6f\n",
-                                        static_cast<double>(p.x),
-                                        static_cast<double>(p.y),
-                                        static_cast<double>(p.z));
+                written = Geometry::IOText::FormatText(buffer, sizeof(buffer), "{} {} {}\n", p.x, p.y, p.z);
             }
             if (written <= 0)
             {
@@ -2295,9 +2273,7 @@ namespace Geometry::PointCloudIO
             stream.put('\n');
 
             {
-                const int written = std::snprintf(buffer, sizeof(buffer),
-                                                  "WIDTH %zu\n",
-                                                  pointCount);
+                const int written = Geometry::IOText::FormatText(buffer, sizeof(buffer), "WIDTH {}\n", pointCount);
                 if (written <= 0)
                 {
                     return PointCloudIOWriteStatus::FileWriteError;
@@ -2307,9 +2283,7 @@ namespace Geometry::PointCloudIO
             stream << "HEIGHT 1\n";
             stream << "VIEWPOINT 0 0 0 1 0 0 0\n";
             {
-                const int written = std::snprintf(buffer, sizeof(buffer),
-                                                  "POINTS %zu\n",
-                                                  pointCount);
+                const int written = Geometry::IOText::FormatText(buffer, sizeof(buffer), "POINTS {}\n", pointCount);
                 if (written <= 0)
                 {
                     return PointCloudIOWriteStatus::FileWriteError;
@@ -2327,11 +2301,7 @@ namespace Geometry::PointCloudIO
                 for (const std::size_t i : rows)
                 {
                     const auto& p = positions[i];
-                    int written = std::snprintf(buffer, sizeof(buffer),
-                                                "%.6f %.6f %.6f",
-                                                static_cast<double>(p.x),
-                                                static_cast<double>(p.y),
-                                                static_cast<double>(p.z));
+                    int written = Geometry::IOText::FormatText(buffer, sizeof(buffer), "{} {} {}", p.x, p.y, p.z);
                     if (written <= 0)
                     {
                         return PointCloudIOWriteStatus::FileWriteError;
@@ -2341,11 +2311,7 @@ namespace Geometry::PointCloudIO
                     if (hasNormals)
                     {
                         const auto& n = normals[i];
-                        written = std::snprintf(buffer, sizeof(buffer),
-                                                " %.6f %.6f %.6f",
-                                                static_cast<double>(n.x),
-                                                static_cast<double>(n.y),
-                                                static_cast<double>(n.z));
+                        written = Geometry::IOText::FormatText(buffer, sizeof(buffer), " {} {} {}", n.x, n.y, n.z);
                         if (written <= 0)
                         {
                             return PointCloudIOWriteStatus::FileWriteError;
@@ -2356,11 +2322,8 @@ namespace Geometry::PointCloudIO
                     if (hasColors)
                     {
                         const auto& c = colors[i];
-                        written = std::snprintf(buffer, sizeof(buffer),
-                                                " %.6f %.6f %.6f",
-                                                static_cast<double>(clampUnit(c.x)),
-                                                static_cast<double>(clampUnit(c.y)),
-                                                static_cast<double>(clampUnit(c.z)));
+                        written = Geometry::IOText::FormatText(
+                            buffer, sizeof(buffer), " {} {} {}", clampUnit(c.x), clampUnit(c.y), clampUnit(c.z));
                         if (written <= 0)
                         {
                             return PointCloudIOWriteStatus::FileWriteError;

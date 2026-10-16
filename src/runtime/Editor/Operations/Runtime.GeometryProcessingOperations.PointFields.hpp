@@ -41,13 +41,24 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
     [[nodiscard]] Geometry::PropertySet* MutableGeometryProperties(entt::registry&, entt::entity, GeometryElementDomain);
     [[nodiscard]] GeometryElementDomain PrimaryPointDomain(const GeometryEntityAvailability&);
 
+    enum class MeshFieldReadinessKind
+    {
+        Curvature,
+        Segmentation,
+        Parameterization
+    };
+
     // Deferred mesh-field validation shares session lifetime and revision guards.
-    [[nodiscard]] bool PrepareMeshFieldInput(
-        const EditorProcessingContext&, entt::entity, const GeometryEntityAvailability&,
-        const GeometryPropertyRef& positions, bool segmentation, std::vector<GeometryPropertyRef> bindings,
+    [[nodiscard]] bool PrepareMeshFieldInput(const EditorProcessingContext&,
+        entt::entity,
+        const GeometryEntityAvailability&,
+        const GeometryPropertyRef& positions,
+        MeshFieldReadinessKind kind,
+        std::vector<GeometryPropertyRef> bindings,
         std::vector<PointPropertyWatch> inputs,
         std::function<bool(const GeometryEntityAvailability&, std::string&)> validate,
-        std::string& diagnostic);
+        std::string& diagnostic,
+        std::string configKey = {});
 
     struct PointDeletionSource
     {

@@ -189,6 +189,7 @@ target_sources(${target_name}
         Editor/Runtime.EditorJobProjection.Public.cpp
         Editor/Operations/Runtime.SceneEditingOperations.Public.cpp
         Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp
+        Editor/Operations/Runtime.SceneEditingOperations.Export.cpp
         Editor/Operations/Runtime.SceneEditingOperations.Debug.cpp
         Editor/Operations/Runtime.VisualizationEditingOperations.Public.cpp
         Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp

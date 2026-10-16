@@ -97,7 +97,7 @@ export namespace Geometry::Parameterization
         SolverFailed,
     };
 
-    // Unevaluated when no solver rejection was inspected or counts were unavailable.
+    // Unevaluated when no prepared-mesh rejection was inspected or counts were unavailable.
     struct ParameterizationRejection
     {
         bool Evaluated{false};

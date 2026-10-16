@@ -525,6 +525,7 @@ namespace Extrinsic::Sandbox::Editor
 
         struct PointCloudConsolidationState
         {
+            std::string HistoryResult{};
             ProcessingEntityInput Input{};
             SandboxPointCloudConsolidationPanelConfig Draft{};
             Runtime::PointCloudConsolidationPropertyRefs Properties{};
@@ -544,6 +545,7 @@ namespace Extrinsic::Sandbox::Editor
 
         struct ParameterizationState
         {
+            std::string HistoryResult{};
             ProcessingEntityInput Input{};
             Runtime::ParameterizationConfig Draft{};
             bool Initialized{false};
@@ -1717,7 +1719,7 @@ namespace Extrinsic::Sandbox::Editor
                         ReadinessUnlessBlocked({{!historyAvailable, "Document history is unavailable.", ReadinessCode::WorkspaceUnavailable},
                                                 {historyAvailable && !canUndo, "The next undo step is not a point-cloud consolidation."}})))
                 {
-                    (void)context.DocumentCommands.Undo();
+                    PointCloudConsolidation.HistoryResult = ApplyEditorHistoryCommand(context.DocumentCommands, true);
                 }
                 ImGui::SameLine();
                 if (DrawProcessingActionButton(
@@ -1725,8 +1727,10 @@ namespace Extrinsic::Sandbox::Editor
                         ReadinessUnlessBlocked({{!historyAvailable, "Document history is unavailable.", ReadinessCode::WorkspaceUnavailable},
                                                 {historyAvailable && !canRedo, "The next redo step is not a point-cloud consolidation."}})))
                 {
-                    (void)context.DocumentCommands.Redo();
+                    PointCloudConsolidation.HistoryResult = ApplyEditorHistoryCommand(context.DocumentCommands, false);
                 }
+
+                DrawEditorHistoryResult(PointCloudConsolidation.HistoryResult);
 
                 if (PointCloudConsolidation.LastConfigApply.has_value() &&
                     !PointCloudConsolidation.LastConfigApply->Succeeded())
@@ -3008,9 +3012,9 @@ namespace Extrinsic::Sandbox::Editor
                 }
             }
 
-            const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
-                context.Parameterization.Commands,
-                {model.HasSelectedEntity && model.SelectedEntityIsMesh, model.Message});
+            const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(context.Parameterization.Commands,
+                Runtime::PreviewEditorParameterizationCommand(
+                    context.Parameterization.Commands, {model.SelectedStableEntityId, Parameterization.Draft}));
             if (DrawProcessingActionButton("Parameterize selected mesh##Parameterization", readiness))
             {
                 PreserveWorkspaceLayout(
@@ -3047,7 +3051,7 @@ namespace Extrinsic::Sandbox::Editor
                                             {historyAvailable && !canUndoUv, "The next undo step is not a UV writeback."}})) &&
                 historyAvailable)
             {
-                (void)context.DocumentCommands.Undo();
+                Parameterization.HistoryResult = ApplyEditorHistoryCommand(context.DocumentCommands, true);
             }
             ImGui::SameLine();
             if (DrawProcessingActionButton("Redo UV writeback##Parameterization",
@@ -3055,8 +3059,9 @@ namespace Extrinsic::Sandbox::Editor
                                             {historyAvailable && !canRedoUv, "The next redo step is not a UV writeback."}})) &&
                 historyAvailable)
             {
-                (void)context.DocumentCommands.Redo();
+                Parameterization.HistoryResult = ApplyEditorHistoryCommand(context.DocumentCommands, false);
             }
+            DrawEditorHistoryResult(Parameterization.HistoryResult);
             if (history.CanUndo && !canUndoUv)
             {
                 ImGui::TextDisabled(

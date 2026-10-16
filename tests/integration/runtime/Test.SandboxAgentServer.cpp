@@ -327,6 +327,116 @@ TEST(SandboxAgentServer, InvalidUndoRedoArgumentsPreserveHistory)
     EXPECT_EQ(value, 2);
 }
 
+TEST(SandboxAgentServer, UndoFailureReportsPartialProgressAndLeavesFailedStepAvailable)
+{
+    AgentRig rig("undo-partial-failure");
+    auto* history = rig.Engine->Services().Find<R::EditorCommandHistory>();
+    ASSERT_NE(history, nullptr);
+    ASSERT_TRUE(history
+            ->Record({.Label = "stale property",
+                .Redo =
+                    []
+                {
+                    return R::EditorCommandHistoryStatus::Applied;
+                },
+                .Undo =
+                    []
+                {
+                    return R::EditorCommandHistoryStatus::StaleEntity;
+                }})
+            .Succeeded());
+    ASSERT_TRUE(history
+            ->Record({.Label = "valid step",
+                .Redo =
+                    []
+                {
+                    return R::EditorCommandHistoryStatus::Applied;
+                },
+                .Undo =
+                    []
+                {
+                    return R::EditorCommandHistoryStatus::Applied;
+                }})
+            .Succeeded());
+    rig.Run(
+        [&](Client& c)
+        {
+            bool isError = false;
+            const auto result = c.Tool("undo", {{"steps", 2}}, &isError);
+            rig.Check(isError, "failed undo must report an error: " + result.dump());
+            rig.Check(result.value("undone", Json::array()) == Json::array({"valid step"}),
+                "successful earlier undo is retained: " + result.dump());
+            rig.Check(result.value("status", "") == "StaleEntity" && result.value("label", "") == "stale property",
+                "actual failure status and label: " + result.dump());
+            rig.Check(c.Tool("history")["undo_count"] == 1, "failed undo remains available");
+        });
+}
+
+TEST(SandboxAgentServer, RedoFailureReportsPartialProgressAndLeavesFailedStepAvailable)
+{
+    AgentRig rig("redo-partial-failure");
+    auto* history = rig.Engine->Services().Find<R::EditorCommandHistory>();
+    ASSERT_NE(history, nullptr);
+    ASSERT_TRUE(history
+            ->Record({.Label = "valid step",
+                .Redo =
+                    []
+                {
+                    return R::EditorCommandHistoryStatus::Applied;
+                },
+                .Undo =
+                    []
+                {
+                    return R::EditorCommandHistoryStatus::Applied;
+                }})
+            .Succeeded());
+    ASSERT_TRUE(history
+            ->Record({.Label = "missing transform",
+                .Redo =
+                    []
+                {
+                    return R::EditorCommandHistoryStatus::MissingTransform;
+                },
+                .Undo =
+                    []
+                {
+                    return R::EditorCommandHistoryStatus::Applied;
+                }})
+            .Succeeded());
+    ASSERT_TRUE(history->Undo().Succeeded());
+    ASSERT_TRUE(history->Undo().Succeeded());
+    rig.Run(
+        [&](Client& c)
+        {
+            bool isError = false;
+            const auto result = c.Tool("redo", {{"steps", 2}}, &isError);
+            rig.Check(isError, "failed redo must report an error: " + result.dump());
+            rig.Check(result.value("redone", Json::array()) == Json::array({"valid step"}),
+                "successful earlier redo is retained: " + result.dump());
+            rig.Check(
+                result.value("status", "") == "MissingTransform" && result.value("label", "") == "missing transform",
+                "actual failure status and label: " + result.dump());
+            rig.Check(c.Tool("history")["redo_count"] == 1, "failed redo remains available");
+        });
+}
+
+TEST(SandboxAgentServer, EmptyUndoRedoHistoryIsSuccessfulExhaustion)
+{
+    AgentRig rig("empty-history");
+    rig.Run(
+        [&](Client& c)
+        {
+            for (const char* operation : {"undo", "redo"})
+            {
+                bool isError = true;
+                const auto result = c.Tool(operation, {{"steps", 2}}, &isError);
+                const char* key = std::string_view(operation) == "undo" ? "undone" : "redone";
+                rig.Check(!isError && result.value(key, Json::array()).empty(),
+                    std::string(operation) + " empty history is not an error: " + result.dump());
+            }
+        });
+}
+
 TEST(SandboxAgentServer, MessageLimitRejectsOversizedCompleteLinesAcrossReceives)
 {
     constexpr std::size_t limit = 16384u; // LocalSocket receives at most 4096 bytes per call.
@@ -352,6 +462,76 @@ TEST(SandboxAgentServer, MessageLimitRejectsOversizedCompleteLinesAcrossReceives
         rig.Check(c.Await(rejectedId, 100).is_null(), "oversized complete line must close the client before invocation");
     });
     EXPECT_EQ(undoCalls, 0);
+}
+
+TEST(SandboxAgentServer, ShutdownStopsSendingPendingRepliesAfterFailure)
+{
+    AgentRig rig("shutdown-pending-replies");
+    constexpr std::uint64_t replyCount = 24;
+    std::atomic_bool initialized{false};
+    std::atomic_bool batchSent{false};
+    std::atomic_bool responseStarted{false};
+    std::atomic_bool clientFinished{false};
+    std::atomic_bool shutdownComplete{false};
+    std::thread client(
+        [&]
+        {
+            Client c;
+            for (int attempt = 0;
+                attempt < 50 && P::ConnectLocalSocket(rig.SocketPath, c.Connection) != P::LocalSocketStatus::Ok;
+                ++attempt)
+                std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            rig.Check(c.Connection.IsOpen(), "connect");
+            if (c.Connection.IsOpen())
+            {
+                rig.Check(c.Request("initialize").contains("result"), "initialize");
+                initialized.store(true);
+                std::string batch;
+                for (std::uint64_t i = 0; i < replyCount; ++i)
+                    batch += Json{{"jsonrpc", "2.0"}, {"id", i}, {"method", "tools/list"}}.dump() + "\n";
+            // Small requests fit one receive chunk; the real schema produces large replies.
+                rig.Check(batch.size() < 4096u, "request batch fits one socket receive");
+                rig.Check(c.Connection.SendAll(batch) == P::LocalSocketStatus::Ok, "send reply batch");
+                batchSent.store(true);
+                c.Buffer.clear();
+                const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+                while (c.Buffer.empty() && std::chrono::steady_clock::now() < deadline)
+                    if (c.Connection.Receive(c.Buffer, 20) == P::LocalSocketStatus::Closed)
+                        break;
+                responseStarted.store(!c.Buffer.empty());
+                rig.Check(responseStarted.load(), "server began sending the reply batch");
+            // Keep the socket open and unread, including through an old sender's second timeout.
+                const auto watchdog = std::chrono::steady_clock::now() + std::chrono::seconds(12);
+                while (!shutdownComplete.load() && std::chrono::steady_clock::now() < watchdog)
+                    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            }
+            c.Connection.Close();
+            clientFinished.store(true);
+        });
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);
+    rig.Frames->OnFrame = [&](R::Engine& engine)
+    {
+        // Hold dispatch while the socket thread receives the batch, then drain all replies.
+        while (initialized.load() && !batchSent.load() && !clientFinished.load() &&
+            std::chrono::steady_clock::now() < deadline)
+            std::this_thread::yield();
+        if ((responseStarted.load() && rig.Server->Status().CallsHandled == replyCount + 1) || clientFinished.load() ||
+            std::chrono::steady_clock::now() >= deadline)
+            engine.RequestExit();
+    };
+    rig.Engine->Run();
+    EXPECT_EQ(rig.Server->Status().CallsHandled, replyCount + 1)
+        << "All replies must be produced before shutdown starts";
+    const auto started = std::chrono::steady_clock::now();
+    rig.Engine->Shutdown();
+    const auto elapsed = std::chrono::steady_clock::now() - started;
+    shutdownComplete.store(true);
+    client.join();
+    for (const auto& failure : rig.Failures)
+        ADD_FAILURE() << failure;
+    ASSERT_TRUE(responseStarted.load());
+    EXPECT_LT(elapsed, std::chrono::seconds(7))
+        << "Only the currently stalled send may consume its five-second timeout";
 }
 
 TEST(SandboxAgentServer, ShutdownReturnsWithANonReadingClient)
@@ -1062,9 +1242,11 @@ TEST(SandboxAgentServer, RunOperationOutlierAnalysisPublishesAndUndoes)
         const auto geodesics = c.Tool("preview_operation", {{"operation", "geodesics"}, {"entity", cloud}}, &isError);
         rig.Check(!isError && geodesics["enabled"] == false && geodesics["reason"].get<std::string>().find("source") != std::string::npos,
                   "geodesics preview: " + geodesics.dump());
-        // Parameterization has no readiness function and says so instead of inventing one.
-        const auto noCheck = c.Tool("preview_operation", {{"operation", "parameterization"}, {"entity", cloud}}, &isError);
-        rig.Check(!isError && noCheck["enabled"].is_null() && !noCheck["reason"].get<std::string>().empty(), "parameterization preview: " + noCheck.dump());
+        // Parameterization rejects the cloud with the same runtime prerequisite used by Apply.
+        const auto uvReadiness =
+            c.Tool("preview_operation", {{"operation", "parameterization"}, {"entity", cloud}}, &isError);
+        rig.Check(!isError && uvReadiness["enabled"] == false && !uvReadiness["reason"].get<std::string>().empty(),
+            "parameterization preview: " + uvReadiness.dump());
         // Every Config row names a real section.
         for (const char* op : {"mesh_curvature", "normal_estimation", "kernel_density", "point_spacing", "outlier_analysis",
                                "density_weight", "descriptor_analysis", "bilateral_filter", "point_construction"})

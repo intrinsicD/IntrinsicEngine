@@ -309,7 +309,9 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                             }
                             const auto entity = SelectionController::ToEntityHandle(identity.StableEntityId);
                             const EditorProcessingContext historyContext{.Scene = identity.Scene, .CommandHistory = commandHistory};
-                            const GeometryPropertyRef output{GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3};
+                            const GeometryPropertyRef output{GeometryElementDomain::MeshVertex,
+                                std::string{GS::PropertyNames::kPosition},
+                                Geometry::PropertyValueKind::Vec3};
                             const auto historyBefore = GeometryProcessingDetail::ObserveGeometryProperties(historyContext, entity, std::span(&output, 1));
                             const auto status = ApplyMeshDenoisePositionState(identity.Scene, identity.StableEntityId, *target);
                             if (status == EditorCommandHistoryStatus::Applied)

@@ -359,12 +359,7 @@ namespace Geometry::GraphIO
                 continue;
             }
             const glm::vec3 p = source.VertexPosition(v);
-            int written = std::snprintf(buffer, sizeof(buffer),
-                                        "%zu %.6f %.6f %.6f",
-                                        i,
-                                        static_cast<double>(p.x),
-                                        static_cast<double>(p.y),
-                                        static_cast<double>(p.z));
+            int written = Geometry::IOText::FormatText(buffer, sizeof(buffer), "{} {} {} {}", i, p.x, p.y, p.z);
             if (written <= 0)
             {
                 return GraphIOWriteStatus::FileWriteError;
@@ -397,10 +392,7 @@ namespace Geometry::GraphIO
             const std::size_t fromIndex = endpoints.first.Index;
             const std::size_t toIndex = endpoints.second.Index;
 
-            int written = std::snprintf(buffer, sizeof(buffer),
-                                        "%zu %zu",
-                                        fromIndex,
-                                        toIndex);
+            int written = Geometry::IOText::FormatText(buffer, sizeof(buffer), "{} {}", fromIndex, toIndex);
             if (written <= 0)
             {
                 return GraphIOWriteStatus::FileWriteError;
@@ -412,9 +404,7 @@ namespace Geometry::GraphIO
             if (weightPresent || labelPresent)
             {
                 const float weight = weightPresent ? edgeWeights[e.Index] : 1.0f;
-                written = std::snprintf(buffer, sizeof(buffer),
-                                        " %.6f",
-                                        static_cast<double>(weight));
+                written = Geometry::IOText::FormatText(buffer, sizeof(buffer), " {}", weight);
                 if (written <= 0)
                 {
                     return GraphIOWriteStatus::FileWriteError;
@@ -479,10 +469,7 @@ namespace Geometry::GraphIO
             const std::size_t fromIndex = endpoints.first.Index;
             const std::size_t toIndex = endpoints.second.Index;
 
-            int written = std::snprintf(buffer, sizeof(buffer),
-                                        "%zu %zu",
-                                        fromIndex,
-                                        toIndex);
+            int written = Geometry::IOText::FormatText(buffer, sizeof(buffer), "{} {}", fromIndex, toIndex);
             if (written <= 0)
             {
                 return GraphIOWriteStatus::FileWriteError;
@@ -493,9 +480,7 @@ namespace Geometry::GraphIO
             if (hasEdgeWeights || labelPresent)
             {
                 const float weight = hasEdgeWeights ? edgeWeights[e.Index] : 1.0f;
-                written = std::snprintf(buffer, sizeof(buffer),
-                                        " %.6f",
-                                        static_cast<double>(weight));
+                written = Geometry::IOText::FormatText(buffer, sizeof(buffer), " {}", weight);
                 if (written <= 0)
                 {
                     return GraphIOWriteStatus::FileWriteError;

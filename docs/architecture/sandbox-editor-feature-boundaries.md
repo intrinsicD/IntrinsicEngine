@@ -681,6 +681,17 @@ ICP trajectory application and construction retain their distinct request sequen
 algorithm controls and statistics remain explicit; compatible Show actions use
 `ShowProcessingProperty`, while face-normal display retains its face-lane path.
 
+File / Scene and the method-specific Undo/Redo controls retain the returned
+history status and command label below their buttons. File / Scene guards New,
+Open path and Close with Save / Discard / Cancel while the document is dirty.
+Saving uses a separate path input, prefilled from the current document, so opening
+another path cannot overwrite that destination accidentally. The queued action
+continues only after its matching save succeeds with the same scene epoch and
+unchanged saved revision. Save failures, a lost completion event after the job
+ends, or edits during saving leave the choice open; Cancel preserves the scene, and a replaced document cancels the queued
+action. Native window close and explicit agent scene commands use their existing
+contracts.
+
 UV regeneration's shared control builds one request for
 `PreviewEditorUvRegenerationCommand` and apply. Both use the same session,
 parameter, mesh-source metadata and active-job admission checks; the preview

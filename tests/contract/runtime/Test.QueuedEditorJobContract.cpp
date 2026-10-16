@@ -633,6 +633,7 @@ TEST(RuntimeReuseDriftGuard, RuntimeUsesTheSharedFiniteCheckAndPositionName)
     // Member chains (`sphere.Center.x`, `a->b[i].x`) and scalar wrappers (`IsFinite(v.x) && IsFinite(v.y)`) count.
     const std::regex handWrittenFinite{
         R"((?:std::isfinite|\bIsFinite)\(([\w.\[\]>-]+)\.x\)\s*(?:&&|\|\|)\s*!?\s*(?:std::isfinite|\bIsFinite)\(\1\.y\))"};
+    const std::regex executesHistory{R"(CommandHistory\s*->\s*Execute\s*\()"};
     // Paged kNN/radius queries advance through GpuRowPages/AdvanceGpuRowPages; these files may
     // queue them without it.
     constexpr std::array<std::string_view, 3> allowedUnpagedQueries{
@@ -688,7 +689,7 @@ TEST(RuntimeReuseDriftGuard, RuntimeUsesTheSharedFiniteCheckAndPositionName)
         else
             EXPECT_FALSE(unpaged) << "page GPU kNN/radius queries through GpuRowPages/AdvanceGpuRowPages";
         const bool publishes = text.find("PrepareGeometryScalarProperty(") != std::string::npos &&
-                               text.find("CommandHistory->Execute(") != std::string::npos;
+            std::regex_search(text, executesHistory);
         if (std::find(allowedScalarPublishers.begin(), allowedScalarPublishers.end(), name) != allowedScalarPublishers.end())
         {
             EXPECT_TRUE(publishes) << "stale allowlist entry: the file no longer publishes scalars itself; remove it";

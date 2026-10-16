@@ -686,7 +686,17 @@ namespace Extrinsic::Runtime
             for (std::uint32_t i = 0; i < steps; ++i)
             {
                 const auto result = undo ? scene.DocumentCommands.Undo() : scene.DocumentCommands.Redo();
-                if (!result.Succeeded()) break;
+                if (result.Status == EditorCommandHistoryStatus::EmptyUndoStack ||
+                    result.Status == EditorCommandHistoryStatus::EmptyRedoStack)
+                    break;
+                if (!result.Succeeded())
+                {
+                    return {.IsError = true,
+                        .Text = Dump({{undo ? "undone" : "redone", labels},
+                            {"status", DebugNameForEditorCommandHistoryStatus(result.Status)},
+                            {"label", result.Label},
+                            {"history", HistoryJson(context)}})};
+                }
                 labels.push_back(result.Label);
             }
             return Ok({{undo ? "undone" : "redone", labels}, {"history", HistoryJson(context)}});

@@ -433,6 +433,14 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                             "Scene close failed: editor session attachment expired.",
                     };
                 });
+            if (context.SceneFileCommands.IsPending)
+                context.SceneFileCommands.IsPending =
+                    GuardAttachmentCommand(std::move(context.SceneFileCommands.IsPending),
+                        epoch,
+                        [](const JobToken)
+                        {
+                            return false;
+                        });
             context.VisualizationRecipes.GetRecipe =
                 GuardAttachmentCommand(
                     std::move(context.VisualizationRecipes.GetRecipe),

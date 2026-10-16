@@ -162,7 +162,7 @@ TEST(SandboxDomainPanels, RegistersTheEightAppOwnedWindowsWithStableMenuMetadata
     panels.Register(harness.Shell);
 
     const auto menu = harness.Shell.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), expected.size() + 12u);
+    ASSERT_EQ(menu.size(), expected.size() + 13u);
     // UI-075: one Appearance window replaces the three per-kind ones.
     for (const std::string_view retired :
          {"pointcloud.appearance", "graph.appearance", "mesh.appearance"})
@@ -186,24 +186,24 @@ TEST(SandboxDomainPanels, RegistrationIsIdempotentAndLifetimeUnregistersEveryWin
     {
         Editor::DomainPanels panels;
         panels.Register(first.Shell);
-        ASSERT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 20u);
+        ASSERT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 21u);
 
         panels.Register(first.Shell);
-        EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 20u);
+        EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 21u);
 
         panels.Register(second.Shell);
-        EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 12u);
-        EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 20u);
+        EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 13u);
+        EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 21u);
 
         panels.Unregister();
-        EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 12u);
+        EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 13u);
 
         panels.Register(second.Shell);
-        ASSERT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 20u);
+        ASSERT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 21u);
     }
 
-    EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 12u);
-    EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 12u);
+    EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 13u);
+    EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 13u);
 }
 
 TEST(SandboxDomainPanels, ClosedRegisteredWindowsBuildNoDomainModels)

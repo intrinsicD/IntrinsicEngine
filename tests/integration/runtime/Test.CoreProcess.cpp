@@ -1,5 +1,18 @@
 #include <gtest/gtest.h>
 
+#include <atomic>
+#include <cerrno>
+#include <cstdlib>
+#include <fstream>
+#include <future>
+#include <thread>
+#include <poll.h>
+#include <pthread.h>
+#include <signal.h>
+#include <sys/syscall.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
 #include <chrono>
 #include <filesystem>
 #include <string>
@@ -193,4 +206,119 @@ TEST(CoreProcess, LargeOutputIsCapturedFully)
     EXPECT_EQ(result.StdOut.size(), 102400u);
 }
 
+namespace
+{
+    struct SignalDisposition
+    {
+        int Signal;
+        struct sigaction Previous{};
+        bool Installed{false};
+        SignalDisposition(int signal, void (*handler)(int)) : Signal(signal)
+        {
+            struct sigaction action{};
+            action.sa_handler = handler;
+            sigemptyset(&action.sa_mask);
+            Installed = sigaction(Signal, &action, &Previous) == 0;
+        }
+        ~SignalDisposition()
+        {
+            if (Installed)
+                sigaction(Signal, &Previous, nullptr);
+        }
+    };
+}
 
+TEST(CoreProcess, InterruptedBlockingWaitStillReturnsChildExitStatus)
+{
+    SignalDisposition signal(SIGUSR1, +[](int) {});
+    ASSERT_TRUE(signal.Installed);
+    struct Pipes
+    {
+        int Ready[2]{-1, -1};
+        int Release[2]{-1, -1};
+        ~Pipes()
+        {
+            for (const int fd : {Ready[0], Ready[1], Release[0], Release[1]})
+                if (fd >= 0)
+                    close(fd);
+        }
+    } pipes;
+    ASSERT_EQ(pipe(pipes.Ready), 0);
+    ASSERT_EQ(pipe(pipes.Release), 0);
+    Process::ProcessConfig config;
+    config.Executable = "sh";
+    config.CaptureOutput = false;
+    config.Args = {"-c",
+        "printf '%s\\n' \"$$\" > /proc/self/fd/" + std::to_string(pipes.Ready[1]) +
+            "; read -r release < /proc/self/fd/" + std::to_string(pipes.Release[0]) + "; exit 37"};
+    std::atomic<pid_t> threadId{0};
+    std::promise<Process::ProcessResult> promise;
+    auto result = promise.get_future();
+    std::thread worker(
+        [&]
+        {
+            threadId.store(static_cast<pid_t>(syscall(SYS_gettid)));
+            promise.set_value(Process::Run(config));
+        });
+    pollfd ready{pipes.Ready[0], POLLIN, 0};
+    const bool childReady = poll(&ready, 1, 2000) == 1;
+    EXPECT_TRUE(childReady);
+    pid_t child = -1;
+    if (childReady)
+    {
+        char bytes[32]{};
+        const auto count = read(pipes.Ready[0], bytes, sizeof(bytes) - 1);
+        if (count > 0)
+            child = static_cast<pid_t>(std::strtol(bytes, nullptr, 10));
+    }
+    bool waiting = false;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    while (childReady && std::chrono::steady_clock::now() < deadline)
+    {
+        // The child remains blocked on Release: observing wait4 makes signal delivery deterministic.
+        std::ifstream state("/proc/self/task/" + std::to_string(threadId.load()) + "/syscall");
+        long call = -1;
+        if (state >> call && call == SYS_wait4)
+        {
+            waiting = true;
+            break;
+        }
+        std::this_thread::yield();
+    }
+    EXPECT_TRUE(waiting) << "The process runner must reach waitpid before the signal";
+    if (waiting)
+    {
+        EXPECT_EQ(pthread_kill(worker.native_handle(), SIGUSR1), 0);
+        EXPECT_EQ(result.wait_for(std::chrono::milliseconds(50)), std::future_status::timeout)
+            << "An interrupted wait must not return while the child is still held";
+    }
+    EXPECT_EQ(write(pipes.Release[1], "go\n", 3), 3);
+    worker.join();
+    const auto actual = result.get();
+    EXPECT_EQ(actual.ExitCode, 37);
+    EXPECT_FALSE(actual.TimedOut);
+    EXPECT_FALSE(actual.SpawnFailed);
+    // Reap the child even when the old implementation returned early.
+    if (child > 0)
+    {
+        int status = 0;
+        while (waitpid(child, &status, 0) < 0 && errno == EINTR)
+        {
+        }
+    }
+}
+
+TEST(CoreProcess, WaitErrorIsNotReportedAsSuccessfulExit)
+{
+    SignalDisposition ignored(SIGCHLD, SIG_IGN);
+    ASSERT_TRUE(ignored.Installed);
+    Process::ProcessConfig config;
+    config.Executable = "true";
+    config.CaptureOutput = false;
+    const auto result = Process::Run(config);
+    EXPECT_EQ(result.ExitCode, -1);
+    EXPECT_FALSE(result.SpawnFailed);
+    EXPECT_FALSE(result.TimedOut);
+    EXPECT_NE(result.StdErr.find("waitpid"), std::string::npos);
+    EXPECT_FALSE(Process::IsExecutableAvailable("true"));
+}

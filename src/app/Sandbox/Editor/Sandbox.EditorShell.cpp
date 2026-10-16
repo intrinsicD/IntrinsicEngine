@@ -79,19 +79,19 @@ namespace Extrinsic::Sandbox::Editor
             std::string_view Title{};
         };
 
-        inline constexpr std::array<BuiltinWindowSpec, 10>
-            kBuiltinWindows{{
-                {"sandbox.shell", "Sandbox Editor"},
-                {"scene.hierarchy", "Scene Hierarchy"},
-                {"scene.inspector", "Inspector"},
-                {"scene.selection", "Selection Details"},
-                {"file.scene", "File / Scene"},
-                {"file.import", "File / Import"},
-                {"view.frame_graph", "Frame Graph"},
-                {"view.render_recipes", "Render Recipes"},
-                {"view.camera_render", "Camera / Render"},
-                {"view.geometry_visualization", "Geometry Visualization"},
-            }};
+        inline constexpr std::array<BuiltinWindowSpec, 11> kBuiltinWindows{{
+            {"sandbox.shell", "Sandbox Editor"},
+            {"scene.hierarchy", "Scene Hierarchy"},
+            {"scene.inspector", "Inspector"},
+            {"scene.selection", "Selection Details"},
+            {"file.scene", "File / Scene"},
+            {"file.import", "File / Import"},
+            {"view.frame_graph", "Frame Graph"},
+            {"view.render_recipes", "Render Recipes"},
+            {"view.camera_render", "Camera / Render"},
+            {"view.geometry_visualization", "Geometry Visualization"},
+            {"file.export", "File / Export"},
+        }};
 
         [[nodiscard]] bool BeginFixedWindow(
             const char* title,
@@ -118,7 +118,7 @@ namespace Extrinsic::Sandbox::Editor
             EditorWorkspaceSnapshotRequest request{};
             request.Hierarchy = registry.IsOpen(builtinHandles[1u]);
             request.Inspector = registry.IsOpen(builtinHandles[2u]);
-            request.Selection = registry.IsOpen(builtinHandles[3u]);
+            request.Selection = registry.IsOpen(builtinHandles[3u]) || registry.IsOpen(builtinHandles[10u]);
             request.Visualization = registry.IsOpen(builtinHandles[9u]);
             return request;
         }
@@ -386,11 +386,23 @@ namespace Extrinsic::Sandbox::Editor
 
         // File > Save Screenshot: requests go to the runtime capture queue; the menu only
         // reports its availability. Returns the ticket of a started capture (0 otherwise).
-        std::uint64_t DrawFileMenu(Runtime::ViewCaptureModule* capture)
+        std::uint64_t DrawFileMenu(Runtime::ViewCaptureModule* capture,
+            EditorWindowRegistry* registry,
+            const std::vector<EditorWindowMenuEntry>& entries)
         {
-            if (capture == nullptr || !ImGui::BeginMenu("File"))
+            if (!ImGui::BeginMenu("File"))
                 return 0u;
             std::uint64_t ticket = 0u;
+            if (registry)
+            {
+                std::vector<std::string> path{"File"};
+                DrawRegisteredWindowMenuTree(*registry, entries, path);
+            }
+            if (capture == nullptr)
+            {
+                ImGui::EndMenu();
+                return ticket;
+            }
             const auto unavailable = capture->UnavailableReason();
             ImGui::BeginDisabled(unavailable.has_value());
             if (ImGui::MenuItem("Save Screenshot", "F12"))
@@ -410,10 +422,10 @@ namespace Extrinsic::Sandbox::Editor
         {
             if (!ImGui::BeginMainMenuBar())
                 return 0u;
-            const std::uint64_t captureTicket = DrawFileMenu(capture);
             std::vector<EditorWindowMenuEntry> registeredEntries{};
             if (windowRegistry != nullptr)
                 registeredEntries = windowRegistry->BuildMenuModel();
+            const std::uint64_t captureTicket = DrawFileMenu(capture, windowRegistry, registeredEntries);
             const std::vector<EditorWindowMenuEntry>* registeredEntriesPtr =
                 windowRegistry != nullptr ? &registeredEntries : nullptr;
             DrawPanelWindowMenu(windowRegistry, registeredEntriesPtr);
@@ -979,8 +991,14 @@ namespace Extrinsic::Sandbox::Editor
             }
         }
 
-        void DrawFixedWindow(
-            const std::string_view windowId,
+        struct GeometryExportUiState
+        {
+            std::array<char, 1024> Path{};
+            std::string Format{"obj"};
+            std::optional<EditorGeometryExportResult> Result{};
+        };
+
+        void DrawFixedWindow(const std::string_view windowId,
             bool& open,
             const EditorWorkspaceSnapshot& frame,
             const SandboxEditorContext* context,
@@ -991,7 +1009,10 @@ namespace Extrinsic::Sandbox::Editor
             EditorAssetPayloadKind* importPayloadKind,
             std::optional<EditorFileImportResult>* lastImportResult,
             std::optional<EditorSceneFileResult>* lastSceneFileResult,
-            TextureBakeUiState* textureBakeState)
+            SceneReplacementState& sceneReplacement,
+            std::string& historyResult,
+            TextureBakeUiState* textureBakeState,
+            GeometryExportUiState* exportState)
         {
             if (windowId == "sandbox.shell" &&
                 BeginFixedWindow("Sandbox Editor", open, ImVec2(360.0f, 520.0f)))
@@ -1349,7 +1370,7 @@ namespace Extrinsic::Sandbox::Editor
                              ReadinessCode::WorkspaceUnavailable},
                             {historyControlsAvailable && !frame.Document.CanUndo, "Nothing to undo."}})) &&
                     historyControlsAvailable)
-                    (void)context->DocumentCommands.Undo();
+                    historyResult = ApplyEditorHistoryCommand(context->DocumentCommands, true);
                 ImGui::SameLine();
                 if (DrawProcessingActionButton(
                         "Redo",
@@ -1358,7 +1379,8 @@ namespace Extrinsic::Sandbox::Editor
                              ReadinessCode::WorkspaceUnavailable},
                             {historyControlsAvailable && !frame.Document.CanRedo, "Nothing to redo."}})) &&
                     historyControlsAvailable)
-                    (void)context->DocumentCommands.Redo();
+                    historyResult = ApplyEditorHistoryCommand(context->DocumentCommands, false);
+                DrawEditorHistoryResult(historyResult);
                 if (!frame.Document.UndoLabel.empty())
                     ImGui::Text("Undo next: %s", frame.Document.UndoLabel.c_str());
                 if (!frame.Document.RedoLabel.empty())
@@ -1377,15 +1399,23 @@ namespace Extrinsic::Sandbox::Editor
                 if (DrawProcessingActionButton("New scene", lifecycleReadiness) &&
                     frame.SceneFile.LifecycleEnabled && sceneSurfaceBound)
                 {
-                    *lastSceneFileResult =
-                        ApplyEditorNewSceneCommand(context->SceneCommands);
+                    RequestSceneReplacement(sceneReplacement,
+                        EditorSceneFileOperation::New,
+                        {},
+                        context->SceneCommands,
+                        frame.Document,
+                        GetEditorSceneEpoch(context->Processing));
                 }
                 ImGui::SameLine();
                 if (DrawProcessingActionButton("Close scene", lifecycleReadiness) &&
                     frame.SceneFile.LifecycleEnabled && sceneSurfaceBound)
                 {
-                    *lastSceneFileResult =
-                        ApplyEditorCloseSceneCommand(context->SceneCommands);
+                    RequestSceneReplacement(sceneReplacement,
+                        EditorSceneFileOperation::Close,
+                        {},
+                        context->SceneCommands,
+                        frame.Document,
+                        GetEditorSceneEpoch(context->Processing));
                 }
 
                 const bool sceneControlsAvailable =
@@ -1418,8 +1448,7 @@ namespace Extrinsic::Sandbox::Editor
                 }
                 if (DrawProcessingActionButton("Save / Save As", sceneFileReadiness) && sceneControlsAvailable)
                 {
-                    *lastSceneFileResult = ApplyEditorSceneSaveCommand(
-                        context->SceneCommands,
+                    sceneReplacement.LastResult = ApplyEditorSceneSaveCommand(context->SceneCommands,
                         EditorSceneFileCommand{
                             .Path = std::string(scenePathBuffer->data()),
                         });
@@ -1427,24 +1456,26 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::SameLine();
                 if (DrawProcessingActionButton("Open path", sceneFileReadiness) && sceneControlsAvailable)
                 {
-                    *lastSceneFileResult = ApplyEditorSceneLoadCommand(
+                    RequestSceneReplacement(sceneReplacement,
+                        EditorSceneFileOperation::Load,
+                        std::string(scenePathBuffer->data()),
                         context->SceneCommands,
-                        EditorSceneFileCommand{
-                            .Path = std::string(scenePathBuffer->data()),
-                        });
+                        frame.Document,
+                        GetEditorSceneEpoch(context->Processing));
                 }
                 ImGui::TextWrapped("%s", frame.SceneFile.StatusText.c_str());
-                const EditorSceneFileResult* result =
-                    lastSceneFileResult != nullptr && lastSceneFileResult->has_value()
-                        ? &**lastSceneFileResult
-                        : frame.SceneFile.LastResult.has_value()
-                            ? &*frame.SceneFile.LastResult
-                            : nullptr;
+                const EditorSceneFileResult* result = sceneReplacement.LastResult.has_value()
+                    ? &*sceneReplacement.LastResult
+                    : lastSceneFileResult != nullptr && lastSceneFileResult->has_value() ? &**lastSceneFileResult
+                    : frame.SceneFile.LastResult.has_value()                             ? &*frame.SceneFile.LastResult
+                                                                                         : nullptr;
                 if (result != nullptr)
                 {
                     ImGui::Text("Last scene command: %s",
                                 DebugNameForEditorCommandStatus(
                                     result->Status));
+                    if (!result->Message.empty())
+                        ImGui::TextWrapped("%s", result->Message.c_str());
                     ImGui::Text("Stats: entities=%u mesh=%u graph=%u pointCloud=%u",
                                 result->Stats.Entities,
                                 result->Stats.MeshEntities,
@@ -1452,6 +1483,58 @@ namespace Extrinsic::Sandbox::Editor
                                 result->Stats.PointCloudEntities);
                 }
                 DrawDiagnostics(frame.SceneFile.Diagnostics);
+                ImGui::End();
+            }
+
+            if (windowId == "file.export" && BeginFixedWindow("File / Export", open, ImVec2(480.0f, 340.0f)))
+            {
+                ImGui::TextWrapped(
+                    "Export committed geometry in object space. Accept GPU previews before exporting their results.");
+                const auto id =
+                    frame.Selection.SelectedStableIds.empty() ? 0u : frame.Selection.SelectedStableIds.front();
+                ImGui::Text("Selected entity: %u", id);
+                if (frame.Selection.SelectedStableIds.size() > 1u)
+                    ImGui::TextWrapped("Exports the first selected entity only.");
+                if (context && exportState)
+                {
+                    const auto formats = GetEditorGeometryExportFormats(context->SceneCommands, id);
+                    if (ImGui::BeginCombo("Format", exportState->Format.c_str()))
+                    {
+                        for (const auto& format : formats)
+                        {
+                            ImGui::BeginDisabled(!format.Enabled);
+                            if (ImGui::Selectable(format.Extension.c_str(), format.Extension == exportState->Format))
+                                exportState->Format = format.Extension;
+                            ImGui::EndDisabled();
+                            if (!format.Enabled)
+                                DrawDisabledReasonTooltip(format.DisabledReason);
+                        }
+                        ImGui::EndCombo();
+                    }
+                    ImGui::InputText("Destination", exportState->Path.data(), exportState->Path.size());
+                    const auto selected = std::ranges::find_if(formats,
+                        [&](const auto& format)
+                        {
+                            return format.Extension == exportState->Format;
+                        });
+                    std::string reason =
+                        selected == formats.end() ? "Choose an export format." : selected->DisabledReason;
+                    if (reason.empty() && exportState->Path[0] == '\0')
+                        reason = "Enter a destination path with the chosen extension.";
+                    if (DrawProcessingActionButton("Export selected geometry", {reason.empty(), reason}))
+                        exportState->Result = ApplyEditorGeometryExportCommand(
+                            context->SceneCommands, {id, exportState->Path.data(), exportState->Format});
+                    if (!reason.empty())
+                        ImGui::TextWrapped("%s", reason.c_str());
+                    if (exportState->Result)
+                    {
+                        ImGui::TextWrapped("%s", exportState->Result->Message.c_str());
+                        for (const auto& name : exportState->Result->DroppedProperties)
+                            ImGui::TextWrapped("Dropped property: %s", name.c_str());
+                        for (const auto& loss : exportState->Result->Losses)
+                            ImGui::TextWrapped("%s", loss.c_str());
+                    }
+                }
                 ImGui::End();
             }
 
@@ -2129,6 +2212,9 @@ namespace Extrinsic::Sandbox::Editor
             Runtime::EditorDiagnosticsStream* Diagnostics{nullptr};
             std::array<char, 1024> ImportPathBuffer{};
             std::array<char, 1024> ScenePathBuffer{};
+            SceneReplacementState SceneReplacement{};
+            std::string HistoryResult{};
+            GeometryExportUiState GeometryExportState{};
             Runtime::EditorAssetPayloadKind ImportPayloadKind{
                 Runtime::EditorAssetPayloadKind::Unknown};
             std::array<char, 8192> RenderRecipeDraftBuffer{};
@@ -2164,18 +2250,17 @@ namespace Extrinsic::Sandbox::Editor
                 for (std::size_t index = 0u; index < kBuiltinWindows.size(); ++index)
                 {
                     const BuiltinWindowSpec& spec = kBuiltinWindows[index];
-                    BuiltinHandles[index] = Host->RegisterWindow(
-                        Runtime::EditorWindowDescriptor{
-                            .Id = std::string{spec.Id},
-                            .MenuPath = {"View"},
-                            .Title = std::string{spec.Title},
-                            .OpenByDefault = false,
-                            .Draw =
-                                [this, id = std::string{spec.Id}](bool& open)
-                                {
-                                    DrawBuiltinWindow(id, open);
-                                },
-                        });
+                    BuiltinHandles[index] = Host->RegisterWindow(Runtime::EditorWindowDescriptor{
+                        .Id = std::string{spec.Id},
+                        .MenuPath = {spec.Id == "file.export" ? "File" : "View"},
+                        .Title = std::string{spec.Title},
+                        .OpenByDefault = false,
+                        .Draw =
+                            [this, id = std::string{spec.Id}](bool& open)
+                        {
+                            DrawBuiltinWindow(id, open);
+                        },
+                    });
                 }
             }
 
@@ -2231,8 +2316,7 @@ namespace Extrinsic::Sandbox::Editor
                     .UvForceRegenerate = &UvAtlasForceRegenerate,
                     .UvPreserveAuthored = &UvAtlasPreserveAuthored,
                 };
-                DrawFixedWindow(
-                    id,
+                DrawFixedWindow(id,
                     open,
                     LastFrame,
                     &*ActiveContext,
@@ -2243,7 +2327,10 @@ namespace Extrinsic::Sandbox::Editor
                     &ImportPayloadKind,
                     &ActivePreparedFrame->Scene.LastAssetImportResult,
                     &ActivePreparedFrame->Scene.LastSceneFileResult,
-                    &textureBakeState);
+                    SceneReplacement,
+                    HistoryResult,
+                    &textureBakeState,
+                    &GeometryExportState);
             }
 
             void DrawFrame()
@@ -2291,6 +2378,11 @@ namespace Extrinsic::Sandbox::Editor
                     prepared.Visualization,
                     prepared.RenderRecipe,
                     LastFrame);
+                ObserveSceneReplacement(SceneReplacement,
+                    ActiveContext->SceneCommands,
+                    LastFrame.Document,
+                    GetEditorSceneEpoch(ActiveContext->Processing),
+                    LastFrame.SceneFile.LastResult);
                 ActiveContext->ClaimSceneViewport =
                     [host = Host](const float x, const float y, const float width, const float height)
                     {
@@ -2316,11 +2408,56 @@ namespace Extrinsic::Sandbox::Editor
                         observer(*ActiveContext);
                 }
                 (void)Host->Windows().DrawOpenWindows();
+                DrawSceneReplacementDialog();
                 // After the panels: their layout claims this frame's scene rectangle.
                 DrawGizmo(gizmoActive);
                 // Drop the context before the frame storage it borrows.
                 ActiveContext.reset();
                 ActivePreparedFrame.reset();
+            }
+
+            void DrawSceneReplacementDialog()
+            {
+                constexpr const char* title = "Unsaved scene changes";
+                if (SceneReplacement.Pending && !ImGui::IsPopupOpen(title))
+                    ImGui::OpenPopup(title);
+                if (!ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+                    return;
+                if (!SceneReplacement.Pending)
+                {
+                    ImGui::CloseCurrentPopup();
+                    ImGui::EndPopup();
+                    return;
+                }
+                ImGui::TextUnformatted("Save changes before replacing or closing this scene?");
+                ImGui::BeginDisabled(SceneReplacement.AwaitingSave);
+                ImGui::InputText("Save scene path", SceneReplacement.SavePath.data(), SceneReplacement.SavePath.size());
+                ImGui::EndDisabled();
+                const auto readiness =
+                    ReadinessUnlessBlocked({{SceneReplacement.AwaitingSave, "The scene is still saving."}});
+                const auto decide = [&](const SceneReplacementDecision decision)
+                {
+                    ResolveSceneReplacement(SceneReplacement,
+                        decision,
+                        ActiveContext->SceneCommands,
+                        LastFrame.Document,
+                        GetEditorSceneEpoch(ActiveContext->Processing));
+                };
+                if (DrawProcessingActionButton("Save", readiness))
+                    decide(SceneReplacementDecision::Save);
+                ImGui::SameLine();
+                if (DrawProcessingActionButton("Discard", readiness))
+                    decide(SceneReplacementDecision::Discard);
+                ImGui::SameLine();
+                if (ImGui::Button("Cancel"))
+                    decide(SceneReplacementDecision::Cancel);
+                if (SceneReplacement.AwaitingSave)
+                    ImGui::TextUnformatted("Saving... Cancel keeps the current scene.");
+                if (!SceneReplacement.Message.empty())
+                    ImGui::TextWrapped("%s", SceneReplacement.Message.c_str());
+                if (!SceneReplacement.Pending)
+                    ImGui::CloseCurrentPopup();
+                ImGui::EndPopup();
             }
 
             [[nodiscard]] GizmoSnapConfig ActiveGizmoSnap() const
@@ -2797,6 +2934,8 @@ namespace Extrinsic::Sandbox::Editor
                 ActiveContext.reset();
                 ActivePreparedFrame.reset();
                 LastFrame = {};
+                SceneReplacement = {};
+                HistoryResult.clear();
                 LastUvRegenerationResult.reset();
                 LastUvExtentAdoption.reset();
                 if (Host != nullptr && FrameContribution.IsValid())

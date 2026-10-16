@@ -106,6 +106,30 @@ export namespace Extrinsic::Runtime
         Close,
     };
 
+    struct EditorGeometryExportFormat
+    {
+        std::string Extension{};
+        bool Enabled{false};
+        std::string DisabledReason{};
+    };
+    struct EditorGeometryExportCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        std::string Path{};
+        std::string Format{};
+    };
+    struct EditorGeometryExportResult
+    {
+        EditorCommandStatus Status{EditorCommandStatus::NoChange};
+        std::string Message{};
+        std::vector<std::string> DroppedProperties{};
+        std::vector<std::string> Losses{};
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == EditorCommandStatus::Applied;
+        }
+    };
+
     struct EditorSceneFileCommand
     {
         std::string Path{};
@@ -132,6 +156,7 @@ export namespace Extrinsic::Runtime
         std::function<EditorSceneFileResult(const EditorSceneFileCommand&)> Save{};
         std::function<EditorSceneFileResult(const EditorSceneFileCommand&)> Load{};
         std::function<EditorSceneFileResult()> Close{};
+        std::function<bool(JobToken)> IsPending{};
 
         [[nodiscard]] bool Available() const noexcept
         {
@@ -500,6 +525,12 @@ export namespace Extrinsic::Runtime
     PrepareEditorSceneEditingFrame(
         const EditorWorkspaceAttachment& attachment);
 
+    // Exports committed canonical geometry in object space; unaccepted GPU previews are excluded.
+    [[nodiscard]] std::vector<EditorGeometryExportFormat> GetEditorGeometryExportFormats(
+        const EditorSceneEditingCommands&, std::uint32_t stableEntityId);
+    [[nodiscard]] EditorGeometryExportResult ApplyEditorGeometryExportCommand(
+        const EditorSceneEditingCommands&, const EditorGeometryExportCommand&);
+
     bool SelectEditorEntity(const EditorSceneEditingContext& context, std::uint32_t stableEntityId);
     bool SelectEditorEntity(const EditorSceneEditingCommands& commands, std::uint32_t stableEntityId);
     EditorFileImportResult ApplyEditorFileImportCommand(const EditorSceneEditingContext& context,
@@ -518,6 +549,7 @@ export namespace Extrinsic::Runtime
     EditorSceneFileResult ApplyEditorNewSceneCommand(const EditorSceneEditingCommands& commands);
     EditorSceneFileResult ApplyEditorCloseSceneCommand(const EditorSceneEditingContext& context);
     EditorSceneFileResult ApplyEditorCloseSceneCommand(const EditorSceneEditingCommands& commands);
+    [[nodiscard]] bool IsEditorSceneFilePending(const EditorSceneEditingCommands& commands, JobToken task);
     EditorCommandStatus ApplyEditorTransformEdit(const EditorSceneEditingContext& context,
                                                  const EditorTransformEditCommand& command);
     EditorCommandStatus ApplyEditorTransformEdit(const EditorSceneEditingCommands& commands,

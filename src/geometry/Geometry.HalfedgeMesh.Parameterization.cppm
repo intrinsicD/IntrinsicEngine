@@ -5,6 +5,7 @@ module;
 #include <cstdint>
 #include <limits>
 #include <optional>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -132,6 +133,22 @@ export namespace Geometry::Parameterization
             return Status == ParameterizationStatus::Success;
         }
     };
+
+    struct ParameterizationInputValidation
+    {
+        std::string_view Diagnostic{};
+        ParameterizationRejection Rejection{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Diagnostic.empty();
+        }
+    };
+
+    // Runs the same topology, pin and boundary admission used by the solvers,
+    // without assembling or solving a sparse system. Diagnostic has static lifetime.
+    [[nodiscard]] ParameterizationInputValidation ValidateParameterizationInput(
+        const HalfedgeMesh::Mesh& mesh, const ParameterizationStrategy& strategy);
 
     [[nodiscard]] ParameterizeResult ParameterizeMesh(
         const HalfedgeMesh::Mesh& mesh,

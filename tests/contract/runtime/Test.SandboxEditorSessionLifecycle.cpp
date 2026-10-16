@@ -4118,3 +4118,164 @@ TEST_F(EditorMeshFieldAgent, PreviewReturnsEveryReasonWithItsField)
     EXPECT_EQ(preview["reasons"][1]["field"], "output");
     EXPECT_EQ(preview["reason"], preview["reasons"][0]["message"]);
 }
+
+TEST_F(EditorPointReadiness, ParameterizationReadinessInvalidatesWhenOnlyStrategyPinsOrBoundaryChange)
+{
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0, 0, 0}), b = mesh.AddVertex({1, 0, 0}), c = mesh.AddVertex({0, 1, 0});
+    ASSERT_TRUE(mesh.AddTriangle(a, b, c));
+    GS::PopulateFromMesh(Scene->Raw(), Entity, mesh);
+    Runtime::EditorParameterizationCommand command{.StableEntityId = Keypoints.StableEntityId};
+    const auto preview = [&]
+    {
+        return Runtime::PreviewEditorParameterizationCommand(
+            Runtime::PrepareEditorParameterizationFrame(Attachment).Commands, command);
+    };
+    EXPECT_FALSE(preview().Enabled);
+    Drain();
+    ASSERT_TRUE(preview().Enabled);
+    const auto originalScans = Stats().PropertyScans;
+
+    command.Config.Lscm.AutoPins = false;
+    command.Config.Lscm.PinVertex0 = 0;
+    command.Config.Lscm.PinVertex1 = 1000;
+    EXPECT_FALSE(preview().Enabled);
+    EXPECT_EQ(Stats().PropertyScans, originalScans); // config invalidation never scans in the UI call
+    Drain();
+    EXPECT_FALSE(preview().Enabled);
+    EXPECT_EQ(Stats().PropertyScans, originalScans + 1u);
+    command.Config.Lscm.PinVertex1 = 1;
+    EXPECT_FALSE(preview().Enabled);
+    Drain();
+    ASSERT_TRUE(preview().Enabled);
+    command.Config.Lscm.PinVertex1 = 1000;
+    EXPECT_FALSE(preview().Enabled);
+    command.Config.Lscm.PinVertex1 = 2; // supersede a queued rejection before it runs
+    EXPECT_FALSE(preview().Enabled);
+    Drain();
+    ASSERT_TRUE(preview().Enabled);
+
+    command.Config.Strategy = Runtime::ParameterizationStrategyKind::HarmonicCotangent;
+    command.Config.Harmonic.Boundary = Runtime::ParameterizationBoundaryPolicy::Custom;
+    command.Config.Harmonic.PinnedVertices = {0, 1};
+    command.Config.Harmonic.PinnedUvs = {{0, 0}, {1, 0}};
+    EXPECT_FALSE(preview().Enabled);
+    Drain();
+    EXPECT_FALSE(preview().Enabled);
+    command.Config.Harmonic.PinnedVertices.push_back(2);
+    command.Config.Harmonic.PinnedUvs.push_back({0, 1});
+    EXPECT_FALSE(preview().Enabled);
+    Drain();
+    ASSERT_TRUE(preview().Enabled);
+    const auto completedScans = Stats().PropertyScans;
+    for (int frame = 0; frame < 3; ++frame)
+    {
+        PrepareFrame();
+        EXPECT_TRUE(preview().Enabled);
+    }
+    EXPECT_EQ(Stats().PropertyScans, completedScans);
+    EXPECT_FALSE(Properties().Exists("v:texcoord"));
+}
+
+TEST_F(EditorPointReadiness, ParameterizationReadinessReusesAndInvalidatesBoundSourceVerdicts)
+{
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0, 0, 0}), b = mesh.AddVertex({1, 0, 0}), c = mesh.AddVertex({0, 1, 0});
+    ASSERT_TRUE(mesh.AddTriangle(a, b, c));
+    GS::PopulateFromMesh(Scene->Raw(), Entity, mesh);
+    Runtime::EditorParameterizationCommand command{.StableEntityId = Keypoints.StableEntityId};
+    command.Config.Texcoords.Name = "draft_uvs";
+    const auto preview = [&]
+    {
+        return Runtime::PreviewEditorParameterizationCommand(
+            Runtime::PrepareEditorParameterizationFrame(Attachment).Commands, command);
+    };
+    EXPECT_FALSE(preview().Enabled);
+    EXPECT_EQ(Stats().PropertyScans, 0u);
+    EXPECT_EQ(Stats().ChecksQueued, 1u);
+    Drain();
+    ASSERT_TRUE(preview().Enabled);
+    for (int frame = 0; frame < 3; ++frame)
+    {
+        PrepareFrame();
+        EXPECT_TRUE(preview().Enabled);
+    }
+    EXPECT_EQ(Stats().PropertyScans, 1u);
+    EXPECT_EQ(Stats().ChecksQueued, 1u);
+    Properties().GetOrAdd<float>("unrelated")[0] = NAN;
+    EXPECT_TRUE(preview().Enabled);
+    EXPECT_EQ(Stats().ChecksQueued, 1u);
+    auto uv = Properties().GetOrAdd<glm::vec2>("draft_uvs");
+    uv[0] = {NAN, 0};
+    EXPECT_FALSE(preview().Enabled);
+    Drain();
+    EXPECT_FALSE(preview().Enabled);
+    EXPECT_NE(preview().DisabledReason.find("bound UV output"), std::string::npos);
+    uv[0] = {0, 0};
+    EXPECT_FALSE(preview().Enabled);
+    // Superseded checks cannot publish the old valid result.
+    uv[0] = {NAN, 0};
+    EXPECT_FALSE(preview().Enabled);
+    Drain();
+    EXPECT_FALSE(preview().Enabled);
+    uv[0] = {0, 0};
+    EXPECT_FALSE(preview().Enabled);
+    Drain();
+    EXPECT_TRUE(preview().Enabled);
+    auto next = Scene->Raw().get<GS::Halfedges>(Entity).Properties.Get<std::uint32_t>(GS::PropertyNames::kHalfedgeNext);
+    next[0] = std::numeric_limits<std::uint32_t>::max();
+    EXPECT_FALSE(preview().Enabled);
+    Drain();
+    EXPECT_FALSE(preview().Enabled);
+    const auto expired = Runtime::PrepareEditorParameterizationFrame(Attachment).Commands;
+    Attachment.Detach();
+    EXPECT_FALSE(Runtime::PreviewEditorParameterizationCommand(expired, command).Enabled);
+}
+
+namespace
+{
+    class EditorParameterizationAgent : public EditorPointReadiness
+    {
+        void SetUp() override
+        {
+            Runtime::RuntimeEngineConfigSectionRegistry sections;
+            ASSERT_TRUE(sections.Register(Runtime::MakeParameterizationConfigSectionRegistration()));
+            Engine.EmplaceModule<Runtime::EngineConfigControl>(std::move(sections));
+            EditorPointReadiness::SetUp();
+        }
+    };
+}
+
+TEST_F(EditorParameterizationAgent, PreviewOperationUsesTheActiveParameterizationBindings)
+{
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0, 0, 0}), b = mesh.AddVertex({1, 0, 0}), c = mesh.AddVertex({0, 1, 0});
+    ASSERT_TRUE(mesh.AddTriangle(a, b, c));
+    GS::PopulateFromMesh(Scene->Raw(), Entity, mesh);
+    Runtime::ParameterizationConfig config;
+    config.Texcoords.Name = "configured_uvs";
+    Properties().GetOrAdd<float>("configured_uvs")[0] = 1.f;
+    const auto commands = Runtime::PrepareEditorParameterizationFrame(Attachment).Commands;
+    ASSERT_TRUE(Runtime::ApplyEditorParameterizationConfig(commands, config).Succeeded());
+    Runtime::AgentOperationRegistry registry;
+    Runtime::RegisterEditorAgentOperations(registry);
+    const Runtime::AgentOperationContext context{.Attachment = &Attachment};
+    const auto args = nlohmann::json{{"operation", "parameterization"}, {"entity", Keypoints.StableEntityId}}.dump();
+    const auto preview = [&]
+    {
+        const auto result = Runtime::InvokeAgentOperation(registry, "preview_operation", context, args, false);
+        EXPECT_FALSE(result.IsError) << result.Text;
+        return nlohmann::json::parse(result.Text);
+    };
+    EXPECT_EQ(preview()["enabled"], false);
+    Drain();
+    const auto rejected = preview();
+    EXPECT_EQ(rejected["enabled"], false);
+    EXPECT_NE(rejected.dump().find("bound UV output"), std::string::npos);
+    config.Texcoords.Name = "fresh_configured_uvs";
+    ASSERT_TRUE(Runtime::ApplyEditorParameterizationConfig(commands, config).Succeeded());
+    EXPECT_EQ(preview()["enabled"], false);
+    Drain();
+    EXPECT_EQ(preview()["enabled"], true);
+    EXPECT_FALSE(Properties().Exists("fresh_configured_uvs"));
+}

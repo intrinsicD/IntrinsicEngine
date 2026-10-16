@@ -115,6 +115,11 @@ Malformed arguments are rejected before invoking a mutation. The socket rejects
 each complete line exceeding `MaxMessageBytes` before queueing it and applies the
 same bound to an incomplete line, including lines assembled over multiple receives.
 
+Undo/redo stops on a failed history command and returns
+`isError: true`, the command's `status` and `label`, the labels of any earlier
+successful steps (`undone` or `redone`), and the resulting `history`. An empty
+stack ends the requested batch successfully; it does not mask a failed command.
+
 - Version negotiation: `initialize` echoes the client's `protocolVersion` when it is one of
   `kAgentSupportedProtocolVersions` (`2025-06-18`, `2025-03-26`, `2024-11-05`) and otherwise
   answers the newest, `2025-06-18`; the client then decides whether to continue.
@@ -309,8 +314,9 @@ same bound to an incomplete line, including lines assembled over multiple receiv
   picks its `property` from the entity's vertex scalars like the panel's combo, publishes its
   curve graph as one undo step and, with `publish_mesh_features`, mesh feature properties as a
   second one (undo with `steps: 2`). Geodesics, curvature segmentation, scalar ridges and the
-  topology operations report their panel's readiness; parameterization alone has no readiness
-  function (its panel gates on the selection), so its preview answers `"enabled": null`. A
+  topology operations report their panel's readiness. Parameterization uses the resolved active
+  config and shared source, strategy, pin and boundary checks; its preview answers `enabled: false`
+  with a reason while validation is pending or a prerequisite fails. A
   `Pending` command answers when its job delivered (`result_unavailable` when none can). The
   tool flag `NeedsPresentedFrame` is per tool, so `run_operation` (as `run_mesh_operation`) is
   refused while minimized even for CPU-only rows. Behavior of the mesh aliases after the move

@@ -4,13 +4,13 @@
 #include <array>
 #include <bit>
 #include <charconv>
-#include <cstdarg>
 #include <cstdint>
 #include <cstring>
 #include <cstddef>
-#include <cstdio>
 #include <expected>
 #include <fstream>
+#include <format>
+#include <utility>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -338,22 +338,23 @@ namespace Geometry::IOText
         return static_cast<std::uint8_t>(rounded > 255u ? 255u : rounded);
     }
 
-    // Formats into the caller's buffer and appends the text. Encoding errors and
-    // truncation return false, so values too long for the format fail closed.
-    [[gnu::format(printf, 4, 5)]] inline bool AppendFormatted(std::ostream& stream,
-                                                              char* buffer,
-                                                              std::size_t size,
-                                                              const char* format,
-                                                              ...)
+    // Default numeric formatting is locale-independent and round-trips the original float type.
+    template <typename... Args>
+    [[nodiscard]] int FormatText(char* buffer, std::size_t size, std::format_string<Args...> format, Args&&... args)
     {
-        std::va_list args;
-        va_start(args, format);
-        const int written = std::vsnprintf(buffer, size, format, args);
-        va_end(args);
-        if (written <= 0 || static_cast<std::size_t>(written) >= size)
-        {
+        const auto result = std::format_to_n(buffer, size, format, std::forward<Args>(args)...);
+        if (result.size <= 0 || static_cast<std::size_t>(result.size) >= size)
+            return -1;
+        return static_cast<int>(result.size);
+    }
+
+    template <typename... Args>
+    [[nodiscard]] bool AppendFormatted(
+        std::ostream& stream, char* buffer, std::size_t size, std::format_string<Args...> format, Args&&... args)
+    {
+        const int written = FormatText(buffer, size, format, std::forward<Args>(args)...);
+        if (written <= 0)
             return false;
-        }
         stream.write(buffer, written);
         return stream.good();
     }

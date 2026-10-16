@@ -142,6 +142,14 @@ ApplyEditorCloseSceneCommand(const EditorSceneEditingCommands &commands) {
   return ApplyEditorCloseSceneCommand(ContextOrEmpty(commands));
 }
 
+bool IsEditorSceneFilePending(const EditorSceneEditingCommands& commands, const JobToken task)
+{
+    if (!commands.IsBound())
+        return false;
+    const auto& pending = ContextOrEmpty(commands).SceneFileCommands.IsPending;
+    return pending && pending(task);
+}
+
 EditorCommandStatus
 ApplyEditorTransformEdit(const EditorSceneEditingCommands &commands,
                          const EditorTransformEditCommand &command) {

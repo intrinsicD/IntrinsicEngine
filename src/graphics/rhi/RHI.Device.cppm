@@ -175,8 +175,8 @@ namespace Extrinsic::RHI
         /// Whether this backend can actually issue GPU work. Real backends
         /// inherit the default true. Stub / null backends override this to
         /// false so callers can short-circuit cleanly without waiting for
-        /// per-call failures. Must be stable for the lifetime of the
-        /// device (return the same value on every call).
+        /// per-call failures. This reports current readiness and may change
+        /// after surface recreation or device loss; query it before GPU work.
         ///
         /// Upstream managers (BufferManager, TextureManager, etc.) consult
         /// this inside Create() and return Core::ErrorCode::DeviceNotOperational

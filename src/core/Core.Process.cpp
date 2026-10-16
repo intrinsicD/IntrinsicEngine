@@ -77,36 +77,54 @@ namespace Extrinsic::Core::Process
             return argv;
         }
 
+        pid_t WaitPid(pid_t pid, int* status, int options) noexcept
+        {
+            pid_t waited;
+            do
+            {
+                waited = waitpid(pid, status, options);
+            } while (waited < 0 && errno == EINTR);
+            return waited;
+        }
+
         void TerminateAndReap(pid_t pid) noexcept
         {
             kill(pid, SIGTERM);
             for (int i = 0; i < 10; ++i)
             {
                 int status = 0;
-                const pid_t w = waitpid(pid, &status, WNOHANG);
+                const pid_t w = WaitPid(pid, &status, WNOHANG);
                 if (w == pid || w < 0) return;
                 struct timespec ts{}; ts.tv_nsec = 10'000'000;
                 nanosleep(&ts, nullptr);
             }
             kill(pid, SIGKILL);
-            waitpid(pid, nullptr, 0);
+            (void)WaitPid(pid, nullptr, 0);
         }
 
-        // Returns true if process exited, false on timeout.
-        bool WaitForProcess(pid_t pid, int& status,
-                            std::chrono::steady_clock::time_point deadline) noexcept
+        enum class WaitOutcome
+        {
+            Exited,
+            TimedOut,
+            Failed
+        };
+
+        WaitOutcome WaitForProcess(pid_t pid, int& status, std::chrono::steady_clock::time_point deadline) noexcept
         {
             if (deadline == std::chrono::steady_clock::time_point::max())
             {
-                waitpid(pid, &status, 0);
-                return true;
+                return WaitPid(pid, &status, 0) == pid ? WaitOutcome::Exited : WaitOutcome::Failed;
             }
             for (;;)
             {
-                const pid_t w = waitpid(pid, &status, WNOHANG);
-                if (w == pid || w < 0) return true;
+                const pid_t w = WaitPid(pid, &status, WNOHANG);
+                if (w == pid)
+                    return WaitOutcome::Exited;
+                if (w < 0)
+                    return WaitOutcome::Failed;
                 const auto now = std::chrono::steady_clock::now();
-                if (now >= deadline) return false;
+                if (now >= deadline)
+                    return WaitOutcome::TimedOut;
                 const auto rem = std::chrono::duration_cast<std::chrono::milliseconds>(
                     deadline - now);
                 const auto sl = std::min(rem, std::chrono::milliseconds(50));
@@ -236,7 +254,13 @@ namespace Extrinsic::Core::Process
         }
 
         int status = 0;
-        if (!WaitForProcess(pid, status, deadline))
+        const auto waited = WaitForProcess(pid, status, deadline);
+        if (waited == WaitOutcome::Failed)
+        {
+            result.StdErr += std::string("waitpid failed: ") + strerror(errno);
+            return result;
+        }
+        if (waited == WaitOutcome::TimedOut)
         {
             result.TimedOut = true;
             TerminateAndReap(pid);
@@ -257,7 +281,7 @@ namespace Extrinsic::Core::Process
             .Timeout       = std::chrono::milliseconds(5000),
             .CaptureOutput = false,
         });
-        return !r.SpawnFailed && !r.TimedOut;
+        return !r.SpawnFailed && !r.TimedOut && r.ExitCode >= 0;
     }
 }
 

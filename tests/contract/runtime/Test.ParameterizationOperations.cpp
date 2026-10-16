@@ -1,4 +1,9 @@
+#include <algorithm>
 #include <array>
+#include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -36,6 +41,13 @@ import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.SelectionController;
+import Geometry.Mesh.Conversion;
+import Geometry.IO;
+import Geometry.HalfedgeMesh.IO;
+import Geometry.PointCloud;
+import Geometry.PointCloud.IO;
+import Geometry.Graph;
+import Geometry.Graph.IO;
 import Geometry.HalfedgeMesh;
 import Geometry.Properties;
 
@@ -144,8 +156,8 @@ namespace
         return mesh;
     }
 
-    // Closed surface: reaches the solver and is rejected on topology, which is
-    // the case BUG-141 saw reported without a cause.
+    // Closed surface: geometry admission rejects its topology, the case
+    // BUG-141 saw reported without a cause.
     [[nodiscard]] Geometry::HalfedgeMesh::Mesh MakeClosedTetrahedronMesh()
     {
         Geometry::HalfedgeMesh::Mesh mesh{};
@@ -911,8 +923,8 @@ TEST(ParameterizationOperations, SolverRejectionCarriesStructuredTopologyCause)
     EXPECT_NE(result.Message.find("disk topology"), std::string::npos)
         << result.Message;
 
-    // A rejection raised before the solver ran has no mesh to count, and must
-    // not pretend otherwise.
+    // A rejection raised before preparing a mesh has no mesh to count, and
+    // must not pretend otherwise.
     ParameterizationHarness quad{MakeQuadMesh()};
     const Runtime::EditorParameterizationResult preSolver =
         Apply(quad, Runtime::ParameterizationStrategyKind::Lscm);
@@ -1773,4 +1785,279 @@ TEST(ParameterizationOperations, PreservationKeepsValidCornerUvsAndRegeneratesOn
     EXPECT_NE(repaired.Diagnostic.find("authored corner UVs were not preserved ("), std::string::npos)
         << repaired.Diagnostic;
     EXPECT_EQ(harness.History.UndoCount(), 1u);
+}
+
+TEST(ParameterizationOperations, PreviewRejectsStrategyBoundaryAndPinPrerequisites)
+{
+    const auto expectRejected = [](ParameterizationHarness& harness, Runtime::ParameterizationConfig config)
+    {
+        const Runtime::EditorParameterizationCommand command{harness.StableEntityId, std::move(config)};
+        const auto preview = Runtime::PreviewEditorParameterizationCommand(harness.Context, command);
+        EXPECT_FALSE(preview.Enabled);
+        EXPECT_FALSE(preview.DisabledReason.empty());
+        const auto applied = Runtime::ApplyEditorParameterizationCommand(harness.Context, command);
+        EXPECT_FALSE(applied.Succeeded());
+        EXPECT_EQ(preview.DisabledReason, applied.Message);
+        EXPECT_EQ(harness.History.UndoCount(), 0u);
+        EXPECT_FALSE(harness.Vertices().Properties.Exists("v:texcoord"));
+    };
+    ParameterizationHarness closed{MakeClosedTetrahedronMesh()};
+    for (const auto strategy : {Runtime::ParameterizationStrategyKind::Lscm,
+             Runtime::ParameterizationStrategyKind::HarmonicCotangent,
+             Runtime::ParameterizationStrategyKind::TutteUniform,
+             Runtime::ParameterizationStrategyKind::Bff})
+        expectRejected(closed, MakeConfig(strategy));
+
+    ParameterizationHarness disk;
+    for (const auto strategy : {Runtime::ParameterizationStrategyKind::Lscm,
+             Runtime::ParameterizationStrategyKind::HarmonicCotangent,
+             Runtime::ParameterizationStrategyKind::TutteUniform,
+             Runtime::ParameterizationStrategyKind::Bff})
+    {
+        const auto preview =
+            Runtime::PreviewEditorParameterizationCommand(disk.Context, {disk.StableEntityId, MakeConfig(strategy)});
+        EXPECT_TRUE(preview.Enabled) << preview.DisabledReason;
+        EXPECT_FALSE(disk.Vertices().Properties.Exists("v:texcoord"));
+    }
+    auto lscm = MakeConfig(Runtime::ParameterizationStrategyKind::Lscm);
+    lscm.Lscm.AutoPins = false;
+    lscm.Lscm.PinVertex0 = 0;
+    lscm.Lscm.PinVertex1 = 1000;
+    expectRejected(disk, lscm);
+    auto deletedMesh = MakeGridMesh();
+    const auto deletedPin = deletedMesh.AddVertex({8, 8, 8});
+    deletedMesh.DeleteVertex(deletedPin);
+    ParameterizationHarness deleted{std::move(deletedMesh)};
+    lscm.Lscm.PinVertex1 = deletedPin.Index;
+    expectRejected(deleted, lscm);
+
+    auto harmonic = MakeConfig(Runtime::ParameterizationStrategyKind::HarmonicCotangent);
+    harmonic.Harmonic.PinnedVertices = {0, 1000};
+    harmonic.Harmonic.PinnedUvs = {{0, 0}, {1, 0}};
+    expectRejected(disk, harmonic);
+    harmonic.Harmonic.PinnedVertices = {0, deletedPin.Index};
+    expectRejected(deleted, harmonic);
+    harmonic.Harmonic.PinnedVertices = {0, 0};
+    expectRejected(disk, harmonic);
+    harmonic.Harmonic.Boundary = Runtime::ParameterizationBoundaryPolicy::Custom;
+    harmonic.Harmonic.PinnedVertices = {0, 1};
+    expectRejected(disk, harmonic); // valid pins, but the remaining boundary is uncovered
+
+    auto bff = MakeConfig(Runtime::ParameterizationStrategyKind::Bff);
+    bff.Bff.Mode = Runtime::ParameterizationBffBoundaryMode::TargetLengths;
+    bff.Bff.BoundaryData = {1.0, 1.0};
+    expectRejected(disk, bff); // finite positive values, wrong boundary cardinality
+}
+
+TEST(ParameterizationOperations, PreviewUsesDraftBindingsAndSharesApplyRejections)
+{
+    ParameterizationHarness harness;
+    Runtime::EditorParameterizationCommand command{.StableEntityId = harness.StableEntityId,
+        .Config = MakeConfig(Runtime::ParameterizationStrategyKind::TutteUniform)};
+    auto& properties = harness.Vertices().Properties;
+    properties.GetOrAdd<glm::vec3>("alternate").Vector() = properties.Get<glm::vec3>("v:position").Vector();
+    command.Config.Positions.Name = "alternate";
+    command.Config.Texcoords.Name = "draft_uvs";
+    EXPECT_TRUE(Runtime::PreviewEditorParameterizationCommand(harness.Context, command).Enabled);
+    EXPECT_FALSE(properties.Exists("draft_uvs"));
+    EXPECT_EQ(harness.History.UndoCount(), 0u);
+    properties.GetOrAdd<float>("draft_uvs")[0] = 1.f;
+    const auto wrongType = Runtime::PreviewEditorParameterizationCommand(harness.Context, command);
+    EXPECT_FALSE(wrongType.Enabled);
+    EXPECT_EQ(wrongType.DisabledReason, Runtime::ApplyEditorParameterizationCommand(harness.Context, command).Message);
+    command.Config.Texcoords.Name = "fresh_uvs";
+    properties.Get<glm::vec3>("alternate")[0].x = std::numeric_limits<float>::quiet_NaN();
+    const auto nonfinite = Runtime::PreviewEditorParameterizationCommand(harness.Context, command);
+    EXPECT_FALSE(nonfinite.Enabled);
+    EXPECT_EQ(nonfinite.DisabledReason, Runtime::ApplyEditorParameterizationCommand(harness.Context, command).Message);
+    command.Config.Positions.Name = "v:position";
+    ASSERT_TRUE(Runtime::PreviewEditorParameterizationCommand(harness.Context, command).Enabled);
+    EXPECT_TRUE(Runtime::ApplyEditorParameterizationCommand(harness.Context, command).Succeeded());
+    EXPECT_TRUE(properties.Exists("fresh_uvs"));
+    ParameterizationHarness quad{MakeQuadMesh()};
+    command.StableEntityId = quad.StableEntityId;
+    const auto topology = Runtime::PreviewEditorParameterizationCommand(quad.Context, command);
+    EXPECT_FALSE(topology.Enabled);
+    EXPECT_EQ(topology.DisabledReason, Runtime::ApplyEditorParameterizationCommand(quad.Context, command).Message);
+}
+
+namespace
+{
+    struct GeometryExportDirectory
+    {
+        std::filesystem::path Path = std::filesystem::temp_directory_path() /
+            ("intrinsic-geometry-export-" +
+                std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+        GeometryExportDirectory()
+        {
+            std::filesystem::create_directory(Path);
+        }
+        ~GeometryExportDirectory()
+        {
+            std::error_code ignored;
+            std::filesystem::remove_all(Path, ignored);
+        }
+    };
+}
+
+TEST(SceneEditingGeometryExport, ImportedMeshUsesCommittedSourcesAndReportsLostProperties)
+{
+    GeometryExportDirectory directory;
+    const auto input = directory.Path / "input.obj";
+    {
+        std::ofstream fixture(input);
+        fixture << "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n";
+    }
+    auto loaded = Geometry::MeshIO::LoadOBJ(input.string());
+    ASSERT_TRUE(loaded);
+    Geometry::MeshSoup::IndexedMesh soup;
+    for (const auto position : loaded->Vertices.Get<glm::vec3>("v:point").Vector())
+        (void)soup.AddVertex(position);
+    for (const auto& face : loaded->Faces.Get<std::vector<std::uint32_t>>("f:vertices").Vector())
+        (void)soup.AddFace(face);
+    auto imported = Geometry::Mesh::Conversion::ToHalfedgeMesh(soup);
+    ASSERT_TRUE(imported.Succeeded());
+    ParameterizationHarness harness{std::move(imported.Mesh)};
+    const auto commands = Runtime::BindEditorSceneEditingCommands(harness.Context);
+    auto& properties = harness.Vertices().Properties;
+    properties.Get<glm::vec3>("v:position")[0].z = 3.25f;
+    properties.GetOrAdd<float>("curvature")[0] = 8.f;
+    properties.GetOrAdd<glm::vec3>("v:normal")[0] = {0, 0, 1};
+    harness.Scene.Raw().get<GS::Faces>(harness.Entity).Properties.GetOrAdd<glm::vec3>("v:normal")[0] = {1, 0, 0};
+    properties.GetOrAdd<glm::vec2>("v:texcoord")[0] = {.2f, .3f};
+    const auto path = directory.Path / "output.obj";
+    const auto result =
+        Runtime::ApplyEditorGeometryExportCommand(commands, {harness.StableEntityId, path.string(), "obj"});
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_NE(std::ranges::find(result.DroppedProperties, "vertex/curvature"), result.DroppedProperties.end());
+    EXPECT_EQ(std::ranges::find(result.DroppedProperties, "vertex/v:texcoord"), result.DroppedProperties.end());
+    const auto roundtrip = Geometry::MeshIO::LoadOBJ(path.string());
+    ASSERT_TRUE(roundtrip);
+    EXPECT_EQ(roundtrip->Vertices.Size(), loaded->Vertices.Size());
+    EXPECT_EQ(roundtrip->Faces.Size(), loaded->Faces.Size());
+    EXPECT_FLOAT_EQ(roundtrip->Vertices.Get<glm::vec3>("v:point")[0].z, 3.25f);
+    EXPECT_EQ(properties.Get<float>("curvature")[0], 8.f);
+    EXPECT_NE(std::ranges::find(result.DroppedProperties, "face/v:normal"), result.DroppedProperties.end());
+    EXPECT_EQ(std::ranges::find(result.DroppedProperties, "vertex/v:normal"), result.DroppedProperties.end());
+    EXPECT_EQ(harness.History.UndoCount(), 0u);
+    const auto off = Runtime::ApplyEditorGeometryExportCommand(
+        commands, {harness.StableEntityId, (directory.Path / "output.off").string(), "off"});
+    ASSERT_TRUE(off.Succeeded()) << off.Message;
+    EXPECT_NE(std::ranges::find(off.DroppedProperties, "vertex/v:texcoord"), off.DroppedProperties.end());
+}
+
+TEST(SceneEditingGeometryExport, CatalogRejectsUnsupportedPairsAndInvalidPayloadPreservesDestination)
+{
+    ParameterizationHarness harness;
+    const auto commands = Runtime::BindEditorSceneEditingCommands(harness.Context);
+    GeometryExportDirectory directory;
+    const auto path = directory.Path / "keep.xyz";
+    {
+        std::ofstream file(path);
+        file << "original";
+    }
+    const auto formats = Runtime::GetEditorGeometryExportFormats(commands, harness.StableEntityId);
+    const auto xyz = std::ranges::find_if(formats,
+        [](const auto& value)
+        {
+            return value.Extension == "xyz";
+        });
+    ASSERT_NE(xyz, formats.end());
+    EXPECT_FALSE(xyz->Enabled);
+    const auto rejected =
+        Runtime::ApplyEditorGeometryExportCommand(commands, {harness.StableEntityId, path.string(), "xyz"});
+    EXPECT_FALSE(rejected.Succeeded());
+    EXPECT_EQ(rejected.Message, xyz->DisabledReason);
+    for (const auto& format : formats)
+        EXPECT_EQ(
+            format.Enabled, Geometry::IO::SupportsExportDomain(format.Extension, Geometry::IO::GeometryIODomain::Mesh));
+    std::ifstream file(path);
+    EXPECT_EQ(std::string((std::istreambuf_iterator<char>(file)), {}), "original");
+    const auto obj = directory.Path / "keep.obj";
+    {
+        std::ofstream original(obj);
+        original << "original";
+    }
+    harness.Vertices().Properties.GetOrAdd<glm::vec2>("v:texcoord")[0] = {NAN, 0};
+    const auto invalid =
+        Runtime::ApplyEditorGeometryExportCommand(commands, {harness.StableEntityId, obj.string(), "obj"});
+    EXPECT_FALSE(invalid.Succeeded());
+    std::ifstream preserved(obj);
+    EXPECT_EQ(std::string((std::istreambuf_iterator<char>(preserved)), {}), "original");
+    EXPECT_FALSE(
+        Runtime::ApplyEditorGeometryExportCommand(commands, {harness.StableEntityId, obj.string(), "off"}).Succeeded());
+}
+
+TEST(SceneEditingGeometryExport, PointCloudAndGraphRoundTripTheirSupportedChannels)
+{
+    GeometryExportDirectory directory;
+    const auto pointsPath = directory.Path / "input.xyz";
+    {
+        std::ofstream fixture(pointsPath);
+        fixture << "0 0 0\n1 2 3\n";
+    }
+    auto points = Geometry::PointCloudIO::LoadXYZ(pointsPath.string());
+    ASSERT_TRUE(points);
+    ECS::Scene::Registry scene;
+    auto entity = scene.Create();
+    GS::PopulateFromCloud(scene.Raw(), entity, points->Cloud);
+    auto& vertices = scene.Raw().get<GS::Vertices>(entity).Properties;
+    vertices.GetOrAdd<glm::vec3>("v:normal").Vector() = {{0, 0, 1}, {0, 1, 0}};
+    vertices.GetOrAdd<float>("p:radius").Vector() = {0.25f, 0.5f};
+    Intrinsic::Tests::EditorFeatureTestContext context;
+    context.Scene = &scene;
+    const auto commands = Runtime::BindEditorSceneEditingCommands(context);
+    const auto id = Runtime::SelectionController::ToStableEntityId(entity);
+    const auto plyPath = directory.Path / "points.ply";
+    ASSERT_TRUE(Runtime::ApplyEditorGeometryExportCommand(commands, {id, plyPath.string(), "ply"}).Succeeded());
+    const auto ply = Geometry::PointCloudIO::LoadPLY(plyPath.string());
+    ASSERT_TRUE(ply);
+    EXPECT_EQ(ply->Cloud.VertexCount(), 2u);
+    ASSERT_TRUE(ply->Cloud.HasNormals());
+    EXPECT_EQ(ply->Cloud.Normals()[1], (glm::vec3{0, 1, 0}));
+    // The PLY reader does not materialize radius; verify the exported channel directly.
+    std::ifstream plyText(plyPath);
+    std::string line;
+    bool hasRadius = false;
+    while (std::getline(plyText, line) && line != "end_header")
+        hasRadius |= line == "property float radius";
+    ASSERT_TRUE(hasRadius);
+    ASSERT_EQ(line, "end_header");
+    for (const float expectedRadius : {0.25f, 0.5f})
+    {
+        float value = 0;
+        for (int field = 0; field < 7; ++field)
+            ASSERT_TRUE(plyText >> value);
+        EXPECT_FLOAT_EQ(value, expectedRadius);
+    }
+    const auto pcdPath = directory.Path / "points.pcd";
+    const auto pcdResult = Runtime::ApplyEditorGeometryExportCommand(commands, {id, pcdPath.string(), "pcd"});
+    ASSERT_TRUE(pcdResult.Succeeded());
+    EXPECT_NE(std::ranges::find(pcdResult.DroppedProperties, "vertex/p:radius"), pcdResult.DroppedProperties.end());
+    ASSERT_TRUE(Geometry::PointCloudIO::LoadPCD(pcdPath.string()));
+    const auto graphPath = directory.Path / "input.tgf";
+    {
+        std::ofstream fixture(graphPath);
+        fixture << "0 0 0 0 first\n1 1 0 0 second\n#\n0 1 2 edge\n";
+    }
+    auto graph = Geometry::GraphIO::LoadTGF(graphPath.string());
+    ASSERT_TRUE(graph);
+    GS::PopulateFromGraph(scene.Raw(), entity, graph->Graph);
+    const auto output = directory.Path / "graph.tgf";
+    const auto graphResult = Runtime::ApplyEditorGeometryExportCommand(commands, {id, output.string(), "tgf"});
+    ASSERT_TRUE(graphResult.Succeeded()) << graphResult.Message;
+    const auto reloaded = Geometry::GraphIO::LoadTGF(output.string());
+    ASSERT_TRUE(reloaded);
+    EXPECT_EQ(reloaded->Graph.VertexCount(), 2u);
+    EXPECT_EQ(reloaded->Graph.EdgeCount(), 1u);
+    EXPECT_EQ(reloaded->Graph.VertexProperties().Get<std::string>("v:label")[0], "first");
+    EXPECT_FLOAT_EQ(reloaded->Graph.EdgeProperties().Get<float>("e:weight")[0], 2.f);
+    const auto edgesResult =
+        Runtime::ApplyEditorGeometryExportCommand(commands, {id, (directory.Path / "graph.edges").string(), "edges"});
+    EXPECT_TRUE(edgesResult.Succeeded());
+    EXPECT_FALSE(edgesResult.Losses.empty());
+    const auto edgeRoundtrip = Geometry::GraphIO::LoadEdgeList((directory.Path / "graph.edges").string());
+    ASSERT_TRUE(edgeRoundtrip);
+    EXPECT_EQ(edgeRoundtrip->Graph.EdgeProperties().Get<std::string>("e:label")[0], "edge");
+    EXPECT_EQ(std::ranges::find(edgesResult.DroppedProperties, "edge/e:label"), edgesResult.DroppedProperties.end());
 }

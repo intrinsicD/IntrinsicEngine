@@ -599,9 +599,20 @@ namespace Extrinsic::Runtime
                         return ApplyEditorProgressivePoissonCommand(c, {id, config}, std::move(onComplete));
                     }));
                 ops.push_back(EntityOperation<EditorParameterizationResult>(
-                    "parameterization", "mesh_analysis", "sandbox.parameterization", &PrepareEditorParameterizationFrame,
-                    [](const auto&, std::uint32_t) { return std::optional<ActionReadiness>{}; },
-                    [](const auto& c, std::uint32_t id, auto onComplete) {
+                    "parameterization",
+                    "mesh_analysis",
+                    "sandbox.parameterization",
+                    &PrepareEditorParameterizationFrame,
+                    [](const auto& c, std::uint32_t id)
+                    {
+                        const auto config = GetEditorParameterizationConfig(c);
+                        return std::optional<ActionReadiness>{config
+                                ? PreviewEditorParameterizationCommand(c, {id, *config})
+                                : ActionReadiness{
+                                      false, "Configured parameterization is missing its registered config section."}};
+                    },
+                    [](const auto& c, std::uint32_t id, auto onComplete)
+                    {
                         return ApplyEditorConfiguredParameterizationCommand(c, EditorConfiguredParameterizationCommand{id}, std::move(onComplete));
                     }));
                 return ops;

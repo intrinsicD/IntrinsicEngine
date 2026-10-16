@@ -413,7 +413,7 @@ namespace Geometry::MeshIO
             stream << "ply\n";
             stream << "format " << format << " 1.0\n";
             stream << "comment Exported by IntrinsicEngine\n";
-            if (!AppendFormatted(stream, buffer, sizeof(buffer), "element vertex %zu\n", vertexCount))
+            if (!AppendFormatted(stream, buffer, sizeof(buffer), "element vertex {}\n", vertexCount))
             {
                 return false;
             }
@@ -437,7 +437,7 @@ namespace Geometry::MeshIO
                 stream << "property float s\n";
                 stream << "property float t\n";
             }
-            if (!AppendFormatted(stream, buffer, sizeof(buffer), "element face %zu\n", faceCount))
+            if (!AppendFormatted(stream, buffer, sizeof(buffer), "element face {}\n", faceCount))
             {
                 return false;
             }
@@ -454,13 +454,13 @@ namespace Geometry::MeshIO
         {
             for (const auto& face : faces)
             {
-                if (!AppendFormatted(stream, buffer, size, "%zu", face.size()))
+                if (!AppendFormatted(stream, buffer, size, "{}", face.size()))
                 {
                     return false;
                 }
                 for (const auto index : face)
                 {
-                    if (!AppendFormatted(stream, buffer, size, " %llu", static_cast<unsigned long long>(index)))
+                    if (!AppendFormatted(stream, buffer, size, " {}", static_cast<unsigned long long>(index)))
                     {
                         return false;
                     }
@@ -2096,10 +2096,7 @@ namespace Geometry::MeshIO
         for (std::size_t i = 0; i < positions.size(); ++i)
         {
             const auto& p = positions[i];
-            if (!AppendFormatted(stream, buffer, sizeof(buffer), "v %.6f %.6f %.6f",
-                                 static_cast<double>(p.x),
-                                 static_cast<double>(p.y),
-                                 static_cast<double>(p.z)))
+            if (!AppendFormatted(stream, buffer, sizeof(buffer), "v {} {} {}", p.x, p.y, p.z))
             {
                 return MeshIOWriteStatus::FileWriteError;
             }
@@ -2107,10 +2104,7 @@ namespace Geometry::MeshIO
             if (colors != nullptr)
             {
                 const auto& c = (*colors)[i];
-                if (!AppendFormatted(stream, buffer, sizeof(buffer), " %.6f %.6f %.6f",
-                                     static_cast<double>(c.x),
-                                     static_cast<double>(c.y),
-                                     static_cast<double>(c.z)))
+                if (!AppendFormatted(stream, buffer, sizeof(buffer), " {} {} {}", c.x, c.y, c.z))
                 {
                     return MeshIOWriteStatus::FileWriteError;
                 }
@@ -2123,9 +2117,7 @@ namespace Geometry::MeshIO
         {
             for (const auto& uv : *texcoords)
             {
-                if (!AppendFormatted(stream, buffer, sizeof(buffer), "vt %.6f %.6f\n",
-                                     static_cast<double>(uv.x),
-                                     static_cast<double>(uv.y)))
+                if (!AppendFormatted(stream, buffer, sizeof(buffer), "vt {} {}\n", uv.x, uv.y))
                 {
                     return MeshIOWriteStatus::FileWriteError;
                 }
@@ -2136,10 +2128,7 @@ namespace Geometry::MeshIO
         {
             for (const auto& n : *normals)
             {
-                if (!AppendFormatted(stream, buffer, sizeof(buffer), "vn %.6f %.6f %.6f\n",
-                                     static_cast<double>(n.x),
-                                     static_cast<double>(n.y),
-                                     static_cast<double>(n.z)))
+                if (!AppendFormatted(stream, buffer, sizeof(buffer), "vn {} {} {}\n", n.x, n.y, n.z))
                 {
                     return MeshIOWriteStatus::FileWriteError;
                 }
@@ -2164,22 +2153,20 @@ namespace Geometry::MeshIO
                 bool written = false;
                 if (texcoords != nullptr && normals != nullptr)
                 {
-                    written = AppendFormatted(stream, buffer, sizeof(buffer), " %llu/%llu/%llu",
-                                              oneBased, uvOneBased, normalOneBased);
+                    written = AppendFormatted(
+                        stream, buffer, sizeof(buffer), " {}/{}/{}", oneBased, uvOneBased, normalOneBased);
                 }
                 else if (texcoords != nullptr)
                 {
-                    written = AppendFormatted(stream, buffer, sizeof(buffer), " %llu/%llu",
-                                              oneBased, uvOneBased);
+                    written = AppendFormatted(stream, buffer, sizeof(buffer), " {}/{}", oneBased, uvOneBased);
                 }
                 else if (normals != nullptr)
                 {
-                    written = AppendFormatted(stream, buffer, sizeof(buffer), " %llu//%llu",
-                                              oneBased, normalOneBased);
+                    written = AppendFormatted(stream, buffer, sizeof(buffer), " {}//{}", oneBased, normalOneBased);
                 }
                 else
                 {
-                    written = AppendFormatted(stream, buffer, sizeof(buffer), " %llu", oneBased);
+                    written = AppendFormatted(stream, buffer, sizeof(buffer), " {}", oneBased);
                 }
                 if (!written)
                 {
@@ -2212,17 +2199,14 @@ namespace Geometry::MeshIO
         char buffer[192];
         stream << "OFF\n";
 
-        if (!AppendFormatted(stream, buffer, sizeof(buffer), "%zu %zu 0\n", positions.size(), faces.size()))
+        if (!AppendFormatted(stream, buffer, sizeof(buffer), "{} {} 0\n", positions.size(), faces.size()))
         {
             return MeshIOWriteStatus::FileWriteError;
         }
 
         for (const auto& p : positions)
         {
-            if (!AppendFormatted(stream, buffer, sizeof(buffer), "%.6f %.6f %.6f\n",
-                                 static_cast<double>(p.x),
-                                 static_cast<double>(p.y),
-                                 static_cast<double>(p.z)))
+            if (!AppendFormatted(stream, buffer, sizeof(buffer), "{} {} {}\n", p.x, p.y, p.z))
             {
                 return MeshIOWriteStatus::FileWriteError;
             }
@@ -2272,10 +2256,7 @@ namespace Geometry::MeshIO
         for (std::size_t i = 0; i < positions.size(); ++i)
         {
             const auto& p = positions[i];
-            if (!AppendFormatted(stream, buffer, sizeof(buffer), "%.6f %.6f %.6f",
-                                 static_cast<double>(p.x),
-                                 static_cast<double>(p.y),
-                                 static_cast<double>(p.z)))
+            if (!AppendFormatted(stream, buffer, sizeof(buffer), "{} {} {}", p.x, p.y, p.z))
             {
                 return MeshIOWriteStatus::FileWriteError;
             }
@@ -2283,10 +2264,7 @@ namespace Geometry::MeshIO
             if (normals != nullptr)
             {
                 const auto& n = (*normals)[i];
-                if (!AppendFormatted(stream, buffer, sizeof(buffer), " %.6f %.6f %.6f",
-                                     static_cast<double>(n.x),
-                                     static_cast<double>(n.y),
-                                     static_cast<double>(n.z)))
+                if (!AppendFormatted(stream, buffer, sizeof(buffer), " {} {} {}", n.x, n.y, n.z))
                 {
                     return MeshIOWriteStatus::FileWriteError;
                 }
@@ -2295,10 +2273,13 @@ namespace Geometry::MeshIO
             if (colors != nullptr)
             {
                 const auto& c = (*colors)[i];
-                if (!AppendFormatted(stream, buffer, sizeof(buffer), " %u %u %u",
-                                     static_cast<unsigned int>(EncodeUnitColorByte(c.x)),
-                                     static_cast<unsigned int>(EncodeUnitColorByte(c.y)),
-                                     static_cast<unsigned int>(EncodeUnitColorByte(c.z))))
+                if (!AppendFormatted(stream,
+                        buffer,
+                        sizeof(buffer),
+                        " {} {} {}",
+                        static_cast<unsigned int>(EncodeUnitColorByte(c.x)),
+                        static_cast<unsigned int>(EncodeUnitColorByte(c.y)),
+                        static_cast<unsigned int>(EncodeUnitColorByte(c.z))))
                 {
                     return MeshIOWriteStatus::FileWriteError;
                 }
@@ -2307,9 +2288,7 @@ namespace Geometry::MeshIO
             if (texcoords != nullptr)
             {
                 const auto& uv = (*texcoords)[i];
-                if (!AppendFormatted(stream, buffer, sizeof(buffer), " %.6f %.6f",
-                                     static_cast<double>(uv.x),
-                                     static_cast<double>(uv.y)))
+                if (!AppendFormatted(stream, buffer, sizeof(buffer), " {} {}", uv.x, uv.y))
                 {
                     return MeshIOWriteStatus::FileWriteError;
                 }
@@ -2444,23 +2423,21 @@ namespace Geometry::MeshIO
                 normal = glm::vec3(0.0f, 0.0f, 0.0f);
             }
 
-            if (!AppendFormatted(stream, buffer, sizeof(buffer),
-                                 "  facet normal %.6e %.6e %.6e\n"
-                                 "    outer loop\n",
-                                 static_cast<double>(normal.x),
-                                 static_cast<double>(normal.y),
-                                 static_cast<double>(normal.z)))
+            if (!AppendFormatted(stream,
+                    buffer,
+                    sizeof(buffer),
+                    "  facet normal {} {} {}\n"
+                    "    outer loop\n",
+                    normal.x,
+                    normal.y,
+                    normal.z))
             {
                 return MeshIOWriteStatus::FileWriteError;
             }
 
             for (const glm::vec3& v : {v0, v1, v2})
             {
-                if (!AppendFormatted(stream, buffer, sizeof(buffer),
-                                     "      vertex %.6e %.6e %.6e\n",
-                                     static_cast<double>(v.x),
-                                     static_cast<double>(v.y),
-                                     static_cast<double>(v.z)))
+                if (!AppendFormatted(stream, buffer, sizeof(buffer), "      vertex {} {} {}\n", v.x, v.y, v.z))
                 {
                     return MeshIOWriteStatus::FileWriteError;
                 }

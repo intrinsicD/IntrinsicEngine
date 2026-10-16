@@ -14,6 +14,7 @@
 #include <cctype>
 #include <chrono>
 #include <cstdint>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -58,6 +59,7 @@ import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.GeometryProcessingOperations;
@@ -109,6 +111,9 @@ import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
 import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.IO;
+import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.ParameterizationConfig;
 import Extrinsic.Runtime.PointCloudConsolidationTypes;
@@ -431,7 +436,7 @@ TEST(SandboxEditorPresentation, DefaultDrawStartsWithOnlyMenuBarVisible)
 
     EXPECT_TRUE(ImGuiWindowExists("##MainMenuBar"));
     const auto menu = shell.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), 98u);
+    ASSERT_EQ(menu.size(), 99u);
     for (const Runtime::EditorWindowMenuEntry& entry : menu)
     {
         EXPECT_FALSE(entry.Open) << entry.Id;
@@ -549,7 +554,7 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
     RegisterAllAppPanels(shell, methodPanels, meshProcessingPanels, domainPanels);
 
     const auto menu = shell.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), expected.size() + 12u);
+    ASSERT_EQ(menu.size(), expected.size() + 13u);
     for (const ExpectedWindow& expectedWindow : expected)
     {
         const Runtime::EditorWindowMenuEntry* entry =
@@ -1681,20 +1686,20 @@ TEST(SandboxEditorPresentation, EditorShellStartsWithOnlyBuiltinWindows)
     Editor::EditorShell shell;
     shell.Attach(engine.Worlds(), engine.Services());
     const auto menu = shell.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), 12u);
-    for (const std::string_view id :
-         {"sandbox.shell",
-          "scene.hierarchy",
-          "scene.inspector",
-          "scene.selection",
-          "file.scene",
-          "file.import",
-          "view.frame_graph",
-          "view.render_recipes",
-          "view.camera_render",
-          "view.geometry_visualization",
-          "view.jobs",
-          "view.diagnostics"})
+    ASSERT_EQ(menu.size(), 13u);
+    for (const std::string_view id : {"sandbox.shell",
+             "scene.hierarchy",
+             "scene.inspector",
+             "scene.selection",
+             "file.scene",
+             "file.import",
+             "file.export",
+             "view.frame_graph",
+             "view.render_recipes",
+             "view.camera_render",
+             "view.geometry_visualization",
+             "view.jobs",
+             "view.diagnostics"})
     {
         EXPECT_NE(FindWindow(menu, id), nullptr) << id;
     }
@@ -1762,7 +1767,7 @@ TEST(SandboxEditorPresentation, ExternalWindowContributionNeedsNoLegacySwitchEnt
     ASSERT_TRUE(handle.IsValid());
 
     const auto menu = shell.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), 13u);
+    ASSERT_EQ(menu.size(), 14u);
     const Runtime::EditorWindowMenuEntry* contributed =
         FindWindow(menu, "graph.analysis.curvature");
     ASSERT_NE(contributed, nullptr);
@@ -1771,7 +1776,7 @@ TEST(SandboxEditorPresentation, ExternalWindowContributionNeedsNoLegacySwitchEnt
     EXPECT_EQ(drawCalls, 0);
 
     EXPECT_TRUE(shell.UnregisterEditorWindow(handle));
-    EXPECT_EQ(shell.BuildEditorWindowMenuModel().size(), 12u);
+    EXPECT_EQ(shell.BuildEditorWindowMenuModel().size(), 13u);
     shell.Detach();
     engine.Shutdown();
 }
@@ -2035,7 +2040,7 @@ TEST(SandboxEditorPresentation, ProcessingActionButtonBlocksDisabledClicksAndEmi
 
 // UI-071: no panel hand-writes a GPU transaction's Stop/Accept/Discard row; they all go through
 // `DrawGpuTransactionControls`. Coherent Point Drift's Discard belongs to its own stepped run (it is
-// not a GPU two-phase transaction), so that one literal is the only exception.
+// not a GPU two-phase transaction); the shell's dirty-scene prompt is also a separate workflow.
 TEST(SandboxEditorPresentation, GpuTransactionRowsAreDrawnByTheSharedHelper)
 {
     std::size_t helperUses = 0;
@@ -2055,7 +2060,9 @@ TEST(SandboxEditorPresentation, GpuTransactionRowsAreDrawnByTheSharedHelper)
             {
                 const auto end = source.find('"', at + needle.size());
                 const std::string literal = source.substr(at, end - at + 1);
-                EXPECT_EQ(literal, "Button(\"Discard##CPD\"") << file << " hand-writes " << literal;
+                const bool sceneDiscard =
+                    std::string_view{file} == "Sandbox.EditorShell.cpp" && literal == "Button(\"Discard\"";
+                EXPECT_TRUE(sceneDiscard || literal == "Button(\"Discard##CPD\"") << file << " hand-writes " << literal;
                 at += needle.size();
             }
         }
@@ -2165,6 +2172,7 @@ namespace
             Script = script.get();
             Engine = std::make_unique<Intrinsic::Tests::RuntimeTestKernel>(std::move(config), std::move(script));
             Engine->EmplaceModule<Runtime::EngineConfigControl>(std::move(sections));
+            Engine->EmplaceModule<Runtime::AsyncWorkModule>();
             Engine->EmplaceModule<Runtime::CameraModule>();
             Engine->EmplaceModule<Runtime::EditorUiModule>();
             Engine->EmplaceModule<Runtime::SceneDocumentModule>();
@@ -3160,4 +3168,404 @@ TEST(SandboxEditorGizmo, FrontalScaleAxesDragAndUndo)
     // the pivot's X and Y axis planes.
     for (const int axis : {0, 1})
         ExpectAxisScaleDragAndUndo(Core::Config::CameraControllerKind::Orbit, axis);
+}
+
+TEST(SandboxEditorPresentation, FileMenuExportWritesSelectedCanonicalGeometryThroughRealControls)
+{
+    GizmoFixture fixture;
+    const auto entity = fixture.Select({0, 0, 0});
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0, 0, 0}), b = mesh.AddVertex({1, 0, 0}), c = mesh.AddVertex({0, 1, 0});
+    ASSERT_TRUE(mesh.AddTriangle(a, b, c));
+    Extrinsic::ECS::Components::GeometrySources::PopulateFromMesh(fixture.Scene().Raw(), entity, mesh);
+    TmpFile destination{"sandbox-editor-geometry-export.obj", "original"};
+    const auto menu = fixture.Shell.BuildEditorWindowMenuModel();
+    const auto* exportWindow = FindWindow(menu, "file.export");
+    ASSERT_NE(exportWindow, nullptr);
+    EXPECT_EQ(exportWindow->MenuPath, (std::vector<std::string>{"File"}));
+    fixture.Wait();
+    fixture.ClickItem("##MainMenuBar", "File", true, TestSupport::MenuBarScan, 200);
+    fixture.Wait();
+    fixture.ClickMenuItem("File / Export");
+    fixture.Then(
+        [&]
+        {
+            EXPECT_TRUE(ImGuiWindowExists("File / Export"));
+        });
+    fixture.ClickItem("File / Export", "Destination", false, TestSupport::WindowColumnScan, 130);
+    fixture.Wait();
+    fixture.Do(
+        [&]
+        {
+            ImGui::GetIO().AddInputCharactersUTF8(destination.Path.string().c_str());
+        });
+    fixture.Wait(2);
+    fixture.ClickItem("File / Export", "Export selected geometry", false, TestSupport::WindowColumnScan, 130);
+    fixture.Then(
+        [&]
+        {
+            const auto exported = Geometry::MeshIO::LoadOBJ(destination.Path.string());
+            ASSERT_TRUE(exported);
+            EXPECT_EQ(exported->Vertices.Size(), 3u);
+            EXPECT_EQ(exported->Faces.Size(), 1u);
+            EXPECT_EQ(fixture.History->UndoCount(), 0u);
+        });
+    fixture.Engine->Run();
+}
+
+TEST(SandboxEditorPresentation, SceneLifecycleButtonsAskBeforeDiscardingDirtyWork)
+{
+    GizmoFixture f;
+    const auto entity = f.Select({0.0f, 0.0f, 0.0f});
+    ASSERT_TRUE(f.History->MarkDirty("unsaved work").Succeeded());
+    ASSERT_TRUE(f.Shell.SetEditorWindowOpen("file.scene", true));
+    const auto observer = f.Shell.AddFrameObserver(
+        [](const Editor::SandboxEditorContext&)
+        {
+            ImGui::SetWindowPos("File / Scene", ImVec2{10.0f, 30.0f});
+            ImGui::SetWindowSize("File / Scene", ImVec2{560.0f, 640.0f});
+        });
+    f.Wait(2);
+    for (const char* label : {"New scene", "Close scene", "Open path"})
+    {
+        f.ClickItem(
+            "File / Scene",
+            label,
+            false,
+            [label](const ImGuiWindow& window, const int k)
+            {
+                float x = window.Pos.x + ImGui::GetStyle().WindowPadding.x + 16.0f;
+                const char* preceding = std::string_view(label) == "Close scene" ? "New scene"
+                    : std::string_view(label) == "Open path"                     ? "Save / Save As"
+                                                                                 : nullptr;
+                if (preceding != nullptr)
+                    x += ImGui::CalcTextSize(preceding).x + 2.0f * ImGui::GetStyle().FramePadding.x +
+                        ImGui::GetStyle().ItemSpacing.x;
+                return glm::vec2{x, window.Pos.y + 4.0f * static_cast<float>(k)};
+            },
+            160);
+        f.Then(
+            [&]
+            {
+                const auto* popup = ImGui::FindWindowByName("Unsaved scene changes");
+                EXPECT_TRUE(popup != nullptr && popup->WasActive);
+                EXPECT_TRUE(f.Scene().Raw().valid(entity));
+                EXPECT_TRUE(f.History->Snapshot().Dirty);
+            });
+        f.ClickItem(
+            "Unsaved scene changes",
+            "Cancel",
+            false,
+            [](const ImGuiWindow& window, const int k)
+            {
+                const auto& style = ImGui::GetStyle();
+                const float x = window.Pos.x + style.WindowPadding.x + ImGui::CalcTextSize("Save").x +
+                    ImGui::CalcTextSize("Discard").x + 4.0f * style.FramePadding.x + 2.0f * style.ItemSpacing.x + 12.0f;
+                return glm::vec2{x, window.Pos.y + 4.0f * static_cast<float>(k)};
+            },
+            100);
+        f.Then(
+            [&]
+            {
+                EXPECT_TRUE(f.Scene().Raw().valid(entity));
+                EXPECT_TRUE(f.History->Snapshot().Dirty);
+                EXPECT_TRUE(ImGui::GetCurrentContext()->OpenPopupStack.empty());
+            });
+    }
+    f.Engine->Run();
+    f.Shell.RemoveFrameObserver(observer);
+}
+
+namespace
+{
+    struct SceneReplacementRig
+    {
+        Runtime::EditorDocumentModel Document{.Dirty = true, .Revision = 7u};
+        Editor::SceneReplacementState State{};
+        std::vector<Runtime::EditorSceneFileOperation> Actions{};
+        std::string SavedPath{};
+        std::string LoadedPath{};
+        bool SavePending{true};
+        Runtime::EditorSceneFileResult SaveResult{.Status = Runtime::EditorCommandStatus::Pending,
+            .Operation = Runtime::EditorSceneFileOperation::Save,
+            .Task = Runtime::JobToken{3u, 1u}};
+        Runtime::EditorSceneEditingCommands Commands;
+
+        SceneReplacementRig()
+        {
+            Runtime::EditorSceneEditingContext context{};
+            context.SceneFileCommands = {.New =
+                                             [&]
+                {
+                    Actions.push_back(Runtime::EditorSceneFileOperation::New);
+                    return Runtime::EditorSceneFileResult{.Status = Runtime::EditorCommandStatus::Applied};
+                },
+                .Save =
+                    [&](const Runtime::EditorSceneFileCommand& command)
+                {
+                    SavedPath = command.Path;
+                    return SaveResult;
+                },
+                .Load =
+                    [&](const Runtime::EditorSceneFileCommand& command)
+                {
+                    LoadedPath = command.Path;
+                    Actions.push_back(Runtime::EditorSceneFileOperation::Load);
+                    return Runtime::EditorSceneFileResult{.Status = Runtime::EditorCommandStatus::Applied};
+                },
+                .Close =
+                    [&]
+                {
+                    Actions.push_back(Runtime::EditorSceneFileOperation::Close);
+                    return Runtime::EditorSceneFileResult{.Status = Runtime::EditorCommandStatus::Applied};
+                },
+                .IsPending =
+                    [&](const Runtime::JobToken task)
+                {
+                    EXPECT_EQ(task, SaveResult.Task);
+                    return SavePending;
+                }};
+            Commands = Runtime::BindEditorSceneEditingCommands(std::move(context));
+        }
+
+        void Request(const Runtime::EditorSceneFileOperation operation)
+        {
+            Editor::RequestSceneReplacement(State, operation, "next.scene.json", Commands, Document, 2u);
+        }
+        void Decide(const Editor::SceneReplacementDecision decision)
+        {
+            Editor::ResolveSceneReplacement(State, decision, Commands, Document, 2u);
+        }
+        void Observe(const Runtime::EditorSceneFileResult& result, const std::uint64_t epoch = 2u)
+        {
+            Editor::ObserveSceneReplacement(State, Commands, Document, epoch, result);
+        }
+    };
+}
+
+TEST(SandboxEditorPresentation, DirtySceneReplacementRequiresDiscardAndCancelPreservesScene)
+{
+    for (const auto operation : {Runtime::EditorSceneFileOperation::New,
+             Runtime::EditorSceneFileOperation::Load,
+             Runtime::EditorSceneFileOperation::Close})
+    {
+        SceneReplacementRig rig;
+        rig.Request(operation);
+        EXPECT_TRUE(rig.Actions.empty());
+        ASSERT_TRUE(rig.State.Pending.has_value());
+        rig.Decide(Editor::SceneReplacementDecision::Cancel);
+        EXPECT_TRUE(rig.Actions.empty());
+        EXPECT_FALSE(rig.State.Pending.has_value());
+        rig.Request(operation);
+        rig.Decide(Editor::SceneReplacementDecision::Discard);
+        ASSERT_EQ(rig.Actions, std::vector{operation});
+        EXPECT_FALSE(rig.State.Pending.has_value());
+        if (operation == Runtime::EditorSceneFileOperation::Load)
+            EXPECT_EQ(rig.LoadedPath, "next.scene.json");
+    }
+}
+
+TEST(SandboxEditorPresentation, CleanSceneReplacementRunsWithoutPrompt)
+{
+    for (const auto operation : {Runtime::EditorSceneFileOperation::New,
+             Runtime::EditorSceneFileOperation::Load,
+             Runtime::EditorSceneFileOperation::Close})
+    {
+        SceneReplacementRig rig;
+        rig.Document.Dirty = false;
+        rig.Request(operation);
+        EXPECT_EQ(rig.Actions, std::vector{operation});
+        EXPECT_FALSE(rig.State.Pending.has_value());
+    }
+}
+
+TEST(SandboxEditorPresentation, SceneReplacementWaitsForMatchingSaveAndKeepsOpenDestination)
+{
+    SceneReplacementRig rig;
+    rig.Document.HasActivePath = true;
+    rig.Document.ActivePath = "current.scene.json";
+    rig.Request(Runtime::EditorSceneFileOperation::Load);
+    EXPECT_STREQ(rig.State.SavePath.data(), "current.scene.json");
+    rig.Decide(Editor::SceneReplacementDecision::Save);
+    EXPECT_EQ(rig.SavedPath, "current.scene.json");
+    EXPECT_TRUE(rig.Actions.empty());
+    rig.Observe(rig.SaveResult);
+    EXPECT_TRUE(rig.Actions.empty());
+    auto completed = rig.SaveResult;
+    completed.Status = Runtime::EditorCommandStatus::Applied;
+    completed.Task = Runtime::JobToken{4u, 1u};
+    rig.Document.Dirty = false;
+    rig.Observe(completed);
+    EXPECT_TRUE(rig.Actions.empty());
+    completed.Task = rig.SaveResult.Task;
+    rig.Observe(completed);
+    ASSERT_EQ(rig.Actions, std::vector{Runtime::EditorSceneFileOperation::Load});
+    EXPECT_EQ(rig.LoadedPath, "next.scene.json");
+    rig.Observe(completed);
+    EXPECT_EQ(rig.Actions.size(), 1u);
+}
+
+TEST(SandboxEditorPresentation, SceneReplacementRejectsFailedSaveAndEditsMadeWhileSaving)
+{
+    SceneReplacementRig rig;
+    rig.Request(Runtime::EditorSceneFileOperation::New);
+    // An untitled document requires an explicit save path, never the Open destination.
+    EXPECT_STREQ(rig.State.SavePath.data(), "");
+    rig.Decide(Editor::SceneReplacementDecision::Save);
+    EXPECT_TRUE(rig.Actions.empty());
+    EXPECT_FALSE(rig.State.AwaitingSave);
+    ASSERT_TRUE(rig.State.LastResult.has_value());
+    EXPECT_EQ(rig.State.LastResult->Status, Runtime::EditorCommandStatus::SceneSaveFailed);
+    std::snprintf(rig.State.SavePath.data(), rig.State.SavePath.size(), "saved.scene.json");
+    rig.Decide(Editor::SceneReplacementDecision::Save);
+    auto completed = rig.SaveResult;
+    completed.Status = Runtime::EditorCommandStatus::SceneSaveFailed;
+    completed.Message = "Write failed.";
+    rig.Observe(completed);
+    EXPECT_TRUE(rig.Actions.empty());
+    EXPECT_TRUE(rig.State.Pending.has_value());
+    EXPECT_EQ(rig.State.Message, "Write failed.");
+    rig.Decide(Editor::SceneReplacementDecision::Save);
+    completed.Status = Runtime::EditorCommandStatus::Applied;
+    ++rig.Document.Revision;
+    rig.Observe(completed);
+    EXPECT_TRUE(rig.Actions.empty());
+    EXPECT_TRUE(rig.State.Pending.has_value());
+    EXPECT_FALSE(rig.State.AwaitingSave);
+    EXPECT_FALSE(rig.State.Message.empty());
+}
+
+TEST(SandboxEditorPresentation, SceneReplacementCancelOrDocumentReplacementIgnoresLaterSave)
+{
+    for (const bool cancel : {false, true})
+    {
+        SceneReplacementRig rig;
+        rig.Document.HasActivePath = true;
+        rig.Document.ActivePath = "current.scene.json";
+        rig.Request(Runtime::EditorSceneFileOperation::Close);
+        rig.Decide(Editor::SceneReplacementDecision::Save);
+        ASSERT_TRUE(rig.State.Pending.has_value());
+        ASSERT_TRUE(rig.State.AwaitingSave);
+        if (cancel)
+            rig.Decide(Editor::SceneReplacementDecision::Cancel);
+        auto completed = rig.SaveResult;
+        completed.Status = Runtime::EditorCommandStatus::Applied;
+        rig.Document.Dirty = false;
+        rig.Observe(completed, cancel ? 2u : 3u);
+        EXPECT_TRUE(rig.Actions.empty());
+        EXPECT_FALSE(rig.State.Pending.has_value());
+    }
+}
+
+TEST(SandboxEditorPresentation, HistoryFeedbackIncludesFailureAndReplacesItAfterSuccess)
+{
+    ProcessingButtonGui gui;
+    const auto draw = [&](Runtime::EditorCommandHistoryResult result)
+    {
+        ImGui::NewFrame();
+        ImGui::Begin("History feedback");
+        gui.Context->LogBuffer.clear();
+        ImGui::LogToBuffer();
+        Runtime::EditorDocumentCommandSurface commands{.Undo =
+                                                           [&]
+            {
+                return result;
+            },
+            .Redo =
+                [&]
+            {
+                return result;
+            }};
+        Editor::DrawEditorHistoryResult(Editor::ApplyEditorHistoryCommand(commands, true));
+        const std::string drawn = gui.Context->LogBuffer.c_str();
+        gui.End();
+        return drawn;
+    };
+    const auto failed =
+        draw({.Status = Runtime::EditorCommandHistoryStatus::StaleEntity, .Label = "Parameterize mesh UVs"});
+    EXPECT_NE(failed.find("StaleEntity"), std::string::npos);
+    EXPECT_NE(failed.find("Parameterize mesh UVs"), std::string::npos);
+    const auto succeeded =
+        draw({.Status = Runtime::EditorCommandHistoryStatus::Undone, .Label = "Parameterize mesh UVs"});
+    EXPECT_NE(succeeded.find("Undone"), std::string::npos);
+    EXPECT_EQ(succeeded.find("StaleEntity"), std::string::npos);
+}
+
+TEST(SandboxEditorPresentation, MissingSaveResultStopsWaitingWithoutReplacingScene)
+{
+    SceneReplacementRig rig;
+    rig.Document.HasActivePath = true;
+    rig.Document.ActivePath = "current.scene.json";
+    rig.Request(Runtime::EditorSceneFileOperation::New);
+    rig.Decide(Editor::SceneReplacementDecision::Save);
+    ASSERT_TRUE(rig.State.AwaitingSave);
+    auto unrelated = rig.SaveResult;
+    unrelated.Status = Runtime::EditorCommandStatus::Applied;
+    unrelated.Task = Runtime::JobToken{4u, 1u};
+    rig.Observe(unrelated);
+    EXPECT_TRUE(rig.State.AwaitingSave) << "An unrelated event cannot end a live save";
+    rig.SavePending = false;
+    rig.Document.Dirty = false;
+    rig.Observe(unrelated);
+    EXPECT_FALSE(rig.State.AwaitingSave);
+    EXPECT_TRUE(rig.State.Pending.has_value());
+    EXPECT_TRUE(rig.Actions.empty());
+    EXPECT_NE(rig.State.Message.find("unavailable"), std::string::npos);
+    rig.Decide(Editor::SceneReplacementDecision::Cancel);
+    EXPECT_FALSE(rig.State.Pending.has_value());
+    EXPECT_TRUE(rig.Actions.empty());
+}
+
+TEST(SandboxEditorPresentation, SceneFilePendingQueryRejectsUnboundAndExpiredCommands)
+{
+    EXPECT_FALSE(Runtime::IsEditorSceneFilePending({}, Runtime::JobToken{3u, 1u}));
+    Runtime::EditorSceneEditingContext context{};
+    EXPECT_FALSE(
+        Runtime::IsEditorSceneFilePending(Runtime::BindEditorSceneEditingCommands(context), Runtime::JobToken{3u, 1u}));
+    bool active = true;
+    bool queried = false;
+    context.AttachmentActive = [&]
+    {
+        return active;
+    };
+    context.SceneFileCommands.IsPending = [&](const Runtime::JobToken task)
+    {
+        queried = true;
+        return task == Runtime::JobToken{3u, 1u};
+    };
+    const auto commands = Runtime::BindEditorSceneEditingCommands(std::move(context));
+    EXPECT_TRUE(Runtime::IsEditorSceneFilePending(commands, Runtime::JobToken{3u, 1u}));
+    EXPECT_TRUE(queried);
+    active = false;
+    queried = false;
+    EXPECT_FALSE(Runtime::IsEditorSceneFilePending(commands, Runtime::JobToken{3u, 1u}));
+    EXPECT_FALSE(queried);
+}
+
+TEST(SandboxEditorPresentation, SceneFilePendingQueryObservesRuntimeJobAndAttachmentLifetime)
+{
+    GizmoFixture fixture;
+    Runtime::EditorWorkspaceAttachment attachment;
+    attachment.Attach(fixture.Engine->Worlds(), fixture.Engine->Services());
+    auto* jobs = fixture.Engine->Services().Find<Runtime::JobService>();
+    ASSERT_NE(jobs, nullptr);
+    const auto task = jobs->Submit({.DebugName = "Test.SceneFilePendingQuery",
+        .Work =
+            [](const Runtime::JobCancellation&)
+        {
+            return Runtime::JobResultEnvelope::Make(true);
+        },
+        .PublishCompletion =
+            [](auto&, const Runtime::JobResultEnvelope&)
+        {
+            return true;
+        }});
+    ASSERT_TRUE(task.IsValid());
+    ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment).has_value());
+    const auto frame = Runtime::PrepareEditorSceneEditingFrame(attachment);
+    ASSERT_TRUE(frame.Commands.IsBound());
+    EXPECT_TRUE(Runtime::IsEditorSceneFilePending(frame.Commands, task));
+    EXPECT_FALSE(Runtime::IsEditorSceneFilePending(frame.Commands, Runtime::JobToken{}));
+    attachment.Detach();
+    EXPECT_FALSE(Runtime::IsEditorSceneFilePending(frame.Commands, task));
 }

@@ -157,6 +157,96 @@ namespace Geometry::Parameterization
             default: return {0.0f, static_cast<float>(1.0 - f)};
             }
         }
+
+        [[nodiscard]] HarmonicStatus PrepareHarmonicInput(const Mesh& mesh,
+            const HarmonicParams& params,
+            std::vector<glm::vec2>& uv,
+            std::vector<std::uint8_t>& fixed,
+            std::vector<VertexHandle>& loop,
+            std::size_t& boundaryCount)
+        {
+            const std::size_t nV = mesh.VerticesSize();
+            if (mesh.VertexCount() == 0)
+            {
+                return HarmonicStatus::EmptyMesh;
+            }
+            if (mesh.VertexCount() < 3)
+            {
+                return HarmonicStatus::InsufficientVertices;
+            }
+            if (mesh.FaceCount() == 0)
+            {
+                return HarmonicStatus::EmptyMesh;
+            }
+
+            // Triangle-mesh precondition.
+            for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
+            {
+                const FaceHandle f{static_cast<PropertyIndex>(fi)};
+                if (!mesh.IsDeleted(f) && mesh.Valence(f) != 3)
+                {
+                    return HarmonicStatus::NotTriangleMesh;
+                }
+            }
+
+            if (params.PinnedVertices.size() != params.PinnedUVs.size())
+            {
+                return HarmonicStatus::MismatchedBoundaryArray;
+            }
+
+            // Validate pins: in range, live, finite, unique.
+            uv.assign(nV, glm::vec2(0.0f));
+            fixed.assign(nV, 0u);
+            for (std::size_t i = 0; i < params.PinnedVertices.size(); ++i)
+            {
+                const std::uint32_t idx = params.PinnedVertices[i];
+                if (idx >= nV)
+                {
+                    return HarmonicStatus::InvalidPins;
+                }
+                const VertexHandle v{static_cast<PropertyIndex>(idx)};
+                if (mesh.IsDeleted(v) || fixed[idx] != 0u)
+                {
+                    return HarmonicStatus::InvalidPins;
+                }
+                if (!Geometry::Validation::IsFinite(params.PinnedUVs[i]))
+                {
+                    return HarmonicStatus::NonFiniteBoundaryUV;
+                }
+                fixed[idx] = 1u;
+                uv[idx] = params.PinnedUVs[i];
+            }
+
+            // Disk topology: exactly one boundary loop covering all boundary verts.
+            loop = ExtractBoundaryLoop(mesh);
+            if (loop.empty() || loop.size() != CountBoundaryVertices(mesh))
+            {
+                return HarmonicStatus::NotDiskTopology;
+            }
+            if (loop.size() < 3)
+            {
+                return HarmonicStatus::DegenerateBoundary;
+            }
+            if (!MeshUtils::IsConnectedManifoldWithEulerOne(mesh, loop.front()))
+            {
+                return HarmonicStatus::NotDiskTopology;
+            }
+
+            boundaryCount = loop.size();
+
+            // Place / validate the boundary.
+            if (params.Boundary == HarmonicBoundaryPolicy::Custom)
+            {
+                for (const VertexHandle v : loop)
+                {
+                    if (fixed[v.Index] == 0u)
+                    {
+                        return HarmonicStatus::InvalidPins; // boundary not fully pinned
+                    }
+                }
+            }
+            return HarmonicStatus::Success;
+        }
     } // namespace
 
     const char* ToString(HarmonicStatus status) noexcept
@@ -178,6 +268,15 @@ namespace Geometry::Parameterization
         return "Unknown";
     }
 
+    HarmonicStatus ValidateHarmonicInput(const Mesh& mesh, const HarmonicParams& params)
+    {
+        std::vector<glm::vec2> uv;
+        std::vector<std::uint8_t> fixed;
+        std::vector<VertexHandle> loop;
+        std::size_t boundaryCount{};
+        return PrepareHarmonicInput(mesh, params, uv, fixed, loop, boundaryCount);
+    }
+
     std::optional<HarmonicResult> ComputeHarmonic(const Mesh& mesh, const HarmonicParams& params)
     {
         HarmonicResult result;
@@ -189,85 +288,13 @@ namespace Geometry::Parameterization
             return result;
         };
 
-        if (mesh.VertexCount() == 0)
-        {
-            return fail(HarmonicStatus::EmptyMesh);
-        }
-        if (mesh.VertexCount() < 3)
-        {
-            return fail(HarmonicStatus::InsufficientVertices);
-        }
-        if (mesh.FaceCount() == 0)
-        {
-            return fail(HarmonicStatus::EmptyMesh);
-        }
-
-        // Triangle-mesh precondition.
-        for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
-        {
-            const FaceHandle f{static_cast<PropertyIndex>(fi)};
-            if (!mesh.IsDeleted(f) && mesh.Valence(f) != 3)
-            {
-                return fail(HarmonicStatus::NotTriangleMesh);
-            }
-        }
-
-        if (params.PinnedVertices.size() != params.PinnedUVs.size())
-        {
-            return fail(HarmonicStatus::MismatchedBoundaryArray);
-        }
-
-        // Validate pins: in range, live, finite, unique.
-        std::vector<glm::vec2> uv(nV, glm::vec2(0.0f));
-        std::vector<std::uint8_t> fixed(nV, 0u);
-        for (std::size_t i = 0; i < params.PinnedVertices.size(); ++i)
-        {
-            const std::uint32_t idx = params.PinnedVertices[i];
-            if (idx >= nV)
-            {
-                return fail(HarmonicStatus::InvalidPins);
-            }
-            const VertexHandle v{static_cast<PropertyIndex>(idx)};
-            if (mesh.IsDeleted(v) || fixed[idx] != 0u)
-            {
-                return fail(HarmonicStatus::InvalidPins);
-            }
-            if (!Geometry::Validation::IsFinite(params.PinnedUVs[i]))
-            {
-                return fail(HarmonicStatus::NonFiniteBoundaryUV);
-            }
-            fixed[idx] = 1u;
-            uv[idx] = params.PinnedUVs[i];
-        }
-
-        // Disk topology: exactly one boundary loop covering all boundary verts.
-        const std::vector<VertexHandle> loop = ExtractBoundaryLoop(mesh);
-        if (loop.empty() || loop.size() != CountBoundaryVertices(mesh))
-        {
-            return fail(HarmonicStatus::NotDiskTopology);
-        }
-        if (loop.size() < 3)
-        {
-            return fail(HarmonicStatus::DegenerateBoundary);
-        }
-        if (!MeshUtils::IsConnectedManifoldWithEulerOne(mesh, loop.front()))
-        {
-            return fail(HarmonicStatus::NotDiskTopology);
-        }
-        result.BoundaryVertexCount = loop.size();
-
-        // Place / validate the boundary.
-        if (params.Boundary == HarmonicBoundaryPolicy::Custom)
-        {
-            for (const VertexHandle v : loop)
-            {
-                if (fixed[v.Index] == 0u)
-                {
-                    return fail(HarmonicStatus::InvalidPins); // boundary not fully pinned
-                }
-            }
-        }
-        else
+        std::vector<glm::vec2> uv;
+        std::vector<std::uint8_t> fixed;
+        std::vector<VertexHandle> loop;
+        const auto prepared = PrepareHarmonicInput(mesh, params, uv, fixed, loop, result.BoundaryVertexCount);
+        if (prepared != HarmonicStatus::Success)
+            return fail(prepared);
+        if (params.Boundary != HarmonicBoundaryPolicy::Custom)
         {
             // Cumulative arc length for arc-length spacing.
             const std::size_t B = loop.size();

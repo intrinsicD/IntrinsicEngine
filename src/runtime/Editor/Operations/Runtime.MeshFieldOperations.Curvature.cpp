@@ -2034,8 +2034,15 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             SegmentationGuideChannels channels;
             return CaptureSegmentationGuides(current.SourceView, *config, source, channels, why);
         };
-        return PrepareMeshFieldInput(context, entity, availability, positions, segmentation != nullptr, std::move(bindings),
-                                     std::move(inputs), validate, diagnostic);
+        return PrepareMeshFieldInput(context,
+            entity,
+            availability,
+            positions,
+            segmentation ? MeshFieldReadinessKind::Segmentation : MeshFieldReadinessKind::Curvature,
+            std::move(bindings),
+            std::move(inputs),
+            validate,
+            diagnostic);
     }
 
 } // namespace Extrinsic::Runtime::MeshFieldDetail

@@ -42,6 +42,7 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.MeshSurfaceTopology;
 import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.JobService;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Parameterization;
 import Geometry.Properties;
@@ -50,6 +51,7 @@ import Geometry.Properties;
 #include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -1039,201 +1041,211 @@ namespace Extrinsic::Runtime
 
     namespace
     {
-    [[nodiscard]] EditorParameterizationResult
-    ApplyParameterizationChecked(
-        const EditorProcessingContext& context,
-        const EditorParameterizationCommand& command,
-        const std::function<void(EditorParameterizationResult)>& sink)
-    {
-        const auto finish = [&sink](EditorParameterizationResult result)
+        [[nodiscard]] EditorParameterizationResult ValidateParameterizationRequest(
+            const EditorProcessingContext& context,
+            const EditorParameterizationCommand& command,
+            GS::ConstSourceView& view,
+            std::string* configKey = nullptr)
         {
-            return PublishResult(sink, std::move(result));
-        };
-        if (context.Scene == nullptr)
-        {
-            return finish(MakeResult(
-                command,
-                EditorCommandStatus::MissingScene,
-                Parameterization::ParameterizationStatus::InvalidInput,
-                "Parameterization requires a scene registry."));
-        }
-
-        const auto bindings = ValidateParameterizationConfigSection(
-            SerializeParameterizationConfig(command.Config), {}, kParameterizationConfigSectionName);
-        if (!bindings.Usable())
-            return finish(MakeResult(command, EditorCommandStatus::InvalidProcessingParameters,
-                Parameterization::ParameterizationStatus::InvalidInput, "Invalid parameterization property bindings."));
-        const auto strategy = ToGeometryStrategy(command.Config);
-        if (!strategy.has_value() ||
-            StableTokenForEditorParameterizationStrategy(
-                command.Config.Strategy).empty())
-        {
-            return finish(MakeResult(
-                command,
-                EditorCommandStatus::InvalidProcessingParameters,
-                Parameterization::ParameterizationStatus::InvalidInput,
-                "Parameterization config is invalid or unsupported."));
-        }
-
-        entt::registry& raw = context.Scene->Raw();
-        const std::optional<ECS::EntityHandle> entity =
-            EditorFeatureDetail::ResolveStableEntity(
-                raw, command.StableEntityId);
-        if (!entity.has_value())
-        {
-            return finish(MakeResult(
-                command,
-                EditorCommandStatus::StaleEntity,
-                Parameterization::ParameterizationStatus::InvalidInput,
-                "Parameterization target is stale or no longer live."));
-        }
-
-        const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
-        std::vector<std::array<std::uint32_t, 3u>> triangles{};
-        std::string topologyDiagnostic{};
-        if (!CollectTriangleIndices(view, triangles, topologyDiagnostic))
-        {
-            return finish(MakeResult(
-                command,
-                GS::BuildSourceAvailability(view).ProvenanceDomain ==
-                        GS::Domain::Mesh
-                    ? EditorCommandStatus::InvalidProcessingParameters
-                    : EditorCommandStatus::UnsupportedGeometryDomain,
-                Parameterization::ParameterizationStatus::InvalidInput,
-                std::move(topologyDiagnostic)));
-        }
-
-        const std::optional<ParameterizationUvState> before =
-            CaptureUvState(view, command.Config);
-        if (!before.has_value())
-        {
-            return finish(MakeResult(
-                command,
-                EditorCommandStatus::InvalidProcessingParameters,
-                Parameterization::ParameterizationStatus::InvalidInput,
-                "The bound UV output has the wrong type, count, or non-finite values."));
-        }
-        const ParameterizationSourceSnapshot sourceGeneration =
-            CaptureParameterizationSourceState(view, command.Config);
-        if (sourceGeneration == nullptr)
-        {
-            return finish(MakeResult(
-                command,
-                EditorCommandStatus::InvalidProcessingParameters,
-                Parameterization::ParameterizationStatus::InvalidInput,
-                "Parameterization requires finite count-matched positions and "
-                "valid triangle topology."));
-        }
-        const std::uint64_t geometryMetadataSignature =
-            EditorFeatureDetail::GeometryMetadataSignatureForEntity(
-                raw,
-                *entity);
-
-        GeometryProcessingDetail::MeshSupport::MeshProcessingSourceResult source =
-            GeometryProcessingDetail::MeshSupport::BuildHalfedgeMeshForProcessing(
-                view, "Parameterization", command.Config.Positions.Name);
-        if (source.Status != EditorCommandStatus::Applied)
-        {
-            return finish(MakeResult(
-                command,
-                source.Status,
-                Parameterization::ParameterizationStatus::InvalidInput,
-                std::move(source.Diagnostic)));
-        }
-        if (!RestoreDeletedVertexSlots(source, topologyDiagnostic))
-        {
-            return finish(MakeResult(
-                command,
-                EditorCommandStatus::InvalidProcessingParameters,
-                Parameterization::ParameterizationStatus::InvalidInput,
-                std::move(topologyDiagnostic)));
-        }
-
-        Parameterization::ParameterizeResult parameterized =
-            Parameterization::ParameterizeMesh(source.Mesh, *strategy);
-        if (parameterized.Succeeded() &&
-            !AlignFaceDiagnosticsToSourceStorage(
-                parameterized.Diagnostics,
-                source.SourceFaceForMeshFace,
-                view.FaceSource->Properties.Size()))
-        {
-            return finish(MakeResult(
-                command,
-                EditorCommandStatus::GeometryProcessingFailed,
-                Parameterization::ParameterizationStatus::SolverFailed,
-                "Parameterization could not align face diagnostics with source storage."));
-        }
-        EditorParameterizationResult result = MakeResult(
-            command,
-            parameterized.Succeeded()
-                ? EditorCommandStatus::Applied
-                : EditorCommandStatus::GeometryProcessingFailed,
-            parameterized.Status,
-            parameterized.Succeeded()
-                ? "Mesh parameterization applied."
-                : DescribeParameterizationRejection(parameterized.Rejection));
-        result.Diagnostics = parameterized.Diagnostics;
-        result.Rejection = parameterized.Rejection;
-        result.VertexCount = parameterized.UVs.size();
-        if (!parameterized.Succeeded())
-            return finish(std::move(result));
-
-        const std::size_t vertexCount = view.VertexSource->Properties.Size();
-        if (parameterized.UVs.size() != vertexCount ||
-            !AllFiniteUvs(parameterized.UVs))
-        {
-            result.Status = EditorCommandStatus::GeometryProcessingFailed;
-            result.ParameterizationStatus =
-                Parameterization::ParameterizationStatus::SolverFailed;
-            result.Message =
-                "Parameterization returned non-finite or count-mismatched UVs.";
-            return finish(std::move(result));
-        }
-
-        std::vector<std::uint32_t> fingerprintSurfaceIndices{};
-        std::vector<std::uint32_t> fingerprintTriangleFaces{};
-        if (BuildMeshSurfaceTriangleTopology(
-                view,
-                fingerprintSurfaceIndices,
-                fingerprintTriangleFaces) == MeshSurfaceTopologyStatus::Success)
-        {
-            const auto positions = view.VertexSource->Properties.Get<glm::vec3>(
-                command.Config.Positions.Name);
-            if (positions &&
-                positions.Vector().size() ==
-                    view.VertexSource->Properties.Size() &&
-                AllFinitePositions(positions.Vector()))
+            if (context.Scene == nullptr)
             {
-                result.DiagnosticInputFingerprint =
-                    ComputeDiagnosticInputFingerprint(
-                        fingerprintSurfaceIndices,
-                        fingerprintTriangleFaces,
-                        positions.Vector(),
-                        parameterized.UVs);
+                return MakeResult(command,
+                    EditorCommandStatus::MissingScene,
+                    Parameterization::ParameterizationStatus::InvalidInput,
+                    "Parameterization requires a scene registry.");
             }
+
+            const auto bindings = ValidateParameterizationConfigSection(
+                SerializeParameterizationConfig(command.Config), {}, kParameterizationConfigSectionName);
+            if (!bindings.Usable())
+                return MakeResult(command,
+                    EditorCommandStatus::InvalidProcessingParameters,
+                    Parameterization::ParameterizationStatus::InvalidInput,
+                    "Invalid parameterization property bindings.");
+            if (configKey)
+                *configKey = bindings.CanonicalPayloadJson;
+            const auto strategy = ToGeometryStrategy(command.Config);
+            if (!strategy.has_value() || StableTokenForEditorParameterizationStrategy(command.Config.Strategy).empty())
+            {
+                return MakeResult(command,
+                    EditorCommandStatus::InvalidProcessingParameters,
+                    Parameterization::ParameterizationStatus::InvalidInput,
+                    "Parameterization config is invalid or unsupported.");
+            }
+
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                EditorFeatureDetail::ResolveStableEntity(raw, command.StableEntityId);
+            if (!entity.has_value())
+            {
+                return MakeResult(command,
+                    EditorCommandStatus::StaleEntity,
+                    Parameterization::ParameterizationStatus::InvalidInput,
+                    "Parameterization target is stale or no longer live.");
+            }
+
+            view = GS::BuildConstView(raw, *entity);
+            return MakeResult(
+                command, EditorCommandStatus::Applied, Parameterization::ParameterizationStatus::Success, {});
         }
 
-        const EditorCommandStatus commitStatus = CommitUvState(
-            context,
-            command.StableEntityId,
-            geometryMetadataSignature,
-            sourceGeneration,
-            *before,
-            ParameterizationUvState{
-                .PropertyName = command.Config.Texcoords.Name,
-                .Present = true,
-                .Values = std::move(parameterized.UVs),
-                .CornerPropertyName = before->CornerPropertyName,
-            });
-        if (commitStatus != EditorCommandStatus::Applied)
+        [[nodiscard]] EditorParameterizationResult PrepareParameterizationSource(const GS::ConstSourceView& view,
+            const EditorParameterizationCommand& command,
+            std::optional<ParameterizationUvState>& before,
+            ParameterizationSourceSnapshot& sourceGeneration,
+            GeometryProcessingDetail::MeshSupport::MeshProcessingSourceResult& source)
         {
-            result.Status = commitStatus;
-            result.Message =
-                "Parameterization UV writeback failed during editor history commit.";
+            std::vector<std::array<std::uint32_t, 3u>> triangles{};
+            std::string topologyDiagnostic{};
+            if (!CollectTriangleIndices(view, triangles, topologyDiagnostic))
+            {
+                return MakeResult(command,
+                    GS::BuildSourceAvailability(view).ProvenanceDomain == GS::Domain::Mesh
+                        ? EditorCommandStatus::InvalidProcessingParameters
+                        : EditorCommandStatus::UnsupportedGeometryDomain,
+                    Parameterization::ParameterizationStatus::InvalidInput,
+                    std::move(topologyDiagnostic));
+            }
+
+            before = CaptureUvState(view, command.Config);
+            if (!before.has_value())
+            {
+                return MakeResult(command,
+                    EditorCommandStatus::InvalidProcessingParameters,
+                    Parameterization::ParameterizationStatus::InvalidInput,
+                    "The bound UV output has the wrong type, count, or non-finite values.");
+            }
+            sourceGeneration = CaptureParameterizationSourceState(view, command.Config);
+            if (sourceGeneration == nullptr)
+            {
+                return MakeResult(command,
+                    EditorCommandStatus::InvalidProcessingParameters,
+                    Parameterization::ParameterizationStatus::InvalidInput,
+                    "Parameterization requires finite count-matched positions and "
+                    "valid triangle topology.");
+            }
+            source = GeometryProcessingDetail::MeshSupport::BuildHalfedgeMeshForProcessing(
+                view, "Parameterization", command.Config.Positions.Name);
+            if (source.Status != EditorCommandStatus::Applied)
+            {
+                return MakeResult(command,
+                    source.Status,
+                    Parameterization::ParameterizationStatus::InvalidInput,
+                    std::move(source.Diagnostic));
+            }
+            if (!RestoreDeletedVertexSlots(source, topologyDiagnostic))
+            {
+                return MakeResult(command,
+                    EditorCommandStatus::InvalidProcessingParameters,
+                    Parameterization::ParameterizationStatus::InvalidInput,
+                    std::move(topologyDiagnostic));
+            }
+
+            const auto validation =
+                Parameterization::ValidateParameterizationInput(source.Mesh, *ToGeometryStrategy(command.Config));
+            if (!validation.Succeeded())
+            {
+                auto result = MakeResult(command,
+                    EditorCommandStatus::GeometryProcessingFailed,
+                    Parameterization::ParameterizationStatus::InvalidInput,
+                    validation.Rejection.ViolatesDiskTopology()
+                        ? DescribeParameterizationRejection(validation.Rejection)
+                        : std::string{validation.Diagnostic});
+                result.Rejection = validation.Rejection;
+                return result;
+            }
+
+            return MakeResult(
+                command, EditorCommandStatus::Applied, Parameterization::ParameterizationStatus::Success, {});
+        }
+
+        [[nodiscard]] EditorParameterizationResult ApplyParameterizationChecked(const EditorProcessingContext& context,
+            const EditorParameterizationCommand& command,
+            const std::function<void(EditorParameterizationResult)>& sink)
+        {
+            const auto finish = [&sink](EditorParameterizationResult result)
+            {
+                return PublishResult(sink, std::move(result));
+            };
+            GS::ConstSourceView view;
+            auto admission = ValidateParameterizationRequest(context, command, view);
+            if (!admission.Succeeded())
+                return finish(std::move(admission));
+            std::optional<ParameterizationUvState> before;
+            ParameterizationSourceSnapshot sourceGeneration;
+            GeometryProcessingDetail::MeshSupport::MeshProcessingSourceResult source;
+            admission = PrepareParameterizationSource(view, command, before, sourceGeneration, source);
+            if (!admission.Succeeded())
+                return finish(std::move(admission));
+            const auto entity = EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(), command.StableEntityId);
+            const auto geometryMetadataSignature =
+                EditorFeatureDetail::GeometryMetadataSignatureForEntity(context.Scene->Raw(), *entity);
+            const auto strategy = ToGeometryStrategy(command.Config);
+            Parameterization::ParameterizeResult parameterized =
+                Parameterization::ParameterizeMesh(source.Mesh, *strategy);
+            if (parameterized.Succeeded() &&
+                !AlignFaceDiagnosticsToSourceStorage(
+                    parameterized.Diagnostics, source.SourceFaceForMeshFace, view.FaceSource->Properties.Size()))
+            {
+                return finish(MakeResult(command,
+                    EditorCommandStatus::GeometryProcessingFailed,
+                    Parameterization::ParameterizationStatus::SolverFailed,
+                    "Parameterization could not align face diagnostics with source storage."));
+            }
+            EditorParameterizationResult result = MakeResult(command,
+                parameterized.Succeeded() ? EditorCommandStatus::Applied
+                                          : EditorCommandStatus::GeometryProcessingFailed,
+                parameterized.Status,
+                parameterized.Succeeded() ? "Mesh parameterization applied."
+                                          : DescribeParameterizationRejection(parameterized.Rejection));
+            result.Diagnostics = parameterized.Diagnostics;
+            result.Rejection = parameterized.Rejection;
+            result.VertexCount = parameterized.UVs.size();
+            if (!parameterized.Succeeded())
+                return finish(std::move(result));
+
+            const std::size_t vertexCount = view.VertexSource->Properties.Size();
+            if (parameterized.UVs.size() != vertexCount || !AllFiniteUvs(parameterized.UVs))
+            {
+                result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                result.ParameterizationStatus = Parameterization::ParameterizationStatus::SolverFailed;
+                result.Message = "Parameterization returned non-finite or count-mismatched UVs.";
+                return finish(std::move(result));
+            }
+
+            std::vector<std::uint32_t> fingerprintSurfaceIndices{};
+            std::vector<std::uint32_t> fingerprintTriangleFaces{};
+            if (BuildMeshSurfaceTriangleTopology(view, fingerprintSurfaceIndices, fingerprintTriangleFaces) ==
+                MeshSurfaceTopologyStatus::Success)
+            {
+                const auto positions = view.VertexSource->Properties.Get<glm::vec3>(command.Config.Positions.Name);
+                if (positions && positions.Vector().size() == view.VertexSource->Properties.Size() &&
+                    AllFinitePositions(positions.Vector()))
+                {
+                    result.DiagnosticInputFingerprint = ComputeDiagnosticInputFingerprint(
+                        fingerprintSurfaceIndices, fingerprintTriangleFaces, positions.Vector(), parameterized.UVs);
+                }
+            }
+
+            const EditorCommandStatus commitStatus = CommitUvState(context,
+                command.StableEntityId,
+                geometryMetadataSignature,
+                sourceGeneration,
+                *before,
+                ParameterizationUvState{
+                    .PropertyName = command.Config.Texcoords.Name,
+                    .Present = true,
+                    .Values = std::move(parameterized.UVs),
+                    .CornerPropertyName = before->CornerPropertyName,
+                });
+            if (commitStatus != EditorCommandStatus::Applied)
+            {
+                result.Status = commitStatus;
+                result.Message = "Parameterization UV writeback failed during editor history commit.";
+                return finish(std::move(result));
+            }
             return finish(std::move(result));
         }
-        return finish(std::move(result));
-    }
 
     [[nodiscard]] EditorParameterizationResult
     ApplyConfiguredParameterizationChecked(
@@ -1279,6 +1291,59 @@ namespace Extrinsic::Runtime
             sink);
     }
     } // namespace
+
+    ActionReadiness PreviewEditorParameterizationCommand(
+        const EditorProcessingCommands& commands, const EditorParameterizationCommand& command)
+    {
+        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
+        GS::ConstSourceView view;
+        std::string configKey;
+        const auto admission = ValidateParameterizationRequest(context, command, view, &configKey);
+        if (!admission.Succeeded())
+            return {false, admission.Message};
+        using D = GeometryElementDomain;
+        using namespace GeometryProcessingDetail;
+        const auto availability = BuildGeometryAvailability(view);
+        const auto entity = EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(), command.StableEntityId);
+        std::vector<GeometryPropertyRef> bindings{command.Config.Positions, command.Config.Texcoords};
+        if (command.Config.CornerTexcoordsToRetire)
+            bindings.push_back(*command.Config.CornerTexcoordsToRetire);
+        std::vector<PointPropertyWatch> inputs;
+        const auto watch = [&](D domain, std::string_view name)
+        {
+            inputs.push_back(ObserveGeometryProperty(availability, domain, std::string{name}));
+        };
+        for (const auto& binding : bindings)
+            watch(binding.Domain, binding.Name);
+        watch(D::MeshVertex, "v:deleted");
+        watch(D::MeshHalfedge, GS::PropertyNames::kHalfedgeToVertex);
+        watch(D::MeshHalfedge, GS::PropertyNames::kHalfedgeNext);
+        watch(D::MeshHalfedge, GS::PropertyNames::kHalfedgeFace);
+        watch(D::MeshFace, GS::PropertyNames::kFaceHalfedge);
+        watch(D::MeshFace, "f:deleted");
+        std::string diagnostic;
+        const bool ready = PrepareMeshFieldInput(
+            context,
+            *entity,
+            availability,
+            command.Config.Positions,
+            MeshFieldReadinessKind::Parameterization,
+            std::move(bindings),
+            std::move(inputs),
+            [command](const GeometryEntityAvailability& current, std::string& reason)
+            {
+                std::optional<ParameterizationUvState> before;
+                ParameterizationSourceSnapshot snapshot;
+                MeshSupport::MeshProcessingSourceResult source;
+                const auto result =
+                    PrepareParameterizationSource(current.SourceView, command, before, snapshot, source);
+                reason = result.Message;
+                return result.Succeeded();
+            },
+            diagnostic,
+            std::move(configKey));
+        return {ready, std::move(diagnostic)};
+    }
 
     EditorParameterizationResult ApplyEditorParameterizationCommand(
         const EditorProcessingCommands& commands, const EditorParameterizationCommand& command,

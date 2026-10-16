@@ -160,10 +160,9 @@ export namespace Extrinsic::Runtime
         Geometry::Parameterization::ParameterizationStatus ParameterizationStatus{
             Geometry::Parameterization::ParameterizationStatus::InvalidInput};
         Geometry::Parameterization::ParameterizationDiagnostics Diagnostics{};
-        // Structured cause behind a solver rejection. Populated
-        // only when the solver ran and refused the mesh; a rejection raised
-        // before the solver (stale entity, bad config, unusable source) leaves
-        // it unevaluated because no mesh reached the solver.
+        // Structured cause from a rejected prepared mesh. Stale entities,
+        // invalid config and unusable sources leave it unevaluated because
+        // no mesh reached geometry admission or the solver.
         Geometry::Parameterization::ParameterizationRejection Rejection{};
         std::size_t VertexCount{0u};
         // Identifies the exact canonical triangle topology and UV payload that
@@ -273,6 +272,9 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] EditorUvRegenerationCommandResult ApplyEditorUvRegenerationCommand(
         const EditorProcessingCommands&, const EditorUvRegenerationCommand&,
         std::function<void(EditorUvRegenerationCommandResult)> onComplete = {});
+    // Uses the command's draft bindings; attached sessions cache deferred source checks.
+    [[nodiscard]] ActionReadiness PreviewEditorParameterizationCommand(
+        const EditorProcessingCommands&, const EditorParameterizationCommand&);
     [[nodiscard]] EditorParameterizationResult ApplyEditorParameterizationCommand(
         const EditorProcessingCommands&, const EditorParameterizationCommand&,
         std::function<void(EditorParameterizationResult)> onComplete = {});

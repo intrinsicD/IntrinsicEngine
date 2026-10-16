@@ -13,6 +13,46 @@ namespace Extrinsic::Runtime
 
 namespace Extrinsic::Sandbox::Editor
 {
+    enum class SceneReplacementDecision
+    {
+        Save,
+        Discard,
+        Cancel
+    };
+
+    struct SceneReplacementState
+    {
+        std::optional<Runtime::EditorSceneFileOperation> Pending{};
+        std::string OpenPath{};
+        std::array<char, 1024> SavePath{};
+        std::uint64_t Epoch{0u};
+        std::uint64_t Revision{0u};
+        bool AwaitingSave{false};
+        decltype(Runtime::EditorSceneFileResult::Task) SaveTask{};
+        std::optional<Runtime::EditorSceneFileResult> LastResult{};
+        std::string Message{};
+    };
+
+    void RequestSceneReplacement(SceneReplacementState& state,
+        Runtime::EditorSceneFileOperation operation,
+        const std::string& openPath,
+        const Runtime::EditorSceneEditingCommands& commands,
+        const Runtime::EditorDocumentModel& document,
+        std::uint64_t epoch);
+    void ResolveSceneReplacement(SceneReplacementState& state,
+        SceneReplacementDecision decision,
+        const Runtime::EditorSceneEditingCommands& commands,
+        const Runtime::EditorDocumentModel& document,
+        std::uint64_t epoch);
+    void ObserveSceneReplacement(SceneReplacementState& state,
+        const Runtime::EditorSceneEditingCommands& commands,
+        const Runtime::EditorDocumentModel& document,
+        std::uint64_t epoch,
+        const std::optional<Runtime::EditorSceneFileResult>& completion);
+    [[nodiscard]] std::string ApplyEditorHistoryCommand(
+        const Runtime::EditorDocumentCommandSurface& commands, bool undo);
+    void DrawEditorHistoryResult(const std::string& result);
+
     inline constexpr std::array<const char*, 6> kColormapNames{{
         "Viridis", "Inferno", "Plasma", "Jet", "Coolwarm", "Heat"}};
 
