@@ -26,11 +26,19 @@ literal filename. These files are unchanged by METHOD-078; their baseline bytes 
 with `git show bbdf1af79:<path>`. No PR exists for the current local diagnosis branch.
 
 ## Acceptance criteria
-- [ ] Diagnose the intended repository representation of source-line links in archived review records.
-- [ ] Make strict doc-link validation pass without suppressing unrelated broken links or altering verdicts.
+- [x] Diagnose the intended repository representation of source-line links in archived review records.
+- [x] Make strict doc-link validation pass without suppressing unrelated broken links or altering verdicts.
 
 ## Verification
 ```bash
 python3 tools/docs/check_doc_links.py --root . --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+## Completion
+Completed 2026-10-16. Commit: `000eedca8` (fix), with skill mirror sync `323f9f5c8`. The five verbatim Codex transcripts
+(`codex-{d1,d2,d3,r1b,r2}`) were renamed byte-identically to `.txt`, following
+`36a7b5062`; `docs/agent/ara-evidence-policy.md` now states the storage rule.
+Independent review (fresh Claude session) marked both criteria MET: strict
+doc-link, task-policy and task-state-link checks pass; the checker is unchanged
+and no manifest or digest names the renamed files.

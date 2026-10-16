@@ -23,10 +23,17 @@ contract_review: Existing documentation-checker input filtering and source-link 
 
 ## Acceptance criteria
 - [ ] Define and test how temporary evidence and supported source-line links participate in the documentation gate.
-- [ ] The strict check passes on maintained documentation without weakening missing-target checks or changing live research evidence.
+- [x] The strict check passes on maintained documentation without weakening missing-target checks or changing live research evidence.
 
 ## Verification
 ```bash
 python3 tools/docs/check_doc_links.py --root . --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+## Status (2026-10-16)
+- `000eedca8` (BUG-241) restored the strict check by storing verbatim review transcripts as `.txt`;
+  the storage rule is in `docs/agent/ara-evidence-policy.md`. Independent review: criterion 2 MET,
+  criterion 1 PARTIAL — the rule is defined, but no checker test exists, `:line` links are still read as
+  literal file names, and untracked local `*.md` evidence is still scanned. Open decision: add a
+  checker test and/or `:line` support, or narrow criterion 1 to the storage rule.

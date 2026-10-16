@@ -1,5 +1,6 @@
 # Retirement Log
 
+- 2026-10-16 — **BUG-241**: the strict doc-link check (ci-docs) failed on host-local links in five verbatim METHOD-077 Codex review transcripts; they are now byte-identical `.txt` files (precedent `36a7b5062`) and the evidence policy states the rule. Commits `000eedca8`, `323f9f5c8`; independent review accepted both criteria. BUG-243 stays open for checker tests/`:line` support. [Task](BUG-241-method077-review-link-validation.md).
 - 2026-10-12 — **METHOD-082**: bounded Nyström convergence diagnostic completed at frozen input `8c3ffaaa7`; all task criteria accepted by independent raw/report review. Negative predictions C123/C124 and two censored outcomes are retained; no engine change or maturity promotion. [Task](METHOD-082-nystrom-convergence-test.md).
 
 - 2026-10-11 — **METHOD-081**: exact replacement of invalid Nyström target rows; implementation `ba11fce6b`, frozen diagnostic `7c49f5f14`. Independent code and raw-results reviews accept all criteria; bounded result and limits are ARA C122. [Task](METHOD-081-nystrom-exact-row-repair.md).
