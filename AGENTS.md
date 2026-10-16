@@ -125,6 +125,9 @@ Justify every new dependency and document architectural changes.
   Preserve user-facing capabilities and current-format save/load/config round trips.
 - Preserve module names during mechanical moves; do not mix moves with semantic
   refactors or add features during reorganization. Keep patches scoped.
+- Format changed C++ lines with clang-format 20.1.8 and the root `.clang-format`.
+  Keep whole-file formatting in separate family commits, verify token equivalence,
+  and list those commits in `.git-blame-ignore-revs`; see the detailed coding rules.
 - Use `intrinsic_add_module_library(...)` and `FILE_SET CXX_MODULES`. Keep
   `.cppm` surfaces to exported declarations/types, small accessors, and necessary
   templates; non-trivial bodies belong in matching private `.cpp` units.

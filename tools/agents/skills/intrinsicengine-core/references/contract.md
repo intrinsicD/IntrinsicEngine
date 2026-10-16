@@ -124,6 +124,14 @@ Every new dependency edge must be justifiable by layer policy and reflected in d
 
 ## Coding and change-scope rules
 
+Use clang-format 20.1.8 with the root `.clang-format` on changed C++ lines, for example
+`git clang-format --binary <clang-format-20.1.8> --extensions cpp,cppm,h,hpp HEAD -- <paths>`.
+The shared style is four spaces, Allman braces, indented namespaces, left-attached pointers/references,
+and a 120-column target. Preserve include/using order, comments, and literal spelling; long indivisible
+tokens or retained comments may exceed that target. Keep unrelated formatting out of semantic changes.
+Whole-file cleanup is limited to approved file families in separate format-only commits, verified with
+a compiler-token comparison including preprocessing boundaries, and recorded in `.git-blame-ignore-revs`.
+
 - Use C++23.
 - During the current simplification and compile-locality migration, public C++
   APIs and engine-owned scene/config formats have no backward-compatibility

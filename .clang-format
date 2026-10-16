@@ -1,0 +1,33 @@
+# clang-format 20.1.8; apply to changed lines unless a format-only family is approved.
+BasedOnStyle: LLVM
+IndentWidth: 4
+ContinuationIndentWidth: 4
+BreakBeforeBraces: Allman
+NamespaceIndentation: All
+PointerAlignment: Left
+ReferenceAlignment: Pointer
+ColumnLimit: 120
+SpaceBeforeParens: ControlStatements
+AccessModifierOffset: -4
+UseTab: Never
+SortIncludes: Never
+SortUsingDeclarations: Never
+ReflowComments: Never
+BreakStringLiterals: false
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortLambdasOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+BinPackParameters: OnePerLine
+BinPackArguments: false
+AlignConsecutiveDeclarations: None
+AlignConsecutiveAssignments: None
+AlignTrailingComments:
+  Kind: Leave
+AllowShortCaseLabelsOnASingleLine: true
+FixNamespaceComments: false
+AlignConsecutiveShortCaseStatements:
+  Enabled: true
+AlignAfterOpenBracket: DontAlign
+AlignOperands: DontAlign
