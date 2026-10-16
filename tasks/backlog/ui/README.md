@@ -10,7 +10,6 @@ its dependencies, conditional gates, scope and verification.
 - [UI-042 — Signed Heat mesh method panel](UI-042-signed-heat-mesh-panel.md)
 - [UI-043 — K-Means property-domain panel](UI-043-kmeans-property-domain-panel.md)
 - [UI-044 — Progressive Poisson property-domain panel](UI-044-progressive-poisson-property-domain-panel.md)
-- [UI-046 — Sandbox cannot export geometry at all](UI-046-sandbox-geometry-export.md)
 - [UI-047 — File paths must be hand-typed into a raw text field](UI-047-file-chooser-for-import-and-scene-paths.md)
 - [UI-048 — Editor opens empty, hides file operations under View, and never remembers layout](UI-048-first-run-workspace-and-layout-persistence.md)
 - [UI-049 — Editor panels are sized so that labels clip and results are hidden](UI-049-editor-panel-sizing-and-readability.md)

@@ -22,8 +22,8 @@ at `ffe7e8372` fails only
 property with a string literal despite already importing the canonical owner.
 
 ## Acceptance criteria
-- [ ] Use `GeometrySources::PropertyNames::kPosition` at the reported output construction without changing behavior or weakening the guard.
-- [ ] The same guard fails on the original source and passes after the correction; include the affected runtime build in HARDEN-091's combined verification.
+- [x] Use `GeometrySources::PropertyNames::kPosition` at the reported output construction without changing behavior or weakening the guard.
+- [x] The same guard fails on the original source and passes after the correction; include the affected runtime build in HARDEN-091's combined verification.
 
 ## Verification
 ```bash
@@ -31,7 +31,6 @@ cmake --build --preset ci --target IntrinsicRuntimeContractTests
 ctest --test-dir build/ci --output-on-failure --no-tests=error --timeout 60 -R '^RuntimeReuseDriftGuard.RuntimeUsesTheSharedFiniteCheckAndPositionName$'
 ```
 
-The original failure was reproduced locally in this session. CI and local logs
-are temporarily retained under ignored `tasks/evidence/BUG-246/`; this is a
-source reuse regression, not an environmental failure. Independent review and
-the integrated build remain pending.
+Completed 2026-10-17. Commit: `761040df0`; both criteria accepted by independent reviewer
+`/root/final_review`. See the canonical [completion and verification record](RETIREMENT-LOG.md#2026-10-17--src-workflow-follow-up).
+Raw evidence remains temporarily owned by active HARDEN-091 until its last slice closes.

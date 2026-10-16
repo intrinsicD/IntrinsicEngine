@@ -157,7 +157,7 @@ Task links retain detailed acceptance criteria, source references and evidence.
 | [UI-042](../../tasks/backlog/ui/UI-042-signed-heat-mesh-panel.md) | Revised | Signed Heat panel remains; reuse shared processing-panel support. |
 | [UI-043](../../tasks/backlog/ui/UI-043-kmeans-property-domain-panel.md) | Revised | K-Means domain panel remains blocked on RUNTIME-211; reuse shared panel support. |
 | [UI-044](../../tasks/backlog/ui/UI-044-progressive-poisson-property-domain-panel.md) | Revised | Poisson domain panel remains blocked on RUNTIME-212; reuse shared panel support. |
-| [UI-046](../../tasks/backlog/ui/UI-046-sandbox-geometry-export.md) | Keep | Sandbox cannot export geometry at all. |
+| [UI-046](../../tasks/done/UI-046-sandbox-geometry-export.md) | Keep | Sandbox cannot export geometry at all. |
 | [UI-047](../../tasks/backlog/ui/UI-047-file-chooser-for-import-and-scene-paths.md) | Revised | Path chooser remains missing; source references updated to current controls. |
 | [UI-048](../../tasks/backlog/ui/UI-048-first-run-workspace-and-layout-persistence.md) | Revised | First-run layout/persistence remains; references updated to current owners. |
 | [UI-049](../../tasks/backlog/ui/UI-049-editor-panel-sizing-and-readability.md) | Revised | Reproduce historical layout symptoms on shared panels before fixing remaining defects. |

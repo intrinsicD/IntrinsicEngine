@@ -1,5 +1,53 @@
 # Retirement Log
 
+## 2026-10-17 — src workflow follow-up
+
+Retired [UI-046](UI-046-sandbox-geometry-export.md) and
+[BUG-246](BUG-246-runtime-position-name-reuse-drift.md); implementation `761040df0`.
+[HARDEN-091](../active/HARDEN-091-src-workflow-followup.md) remains active only for
+PROC-036's final formatter decision and family commits. UI-037 closes only its
+current slice 7; its other readiness work remains open.
+
+- Undo/Redo failures now reach every existing button and agent replies, including
+  partial progress. Dirty New/Open/Close waits for Discard or a matching successful
+  save; cancellation, failed/lost completions and newer edits retain the document.
+- Parameterization Preview and Apply share canonical source and existing
+  strategy/pin/boundary prerequisites, cached against both source and actual config.
+  Numerical solvers are unchanged. File / Export projects committed CPU geometry
+  through existing writers and reports losses; it preserves the destination on
+  rejected/failed output. PLY radius is verified in output because its reader does
+  not materialize that channel. Native path browsing remains UI-047.
+- Shared float text formatting preserves small/large finite values and locale
+  independence. Process wait handles interruption/errors; AgentServer stops after
+  failed sends. BUG-246 replaces the position literal with its canonical constant.
+  RHI documentation, the unused Vulkan stub and three source entry points are repaired.
+- Verification: final `ci` IntrinsicTests build passed. One full CPU run selected
+  5,850 tests: 5,840 passed, eight failed, two native-close cases skipped. All eight
+  failures were test expectations/setup; production was unchanged afterwards.
+  Focused corrections passed 105/106, then the remaining fixture prerequisite and
+  its related Gizmo cases passed 15/15. The original CI guard failed before the fix
+  and passed after it. Baseline/mechanism-removal runs reproduce the relevant
+  process, IO, UI, agent, readiness/export and socket failures; both pending-query
+  tests fail when the query is forced false in the otherwise unchanged test binary.
+- Independent reviewer `/root/final_review` accepted HARDEN-091 criteria 1–7/9,
+  all UI-046 criteria and both BUG-246 criteria, bound to source packet SHA256
+  `2212831a85b91cda6694afa481d92831c5d30f19fd89744f0ae10e5fff61ed79`.
+  Separate source-slice and formatter reviews also ran; no Claude verdict is claimed
+  after CLI turn/time limits and DNS failures. Structural layering/test layout,
+  docs-sync, task policy, skill mirror and workflow-evidence checks pass. Maintained
+  files pass strict links; the whole-checkout scanner still sees older HARDEN-090
+  review-copy links, whose evidence remains with that active owner.
+- Installed jscpd CLI (including cppm, excluding generated/vendor/build/evidence)
+  found 1,025 baseline and 1,034 final clones. Independent triage found detector
+  shifts/existing patterns plus one socket-test setup overlap, no new production
+  mechanism duplication. Selected source documentation has zero objective errors;
+  167 advisory hints are not a claim of whole-tree cleanup.
+
+No sanitizer, GPU/Vulkan, native window-close or real-display execution is claimed.
+This session's raw evidence remains under HARDEN-091/BUG-246 while the formatter
+slice is open; unrelated evidence and `.serena` are preserved.
+
+
 - 2026-10-16 — **BUG-241**: the strict doc-link check (ci-docs) failed on host-local links in five verbatim METHOD-077 Codex review transcripts; they are now byte-identical `.txt` files (precedent `36a7b5062`) and the evidence policy states the rule. Commits `000eedca8`, `323f9f5c8`; independent review accepted both criteria. BUG-243 stays open for checker tests/`:line` support. [Task](BUG-241-method077-review-link-validation.md).
 - 2026-10-12 — **METHOD-082**: bounded Nyström convergence diagnostic completed at frozen input `8c3ffaaa7`; all task criteria accepted by independent raw/report review. Negative predictions C123/C124 and two censored outcomes are retained; no engine change or maturity promotion. [Task](METHOD-082-nystrom-convergence-test.md).
 

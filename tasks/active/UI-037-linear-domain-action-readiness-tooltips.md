@@ -6152,7 +6152,7 @@ compile-time improvement is claimed.
       `v:deleted` as no mask, whereas normal capture rejects wrong types. Inventory
       face/edge mask policies per actual consumer before extending validation;
       UV soup and processing triangulation do not consume those masks.
-- [ ] Slice 7: shared runtime parameterization strategy, pin and boundary readiness.
+- [x] Slice 7: shared runtime parameterization strategy, pin and boundary readiness. Completed in `761040df0`; [HARDEN-091 record](../done/RETIREMENT-LOG.md#2026-10-17--src-workflow-follow-up).
 - [ ] Slice 8: texture-bake property/UV/device/range readiness and shared presentation.
 - [ ] Slice 9: K-Means, Progressive Poisson, consolidation and outlier service,
       backend and variant readiness through config/UI/agent validation.

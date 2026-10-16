@@ -32,15 +32,15 @@ global socket deadlines and general atomic-file-writing infrastructure are outsi
 this slice. Existing HARDEN-090 evidence remainders retain their owners.
 
 ## Acceptance criteria
-- [ ] Q3/4: All existing Undo/Redo buttons report failures; agent replies distinguish empty history, failure and partial success.
-- [ ] Q3/4: UI-037 parameterization readiness and Apply share prerequisites for the actual UI draft / resolved agent config.
-- [ ] Q3/4: Dirty-scene New/Open/Close waits for explicit discard or successful matching save; cancellation, failed save and newer edits preserve the document.
-- [ ] Q3/4: Geometry text writers preserve finite float values across small/large magnitudes and locale; existing reject-before-write contracts remain intact.
-- [ ] Q3/4: UI-046 exports supported selected mesh/graph/point-cloud geometry through Runtime and the existing writers; unsupported formats and dropped properties are reported.
-- [ ] Q3/4: Process waiting handles interrupted/error waits; agent sending stops after first failure and observes shutdown between pending replies.
-- [ ] Q1/2/4: RHI operational-status documentation is accurate; the unused Vulkan migration stub and stale references are removed; geometry/graphics/physics have concise entry points.
+- [x] Q3/4: All existing Undo/Redo buttons report failures; agent replies distinguish empty history, failure and partial success.
+- [x] Q3/4: UI-037 parameterization readiness and Apply share prerequisites for the actual UI draft / resolved agent config.
+- [x] Q3/4: Dirty-scene New/Open/Close waits for explicit discard or successful matching save; cancellation, failed save and newer edits preserve the document.
+- [x] Q3/4: Geometry text writers preserve finite float values across small/large magnitudes and locale; existing reject-before-write contracts remain intact.
+- [x] Q3/4: UI-046 exports supported selected mesh/graph/point-cloud geometry through Runtime and the existing writers; unsupported formats and dropped properties are reported.
+- [x] Q3/4: Process waiting handles interrupted/error waits; agent sending stops after first failure and observes shutdown between pending replies.
+- [x] Q1/2/4: RHI operational-status documentation is accurate; the unused Vulkan migration stub and stale references are removed; geometry/graphics/physics have concise entry points.
 - [ ] Q2/4: PROC-036 option 2 is implemented with a validated formatter and separate token-equivalent family commits, preserving semantic fixes separately.
-- [ ] Q4: New behavior has baseline or mechanism-removal failures; integrated affected suites and structural checks pass; independent review binds the final source.
+- [x] Q4: New behavior has baseline or mechanism-removal failures; integrated affected suites and structural checks pass; independent review binds the final source.
 
 ## Execution
 Source baseline: `ffe7e83728b1e37cac926bacaa6e8364b49b2526`.
@@ -75,14 +75,12 @@ Formatter validation compares tokens, comments/literals and preprocessing,
 and checks idempotence with clang-format 20.1.8. The formatter's MaterialSystem
 sample churn and long preserved literals await the operator's final decision.
 
-## Current verification state
-The integrated build passed. The one full CPU run selected 5,850 tests: 5,840
-passed, eight failed, two native-close tests skipped. The eight failures were
-test expectations/setup; production code did not change after that run. Focused
-corrections passed 105/106, then the last fixture correction and all related
-Gizmo cases passed 15/15. Baseline and mechanism-removal checks demonstrate the
-new behavior's failure signatures; final acceptance is under independent review.
+## Current state
+Independent reviewer `/root/final_review` accepted criteria 1–7 and 9 on
+2026-10-17, bound to source packet
+`2212831a85b91cda6694afa481d92831c5d30f19fd89744f0ae10e5fff61ed79`.
+Implementation: `761040df0`. The canonical verification and completion record is
+[in the retirement log](../done/RETIREMENT-LOG.md#2026-10-17--src-workflow-follow-up).
 
-The whole-checkout link checker sees broken links in existing HARDEN-090 raw
-review copies. The maintained tracked/new-file tree passes strict link checking;
-HARDEN-090's active evidence is retained. No sanitizer/GPU run is claimed.
+Only PROC-036's formatter-limit decision, separate family commits and blame-ignore
+list remain. Keep this task and its raw evidence active until those are resolved.

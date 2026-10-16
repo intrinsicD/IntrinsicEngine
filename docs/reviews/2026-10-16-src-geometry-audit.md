@@ -241,7 +241,7 @@ zunächst behalten. Der erste konkrete Gewinn wäre GEO-AUD-12.
 | Partiell überlappende Mesh-CSG | `src/geometry/Geometry.HalfedgeMesh.Boolean.cppm:38–49` | Explizit nicht unterstützt, `Compute` liefert `nullopt` |
 | Exact/adaptive Prädikate, incircle/insphere | [GEOM-007 Historie](../../tasks/archive/GEOM-007-robust-predicates-intersection-classification.md), [Numeric Policy](../architecture/geometry-api-style.md) | Foundation vorhanden; Erweiterungen nicht als geliefert ausweisen, aktuelle Owner vor Planung auflösen |
 | Simplification-Varianten C/D | `src/geometry/Geometry.HalfedgeMesh.Simplification.cppm:120–121` | Explizit nicht implementiert, ohne konkreten Owner; kein automatisch erforderliches Feature |
-| Sandbox-Export-Integration | [UI-046](../../tasks/backlog/ui/UI-046-sandbox-geometry-export.md) | Runtime/UI-Aufgabe, kein Anlass für einen weiteren Geometry-Writer |
+| Sandbox-Export-Integration | [UI-046](../../tasks/done/UI-046-sandbox-geometry-export.md) | Runtime/UI-Aufgabe, kein Anlass für einen weiteren Geometry-Writer |
 
 Kein zusätzlicher Bugbefund: Runtime-Subdivision meldet UV-Verlust ausdrücklich
 als `TexcoordOutcome::Discarded` samt Erklärung. Daraus keinen stillen Verlust
