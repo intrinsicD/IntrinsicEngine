@@ -30,7 +30,10 @@ Every canonical object contains:
 - `schema_version`: integer `2`.
 - `benchmark_id`, `run_id`, `attempt_id`: identities described above.
 - `method`, `backend`, `dataset`: execution binding; method and dataset must
-  exactly match the manifest.
+  exactly match the benchmark manifest. Result backends additionally accept the
+  existing solver identities `cpu_reference_sparse_cholesky` and
+  `cpu_admm_sparse_cholesky`. These result identities do not extend the backend
+  classes allowed in method manifests.
 - `commit`: compatibility alias equal to `source.revision`.
 - `source`: revision and source-state binding.
 - `claim_eligible`: explicit boolean, false by default.

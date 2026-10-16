@@ -37,7 +37,7 @@ class BenchmarkResultValidatorTests(unittest.TestCase):
             check=False,
         )
 
-    def _fixture(self, root: Path) -> tuple[Path, Path, Path]:
+    def _fixture(self, root: Path, backend: str = "cpu_reference") -> tuple[Path, Path, Path]:
         results = root / "results"
         manifests = root / "manifests"
         results.mkdir()
@@ -66,7 +66,7 @@ class BenchmarkResultValidatorTests(unittest.TestCase):
                 {
                     "benchmark_id": "geometry.fixture.smoke",
                     "method": "geometry.fixture",
-                    "backend": "cpu_reference",
+                    "backend": backend,
                     "dataset": "builtin.fixture.small",
                     "commit": "local-dev",
                     "metrics": {"runtime_ms": 1.0, "quality_error_l2": 0.0},
@@ -148,6 +148,23 @@ class BenchmarkResultValidatorTests(unittest.TestCase):
             results, manifests, _ = self._fixture(Path(tmp))
             result = self._run_validator(results, manifests)
         self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_existing_sparse_solver_backend_ids_seal_and_validate(self) -> None:
+        for backend in ("cpu_reference_sparse_cholesky", "cpu_admm_sparse_cholesky"):
+            with self.subTest(backend=backend), tempfile.TemporaryDirectory() as tmp:
+                results, manifests, _ = self._fixture(Path(tmp), backend)
+                result = self._run_validator(results, manifests)
+                self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_unknown_sparse_solver_backend_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            results, manifests, path = self._fixture(Path(tmp))
+            data = self._load(path)
+            data["backend"] = "cpu_unimplemented_sparse_cholesky"
+            self._write(path, data)
+            result = self._run_validator(results, manifests)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("unsupported backend 'cpu_unimplemented_sparse_cholesky'", result.stdout)
 
     def test_duplicate_json_key_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

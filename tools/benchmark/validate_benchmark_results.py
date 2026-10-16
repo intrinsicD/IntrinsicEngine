@@ -35,6 +35,8 @@ REQUIRED_FIELDS_V2 = {
 }
 ALLOWED_BACKENDS = {
     "cpu_reference",
+    "cpu_reference_sparse_cholesky",
+    "cpu_admm_sparse_cholesky",
     "cpu_optimized",
     "gpu_vulkan_compute",
     "gpu_vulkan_graphics",
