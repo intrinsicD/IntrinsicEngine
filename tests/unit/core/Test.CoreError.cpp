@@ -25,6 +25,8 @@ TEST(CoreError, ErrorCodeToStringCoversAllCodes)
     EXPECT_EQ(Error::ToString(ErrorCode::OutOfMemory), "OutOfMemory");
     EXPECT_EQ(Error::ToString(ErrorCode::FileNotFound), "FileNotFound");
     EXPECT_EQ(Error::ToString(ErrorCode::InvalidArgument), "InvalidArgument");
+    EXPECT_EQ(Error::ToString(ErrorCode::UnsupportedFormat), "UnsupportedFormat");
+    EXPECT_EQ(Error::ToString(ErrorCode::AssetLoaderMissing), "AssetLoaderMissing");
     EXPECT_EQ(Error::ToString(ErrorCode::DeviceLost), "DeviceLost");
     EXPECT_EQ(Error::ToString(ErrorCode::AssetNotLoaded), "AssetNotLoaded");
     EXPECT_EQ(Error::ToString(ErrorCode::ThreadViolation), "ThreadViolation");
@@ -41,42 +43,24 @@ TEST(CoreError, UnknownCodeMapsToUnknown)
 }
 
 // ---------------------------------------------------------------------------
-// Ok<T>: creates a successful expected with the given value.
+// Ok/Err build successful and failed Expected<T> and Result values.
 // ---------------------------------------------------------------------------
-TEST(CoreError, OkCreatesSuccessValue)
+TEST(CoreError, OkAndErrBuildExpectedAndResult)
 {
-    Expected<int> result = Ok(42);
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(*result, 42);
-}
+    Expected<int> value = Ok(42);
+    ASSERT_TRUE(value.has_value());
+    EXPECT_EQ(*value, 42);
 
-// ---------------------------------------------------------------------------
-// Err<T>: creates an error expected with the given code.
-// ---------------------------------------------------------------------------
-TEST(CoreError, ErrCreatesErrorValue)
-{
-    Expected<int> result = Err<int>(ErrorCode::InvalidArgument);
-    ASSERT_FALSE(result.has_value());
-    EXPECT_EQ(result.error(), ErrorCode::InvalidArgument);
-}
+    Expected<int> error = Err<int>(ErrorCode::InvalidArgument);
+    ASSERT_FALSE(error.has_value());
+    EXPECT_EQ(error.error(), ErrorCode::InvalidArgument);
 
-// ---------------------------------------------------------------------------
-// Result (void success): Ok() creates a successful unit result.
-// ---------------------------------------------------------------------------
-TEST(CoreError, ResultOkIsSuccess)
-{
-    Result result = Ok();
-    EXPECT_TRUE(result.has_value());
-}
+    Result ok = Ok();
+    EXPECT_TRUE(ok.has_value());
 
-// ---------------------------------------------------------------------------
-// Result (void error): Err() creates an error result.
-// ---------------------------------------------------------------------------
-TEST(CoreError, ResultErrIsError)
-{
-    Result result = Err(ErrorCode::FileReadError);
-    ASSERT_FALSE(result.has_value());
-    EXPECT_EQ(result.error(), ErrorCode::FileReadError);
+    Result failed = Err(ErrorCode::FileReadError);
+    ASSERT_FALSE(failed.has_value());
+    EXPECT_EQ(failed.error(), ErrorCode::FileReadError);
 }
 
 // ---------------------------------------------------------------------------
@@ -155,6 +139,7 @@ TEST(CoreError, ErrorCodeCategories)
     EXPECT_LT(static_cast<uint32_t>(ErrorCode::PermissionDenied), 300u);
 
     // Validation errors: 300-399
+    EXPECT_EQ(Error::ToUnderlying(ErrorCode::InvalidArgument), 300u);
     EXPECT_GE(static_cast<uint32_t>(ErrorCode::InvalidArgument), 300u);
     EXPECT_LT(static_cast<uint32_t>(ErrorCode::TypeMismatch), 400u);
 
