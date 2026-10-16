@@ -540,7 +540,7 @@ statistical outliers keep their self-excluding queries. Density and spacing also
 share framed fixed-width kNN pagination; radius pagination retains its separate
 support-membership contract. Their capture, index admission, job lifecycle and
 publication are one TU-local template in
-`Runtime.GeometryProcessingOperations.Density.cpp`, instantiated for two typed
+`Runtime.PointFieldOperations.Processing.cpp`, instantiated for two typed
 method records that keep config, statistics, wording and self-neighbor floors
 (`max(k,2)+1` for density, `max(k,1)+1` for spacing). These declarations live in `RadiusRows.hpp` for
 consumers of spatial-index neighborhoods.
@@ -1036,11 +1036,11 @@ the removed `Runtime.SandboxEditorFacades` and
 | `SandboxEditorVisualizationPropertyDomain` | `EditorVisualizationPropertyDomain` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorVisualizationPropertyPreset` | `EditorVisualizationPropertyPreset` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorVisualizationTarget` | `EditorVisualizationTarget` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
-| `SandboxEditorGeometryProcessingDomain` | `EditorGeometryProcessingDomain` | `Runtime.GeometryProcessingOperations.cppm` | feature-owned runtime contract |
-| `SandboxEditorGeometryProcessingAlgorithm` | `EditorGeometryProcessingAlgorithm` | `Runtime.GeometryProcessingOperations.cppm` | feature-owned runtime contract |
-| `SandboxEditorGeometryProcessingCapabilities` | `EditorGeometryProcessingCapabilities` | `Runtime.GeometryProcessingOperations.cppm` | feature-owned runtime contract |
-| `SandboxEditorGeometryProcessingEntry` | `EditorGeometryProcessingEntry` | `Runtime.GeometryProcessingOperations.cppm` | feature-owned runtime contract |
-| `SandboxEditorGeometryProcessingMenuItem` | `EditorGeometryProcessingMenuItem` | `Runtime.GeometryProcessingOperations.cppm` | feature-owned runtime contract |
+| `SandboxEditorGeometryProcessingDomain` | `EditorGeometryProcessingDomain` | `Runtime.PointSetOperations.Processing.cppm` | feature-owned runtime contract |
+| `SandboxEditorGeometryProcessingAlgorithm` | `EditorGeometryProcessingAlgorithm` | `Runtime.PointSetOperations.Processing.cppm` | feature-owned runtime contract |
+| `SandboxEditorGeometryProcessingCapabilities` | `EditorGeometryProcessingCapabilities` | `Runtime.PointSetOperations.Processing.cppm` | feature-owned runtime contract |
+| `SandboxEditorGeometryProcessingEntry` | `EditorGeometryProcessingEntry` | `Runtime.PointSetOperations.Processing.cppm` | feature-owned runtime contract |
+| `SandboxEditorGeometryProcessingMenuItem` | `EditorGeometryProcessingMenuItem` | `Runtime.PointSetOperations.Processing.cppm` | feature-owned runtime contract |
 | `SandboxEditorProgressivePoissonCommand` | `EditorProgressivePoissonCommand` | `Runtime.PointSetOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorProgressivePoissonResult` | `EditorProgressivePoissonResult` | `Runtime.PointSetOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorProgressivePoissonConfigStatus` | `RuntimeEngineConfigApplyStatus` | `Runtime.EngineConfigControl.cppm` | shared config result contract |
@@ -1152,7 +1152,7 @@ the removed `Runtime.SandboxEditorFacades` and
 | `SandboxEditorVisualizationPropertyInfo` | `EditorVisualizationPropertyInfo` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorVisualizationRecipeModel` | `EditorVisualizationRecipeModel` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorVisualizationModel` | `EditorVisualizationModel` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
-| `SandboxEditorGeometryProcessingModel` | `EditorGeometryProcessingModel` | `Runtime.GeometryProcessingOperations.cppm` | feature-owned runtime contract |
+| `SandboxEditorGeometryProcessingModel` | `EditorGeometryProcessingModel` | `Runtime.PointSetOperations.Processing.cppm` | feature-owned runtime contract |
 | `SandboxEditorDomainWindowModel` | `EditorDomainWindowModel` | `Runtime.EditorWorkspaceSnapshots.cppm` | feature-owned runtime contract |
 | `SandboxEditorSelectedModelCacheSection` | `EditorSelectedModelCacheSection` | `Runtime.EditorWorkspaceSnapshots.cppm` | feature-owned runtime contract |
 | `SandboxEditorSelectedAnalysisCacheConsumer` | `EditorSelectedAnalysisCacheConsumer` | `Runtime.EditorWorkspaceSnapshots.cppm` | feature-owned runtime contract |

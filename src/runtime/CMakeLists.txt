@@ -66,7 +66,7 @@ target_sources(${target_name}
         Editor/Runtime.EditorWorkspaceSnapshots.cppm
         Editor/Runtime.EditorJobProjection.cppm
         Editor/Operations/Runtime.SceneEditingOperations.cppm
-        Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+        Editor/Operations/Runtime.PointSetOperations.Processing.cppm
         Editor/Operations/Runtime.VisualizationEditingOperations.cppm
         Editor/Operations/Runtime.RenderRecipeEditingOperations.cppm
         Editor/Runtime.EditorPropertyWidgets.cppm
@@ -155,21 +155,21 @@ target_sources(${target_name}
         Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cpp
         Modules/Curvature/Runtime.MeshCurvatureConfig.cpp
         Modules/Geodesics/Runtime.GeodesicsConfig.cpp
-        Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp
+        Editor/Operations/Runtime.PointAnalysisOperations.Outliers.cpp
         Editor/Operations/Runtime.PointScalarTransaction.cpp
-        Editor/Operations/Runtime.GeometryProcessingOperations.Density.cpp
+        Editor/Operations/Runtime.PointFieldOperations.Processing.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.GpuPositions.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.cpp
         Editor/Operations/Runtime.GpuTransactionLifecycle.cpp
-        Editor/Operations/Runtime.GeometryProcessingOperations.Bilateral.cpp
-        Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp
-        Editor/Operations/Runtime.GeometryProcessingOperations.Descriptors.cpp
-        Editor/Operations/Runtime.GeometryProcessingOperations.DensityWeights.cpp
-        Editor/Operations/Runtime.GeometryProcessingOperations.Construction.cpp
+        Editor/Operations/Runtime.PointSetOperations.Bilateral.cpp
+        Editor/Operations/Runtime.PointAnalysisOperations.Keypoints.cpp
+        Editor/Operations/Runtime.PointAnalysisOperations.Descriptors.cpp
+        Editor/Operations/Runtime.PointAnalysisOperations.DensityWeights.cpp
+        Editor/Operations/Runtime.PointConstructionOperations.Processing.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.cpp
-        Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp
+        Editor/Operations/Runtime.NormalOperations.Processing.cpp
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cpp
@@ -208,7 +208,7 @@ target_sources(${target_name}
         Editor/Operations/Runtime.MeshFieldOperations.Properties.hpp
         Editor/Operations/Runtime.MeshFieldOperations.PropertyGraph.hpp
         Editor/internal/Runtime.EditorWorkspaceSession.cpp
-        Editor/Operations/Runtime.GeometryProcessingOperations.cpp
+        Editor/Operations/Runtime.PointSetOperations.Processing.cpp
     Editor/Runtime.EditorProcessing.cpp
     Editor/Operations/Runtime.PropertyInspectionOperations.cpp
     Editor/Operations/Runtime.PointFieldOperations.cpp
@@ -241,8 +241,8 @@ target_sources(${target_name}
         Editor/Operations/Runtime.MeshFieldOperations.Geodesics.cpp
         Editor/Operations/Runtime.MeshTopologyOperations.Topology.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
-        Editor/Operations/Runtime.GeometryProcessingOperations.Registration.cpp
-        Editor/Operations/Runtime.GeometryProcessingOperations.Uv.cpp
+        Editor/Operations/Runtime.RegistrationOperations.Processing.cpp
+        Editor/Operations/Runtime.ParameterizationOperations.Processing.cpp
         Editor/Operations/Runtime.ParameterizationOperations.cpp
         Editor/Operations/Runtime.RenderRecipeEditingOperations.cpp
         Editor/Operations/Runtime.RenderRecipeEditingOperations.Debug.cpp

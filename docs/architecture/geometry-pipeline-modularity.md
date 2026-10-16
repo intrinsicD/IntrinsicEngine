@@ -517,16 +517,16 @@ is allocated per slice (the `GRAPHICS-072/073/074` series pattern).
 - `Geometry.Registration.cppm:73` / `:145` — `RegistrationParams`/`AlignICP` to extend.
 - `Geometry.PointCloud.Features.cppm:184` — the coarse-align seam to glue in.
 - `Geometry.KMeans.cppm` + [algorithm-variant-dispatch.md](algorithm-variant-dispatch.md) — the Strategy×Backend telemetry to adopt.
-- `src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm` and
-  `src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp` — the runtime-owned
+- `src/runtime/Editor/Operations/Runtime.PointSetOperations.Processing.cppm` and
+  `src/runtime/Editor/Operations/Runtime.PointSetOperations.Processing.cpp` — the runtime-owned
   algorithm catalog, capability snapshots, and typed operations.
-- `src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp` — typed geometry
+- `src/runtime/Editor/Operations/Runtime.PointSetOperations.Processing.cpp` — typed geometry
   operations that still belong to the broad module, and
   `Runtime.GeometryProcessingOperations.Mesh.cpp` — the cross-cutting mesh
   domain/menu catalogue. The mesh executors themselves live with their families:
   `Runtime.MeshFieldOperations.*` (curvature, segmentation, geodesics),
   `Runtime.MeshTopologyOperations.*` (denoise, remesh, subdivide, simplify) and
-  `Runtime.GeometryProcessingOperations.Registration.cpp` (ICP).
+  `Runtime.RegistrationOperations.Processing.cpp` (ICP).
 - `src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp` and
   `src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp` — presentation-free
   workspace model assembly and the bounded attachment/job-result lifecycle.

@@ -33,7 +33,7 @@ Existing owners and evidence:
 
 - [`src/geometry/Geometry.PointCloud.Utils.cpp`](../../../src/geometry/Geometry.PointCloud.Utils.cpp)
 - [`docs/architecture/bilateral-point-filter.md`](../../../docs/architecture/bilateral-point-filter.md)
-- [`src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Bilateral.cpp`](../../../src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Bilateral.cpp)
+- [`src/runtime/Editor/Operations/Runtime.PointSetOperations.Bilateral.cpp`](../../../src/runtime/Editor/Operations/Runtime.PointSetOperations.Bilateral.cpp)
 
 ## Engine integration
 

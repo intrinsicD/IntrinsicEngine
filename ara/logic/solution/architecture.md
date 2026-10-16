@@ -45,7 +45,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Evidence**: [src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp,
-  src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp,
+  src/runtime/Editor/Operations/Runtime.PointSetOperations.Processing.cpp,
   src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp,
   tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp,
   docs/architecture/runtime.md,
@@ -712,7 +712,7 @@
 - **Evidence**: [N436, N437,
   ara/evidence/tables/eig3x3_live_curvature_diagnostic_2026-08-12.md,
   src/geometry/Geometry.HalfedgeMesh.Curvature.cpp,
-  src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm,
+  src/runtime/Editor/Operations/Runtime.PointSetOperations.Processing.cppm,
   src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp]
 - **From staging**: O158
 
@@ -748,5 +748,5 @@
 - **Decision**: Full keypoint computation reuses the runtime spatial cache's framed submission/readback owner. A captured graphics workspace records spacing, reduction, covariance/eigenvalue scoring and immutable-score suppression over the retained index; only the final result returns to runtime for guarded property/history publication. Method shaders and buffers stay in graphics, with no new runtime module or computation registry.
 - **Provenance**: ai-suggested
 - **Crystallized via**: artifact-commitment
-- **Evidence**: [N563, src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp, src/graphics/renderer/Graphics.PointKeypoints.cpp, src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp, docs/architecture/spatial-indices.md]
+- **Evidence**: [N563, src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp, src/graphics/renderer/Graphics.PointKeypoints.cpp, src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.Keypoints.cpp, docs/architecture/spatial-indices.md]
 - **From staging**: O225

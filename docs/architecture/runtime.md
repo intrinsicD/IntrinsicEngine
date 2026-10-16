@@ -757,7 +757,7 @@ After a successful FPFH histogram display request, moving the display-bin slider
 selects the corresponding output property without recomputing descriptors.
 Changing the analysis configuration resets this live display selection.
 Progressive Poisson operation bodies and clustering config-control helpers compile
-in the private `Runtime.GeometryProcessingOperations.cpp` implementation unit. K-Means
+in the private `Runtime.PointSetOperations.Processing.cpp` implementation unit. K-Means
 execution goes directly from the app panel to the borrowed `ClusteringService`;
 the Vulkan recorder/cache/readback partition is private to
 `Extrinsic.Runtime.ClusteringModule`. Render-recipe and artifact operations compile

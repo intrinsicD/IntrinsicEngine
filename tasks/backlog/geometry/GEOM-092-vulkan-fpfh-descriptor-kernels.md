@@ -33,7 +33,7 @@ Existing owners and evidence:
 
 - [`src/geometry/Geometry.PointCloud.Features.cpp`](../../../src/geometry/Geometry.PointCloud.Features.cpp)
 - [`docs/architecture/descriptor-analysis.md`](../../../docs/architecture/descriptor-analysis.md)
-- [`src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Descriptors.cpp`](../../../src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Descriptors.cpp)
+- [`src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.Descriptors.cpp`](../../../src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.Descriptors.cpp)
 
 ## Engine integration
 

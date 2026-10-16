@@ -492,12 +492,12 @@ TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
     constexpr std::array<std::string_view, 7> handWritten{
         // The resident keypoint run guards the sink of the scalar publication it drives
         // (the GPU Run/Accept transactions themselves are on Runtime.GpuTransactionLifecycle).
-        "Runtime.GeometryProcessingOperations.Keypoints.cpp",
+        "Runtime.PointAnalysisOperations.Keypoints.cpp",
         // Mesh-family jobs that keep their result in a typed state struct with the shared
         // `BuildUnpublishedEditorJobFailure` wording and `ActiveOutputJobRefusal`.
-        "Runtime.GeometryProcessingOperations.cpp",
-        "Runtime.GeometryProcessingOperations.Registration.cpp",
-        "Runtime.GeometryProcessingOperations.Uv.cpp",
+        "Runtime.PointSetOperations.Processing.cpp",
+        "Runtime.RegistrationOperations.Processing.cpp",
+        "Runtime.ParameterizationOperations.Processing.cpp",
         "Runtime.MeshFieldOperations.Curvature.cpp",
         "Runtime.MeshTopologyOperations.Topology.cpp",
         // A run object with interactive steps (Busy flag, optional completion).
@@ -644,7 +644,7 @@ TEST(RuntimeReuseDriftGuard, RuntimeUsesTheSharedFiniteCheckAndPositionName)
     // scalar snapshots and execute history themselves.
     constexpr std::array<std::string_view, 4> allowedScalarPublishers{
         "Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp", // the publisher
-        "Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp",        // RUNTIME-311 owns it
+        "Editor/Operations/Runtime.PointAnalysisOperations.Outliers.cpp",        // RUNTIME-311 owns it
         "Editor/Operations/Runtime.MeshFieldOperations.Geodesics.cpp",   // double distances with infinity sentinels
         "Editor/Operations/Runtime.ScalarRidgeOperations.cpp",           // vertex and edge outputs, two slot sets
     };

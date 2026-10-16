@@ -35,7 +35,7 @@ contracts: [repo.source-documentation, method.engine-integration, geometry.eleme
 - [ ] `PointConstructionMethod::ConvexHull` with `DistanceEpsilon` round-trips through the
       codec (`Runtime.PointFeaturesConfigCodecs.cpp`, which today assumes two methods);
       non-finite or non-positive epsilon is rejected; only `CpuReference` is accepted for this method; `CpuLBVH` and `VulkanLBVH` are rejected with a reason, each covered by a test.
-- [ ] Capture/compute in `Runtime.GeometryProcessingOperations.Construction.cpp` branches by
+- [ ] Capture/compute in `Runtime.PointConstructionOperations.Processing.cpp` branches by
       method; the hull path needs no neighbourhood queue or normal estimation.
 - [ ] Non-canonical property names, deleted slots, multi-entity world-space union and
       primitive-subset input work; preview changes nothing; UI and agent reach the same apply path.

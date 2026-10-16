@@ -88,7 +88,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Family
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointFieldOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.PointFieldOperations.cpp
-        --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Density.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.PointFieldOperations.Processing.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.cpp
         --forbid-module Extrinsic.ECS.Component.Transform
@@ -114,7 +114,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointSetResults
         --check-source src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cppm
         --check-source src/runtime/Config/internal/Runtime.PointFeaturesConfigCodecs.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointSetOperations.cppm
-        --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.PointSetOperations.Processing.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointSetOperations.Frame.cpp
         --forbid-module Geometry.PointCloud.Utils
         --forbid-module Geometry.PointCloud)
@@ -135,10 +135,10 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointAnalysis
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cpp
-        --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.DensityWeights.cpp
-        --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp
-        --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp
-        --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Descriptors.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.DensityWeights.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.Keypoints.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.Outliers.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.Descriptors.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp
         --forbid-module Geometry.HalfedgeMesh
@@ -187,7 +187,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Normals
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cpp
         --check-source src/runtime/Editor/Operations/Runtime.NormalOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.NormalOperations.cpp
-        --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.NormalOperations.Processing.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp
         --forbid-module Geometry.PointCloud.Utils
@@ -286,8 +286,8 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.MeshSupport
 # in through a shared helper header.
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointSet
         --check-source src/runtime/Editor/Operations/Runtime.PointSetOperations.cppm
-        --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp
-        --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Bilateral.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.PointSetOperations.Processing.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.PointSetOperations.Bilateral.cpp
         --forbid-module Extrinsic.ECS.Component.Transform
         --forbid-module Geometry.HalfedgeMesh
         --forbid-module Geometry.MeshSoup
@@ -305,7 +305,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointSet
         --forbid-module Extrinsic.Runtime.Private.EditorWorkspaceAttachment)
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointConstruction
         --check-source src/runtime/Editor/Operations/Runtime.PointConstructionOperations.cppm
-        --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Construction.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.PointConstructionOperations.Processing.cpp
         --forbid-module Extrinsic.Runtime.GeometryProcessingOperations
         --forbid-module Extrinsic.Runtime.NormalOperations
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
@@ -339,7 +339,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointCloudServi
 # Cross-cutting discovery answers which algorithms and domains apply; it
 # must not acquire a back edge onto any method family's results or config.
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Discovery
-        --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.PointSetOperations.Processing.cppm
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
         --forbid-module Geometry.HalfedgeMesh
         --forbid-module Extrinsic.Runtime.SpatialIndexCache
@@ -372,7 +372,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointConstructi
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Registration
         --check-source src/runtime/Editor/Operations/Runtime.RegistrationOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.RegistrationOperations.cpp
-        --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Registration.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.RegistrationOperations.Processing.cpp
         --forbid-module Geometry.HalfedgeMesh
         --forbid-module Geometry.MeshSoup
         --forbid-module Extrinsic.Runtime.GeometryProcessingOperations
@@ -390,7 +390,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Registration
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Parameterization
         --check-source src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cpp
-        --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Uv.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.ParameterizationOperations.Processing.cpp
         --forbid-module Extrinsic.ECS.Components.GeometrySourcesPopulate
         --forbid-module Extrinsic.ECS.Component.Transform
         --forbid-module Extrinsic.Runtime.GeometryProcessingOperations
@@ -821,7 +821,7 @@ endif()
 # Borrowing device/cache pointers must not import their complete APIs or kernels.
 intrinsic_add_module_boundary_test(EditorCompilationLocality.ProcessingServiceBorrows
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cppm
-        --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.PointSetOperations.Processing.cppm
         --check-source src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm
         --forbid-module Extrinsic.RHI.Device
         --forbid-module Extrinsic.Runtime.SpatialIndexCache
@@ -885,7 +885,7 @@ set_tests_properties(EditorCompilationLocality.AssetService
 intrinsic_add_module_boundary_test(EditorCompilationLocality.SceneRegistryBorrows
         --check-source src/runtime/Editor/Runtime.EditorCommandHistory.cppm
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cppm
-        --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.PointSetOperations.Processing.cppm
         --check-source src/runtime/GeometryIntegration/Runtime.PrimitiveSelectionRefinement.cppm
         --check-source src/runtime/Editor/Operations/Runtime.SceneEditingOperations.cppm
         --check-source src/runtime/Scene/Runtime.SceneSerialization.cppm

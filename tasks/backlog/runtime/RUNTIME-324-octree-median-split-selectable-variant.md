@@ -25,7 +25,7 @@ contracts: [repo.source-documentation, method.engine-integration, geometry.eleme
 | --- | --- |
 | Least-structured input | Unchanged: compatible 3D samples and existing k/radius parameters. |
 | Compatible entity sources | All domains point spacing already supports (mesh, graph, point cloud). |
-| RuntimeModule | Existing `Runtime.PointFieldOperations` point-spacing execution (`Runtime.GeometryProcessingOperations.Density.cpp`). |
+| RuntimeModule | Existing `Runtime.PointFieldOperations` point-spacing execution (`Runtime.PointFieldOperations.Processing.cpp`). |
 | Config/agent | `sandbox.point_spacing` gains `octree_split_point = center\|mean\|median` (runtime-owned enum, no `Geometry.Octree` import in the config interface); existing `operation = point_spacing` reports the effective policy or N/A. |
 | UI | Split combo in the point-spacing panel, marked effective only for the CPU-octree backend. |
 | Publication | Unchanged same-domain radius property, revision and undo path. |

@@ -371,7 +371,7 @@ RULES: list[Rule] = [
          files=("src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cpp",),
          count=(("JobDesc ", 3), (".Scope = ", 3))),
     rule("ProductionAsyncSubmissionsCarryOwningWorldScope/geometry-operations",
-         files=(OPERATIONS + "Runtime.GeometryProcessingOperations.cpp",),
+         files=(OPERATIONS + "Runtime.PointSetOperations.Processing.cpp",),
          count=(("JobDesc desc{", 1), (".Scope = context.World", 1))),
     rule("ProductionAsyncSubmissionsCarryOwningWorldScope/clustering",
          files=("src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp",),
@@ -384,13 +384,13 @@ RULES: list[Rule] = [
     rule("ProductionAsyncSubmissionsCarryOwningWorldScope/mesh-operations",
          files=tuple(OPERATIONS + name for name in (
              "Runtime.GeometryProcessingOperations.Mesh.cpp", "Runtime.GeometryProcessingOperations.MeshSupport.cpp",
-             "Runtime.GeometryProcessingOperations.Registration.cpp", "Runtime.GeometryProcessingOperations.Uv.cpp",
+             "Runtime.RegistrationOperations.Processing.cpp", "Runtime.ParameterizationOperations.Processing.cpp",
              "Runtime.MeshFieldOperations.Curvature.cpp", "Runtime.MeshFieldOperations.Geodesics.cpp",
              "Runtime.MeshTopologyOperations.Topology.cpp")),
          forbid=("return DerivedJobDesc{",),
          count=(("return JobDesc{", 4), (".Scope = context.World", 4))),
     rule("ProductionAsyncSubmissionsCarryOwningWorldScope/normal-operations",
-         files=(OPERATIONS + "Runtime.GeometryProcessingOperations.Normals.cpp",),
+         files=(OPERATIONS + "Runtime.NormalOperations.Processing.cpp",),
          count=(("JobDesc desc{", 1), ("JobDesc ", 1), (".Scope = context.World", 1))),
     rule("ProductionAsyncSubmissionsCarryOwningWorldScope/gpu-transactions",
          files=(OPERATIONS + "Runtime.GpuTransactionLifecycle.cpp",),
@@ -412,7 +412,7 @@ RULES: list[Rule] = [
          files=("src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp",),
          forbid=("import Extrinsic.Runtime.DerivedJobGraph", "DerivedJobRegistry", "m_DerivedJobSnapshot")),
     rule("SandboxEditorJobsUseSingleJobServiceSurface/geometry-operations",
-         files=(OPERATIONS + "Runtime.GeometryProcessingOperations.cpp",),
+         files=(OPERATIONS + "Runtime.PointSetOperations.Processing.cpp",),
          forbid=("import Extrinsic.Runtime.DerivedJobGraph", "import Extrinsic.Runtime.StreamingExecutor",
                  "FindActiveEditorDerivedJob")),
     rule("SandboxEditorJobsUseSingleJobServiceSurface/job-projection",
@@ -667,7 +667,7 @@ RULES: list[Rule] = [
                 "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp")
          + tuple(OPERATIONS + name for name in (
              "Runtime.GeometryProcessingOperations.Mesh.cpp", "Runtime.GeometryProcessingOperations.MeshSupport.cpp",
-             "Runtime.GeometryProcessingOperations.Registration.cpp", "Runtime.GeometryProcessingOperations.Uv.cpp",
+             "Runtime.RegistrationOperations.Processing.cpp", "Runtime.ParameterizationOperations.Processing.cpp",
              "Runtime.GeometryProcessingOperations.MeshSupport.hpp", "Runtime.GeometryProcessingOperations.MeshSoup.hpp",
              "Runtime.MeshFieldOperations.Curvature.cpp", "Runtime.MeshTopologyOperations.Topology.cpp"))
          + ("src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cpp",),

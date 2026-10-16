@@ -34,8 +34,8 @@ helper set copied in five files, not two:
 | Transaction | File |
 | --- | --- |
 | Point scalar (density/spacing/weights/keypoints) | `Runtime.PointScalarTransaction.cpp` |
-| Outliers | `Runtime.GeometryProcessingOperations.Outliers.cpp` |
-| Vertex normals | `Runtime.GeometryProcessingOperations.Normals.cpp` (`BeginAccept`, accept job, run job) |
+| Outliers | `Runtime.PointAnalysisOperations.Outliers.cpp` |
+| Vertex normals | `Runtime.NormalOperations.Processing.cpp` (`BeginAccept`, accept job, run job) |
 | Property smoothing | `Runtime.MeshFieldOperations.Smoothing.cpp` (`BeginAccept`, accept job, run job) |
 | GPU positions (accept-only variant) | `Runtime.GeometryProcessingOperations.GpuPositions.cpp` |
 

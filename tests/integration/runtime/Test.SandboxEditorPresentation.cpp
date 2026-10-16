@@ -1057,7 +1057,7 @@ TEST(SandboxEditorPresentation,
     const std::string sceneActions =
         ReadRepositoryTextFile("src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp");
     const std::string pointSetOperations =
-        ReadRepositoryTextFile("src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp");
+        ReadRepositoryTextFile("src/runtime/Editor/Operations/Runtime.PointSetOperations.Processing.cpp");
     const std::string pointCloudServiceOperations = ReadRepositoryTextFile(
         "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cpp");
     const std::string geometryMeshOperations =

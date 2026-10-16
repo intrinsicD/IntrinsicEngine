@@ -301,7 +301,7 @@
 - **Provenance**: user-revised
 - **Crystallized via**: verbal-affirmation
 - **Sensitivity**: high
-- **Code ref**: [N509, src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp, src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm, src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp, docs/architecture/normal-estimation.md]
+- **Code ref**: [N509, src/runtime/Editor/Operations/Runtime.NormalOperations.Processing.cpp, src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm, src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp, docs/architecture/normal-estimation.md]
 - **From staging**: O208
 
 ## H21: Advance point-query consumers one method at a time
@@ -309,5 +309,5 @@
 - **Provenance**: user-revised
 - **Crystallized via**: verbal-affirmation
 - **Sensitivity**: high
-- **Code ref**: [N515, src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp, src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp, tasks/done/RUNTIME-209-point-set-outlier-analysis-publication.md]
+- **Code ref**: [N515, src/runtime/Editor/Operations/Runtime.NormalOperations.Processing.cpp, src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp, tasks/done/RUNTIME-209-point-set-outlier-analysis-publication.md]
 - **From staging**: O210

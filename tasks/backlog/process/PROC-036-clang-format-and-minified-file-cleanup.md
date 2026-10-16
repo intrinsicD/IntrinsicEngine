@@ -32,7 +32,7 @@ Source: 2026-10-01 duplication/consistency audit (finding 2.6), re-verified at `
   1,211 lines contain tabs; check whether they are string literals before choosing `UseTab`.
 - Minified outliers, counted as `if(` / `if (` (some also have lines over 160 columns):
   `Runtime.ClusteringGpuState.cpp` 60/0, `Runtime.ClusteringGpuBackend.cpp` 16/0,
-  `Runtime.GeometryProcessingOperations.Keypoints.cpp` 61/19, `...DensityWeights.cpp` 30/4,
+  `Runtime.PointAnalysisOperations.Keypoints.cpp` 61/19, `...DensityWeights.cpp` 30/4,
   `Runtime.PointScalarTransaction.cpp` 62/28 (one `Current()` predicate over 300 columns),
   `...Descriptors.cpp` 33/20, `Runtime.PointNeighborhoodConfigCodecs.cpp` 27/14,
   `Geometry.PointCloud.Features.cpp` 49/40, `Graphics.PointScalarAnalysis.cpp` 9/2,
