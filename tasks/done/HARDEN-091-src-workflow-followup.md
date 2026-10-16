@@ -39,7 +39,7 @@ this slice. Existing HARDEN-090 evidence remainders retain their owners.
 - [x] Q3/4: UI-046 exports supported selected mesh/graph/point-cloud geometry through Runtime and the existing writers; unsupported formats and dropped properties are reported.
 - [x] Q3/4: Process waiting handles interrupted/error waits; agent sending stops after first failure and observes shutdown between pending replies.
 - [x] Q1/2/4: RHI operational-status documentation is accurate; the unused Vulkan migration stub and stale references are removed; geometry/graphics/physics have concise entry points.
-- [ ] Q2/4: PROC-036 option 2 is implemented with a validated formatter and separate token-equivalent family commits, preserving semantic fixes separately.
+- [x] Q2/4: PROC-036 option 2 is implemented with a validated formatter and separate token-equivalent family commits, preserving semantic fixes separately.
 - [x] Q4: New behavior has baseline or mechanism-removal failures; integrated affected suites and structural checks pass; independent review binds the final source.
 
 ## Execution
@@ -73,14 +73,16 @@ run outside the filesystem sandbox. Before committing, docs-sync receives the
 explicit changed-path list because diff-mode compares commits.
 Formatter validation compares tokens, comments/literals and preprocessing,
 and checks idempotence with clang-format 20.1.8. The formatter's MaterialSystem
-sample churn and long preserved literals await the operator's final decision.
+sample churn and long preserved literals were explicitly accepted by the operator
+on 2026-10-17.
 
-## Current state
-Independent reviewer `/root/final_review` accepted criteria 1–7 and 9 on
-2026-10-17, bound to source packet
-`2212831a85b91cda6694afa481d92831c5d30f19fd89744f0ae10e5fff61ed79`.
-Implementation: `761040df0`. The canonical verification and completion record is
-[in the retirement log](../done/RETIREMENT-LOG.md#2026-10-17--src-workflow-follow-up).
-
-Only PROC-036's formatter-limit decision, separate family commits and blame-ignore
-list remain. Keep this task and its raw evidence active until those are resolved.
+## Completion
+Completed 2026-10-17. Commit: `761040df0`; routing correction `75329c9a6`,
+formatter configuration `d2dcac986` and the five revisions listed in
+`.git-blame-ignore-revs`. Independent reviewer `/root/final_review` accepted
+all nine criteria: 1–7/9 on source packet
+`2212831a85b91cda6694afa481d92831c5d30f19fd89744f0ae10e5fff61ed79`,
+criterion 8 on final formatter commits through `a13948cc5` and closure file-set
+`8944e583b9c2b52e75df758a312145bc00e561074a732b0f5d673d50b0abcc60`.
+The canonical [completion and verification record](RETIREMENT-LOG.md#2026-10-17--src-workflow-follow-up)
+records actual CPU evidence, accepted limits and the separate local BUG-247 gap.

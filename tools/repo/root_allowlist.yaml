@@ -1,6 +1,8 @@
 allowed_root_entries:
+  - .clang-format
   - .claude/
   - .codex/
+  - .git-blame-ignore-revs
   - .github/
   - .gitignore
   - .mcp.json

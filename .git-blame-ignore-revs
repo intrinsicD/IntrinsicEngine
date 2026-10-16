@@ -1,0 +1,12 @@
+# PROC-036: token-identical formatting, one commit per source family.
+# Usage: git blame --ignore-revs-file .git-blame-ignore-revs -- <path>
+# clustering
+7d3bef49471ac73017e2e82167735da5404b0525
+# pointoperations-config
+b9120d77c06dc610c0945673e495d933861bc2e4
+# geometry
+a3f89f3e3eacee395b4b628be7be1c1b49081375
+# graphicsanalysis
+1e43c440e780d74caf1f3c0b3ef026c84fff8c77
+# sandbox
+a13948cc55cd89740233bf33b106a01e70fc0064

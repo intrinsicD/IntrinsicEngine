@@ -11,7 +11,6 @@ picking backlog work; theme priorities and rationale live in
 - `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/active/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
 - `GRAPHICS-153` — GPU methods reuse resident buffers; CPU<->GPU IO only at start and end (tasks/active/GRAPHICS-153-gpu-buffer-reuse-and-minimal-io.md)
 - `HARDEN-090` — Consolidated src audit remediation (tasks/active/HARDEN-090-src-audit-remediation.md)
-- `HARDEN-091` — Complete the src workflow follow-up (tasks/active/HARDEN-091-src-workflow-followup.md)
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
 - `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)
 - `METHOD-077` — Compare the Nystroem landmark variants for Bayesian CPD (tasks/active/METHOD-077-cpd-nystrom-landmark-variant-experiment.md)
@@ -88,6 +87,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-242` — CPU coverage rejects an invalid LLVM execution counter (tasks/backlog/bugs/BUG-242-cpu-source-coverage-counter-invalid.md)
 - unblocked: `BUG-244` — CPU selection rejects a source-rule test without a producer (tasks/backlog/bugs/BUG-244-cpu-selection-rejects-source-rules-producer.md)
 - unblocked: `BUG-245` — Nightly smoke sealing rejects two emitted backend names (tasks/backlog/bugs/BUG-245-nightly-smoke-backend-manifest-mismatch.md)
+- unblocked: `BUG-247` — Local root hygiene rejects existing tool state (tasks/backlog/bugs/BUG-247-local-root-hygiene-state-mismatch.md)
 - unblocked: `RUNTIME-291` — Scale-aware default radii for point operations (tasks/backlog/runtime/RUNTIME-291-scale-aware-radius-defaults.md)
 
 ## Theme H — Agentic workflow hardening
@@ -104,7 +104,6 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `BUILD-006`: `CI-019` — Make CI thin and run full confidence once per merge group (tasks/backlog/process/CI-019-thin-ci-merge-queue-topology.md)
 - blocked by `CI-019`: `CI-020` — Cut over verification and retire legacy policy (tasks/backlog/process/CI-020-verification-cutover-and-legacy-retirement.md)
 - blocked by `CI-013`: `PROC-031` — Bind agent workflow to unified verification receipts (tasks/backlog/process/PROC-031-agent-verification-receipts.md)
-- unblocked: `PROC-036` — Add a `.clang-format` and remove the minified-style outliers (tasks/backlog/process/PROC-036-clang-format-and-minified-file-cleanup.md)
 
 ## Theme I — Research method implementation (paused except explicit P0 dependencies)
 

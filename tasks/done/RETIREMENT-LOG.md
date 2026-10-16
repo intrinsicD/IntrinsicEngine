@@ -2,11 +2,12 @@
 
 ## 2026-10-17 — src workflow follow-up
 
-Retired [UI-046](UI-046-sandbox-geometry-export.md) and
-[BUG-246](BUG-246-runtime-position-name-reuse-drift.md); implementation `761040df0`.
-[HARDEN-091](../active/HARDEN-091-src-workflow-followup.md) remains active only for
-PROC-036's final formatter decision and family commits. UI-037 closes only its
-current slice 7; its other readiness work remains open.
+Retired [HARDEN-091](HARDEN-091-src-workflow-followup.md),
+[UI-046](UI-046-sandbox-geometry-export.md),
+[BUG-246](BUG-246-runtime-position-name-reuse-drift.md) and
+[PROC-036](PROC-036-clang-format-and-minified-file-cleanup.md).
+Semantic implementation: `761040df0`; maturity: CPUContracted.
+UI-037 closes only its current slice 7; its other readiness work remains open.
 
 - Undo/Redo failures now reach every existing button and agent replies, including
   partial progress. Dirty New/Open/Close waits for Discard or a matching successful
@@ -43,9 +44,44 @@ current slice 7; its other readiness work remains open.
   mechanism duplication. Selected source documentation has zero objective errors;
   167 advisory hints are not a claim of whole-tree cleanup.
 
+- Formatter: clang-format 20.1.8 configuration `d2dcac986`; five separate,
+  token-identical family commits cover 14 files and are listed in
+  `.git-blame-ignore-revs`. A fresh verification on the final main checkout confirms
+  token/directive equality, idempotence and six rejected negative controls. The user
+  accepted the MaterialSystem sample's −175/+134 lines and 34 preserved string
+  lines over 120 columns. The sample itself is unchanged; no other code/comment-only
+  over-limit lines remain in the approved files. No extra full build/test run was
+  started for unchanged source bytes. Independent reviewer `/root/final_review`
+  accepted all four PROC-036 criteria and HARDEN-091 criterion 8, bound to commits
+  through `a13948cc5` and closure file-set SHA256
+  `8944e583b9c2b52e75df758a312145bc00e561074a732b0f5d673d50b0abcc60`.
+- Remote CI at `1ebfd18d4`: [docs passed](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/38977737916);
+  [CPU compilation passed but routing failed](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/38977737912)
+  because the two new CoreProcess identities were missing from the exact baseline.
+  Commit `75329c9a6` adds both and updates counts 78→80 / 177→179. Live reconciliation
+  reproduces the two-name failure before the fix and passes afterwards (27 targets,
+  5,745 cases, 378 sources); all 19 unchanged checker self-tests pass. Independent
+  reviewer `/root/implement_foundation` approved patch SHA256
+  `563a149338b5d50507a8273b1cd3d4db3e70ffd1e36b8e35ecb9e025fc8fd40b`.
+  No routing policy, label, source ownership or exact-equality gate was weakened.
+
+- Final metadata checks: both new formatter files are explicit root-policy entries.
+  All 13 root-hygiene regression methods pass on the maintained-file snapshot.
+  The actual local checkout passes 12/13; the remaining method's two subtests
+  reject existing `.aws/` and `.serena/`, tracked separately in
+  [BUG-247](../backlog/bugs/BUG-247-local-root-hygiene-state-mismatch.md).
+  Neither directory nor their classification changed. The final whole-repository
+  jscpd CLI scan retains 1,034 clones; its only changed match is UI-037 task prose,
+  with no new code duplication.
+
 No sanitizer, GPU/Vulkan, native window-close or real-display execution is claimed.
-This session's raw evidence remains under HARDEN-091/BUG-246 while the formatter
-slice is open; unrelated evidence and `.serena` are preserved.
+The reviewed temporary files under `tasks/evidence/HARDEN-091/` and
+`tasks/evidence/BUG-246/` were removed after independent final acceptance;
+no live consumers remained. These summaries retain the conclusions, not raw proof.
+BUG-247 evidence, HARDEN-090 evidence and all unrelated local data remain untouched.
+The three temporary agent worktrees remain: automatic approval rejected their
+forced removal because they contain uncommitted source copies. Their code is
+integrated into the committed main tree; no destructive cleanup was retried.
 
 
 - 2026-10-16 — **BUG-241**: the strict doc-link check (ci-docs) failed on host-local links in five verbatim METHOD-077 Codex review transcripts; they are now byte-identical `.txt` files (precedent `36a7b5062`) and the evidence policy states the rule. Commits `000eedca8`, `323f9f5c8`; independent review accepted both criteria. BUG-243 stays open for checker tests/`:line` support. [Task](BUG-241-method077-review-link-validation.md).

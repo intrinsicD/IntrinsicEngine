@@ -33,4 +33,3 @@ ctest --test-dir build/ci --output-on-failure --no-tests=error --timeout 60 -R '
 
 Completed 2026-10-17. Commit: `761040df0`; both criteria accepted by independent reviewer
 `/root/final_review`. See the canonical [completion and verification record](RETIREMENT-LOG.md#2026-10-17--src-workflow-follow-up).
-Raw evidence remains temporarily owned by active HARDEN-091 until its last slice closes.

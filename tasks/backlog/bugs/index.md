@@ -5,6 +5,9 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [BUG-247 — Local root hygiene rejects existing tool state](BUG-247-local-root-hygiene-state-mismatch.md):
+  local `.aws/` and `.serena/` remain unclassified; preserve both pending an operator setup decision.
+
 - [BUG-240 — ASan and UBSan CPU jobs have been red since 2026-09-05](BUG-240-sanitizer-cpu-jobs-red-since-september.md):
   sanitizer jobs run only on PRs/manual dispatch; six timeouts and one ProgressivePoisson panel
   assertion failure under ASan, one timeout under UBSan.
