@@ -2602,52 +2602,61 @@ namespace
         if (lhs.PushConstantSize != rhs.PushConstantSize) return false;
         return true;
     }
+
+    // Initializes a renderer on an operational mock device, lets `check` inspect the pipeline's
+    // initial descriptor, then requires the pipeline to survive RebuildOperationalResources with a
+    // byte-identical descriptor.
+    template <class Check>
+    void ExpectPipelineSurvivesOperationalRebuild(const PipelineId pipeline,
+                                                  const std::uint32_t backbufferIndex,
+                                                  Check&& check)
+    {
+        Extrinsic::Tests::MockDevice device;
+        device.Operational = true;
+        device.BackbufferHandle = Extrinsic::RHI::TextureHandle{backbufferIndex, 1u};
+
+        std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+        renderer->Initialize(device);
+
+        EXPECT_TRUE(renderer->GetPipeline(pipeline).IsValid());
+        const Extrinsic::RHI::PipelineDesc initialDesc = RequiredPipelineDesc(*renderer, pipeline);
+        check(initialDesc, device, renderer);
+
+        EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+        EXPECT_TRUE(renderer->GetPipeline(pipeline).IsValid());
+        EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, RequiredPipelineDesc(*renderer, pipeline)));
+
+        renderer->Shutdown();
+    }
 }
 
 TEST(RendererFrameLifecycle, DefaultDebugSurfacePipelineSurvivesOperationalRebuild)
 {
-    Extrinsic::Tests::MockDevice device;
-    device.Operational = true;
-    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{173u, 1u};
+    ExpectPipelineSurvivesOperationalRebuild(
+        PipelineId::DefaultDebugSurface, 173u,
+        [&](const auto& initialDesc, [[maybe_unused]] auto& device, [[maybe_unused]] auto& renderer)
+    {
+        // The descriptor must reference the compiled SPIR-V artifact emitted by
+        // intrinsic_add_glsl_shaders(), not the raw GLSL source — VulkanDevice::
+        // CreatePipeline() reads the path verbatim as a SPIR-V binary.
+        EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
+            "shaders/forward/default_debug_surface.vert.spv"))
+            << initialDesc.VertexShaderPath;
+        EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
+            "shaders/forward/default_debug_surface.frag.spv"))
+            << initialDesc.FragmentShaderPath;
+        EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
+        EXPECT_EQ(initialDesc.Rasterizer.Winding, kVulkanCameraTriangleFrontFace);
+        EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Less);
+        EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
+        EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
 
-    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
-    renderer->Initialize(device);
-
-    const Extrinsic::RHI::PipelineHandle initialPipeline =
-        renderer->GetPipeline(PipelineId::DefaultDebugSurface);
-    EXPECT_TRUE(initialPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc initialDesc =
-        RequiredPipelineDesc(*renderer, PipelineId::DefaultDebugSurface);
-    // The descriptor must reference the compiled SPIR-V artifact emitted by
-    // intrinsic_add_glsl_shaders(), not the raw GLSL source — VulkanDevice::
-    // CreatePipeline() reads the path verbatim as a SPIR-V binary.
-    EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
-        "shaders/forward/default_debug_surface.vert.spv"))
-        << initialDesc.VertexShaderPath;
-    EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
-        "shaders/forward/default_debug_surface.frag.spv"))
-        << initialDesc.FragmentShaderPath;
-    EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
-    EXPECT_EQ(initialDesc.Rasterizer.Winding, kVulkanCameraTriangleFrontFace);
-    EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Less);
-    EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
-    EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
-
-    const Extrinsic::RHI::PipelineDesc* depthPrepass =
-        FindCreatedPipelineDesc(device, "Renderer.DepthPrepass");
-    ASSERT_NE(depthPrepass, nullptr);
-    EXPECT_EQ(depthPrepass->Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
-    EXPECT_EQ(depthPrepass->Rasterizer.Winding, kVulkanCameraTriangleFrontFace);
-
-    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
-        renderer->GetPipeline(PipelineId::DefaultDebugSurface);
-    EXPECT_TRUE(rebuiltPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
-        RequiredPipelineDesc(*renderer, PipelineId::DefaultDebugSurface);
-    EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
-
-    renderer->Shutdown();
+        const Extrinsic::RHI::PipelineDesc* depthPrepass =
+            FindCreatedPipelineDesc(device, "Renderer.DepthPrepass");
+        ASSERT_NE(depthPrepass, nullptr);
+        EXPECT_EQ(depthPrepass->Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
+        EXPECT_EQ(depthPrepass->Rasterizer.Winding, kVulkanCameraTriangleFrontFace);
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -3069,57 +3078,39 @@ TEST(RendererFrameLifecycle, ForwardLinePointPassesSkipUnavailableWhenCullOutput
 
 TEST(RendererFrameLifecycle, DeferredGBufferPipelineSurvivesOperationalRebuild)
 {
-    Extrinsic::Tests::MockDevice device;
-    device.Operational = true;
-    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{281u, 1u};
-
-    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
-    renderer->Initialize(device);
-
-    const Extrinsic::RHI::PipelineHandle initialPipeline =
-        renderer->GetPipeline(PipelineId::DeferredGBuffer);
-    EXPECT_TRUE(initialPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc initialDesc =
-        RequiredPipelineDesc(*renderer, PipelineId::DeferredGBuffer);
-
-    // GRAPHICS-072 Slice A — the deferred GBuffer pipeline MUST select
-    // shaders that declare a `layout(push_constant) ScenePC` block matching
-    // `RHI::GpuScenePushConstants` byte-for-byte, because
-    // `DeferredGBufferPass::Execute` pushes that struct verbatim. The
-    // legacy `assets/shaders/surface.vert` + `surface_gbuffer.frag` pair
-    // declares the pre-GpuScene `mat4 Model + Ptr*` push block and must
-    // never be referenced here (the `SceneTableBDA` pointer would land in
-    // `mat4 Model[0]` and every BDA dereference would read garbage on a
-    // real Vulkan run). See the renderer README "Shader push-constant
-    // compatibility policy" subsection.
-    EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
-        "shaders/forward/default_debug_surface.vert.spv"))
-        << initialDesc.VertexShaderPath;
-    EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
-        "shaders/deferred/default_debug_gbuffer.frag.spv"))
-        << initialDesc.FragmentShaderPath;
-    EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
-    EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
-    EXPECT_EQ(initialDesc.Rasterizer.Winding, kVulkanCameraTriangleFrontFace);
-    EXPECT_TRUE(initialDesc.DepthStencil.DepthTestEnable);
-    EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
-    EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Equal);
-    EXPECT_EQ(initialDesc.ColorTargetCount, 3u);
-    EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA16_FLOAT);
-    EXPECT_EQ(initialDesc.ColorTargetFormats[1], Extrinsic::RHI::Format::RGBA8_UNORM);
-    EXPECT_EQ(initialDesc.ColorTargetFormats[2], Extrinsic::RHI::Format::RGBA16_FLOAT);
-    EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::D32_FLOAT);
-    EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
-
-    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
-        renderer->GetPipeline(PipelineId::DeferredGBuffer);
-    EXPECT_TRUE(rebuiltPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
-        RequiredPipelineDesc(*renderer, PipelineId::DeferredGBuffer);
-    EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
-
-    renderer->Shutdown();
+    ExpectPipelineSurvivesOperationalRebuild(
+        PipelineId::DeferredGBuffer, 281u,
+        [&](const auto& initialDesc, [[maybe_unused]] auto& device, [[maybe_unused]] auto& renderer)
+    {
+        // GRAPHICS-072 Slice A — the deferred GBuffer pipeline MUST select
+        // shaders that declare a `layout(push_constant) ScenePC` block matching
+        // `RHI::GpuScenePushConstants` byte-for-byte, because
+        // `DeferredGBufferPass::Execute` pushes that struct verbatim. The
+        // legacy `assets/shaders/surface.vert` + `surface_gbuffer.frag` pair
+        // declares the pre-GpuScene `mat4 Model + Ptr*` push block and must
+        // never be referenced here (the `SceneTableBDA` pointer would land in
+        // `mat4 Model[0]` and every BDA dereference would read garbage on a
+        // real Vulkan run). See the renderer README "Shader push-constant
+        // compatibility policy" subsection.
+        EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
+            "shaders/forward/default_debug_surface.vert.spv"))
+            << initialDesc.VertexShaderPath;
+        EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
+            "shaders/deferred/default_debug_gbuffer.frag.spv"))
+            << initialDesc.FragmentShaderPath;
+        EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
+        EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
+        EXPECT_EQ(initialDesc.Rasterizer.Winding, kVulkanCameraTriangleFrontFace);
+        EXPECT_TRUE(initialDesc.DepthStencil.DepthTestEnable);
+        EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
+        EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Equal);
+        EXPECT_EQ(initialDesc.ColorTargetCount, 3u);
+        EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA16_FLOAT);
+        EXPECT_EQ(initialDesc.ColorTargetFormats[1], Extrinsic::RHI::Format::RGBA8_UNORM);
+        EXPECT_EQ(initialDesc.ColorTargetFormats[2], Extrinsic::RHI::Format::RGBA16_FLOAT);
+        EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::D32_FLOAT);
+        EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
+    });
 }
 
 // GRAPHICS-072 Slice A — when `SetLightingPath(Deferred)` is in effect and
@@ -3239,43 +3230,25 @@ TEST(RendererFrameLifecycle, DeferredSurfacePassSkipsUnavailableWhenPipelineMiss
 // bytes — referencing it here is a known footgun that this test catches.
 TEST(RendererFrameLifecycle, DeferredLightingPipelineSurvivesOperationalRebuild)
 {
-    Extrinsic::Tests::MockDevice device;
-    device.Operational = true;
-    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{284u, 1u};
-
-    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
-    renderer->Initialize(device);
-
-    const Extrinsic::RHI::PipelineHandle initialPipeline =
-        renderer->GetPipeline(PipelineId::DeferredLighting);
-    EXPECT_TRUE(initialPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc initialDesc =
-        RequiredPipelineDesc(*renderer, PipelineId::DeferredLighting);
-
-    EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
-        "shaders/post_fullscreen.vert.spv"))
-        << initialDesc.VertexShaderPath;
-    EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
-        "shaders/deferred/lighting.frag.spv"))
-        << initialDesc.FragmentShaderPath;
-    EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
-    EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
-    EXPECT_FALSE(initialDesc.DepthStencil.DepthTestEnable);
-    EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
-    EXPECT_EQ(initialDesc.ColorTargetCount, 1u);
-    EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA16_FLOAT);
-    EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
-    EXPECT_EQ(initialDesc.PushConstantSize, 16u);
-
-    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
-        renderer->GetPipeline(PipelineId::DeferredLighting);
-    EXPECT_TRUE(rebuiltPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
-        RequiredPipelineDesc(*renderer, PipelineId::DeferredLighting);
-    EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
-
-    renderer->Shutdown();
+    ExpectPipelineSurvivesOperationalRebuild(
+        PipelineId::DeferredLighting, 284u,
+        [&](const auto& initialDesc, [[maybe_unused]] auto& device, [[maybe_unused]] auto& renderer)
+    {
+        EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
+            "shaders/post_fullscreen.vert.spv"))
+            << initialDesc.VertexShaderPath;
+        EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
+            "shaders/deferred/lighting.frag.spv"))
+            << initialDesc.FragmentShaderPath;
+        EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
+        EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
+        EXPECT_FALSE(initialDesc.DepthStencil.DepthTestEnable);
+        EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
+        EXPECT_EQ(initialDesc.ColorTargetCount, 1u);
+        EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA16_FLOAT);
+        EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
+        EXPECT_EQ(initialDesc.PushConstantSize, 16u);
+    });
 }
 
 // GRAPHICS-072 Slice B — when the deferred lighting pipeline could not be
@@ -3756,95 +3729,59 @@ TEST(RendererFrameLifecycle, DeferredLightingPushConstantsCarryShadowAtlasBindle
 
 TEST(RendererFrameLifecycle, EntityIdPickingPipelineSurvivesOperationalRebuild)
 {
-    Extrinsic::Tests::MockDevice device;
-    device.Operational = true;
-    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{287u, 1u};
-
-    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
-    renderer->Initialize(device);
-
-    const Extrinsic::RHI::PipelineHandle initialPipeline =
-        renderer->GetPipeline(PipelineId::SelectionEntityId);
-    EXPECT_TRUE(initialPipeline.IsValid());
-
-    const Extrinsic::RHI::PipelineDesc initialDesc =
-        RequiredPipelineDesc(*renderer, PipelineId::SelectionEntityId);
-    EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
-        "shaders/selection/entity_id.vert.spv"))
-        << initialDesc.VertexShaderPath;
-    EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
-        "shaders/selection/entity_id.frag.spv"))
-        << initialDesc.FragmentShaderPath;
-    EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
-    EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
-    EXPECT_EQ(initialDesc.Rasterizer.Winding, kVulkanCameraTriangleFrontFace);
-    // Render-pass compatibility with the recipe-declared depth-read
-    // PickingPass: depth-test on, depth-equal, depth-write off, D32_FLOAT.
-    EXPECT_TRUE(initialDesc.DepthStencil.DepthTestEnable);
-    EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
-    EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Equal);
-    EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
-    EXPECT_FALSE(initialDesc.ColorBlend[1].Enable);
-    EXPECT_EQ(initialDesc.ColorTargetCount, 2u);
-    EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::R32_UINT);
-    EXPECT_EQ(initialDesc.ColorTargetFormats[1], Extrinsic::RHI::Format::R32_UINT);
-    EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::D32_FLOAT);
-    EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
-
-    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
-        renderer->GetPipeline(PipelineId::SelectionEntityId);
-    EXPECT_TRUE(rebuiltPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
-        RequiredPipelineDesc(*renderer, PipelineId::SelectionEntityId);
-    EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
-
-    renderer->Shutdown();
+    ExpectPipelineSurvivesOperationalRebuild(
+        PipelineId::SelectionEntityId, 287u,
+        [&](const auto& initialDesc, [[maybe_unused]] auto& device, [[maybe_unused]] auto& renderer)
+    {
+        EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
+            "shaders/selection/entity_id.vert.spv"))
+            << initialDesc.VertexShaderPath;
+        EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
+            "shaders/selection/entity_id.frag.spv"))
+            << initialDesc.FragmentShaderPath;
+        EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
+        EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
+        EXPECT_EQ(initialDesc.Rasterizer.Winding, kVulkanCameraTriangleFrontFace);
+        // Render-pass compatibility with the recipe-declared depth-read
+        // PickingPass: depth-test on, depth-equal, depth-write off, D32_FLOAT.
+        EXPECT_TRUE(initialDesc.DepthStencil.DepthTestEnable);
+        EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
+        EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Equal);
+        EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
+        EXPECT_FALSE(initialDesc.ColorBlend[1].Enable);
+        EXPECT_EQ(initialDesc.ColorTargetCount, 2u);
+        EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::R32_UINT);
+        EXPECT_EQ(initialDesc.ColorTargetFormats[1], Extrinsic::RHI::Format::R32_UINT);
+        EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::D32_FLOAT);
+        EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
+    });
 }
 
 TEST(RendererFrameLifecycle, EntityIdOutlinePipelineUsesSingleTargetShape)
 {
-    Extrinsic::Tests::MockDevice device;
-    device.Operational = true;
-    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{327u, 1u};
-
-    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
-    renderer->Initialize(device);
-
-    const Extrinsic::RHI::PipelineHandle initialPipeline =
-        renderer->GetPipeline(PipelineId::SelectionEntityIdOutline);
-    EXPECT_TRUE(initialPipeline.IsValid());
-
-    const Extrinsic::RHI::PipelineDesc initialDesc =
-        RequiredPipelineDesc(*renderer, PipelineId::SelectionEntityIdOutline);
-    EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
-        "shaders/selection/entity_id.vert.spv"))
-        << initialDesc.VertexShaderPath;
-    EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
-        "shaders/selection/entity_id_outline.frag.spv"))
-        << initialDesc.FragmentShaderPath;
-    EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
-    EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
-    EXPECT_EQ(initialDesc.Rasterizer.Winding, kVulkanCameraTriangleFrontFace);
-    EXPECT_TRUE(initialDesc.DepthStencil.DepthTestEnable);
-    EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
-    EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Equal);
-    EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
-    EXPECT_EQ(initialDesc.ColorTargetCount, 1u);
-    EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::R32_UINT);
-    EXPECT_EQ(initialDesc.ColorTargetFormats[1], Extrinsic::RHI::Format::Undefined);
-    EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::D32_FLOAT);
-    EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
-
-    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
-        renderer->GetPipeline(PipelineId::SelectionEntityIdOutline);
-    EXPECT_TRUE(rebuiltPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
-        RequiredPipelineDesc(*renderer, PipelineId::SelectionEntityIdOutline);
-    EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
-
-    renderer->Shutdown();
+    ExpectPipelineSurvivesOperationalRebuild(
+        PipelineId::SelectionEntityIdOutline, 327u,
+        [&](const auto& initialDesc, [[maybe_unused]] auto& device, [[maybe_unused]] auto& renderer)
+    {
+        EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
+            "shaders/selection/entity_id.vert.spv"))
+            << initialDesc.VertexShaderPath;
+        EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
+            "shaders/selection/entity_id_outline.frag.spv"))
+            << initialDesc.FragmentShaderPath;
+        EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
+        EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
+        EXPECT_EQ(initialDesc.Rasterizer.Winding, kVulkanCameraTriangleFrontFace);
+        EXPECT_TRUE(initialDesc.DepthStencil.DepthTestEnable);
+        EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
+        EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Equal);
+        EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
+        EXPECT_EQ(initialDesc.ColorTargetCount, 1u);
+        EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::R32_UINT);
+        EXPECT_EQ(initialDesc.ColorTargetFormats[1], Extrinsic::RHI::Format::Undefined);
+        EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::D32_FLOAT);
+        EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -3863,140 +3800,86 @@ TEST(RendererFrameLifecycle, EntityIdOutlinePipelineUsesSingleTargetShape)
 
 TEST(RendererFrameLifecycle, FaceIdPickingPipelineSurvivesOperationalRebuild)
 {
-    Extrinsic::Tests::MockDevice device;
-    device.Operational = true;
-    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{288u, 1u};
-
-    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
-    renderer->Initialize(device);
-
-    const Extrinsic::RHI::PipelineHandle initialPipeline =
-        renderer->GetPipeline(PipelineId::SelectionFaceId);
-    EXPECT_TRUE(initialPipeline.IsValid());
-
-    const Extrinsic::RHI::PipelineDesc initialDesc =
-        RequiredPipelineDesc(*renderer, PipelineId::SelectionFaceId);
-    EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
-        "shaders/selection/face_id.vert.spv"))
-        << initialDesc.VertexShaderPath;
-    EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
-        "shaders/selection/face_id.frag.spv"))
-        << initialDesc.FragmentShaderPath;
-    EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
-    EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
-    EXPECT_EQ(initialDesc.Rasterizer.Winding, kVulkanCameraTriangleFrontFace);
-    EXPECT_TRUE(initialDesc.DepthStencil.DepthTestEnable);
-    EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
-    EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Equal);
-    EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
-    EXPECT_FALSE(initialDesc.ColorBlend[1].Enable);
-    EXPECT_EQ(initialDesc.ColorTargetCount, 2u);
-    EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::R32_UINT);
-    EXPECT_EQ(initialDesc.ColorTargetFormats[1], Extrinsic::RHI::Format::R32_UINT);
-    EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::D32_FLOAT);
-    EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
-
-    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
-        renderer->GetPipeline(PipelineId::SelectionFaceId);
-    EXPECT_TRUE(rebuiltPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
-        RequiredPipelineDesc(*renderer, PipelineId::SelectionFaceId);
-    EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
-
-    renderer->Shutdown();
+    ExpectPipelineSurvivesOperationalRebuild(
+        PipelineId::SelectionFaceId, 288u,
+        [&](const auto& initialDesc, [[maybe_unused]] auto& device, [[maybe_unused]] auto& renderer)
+    {
+        EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
+            "shaders/selection/face_id.vert.spv"))
+            << initialDesc.VertexShaderPath;
+        EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
+            "shaders/selection/face_id.frag.spv"))
+            << initialDesc.FragmentShaderPath;
+        EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
+        EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
+        EXPECT_EQ(initialDesc.Rasterizer.Winding, kVulkanCameraTriangleFrontFace);
+        EXPECT_TRUE(initialDesc.DepthStencil.DepthTestEnable);
+        EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
+        EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Equal);
+        EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
+        EXPECT_FALSE(initialDesc.ColorBlend[1].Enable);
+        EXPECT_EQ(initialDesc.ColorTargetCount, 2u);
+        EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::R32_UINT);
+        EXPECT_EQ(initialDesc.ColorTargetFormats[1], Extrinsic::RHI::Format::R32_UINT);
+        EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::D32_FLOAT);
+        EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
+    });
 }
 
 TEST(RendererFrameLifecycle, EdgeIdPickingPipelineSurvivesOperationalRebuild)
 {
-    Extrinsic::Tests::MockDevice device;
-    device.Operational = true;
-    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{289u, 1u};
-
-    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
-    renderer->Initialize(device);
-
-    const Extrinsic::RHI::PipelineHandle initialPipeline =
-        renderer->GetPipeline(PipelineId::SelectionEdgeId);
-    EXPECT_TRUE(initialPipeline.IsValid());
-
-    const Extrinsic::RHI::PipelineDesc initialDesc =
-        RequiredPipelineDesc(*renderer, PipelineId::SelectionEdgeId);
-    EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
-        "shaders/selection/edge_id.vert.spv"))
-        << initialDesc.VertexShaderPath;
-    EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
-        "shaders/selection/edge_id.frag.spv"))
-        << initialDesc.FragmentShaderPath;
-    EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::LineList);
-    EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
-    EXPECT_EQ(initialDesc.Rasterizer.Winding, Extrinsic::RHI::FrontFace::CounterClockwise);
-    EXPECT_TRUE(initialDesc.DepthStencil.DepthTestEnable);
-    EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
-    EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Equal);
-    EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
-    EXPECT_FALSE(initialDesc.ColorBlend[1].Enable);
-    EXPECT_EQ(initialDesc.ColorTargetCount, 2u);
-    EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::R32_UINT);
-    EXPECT_EQ(initialDesc.ColorTargetFormats[1], Extrinsic::RHI::Format::R32_UINT);
-    EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::D32_FLOAT);
-    EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
-
-    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
-        renderer->GetPipeline(PipelineId::SelectionEdgeId);
-    EXPECT_TRUE(rebuiltPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
-        RequiredPipelineDesc(*renderer, PipelineId::SelectionEdgeId);
-    EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
-
-    renderer->Shutdown();
+    ExpectPipelineSurvivesOperationalRebuild(
+        PipelineId::SelectionEdgeId, 289u,
+        [&](const auto& initialDesc, [[maybe_unused]] auto& device, [[maybe_unused]] auto& renderer)
+    {
+        EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
+            "shaders/selection/edge_id.vert.spv"))
+            << initialDesc.VertexShaderPath;
+        EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
+            "shaders/selection/edge_id.frag.spv"))
+            << initialDesc.FragmentShaderPath;
+        EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::LineList);
+        EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
+        EXPECT_EQ(initialDesc.Rasterizer.Winding, Extrinsic::RHI::FrontFace::CounterClockwise);
+        EXPECT_TRUE(initialDesc.DepthStencil.DepthTestEnable);
+        EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
+        EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Equal);
+        EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
+        EXPECT_FALSE(initialDesc.ColorBlend[1].Enable);
+        EXPECT_EQ(initialDesc.ColorTargetCount, 2u);
+        EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::R32_UINT);
+        EXPECT_EQ(initialDesc.ColorTargetFormats[1], Extrinsic::RHI::Format::R32_UINT);
+        EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::D32_FLOAT);
+        EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
+    });
 }
 
 TEST(RendererFrameLifecycle, PointIdPickingPipelineSurvivesOperationalRebuild)
 {
-    Extrinsic::Tests::MockDevice device;
-    device.Operational = true;
-    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{290u, 1u};
-
-    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
-    renderer->Initialize(device);
-
-    const Extrinsic::RHI::PipelineHandle initialPipeline =
-        renderer->GetPipeline(PipelineId::SelectionPointId);
-    EXPECT_TRUE(initialPipeline.IsValid());
-
-    const Extrinsic::RHI::PipelineDesc initialDesc =
-        RequiredPipelineDesc(*renderer, PipelineId::SelectionPointId);
-    EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
-        "shaders/selection/point_id.vert.spv"))
-        << initialDesc.VertexShaderPath;
-    EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
-        "shaders/selection/point_id.frag.spv"))
-        << initialDesc.FragmentShaderPath;
-    EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::PointList);
-    EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
-    EXPECT_EQ(initialDesc.Rasterizer.Winding, Extrinsic::RHI::FrontFace::CounterClockwise);
-    EXPECT_TRUE(initialDesc.DepthStencil.DepthTestEnable);
-    EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
-    EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Equal);
-    EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
-    EXPECT_FALSE(initialDesc.ColorBlend[1].Enable);
-    EXPECT_EQ(initialDesc.ColorTargetCount, 2u);
-    EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::R32_UINT);
-    EXPECT_EQ(initialDesc.ColorTargetFormats[1], Extrinsic::RHI::Format::R32_UINT);
-    EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::D32_FLOAT);
-    EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
-
-    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
-        renderer->GetPipeline(PipelineId::SelectionPointId);
-    EXPECT_TRUE(rebuiltPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
-        RequiredPipelineDesc(*renderer, PipelineId::SelectionPointId);
-    EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
-
-    renderer->Shutdown();
+    ExpectPipelineSurvivesOperationalRebuild(
+        PipelineId::SelectionPointId, 290u,
+        [&](const auto& initialDesc, [[maybe_unused]] auto& device, [[maybe_unused]] auto& renderer)
+    {
+        EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
+            "shaders/selection/point_id.vert.spv"))
+            << initialDesc.VertexShaderPath;
+        EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
+            "shaders/selection/point_id.frag.spv"))
+            << initialDesc.FragmentShaderPath;
+        EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::PointList);
+        EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
+        EXPECT_EQ(initialDesc.Rasterizer.Winding, Extrinsic::RHI::FrontFace::CounterClockwise);
+        EXPECT_TRUE(initialDesc.DepthStencil.DepthTestEnable);
+        EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
+        EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Equal);
+        EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
+        EXPECT_FALSE(initialDesc.ColorBlend[1].Enable);
+        EXPECT_EQ(initialDesc.ColorTargetCount, 2u);
+        EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::R32_UINT);
+        EXPECT_EQ(initialDesc.ColorTargetFormats[1], Extrinsic::RHI::Format::R32_UINT);
+        EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::D32_FLOAT);
+        EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -4011,63 +3894,45 @@ TEST(RendererFrameLifecycle, PointIdPickingPipelineSurvivesOperationalRebuild)
 
 TEST(RendererFrameLifecycle, SelectionOutlinePipelineSurvivesOperationalRebuild)
 {
-    Extrinsic::Tests::MockDevice device;
-    device.Operational = true;
-    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{291u, 1u};
-
-    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
-    renderer->Initialize(device);
-
-    const Extrinsic::RHI::PipelineHandle initialPipeline =
-        renderer->GetPipeline(PipelineId::SelectionOutline);
-    EXPECT_TRUE(initialPipeline.IsValid());
-
-    const Extrinsic::RHI::PipelineDesc initialDesc =
-        RequiredPipelineDesc(*renderer, PipelineId::SelectionOutline);
-    EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
-        "shaders/post_fullscreen.vert.spv"))
-        << initialDesc.VertexShaderPath;
-    EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
-        "shaders/selection_outline.frag.spv"))
-        << initialDesc.FragmentShaderPath;
-    EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
-    EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
-    EXPECT_FALSE(initialDesc.DepthStencil.DepthTestEnable);
-    EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
-    EXPECT_TRUE(initialDesc.ColorBlend[0].Enable);
-    EXPECT_EQ(initialDesc.ColorBlend[0].SrcColorFactor, Extrinsic::RHI::BlendFactor::SrcAlpha);
-    EXPECT_EQ(initialDesc.ColorBlend[0].DstColorFactor, Extrinsic::RHI::BlendFactor::OneMinusSrcAlpha);
-    EXPECT_EQ(initialDesc.ColorBlend[0].ColorOp, Extrinsic::RHI::BlendOp::Add);
-    EXPECT_EQ(initialDesc.ColorBlend[0].SrcAlphaFactor, Extrinsic::RHI::BlendFactor::One);
-    EXPECT_EQ(initialDesc.ColorBlend[0].DstAlphaFactor, Extrinsic::RHI::BlendFactor::OneMinusSrcAlpha);
-    EXPECT_EQ(initialDesc.ColorBlend[0].AlphaOp, Extrinsic::RHI::BlendOp::Add);
-    EXPECT_EQ(initialDesc.ColorTargetCount, 1u);
-    // Color target matches the recipe's current present source, whose format
-    // is `FrameRecipeSizing::BackbufferFormat`; the MockDevice does not
-    // override `GetBackbufferFormat()` so the renderer's stored format is
-    // `RHI::Format::RGBA8_UNORM`.
-    EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA8_UNORM);
-    // Render-pass-compatible with the recipe-declared depth attachment
-    // (`builder.Read(SceneDepth, DepthRead)`) even though the pipeline does
-    // not test or write depth itself.
-    EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::D32_FLOAT);
-    // Matches `SelectionOutlinePushConstants` in `Pass.Selection.Outline.cpp`,
-    // which mirrors the `selection_outline.frag` `Push` block byte-for-byte
-    // (vec4 OutlineColor + vec4 HoverColor + 12 floats/uints + uint[16]
-    // SelectedIds = 144 bytes under Vulkan std430). The pass body pushes a
-    // zero-initialised instance every frame so the shader sees defined
-    // values rather than stale push memory left by a prior draw.
-    EXPECT_EQ(initialDesc.PushConstantSize, 144u);
-
-    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
-        renderer->GetPipeline(PipelineId::SelectionOutline);
-    EXPECT_TRUE(rebuiltPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
-        RequiredPipelineDesc(*renderer, PipelineId::SelectionOutline);
-    EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
-
-    renderer->Shutdown();
+    ExpectPipelineSurvivesOperationalRebuild(
+        PipelineId::SelectionOutline, 291u,
+        [&](const auto& initialDesc, [[maybe_unused]] auto& device, [[maybe_unused]] auto& renderer)
+    {
+        EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
+            "shaders/post_fullscreen.vert.spv"))
+            << initialDesc.VertexShaderPath;
+        EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
+            "shaders/selection_outline.frag.spv"))
+            << initialDesc.FragmentShaderPath;
+        EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
+        EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
+        EXPECT_FALSE(initialDesc.DepthStencil.DepthTestEnable);
+        EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
+        EXPECT_TRUE(initialDesc.ColorBlend[0].Enable);
+        EXPECT_EQ(initialDesc.ColorBlend[0].SrcColorFactor, Extrinsic::RHI::BlendFactor::SrcAlpha);
+        EXPECT_EQ(initialDesc.ColorBlend[0].DstColorFactor, Extrinsic::RHI::BlendFactor::OneMinusSrcAlpha);
+        EXPECT_EQ(initialDesc.ColorBlend[0].ColorOp, Extrinsic::RHI::BlendOp::Add);
+        EXPECT_EQ(initialDesc.ColorBlend[0].SrcAlphaFactor, Extrinsic::RHI::BlendFactor::One);
+        EXPECT_EQ(initialDesc.ColorBlend[0].DstAlphaFactor, Extrinsic::RHI::BlendFactor::OneMinusSrcAlpha);
+        EXPECT_EQ(initialDesc.ColorBlend[0].AlphaOp, Extrinsic::RHI::BlendOp::Add);
+        EXPECT_EQ(initialDesc.ColorTargetCount, 1u);
+        // Color target matches the recipe's current present source, whose format
+        // is `FrameRecipeSizing::BackbufferFormat`; the MockDevice does not
+        // override `GetBackbufferFormat()` so the renderer's stored format is
+        // `RHI::Format::RGBA8_UNORM`.
+        EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA8_UNORM);
+        // Render-pass-compatible with the recipe-declared depth attachment
+        // (`builder.Read(SceneDepth, DepthRead)`) even though the pipeline does
+        // not test or write depth itself.
+        EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::D32_FLOAT);
+        // Matches `SelectionOutlinePushConstants` in `Pass.Selection.Outline.cpp`,
+        // which mirrors the `selection_outline.frag` `Push` block byte-for-byte
+        // (vec4 OutlineColor + vec4 HoverColor + 12 floats/uints + uint[16]
+        // SelectedIds = 144 bytes under Vulkan std430). The pass body pushes a
+        // zero-initialised instance every frame so the shader sees defined
+        // values rather than stale push memory left by a prior draw.
+        EXPECT_EQ(initialDesc.PushConstantSize, 144u);
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -4078,61 +3943,43 @@ TEST(RendererFrameLifecycle, SelectionOutlinePipelineSurvivesOperationalRebuild)
 
 TEST(RendererFrameLifecycle, PostProcessToneMapPipelineSurvivesOperationalRebuild)
 {
-    Extrinsic::Tests::MockDevice device;
-    device.Operational = true;
-    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{293u, 1u};
-
-    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
-    renderer->Initialize(device);
-
-    const Extrinsic::RHI::PipelineHandle initialPipeline =
-        renderer->GetPipeline(PipelineId::PostProcessToneMap);
-    EXPECT_TRUE(initialPipeline.IsValid());
-
-    const Extrinsic::RHI::PipelineDesc initialDesc =
-        RequiredPipelineDesc(*renderer, PipelineId::PostProcessToneMap);
-    EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
-        "shaders/post_fullscreen.vert.spv"))
-        << initialDesc.VertexShaderPath;
-    EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
-        "shaders/post_tonemap.frag.spv"))
-        << initialDesc.FragmentShaderPath;
-    EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
-    EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
-    EXPECT_FALSE(initialDesc.DepthStencil.DepthTestEnable);
-    EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
-    EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
-    EXPECT_EQ(initialDesc.ColorTargetCount, 1u);
-    // The recipe's `SceneColorLDR` is allocated with
-    // `FrameRecipeSizing::BackbufferFormat`; MockDevice keeps the default
-    // `RHI::Format::RGBA8_UNORM`.
-    EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA8_UNORM);
-    // No depth attachment is required by `"PostProcessPass"`, so the
-    // tonemap pipeline declares `DepthTargetFormat::Undefined` (unlike the
-    // SelectionOutline pipeline, which stays render-pass-compatible with
-    // the recipe-read SceneDepth attachment).
-    EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
-    // Matches the pass-local `PostProcessToneMapPushConstants` block
-    // exported by `Pass.PostProcess.ToneMap` (80 bytes — `Exposure +
-    // Operator + BloomIntensity + ColorGradingOn` + 4 grading scalars +
-    // three `vec3 + float pad` rows under std430). The block mirrors the
-    // shader's `layout(push_constant) Push { ... }` declaration byte-for-
-    // byte; the canonical 20-byte `PostProcessPushConstants` block
-    // shared by the other postprocess stages is intentionally not used
-    // for tonemap since it aliases `HistogramBinCount` /
-    // `StageKind` onto `ColorGradingOn` / `Saturation` and leaves the
-    // grading tail unwritten.
-    EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::Graphics::PostProcessToneMapPushConstants));
-
-    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
-        renderer->GetPipeline(PipelineId::PostProcessToneMap);
-    EXPECT_TRUE(rebuiltPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
-        RequiredPipelineDesc(*renderer, PipelineId::PostProcessToneMap);
-    EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
-
-    renderer->Shutdown();
+    ExpectPipelineSurvivesOperationalRebuild(
+        PipelineId::PostProcessToneMap, 293u,
+        [&](const auto& initialDesc, [[maybe_unused]] auto& device, [[maybe_unused]] auto& renderer)
+    {
+        EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
+            "shaders/post_fullscreen.vert.spv"))
+            << initialDesc.VertexShaderPath;
+        EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
+            "shaders/post_tonemap.frag.spv"))
+            << initialDesc.FragmentShaderPath;
+        EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
+        EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
+        EXPECT_FALSE(initialDesc.DepthStencil.DepthTestEnable);
+        EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
+        EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
+        EXPECT_EQ(initialDesc.ColorTargetCount, 1u);
+        // The recipe's `SceneColorLDR` is allocated with
+        // `FrameRecipeSizing::BackbufferFormat`; MockDevice keeps the default
+        // `RHI::Format::RGBA8_UNORM`.
+        EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA8_UNORM);
+        // No depth attachment is required by `"PostProcessPass"`, so the
+        // tonemap pipeline declares `DepthTargetFormat::Undefined` (unlike the
+        // SelectionOutline pipeline, which stays render-pass-compatible with
+        // the recipe-read SceneDepth attachment).
+        EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
+        // Matches the pass-local `PostProcessToneMapPushConstants` block
+        // exported by `Pass.PostProcess.ToneMap` (80 bytes — `Exposure +
+        // Operator + BloomIntensity + ColorGradingOn` + 4 grading scalars +
+        // three `vec3 + float pad` rows under std430). The block mirrors the
+        // shader's `layout(push_constant) Push { ... }` declaration byte-for-
+        // byte; the canonical 20-byte `PostProcessPushConstants` block
+        // shared by the other postprocess stages is intentionally not used
+        // for tonemap since it aliases `HistogramBinCount` /
+        // `StageKind` onto `ColorGradingOn` / `Saturation` and leaves the
+        // grading tail unwritten.
+        EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::Graphics::PostProcessToneMapPushConstants));
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -4232,55 +4079,37 @@ TEST(RendererFrameLifecycle, PostProcessBloomPipelinesSurviveOperationalRebuild)
 
 TEST(RendererFrameLifecycle, PostProcessFXAAPipelineSurvivesOperationalRebuild)
 {
-    Extrinsic::Tests::MockDevice device;
-    device.Operational = true;
-    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{297u, 1u};
-
-    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
-    renderer->Initialize(device);
-
-    const Extrinsic::RHI::PipelineHandle initialPipeline =
-        renderer->GetPipeline(PipelineId::PostProcessFXAA);
-    EXPECT_TRUE(initialPipeline.IsValid());
-
-    const Extrinsic::RHI::PipelineDesc initialDesc =
-        RequiredPipelineDesc(*renderer, PipelineId::PostProcessFXAA);
-    EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
-        "shaders/post_fullscreen.vert.spv"))
-        << initialDesc.VertexShaderPath;
-    EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
-        "shaders/post_fxaa.frag.spv"))
-        << initialDesc.FragmentShaderPath;
-    EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
-    EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
-    EXPECT_FALSE(initialDesc.DepthStencil.DepthTestEnable);
-    EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
-    EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
-    EXPECT_EQ(initialDesc.ColorTargetCount, 1u);
-    // FXAA writes into the recipe's `SceneColorLDR` target, which is
-    // allocated with `FrameRecipeSizing::BackbufferFormat`; MockDevice
-    // keeps the default `RHI::Format::RGBA8_UNORM`.
-    EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA8_UNORM);
-    EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
-    // 20-byte std430 block: `vec2 InvResolution + float ContrastThreshold +
-    // float RelativeThreshold + float SubpixelBlending`. The canonical
-    // 20-byte `PostProcessPushConstants` block happens to share the same
-    // byte size but a completely different field layout (Exposure/Gamma/
-    // BloomIntensity/HistogramBinCount/StageKind), so this assertion uses
-    // the typed `sizeof(PostProcessFXAAPushConstants)` rather than a raw
-    // 20u literal to keep the contract anchored to the FXAA-shaped struct.
-    EXPECT_EQ(initialDesc.PushConstantSize,
-              sizeof(Extrinsic::Graphics::PostProcessFXAAPushConstants));
-
-    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
-        renderer->GetPipeline(PipelineId::PostProcessFXAA);
-    EXPECT_TRUE(rebuiltPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
-        RequiredPipelineDesc(*renderer, PipelineId::PostProcessFXAA);
-    EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
-
-    renderer->Shutdown();
+    ExpectPipelineSurvivesOperationalRebuild(
+        PipelineId::PostProcessFXAA, 297u,
+        [&](const auto& initialDesc, [[maybe_unused]] auto& device, [[maybe_unused]] auto& renderer)
+    {
+        EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
+            "shaders/post_fullscreen.vert.spv"))
+            << initialDesc.VertexShaderPath;
+        EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
+            "shaders/post_fxaa.frag.spv"))
+            << initialDesc.FragmentShaderPath;
+        EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
+        EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
+        EXPECT_FALSE(initialDesc.DepthStencil.DepthTestEnable);
+        EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
+        EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
+        EXPECT_EQ(initialDesc.ColorTargetCount, 1u);
+        // FXAA writes into the recipe's `SceneColorLDR` target, which is
+        // allocated with `FrameRecipeSizing::BackbufferFormat`; MockDevice
+        // keeps the default `RHI::Format::RGBA8_UNORM`.
+        EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA8_UNORM);
+        EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
+        // 20-byte std430 block: `vec2 InvResolution + float ContrastThreshold +
+        // float RelativeThreshold + float SubpixelBlending`. The canonical
+        // 20-byte `PostProcessPushConstants` block happens to share the same
+        // byte size but a completely different field layout (Exposure/Gamma/
+        // BloomIntensity/HistogramBinCount/StageKind), so this assertion uses
+        // the typed `sizeof(PostProcessFXAAPushConstants)` rather than a raw
+        // 20u literal to keep the contract anchored to the FXAA-shaped struct.
+        EXPECT_EQ(initialDesc.PushConstantSize,
+                  sizeof(Extrinsic::Graphics::PostProcessFXAAPushConstants));
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -4412,48 +4241,30 @@ TEST(RendererFrameLifecycle, PostProcessSMAAPipelinesSurviveOperationalRebuild)
 
 TEST(RendererFrameLifecycle, PostProcessHistogramPipelineSurvivesOperationalRebuild)
 {
-    Extrinsic::Tests::MockDevice device;
-    device.Operational = true;
-    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{421u, 1u};
-
-    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
-    renderer->Initialize(device);
-
-    const Extrinsic::RHI::PipelineHandle initialPipeline =
-        renderer->GetPipeline(PipelineId::PostProcessHistogram);
-    EXPECT_TRUE(initialPipeline.IsValid());
-
-    const Extrinsic::RHI::PipelineDesc initialDesc =
-        RequiredPipelineDesc(*renderer, PipelineId::PostProcessHistogram);
-    EXPECT_TRUE(initialDesc.ComputeShaderPath.ends_with(
-        "shaders/post_histogram.comp.spv"))
-        << initialDesc.ComputeShaderPath;
-    EXPECT_TRUE(initialDesc.VertexShaderPath.empty())
-        << "Compute pipeline must leave VertexShaderPath empty so the "
-           "backend interprets the descriptor as compute.";
-    EXPECT_TRUE(initialDesc.FragmentShaderPath.empty())
-        << "Compute pipeline must leave FragmentShaderPath empty so the "
-           "backend interprets the descriptor as compute.";
-    EXPECT_EQ(initialDesc.ColorTargetCount, 0u);
-    EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
-    // 16-byte std430 block: `uint Width + uint Height + float MinLogLum +
-    // float RangeLogLum`. The canonical 20-byte block is intentionally
-    // not used here per the standing shader-push-constant compatibility
-    // policy (it would alias `Exposure` onto `Width` as
-    // `bit_cast<uint>(1.0f)` ≈ 1.07e9, producing a degenerate dispatch
-    // shape).
-    EXPECT_EQ(initialDesc.PushConstantSize,
-              sizeof(Extrinsic::Graphics::PostProcessHistogramPushConstants));
-
-    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
-        renderer->GetPipeline(PipelineId::PostProcessHistogram);
-    EXPECT_TRUE(rebuiltPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
-        RequiredPipelineDesc(*renderer, PipelineId::PostProcessHistogram);
-    EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
-
-    renderer->Shutdown();
+    ExpectPipelineSurvivesOperationalRebuild(
+        PipelineId::PostProcessHistogram, 421u,
+        [&](const auto& initialDesc, [[maybe_unused]] auto& device, [[maybe_unused]] auto& renderer)
+    {
+        EXPECT_TRUE(initialDesc.ComputeShaderPath.ends_with(
+            "shaders/post_histogram.comp.spv"))
+            << initialDesc.ComputeShaderPath;
+        EXPECT_TRUE(initialDesc.VertexShaderPath.empty())
+            << "Compute pipeline must leave VertexShaderPath empty so the "
+               "backend interprets the descriptor as compute.";
+        EXPECT_TRUE(initialDesc.FragmentShaderPath.empty())
+            << "Compute pipeline must leave FragmentShaderPath empty so the "
+               "backend interprets the descriptor as compute.";
+        EXPECT_EQ(initialDesc.ColorTargetCount, 0u);
+        EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
+        // 16-byte std430 block: `uint Width + uint Height + float MinLogLum +
+        // float RangeLogLum`. The canonical 20-byte block is intentionally
+        // not used here per the standing shader-push-constant compatibility
+        // policy (it would alias `Exposure` onto `Width` as
+        // `bit_cast<uint>(1.0f)` ≈ 1.07e9, producing a degenerate dispatch
+        // shape).
+        EXPECT_EQ(initialDesc.PushConstantSize,
+                  sizeof(Extrinsic::Graphics::PostProcessHistogramPushConstants));
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -4462,41 +4273,23 @@ TEST(RendererFrameLifecycle, PostProcessHistogramPipelineSurvivesOperationalRebu
 
 TEST(RendererFrameLifecycle, HZBBuildPipelineSurvivesOperationalRebuild)
 {
-    Extrinsic::Tests::MockDevice device;
-    device.Operational = true;
-    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{431u, 1u};
-
-    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
-    renderer->Initialize(device);
-
-    const Extrinsic::RHI::PipelineHandle initialPipeline =
-        renderer->GetPipeline(PipelineId::HZBBuild);
-    EXPECT_TRUE(initialPipeline.IsValid());
-
-    const Extrinsic::RHI::PipelineDesc initialDesc =
-        RequiredPipelineDesc(*renderer, PipelineId::HZBBuild);
-    EXPECT_TRUE(initialDesc.ComputeShaderPath.ends_with(
-        "shaders/hzb_build.comp.spv"))
-        << initialDesc.ComputeShaderPath;
-    EXPECT_TRUE(initialDesc.VertexShaderPath.empty())
-        << "HZB build is a compute pipeline; VertexShaderPath must stay empty.";
-    EXPECT_TRUE(initialDesc.FragmentShaderPath.empty())
-        << "HZB build is a compute pipeline; FragmentShaderPath must stay empty.";
-    EXPECT_EQ(initialDesc.ColorTargetCount, 0u);
-    EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
-    static_assert(sizeof(Extrinsic::Graphics::HZBBuildPushConstants) == 32u);
-    EXPECT_EQ(initialDesc.PushConstantSize,
-              sizeof(Extrinsic::Graphics::HZBBuildPushConstants));
-
-    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
-        renderer->GetPipeline(PipelineId::HZBBuild);
-    EXPECT_TRUE(rebuiltPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
-        RequiredPipelineDesc(*renderer, PipelineId::HZBBuild);
-    EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
-
-    renderer->Shutdown();
+    ExpectPipelineSurvivesOperationalRebuild(
+        PipelineId::HZBBuild, 431u,
+        [&](const auto& initialDesc, [[maybe_unused]] auto& device, [[maybe_unused]] auto& renderer)
+    {
+        EXPECT_TRUE(initialDesc.ComputeShaderPath.ends_with(
+            "shaders/hzb_build.comp.spv"))
+            << initialDesc.ComputeShaderPath;
+        EXPECT_TRUE(initialDesc.VertexShaderPath.empty())
+            << "HZB build is a compute pipeline; VertexShaderPath must stay empty.";
+        EXPECT_TRUE(initialDesc.FragmentShaderPath.empty())
+            << "HZB build is a compute pipeline; FragmentShaderPath must stay empty.";
+        EXPECT_EQ(initialDesc.ColorTargetCount, 0u);
+        EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
+        static_assert(sizeof(Extrinsic::Graphics::HZBBuildPushConstants) == 32u);
+        EXPECT_EQ(initialDesc.PushConstantSize,
+                  sizeof(Extrinsic::Graphics::HZBBuildPushConstants));
+    });
 }
 
 TEST(RendererFrameLifecycle, ClusterLightingPipelinesAndSceneTablePublishSurviveRebuild)
