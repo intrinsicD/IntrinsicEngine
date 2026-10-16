@@ -2980,47 +2980,54 @@ TEST(GeometryIO_MeshIO, WritesOBJQuadRoundTripsFaceArity)
     EXPECT_EQ(faceVertices.Vector()[0][3], 3u);
 }
 
-TEST(GeometryIO_MeshIO, WriteOBJRejectsEmptyMesh)
+TEST(GeometryIO_MeshIO, MeshWritersFailClosed)
 {
-    Geometry::MeshIO::MeshIOResult mesh;
-    TempFile file(".obj", "");
-    EXPECT_EQ(Geometry::MeshIO::WriteOBJ(file.Path, mesh),
-              Geometry::MeshIO::MeshIOWriteStatus::EmptyMesh);
-}
-
-TEST(GeometryIO_MeshIO, WriteOBJRejectsOutOfRangeIndex)
-{
-    Geometry::MeshIO::MeshIOResult mesh;
-    const std::array<glm::vec3, 3> positions{
+    using Geometry::MeshIO::MeshIOResult;
+    using Geometry::MeshIO::MeshIOWriteStatus;
+    using Writer = MeshIOWriteStatus (*)(std::string_view, const MeshIOResult&);
+    struct WriterCase
+    {
+        const char* Name;
+        const char* Extension;
+        Writer Write;
+        bool TrianglesOnly;
+    };
+    const std::array<WriterCase, 5> writers{{
+        {"OBJ", ".obj", &Geometry::MeshIO::WriteOBJ, false},
+        {"PLY", ".ply", &Geometry::MeshIO::WritePLY, false},
+        {"PLYBinary", ".ply", &Geometry::MeshIO::WritePLYBinary, false},
+        {"STL", ".stl", &Geometry::MeshIO::WriteSTL, true},
+        {"STLBinary", ".stl", &Geometry::MeshIO::WriteSTLBinary, true},
+    }};
+    const std::array<glm::vec3, 4> positions{
         glm::vec3{0.0f, 0.0f, 0.0f},
         glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 1.0f, 0.0f},
         glm::vec3{0.0f, 1.0f, 0.0f},
     };
-    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 99u}}};
-    PopulateTriangleMesh(mesh, positions, faces);
-
-    TempFile file(".obj", "");
-    EXPECT_EQ(Geometry::MeshIO::WriteOBJ(file.Path, mesh),
-              Geometry::MeshIO::MeshIOWriteStatus::InvalidFace);
-}
-
-TEST(GeometryIO_MeshIO, WriteOBJRejectsBadPath)
-{
-    Geometry::MeshIO::MeshIOResult mesh;
-    const std::array<glm::vec3, 3> positions{
-        glm::vec3{0.0f, 0.0f, 0.0f},
-        glm::vec3{1.0f, 0.0f, 0.0f},
-        glm::vec3{0.0f, 1.0f, 0.0f},
+    const auto meshWith = [&](std::vector<std::uint32_t> face) {
+        MeshIOResult mesh;
+        const std::array<std::vector<std::uint32_t>, 1> faces{{std::move(face)}};
+        PopulateTriangleMesh(mesh, positions, faces);
+        return mesh;
     };
-    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
-    PopulateTriangleMesh(mesh, positions, faces);
 
-    const std::string path =
-        std::string("/this/directory/does/not/exist/intrinsic_geometry_io_") +
-        std::to_string(static_cast<long long>(getpid())) + ".obj";
+    for (const WriterCase& writer : writers)
+    {
+        SCOPED_TRACE(writer.Name);
+        TempFile file(writer.Extension, "");
+        EXPECT_EQ(writer.Write(file.Path, MeshIOResult{}), MeshIOWriteStatus::EmptyMesh);
+        EXPECT_EQ(writer.Write(file.Path, meshWith({0u, 1u, 99u})), MeshIOWriteStatus::InvalidFace);
+        if (writer.TrianglesOnly)
+            EXPECT_EQ(writer.Write(file.Path, meshWith({0u, 1u, 2u, 3u})), MeshIOWriteStatus::InvalidFace);
 
-    EXPECT_EQ(Geometry::MeshIO::WriteOBJ(path, mesh),
-              Geometry::MeshIO::MeshIOWriteStatus::InvalidPath);
+        const MeshIOResult valid = meshWith({0u, 1u, 2u});
+        const std::string missingDirectory =
+            std::string("/this/directory/does/not/exist/intrinsic_geometry_io_") +
+            std::to_string(static_cast<long long>(getpid())) + writer.Extension;
+        EXPECT_EQ(writer.Write({}, valid), MeshIOWriteStatus::InvalidPath);
+        EXPECT_EQ(writer.Write(missingDirectory, valid), MeshIOWriteStatus::InvalidPath);
+    }
 }
 
 TEST(GeometryIO_MeshIO, WritesPLYTriangle)
@@ -3210,49 +3217,6 @@ TEST(GeometryIO_MeshIO, WritesPLYQuadRoundTripsFaceArity)
     EXPECT_EQ(faceVertices.Vector()[0][3], 3u);
 }
 
-TEST(GeometryIO_MeshIO, WritePLYRejectsEmptyMesh)
-{
-    Geometry::MeshIO::MeshIOResult mesh;
-    TempFile file(".ply", "");
-    EXPECT_EQ(Geometry::MeshIO::WritePLY(file.Path, mesh),
-              Geometry::MeshIO::MeshIOWriteStatus::EmptyMesh);
-}
-
-TEST(GeometryIO_MeshIO, WritePLYRejectsOutOfRangeIndex)
-{
-    Geometry::MeshIO::MeshIOResult mesh;
-    const std::array<glm::vec3, 3> positions{
-        glm::vec3{0.0f, 0.0f, 0.0f},
-        glm::vec3{1.0f, 0.0f, 0.0f},
-        glm::vec3{0.0f, 1.0f, 0.0f},
-    };
-    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 99u}}};
-    PopulateTriangleMesh(mesh, positions, faces);
-
-    TempFile file(".ply", "");
-    EXPECT_EQ(Geometry::MeshIO::WritePLY(file.Path, mesh),
-              Geometry::MeshIO::MeshIOWriteStatus::InvalidFace);
-}
-
-TEST(GeometryIO_MeshIO, WritePLYRejectsBadPath)
-{
-    Geometry::MeshIO::MeshIOResult mesh;
-    const std::array<glm::vec3, 3> positions{
-        glm::vec3{0.0f, 0.0f, 0.0f},
-        glm::vec3{1.0f, 0.0f, 0.0f},
-        glm::vec3{0.0f, 1.0f, 0.0f},
-    };
-    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
-    PopulateTriangleMesh(mesh, positions, faces);
-
-    const std::string path =
-        std::string("/this/directory/does/not/exist/intrinsic_geometry_io_") +
-        std::to_string(static_cast<long long>(getpid())) + ".ply";
-
-    EXPECT_EQ(Geometry::MeshIO::WritePLY(path, mesh),
-              Geometry::MeshIO::MeshIOWriteStatus::InvalidPath);
-}
-
 TEST(GeometryIO_MeshIO, WritesPLYBinaryTriangle)
 {
     Geometry::MeshIO::MeshIOResult mesh;
@@ -3425,51 +3389,6 @@ TEST(GeometryIO_MeshIO, WritesPLYBinaryQuadRoundTripsFaceArity)
     ASSERT_EQ(faceVertices.Vector().size(), 1u);
     EXPECT_EQ(faceVertices.Vector()[0].size(), 4u);
     EXPECT_EQ(faceVertices.Vector()[0][3], 3u);
-}
-
-TEST(GeometryIO_MeshIO, WritePLYBinaryRejectsEmptyMesh)
-{
-    Geometry::MeshIO::MeshIOResult mesh;
-    TempFile file(".ply", "");
-    EXPECT_EQ(Geometry::MeshIO::WritePLYBinary(file.Path, mesh),
-              Geometry::MeshIO::MeshIOWriteStatus::EmptyMesh);
-}
-
-TEST(GeometryIO_MeshIO, WritePLYBinaryRejectsOutOfRangeIndex)
-{
-    Geometry::MeshIO::MeshIOResult mesh;
-    const std::array<glm::vec3, 3> positions{
-        glm::vec3{0.0f, 0.0f, 0.0f},
-        glm::vec3{1.0f, 0.0f, 0.0f},
-        glm::vec3{0.0f, 1.0f, 0.0f},
-    };
-    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 99u}}};
-    PopulateTriangleMesh(mesh, positions, faces);
-
-    TempFile file(".ply", "");
-    EXPECT_EQ(Geometry::MeshIO::WritePLYBinary(file.Path, mesh),
-              Geometry::MeshIO::MeshIOWriteStatus::InvalidFace);
-}
-
-TEST(GeometryIO_MeshIO, WritePLYBinaryRejectsBadPath)
-{
-    Geometry::MeshIO::MeshIOResult mesh;
-    const std::array<glm::vec3, 3> positions{
-        glm::vec3{0.0f, 0.0f, 0.0f},
-        glm::vec3{1.0f, 0.0f, 0.0f},
-        glm::vec3{0.0f, 1.0f, 0.0f},
-    };
-    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
-    PopulateTriangleMesh(mesh, positions, faces);
-
-    EXPECT_EQ(Geometry::MeshIO::WritePLYBinary({}, mesh),
-              Geometry::MeshIO::MeshIOWriteStatus::InvalidPath);
-
-    const std::string path =
-        std::string("/this/directory/does/not/exist/intrinsic_geometry_io_bin_mesh_") +
-        std::to_string(static_cast<long long>(getpid())) + ".ply";
-    EXPECT_EQ(Geometry::MeshIO::WritePLYBinary(path, mesh),
-              Geometry::MeshIO::MeshIOWriteStatus::InvalidPath);
 }
 
 TEST(GeometryIO_MeshIO, MeshExportersRejectNonFinitePositions)
@@ -3769,66 +3688,6 @@ TEST(GeometryIO_MeshIO, WritesSTLTriangleEmitsFacetNormal)
               std::string::npos);
 }
 
-TEST(GeometryIO_MeshIO, WriteSTLRejectsQuadFace)
-{
-    Geometry::MeshIO::MeshIOResult mesh;
-    const std::array<glm::vec3, 4> positions{
-        glm::vec3{0.0f, 0.0f, 0.0f},
-        glm::vec3{1.0f, 0.0f, 0.0f},
-        glm::vec3{1.0f, 1.0f, 0.0f},
-        glm::vec3{0.0f, 1.0f, 0.0f},
-    };
-    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u, 3u}}};
-    PopulateTriangleMesh(mesh, positions, faces);
-
-    TempFile file(".stl", "");
-    EXPECT_EQ(Geometry::MeshIO::WriteSTL(file.Path, mesh),
-              Geometry::MeshIO::MeshIOWriteStatus::InvalidFace);
-}
-
-TEST(GeometryIO_MeshIO, WriteSTLRejectsEmptyMesh)
-{
-    Geometry::MeshIO::MeshIOResult mesh;
-    TempFile file(".stl", "");
-    EXPECT_EQ(Geometry::MeshIO::WriteSTL(file.Path, mesh),
-              Geometry::MeshIO::MeshIOWriteStatus::EmptyMesh);
-}
-
-TEST(GeometryIO_MeshIO, WriteSTLRejectsOutOfRangeIndex)
-{
-    Geometry::MeshIO::MeshIOResult mesh;
-    const std::array<glm::vec3, 3> positions{
-        glm::vec3{0.0f, 0.0f, 0.0f},
-        glm::vec3{1.0f, 0.0f, 0.0f},
-        glm::vec3{0.0f, 1.0f, 0.0f},
-    };
-    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 99u}}};
-    PopulateTriangleMesh(mesh, positions, faces);
-
-    TempFile file(".stl", "");
-    EXPECT_EQ(Geometry::MeshIO::WriteSTL(file.Path, mesh),
-              Geometry::MeshIO::MeshIOWriteStatus::InvalidFace);
-}
-
-TEST(GeometryIO_MeshIO, WriteSTLRejectsBadPath)
-{
-    Geometry::MeshIO::MeshIOResult mesh;
-    const std::array<glm::vec3, 3> positions{
-        glm::vec3{0.0f, 0.0f, 0.0f},
-        glm::vec3{1.0f, 0.0f, 0.0f},
-        glm::vec3{0.0f, 1.0f, 0.0f},
-    };
-    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
-    PopulateTriangleMesh(mesh, positions, faces);
-
-    const std::string path =
-        std::string("/this/directory/does/not/exist/intrinsic_geometry_io_") +
-        std::to_string(static_cast<long long>(getpid())) + ".stl";
-
-    EXPECT_EQ(Geometry::MeshIO::WriteSTL(path, mesh),
-              Geometry::MeshIO::MeshIOWriteStatus::InvalidPath);
-}
-
 TEST(GeometryIO_MeshIO, WritesSTLBinaryTriangleRoundTrip)
 {
     Geometry::MeshIO::MeshIOResult mesh;
@@ -3897,68 +3756,6 @@ TEST(GeometryIO_MeshIO, WritesSTLBinaryReportsTriangleCountInHeader)
     ASSERT_EQ(faceVertices.Vector().size(), 2u);
     EXPECT_EQ(faceVertices.Vector()[0].size(), 3u);
     EXPECT_EQ(faceVertices.Vector()[1].size(), 3u);
-}
-
-TEST(GeometryIO_MeshIO, WriteSTLBinaryRejectsQuadFace)
-{
-    Geometry::MeshIO::MeshIOResult mesh;
-    const std::array<glm::vec3, 4> positions{
-        glm::vec3{0.0f, 0.0f, 0.0f},
-        glm::vec3{1.0f, 0.0f, 0.0f},
-        glm::vec3{1.0f, 1.0f, 0.0f},
-        glm::vec3{0.0f, 1.0f, 0.0f},
-    };
-    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u, 3u}}};
-    PopulateTriangleMesh(mesh, positions, faces);
-
-    TempFile file(".stl", "");
-    EXPECT_EQ(Geometry::MeshIO::WriteSTLBinary(file.Path, mesh),
-              Geometry::MeshIO::MeshIOWriteStatus::InvalidFace);
-}
-
-TEST(GeometryIO_MeshIO, WriteSTLBinaryRejectsEmptyMesh)
-{
-    Geometry::MeshIO::MeshIOResult mesh;
-    TempFile file(".stl", "");
-    EXPECT_EQ(Geometry::MeshIO::WriteSTLBinary(file.Path, mesh),
-              Geometry::MeshIO::MeshIOWriteStatus::EmptyMesh);
-}
-
-TEST(GeometryIO_MeshIO, WriteSTLBinaryRejectsOutOfRangeIndex)
-{
-    Geometry::MeshIO::MeshIOResult mesh;
-    const std::array<glm::vec3, 3> positions{
-        glm::vec3{0.0f, 0.0f, 0.0f},
-        glm::vec3{1.0f, 0.0f, 0.0f},
-        glm::vec3{0.0f, 1.0f, 0.0f},
-    };
-    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 99u}}};
-    PopulateTriangleMesh(mesh, positions, faces);
-
-    TempFile file(".stl", "");
-    EXPECT_EQ(Geometry::MeshIO::WriteSTLBinary(file.Path, mesh),
-              Geometry::MeshIO::MeshIOWriteStatus::InvalidFace);
-}
-
-TEST(GeometryIO_MeshIO, WriteSTLBinaryRejectsBadPath)
-{
-    Geometry::MeshIO::MeshIOResult mesh;
-    const std::array<glm::vec3, 3> positions{
-        glm::vec3{0.0f, 0.0f, 0.0f},
-        glm::vec3{1.0f, 0.0f, 0.0f},
-        glm::vec3{0.0f, 1.0f, 0.0f},
-    };
-    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
-    PopulateTriangleMesh(mesh, positions, faces);
-
-    EXPECT_EQ(Geometry::MeshIO::WriteSTLBinary({}, mesh),
-              Geometry::MeshIO::MeshIOWriteStatus::InvalidPath);
-
-    const std::string path =
-        std::string("/this/directory/does/not/exist/intrinsic_geometry_io_binstl_w_") +
-        std::to_string(static_cast<long long>(getpid())) + ".stl";
-    EXPECT_EQ(Geometry::MeshIO::WriteSTLBinary(path, mesh),
-              Geometry::MeshIO::MeshIOWriteStatus::InvalidPath);
 }
 
 namespace
@@ -5601,27 +5398,39 @@ TEST(GeometryIO_PointCloudIO, WritesPLYPointCloudWithRadiiEmitsRadiusProperty)
     EXPECT_NE(contents.find("1.000000 0.000000 0.000000 0.500000\n"), std::string::npos);
 }
 
-TEST(GeometryIO_PointCloudIO, WritePLYPointCloudRejectsEmptyCloud)
+TEST(GeometryIO_PointCloudIO, PointCloudWritersFailClosed)
 {
-    Geometry::PointCloudIO::PointCloudIOResult cloud;
-    TempFile file(".ply", "");
-    EXPECT_EQ(Geometry::PointCloudIO::WritePLY(file.Path, cloud),
-              Geometry::PointCloudIO::PointCloudIOWriteStatus::EmptyCloud);
-}
-
-TEST(GeometryIO_PointCloudIO, WritePLYPointCloudRejectsBadPath)
-{
-    Geometry::PointCloudIO::PointCloudIOResult cloud;
+    using Geometry::PointCloudIO::PointCloudIOResult;
+    using Geometry::PointCloudIO::PointCloudIOWriteStatus;
+    using Writer = PointCloudIOWriteStatus (*)(std::string_view, const PointCloudIOResult&);
+    struct WriterCase
+    {
+        const char* Name;
+        const char* Extension;
+        Writer Write;
+    };
+    const std::array<WriterCase, 5> writers{{
+        {"PLY", ".ply", &Geometry::PointCloudIO::WritePLY},
+        {"PLYBinary", ".ply", &Geometry::PointCloudIO::WritePLYBinary},
+        {"XYZ", ".xyz", &Geometry::PointCloudIO::WriteXYZ},
+        {"PCD", ".pcd", &Geometry::PointCloudIO::WritePCD},
+        {"PCDBinary", ".pcd", &Geometry::PointCloudIO::WritePCDBinary},
+    }};
+    PointCloudIOResult cloud;
     cloud.Cloud.AddPoint(glm::vec3(0.0f, 0.0f, 0.0f));
 
-    EXPECT_EQ(Geometry::PointCloudIO::WritePLY({}, cloud),
-              Geometry::PointCloudIO::PointCloudIOWriteStatus::InvalidPath);
+    for (const WriterCase& writer : writers)
+    {
+        SCOPED_TRACE(writer.Name);
+        TempFile file(writer.Extension, "");
+        EXPECT_EQ(writer.Write(file.Path, PointCloudIOResult{}), PointCloudIOWriteStatus::EmptyCloud);
 
-    const std::string path =
-        std::string("/this/directory/does/not/exist/intrinsic_geometry_io_") +
-        std::to_string(static_cast<long long>(getpid())) + ".ply";
-    EXPECT_EQ(Geometry::PointCloudIO::WritePLY(path, cloud),
-              Geometry::PointCloudIO::PointCloudIOWriteStatus::InvalidPath);
+        const std::string missingDirectory =
+            std::string("/this/directory/does/not/exist/intrinsic_geometry_io_") +
+            std::to_string(static_cast<long long>(getpid())) + writer.Extension;
+        EXPECT_EQ(writer.Write({}, cloud), PointCloudIOWriteStatus::InvalidPath);
+        EXPECT_EQ(writer.Write(missingDirectory, cloud), PointCloudIOWriteStatus::InvalidPath);
+    }
 }
 
 TEST(GeometryIO_PointCloudIO, WritesPLYBinaryPointCloud)
@@ -5711,29 +5520,6 @@ TEST(GeometryIO_PointCloudIO, WritesPLYBinaryPointCloudWithRadiiEmitsRadiusPrope
     EXPECT_EQ(loaded->Cloud.Position(Geometry::VertexHandle{1}), glm::vec3(1.0f, 0.0f, 0.0f));
 }
 
-TEST(GeometryIO_PointCloudIO, WritePLYBinaryPointCloudRejectsEmptyCloud)
-{
-    Geometry::PointCloudIO::PointCloudIOResult cloud;
-    TempFile file(".ply", "");
-    EXPECT_EQ(Geometry::PointCloudIO::WritePLYBinary(file.Path, cloud),
-              Geometry::PointCloudIO::PointCloudIOWriteStatus::EmptyCloud);
-}
-
-TEST(GeometryIO_PointCloudIO, WritePLYBinaryPointCloudRejectsBadPath)
-{
-    Geometry::PointCloudIO::PointCloudIOResult cloud;
-    cloud.Cloud.AddPoint(glm::vec3(0.0f, 0.0f, 0.0f));
-
-    EXPECT_EQ(Geometry::PointCloudIO::WritePLYBinary({}, cloud),
-              Geometry::PointCloudIO::PointCloudIOWriteStatus::InvalidPath);
-
-    const std::string path =
-        std::string("/this/directory/does/not/exist/intrinsic_geometry_io_bin_") +
-        std::to_string(static_cast<long long>(getpid())) + ".ply";
-    EXPECT_EQ(Geometry::PointCloudIO::WritePLYBinary(path, cloud),
-              Geometry::PointCloudIO::PointCloudIOWriteStatus::InvalidPath);
-}
-
 TEST(GeometryIO_PointCloudIO, WritesXYZPositionsOnly)
 {
     Geometry::PointCloudIO::PointCloudIOResult cloud;
@@ -5816,29 +5602,6 @@ TEST(GeometryIO_PointCloudIO, WritesXYZIgnoresRadiiAndNormals)
     EXPECT_FALSE(loaded->Cloud.HasRadii());
     EXPECT_FALSE(loaded->Cloud.HasColors());
     EXPECT_EQ(loaded->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(2.0f, 3.0f, 4.0f));
-}
-
-TEST(GeometryIO_PointCloudIO, WriteXYZRejectsEmptyCloud)
-{
-    Geometry::PointCloudIO::PointCloudIOResult cloud;
-    TempFile file(".xyz", "");
-    EXPECT_EQ(Geometry::PointCloudIO::WriteXYZ(file.Path, cloud),
-              Geometry::PointCloudIO::PointCloudIOWriteStatus::EmptyCloud);
-}
-
-TEST(GeometryIO_PointCloudIO, WriteXYZRejectsBadPath)
-{
-    Geometry::PointCloudIO::PointCloudIOResult cloud;
-    cloud.Cloud.AddPoint(glm::vec3(0.0f, 0.0f, 0.0f));
-
-    EXPECT_EQ(Geometry::PointCloudIO::WriteXYZ({}, cloud),
-              Geometry::PointCloudIO::PointCloudIOWriteStatus::InvalidPath);
-
-    const std::string path =
-        std::string("/this/directory/does/not/exist/intrinsic_geometry_io_xyz_") +
-        std::to_string(static_cast<long long>(getpid())) + ".xyz";
-    EXPECT_EQ(Geometry::PointCloudIO::WriteXYZ(path, cloud),
-              Geometry::PointCloudIO::PointCloudIOWriteStatus::InvalidPath);
 }
 
 TEST(GeometryIO_PointCloudIO, ReadersPreserveMissingFileErrors)
@@ -6006,29 +5769,6 @@ TEST(GeometryIO_PointCloudIO, WritesPCDIgnoresRadii)
     EXPECT_EQ(loaded->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(2.0f, 3.0f, 4.0f));
 }
 
-TEST(GeometryIO_PointCloudIO, WritePCDRejectsEmptyCloud)
-{
-    Geometry::PointCloudIO::PointCloudIOResult cloud;
-    TempFile file(".pcd", "");
-    EXPECT_EQ(Geometry::PointCloudIO::WritePCD(file.Path, cloud),
-              Geometry::PointCloudIO::PointCloudIOWriteStatus::EmptyCloud);
-}
-
-TEST(GeometryIO_PointCloudIO, WritePCDRejectsBadPath)
-{
-    Geometry::PointCloudIO::PointCloudIOResult cloud;
-    cloud.Cloud.AddPoint(glm::vec3(0.0f, 0.0f, 0.0f));
-
-    EXPECT_EQ(Geometry::PointCloudIO::WritePCD({}, cloud),
-              Geometry::PointCloudIO::PointCloudIOWriteStatus::InvalidPath);
-
-    const std::string path =
-        std::string("/this/directory/does/not/exist/intrinsic_geometry_io_pcd_") +
-        std::to_string(static_cast<long long>(getpid())) + ".pcd";
-    EXPECT_EQ(Geometry::PointCloudIO::WritePCD(path, cloud),
-              Geometry::PointCloudIO::PointCloudIOWriteStatus::InvalidPath);
-}
-
 TEST(GeometryIO_PointCloudIO, WritesPCDBinaryPositionsOnly)
 {
     Geometry::PointCloudIO::PointCloudIOResult cloud;
@@ -6128,29 +5868,6 @@ TEST(GeometryIO_PointCloudIO, WritesPCDBinaryIgnoresRadii)
     EXPECT_FALSE(loaded->Cloud.HasColors());
     EXPECT_FALSE(loaded->Cloud.HasRadii());
     EXPECT_EQ(loaded->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(2.0f, 3.0f, 4.0f));
-}
-
-TEST(GeometryIO_PointCloudIO, WritePCDBinaryRejectsEmptyCloud)
-{
-    Geometry::PointCloudIO::PointCloudIOResult cloud;
-    TempFile file(".pcd", "");
-    EXPECT_EQ(Geometry::PointCloudIO::WritePCDBinary(file.Path, cloud),
-              Geometry::PointCloudIO::PointCloudIOWriteStatus::EmptyCloud);
-}
-
-TEST(GeometryIO_PointCloudIO, WritePCDBinaryRejectsBadPath)
-{
-    Geometry::PointCloudIO::PointCloudIOResult cloud;
-    cloud.Cloud.AddPoint(glm::vec3(0.0f, 0.0f, 0.0f));
-
-    EXPECT_EQ(Geometry::PointCloudIO::WritePCDBinary({}, cloud),
-              Geometry::PointCloudIO::PointCloudIOWriteStatus::InvalidPath);
-
-    const std::string path =
-        std::string("/this/directory/does/not/exist/intrinsic_geometry_io_pcdbin_") +
-        std::to_string(static_cast<long long>(getpid())) + ".pcd";
-    EXPECT_EQ(Geometry::PointCloudIO::WritePCDBinary(path, cloud),
-              Geometry::PointCloudIO::PointCloudIOWriteStatus::InvalidPath);
 }
 
 TEST(GeometryIO_PointCloudIO, PointCloudExportersRejectNonFinitePositions)
