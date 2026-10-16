@@ -645,6 +645,23 @@ struct TmpFile
 
 }
 
+// One editor context with command history and an attached job harness for queued-job tests.
+// The harness is declared last so it detaches before the context it borrows.
+struct QueuedJobScene
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    Extrinsic::Tests::EditorJobHarness jobs{};
+
+    QueuedJobScene()
+    {
+        context.CommandHistory = &history;
+        jobs.Attach(context);
+    }
+};
+
 TEST(SandboxEditorUi, MeshDenoiseDirectAndQueuedComputeAgree)
 {
     const auto counters = [](const auto& a, const auto& b) {
@@ -1377,6 +1394,260 @@ TEST(SandboxEditorUi, MeshDenoisePinnedRatioIsReportedForPartiallyPinnedRuns)
 
 TEST(SandboxEditorUi, MeshDenoiseRequestQueuesDerivedJobAndPublishesOnApply)
 {
+    QueuedJobScene s;
+    const ECS::EntityHandle mesh = MakeSelectable(s.registry, "DenoiseMesh");
+    AddDenoiseTetraMeshSource(s.registry, mesh);
+    const std::vector<glm::vec3> original = MeshVertexPositions(s.registry, mesh);
+    const Runtime::EditorMeshDenoiseCommand command{
+        .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh),
+        .NormalIterations = 2u, .VertexIterations = 3u,
+        .SigmaSpatial = 0.0, .SigmaRange = 0.0, .PreserveBoundary = true};
+    Extrinsic::Tests::ExpectQueuedJobTerminates(s.jobs, "Sandbox.MeshDenoise.CPU",
+        Runtime::JobState::Published,
+        [&](auto sink) { return Runtime::ApplyEditorMeshDenoiseCommand(s.context, command, sink); },
+        [&](const auto&) {
+            ExpectPositionsExactlyEqual(MeshVertexPositions(s.registry, mesh), original);
+            EXPECT_FALSE(s.registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+            EXPECT_FALSE(s.registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+        },
+        [&](const auto& result) {
+            EXPECT_EQ(result.DenoiseStatus, Smooth::DenoiseStatus::Success);
+            EXPECT_EQ(result.VertexSlotCount, original.size());
+            EXPECT_GT(result.MovedVertexCount, 0u);
+            EXPECT_TRUE(s.registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+            EXPECT_TRUE(s.registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+            EXPECT_TRUE(s.history.IsDirty());
+            EXPECT_TRUE(AnyPositionDiffers(original, MeshVertexPositions(s.registry, mesh)));
+        });
+}
+// BUG-138: a queued mesh job whose snapshotted input changes before apply is
+// discarded, publishes nothing and still reports exactly one StaleEntity
+// result. Before, the discard was silent and the panel kept its submit-time
+// "...CPU job queued" text forever. One block per operation and per input its
+// apply gate fingerprints; the shared lifecycle asserts are in
+// ExpectQueuedJobTerminates, the refusal-is-not-mutation checks stay here.
+TEST(SandboxEditorUi, QueuedMeshJobsDiscardStaleInputAndReportOneTerminalResult)
+{
+    const auto expectStale = [](QueuedJobScene& s, const ECS::EntityHandle mesh,
+        const std::string_view jobName, auto submit, auto mutate, auto check)
+    {
+        const MeshCounts before = SourceMeshCounts(s.registry, mesh);
+        Extrinsic::Tests::ExpectQueuedJobTerminates(s.jobs, jobName,
+            Runtime::JobState::StaleDiscarded, submit,
+            [&](const auto&) { mutate(); }, check);
+        // Refusal is not mutation: no publication, no history, same topology.
+        ExpectMeshCountsEqual(SourceMeshCounts(s.registry, mesh), before);
+        EXPECT_FALSE(s.history.CanUndo());
+        EXPECT_FALSE(s.history.IsDirty());
+        EXPECT_FALSE(s.registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+        EXPECT_FALSE(s.registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+        EXPECT_FALSE(s.registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
+        EXPECT_FALSE(s.registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
+    };
+    const auto moveFirstVertex = [](ECS::Scene::Registry& registry, const ECS::EntityHandle mesh)
+    {
+        auto positions = registry.Raw().get<GS::Vertices>(mesh).Properties.Get<glm::vec3>(PN::kPosition);
+        ASSERT_TRUE(positions.IsValid());
+        ASSERT_FALSE(positions.Vector().empty());
+        positions.Vector()[0] += glm::vec3{0.5f, 0.25f, 0.125f};
+    };
+    const auto withNanTexcoord = [](ECS::Scene::Registry& registry, const ECS::EntityHandle mesh)
+    {
+        auto texcoords = registry.Raw().get<GS::Vertices>(mesh).Properties.Get<glm::vec2>("v:texcoord");
+        ASSERT_TRUE(texcoords);
+        texcoords[1] = glm::vec2{std::numeric_limits<float>::quiet_NaN(), 0.0f};
+    };
+    const auto texcoordStillNan = [](ECS::Scene::Registry& registry, const ECS::EntityHandle mesh)
+    {
+        const GS::ConstSourceView view = GS::BuildConstView(registry.Raw(), mesh);
+        ASSERT_NE(view.VertexSource, nullptr);
+        const auto texcoords = view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
+        ASSERT_TRUE(texcoords);
+        ASSERT_GT(texcoords.Vector().size(), 1u);
+        EXPECT_FALSE(std::isfinite(texcoords[1].x));
+    };
+    const Runtime::EditorMeshDenoiseCommand denoise{
+        .NormalIterations = 2u, .VertexIterations = 3u,
+        .SigmaSpatial = 0.0, .SigmaRange = 0.0, .PreserveBoundary = true};
+    const Runtime::EditorMeshCurvatureCommand curvature{
+        .Output = Runtime::EditorMeshCurvatureOutput::All, .PublishPrincipalDirections = true};
+    const Runtime::EditorMeshSubdivideCommand loop{
+        .Operator = Runtime::EditorMeshSubdivideOperator::Loop, .Iterations = 1u};
+    const Runtime::EditorUvRegenerationCommand uv{.Atlas = {.Resolution = 64u, .Padding = 2u}};
+    const auto submitTo = [](QueuedJobScene& s, const ECS::EntityHandle mesh, auto apply, auto command)
+    {
+        command.StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh);
+        return [&s, apply, command](auto sink) { return apply(s.context, command, sink); };
+    };
+
+    {
+        SCOPED_TRACE("Denoise: moved vertex positions");
+        QueuedJobScene s;
+        const ECS::EntityHandle mesh = MakeSelectable(s.registry, "StaleDenoiseMesh");
+        AddDenoiseTetraMeshSource(s.registry, mesh);
+        expectStale(s, mesh, "Sandbox.MeshDenoise.CPU",
+            submitTo(s, mesh, Runtime::ApplyEditorMeshDenoiseCommand, denoise),
+            [&] { SetPositions(s.registry.Raw().get<GS::Vertices>(mesh),
+                      {{10.0f, 0.0f, 0.0f}, {11.0f, 0.0f, 0.0f}, {12.0f, 0.0f, 0.0f}, {13.0f, 0.0f, 0.0f}}); },
+            [](const auto&) {});
+    }
+    // Mean and principal scalars both participate in the fingerprint, so a
+    // queued result cannot overwrite a concurrent property update.
+    for (const std::string_view edited : {PN::kMeanCurvature, PN::kMaxPrincipalCurvature})
+    {
+        SCOPED_TRACE(std::string{"Curvature: edited "} + std::string{edited});
+        QueuedJobScene s;
+        const ECS::EntityHandle mesh = MakeSelectable(s.registry, "StaleCurvature");
+        AddDenoiseTetraMeshSource(s.registry, mesh);
+        auto& properties = s.registry.Raw().get<GS::Vertices>(mesh).Properties;
+        const auto fill = [&](const double value)
+        {
+            auto scalar = properties.GetOrAdd<double>(std::string{edited}, 0.0);
+            ASSERT_TRUE(scalar.IsValid());
+            ASSERT_EQ(scalar.Vector().size(), 4u);
+            for (double& v : scalar.Vector())
+                v = value;
+        };
+        fill(1.0);
+        expectStale(s, mesh, "Sandbox.MeshCurvature.CPU",
+            submitTo(s, mesh, Runtime::ApplyEditorMeshCurvatureCommand, curvature),
+            [&] { fill(2.0); },
+            [&](const auto&) {
+                const auto current = properties.Get<double>(edited);
+                ASSERT_TRUE(current.IsValid());
+                for (const double value : current.Vector())
+                    EXPECT_DOUBLE_EQ(value, 2.0);
+                for (const std::string_view name : {PN::kMeanCurvature, PN::kGaussianCurvature,
+                         PN::kMinPrincipalCurvature, PN::kMaxPrincipalCurvature,
+                         PN::kPrincipalDir1, PN::kPrincipalDir2})
+                    if (name != edited)
+                        EXPECT_FALSE(properties.Exists(name)) << name;
+            });
+    }
+    {
+        SCOPED_TRACE("Simplify: moved vertex");
+        QueuedJobScene s;
+        const ECS::EntityHandle mesh = MakeSelectable(s.registry, "StaleSimplify");
+        AddIcosahedronMeshSource(s.registry, mesh);
+        expectStale(s, mesh, "Sandbox.MeshSimplify.CPU",
+            submitTo(s, mesh, Runtime::ApplyEditorMeshSimplifyCommand,
+                Runtime::EditorMeshSimplifyCommand{.Metric = Runtime::EditorMeshSimplifyMetric::FA_QEM,
+                    .TargetFaces = 12u, .PreserveBoundary = false}),
+            [&] { moveFirstVertex(s.registry, mesh); },
+            [](const auto& result) {
+                EXPECT_EQ(result.Error, Core::ErrorCode::InvalidState);
+                EXPECT_EQ(result.Message,
+                    "Sandbox.MeshSimplify.CPU did not apply: "
+                    "the source geometry changed after the job was queued, "
+                    "so the result no longer matches the geometry it was computed from.");
+            });
+    }
+    // Remesh and subdivide share `MakeMeshCpuJobDesc` with simplify; pin both
+    // so a future divergence is visible.
+    {
+        SCOPED_TRACE("Remesh: moved vertex");
+        QueuedJobScene s;
+        const ECS::EntityHandle mesh = MakeSelectable(s.registry, "StaleRemesh");
+        AddIcosahedronMeshSource(s.registry, mesh);
+        expectStale(s, mesh, "Sandbox.MeshRemesh.CPU",
+            submitTo(s, mesh, Runtime::ApplyEditorMeshRemeshCommand,
+                Runtime::EditorMeshRemeshCommand{.Mode = Runtime::EditorMeshRemeshMode::Uniform,
+                    .SizingLaw = Runtime::EditorMeshRemeshSizingLaw::MeanCurvature, .Iterations = 1u,
+                    .TargetEdgeLength = 0.35, .PreserveBoundary = false, .ProjectToSurface = true}),
+            [&] { moveFirstVertex(s.registry, mesh); },
+            [](const auto&) {});
+    }
+    {
+        SCOPED_TRACE("Subdivide: moved vertex positions");
+        QueuedJobScene s;
+        const ECS::EntityHandle mesh = MakeSelectable(s.registry, "StaleSubdivide");
+        AddDenoiseTetraMeshSource(s.registry, mesh);
+        const std::vector<glm::vec3> stalePositions{
+            {2.0f, 0.0f, 0.0f}, {0.0f, 2.0f, 0.0f}, {0.0f, 0.0f, 2.0f}, {2.0f, 2.0f, 2.0f}};
+        expectStale(s, mesh, "Sandbox.MeshSubdivide.CPU",
+            submitTo(s, mesh, Runtime::ApplyEditorMeshSubdivideCommand, loop),
+            [&] { SetPositions(s.registry.Raw().get<GS::Vertices>(mesh), stalePositions); },
+            [&](const auto&) {
+                ExpectPositionsExactlyEqual(MeshVertexPositions(s.registry, mesh), stalePositions);
+            });
+    }
+    {
+        SCOPED_TRACE("Subdivide: moved vertex with preserved feature edges");
+        QueuedJobScene s;
+        const ECS::EntityHandle mesh = MakeSelectable(s.registry, "StaleFeatureSubdivide");
+        AddIcosahedronMeshSource(s.registry, mesh);
+        (void)s.registry.Raw().get<GS::Edges>(mesh).Properties.GetOrAdd<bool>("e:feature", false);
+        auto features = loop;
+        features.PreserveLoopFeatureEdges = true;
+        expectStale(s, mesh, "Sandbox.MeshSubdivide.CPU",
+            submitTo(s, mesh, Runtime::ApplyEditorMeshSubdivideCommand, features),
+            [&] { moveFirstVertex(s.registry, mesh); },
+            [](const auto&) {});
+    }
+    {
+        SCOPED_TRACE("Subdivide: edited halfedge connectivity");
+        QueuedJobScene s;
+        const ECS::EntityHandle mesh = MakeSelectable(s.registry, "StaleSubdivideTopology");
+        AddDenoiseTetraMeshSource(s.registry, mesh);
+        auto next = s.registry.Raw().get<GS::Halfedges>(mesh).Properties.Get<std::uint32_t>(PN::kHalfedgeNext);
+        ASSERT_TRUE(next.IsValid());
+        ASSERT_FALSE(next.Vector().empty());
+        const std::uint32_t staleNext = next.Vector().front() == 0u ? 1u : 0u;
+        expectStale(s, mesh, "Sandbox.MeshSubdivide.CPU",
+            submitTo(s, mesh, Runtime::ApplyEditorMeshSubdivideCommand, loop),
+            [&] { next.Vector().front() = staleNext; },
+            [&](const auto&) {
+                EXPECT_EQ(s.registry.Raw().get<GS::Halfedges>(mesh)
+                              .Properties.Get<std::uint32_t>(PN::kHalfedgeNext).Vector().front(),
+                          staleNext);
+            });
+    }
+    {
+        SCOPED_TRACE("UV regeneration: moved vertex positions");
+        QueuedJobScene s;
+        const ECS::EntityHandle mesh = MakeSelectable(s.registry, "StaleUvRepairMesh");
+        AddTriangleMeshSource(s.registry, mesh);
+        withNanTexcoord(s.registry, mesh);
+        expectStale(s, mesh, "Sandbox.UvRegeneration.CPU",
+            submitTo(s, mesh, Runtime::ApplyEditorUvRegenerationCommand, uv),
+            [&] { SetPositions(s.registry.Raw().get<GS::Vertices>(mesh),
+                      {{0.0f, 0.0f, 0.0f}, {1.25f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}}); },
+            [&](const auto& result) {
+                EXPECT_EQ(result.UvStatus, Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput);
+                EXPECT_EQ(result.Diagnostic,
+                    "UV regeneration did not apply: "
+                    "the source geometry changed after the job was queued, "
+                    "so the result no longer matches the geometry it was computed from.");
+                EXPECT_FALSE(s.registry.Raw().all_of<Dirty::GpuDirty>(mesh));
+                texcoordStillNan(s.registry, mesh);
+            });
+    }
+    {
+        SCOPED_TRACE("UV regeneration: edited authored vertex property");
+        QueuedJobScene s;
+        const ECS::EntityHandle mesh = MakeSelectable(s.registry, "StaleUvPropertyMesh");
+        AddTriangleMeshSource(s.registry, mesh);
+        withNanTexcoord(s.registry, mesh);
+        auto paint = s.registry.Raw().get<GS::Vertices>(mesh).Properties.GetOrAdd<glm::vec4>("v:paint", glm::vec4{1.0f});
+        ASSERT_TRUE(paint);
+        expectStale(s, mesh, "Sandbox.UvRegeneration.CPU",
+            submitTo(s, mesh, Runtime::ApplyEditorUvRegenerationCommand, uv),
+            [&] { paint[0] = glm::vec4{0.25f, 0.5f, 0.75f, 1.0f}; },
+            [&](const auto&) {
+                EXPECT_FALSE(s.registry.Raw().all_of<Dirty::GpuDirty>(mesh));
+                texcoordStillNan(s.registry, mesh);
+                const auto stalePaint = GS::BuildConstView(s.registry.Raw(), mesh)
+                    .VertexSource->Properties.Get<glm::vec4>("v:paint");
+                ASSERT_TRUE(stalePaint);
+                EXPECT_EQ(stalePaint[0], (glm::vec4{0.25f, 0.5f, 0.75f, 1.0f}));
+            });
+    }
+}
+
+// The other two topology operations share `MakeMeshCpuJobDesc`, so they share
+// the defect and the fix; pin both so a future divergence is visible.
+TEST(SandboxEditorUi, MeshRemeshAndSubdivideStaleDiscardsReportTerminalResults)
+{
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
     Runtime::EditorCommandHistory history;
@@ -1384,119 +1655,144 @@ TEST(SandboxEditorUi, MeshDenoiseRequestQueuesDerivedJobAndPublishesOnApply)
     context.CommandHistory = &history;
     Extrinsic::Tests::EditorJobHarness jobs{};
     jobs.Attach(context);
-    std::optional<Runtime::EditorMeshDenoiseResult> completedResult{};
-    const std::function<void(Runtime::EditorMeshDenoiseResult)> onDenoise =
-        [&completedResult](Runtime::EditorMeshDenoiseResult result)
-        {
-            completedResult = std::move(result);
-        };
+    std::optional<Runtime::EditorMeshRemeshResult> remeshResult{};
+    std::optional<Runtime::EditorMeshSubdivideResult> subdivideResult{};
+    const std::function<void(Runtime::EditorMeshRemeshResult)> onRemesh =
+        [&remeshResult](Runtime::EditorMeshRemeshResult result)
+        { remeshResult = std::move(result); };
+    const std::function<void(Runtime::EditorMeshSubdivideResult)> onSubdivide =
+        [&subdivideResult](Runtime::EditorMeshSubdivideResult result)
+        { subdivideResult = std::move(result); };
 
-    const ECS::EntityHandle mesh = MakeSelectable(registry, "DenoiseMesh");
-    AddDenoiseTetraMeshSource(registry, mesh);
-    const std::uint32_t stableId =
-        Runtime::SelectionController::ToStableEntityId(mesh);
-    const std::vector<glm::vec3> original =
-        MeshVertexPositions(registry, mesh);
+    const auto stale = [&registry](const ECS::EntityHandle entity)
+    {
+        auto positions = registry.Raw()
+                             .get<GS::Vertices>(entity)
+                             .Properties.Get<glm::vec3>(PN::kPosition);
+        ASSERT_TRUE(positions.IsValid());
+        ASSERT_FALSE(positions.Vector().empty());
+        positions.Vector()[0] += glm::vec3{0.5f, 0.25f, 0.125f};
+    };
 
-    const Runtime::EditorMeshDenoiseResult result =
-        Runtime::ApplyEditorMeshDenoiseCommand(
-            context,
-            Runtime::EditorMeshDenoiseCommand{
-                .StableEntityId = stableId,
-                .NormalIterations = 2u,
-                .VertexIterations = 3u,
-                .SigmaSpatial = 0.0,
-                .SigmaRange = 0.0,
-                .PreserveBoundary = true,
-            },
-                onDenoise);
+    const ECS::EntityHandle remeshMesh = MakeSelectable(registry, "StaleRemesh");
+    AddIcosahedronMeshSource(registry, remeshMesh);
+    const ECS::EntityHandle subdivideMesh =
+        MakeSelectable(registry, "StaleSubdivide");
+    AddIcosahedronMeshSource(registry, subdivideMesh);
+    (void)registry.Raw().get<GS::Edges>(subdivideMesh).Properties.GetOrAdd<bool>("e:feature", false);
 
-    EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
-    EXPECT_NE(result.Message.find("queued"), std::string::npos);
-    ExpectPositionsExactlyEqual(MeshVertexPositions(registry, mesh), original);
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+    ASSERT_EQ(Runtime::ApplyEditorMeshRemeshCommand(
+                  context,
+                  Runtime::EditorMeshRemeshCommand{
+                      .StableEntityId =
+                          Runtime::SelectionController::ToStableEntityId(remeshMesh),
+                      .Mode = Runtime::EditorMeshRemeshMode::Uniform,
+                      .SizingLaw =
+                          Runtime::EditorMeshRemeshSizingLaw::MeanCurvature,
+                      .Iterations = 1u,
+                      .TargetEdgeLength = 0.35,
+                      .PreserveBoundary = false,
+                      .ProjectToSurface = true,
+                  },
+                onRemesh)
+                  .Status,
+              Runtime::EditorCommandStatus::Pending);
+    ASSERT_EQ(Runtime::ApplyEditorMeshSubdivideCommand(
+                  context,
+                  Runtime::EditorMeshSubdivideCommand{
+                      .StableEntityId =
+                          Runtime::SelectionController::ToStableEntityId(
+                              subdivideMesh),
+                      .Operator = Runtime::EditorMeshSubdivideOperator::Loop,
+                      .Iterations = 1u,
+                      .PreserveLoopFeatureEdges = true,
+                  },
+                onSubdivide)
+                  .Status,
+              Runtime::EditorCommandStatus::Pending);
 
-    Runtime::EditorJobQueueSnapshot queued =
-        jobs.Snapshot();
-    ASSERT_EQ(queued.Entries.size(), 1u);
-    EXPECT_EQ(queued.Entries[0].Name, "Sandbox.MeshDenoise.CPU");
-    // `JobService` dispatches at submit, so the pre-drain state races
-    // between Queued/Running/AwaitingGate; assert only that it is active.
-    EXPECT_TRUE(Runtime::IsActiveEditorJobState(queued.Entries[0].State));
-
-    ExpectPositionsExactlyEqual(MeshVertexPositions(registry, mesh), original);
-    EXPECT_FALSE(completedResult.has_value());
+    stale(remeshMesh);
+    stale(subdivideMesh);
 
     ASSERT_TRUE(jobs.DrainUntilTerminal());
-    Runtime::EditorJobQueueSnapshot done =
-        jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
-    ASSERT_TRUE(completedResult.has_value());
-    EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
-    EXPECT_EQ(completedResult->DenoiseStatus, Smooth::DenoiseStatus::Success);
-    EXPECT_EQ(completedResult->VertexSlotCount, original.size());
-    EXPECT_GT(completedResult->MovedVertexCount, 0u);
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
-    EXPECT_TRUE(history.IsDirty());
-    EXPECT_TRUE(AnyPositionDiffers(original, MeshVertexPositions(registry, mesh)));
+    for (const Runtime::EditorJobRecord& entry : jobs.Snapshot().Entries)
+    {
+        EXPECT_EQ(entry.State, Runtime::JobState::StaleDiscarded) << entry.Name;
+        EXPECT_FALSE(Runtime::IsActiveEditorJobState(entry.State)) << entry.Name;
+    }
+
+    ASSERT_TRUE(remeshResult.has_value());
+    EXPECT_EQ(remeshResult->Status, Runtime::EditorCommandStatus::StaleEntity);
+    EXPECT_NE(remeshResult->Message.find("did not apply"), std::string::npos)
+        << remeshResult->Message;
+    ASSERT_TRUE(subdivideResult.has_value());
+    EXPECT_EQ(subdivideResult->Status, Runtime::EditorCommandStatus::StaleEntity);
+    EXPECT_NE(subdivideResult->Message.find("did not apply"), std::string::npos)
+        << subdivideResult->Message;
+    EXPECT_FALSE(history.IsDirty());
 }
-TEST(SandboxEditorUi, MeshDenoiseDerivedJobDiscardsStaleMeshBeforeApply)
+
+// A queued UV job that never reaches its publisher still owes one terminal
+// result, or the panel sits on its submit-time `Pending` state forever.
+TEST(SandboxEditorUi, StaleQueuedUvRegenerationStillReportsOneTerminalResult)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    Runtime::EditorCommandHistory history;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "UvQueuedStale");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    Intrinsic::Tests::EditorFeatureTestContext context =
+        MakeContext(registry, selection);
+    context.CommandHistory = &history;
     Extrinsic::Tests::EditorJobHarness jobs{};
     jobs.Attach(context);
-    std::optional<Runtime::EditorMeshDenoiseResult> completedResult{};
-    const std::function<void(Runtime::EditorMeshDenoiseResult)> onDenoise =
-        [&completedResult](Runtime::EditorMeshDenoiseResult result)
-        {
-            completedResult = std::move(result);
-        };
 
-    const ECS::EntityHandle mesh = MakeSelectable(registry, "StaleDenoiseMesh");
-    AddDenoiseTetraMeshSource(registry, mesh);
-    const std::uint32_t stableId =
-        Runtime::SelectionController::ToStableEntityId(mesh);
-
-    const Runtime::EditorMeshDenoiseResult result =
-        Runtime::ApplyEditorMeshDenoiseCommand(
+    std::size_t deliveries = 0u;
+    std::optional<Runtime::EditorUvRegenerationCommandResult> delivered{};
+    const Runtime::EditorUvRegenerationCommandResult submitted =
+        Runtime::ApplyEditorUvRegenerationCommand(
             context,
-            Runtime::EditorMeshDenoiseCommand{
-                .StableEntityId = stableId,
-                .NormalIterations = 2u,
-                .VertexIterations = 3u,
-                .SigmaSpatial = 0.0,
-                .SigmaRange = 0.0,
-                .PreserveBoundary = true,
+            Runtime::EditorUvRegenerationCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+                .Atlas = {.Resolution = 64u, .Padding = 2u},
             },
-                onDenoise);
-    ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
+            [&](Runtime::EditorUvRegenerationCommandResult result)
+            {
+                ++deliveries;
+                delivered = std::move(result);
+            });
+    ASSERT_EQ(submitted.Status, Runtime::EditorCommandStatus::Pending)
+        << submitted.Diagnostic;
 
+    // Moving the source invalidates the apply gate the job submitted against,
+    // so the completion is discarded rather than published.
     SetPositions(registry.Raw().get<GS::Vertices>(mesh),
                  {
                      {10.0f, 0.0f, 0.0f},
                      {11.0f, 0.0f, 0.0f},
-                     {12.0f, 0.0f, 0.0f},
-                     {13.0f, 0.0f, 0.0f},
+                     {10.0f, 1.0f, 0.0f},
                  });
 
     ASSERT_TRUE(jobs.DrainUntilTerminal());
-
-    Runtime::EditorJobQueueSnapshot done =
-        jobs.Snapshot();
+    Runtime::EditorJobQueueSnapshot done = jobs.Snapshot();
     ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State,
-              Runtime::JobState::StaleDiscarded);
-    // BUG-138: the refusal is now reported instead of silent. It is still a
-    // refusal, so the assertions below still require zero mutation.
-    ASSERT_TRUE(completedResult.has_value());
-    EXPECT_EQ(completedResult->Status, Runtime::EditorCommandStatus::StaleEntity);
-    EXPECT_FALSE(completedResult->Succeeded());
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::StaleDiscarded);
+
+    ASSERT_TRUE(delivered.has_value());
+    EXPECT_EQ(deliveries, 1u) << "exactly one terminal result, never two";
+    EXPECT_FALSE(delivered->Succeeded());
+    EXPECT_EQ(delivered->Status, Runtime::EditorCommandStatus::StaleEntity)
+        << delivered->Diagnostic;
+    EXPECT_EQ(delivered->UvStatus,
+              Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput);
+    EXPECT_EQ(delivered->Diagnostic,
+              "UV regeneration did not apply: "
+              "the source geometry changed after the job was queued, "
+              "so the result no longer matches the geometry it was computed from.");
+    EXPECT_EQ(history.UndoCount(), 0u);
 }
 
 TEST(SandboxEditorUi, MeshPreparationPreservesMaskFailurePrecedenceAndSnapshotCounts)
@@ -2054,87 +2350,48 @@ TEST(SandboxEditorUi, MeshCurvatureRecomputeThatChangesNothingReportsNoChange)
 }
 TEST(SandboxEditorUi, MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply)
 {
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::EditorCommandHistory history;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    context.CommandHistory = &history;
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    std::optional<Runtime::EditorMeshCurvatureResult> completedResult{};
-    const std::function<void(Runtime::EditorMeshCurvatureResult)> onCurvature =
-        [&completedResult](Runtime::EditorMeshCurvatureResult result)
-        {
-            completedResult = std::move(result);
-        };
-
-    const ECS::EntityHandle mesh = MakeSelectable(registry, "QueuedCurvature");
-    AddDenoiseTetraMeshSource(registry, mesh);
-    auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
-    ASSERT_FALSE(properties.Exists(PN::kMeanCurvature));
-    ASSERT_FALSE(properties.Exists(PN::kGaussianCurvature));
-    ASSERT_FALSE(properties.Exists(PN::kMinPrincipalCurvature));
-    ASSERT_FALSE(properties.Exists(PN::kMaxPrincipalCurvature));
-    const std::uint32_t stableId =
-        Runtime::SelectionController::ToStableEntityId(mesh);
-
-    const Runtime::EditorMeshCurvatureResult result =
-        Runtime::ApplyEditorMeshCurvatureCommand(
-            context,
-            Runtime::EditorMeshCurvatureCommand{
-                .StableEntityId = stableId,
-                .Output = Runtime::EditorMeshCurvatureOutput::All,
-                .PublishPrincipalDirections = true,
-            },
-                onCurvature);
-
-    EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
-    EXPECT_EQ(result.VertexSlotCount, 4u);
-    EXPECT_TRUE(result.DirectionsRequested);
-    EXPECT_TRUE(result.DirectionsAvailable);
-    EXPECT_NE(result.Message.find("queued"), std::string::npos);
-    EXPECT_FALSE(properties.Exists(PN::kMeanCurvature));
-    EXPECT_FALSE(properties.Exists(PN::kGaussianCurvature));
-    EXPECT_FALSE(properties.Exists(PN::kMinPrincipalCurvature));
-    EXPECT_FALSE(properties.Exists(PN::kMaxPrincipalCurvature));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
-
-    Runtime::EditorJobQueueSnapshot queued =
-        jobs.Snapshot();
-    ASSERT_EQ(queued.Entries.size(), 1u);
-    EXPECT_EQ(queued.Entries[0].Name, "Sandbox.MeshCurvature.CPU");
-    // `JobService` dispatches at submit, so the pre-drain state races
-    // between Queued/Running/AwaitingGate; assert only that it is active.
-    EXPECT_TRUE(Runtime::IsActiveEditorJobState(queued.Entries[0].State));
-
-    EXPECT_FALSE(completedResult.has_value());
-    EXPECT_FALSE(properties.Exists(PN::kMeanCurvature));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-    Runtime::EditorJobQueueSnapshot done =
-        jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
-    ASSERT_TRUE(completedResult.has_value());
-    EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
-    EXPECT_EQ(completedResult->VertexSlotCount, 4u);
-    EXPECT_EQ(completedResult->SupportedVertexCount, 4u);
-    EXPECT_EQ(completedResult->NonZeroPrincipalVertexCount, 4u);
-    EXPECT_EQ(completedResult->ScalarPropertyCount, 4u);
-    EXPECT_EQ(completedResult->ScalarWrittenCount, 16u);
-    EXPECT_EQ(completedResult->DirectionPropertyCount, 2u);
-    EXPECT_EQ(completedResult->DirectionWrittenCount, 8u);
-    EXPECT_TRUE(completedResult->DirectionsPublished);
+    QueuedJobScene s;
+    const ECS::EntityHandle mesh = MakeSelectable(s.registry, "QueuedCurvature");
+    AddDenoiseTetraMeshSource(s.registry, mesh);
+    auto& properties = s.registry.Raw().get<GS::Vertices>(mesh).Properties;
+    const auto expectNoScalars = [&] {
+        EXPECT_FALSE(properties.Exists(PN::kMeanCurvature));
+        EXPECT_FALSE(properties.Exists(PN::kGaussianCurvature));
+        EXPECT_FALSE(properties.Exists(PN::kMinPrincipalCurvature));
+        EXPECT_FALSE(properties.Exists(PN::kMaxPrincipalCurvature));
+    };
+    expectNoScalars();
+    const Runtime::EditorMeshCurvatureCommand command{
+        .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh),
+        .Output = Runtime::EditorMeshCurvatureOutput::All,
+        .PublishPrincipalDirections = true};
+    Extrinsic::Tests::ExpectQueuedJobTerminates(s.jobs, "Sandbox.MeshCurvature.CPU",
+        Runtime::JobState::Published,
+        [&](auto sink) { return Runtime::ApplyEditorMeshCurvatureCommand(s.context, command, sink); },
+        [&](const auto& pending) {
+            EXPECT_EQ(pending.VertexSlotCount, 4u);
+            EXPECT_TRUE(pending.DirectionsRequested);
+            EXPECT_TRUE(pending.DirectionsAvailable);
+            expectNoScalars();
+            EXPECT_FALSE(s.registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+        },
+        [&](const auto& result) {
+            EXPECT_EQ(result.VertexSlotCount, 4u);
+            EXPECT_EQ(result.SupportedVertexCount, 4u);
+            EXPECT_EQ(result.NonZeroPrincipalVertexCount, 4u);
+            EXPECT_EQ(result.ScalarPropertyCount, 4u);
+            EXPECT_EQ(result.ScalarWrittenCount, 16u);
+            EXPECT_EQ(result.DirectionPropertyCount, 2u);
+            EXPECT_EQ(result.DirectionWrittenCount, 8u);
+            EXPECT_TRUE(result.DirectionsPublished);
+        });
     EXPECT_TRUE(properties.Get<double>(PN::kMeanCurvature).IsValid());
     EXPECT_TRUE(properties.Get<double>(PN::kGaussianCurvature).IsValid());
     EXPECT_TRUE(properties.Get<glm::vec3>(PN::kPrincipalDir1).IsValid());
     EXPECT_TRUE(properties.Get<glm::vec3>(PN::kPrincipalDir2).IsValid());
 
-    const auto queuedMin =
-        properties.Get<double>(PN::kMinPrincipalCurvature);
-    const auto queuedMax =
-        properties.Get<double>(PN::kMaxPrincipalCurvature);
+    const auto queuedMin = properties.Get<double>(PN::kMinPrincipalCurvature);
+    const auto queuedMax = properties.Get<double>(PN::kMaxPrincipalCurvature);
     ASSERT_TRUE(queuedMin.IsValid());
     ASSERT_TRUE(queuedMax.IsValid());
     ASSERT_EQ(queuedMin.Vector().size(), 4u);
@@ -2146,158 +2403,16 @@ TEST(SandboxEditorUi, MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply)
         EXPECT_LE(queuedMin.Vector()[i], queuedMax.Vector()[i]);
     }
 
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
-    EXPECT_TRUE(history.IsDirty());
-    ASSERT_TRUE(history.CanUndo());
-    EXPECT_EQ(history.Undo().Status,
-              Runtime::EditorCommandHistoryStatus::Undone);
-    EXPECT_FALSE(properties.Exists(PN::kMeanCurvature));
-    EXPECT_FALSE(properties.Exists(PN::kGaussianCurvature));
-    EXPECT_FALSE(properties.Exists(PN::kMinPrincipalCurvature));
-    EXPECT_FALSE(properties.Exists(PN::kMaxPrincipalCurvature));
+    EXPECT_TRUE(s.registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+    EXPECT_TRUE(s.history.IsDirty());
+    ASSERT_TRUE(s.history.CanUndo());
+    EXPECT_EQ(s.history.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+    expectNoScalars();
     EXPECT_FALSE(properties.Exists(PN::kPrincipalDir1));
     EXPECT_FALSE(properties.Exists(PN::kPrincipalDir2));
-    EXPECT_EQ(history.Redo().Status,
-              Runtime::EditorCommandHistoryStatus::Redone);
-    EXPECT_TRUE(
-        properties.Get<double>(PN::kMinPrincipalCurvature).IsValid());
-    EXPECT_TRUE(
-        properties.Get<double>(PN::kMaxPrincipalCurvature).IsValid());
-}
-TEST(SandboxEditorUi, MeshCurvatureDerivedJobDiscardsStalePropertiesBeforeApply)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    std::optional<Runtime::EditorMeshCurvatureResult> completedResult{};
-    const std::function<void(Runtime::EditorMeshCurvatureResult)> onCurvature =
-        [&completedResult](Runtime::EditorMeshCurvatureResult result)
-        {
-            completedResult = std::move(result);
-        };
-
-    const ECS::EntityHandle mesh =
-        MakeSelectable(registry, "StaleCurvatureProperties");
-    AddDenoiseTetraMeshSource(registry, mesh);
-    auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
-    auto mean = properties.GetOrAdd<double>(
-        std::string{PN::kMeanCurvature},
-        0.0);
-    ASSERT_TRUE(mean.IsValid());
-    ASSERT_EQ(mean.Vector().size(), 4u);
-    for (double& value : mean.Vector())
-        value = 1.0;
-
-    const Runtime::EditorMeshCurvatureResult result =
-        Runtime::ApplyEditorMeshCurvatureCommand(
-            context,
-            Runtime::EditorMeshCurvatureCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(mesh),
-                .Output = Runtime::EditorMeshCurvatureOutput::All,
-                .PublishPrincipalDirections = true,
-            },
-                onCurvature);
-    ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
-
-    auto currentMean = properties.Get<double>(PN::kMeanCurvature);
-    ASSERT_TRUE(currentMean.IsValid());
-    for (double& value : currentMean.Vector())
-        value = 2.0;
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-
-    Runtime::EditorJobQueueSnapshot done =
-        jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State,
-              Runtime::JobState::StaleDiscarded);
-    // BUG-138: the refusal is now reported instead of silent. It is still a
-    // refusal, so the assertions below still require zero mutation.
-    ASSERT_TRUE(completedResult.has_value());
-    EXPECT_EQ(completedResult->Status, Runtime::EditorCommandStatus::StaleEntity);
-    EXPECT_FALSE(completedResult->Succeeded());
-    currentMean = properties.Get<double>(PN::kMeanCurvature);
-    ASSERT_TRUE(currentMean.IsValid());
-    for (const double value : currentMean.Vector())
-        EXPECT_DOUBLE_EQ(value, 2.0);
-    EXPECT_FALSE(properties.Exists(PN::kGaussianCurvature));
-    EXPECT_FALSE(properties.Exists(PN::kMinPrincipalCurvature));
-    EXPECT_FALSE(properties.Exists(PN::kMaxPrincipalCurvature));
-    EXPECT_FALSE(properties.Exists(PN::kPrincipalDir1));
-    EXPECT_FALSE(properties.Exists(PN::kPrincipalDir2));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
-}
-
-// Principal-scalar edits participate in staleness checks so queued results
-// cannot overwrite a concurrent property update.
-TEST(SandboxEditorUi, MeshCurvatureDerivedJobDiscardsStalePrincipalScalarsBeforeApply)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Intrinsic::Tests::EditorFeatureTestContext context =
-        MakeContext(registry, selection);
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    std::optional<Runtime::EditorMeshCurvatureResult> completedResult{};
-    const std::function<void(Runtime::EditorMeshCurvatureResult)> onCurvature =
-        [&completedResult](Runtime::EditorMeshCurvatureResult result)
-        {
-            completedResult = std::move(result);
-        };
-
-    const ECS::EntityHandle mesh =
-        MakeSelectable(registry, "StalePrincipalCurvature");
-    AddDenoiseTetraMeshSource(registry, mesh);
-    auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
-    auto maxPrincipal = properties.GetOrAdd<double>(
-        std::string{PN::kMaxPrincipalCurvature},
-        0.0);
-    ASSERT_TRUE(maxPrincipal.IsValid());
-    ASSERT_EQ(maxPrincipal.Vector().size(), 4u);
-    for (double& value : maxPrincipal.Vector())
-        value = 1.0;
-
-    const Runtime::EditorMeshCurvatureResult result =
-        Runtime::ApplyEditorMeshCurvatureCommand(
-            context,
-            Runtime::EditorMeshCurvatureCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(mesh),
-                .Output = Runtime::EditorMeshCurvatureOutput::All,
-                .PublishPrincipalDirections = true,
-            },
-                onCurvature);
-    ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
-
-    auto currentMax =
-        properties.Get<double>(PN::kMaxPrincipalCurvature);
-    ASSERT_TRUE(currentMax.IsValid());
-    for (double& value : currentMax.Vector())
-        value = 2.0;
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-
-    const Runtime::EditorJobQueueSnapshot done = jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::StaleDiscarded);
-    ASSERT_TRUE(completedResult.has_value());
-    EXPECT_EQ(completedResult->Status,
-              Runtime::EditorCommandStatus::StaleEntity);
-    EXPECT_FALSE(completedResult->Succeeded());
-
-    currentMax = properties.Get<double>(PN::kMaxPrincipalCurvature);
-    ASSERT_TRUE(currentMax.IsValid());
-    for (const double value : currentMax.Vector())
-        EXPECT_DOUBLE_EQ(value, 2.0);
-    EXPECT_FALSE(properties.Exists(PN::kMeanCurvature));
-    EXPECT_FALSE(properties.Exists(PN::kGaussianCurvature));
-    EXPECT_FALSE(properties.Exists(PN::kMinPrincipalCurvature));
-    EXPECT_FALSE(properties.Exists(PN::kPrincipalDir1));
-    EXPECT_FALSE(properties.Exists(PN::kPrincipalDir2));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+    EXPECT_EQ(s.history.Redo().Status, Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_TRUE(properties.Get<double>(PN::kMinPrincipalCurvature).IsValid());
+    EXPECT_TRUE(properties.Get<double>(PN::kMaxPrincipalCurvature).IsValid());
 }
 
 TEST(SandboxEditorUi, MeshCurvatureCommandFallsBackToScalarOnlyWhenDirectionsUnavailable)
@@ -2542,75 +2657,75 @@ TEST(SandboxEditorUi, MeshRemeshCommandReplacesTopologyAndSupportsUndoRedo)
     EXPECT_GT(adaptive.OutputFaceCount, 0u);
     EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(adaptiveMesh));
 }
-TEST(SandboxEditorUi, MeshRemeshRequestQueuesDerivedJobAndPublishesOnApply)
+// Remesh, subdivide and simplify queue a topology replacement: nothing is
+// published before the drain, and the published face count is the result's.
+TEST(SandboxEditorUi, MeshTopologyRequestsQueueDerivedJobsAndPublishOnApply)
 {
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::EditorCommandHistory history;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    context.CommandHistory = &history;
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    std::optional<Runtime::EditorMeshRemeshResult> completedResult{};
-    const std::function<void(Runtime::EditorMeshRemeshResult)> onRemesh =
-        [&completedResult](Runtime::EditorMeshRemeshResult result)
-        {
-            completedResult = std::move(result);
-        };
-
-    const ECS::EntityHandle mesh = MakeSelectable(registry, "QueuedRemesh");
-    AddIcosahedronMeshSource(registry, mesh);
-    const MeshCounts before = SourceMeshCounts(registry, mesh);
-    const std::uint32_t stableId =
-        Runtime::SelectionController::ToStableEntityId(mesh);
-
-    const Runtime::EditorMeshRemeshResult result =
-        Runtime::ApplyEditorMeshRemeshCommand(
-            context,
-            Runtime::EditorMeshRemeshCommand{
-                .StableEntityId = stableId,
-                .Mode = Runtime::EditorMeshRemeshMode::Uniform,
-                .SizingLaw =
-                    Runtime::EditorMeshRemeshSizingLaw::MeanCurvature,
-                .Iterations = 1u,
-                .TargetEdgeLength = 0.35,
-                .PreserveBoundary = false,
-                .ProjectToSurface = false,
+    const auto expectTopologyJob = [](void (*populate)(ECS::Scene::Registry&, ECS::EntityHandle),
+        const std::string_view jobName, auto apply, auto command, auto check)
+    {
+        QueuedJobScene s;
+        const ECS::EntityHandle mesh = MakeSelectable(s.registry, std::string{jobName});
+        populate(s.registry, mesh);
+        const MeshCounts before = SourceMeshCounts(s.registry, mesh);
+        command.StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh);
+        Extrinsic::Tests::ExpectQueuedJobTerminates(s.jobs, jobName, Runtime::JobState::Published,
+            [&](auto sink) { return apply(s.context, command, sink); },
+            [&](const auto& pending) {
+                EXPECT_EQ(pending.InputVertexCount, before.Vertices);
+                EXPECT_EQ(pending.InputFaceCount, before.Faces);
+                ExpectMeshCountsEqual(SourceMeshCounts(s.registry, mesh), before);
+                EXPECT_FALSE(s.registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
+                EXPECT_FALSE(s.registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
             },
-                onRemesh);
+            [&](const auto& result) {
+                EXPECT_EQ(result.InputFaceCount, before.Faces);
+                EXPECT_TRUE(s.registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
+                EXPECT_TRUE(s.registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
+                EXPECT_TRUE(s.history.IsDirty());
+                EXPECT_EQ(SourceMeshCounts(s.registry, mesh).Faces, result.OutputFaceCount);
+                check(s, mesh, before, result);
+            });
+    };
 
-    EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
-    EXPECT_EQ(result.InputVertexCount, before.Vertices);
-    EXPECT_EQ(result.InputFaceCount, before.Faces);
-    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
-
-    Runtime::EditorJobQueueSnapshot queued =
-        jobs.Snapshot();
-    ASSERT_EQ(queued.Entries.size(), 1u);
-    EXPECT_EQ(queued.Entries[0].Name, "Sandbox.MeshRemesh.CPU");
-    // `JobService` dispatches at submit, so the pre-drain state races
-    // between Queued/Running/AwaitingGate; assert only that it is active.
-    EXPECT_TRUE(Runtime::IsActiveEditorJobState(queued.Entries[0].State));
-
-    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
-    EXPECT_FALSE(completedResult.has_value());
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-    Runtime::EditorJobQueueSnapshot done =
-        jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
-    ASSERT_TRUE(completedResult.has_value());
-    EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
-    EXPECT_EQ(completedResult->InputFaceCount, before.Faces);
-    EXPECT_GT(completedResult->OutputFaceCount, before.Faces);
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
-    EXPECT_TRUE(history.IsDirty());
-    EXPECT_EQ(SourceMeshCounts(registry, mesh).Faces,
-              completedResult->OutputFaceCount);
+    {
+        SCOPED_TRACE("Remesh");
+        expectTopologyJob(AddIcosahedronMeshSource, "Sandbox.MeshRemesh.CPU",
+            Runtime::ApplyEditorMeshRemeshCommand,
+            Runtime::EditorMeshRemeshCommand{.Mode = Runtime::EditorMeshRemeshMode::Uniform,
+                .SizingLaw = Runtime::EditorMeshRemeshSizingLaw::MeanCurvature, .Iterations = 1u,
+                .TargetEdgeLength = 0.35, .PreserveBoundary = false, .ProjectToSurface = false},
+            [](QueuedJobScene&, ECS::EntityHandle, const MeshCounts& before, const auto& result) {
+                EXPECT_GT(result.OutputFaceCount, before.Faces);
+            });
+    }
+    {
+        SCOPED_TRACE("Subdivide");
+        expectTopologyJob(AddDenoiseTetraMeshSource, "Sandbox.MeshSubdivide.CPU",
+            Runtime::ApplyEditorMeshSubdivideCommand,
+            Runtime::EditorMeshSubdivideCommand{
+                .Operator = Runtime::EditorMeshSubdivideOperator::Loop, .Iterations = 1u},
+            [](QueuedJobScene& s, ECS::EntityHandle mesh, const MeshCounts& before, const auto& result) {
+                EXPECT_GT(result.OutputFaceCount, before.Faces);
+                EXPECT_TRUE(s.registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+                EXPECT_TRUE(s.registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+                ASSERT_TRUE(s.history.CanUndo());
+                EXPECT_EQ(s.history.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+                ExpectMeshCountsEqual(SourceMeshCounts(s.registry, mesh), before);
+            });
+    }
+    {
+        SCOPED_TRACE("Simplify");
+        expectTopologyJob(AddIcosahedronMeshSource, "Sandbox.MeshSimplify.CPU",
+            Runtime::ApplyEditorMeshSimplifyCommand,
+            Runtime::EditorMeshSimplifyCommand{.Metric = Runtime::EditorMeshSimplifyMetric::FA_QEM,
+                .TargetFaces = 12u, .PreserveBoundary = false},
+            [](QueuedJobScene&, ECS::EntityHandle, const MeshCounts& before, const auto& result) {
+                ASSERT_GT(before.Faces, 12u);
+                EXPECT_LT(result.OutputFaceCount, before.Faces);
+                EXPECT_GT(result.CollapseCount, 0u);
+            });
+    }
 }
 TEST(SandboxEditorUi, MeshSubdivideCommandReplacesTopologyForAllOperatorsAndSupportsUndoRedo)
 {
@@ -2709,199 +2824,6 @@ TEST(SandboxEditorUi, MeshSubdivideCommandReplacesTopologyForAllOperatorsAndSupp
     EXPECT_GT(sqrt3.OutputFaceCount, sqrt3.InputFaceCount);
     EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(sqrt3Mesh));
 }
-TEST(SandboxEditorUi, MeshSubdivideRequestQueuesDerivedJobAndPublishesOnApply)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::EditorCommandHistory history;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    context.CommandHistory = &history;
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    std::optional<Runtime::EditorMeshSubdivideResult> completedResult{};
-    const std::function<void(Runtime::EditorMeshSubdivideResult)> onSubdivide =
-        [&completedResult](Runtime::EditorMeshSubdivideResult result)
-        {
-            completedResult = std::move(result);
-        };
-
-    const ECS::EntityHandle mesh = MakeSelectable(registry, "QueuedSubdivide");
-    AddDenoiseTetraMeshSource(registry, mesh);
-    const MeshCounts before = SourceMeshCounts(registry, mesh);
-    const std::uint32_t stableId =
-        Runtime::SelectionController::ToStableEntityId(mesh);
-
-    const Runtime::EditorMeshSubdivideResult result =
-        Runtime::ApplyEditorMeshSubdivideCommand(
-            context,
-            Runtime::EditorMeshSubdivideCommand{
-                .StableEntityId = stableId,
-                .Operator = Runtime::EditorMeshSubdivideOperator::Loop,
-                .Iterations = 1u,
-            },
-                onSubdivide);
-
-    EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
-    EXPECT_EQ(result.InputVertexCount, before.Vertices);
-    EXPECT_EQ(result.InputFaceCount, before.Faces);
-    EXPECT_NE(result.Message.find("queued"), std::string::npos);
-    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
-
-    Runtime::EditorJobQueueSnapshot queued =
-        jobs.Snapshot();
-    ASSERT_EQ(queued.Entries.size(), 1u);
-    EXPECT_EQ(queued.Entries[0].Name, "Sandbox.MeshSubdivide.CPU");
-    // `JobService` dispatches at submit, so the pre-drain state races
-    // between Queued/Running/AwaitingGate; assert only that it is active.
-    EXPECT_TRUE(Runtime::IsActiveEditorJobState(queued.Entries[0].State));
-
-    EXPECT_FALSE(completedResult.has_value());
-    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-    Runtime::EditorJobQueueSnapshot done =
-        jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
-    ASSERT_TRUE(completedResult.has_value());
-    EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
-    EXPECT_EQ(completedResult->InputFaceCount, before.Faces);
-    EXPECT_GT(completedResult->OutputFaceCount, before.Faces);
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
-    EXPECT_TRUE(history.IsDirty());
-    EXPECT_EQ(SourceMeshCounts(registry, mesh).Faces,
-              completedResult->OutputFaceCount);
-    ASSERT_TRUE(history.CanUndo());
-    EXPECT_EQ(history.Undo().Status,
-              Runtime::EditorCommandHistoryStatus::Undone);
-    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
-}
-TEST(SandboxEditorUi, MeshSubdivideDerivedJobDiscardsStaleMeshBeforeApply)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    std::optional<Runtime::EditorMeshSubdivideResult> completedResult{};
-    const std::function<void(Runtime::EditorMeshSubdivideResult)> onSubdivide =
-        [&completedResult](Runtime::EditorMeshSubdivideResult result)
-        {
-            completedResult = std::move(result);
-        };
-
-    const ECS::EntityHandle mesh = MakeSelectable(registry, "StaleSubdivide");
-    AddDenoiseTetraMeshSource(registry, mesh);
-    const MeshCounts before = SourceMeshCounts(registry, mesh);
-    const std::uint32_t stableId =
-        Runtime::SelectionController::ToStableEntityId(mesh);
-
-    const Runtime::EditorMeshSubdivideResult result =
-        Runtime::ApplyEditorMeshSubdivideCommand(
-            context,
-            Runtime::EditorMeshSubdivideCommand{
-                .StableEntityId = stableId,
-                .Operator = Runtime::EditorMeshSubdivideOperator::Loop,
-                .Iterations = 1u,
-            },
-                onSubdivide);
-    ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
-
-    const std::vector<glm::vec3> stalePositions{
-        glm::vec3{2.0f, 0.0f, 0.0f},
-        glm::vec3{0.0f, 2.0f, 0.0f},
-        glm::vec3{0.0f, 0.0f, 2.0f},
-        glm::vec3{2.0f, 2.0f, 2.0f},
-    };
-    SetPositions(registry.Raw().get<GS::Vertices>(mesh), stalePositions);
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-
-    Runtime::EditorJobQueueSnapshot done =
-        jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State,
-              Runtime::JobState::StaleDiscarded);
-    // BUG-138: the refusal is now reported instead of silent. It is still a
-    // refusal, so the assertions below still require zero mutation.
-    ASSERT_TRUE(completedResult.has_value());
-    EXPECT_EQ(completedResult->Status, Runtime::EditorCommandStatus::StaleEntity);
-    EXPECT_FALSE(completedResult->Succeeded());
-    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
-    ExpectPositionsExactlyEqual(MeshVertexPositions(registry, mesh),
-                                stalePositions);
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
-}
-TEST(SandboxEditorUi, MeshSubdivideDerivedJobDiscardsStaleTopologyBeforeApply)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    std::optional<Runtime::EditorMeshSubdivideResult> completedResult{};
-    const std::function<void(Runtime::EditorMeshSubdivideResult)> onSubdivide =
-        [&completedResult](Runtime::EditorMeshSubdivideResult result)
-        {
-            completedResult = std::move(result);
-        };
-
-    const ECS::EntityHandle mesh =
-        MakeSelectable(registry, "StaleSubdivideTopology");
-    AddDenoiseTetraMeshSource(registry, mesh);
-    const MeshCounts before = SourceMeshCounts(registry, mesh);
-    const Runtime::EditorMeshSubdivideResult result =
-        Runtime::ApplyEditorMeshSubdivideCommand(
-            context,
-            Runtime::EditorMeshSubdivideCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(mesh),
-                .Operator = Runtime::EditorMeshSubdivideOperator::Loop,
-                .Iterations = 1u,
-            },
-                onSubdivide);
-    ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
-
-    auto nextHalfedge =
-        registry.Raw()
-            .get<GS::Halfedges>(mesh)
-            .Properties.Get<std::uint32_t>(PN::kHalfedgeNext);
-    ASSERT_TRUE(nextHalfedge.IsValid());
-    ASSERT_FALSE(nextHalfedge.Vector().empty());
-    const std::uint32_t staleNext =
-        nextHalfedge.Vector().front() == 0u ? 1u : 0u;
-    nextHalfedge.Vector().front() = staleNext;
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-
-    const Runtime::EditorJobQueueSnapshot done =
-        jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State,
-              Runtime::JobState::StaleDiscarded);
-    // BUG-138: the refusal is now reported instead of silent. It is still a
-    // refusal, so the assertions below still require zero mutation.
-    ASSERT_TRUE(completedResult.has_value());
-    EXPECT_EQ(completedResult->Status, Runtime::EditorCommandStatus::StaleEntity);
-    EXPECT_FALSE(completedResult->Succeeded());
-    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
-    EXPECT_EQ(
-        registry.Raw()
-            .get<GS::Halfedges>(mesh)
-            .Properties.Get<std::uint32_t>(PN::kHalfedgeNext)
-            .Vector()
-            .front(),
-        staleNext);
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
-}
 TEST(SandboxEditorUi, MeshSimplifyCommandReducesFaceCountAndSupportsUndoRedo)
 {
     ECS::Scene::Registry registry;
@@ -2983,74 +2905,6 @@ TEST(SandboxEditorUi, MeshSimplifyCommandReducesFaceCountAndSupportsUndoRedo)
     EXPECT_LT(classical.OutputFaceCount, before.Faces);
     EXPECT_EQ(classical.SharpFeatureVerticesPinned, 0u);
     EXPECT_EQ(classical.SeamVerticesPinned, 0u);
-}
-TEST(SandboxEditorUi, MeshSimplifyRequestQueuesDerivedJobAndPublishesOnApply)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::EditorCommandHistory history;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    context.CommandHistory = &history;
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    std::optional<Runtime::EditorMeshSimplifyResult> completedResult{};
-    const std::function<void(Runtime::EditorMeshSimplifyResult)> onSimplify =
-        [&completedResult](Runtime::EditorMeshSimplifyResult result)
-        {
-            completedResult = std::move(result);
-        };
-
-    const ECS::EntityHandle mesh = MakeSelectable(registry, "QueuedSimplify");
-    AddIcosahedronMeshSource(registry, mesh);
-    const MeshCounts before = SourceMeshCounts(registry, mesh);
-    ASSERT_GT(before.Faces, 12u);
-    const std::uint32_t stableId =
-        Runtime::SelectionController::ToStableEntityId(mesh);
-
-    const Runtime::EditorMeshSimplifyResult result =
-        Runtime::ApplyEditorMeshSimplifyCommand(
-            context,
-            Runtime::EditorMeshSimplifyCommand{
-                .StableEntityId = stableId,
-                .Metric = Runtime::EditorMeshSimplifyMetric::FA_QEM,
-                .TargetFaces = 12u,
-                .PreserveBoundary = false,
-            },
-                onSimplify);
-
-    EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
-    EXPECT_EQ(result.InputVertexCount, before.Vertices);
-    EXPECT_EQ(result.InputFaceCount, before.Faces);
-    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
-
-    Runtime::EditorJobQueueSnapshot queued =
-        jobs.Snapshot();
-    ASSERT_EQ(queued.Entries.size(), 1u);
-    EXPECT_EQ(queued.Entries[0].Name, "Sandbox.MeshSimplify.CPU");
-    // `JobService` dispatches at submit, so the pre-drain state races
-    // between Queued/Running/AwaitingGate; assert only that it is active.
-    EXPECT_TRUE(Runtime::IsActiveEditorJobState(queued.Entries[0].State));
-
-    ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
-    EXPECT_FALSE(completedResult.has_value());
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-    Runtime::EditorJobQueueSnapshot done =
-        jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
-    ASSERT_TRUE(completedResult.has_value());
-    EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
-    EXPECT_EQ(completedResult->InputFaceCount, before.Faces);
-    EXPECT_LT(completedResult->OutputFaceCount, before.Faces);
-    EXPECT_GT(completedResult->CollapseCount, 0u);
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
-    EXPECT_TRUE(history.IsDirty());
-    EXPECT_EQ(SourceMeshCounts(registry, mesh).Faces,
-              completedResult->OutputFaceCount);
 }
 
 // BUG-138: the first topology edit on an entity succeeds and every later one is
@@ -3206,166 +3060,6 @@ TEST(SandboxEditorUi, MeshSubdivideAndRemeshApplyAfterAnEarlierSimplify)
     ASSERT_TRUE(jobs.DrainUntilTerminal());
     ASSERT_TRUE(remeshed.has_value());
     EXPECT_TRUE(remeshed->Succeeded()) << remeshed->Message;
-}
-
-// BUG-138: a queued mesh job that terminates without publishing must still
-// deliver one terminal result. Before this, the discard was silent: the panel
-// kept the "…CPU job queued" text it was handed at submit time, so an
-// operation that had already been refused was indistinguishable from one still
-// running, forever.
-TEST(SandboxEditorUi, MeshSimplifyStaleDiscardReportsTerminalResultInsteadOfStayingPending)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::EditorCommandHistory history;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    context.CommandHistory = &history;
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    std::optional<Runtime::EditorMeshSimplifyResult> completedResult{};
-    const std::function<void(Runtime::EditorMeshSimplifyResult)> onSimplify =
-        [&completedResult](Runtime::EditorMeshSimplifyResult result)
-        {
-            completedResult = std::move(result);
-        };
-
-    const ECS::EntityHandle mesh = MakeSelectable(registry, "StaleSimplify");
-    AddIcosahedronMeshSource(registry, mesh);
-    const MeshCounts before = SourceMeshCounts(registry, mesh);
-    const std::uint32_t stableId =
-        Runtime::SelectionController::ToStableEntityId(mesh);
-
-    const Runtime::EditorMeshSimplifyResult queued =
-        Runtime::ApplyEditorMeshSimplifyCommand(
-            context,
-            Runtime::EditorMeshSimplifyCommand{
-                .StableEntityId = stableId,
-                .Metric = Runtime::EditorMeshSimplifyMetric::FA_QEM,
-                .TargetFaces = 12u,
-                .PreserveBoundary = false,
-            },
-                onSimplify);
-    ASSERT_EQ(queued.Status, Runtime::EditorCommandStatus::Pending);
-
-    // Move the mesh out from under the in-flight job, exactly as a user edit
-    // between click and completion would. The apply gate must refuse it.
-    {
-        auto positions = registry.Raw()
-                             .get<GS::Vertices>(mesh)
-                             .Properties.Get<glm::vec3>(PN::kPosition);
-        ASSERT_TRUE(positions.IsValid());
-        ASSERT_FALSE(positions.Vector().empty());
-        positions.Vector()[0] += glm::vec3{0.5f, 0.25f, 0.125f};
-    }
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-    const Runtime::EditorJobQueueSnapshot done = jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::StaleDiscarded);
-    EXPECT_FALSE(Runtime::IsActiveEditorJobState(done.Entries[0].State));
-
-    ASSERT_TRUE(completedResult.has_value())
-        << "A stale-discarded mesh job published nothing, so the editor is "
-           "still showing its submit-time Pending message.";
-    EXPECT_EQ(completedResult->Status, Runtime::EditorCommandStatus::StaleEntity);
-    EXPECT_FALSE(completedResult->Succeeded());
-    EXPECT_EQ(completedResult->Error, Core::ErrorCode::InvalidState);
-    EXPECT_EQ(completedResult->Message,
-              "Sandbox.MeshSimplify.CPU did not apply: "
-              "the source geometry changed after the job was queued, "
-              "so the result no longer matches the geometry it was computed from.");
-
-    // Refusal is not mutation: the mesh keeps the topology the user edited.
-    EXPECT_EQ(SourceMeshCounts(registry, mesh).Faces, before.Faces);
-    EXPECT_FALSE(history.IsDirty());
-}
-
-// The other two topology operations share `MakeMeshCpuJobDesc`, so they share
-// the defect and the fix; pin both so a future divergence is visible.
-TEST(SandboxEditorUi, MeshRemeshAndSubdivideStaleDiscardsReportTerminalResults)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::EditorCommandHistory history;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    context.CommandHistory = &history;
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    std::optional<Runtime::EditorMeshRemeshResult> remeshResult{};
-    std::optional<Runtime::EditorMeshSubdivideResult> subdivideResult{};
-    const std::function<void(Runtime::EditorMeshRemeshResult)> onRemesh =
-        [&remeshResult](Runtime::EditorMeshRemeshResult result)
-        { remeshResult = std::move(result); };
-    const std::function<void(Runtime::EditorMeshSubdivideResult)> onSubdivide =
-        [&subdivideResult](Runtime::EditorMeshSubdivideResult result)
-        { subdivideResult = std::move(result); };
-
-    const auto stale = [&registry](const ECS::EntityHandle entity)
-    {
-        auto positions = registry.Raw()
-                             .get<GS::Vertices>(entity)
-                             .Properties.Get<glm::vec3>(PN::kPosition);
-        ASSERT_TRUE(positions.IsValid());
-        ASSERT_FALSE(positions.Vector().empty());
-        positions.Vector()[0] += glm::vec3{0.5f, 0.25f, 0.125f};
-    };
-
-    const ECS::EntityHandle remeshMesh = MakeSelectable(registry, "StaleRemesh");
-    AddIcosahedronMeshSource(registry, remeshMesh);
-    const ECS::EntityHandle subdivideMesh =
-        MakeSelectable(registry, "StaleSubdivide");
-    AddIcosahedronMeshSource(registry, subdivideMesh);
-    (void)registry.Raw().get<GS::Edges>(subdivideMesh).Properties.GetOrAdd<bool>("e:feature", false);
-
-    ASSERT_EQ(Runtime::ApplyEditorMeshRemeshCommand(
-                  context,
-                  Runtime::EditorMeshRemeshCommand{
-                      .StableEntityId =
-                          Runtime::SelectionController::ToStableEntityId(remeshMesh),
-                      .Mode = Runtime::EditorMeshRemeshMode::Uniform,
-                      .SizingLaw =
-                          Runtime::EditorMeshRemeshSizingLaw::MeanCurvature,
-                      .Iterations = 1u,
-                      .TargetEdgeLength = 0.35,
-                      .PreserveBoundary = false,
-                      .ProjectToSurface = true,
-                  },
-                onRemesh)
-                  .Status,
-              Runtime::EditorCommandStatus::Pending);
-    ASSERT_EQ(Runtime::ApplyEditorMeshSubdivideCommand(
-                  context,
-                  Runtime::EditorMeshSubdivideCommand{
-                      .StableEntityId =
-                          Runtime::SelectionController::ToStableEntityId(
-                              subdivideMesh),
-                      .Operator = Runtime::EditorMeshSubdivideOperator::Loop,
-                      .Iterations = 1u,
-                      .PreserveLoopFeatureEdges = true,
-                  },
-                onSubdivide)
-                  .Status,
-              Runtime::EditorCommandStatus::Pending);
-
-    stale(remeshMesh);
-    stale(subdivideMesh);
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-    for (const Runtime::EditorJobRecord& entry : jobs.Snapshot().Entries)
-    {
-        EXPECT_EQ(entry.State, Runtime::JobState::StaleDiscarded) << entry.Name;
-        EXPECT_FALSE(Runtime::IsActiveEditorJobState(entry.State)) << entry.Name;
-    }
-
-    ASSERT_TRUE(remeshResult.has_value());
-    EXPECT_EQ(remeshResult->Status, Runtime::EditorCommandStatus::StaleEntity);
-    EXPECT_NE(remeshResult->Message.find("did not apply"), std::string::npos)
-        << remeshResult->Message;
-    ASSERT_TRUE(subdivideResult.has_value());
-    EXPECT_EQ(subdivideResult->Status, Runtime::EditorCommandStatus::StaleEntity);
-    EXPECT_NE(subdivideResult->Message.find("did not apply"), std::string::npos)
-        << subdivideResult->Message;
-    EXPECT_FALSE(history.IsDirty());
 }
 
 TEST(SandboxEditorUi, MeshSimplifyCommandFailsClosedForInvalidTargetsAndUnavailableKernel)
@@ -5106,69 +4800,6 @@ TEST(SandboxEditorUi, QueuedUvRegenerationDeliversItsOutcomeThroughTheTerminalCa
     EXPECT_GT(history.UndoCount(), 0u);
 }
 
-// A queued UV job that never reaches its publisher still owes one terminal
-// result, or the panel sits on its submit-time `Pending` state forever.
-TEST(SandboxEditorUi, StaleQueuedUvRegenerationStillReportsOneTerminalResult)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::EditorCommandHistory history;
-
-    const ECS::EntityHandle mesh = MakeSelectable(registry, "UvQueuedStale");
-    AddTriangleMeshSource(registry, mesh);
-    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
-    Intrinsic::Tests::EditorFeatureTestContext context =
-        MakeContext(registry, selection);
-    context.CommandHistory = &history;
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-
-    std::size_t deliveries = 0u;
-    std::optional<Runtime::EditorUvRegenerationCommandResult> delivered{};
-    const Runtime::EditorUvRegenerationCommandResult submitted =
-        Runtime::ApplyEditorUvRegenerationCommand(
-            context,
-            Runtime::EditorUvRegenerationCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(mesh),
-                .Atlas = {.Resolution = 64u, .Padding = 2u},
-            },
-            [&](Runtime::EditorUvRegenerationCommandResult result)
-            {
-                ++deliveries;
-                delivered = std::move(result);
-            });
-    ASSERT_EQ(submitted.Status, Runtime::EditorCommandStatus::Pending)
-        << submitted.Diagnostic;
-
-    // Moving the source invalidates the apply gate the job submitted against,
-    // so the completion is discarded rather than published.
-    SetPositions(registry.Raw().get<GS::Vertices>(mesh),
-                 {
-                     {10.0f, 0.0f, 0.0f},
-                     {11.0f, 0.0f, 0.0f},
-                     {10.0f, 1.0f, 0.0f},
-                 });
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-    Runtime::EditorJobQueueSnapshot done = jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::StaleDiscarded);
-
-    ASSERT_TRUE(delivered.has_value());
-    EXPECT_EQ(deliveries, 1u) << "exactly one terminal result, never two";
-    EXPECT_FALSE(delivered->Succeeded());
-    EXPECT_EQ(delivered->Status, Runtime::EditorCommandStatus::StaleEntity)
-        << delivered->Diagnostic;
-    EXPECT_EQ(delivered->UvStatus,
-              Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput);
-    EXPECT_EQ(delivered->Diagnostic,
-              "UV regeneration did not apply: "
-              "the source geometry changed after the job was queued, "
-              "so the result no longer matches the geometry it was computed from.");
-    EXPECT_EQ(history.UndoCount(), 0u);
-}
-
 // BUG-147 — the atlas emits a fresh output vertex per (chart, source vertex)
 // pair, so publishing its output mesh as the entity mesh converted a manifold
 // into a triangle soup: a closed icosahedron came back as 60 vertices and 60
@@ -5446,109 +5077,61 @@ TEST(SandboxEditorUi, UvRegenerationCommandRepairsSelectedMeshTexcoords)
 }
 TEST(SandboxEditorUi, UvRegenerationRequestQueuesDerivedJobAndPublishesOnApply)
 {
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::EditorCommandHistory history;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    context.CommandHistory = &history;
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    std::optional<Runtime::EditorUvRegenerationCommandResult>
-        completedResult{};
-    const std::function<void(Runtime::EditorUvRegenerationCommandResult)> onComplete =
-        [&completedResult](
-            Runtime::EditorUvRegenerationCommandResult result)
-        {
-            completedResult = std::move(result);
-        };
-
-    const ECS::EntityHandle mesh =
-        MakeSelectable(registry, "QueuedUvRepairMesh");
-    AddTriangleMeshSource(registry, mesh);
-    auto& vertices = registry.Raw().get<GS::Vertices>(mesh);
-    auto texcoords = vertices.Properties.Get<glm::vec2>("v:texcoord");
+    QueuedJobScene s;
+    const ECS::EntityHandle mesh = MakeSelectable(s.registry, "QueuedUvRepairMesh");
+    AddTriangleMeshSource(s.registry, mesh);
+    auto texcoords = s.registry.Raw().get<GS::Vertices>(mesh).Properties.Get<glm::vec2>("v:texcoord");
     ASSERT_TRUE(texcoords);
-    texcoords[1] = glm::vec2{
-        std::numeric_limits<float>::quiet_NaN(),
-        0.0f,
+    texcoords[1] = glm::vec2{std::numeric_limits<float>::quiet_NaN(), 0.0f};
+
+    const auto texcoordsFinite = [&s, mesh]()
+    {
+        const GS::ConstSourceView view = GS::BuildConstView(s.registry.Raw(), mesh);
+        if (view.VertexSource == nullptr)
+            return false;
+        const auto uv = view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
+        if (!uv)
+            return false;
+        for (const glm::vec2 value : uv.Vector())
+        {
+            if (!std::isfinite(value.x) || !std::isfinite(value.y))
+                return false;
+        }
+        return true;
     };
 
-    const auto texcoordsFinite =
-        [&registry, mesh]()
-        {
-            const GS::ConstSourceView view =
-                GS::BuildConstView(registry.Raw(), mesh);
-            if (view.VertexSource == nullptr)
-                return false;
-            const auto uv =
-                view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
-            if (!uv)
-                return false;
-            for (const glm::vec2 value : uv.Vector())
-            {
-                if (!std::isfinite(value.x) || !std::isfinite(value.y))
-                    return false;
-            }
-            return true;
-        };
-
-    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
-    const std::uint32_t stableId =
-        Runtime::SelectionController::ToStableEntityId(mesh);
-    const Runtime::EditorUvRegenerationCommandResult result =
-        Runtime::ApplyEditorUvRegenerationCommand(
-            context,
-            Runtime::EditorUvRegenerationCommand{
-                .StableEntityId = stableId,
-                .Atlas = {.Resolution = 64u, .Padding = 2u},
-            }, onComplete);
-
-    EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
-    EXPECT_NE(result.Diagnostic.find("queued"), std::string::npos);
-    EXPECT_FALSE(texcoordsFinite());
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(mesh));
-
-    Runtime::EditorJobQueueSnapshot queued =
-        jobs.Snapshot();
-    ASSERT_EQ(queued.Entries.size(), 1u);
-    EXPECT_EQ(queued.Entries[0].Name, "Sandbox.UvRegeneration.CPU");
-    // `JobService` dispatches at submit, so the pre-drain state races;
-    // assert only that the job is still active.
-    EXPECT_TRUE(
-        Runtime::IsActiveEditorJobState(queued.Entries[0].State));
-
-    EXPECT_FALSE(completedResult.has_value());
-    EXPECT_FALSE(texcoordsFinite());
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-    Runtime::EditorJobQueueSnapshot done =
-        jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
-    ASSERT_TRUE(completedResult.has_value());
-    EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Diagnostic;
-    EXPECT_EQ(completedResult->UvStatus,
-              Geometry::UvAtlas::UvAtlasStatus::Success);
-    EXPECT_EQ(completedResult->Provenance,
-              Geometry::UvAtlas::UvAtlasProvenance::Generated);
+    ASSERT_TRUE(s.selection.SetSelectedEntity(s.registry, mesh));
+    const Runtime::EditorUvRegenerationCommand command{
+        .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh),
+        .Atlas = {.Resolution = 64u, .Padding = 2u}};
+    const auto& raw = s.registry.Raw();
+    Extrinsic::Tests::ExpectQueuedJobTerminates(s.jobs, "Sandbox.UvRegeneration.CPU",
+        Runtime::JobState::Published,
+        [&](auto sink) { return Runtime::ApplyEditorUvRegenerationCommand(s.context, command, sink); },
+        [&](const auto&) {
+            EXPECT_FALSE(texcoordsFinite());
+            EXPECT_FALSE(raw.all_of<Dirty::DirtyVertexPositions>(mesh));
+            EXPECT_FALSE(raw.all_of<Dirty::DirtyVertexAttributes>(mesh));
+            EXPECT_FALSE(raw.all_of<Dirty::DirtyEdgeTopology>(mesh));
+            EXPECT_FALSE(raw.all_of<Dirty::DirtyFaceTopology>(mesh));
+            EXPECT_FALSE(raw.all_of<Dirty::GpuDirty>(mesh));
+        },
+        [&](const auto& result) {
+            EXPECT_EQ(result.UvStatus, Geometry::UvAtlas::UvAtlasStatus::Success);
+            EXPECT_EQ(result.Provenance, Geometry::UvAtlas::UvAtlasProvenance::Generated);
+        });
     EXPECT_TRUE(texcoordsFinite());
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexTexcoords>(mesh));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::GpuDirty>(mesh));
-    EXPECT_TRUE(history.IsDirty());
+    EXPECT_TRUE(raw.all_of<Dirty::DirtyVertexTexcoords>(mesh));
+    EXPECT_FALSE(raw.all_of<Dirty::DirtyVertexPositions>(mesh));
+    EXPECT_FALSE(raw.all_of<Dirty::DirtyEdgeTopology>(mesh));
+    EXPECT_FALSE(raw.all_of<Dirty::DirtyFaceTopology>(mesh));
+    EXPECT_TRUE(raw.all_of<Dirty::GpuDirty>(mesh));
+    EXPECT_TRUE(s.history.IsDirty());
 
-    ASSERT_TRUE(history.CanUndo());
-    EXPECT_EQ(history.Undo().Status,
-              Runtime::EditorCommandHistoryStatus::Undone);
+    ASSERT_TRUE(s.history.CanUndo());
+    EXPECT_EQ(s.history.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
     EXPECT_FALSE(texcoordsFinite());
-    EXPECT_EQ(history.Redo().Status,
-              Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_EQ(s.history.Redo().Status, Runtime::EditorCommandHistoryStatus::Redone);
     EXPECT_TRUE(texcoordsFinite());
 }
 TEST(SandboxEditorUi, UvRegenerationDuplicateSubmitUsesExistingActiveJob)
@@ -5656,148 +5239,6 @@ TEST(SandboxEditorUi, UvRegenerationDuplicateSubmitUsesExistingActiveJob)
     ASSERT_EQ(afterRerun.Entries.size(), 2u);
     EXPECT_TRUE(
         Runtime::IsActiveEditorJobState(afterRerun.Entries[1].State));
-}
-TEST(SandboxEditorUi, UvRegenerationDerivedJobDiscardsStaleSource)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    std::size_t deliveries = 0u;
-    Runtime::EditorCommandStatus deliveredStatus{};
-    const std::function<void(Runtime::EditorUvRegenerationCommandResult)> onComplete =
-        [&](
-            Runtime::EditorUvRegenerationCommandResult result)
-        {
-            ++deliveries;
-            deliveredStatus = result.Status;
-        };
-
-    const ECS::EntityHandle mesh =
-        MakeSelectable(registry, "StaleUvRepairMesh");
-    AddTriangleMeshSource(registry, mesh);
-    auto& vertices = registry.Raw().get<GS::Vertices>(mesh);
-    auto texcoords = vertices.Properties.Get<glm::vec2>("v:texcoord");
-    ASSERT_TRUE(texcoords);
-    texcoords[1] = glm::vec2{
-        std::numeric_limits<float>::quiet_NaN(),
-        0.0f,
-    };
-
-    const std::uint32_t stableId =
-        Runtime::SelectionController::ToStableEntityId(mesh);
-    const Runtime::EditorUvRegenerationCommandResult result =
-        Runtime::ApplyEditorUvRegenerationCommand(
-            context,
-            Runtime::EditorUvRegenerationCommand{
-                .StableEntityId = stableId,
-                .Atlas = {.Resolution = 64u, .Padding = 2u},
-            }, onComplete);
-    ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
-
-    SetPositions(vertices,
-                 {
-                     {0.0f, 0.0f, 0.0f},
-                     {1.25f, 0.0f, 0.0f},
-                     {0.0f, 1.0f, 0.0f},
-                 });
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-
-    Runtime::EditorJobQueueSnapshot done =
-        jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State,
-              Runtime::JobState::StaleDiscarded);
-    EXPECT_EQ(deliveries, 1u);
-    EXPECT_EQ(deliveredStatus, Runtime::EditorCommandStatus::StaleEntity);
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(mesh));
-
-    const GS::ConstSourceView stale = GS::BuildConstView(registry.Raw(), mesh);
-    ASSERT_NE(stale.VertexSource, nullptr);
-    const auto staleTexcoords =
-        stale.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
-    ASSERT_TRUE(staleTexcoords);
-    ASSERT_GT(staleTexcoords.Vector().size(), 1u);
-    EXPECT_FALSE(std::isfinite(staleTexcoords[1].x));
-}
-TEST(SandboxEditorUi, UvRegenerationDerivedJobDiscardsStaleAuthoredProperty)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    std::size_t deliveries = 0u;
-    Runtime::EditorCommandStatus deliveredStatus{};
-    const std::function<void(Runtime::EditorUvRegenerationCommandResult)> onComplete =
-        [&](
-            Runtime::EditorUvRegenerationCommandResult result)
-        {
-            ++deliveries;
-            deliveredStatus = result.Status;
-        };
-
-    const ECS::EntityHandle mesh =
-        MakeSelectable(registry, "StaleUvPropertyMesh");
-    AddTriangleMeshSource(registry, mesh);
-    auto& vertices = registry.Raw().get<GS::Vertices>(mesh);
-    auto texcoords = vertices.Properties.Get<glm::vec2>("v:texcoord");
-    ASSERT_TRUE(texcoords);
-    texcoords[1] = glm::vec2{
-        std::numeric_limits<float>::quiet_NaN(),
-        0.0f,
-    };
-    auto paint =
-        vertices.Properties.GetOrAdd<glm::vec4>(
-            "v:paint",
-            glm::vec4{1.0f});
-    ASSERT_TRUE(paint);
-
-    const Runtime::EditorUvRegenerationCommandResult result =
-        Runtime::ApplyEditorUvRegenerationCommand(
-            context,
-            Runtime::EditorUvRegenerationCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(mesh),
-                .Atlas = {.Resolution = 64u, .Padding = 2u},
-            }, onComplete);
-    ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
-
-    paint[0] = glm::vec4{0.25f, 0.5f, 0.75f, 1.0f};
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-    const Runtime::EditorJobQueueSnapshot done =
-        jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State,
-              Runtime::JobState::StaleDiscarded);
-    EXPECT_EQ(deliveries, 1u);
-    EXPECT_EQ(deliveredStatus, Runtime::EditorCommandStatus::StaleEntity);
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(mesh));
-
-    const GS::ConstSourceView stale = GS::BuildConstView(registry.Raw(), mesh);
-    ASSERT_NE(stale.VertexSource, nullptr);
-    const auto staleTexcoords =
-        stale.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
-    const auto stalePaint =
-        stale.VertexSource->Properties.Get<glm::vec4>("v:paint");
-    ASSERT_TRUE(staleTexcoords);
-    ASSERT_TRUE(stalePaint);
-    EXPECT_FALSE(std::isfinite(staleTexcoords[1].x));
-    EXPECT_FLOAT_EQ(stalePaint[0].x, 0.25f);
-    EXPECT_FLOAT_EQ(stalePaint[0].y, 0.5f);
-    EXPECT_FLOAT_EQ(stalePaint[0].z, 0.75f);
-    EXPECT_FLOAT_EQ(stalePaint[0].w, 1.0f);
 }
 TEST(SandboxEditorUi, AtlasJobRejectsCornerEditsAndAcceptsUnchangedBoundaryNanSlots)
 {

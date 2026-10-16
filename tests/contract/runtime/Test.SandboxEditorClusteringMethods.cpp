@@ -264,6 +264,23 @@ void SetPointCloudNormals(ECS::Scene::Registry& registry,
     return std::vector<glm::vec3>(count, normal);
 }
 
+// One editor context with command history and an attached job harness for queued-job tests.
+// The harness is declared last so it detaches before the context it borrows.
+struct QueuedJobScene
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    Extrinsic::Tests::EditorJobHarness jobs{};
+
+    QueuedJobScene()
+    {
+        context.CommandHistory = &history;
+        jobs.Attach(context);
+    }
+};
+
 }
 TEST(SandboxEditorUi, ProgressivePoissonCommandPublishesPointPropertiesAndVisualization)
 {
@@ -867,19 +884,7 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandMatchesDirectMethodConfig)
 }
 TEST(SandboxEditorUi, ProgressivePoissonCpuRequestQueuesDerivedJobAndPublishesOnApply)
 {
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    std::optional<Runtime::EditorProgressivePoissonResult>
-        completedResult{};
-    const auto onComplete =
-        [&completedResult](Runtime::EditorProgressivePoissonResult result)
-        {
-            completedResult = std::move(result);
-        };
-
+    QueuedJobScene s;
     const std::vector<glm::vec3> positions{
         {0.0f, 0.0f, 0.0f},
         {0.25f, 0.0f, 0.0f},
@@ -888,9 +893,12 @@ TEST(SandboxEditorUi, ProgressivePoissonCpuRequestQueuesDerivedJobAndPublishesOn
         {1.0f, 1.0f, 0.0f},
         {0.0f, 1.0f, 0.0f},
     };
-    const ECS::EntityHandle cloud = MakeSelectable(registry, "PoissonCloud");
-    AddPointCloudSource(registry, cloud, positions.size());
-    SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
+    const ECS::EntityHandle cloud = MakeSelectable(s.registry, "PoissonCloud");
+    AddPointCloudSource(s.registry, cloud, positions.size());
+    SetPositions(s.registry.Raw().get<GS::Vertices>(cloud), positions);
+    const auto ranks = [&] {
+        return s.registry.Raw().get<GS::Vertices>(cloud).Properties.Get<float>("v:poisson_rank");
+    };
 
     const Runtime::ProgressivePoissonPlaygroundConfig config{
         .Dimension = 2u,
@@ -905,44 +913,10 @@ TEST(SandboxEditorUi, ProgressivePoissonCpuRequestQueuesDerivedJobAndPublishesOn
         .PrefixCount = 3u,
         .Channel = Runtime::ProgressivePoissonPlaygroundChannel::Rank,
     };
-
-    const Runtime::EditorProgressivePoissonResult result =
-        Runtime::ApplyEditorProgressivePoissonCommand(
-            context,
-            Runtime::EditorProgressivePoissonCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(cloud),
-                .Config = config,
-            },
-            onComplete);
-
-    EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
-    EXPECT_NE(result.Message.find("queued"), std::string::npos);
-    EXPECT_FALSE(registry.Raw()
-                     .get<GS::Vertices>(cloud)
-                     .Properties.Get<float>("v:poisson_rank"));
-
-    Runtime::EditorJobQueueSnapshot queued =
-        jobs.Snapshot();
-    ASSERT_EQ(queued.Entries.size(), 1u);
-    EXPECT_EQ(queued.Entries[0].Name, "Sandbox.ProgressivePoisson.CPU");
-    // `JobService` dispatches at submit, so the pre-drain state races
-    // between Queued/Running/AwaitingGate; assert only that it is active.
-    EXPECT_TRUE(
-        Runtime::IsActiveEditorJobState(queued.Entries[0].State));
-
-    EXPECT_FALSE(registry.Raw()
-                     .get<GS::Vertices>(cloud)
-                     .Properties.Get<float>("v:poisson_rank"));
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-    Runtime::EditorJobQueueSnapshot done =
-        jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
-    ASSERT_TRUE(completedResult.has_value());
-    EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
-    EXPECT_EQ(completedResult->InputCount, positions.size());
+    const Runtime::EditorProgressivePoissonCommand command{
+        .StableEntityId = Runtime::SelectionController::ToStableEntityId(cloud),
+        .Config = config,
+    };
 
     PPR::Config directConfig{};
     directConfig.Dimension = config.Dimension;
@@ -956,337 +930,229 @@ TEST(SandboxEditorUi, ProgressivePoissonCpuRequestQueuesDerivedJobAndPublishesOn
     directConfig.ShuffleSeed = config.ShuffleSeed;
     const PPR::Result direct = PPR::Compute(positions, directConfig);
     ASSERT_EQ(direct.Diag.Code, PPR::ValidationCode::Valid);
-    EXPECT_EQ(completedResult->AcceptedCount, direct.Diag.AcceptedCount);
-    EXPECT_EQ(completedResult->LevelAcceptedCounts, direct.Diag.LevelCounts);
 
-    const auto ranks =
-        registry.Raw()
-            .get<GS::Vertices>(cloud)
-            .Properties.Get<float>("v:poisson_rank");
-    ASSERT_TRUE(ranks);
-    EXPECT_EQ(ranks.Vector().size(), positions.size());
-}
-TEST(SandboxEditorUi, ProgressivePoissonCpuDerivedJobDiscardsStalePointCloudBeforeApply)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    std::size_t deliveries = 0u;
-    std::optional<Runtime::EditorProgressivePoissonResult> completedResult{};
-    const auto onComplete =
-        [&deliveries,
-         &completedResult](Runtime::EditorProgressivePoissonResult result)
-        {
-            ++deliveries;
-            completedResult = std::move(result);
-        };
-
-    const ECS::EntityHandle cloud = MakeSelectable(registry, "PoissonCloud");
-    AddPointCloudSource(registry, cloud, 4u);
-    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
-                 {
-                     {0.0f, 0.0f, 0.0f},
-                     {0.25f, 0.0f, 0.0f},
-                     {1.0f, 0.0f, 0.0f},
-                     {1.0f, 1.0f, 0.0f},
-                 });
-
-    const Runtime::EditorProgressivePoissonResult result =
-        Runtime::ApplyEditorProgressivePoissonCommand(
-            context,
-            Runtime::EditorProgressivePoissonCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(cloud),
-                .Config = Runtime::ProgressivePoissonPlaygroundConfig{
-                    .Dimension = 2u,
-                    .GridWidth = 3u,
-                    .MaxLevels = 5u,
-                    .HashLoadFactor = 0.75f,
-                    .RadiusAlpha = 0.4f,
-                    .RandomizeGridOrigin = false,
-                    .ShuffleWithinLevels = false,
-                    .PrefixCount = 0u,
-                },
-            },
-            onComplete);
-    ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
-
-    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
-                 {
-                     {10.0f, 0.0f, 0.0f},
-                     {11.0f, 0.0f, 0.0f},
-                     {12.0f, 0.0f, 0.0f},
-                     {13.0f, 0.0f, 0.0f},
-                 });
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-
-    Runtime::EditorJobQueueSnapshot done =
-        jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State,
-              Runtime::JobState::StaleDiscarded);
-    // A discarded job still owes exactly one terminal result, otherwise the
-    // panel row keeps its submit-time "queued" text forever.
-    EXPECT_EQ(deliveries, 1u);
-    ASSERT_TRUE(completedResult.has_value());
-    EXPECT_EQ(completedResult->Status, Runtime::EditorCommandStatus::StaleEntity);
-    EXPECT_FALSE(completedResult->Succeeded());
-    EXPECT_NE(completedResult->Message.find("did not apply"), std::string::npos)
-        << completedResult->Message;
-    EXPECT_NE(completedResult->Message.find("geometry changed"), std::string::npos)
-        << completedResult->Message;
-    EXPECT_EQ(completedResult->Channel,
-              Runtime::ProgressivePoissonPlaygroundChannel::Level);
-    EXPECT_FALSE(registry.Raw()
-                     .get<GS::Vertices>(cloud)
-                     .Properties.Get<float>("v:poisson_level"));
-}
-TEST(SandboxEditorUi,
-     ProgressivePoissonGraphCpuJobRejectsStaleProductionConnectivity)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Intrinsic::Tests::EditorFeatureTestContext context =
-        MakeContext(registry, selection);
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    std::size_t deliveries = 0u;
-    std::optional<Runtime::EditorProgressivePoissonResult> completedResult{};
-    const auto onComplete =
-        [&deliveries,
-         &completedResult](Runtime::EditorProgressivePoissonResult result)
-        {
-            ++deliveries;
-            completedResult = std::move(result);
-        };
-
-    const ECS::EntityHandle graph =
-        MakeSelectable(registry, "PoissonGraphStaleConnectivity");
-    AddGraphSource(
-        registry,
-        graph,
-        {
-            {0.0f, 0.0f, 0.0f},
-            {0.25f, 0.0f, 0.0f},
-            {0.75f, 0.25f, 0.0f},
-            {1.0f, 1.0f, 0.0f},
+    Tests::ExpectQueuedJobTerminates(s.jobs, "Sandbox.ProgressivePoisson.CPU",
+        Runtime::JobState::Published,
+        [&](auto sink) { return Runtime::ApplyEditorProgressivePoissonCommand(s.context, command, sink); },
+        [&](const auto&) { EXPECT_FALSE(ranks()); },
+        [&](const auto& result) {
+            EXPECT_EQ(result.InputCount, positions.size());
+            EXPECT_EQ(result.AcceptedCount, direct.Diag.AcceptedCount);
+            EXPECT_EQ(result.LevelAcceptedCounts, direct.Diag.LevelCounts);
         });
+    ASSERT_TRUE(ranks());
+    EXPECT_EQ(ranks().Vector().size(), positions.size());
+}
+// BUG-138: a queued point-set job whose snapshotted input changes before apply
+// is discarded, publishes nothing and still reports exactly one StaleEntity
+// result; otherwise the panel row keeps its submit-time "queued" text forever.
+// One block per operation and per input its apply gate fingerprints; the
+// shared lifecycle asserts are in ExpectQueuedJobTerminates.
+TEST(SandboxEditorUi, QueuedPointSetJobsDiscardStaleInputAndReportOneTerminalResult)
+{
+    const auto expectStale = [](QueuedJobScene& s, const std::string_view jobName,
+        auto submit, auto mutate, auto check)
+    {
+        Tests::ExpectQueuedJobTerminates(s.jobs, jobName, Runtime::JobState::StaleDiscarded,
+            submit, [&](const auto&) { mutate(); }, check);
+        EXPECT_FALSE(s.history.CanUndo());
+        EXPECT_FALSE(s.history.IsDirty());
+    };
+    const auto poisson = [](QueuedJobScene& s, const ECS::EntityHandle entity)
+    {
+        return [&s, entity](auto sink) {
+            return Runtime::ApplyEditorProgressivePoissonCommand(s.context,
+                Runtime::EditorProgressivePoissonCommand{
+                    .StableEntityId = Runtime::SelectionController::ToStableEntityId(entity),
+                    .Config = Runtime::ProgressivePoissonPlaygroundConfig{
+                        .Dimension = 2u, .GridWidth = 3u, .MaxLevels = 5u,
+                        .HashLoadFactor = 0.75f, .RadiusAlpha = 0.4f,
+                        .RandomizeGridOrigin = false, .ShuffleWithinLevels = false}},
+                sink);
+        };
+    };
+    const auto noPoissonLevels = [](QueuedJobScene& s, const ECS::EntityHandle entity)
+    {
+        EXPECT_FALSE(s.registry.Raw().get<GS::Vertices>(entity).Properties.Exists("v:poisson_level"));
+    };
 
-    const Runtime::EditorProgressivePoissonResult result =
-        Runtime::ApplyEditorProgressivePoissonCommand(
-            context,
-            Runtime::EditorProgressivePoissonCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(graph),
-                .Config = Runtime::ProgressivePoissonPlaygroundConfig{
-                    .Dimension = 2u,
-                    .GridWidth = 3u,
-                    .MaxLevels = 5u,
-                    .HashLoadFactor = 0.75f,
-                    .RadiusAlpha = 0.4f,
-                    .RandomizeGridOrigin = false,
-                    .ShuffleWithinLevels = false,
-                },
+    {
+        SCOPED_TRACE("ProgressivePoisson: moved point-cloud positions");
+        QueuedJobScene s;
+        const ECS::EntityHandle cloud = MakeSelectable(s.registry, "PoissonCloud");
+        AddPointCloudSource(s.registry, cloud, 4u);
+        SetPositions(s.registry.Raw().get<GS::Vertices>(cloud),
+            {{0.0f, 0.0f, 0.0f}, {0.25f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 0.0f}});
+        expectStale(s, "Sandbox.ProgressivePoisson.CPU", poisson(s, cloud),
+            [&] { SetPositions(s.registry.Raw().get<GS::Vertices>(cloud),
+                      {{10.0f, 0.0f, 0.0f}, {11.0f, 0.0f, 0.0f}, {12.0f, 0.0f, 0.0f}, {13.0f, 0.0f, 0.0f}}); },
+            [&](const auto& result) {
+                EXPECT_NE(result.Message.find("geometry changed"), std::string::npos) << result.Message;
+                EXPECT_EQ(result.Channel, Runtime::ProgressivePoissonPlaygroundChannel::Level);
+                noPoissonLevels(s, cloud);
+            });
+    }
+    {
+        SCOPED_TRACE("ProgressivePoisson: edited graph halfedge connectivity");
+        QueuedJobScene s;
+        const ECS::EntityHandle graph = MakeSelectable(s.registry, "PoissonGraphStaleConnectivity");
+        AddGraphSource(s.registry, graph,
+            {{0.0f, 0.0f, 0.0f}, {0.25f, 0.0f, 0.0f}, {0.75f, 0.25f, 0.0f}, {1.0f, 1.0f, 0.0f}});
+        auto connectivity = s.registry.Raw().get<GS::Halfedges>(graph)
+            .Properties.Get<Geometry::Graph::HalfedgeConnectivity>(PN::kHalfedgeConnectivity);
+        ASSERT_TRUE(connectivity);
+        ASSERT_FALSE(connectivity.Vector().empty());
+        const Geometry::HalfedgeHandle changedNext{connectivity[0].Next.Index == 0u ? 1u : 0u};
+        expectStale(s, "Sandbox.ProgressivePoisson.CPU", poisson(s, graph),
+            [&] { connectivity[0].Next = changedNext; },
+            [&](const auto&) {
+                EXPECT_EQ(connectivity[0].Next, changedNext);
+                noPoissonLevels(s, graph);
+            });
+    }
+    {
+        SCOPED_TRACE("ProgressivePoisson: edited mesh vertex connectivity");
+        QueuedJobScene s;
+        const ECS::EntityHandle mesh = MakeSelectable(s.registry, "PoissonMeshStaleConnectivity");
+        AddTriangleMeshSource(s.registry, mesh);
+        auto connectivity = s.registry.Raw().get<GS::Vertices>(mesh)
+            .Properties.Get<Geometry::Graph::VertexConnectivity>(PN::kVertexConnectivity);
+        ASSERT_TRUE(connectivity);
+        ASSERT_FALSE(connectivity.Vector().empty());
+        const Geometry::HalfedgeHandle changedHalfedge{connectivity[0].Halfedge.Index == 0u ? 1u : 0u};
+        expectStale(s, "Sandbox.ProgressivePoisson.CPU", poisson(s, mesh),
+            [&] { connectivity[0].Halfedge = changedHalfedge; },
+            [&](const auto&) {
+                EXPECT_EQ(connectivity[0].Halfedge, changedHalfedge);
+                noPoissonLevels(s, mesh);
+            });
+    }
+    const auto expectSourcePoseUnchanged = [](QueuedJobScene& s, const ECS::EntityHandle source,
+        const ECSC::Transform::Component& before)
+    {
+        const ECSC::Transform::Component& after = s.registry.Raw().get<ECSC::Transform::Component>(source);
+        EXPECT_NEAR(after.Position.x, before.Position.x, 1.0e-6f);
+        EXPECT_NEAR(after.Position.y, before.Position.y, 1.0e-6f);
+        EXPECT_NEAR(after.Position.z, before.Position.z, 1.0e-6f);
+        EXPECT_FALSE(s.registry.Raw().all_of<ECSC::Transform::IsDirtyTag>(source));
+    };
+    {
+        SCOPED_TRACE("Registration: moved source points");
+        QueuedJobScene s;
+        const std::vector<glm::vec3> target = MakeRegistrationCloud();
+        std::vector<glm::vec3> sourcePoints{};
+        for (const glm::vec3& p : target)
+            sourcePoints.push_back(p + glm::vec3{0.05f, -0.03f, 0.02f});
+        const ECS::EntityHandle source = MakePointCloudEntity(s.registry, "Stale ICP Source", sourcePoints);
+        const ECS::EntityHandle targetEntity = MakePointCloudEntity(s.registry, "Stale ICP Target", target);
+        const ECSC::Transform::Component before = s.registry.Raw().get<ECSC::Transform::Component>(source);
+        expectStale(s, "Sandbox.RegistrationICP",
+            [&](auto sink) {
+                return Runtime::ApplyEditorRegistrationCommand(s.context,
+                    Runtime::EditorRegistrationCommand{
+                        .SourceStableEntityId = Runtime::SelectionController::ToStableEntityId(source),
+                        .TargetStableEntityId = Runtime::SelectionController::ToStableEntityId(targetEntity),
+                        .Variant = Runtime::EditorICPVariant::PointToPoint,
+                        .MaxIterations = 60u, .InlierRatio = 1.0, .TrajectoryStep = 1000u},
+                    sink);
             },
-            onComplete);
-    ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
-
-    auto connectivity =
-        registry.Raw()
-            .get<GS::Halfedges>(graph)
-            .Properties.Get<Geometry::Graph::HalfedgeConnectivity>(
-                PN::kHalfedgeConnectivity);
-    ASSERT_TRUE(connectivity);
-    ASSERT_FALSE(connectivity.Vector().empty());
-    const Geometry::HalfedgeHandle changedNext{
-        connectivity[0].Next.Index == 0u ? 1u : 0u};
-    connectivity[0].Next = changedNext;
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-    const Runtime::EditorJobQueueSnapshot done = jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::StaleDiscarded);
-    EXPECT_EQ(deliveries, 1u);
-    ASSERT_TRUE(completedResult.has_value());
-    EXPECT_EQ(completedResult->Status, Runtime::EditorCommandStatus::StaleEntity);
-    EXPECT_NE(completedResult->Message.find("did not apply"), std::string::npos)
-        << completedResult->Message;
-    EXPECT_EQ(connectivity[0].Next, changedNext);
-    EXPECT_FALSE(
-        registry.Raw()
-            .get<GS::Vertices>(graph)
-            .Properties.Exists("v:poisson_level"));
+            [&] {
+                std::vector<glm::vec3> stale = sourcePoints;
+                for (glm::vec3& point : stale)
+                    point += glm::vec3{10.0f, 0.0f, 0.0f};
+                SetPositions(s.registry.Raw().get<GS::Vertices>(source), stale);
+            },
+            [&](const auto& result) {
+                EXPECT_EQ(result.Variant, Runtime::EditorICPVariant::PointToPoint);
+                expectSourcePoseUnchanged(s, source, before);
+            });
+    }
+    {
+        SCOPED_TRACE("Registration: edited point-to-plane target normals");
+        QueuedJobScene s;
+        const std::vector<glm::vec3> target = MakePlanarRegistrationCloud();
+        std::vector<glm::vec3> sourcePoints{};
+        for (const glm::vec3& p : target)
+            sourcePoints.push_back(p + glm::vec3{0.0f, 0.0f, 0.35f});
+        const ECS::EntityHandle source = MakePointCloudEntity(s.registry, "StaleNormalSource", sourcePoints);
+        const ECS::EntityHandle targetEntity = MakePointCloudEntity(s.registry, "StaleNormalTarget", target);
+        SetPointCloudNormals(s.registry, targetEntity, UniformNormals(target.size(), glm::vec3{0.0f, 0.0f, 1.0f}));
+        const ECSC::Transform::Component before = s.registry.Raw().get<ECSC::Transform::Component>(source);
+        expectStale(s, "Sandbox.RegistrationICP",
+            [&](auto sink) {
+                return Runtime::ApplyEditorRegistrationCommand(s.context,
+                    Runtime::EditorRegistrationCommand{
+                        .SourceStableEntityId = Runtime::SelectionController::ToStableEntityId(source),
+                        .TargetStableEntityId = Runtime::SelectionController::ToStableEntityId(targetEntity),
+                        .Variant = Runtime::EditorICPVariant::PointToPlane,
+                        .MaxIterations = 40u, .MaxCorrespondenceDistance = 10.0,
+                        .InlierRatio = 1.0, .TrajectoryStep = 1000u},
+                    sink);
+            },
+            // Edit the normals the job snapshotted, before it applies.
+            [&] { SetPointCloudNormals(s.registry, targetEntity,
+                      UniformNormals(target.size(), glm::vec3{1.0f, 0.0f, 0.0f})); },
+            [&](const auto& result) {
+                EXPECT_EQ(result.Variant, Runtime::EditorICPVariant::PointToPlane);
+                expectSourcePoseUnchanged(s, source, before);
+            });
+    }
 }
 TEST(SandboxEditorUi, ProgressivePoissonMeshCpuRequestQueuesDerivedJobAndPublishesOnApply)
 {
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    std::optional<Runtime::EditorProgressivePoissonResult>
-        completedResult{};
-    const auto onComplete =
-        [&completedResult](Runtime::EditorProgressivePoissonResult result)
-        {
-            completedResult = std::move(result);
-        };
-
-    const ECS::EntityHandle mesh = MakeSelectable(registry, "PoissonMesh");
-    AddTriangleMeshSource(registry, mesh);
-    registry.Raw().emplace<G::RenderSurface>(mesh);
+    QueuedJobScene s;
+    auto& raw = s.registry.Raw();
+    const ECS::EntityHandle mesh = MakeSelectable(s.registry, "PoissonMesh");
+    AddTriangleMeshSource(s.registry, mesh);
+    raw.emplace<G::RenderSurface>(mesh);
     const std::vector<glm::vec3> sourcePositions =
-        registry.Raw()
-            .get<GS::Vertices>(mesh)
-            .Properties.Get<glm::vec3>(PN::kPosition)
-            .Vector();
+        raw.get<GS::Vertices>(mesh).Properties.Get<glm::vec3>(PN::kPosition).Vector();
     const std::vector<std::uint32_t> sourceHalfedgeTo =
-        registry.Raw()
-            .get<GS::Halfedges>(mesh)
-            .Properties.Get<std::uint32_t>(PN::kHalfedgeToVertex)
-            .Vector();
+        raw.get<GS::Halfedges>(mesh).Properties.Get<std::uint32_t>(PN::kHalfedgeToVertex).Vector();
 
-    const Runtime::ProgressivePoissonPlaygroundConfig config{
-        .Dimension = 2u,
-        .GridWidth = 3u,
-        .MaxLevels = 5u,
-        .HashLoadFactor = 0.75f,
-        .RadiusAlpha = 0.4f,
-        .RandomizeGridOrigin = false,
-        .GridOriginSeed = 31u,
-        .ShuffleWithinLevels = true,
-        .ShuffleSeed = 37u,
-        .PrefixCount = 7u,
-        .Channel = Runtime::ProgressivePoissonPlaygroundChannel::Level,
+    const Runtime::EditorProgressivePoissonCommand command{
+        .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh),
+        .Config = Runtime::ProgressivePoissonPlaygroundConfig{
+            .Dimension = 2u,
+            .GridWidth = 3u,
+            .MaxLevels = 5u,
+            .HashLoadFactor = 0.75f,
+            .RadiusAlpha = 0.4f,
+            .RandomizeGridOrigin = false,
+            .GridOriginSeed = 31u,
+            .ShuffleWithinLevels = true,
+            .ShuffleSeed = 37u,
+            .PrefixCount = 7u,
+            .Channel = Runtime::ProgressivePoissonPlaygroundChannel::Level,
+        },
     };
+    Tests::ExpectQueuedJobTerminates(s.jobs, "Sandbox.ProgressivePoisson.CPU",
+        Runtime::JobState::Published,
+        [&](auto sink) { return Runtime::ApplyEditorProgressivePoissonCommand(s.context, command, sink); },
+        [&](const auto&) {
+            EXPECT_TRUE(raw.all_of<G::RenderSurface>(mesh));
+            EXPECT_TRUE(raw.all_of<GS::Faces>(mesh));
+            EXPECT_FALSE(raw.get<GS::Vertices>(mesh).Properties.Exists("v:poisson_level"));
+            EXPECT_EQ(s.jobs.Snapshot().Entries[0].Identity.Scope, Runtime::EditorJobScope::MeshVertex);
+        },
+        [&](const auto& result) { EXPECT_EQ(result.InputCount, sourcePositions.size()); });
 
-    const Runtime::EditorProgressivePoissonResult result =
-        Runtime::ApplyEditorProgressivePoissonCommand(
-            context,
-            Runtime::EditorProgressivePoissonCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(mesh),
-                .Config = config,
-            },
-            onComplete);
-
-    EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
-    EXPECT_TRUE(registry.Raw().all_of<G::RenderSurface>(mesh));
-    EXPECT_TRUE(registry.Raw().all_of<GS::Faces>(mesh));
-    EXPECT_FALSE(
-        registry.Raw()
-            .get<GS::Vertices>(mesh)
-            .Properties.Exists("v:poisson_level"));
-
-    const Runtime::EditorJobQueueSnapshot queued = jobs.Snapshot();
-    ASSERT_EQ(queued.Entries.size(), 1u);
-    EXPECT_EQ(
-        queued.Entries[0].Identity.Scope,
-        Runtime::EditorJobScope::MeshVertex);
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-    Runtime::EditorJobQueueSnapshot done =
-        jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
-    ASSERT_TRUE(completedResult.has_value());
-    EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
-    EXPECT_EQ(completedResult->InputCount, sourcePositions.size());
-
-    const GS::ConstSourceView view = GS::BuildConstView(registry.Raw(), mesh);
-    const GS::SourceAvailability availability =
-        GS::BuildSourceAvailability(view);
+    const GS::ConstSourceView view = GS::BuildConstView(raw, mesh);
+    const GS::SourceAvailability availability = GS::BuildSourceAvailability(view);
     EXPECT_EQ(availability.ProvenanceDomain, GS::Domain::Mesh);
-    EXPECT_TRUE(registry.Raw().all_of<G::RenderSurface>(mesh));
-    EXPECT_TRUE((registry.Raw().all_of<GS::Edges, GS::Halfedges, GS::Faces>(mesh)));
+    EXPECT_TRUE(raw.all_of<G::RenderSurface>(mesh));
+    EXPECT_TRUE((raw.all_of<GS::Edges, GS::Halfedges, GS::Faces>(mesh)));
     ASSERT_NE(view.VertexSource, nullptr);
     ASSERT_NE(view.FaceSource, nullptr);
 
-    const auto positions =
-        view.VertexSource->Properties.Get<glm::vec3>(PN::kPosition);
-    const auto levels =
-        view.VertexSource->Properties.Get<float>("v:poisson_level");
+    const auto positions = view.VertexSource->Properties.Get<glm::vec3>(PN::kPosition);
+    const auto levels = view.VertexSource->Properties.Get<float>("v:poisson_level");
     ASSERT_TRUE(positions);
     ASSERT_TRUE(levels);
     EXPECT_EQ(positions.Vector(), sourcePositions);
     EXPECT_EQ(levels.Vector().size(), sourcePositions.size());
-    EXPECT_EQ(
-        registry.Raw()
-            .get<GS::Halfedges>(mesh)
-            .Properties.Get<std::uint32_t>(PN::kHalfedgeToVertex)
-            .Vector(),
-        sourceHalfedgeTo);
-}
-TEST(SandboxEditorUi,
-     ProgressivePoissonMeshCpuJobRejectsStaleProductionConnectivity)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Intrinsic::Tests::EditorFeatureTestContext context =
-        MakeContext(registry, selection);
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    std::size_t deliveries = 0u;
-    std::optional<Runtime::EditorProgressivePoissonResult> completedResult{};
-    const auto onComplete =
-        [&deliveries,
-         &completedResult](Runtime::EditorProgressivePoissonResult result)
-        {
-            ++deliveries;
-            completedResult = std::move(result);
-        };
-
-    const ECS::EntityHandle mesh =
-        MakeSelectable(registry, "PoissonMeshStaleConnectivity");
-    AddTriangleMeshSource(registry, mesh);
-
-    const Runtime::EditorProgressivePoissonResult result =
-        Runtime::ApplyEditorProgressivePoissonCommand(
-            context,
-            Runtime::EditorProgressivePoissonCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(mesh),
-                .Config = Runtime::ProgressivePoissonPlaygroundConfig{
-                    .Dimension = 2u,
-                    .GridWidth = 3u,
-                    .MaxLevels = 5u,
-                    .HashLoadFactor = 0.75f,
-                    .RadiusAlpha = 0.4f,
-                    .RandomizeGridOrigin = false,
-                    .ShuffleWithinLevels = false,
-                },
-            },
-            onComplete);
-    ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
-
-    auto connectivity =
-        registry.Raw()
-            .get<GS::Vertices>(mesh)
-            .Properties.Get<Geometry::Graph::VertexConnectivity>(
-                PN::kVertexConnectivity);
-    ASSERT_TRUE(connectivity);
-    ASSERT_FALSE(connectivity.Vector().empty());
-    const Geometry::HalfedgeHandle changedHalfedge{
-        connectivity[0].Halfedge.Index == 0u ? 1u : 0u};
-    connectivity[0].Halfedge = changedHalfedge;
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-    const Runtime::EditorJobQueueSnapshot done = jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::StaleDiscarded);
-    EXPECT_EQ(deliveries, 1u);
-    ASSERT_TRUE(completedResult.has_value());
-    EXPECT_EQ(completedResult->Status, Runtime::EditorCommandStatus::StaleEntity);
-    EXPECT_NE(completedResult->Message.find("did not apply"), std::string::npos)
-        << completedResult->Message;
-    EXPECT_EQ(connectivity[0].Halfedge, changedHalfedge);
-    EXPECT_FALSE(
-        registry.Raw()
-            .get<GS::Vertices>(mesh)
-            .Properties.Exists("v:poisson_level"));
+    EXPECT_EQ(raw.get<GS::Halfedges>(mesh).Properties.Get<std::uint32_t>(PN::kHalfedgeToVertex).Vector(),
+              sourceHalfedgeTo);
 }
 
 namespace
@@ -2520,20 +2386,7 @@ TEST(SandboxEditorUi, RegistrationCommandAlignsSourceOntoTargetAndSupportsUndoRe
 }
 TEST(SandboxEditorUi, RegistrationRequestQueuesDerivedJobAndPublishesOnApply)
 {
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::EditorCommandHistory history;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    context.CommandHistory = &history;
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    std::optional<Runtime::EditorRegistrationResult> completedResult{};
-    const std::function<void(Runtime::EditorRegistrationResult)> onComplete =
-        [&completedResult](Runtime::EditorRegistrationResult result)
-        {
-            completedResult = std::move(result);
-        };
-
+    QueuedJobScene s;
     const std::vector<glm::vec3> target = MakeRegistrationCloud();
     const glm::vec3 offset{0.05f, -0.03f, 0.02f};
     std::vector<glm::vec3> sourcePoints{};
@@ -2541,155 +2394,45 @@ TEST(SandboxEditorUi, RegistrationRequestQueuesDerivedJobAndPublishesOnApply)
     for (const glm::vec3& p : target)
         sourcePoints.push_back(p + offset);
 
-    const ECS::EntityHandle source =
-        MakePointCloudEntity(registry, "Queued ICP Source", sourcePoints);
-    const ECS::EntityHandle targetEntity =
-        MakePointCloudEntity(registry, "Queued ICP Target", target);
-    const std::uint32_t sourceId =
-        Runtime::SelectionController::ToStableEntityId(source);
-    const std::uint32_t targetId =
-        Runtime::SelectionController::ToStableEntityId(targetEntity);
-    const ECSC::Transform::Component before =
-        registry.Raw().get<ECSC::Transform::Component>(source);
+    const ECS::EntityHandle source = MakePointCloudEntity(s.registry, "Queued ICP Source", sourcePoints);
+    const ECS::EntityHandle targetEntity = MakePointCloudEntity(s.registry, "Queued ICP Target", target);
+    const ECSC::Transform::Component before = s.registry.Raw().get<ECSC::Transform::Component>(source);
+    const auto expectPose = [&](const glm::vec3 expected, const float tolerance) {
+        const ECSC::Transform::Component& pose = s.registry.Raw().get<ECSC::Transform::Component>(source);
+        EXPECT_NEAR(pose.Position.x, expected.x, tolerance);
+        EXPECT_NEAR(pose.Position.y, expected.y, tolerance);
+        EXPECT_NEAR(pose.Position.z, expected.z, tolerance);
+    };
+    const Runtime::EditorRegistrationCommand command{
+        .SourceStableEntityId = Runtime::SelectionController::ToStableEntityId(source),
+        .TargetStableEntityId = Runtime::SelectionController::ToStableEntityId(targetEntity),
+        .Variant = Runtime::EditorICPVariant::PointToPoint,
+        .MaxIterations = 60u,
+        .InlierRatio = 1.0,
+        .TrajectoryStep = 1000u,
+    };
 
-    const Runtime::EditorRegistrationResult result =
-        Runtime::ApplyEditorRegistrationCommand(
-            context,
-            Runtime::EditorRegistrationCommand{
-                .SourceStableEntityId = sourceId,
-                .TargetStableEntityId = targetId,
-                .Variant = Runtime::EditorICPVariant::PointToPoint,
-                .MaxIterations = 60u,
-                .InlierRatio = 1.0,
-                .TrajectoryStep = 1000u,
-            }, onComplete);
+    Tests::ExpectQueuedJobTerminates(s.jobs, "Sandbox.RegistrationICP", Runtime::JobState::Published,
+        [&](auto sink) { return Runtime::ApplyEditorRegistrationCommand(s.context, command, sink); },
+        [&](const auto& pending) {
+            EXPECT_EQ(pending.SourcePointCount, sourcePoints.size());
+            EXPECT_EQ(pending.TargetPointCount, target.size());
+            expectPose(before.Position, 1.0e-6f);
+            EXPECT_FALSE(s.registry.Raw().all_of<ECSC::Transform::IsDirtyTag>(source));
+        },
+        [&](const auto& result) {
+            EXPECT_TRUE(result.HasResult);
+            EXPECT_GT(result.IterationsPerformed, 0u);
+            EXPECT_EQ(result.AppliedStep, result.TrajectoryLength);
+            EXPECT_LT(result.FinalRMSE, 1.0e-3);
+        });
 
-    EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
-    EXPECT_EQ(result.SourcePointCount, sourcePoints.size());
-    EXPECT_EQ(result.TargetPointCount, target.size());
-    EXPECT_NE(result.Message.find("queued"), std::string::npos);
-    const ECSC::Transform::Component& pending =
-        registry.Raw().get<ECSC::Transform::Component>(source);
-    EXPECT_NEAR(pending.Position.x, before.Position.x, 1.0e-6f);
-    EXPECT_NEAR(pending.Position.y, before.Position.y, 1.0e-6f);
-    EXPECT_NEAR(pending.Position.z, before.Position.z, 1.0e-6f);
-    EXPECT_FALSE(registry.Raw().all_of<ECSC::Transform::IsDirtyTag>(source));
-
-    Runtime::EditorJobQueueSnapshot queued =
-        jobs.Snapshot();
-    ASSERT_EQ(queued.Entries.size(), 1u);
-    EXPECT_EQ(queued.Entries[0].Name, "Sandbox.RegistrationICP");
-    // `JobService` dispatches at submit, so the pre-drain state races
-    // between Queued/Running/AwaitingGate; assert only that it is active.
-    EXPECT_TRUE(
-        Runtime::IsActiveEditorJobState(queued.Entries[0].State));
-
-    EXPECT_FALSE(completedResult.has_value());
-    EXPECT_NEAR(
-        registry.Raw().get<ECSC::Transform::Component>(source).Position.x,
-        before.Position.x,
-        1.0e-6f);
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-    Runtime::EditorJobQueueSnapshot done =
-        jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
-    ASSERT_TRUE(completedResult.has_value());
-    EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
-    EXPECT_TRUE(completedResult->HasResult);
-    EXPECT_GT(completedResult->IterationsPerformed, 0u);
-    EXPECT_EQ(completedResult->AppliedStep,
-              completedResult->TrajectoryLength);
-    EXPECT_LT(completedResult->FinalRMSE, 1.0e-3);
-
-    const ECSC::Transform::Component& aligned =
-        registry.Raw().get<ECSC::Transform::Component>(source);
-    EXPECT_NEAR(aligned.Position.x, -offset.x, 1.0e-2f);
-    EXPECT_NEAR(aligned.Position.y, -offset.y, 1.0e-2f);
-    EXPECT_NEAR(aligned.Position.z, -offset.z, 1.0e-2f);
-    EXPECT_TRUE(registry.Raw().all_of<ECSC::Transform::IsDirtyTag>(source));
-    EXPECT_TRUE(history.IsDirty());
-    ASSERT_TRUE(history.CanUndo());
-    EXPECT_EQ(history.Undo().Status,
-              Runtime::EditorCommandHistoryStatus::Undone);
-    const ECSC::Transform::Component& undone =
-        registry.Raw().get<ECSC::Transform::Component>(source);
-    EXPECT_NEAR(undone.Position.x, before.Position.x, 1.0e-6f);
-    EXPECT_NEAR(undone.Position.y, before.Position.y, 1.0e-6f);
-    EXPECT_NEAR(undone.Position.z, before.Position.z, 1.0e-6f);
-}
-TEST(SandboxEditorUi, RegistrationDerivedJobDiscardsStaleSourceBeforeApply)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    std::size_t deliveries = 0u;
-    std::optional<Runtime::EditorRegistrationResult> completedResult{};
-    const std::function<void(Runtime::EditorRegistrationResult)> onComplete =
-        [&deliveries, &completedResult](Runtime::EditorRegistrationResult result)
-        {
-            ++deliveries;
-            completedResult = std::move(result);
-        };
-
-    const std::vector<glm::vec3> target = MakeRegistrationCloud();
-    const glm::vec3 offset{0.05f, -0.03f, 0.02f};
-    std::vector<glm::vec3> sourcePoints{};
-    sourcePoints.reserve(target.size());
-    for (const glm::vec3& p : target)
-        sourcePoints.push_back(p + offset);
-
-    const ECS::EntityHandle source =
-        MakePointCloudEntity(registry, "Stale ICP Source", sourcePoints);
-    const ECS::EntityHandle targetEntity =
-        MakePointCloudEntity(registry, "Stale ICP Target", target);
-    const std::uint32_t sourceId =
-        Runtime::SelectionController::ToStableEntityId(source);
-    const std::uint32_t targetId =
-        Runtime::SelectionController::ToStableEntityId(targetEntity);
-
-    const Runtime::EditorRegistrationResult result =
-        Runtime::ApplyEditorRegistrationCommand(
-            context,
-            Runtime::EditorRegistrationCommand{
-                .SourceStableEntityId = sourceId,
-                .TargetStableEntityId = targetId,
-                .Variant = Runtime::EditorICPVariant::PointToPoint,
-                .MaxIterations = 60u,
-                .InlierRatio = 1.0,
-                .TrajectoryStep = 1000u,
-            }, onComplete);
-    ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
-
-    std::vector<glm::vec3> staleSourcePoints = sourcePoints;
-    for (glm::vec3& point : staleSourcePoints)
-        point += glm::vec3{10.0f, 0.0f, 0.0f};
-    SetPositions(registry.Raw().get<GS::Vertices>(source), staleSourcePoints);
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-
-    Runtime::EditorJobQueueSnapshot done =
-        jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State,
-              Runtime::JobState::StaleDiscarded);
-    // A discarded ICP job still owes exactly one terminal result.
-    EXPECT_EQ(deliveries, 1u);
-    ASSERT_TRUE(completedResult.has_value());
-    EXPECT_EQ(completedResult->Status, Runtime::EditorCommandStatus::StaleEntity);
-    EXPECT_FALSE(completedResult->Succeeded());
-    EXPECT_NE(completedResult->Message.find("did not apply"), std::string::npos)
-        << completedResult->Message;
-    EXPECT_EQ(completedResult->Variant, Runtime::EditorICPVariant::PointToPoint);
-    const ECSC::Transform::Component& transform =
-        registry.Raw().get<ECSC::Transform::Component>(source);
-    EXPECT_NEAR(transform.Position.x, 0.0f, 1.0e-6f);
-    EXPECT_NEAR(transform.Position.y, 0.0f, 1.0e-6f);
-    EXPECT_NEAR(transform.Position.z, 0.0f, 1.0e-6f);
-    EXPECT_FALSE(registry.Raw().all_of<ECSC::Transform::IsDirtyTag>(source));
+    expectPose(-offset, 1.0e-2f);
+    EXPECT_TRUE(s.registry.Raw().all_of<ECSC::Transform::IsDirtyTag>(source));
+    EXPECT_TRUE(s.history.IsDirty());
+    ASSERT_TRUE(s.history.CanUndo());
+    EXPECT_EQ(s.history.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+    expectPose(before.Position, 1.0e-6f);
 }
 // BUG-096: both runtime branches called `AlignICP` with an empty target-normal
 // span, which the solver silently treats as "run point-to-point", while the
@@ -3140,82 +2883,6 @@ TEST(SandboxEditorUi, RegistrationPointToPlaneTransformsNormalsByInverseTranspos
     // inverse-transpose path produced usable unit normals under non-uniform
     // scale.
     EXPECT_TRUE(std::isfinite(result.FinalRMSE));
-}
-
-// A target-normal edit between submit and apply must discard the completion,
-// exactly as a position edit does.
-TEST(SandboxEditorUi, QueuedRegistrationPointToPlaneDiscardsStaleTargetNormals)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::EditorCommandHistory history;
-    Intrinsic::Tests::EditorFeatureTestContext context =
-        MakeContext(registry, selection);
-    context.CommandHistory = &history;
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    std::size_t deliveries = 0u;
-    std::optional<Runtime::EditorRegistrationResult> completed{};
-    const std::function<void(Runtime::EditorRegistrationResult)> onComplete =
-        [&deliveries, &completed](Runtime::EditorRegistrationResult result)
-        {
-            ++deliveries;
-            completed = std::move(result);
-        };
-
-    const std::vector<glm::vec3> target = MakePlanarRegistrationCloud();
-    std::vector<glm::vec3> sourcePoints{};
-    sourcePoints.reserve(target.size());
-    for (const glm::vec3& p : target)
-        sourcePoints.push_back(p + glm::vec3{0.0f, 0.0f, 0.35f});
-
-    const ECS::EntityHandle source =
-        MakePointCloudEntity(registry, "StaleNormalSource", sourcePoints);
-    const ECS::EntityHandle targetEntity =
-        MakePointCloudEntity(registry, "StaleNormalTarget", target);
-    SetPointCloudNormals(registry, targetEntity,
-                         UniformNormals(target.size(),
-                                        glm::vec3{0.0f, 0.0f, 1.0f}));
-    const ECSC::Transform::Component before =
-        registry.Raw().get<ECSC::Transform::Component>(source);
-
-    const Runtime::EditorRegistrationResult queued =
-        Runtime::ApplyEditorRegistrationCommand(
-            context,
-            Runtime::EditorRegistrationCommand{
-                .SourceStableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(source),
-                .TargetStableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(targetEntity),
-                .Variant = Runtime::EditorICPVariant::PointToPlane,
-                .MaxIterations = 40u,
-                .MaxCorrespondenceDistance = 10.0,
-                .InlierRatio = 1.0,
-                .TrajectoryStep = 1000u,
-            }, onComplete);
-    ASSERT_EQ(queued.Status, Runtime::EditorCommandStatus::Pending);
-
-    // Edit the normals the job snapshotted, before it applies.
-    SetPointCloudNormals(registry, targetEntity,
-                         UniformNormals(target.size(),
-                                        glm::vec3{1.0f, 0.0f, 0.0f}));
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-    const Runtime::EditorJobQueueSnapshot done = jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::StaleDiscarded);
-    // A discarded job publishes no pose, but still reports one terminal result.
-    EXPECT_EQ(deliveries, 1u);
-    ASSERT_TRUE(completed.has_value());
-    EXPECT_EQ(completed->Status, Runtime::EditorCommandStatus::StaleEntity);
-    EXPECT_FALSE(completed->Succeeded());
-    EXPECT_EQ(completed->Variant, Runtime::EditorICPVariant::PointToPlane);
-    EXPECT_FALSE(history.CanUndo());
-    const ECSC::Transform::Component& after =
-        registry.Raw().get<ECSC::Transform::Component>(source);
-    EXPECT_NEAR(after.Position.x, before.Position.x, 1.0e-6f);
-    EXPECT_NEAR(after.Position.y, before.Position.y, 1.0e-6f);
-    EXPECT_NEAR(after.Position.z, before.Position.z, 1.0e-6f);
 }
 
 TEST(SandboxEditorUi, RegistrationCommandFailsClosedForInvalidSelectionAndParameters)
