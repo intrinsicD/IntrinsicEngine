@@ -169,7 +169,9 @@ conversational pre-merge sweep does not replace it. Repository mapping:
   run's raw outputs under ignored `ara/evidence/diagnostics/<run>/`. A
   micro task's `evidence: not_applicable` exempts it from completion
   artifacts, not from the pre-flight; no task file is created only to hold a
-  packet.
+  packet. Store verbatim review transcripts as `.txt`, not `.md`: they keep the
+  reviewer's host-local links (absolute paths, `:line` suffixes), and the
+  strict documentation-link check validates every `*.md` file in the tree.
 - Freeze committed source identity and the exact local packet/input hashes after
   the last source change. Packets remain ignored; reviewers receive the actual
   files explicitly. The manifest tool skips ignored files by default, so pass
