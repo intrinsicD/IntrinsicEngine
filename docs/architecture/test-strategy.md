@@ -133,7 +133,7 @@ aggregate from target labels and reconciles its inventory, CTest JSON discovery,
 and expanded `--gtest_list_tests` output. Duplicate raw cases or CTest filters,
 missing/extra aggregate members, label drift, missing binaries, and
 GoogleTest/CTest case mismatches fail closed. Its committed
-`Test.TestGateRouting.baseline.tsv` pins all 233 affected target/case identities
+`Test.TestGateRouting.baseline.tsv` pins all affected target/case identities
 against simultaneous shrinkage of the live inventories. The required CI lanes
 run it for both `IntrinsicCpuTests` and `IntrinsicGpuVulkanTests` before CTest
 execution.
