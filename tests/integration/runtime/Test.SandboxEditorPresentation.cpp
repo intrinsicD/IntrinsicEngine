@@ -177,17 +177,7 @@ namespace
         }
     };
 
-    class OneFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
-    {
-    public:
-        void Resolve() override {}
-        void Frame(double, double) override
-        {
-            auto& engine = Kernel();
-            engine.RequestExit();
-        }
-        void Shutdown() override {}
-    };
+    using Intrinsic::Tests::OneFrameApplication;
 
     class TooltipDelayApplication final : public Intrinsic::Tests::RuntimeTestModule
     {

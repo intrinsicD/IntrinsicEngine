@@ -35,17 +35,7 @@ namespace Graphics = Extrinsic::Graphics;
 namespace Runtime = Extrinsic::Runtime;
 
 namespace {
-    class OneFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
-    {
-    public:
-        void Resolve() override {}
-        void Frame(double, double) override
-        {
-            auto& engine = Kernel();
-            engine.RequestExit();
-        }
-        void Shutdown() override {}
-    };
+    using Intrinsic::Tests::OneFrameApplication;
 
 struct UiBracketProbeState {
   std::vector<std::string> Trace{};

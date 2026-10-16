@@ -39,17 +39,7 @@ namespace Runtime = Extrinsic::Runtime;
 
 namespace
 {
-    class OneFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
-    {
-    public:
-        void Resolve() override {}
-        void Frame(double /*alpha*/, double /*dt*/) override
-        {
-            auto& engine = Kernel();
-            engine.RequestExit();
-        }
-        void Shutdown() override {}
-    };
+    using Intrinsic::Tests::OneFrameApplication;
 
     class TwoFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
     {

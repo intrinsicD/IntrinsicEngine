@@ -43,6 +43,13 @@ namespace Intrinsic::Tests
         bool m_ShutdownInvoked{false};
     };
 
+    // Requests exit after the first frame, so `Engine::Run()` drives exactly one frame.
+    class OneFrameApplication final : public RuntimeTestModule
+    {
+    protected:
+        void Frame(double, double) override { Kernel().RequestExit(); }
+    };
+
     class RuntimeTestResolveModule final : public Extrinsic::Runtime::IRuntimeModule
     {
     public:
