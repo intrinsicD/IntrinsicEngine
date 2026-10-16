@@ -408,8 +408,7 @@ that requires a live Vulkan backend. The corrected graphics/runtime topology is:
 | Executable | Canonical ownership |
 | --- | --- |
 | `IntrinsicRuntimeIntegrationTests` | Six runtime/core/assets CPU sources, 104 cases, labeled `integration;runtime` |
-| `IntrinsicRuntimeContractTests` | Sole CPU owner of the 39 `CoreGraphInterfaces` and `RuntimeEngineLayering` cases, labeled `contract;runtime` |
-| `IntrinsicRuntimeGraphicsCpuTests` | Sole owner of `RuntimeFrameLoopContract` and its nine cases, labeled `integration;runtime;graphics` |
+| `IntrinsicRuntimeContractTests` | Sole CPU owner of the `CoreGraphInterfaces` cases, labeled `contract;runtime` |
 | `IntrinsicGraphicsIntegrationCpuTests` | Three MockDevice graphics integration sources, 74 cases, labeled `integration;graphics` |
 | `IntrinsicGraphicsUnitTests` | Three MockDevice unit sources, 20 cases, labeled `unit;graphics` |
 | `IntrinsicRuntimeGpuResultReadbackSmokeTests` | The one real shared-result readback case, labeled `gpu;vulkan;integration;runtime;graphics;slow` |

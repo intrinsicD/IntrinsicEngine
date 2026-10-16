@@ -180,12 +180,12 @@ former mixed graphics/runtime set as follows:
 
 - `IntrinsicRuntimeIntegrationTests` owns six CPU sources and 104 cases under
   `integration;runtime`.
-- `IntrinsicRuntimeContractTests` owns the 39 `CoreGraphInterfaces` and
-  `RuntimeEngineLayering` cases under `contract;runtime`.
-- `IntrinsicRuntimeGraphicsCpuTests` is the sole owner of
-  `RuntimeFrameLoopContract` and its nine owner-level Engine ordering cases
-  under `integration;runtime;graphics`; they inspect the real Runtime owner,
-  not hook-interface doubles.
+- `IntrinsicRuntimeContractTests` owns the `CoreGraphInterfaces` cases under
+  `contract;runtime`.
+- The Engine layering and frame-loop ordering guards are source rules
+  (`tools/repo/source_rules.py`), registered as the
+  `RuntimeEngineLayering.SourceRules` and `RuntimeFrameLoopContract.SourceRules`
+  CTests; they inspect the real Runtime owner, not hook-interface doubles.
 - `IntrinsicGraphicsIntegrationCpuTests` owns three MockDevice integration
   sources and 74 cases under `integration;graphics`.
 - `IntrinsicGraphicsUnitTests` owns three MockDevice unit sources and 20 cases

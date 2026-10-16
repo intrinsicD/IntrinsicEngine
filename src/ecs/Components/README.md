@@ -45,9 +45,8 @@ records the contract for entity-stable identity:
   defaulted equality / `operator<=>` + the exported `StableIdHash`
   hasher (Decision 3). The payload header imports neither `entt` nor
   any higher-layer module so it remains usable from serializer / editor /
-  runtime helpers; the contract test
-  [`tests/contract/ecs/Test.ECS.LayeringBoundaries.cpp`](../../../tests/contract/ecs/Test.ECS.LayeringBoundaries.cpp)
-  (`StableIdPayloadStaysCpuOnly`) enforces that rule. Any
+  runtime helpers; the source rule `EcsLayeringBoundaries.StableIdPayloadStaysCpuOnly` in
+  [`tools/repo/source_rules.py`](../../../tools/repo/source_rules.py) enforces that rule. Any
   `StableId → entt::entity` lookup sidecar lives in `src/runtime/`,
   not in `src/ecs/`.
 - Future authoring metadata (`SerializationHints`, `SceneSource`,

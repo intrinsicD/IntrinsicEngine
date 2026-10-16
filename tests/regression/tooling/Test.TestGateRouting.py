@@ -101,14 +101,6 @@ CPU_SOURCE_OWNERS = {
         "GraphicsIntegrationCpuTestObjs",
         "IntrinsicGraphicsIntegrationCpuTests",
     ),
-    "Test.RuntimeEngineLayering.cpp": (
-        "RuntimeContractTestObjs",
-        "IntrinsicRuntimeContractTests",
-    ),
-    "Test.RuntimeFrameLoopContract.cpp": (
-        "RuntimeGraphicsCpuTestObjs",
-        "IntrinsicRuntimeGraphicsCpuTests",
-    ),
 }
 CPU_RECLASSIFIED_SOURCES = frozenset(CPU_SOURCE_OWNERS)
 RHI_MANAGER_SOURCES = frozenset(
@@ -120,7 +112,6 @@ RHI_MANAGER_SOURCES = frozenset(
 )
 READBACK_SOURCE = "Test.GpuResultReadbackGpuSmoke.cpp"
 READBACK_TARGET = "IntrinsicRuntimeGpuResultReadbackSmokeTests"
-FRAME_LOOP_SOURCE = "Test.RuntimeFrameLoopContract.cpp"
 GROUPED_PURE_CTEST_TARGETS = frozenset(
     {
         "IntrinsicGeometryCurvatureTests",
@@ -179,19 +170,17 @@ AFFECTED_DEDICATED_TARGETS = frozenset(
 )
 AFFECTED_SHARED_SUITES = {
     "IntrinsicRuntimeContractTests": frozenset(
-        {"CoreGraphInterfaces", "RuntimeEngineLayering"}
+        {"CoreGraphInterfaces"}
     ),
-    "IntrinsicRuntimeGraphicsCpuTests": frozenset({"RuntimeFrameLoopContract"}),
 }
 AFFECTED_TARGET_CASE_COUNTS = {
     "IntrinsicGraphicsIntegrationCpuTests": 74,
     "IntrinsicGraphicsUnitTests": 20,
-    "IntrinsicRuntimeContractTests": 40,
+    "IntrinsicRuntimeContractTests": 4,
     "IntrinsicRuntimeGpuResultReadbackSmokeTests": 1,
-    "IntrinsicRuntimeGraphicsCpuTests": 9,
     "IntrinsicRuntimeIntegrationTests": 90,
 }
-EXPECTED_AFFECTED_CASE_COUNT = 234
+EXPECTED_AFFECTED_CASE_COUNT = 189
 
 AggregatePredicate = Callable[[frozenset[str]], bool]
 

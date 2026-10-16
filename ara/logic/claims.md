@@ -113,7 +113,7 @@ not rerun or revalidate them. See [evidence retirement](../../docs/lessons/evide
   src/runtime/Kernel/Runtime.Engine.cpp,
   tests/contract/runtime/Test.RuntimeJobService.cpp,
   tests/contract/runtime/Test.AsyncWorkModule.cpp,
-  tests/contract/runtime/Test.RuntimeEngineLayering.cpp,
+  tools/repo/source_rules_engine_layering.py,
   tests/contract/runtime/Test.ImGuiAdapterEngineWiring.cpp,
   docs/api/generated/module_inventory.md]
 - **Dependencies**: [K05]
@@ -220,7 +220,7 @@ not rerun or revalidate them. See [evidence retirement](../../docs/lessons/evide
   src/runtime/Modules/Clustering/Runtime.ClusteringGpuBackend.cpp,
   src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cpp,
   tests/contract/runtime/Test.GpuResultReadbackJob.cpp,
-  tests/contract/runtime/Test.RuntimeEngineLayering.cpp,
+  tools/repo/source_rules_engine_layering.py,
   tests/integration/runtime/Test.GpuResultReadbackGpuSmoke.cpp,
   docs/api/generated/module_inventory.md]
 - **Dependencies**: [C06, C08, C09]
@@ -251,7 +251,7 @@ not rerun or revalidate them. See [evidence retirement](../../docs/lessons/evide
   src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp,
   src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp,
   tests/contract/runtime/Test.ClusteringModule.cpp,
-  tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp,
+  tools/repo/source_rules.py,
   tests/integration/runtime/Test.SandboxConfigSections.cpp,
   tests/integration/runtime/Test.ClusteringServiceGpuSmoke.cpp,
   benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp]
@@ -286,7 +286,7 @@ not rerun or revalidate them. See [evidence retirement](../../docs/lessons/evide
   tasks/done/RUNTIME-191-unified-property-texture-bake-pipeline.md,
   tests/contract/runtime/Test.GeometryPresentation.cpp,
   tests/contract/runtime/Test.RuntimeSceneSerialization.cpp,
-  tests/contract/runtime/Test.RuntimeEngineLayering.cpp,
+  tools/repo/source_rules_engine_layering.py,
   tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp,
   docs/api/generated/module_inventory.md]
 - **Dependencies**: []
@@ -322,7 +322,7 @@ not rerun or revalidate them. See [evidence retirement](../../docs/lessons/evide
   src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cppm,
   src/runtime/GeometryIntegration/Runtime.MeshPrimitiveView.cppm,
   tests/contract/graphics/Test.GeometryResidency.cpp,
-  tests/contract/runtime/Test.RuntimeEngineLayering.cpp,
+  tools/repo/source_rules_engine_layering.py,
   tests/contract/runtime/Test.MeshGeometryExtraction.cpp,
   tests/contract/runtime/Test.GraphGeometryExtraction.cpp,
   tests/contract/runtime/Test.PointCloudGeometryExtraction.cpp,
@@ -397,7 +397,7 @@ not rerun or revalidate them. See [evidence retirement](../../docs/lessons/evide
   src/graphics/renderer/Graphics.PropertyTextureBake.cpp,
   tests/contract/runtime/Test.TextureBakeModule.cpp,
   tests/contract/runtime/Test.AssetWorkflowModule.cpp,
-  tests/contract/runtime/Test.RuntimeEngineLayering.cpp,
+  tools/repo/source_rules_engine_layering.py,
   tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp,
   docs/api/generated/module_inventory.md]
 - **Dependencies**: [C12]
@@ -438,7 +438,7 @@ not rerun or revalidate them. See [evidence retirement](../../docs/lessons/evide
   src/runtime/Gizmos/Runtime.GizmoInteraction.cpp,
   src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp,
   tests/contract/runtime/Test.EditorCommandHistory.cpp,
-  tests/contract/runtime/Test.RuntimeEngineLayering.cpp,
+  tools/repo/source_rules_engine_layering.py,
   tests/contract/runtime/Test.SandboxEditorVisualization.cpp,
   tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp,
   tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp,
@@ -820,7 +820,7 @@ not rerun or revalidate them. See [evidence retirement](../../docs/lessons/evide
   src/app/Sandbox/main.cpp,
   tests/integration/runtime/Test.PhysicsModule.cpp,
   tests/integration/runtime/Test.SandboxConfigSections.cpp,
-  tests/contract/runtime/Test.RuntimeEngineLayering.cpp,
+  tools/repo/source_rules_engine_layering.py,
   36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/PHYSICS-004/commands/final-ci-tests.json,
   36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/PHYSICS-004/commands/final-ci-asan-tests.json,
   36a7b5062d9be3239d667efd9e41c4d4028ba249:tasks/evidence/PHYSICS-004/commands/final-ci-ubsan-tests.json]

@@ -143,11 +143,15 @@ jobs:
           python3 tests/regression/tooling/Test.WorkflowConcurrency.py
           python3 tests/regression/tooling/Test.WorkflowRouting.py
 
+      - name: Validate source-structure rules
+        run: python3 tools/repo/check_source_rules.py --self-check
+
       - name: Validate structural CI policy regressions
         run: |
           python3 tests/regression/tooling/Test.CheckTaskStateLinks.py
           python3 tests/regression/tooling/Test.CheckKernelConvergence.py
           python3 tests/regression/tooling/Test.CheckCompilerHazards.py
+          python3 tests/regression/tooling/Test.CheckSourceRules.py
           python3 tests/regression/tooling/Test.McpBridge.py
           python3 tests/regression/tooling/Test.CheckAraClaims.py
           python3 tests/regression/tooling/Test.SourceDocumentationAudit.py

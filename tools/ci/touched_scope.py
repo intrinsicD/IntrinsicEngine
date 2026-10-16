@@ -90,7 +90,7 @@ LAYER_SCOPES: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
     (
         "src/ecs/",
         ("ecs",),
-        ("IntrinsicECSTests", "IntrinsicEcsContractTests"),
+        ("IntrinsicECSTests",),
     ),
     (
         "src/physics/",
@@ -176,11 +176,6 @@ TEST_SCOPES: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
     ),
     ("tests/unit/assets/", ("assets",), ("IntrinsicAssetUnitTests",)),
     ("tests/unit/ecs/", ("ecs",), ("IntrinsicECSTests",)),
-    (
-        "tests/contract/ecs/",
-        ("ecs",),
-        ("IntrinsicEcsContractTests",),
-    ),
     (
         "tests/unit/physics/",
         ("physics",),
@@ -1041,6 +1036,17 @@ def structural_commands(root_arg: str, checks: Sequence[str]) -> list[Command]:
                     "--strict",
                 ),
                 "layering contract",
+            )
+        )
+        commands.append(
+            Command(
+                (
+                    "python3",
+                    "tools/repo/check_source_rules.py",
+                    "--root",
+                    root_arg,
+                ),
+                "source-structure rules",
             )
         )
     if "test_layout" in selected:

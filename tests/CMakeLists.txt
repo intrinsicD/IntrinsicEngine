@@ -1246,23 +1246,6 @@ intrinsic_test_object_lib(ECSTestObjs
     DEPS ExtrinsicCore ExtrinsicECS IntrinsicGeometry
 )
 
-# --- ECS contract tests (CPU-only structural checks over src/ecs sources) ---
-# Reads ECS source files via std::filesystem to enforce the
-# ecs -> {core, geometry} dependency contract from /AGENTS.md §2 and to keep
-# canonical components free of higher-layer handles or solver-owned state.
-set(_ecs_contract_test_files
-    Test.ECS.LayeringBoundaries.cpp
-)
-intrinsic_resolve_test_sources(_ecs_contract_test_sources
-    SEARCH_DIRS contract/ecs
-    FILES ${_ecs_contract_test_files}
-)
-intrinsic_test_object_lib(EcsContractTestObjs
-    SOURCES
-        ${_ecs_contract_test_sources}
-    DEPS ExtrinsicCore
-)
-
 # --- Runtime contract tests (CPU-only; GRAPHICS-030-Impl-A procedural geometry) ---
 # These tests exercise runtime-owned value types (procedural geometry descriptor,
 # cache, and packer) directly. They do not require IRenderer, GLFW, or Vulkan,
@@ -1340,8 +1323,6 @@ if(TARGET ExtrinsicRuntime)
         Test.RuntimeCameraControllers.cpp
         Test.RuntimeConfigControl.cpp
         Test.RuntimeEngineConfigBoot.cpp
-        Test.RuntimeEngineLayering.cpp
-        Test.RuntimeEnginePrivateGlue.cpp
         Test.RuntimeInputActions.cpp
         Test.RuntimeRenderRecipeActivation.cpp
         Test.RuntimeCameraFocusCommand.cpp
@@ -1374,7 +1355,6 @@ if(TARGET ExtrinsicRuntime)
         Test.VertexChannelBindings.cpp
         Test.VertexChannelStreams.cpp
         Test.RenderWorldPool.cpp
-        Test.RenderWorldPoolEngineWiring.cpp
         Test.VisualizationRecipes.cpp
     )
     intrinsic_resolve_test_sources(_runtime_contract_test_sources
@@ -1824,7 +1804,6 @@ intrinsic_test_object_lib(CoreWrapperUnitTestObjs
 set(_platform_test_files
     Test.LocalSocket.cpp
     Test.NullPlatform.cpp
-    Test.PlatformLayering.cpp
 )
 intrinsic_resolve_test_sources(_platform_test_sources
     SEARCH_DIRS unit/platform contract/platform
@@ -2165,7 +2144,6 @@ set(_graphics_contract_cpu_test_files
     Test.GpuWorldCompactionContract.cpp
     Test.GpuWorldLifetimeContract.cpp
     Test.GpuWorldPositionPreviewContract.cpp
-    Test.GpuWorldUniformSoAContract.cpp
     Test.HZBResourceLifetime.cpp
     Test.ImGuiPass.cpp
     Test.ImGuiPresentContract.cpp
@@ -2217,7 +2195,6 @@ set(_runtime_graphics_cpu_test_files
     Test.RuntimeRenderExtraction.cpp
     Test.RuntimeVectorFieldExtraction.cpp
     Test.RuntimeDeviceSelection.cpp
-    Test.RuntimeFrameLoopContract.cpp
     Test.RenderWorldPoolPipelined.cpp
     Test.RuntimeSandboxAcceptance.cpp
 )
@@ -2344,13 +2321,6 @@ intrinsic_test_executable(IntrinsicECSTests
     OBJECTS  ECSTestObjs
     LINK_LIBS ExtrinsicCore ExtrinsicECS
     LABELS unit ecs
-)
-
-# --- ECS contract tests (CPU-only structural checks) ---
-intrinsic_test_executable(IntrinsicEcsContractTests
-    OBJECTS  EcsContractTestObjs
-    LINK_LIBS ExtrinsicCore
-    LABELS contract ecs
 )
 
 # --- Runtime contract tests (CPU-only procedural geometry contracts) ---
@@ -3024,6 +2994,28 @@ if(_intrinsic_registered_test_targets)
     set(_intrinsic_property_fixup_file "${CMAKE_CURRENT_BINARY_DIR}/IntrinsicTestPropertyFixups.cmake")
     file(GENERATE OUTPUT "${_intrinsic_property_fixup_file}" CONTENT "${_intrinsic_property_fixup_script}")
     set_property(DIRECTORY APPEND PROPERTY TEST_INCLUDE_FILES "${_intrinsic_property_fixup_file}")
+endif()
+
+# Source-structure guards (layering, retired surfaces, private wiring) run as one
+# ctest per former GoogleTest suite, so existing `-R '^Suite\.'` filters keep matching.
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+    function(intrinsic_add_source_rules_test suite)
+        add_test(NAME ${suite}.SourceRules
+            COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/repo/check_source_rules.py"
+                --root "${CMAKE_SOURCE_DIR}" --suite ${suite})
+        set_tests_properties(${suite}.SourceRules PROPERTIES LABELS "${ARGN}")
+    endfunction()
+    intrinsic_add_source_rules_test(RenderWorldPoolEngineWiring contract runtime)
+    intrinsic_add_source_rules_test(RendererRhiBoundary contract graphics)
+    intrinsic_add_source_rules_test(EcsLayeringBoundaries contract ecs)
+    intrinsic_add_source_rules_test(PlatformLayering unit contract platform headless)
+    intrinsic_add_source_rules_test(GpuWorldUniformSoAContract contract graphics)
+    intrinsic_add_source_rules_test(RuntimeFrameLoopContract graphics integration runtime)
+    intrinsic_add_source_rules_test(RuntimeEnginePrivateGlue contract runtime)
+    intrinsic_add_source_rules_test(RuntimeEngineLayering contract runtime)
+else()
+    message(WARNING "Python3 not found: source-structure rule CTests are not registered (ci-docs still runs them).")
 endif()
 
 include(${CMAKE_SOURCE_DIR}/cmake/IntrinsicTestDiscovery.cmake)

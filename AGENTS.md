@@ -169,6 +169,9 @@ fixed behavior must fail without the change. Do not weaken gates to reach green.
 for labels, focused selection, full CPU, sanitizer, and Vulkan gates.
 Task-specific stricter checks still apply. C++ tests use `Test.<Name>.cpp`;
 do not rename legacy test files outside an explicit mechanical task.
+Source-structure guards (layering, retired surfaces, private wiring) are rules in
+`tools/repo/source_rules.py`, run as `<Suite>.SourceRules` CTests and in `ci-docs`;
+do not add C++ tests that read source text.
 
 Default code/test gate is **focused**: build only the test executable(s) that own
 the new, changed, or directly affected tests and run only those suites. Map a

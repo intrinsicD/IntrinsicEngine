@@ -152,9 +152,9 @@ communication with `Graphics` flows through data contracts carried on
 components (`GeometrySources` + culling/light tags), not through direct
 imports of graphics internals.
 
-The contract test
-[`tests/contract/ecs/Test.ECS.LayeringBoundaries.cpp`](../../tests/contract/ecs/Test.ECS.LayeringBoundaries.cpp)
-enforces the prohibited-import set in addition to the structural
+The `EcsLayeringBoundaries` source rules in
+[`tools/repo/source_rules.py`](../../tools/repo/source_rules.py)
+enforce the prohibited-import set in addition to the structural
 `tools/repo/check_layering.py` sweep, so CPU-only test runs catch upward
 imports before they reach the layering allowlist.
 
@@ -247,9 +247,9 @@ exporting `Extrinsic::ECS::Components::StableId`, `kInvalidStableId`,
 pattern). The payload is a pure CPU value type — no `entt`, `geometry`,
 `assets`, `runtime`, `graphics`, or `platform` imports — so serializers,
 editors, and runtime helpers can consume it without taking on those
-dependencies. The contract test
-`tests/contract/ecs/Test.ECS.LayeringBoundaries.cpp`
-(`StableIdPayloadStaysCpuOnly`) enforces the no-`entt` rule on this one
+dependencies. The source rule
+`EcsLayeringBoundaries.StableIdPayloadStaysCpuOnly` in `tools/repo/source_rules.py`
+enforces the no-`entt` rule on this one
 module specifically; the existing directory-recursive sweep enforces the
 shared `ecs -> {core, geometry}` import constraint. CPU-only `unit;ecs`
 payload tests live in `tests/unit/ecs/Test.ECS.StableIdentity.cpp`.

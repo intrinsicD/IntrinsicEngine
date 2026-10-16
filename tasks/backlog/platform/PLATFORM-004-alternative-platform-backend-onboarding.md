@@ -102,7 +102,7 @@ contract_review: "Planning-only text; no backend implementation, layer rule or w
   - An opt-in smoke test under a backend-specific label (analogous to
     `tests/integration/platform/Test.GlfwPlatformSmoke.cpp`).
   - Layering coverage equivalent to
-    `tests/contract/platform/Test.PlatformLayering.cpp` for any new module
+    the `PlatformLayering` source rules in `tools/repo/source_rules.py` for any new module
     surface introduced.
 
 ## Docs

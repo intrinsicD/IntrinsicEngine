@@ -31,9 +31,8 @@ export namespace Extrinsic::ECS::Components
     //
     // The payload is CPU-only and intentionally imports neither `entt`,
     // `geometry`, `assets`, `runtime`, `graphics`, nor `platform`. The
-    // contract test
-    // `tests/contract/ecs/Test.ECS.LayeringBoundaries.cpp`
-    // (`StableIdPayloadStaysCpuOnly`) enforces this so the value type
+    // source rule `EcsLayeringBoundaries.StableIdPayloadStaysCpuOnly`
+    // (tools/repo/source_rules.py) enforces this so the value type
     // remains usable outside ECS (serializer, editor, runtime helpers).
     struct StableId
     {

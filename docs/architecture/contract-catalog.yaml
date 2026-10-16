@@ -86,7 +86,7 @@ contracts:
       - tests/contract/runtime/Test.SceneInteractionModule.cpp
       - tests/contract/runtime/Test.EditorUiHost.cpp
       - tests/contract/runtime/Test.ImGuiAdapterEngineWiring.cpp
-      - tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp
+      - tools/repo/source_rules.py  # RuntimeEnginePrivateGlue source rules
       - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
       # Operational on Vulkan for the executed path at pixel ratio 1 only (ara claim C118);
       # a HiDPI run is owned by UI-079.

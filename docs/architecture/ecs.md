@@ -125,9 +125,9 @@ defaulted equality / `operator<=>`, and the exported `StableIdHash`
 functor. The payload is a pure CPU value type with no `entt`,
 `geometry`, `assets`, `runtime`, `graphics`, or `platform` imports, so
 serializers, editors, and runtime helpers can consume it without taking
-on those dependencies. The targeted contract test
-`tests/contract/ecs/Test.ECS.LayeringBoundaries.cpp`
-(`StableIdPayloadStaysCpuOnly`) guards the no-`entt` rule on this one
+on those dependencies. The targeted source rule
+`EcsLayeringBoundaries.StableIdPayloadStaysCpuOnly` in `tools/repo/source_rules.py`
+guards the no-`entt` rule on this one
 file; the existing directory-recursive sweep continues to enforce the
 shared `ecs -> {core, geometry}` import constraint. CPU-only
 `unit;ecs` payload tests live in

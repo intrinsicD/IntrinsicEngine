@@ -191,8 +191,8 @@
   src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cppm,
   src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cpp,
   tests/contract/runtime/Test.AssetWorkflowModule.cpp,
-  tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp,
-  tests/contract/runtime/Test.RuntimeEngineLayering.cpp]
+  tools/repo/source_rules.py,
+  tools/repo/source_rules_engine_layering.py]
 - **From staging**: O55
 - **Supersedes**: A05
 

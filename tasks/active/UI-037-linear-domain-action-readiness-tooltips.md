@@ -2645,7 +2645,7 @@ Logs and fixed Claude packets: `/tmp/intrinsic-property-contracts/`.
 ```bash
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests -j4
-ctest --test-dir build/ci --output-on-failure -R '^SandboxConfigSections\.|^RuntimeGeometryAvailability\.|^ProcessingCompilationLocality\.|^RuntimeEngineLayering.NoDuplicateGeometryPropertyVocabularyRemains$|^SandboxEditorPresentation.DisabledActionReasonTooltipAppearsAfterTwoFrames$' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+ctest --test-dir build/ci --output-on-failure -R '^SandboxConfigSections\.|^RuntimeGeometryAvailability\.|^ProcessingCompilationLocality\.|^RuntimeEngineLayering\.SourceRules$|^SandboxEditorPresentation.DisabledActionReasonTooltipAppearsAfterTwoFrames$' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
 cmake --preset ci-vulkan
 cmake --build --preset ci-vulkan --target ExtrinsicSandbox -j4
