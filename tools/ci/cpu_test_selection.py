@@ -30,8 +30,11 @@ MODE_IDENTITIES = {
 }
 REPO_ROOT = Path(__file__).resolve().parents[2]
 # Repository scripts that CTest runs directly instead of a registered test
-# binary (build-graph contracts); selected as script tests, not producer cases.
-SCRIPT_TESTS = ("tools/analysis/compile_hotspots.py",)
+# binary (build-graph and source contracts); selected as script tests, not producer cases.
+SCRIPT_TESTS = (
+    "tools/analysis/compile_hotspots.py",
+    "tools/repo/check_source_rules.py",
+)
 _PYTHON_LAUNCHER_RE = re.compile(r"python(?:3(?:\.[0-9]+)?)?")
 _GTEST_SUITE_RE = re.compile(r"^(?P<suite>\S+)\.\s*(?:#.*)?$")
 _GTEST_COMMENT_RE = re.compile(r"\s+#.*$")

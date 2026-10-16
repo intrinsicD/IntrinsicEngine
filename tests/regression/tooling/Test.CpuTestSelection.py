@@ -610,6 +610,38 @@ Alpha.
         self.assertEqual(result.returncode, 3)
         self.assertIn("does not map to a registered producer", result.stderr)
 
+    def test_capture_records_source_rules_as_script_tests(self) -> None:
+        build = self.root / "build"
+        record = _script_record(
+            build,
+            "RenderWorldPoolEngineWiring.SourceRules",
+            "tools/repo/check_source_rules.py",
+        )
+        record["command"] = [
+            sys.executable,
+            str(REPO_ROOT / "tools/repo/check_source_rules.py"),
+            "--root",
+            str(REPO_ROOT),
+            "--suite",
+            "RenderWorldPoolEngineWiring",
+        ]
+        _write_build(build, "none", tests=[*_default_tests(build), record])
+
+        _result, output = self._capture(build, "ci", "none")
+        report = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual(
+            report["selection"]["normalized"]["script_tests"],
+            [{
+                "disabled": False,
+                "labels": ["build", "contract", "runtime"],
+                "name": "RenderWorldPoolEngineWiring.SourceRules",
+                "script": "tools/repo/check_source_rules.py",
+            }],
+        )
+        self.assertEqual(report["summary"]["script_test_count"], 1)
+        self.assertEqual(report["summary"]["selected_test_count"], 4)
+        self.assertNotIn(str(REPO_ROOT), output.read_text(encoding="utf-8"))
+
     def test_capture_records_allowlisted_script_tests_without_build_paths(
         self,
     ) -> None:
