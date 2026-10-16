@@ -1862,242 +1862,55 @@ TEST(SandboxEditorPresentation, GlobalVisibilityHotkeyUsesTheVisibilityCommandPa
     engine.Shutdown();
 }
 
-TEST(SandboxEditorPresentation, RegistrationDomainMenusOpenOneSharedWindow)
+TEST(SandboxEditorPresentation, DomainMenusOpenOneSharedWindow)
 {
-    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
-    ComposeEditorUiAndInitialize(engine);
-    Editor::EditorShell shell;
-    shell.Attach(engine.Worlds(), engine.Services());
-    Editor::MeshProcessingPanels panels;
-    panels.Register(shell);
-    for (const auto* id : {"mesh.processing.registration", "graph.processing.registration", "pointcloud.processing.registration"})
+    // Each per-domain menu entry opens the shared method window and stays closed itself.
+    struct SharedWindowCase
     {
-        ASSERT_TRUE(shell.SetEditorWindowOpen(id, true));
-        const auto menu = shell.BuildEditorWindowMenuModel();
-        ASSERT_NE(FindWindow(menu, "view.registration"), nullptr);
-        EXPECT_TRUE(FindWindow(menu, "view.registration")->Open);
-        ASSERT_NE(FindWindow(menu, id), nullptr);
-        EXPECT_FALSE(FindWindow(menu, id)->Open);
-        ASSERT_TRUE(shell.SetEditorWindowOpen("view.registration", false));
-    }
-    shell.Detach();
-    engine.Shutdown();
-}
-
-TEST(SandboxEditorPresentation, NormalDomainMenusOpenOneSharedWindow)
-{
-    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
-    ComposeEditorUiAndInitialize(engine);
-    Editor::EditorShell shell;
-    shell.Attach(engine.Worlds(), engine.Services());
-    Editor::MeshProcessingPanels panels;
-    panels.Register(shell);
-    for (const auto* id : {"mesh.processing.vertices.normals", "graph.processing.vertices.normals", "pointcloud.processing.vertices.normals", "mesh.processing.faces.normals"})
+        const char* Shared;
+        std::vector<const char*> DomainIds;
+        bool Draw; // Opening the shared window must also draw one frame.
+    };
+    const std::vector<SharedWindowCase> cases{
+        {"view.registration", {"mesh.processing.registration", "graph.processing.registration", "pointcloud.processing.registration"}, false},
+        {"view.normal_estimation", {"mesh.processing.vertices.normals", "graph.processing.vertices.normals", "pointcloud.processing.vertices.normals", "mesh.processing.faces.normals"}, true},
+        {"view.outlier_analysis", {"mesh.processing.outliers", "graph.processing.outliers", "pointcloud.processing.remove_outliers"}, true},
+        {"view.kernel_density", {"mesh.processing.kernel_density", "graph.processing.kernel_density", "pointcloud.processing.kernel_density"}, true},
+        {"view.point_spacing", {"mesh.processing.point_spacing", "graph.processing.point_spacing", "pointcloud.processing.point_spacing"}, true},
+        {"view.bilateral_filter", {"mesh.processing.bilateral_filter", "graph.processing.bilateral_filter", "pointcloud.processing.bilateral_filter"}, true},
+        {"view.keypoint_analysis", {"mesh.processing.keypoints", "graph.processing.keypoints", "pointcloud.processing.keypoints"}, true},
+        {"view.descriptor_analysis", {"mesh.processing.descriptors", "graph.processing.descriptors", "pointcloud.processing.descriptors"}, true},
+        {"view.density_weights", {"mesh.processing.density_weights", "graph.processing.density_weights", "pointcloud.processing.density_weights"}, true},
+        {"view.point_construction", {"mesh.processing.point_construction", "graph.processing.point_construction", "pointcloud.processing.point_construction"}, true},
+    };
+    for (const SharedWindowCase& c : cases)
     {
-        ASSERT_TRUE(shell.SetEditorWindowOpen(id, true));
-        const auto menu = shell.BuildEditorWindowMenuModel();
-        ASSERT_NE(FindWindow(menu, "view.normal_estimation"), nullptr);
-        EXPECT_TRUE(FindWindow(menu, "view.normal_estimation")->Open);
-        ASSERT_NE(FindWindow(menu, id), nullptr);
-        EXPECT_FALSE(FindWindow(menu, id)->Open);
-        ASSERT_TRUE(shell.SetEditorWindowOpen("view.normal_estimation", false));
+        SCOPED_TRACE(c.Shared);
+        Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+        ComposeEditorUiAndInitialize(engine);
+        Editor::EditorShell shell;
+        shell.Attach(engine.Worlds(), engine.Services());
+        Editor::MeshProcessingPanels panels;
+        panels.Register(shell);
+        for (const char* id : c.DomainIds)
+        {
+            SCOPED_TRACE(id);
+            ASSERT_TRUE(shell.SetEditorWindowOpen(id, true));
+            const auto menu = shell.BuildEditorWindowMenuModel();
+            ASSERT_NE(FindWindow(menu, c.Shared), nullptr);
+            EXPECT_TRUE(FindWindow(menu, c.Shared)->Open);
+            ASSERT_NE(FindWindow(menu, id), nullptr);
+            EXPECT_FALSE(FindWindow(menu, id)->Open);
+            ASSERT_TRUE(shell.SetEditorWindowOpen(c.Shared, false));
+        }
+        if (c.Draw)
+        {
+            ASSERT_TRUE(shell.SetEditorWindowOpen(c.Shared, true));
+            engine.Run();
+        }
+        shell.Detach();
+        engine.Shutdown();
     }
-    ASSERT_TRUE(shell.SetEditorWindowOpen("view.normal_estimation", true));
-    engine.Run();
-    shell.Detach();
-    engine.Shutdown();
-}
-
-TEST(SandboxEditorPresentation, OutlierDomainMenusOpenOneSharedWindow)
-{
-    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
-    ComposeEditorUiAndInitialize(engine);
-    Editor::EditorShell shell;
-    shell.Attach(engine.Worlds(), engine.Services());
-    Editor::MeshProcessingPanels panels;
-    panels.Register(shell);
-    for (const auto* id : {"mesh.processing.outliers", "graph.processing.outliers", "pointcloud.processing.remove_outliers"})
-    {
-        ASSERT_TRUE(shell.SetEditorWindowOpen(id, true));
-        const auto menu = shell.BuildEditorWindowMenuModel();
-        ASSERT_NE(FindWindow(menu, "view.outlier_analysis"), nullptr);
-        EXPECT_TRUE(FindWindow(menu, "view.outlier_analysis")->Open);
-        ASSERT_NE(FindWindow(menu, id), nullptr);
-        EXPECT_FALSE(FindWindow(menu, id)->Open);
-        ASSERT_TRUE(shell.SetEditorWindowOpen("view.outlier_analysis", false));
-    }
-    ASSERT_TRUE(shell.SetEditorWindowOpen("view.outlier_analysis", true));
-    engine.Run();
-    shell.Detach();
-    engine.Shutdown();
-}
-
-TEST(SandboxEditorPresentation, DensityDomainMenusOpenOneSharedWindow)
-{
-    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
-    ComposeEditorUiAndInitialize(engine);
-    Editor::EditorShell shell;
-    shell.Attach(engine.Worlds(), engine.Services());
-    Editor::MeshProcessingPanels panels;
-    panels.Register(shell);
-    for (const auto* id : {"mesh.processing.kernel_density", "graph.processing.kernel_density", "pointcloud.processing.kernel_density"})
-    {
-        ASSERT_TRUE(shell.SetEditorWindowOpen(id, true));
-        const auto menu = shell.BuildEditorWindowMenuModel();
-        ASSERT_NE(FindWindow(menu, "view.kernel_density"), nullptr);
-        EXPECT_TRUE(FindWindow(menu, "view.kernel_density")->Open);
-        ASSERT_NE(FindWindow(menu, id), nullptr);
-        EXPECT_FALSE(FindWindow(menu, id)->Open);
-        ASSERT_TRUE(shell.SetEditorWindowOpen("view.kernel_density", false));
-    }
-    ASSERT_TRUE(shell.SetEditorWindowOpen("view.kernel_density", true));
-    engine.Run();
-    shell.Detach();
-    engine.Shutdown();
-}
-
-TEST(SandboxEditorPresentation, SpacingDomainMenusOpenOneSharedWindow)
-{
-    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
-    ComposeEditorUiAndInitialize(engine);
-    Editor::EditorShell shell;
-    shell.Attach(engine.Worlds(), engine.Services());
-    Editor::MeshProcessingPanels panels;
-    panels.Register(shell);
-    for (const auto* id : {"mesh.processing.point_spacing", "graph.processing.point_spacing", "pointcloud.processing.point_spacing"})
-    {
-        ASSERT_TRUE(shell.SetEditorWindowOpen(id, true));
-        const auto menu = shell.BuildEditorWindowMenuModel();
-        ASSERT_NE(FindWindow(menu, "view.point_spacing"), nullptr);
-        EXPECT_TRUE(FindWindow(menu, "view.point_spacing")->Open);
-        ASSERT_NE(FindWindow(menu, id), nullptr);
-        EXPECT_FALSE(FindWindow(menu, id)->Open);
-        ASSERT_TRUE(shell.SetEditorWindowOpen("view.point_spacing", false));
-    }
-    ASSERT_TRUE(shell.SetEditorWindowOpen("view.point_spacing", true));
-    engine.Run();
-    shell.Detach();
-    engine.Shutdown();
-}
-
-TEST(SandboxEditorPresentation, BilateralDomainMenusOpenOneSharedWindow)
-{
-    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
-    ComposeEditorUiAndInitialize(engine);
-    Editor::EditorShell shell;
-    shell.Attach(engine.Worlds(), engine.Services());
-    Editor::MeshProcessingPanels panels;
-    panels.Register(shell);
-    for (const auto* id : {"mesh.processing.bilateral_filter", "graph.processing.bilateral_filter", "pointcloud.processing.bilateral_filter"})
-    {
-        ASSERT_TRUE(shell.SetEditorWindowOpen(id, true));
-        const auto menu = shell.BuildEditorWindowMenuModel();
-        ASSERT_NE(FindWindow(menu, "view.bilateral_filter"), nullptr);
-        EXPECT_TRUE(FindWindow(menu, "view.bilateral_filter")->Open);
-        ASSERT_NE(FindWindow(menu, id), nullptr);
-        EXPECT_FALSE(FindWindow(menu, id)->Open);
-        ASSERT_TRUE(shell.SetEditorWindowOpen("view.bilateral_filter", false));
-    }
-    ASSERT_TRUE(shell.SetEditorWindowOpen("view.bilateral_filter", true));
-    engine.Run();
-    shell.Detach();
-    engine.Shutdown();
-}
-
-TEST(SandboxEditorPresentation, KeypointDomainMenusOpenOneSharedWindow)
-{
-    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
-    ComposeEditorUiAndInitialize(engine);
-    Editor::EditorShell shell;
-    shell.Attach(engine.Worlds(), engine.Services());
-    Editor::MeshProcessingPanels panels;
-    panels.Register(shell);
-    for (const auto* id : {"mesh.processing.keypoints", "graph.processing.keypoints", "pointcloud.processing.keypoints"})
-    {
-        ASSERT_TRUE(shell.SetEditorWindowOpen(id, true));
-        const auto menu = shell.BuildEditorWindowMenuModel();
-        ASSERT_NE(FindWindow(menu, "view.keypoint_analysis"), nullptr);
-        EXPECT_TRUE(FindWindow(menu, "view.keypoint_analysis")->Open);
-        ASSERT_NE(FindWindow(menu, id), nullptr);
-        EXPECT_FALSE(FindWindow(menu, id)->Open);
-        ASSERT_TRUE(shell.SetEditorWindowOpen("view.keypoint_analysis", false));
-    }
-    ASSERT_TRUE(shell.SetEditorWindowOpen("view.keypoint_analysis", true));
-    engine.Run();
-    shell.Detach();
-    engine.Shutdown();
-}
-TEST(SandboxEditorPresentation, DescriptorDomainMenusOpenOneSharedWindow)
-{
-    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
-    ComposeEditorUiAndInitialize(engine);
-    Editor::EditorShell shell;
-    shell.Attach(engine.Worlds(), engine.Services());
-    Editor::MeshProcessingPanels panels;
-    panels.Register(shell);
-    for (const auto* id : {"mesh.processing.descriptors", "graph.processing.descriptors", "pointcloud.processing.descriptors"})
-    {
-        ASSERT_TRUE(shell.SetEditorWindowOpen(id, true));
-        const auto menu = shell.BuildEditorWindowMenuModel();
-        ASSERT_NE(FindWindow(menu, "view.descriptor_analysis"), nullptr);
-        EXPECT_TRUE(FindWindow(menu, "view.descriptor_analysis")->Open);
-        ASSERT_NE(FindWindow(menu, id), nullptr);
-        EXPECT_FALSE(FindWindow(menu, id)->Open);
-        ASSERT_TRUE(shell.SetEditorWindowOpen("view.descriptor_analysis", false));
-    }
-    ASSERT_TRUE(shell.SetEditorWindowOpen("view.descriptor_analysis", true));
-    engine.Run();
-    shell.Detach();
-    engine.Shutdown();
-}
-
-TEST(SandboxEditorPresentation, DensityWeightDomainMenusOpenOneSharedWindow)
-{
-    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
-    ComposeEditorUiAndInitialize(engine);
-    Editor::EditorShell shell;
-    shell.Attach(engine.Worlds(), engine.Services());
-    Editor::MeshProcessingPanels panels;
-    panels.Register(shell);
-    for (const auto* id : {"mesh.processing.density_weights", "graph.processing.density_weights", "pointcloud.processing.density_weights"})
-    {
-        ASSERT_TRUE(shell.SetEditorWindowOpen(id, true));
-        const auto menu = shell.BuildEditorWindowMenuModel();
-        ASSERT_NE(FindWindow(menu, "view.density_weights"), nullptr);
-        EXPECT_TRUE(FindWindow(menu, "view.density_weights")->Open);
-        ASSERT_NE(FindWindow(menu, id), nullptr);
-        EXPECT_FALSE(FindWindow(menu, id)->Open);
-        ASSERT_TRUE(shell.SetEditorWindowOpen("view.density_weights", false));
-    }
-    ASSERT_TRUE(shell.SetEditorWindowOpen("view.density_weights", true));
-    engine.Run();
-    shell.Detach();
-    engine.Shutdown();
-}
-
-
-TEST(SandboxEditorPresentation, PointConstructionDomainMenusOpenOneSharedWindow)
-{
-    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
-    ComposeEditorUiAndInitialize(engine);
-    Editor::EditorShell shell;
-    shell.Attach(engine.Worlds(), engine.Services());
-    Editor::MeshProcessingPanels panels;
-    panels.Register(shell);
-    for (const auto* id : {"mesh.processing.point_construction", "graph.processing.point_construction", "pointcloud.processing.point_construction"})
-    {
-        ASSERT_TRUE(shell.SetEditorWindowOpen(id, true));
-        const auto menu = shell.BuildEditorWindowMenuModel();
-        ASSERT_NE(FindWindow(menu, "view.point_construction"), nullptr);
-        EXPECT_TRUE(FindWindow(menu, "view.point_construction")->Open);
-        ASSERT_NE(FindWindow(menu, id), nullptr);
-        EXPECT_FALSE(FindWindow(menu, id)->Open);
-        ASSERT_TRUE(shell.SetEditorWindowOpen("view.point_construction", false));
-    }
-    ASSERT_TRUE(shell.SetEditorWindowOpen("view.point_construction", true));
-    engine.Run();
-    shell.Detach();
-    engine.Shutdown();
 }
 
 TEST(SandboxEditorPresentation, RegistrationInterfacesExcludeProcessingDependencies)
