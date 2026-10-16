@@ -1,3 +1,4 @@
+// Task scheduling, worker-only priorities and coroutine ownership.
 module;
 
 #include <atomic>
@@ -19,9 +20,9 @@ export class Job;
     // most to least urgent so hot scheduler scans need no dynamic policy
     // state. Priority is preferential rather than realtime or starvation-free.
     //
-    // Background is also worker-only: external help (TryRunOne, WaitForAll,
-    // and therefore TaskGraphCompletion::Wait) never executes it, so a
-    // waiting frame thread cannot inline a long job. Use it for long work
+    // Background-prefixed lanes are worker-only: external help (TryRunOne,
+    // WaitForAll and TaskGraphCompletion::Wait) never executes them, so a
+    // waiting frame thread cannot inline a long job. Use them for long work
     // that no thread waits on synchronously; such work completes only on a
     // scheduler worker (Initialize() always starts at least one).
     export enum class DispatchPriority : std::uint8_t
@@ -29,6 +30,10 @@ export class Job;
         High = 0,
         Normal,
         Low,
+        BackgroundCritical,
+        BackgroundHigh,
+        BackgroundNormal,
+        BackgroundLow,
         Background,
     };
 
@@ -112,9 +117,11 @@ export class Job;
         }
 
         static void Dispatch(Job&& job);
-        // Priority applies to this queued resume only. Later coroutine
-        // reschedules return to the normal lane.
+        // Priority is retained across coroutine yields and wait-token resumes,
+        // including when another thread signals the token.
         static void Dispatch(DispatchPriority priority, Job&& job);
+        // Retains the current task lane (Normal outside a task) and takes frame ownership
+        // until resumed; rejection or shutdown destroys a queued frame.
         static void Reschedule(std::coroutine_handle<> h, std::shared_ptr<std::atomic<bool>> alive = nullptr);
 
         [[nodiscard]] static bool IsInitialized() noexcept;
@@ -146,6 +153,8 @@ export class Job;
     private:
         static void WorkerEntry(unsigned threadIndex);
         static void DispatchInternal(LocalTask&& task, DispatchPriority priority);
+        static void Reschedule(std::coroutine_handle<> h, std::shared_ptr<std::atomic<bool>> alive,
+                               DispatchPriority priority);
     };
 
     export class Job

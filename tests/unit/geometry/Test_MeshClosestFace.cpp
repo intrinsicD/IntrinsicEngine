@@ -77,10 +77,10 @@ namespace
             for (std::size_t i = 1; i + 1 < c.size(); ++i)
             {
                 const Triangle tri{c[0], c[i], c[i + 1]};
-                if (tri.GetArea() <= 1.0e-6f)
+                const glm::vec3 n = tri.GetNormal();
+                if (n == glm::vec3(0.0f))
                     continue;
                 const glm::vec3 cp = Geometry::ClosestPoint(tri, p);
-                const glm::vec3 n = tri.GetNormal();
                 const float sd = static_cast<float>(
                     Geometry::SquaredDistance(tri, p));
                 hits.push_back(Geometry::MeshClosestFaceHit{
@@ -278,4 +278,34 @@ TEST(GeometryMeshClosestFace, SubsetBuildRestrictsCandidates)
     EXPECT_NEAR(result.SquaredDistance,
                 brute.front().SquaredDistance,
                 1.0e-5f);
+}
+
+
+TEST(GeometryMeshClosestFace, UniformScalePreservesInteriorFaceHit)
+{
+    for (const float scale : {1.0e-8f, 5.0e-4f, 1.0f, 1.0e8f})
+    {
+        SCOPED_TRACE(scale);
+        Geometry::HalfedgeMesh::Mesh mesh;
+        const auto a = mesh.AddVertex({0, 0, 0});
+        const auto b = mesh.AddVertex({scale, 0, 0});
+        const auto c = mesh.AddVertex({0, scale, 0});
+        ASSERT_TRUE(mesh.AddTriangle(a, b, c));
+        Geometry::MeshClosestFaceIndex index;
+        const bool built = index.Build(mesh);
+        EXPECT_TRUE(built);
+        if (!built) continue;
+        const glm::vec3 query{scale * .2f, scale * .2f, scale * .3f};
+        const auto hit = index.Query(query);
+        ASSERT_TRUE(hit.Found);
+        EXPECT_NEAR(hit.Point.x / scale, .2f, 1.0e-6f);
+        EXPECT_NEAR(hit.Point.y / scale, .2f, 1.0e-6f);
+        EXPECT_NEAR(hit.Point.z / scale, 0.f, 1.0e-6f);
+        EXPECT_NEAR(hit.SquaredDistance / (scale * scale), .09f, 1.0e-6f);
+        EXPECT_EQ(hit.Normal, glm::vec3(0, 0, 1));
+        const auto brute = BruteForceHits(mesh, query);
+        ASSERT_EQ(brute.size(), 1u);
+        EXPECT_NEAR(brute.front().Point.x / scale, .2f, 1.0e-6f);
+        EXPECT_NEAR(brute.front().Point.y / scale, .2f, 1.0e-6f);
+    }
 }

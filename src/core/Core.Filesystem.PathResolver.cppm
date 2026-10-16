@@ -1,3 +1,4 @@
+// Repository-relative asset and shader path resolution with checked shader lookup.
 module;
 
 #include <string>

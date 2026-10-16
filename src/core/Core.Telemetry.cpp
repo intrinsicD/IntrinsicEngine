@@ -5,6 +5,7 @@ module;
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -96,8 +97,8 @@ namespace Extrinsic::Core::Telemetry
         m_SimClampCount.store(0, std::memory_order_relaxed);
         m_SimCpuNs.store(0, std::memory_order_relaxed);
 
-        const std::size_t count = m_CategoryCount.load(std::memory_order_relaxed);
-        for (std::size_t i = 0; i < count; ++i)
+        std::lock_guard lock(m_CategoryMutex);
+        for (std::size_t i = 0; i < m_CategoryCount; ++i)
             m_Categories[i].Reset();
     }
 
@@ -126,8 +127,9 @@ namespace Extrinsic::Core::Telemetry
         f.AllocCount = Alloc::SnapshotCount();
         f.FrameGraphCompileTimeNs = m_FGCompileNs.load(std::memory_order_relaxed);
         f.FrameGraphExecuteTimeNs = m_FGExecuteNs.load(std::memory_order_relaxed);
-        f.FrameGraphCriticalPathTimeNs = m_FGCriticalPathNs.load(std::memory_order_relaxed);
         // Task stats
+        f.Tasks.InFlightTasks = m_TaskInFlight.load(std::memory_order_relaxed);
+        f.Tasks.QueuedTasks = m_TaskQueued.load(std::memory_order_relaxed);
         f.Tasks.ParkCount = m_TaskParkCount.load(std::memory_order_relaxed);
         f.Tasks.UnparkCount = m_TaskUnparkCount.load(std::memory_order_relaxed);
         f.Tasks.ParkLatencyP50Ns = m_TaskParkP50Ns.load(std::memory_order_relaxed);
@@ -147,21 +149,13 @@ namespace Extrinsic::Core::Telemetry
     }
 
     void TelemetrySystem::RecordSample(uint32_t nameHash, const char* name,
-                                       uint64_t durationNs, uint16_t depth)
+                                       uint64_t durationNs)
     {
+        std::lock_guard lock(m_CategoryMutex);
         const std::size_t catIdx = FindOrCreateCategory(nameHash, name);
         if (catIdx < kMaxCategories)
             m_Categories[catIdx].AddSample(durationNs);
-
-        const uint32_t si = m_SampleCount.fetch_add(1, std::memory_order_relaxed);
-        if (si < kMaxSamplesPerFrame)
-        {
-            const std::size_t fi = m_CurrentFrame % kMaxFrameHistory;
-            auto& s = m_SampleBuffer[fi * kMaxSamplesPerFrame + si];
-            s.NameHash = nameHash;
-            s.DurationNs = durationNs;
-            s.Depth = depth;
-        }
+        m_SampleCount.fetch_add(1, std::memory_order_relaxed);
     }
 
     void TelemetrySystem::RecordDrawCall(uint32_t triangles) noexcept
@@ -201,6 +195,8 @@ namespace Extrinsic::Core::Telemetry
 
     void TelemetrySystem::SetTaskStats(const TaskSchedulerStats& s) noexcept
     {
+        m_TaskInFlight.store(s.InFlightTasks, std::memory_order_relaxed);
+        m_TaskQueued.store(s.QueuedTasks, std::memory_order_relaxed);
         m_TaskParkCount.store(s.ParkCount, std::memory_order_relaxed);
         m_TaskUnparkCount.store(s.UnparkCount, std::memory_order_relaxed);
         m_TaskParkP50Ns.store(s.ParkLatencyP50Ns, std::memory_order_relaxed);
@@ -217,12 +213,10 @@ namespace Extrinsic::Core::Telemetry
     }
 
     void TelemetrySystem::SetFrameGraphTimings(uint64_t compileNs,
-                                               uint64_t executeNs,
-                                               uint64_t criticalPathNs) noexcept
+                                               uint64_t executeNs) noexcept
     {
         m_FGCompileNs.store(compileNs, std::memory_order_relaxed);
         m_FGExecuteNs.store(executeNs, std::memory_order_relaxed);
-        m_FGCriticalPathNs.store(criticalPathNs, std::memory_order_relaxed);
     }
 
     void TelemetrySystem::SetGpuMemoryBudgets(const GpuMemorySnapshot& snapshot)
@@ -279,40 +273,23 @@ namespace Extrinsic::Core::Telemetry
         return ms > 0.0 ? 1000.0 / ms : 0.0;
     }
 
-    std::vector<const TimingCategory*> TelemetrySystem::GetCategoriesSortedByTime() const
+    std::vector<TimingCategory> TelemetrySystem::GetCategories() const
     {
-        const std::size_t count = m_CategoryCount.load(std::memory_order_relaxed);
-        std::vector<const TimingCategory*> result;
-        result.reserve(count);
-        for (std::size_t i = 0; i < count; ++i)
-            if (m_Categories[i].CallCount > 0)
-                result.push_back(&m_Categories[i]);
-        std::sort(result.begin(), result.end(),
-                  [](const TimingCategory* a, const TimingCategory* b)
-                  {
-                      return a->TotalTimeNs > b->TotalTimeNs;
-                  });
-        return result;
+        std::lock_guard lock(m_CategoryMutex);
+        return {m_Categories.begin(), m_Categories.begin() + m_CategoryCount};
     }
 
     std::size_t TelemetrySystem::FindOrCreateCategory(uint32_t nameHash, const char* name)
     {
-        const std::size_t count = m_CategoryCount.load(std::memory_order_relaxed);
-        for (std::size_t i = 0; i < count; ++i)
+        for (std::size_t i = 0; i < m_CategoryCount; ++i)
             if (m_Categories[i].NameHash == nameHash)
                 return i;
-        if (count < kMaxCategories)
-        {
-            const std::size_t newIdx =
-                m_CategoryCount.fetch_add(1, std::memory_order_relaxed);
-            if (newIdx < kMaxCategories)
-            {
-                m_Categories[newIdx].NameHash = nameHash;
-                m_Categories[newIdx].Name = name;
-                return newIdx;
-            }
-        }
-        return kMaxCategories; // dropped
+        if (m_CategoryCount == kMaxCategories)
+            return kMaxCategories;
+        const std::size_t index = m_CategoryCount++;
+        m_Categories[index].NameHash = nameHash;
+        m_Categories[index].Name = name;
+        return index;
     }
 
     ScopedTimer::ScopedTimer(const char* name, uint32_t nameHash) noexcept

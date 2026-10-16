@@ -44,18 +44,20 @@ namespace Geometry
 
     float ClosestPointParameter(const Segment& segment, const glm::vec3& point)
     {
-        const glm::vec3 ab = segment.B - segment.A;
-        const float abLenSq = glm::dot(ab, ab);
-        if (abLenSq <= 1e-12f)
+        const glm::dvec3 ab = glm::dvec3(segment.B) - glm::dvec3(segment.A);
+        const double abLenSq = glm::dot(ab, ab);
+        if (abLenSq == 0.0)
         {
             return 0.0f;
         }
-        return glm::clamp(glm::dot(point - segment.A, ab) / abLenSq, 0.0f, 1.0f);
+        const glm::dvec3 ap = glm::dvec3(point) - glm::dvec3(segment.A);
+        return static_cast<float>(glm::clamp(glm::dot(ap, ab) / abLenSq, 0.0, 1.0));
     }
 
     glm::vec3 ClosestPoint(const Segment& segment, const glm::vec3& point)
     {
-        return segment.GetPoint(ClosestPointParameter(segment, point));
+        const glm::dvec3 a(segment.A);
+        return glm::vec3(a + (glm::dvec3(segment.B) - a) * static_cast<double>(ClosestPointParameter(segment, point)));
     }
 
     double SquaredDistance(const Segment& segment, const glm::vec3& point)

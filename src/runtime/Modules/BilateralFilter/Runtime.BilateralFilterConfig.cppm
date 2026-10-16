@@ -2,14 +2,17 @@
 module;
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 export module Extrinsic.Runtime.BilateralFilterConfig;
 export import Extrinsic.Runtime.GeometryProperty.Types;
+import Extrinsic.Runtime.ConfigFieldSpec;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 export namespace Extrinsic::Runtime
 {
+    extern "C++" [[nodiscard]] std::span<const ConfigFieldSpec> BilateralFilterConfigFieldSpecs() noexcept;
     inline constexpr std::string_view kBilateralFilterConfigSectionName="sandbox.bilateral_filter";
     inline constexpr std::string_view kBilateralFilterConfigSectionSchemaId="intrinsic.runtime.sandbox.bilateral_filter";
     enum class BilateralFilterBackend : std::uint8_t { CpuOctree, CpuLBVH, VulkanLBVH };

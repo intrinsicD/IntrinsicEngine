@@ -1,3 +1,4 @@
+// Point storage with typed vertex properties, live-point iteration and borrowed range views.
 module;
 
 #include <cstddef>
@@ -61,7 +62,11 @@ export namespace Geometry::PointCloud
 
         [[nodiscard]] bool IsDeleted(VertexHandle v) const { return m_VDeleted[v]; }
 
-        [[nodiscard]] bool IsValid(VertexHandle v) const { return v.IsValid() && v.Index < VerticesSize(); }
+        [[nodiscard]] bool IsValid(VertexHandle v) const
+        {
+            const std::size_t offset = m_IsSubmeshView ? m_VertexRange.Offset : 0u;
+            return v.IsValid() && v.Index >= offset && v.Index - offset < VerticesSize();
+        }
 
         [[nodiscard]] LivePointRange LivePoints() const
         {

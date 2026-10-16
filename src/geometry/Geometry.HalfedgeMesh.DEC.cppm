@@ -1,3 +1,4 @@
+// Discrete differential operators, sparse solves and Laplacian diagnostics for halfedge meshes.
 module;
 
 #include <cassert>

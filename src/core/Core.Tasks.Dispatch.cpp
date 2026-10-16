@@ -5,6 +5,7 @@ module;
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <utility>
 
 module Extrinsic.Core.Tasks;
 
@@ -14,6 +15,29 @@ namespace Extrinsic::Core::Tasks
 {
     namespace
     {
+        struct ResumeTask
+        {
+            std::coroutine_handle<> Handle;
+            std::shared_ptr<std::atomic<bool>> Alive;
+
+            ResumeTask(std::coroutine_handle<> handle,
+                       std::shared_ptr<std::atomic<bool>> alive) noexcept
+                : Handle(handle), Alive(std::move(alive)) {}
+            ResumeTask(ResumeTask&& other) noexcept
+                : Handle(std::exchange(other.Handle, {})), Alive(std::move(other.Alive)) {}
+            ~ResumeTask()
+            {
+                if (Handle && (!Alive || Alive->exchange(false, std::memory_order_acq_rel)))
+                    Handle.destroy();
+            }
+            void operator()()
+            {
+                const auto handle = std::exchange(Handle, {});
+                if (handle && (!Alive || Alive->load(std::memory_order_acquire)))
+                    handle.resume();
+            }
+        };
+
         inline constexpr std::uint8_t NormalPriorityLane =
             static_cast<std::uint8_t>(DispatchPriority::Normal);
 
@@ -26,6 +50,8 @@ namespace Extrinsic::Core::Tasks
                 : static_cast<std::uint8_t>(DispatchPriority::Normal);
         }
     }
+
+    thread_local std::uint8_t s_CurrentPriorityLane = NormalPriorityLane;
 
     void Scheduler::Dispatch(Job&& job)
     {
@@ -42,27 +68,18 @@ namespace Extrinsic::Core::Tasks
         job.m_Handle = {};
         job.m_Alive = nullptr;
 
-        DispatchInternal(LocalTask([handle, alive = std::move(alive)]() mutable
-        {
-            if (alive && !alive->load(std::memory_order_acquire))
-                return;
-
-            handle.resume();
-        }), priority);
+        DispatchInternal(LocalTask(ResumeTask(handle, std::move(alive))), priority);
     }
 
     void Scheduler::Reschedule(std::coroutine_handle<> h, std::shared_ptr<std::atomic<bool>> alive)
     {
-        if (!s_Ctx || !h)
-            return;
+        Reschedule(h, std::move(alive), static_cast<DispatchPriority>(s_CurrentPriorityLane));
+    }
 
-        DispatchInternal(LocalTask([h, alive = std::move(alive)]() mutable
-        {
-            if (alive && !alive->load(std::memory_order_acquire))
-                return;
-
-            h.resume();
-        }), DispatchPriority::Normal);
+    void Scheduler::Reschedule(std::coroutine_handle<> h, std::shared_ptr<std::atomic<bool>> alive,
+                               const DispatchPriority priority)
+    {
+        DispatchInternal(LocalTask(ResumeTask(h, std::move(alive))), priority);
     }
 
     void Scheduler::DispatchInternal(LocalTask&& task,
@@ -81,7 +98,7 @@ namespace Extrinsic::Core::Tasks
                 1, std::memory_order_relaxed);
         }
 
-        if (s_WorkerIndex >= 0)
+        if (s_WorkerIndex >= 0 && lane < Detail::HelpableLaneCount)
         {
             auto& worker = s_Ctx->workerStates[static_cast<unsigned>(s_WorkerIndex)];
             std::lock_guard lock(worker.localLock);
@@ -109,7 +126,9 @@ namespace Extrinsic::Core::Tasks
     bool EnqueueInject(LocalTask&& task, const std::uint8_t lane)
     {
         auto& injectLane = s_Ctx->injectLanes[lane];
-        const bool pushed = injectLane.Queue.Push(std::move(task));
+        // One FIFO owns worker-only tasks, including submissions from workers.
+        const bool pushed = lane < Detail::HelpableLaneCount &&
+                            injectLane.Queue.Push(std::move(task));
         s_Ctx->injectPushCount.fetch_add(1, std::memory_order_relaxed);
         if (pushed)
             return true;
@@ -162,9 +181,9 @@ namespace Extrinsic::Core::Tasks
                               const std::optional<unsigned> workerIndex,
                               std::uint8_t& poppedLane)
     {
-        // Helpers stop before the worker-only Background lane so a waiting
+        // Helpers stop before the worker-only lanes so a waiting
         // thread never inlines a long job. Workers' own loop still drains
-        // that lane, so skipping it here cannot strand the task.
+        // those lanes, so skipping them here cannot strand the task.
         for (std::uint8_t lane = 0u;
              lane < Detail::HelpableLaneCount;
              ++lane)
@@ -344,8 +363,12 @@ namespace Extrinsic::Core::Tasks
             s_Ctx->queuedTaskCountByLane[lane].fetch_sub(
                 1, std::memory_order_relaxed);
         }
+        // Nested help executes another task on this thread; restore its caller's
+        // lane so a later park or yield retains the outer continuation's policy.
+        const auto previousLane = std::exchange(s_CurrentPriorityLane, lane);
         if (task.Valid())
             task();
+        s_CurrentPriorityLane = previousLane;
 
         s_Ctx->activeTaskCount.fetch_sub(1, std::memory_order_relaxed);
         const auto remaining = s_Ctx->inFlightTasks.fetch_sub(1, std::memory_order_acq_rel) - 1;

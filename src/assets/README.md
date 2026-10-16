@@ -4,18 +4,8 @@
 `AssetService` is the main entry point; it wires together the registry, payload
 store, load pipeline, event bus, and path index behind a single façade.
 
-## Public module surface
-
-- `Extrinsic.Asset.Service`
-- `Extrinsic.Asset.Registry`
-- `Extrinsic.Asset.PayloadStore`
-- `Extrinsic.Asset.ImportRouter`
-- `Extrinsic.Asset.GeometryPayload`
-- `Extrinsic.Asset.ModelTexturePayload`
-- `Extrinsic.Asset.LoadPipeline`
-- `Extrinsic.Asset.EventBus`
-- `Extrinsic.Asset.PathIndex`
-- `Extrinsic.Asset.TypePool`
+The [generated module inventory](../../docs/api/generated/module_inventory.md)
+lists the public modules; [CMakeLists.txt](CMakeLists.txt) defines their build units.
 
 ## How the subsystem fits together
 
@@ -33,6 +23,8 @@ store, load pipeline, event bus, and path index behind a single façade.
   used by model-scene payloads. It owns no codec registry or IO dispatch;
   runtime calls the promoted geometry loaders selected by `Asset.ImportRouter`
   directly, while geometry modules retain their ordinary exporters.
+- `Asset.ImportValidation` defines per-request validation options and reports
+  shared by CPU payloads and Runtime imports, including optional byte budgets.
 - `Asset.ModelTexturePayload` defines CPU-only model-scene and texture payload
   records, validation helpers, material texture references, and external
   resource diagnostics for GLTF/GLB and image ingest. Model primitives point at
@@ -53,8 +45,7 @@ store, load pipeline, event bus, and path index behind a single façade.
   Current promoted workflows have no checked-in KTX assets or compressed/mip
   texture requirement, so `Asset.ModelTexturePayload` does not accept KTX CPU
   payloads and runtime registers no KTX decoder.
-- `AssetLoadPipeline` tracks load stages, in-flight requests, GPU fence waits,
-  and failure / completion transitions. Reload requests can queue a `Reloaded`
+- `AssetLoadPipeline` tracks in-flight CPU requests and completion transitions. Reload requests can queue a `Reloaded`
   event immediately after entering `QueuedIO`, so main-thread subscribers see
   `Reloaded` before the subsequent `Ready` event. Scheduled CPU transitions
   capture a shared invalidation gate rather than the pipeline object: pipeline
@@ -67,40 +58,10 @@ store, load pipeline, event bus, and path index behind a single façade.
   single asset to those listeners while preserving unrelated pending events,
   which `AssetService` uses during destroy.
 - `AssetPathIndex` resolves absolute paths to live assets.
-- `TypePools<Key>` in `Asset.TypePool.cppm` provides stable type IDs for
-  payloads without requiring RTTI.
+- `TypePools<Key>` in `Asset.TypePool.cppm` provides process-local type tokens
+  without RTTI, including the normalized 32-bit fold used by asset metadata.
 
-## Files in this directory
-
-### Module interfaces (`.cppm`)
-
-```text
-Asset.EventBus.cppm
-Asset.GeometryPayload.cppm
-Asset.ImportRouter.cppm
-Asset.LoadPipeline.cppm
-Asset.ModelTexturePayload.cppm
-Asset.PathIndex.cppm
-Asset.PayloadStore.cppm
-Asset.Registry.cppm
-Asset.Service.cppm
-Asset.TypePool.cppm
-```
-
-### Private implementation units (`.cpp`)
-
-```text
-Asset.EventBus.cpp
-Asset.ImportRouter.cpp
-Asset.LoadPipeline.cpp
-Asset.ModelTexturePayload.cpp
-Asset.PathIndex.cpp
-Asset.PayloadStore.cpp
-Asset.Registry.cpp
-Asset.Service.cpp
-```
-
-### Build wiring
+## Build wiring
 
 - `CMakeLists.txt` builds `ExtrinsicAssets` and links it publicly against
   `ExtrinsicCore`.
@@ -115,21 +76,36 @@ Asset.Service.cpp
 
 Asset decoders and `AssetService` report failures using `Core::ErrorCode`.
 
-Reload is transactional through `AssetService`:
+`Load<T>` and `Reload<T>` decode through the caller's loader for that call;
+`AssetService` does not retain loaders or their captures. Publication, path
+interning, metadata changes and read lookup are serialized by the service.
+Decoders execute outside that transaction, so they may call back into the service.
 
-- Failed loader callbacks leave the last good payload, payload ticket
-  generation, registry payload slot, and `Ready` state intact.
-- Successful reload publishes a new payload ticket generation, then queues
-  `Reloaded` followed by `Ready` for that asset.
-- Failed pre-commit transitions restore the previous payload checkpoint and do
-  not queue successful reload events.
+Reload is transactional:
 
-Destroy first cancels in-flight pipeline bookkeeping and drains queued events
-for the asset while its payload is still readable. It then unregisters reload
-callbacks, removes path-index state, retires the payload, destroys the registry
-entry, and queues `Destroyed`. Runtime/graphics subscribers therefore never
-receive a same-asset `Ready` event after `AssetService` has retired that
-asset's CPU payload.
+- Failed decoders leave the last good payload, payload ticket generation,
+  registry payload slot and `Ready` state intact.
+- Successful reload advances the payload ticket and queues `Reloaded` before
+  `Ready`. If another reload has already published, the older decode returns
+  `ResourceBusy`; if destroy won, it returns `ResourceNotFound`.
+- Failed commit transitions restore the checkpoint captured within the same
+  transaction. A losing load for an interned path returns the winning ID only
+  when its requested type matches.
+
+`Read<T>` returns a borrowed span. The lookup itself is synchronized, but using
+its span must be ordered against subsequent reload or destroy of the same ID.
+Concurrent callers do not gain a payload lease.
+
+Destroy joins pipeline completion, dispatches already queued events without the
+service lock, then joins again before removing path, payload and registry state.
+Callbacks can re-enter the service; nested retirement of the same ID counts as
+success for the outer destroy and queues `Destroyed` only once. Before each
+nonterminal callback (`Ready`, `Reloaded`, `Failed`), the service checks that the
+ID is still alive. Thus one callback's destroy suppresses later stale callbacks.
+Events describe history, not a retained payload generation: a newer reload may
+already be visible, and concurrent destroy after the live check can make a
+callback's read fail. Callers that dispatch concurrently must synchronize their
+own listener state. The runtime dispatches on its main thread.
 
 ## Assets ↔ Graphics boundary
 

@@ -50,6 +50,43 @@ namespace CoreConfig = Extrinsic::Core::Config;
 namespace Runtime = Extrinsic::Runtime;
 namespace Sandbox = Extrinsic::Sandbox;
 
+TEST(SandboxConfigSections, ActiveNormalRadiusRemainsPositiveInFloatStorage)
+{
+    for (const auto radius : {"1e-300", "1e-50"})
+    {
+        SCOPED_TRACE(radius);
+        const auto rejected = Runtime::ValidateNormalEstimationConfigSection(
+            std::string{R"({"use_radius":true,"radius":)"} + radius + "}", {}, "normal-radius");
+        EXPECT_EQ(rejected.State, CoreConfig::EngineConfigState::Invalid);
+        EXPECT_TRUE(rejected.CanonicalPayloadJson.empty());
+    }
+    for (const auto radius : {"1.401298464324817e-45", "1e-20"})
+    {
+        SCOPED_TRACE(radius);
+        const auto valid = Runtime::ValidateNormalEstimationConfigSection(
+            std::string{R"({"use_radius":true,"radius":)"} + radius + "}", {}, "normal-radius");
+        ASSERT_TRUE(valid.Usable());
+        const auto roundTrip = Runtime::ValidateNormalEstimationConfigSection(
+            valid.CanonicalPayloadJson, {}, "normal-radius");
+        EXPECT_TRUE(roundTrip.Usable());
+        EXPECT_EQ(roundTrip.CanonicalPayloadJson, valid.CanonicalPayloadJson);
+    }
+    // An inactive radius retains the existing zero/underflow policy.
+    EXPECT_TRUE(Runtime::ValidateNormalEstimationConfigSection(
+        R"({"use_radius":false,"radius":1e-300})", {}, "normal-radius").Usable());
+}
+
+TEST(SandboxConfigSections, LaterFallbackWarningPreservesAnEarlierInvalidSection)
+{
+    const auto result = Runtime::ValidateParameterizationConfigSection(
+        R"({"atlas":{"method":"xatlas"},"lscm":{"max_solver_iterations":0}})",
+        Runtime::SerializeParameterizationConfig({}), "parameterization");
+    EXPECT_EQ(result.State, CoreConfig::EngineConfigState::Invalid);
+    EXPECT_FALSE(result.Usable());
+    ASSERT_GE(result.Diagnostics.size(), 2u);
+    EXPECT_EQ(result.Diagnostics.back().State, CoreConfig::EngineConfigState::FallbackApplied);
+}
+
 namespace
 {
     using Intrinsic::Tests::OneFrameApplication;
@@ -1214,7 +1251,7 @@ namespace
         ASSERT_NE(registeredValidator, nullptr);
         EXPECT_EQ(*registeredValidator, validate);
         EXPECT_FALSE(static_cast<bool>(registration.OnChanged));
-        EXPECT_TRUE(registration.SchemaJson.empty());
+        EXPECT_FALSE(registration.SchemaJson.empty());
 
         CoreConfig::EngineConfig config;
         set(config, T{});

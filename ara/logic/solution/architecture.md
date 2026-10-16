@@ -712,7 +712,7 @@
 - **Evidence**: [N436, N437,
   ara/evidence/tables/eig3x3_live_curvature_diagnostic_2026-08-12.md,
   src/geometry/Geometry.HalfedgeMesh.Curvature.cpp,
-  src/runtime/Editor/Operations/Runtime.PointSetOperations.Processing.cppm,
+  src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm,
   src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp]
 - **From staging**: O158
 

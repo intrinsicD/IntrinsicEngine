@@ -955,3 +955,150 @@ TEST(PointCloud_KMeans, CentroidAccumulationPreservesSmallTermsBetweenLargeCoord
     EXPECT_FLOAT_EQ(result->Centroids[0].x,1.f/3.f);
     EXPECT_EQ(result->Labels,(std::vector<std::uint32_t>{0,0,0}));
 }
+
+
+TEST(PointCloud_Cloud, ClearRebindsOptionalAttributesBeforeReuse)
+{
+    Geometry::PointCloud::Cloud cloud;
+    cloud.EnableNormals();
+    cloud.EnableColors();
+    cloud.EnableRadii();
+    cloud.AddPoint({1, 2, 3});
+    cloud.Clear();
+    ASSERT_FALSE(cloud.HasNormals());
+    ASSERT_FALSE(cloud.HasColors());
+    ASSERT_FALSE(cloud.HasRadii());
+    EXPECT_FALSE(cloud.PointProperties().Exists("p:normal"));
+    EXPECT_FALSE(cloud.PointProperties().Exists("p:color"));
+    EXPECT_FALSE(cloud.PointProperties().Exists("p:radius"));
+    cloud.EnableNormals();
+    cloud.EnableColors();
+    cloud.EnableRadii();
+    const auto point = cloud.AddPoint({4, 5, 6});
+    cloud.Normal(point) = {1, 0, 0};
+    cloud.Color(point) = {0, 1, 0, 1};
+    cloud.Radius(point) = 2;
+    EXPECT_EQ(cloud.PointProperties().Get<glm::vec3>("p:normal")[point.Index], glm::vec3(1, 0, 0));
+    EXPECT_EQ(cloud.PointProperties().Get<glm::vec4>("p:color")[point.Index], glm::vec4(0, 1, 0, 1));
+    EXPECT_EQ(cloud.PointProperties().Get<float>("p:radius")[point.Index], 2);
+    EXPECT_TRUE(cloud.IsValid());
+}
+
+TEST(PointCloud_Cloud, AssignmentRebindsOptionalAttributesToReplacementStorage)
+{
+    for (const bool move : {false, true})
+    {
+        for (const bool withAttributes : {false, true})
+        {
+            SCOPED_TRACE(move ? "move" : "copy");
+            SCOPED_TRACE(withAttributes ? "attributes" : "positions only");
+            Geometry::PointCloud::Cloud source;
+            if (withAttributes)
+            {
+                source.EnableNormals();
+                source.EnableColors();
+                source.EnableRadii();
+            }
+            source.AddPoint({1, 2, 3});
+            Geometry::PointCloud::Cloud destination;
+            destination.EnableNormals();
+            destination.EnableColors();
+            destination.EnableRadii();
+            destination.AddPoint({4, 5, 6});
+            if (move) destination = std::move(source);
+            else destination = source;
+            ASSERT_EQ(destination.HasNormals(), withAttributes);
+            ASSERT_EQ(destination.HasColors(), withAttributes);
+            ASSERT_EQ(destination.HasRadii(), withAttributes);
+            if (!withAttributes) continue;
+            ASSERT_EQ(destination.Normals().data(), destination.PointProperties().Get<glm::vec3>("p:normal").Span().data());
+            ASSERT_EQ(destination.Colors().data(), destination.PointProperties().Get<glm::vec4>("p:color").Span().data());
+            ASSERT_EQ(destination.Radii().data(), destination.PointProperties().Get<float>("p:radius").Span().data());
+            const auto point = Geometry::PointCloud::Cloud::Handle(0);
+            destination.Normal(point) = {1, 0, 0};
+            destination.Color(point) = {0, 1, 0, 1};
+            destination.Radius(point) = 2;
+            EXPECT_EQ(destination.PointProperties().Get<glm::vec3>("p:normal")[0], glm::vec3(1, 0, 0));
+            EXPECT_EQ(destination.PointProperties().Get<glm::vec4>("p:color")[0], glm::vec4(0, 1, 0, 1));
+            EXPECT_EQ(destination.PointProperties().Get<float>("p:radius")[0], 2);
+        }
+    }
+}
+
+TEST(PointCloud_KMeans, InitialZeroLabelsDoNotClaimConvergence)
+{
+    const std::vector<glm::vec3> points{{0, 0, 0}, {10, 0, 0}, {11, 0, 0}};
+    const std::vector<glm::vec3> seeds{{0, 0, 0}, {100, 0, 0}};
+    Geometry::KMeans::KMeansParams params;
+    params.ClusterCount = 2;
+    params.MaxIterations = 32;
+    for (const bool accelerated : {false, true})
+    {
+        SCOPED_TRACE(accelerated);
+        Geometry::KMeans::CpuScratch scratch;
+        const auto result = Geometry::KMeans::Cluster(points, seeds, params, accelerated ? &scratch : nullptr);
+        ASSERT_TRUE(result);
+        EXPECT_TRUE(result->Converged);
+        EXPECT_EQ(result->Iterations, 3u);
+        EXPECT_EQ(result->Labels, (std::vector<std::uint32_t>{0, 1, 1}));
+        EXPECT_EQ(result->Centroids, (std::vector<glm::vec3>{{0, 0, 0}, {10.5f, 0, 0}}));
+        EXPECT_EQ(result->SquaredDistances, (std::vector<float>{0, .25f, .25f}));
+        EXPECT_FLOAT_EQ(result->Inertia, .5f);
+        EXPECT_EQ(result->MaxDistanceIndex, 1u);
+    }
+}
+
+TEST(PointCloud_KMeans, IterationLimitReturnsAssignmentsAndDiagnosticsForFinalCentroids)
+{
+    const std::vector<glm::vec3> points{{0, 0, 0}, {10, 0, 0}, {11, 0, 0}};
+    const std::vector<glm::vec3> seeds{{0, 0, 0}, {100, 0, 0}};
+    Geometry::KMeans::KMeansParams params;
+    params.ClusterCount = 2;
+    params.MaxIterations = 1;
+    for (const bool accelerated : {false, true})
+    {
+        SCOPED_TRACE(accelerated);
+        Geometry::KMeans::CpuScratch scratch;
+        const auto result = Geometry::KMeans::Cluster(points, seeds, params, accelerated ? &scratch : nullptr);
+        ASSERT_TRUE(result);
+        EXPECT_FALSE(result->Converged);
+        EXPECT_EQ(result->Iterations, 1u);
+        EXPECT_EQ(result->Centroids, (std::vector<glm::vec3>{{7, 0, 0}, {11, 0, 0}}));
+        EXPECT_EQ(result->Labels, (std::vector<std::uint32_t>{0, 1, 1}));
+        EXPECT_EQ(result->SquaredDistances, (std::vector<float>{49, 1, 0}));
+        EXPECT_FLOAT_EQ(result->Inertia, 50);
+        EXPECT_EQ(result->MaxDistanceIndex, 0u);
+    }
+}
+
+TEST(PointCloud_Statistics, DeletedSlotsDoNotAffectStatisticsOrNoiseScale)
+{
+    for (const float deletedPosition : {100.f, std::numeric_limits<float>::quiet_NaN()})
+    {
+        Geometry::PointCloud::Cloud cloud;
+        cloud.AddPoint({0, 0, 0});
+        const auto deleted = cloud.AddPoint({deletedPosition, 0, 0});
+        cloud.AddPoint({2, 0, 0});
+        cloud.DeletePoint(deleted);
+        const auto stats = Geometry::PointCloud::ComputeStatistics(cloud);
+        EXPECT_TRUE(stats.has_value());
+        if (stats)
+        {
+            EXPECT_EQ(stats->PointCount, 2u);
+            EXPECT_EQ(stats->Centroid, glm::vec3(1, 0, 0));
+            EXPECT_FLOAT_EQ(stats->AverageSpacing, 2);
+            EXPECT_FLOAT_EQ(stats->BoundingBoxDiagonal, 2);
+        }
+        const auto noise = Geometry::PointCloud::ApplyGaussianNoise(cloud, {.StdDevFraction = .25f, .Seed = 7});
+        EXPECT_EQ(noise.Status, Geometry::PointCloud::GaussianNoiseStatus::Success);
+        EXPECT_FLOAT_EQ(noise.Scale, .5f);
+        EXPECT_EQ(noise.DisplacedCount, 2u);
+        if (std::isfinite(deletedPosition)) EXPECT_EQ(cloud.Position(deleted).x, deletedPosition);
+        else EXPECT_TRUE(std::isnan(cloud.Position(deleted).x));
+    }
+    Geometry::PointCloud::Cloud allDeleted;
+    allDeleted.DeletePoint(allDeleted.AddPoint({1, 2, 3}));
+    EXPECT_FALSE(Geometry::PointCloud::ComputeStatistics(allDeleted));
+    EXPECT_EQ(Geometry::PointCloud::ApplyGaussianNoise(allDeleted, {}).Status,
+              Geometry::PointCloud::GaussianNoiseStatus::EmptyInput);
+}

@@ -2,7 +2,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
-#include <initializer_list>
+#include <span>
 #include <limits>
 #include <nlohmann/json.hpp>
 #include <optional>
@@ -10,6 +10,7 @@
 #include <string_view>
 #include <utility>
 
+import Extrinsic.Runtime.ConfigFieldSpec;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 
@@ -19,11 +20,72 @@ import Extrinsic.Runtime.PointSpacingConfig;
 import Extrinsic.Runtime.DensityWeightConfig;
 
 #include "Config/internal/Runtime.PointConfigJson.hpp"
+#include "Config/internal/Runtime.ConfigFieldJson.hpp"
 
 namespace Extrinsic::Runtime
 {
     namespace
     {
+        constexpr Geometry::PropertyValueKind kFloatKind[]{Geometry::PropertyValueKind::Float};
+        constexpr Geometry::PropertyValueKind kUInt32Kind[]{Geometry::PropertyValueKind::UInt32};
+        constexpr Geometry::PropertyValueKind kVec3Kind[]{Geometry::PropertyValueKind::Vec3};
+        constexpr std::string_view kOutlierAnalysisMethod[]{"statistical", "radius", "local_distance_ratio"};
+        constexpr std::string_view kOutlierAnalysisOperation[]{"analyze", "remove_marked"};
+        constexpr std::string_view kOutlierAnalysisBackend[]{"cpu_octree", "cpu_lbvh", "vulkan_lbvh"};
+        constexpr std::string_view kOutlierAnalysisBackendNames[]{"CPU octree", "CPU LBVH (cached)", "Vulkan LBVH"};
+        constexpr ConfigFieldSpec kOutlierAnalysisFields[]{
+            {.Name = "entity", .Type = ConfigFieldType::UInt, .Description = "Entity."},
+            {.Name = "k_neighbors", .Type = ConfigFieldType::UInt, .Description = "K neighbors.", .Min = 1},
+            {.Name = "minimum_neighbors", .Type = ConfigFieldType::UInt, .Description = "Minimum neighbors."},
+            {.Name = "gpu_query_batch_size", .Type = ConfigFieldType::UInt, .Description = "Gpu query batch size.", .Min = 1, .Max = 16384},
+            {.Name = "method", .Type = ConfigFieldType::StringEnum, .Description = "Method.", .EnumValues = kOutlierAnalysisMethod},
+            {.Name = "operation", .Type = ConfigFieldType::StringEnum, .Description = "Operation.", .EnumValues = kOutlierAnalysisOperation},
+            {.Name = "backend", .Type = ConfigFieldType::StringEnum, .Description = "Backend.", .EnumNames = kOutlierAnalysisBackendNames, .EnumValues = kOutlierAnalysisBackend},
+            {.Name = "radius", .Type = ConfigFieldType::Float, .Description = "With method radius, the value must be strictly positive after conversion to float; otherwise zero is allowed.", .Min = 0, .Max = double(std::numeric_limits<float>::max())},
+            {.Name = "stddev_multiplier", .Type = ConfigFieldType::Float, .Description = "Stddev multiplier.", .Min = 0, .Max = double(std::numeric_limits<float>::max())},
+            {.Name = "score_threshold", .Type = ConfigFieldType::Float, .Description = "Score threshold.", .Min = 0, .Max = double(std::numeric_limits<float>::max())},
+            {.Name = "positions", .Type = ConfigFieldType::PropertyRef, .Description = "Positions, mask and score must have distinct names on the same element domain.", .RefKinds = kVec3Kind},
+            {.Name = "mask", .Type = ConfigFieldType::PropertyRef, .Description = "Mask.", .RefKinds = kUInt32Kind, .AnyScalar = true},
+            {.Name = "score", .Type = ConfigFieldType::PropertyRef, .Description = "Score.", .RefKinds = kFloatKind, .AnyScalar = true},
+        };
+        constexpr std::string_view kKernelDensityBackend[]{"cpu_octree", "cpu_lbvh", "vulkan_lbvh"};
+        constexpr std::string_view kKernelDensityBackendNames[]{"CPU octree", "CPU LBVH (cached)", "Vulkan LBVH"};
+        constexpr ConfigFieldSpec kKernelDensityFields[]{
+            {.Name = "entity", .Type = ConfigFieldType::UInt, .Description = "Entity."},
+            {.Name = "k_neighbors", .Type = ConfigFieldType::UInt, .Description = "K neighbors."},
+            {.Name = "gpu_query_batch_size", .Type = ConfigFieldType::UInt, .Description = "Gpu query batch size.", .Min = 1, .Max = 16384},
+            {.Name = "backend", .Type = ConfigFieldType::StringEnum, .Description = "Backend.", .EnumNames = kKernelDensityBackendNames, .EnumValues = kKernelDensityBackend},
+            {.Name = "bandwidth", .Type = ConfigFieldType::Float, .Description = "Zero selects automatic bandwidth; positive values must remain positive in float storage.", .Min = 0, .Max = double(std::numeric_limits<float>::max())},
+            {.Name = "positions", .Type = ConfigFieldType::PropertyRef, .Description = "Position and density bindings must have distinct names on the same element domain.", .RefKinds = kVec3Kind},
+            {.Name = "density", .Type = ConfigFieldType::PropertyRef, .Description = "Density.", .RefKinds = kFloatKind, .AnyScalar = true},
+        };
+        constexpr std::string_view kPointSpacingBackend[]{"cpu_octree", "cpu_lbvh", "vulkan_lbvh"};
+        constexpr std::string_view kPointSpacingBackendNames[]{"CPU octree", "CPU LBVH (cached)", "Vulkan LBVH"};
+        constexpr ConfigFieldSpec kPointSpacingFields[]{
+            {.Name = "entity", .Type = ConfigFieldType::UInt, .Description = "Entity."},
+            {.Name = "k_neighbors", .Type = ConfigFieldType::UInt, .Description = "K neighbors."},
+            {.Name = "gpu_query_batch_size", .Type = ConfigFieldType::UInt, .Description = "Gpu query batch size.", .Min = 1, .Max = 16384},
+            {.Name = "backend", .Type = ConfigFieldType::StringEnum, .Description = "Backend.", .EnumNames = kPointSpacingBackendNames, .EnumValues = kPointSpacingBackend},
+            {.Name = "scale_factor", .Type = ConfigFieldType::Float, .Description = "Nonnegative radius scale factor; positive values must remain positive in float storage.", .Min = 0, .Max = double(std::numeric_limits<float>::max())},
+            {.Name = "positions", .Type = ConfigFieldType::PropertyRef, .Description = "Position and radii bindings must have distinct names on the same element domain.", .RefKinds = kVec3Kind},
+            {.Name = "radii", .Type = ConfigFieldType::PropertyRef, .Description = "Radii.", .RefKinds = kFloatKind, .AnyScalar = true},
+        };
+        constexpr std::string_view kDensityWeightBackend[]{"cpu_kdtree", "cpu_lbvh", "vulkan_lbvh"};
+        constexpr std::string_view kDensityWeightKernel[]{"gaussian", "theta_lop", "wendland_c2"};
+        constexpr std::string_view kDensityWeightMode[]{"direct", "reciprocal"};
+        constexpr std::string_view kDensityWeightBackendNames[]{"CPU KD-tree", "CPU LBVH (cached)", "Vulkan LBVH"};
+        constexpr ConfigFieldSpec kDensityWeightFields[]{
+            {.Name = "entity", .Type = ConfigFieldType::UInt, .Description = "Entity."},
+            {.Name = "gpu_query_batch_size", .Type = ConfigFieldType::UInt, .Description = "Gpu query batch size.", .Min = 1, .Max = 16384},
+            {.Name = "gpu_radius_capacity", .Type = ConfigFieldType::UInt, .Description = "Gpu radius capacity.", .Min = 1, .Max = 1024},
+            {.Name = "backend", .Type = ConfigFieldType::StringEnum, .Description = "Backend.", .EnumNames = kDensityWeightBackendNames, .EnumValues = kDensityWeightBackend},
+            {.Name = "kernel", .Type = ConfigFieldType::StringEnum, .Description = "Kernel.", .EnumValues = kDensityWeightKernel},
+            {.Name = "mode", .Type = ConfigFieldType::StringEnum, .Description = "Mode.", .EnumValues = kDensityWeightMode},
+            {.Name = "support_radius", .Type = ConfigFieldType::Float, .Description = "Support radius.", .Min = 0, .Max = double(std::numeric_limits<float>::max()), .ExclusiveMin = true},
+            {.Name = "positions", .Type = ConfigFieldType::PropertyRef, .Description = "Position and weight bindings must have distinct names on the same element domain.", .RefKinds = kVec3Kind},
+            {.Name = "weights", .Type = ConfigFieldType::PropertyRef, .Description = "Weights.", .RefKinds = kFloatKind, .AnyScalar = true},
+        };
+
         using Json=nlohmann::json;
         OutlierAnalysisConfig ParseOutlierAnalysisConfig(const Json& data)
         {
@@ -67,20 +129,22 @@ namespace Extrinsic::Runtime
         auto input=ConfigDetail::ParseConfigJson(payload, false),data=ConfigDetail::ParseConfigJson(SerializeOutlierAnalysisConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, data, "Outlier analysis config must be an object.", "Unknown outlier field: ",
-            {"entity", "k_neighbors", "minimum_neighbors", "gpu_query_batch_size"}))
+            kOutlierAnalysisFields))
             return RejectConfigSection(subject, std::move(*error));
-        if(data["k_neighbors"]==0 || data["gpu_query_batch_size"]==0 || data["gpu_query_batch_size"]>16384)
+        if(!ConfigDetail::InConfigFieldRange(kOutlierAnalysisFields, "k_neighbors", data["k_neighbors"].get<double>()) || !ConfigDetail::InConfigFieldRange(kOutlierAnalysisFields, "gpu_query_batch_size", data["gpu_query_batch_size"].get<double>()))
             return RejectConfigSection(subject, "k must be positive and GPU query batch size must be 1..16384.");
-        if(data["method"]!="statistical" && data["method"]!="radius" && data["method"]!="local_distance_ratio")return RejectConfigSection(subject, "Unknown outlier method.");
-        if(data["operation"]!="analyze" && data["operation"]!="remove_marked")return RejectConfigSection(subject, "Unknown outlier operation.");
-        if(data["backend"]!="cpu_octree" && data["backend"]!="cpu_lbvh" && data["backend"]!="vulkan_lbvh")return RejectConfigSection(subject, "Unknown outlier backend.");
+        if(!ConfigDetail::IsConfigFieldToken(kOutlierAnalysisFields, "method", data["method"]))return RejectConfigSection(subject, "Unknown outlier method.");
+        if(!ConfigDetail::IsConfigFieldToken(kOutlierAnalysisFields, "operation", data["operation"]))return RejectConfigSection(subject, "Unknown outlier operation.");
+        if(!ConfigDetail::IsConfigFieldToken(kOutlierAnalysisFields, "backend", data["backend"]))return RejectConfigSection(subject, "Unknown outlier backend.");
         if (auto error = ConfigDetail::ValidatePointConfigNonnegativeFloats(
-            data, {"radius", "stddev_multiplier", "score_threshold"}))
+            data, kOutlierAnalysisFields))
             return RejectConfigSection(subject, std::move(*error));
-        if(data["method"]=="radius" && data["radius"].get<double>()<=0)return RejectConfigSection(subject, "Radius must be positive.");
-        const OutlierAnalysisConfig defaults;
+        if(data["method"]=="radius" && data["radius"].get<float>()<=0)
+            return RejectConfigSection(subject, data["radius"].get<double>() <= 0.0
+                ? "Radius must be positive."
+                : "Radius must remain positive in float storage.");
         if (auto error = ConfigDetail::ValidatePointConfigPropertyRefs(
-            data, {{"positions", defaults.Positions.ValueKind}, {"mask", defaults.Mask.ValueKind}, {"score", defaults.Score.ValueKind}}))
+            data, kOutlierAnalysisFields))
             return RejectConfigSection(subject, std::move(*error));
         if(data["positions"]["domain"]!=data["mask"]["domain"] || data["mask"]["domain"]!=data["score"]["domain"] ||
            data["positions"]["name"]==data["mask"]["name"] || data["positions"]["name"]==data["score"]["name"] || data["mask"]["name"]==data["score"]["name"])
@@ -94,9 +158,13 @@ namespace Extrinsic::Runtime
     void SetOutlierAnalysisConfig(Core::Config::EngineConfig& c,const OutlierAnalysisConfig& value)
     {Core::Config::UpsertEngineConfigSection(c.AppSections,ConfigDetail::MakeConfigSection(
             kOutlierAnalysisConfigSectionName, kOutlierAnalysisConfigSectionSchemaId, 1, SerializeOutlierAnalysisConfig(value)));}
+    std::span<const ConfigFieldSpec> OutlierAnalysisConfigFieldSpecs() noexcept
+    { return kOutlierAnalysisFields; }
     Core::Config::EngineConfigSectionRegistration MakeOutlierAnalysisConfigSectionRegistration()
     {return ConfigDetail::MakeSectionRegistration(
-            kOutlierAnalysisConfigSectionName, kOutlierAnalysisConfigSectionSchemaId, 1, SerializeOutlierAnalysisConfig({}), ValidateOutlierAnalysisConfigSection, {});}
+            kOutlierAnalysisConfigSectionName, kOutlierAnalysisConfigSectionSchemaId, 1, SerializeOutlierAnalysisConfig({}), ValidateOutlierAnalysisConfigSection,
+            ConfigDetail::BuildSectionSchemaJson(kOutlierAnalysisConfigSectionSchemaId, "OutlierAnalysis", "Validated OutlierAnalysis configuration.",
+                kOutlierAnalysisFields, ConfigDetail::ParseConfigJson(SerializeOutlierAnalysisConfig({}), true)));}
 }
 
 namespace Extrinsic::Runtime
@@ -134,19 +202,18 @@ namespace Extrinsic::Runtime
         auto input=ConfigDetail::ParseConfigJson(payload, false),data=ConfigDetail::ParseConfigJson(SerializeKernelDensityConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, data, "Kernel density config must be an object.", "Unknown density field: ",
-            {"entity", "k_neighbors", "gpu_query_batch_size"}))
+            kKernelDensityFields))
             return RejectConfigSection(subject, std::move(*error));
-        if(data["gpu_query_batch_size"]==0 || data["gpu_query_batch_size"]>16384)
+        if(!ConfigDetail::InConfigFieldRange(kKernelDensityFields, "gpu_query_batch_size", data["gpu_query_batch_size"].get<double>()))
             return RejectConfigSection(subject, "GPU query batch size must be 1..16384.");
-        if(data["backend"]!="cpu_octree" && data["backend"]!="cpu_lbvh" && data["backend"]!="vulkan_lbvh")return RejectConfigSection(subject, "Unknown density backend.");
+        if(!ConfigDetail::IsConfigFieldToken(kKernelDensityFields, "backend", data["backend"]))return RejectConfigSection(subject, "Unknown density backend.");
         if (auto error = ConfigDetail::ValidatePointConfigNonnegativeFloats(
-            data, {"bandwidth"}))
+            data, kKernelDensityFields))
             return RejectConfigSection(subject, std::move(*error));
         if(data["bandwidth"].get<double>()>0 && data["bandwidth"].get<float>()==0)
             return RejectConfigSection(subject, "Positive bandwidth must remain positive in float storage.");
-        const KernelDensityConfig defaults;
         if (auto error = ConfigDetail::ValidatePointConfigPropertyRefs(
-            data, {{"positions", defaults.Positions.ValueKind}, {"density", defaults.Density.ValueKind}}))
+            data, kKernelDensityFields))
             return RejectConfigSection(subject, std::move(*error));
         if(data["positions"]["domain"]!=data["density"]["domain"] ||
            data["positions"]["name"]==data["density"]["name"])
@@ -160,9 +227,13 @@ namespace Extrinsic::Runtime
     void SetKernelDensityConfig(Core::Config::EngineConfig& c,const KernelDensityConfig& value)
     {Core::Config::UpsertEngineConfigSection(c.AppSections,ConfigDetail::MakeConfigSection(
             kKernelDensityConfigSectionName, kKernelDensityConfigSectionSchemaId, 1, SerializeKernelDensityConfig(value)));}
+    std::span<const ConfigFieldSpec> KernelDensityConfigFieldSpecs() noexcept
+    { return kKernelDensityFields; }
     Core::Config::EngineConfigSectionRegistration MakeKernelDensityConfigSectionRegistration()
     {return ConfigDetail::MakeSectionRegistration(
-            kKernelDensityConfigSectionName, kKernelDensityConfigSectionSchemaId, 1, SerializeKernelDensityConfig({}), ValidateKernelDensityConfigSection, {});}
+            kKernelDensityConfigSectionName, kKernelDensityConfigSectionSchemaId, 1, SerializeKernelDensityConfig({}), ValidateKernelDensityConfigSection,
+            ConfigDetail::BuildSectionSchemaJson(kKernelDensityConfigSectionSchemaId, "KernelDensity", "Validated KernelDensity configuration.",
+                kKernelDensityFields, ConfigDetail::ParseConfigJson(SerializeKernelDensityConfig({}), true)));}
 }
 
 namespace Extrinsic::Runtime
@@ -200,19 +271,18 @@ namespace Extrinsic::Runtime
         auto input=ConfigDetail::ParseConfigJson(payload, false),data=ConfigDetail::ParseConfigJson(SerializePointSpacingConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, data, "Point spacing config must be an object.", "Unknown radii field: ",
-            {"entity", "k_neighbors", "gpu_query_batch_size"}))
+            kPointSpacingFields))
             return RejectConfigSection(subject, std::move(*error));
-        if(data["gpu_query_batch_size"]==0 || data["gpu_query_batch_size"]>16384)
+        if(!ConfigDetail::InConfigFieldRange(kPointSpacingFields, "gpu_query_batch_size", data["gpu_query_batch_size"].get<double>()))
             return RejectConfigSection(subject, "GPU query batch size must be 1..16384.");
-        if(data["backend"]!="cpu_octree" && data["backend"]!="cpu_lbvh" && data["backend"]!="vulkan_lbvh")return RejectConfigSection(subject, "Unknown radii backend.");
+        if(!ConfigDetail::IsConfigFieldToken(kPointSpacingFields, "backend", data["backend"]))return RejectConfigSection(subject, "Unknown radii backend.");
         if (auto error = ConfigDetail::ValidatePointConfigNonnegativeFloats(
-            data, {"scale_factor"}))
+            data, kPointSpacingFields))
             return RejectConfigSection(subject, std::move(*error));
         if(data["scale_factor"].get<double>()>0 && data["scale_factor"].get<float>()==0)
             return RejectConfigSection(subject, "Positive scale factor must remain positive in float storage.");
-        const PointSpacingConfig defaults;
         if (auto error = ConfigDetail::ValidatePointConfigPropertyRefs(
-            data, {{"positions", defaults.Positions.ValueKind}, {"radii", defaults.Radii.ValueKind}}))
+            data, kPointSpacingFields))
             return RejectConfigSection(subject, std::move(*error));
         if(data["positions"]["domain"]!=data["radii"]["domain"] ||
            data["positions"]["name"]==data["radii"]["name"])
@@ -226,9 +296,13 @@ namespace Extrinsic::Runtime
     void SetPointSpacingConfig(Core::Config::EngineConfig& c,const PointSpacingConfig& value)
     {Core::Config::UpsertEngineConfigSection(c.AppSections,ConfigDetail::MakeConfigSection(
             kPointSpacingConfigSectionName, kPointSpacingConfigSectionSchemaId, 1, SerializePointSpacingConfig(value)));}
+    std::span<const ConfigFieldSpec> PointSpacingConfigFieldSpecs() noexcept
+    { return kPointSpacingFields; }
     Core::Config::EngineConfigSectionRegistration MakePointSpacingConfigSectionRegistration()
     {return ConfigDetail::MakeSectionRegistration(
-            kPointSpacingConfigSectionName, kPointSpacingConfigSectionSchemaId, 1, SerializePointSpacingConfig({}), ValidatePointSpacingConfigSection, {});}
+            kPointSpacingConfigSectionName, kPointSpacingConfigSectionSchemaId, 1, SerializePointSpacingConfig({}), ValidatePointSpacingConfigSection,
+            ConfigDetail::BuildSectionSchemaJson(kPointSpacingConfigSectionSchemaId, "PointSpacing", "Validated PointSpacing configuration.",
+                kPointSpacingFields, ConfigDetail::ParseConfigJson(SerializePointSpacingConfig({}), true)));}
 }
 
 namespace Extrinsic::Runtime
@@ -271,21 +345,20 @@ namespace Extrinsic::Runtime
         auto input=ConfigDetail::ParseConfigJson(payload, false),data=ConfigDetail::ParseConfigJson(SerializeDensityWeightConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, data, "Density weight config must be an object.", "Unknown density weight field: ",
-            {"entity", "gpu_query_batch_size", "gpu_radius_capacity"}))
+            kDensityWeightFields))
             return RejectConfigSection(subject, std::move(*error));
-        if(data["gpu_query_batch_size"]==0 || data["gpu_query_batch_size"]>16384 ||
-           data["gpu_radius_capacity"]==0 || data["gpu_radius_capacity"]>1024)
+        if(!ConfigDetail::InConfigFieldRange(kDensityWeightFields, "gpu_query_batch_size", data["gpu_query_batch_size"].get<double>()) ||
+           !ConfigDetail::InConfigFieldRange(kDensityWeightFields, "gpu_radius_capacity", data["gpu_radius_capacity"].get<double>()))
             return RejectConfigSection(subject, "GPU query batch must be 1..16384 and complete radius capacity 1..1024.");
-        if(data["backend"]!="cpu_kdtree" && data["backend"]!="cpu_lbvh" && data["backend"]!="vulkan_lbvh")
+        if(!ConfigDetail::IsConfigFieldToken(kDensityWeightFields, "backend", data["backend"]))
             return RejectConfigSection(subject, "Unknown density weight backend.");
-        if(!data["support_radius"].is_number() || !std::isfinite(data["support_radius"].get<double>()) ||
-           data["support_radius"]<=0 || data["support_radius"].get<double>()>std::numeric_limits<float>::max())
+        if(!data["support_radius"].is_number() || !ConfigDetail::InConfigFieldRange(kDensityWeightFields, "support_radius", data["support_radius"].get<double>()))
             return RejectConfigSection(subject, "Support radius must be positive and finite, at most floatmax.");
-        if(data["kernel"]!="gaussian" && data["kernel"]!="theta_lop" && data["kernel"]!="wendland_c2")return RejectConfigSection(subject, "Unknown radial kernel.");
-        if(data["mode"]!="direct" && data["mode"]!="reciprocal")return RejectConfigSection(subject, "Unknown density weight mode.");
+        if(!ConfigDetail::IsConfigFieldToken(kDensityWeightFields, "kernel", data["kernel"]))return RejectConfigSection(subject, "Unknown radial kernel.");
+        if(!ConfigDetail::IsConfigFieldToken(kDensityWeightFields, "mode", data["mode"]))return RejectConfigSection(subject, "Unknown density weight mode.");
         using ConfigDetail::PointPropertyValidation;
-        if(ConfigDetail::ValidatePointPropertyRef(data["positions"],Geometry::PropertyValueKind::Vec3) != PointPropertyValidation::Valid ||
-           ConfigDetail::ValidatePointPropertyRef(data["weights"],Geometry::PropertyValueKind::Float, true) != PointPropertyValidation::Valid ||
+        if(ConfigDetail::ValidatePointPropertyRef(data["positions"], FindConfigFieldSpec(kDensityWeightFields, "positions")->RefKinds.front(), FindConfigFieldSpec(kDensityWeightFields, "positions")->AnyScalar) != PointPropertyValidation::Valid ||
+           ConfigDetail::ValidatePointPropertyRef(data["weights"], FindConfigFieldSpec(kDensityWeightFields, "weights")->RefKinds.front(), FindConfigFieldSpec(kDensityWeightFields, "weights")->AnyScalar) != PointPropertyValidation::Valid ||
            data["positions"]["domain"]!=data["weights"]["domain"] || data["positions"]["name"]==data["weights"]["name"])
             return RejectConfigSection(subject, "Position and weight bindings need distinct canonical vec3/float properties on the same domain.");
         return ConfigDetail::AcceptConfigSection(SerializeDensityWeightConfig(ParseDensityWeightConfig(data)), input.size());
@@ -297,7 +370,11 @@ namespace Extrinsic::Runtime
     void SetDensityWeightConfig(Core::Config::EngineConfig& c,const DensityWeightConfig& value)
     {Core::Config::UpsertEngineConfigSection(c.AppSections,ConfigDetail::MakeConfigSection(
             kDensityWeightConfigSectionName, kDensityWeightConfigSectionSchemaId, 1, SerializeDensityWeightConfig(value)));}
+    std::span<const ConfigFieldSpec> DensityWeightConfigFieldSpecs() noexcept
+    { return kDensityWeightFields; }
     Core::Config::EngineConfigSectionRegistration MakeDensityWeightConfigSectionRegistration()
     {return ConfigDetail::MakeSectionRegistration(
-            kDensityWeightConfigSectionName, kDensityWeightConfigSectionSchemaId, 1, SerializeDensityWeightConfig({}), ValidateDensityWeightConfigSection, {});}
+            kDensityWeightConfigSectionName, kDensityWeightConfigSectionSchemaId, 1, SerializeDensityWeightConfig({}), ValidateDensityWeightConfigSection,
+            ConfigDetail::BuildSectionSchemaJson(kDensityWeightConfigSectionSchemaId, "DensityWeight", "Validated DensityWeight configuration.",
+                kDensityWeightFields, ConfigDetail::ParseConfigJson(SerializeDensityWeightConfig({}), true)));}
 }

@@ -61,7 +61,6 @@ namespace
         [[nodiscard]] bool IsMinimized() const override { return false; }
         [[nodiscard]] bool WasResized() const override { return false; }
         void AcknowledgeResize() override {}
-        [[nodiscard]] bool ConsumeInputActivity() override { return false; }
         [[nodiscard]] Plat::Extent2D GetWindowExtent() const override { return m_Extent; }
         [[nodiscard]] Plat::Extent2D GetFramebufferExtent() const override { return m_Framebuffer; }
         [[nodiscard]] void* GetNativeHandle() const override { return nullptr; }
@@ -74,7 +73,6 @@ namespace
             return drained;
         }
 
-        void OnUpdate() override {}
         void WaitForEventsTimeout(double) override {}
 
         void SetClipboardText(std::string_view text) override { m_Clipboard = std::string(text); }
@@ -146,6 +144,8 @@ TEST(ImGuiAdapter, InitializeLoadsBundledRobotoAndBuildsLegacyFontAtlas)
     ASSERT_TRUE(adapter.Initialize());
 
     ImGuiIO& io = ImGui::GetIO();
+    EXPECT_EQ(io.BackendFlags & ImGuiBackendFlags_HasMouseCursors, 0);
+    EXPECT_EQ(io.BackendFlags & ImGuiBackendFlags_HasSetMousePos, 0);
     EXPECT_EQ(io.BackendFlags & ImGuiBackendFlags_RendererHasTextures, 0);
     EXPECT_NE(io.BackendFlags & ImGuiBackendFlags_RendererHasVtxOffset, 0);
     ASSERT_GT(io.Fonts->Fonts.Size, 0);

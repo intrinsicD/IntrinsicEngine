@@ -24,8 +24,8 @@ export namespace Geometry::PCA
 
     // Closed-form symmetric 3x3 eigensolver for the matrix whose upper triangle
     // is (a00 a01 a02 / · a11 a12 / · · a22). Deterministic, allocation-free, and
-    // fail-closed: degenerate/isotropic inputs return the identity frame with the
-    // (repeated) mean eigenvalue. Shared by PCA and the curvature-tensor decomposition.
+    // normalized by the largest absolute coefficient before rank tests. Zero and
+    // isotropic inputs return the identity frame with the repeated eigenvalue.
     [[nodiscard]] Eigen3 SymmetricEigen3(
         double a00, double a01, double a02,
         double a11, double a12, double a22);
@@ -42,5 +42,8 @@ export namespace Geometry
         glm::vec3 Eigenvalues{1.0f}; // Corresponding eigenvalues
     };
 
+    // Local offsets must remain representable in the float input coordinates.
+    // Flat uses the double eigenvalue ratio; public float eigenvalues can still
+    // underflow or overflow when the covariance scale is cast to PCAResult.
     [[nodiscard]] PCAResult ToPCA(std::span<const glm::vec3> points);
 }

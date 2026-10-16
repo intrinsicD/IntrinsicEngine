@@ -1,6 +1,5 @@
 module;
 #include <chrono>
-#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -38,7 +37,15 @@ namespace Extrinsic::Runtime
             double Sigma2{1.0}, LogOutlier{0.0};
         };
 
-        enum class Slot : std::uint8_t { Idle, Queued, InFlight, Done, Failed };
+        enum class Slot : std::uint8_t { Idle, Preparing, Queued, InFlight, Done };
+
+        bool HasValidShape(const EStep::ExternalRequest& request)
+        {
+            const std::size_t n = request.Target.Size(), m = request.Moved.Size();
+            return n != 0u && m != 0u && request.LogWeights.size() == m && request.LogDenominator.size() == n &&
+                request.Pt1.size() == n && request.P1.size() == m && request.PXx.size() == m &&
+                request.PXy.size() == m && request.PXz.size() == m;
+        }
     }
 
     struct CoherentPointDriftGpuEStep::Impl
@@ -51,14 +58,23 @@ namespace Extrinsic::Runtime
         const std::shared_ptr<Request> Staging{std::make_shared<Request>()};
 
         mutable std::mutex Mutex{};
-        std::condition_variable Changed{};
         Slot State{Slot::Idle};
-        bool Pending{false}; // a worker waits for the queued or in-flight computation
+        std::shared_ptr<Core::Tasks::CounterEvent> Pending{};
+        std::chrono::steady_clock::time_point Started{};
+        bool Settled{false};
         std::shared_ptr<SpatialGpuResult> Gpu{};
         std::vector<std::byte> Data{};
         bool IsClosed{false}, IsWorkerActive{false};
         std::string LastDiagnostic{};
         CoherentPointDriftGpuEStepStats Counters{};
+
+        std::shared_ptr<Core::Tasks::CounterEvent> SettleLocked()
+        {
+            if (!Pending || Settled) return {};
+            Settled = true;
+            Counters.WaitSeconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - Started).count();
+            return Pending;
+        }
 
         Impl(SpatialIndexCache& cache, std::chrono::milliseconds timeout) : Cache(cache), Timeout(timeout) {}
     };
@@ -68,17 +84,15 @@ namespace Extrinsic::Runtime
 
     CoherentPointDriftGpuEStep::~CoherentPointDriftGpuEStep() = default;
 
-    bool CoherentPointDriftGpuEStep::Evaluate(const EStep::ExternalRequest& request)
+    std::shared_ptr<Core::Tasks::CounterEvent> CoherentPointDriftGpuEStep::Queue(const EStep::ExternalRequest& request)
     {
         auto& s = *m_Impl;
         const std::size_t n = request.Target.Size(), m = request.Moved.Size();
-        if (n == 0u || m == 0u || request.LogWeights.size() != m || request.LogDenominator.size() != n ||
-            request.Pt1.size() != n || request.P1.size() != m || request.PXx.size() != m || request.PXy.size() != m ||
-            request.PXz.size() != m)
-            return false;
+        if (!HasValidShape(request)) return {};
         {
             std::scoped_lock lock{s.Mutex};
-            if (s.IsClosed || s.State != Slot::Idle) return false; // the staging may still be read
+            if (s.IsClosed || s.State != Slot::Idle) return {}; // the staging may still be read
+            s.State = Slot::Preparing;
         }
         // Normalized coordinates convert to float-float pairs here, off the main thread; the
         // target once per run.
@@ -104,29 +118,34 @@ namespace Extrinsic::Runtime
             split(staged.Source.data() + 8u * i, request.Moved.X[i], request.Moved.Y[i], request.Moved.Z[i],
                   request.LogWeights[i]);
 
-        const auto start = std::chrono::steady_clock::now();
+        std::scoped_lock lock{s.Mutex};
+        if (s.IsClosed)
+        {
+            s.State = Slot::Idle;
+            return {};
+        }
+        s.Pending = std::make_shared<Core::Tasks::CounterEvent>(1u);
+        s.Started = std::chrono::steady_clock::now();
+        s.Settled = false;
+        s.State = Slot::Queued;
+        ++s.Counters.Requests;
+        return s.Pending;
+    }
+
+    bool CoherentPointDriftGpuEStep::Complete(
+        const std::shared_ptr<Core::Tasks::CounterEvent>& event,
+        const EStep::ExternalRequest& request)
+    {
+        auto& s = *m_Impl;
+        if (!HasValidShape(request)) return false;
+        const std::size_t n = request.Target.Size(), m = request.Moved.Size();
         std::vector<std::byte> data;
         {
-            std::unique_lock lock{s.Mutex};
-            if (s.IsClosed || s.State != Slot::Idle) return false;
-            s.Pending = true;
-            s.State = Slot::Queued;
-            ++s.Counters.Requests;
-            const bool ended = s.Changed.wait_for(lock, s.Timeout, [&] {
-                return s.State == Slot::Done || s.State == Slot::Failed || s.IsClosed;
-            });
-            s.Counters.WaitSeconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
-            if (!ended)
-            {
-                // The device may still finish; nothing is queued after this.
-                s.IsClosed = true;
-                s.LastDiagnostic = "No Vulkan E-step result arrived in time; the run continues on the CPU.";
-            }
-            const bool done = s.State == Slot::Done;
-            if (done) data = std::move(s.Data);
-            if (s.State != Slot::InFlight) s.State = Slot::Idle; // a timed-out computation keeps its slot
-            s.Pending = false;
-            if (!done) return false;
+            std::scoped_lock lock{s.Mutex};
+            if (!event || event != s.Pending || s.IsClosed || s.State != Slot::Done) return false;
+            data = std::move(s.Data);
+            s.Pending.reset();
+            s.State = Slot::Idle;
         }
         if (data.size() != Graphics::CoherentPointDriftEStepWorkspace::ReadbackBytes(n, m)) return false;
         const auto copy = [&](std::span<double> to, std::size_t offset) {
@@ -144,59 +163,71 @@ namespace Extrinsic::Runtime
     void CoherentPointDriftGpuEStep::Pump()
     {
         auto& s = *m_Impl;
-        std::scoped_lock lock{s.Mutex};
-        if (s.State == Slot::Queued)
+        std::shared_ptr<Core::Tasks::CounterEvent> signal;
         {
-            if (s.IsClosed)
+            std::scoped_lock lock{s.Mutex};
+            if (s.Pending && !s.Settled && std::chrono::steady_clock::now() - s.Started >= s.Timeout)
             {
-                s.State = Slot::Failed;
-                s.Changed.notify_all();
-                return;
-            }
-            if (!s.Workspace) s.Workspace = s.Cache.LeaseGpuWorkspace<Graphics::CoherentPointDriftEStepWorkspace>();
-            if (!s.Workspace)
-            {
-                s.LastDiagnostic = "No Vulkan E-step workspace (no device); the run continues on the CPU.";
-                ++s.Counters.Failed;
                 s.IsClosed = true;
-                s.State = Slot::Failed;
-                s.Changed.notify_all();
-                return;
+                s.LastDiagnostic = "No Vulkan E-step result arrived in time; the run continues on the CPU.";
+                signal = s.SettleLocked();
+                s.Pending.reset();
+                if (s.State != Slot::InFlight) s.State = Slot::Idle;
             }
-            const auto request = s.Staging;
-            const std::size_t n = request->Target->size() / 8u, m = request->Source.size() / 8u;
-            s.Gpu = s.Cache.QueueGpuCompute(Graphics::CoherentPointDriftEStepWorkspace::ReadbackBytes(n, m),
-                [workspace = s.Workspace, request](RHI::ICommandContext& commands, const SpatialGpuIndexView&) {
-                    return workspace->Record(commands, {.Target = *request->Target,
-                        .TargetGeneration = request->TargetGeneration, .Source = request->Source,
-                        .SkipRows = request->SkipRows,
-                        .Sigma2 = request->Sigma2, .LogOutlier = request->LogOutlier});
-                }, SpatialGpuLatency::Immediate);
-            s.State = Slot::InFlight;
-        }
-        if (s.State == Slot::InFlight && s.Gpu)
-        {
-            if (s.Gpu->State == SpatialQueryState::Ready)
+            if (s.State == Slot::Queued)
             {
-                s.Data = std::move(s.Gpu->Data);
-                s.Gpu.reset();
-                ++s.Counters.Completed;
-                // After a timeout nobody waits: drop the result.
-                s.State = s.Pending ? Slot::Done : Slot::Idle;
-                s.Changed.notify_all();
+                if (!s.Workspace) s.Workspace = s.Cache.LeaseGpuWorkspace<Graphics::CoherentPointDriftEStepWorkspace>();
+                if (!s.Workspace)
+                {
+                    s.LastDiagnostic = "No Vulkan E-step workspace (no device); the run continues on the CPU.";
+                    ++s.Counters.Failed;
+                    s.IsClosed = true;
+                    s.State = Slot::Idle;
+                    signal = s.SettleLocked();
+                    s.Pending.reset();
+                }
+                else
+                {
+                    const auto request = s.Staging;
+                    const std::size_t n = request->Target->size() / 8u, m = request->Source.size() / 8u;
+                    s.Gpu = s.Cache.QueueGpuCompute(Graphics::CoherentPointDriftEStepWorkspace::ReadbackBytes(n, m),
+                        [workspace = s.Workspace, request](RHI::ICommandContext& commands, const SpatialGpuIndexView&) {
+                            return workspace->Record(commands, {.Target = *request->Target,
+                                .TargetGeneration = request->TargetGeneration, .Source = request->Source,
+                                .SkipRows = request->SkipRows,
+                                .Sigma2 = request->Sigma2, .LogOutlier = request->LogOutlier});
+                        }, SpatialGpuLatency::Immediate);
+                    s.State = Slot::InFlight;
+                }
             }
-            else if (s.Gpu->State == SpatialQueryState::Failed)
+            if (s.State == Slot::InFlight && s.Gpu)
             {
-                s.LastDiagnostic = s.Gpu->Diagnostic.empty()
-                    ? std::string("The Vulkan E-step was refused or failed; the run continues on the CPU.")
-                    : s.Gpu->Diagnostic;
-                s.Gpu.reset();
-                ++s.Counters.Failed;
-                s.IsClosed = true;
-                s.State = s.Pending ? Slot::Failed : Slot::Idle;
-                s.Changed.notify_all();
+                if (s.Gpu->State == SpatialQueryState::Ready)
+                {
+                    ++s.Counters.Completed;
+                    s.State = s.Pending ? Slot::Done : Slot::Idle;
+                    if (s.Pending)
+                    {
+                        s.Data = std::move(s.Gpu->Data);
+                        signal = s.SettleLocked();
+                    }
+                    s.Gpu.reset();
+                }
+                else if (s.Gpu->State == SpatialQueryState::Failed)
+                {
+                    s.LastDiagnostic = s.Gpu->Diagnostic.empty()
+                        ? std::string("The Vulkan E-step was refused or failed; the run continues on the CPU.")
+                        : s.Gpu->Diagnostic;
+                    s.Gpu.reset();
+                    ++s.Counters.Failed;
+                    s.IsClosed = true;
+                    s.State = Slot::Idle;
+                    if (auto completed = s.SettleLocked()) signal = std::move(completed);
+                    s.Pending.reset();
+                }
             }
         }
+        if (signal) signal->Signal();
     }
 
     void CoherentPointDriftGpuEStep::ReleaseDeviceResources()
@@ -208,10 +239,17 @@ namespace Extrinsic::Runtime
     void CoherentPointDriftGpuEStep::Close(std::string diagnostic)
     {
         auto& s = *m_Impl;
-        std::scoped_lock lock{s.Mutex};
-        s.IsClosed = true;
-        if (!diagnostic.empty()) s.LastDiagnostic = std::move(diagnostic);
-        s.Changed.notify_all();
+        std::shared_ptr<Core::Tasks::CounterEvent> signal;
+        {
+            std::scoped_lock lock{s.Mutex};
+            s.IsClosed = true;
+            if (!diagnostic.empty()) s.LastDiagnostic = std::move(diagnostic);
+            signal = s.SettleLocked();
+            s.Pending.reset();
+            s.Data.clear();
+            if (s.State == Slot::Queued || s.State == Slot::Done) s.State = Slot::Idle;
+        }
+        if (signal) signal->Signal();
     }
 
     bool CoherentPointDriftGpuEStep::Closed() const

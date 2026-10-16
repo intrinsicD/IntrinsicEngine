@@ -1,3 +1,4 @@
+// Propagates local bounds into conservative world bounds after transform changes.
 module;
 
 #include <cstdint>
@@ -41,10 +42,11 @@ export namespace Extrinsic::ECS::Systems::BoundsPropagation
 
     // Recompute Components::Culling::World::Bounds from
     // Components::Culling::Local::Bounds and Components::Transform::WorldMatrix
-    // for every entity that the transform hierarchy stamped with
-    // Components::Transform::WorldUpdatedTag this frame. The world OBB inherits
-    // the rotation embedded in the world matrix and scales its extents per
-    // matrix column. Ordinary orthogonal TRS bases preserve the tight local
+    // for every entity stamped with Components::Transform::WorldUpdatedTag
+    // by hierarchy traversal or runtime physics writeback. Orthogonal bases
+    // retain an oriented box with per-column extents, correcting reflections
+    // to a proper rotation. Sheared or degenerate bases use a transformed local
+    // AABB with identity rotation. Ordinary orthogonal TRS bases preserve the tight local
     // sphere using the largest column magnitude. When composed non-uniform
     // scale and rotation produce material affine shear, a valid local AABB
     // instead yields a world sphere enclosing its transformed corners;

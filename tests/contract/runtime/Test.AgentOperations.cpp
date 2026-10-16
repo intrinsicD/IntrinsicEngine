@@ -64,6 +64,41 @@ TEST(AgentOperations, RegistryRejectsDuplicatesAndMissingInvokers)
     EXPECT_FALSE(registry.Find("mutate")->ReadOnly);
 }
 
+TEST(AgentOperations, ProtocolRejectsNonObjectArgumentsBeforeMutation)
+{
+    int mutations = 0;
+    auto registry = TestRegistry(mutations);
+    R::AgentProtocol protocol{registry, false};
+    R::EditorCommandHistory history;
+    const R::AgentOperationContext context{.History = &history};
+    for (const auto& arguments : {Json::array(), Json::array({1}), Json(nullptr), Json("bad"), Json(7)})
+    {
+        const auto response = Call(protocol, context,
+            {{"jsonrpc", "2.0"}, {"id", 1}, {"method", "tools/call"},
+             {"params", {{"name", "mutate"}, {"arguments", arguments}}}});
+        EXPECT_EQ(response.value("error", Json::object()).value("code", 0), -32602);
+        EXPECT_EQ(mutations, 0);
+        EXPECT_EQ(history.UndoCount(), 0u);
+    }
+    const auto omitted = Call(protocol, context,
+        {{"jsonrpc", "2.0"}, {"id", 2}, {"method", "tools/call"}, {"params", {{"name", "mutate"}}}});
+    EXPECT_TRUE(omitted.contains("result"));
+    EXPECT_EQ(mutations, 1);
+}
+
+TEST(AgentOperations, UndoRedoRejectMalformedDirectArguments)
+{
+    R::AgentOperationRegistry registry;
+    R::RegisterEditorAgentOperations(registry);
+    for (const auto* operation : {"undo", "redo"})
+        for (const auto* arguments : {"not-json", "[]", "null", R"({"steps":-1})", R"({"steps":"2"})"})
+        {
+            const auto result = R::InvokeAgentOperation(registry, operation, {}, arguments, false);
+            EXPECT_TRUE(result.IsError);
+            EXPECT_EQ(result.ErrorCode, "invalid_params");
+        }
+}
+
 TEST(AgentOperations, EditorOperationsHaveUniqueNamesAndValidSchemas)
 {
     R::AgentOperationRegistry registry;

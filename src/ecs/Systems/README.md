@@ -40,8 +40,8 @@ and passes that `WaitFor("TransformUpdate")` run after the traversal.
 `Extrinsic.ECS.System.BoundsPropagation::OnUpdate(entt::registry&)` recomputes
 `Components::Culling::World::Bounds` from `Components::Culling::Local::Bounds`
 and `Components::Transform::WorldMatrix` for every entity that
-`TransformHierarchy` stamped with `Components::Transform::WorldUpdatedTag`
-this frame.
+`TransformHierarchy` or runtime physics writeback stamped with
+`Components::Transform::WorldUpdatedTag` this frame.
 
 Selected propagation policy: **driven by `WorldUpdatedTag`**. The system does
 not introduce a separate local-bounds dirty tag and does not perform full
@@ -50,9 +50,12 @@ also mark the owning transform dirty (so the hierarchy traversal stamps
 `WorldUpdatedTag`) if they need the world bounds refreshed on the same
 frame; this keeps propagation O(updated subtrees) rather than O(N).
 
-The world OBB inherits the rotation embedded in the world matrix; world AABB
-extents are scaled per-column; the world sphere uses the largest column
-magnitude as a conservative scale factor. Writes use `emplace_or_replace`
+An orthogonal world basis produces an oriented box with per-column extents;
+mirrored bases are converted to a proper rotation without changing the box.
+Sheared or degenerate bases use the transformed local AABB as an axis-aligned
+box. For shear with valid local bounds, the world sphere encloses that AABB;
+otherwise its scale uses a conservative operator-norm upper bound, reducing
+to the largest column magnitude for orthogonal TRS. Writes use `emplace_or_replace`
 so first-frame entities and entities whose local bounds were freshly
 authored receive an initial world value. The `WorldUpdatedTag` is **not**
 cleared here — render-sync owns that hand-off.
@@ -79,7 +82,7 @@ GPU-handle-touching render residency does not belong in ECS systems.
 Per [`HARDEN-066`](../../../tasks/archive/HARDEN-066-ecs-render-sync-export-policy.md),
 `Extrinsic.ECS.System.RenderSync` is a CPU-only tag-forwarding pass that
 translates `Components::Transform::WorldUpdatedTag` (the producer signal
-emitted by `TransformHierarchy`) into `Components::DirtyTags::DirtyTransform`
+emitted by `TransformHierarchy` or runtime physics writeback) into `Components::DirtyTags::DirtyTransform`
 (the GPU-sync hand-off drained by `Runtime.RenderExtraction`). It also
 clears `WorldUpdatedTag` so the producer/consumer cycle is closed within
 the ECS layer; downstream consumers that need a "transform changed" signal

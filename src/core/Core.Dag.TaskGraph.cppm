@@ -298,7 +298,6 @@ export namespace Extrinsic::Core::Dag
         [[nodiscard]] std::string_view PassName(uint32_t index) const noexcept;
         [[nodiscard]] uint64_t LastCompileTimeNs()     const noexcept;
         [[nodiscard]] uint64_t LastExecuteTimeNs()     const noexcept;
-        [[nodiscard]] uint64_t LastCriticalPathTimeNs()const noexcept;
         [[nodiscard]] ScheduleStats GetScheduleStats() const noexcept;
         [[nodiscard]] TaskGraphPlanReuseStats GetPlanReuseStats() const noexcept;
 

@@ -269,10 +269,12 @@ namespace Extrinsic::Runtime
                 if (!GeometryPropertiesCurrent(context,entity,inputs) || !GeometryPropertiesCurrent(context,entity,*revisions))
                     return EditorCommandHistoryStatus::StaleEntity;
                 auto* props=MutableGeometryProperties(context.Scene->Raw(),entity,c.Positions.Domain);
+                const auto historyBefore = *revisions;
                 if (target.Exists) props->GetOrAdd<glm::vec3>(c.Output.Name).Vector()=target.Values;
                 else if (auto p=props->Get<glm::vec3>(c.Output.Name)) props->Remove(p);
                 const auto a=BuildGeometryAvailability(context.Scene->Raw(),entity);
                 *revisions={ObserveGeometryProperty(a,c.Output.Domain,c.Output.Name)};
+                GeometryProcessingDetail::RebasePointPropertyHistory(context, entity, historyBefore);
                 ECS::Components::DirtyTags::MarkGpuDirty(context.Scene->Raw(),entity);
                 ECS::Components::DirtyTags::MarkVertexPositionsDirty(context.Scene->Raw(),entity);
                 if (context.InvalidateWorkspaceSnapshotCache) context.InvalidateWorkspaceSnapshotCache();
@@ -362,27 +364,27 @@ namespace Extrinsic::Runtime
         bool submitted=true;
         if(w->Config.Backend!=BilateralFilterBackend::VulkanLBVH || !w->Config.Iterations)
         {
-            submitted=submit({.DebugName="Bilateral point filter",.Scope=context.World,.Kind=RuntimeTaskKinds::GeometryProcess,
+            submitted=submit({.DebugName="Bilateral point filter",.Scope=context.World,
                 .Work=[w](const JobCancellation&){Compute(*w);return JobResultEnvelope::Make(true);},
                 .ValidateBeforeApply=validate,.PublishCompletion=publish,.FinalizeUnpublishedOnMainThread=finalize});
         }
         else
         {
-            submitted=submit({.DebugName="Bilateral bandwidth",.Scope=context.World,.Kind=RuntimeTaskKinds::GeometryProcess,
+            submitted=submit({.DebugName="Bilateral bandwidth",.Scope=context.World,
                 .Work=[w](const JobCancellation&){return JobResultEnvelope::Make(Prepare(*w));},
                 .ValidateBeforeApply=validate,
                 .PublishCompletion=[w](KernelEventBus&,const JobResultEnvelope&){if(w->Result.Status!=EditorCommandStatus::Applied){w->MainFailure=w->Result;return false;}return true;},
                 .FinalizeUnpublishedOnMainThread=[w]{w->Abandoned=true;}});
             for(std::uint32_t i=0;submitted && i<w->Config.Iterations;++i)
             {
-                submitted=submit({.DebugName="Bilateral neighborhoods (Vulkan)",.Scope=context.World,.Kind=RuntimeTaskKinds::GeometryProcess,
+                submitted=submit({.DebugName="Bilateral neighborhoods (Vulkan)",.Scope=context.World,
                     .Work=[](const JobCancellation&){return JobResultEnvelope::Make(true);},
                     .IsReadyToApply=[context,w]{return AdvanceGpu(context,*w);},.ValidateBeforeApply=validate,
                     .PublishCompletion=[w](KernelEventBus&,const JobResultEnvelope&){return w->Pages.Finished;},
                     .FinalizeUnpublishedOnMainThread=[w]{w->Abandoned=true;}});
                 if(!submitted)break;
                 const bool last=i+1==w->Config.Iterations;
-                JobDesc step{.DebugName="Bilateral position update",.Scope=context.World,.Kind=RuntimeTaskKinds::GeometryProcess,
+                JobDesc step{.DebugName="Bilateral position update",.Scope=context.World,
                     .Work=[w](const JobCancellation&){ComputeStep(*w);return JobResultEnvelope::Make(true);},
                     .ValidateBeforeApply=validate};
                 if(last){step.PublishCompletion=publish;step.FinalizeUnpublishedOnMainThread=finalize;}

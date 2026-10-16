@@ -17,6 +17,10 @@ export namespace Geometry
     [[nodiscard]] bool RayAabbSlabInterval(
         const Ray& ray, const AABB& box, float& tmin, float& tmax);
 
+    // First forward ray parameter; inside origins return zero. Direction need not
+    // be normalized. Invalid inputs or an unrepresentable parameter return nullopt.
+    [[nodiscard]] std::optional<float> RaySphereParameter(const Ray& ray, const Sphere& sphere);
+
     struct RayTriangleHit
     {
         float T = std::numeric_limits<float>::infinity();

@@ -1,3 +1,4 @@
+// Resource-access hazard edges used to order pending DAG tasks.
 module;
 
 #include <span>

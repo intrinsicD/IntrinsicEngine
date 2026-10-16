@@ -27,6 +27,7 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.ECS.System.TransformHierarchy;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GeometryAvailability;
@@ -39,6 +40,7 @@ import Geometry.Properties;
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/internal/Runtime.EditorGeneratedEntity.hpp"
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
+#include "Editor/internal/Runtime.EditorPropertyHistory.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.hpp"
 
 namespace Extrinsic::Runtime
@@ -195,7 +197,7 @@ namespace Extrinsic::Runtime
             GeometryProcessingDetail::MeshSupport::BuildHalfedgeMeshForProcessing(view, "Scalar ridges");
         if (!source.Succeeded())
             return fail(source.Status, std::move(source.Diagnostic));
-        const auto matrix = GeometryProcessingDetail::ComposeEditorWorldMatrix(raw, *entity);
+        const auto matrix = ECS::Systems::TransformHierarchy::TryComposeWorldMatrix(raw, *entity);
         if (command.PublishGraph && !matrix)
             return fail(EditorCommandStatus::MissingTransform,
                         "Scalar ridge target has no finite world transform.");
@@ -346,6 +348,7 @@ namespace Extrinsic::Runtime
                     return fail(EditorCommandStatus::InvalidProcessingParameters,
                                 "Scalar ridge target topology is invalid.");
                 const auto mutate = [scene = context.Scene, entity = *entity, signature, bindings,
+                                     history = context.CommandHistory,
                                      invalidate = context.InvalidateWorkspaceSnapshotCache](
                                         const FeatureState& expected, const FeatureState& target) {
                     auto& raw = scene->Raw();
@@ -360,8 +363,14 @@ namespace Extrinsic::Runtime
                     FeatureState current;
                     if (!CaptureFeatures(vertices, edges, bindings, current) || current != expected)
                         return EditorCommandHistoryStatus::StaleEntity;
+                    const EditorProcessingContext historyContext{.Scene = scene, .CommandHistory = history};
+                    const std::array outputs{bindings.Vertices, bindings.Edges, bindings.Basins};
+                    const auto beforeWrites = GeometryProcessingDetail::ObserveGeometryProperties(
+                        historyContext, entity, std::span{outputs}.first(bindings.WithBasins ? 3u : 2u));
                     if (!ApplyFeatures(vertices, edges, bindings, target))
                         return EditorCommandHistoryStatus::CommandFailed;
+                    GeometryProcessingDetail::RebasePointPropertyHistory(
+                        historyContext, entity, beforeWrites);
                     if (invalidate)
                         invalidate();
                     return EditorCommandHistoryStatus::Applied;

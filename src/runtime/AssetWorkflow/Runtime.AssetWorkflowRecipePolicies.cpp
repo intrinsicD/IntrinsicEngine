@@ -611,8 +611,6 @@ namespace Extrinsic::Runtime
                         FileNameFromPath(sourcePath),
                     .Scope = world,
                     .Priority = Core::Dag::TaskPriority::Low,
-                    .Kind = RuntimeTaskKinds::AssetDecode,
-                    .EstimatedCost = 1u,
                     .Work =
                         [entity](const JobCancellation&)
                         {
@@ -789,8 +787,6 @@ namespace Extrinsic::Runtime
                         FileNameFromPath(state->Path),
                     .Scope = world,
                     .Priority = Core::Dag::TaskPriority::Low,
-                    .Kind = RuntimeTaskKinds::AssetDecode,
-                    .EstimatedCost = 8u,
                     .CancellationGeneration = jobs->WorldGeneration(world),
                     .Work =
                         [state](const JobCancellation&)

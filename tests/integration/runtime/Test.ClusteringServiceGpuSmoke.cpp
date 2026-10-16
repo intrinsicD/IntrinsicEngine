@@ -287,6 +287,12 @@ TEST_P(ClusteringServiceGpuSmoke,
         }
         Runtime::KMeansPagingForTesting={.PagePairs=256,.SubmissionPairs=1u<<18};
     }
+    if(GetParam()==3){
+        app->Points={{0,0,0},{1,0,0},{6,0,0},{7,0,0},{10,0,0}};
+        app->Parameters.ClusterCount=2;
+        app->Parameters.MaxIterations=1;
+        Runtime::KMeansPagingForTesting={.PagePairs=256,.SubmissionPairs=1u<<18};
+    }
     ClusteringServiceGpuApp* appPtr = app.get();
     auto livePoints=appPtr->Points;if(appPtr->Deleted)livePoints.erase(livePoints.begin()+1);
     Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
@@ -332,6 +338,7 @@ TEST_P(ClusteringServiceGpuSmoke,
     // Case 2's budgets fit a whole iteration (and a due preview) per submission:
     // one per iteration plus the terminal preview/centroid submission.
     if(GetParam()==2)EXPECT_EQ(appPtr->Completion->GpuSubmissions,appPtr->Completion->Iterations+1u);
+    else if(GetParam()==3)EXPECT_EQ(appPtr->Completion->GpuSubmissions,3u);
     else EXPECT_GT(appPtr->Completion->GpuSubmissions,appPtr->Completion->Iterations+1u);
     EXPECT_EQ(appPtr->Completion->LabelCount, livePoints.size());
     EXPECT_EQ(appPtr->Completion->ClusterCount,
@@ -371,6 +378,20 @@ TEST_P(ClusteringServiceGpuSmoke,
     EXPECT_EQ(appPtr->Completion->MaxDistanceIndex,
               cpu->MaxDistanceIndex);
 
+    if(GetParam()==3){
+        // Hierarchical seeds are {4.8,10}; one update returns {3.5,10}.
+        // Row3 crosses their Voronoi boundary and must be assigned again.
+        const std::vector<std::uint32_t> labels{0,0,0,1,1};
+        EXPECT_EQ(appPtr->TypedLabels,labels);
+        ASSERT_EQ(appPtr->Completion->Centroids.size(),2u);
+        EXPECT_EQ(appPtr->Completion->Centroids[0],glm::vec3(3.5f,0,0));
+        EXPECT_EQ(appPtr->Completion->Centroids[1],glm::vec3(10,0,0));
+        EXPECT_FLOAT_EQ(appPtr->Completion->Inertia,33.75f);
+        EXPECT_EQ(appPtr->Completion->MaxDistanceIndex,0u);
+        EXPECT_EQ(appPtr->Completion->Iterations,1u);
+        EXPECT_FALSE(appPtr->Completion->Converged);
+    }
+
     EXPECT_EQ(appPtr->Stats.GpuRequestsAccepted, 2u);
     EXPECT_EQ(appPtr->Stats.GpuFallbacks, 0u);
     EXPECT_EQ(appPtr->Stats.GpuCompletions, 1u);
@@ -380,4 +401,4 @@ TEST_P(ClusteringServiceGpuSmoke,
     engine.Shutdown();
 }
 
-INSTANTIATE_TEST_SUITE_P(ResidentPages,ClusteringServiceGpuSmoke,::testing::Values(0,1,2));
+INSTANTIATE_TEST_SUITE_P(ResidentPages,ClusteringServiceGpuSmoke,::testing::Values(0,1,2,3));

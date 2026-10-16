@@ -65,6 +65,20 @@ namespace Geometry::GraphIO
             return Extrinsic::Core::Err<GraphIOResult>(Extrinsic::Core::ErrorCode::InvalidFormat);
         }
 
+        [[nodiscard]] bool HasFiniteEdgeWeights(const Graph::Graph& graph)
+        {
+            const auto weights = graph.EdgeProperties().Get<float>("e:weight");
+            if (weights.IsValid())
+            {
+                for (std::size_t i = 0; i < graph.EdgesSize(); ++i)
+                {
+                    const EdgeHandle edge{static_cast<PropertyIndex>(i)};
+                    if (!graph.IsDeleted(edge) && !std::isfinite(weights[i])) return false;
+                }
+            }
+            return true;
+        }
+
         void ApplyPathInfo(GraphIOResult& result, std::string_view path)
         {
             const auto pathInfo = MakePathInfo(path);
@@ -315,6 +329,14 @@ namespace Geometry::GraphIO
             return GraphIOWriteStatus::EmptyGraph;
         }
 
+        for (std::size_t i = 0; i < source.VerticesSize(); ++i)
+        {
+            const VertexHandle vertex{static_cast<PropertyIndex>(i)};
+            if (!source.IsDeleted(vertex) && !Geometry::Validation::IsFinite(source.VertexPosition(vertex)))
+                return GraphIOWriteStatus::FileWriteError;
+        }
+        if (!HasFiniteEdgeWeights(source)) return GraphIOWriteStatus::FileWriteError;
+
         std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
         if (!stream)
         {
@@ -337,10 +359,6 @@ namespace Geometry::GraphIO
                 continue;
             }
             const glm::vec3 p = source.VertexPosition(v);
-            if (!Geometry::Validation::IsFinite(p))
-            {
-                return GraphIOWriteStatus::FileWriteError;
-            }
             int written = std::snprintf(buffer, sizeof(buffer),
                                         "%zu %.6f %.6f %.6f",
                                         i,
@@ -394,10 +412,6 @@ namespace Geometry::GraphIO
             if (weightPresent || labelPresent)
             {
                 const float weight = weightPresent ? edgeWeights[e.Index] : 1.0f;
-                if (!std::isfinite(weight))
-                {
-                    return GraphIOWriteStatus::FileWriteError;
-                }
                 written = std::snprintf(buffer, sizeof(buffer),
                                         " %.6f",
                                         static_cast<double>(weight));
@@ -439,6 +453,8 @@ namespace Geometry::GraphIO
             return GraphIOWriteStatus::EmptyGraph;
         }
 
+        if (!HasFiniteEdgeWeights(source)) return GraphIOWriteStatus::FileWriteError;
+
         std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
         if (!stream)
         {
@@ -477,10 +493,6 @@ namespace Geometry::GraphIO
             if (hasEdgeWeights || labelPresent)
             {
                 const float weight = hasEdgeWeights ? edgeWeights[e.Index] : 1.0f;
-                if (!std::isfinite(weight))
-                {
-                    return GraphIOWriteStatus::FileWriteError;
-                }
                 written = std::snprintf(buffer, sizeof(buffer),
                                         " %.6f",
                                         static_cast<double>(weight));

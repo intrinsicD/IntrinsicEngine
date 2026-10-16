@@ -1,3 +1,4 @@
+// Simulation configuration for the task scheduler worker count.
 export module Extrinsic.Core.Config.Simulation;
 
 namespace Extrinsic::Core::Config

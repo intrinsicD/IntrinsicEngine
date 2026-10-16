@@ -252,12 +252,18 @@ uint64_t VulkanTransferQueue::SubmitTimelineLocked(
 RHI::TransferToken VulkanTransferQueue::Submit(VkCommandBuffer cmd)
 {
     if (!FinishCommandBuffer(cmd, "upload"))
+    {
+        m_Belt->CancelPending();
         return {};
+    }
 
     std::scoped_lock lock{m_Mutex};
     const uint64_t ticket = SubmitTimelineLocked(cmd, "upload");
     if (ticket == 0u)
+    {
+        m_Belt->CancelPending();
         return {};
+    }
     m_Belt->Retire(ticket);
     return RHI::TransferToken{ticket};
 }
@@ -492,6 +498,7 @@ RHI::TransferToken VulkanTransferQueue::UploadBuffer(RHI::BufferHandle dst,
         return {};
     }
 
+    std::scoped_lock uploadLock{m_UploadMutex};
     auto staging = m_Belt->Allocate(static_cast<size_t>(size), 4);
     if (!staging.MappedPtr || staging.Buffer == VK_NULL_HANDLE)
     {
@@ -502,7 +509,10 @@ RHI::TransferToken VulkanTransferQueue::UploadBuffer(RHI::BufferHandle dst,
 
     VkCommandBuffer cmd = Begin();
     if (cmd == VK_NULL_HANDLE)
+    {
+        m_Belt->CancelPending();
         return {};
+    }
 
     // Uploads share the graphics queue with frame submissions. Queue order
     // alone is an execution order, not a memory dependency: a later staged
@@ -581,7 +591,20 @@ RHI::TransferToken VulkanTransferQueue::UploadTexture(RHI::TextureHandle dst,
         return {};
     }
 
-    auto staging = m_Belt->Allocate(static_cast<size_t>(dataSizeBytes), 4);
+    const RHI::TextureDesc desc{
+        .Width = img->Width, .Height = img->Height,
+        .MipLevels = img->MipLevels, .Fmt = img->RhiFormat,
+    };
+    const std::uint64_t expectedSize = RHI::ComputeSubresourceUploadSize(desc, mipLevel);
+    if (expectedSize == 0u || dataSizeBytes != expectedSize)
+    {
+        Core::Log::Warn("[VulkanTransferQueue] UploadTexture rejected; upload size mismatch: expected={} actual={}",
+                       expectedSize, dataSizeBytes);
+        return {};
+    }
+    std::scoped_lock uploadLock{m_UploadMutex};
+    auto staging = m_Belt->Allocate(static_cast<size_t>(dataSizeBytes),
+                                   RHI::RequiredBufferOffsetAlignment(img->RhiFormat));
     if (!staging.MappedPtr || staging.Buffer == VK_NULL_HANDLE)
     {
         Core::Log::Warn("[VulkanTransferQueue] UploadTexture rejected; staging allocation failed");
@@ -591,7 +614,10 @@ RHI::TransferToken VulkanTransferQueue::UploadTexture(RHI::TextureHandle dst,
 
     VkCommandBuffer cmd = Begin();
     if (cmd == VK_NULL_HANDLE)
+    {
+        m_Belt->CancelPending();
         return {};
+    }
 
     // Transition: Undefined → TransferDst
     VkImageMemoryBarrier2 toXfer{};
@@ -710,6 +736,7 @@ RHI::TransferToken VulkanTransferQueue::UploadTextureFullChain(RHI::TextureHandl
     }
 
     const std::uint32_t offsetAlignment = RHI::RequiredBufferOffsetAlignment(desc.Fmt);
+    std::scoped_lock uploadLock{m_UploadMutex};
     auto staging = m_Belt->Allocate(static_cast<std::size_t>(layout.TotalBytes), offsetAlignment);
     if (!staging.MappedPtr || staging.Buffer == VK_NULL_HANDLE)
     {
@@ -744,7 +771,10 @@ RHI::TransferToken VulkanTransferQueue::UploadTextureFullChain(RHI::TextureHandl
 
     VkCommandBuffer cmd = Begin();
     if (cmd == VK_NULL_HANDLE)
+    {
+        m_Belt->CancelPending();
         return {};
+    }
 
     VkImageMemoryBarrier2 toXfer{};
     toXfer.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;

@@ -1,3 +1,4 @@
+// Signed heat-distance fields from boundary halfedges, with solver and degeneracy diagnostics.
 module;
 
 #include <cstddef>

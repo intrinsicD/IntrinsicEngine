@@ -215,6 +215,7 @@ namespace Extrinsic::Core::Tasks
                 .Handle = h,
                 .Alive = std::move(alive),
                 .ParkedAt = parkStart,
+                .Lane = s_CurrentPriorityLane,
             };
 
             if (slot.parkedTail == Detail::SchedulerContext::InvalidParkedNode)
@@ -275,7 +276,8 @@ namespace Extrinsic::Core::Tasks
             s_Ctx->unparkCount.fetch_add(1, std::memory_order_relaxed);
             Detail::RecordLatencySample(s_Ctx->unparkLatencyHistogram, static_cast<uint64_t>(unparkNs));
 
-            Reschedule(continuation.Handle, std::move(continuation.Alive));
+            Reschedule(continuation.Handle, std::move(continuation.Alive),
+                       static_cast<DispatchPriority>(continuation.Lane));
         }
 
         return static_cast<uint32_t>(continuations.size());

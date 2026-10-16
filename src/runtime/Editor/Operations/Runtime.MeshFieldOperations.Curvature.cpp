@@ -61,6 +61,7 @@ import Geometry.Properties;
 
 #include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
+#include "Editor/internal/Runtime.EditorPropertyHistory.hpp"
 
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.hpp"
 #include "Editor/Operations/Runtime.MeshFieldOperations.Properties.hpp"
@@ -82,7 +83,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
         if (!properties.Exists(name))
             return true;
 
-        auto property = properties.Get<T>(name);
+        const auto property = properties.Get<T>(name);
         if (!property || property.Vector().size() != expectedCount)
         {
             diagnostic = "existing curvature property has an incompatible type or count: ";
@@ -453,7 +454,8 @@ namespace Extrinsic::Runtime::MeshFieldDetail
         [[nodiscard]] EditorCommandHistoryStatus ApplyMeshCurvatureState(
             ECS::Scene::Registry* scene,
             const std::uint32_t stableEntityId,
-            const MeshCurvaturePropertyState& state)
+            const MeshCurvaturePropertyState& state,
+            EditorCommandHistory* history)
         {
             if (scene == nullptr)
                 return EditorCommandHistoryStatus::MissingScene;
@@ -473,12 +475,20 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                 return EditorCommandHistoryStatus::UnsupportedOperation;
             }
 
+            const EditorProcessingContext historyContext{.Scene = scene, .CommandHistory = history};
+            const std::array outputs{state.Bindings.Mean, state.Bindings.Gaussian,
+                state.Bindings.MinPrincipal, state.Bindings.MaxPrincipal,
+                state.Bindings.Direction1, state.Bindings.Direction2};
+            const auto beforeWrites = GeometryProcessingDetail::ObserveGeometryProperties(
+                historyContext, *entity, outputs);
             if (!ApplyMeshCurvaturePropertyState(
                     view.VertexSource->Properties,
                     state))
             {
                 return EditorCommandHistoryStatus::CommandFailed;
             }
+            GeometryProcessingDetail::RebasePointPropertyHistory(
+                historyContext, *entity, beforeWrites);
 
             return EditorCommandHistoryStatus::Applied;
         }
@@ -619,7 +629,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                             }
                             return EditorCommandHistoryStatus::Applied;
                         },
-                        [](
+                        [history = context.CommandHistory](
                             const MeshPropertyMutationIdentity& identity,
                             const MeshCurvaturePropertySnapshot& target)
                         {
@@ -631,7 +641,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                             return ApplyMeshCurvatureState(
                                 identity.Scene,
                                 identity.StableEntityId,
-                                *target);
+                                *target, history);
                         },
                         [](
                             const MeshPropertyMutationIdentity& identity,
@@ -659,7 +669,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             }
 
             const EditorCommandHistoryStatus applied =
-                ApplyMeshCurvatureState(context.Scene, stableEntityId, after);
+                ApplyMeshCurvatureState(context.Scene, stableEntityId, after, nullptr);
             if (applied != EditorCommandHistoryStatus::Applied)
                 return ToEditorCommandStatus(applied);
             StampMeshCurvaturePropertyDirty(
@@ -1155,7 +1165,8 @@ namespace Extrinsic::Runtime::MeshFieldDetail
         ApplyMeshCurvatureSegmentationState(
             ECS::Scene::Registry* scene,
             const std::uint32_t stableEntityId,
-            const MeshCurvatureSegmentationPropertyState& state)
+            const MeshCurvatureSegmentationPropertyState& state,
+            EditorCommandHistory* history)
         {
             if (scene == nullptr)
                 return EditorCommandHistoryStatus::MissingScene;
@@ -1172,6 +1183,12 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             {
                 return EditorCommandHistoryStatus::UnsupportedOperation;
             }
+            const EditorProcessingContext historyContext{.Scene = scene, .CommandHistory = history};
+            const std::array outputs{state.Bindings.Components, state.Bindings.Regions,
+                state.Bindings.Boundaries, state.Bindings.HardFeatures,
+                state.Bindings.FeatureConfidence, state.Bindings.BoundaryRoles};
+            const auto beforeWrites = GeometryProcessingDetail::ObserveGeometryProperties(
+                historyContext, *entity, outputs);
             if (!ApplyMeshCurvatureSegmentationPropertyState(
                     view.FaceSource->Properties,
                     view.EdgeSource->Properties,
@@ -1179,6 +1196,8 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             {
                 return EditorCommandHistoryStatus::CommandFailed;
             }
+            GeometryProcessingDetail::RebasePointPropertyHistory(
+                historyContext, *entity, beforeWrites);
             return EditorCommandHistoryStatus::Applied;
         }
 
@@ -1207,7 +1226,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             {
                 const EditorCommandHistoryStatus applied =
                     ApplyMeshCurvatureSegmentationState(
-                        context.Scene, stableEntityId, after);
+                        context.Scene, stableEntityId, after, nullptr);
                 if (applied != EditorCommandHistoryStatus::Applied)
                     return ToEditorCommandStatus(applied);
                 StampMeshCurvatureSegmentationDirty(
@@ -1321,7 +1340,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                         }
                         return EditorCommandHistoryStatus::Applied;
                     },
-                    [](
+                    [history = context.CommandHistory](
                         const MeshPropertyMutationIdentity& identity,
                         const MeshCurvatureSegmentationPropertySnapshot& target)
                     {
@@ -1330,7 +1349,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                         return ApplyMeshCurvatureSegmentationState(
                             identity.Scene,
                             identity.StableEntityId,
-                            *target);
+                            *target, history);
                     },
                     [](
                         const MeshPropertyMutationIdentity& identity,
@@ -1695,20 +1714,10 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             const EditorProcessingContext& context,
             const std::shared_ptr<EditorMeshCurvatureJobState>& state)
         {
-            const std::uint32_t estimatedCost =
-                std::max<std::uint32_t>(
-                    1u,
-                    static_cast<std::uint32_t>(
-                        (std::max(state->SnapshotPositions.size(),
-                                  state->Mesh.FaceCount()) +
-                         1023u) /
-                        1024u));
             return JobDesc{
                 .DebugName = kMeshCurvatureJobName,
                 .Scope = context.World,
                 .Priority = Core::Dag::TaskPriority::Normal,
-                .Kind = RuntimeTaskKinds::GeometryProcess,
-                .EstimatedCost = estimatedCost,
                 .Work =
                     [state](const JobCancellation&) -> JobResultEnvelope
                     {

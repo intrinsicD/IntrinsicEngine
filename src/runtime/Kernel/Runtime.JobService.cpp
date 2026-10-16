@@ -25,6 +25,23 @@ namespace Extrinsic::Runtime
 {
     namespace
     {
+        // TaskGraph's mapping targets helpable frame work. Runtime jobs use
+        // distinct worker-only lanes so priority never makes them run inline.
+        [[nodiscard]] constexpr Core::Tasks::DispatchPriority JobDispatchPriority(
+            const Core::Dag::TaskPriority priority) noexcept
+        {
+            using Core::Tasks::DispatchPriority;
+            switch (priority)
+            {
+            case Core::Dag::TaskPriority::Critical: return DispatchPriority::BackgroundCritical;
+            case Core::Dag::TaskPriority::High: return DispatchPriority::BackgroundHigh;
+            case Core::Dag::TaskPriority::Normal: return DispatchPriority::BackgroundNormal;
+            case Core::Dag::TaskPriority::Low: return DispatchPriority::BackgroundLow;
+            case Core::Dag::TaskPriority::Background: return DispatchPriority::Background;
+            }
+            return DispatchPriority::BackgroundNormal;
+        }
+
         // Names the job whose main-thread callback runs for its duration; restores the outer
         // value, so a callback that drains nothing itself keeps it correct.
         class CompletingScope
@@ -69,6 +86,10 @@ namespace Extrinsic::Runtime
         std::string DebugName{};
         std::move_only_function<JobResultEnvelope(const JobCancellation&)>
             Work{};
+        std::move_only_function<Core::Tasks::Job(
+            JobCancellation, std::move_only_function<void(JobResultEnvelope)>)>
+            CoroutineWork{};
+        std::move_only_function<void()> WakeOnCancel{};
         std::move_only_function<bool(KernelEventBus&,
                                      const JobResultEnvelope&)>
             PublishCompletion{};
@@ -79,8 +100,6 @@ namespace Extrinsic::Runtime
         // RUNTIME-194 scheduling/lifecycle additions.
         std::vector<JobToken> DependsOn{};
         Core::Dag::TaskPriority Priority{Core::Dag::TaskPriority::Normal};
-        Core::Dag::TaskKind Kind{RuntimeTaskKinds::Generic};
-        std::uint32_t EstimatedCost{1u};
         std::uint64_t CancellationGeneration{0u};
         std::move_only_function<bool()> IsReadyToApply{};
         std::move_only_function<JobApplyValidation()> ValidateBeforeApply{};
@@ -190,16 +209,19 @@ namespace Extrinsic::Runtime
     {
         // Engine calls this on the main thread while borrowed services/device live.
         // Reject reentrant submissions from workers and unpublished finalizers.
+        std::vector<std::move_only_function<void()>> wakeups;
         {
             std::lock_guard lock(m_State->Mutex);
             m_State->Draining = true;
             for (const auto& [token, job] : m_State->Jobs)
             {
-                if (!IsTerminal(job->State.load(std::memory_order_acquire)) &&
-                    !job->CancelRequested->exchange(true, std::memory_order_acq_rel))
+                if (IsTerminal(job->State.load(std::memory_order_acquire))) continue;
+                if (!job->CancelRequested->exchange(true, std::memory_order_acq_rel))
                     ++m_State->Stats.CancelledJobs;
+                if (job->WakeOnCancel) wakeups.push_back(std::exchange(job->WakeOnCancel, {}));
             }
         }
+        for (auto& wake : wakeups) wake();
         Core::Tasks::Scheduler::WaitForAll();
         decltype(m_State->Jobs) jobs;
         {
@@ -229,6 +251,8 @@ namespace Extrinsic::Runtime
         for (auto& [token, job] : jobs)
         {
             job->Work = {};
+            job->CoroutineWork = {};
+            job->WakeOnCancel = {};
             job->PublishCompletion = {};
             job->IsReadyToApply = {};
             job->ValidateBeforeApply = {};
@@ -336,13 +360,12 @@ namespace Extrinsic::Runtime
         if (!m_State)
             return {};
 
-        if (!desc.Work || !desc.PublishCompletion)
+        if (static_cast<bool>(desc.Work) == static_cast<bool>(desc.CoroutineWork) || !desc.PublishCompletion)
         {
             std::lock_guard lock(m_State->Mutex);
             m_State->Stats.RejectedJobs += 1;
             Core::Log::Error(
-                "[JobService] Rejected job '{}': work and completion publisher "
-                "must both be valid.",
+                "[JobService] Rejected job '{}': exactly one work callable and a completion publisher are required.",
                 desc.DebugName);
             return {};
         }
@@ -372,10 +395,10 @@ namespace Extrinsic::Runtime
             job->CorrelationId = desc.CorrelationId;
             job->SubmittedAt = std::chrono::steady_clock::now();
             job->Work = std::move(desc.Work);
+            job->CoroutineWork = std::move(desc.CoroutineWork);
+            job->WakeOnCancel = std::move(desc.WakeOnCancel);
             job->PublishCompletion = std::move(desc.PublishCompletion);
             job->Priority = desc.Priority;
-            job->Kind = desc.Kind;
-            job->EstimatedCost = desc.EstimatedCost;
             job->CancellationGeneration = desc.CancellationGeneration;
             job->IsReadyToApply = std::move(desc.IsReadyToApply);
             job->ValidateBeforeApply = std::move(desc.ValidateBeforeApply);
@@ -410,78 +433,72 @@ namespace Extrinsic::Runtime
         return job->Token;
     }
 
+    void JobService::FinishWork(
+        const std::shared_ptr<SharedState>& state,
+        const std::shared_ptr<JobRecord>& job,
+        JobResultEnvelope result)
+    {
+        const bool cancelled = job->CancelRequested->load(std::memory_order_acquire);
+        if (cancelled || !result.IsValid())
+        {
+            job->State.store(cancelled ? JobState::Cancelled : JobState::Dropped,
+                             std::memory_order_release);
+            if (state->TestHooks.BeforeWorkerUnpublishedQueued)
+                state->TestHooks.BeforeWorkerUnpublishedQueued(job->Token);
+            {
+                std::lock_guard lock(state->Mutex);
+                if (!cancelled) ++state->Stats.DroppedCompletions;
+                QueueUnpublishedFinalizerLocked(*state, job);
+            }
+            if (!cancelled)
+                Core::Log::Error("[JobService] Job '{}' produced an empty result envelope; completion dropped.", job->DebugName);
+            return;
+        }
+        {
+            std::lock_guard lock(state->Mutex);
+            // Insertion publishes ownership to the main-thread completion drain.
+            job->State.store(JobState::AwaitingGate, std::memory_order_release);
+            state->CompletionQueue.push_back(SharedState::CompletionRecord{
+                .Job = job, .Result = std::move(result)});
+        }
+        if (state->TestHooks.AfterCompletionQueued)
+            state->TestHooks.AfterCompletionQueued(job->Token);
+    }
+
     void JobService::DispatchJob(
         const std::shared_ptr<SharedState>& state,
         const std::shared_ptr<JobService::JobRecord>& job)
     {
         job->State.store(JobState::Queued, std::memory_order_release);
-        // Background is worker-only: a frame-graph Wait() on the main thread
-        // must never inline a long job and freeze the frame.
         Core::Tasks::Scheduler::Dispatch(
-            Core::Tasks::DispatchPriority::Background,
+            JobDispatchPriority(job->Priority),
             [state, queuedJob = std::shared_ptr<JobRecord>(job)]() mutable
         {
-            // Drop this record before the scheduler marks the task finished;
-            // its callable storage may survive WaitForAll briefly on a worker.
+            // Drop the record before the scheduler marks this dispatch finished.
             const auto job = std::move(queuedJob);
-            const auto finishUnpublished =
-                [&state, &job](const JobState terminalState,
-                               const bool countDropped)
-                {
-                    job->State.store(terminalState,
-                                     std::memory_order_release);
-                    if (state->TestHooks.BeforeWorkerUnpublishedQueued)
-                    {
-                        state->TestHooks.BeforeWorkerUnpublishedQueued(
-                            job->Token);
-                    }
-                    std::lock_guard lock(state->Mutex);
-                    if (countDropped)
-                        state->Stats.DroppedCompletions += 1;
-                    QueueUnpublishedFinalizerLocked(*state, job);
-                };
-
             if (job->CancelRequested->load(std::memory_order_acquire))
             {
-                finishUnpublished(JobState::Cancelled, false);
+                FinishWork(state, job, {});
                 return;
             }
-
             job->State.store(JobState::Running, std::memory_order_release);
-
-            JobResultEnvelope result =
-                job->Work(JobCancellation(job->CancelRequested, job->Progress));
-
-            if (job->CancelRequested->load(std::memory_order_acquire))
+            const JobCancellation cancellation(job->CancelRequested, job->Progress);
+            if (job->CoroutineWork)
             {
-                finishUnpublished(JobState::Cancelled, false);
+                auto coroutine = job->CoroutineWork(cancellation,
+                    [state, completingJob = job](JobResultEnvelope result) mutable {
+                        if (auto current = std::exchange(completingJob, {}))
+                            FinishWork(state, current, std::move(result));
+                    });
+                if (!coroutine.Valid())
+                {
+                    FinishWork(state, job, {});
+                    return;
+                }
+                Core::Tasks::Scheduler::Dispatch(JobDispatchPriority(job->Priority), std::move(coroutine));
                 return;
             }
-
-            if (!result.IsValid())
-            {
-                finishUnpublished(JobState::Dropped, true);
-                Core::Log::Error(
-                    "[JobService] Job '{}' produced an empty result envelope; "
-                    "completion dropped.",
-                    job->DebugName);
-                return;
-            }
-
-            {
-                std::lock_guard lock(state->Mutex);
-                // Queue insertion is the publication point. AwaitingGate must
-                // already be visible before the drain can take this record;
-                // after insertion, only the drain may advance its state.
-                job->State.store(JobState::AwaitingGate, std::memory_order_release);
-                state->CompletionQueue.push_back(SharedState::CompletionRecord{
-                    .Job = job,
-                    .Result = std::move(result),
-                });
-            }
-
-            if (state->TestHooks.AfterCompletionQueued)
-                state->TestHooks.AfterCompletionQueued(job->Token);
+            FinishWork(state, job, job->Work(cancellation));
         });
     }
 
@@ -491,6 +508,7 @@ namespace Extrinsic::Runtime
             return false;
 
         std::shared_ptr<JobService::JobRecord> job;
+        std::move_only_function<void()> wake;
         {
             std::lock_guard lock(m_State->Mutex);
             const auto it = m_State->Jobs.find(token);
@@ -503,7 +521,9 @@ namespace Extrinsic::Runtime
             if (job->CancelRequested->exchange(true, std::memory_order_acq_rel))
                 return false;
             m_State->Stats.CancelledJobs += 1;
+            wake = std::exchange(job->WakeOnCancel, {});
         }
+        if (wake) wake();
         if (m_State->TestHooks.AfterCancelRequested)
             m_State->TestHooks.AfterCancelRequested(token);
         return true;
@@ -807,6 +827,7 @@ namespace Extrinsic::Runtime
 
         std::vector<std::shared_ptr<JobRecord>> ready;
         std::vector<std::shared_ptr<JobRecord>> cancelled;
+        std::vector<std::move_only_function<void()>> wakeups;
         {
             std::lock_guard lock(m_State->Mutex);
             std::vector<std::shared_ptr<JobRecord>> stillPending;
@@ -851,8 +872,12 @@ namespace Extrinsic::Runtime
                     // A chain never applies half its work: if an upstream job
                     // did not publish, its dependents are cancelled rather than
                     // run against inputs that were never produced.
-                    (void)job->CancelRequested->exchange(
-                        true, std::memory_order_acq_rel);
+                    if (!job->CancelRequested->exchange(
+                            true, std::memory_order_acq_rel))
+                    {
+                        ++m_State->Stats.DependencyCancelledJobs;
+                        ++m_State->Stats.CancelledJobs;
+                    }
                     cancelled.push_back(job);
                     continue;
                 }
@@ -863,16 +888,16 @@ namespace Extrinsic::Runtime
             m_State->PendingDependencies.swap(stillPending);
             m_State->Stats.AwaitingDependencyJobs =
                 static_cast<std::uint64_t>(m_State->PendingDependencies.size());
-            m_State->Stats.DependencyCancelledJobs +=
-                static_cast<std::uint64_t>(cancelled.size());
-            m_State->Stats.CancelledJobs +=
-                static_cast<std::uint64_t>(cancelled.size());
             // These never dispatched, so no worker path will ever reach them;
             // this is their only chance to owe their consumer a finalizer.
             for (const auto& job : cancelled)
+            {
+                if (job->WakeOnCancel) wakeups.push_back(std::exchange(job->WakeOnCancel, {}));
                 QueueUnpublishedFinalizerLocked(*m_State, job);
+            }
         }
 
+        for (auto& wake : wakeups) wake();
         for (const auto& job : cancelled)
             job->State.store(JobState::Cancelled, std::memory_order_release);
         for (const auto& job : ready)

@@ -2,7 +2,7 @@
 // transaction on the shared GPU transaction lifecycle, the undoable positions publication, and
 // the 1:1 render commit that keeps the copied front in the block instead of uploading it again.
 module;
-#include <array>
+#include "GeometryIntegration/Runtime.GeometryValueComparison.hpp"
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -172,6 +172,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         const EditorProcessingContext& context, const entt::entity entity, const PointPositionCapture& w,
         std::vector<glm::vec3> after, std::string label, std::function<bool(const PointPropertyWatch&)> commitOnce)
     {
+        if (!PointPositionFieldCurrent(context, entity, w)) return EditorCommandHistoryStatus::StaleEntity;
         if (after.size() != w.BeforeValues.size()) return EditorCommandHistoryStatus::InvalidCommand;
         if (after == w.BeforeValues) return EditorCommandHistoryStatus::NoChange;
         struct State
@@ -193,37 +194,37 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         auto before = std::make_shared<State>(State{w.BeforeValues, CurrentBoundsState(registry, entity)});
         auto target = std::make_shared<State>(State{std::move(after), std::move(bounds)});
         const auto ref = w.Positions;
-        // The positions are the output: their own revision is watched through `revisions`
-        // (re-observed after every write), the other inputs through `inputs`.
+        // Replay checks exact rows and the shared output revision advanced by owned history writes.
+        // Other inputs retain their original captured revision guards.
         auto inputs = w.Inputs;
         std::erase_if(inputs, [&](const auto& input) { return input.Domain == ref.Domain && input.Name == ref.Name; });
-        auto revisions = std::make_shared<std::array<PointPropertyWatch, 1>>();
-        for (const auto& input : w.Inputs)
-            if (input.Domain == ref.Domain && input.Name == ref.Name) revisions->front() = input;
         auto commit = std::make_shared<std::function<bool(const PointPropertyWatch&)>>(std::move(commitOnce));
-        const auto mutate = [context, entity, inputs = std::move(inputs), revisions, ref, commit](const State& state) {
+        auto outputWatches = CapturePointPropertyHistory(context, entity, std::span(&ref, 1));
+        const auto mutate = [context, entity, inputs = std::move(inputs), ref, commit,
+                             outputWatches=std::move(outputWatches)](const State& expected, const State& state) {
             const auto& values = state.Rows;
-            if (!GeometryPropertiesCurrent(context, entity, inputs) ||
-                !GeometryPropertiesCurrent(context, entity, *revisions) || !EditorProcessingContextWorldCurrent(context))
+            if (!EditorProcessingContextWorldCurrent(context) || !GeometryPropertiesCurrent(context, entity, inputs) ||
+                !PointPropertyHistoryCurrent(context, entity, outputWatches))
                 return EditorCommandHistoryStatus::StaleEntity;
             auto& registry = context.Scene->Raw();
             auto* props = MutableGeometryProperties(registry, entity, ref.Domain);
             if (!props || props->Size() != values.size()) return EditorCommandHistoryStatus::StaleEntity;
-            auto positions = props->Get<glm::vec3>(ref.Name);
-            if (!positions) return EditorCommandHistoryStatus::InvalidCommand;
+            const auto current = std::as_const(*props).Get<glm::vec3>(ref.Name);
+            if (!current || !GeometryValueComparison::BitEqual(current.Vector(), expected.Rows))
+                return EditorCommandHistoryStatus::StaleEntity;
             // The culling bounds move with the rows in the same command (world bounds under
             // the matrix of this moment), so an accepted or restored result outside the old
             // bounds is not culled. Applied first: a refusal leaves the rows untouched.
             if (!ApplyBoundsState(registry, entity, state.Bounds)) return EditorCommandHistoryStatus::InvalidCommand;
-            positions.Vector() = values;
-            const auto now = BuildGeometryAvailability(registry, entity);
-            *revisions = {ObserveGeometryProperty(now, ref.Domain, ref.Name)};
+            props->Get<glm::vec3>(ref.Name).Vector() = values;
+            StampPointPropertyHistory(context, entity, outputWatches);
             // The accepting publication may leave the render block as it is (it already
             // holds the front); undo, redo and a refused commit upload the CPU rows once.
             bool acknowledged = false;
             if (*commit)
             {
-                acknowledged = (*commit)(revisions->front());
+                const auto now = BuildGeometryAvailability(registry, entity);
+                acknowledged = (*commit)(ObserveGeometryProperty(now, ref.Domain, ref.Name));
                 *commit = {};
             }
             if (!acknowledged) ECS::Components::DirtyTags::MarkVertexPositionsDirty(registry, entity);
@@ -232,9 +233,9 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         };
         return context.CommandHistory
             ? context.CommandHistory->Execute({.Label = std::move(label),
-                                               .Redo = [mutate, target] { return mutate(*target); },
-                                               .Undo = [mutate, before] { return mutate(*before); }}).Status
-            : mutate(*target);
+                                               .Redo = [mutate, before, target] { return mutate(*before, *target); },
+                                               .Undo = [mutate, before, target] { return mutate(*target, *before); }}).Status
+            : mutate(*before, *target);
     }
 }
 }

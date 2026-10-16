@@ -101,14 +101,14 @@ namespace Geometry::PointCloud
     {
         m_PPoint = VertexProperty<glm::vec3>(m_Vertices.GetOrAdd<glm::vec3>("v:point", glm::vec3(0.f)));
         m_VDeleted = VertexProperty<bool>(m_Vertices.GetOrAdd<bool>("p:deleted", false));
-        if (m_Vertices.Exists("p:normal")) EnableNormals();
-        if (m_Vertices.Exists("p:color")) EnableColors();
-        if (m_Vertices.Exists("p:radius")) EnableRadii();
+        m_PNormal = VertexProperty<glm::vec3>(m_Vertices.Get<glm::vec3>("p:normal"));
+        m_PColor = VertexProperty<glm::vec4>(m_Vertices.Get<glm::vec4>("p:color"));
+        m_PRadius = VertexProperty<float>(m_Vertices.Get<float>("p:radius"));
     }
 
     void Cloud::Clear()
     {
-        // Wipe all point data but keep the property slots alive.
+        // Remove all properties, then recreate the mandatory point storage.
         m_Vertices.Clear();
         m_DeletedVertices = 0;
         EnsureProperties();

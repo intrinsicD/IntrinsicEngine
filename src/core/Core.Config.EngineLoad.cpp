@@ -1044,7 +1044,7 @@ namespace Extrinsic::Core::Config
         nlohmann::ordered_json document{
             {"$schema", "https://json-schema.org/draft/2020-12/schema"},
             {"title", "IntrinsicEngine config sections"},
-            {"description", "Payload schemas of the registered engine-config sections; enums are integer-coded with x-enum-names."},
+            {"description", "Payload schemas of the registered engine-config sections; enums use integer codes or stable string tokens, with optional x-enum-names display labels."},
             {"$defs", std::move(defs)},
         };
         return document.dump(-1, ' ', false, nlohmann::ordered_json::error_handler_t::replace);

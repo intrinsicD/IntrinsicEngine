@@ -286,7 +286,7 @@ namespace Extrinsic::Runtime
         }
         if (temporary.empty()) return ViewCaptureWriteError{ViewCaptureFailure::None, "Cannot pick a temporary name next to " + path.string()};
         {
-            std::ofstream out(temporary, std::ios::binary | std::ios::trunc);
+            std::ofstream out(temporary, std::ios::binary | std::ios::noreplace);
             if (!out) return ViewCaptureWriteError{ViewCaptureFailure::None, "Cannot open " + temporary.string() + " for writing"};
             out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
             out.close();

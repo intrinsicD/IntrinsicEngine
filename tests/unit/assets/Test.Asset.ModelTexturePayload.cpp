@@ -458,3 +458,28 @@ TEST(AssetModelTexturePayload, ImportReportRetainsFailuresBeyondWarningSample)
     ASSERT_EQ(report.Diagnostics.size(), 9u);
     EXPECT_EQ(report.Diagnostics.back().Message, "invalid storage");
 }
+
+
+TEST(AssetModelTexturePayload, RejectsNonFiniteMaterialFactors)
+{
+    ASSERT_TRUE(ValidateAssetModelScenePayload(MakeModelPayload()).has_value());
+    for (const float invalid : {std::numeric_limits<float>::quiet_NaN(),
+                               std::numeric_limits<float>::infinity(),
+                               -std::numeric_limits<float>::infinity()})
+    {
+        for (std::size_t factor = 0; factor < 6; ++factor)
+        {
+            SCOPED_TRACE(factor);
+            auto payload = MakeModelPayload();
+            auto& material = payload.Materials[0];
+            const std::array<float*, 6> factors{
+                &material.BaseColorFactor[0], &material.BaseColorFactor[1],
+                &material.BaseColorFactor[2], &material.BaseColorFactor[3],
+                &material.MetallicFactor, &material.RoughnessFactor};
+            *factors[factor] = invalid;
+            const auto result = ValidateAssetModelScenePayload(payload);
+            EXPECT_FALSE(result.has_value());
+            if (!result.has_value()) EXPECT_EQ(result.error(), ErrorCode::AssetInvalidData);
+        }
+    }
+}

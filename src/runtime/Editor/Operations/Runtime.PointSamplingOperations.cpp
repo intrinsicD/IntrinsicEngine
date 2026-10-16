@@ -1,4 +1,5 @@
 module;
+#include "GeometryIntegration/Runtime.GeometryValueComparison.hpp"
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -118,10 +119,11 @@ namespace Extrinsic::Runtime
                 return Failure(EditorCommandStatus::InvalidProcessingParameters, diagnostic);
             if (input.LiveCount == 0u)
                 return Failure(EditorCommandStatus::InvalidProcessingParameters, "The point domain has no live points.");
-            for (const auto& name : {config.RankName, config.SelectedName})
-                if (IsTopologyProperty(config.Positions.Domain, name))
-                    return Failure(EditorCommandStatus::InvalidProcessingParameters,
-                                   "The output properties cannot replace topology or deletion data.");
+            const std::array outputs{
+                GeometryPropertyRef{config.Positions.Domain, config.RankName, Geometry::PropertyValueKind::Float},
+                GeometryPropertyRef{config.Positions.Domain, config.SelectedName, Geometry::PropertyValueKind::Bool}};
+            if (!GPD::ValidatePointOutputs(available, config.Positions, outputs, "Point sampling", diagnostic))
+                return Failure(EditorCommandStatus::InvalidProcessingParameters, diagnostic);
             const auto* props = ResolveGeometryPropertySet(available, config.Positions.Domain);
             std::optional<std::span<const float>> weights;
             if (!config.WeightsName.empty())
@@ -159,6 +161,9 @@ namespace Extrinsic::Runtime
                                                      const PointSamplingOperationConfig& config,
                                                      const std::vector<std::uint32_t>& order, std::size_t count)
         {
+            if (!GPD::EditorProcessingContextWorldCurrent(context) ||
+                !GPD::GeometryPropertiesCurrent(context, captured.Entity, captured.Input.Inputs))
+                return EditorCommandHistoryStatus::StaleEntity;
             entt::registry& raw = context.Scene->Raw();
             const GeometryElementDomain domain = config.Positions.Domain;
             const auto* props = GPD::MutableGeometryProperties(raw, captured.Entity, domain);
@@ -182,27 +187,40 @@ namespace Extrinsic::Runtime
                 after->Rank[slot] = float(k);
                 if (k < count) after->Selected[slot] = true;
             }
-            const auto available = BuildGeometryAvailability(raw, captured.Entity);
-            auto revisions = std::make_shared<std::vector<GPD::PointPropertyWatch>>(
-                std::vector{GPD::ObserveGeometryProperty(available, domain, config.RankName),
-                            GPD::ObserveGeometryProperty(available, domain, config.SelectedName)});
             auto inputs = captured.Input.Inputs;
             std::erase_if(inputs, [&](const auto& input) {
                 return input.Domain == domain && (input.Name == config.RankName || input.Name == config.SelectedName);
             });
-            const auto mutate = [context, entity = captured.Entity, inputs = std::move(inputs), revisions, domain,
-                                 rankName = config.RankName, selectedName = config.SelectedName](const State& target) {
-                if (!GPD::GeometryPropertiesCurrent(context, entity, inputs) ||
-                    !GPD::GeometryPropertiesCurrent(context, entity, *revisions))
+            const std::array outputRefs{
+                GeometryPropertyRef{domain, config.RankName, Geometry::PropertyValueKind::Float},
+                GeometryPropertyRef{domain, config.SelectedName, Geometry::PropertyValueKind::Bool}};
+            auto outputWatches = GPD::CapturePointPropertyHistory(context, captured.Entity, outputRefs);
+            const auto mutate = [context, entity = captured.Entity, inputs = std::move(inputs), domain,
+                                 outputWatches=std::move(outputWatches),
+                                 rankName = config.RankName, selectedName = config.SelectedName](const State& expected,
+                                                                                             const State& target) {
+                if (!GPD::EditorProcessingContextWorldCurrent(context) ||
+                    !GPD::GeometryPropertiesCurrent(context, entity, inputs) ||
+                    !GPD::PointPropertyHistoryCurrent(context, entity, outputWatches))
                     return EditorCommandHistoryStatus::StaleEntity;
                 auto& registry = context.Scene->Raw();
                 auto* set = GPD::MutableGeometryProperties(registry, entity, domain);
+                if (!set) return EditorCommandHistoryStatus::StaleEntity;
+                const auto& read = std::as_const(*set);
+                const auto rank = read.Get<float>(rankName);
+                const auto selected = read.Get<bool>(selectedName);
+                // Undo of a newer command restores these values with fresh revisions.
+                // Check both expected columns before either write, including absent/wrong-type outputs.
+                if (read.Exists(rankName) != expected.RankExists ||
+                    read.Exists(selectedName) != expected.SelectedExists ||
+                    (expected.RankExists && (!rank || !GeometryValueComparison::BitEqual(rank.Vector(), expected.Rank))) ||
+                    (expected.SelectedExists && (!selected || !GeometryValueComparison::BitEqual(selected.Vector(), expected.Selected))))
+                    return EditorCommandHistoryStatus::StaleEntity;
                 if (target.RankExists) set->GetOrAdd<float>(rankName).Vector() = target.Rank;
                 else if (auto property = set->Get<float>(rankName)) set->Remove(property);
                 if (target.SelectedExists) set->GetOrAdd<bool>(selectedName).Vector() = target.Selected;
                 else if (auto property = set->Get<bool>(selectedName)) set->Remove(property);
-                const auto now = BuildGeometryAvailability(registry, entity);
-                for (auto& watch : *revisions) watch = GPD::ObserveGeometryProperty(now, domain, watch.Name);
+                GPD::StampPointPropertyHistory(context, entity, outputWatches);
                 ECS::Components::DirtyTags::MarkGpuDirty(registry, entity);
                 ECS::Components::DirtyTags::MarkVertexAttributesDirty(registry, entity);
                 if (context.InvalidateWorkspaceSnapshotCache) context.InvalidateWorkspaceSnapshotCache();
@@ -210,9 +228,9 @@ namespace Extrinsic::Runtime
             };
             return context.CommandHistory
                 ? context.CommandHistory->Execute({.Label = "Point sampling",
-                                                   .Redo = [mutate, after] { return mutate(*after); },
-                                                   .Undo = [mutate, before] { return mutate(*before); }}).Status
-                : mutate(*after);
+                                                   .Redo = [mutate, before, after] { return mutate(*before, *after); },
+                                                   .Undo = [mutate, before, after] { return mutate(*after, *before); }}).Status
+                : mutate(*before, *after);
         }
 
         // Publishes an order computed by either backend (the source was captured in `captured`).

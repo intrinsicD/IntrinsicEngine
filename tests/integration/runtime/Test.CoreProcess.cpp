@@ -106,6 +106,20 @@ TEST(CoreProcess, TimeoutWithoutCaptureKillsProcess)
     EXPECT_LT(elapsed, std::chrono::seconds(5));
 }
 
+TEST(CoreProcess, TimeoutStillAppliesAfterCapturedPipesClose)
+{
+    Process::ProcessConfig config;
+    config.Executable = "sh";
+    config.Args = {"-c", "exec >&- 2>&-; exec sleep 3"};
+    config.Timeout = std::chrono::milliseconds(500);
+    config.CaptureOutput = true;
+    const auto start = std::chrono::steady_clock::now();
+    const auto result = Process::Run(config);
+    EXPECT_FALSE(result.SpawnFailed);
+    EXPECT_TRUE(result.TimedOut);
+    EXPECT_LT(std::chrono::steady_clock::now() - start, std::chrono::seconds(2));
+}
+
 TEST(CoreProcess, TimeoutWithCapturePreservesPartialOutput)
 {
     Process::ProcessConfig config;

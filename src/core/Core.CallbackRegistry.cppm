@@ -1,3 +1,4 @@
+// Generational callback storage with synchronized lookup and invocation outside the registry lock.
 module;
 
 #include <cstdint>

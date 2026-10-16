@@ -1036,11 +1036,11 @@ the removed `Runtime.SandboxEditorFacades` and
 | `SandboxEditorVisualizationPropertyDomain` | `EditorVisualizationPropertyDomain` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorVisualizationPropertyPreset` | `EditorVisualizationPropertyPreset` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorVisualizationTarget` | `EditorVisualizationTarget` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
-| `SandboxEditorGeometryProcessingDomain` | `EditorGeometryProcessingDomain` | `Runtime.PointSetOperations.Processing.cppm` | feature-owned runtime contract |
-| `SandboxEditorGeometryProcessingAlgorithm` | `EditorGeometryProcessingAlgorithm` | `Runtime.PointSetOperations.Processing.cppm` | feature-owned runtime contract |
-| `SandboxEditorGeometryProcessingCapabilities` | `EditorGeometryProcessingCapabilities` | `Runtime.PointSetOperations.Processing.cppm` | feature-owned runtime contract |
-| `SandboxEditorGeometryProcessingEntry` | `EditorGeometryProcessingEntry` | `Runtime.PointSetOperations.Processing.cppm` | feature-owned runtime contract |
-| `SandboxEditorGeometryProcessingMenuItem` | `EditorGeometryProcessingMenuItem` | `Runtime.PointSetOperations.Processing.cppm` | feature-owned runtime contract |
+| `SandboxEditorGeometryProcessingDomain` | `EditorGeometryProcessingDomain` | `Runtime.GeometryProcessingOperations.cppm` | feature-owned runtime contract |
+| `SandboxEditorGeometryProcessingAlgorithm` | `EditorGeometryProcessingAlgorithm` | `Runtime.GeometryProcessingOperations.cppm` | feature-owned runtime contract |
+| `SandboxEditorGeometryProcessingCapabilities` | `EditorGeometryProcessingCapabilities` | `Runtime.GeometryProcessingOperations.cppm` | feature-owned runtime contract |
+| `SandboxEditorGeometryProcessingEntry` | `EditorGeometryProcessingEntry` | `Runtime.GeometryProcessingOperations.cppm` | feature-owned runtime contract |
+| `SandboxEditorGeometryProcessingMenuItem` | `EditorGeometryProcessingMenuItem` | `Runtime.GeometryProcessingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorProgressivePoissonCommand` | `EditorProgressivePoissonCommand` | `Runtime.PointSetOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorProgressivePoissonResult` | `EditorProgressivePoissonResult` | `Runtime.PointSetOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorProgressivePoissonConfigStatus` | `RuntimeEngineConfigApplyStatus` | `Runtime.EngineConfigControl.cppm` | shared config result contract |
@@ -1152,7 +1152,7 @@ the removed `Runtime.SandboxEditorFacades` and
 | `SandboxEditorVisualizationPropertyInfo` | `EditorVisualizationPropertyInfo` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorVisualizationRecipeModel` | `EditorVisualizationRecipeModel` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorVisualizationModel` | `EditorVisualizationModel` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
-| `SandboxEditorGeometryProcessingModel` | `EditorGeometryProcessingModel` | `Runtime.PointSetOperations.Processing.cppm` | feature-owned runtime contract |
+| `SandboxEditorGeometryProcessingModel` | `EditorGeometryProcessingModel` | `Runtime.GeometryProcessingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorDomainWindowModel` | `EditorDomainWindowModel` | `Runtime.EditorWorkspaceSnapshots.cppm` | feature-owned runtime contract |
 | `SandboxEditorSelectedModelCacheSection` | `EditorSelectedModelCacheSection` | `Runtime.EditorWorkspaceSnapshots.cppm` | feature-owned runtime contract |
 | `SandboxEditorSelectedAnalysisCacheConsumer` | `EditorSelectedAnalysisCacheConsumer` | `Runtime.EditorWorkspaceSnapshots.cppm` | feature-owned runtime contract |

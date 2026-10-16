@@ -411,5 +411,6 @@ namespace Extrinsic::Runtime
 
         RuntimeSceneInteractionRenderSnapshot m_SceneInteraction{};
         RuntimeRenderExtractionStats m_LastStats{};
+        std::uint64_t m_SceneEpoch{0u};
     };
 }

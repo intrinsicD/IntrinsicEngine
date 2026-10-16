@@ -10,6 +10,7 @@ picking backlog work; theme priorities and rationale live in
 
 - `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/active/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
 - `GRAPHICS-153` — GPU methods reuse resident buffers; CPU<->GPU IO only at start and end (tasks/active/GRAPHICS-153-gpu-buffer-reuse-and-minimal-io.md)
+- `HARDEN-090` — Consolidated src audit remediation (tasks/active/HARDEN-090-src-audit-remediation.md)
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
 - `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)
 - `METHOD-077` — Compare the Nystroem landmark variants for Bayesian CPD (tasks/active/METHOD-077-cpd-nystrom-landmark-variant-experiment.md)
@@ -84,6 +85,8 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-193` — Investigate GPU pacing variability and watchdog margin (tasks/backlog/bugs/BUG-193-gpu-pacing-and-watchdog-margin.md)
 - unblocked: `BUG-240` — ASan and UBSan CPU jobs have been red since 2026-09-05 (tasks/backlog/bugs/BUG-240-sanitizer-cpu-jobs-red-since-september.md)
 - unblocked: `BUG-242` — CPU coverage rejects an invalid LLVM execution counter (tasks/backlog/bugs/BUG-242-cpu-source-coverage-counter-invalid.md)
+- unblocked: `BUG-244` — CPU selection rejects a source-rule test without a producer (tasks/backlog/bugs/BUG-244-cpu-selection-rejects-source-rules-producer.md)
+- unblocked: `BUG-245` — Nightly smoke sealing rejects two emitted backend names (tasks/backlog/bugs/BUG-245-nightly-smoke-backend-manifest-mismatch.md)
 - unblocked: `RUNTIME-291` — Scale-aware default radii for point operations (tasks/backlog/runtime/RUNTIME-291-scale-aware-radius-defaults.md)
 
 ## Theme H — Agentic workflow hardening

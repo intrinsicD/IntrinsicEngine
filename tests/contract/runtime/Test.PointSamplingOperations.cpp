@@ -1,6 +1,7 @@
 // RUNTIME-274: standalone point sampling through the editor command.
 #include <algorithm>
 #include <cstring>
+#include <cstdlib>
 #include <optional>
 #include <cmath>
 #include <random>
@@ -80,6 +81,125 @@ TEST(PointSamplingOperations, PublishesRankAndSelectionPropertiesUndoably)
     ASSERT_TRUE(s.History.Undo().Succeeded());
     EXPECT_FALSE(vertices.Exists("v:sample_rank"));
     EXPECT_FALSE(vertices.Exists("v:sample_selected"));
+}
+
+TEST(PointSamplingOperations, RejectsWrongTypeOutputsInPreview)
+{
+    for (const bool rankConflict : {true, false})
+    {
+        Scene s;
+        const auto cloud = MakeCloud(s, 20);
+        auto& vertices = s.Registry.Raw().get<GS::Vertices>(cloud).Properties;
+        (void)vertices.GetOrAdd<glm::vec3>("v:blocked", glm::vec3{7.0f});
+        R::PointSamplingOperationConfig config{.SourceStableEntityId = Id(cloud), .Count = 8};
+        (rankConflict ? config.RankName : config.SelectedName) = "v:blocked";
+        EXPECT_FALSE(R::PreviewEditorPointSamplingCommand(s.Commands(), config).Enabled);
+        EXPECT_FALSE(s.History.CanUndo());
+        EXPECT_FALSE(vertices.Exists("v:sample_rank"));
+        EXPECT_FALSE(vertices.Exists("v:sample_selected"));
+    }
+}
+
+TEST(PointSamplingOperations, RejectsWrongTypeOutputsBeforeMutation)
+{
+    for (const bool rankConflict : {true, false})
+    {
+        Scene s;
+        const auto cloud = MakeCloud(s, 20);
+        auto& vertices = s.Registry.Raw().get<GS::Vertices>(cloud).Properties;
+        (void)vertices.GetOrAdd<glm::vec3>("v:blocked", glm::vec3{7.0f});
+        (void)vertices.GetOrAdd<float>("v:sample_rank", 42.0f);
+        (void)vertices.GetOrAdd<bool>("v:sample_selected", true);
+        R::PointSamplingOperationConfig config{.SourceStableEntityId = Id(cloud), .Count = 8};
+        (rankConflict ? config.RankName : config.SelectedName) = "v:blocked";
+        EXPECT_EXIT({
+            const auto result = R::ApplyEditorPointSamplingCommand(s.Commands(), config);
+            const auto& read = std::as_const(vertices);
+            const bool unchanged = !result.Succeeded() && !s.History.CanUndo() &&
+                read.Get<glm::vec3>("v:blocked").Vector() == std::vector<glm::vec3>(20, glm::vec3{7.0f}) &&
+                read.Get<float>("v:sample_rank").Vector() == std::vector<float>(20, 42.0f) &&
+                read.Get<bool>("v:sample_selected").Vector() == std::vector<bool>(20, true);
+            std::_Exit(unchanged ? 0 : 1);
+        }, ::testing::ExitedWithCode(0), "");
+    }
+}
+
+TEST(PointSamplingOperations, SuccessiveEditsReplayAndRejectForeignOutputChanges)
+{
+    Scene s;
+    const auto cloud = MakeCloud(s, 20);
+    auto& properties = s.Registry.Raw().get<GS::Vertices>(cloud).Properties;
+    const auto rank = [&] { return std::as_const(properties).Get<float>("v:sample_rank").Vector(); };
+    const auto selected = [&] { return std::as_const(properties).Get<bool>("v:sample_selected").Vector(); };
+    R::PointSamplingOperationConfig config{.SourceStableEntityId = Id(cloud), .Count = 8};
+    ASSERT_TRUE(R::ApplyEditorPointSamplingCommand(s.Commands(), config).Succeeded());
+    const auto firstRank = rank();
+    const auto firstSelected = selected();
+    config.Count = 5;
+    ASSERT_TRUE(R::ApplyEditorPointSamplingCommand(s.Commands(), config).Succeeded());
+    const auto secondRank = rank();
+    const auto secondSelected = selected();
+    ASSERT_TRUE(s.History.Undo().Succeeded());
+    EXPECT_EQ(rank(), firstRank);
+    EXPECT_EQ(selected(), firstSelected);
+    ASSERT_TRUE(s.History.Undo().Succeeded());
+    EXPECT_FALSE(properties.Exists("v:sample_rank"));
+    EXPECT_FALSE(properties.Exists("v:sample_selected"));
+    ASSERT_TRUE(s.History.Redo().Succeeded());
+    EXPECT_EQ(rank(), firstRank);
+    EXPECT_EQ(selected(), firstSelected);
+    ASSERT_TRUE(s.History.Redo().Succeeded());
+    EXPECT_EQ(rank(), secondRank);
+    EXPECT_EQ(selected(), secondSelected);
+    properties.Get<float>("v:sample_rank")[0] = 99.0f;
+    EXPECT_EQ(s.History.Undo().Status, R::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(s.History.UndoCount(), 2u);
+    EXPECT_EQ(rank()[0], 99.0f);
+    EXPECT_EQ(selected(), secondSelected);
+
+    for (const bool replaceRank : {true, false})
+    for (const bool redo : {false, true})
+    {
+        SCOPED_TRACE(replaceRank);
+        SCOPED_TRACE(redo);
+        Scene foreign;
+        const auto entity = MakeCloud(foreign, 20);
+        auto& props = foreign.Registry.Raw().get<GS::Vertices>(entity).Properties;
+        (void)props.GetOrAdd<float>("v:sample_rank", 42.0f);
+        (void)props.GetOrAdd<bool>("v:sample_selected", true);
+        unsigned invalidations = 0;
+        foreign.Context.InvalidateWorkspaceSnapshotCache = [&] { ++invalidations; };
+        R::PointSamplingOperationConfig request{.SourceStableEntityId = Id(entity), .Count = 5};
+        ASSERT_TRUE(R::ApplyEditorPointSamplingCommand(foreign.Commands(), request).Succeeded());
+        if (redo) ASSERT_TRUE(foreign.History.Undo().Succeeded());
+        const auto expectedRank = std::as_const(props).Get<float>("v:sample_rank").Vector();
+        const auto expectedSelected = std::as_const(props).Get<bool>("v:sample_selected").Vector();
+        const auto name = replaceRank ? "v:sample_rank" : "v:sample_selected";
+        const auto previousId = props.Registry().Find(name);
+        if (replaceRank)
+        {
+            auto old = props.Get<float>(name);
+            props.Remove(old);
+            props.GetOrAdd<float>(name).Vector() = expectedRank;
+        }
+        else
+        {
+            auto old = props.Get<bool>(name);
+            props.Remove(old);
+            props.GetOrAdd<bool>(name).Vector() = expectedSelected;
+        }
+        ASSERT_NE(props.Registry().Find(name), previousId);
+        const auto undoCount = foreign.History.UndoCount();
+        const auto redoCount = foreign.History.RedoCount();
+        invalidations = 0;
+        EXPECT_EQ((redo ? foreign.History.Redo() : foreign.History.Undo()).Status,
+                  R::EditorCommandHistoryStatus::StaleEntity);
+        EXPECT_EQ(foreign.History.UndoCount(), undoCount);
+        EXPECT_EQ(foreign.History.RedoCount(), redoCount);
+        EXPECT_EQ(std::as_const(props).Get<float>("v:sample_rank").Vector(), expectedRank);
+        EXPECT_EQ(std::as_const(props).Get<bool>("v:sample_selected").Vector(), expectedSelected);
+        EXPECT_EQ(invalidations, 0u);
+    }
 }
 
 TEST(PointSamplingOperations, CreatesAPointCloudWithEveryMethod)

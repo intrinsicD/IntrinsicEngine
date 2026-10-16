@@ -224,6 +224,8 @@ export namespace Geometry::CoherentPointDrift
     [[nodiscard]] std::string_view ToString(Status value) noexcept;
     [[nodiscard]] std::string_view ToString(Termination value) noexcept;
 
+    enum class StepState : std::uint8_t { Failed, Complete, AwaitingExternal };
+
     // Incremental form of Register for inspection (init, single steps, run to the end).
     class Solver
     {
@@ -238,6 +240,15 @@ export namespace Geometry::CoherentPointDrift
                                         const Params& params);
         // One EM iteration; false once the run has ended (converged, floor, cap or failure).
         bool Step(const IterationObserver& observer = {});
+        // Split EM iteration: CPU paths complete immediately; external work leaves a request
+        // owned by this solver. Calls may migrate threads but must not overlap. Reentrant Begin
+        // fails without altering the pending step. Current() stays at the pre-step estimate;
+        // destruction or Initialize may abandon the request once its external writer has stopped.
+        [[nodiscard]] StepState BeginStep(const IterationObserver& observer = {});
+        [[nodiscard]] const EStep::ExternalRequest* PendingExternalRequest() const noexcept;
+        // The observer belongs to the call that finishes the iteration. False has the same
+        // meaning as Step(), including a successfully completed final iteration.
+        bool CompleteExternalStep(bool success, const IterationObserver& observer = {});
         // Steps until the run ends.
         void Run(const IterationObserver& observer = {});
         [[nodiscard]] bool Finished() const noexcept;

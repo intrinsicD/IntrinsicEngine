@@ -1,3 +1,4 @@
+// In-place isotropic remeshing controls edge length, boundary preservation and surface projection.
 module;
 
 #include <cstddef>

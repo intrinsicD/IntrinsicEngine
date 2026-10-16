@@ -147,9 +147,9 @@ namespace Geometry::PCADetail
         return length > 1e-30 ? best / std::sqrt(length) : glm::dvec3(0.0);
     }
 
-    // GLSL twin: pcaEigen in pca_eigen_double.glsl. Keep the expression order,
+    // GLSL twin: pcaEigenNormalized in pca_eigen_double.glsl. Keep the expression order,
     // thresholds and repeated-root fallback synchronized with that implementation.
-    void Eigen(double a00, double a01, double a02, double a11, double a12, double a22,
+    void EigenNormalized(double a00, double a01, double a02, double a11, double a12, double a22,
                glm::dvec3& values, glm::dmat3& vectors)
     {
         const glm::dmat3 a(glm::dvec3(a00, a01, a02), glm::dvec3(a01, a11, a12), glm::dvec3(a02, a12, a22));
@@ -225,6 +225,25 @@ namespace Geometry::PCADetail
         values = glm::dvec3(std::max(l2, 0.0), std::max(l1, 0.0), std::max(l0, 0.0));
     }
 
+    // Scale before the closed-form products and rank tests. Divide each entry
+    // directly so a subnormal matrix does not overflow a reciprocal scale.
+    // GLSL twin: pcaEigen in pca_eigen_double.glsl.
+    void Eigen(double a00, double a01, double a02, double a11, double a12, double a22,
+               glm::dvec3& values, glm::dmat3& vectors)
+    {
+        const double scale = std::max(std::max(std::max(std::abs(a00), std::abs(a01)),
+                                               std::max(std::abs(a02), std::abs(a11))),
+                                      std::max(std::abs(a12), std::abs(a22)));
+        if (scale == 0.0)
+        {
+            values = glm::dvec3(0.0);
+            vectors = glm::dmat3(1.0);
+            return;
+        }
+        EigenNormalized(a00 / scale, a01 / scale, a02 / scale,
+                        a11 / scale, a12 / scale, a22 / scale, values, vectors);
+        values *= scale;
+    }
 }
 namespace Geometry::PCA
 {
@@ -316,8 +335,7 @@ namespace Geometry
             static_cast<float>(eigen.Eigenvalues.z),
         };
 
-        const float largest = std::max(result.Eigenvalues.x, 1.0e-12f);
-        result.Flat = result.Eigenvalues.z <= largest * 1.0e-5f;
+        result.Flat = eigen.Eigenvalues.z <= eigen.Eigenvalues.x * 1.0e-5;
         return result;
     }
 }

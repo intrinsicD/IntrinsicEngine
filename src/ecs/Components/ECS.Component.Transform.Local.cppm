@@ -1,3 +1,4 @@
+// Defines local TRS state, recompute tags, and checked matrix conversion contracts.
 module;
 
 #define GLM_ENABLE_EXPERIMENTAL
@@ -24,7 +25,7 @@ export namespace Extrinsic::ECS::Components::Transform
     {
     };
 
-    // Stamped by the promoted TransformHierarchy traversal on every entity
+    // Stamped by TransformHierarchy or runtime physics writeback on every entity
     // whose world matrix it just rewrote (root or child). Consumers (e.g.,
     // GPU scene sync) clear it once they have processed the update.
     struct WorldUpdatedTag
@@ -33,8 +34,12 @@ export namespace Extrinsic::ECS::Components::Transform
 
     [[nodiscard]] glm::mat4 GetMatrix(const Component& transform);
 
+    // Extract finite TRS components, discarding shear/perspective. Reject singular
+    // scale or nonfinite input/output; failure leaves outTransform unchanged.
     [[nodiscard]] bool TryDecomposeMatrix(const glm::mat4& matrix, Component& outTransform);
 
+    // Require an invertible finite parent and faithfully reconstructible affine
+    // local TRS; shear/perspective failure leaves outLocalTransform unchanged.
     [[nodiscard]] bool TryComputeLocalTransform(const glm::mat4& worldMatrix,
                                                 const glm::mat4& parentWorldMatrix,
                                                 Component& outLocalTransform);

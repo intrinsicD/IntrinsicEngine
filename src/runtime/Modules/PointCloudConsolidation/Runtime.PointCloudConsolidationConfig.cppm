@@ -3,12 +3,14 @@ module;
 
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 
 export module Extrinsic.Runtime.PointCloudConsolidationConfig;
 
 export import Extrinsic.Runtime.PointSamplingConfig;
+import Extrinsic.Runtime.ConfigFieldSpec;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 
@@ -106,6 +108,8 @@ export namespace Extrinsic::Runtime
     // JSON dependency once for every feature family.
     extern "C++"
     {
+        [[nodiscard]] std::span<const ConfigFieldSpec> PointCloudConsolidationConfigFieldSpecs() noexcept;
+
         [[nodiscard]] std::string SerializePointCloudConsolidationConfig(
             const PointCloudConsolidationConfig& config);
 

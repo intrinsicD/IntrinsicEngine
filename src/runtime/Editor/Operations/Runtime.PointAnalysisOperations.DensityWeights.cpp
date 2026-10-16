@@ -208,7 +208,7 @@ namespace Extrinsic::Runtime
             return report(EditorCommandStatus::Pending, std::move(busy->Message));
         const MS::QueuedJobDelivery<EditorDensityWeightResult> delivery{
             context, std::move(onComplete), report(EditorCommandStatus::Pending, "Density weights queued."), "Density weights"};
-        JobDesc desc{.DebugName="Compact density weights",.Scope=context.World,.Kind=RuntimeTaskKinds::GeometryProcess,
+        JobDesc desc{.DebugName="Compact density weights",.Scope=context.World,
             .Work=[w](const JobCancellation&){Compute(*w);return JobResultEnvelope::Make(true);},
             .ValidateBeforeApply=[context,w]{return MS::ValidateQueuedJob(w->Abandoned,Current(context,*w));},
             .PublishCompletion=[context,w,delivery](KernelEventBus&,const JobResultEnvelope&){return delivery.Publish(Publish(context,w));},

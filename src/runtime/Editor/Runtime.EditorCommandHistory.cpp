@@ -184,11 +184,11 @@ namespace Extrinsic::Runtime
         SetActivePath(std::move(path));
     }
 
-    void EditorCommandHistory::MarkSaved(std::string path)
+    void EditorCommandHistory::MarkSaved(std::string path, const std::optional<std::uint64_t> savedRevision)
     {
         if (!path.empty())
             SetActivePath(std::move(path));
-        m_SavedRevision = m_Revision;
+        m_SavedRevision = savedRevision.value_or(m_Revision);
     }
 
     void EditorCommandHistory::SetActivePath(std::string path)

@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <array>
 #include <cstddef>
+#include <cmath>
 #include <cstring>
 #include <limits>
 #include <memory>
@@ -12,6 +13,7 @@
 #include <entt/entity/entity.hpp>
 #include <gtest/gtest.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 #include "EditorFeatureTestContext.hpp"
 
@@ -26,7 +28,9 @@ import Extrinsic.ECS.Component.ProceduralGeometryRef;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Component.Light;
+import Extrinsic.ECS.Component.Culling.World;
 import Extrinsic.Graphics.GpuAssetCache;
+import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.Graphics.SceneHandles;
@@ -44,7 +48,11 @@ import Extrinsic.Runtime.PointFieldOperations;
 import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.MeshPrimitiveView;
 import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.GeometryProperty.Types;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.RenderWorldPool;
+import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.SceneEditingOperations;
@@ -55,6 +63,8 @@ import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.VisualizationRecipes;
 import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.AABB;
+import Geometry.OBB;
+import Geometry.Sphere;
 import Geometry.Graph;
 import Geometry.HalfedgeMesh;
 import Geometry.Plane;
@@ -493,6 +503,77 @@ TEST(RuntimeRenderExtraction, CreatesUpdatesAndClearsDirtyTransformSidecar)
     EXPECT_EQ(fixture.Extraction.GetTrackedRenderableCount(), 1u);
 }
 
+TEST(RuntimeRenderExtraction, RotatedWorldBoundsEncloseTheAuthoredObb)
+{
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+    const auto entity = scene.Create();
+    auto& raw = scene.Raw();
+    raw.emplace<ECS::Components::Transform::WorldMatrix>(entity);
+    raw.emplace<Graphics::Components::RenderSurface>(entity);
+    AttachTriangleMeshSources(scene, entity);
+    auto& authored = raw.emplace<ECS::Components::Culling::World::Bounds>(entity);
+    authored.WorldBoundingOBB = Geometry::OBB{
+        .Center = {10.f, 20.f, 30.f},
+        .Extents = {4.f, 1.f, 2.f},
+        .Rotation = glm::quat{0.70710678f, 0.f, 0.f, 0.70710678f},
+    };
+    authored.WorldBoundingSphere = Geometry::Sphere{{10.f, 20.f, 30.f}, 7.f};
+
+    (void)fixture.Extract(scene);
+    const auto snapshot = fixture.Renderer->ExtractRenderWorld(Graphics::RenderFrameInput{});
+    ASSERT_EQ(snapshot.Renderables.size(), 1u);
+    ASSERT_EQ(snapshot.Renderables.front().StableId, StableId(entity));
+    const auto bounds = snapshot.Renderables.front().Bounds;
+    const glm::vec3 expectedMin{9.f, 16.f, 28.f};
+    const glm::vec3 expectedMax{11.f, 24.f, 32.f};
+    for (int axis = 0; axis < 3; ++axis)
+    {
+        EXPECT_NEAR(bounds.WorldAabbMin[axis], expectedMin[axis], 1e-5f);
+        EXPECT_NEAR(bounds.WorldAabbMax[axis], expectedMax[axis], 1e-5f);
+    }
+    EXPECT_EQ(bounds.WorldSphere, (glm::vec4{10.f, 20.f, 30.f, 7.f}));
+}
+
+TEST(RuntimeRenderExtraction, RotatedBoundPositionsUseAnEnclosingWorldAabb)
+{
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+    const auto entity = scene.Create();
+    auto& raw = scene.Raw();
+    auto& world = raw.emplace<ECS::Components::Transform::WorldMatrix>(entity);
+    world.Matrix = glm::mat4{
+        glm::vec4{0.f, 1.f, 0.f, 0.f},
+        glm::vec4{-1.f, 0.f, 0.f, 0.f},
+        glm::vec4{0.f, 0.f, 1.f, 0.f},
+        glm::vec4{10.f, 20.f, 30.f, 1.f}};
+    raw.emplace<Graphics::Components::RenderSurface>(entity);
+    AttachTriangleMeshSources(scene, entity);
+    auto& vertices = raw.get<ECS::Components::GeometrySources::Vertices>(entity).Properties;
+    vertices.GetOrAdd<glm::vec3>("v:display", glm::vec3{0.f}).Vector() = {
+        {-4.f, -1.f, -2.f}, {4.f, 1.f, 2.f}, {0.f, 0.f, 0.f}};
+    raw.emplace<Runtime::VertexChannelBindingSet>(entity).Position = {
+        .Enabled = true,
+        .Property = {Runtime::GeometryElementDomain::MeshVertex,
+                     "v:display", Geometry::PropertyValueKind::Vec3}};
+    ASSERT_FALSE(raw.any_of<ECS::Components::Culling::World::Bounds>(entity));
+
+    (void)fixture.Extract(scene);
+    const auto snapshot = fixture.Renderer->ExtractRenderWorld(Graphics::RenderFrameInput{});
+    ASSERT_EQ(snapshot.Renderables.size(), 1u);
+    ASSERT_EQ(snapshot.Renderables.front().StableId, StableId(entity));
+    const auto bounds = snapshot.Renderables.front().Bounds;
+    const glm::vec3 expectedMin{9.f, 16.f, 28.f};
+    const glm::vec3 expectedMax{11.f, 24.f, 32.f};
+    for (int axis = 0; axis < 3; ++axis)
+    {
+        EXPECT_NEAR(bounds.WorldAabbMin[axis], expectedMin[axis], 1e-5f);
+        EXPECT_NEAR(bounds.WorldAabbMax[axis], expectedMax[axis], 1e-5f);
+        EXPECT_EQ(bounds.LocalSphere[axis], 0.f);
+    }
+    EXPECT_NEAR(bounds.LocalSphere.w, std::sqrt(21.f), 1e-5f);
+}
+
 TEST(RuntimeRenderExtraction, ClearSceneStateDropsSidecarsAndPerEntityRecipes)
 {
     RendererFixture fixture;
@@ -524,6 +605,69 @@ TEST(RuntimeRenderExtraction, ClearSceneStateDropsSidecarsAndPerEntityRecipes)
     EXPECT_FALSE(fixture.Extraction.GetVisualizationRecipe(stableId).has_value());
     EXPECT_TRUE(world.Visualization.Scalars.empty());
     EXPECT_FALSE(world.Visualization.HasVisualizationPackets);
+}
+
+TEST(RuntimeRenderExtraction, ClearSceneStateInvalidatesEverySnapshotSlot)
+{
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+    const auto entity = scene.Create();
+    ConfigureScalarVisualization(scene, entity);
+    AttachPointScalarProperty(scene, entity);
+    scene.Raw().emplace<ECS::Components::Lights::DirectionalLight>(entity);
+    const std::uint32_t stableId = StableId(entity);
+    fixture.Extraction.SetVisualizationRecipe(
+        stableId,
+        Runtime::VisualizationRecipe{.Data = Runtime::ScalarVisualizationRecipe{
+            .Source = PointProperty("curvature", Geometry::PropertyValueKind::Float),
+            .OutputName = "curvature",
+            .BufferBDA = 0xCAFE1000u,
+        }});
+    fixture.Extraction.SubmitSceneInteractionSnapshot(
+        Runtime::RuntimeSceneInteractionRenderSnapshot{
+            .World = Runtime::DefaultWorldHandle,
+            .SelectedRenderIds = {stableId},
+            .HasHovered = true,
+            .HoveredRenderId = stableId,
+            .GizmoDrawPackets = {{.StableId = stableId}},
+            .DebugPoints = {{.Position = glm::vec3{1.0f}}},
+            .DebugLines = {{.End = glm::vec3{1.0f}}},
+        });
+
+    for (std::uint32_t slot = 0u; slot < Runtime::RenderWorldPool::kMaxBuffers; ++slot)
+    {
+        RHI::FrameHandle frame{};
+        ASSERT_TRUE(fixture.Renderer->BeginFrame(frame));
+        (void)fixture.Extraction.ExtractAndSubmit(
+            scene, *fixture.Renderer, nullptr, slot);
+        const auto world = fixture.Renderer->ExtractRenderWorld(
+            Graphics::RenderFrameInput{}, slot);
+        ASSERT_EQ(world.Renderables.size(), 1u) << slot;
+        ASSERT_EQ(world.Lights.size(), 1u) << slot;
+        ASSERT_EQ(world.Selection.SelectedStableIds.size(), 1u) << slot;
+        ASSERT_TRUE(world.Selection.HasHovered) << slot;
+        ASSERT_EQ(world.Gizmos.TransformGizmos.size(), 1u) << slot;
+        ASSERT_EQ(world.DebugPrimitives.Points.size(), 1u) << slot;
+        ASSERT_EQ(world.DebugPrimitives.Lines.size(), 1u) << slot;
+        ASSERT_EQ(world.Visualization.Scalars.size(), 1u) << slot;
+    }
+
+    fixture.Extraction.ClearSceneState(*fixture.Renderer);
+    for (std::uint32_t slot = 0u; slot < Runtime::RenderWorldPool::kMaxBuffers; ++slot)
+    {
+        const auto world = fixture.Renderer->ExtractRenderWorld(
+            Graphics::RenderFrameInput{}, slot);
+        EXPECT_TRUE(world.Renderables.empty()) << slot;
+        EXPECT_TRUE(world.Lights.empty()) << slot;
+        EXPECT_TRUE(world.Selection.SelectedStableIds.empty()) << slot;
+        EXPECT_FALSE(world.Selection.HasHovered) << slot;
+        EXPECT_TRUE(world.Gizmos.TransformGizmos.empty()) << slot;
+        EXPECT_TRUE(world.DebugPrimitives.Points.empty()) << slot;
+        EXPECT_TRUE(world.DebugPrimitives.Lines.empty()) << slot;
+        EXPECT_FALSE(world.DebugPrimitives.HasTransientDebug) << slot;
+        EXPECT_TRUE(world.Visualization.Scalars.empty()) << slot;
+        EXPECT_FALSE(world.Visualization.HasVisualizationPackets) << slot;
+    }
 }
 
 TEST(RuntimeRenderExtraction, RetiresDestroyedRenderableSidecar)
@@ -1507,47 +1651,62 @@ TEST(RuntimeRenderExtraction, MeshScalarDegenerateManualRangeIsSanitizedInPrepar
     using ColorSource = Graphics::Components::VisualizationConfig::ColorSource;
     using Domain = Graphics::Components::VisualizationConfig::Domain;
 
-    RendererFixture fixture;
-    ECS::Scene::Registry scene;
+    struct Case { float Value, Min, Max; };
+    constexpr Case cases[]{
+        {0.5f, 0.0f, 1.0f},
+        {2.0f, 1.5f, 2.5f},
+        {16777216.0f, 16777215.0f, 16777218.0f},
+        {-16777216.0f, -16777218.0f, -16777215.0f},
+        {0x1.fffffep127f, 0x1.fffffcp127f, 0x1.fffffep127f},
+        {-0x1.fffffep127f, -0x1.fffffep127f, -0x1.fffffcp127f},
+    };
+    for (const auto& test : cases)
+    {
+        SCOPED_TRACE(test.Value);
+        RendererFixture fixture;
+        ECS::Scene::Registry scene;
 
-    const auto entity = scene.Create();
-    auto& registry = scene.Raw();
-    registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix =
-        glm::mat4{1.f};
-    registry.emplace<Graphics::Components::RenderSurface>(entity);
-    AttachTriangleMeshSources(scene, entity);
+        const auto entity = scene.Create();
+        auto& registry = scene.Raw();
+        registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix =
+            glm::mat4{1.f};
+        registry.emplace<Graphics::Components::RenderSurface>(entity);
+        AttachTriangleMeshSources(scene, entity);
 
-    auto& vertexProperties = registry.get<GS::Vertices>(entity).Properties;
-    vertexProperties.GetOrAdd<double>("v:mean_curvature", 0.0).Vector() =
-        {-0.02, 0.004, 0.05};
+        auto& vertexProperties = registry.get<GS::Vertices>(entity).Properties;
+        vertexProperties.GetOrAdd<double>("v:mean_curvature", 0.0).Vector() =
+            {-0.02, 0.004, 0.05};
 
-    Graphics::Components::VisualizationConfig laneConfig{};
-    laneConfig.Source = ColorSource::ScalarField;
-    laneConfig.ScalarFieldName = "v:mean_curvature";
-    laneConfig.ScalarDomain = Domain::Vertex;
-    laneConfig.Scalar.AutoRange = false;
-    laneConfig.Scalar.RangeMin = 0.5f;
-    laneConfig.Scalar.RangeMax = 0.5f;
-    registry.emplace<Graphics::Components::VisualizationLaneOverrides>(entity)
-        .Surface = laneConfig;
+        Graphics::Components::VisualizationConfig laneConfig{};
+        laneConfig.Source = ColorSource::ScalarField;
+        laneConfig.ScalarFieldName = "v:mean_curvature";
+        laneConfig.ScalarDomain = Domain::Vertex;
+        laneConfig.Scalar.AutoRange = false;
+        laneConfig.Scalar.RangeMin = test.Value;
+        laneConfig.Scalar.RangeMax = test.Value;
+        registry.emplace<Graphics::Components::VisualizationLaneOverrides>(entity)
+            .Surface = laneConfig;
 
-    const auto stats = fixture.Extract(scene);
-    Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
-    EXPECT_EQ(stats.VisualizationRecipeInvalidRangeCount, 1u);
-    EXPECT_EQ(world.Visualization.Scalars.size(), 0u);
+        const auto stats = fixture.Extract(scene);
+        Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
+        EXPECT_EQ(stats.VisualizationRecipeInvalidRangeCount, 1u);
+        EXPECT_EQ(world.Visualization.Scalars.size(), 0u);
 
-    fixture.Renderer->PrepareFrame(world);
+        fixture.Renderer->PrepareFrame(world);
 
-    const auto sidecar =
-        fixture.Extraction.FindRenderableSidecarForTest(StableId(entity));
-    ASSERT_TRUE(sidecar.has_value());
+        const auto sidecar =
+            fixture.Extraction.FindRenderableSidecarForTest(StableId(entity));
+        ASSERT_TRUE(sidecar.has_value());
 
-    const RHI::GpuEntityConfig config =
-        fixture.Renderer->GetGpuWorld().GetEntityConfigForTest(sidecar->Instance);
-    EXPECT_EQ(config.ColorSourceMode, 2u);
-    EXPECT_LT(config.ScalarRangeMin, config.ScalarRangeMax);
-    EXPECT_FLOAT_EQ(config.ScalarRangeMin, 0.0f);
-    EXPECT_FLOAT_EQ(config.ScalarRangeMax, 1.0f);
+        const RHI::GpuEntityConfig config =
+            fixture.Renderer->GetGpuWorld().GetEntityConfigForTest(sidecar->Instance);
+        EXPECT_EQ(config.ColorSourceMode, 2u);
+        EXPECT_LT(config.ScalarRangeMin, config.ScalarRangeMax);
+        EXPECT_TRUE(std::isfinite(config.ScalarRangeMin));
+        EXPECT_TRUE(std::isfinite(config.ScalarRangeMax));
+        EXPECT_EQ(config.ScalarRangeMin, test.Min);
+        EXPECT_EQ(config.ScalarRangeMax, test.Max);
+    }
 }
 
 TEST(RuntimeRenderExtraction, GraphVisualizationPropertyBuffersUploadFromNodeAndEdgeDomains)
@@ -2659,6 +2818,62 @@ TEST(RuntimeRenderExtraction, PublishedAnalysisPropertiesReuseMeshGeometry)
         properties.Get<glm::vec3>("v:position").Vector()[1].x += 0.25f;
         const auto changed = fixture.Extract(scene);
         EXPECT_GT(changed.MeshGeometryUploads + changed.MeshGeometryReuploads, 0u);
+    }
+}
+
+TEST(RuntimeRenderExtraction, ExtremeConstantGpuFrontRangesRemainFinite)
+{
+    struct Case { float Value, Min, Max; };
+    constexpr Case cases[]{
+        {2.0f, 1.5f, 2.5f},
+        {std::numeric_limits<float>::infinity(), 0.f, 1.f},
+        {0x1.fffffep127f, 0x1.fffeaep127f, 0x1.fffffep127f},
+        {-0x1.fffffep127f, -0x1.fffffep127f, -0x1.fffeaep127f},
+    };
+    using Config = Graphics::Components::VisualizationConfig;
+    for (const auto& test : cases)
+    {
+        SCOPED_TRACE(test.Value);
+        RendererFixture fixture;
+        ECS::Scene::Registry scene;
+        const auto entity = scene.Create();
+        auto& registry = scene.Raw();
+        registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1};
+        registry.emplace<Graphics::Components::RenderSurface>(entity);
+        AttachCornerSplitQuadMeshSources(scene, entity);
+        auto& config = registry.emplace<Config>(entity);
+        config.Source = Config::ColorSource::ScalarField;
+        config.ScalarDomain = Config::Domain::Vertex;
+        config.ScalarFieldName = "v:split_scalar";
+        constexpr std::uint64_t previewAddress = 0xABCD0000ull;
+        fixture.Extraction.SetGpuPropertyObserver(
+            [entity, value = test.Value](auto, auto observedEntity, const auto& property)
+                -> std::optional<Runtime::RenderExtractionCache::GpuPropertyFront> {
+                if (observedEntity != entity || property.Name != "v:split_scalar") return {};
+                return Runtime::RenderExtractionCache::GpuPropertyFront{
+                    .Buffer = {9, 1}, .Address = previewAddress, .Bytes = 16,
+                    .Count = 4, .Stamp = 1, .ScalarRange = std::array{value, value}};
+            });
+        const auto stats = fixture.Extract(scene);
+        EXPECT_GT(stats.VisualizationRecipeScalarGpuFrontsObserved, 0u);
+        auto world = fixture.Renderer->ExtractRenderWorld({});
+        if (!std::isfinite(test.Value))
+        {
+            // External previews retain their buffer but reject an invalid
+            // range in favor of the existing [0, 1] display fallback.
+            EXPECT_GT(stats.VisualizationRecipeInvalidRangeCount, 0u);
+        }
+        EXPECT_EQ(stats.VisualizationScalarPacketCount, 1u);
+        fixture.Renderer->PrepareFrame(world);
+        const auto sidecar = fixture.Extraction.FindRenderableSidecarForTest(StableId(entity));
+        ASSERT_TRUE(sidecar);
+        const auto surface = fixture.Renderer->GetGpuWorld().GetEntityConfigForTest(sidecar->Instance);
+        EXPECT_EQ(surface.ScalarBDA, previewAddress);
+        EXPECT_TRUE(std::isfinite(surface.ScalarRangeMin));
+        EXPECT_TRUE(std::isfinite(surface.ScalarRangeMax));
+        EXPECT_LT(surface.ScalarRangeMin, surface.ScalarRangeMax);
+        EXPECT_EQ(surface.ScalarRangeMin, test.Min);
+        EXPECT_EQ(surface.ScalarRangeMax, test.Max);
     }
 }
 

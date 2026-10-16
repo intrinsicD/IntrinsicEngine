@@ -37,7 +37,7 @@ layout(push_constant, scalar) uniform Push {
 
 void main()
 {
-    const uint id = gl_GlobalInvocationID.x;
+    const uint id = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x;
     Doubles src = Doubles(pc.src), dst = Doubles(pc.dst);
     const uint C = pc.channels;
     if (pc.mode == ModeBilateralWeights)

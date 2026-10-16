@@ -9,8 +9,8 @@
 - Import pipeline interfaces for runtime and tools.
 - CPU-only typed payloads and decoder-callback bridges for geometry routes,
   model scenes, textures, and external-resource diagnostics.
-- Asset-owned primary/external byte transport for model/texture decoders while
-  runtime owns concrete tinygltf/stb registration and later ECS/GPU handoff.
+- Runtime reads model/texture primary and external resources through Core
+  `IIOBackend`, calls concrete tinygltf/stb decoders, and owns ECS/GPU handoff.
 
 ## Dependencies
 
@@ -19,19 +19,33 @@
 
 ## Load completion and event ordering
 
-`AssetLoadPipeline` serializes each lifecycle transition with its existing mutex,
-including registry updates, queued-event publication and in-flight archival.
-`CompleteCpuLoad` joins a scheduled or direct transition before deciding whether
-the asset is Ready. Cancellation and failure updates use the same lock, so a
-completing transition cannot publish a late Ready event after cancellation returns.
-Actual payload loaders execute outside this state-transition lock.
+`AssetService` serializes publication, identity/path updates and payload lookup.
+Typed loader callbacks run outside the service transaction, producing a payload
+that is published only after the provisional ID, path winner or previous reload
+ticket is rechecked. A newer reload wins over an older decode; destroy cannot be
+undone by rollback. Loaders are supplied per call and are not retained.
 
-`AssetService::CompleteCpuLoadAndFlushEvent` then delivers that asset's pending
-events to the global listeners on the main thread, outside pipeline locks. Success follows Ready publication;
-it does not require waiting for unrelated scheduler jobs. Registry/event-queue
-operations do not invoke listeners while holding the pipeline lock. Constructor
-test hooks pause completion at the decode claim and before Ready-event publication;
-these hooks must not re-enter the pipeline.
+`AssetLoadPipeline` serializes lifecycle transitions, registry updates, queued
+events and in-flight removal. `CompleteCpuLoad` joins a scheduled or direct
+transition before deciding whether the asset is Ready. Cancellation uses the
+same lock, so a completing transition cannot publish a late Ready after cancel
+returns. The lock order is service, pipeline, then registry/event queue. No
+listener runs under these locks. Constructor test hooks pause under the pipeline
+mutex and must not enter either the pipeline or `AssetService`.
+
+`AssetService::CompleteCpuLoadAndFlushEvent` joins completion and then dispatches
+that asset's pending events outside the service lock, without waiting for
+unrelated scheduler jobs. Destroy cancels before dispatch and again afterward
+to join a reload started by a callback. A nested destroy retires the ID once;
+the outer destroy also succeeds. Nonterminal events are skipped before each
+listener if the ID has died. They describe history, not a pinned payload version;
+a newer reload may already be visible. Concurrent destroy after the live check
+can still make a listener's read fail. Runtime dispatches on the main thread;
+other concurrent dispatchers must synchronize their listener state.
+
+Read spans borrow the current payload. The read call is synchronized, but callers
+must order span use against reload and destroy of that ID. The facade does not
+provide retained lifetime across concurrent mutation.
 
 ## Geometry-format capability authority
 

@@ -57,6 +57,8 @@ namespace
         return path;
     }
 
+    [[nodiscard]] std::string ReadFileContents(const std::string& path);
+
     struct TempFile
     {
         std::string Path;
@@ -2349,9 +2351,10 @@ TEST(GeometryIO_GraphIO, WriteTGFRejectsNonFiniteVertexPosition)
     Geometry::GraphIO::GraphIOResult source;
     source.Graph.AddVertex(glm::vec3(std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f));
 
-    TempFile file(".tgf", "");
+    TempFile file(".tgf", "existing document");
     EXPECT_EQ(Geometry::GraphIO::WriteTGF(file.Path, source),
               Geometry::GraphIO::GraphIOWriteStatus::FileWriteError);
+    EXPECT_EQ(ReadFileContents(file.Path), "existing document");
 }
 
 TEST(GeometryIO_GraphIO, GraphExportersRejectNonFiniteEdgeWeight)
@@ -2366,12 +2369,14 @@ TEST(GeometryIO_GraphIO, GraphExportersRejectNonFiniteEdgeWeight)
     auto weights = source.Graph.GetOrAddEdgeProperty<float>("e:weight", 1.0f);
     weights[*edge] = std::numeric_limits<float>::infinity();
 
-    TempFile tgf(".tgf", "");
-    TempFile edges(".edges", "");
+    TempFile tgf(".tgf", "existing document");
+    TempFile edges(".edges", "existing document");
     EXPECT_EQ(Geometry::GraphIO::WriteTGF(tgf.Path, source),
               Geometry::GraphIO::GraphIOWriteStatus::FileWriteError);
     EXPECT_EQ(Geometry::GraphIO::WriteEdgeList(edges.Path, source),
               Geometry::GraphIO::GraphIOWriteStatus::FileWriteError);
+    EXPECT_EQ(ReadFileContents(tgf.Path), "existing document");
+    EXPECT_EQ(ReadFileContents(edges.Path), "existing document");
 }
 
 namespace
@@ -5954,4 +5959,106 @@ TEST(GeometryIO_PointCloudIO, PointCloudPLYExportersRejectNonFiniteRadii)
               Geometry::PointCloudIO::PointCloudIOWriteStatus::FileWriteError);
     EXPECT_EQ(Geometry::PointCloudIO::WritePLYBinary(binaryPly.Path, cloud),
               Geometry::PointCloudIO::PointCloudIOWriteStatus::FileWriteError);
+}
+
+
+TEST(GeometryIO_PointCloudIO, WritersOmitDeletedRowsAndPreserveLiveAttributes)
+{
+    using namespace Geometry::PointCloudIO;
+    struct Format
+    {
+        const char* Extension;
+        decltype(&WritePLY) Write;
+        decltype(&LoadPLY) Read;
+        bool Normals;
+        bool Radii;
+    };
+    const std::array<Format, 5> formats{{
+        {".ply", WritePLY, LoadPLY, true, true},
+        {".ply", WritePLYBinary, LoadPLY, true, true},
+        {".xyz", WriteXYZ, LoadXYZ, false, false},
+        {".pcd", WritePCD, LoadPCD, true, false},
+        {".pcd", WritePCDBinary, LoadPCD, true, false},
+    }};
+    for (const auto& format : formats)
+    {
+        SCOPED_TRACE(format.Extension);
+        PointCloudIOResult cloud;
+        cloud.Cloud.EnableNormals();
+        cloud.Cloud.EnableColors();
+        cloud.Cloud.EnableRadii();
+        const auto a = cloud.Cloud.AddPoint({1, 2, 3});
+        const auto deleted = cloud.Cloud.AddPoint({100, 100, 100});
+        const auto b = cloud.Cloud.AddPoint({4, 5, 6});
+        cloud.Cloud.Normal(a) = {0, 0, 1};
+        cloud.Cloud.Normal(b) = {0, 1, 0};
+        cloud.Cloud.Color(a) = {1, 0, 0, 1};
+        cloud.Cloud.Color(b) = {0, 1, 0, 1};
+        cloud.Cloud.Radius(a) = .25f;
+        cloud.Cloud.Radius(b) = .5f;
+        cloud.Cloud.DeletePoint(deleted);
+        TempFile file(format.Extension, "");
+        EXPECT_EQ(format.Write(file.Path, cloud), PointCloudIOWriteStatus::Success);
+        const auto loaded = format.Read(file.Path);
+        EXPECT_TRUE(loaded.has_value());
+        if (loaded)
+        {
+            EXPECT_EQ(loaded->Cloud.VerticesSize(), 2u);
+            if (loaded->Cloud.VerticesSize() == 2)
+            {
+                const auto first = Geometry::PointCloud::Cloud::Handle(0);
+                const auto second = Geometry::PointCloud::Cloud::Handle(1);
+                EXPECT_EQ(loaded->Cloud.Position(first), glm::vec3(1, 2, 3));
+                EXPECT_EQ(loaded->Cloud.Position(second), glm::vec3(4, 5, 6));
+                ASSERT_TRUE(loaded->Cloud.HasColors());
+                EXPECT_EQ(loaded->Cloud.Color(first), glm::vec4(1, 0, 0, 1));
+                EXPECT_EQ(loaded->Cloud.Color(second), glm::vec4(0, 1, 0, 1));
+                if (format.Normals)
+                {
+                    ASSERT_TRUE(loaded->Cloud.HasNormals());
+                    EXPECT_EQ(loaded->Cloud.Normal(first), glm::vec3(0, 0, 1));
+                    EXPECT_EQ(loaded->Cloud.Normal(second), glm::vec3(0, 1, 0));
+                }
+                if (format.Radii)
+                {
+                    const std::string contents = ReadFileContents(file.Path);
+                    EXPECT_NE(contents.find("property float radius\n"), std::string::npos);
+                    if (format.Write == WritePLYBinary)
+                    {
+                        const auto headerEnd = contents.find("end_header\n");
+                        ASSERT_NE(headerEnd, std::string::npos);
+                        const auto body = contents.substr(headerEnd + std::string("end_header\n").size());
+                        ASSERT_EQ(body.size(), 62u);
+                        EXPECT_EQ(body.substr(27, 4), std::string("\0\0\x80\x3e", 4));
+                        EXPECT_EQ(body.substr(58, 4), std::string("\0\0\0\x3f", 4));
+                    }
+                    else
+                    {
+                        EXPECT_NE(contents.find("255 0 0 0.250000\n"), std::string::npos);
+                        EXPECT_NE(contents.find("0 255 0 0.500000\n"), std::string::npos);
+                    }
+                }
+            }
+        }
+        const float nan = std::numeric_limits<float>::quiet_NaN();
+        cloud.Cloud.Position(deleted) = glm::vec3(nan);
+        cloud.Cloud.Normal(deleted) = glm::vec3(nan);
+        cloud.Cloud.Color(deleted) = glm::vec4(nan);
+        cloud.Cloud.Radius(deleted) = nan;
+        EXPECT_EQ(format.Write(file.Path, cloud), PointCloudIOWriteStatus::Success);
+    }
+}
+
+TEST(GeometryIO_PointCloudIO, AllDeletedWritersPreserveDestinationAndReportEmpty)
+{
+    using namespace Geometry::PointCloudIO;
+    const std::array<decltype(&WritePLY), 5> writers{WritePLY, WritePLYBinary, WriteXYZ, WritePCD, WritePCDBinary};
+    PointCloudIOResult cloud;
+    cloud.Cloud.DeletePoint(cloud.Cloud.AddPoint({1, 2, 3}));
+    for (const auto write : writers)
+    {
+        TempFile file(".points", "existing document");
+        EXPECT_EQ(write(file.Path, cloud), PointCloudIOWriteStatus::EmptyCloud);
+        EXPECT_EQ(ReadFileContents(file.Path), "existing document");
+    }
 }

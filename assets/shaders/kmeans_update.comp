@@ -24,7 +24,10 @@ void main(){
     sums.v[c*3]=total.x;sums.v[c*3+1]=total.y;sums.v[c*3+2]=total.z;UInts(pc.counts).v[c]=count;
     if(pc.innerFirst+pc.innerCount==pc.points){
         precise vec3 next=count>0?vec3(total/double(count)):load3(pc.positions,Stats(pc.stats).maxDistanceIndex);
-        float shift=distance2(load3(pc.centroids,c),next);
+        vec3 previous=load3(pc.centroids,c);
+        float shift=distance2(previous,next);
+        // Exact movement remains visible even when the squared shift underflows.
+        if(any(notEqual(previous,next)))atomicOr(Stats(pc.stats).changed,2u);
         if(any(isnan(next))||any(isinf(next))||isnan(shift)||isinf(shift))atomicOr(Stats(pc.stats).invalid,1);
         atomicMax(Stats(pc.stats).maxShift,floatBitsToUint(shift));store3(pc.centroids,c,next);
     }

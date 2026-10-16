@@ -86,6 +86,7 @@ import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.ParameterizationOperations;
 import Extrinsic.Runtime.PointCloudConsolidationTypes;
+import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Runtime.SpatialIndexCache;
 
@@ -1291,26 +1292,70 @@ TEST(SandboxProcessingPanels, BackendControlsPersistTheRequestedExecutionPath)
         int ChoiceIndex{2}, ExpectedBackend{2};
     };
     const std::array controls{
+        Control{"view.normal_estimation", "Normal Estimation", "Backend##Normals", "CPU LBVH (cached)",
+            [](const auto& c) { return int(R::GetNormalEstimationConfig(c)->Backend); }, 1, 1},
+        Control{"view.normal_estimation", "Normal Estimation", "Backend##Normals", "CPU KD-tree",
+            [](const auto& c) { return int(R::GetNormalEstimationConfig(c)->Backend); }, 0, 0},
         Control{"view.normal_estimation", "Normal Estimation", "Backend##Normals", "Vulkan LBVH (resident PCA)",
             [](const auto& c) { return int(R::GetNormalEstimationConfig(c)->Backend); }},
+        Control{"view.normal_estimation", "Normal Estimation", "Backend##Normals", "Vulkan (GPU property residency, double precision)",
+            [](const auto& c) { return int(R::GetNormalEstimationConfig(c)->Backend); }, 3, 2},
+        Control{"view.outlier_analysis", "Outlier Analysis", "Backend", "CPU LBVH (cached)",
+            [](const auto& c) { return int(R::GetOutlierAnalysisConfig(c)->Backend); }, 1, 1},
+        Control{"view.outlier_analysis", "Outlier Analysis", "Backend", "CPU octree",
+            [](const auto& c) { return int(R::GetOutlierAnalysisConfig(c)->Backend); }, 0, 0},
         Control{"view.outlier_analysis", "Outlier Analysis", "Backend", "Vulkan LBVH",
             [](const auto& c) { return int(R::GetOutlierAnalysisConfig(c)->Backend); }},
+        Control{"view.keypoint_analysis", "ISS Keypoint Analysis", "Acceleration", "CPU LBVH (cached)",
+            [](const auto& c) { return int(R::GetKeypointAnalysisConfig(c)->Backend); }, 1, 1},
+        Control{"view.keypoint_analysis", "ISS Keypoint Analysis", "Acceleration", "CPU KD-tree",
+            [](const auto& c) { return int(R::GetKeypointAnalysisConfig(c)->Backend); }, 0, 0},
         Control{"view.keypoint_analysis", "ISS Keypoint Analysis", "Acceleration", "Vulkan LBVH neighborhoods",
             [](const auto& c) { return int(R::GetKeypointAnalysisConfig(c)->Backend); }},
+        Control{"view.keypoint_analysis", "ISS Keypoint Analysis", "Acceleration", "Vulkan",
+            [](const auto& c) { return int(R::GetKeypointAnalysisConfig(c)->Backend); }, 3, 2},
         Control{"view.keypoint_analysis", "ISS Keypoint Analysis", "Backend", "Vulkan",
             [](const auto& c) { return int(R::GetKeypointAnalysisConfig(c)->Backend); },1,3},
+        Control{"view.descriptor_analysis", "FPFH Descriptor Analysis", "Backend", "CPU LBVH (cached)",
+            [](const auto& c) { return int(R::GetDescriptorAnalysisConfig(c)->Backend); }, 1, 1},
+        Control{"view.descriptor_analysis", "FPFH Descriptor Analysis", "Backend", "CPU KD-tree",
+            [](const auto& c) { return int(R::GetDescriptorAnalysisConfig(c)->Backend); }, 0, 0},
         Control{"view.descriptor_analysis", "FPFH Descriptor Analysis", "Backend", "Vulkan LBVH",
             [](const auto& c) { return int(R::GetDescriptorAnalysisConfig(c)->Backend); }},
+        Control{"view.kernel_density", "Kernel Density", "Backend", "CPU LBVH (cached)",
+            [](const auto& c) { return int(R::GetKernelDensityConfig(c)->Backend); }, 1, 1},
+        Control{"view.kernel_density", "Kernel Density", "Backend", "CPU octree",
+            [](const auto& c) { return int(R::GetKernelDensityConfig(c)->Backend); }, 0, 0},
         Control{"view.kernel_density", "Kernel Density", "Backend", "Vulkan LBVH",
             [](const auto& c) { return int(R::GetKernelDensityConfig(c)->Backend); }},
+        Control{"view.density_weights", "Compact Density Weights", "Backend", "CPU LBVH (cached)",
+            [](const auto& c) { return int(R::GetDensityWeightConfig(c)->Backend); }, 1, 1},
+        Control{"view.density_weights", "Compact Density Weights", "Backend", "CPU KD-tree",
+            [](const auto& c) { return int(R::GetDensityWeightConfig(c)->Backend); }, 0, 0},
         Control{"view.density_weights", "Compact Density Weights", "Backend", "Vulkan LBVH",
             [](const auto& c) { return int(R::GetDensityWeightConfig(c)->Backend); }},
+        Control{"view.point_construction", "Construct from Points", "Backend", "CPU LBVH (cached)",
+            [](const auto& c) { return int(R::GetPointConstructionConfig(c)->Backend); }, 1, 1},
+        Control{"view.point_construction", "Construct from Points", "Backend", "CPU reference",
+            [](const auto& c) { return int(R::GetPointConstructionConfig(c)->Backend); }, 0, 0},
         Control{"view.point_construction", "Construct from Points", "Backend", "Vulkan LBVH",
             [](const auto& c) { return int(R::GetPointConstructionConfig(c)->Backend); }},
+        Control{"view.point_spacing", "Point Spacing and Radii", "Backend", "CPU LBVH (cached)",
+            [](const auto& c) { return int(R::GetPointSpacingConfig(c)->Backend); }, 1, 1},
+        Control{"view.point_spacing", "Point Spacing and Radii", "Backend", "CPU octree",
+            [](const auto& c) { return int(R::GetPointSpacingConfig(c)->Backend); }, 0, 0},
         Control{"view.point_spacing", "Point Spacing and Radii", "Backend", "Vulkan LBVH",
             [](const auto& c) { return int(R::GetPointSpacingConfig(c)->Backend); }},
+        Control{"view.bilateral_filter", "Bilateral Point Filter", "Backend", "CPU LBVH (cached)",
+            [](const auto& c) { return int(R::GetBilateralFilterConfig(c)->Backend); }, 1, 1},
+        Control{"view.bilateral_filter", "Bilateral Point Filter", "Backend", "CPU octree",
+            [](const auto& c) { return int(R::GetBilateralFilterConfig(c)->Backend); }, 0, 0},
         Control{"view.bilateral_filter", "Bilateral Point Filter", "Backend", "Vulkan LBVH",
             [](const auto& c) { return int(R::GetBilateralFilterConfig(c)->Backend); }},
+        Control{"view.registration", "ICP Registration", "Backend##ICP", "CPU LBVH (cached)",
+            [](const auto& c) { return int(R::GetRegistrationConfig(c)->Backend); }, 1, 1},
+        Control{"view.registration", "ICP Registration", "Backend##ICP", "CPU KD-tree (reference)",
+            [](const auto& c) { return int(R::GetRegistrationConfig(c)->Backend); }, 0, 0},
         Control{"view.registration", "ICP Registration", "Backend##ICP", "Vulkan LBVH (CPU solve)",
             [](const auto& c) { return int(R::GetRegistrationConfig(c)->Backend); }},
         Control{"view.coherent_point_drift", "Coherent Point Drift", "Backend (E-step)##CPD",
@@ -1321,7 +1366,7 @@ TEST(SandboxProcessingPanels, BackendControlsPersistTheRequestedExecutionPath)
     std::size_t action = 0;
     int step = 0, frames = 0;
     h.Driver->OnFrame = [&](R::Engine& engine) {
-        if (++frames > 180) { ADD_FAILURE() << "Backend controls did not finish"; engine.RequestExit(); return; }
+        if (++frames > 420) { ADD_FAILURE() << "Backend controls did not finish"; engine.RequestExit(); return; }
         const auto& control = controls[action];
         auto* window = ImGui::FindWindowByName(control.Title);
         if (!window) return;
@@ -1348,6 +1393,128 @@ TEST(SandboxProcessingPanels, BackendControlsPersistTheRequestedExecutionPath)
     };
     h.Engine->Run();
     EXPECT_EQ(action, controls.size());
+}
+
+// Refactor controls: these exercise the existing UI before owner labels replace literals.
+TEST(SandboxProcessingPanels, NormalPcaKeepsOutOfPrefixBackendWithoutInventingAPreview)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto normals = *R::GetNormalEstimationConfig(config);
+    normals.Method = R::NormalEstimationMethod::PointSetPCA;
+    normals.Backend = R::NormalEstimationBackend::Vulkan;
+    R::SetNormalEstimationConfig(config, normals);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.normal_estimation", true));
+    int step = 0, frames = 0;
+    bool checked = false;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        if (++frames > 40) { ADD_FAILURE() << "Normal backend preview did not finish"; engine.RequestExit(); return; }
+        auto* window = ImGui::FindWindowByName("Normal Estimation");
+        if (!window) return;
+        ImGui::SetWindowSize(window, {750, 1800});
+        ImGui::SetWindowPos(window, {0, 0});
+        if (step == 2)
+        {
+            ImGui::GetCurrentContext()->LogBuffer.clear();
+            ImGui::LogToBuffer();
+            ImGui::GetCurrentContext()->LogWindow = nullptr;
+        }
+        if (step == 4)
+        {
+            const std::string log{ImGui::GetCurrentContext()->LogBuffer.c_str()};
+            ImGui::LogFinish();
+            EXPECT_NE(log.find("PCA fits local planes"), std::string::npos);
+            EXPECT_NE(log.find("Backend"), std::string::npos);
+            EXPECT_EQ(log.find("Vulkan LBVH (resident PCA)"), std::string::npos);
+            EXPECT_EQ(log.find("CPU KD-tree"), std::string::npos);
+            EXPECT_EQ(R::GetNormalEstimationConfig(h.Control().GetEngineConfigControlState().ActiveConfig)->Backend,
+                      R::NormalEstimationBackend::Vulkan);
+            checked = true;
+            engine.RequestExit();
+        }
+        ++step;
+    };
+    h.Engine->Run();
+    if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogFinish();
+    EXPECT_TRUE(checked);
+}
+
+TEST(SandboxProcessingPanels, ConsolidationAccelerationKeepsLabelsCodesAndStrategyFilter)
+{
+    using Backend = R::PointCloudConsolidationBackend;
+    using Strategy = R::PointCloudConsolidationStrategy;
+    struct Choice { const char* Label; Backend Value; };
+    const std::array choices{
+        Choice{"CPU reference neighborhoods", Backend::CpuReference},
+        Choice{"CPU LBVH (cached)", Backend::CpuLBVH},
+        Choice{"Vulkan LBVH", Backend::VulkanLBVH}};
+    for (const auto strategy : {Strategy::Lop, Strategy::Wlop})
+    for (const auto& choice : choices)
+    {
+        if (strategy == Strategy::Wlop && choice.Value == Backend::CpuLBVH) continue;
+        SCOPED_TRACE(choice.Label);
+        SCOPED_TRACE(int(strategy));
+        PanelHarness h;
+        auto& scene = h.Scene();
+        const auto entity = scene.Create();
+        PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+        ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+        auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+        auto consolidation = *R::GetPointCloudConsolidationConfig(config);
+        consolidation.Strategy = strategy;
+        consolidation.Backend = choice.Value == Backend::CpuReference ? Backend::VulkanLBVH : Backend::CpuReference;
+        R::SetPointCloudConsolidationConfig(config, consolidation);
+        ASSERT_TRUE(h.Apply(config));
+        ASSERT_TRUE(h.Shell.SetEditorWindowOpen("pointcloud.processing.consolidation", true));
+        int step = 0, frames = 0;
+        bool checked = false;
+        h.Driver->OnFrame = [&](R::Engine& engine) {
+            if (++frames > 50) { ADD_FAILURE() << "Consolidation backend did not finish"; engine.RequestExit(); return; }
+            auto* window = ImGui::FindWindowByName("PointCloud / Processing / Consolidate (LOP/WLOP/CLOP/EAR)");
+            if (!window) return;
+            ImGui::SetWindowSize(window, {850, 2200});
+            ImGui::SetWindowPos(window, {0, 0});
+            if (step == 1) { ImGui::FocusWindow(window); ImGui::SetScrollY(window, 0); }
+            if (step == 3) ImGui::ActivateItemByID(window->GetID("Acceleration##PointCloudConsolidation"));
+            if (step == 5)
+            {
+                ImGui::GetCurrentContext()->LogBuffer.clear();
+                ImGui::LogToBuffer();
+                ImGui::GetCurrentContext()->LogWindow = nullptr;
+            }
+            if (step == 7)
+            {
+                const std::string log{ImGui::GetCurrentContext()->LogBuffer.c_str()};
+                ImGui::LogFinish();
+                EXPECT_NE(log.find("CPU reference neighborhoods"), std::string::npos);
+                EXPECT_NE(log.find("Vulkan LBVH"), std::string::npos);
+                EXPECT_EQ(log.find("CPU LBVH (cached)") != std::string::npos, strategy == Strategy::Lop);
+                auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+                EXPECT_FALSE(popups.empty());
+                if (!popups.empty() && popups.back().Window)
+                    ImGui::ActivateItemByID(popups.back().Window->GetID(choice.Label));
+            }
+            if (step == 9) ImGui::SetScrollY(window, window->ScrollMax.y);
+            if (step == 11)
+                ImGui::ActivateItemByID(window->GetID("Apply configuration##PointCloudConsolidation"));
+            if (step == 15)
+            {
+                EXPECT_EQ(R::GetPointCloudConsolidationConfig(h.Control().GetEngineConfigControlState().ActiveConfig)->Backend,
+                          choice.Value);
+                checked = true;
+                engine.RequestExit();
+            }
+            ++step;
+        };
+        h.Engine->Run();
+        if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogFinish();
+        EXPECT_TRUE(checked);
+    }
 }
 
 TEST(SandboxProcessingPanels, MeshOperationUsesChosenEntityWithoutChangingSceneSelection)
@@ -3791,6 +3958,14 @@ TEST(SandboxProcessingPanels, PropertySmoothingExecutesConfiguredPropertyAndPubl
         if(frames>60) { ADD_FAILURE()<<"Property smoothing panel did not publish"; engine.RequestExit(); }
     };
     h.Engine->Run();
+}
+
+TEST(SandboxProcessingPanels, StringEnumFieldHintsDoNotRepeatWidgetChoices)
+{
+    constexpr std::array<std::string_view, 2> tokens{"cpu", "vulkan"};
+    const R::ConfigFieldSpec field{.Name = "backend", .Type = R::ConfigFieldType::StringEnum,
+        .Description = "Requested backend.", .EnumValues = tokens};
+    EXPECT_EQ(Editor::FormatConfigFieldHint(field, "cpu"), "Requested backend.\nDefault: cpu");
 }
 
 // UI-057: Smooth Property parameters come from the section's field table: typed values are

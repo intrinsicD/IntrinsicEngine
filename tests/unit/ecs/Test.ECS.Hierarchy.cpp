@@ -1,5 +1,6 @@
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -7,6 +8,7 @@
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
@@ -16,6 +18,7 @@ import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Hierarchy.Mutation;
 import Extrinsic.ECS.Hierarchy.Structure;
+import Extrinsic.ECS.System.TransformHierarchy;
 
 using Extrinsic::ECS::EntityHandle;
 using Extrinsic::ECS::InvalidEntityHandle;
@@ -643,4 +646,182 @@ TEST(ECSHierarchy, CollectQueriesFailClosedWhenTraversalLimitIsExceeded)
     ExpectQueryFailure(
         Structure::CollectDescendantsPreorder(raw, root),
         Structure::HierarchyQueryStatus::TraversalLimitExceeded);
+}
+
+
+TEST(ECSHierarchy, DetachPreservesWorldPoseThroughUpdateAndNextLocalEdit)
+{
+    Registry scene;
+    auto& raw = scene.Raw();
+    const auto parent = CreateDefault(scene, "Parent");
+    const auto child = CreateDefault(scene, "Child");
+    auto& parentLocal = raw.get<Components::Transform::Component>(parent);
+    parentLocal.Position.x = 10.0f;
+    parentLocal.Rotation = glm::angleAxis(glm::radians(30.0f), glm::vec3{0, 0, 1});
+    parentLocal.Scale = glm::vec3{2.0f};
+    raw.get<Components::Transform::Component>(child).Position.x = 2.0f;
+    raw.emplace<Components::Transform::IsDirtyTag>(parent);
+    raw.emplace<Components::Transform::IsDirtyTag>(child);
+    Attach(raw, child, parent);
+    Extrinsic::ECS::Systems::TransformHierarchy::OnUpdate(raw);
+    const auto before = raw.get<Components::Transform::WorldMatrix>(child).Matrix;
+
+    Detach(raw, child);
+
+    EXPECT_EQ(Hier(scene, child).Parent, InvalidEntityHandle);
+    for (int axis = 0; axis < 3; ++axis)
+        EXPECT_NEAR(raw.get<Components::Transform::Component>(child).Position[axis], before[3][axis], 1.0e-5f);
+    EXPECT_TRUE(raw.all_of<Components::Transform::IsDirtyTag>(child));
+    Extrinsic::ECS::Systems::TransformHierarchy::OnUpdate(raw);
+    for (int column = 0; column < 4; ++column)
+        for (int row = 0; row < 4; ++row)
+            EXPECT_NEAR(raw.get<Components::Transform::WorldMatrix>(child).Matrix[column][row], before[column][row], 1.0e-5f);
+    raw.get<Components::Transform::Component>(child).Position.x += 1.0f;
+    raw.emplace<Components::Transform::IsDirtyTag>(child);
+    Extrinsic::ECS::Systems::TransformHierarchy::OnUpdate(raw);
+    auto afterEdit = before;
+    afterEdit[3].x += 1.0f;
+    for (int column = 0; column < 4; ++column)
+        for (int row = 0; row < 4; ++row)
+            EXPECT_NEAR(raw.get<Components::Transform::WorldMatrix>(child).Matrix[column][row], afterEdit[column][row], 1.0e-5f);
+}
+
+TEST(ECSHierarchy, ReparentRejectsUnrepresentableLocalWithoutChangingHierarchy)
+{
+    for (const bool nonFiniteParent : {false, true})
+    {
+        SCOPED_TRACE(nonFiniteParent ? "non-finite parent" : "required shear");
+        Registry scene;
+        auto& raw = scene.Raw();
+        const auto parent = CreateDefault(scene, "Old parent");
+        const auto target = CreateDefault(scene, "Scaled parent");
+        const auto child = CreateDefault(scene, "Rotated child");
+        Attach(raw, child, parent);
+        raw.remove<Components::Transform::IsDirtyTag>(child);
+        auto& local = raw.get<Components::Transform::Component>(child);
+        local.Rotation = glm::angleAxis(glm::radians(45.0f), glm::vec3{0, 0, 1});
+        const auto before = Components::Transform::GetMatrix(local);
+        raw.get<Components::Transform::WorldMatrix>(child).Matrix = before;
+        raw.get<Components::Transform::WorldMatrix>(target).Matrix =
+            glm::scale(glm::mat4{1.0f}, glm::vec3{2, 1, 1});
+
+        if (nonFiniteParent)
+            raw.get<Components::Transform::WorldMatrix>(target).Matrix[0][0] =
+                std::numeric_limits<float>::quiet_NaN();
+
+        Attach(raw, child, target);
+
+        EXPECT_EQ(Hier(scene, child).Parent, parent);
+        EXPECT_EQ(Hier(scene, parent).FirstChild, child);
+        EXPECT_EQ(Hier(scene, parent).ChildCount, 1u);
+        EXPECT_EQ(Hier(scene, target).FirstChild, InvalidEntityHandle);
+        EXPECT_EQ(Hier(scene, target).ChildCount, 0u);
+        EXPECT_EQ(Components::Transform::GetMatrix(local), before);
+        EXPECT_EQ(raw.get<Components::Transform::WorldMatrix>(child).Matrix, before);
+        EXPECT_FALSE(raw.all_of<Components::Transform::IsDirtyTag>(child));
+    }
+}
+
+TEST(ECSHierarchy, DetachShearedReadyChildUnlinksAndPreservesTranslation)
+{
+    Registry scene;
+    auto& raw = scene.Raw();
+    const auto parent = CreateDefault(scene, "Parent");
+    const auto child = CreateDefault(scene, "Child");
+    Attach(raw, child, parent);
+    raw.remove<Components::Transform::IsDirtyTag>(child);
+    auto& world = raw.get<Components::Transform::WorldMatrix>(child).Matrix;
+    world[1][0] = 0.5f;
+    world[3] = glm::vec4{7, 8, 9, 1};
+
+    Detach(raw, child);
+
+    EXPECT_EQ(Hier(scene, child).Parent, InvalidEntityHandle);
+    EXPECT_EQ(Hier(scene, parent).FirstChild, InvalidEntityHandle);
+    EXPECT_EQ(Hier(scene, parent).ChildCount, 0u);
+    EXPECT_TRUE(raw.all_of<Components::Transform::IsDirtyTag>(child));
+    EXPECT_EQ(raw.get<Components::Transform::Component>(child).Position, (glm::vec3{7, 8, 9}));
+    Extrinsic::ECS::Systems::TransformHierarchy::OnUpdate(raw);
+    EXPECT_EQ(glm::vec3(raw.get<Components::Transform::WorldMatrix>(child).Matrix[3]), (glm::vec3{7, 8, 9}));
+}
+
+TEST(ECSHierarchy, DetachAllowsTeardownLoopToProgressForShearedAndNonFiniteChildren)
+{
+    Registry scene;
+    auto& raw = scene.Raw();
+    const auto parent = CreateDefault(scene, "Parent");
+    const auto sheared = CreateDefault(scene, "Sheared child");
+    const auto nonFinite = CreateDefault(scene, "Non-finite child");
+    Attach(raw, sheared, parent);
+    Attach(raw, nonFinite, parent);
+    raw.remove<Components::Transform::IsDirtyTag>(sheared);
+    raw.remove<Components::Transform::IsDirtyTag>(nonFinite);
+    raw.get<Components::Transform::WorldMatrix>(sheared).Matrix[1][0] = 0.5f;
+    raw.get<Components::Transform::WorldMatrix>(nonFinite).Matrix[3].x =
+        std::numeric_limits<float>::infinity();
+    raw.get<Components::Transform::Component>(nonFinite).Position = glm::vec3{3, 4, 5};
+    const auto authored = Components::Transform::GetMatrix(
+        raw.get<Components::Transform::Component>(nonFinite));
+
+    // Same progress requirement as model materialization teardown, bounded here
+    // so refusing Detach fails the assertion instead of hanging the test runner.
+    unsigned attempts = 0;
+    while (Hier(scene, parent).FirstChild != InvalidEntityHandle && attempts < 3u)
+    {
+        Detach(raw, Hier(scene, parent).FirstChild);
+        ++attempts;
+    }
+
+    EXPECT_EQ(attempts, 2u);
+    EXPECT_EQ(Hier(scene, parent).FirstChild, InvalidEntityHandle);
+    EXPECT_EQ(Hier(scene, parent).ChildCount, 0u);
+    EXPECT_EQ(Hier(scene, sheared).Parent, InvalidEntityHandle);
+    EXPECT_EQ(Hier(scene, nonFinite).Parent, InvalidEntityHandle);
+    EXPECT_EQ(Components::Transform::GetMatrix(
+        raw.get<Components::Transform::Component>(nonFinite)), authored);
+}
+
+TEST(ECSHierarchy, DecomposeRejectsNonFiniteTranslationWithoutChangingOutput)
+{
+    for (const float invalid : {std::numeric_limits<float>::quiet_NaN(),
+                               std::numeric_limits<float>::infinity(),
+                               -std::numeric_limits<float>::infinity()})
+    {
+        glm::mat4 matrix{1.0f};
+        matrix[3].x = invalid;
+        Components::Transform::Component result{.Position = {7, 8, 9}, .Scale = {2, 3, 4}};
+        const auto before = Components::Transform::GetMatrix(result);
+        EXPECT_FALSE(Components::Transform::TryDecomposeMatrix(matrix, result));
+        EXPECT_EQ(Components::Transform::GetMatrix(result), before);
+    }
+}
+
+TEST(ECSHierarchy, LocalTransformRejectsShearAndPerspectiveWithoutChangingOutput)
+{
+    for (const bool perspective : {false, true})
+    {
+        glm::mat4 matrix{1.0f};
+        matrix[3].x = 1.0e8f; // Translation magnitude must not hide basis/affine errors.
+        if (perspective) matrix[0][3] = 0.25f;
+        else matrix[1][0] = 0.5f;
+        Components::Transform::Component result{.Position = {7, 8, 9}, .Scale = {2, 3, 4}};
+        const auto before = Components::Transform::GetMatrix(result);
+        EXPECT_FALSE(Components::Transform::TryComputeLocalTransform(matrix, glm::mat4{1.0f}, result));
+        EXPECT_EQ(Components::Transform::GetMatrix(result), before);
+    }
+}
+
+TEST(ECSHierarchy, LocalTransformRoundTripsReflectedTrs)
+{
+    Components::Transform::Component original{
+        .Position = {7, 8, 9},
+        .Rotation = glm::angleAxis(glm::radians(45.0f), glm::vec3{0, 0, 1}),
+        .Scale = {-2, 3, 4}};
+    const auto matrix = Components::Transform::GetMatrix(original);
+    Components::Transform::Component result;
+    ASSERT_TRUE(Components::Transform::TryComputeLocalTransform(matrix, glm::mat4{1.0f}, result));
+    const auto reconstructed = Components::Transform::GetMatrix(result);
+    for (int column = 0; column < 4; ++column)
+        for (int row = 0; row < 4; ++row)
+            EXPECT_NEAR(reconstructed[column][row], matrix[column][row], 1.0e-5f);
 }

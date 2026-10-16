@@ -9,6 +9,8 @@
 #include "SandboxEditorJobHarness.hpp"
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.PointFieldOperations;
+import Extrinsic.Runtime.PointSamplingOperations;
+import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.CommandBus;
@@ -60,11 +62,11 @@ namespace
             Device.TransferQueue.AcceptBufferUploads=true;Jobs.Attach(Context);
         }
         auto Commands(){return R::BindEditorProcessingCommands(Context);}
-        Geometry::PropertySet& Rows(){return Intrinsic::Tests::PointDomainProperties(Scene,Entity,R::GeometryElementDomain::PointCloudPoint);}
+        Geometry::PropertySet& Rows(){return Intrinsic::Tests::PointDomainProperties(Scene,Entity,Density.Positions.Domain);}
         auto Key(){return R::MakeGpuPropertyKey(Context.World,Entity,Density.Density);}
-        auto Ready()
+        auto Ready(float value = 3.0f)
         {
-            std::vector<float> values(Rows().Size(),3);
+            std::vector<float> values(Rows().Size(),value);
             if(GetParam()==0)return R::MakeEditorKernelDensityTransactionForTest(Commands(),Density,values,Residency);
             if(GetParam()==1)return R::MakeEditorPointSpacingTransactionForTest(Commands(),Spacing,values,Residency);
             return R::MakeEditorDensityWeightTransactionForTest(Commands(),Weight,values,Residency);
@@ -85,6 +87,173 @@ TEST_P(PointScalarTransaction,AcceptBindsRevisionAndUndoRestoresRows)
     ASSERT_TRUE(input);EXPECT_EQ(input->Buffer,front->Buffer);EXPECT_EQ(Residency.Stats().UploadBytes,before);
     ASSERT_TRUE(History.Undo().Succeeded());EXPECT_FALSE(Rows().Exists("result"));
     ASSERT_TRUE(History.Redo().Succeeded());EXPECT_TRUE(Rows().Exists("result"));
+}
+
+TEST_P(PointScalarTransaction, SuccessiveEditsReplayAndRejectForeignOutputChanges)
+{
+    for (const bool existing : {true, false})
+    {
+        SCOPED_TRACE(existing);
+        History.ClearHistory();
+        if (auto old = Rows().Get<float>("result")) Rows().Remove(old);
+        if (existing) (void)Rows().GetOrAdd<float>("result", 1.0f);
+        const auto values = [&] { return std::as_const(Rows()).Get<float>("result").Vector(); };
+        for (const auto value : {3.0f, 7.0f})
+        {
+            const auto run = Ready(value);
+            ASSERT_TRUE(run);
+            ASSERT_EQ(R::AcceptEditorPointScalar(Commands(), run).Status, R::EditorCommandStatus::Pending);
+            ASSERT_TRUE(Jobs.DrainUntilTerminal());
+            ASSERT_EQ(R::SnapshotEditorPointScalar(Commands(), run).Phase, R::EditorGpuTransactionPhase::Applied);
+        }
+        ASSERT_TRUE(History.Undo().Succeeded());
+        EXPECT_EQ(values(), std::vector<float>(Rows().Size(), 3.0f));
+        ASSERT_TRUE(History.Undo().Succeeded());
+        if (existing) EXPECT_EQ(values(), std::vector<float>(Rows().Size(), 1.0f));
+        else EXPECT_FALSE(Rows().Exists("result"));
+        ASSERT_TRUE(History.Redo().Succeeded());
+        EXPECT_EQ(values(), std::vector<float>(Rows().Size(), 3.0f));
+        ASSERT_TRUE(History.Redo().Succeeded());
+        EXPECT_EQ(values(), std::vector<float>(Rows().Size(), 7.0f));
+        Rows().Get<float>("result")[0] = 13.0f;
+        EXPECT_EQ(History.Undo().Status, R::EditorCommandHistoryStatus::StaleEntity);
+        EXPECT_EQ(History.UndoCount(), 2u);
+        EXPECT_EQ(values()[0], 13.0f);
+    }
+
+    // A later legitimate command must not legitimize an older foreign replacement.
+    History.ClearHistory();
+    if (auto old = Rows().Get<float>("result")) Rows().Remove(old);
+    (void)Rows().GetOrAdd<float>("result", 1.0f);
+    unsigned invalidations = 0;
+    Context.InvalidateWorkspaceSnapshotCache = [&] { ++invalidations; };
+    for (const auto value : {3.0f, 7.0f, 11.0f})
+    {
+        if (value == 11.0f)
+        {
+            const auto previousId = Rows().Registry().Find("result");
+            if (auto old = Rows().Get<float>("result")) Rows().Remove(old);
+            (void)Rows().GetOrAdd<float>("result", 7.0f);
+            ASSERT_NE(Rows().Registry().Find("result"), previousId);
+        }
+        const auto run = Ready(value);
+        ASSERT_TRUE(run);
+        ASSERT_EQ(R::AcceptEditorPointScalar(Commands(), run).Status, R::EditorCommandStatus::Pending);
+        ASSERT_TRUE(Jobs.DrainUntilTerminal());
+        ASSERT_EQ(R::SnapshotEditorPointScalar(Commands(), run).Phase, R::EditorGpuTransactionPhase::Applied);
+    }
+    ASSERT_TRUE(History.Undo().Succeeded()); // C restores the foreign B-valued column.
+    const auto unchanged = std::as_const(Rows()).Get<float>("result").Vector();
+    ASSERT_EQ(unchanged, std::vector<float>(Rows().Size(), 7.0f));
+    invalidations = 0;
+    EXPECT_EQ(History.Undo().Status, R::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(History.UndoCount(), 2u);
+    EXPECT_EQ(History.RedoCount(), 1u);
+    EXPECT_EQ(std::as_const(Rows()).Get<float>("result").Vector(), unchanged);
+    EXPECT_EQ(invalidations, 0u);
+
+    // Sampling owns the same float column before the scalar command edits it.
+    History.ClearHistory();
+    if (auto old = Rows().Get<float>("result")) Rows().Remove(old);
+    R::PointSamplingOperationConfig sampling;
+    sampling.SourceStableEntityId = Density.StableEntityId;
+    sampling.Positions = Density.Positions;
+    sampling.RankName = "result";
+    sampling.Count = 2;
+    ASSERT_TRUE(R::ApplyEditorPointSamplingCommand(Commands(), sampling).Succeeded());
+    const auto sampled = std::as_const(Rows()).Get<float>("result").Vector();
+    const auto sampledId = Rows().Registry().Find("result");
+    const auto run = Ready(17.0f);
+    ASSERT_TRUE(run);
+    ASSERT_EQ(R::AcceptEditorPointScalar(Commands(), run).Status, R::EditorCommandStatus::Pending);
+    ASSERT_TRUE(Jobs.DrainUntilTerminal());
+    ASSERT_EQ(R::SnapshotEditorPointScalar(Commands(), run).Phase, R::EditorGpuTransactionPhase::Applied);
+    ASSERT_TRUE(History.Undo().Succeeded());
+    EXPECT_EQ(std::as_const(Rows()).Get<float>("result").Vector(), sampled);
+    ASSERT_TRUE(History.Undo().Succeeded());
+    EXPECT_FALSE(Rows().Exists("result"));
+    ASSERT_TRUE(History.Redo().Succeeded());
+    EXPECT_EQ(std::as_const(Rows()).Get<float>("result").Vector(), sampled);
+    EXPECT_NE(Rows().Registry().Find("result"), sampledId);
+    ASSERT_TRUE(History.Redo().Succeeded());
+    EXPECT_EQ(std::as_const(Rows()).Get<float>("result").Vector(), std::vector<float>(Rows().Size(), 17.0f));
+
+    // An independent mesh-field author creates a float mask before B edits it.
+    History.ClearHistory();
+    Entity = Intrinsic::Tests::MakePointDomainSource(Scene, R::GeometryElementDomain::MeshVertex);
+    Density.StableEntityId = Spacing.StableEntityId = Weight.StableEntityId = R::SelectionController::ToStableEntityId(Entity);
+    Density.Positions.Domain = Spacing.Positions.Domain = Weight.Positions.Domain = R::GeometryElementDomain::MeshVertex;
+    Density.Density.Domain = Spacing.Radii.Domain = Weight.Weights.Domain = R::GeometryElementDomain::MeshVertex;
+    R::EditorGeodesicsCommand geodesics;
+    geodesics.StableEntityId = Density.StableEntityId;
+    geodesics.Config.SourceVertices = {0};
+    geodesics.Config.SourceMaskProperty = Density.Density;
+    ASSERT_TRUE(R::ApplyEditorGeodesicsCommand(Commands(), geodesics).Succeeded());
+    const auto sourceMask = std::as_const(Rows()).Get<float>("result").Vector();
+    const auto scalar = Ready(19.0f);
+    ASSERT_TRUE(scalar);
+    ASSERT_EQ(R::AcceptEditorPointScalar(Commands(), scalar).Status, R::EditorCommandStatus::Pending);
+    ASSERT_TRUE(Jobs.DrainUntilTerminal());
+    ASSERT_EQ(R::SnapshotEditorPointScalar(Commands(), scalar).Phase, R::EditorGpuTransactionPhase::Applied);
+    ASSERT_TRUE(History.Undo().Succeeded());
+    EXPECT_EQ(std::as_const(Rows()).Get<float>("result").Vector(), sourceMask);
+    ASSERT_TRUE(History.Undo().Succeeded());
+    EXPECT_FALSE(Rows().Exists("result"));
+    ASSERT_TRUE(History.Redo().Succeeded());
+    EXPECT_EQ(std::as_const(Rows()).Get<float>("result").Vector(), sourceMask);
+    ASSERT_TRUE(History.Redo().Succeeded());
+    EXPECT_EQ(std::as_const(Rows()).Get<float>("result").Vector(), std::vector<float>(Rows().Size(), 19.0f));
+
+    // A legitimate mesh-field command must not rebase an older, foreign-replaced scalar slot.
+    const auto foreignValues = std::as_const(Rows()).Get<float>("result").Vector();
+    const auto previousId = Rows().Registry().Find("result");
+    auto old = Rows().Get<float>("result");
+    Rows().Remove(old);
+    Rows().GetOrAdd<float>("result").Vector() = foreignValues;
+    ASSERT_NE(Rows().Registry().Find("result"), previousId);
+    const auto newGeodesics = R::ApplyEditorGeodesicsCommand(Commands(), geodesics);
+    ASSERT_TRUE(newGeodesics.Succeeded()) << newGeodesics.Message;
+    ASSERT_EQ(History.UndoCount(), 3u);
+    ASSERT_TRUE(History.Undo().Succeeded());
+    ASSERT_EQ(std::as_const(Rows()).Get<float>("result").Vector(), foreignValues);
+    invalidations = 0;
+    EXPECT_EQ(History.Undo().Status, R::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(History.UndoCount(), 2u);
+    EXPECT_EQ(History.RedoCount(), 1u);
+    EXPECT_EQ(std::as_const(Rows()).Get<float>("result").Vector(), foreignValues);
+    EXPECT_EQ(invalidations, 0u);
+
+    // A scalar edit followed by outlier analysis retains the legal UndoB -> UndoA prefix.
+    History.ClearHistory();
+    Entity = Intrinsic::Tests::MakePointDomainSource(Scene, R::GeometryElementDomain::PointCloudPoint);
+    Density.StableEntityId = Spacing.StableEntityId = Weight.StableEntityId = R::SelectionController::ToStableEntityId(Entity);
+    Density.Positions.Domain = Spacing.Positions.Domain = Weight.Positions.Domain = R::GeometryElementDomain::PointCloudPoint;
+    Density.Density.Domain = Spacing.Radii.Domain = Weight.Weights.Domain = R::GeometryElementDomain::PointCloudPoint;
+    Rows().GetOrAdd<glm::vec3>("v:position").Vector() = {{0, 0, 0}, {.01f, 0, 0}, {.02f, 0, 0}, {10, 0, 0}, {.03f, 0, 0}};
+    const auto beforeOutliers = Ready(29.0f);
+    ASSERT_TRUE(beforeOutliers);
+    ASSERT_EQ(R::AcceptEditorPointScalar(Commands(), beforeOutliers).Status, R::EditorCommandStatus::Pending);
+    ASSERT_TRUE(Jobs.DrainUntilTerminal());
+    ASSERT_EQ(R::SnapshotEditorPointScalar(Commands(), beforeOutliers).Phase, R::EditorGpuTransactionPhase::Applied);
+    const auto scalarValues = std::as_const(Rows()).Get<float>("result").Vector();
+    auto direct = Context;
+    direct.JobCommands = {};
+    R::OutlierAnalysisConfig outliers;
+    outliers.StableEntityId = Density.StableEntityId;
+    outliers.Positions = Density.Positions;
+    outliers.Mask = {R::GeometryElementDomain::PointCloudPoint, "outlier_mask", Geometry::PropertyValueKind::UInt32};
+    outliers.Score = Density.Density;
+    outliers.KNeighbors = 2;
+    const auto analyzed = R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(direct), outliers);
+    ASSERT_TRUE(analyzed.Succeeded()) << analyzed.Message;
+    ASSERT_NE(std::as_const(Rows()).Get<float>("result").Vector(), scalarValues);
+    ASSERT_EQ(History.UndoCount(), 2u);
+    ASSERT_TRUE(History.Undo().Succeeded());
+    EXPECT_EQ(std::as_const(Rows()).Get<float>("result").Vector(), scalarValues);
+    EXPECT_TRUE(History.Undo().Succeeded());
+    EXPECT_FALSE(Rows().Exists("result"));
+    EXPECT_EQ(History.UndoCount(), 0u);
+    EXPECT_EQ(History.RedoCount(), 2u);
 }
 TEST_P(PointScalarTransaction,DiscardKeepsRowsAndReleasesRing)
 {

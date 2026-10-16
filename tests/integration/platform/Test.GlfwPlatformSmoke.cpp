@@ -1,6 +1,7 @@
 #include <chrono>
 #include <memory>
 #include <string>
+#include <type_traits>
 #include <variant>
 #include <vector>
 
@@ -114,4 +115,125 @@ TEST(GlfwPlatformSmoke, NativeFocusChangesEmitWindowFocusEvents)
             EXPECT_FALSE(other.back());
         }
     }
+}
+
+
+TEST(GlfwPlatformSmoke, OwningWindowIsNeitherCopyableNorMovable)
+{
+    using Window = Extrinsic::Platform::Backends::Glfw::Window;
+    EXPECT_FALSE(std::is_copy_constructible_v<Window>);
+    EXPECT_FALSE(std::is_copy_assignable_v<Window>);
+    EXPECT_FALSE(std::is_move_constructible_v<Window>);
+    EXPECT_FALSE(std::is_move_assignable_v<Window>);
+}
+
+namespace
+{
+    [[nodiscard]] std::unique_ptr<Extrinsic::Platform::Backends::Glfw::Window>
+    CreateMappedMinimizeTestWindow()
+    {
+        namespace Glfw = Extrinsic::Platform::Backends::Glfw;
+        if (!Glfw::CanInitialize())
+            return nullptr;
+        Extrinsic::Core::Config::WindowConfig config{
+            .Title = "GlfwMinimizeSmoke", .Width = 320, .Height = 240};
+        auto window = std::make_unique<Glfw::Window>(config);
+        if (window->GetNativeHandle() == nullptr)
+            return nullptr;
+        // Map the window before making window-manager iconification requests.
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(500);
+        do { window->WaitForEventsTimeout(0.02); }
+        while (std::chrono::steady_clock::now() < deadline);
+        return window;
+    }
+
+    [[nodiscard]] bool WaitForNativeIconified(
+        Extrinsic::Platform::Backends::Glfw::Window& window, const bool expected)
+    {
+        auto* native = static_cast<GLFWwindow*>(window.GetNativeHandle());
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+        do
+        {
+            window.WaitForEventsTimeout(0.02);
+            if ((glfwGetWindowAttrib(native, GLFW_ICONIFIED) == GLFW_TRUE) == expected)
+                return true;
+        } while (std::chrono::steady_clock::now() < deadline);
+        return false;
+    }
+}
+
+TEST(GlfwPlatformSmoke, NativeIconifyUpdatesMinimizedState)
+{
+    auto window = CreateMappedMinimizeTestWindow();
+    if (!window)
+        GTEST_SKIP() << "No native GLFW window is available; minimization requires a display.";
+    EXPECT_FALSE(window->IsMinimized());
+    glfwIconifyWindow(static_cast<GLFWwindow*>(window->GetNativeHandle()));
+    if (!WaitForNativeIconified(*window, true))
+        GTEST_SKIP() << "The window manager did not grant native iconification within 3 seconds.";
+    const auto extent = window->GetFramebufferExtent();
+    EXPECT_TRUE(window->IsMinimized()) << "GLFW_ICONIFIED is true with framebuffer "
+        << extent.Width << 'x' << extent.Height;
+}
+
+TEST(GlfwPlatformSmoke, NativeRestoreClearsMinimizedState)
+{
+    auto window = CreateMappedMinimizeTestWindow();
+    if (!window)
+        GTEST_SKIP() << "No native GLFW window is available; restoration requires a display.";
+    auto* native = static_cast<GLFWwindow*>(window->GetNativeHandle());
+    glfwIconifyWindow(native);
+    if (!WaitForNativeIconified(*window, true))
+        GTEST_SKIP() << "The window manager did not grant native iconification within 3 seconds.";
+    glfwRestoreWindow(native);
+    if (!WaitForNativeIconified(*window, false))
+        GTEST_SKIP() << "The window manager did not grant native restoration within 3 seconds.";
+    EXPECT_FALSE(window->IsMinimized());
+}
+
+TEST(GlfwPlatformSmoke, NativeResizeCallbackDoesNotBorrowDrainedQueueStorage)
+{
+    namespace Glfw = Extrinsic::Platform::Backends::Glfw;
+    using namespace Extrinsic::Platform;
+    if (!Glfw::CanInitialize())
+        GTEST_SKIP() << "GLFW cannot initialize; native resize requires a display.";
+    Extrinsic::Core::Config::WindowConfig config{
+        .Title = "GlfwCallbackStorageSmoke", .Width = 320, .Height = 240};
+    Glfw::Window window(config);
+    auto* native = static_cast<GLFWwindow*>(window.GetNativeHandle());
+    if (native == nullptr)
+        GTEST_SKIP() << "GLFW initialized but could not create the native test window.";
+    const auto mappedAt = std::chrono::steady_clock::now() + std::chrono::milliseconds(500);
+    do { window.WaitForEventsTimeout(0.02); }
+    while (std::chrono::steady_clock::now() < mappedAt);
+    (void)window.DrainEvents();
+    int originalWidth = 0, originalHeight = 0;
+    glfwGetFramebufferSize(native, &originalWidth, &originalHeight);
+    bool observedResize = false;
+    window.Listen([&](const Event& event)
+    {
+        const auto* resize = std::get_if<WindowResizeEvent>(&event);
+        if (resize == nullptr)
+            return;
+        observedResize = true;
+        const auto expected = *resize;
+        auto drained = window.DrainEvents();
+        ASSERT_FALSE(drained.empty());
+        // The drained queue remains alive, so overwriting its last element tests
+        // aliasing deterministically without dereferencing freed storage.
+        drained.back() = WindowCloseEvent{};
+        const auto* afterDrain = std::get_if<WindowResizeEvent>(&event);
+        ASSERT_NE(afterDrain, nullptr) << "callback argument aliases the drained queue";
+        EXPECT_EQ(afterDrain->Width, expected.Width);
+        EXPECT_EQ(afterDrain->Height, expected.Height);
+    });
+    glfwSetWindowSize(native, 480, 360);
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+    do { window.WaitForEventsTimeout(0.02); }
+    while (!observedResize && std::chrono::steady_clock::now() < deadline);
+    int width = 0, height = 0;
+    glfwGetFramebufferSize(native, &width, &height);
+    if (!observedResize && width == originalWidth && height == originalHeight)
+        GTEST_SKIP() << "The host did not change the framebuffer size after the native resize request.";
+    EXPECT_TRUE(observedResize) << "native framebuffer changed without a resize callback";
 }

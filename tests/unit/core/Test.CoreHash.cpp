@@ -5,6 +5,8 @@
 #include <unordered_map>
 #include <string>
 #include <string_view>
+#include <set>
+#include <compare>
 
 import Extrinsic.Core.Hash;
 
@@ -19,6 +21,22 @@ TEST(CoreHash, HashString_EmptyString)
     // FNV-1a base value XOR'd with nothing = base value
     uint32_t hash = HashString("");
     EXPECT_EQ(hash, 2166136261u);  // FNV offset basis
+}
+
+TEST(CoreHash, StringIdOrderingUsesTheSameIdentityAsEquality)
+{
+    const char firstText[] = "shared-id";
+    const char secondText[] = "shared-id";
+    const StringID first(firstText);
+    const StringID second(secondText);
+    const StringID raw(first.Value);
+    ASSERT_EQ(first, second);
+    ASSERT_EQ(first, raw);
+    EXPECT_EQ(first <=> second, std::strong_ordering::equal);
+    EXPECT_EQ(first <=> raw, std::strong_ordering::equal);
+    const std::set<StringID> ids{first, second, raw};
+    EXPECT_EQ(ids.size(), 1u);
+    EXPECT_LT(StringID(1u), StringID(2u));
 }
 
 TEST(CoreHash, HashString_SingleChar)

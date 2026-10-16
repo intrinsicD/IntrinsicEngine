@@ -381,3 +381,21 @@ TEST(Physics_Contact, EPA_UsesScratchArena_Smoke)
 
     EXPECT_GT(scratch.Used(), beforeUsed) << "Expected EPA to consume scratch arena memory";
 }
+
+
+TEST(GeometryPrimitives, SegmentProjectionPreservesUniformScale)
+{
+    for (const float scale : {1.0e-8f, 5.0e-4f, 1.0f, 1.0e8f})
+    {
+        SCOPED_TRACE(scale);
+        const Segment segment{{0, 0, 0}, {scale, 0, 0}};
+        const glm::vec3 query{scale * .5f, scale, 0};
+        EXPECT_NEAR(ClosestPointParameter(segment, query), .5f, 1.0e-6f);
+        ExpectVec3Near(ClosestPoint(segment, query) / scale, {.5f, 0, 0}, 1.0e-6f);
+        const Triangle collinear{{0, 0, 0}, {scale, 0, 0}, {2 * scale, 0, 0}};
+        ExpectVec3Near(ClosestPoint(collinear, query) / scale, {.5f, 0, 0}, 1.0e-6f);
+    }
+    const Segment point{{2, 3, 4}, {2, 3, 4}};
+    EXPECT_EQ(ClosestPointParameter(point, {0, 0, 0}), 0.f);
+    EXPECT_EQ(ClosestPoint(point, {0, 0, 0}), point.A);
+}

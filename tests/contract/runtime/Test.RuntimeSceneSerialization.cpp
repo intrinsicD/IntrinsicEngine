@@ -309,7 +309,7 @@ TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesPromotedSandboxSceneDa
     const std::string document = backend.Text("scene.json");
     ASSERT_FALSE(document.empty());
     const nlohmann::json parsed = nlohmann::json::parse(document);
-    ASSERT_EQ(parsed["version"].get<std::uint32_t>(), 5u);
+    ASSERT_EQ(parsed["version"].get<std::uint32_t>(), 6u);
     ASSERT_EQ(parsed["entities"].size(), 3u);
     EXPECT_EQ(parsed["stats"]["renderHintEntities"].get<std::uint32_t>(), 3u);
     ASSERT_TRUE(parsed["entities"][0]["render"]["visualization"].is_object());
@@ -471,6 +471,103 @@ TEST(RuntimeSceneSerialization, UnsupportedPersistenceFamiliesReportDiagnosticsA
     EXPECT_FALSE(loadedRaw.any_of<AssetInstance::Source>(loadedEntity));
 }
 
+TEST(RuntimeSceneSerialization, HierarchyCyclesRejectWithoutReplacingScene)
+{
+    ECS::Scene::Registry source;
+    const auto serialized = Runtime::SerializeSceneDocument(source);
+    ASSERT_TRUE(serialized.has_value());
+    const auto empty = nlohmann::json::parse(*serialized);
+    const std::vector<nlohmann::json> cycles{
+        nlohmann::json::array({{{"id", 0u}, {"parentId", 0u}, {"siblingOrder", 0u}}}),
+        nlohmann::json::array({{{"id", 0u}, {"parentId", 1u}, {"siblingOrder", 0u}},
+                               {{"id", 1u}, {"parentId", 0u}, {"siblingOrder", 0u}}})};
+    for (const auto& entities : cycles)
+    {
+        SCOPED_TRACE(entities.dump());
+        ECS::Scene::Registry destination;
+        const auto sentinel = ECS::Scene::CreateDefault(destination, "Preserved");
+        const auto before = Runtime::SerializeSceneDocument(destination);
+        ASSERT_TRUE(before.has_value());
+        auto document = empty;
+        document["entities"] = entities;
+        const auto result = Runtime::DeserializeSceneDocument(destination, document.dump());
+        EXPECT_FALSE(result.has_value());
+        if (!result) EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+        EXPECT_TRUE(destination.IsValid(sentinel));
+        EXPECT_EQ(Runtime::SerializeSceneDocument(destination), before);
+    }
+}
+
+TEST(RuntimeSceneSerialization, SiblingOrderSurvivesRoundTrip)
+{
+    ECS::Scene::Registry source;
+    const auto parent = ECS::Scene::CreateDefault(source, "Parent");
+    const auto a = ECS::Scene::CreateDefault(source, "A");
+    const auto b = ECS::Scene::CreateDefault(source, "B");
+    const auto c = ECS::Scene::CreateDefault(source, "C");
+    ECS::Hierarchy::Attach(source.Raw(), a, parent);
+    ECS::Hierarchy::Attach(source.Raw(), c, parent);
+    ECS::Hierarchy::Attach(source.Raw(), b, parent);
+    const auto serialized = Runtime::SerializeSceneDocument(source);
+    ASSERT_TRUE(serialized.has_value());
+    ECS::Scene::Registry loaded;
+    ASSERT_TRUE(Runtime::DeserializeSceneDocument(loaded, *serialized).has_value());
+    const auto loadedParent = FindEntityByName(loaded, "Parent");
+    ASSERT_NE(loadedParent, ECS::InvalidEntityHandle);
+    const auto& hierarchy = loaded.Raw().get<ECSC::Hierarchy::Component>(loadedParent);
+    EXPECT_EQ(hierarchy.ChildCount, 3u);
+    auto child = hierarchy.FirstChild;
+    auto previous = ECS::InvalidEntityHandle;
+    for (const std::string_view name : {"B", "C", "A"})
+    {
+        ASSERT_TRUE(loaded.IsValid(child));
+        EXPECT_EQ(loaded.Raw().get<ECSC::MetaData>(child).EntityName, name);
+        const auto& link = loaded.Raw().get<ECSC::Hierarchy::Component>(child);
+        EXPECT_EQ(link.Parent, loadedParent);
+        EXPECT_EQ(link.PrevSibling, previous);
+        previous = child;
+        child = link.NextSibling;
+    }
+    EXPECT_EQ(child, ECS::InvalidEntityHandle);
+}
+
+TEST(RuntimeSceneSerialization, MalformedSiblingOrdersRejectWithoutReplacingScene)
+{
+    ECS::Scene::Registry source;
+    const auto serialized = Runtime::SerializeSceneDocument(source);
+    ASSERT_TRUE(serialized.has_value());
+    auto valid = nlohmann::json::parse(*serialized);
+    valid["entities"] = nlohmann::json::array({{{"id", 0u}, {"name", "Parent"}},
+        {{"id", 1u}, {"name", "A"}, {"parentId", 0u}, {"siblingOrder", 2u}},
+        {{"id", 2u}, {"name", "B"}, {"parentId", 0u}, {"siblingOrder", 0u}},
+        {{"id", 3u}, {"name", "C"}, {"parentId", 0u}, {"siblingOrder", 1u}}});
+    const auto reject = [&](const nlohmann::json& document) {
+        SCOPED_TRACE(document.dump());
+        ECS::Scene::Registry destination;
+        (void)ECS::Scene::CreateDefault(destination, "Preserved");
+        const auto before = Runtime::SerializeSceneDocument(destination);
+        ASSERT_TRUE(before.has_value());
+        const auto result = Runtime::DeserializeSceneDocument(destination, document.dump());
+        EXPECT_FALSE(result.has_value());
+        if (!result) EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+        EXPECT_EQ(Runtime::SerializeSceneDocument(destination), before);
+    };
+    for (const nlohmann::json& order : {nlohmann::json(0u), nlohmann::json(3u), nlohmann::json(-1),
+                                      nlohmann::json(1.5), nlohmann::json("2"),
+                                      nlohmann::json(std::uint64_t{1} << 32u)})
+    {
+        auto malformed = valid;
+        malformed["entities"][1]["siblingOrder"] = order;
+        reject(malformed);
+    }
+    auto missing = valid;
+    missing["entities"][1].erase("siblingOrder");
+    reject(missing);
+    auto orphan = valid;
+    orphan["entities"][0]["siblingOrder"] = 0u;
+    reject(orphan);
+}
+
 TEST(RuntimeSceneSerialization, InvalidDocumentsFailClosed)
 {
     ECS::Scene::Registry scene;
@@ -504,9 +601,15 @@ TEST(RuntimeSceneSerialization, InvalidDocumentsFailClosed)
         << "version 4 may carry legacy property-reference keys (REVIEW-007 PK12)";
     EXPECT_EQ(version4.error(), Core::ErrorCode::InvalidFormat);
 
+    auto version5 = Runtime::DeserializeSceneDocument(
+        scene,
+        R"({"version":5,"entities":[]})");
+    EXPECT_FALSE(version5.has_value()) << "version 5 lacks authored sibling order";
+    EXPECT_EQ(version5.error(), Core::ErrorCode::InvalidFormat);
+
     auto badGeometry = Runtime::DeserializeSceneDocument(
         scene,
-        R"({"version":5,"entities":[{"id":0,"geometrySources":{"domain":"Mesh"}}]})");
+        R"({"version":6,"entities":[{"id":0,"geometrySources":{"domain":"Mesh"}}]})");
     EXPECT_FALSE(badGeometry.has_value());
     EXPECT_EQ(badGeometry.error(), Core::ErrorCode::InvalidFormat);
 }
@@ -514,7 +617,7 @@ TEST(RuntimeSceneSerialization, InvalidDocumentsFailClosed)
 TEST(RuntimeSceneSerialization, MalformedGraphTopologyFailsClosed)
 {
     const nlohmann::json valid = nlohmann::json::parse(
-        R"({"version":5,"entities":[{"id":0,"geometrySources":{"domain":"Graph","nodes":{"deleted":0,"positions":[[0,0,0],[1,0,0]]},"halfedges":{"toVertex":[1,0],"next":[1,0],"prev":[1,0]},"edges":{"deleted":0,"v0":[0],"v1":[1]}}}]})");
+        R"({"version":6,"entities":[{"id":0,"geometrySources":{"domain":"Graph","nodes":{"deleted":0,"positions":[[0,0,0],[1,0,0]]},"halfedges":{"toVertex":[1,0],"next":[1,0],"prev":[1,0]},"edges":{"deleted":0,"v0":[0],"v1":[1]}}}]})");
 
     {
         ECS::Scene::Registry scene;

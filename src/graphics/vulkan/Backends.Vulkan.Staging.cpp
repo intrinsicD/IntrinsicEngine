@@ -23,7 +23,7 @@ namespace Extrinsic::Backends::Vulkan
 // =============================================================================
 
 StagingBelt::StagingBelt(VkDevice device, VmaAllocator vma, size_t capacityBytes)
-    : m_Device(device), m_Vma(vma), m_Capacity(capacityBytes)
+    : m_Device(device), m_Vma(vma), m_Capacity(capacityBytes), m_Ring(capacityBytes)
 {
     if (m_Device == VK_NULL_HANDLE || m_Vma == VK_NULL_HANDLE || m_Capacity == 0)
     {
@@ -73,57 +73,31 @@ bool StagingBelt::IsValid() const noexcept
 StagingBelt::Allocation StagingBelt::Allocate(size_t sizeBytes, size_t alignment)
 {
     std::scoped_lock lock{m_Mutex};
-    const size_t aligned = AlignUp(m_Tail, alignment ? alignment : 1);
-    const size_t end     = aligned + sizeBytes;
-
-    if (end > m_Capacity)
+    const auto offset = m_Ring.Allocate(sizeBytes, alignment);
+    if (!offset)
     {
-        // Wrap: try from zero — only valid if head hasn't wrapped here yet.
-        const size_t wEnd = sizeBytes;
-        if (wEnd > m_Head)
-        {
-            Core::Log::Error("[StagingBelt] Out of staging memory");
-            return {};
-        }
-        m_Tail = wEnd;
-        void* ptr = static_cast<char*>(m_Mapped);
-        if (!m_HasPending) { m_PendingBegin = 0; m_HasPending = true; }
-        m_PendingEnd = wEnd;
-        return {m_Buffer, 0, ptr, sizeBytes};
-    }
-
-    if (aligned < m_Head && end > m_Head)
-    {
-        Core::Log::Error("[StagingBelt] Staging belt head collision");
+        Core::Log::Error("[StagingBelt] Out of staging memory");
         return {};
     }
-
-    m_Tail = end;
-    void* ptr = static_cast<char*>(m_Mapped) + aligned;
-    if (!m_HasPending) { m_PendingBegin = aligned; m_HasPending = true; }
-    m_PendingEnd = end;
-    return {m_Buffer, aligned, ptr, sizeBytes};
+    return {m_Buffer, *offset, static_cast<char*>(m_Mapped) + *offset, sizeBytes};
 }
 
 void StagingBelt::Retire(uint64_t retireValue)
 {
     std::scoped_lock lock{m_Mutex};
-    if (m_HasPending)
-    {
-        m_InFlight.push_back({m_PendingBegin, m_PendingEnd, retireValue});
-        m_HasPending = false;
-    }
+    m_Ring.Retire(retireValue);
+}
+
+void StagingBelt::CancelPending()
+{
+    std::scoped_lock lock{m_Mutex};
+    m_Ring.CancelPending();
 }
 
 void StagingBelt::GarbageCollect(uint64_t completedValue)
 {
     std::scoped_lock lock{m_Mutex};
-    while (!m_InFlight.empty() && m_InFlight.front().RetireValue <= completedValue)
-    {
-        m_Head = m_InFlight.front().End;
-        m_InFlight.pop_front();
-    }
-    if (m_InFlight.empty()) { m_Head = 0; m_Tail = 0; }
+    m_Ring.GarbageCollect(completedValue);
 }
 
 } // namespace Extrinsic::Backends::Vulkan

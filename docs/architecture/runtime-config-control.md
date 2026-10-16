@@ -92,7 +92,7 @@ geometry or renderer side effect.
 
 Strict point-processing config validators share shallow default-field overrides
 and ordered unsigned-32 and finite nonnegative-float checks through the private
-`Runtime.PointConfigJson.hpp`
+`Runtime.ConfigFieldJson.hpp`
 declarations, compiled in `Runtime.FeatureConfigCodecs.Detail.cpp`. Unknown keys
 are rejected before numeric fields; nested property objects replace defaults
 in full. Families retain their error text, field order, ranges, property rules
@@ -201,11 +201,13 @@ unchanged.
 ## UI And Agent Parity
 
 Section fields are declared once, in `ConfigFieldSpec` tables owned next to each
-section's codec (RUNTIME-276; the mesh-field family so far: smoothing, harmonic
-field, spectral modes, scalar gradient, geodesics, mesh curvature).
-`ConfigDetail::ValidateDeclaredFields` performs the strict merge plus type, range
-and enum checks from the table; the section validator keeps only cross-field
-rules. `ConfigDetail::BuildSectionSchemaJson` generates the registration's
+section's codec (RUNTIME-276), including all 26 registered runtime sections.
+`ConfigDetail::ValidateDeclaredFields` performs strict merge and mechanical
+checks for the owners that use it. The point codecs retain their ordered
+validation phases and diagnostics through the existing table-driven helpers;
+the fallback codecs read table bounds and tokens through their existing readers.
+Owners keep cross-field, representability, reference merge and group-clamp rules.
+`ConfigDetail::BuildSectionSchemaJson` generates the registration's
 `SchemaJson`, and `PropertySmoothingConfigFieldSpecs()` (and siblings) give the
 editor descriptions, ranges and enum names without JSON. Agents read the same
 data through `config_schema` (the full export or one section) and the `schema`
@@ -215,6 +217,11 @@ The Sandbox panels read the same tables through `Sandbox.PanelSupport`'s
 `DrawSpec*` controls (UI-057): hover hints with description, accepted values and
 default, numeric inputs clamped to the declared range, and combos labeled from
 `EnumNames`. The Smooth Property panel uses them for every parameter.
+Point-family backend choices also take per-value labels from the owner table,
+matched by stable token. CPU/Vulkan group labels, selection filters and raw
+stored selection codes remain in the panels. Integer enums and string-token
+enums keep their current payload formats; fallback property references retain
+integer kind codes, while point bindings keep their string kind names.
 
 `Extrinsic.Sandbox.Editor.Shell` keeps the ImGui widget and draft-buffer
 state. Its `Runtime::EditorWorkspaceAttachment` carries the opaque attachment

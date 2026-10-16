@@ -1,7 +1,7 @@
 // Device E-step broker of one Coherent Point Drift run (METHOD-056). The solver runs on a
-// JobService worker, but GPU work is recorded on the device-owner thread: the worker's Evaluate
-// (the solver's EStep::ExternalEvaluator) converts the request to float-float pairs in staging the
-// run reuses, queues it and waits; Pump, called on the main thread every drain while a step job
+// JobService coroutine, but GPU work is recorded on the device-owner thread: Queue
+// converts the request to float-float pairs in staging the run reuses and returns a
+// per-request event for suspension; Pump, called on the main thread every drain while a step job
 // runs, records it through SpatialIndexCache::QueueGpuCompute into a pooled
 // Graphics::CoherentPointDriftEStepWorkspace (SpatialIndexCache::LeaseGpuWorkspace) as an
 // immediate submit (GRAPHICS-150) and hands the readback back, usually in the frame that
@@ -9,9 +9,9 @@
 // for exact evaluation stay on the CPU, so every iteration uploads the moved source and reads
 // back the row and source statistics.
 //
-// Evaluate returns false, and the solver runs that iteration on the CPU, when the broker is
+// Queue refuses or Complete returns false, and an uncancelled solver falls back to the CPU, when the broker is
 // closed, the computation is refused or fails (which closes the broker, so later iterations do
-// not wait for a device that cannot help), or no result arrives within Timeout.
+// not wait for a device that cannot help), or Pump observes the request's timeout.
 module;
 #include <chrono>
 #include <cstdint>
@@ -21,6 +21,7 @@ module;
 export module Extrinsic.Runtime.CoherentPointDriftGpuEStep;
 
 import Geometry.Registration.CoherentPointDrift.EStep;
+import Extrinsic.Core.Tasks.CounterEvent;
 
 extern "C++"
 {
@@ -32,7 +33,7 @@ export namespace Extrinsic::Runtime
     struct CoherentPointDriftGpuEStepStats
     {
         std::uint64_t Requests{0u}, Completed{0u}, Failed{0u};
-        double WaitSeconds{0.0}; // worker time spent waiting for results
+        double WaitSeconds{0.0}; // elapsed request time through owner-thread completion/cancellation
     };
 
     class CoherentPointDriftGpuEStep
@@ -45,8 +46,13 @@ export namespace Extrinsic::Runtime
         CoherentPointDriftGpuEStep(const CoherentPointDriftGpuEStep&) = delete;
         CoherentPointDriftGpuEStep& operator=(const CoherentPointDriftGpuEStep&) = delete;
 
-        // Worker thread; blocks until the result, a failure, Close or the timeout.
-        [[nodiscard]] bool Evaluate(const Geometry::CoherentPointDrift::EStep::ExternalRequest& request);
+        // Worker thread. A non-null event belongs only to this request; Queue never waits.
+        [[nodiscard]] std::shared_ptr<Core::Tasks::CounterEvent> Queue(
+            const Geometry::CoherentPointDrift::EStep::ExternalRequest& request);
+        // Worker thread after the event signals. Copies into the still-owned solver spans;
+        // obsolete, cancelled and failed requests return false without writing them.
+        [[nodiscard]] bool Complete(const std::shared_ptr<Core::Tasks::CounterEvent>& event,
+            const Geometry::CoherentPointDrift::EStep::ExternalRequest& request);
         // Device-owner (main) thread: queues a waiting request, delivers a finished one.
         void Pump();
         // Main thread, once no step job runs: returns the workspace lease to the cache's pool, so a
@@ -58,7 +64,7 @@ export namespace Extrinsic::Runtime
         void Close(std::string diagnostic = {});
         [[nodiscard]] bool Closed() const;
 
-        // Set while a step job may still call Evaluate; the pump job ends once it is cleared.
+        // Set while a step job may still queue work; the pump job ends once it is cleared.
         void SetWorkerActive(bool active);
         [[nodiscard]] bool WorkerActive() const;
 

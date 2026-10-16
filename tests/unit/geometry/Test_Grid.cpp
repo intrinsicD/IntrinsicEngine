@@ -385,12 +385,14 @@ TEST(SparseGrid, TouchVertexAllocatesBlock)
     auto scalar = grid.AddProperty<float>("scalar", 0.0f);
 
     auto idx = grid.TouchVertex(5, 5, 5);
+
+    ASSERT_TRUE(idx.has_value());
     EXPECT_EQ(grid.AllocatedBlockCount(), 1u);
     EXPECT_EQ(grid.AllocatedVertexCount(), SparseGrid::BlockVolume);
 
     // Writing via returned index should work
-    scalar[idx] = 42.0f;
-    EXPECT_NEAR(scalar[idx], 42.0f, 1e-9f);
+    scalar[*idx] = 42.0f;
+    EXPECT_NEAR(scalar[*idx], 42.0f, 1e-9f);
 }
 
 TEST(SparseGrid, VertexIndexReturnsNulloptForUnallocated)
@@ -409,9 +411,10 @@ TEST(SparseGrid, VertexIndexAfterTouch)
 
     SparseGrid grid(dims);
     auto expected = grid.TouchVertex(10, 10, 10);
+    ASSERT_TRUE(expected.has_value());
     auto actual = grid.VertexIndex(10, 10, 10);
     ASSERT_TRUE(actual.has_value());
-    EXPECT_EQ(*actual, expected);
+    EXPECT_EQ(*actual, *expected);
 }
 
 TEST(SparseGrid, SameBlockForNearbyVertices)
@@ -474,7 +477,8 @@ TEST(SparseGrid, ScalarFieldWriteRead)
                 if (std::abs(sdf) <= bandwidth)
                 {
                     auto idx = grid.TouchVertex(x, y, z);
-                    scalar[idx] = sdf;
+                    ASSERT_TRUE(idx.has_value());
+                    scalar[*idx] = sdf;
                     ++touchedCount;
                 }
             }
@@ -509,13 +513,15 @@ TEST(SparseGrid, MultipleProperties)
     auto velocity = grid.AddProperty<glm::vec3>("velocity", glm::vec3(0.0f));
 
     auto idx = grid.TouchVertex(4, 4, 4);
-    density[idx] = 1.5f;
-    velocity[idx] = glm::vec3(1.0f, 2.0f, 3.0f);
 
-    EXPECT_NEAR(density[idx], 1.5f, 1e-9f);
-    EXPECT_NEAR(velocity[idx].x, 1.0f, 1e-9f);
-    EXPECT_NEAR(velocity[idx].y, 2.0f, 1e-9f);
-    EXPECT_NEAR(velocity[idx].z, 3.0f, 1e-9f);
+    ASSERT_TRUE(idx.has_value());
+    density[*idx] = 1.5f;
+    velocity[*idx] = glm::vec3(1.0f, 2.0f, 3.0f);
+
+    EXPECT_NEAR(density[*idx], 1.5f, 1e-9f);
+    EXPECT_NEAR(velocity[*idx].x, 1.0f, 1e-9f);
+    EXPECT_NEAR(velocity[*idx].y, 2.0f, 1e-9f);
+    EXPECT_NEAR(velocity[*idx].z, 3.0f, 1e-9f);
 }
 
 TEST(SparseGrid, ForEachBlock)
@@ -570,7 +576,7 @@ TEST(SparseGrid, Reset)
 
     GridDimensions newDims;
     newDims.NX = 32; newDims.NY = 32; newDims.NZ = 32;
-    grid.Reset(newDims);
+    ASSERT_TRUE(grid.Reset(newDims));
 
     EXPECT_EQ(grid.AllocatedBlockCount(), 0u);
     EXPECT_EQ(grid.AllocatedVertexCount(), 0u);
@@ -620,10 +626,12 @@ TEST(SparseGrid, IntraBlockLocalityConsecutiveIndices)
 
     // Touch two adjacent vertices in the same block
     auto idx0 = grid.TouchVertex(0, 0, 0);
+    ASSERT_TRUE(idx0.has_value());
     auto idx1 = grid.TouchVertex(1, 0, 0);
+    ASSERT_TRUE(idx1.has_value());
 
     // They should be exactly 1 apart (consecutive in the local linear layout)
-    EXPECT_EQ(idx1, idx0 + 1);
+    EXPECT_EQ(*idx1, *idx0 + 1);
 }
 
 // =============================================================================
@@ -692,4 +700,76 @@ TEST(DenseGrid, MarchingCubesExtractSphereSDF)
         EXPECT_GT(glm::dot(faceNormal, centroid), 0.0f);
         EXPECT_GT(glm::dot(faceNormal, result->Normals[t[0]] + result->Normals[t[1]] + result->Normals[t[2]]), 0.0f);
     }
+}
+
+
+TEST(SparseGrid, RejectsDimensionsBeyondPackedCoordinateCapacity)
+{
+    constexpr std::size_t limit = std::size_t{1} << 24;
+    GridDimensions valid;
+    valid.NX = limit - 1; valid.NY = 8; valid.NZ = 1;
+    SparseGrid boundary(valid);
+    (void)boundary.TouchVertex(limit - 1, 0, 0);
+    (void)boundary.TouchVertex(0, 8, 0);
+    const auto x = boundary.VertexIndex(limit - 1, 0, 0);
+    const auto y = boundary.VertexIndex(0, 8, 0);
+    ASSERT_TRUE(x);
+    ASSERT_TRUE(y);
+    EXPECT_NE(*x, *y);
+    for (int axis = 0; axis < 3; ++axis)
+    {
+        SCOPED_TRACE(axis);
+        GridDimensions invalid;
+        invalid.NX = invalid.NY = invalid.NZ = 1;
+        if (axis == 0) invalid.NX = limit;
+        if (axis == 1) invalid.NY = limit;
+        if (axis == 2) invalid.NZ = limit;
+        SparseGrid rejected(invalid);
+        EXPECT_FALSE(rejected.Dimensions().IsValid());
+        EXPECT_FALSE(rejected.TouchVertex(0, 0, 0));
+        EXPECT_EQ(rejected.AllocatedBlockCount(), 0u);
+        EXPECT_FALSE(rejected.VertexIndex(0, 0, 0));
+    }
+}
+
+TEST(SparseGrid, RejectsInvalidCoordinatesBeforePackingOrAllocating)
+{
+    GridDimensions dims;
+    dims.NX = 16; dims.NY = 8; dims.NZ = 1;
+    SparseGrid grid(dims);
+    (void)grid.TouchVertex(0, 0, 0);
+    (void)grid.TouchVertex(0, 8, 0);
+    (void)grid.TouchVertex(16, 0, 0);
+    const auto count = grid.AllocatedBlockCount();
+    constexpr std::size_t limit = std::size_t{1} << 24;
+    EXPECT_FALSE(grid.TouchVertex(limit, 0, 0));
+    EXPECT_FALSE(grid.TouchVertex(17, 0, 0));
+    EXPECT_FALSE(grid.TouchBlock(std::size_t{1} << 21, 0, 0));
+    EXPECT_FALSE(grid.TouchBlock(3, 0, 0));
+    EXPECT_EQ(grid.AllocatedBlockCount(), count);
+    EXPECT_FALSE(grid.VertexIndex(limit, 0, 0));
+    EXPECT_FALSE(grid.VertexIndex(17, 0, 0));
+    EXPECT_FALSE(grid.IsAllocated(limit, 0, 0));
+    EXPECT_FALSE(grid.IsAllocated(17, 0, 0));
+    EXPECT_FALSE(grid.IsAllocated(24, 0, 0));
+}
+
+TEST(SparseGrid, RejectedResetPreservesDimensionsAndData)
+{
+    GridDimensions dims;
+    dims.NX = dims.NY = dims.NZ = 8;
+    SparseGrid grid(dims);
+    (void)grid.TouchVertex(1, 2, 3);
+    const auto slot = grid.VertexIndex(1, 2, 3);
+    ASSERT_TRUE(slot);
+    auto values = grid.AddProperty<float>("value", 0);
+    values[*slot] = 42;
+    GridDimensions invalid = dims;
+    invalid.NX = std::size_t{1} << 24;
+    EXPECT_FALSE(grid.Reset(invalid));
+    ASSERT_EQ(grid.Dimensions(), dims);
+    ASSERT_TRUE(grid.HasProperty("value"));
+    const auto preserved = grid.VertexIndex(1, 2, 3);
+    ASSERT_TRUE(preserved);
+    EXPECT_EQ(grid.GetProperty<float>("value")[*preserved], 42);
 }

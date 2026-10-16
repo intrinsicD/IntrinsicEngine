@@ -1,3 +1,4 @@
+// Catmull-Clark subdivision produces refined quad meshes from polygonal halfedge input.
 module;
 
 #include <cstddef>

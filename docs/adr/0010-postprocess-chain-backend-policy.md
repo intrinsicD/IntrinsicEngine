@@ -131,5 +131,4 @@ Follow-up tasks required: none from this ADR.
 - [`tasks/done/GRAPHICS-013A`](../../tasks/archive/GRAPHICS-013A-postprocess-chain.md) records the underlying `Extrinsic.Graphics.PostProcessSystem` contract, frame-recipe resource declarations, `PostProcessSettings` / `PostProcessPushConstants` shape, and `PostProcessDiagnostics` field set.
 - [`tasks/done/GRAPHICS-013AQ`](../../tasks/archive/GRAPHICS-013AQ-postprocess-backend-clarifications.md) records the four clarification decisions captured in §§1–4.
 - `docs/architecture/rendering-three-pass.md` carries the matching postprocess chain contract block authored by `GRAPHICS-013AQ`.
-- `src/graphics/renderer/README.md` carries the matching ownership-contract bullet next to the existing `PostProcessSystem` line.
 - The default CPU correctness gate (`ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`) exercises the retained-vs-transient ownership, the histogram drain pattern, and the AATemp subresource gate without a Vulkan device.

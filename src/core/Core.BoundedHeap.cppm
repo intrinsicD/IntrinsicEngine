@@ -1,3 +1,4 @@
+// Bounded max-heap retaining the k smallest values under the element ordering.
 module;
 
 #include <vector>

@@ -1,6 +1,6 @@
 # Runtime Architecture
 
-Point-neighbor consumers share the runtime-owned [spatial index cache](spatial-indices.md). Vulkan k-means submits through the same cache's GPU compute path and retains its idle workspace across runs.
+Point-neighbor consumers share the runtime-owned [spatial index cache](spatial-indices.md). Vulkan k-means submits through the same cache's GPU compute path and retains its idle workspace across runs. When the final centroid update moves a center, a final assignment and diagnostic readback refresh labels, inertia and the farthest-point index before terminal presentation, without adding a Lloyd iteration.
 
 `runtime` is the composition root for IntrinsicEngine.
 
@@ -371,6 +371,13 @@ application is deterministic and bounded without a parallel frame-hook path.
 An application that omits the module retains the kernel service for direct
 Engine use but publishes no app-registry job capability.
 
+`JobService` dispatches ready work through the Core scheduler's five worker-only
+priority lanes, from `Critical` through `Background`. Equal-priority jobs follow
+scheduler enqueue order; running work is not preempted, and starvation freedom
+is not promised. Main-thread frame waits cannot execute these jobs inline.
+An explicit cancellation counts once in `CancelledJobs`; only cancellation
+caused by an unsuccessful dependency also increments `DependencyCancelledJobs`.
+
 `JobService::Stats().InFlightJobs` counts all retained nonterminal jobs, including
 dependency waits and parked apply gates. Invalid and terminal records are
 excluded; pending unpublished finalizers have their own counter. Aggregate
@@ -392,6 +399,19 @@ participants may still release their exact registration handles before reverse
 module teardown. Omitting the module leaves Engine and the active world
 operational but publishes no document or history capability.
 
+Queued saves capture the document revision and all serializable scene components,
+including vertex-channel bindings, before dispatch. The completion marks that
+captured revision saved, so later edits remain dirty. Save jobs form one dependency
+chain in submission order; an interrupted chain cancels its queued followers,
+and a subsequent fresh save can start after the chain terminates. World/document
+replacement invalidates publication through the binding epoch but retains any
+unfinished save dependency until its completion/finalizer: cancellation alone
+does not imply that a worker has stopped writing.
+Synchronous `SaveSceneToPath` returns `InvalidState` while any queued save remains
+unfinished, including one targeting a different path. It neither waits nor writes
+or changes document/history state on this rejection; synchronous saving is available
+again after the queued tail's completion/finalizer settles.
+
 Undoable entity edits keep their typed capture, validation, atomic application,
 and dirty-stamp policy with the owning runtime feature. The runtime-internal
 `ExecuteUndoableEntityMutation(...)` template turns those callbacks plus stable
@@ -405,6 +425,22 @@ immediate and queued completion paths, validating exact non-output source
 properties plus the optional current normal property. The canonical normal workflow
 also publishes on edge, halfedge and face domains through one output-only history
 transaction, watching only consumed property revisions and retaining unrelated edits.
+Sampling, scalar-field, normal and position publishers validate captured input
+and output revisions before their initial publication. Related history commands
+share an output revision guard and check exact output presence, type and stored
+value bits on replay. Successful owned writes advance that shared guard before
+notifications; non-output inputs retain their original captured revisions.
+Foreign writes or storage replacement reject replay without moving the cursor,
+even when the stored bits are unchanged. A new command after a foreign edit gets
+a separate guard and cannot legitimize older commands. Other existing property
+history authors preserve mixed-command replay by advancing only guards whose
+full watch matched immediately before their successful writes. Whole-property-set
+replacements apply that rule to tracked keys in the replaced domains, including
+absent outputs; they do not weaken the non-output input guards. These authors
+retain their own replay guards: propagation preserves previously accepted undo
+steps, but does not enable replay sequences they already rejected. In particular,
+CPD, bilateral and outlier-analysis records retain their per-record revisions
+after an older command is replayed.
 See [normal estimation](normal-estimation.md) for config, topology and spatial-cache ownership. Clustering likewise
 captures exact input points and the optional label/color/scalar output cohort;
 its CPU and Vulkan completions enter the transaction when document history is
@@ -544,57 +580,6 @@ withdraws the exact registry and resets it invalid. Omitting the module leaves
 camera output untouched and does not affect generic input actions, import
 selection, non-camera editor models, or reference-content extraction.
 
-The frame order is:
-
-1. poll platform events and handle minimized/resize skip paths;
-2. drain the kernel command bus (`Engine::Commands()`) — the single
-   pre-simulation mutation window per
-   [ADR-0024](../adr/0024-kernel-module-architecture.md) D5; commands enqueue
-   thread-safely from any phase and execute here in enqueue order, fail-closed
-   when no handler is registered (ARCH-007);
-3. pump the queued kernel event bus (`Engine::Events()`) post-command-drain;
-   command-published events become visible before simulation, and events
-   published by listeners defer to the next pump per
-   [ADR-0024](../adr/0024-kernel-module-architecture.md) D7 (ARCH-008);
-4. fixed-step simulation and CPU `FrameGraph` execution: the complete promoted
-   ECS system bundle appends `TransformHierarchy`, `BoundsPropagation`, and
-   `RenderSync`. Each substep finishes with
-   `Compile` → `Execute` → `ResetForReplay`: exact repeated descriptors reuse
-   topology with freshly bound callbacks (CORE-008);
-5. drain `Engine::Jobs()` completions before pump B; `JobService` checks token
-   and world-scope cancellation on the main thread, drops suppressed results
-   whole, and publishes completion events only for survivors per
-   [ADR-0024](../adr/0024-kernel-module-architecture.md) D8 (ARCH-009);
-6. pump the queued kernel event bus post-simulation, before UI/extraction;
-7. runtime-module `UiBegin`, `UiBuild`, then `UiEndCapture` hooks. The optional
-   `EditorUiModule` resets the host's viewport input request, applies the
-   global `G` visibility toggle and opens the ImGui frame in `UiBegin`, draws
-   registered contributions in `UiBuild`, and closes the frame, writes the
-   adapter capture and then merges a contribution's viewport claim in
-   `UiEndCapture`. SceneInteraction's `UiBegin` hook cancels a running gizmo
-   session when the UI has just been hidden;
-8. build `Graphics::RenderFrameInput`, then dispatch deterministic typed
-   viewport-input hooks. Module-name order places optional Camera population
-   before optional SceneInteraction pick input; both see completed editor
-   capture. SceneInteraction cancels a gizmo session on a hide seen since
-   `UiBegin`; the editor gizmo itself (ImGuizmo, app-only) previews during
-   `UiBuild`. Flush pre-render transforms, dispatch generic input actions, then
-   run `BeforeExtraction`, where SceneInteraction drains one pending pick and
-   submits its copied render snapshot. This is not a seventh generic frame
-   phase;
-9. execute the render-frame contract: begin frame, runtime render extraction,
-   renderer world extraction, prepare, execute, and end frame;
-10. present the completed frame;
-11. execute maintenance: transfer retirement, optional app-provided streaming
-   drain/apply, asset-service tick, optional streaming submit/pump, GPU asset
-   cache tick, material texture re-resolution, and render-extraction
-   deferred-retire ticks and terminal `JobService` reaping, then runtime-module
-   `Maintenance` hooks. SceneInteraction drains completed readbacks here and
-   rejects zero/unknown/wrong-world/wrong-epoch sequences before controller or
-   refinement work;
-12. release the consumed `RenderWorldPool` slot, apply deferred
-   `WorldRegistry` active/destroy operations, and finalize the frame clock.
-
 Editor UI contribution is data-driven through
 `Extrinsic.Runtime.EditorWindowRegistry`: contributors provide stable ids,
 structured menu paths, open state, and draw callbacks, and closed or globally
@@ -619,6 +604,18 @@ Registered paths are merged into the menu tree without a fixed runtime enum or
 draw-switch table.
 The frame loop owns one `EditorInputCaptureSnapshot`, resets it at frame
 start, and lends the same value by reference to every hook context.
+`ImGuiAdapterDiagnostics` exposes overlay-transport byte
+counters alongside the existing draw-list counts: `LastFrameFontAtlasCopyBytes`
+is non-zero only when the atlas bytes are recopied into an overlay frame, while
+`LastFrameVertexCopyBytes`, `LastFrameIndexCopyBytes`,
+`LastFrameCommandCopyBytes`, and `LastFrameOverlayCopyBytes` report the POD
+vertex/index/command payload copied for the current submitted frame. These
+counters are runtime-side observability only; graphics still owns retained atlas
+resources and upload buffers. The same diagnostics include
+microsecond timings for `BeginFrame`, the editor callback, `ImGui::Render()`,
+draw-data/font/list copying, and total `EndFrame()` so runtime frame-pacing
+samples can separate editor CPU work from ImGui producer-copy cost.
+
 `EditorUiModule` copies the adapter's completed capture into that value only
 after `EndFrame`, then ORs a host viewport claim into it as mouse and keyboard
 capture and publishes the merged value as `CapturesViewportInput`; typed Camera
@@ -753,6 +750,12 @@ auto-range policy, so the display range can change on Accept. Split mesh
 surfaces upload a canonical-element index map and sample the resident scalar
 buffer through it; canonical point/edge lanes sample that buffer directly.
 Accept or Discard restores extraction from the current CPU property.
+Constant finite scalar ranges use one graphics-owned expansion rule for CPU
+recipes, GPU fronts, component fallbacks and texture baking. Each caller retains
+its preferred half-width; representable neighboring values prevent rounded-flat
+endpoints, and overflow clamps only the outward endpoint to the original value.
+Thus even `±FLT_MAX` has a finite nonempty display range. Nonfinite input remains
+invalid and is not converted into a valid range.
 After a successful FPFH histogram display request, moving the display-bin slider
 selects the corresponding output property without recomputing descriptors.
 Changing the analysis configuration resets this live display selection.
@@ -1055,6 +1058,15 @@ missing predecessor for a satisfied historical token. Once consumers leave the
 pending-dependency queue, the normal reaping pass releases the records. This
 does not add a permanent outcome ledger for jobs submitted after reaping.
 
+Import materialization may synchronously complete only the specific AssetService
+CPU load/reload it issued and flush that asset's event. Import apply reachable
+from `Engine::RunFrame()` must not use `Scheduler::WaitForAll()` as a frame-path
+fence; global waits are reserved for shutdown and explicit non-frame joins.
+Interactive queue cancellation is available before `JobState::AwaitingGate`;
+only shutdown also cancels decoded work waiting at that gate. Direct imports and
+reimports use the same ingest records but reach their terminal row inside the
+synchronous call.
+
 Active-world asset-import and scene-document operations additionally capture
 the submission `{WorldHandle, Scene::Registry*}` pair on the main thread.
 Asset-import apply validates the pipeline binding as before.
@@ -1115,6 +1127,10 @@ resource rebuild success. Vulkan-specific diagnostics are recorded by the Vulkan
 backend/runtime breadcrumb path, but runtime frame control does not branch on
 Vulkan diagnostics.
 
+Runtime jobs use the shared [scheduler and wake contract](task-graphs.md#scheduler-preferences-and-wake-contract).
+The [CPD editor integration](#coherent-point-drift-editor-integration) is the
+current coroutine consumer.
+
 Shutdown is deterministic. After pending-command discard, Engine first marks
 the initialized-state borrow false and publishes/pumps
 `RuntimeShutdownAnnounced` while application, GPU participants, module
@@ -1126,8 +1142,9 @@ runs the Engine-private renderer-hook removal followed by the sole
 idle boundary. Application shutdown follows while the persistent
 `AssetWorkflowModule` and `RuntimeInputActionRegistry` still exist; Sandbox
 unregisters its optional `F` action. Before module teardown, Engine's `Shutdown`
-calls `JobService::CancelAndDrain`: it cancels every job, joins CPU Work through
-the shared scheduler, runs unpublished main-thread finalizers exactly once and
+calls `JobService::CancelAndDrain`: it cancels every job, invokes each pending
+coroutine wake callback outside the service lock, joins work through the shared
+scheduler, runs unpublished main-thread finalizers exactly once and
 releases all retained callback/result captures. Reentrant submissions during
 this barrier are rejected. Thus job-owned GPU workspaces die while the device
 and borrowed module services still exist; cancel flags alone are insufficient.
@@ -1147,7 +1164,9 @@ Scene load/new/close operations are runtime-owned lifecycle transitions.
 `ECS::Scene::Registry`; a parse failure invokes no participant and leaves the
 live registry, path, event, and history unchanged. For a successful load, new,
 or close, the module snapshots live strong-handle registrations in
-name-then-registration order. It advances the binding epoch, invokes every
+name-then-registration order. After validating the binding, it clears render
+extraction when the kernel renderer and extraction services are present. This
+also covers compositions without `AssetWorkflowModule`. It advances the binding epoch, invokes every
 `BeforeReplace` callback while the outgoing registry is live, clears or moves
 the replacement into that registry, invokes every `AfterReplace` callback
 against the rebound registry, and only then resets the exact owned history.
@@ -1167,8 +1186,8 @@ interaction data. The module owns one validated
 monotonic while old-world/old-epoch results fail closed.
 
 `AssetWorkflowModule` retains its own strong participant handle. Before
-replacement it empties import dependencies, clears render-extraction and
-normal-bake scene state, and destroys the model-scene handoff while the outgoing
+replacement it empties import dependencies, clears normal-bake scene state,
+and destroys the model-scene handoff while the outgoing
 registry remains live. After replacement it rebuilds the handoff and pipeline
 dependencies against the exact callback `{WorldHandle, Registry*}`. Its
 module-local binding epoch and optional narrow handoff predicate reject delayed
@@ -1219,7 +1238,7 @@ before reporting an applied result. The complete ownership, staging, and
 failure contract is documented in
 [geometry property CPU/GPU coherence](property-coherence.md).
 
-Scene JSON version 5 remains backend-neutral. Version 2 made graph halfedge
+Scene JSON version 6 remains backend-neutral. Version 2 made graph halfedge
 connectivity mandatory so a loaded graph satisfies the same
 `Vertices + Halfedges + Edges` source contract as a freshly materialized one.
 Version 3 retires the `PointColor`, `PointScalarField`, `LineColor` and
@@ -1257,11 +1276,25 @@ reference is `{domain, name, valueKind?}`; an omitted `valueKind` loads as
 `Unknown` (unconstrained). A reference carrying `propertyName` or
 `expectedValueKind`, alone or beside the canonical keys, fails the whole
 document with `InvalidFormat`.
+Version 6 adds `siblingOrder` to every entity with `parentId`. The ordinal is
+zero-based within its parent; roots carry neither field. The reader requires
+unique contiguous ordinals and rejects missing, malformed or orphaned order
+fields, unknown parents, self-parenting and cycles before replacing the current
+scene. The writer and queued-save snapshot preserve the authored sibling links,
+so reloads retain sibling order independently of entity IDs.
+
+Native scene saves use an exclusively created sibling temporary file, checked
+write/close and rename over the destination. Failure leaves the previous file
+intact and removes the temporary. A destination symlink is replaced as a directory
+entry; its target is not written through. This is atomic replacement, not an
+`fsync` or power-loss durability guarantee. The explicit `IIOBackend` overload
+retains that backend's own write semantics.
+
 The reader and writer reject non-compact graph sources, endpoint indices outside
 the vertex range, halfedge counts other than twice the edge count, endpoint/
 halfedge-pair disagreement, out-of-range next/previous handles, non-reciprocal
 next/previous links, and successor links that do not continue at the target
-vertex. Versions 1 to 4 are rejected rather than upgraded. Supported
+vertex. Versions 1 to 5 are rejected rather than upgraded. Supported
 persistence is limited to current
 sandbox-authoring CPU state: metadata names, stable ids, transforms, hierarchy,
 selection eligibility, render hints, visualization configs, authored
@@ -1309,6 +1342,379 @@ handle, universal physics service, or unused module publication crosses the
 runtime boundary. The former
 test-only `Extrinsic.Runtime.PhysicsBridge` public module is retired.
 
+## Initialization and frame order
+
+`Engine::Initialize()` starts the shared Core scheduler before task-graph or
+streaming dispatch. It creates the platform window, device and renderer, applies
+an optional startup render recipe through `RenderRecipeActivation`, creates the
+CPU frame graph and boot world, then registers and resolves the name-sorted
+runtime modules. Registration publishes services before resolution borrows them;
+the complete hook schedule is validated and locked. The app initializes its own
+state afterward. Missing or invalid startup recipe files leave the derived
+frame recipe active; invalid live recipe changes preserve the current override.
+A requested but non-operational Vulkan device produces a diagnostic breadcrumb
+and the existing Null fallback, not an Engine abort solely for that fallback.
+
+`Engine::Run()` normalizes native close through `RequestExit()`, so `IsRunning()`
+is false when it returns. The normal `RunFrame()` order is:
+
+1. poll platform events, handle resizing, and take the minimized skip path when needed;
+2. drain the kernel command bus (`Engine::Commands()`) — the single
+   pre-simulation mutation window per
+   [ADR-0024](../adr/0024-kernel-module-architecture.md) D5; commands enqueue
+   thread-safely from any phase and execute here in enqueue order, fail-closed
+   when no handler is registered (ARCH-007);
+3. pump the queued kernel event bus (`Engine::Events()`) post-command-drain;
+   command-published events become visible before simulation, and events
+   published by listeners defer to the next pump per
+   [ADR-0024](../adr/0024-kernel-module-architecture.md) D7 (ARCH-008);
+4. fixed-step simulation and CPU `FrameGraph` execution: the complete promoted
+   ECS system bundle appends `TransformHierarchy`, `BoundsPropagation`, and
+   `RenderSync`. Each substep finishes with
+   `Compile` → `Execute` → `ResetForReplay`: exact repeated descriptors reuse
+   topology with freshly bound callbacks (CORE-008); after the substeps, the
+   runtime `Simulation` hook runs once per frame, including frames with no substep;
+5. drain `Engine::Jobs()` completions before pump B; `JobService` checks token
+   and world-scope cancellation on the main thread, drops suppressed results
+   whole, and publishes completion events only for survivors per
+   [ADR-0024](../adr/0024-kernel-module-architecture.md) D8 (ARCH-009);
+6. pump the queued kernel event bus post-simulation, before UI/extraction;
+7. runtime-module `UiBegin`, `UiBuild`, then `UiEndCapture` hooks. The optional
+   `EditorUiModule` resets the host's viewport input request, applies the
+   global `G` visibility toggle and opens the ImGui frame in `UiBegin`, draws
+   registered contributions in `UiBuild`, and closes the frame, writes the
+   adapter capture and then merges a contribution's viewport claim in
+   `UiEndCapture`. SceneInteraction's `UiBegin` hook cancels a running gizmo
+   session when the UI has just been hidden;
+8. build `Graphics::RenderFrameInput`, then dispatch deterministic typed
+   viewport-input hooks. Module-name order places optional Camera population
+   before optional SceneInteraction pick input; both see completed editor
+   capture. SceneInteraction cancels a gizmo session on a hide seen since
+   `UiBegin`; the editor gizmo itself (ImGuizmo, app-only) previews during
+   `UiBuild`. Flush pre-render transforms, dispatch generic input actions, then
+   run `BeforeExtraction`, where SceneInteraction drains one pending pick and
+   submits its copied render snapshot. This is not a seventh generic frame
+   phase;
+9. execute the render-frame contract: begin frame, runtime render extraction,
+   renderer world extraction, prepare, execute, and end frame;
+10. present the completed frame;
+11. execute maintenance: transfer retirement, optional app-provided streaming
+   drain/apply, asset-service tick, optional streaming submit/pump, GPU asset
+   cache tick, material texture re-resolution, and render-extraction
+   deferred-retire ticks and terminal `JobService` reaping, then runtime-module
+   `Maintenance` hooks. SceneInteraction drains completed readbacks here and
+   rejects zero/unknown/wrong-world/wrong-epoch sequences before controller or
+   refinement work;
+12. release the consumed `RenderWorldPool` slot, apply deferred
+   `WorldRegistry` active/destroy operations, and finalize the frame clock.
+
+The render-world pool is used only through serialized owner-thread calls,
+including its diagnostics. A scene replacement or active-world change clears
+every renderer snapshot slot and advances the extraction cache's scene epoch.
+The first successful publication in that epoch is consumed immediately, even
+in pipelined mode; following frames resume consuming the previous front.
+An exhausted pool does not acknowledge the new epoch, so a later successful
+publication still starts the new scene without a stale frame.
+
+After optional UI and input consumers, the engine discards remaining polled
+window events immediately before `Renderer::BeginFrame`. This also covers a
+failed renderer begin. Minimized frames retain their events so key releases and
+focus changes reach the UI after restore; without an editor UI, events polled
+while minimized remain queued until the next normal frame. The close/exit paths
+do not drain the queue.
+
+Minimized frames skip simulation, UI, extraction, render and normal maintenance.
+When modules registered `Idle`, the bounded idle path drains commands, pumps
+events, runs Idle hooks, drains completions, pumps again and reaps jobs. It does
+not flush transforms or advance the render frame index. The frame clock
+resamples after deliberate waiting; normal consumers use the previous completed
+frame's duration. Before the first completed frame the clock returns zero and
+ImGui retains its existing non-positive-delta fallback.
+
+## Editor change and no-op policy
+
+Geometry processing reports `Applied` from actual changed values or topology,
+not a written/processed count. A no-op returns `NoChange` before history commit
+and stamps no dirty tag. Panels display the result counters for both statuses.
+Normal and scalar publications compare the exact stored values; an absent
+output property counts as newly authored values. An epsilon cannot discard a
+real stored change. Replacement meshes compare storage sizes, positions and
+halfedge connectivity; counts alone miss an edge flip or tangential relaxation.
+UV regeneration also compares texcoords. A mesh carrying garbage compares as
+changed, conservatively. Subdivision either increases face count or fails
+closed; it has no reachable successful no-op branch.
+
+## Stable entity lookup policy
+
+`StableEntityLookup` owns Runtime's durable `StableId` to live entity sidecar.
+ECS owns only the ID value type; graphics consumes render IDs and never resolves
+durable IDs. `ToRenderId` encodes the full live handle as its uint32 value plus
+one, reserving zero for background. Render-ID resolution decodes and validates
+the live handle instead of maintaining a second map.
+
+For duplicate durable IDs, the live entity with the smallest `ToRenderId` wins
+independently of iteration order; duplicate occurrences increment diagnostics.
+Invalid IDs are never tracked. `Rebuild` re-derives winners; forgetting a winner
+drops that mapping until another Track/Rebuild. Resolve lazily rejects and
+prunes stale handles; `PruneStale` performs the bulk equivalent. Missing or
+sentinel IDs return `nullopt`. Tracking reassignment drops that entity's previous
+winner entry before inserting the new ID.
+
+`SceneInteractionModule` owns the lookup and its registry binding, connects
+StableId construction/update/destruction to Track/Forget, and lends it to the
+selection controller. Scene replacement disconnects before clearing the old
+registry and reconnects/rebuilds against the new contents. Active-world mismatch
+resets/rebinds before resolution; no per-world lookup cache survives away/back.
+Standalone selection controllers without an attached lookup retain their direct
+handle decode plus validity check. Reference-scene population assigns durable
+IDs; it is not an exception that leaves all reference entities transient.
+
+## Geometry property vocabularies
+
+`GeometryAvailability` owns canonical property naming. These distinct types
+answer different questions and must not be folded together:
+
+| Vocabulary | Meaning |
+| --- | --- |
+| `GeometryElementDomain` | The property's element domain. |
+| `Geometry::PropertyValueKind` | Stored value type. |
+| `GeometryPropertyValueKindFilter` | Accepted type (`nullopt` accepts any). |
+| `GeometrySources::Domain` | Geometry provenance. |
+| `GeometryRenderLane` | Consuming render lane. |
+| `VertexChannel` | Structural vertex stream. |
+| `Graphics::MaterialChannel` | Material slot. |
+
+Scene serialization owns its wire spellings independently of debug names:
+`ScalarFloat`/`ScalarDouble`, `GraphVertex`/`Point`, and the accepted `MeshSurface`
+wire domain mapped to `Unknown`. Do not derive them from canonical debug names.
+Current-format scene round-trip tests pin these spellings and reject canonical
+name substitutions.
+
+## Derived overlay representation
+
+Cross-domain child overlays use ordinary authored/imported `GeometrySources`
+entities. Mesh edge/vertex overlays use `RenderEdges`/`RenderPoints` primitive
+sidecars over the parent mesh. Vector fields and isolines use copied data-only
+`VisualizationRecipes` packets in `RuntimeRenderSnapshotBatch`, without child
+ECS entities or graphics handles in ECS. No separate `DerivedOverlayProducer`
+module is required by these current workflows.
+
+## Consolidation radius admission
+
+The [support-radius policy](support-radius-policy.md) owns automatic rank
+selection, manual-radius admission, memory/work limits, backend preflight and
+terminal telemetry for point-cloud consolidation.
+
+## Coherent Point Drift editor integration
+
+`Extrinsic.Runtime.RegistrationOperations` also owns Coherent Point Drift (RUNTIME-273,
+reference `Geometry.Registration.CoherentPointDrift`). `StartEditorCoherentPointDrift`
+validates `sandbox.coherent_point_drift` (`Extrinsic.Runtime.CoherentPointDriftConfig`,
+declared in a `ConfigFieldSpec` table) and captures both operands in world space;
+`StepEditorCoherentPointDrift` queues one job running N iterations or to the end, with
+cancellation checked every iteration; the worker alone touches the solver and publishes a
+mutex-guarded snapshot (phase, trace, moving source positions) after each iteration, read by
+`SnapshotEditorCoherentPointDrift`. `ApplyEditorCoherentPointDrift` revalidates captured
+property revisions and both entity transforms, then publishes one history entry: the source
+Transform for rigid results (mirrored results are refused), or the source positions or a
+named vec3 displacement property in source-local space for affine and nonrigid results.
+Writing mesh-vertex positions also recomputes a stored `v:normal` (area-weighted, in the
+same history entry). Operands are mapped with their local Transform only, so parented
+entities are refused. `ApplyEditorCoherentPointDriftCommand` chains start, a full run and publication with one
+terminal callback; agents reach it through `run_registration`.
+
+The section also selects the METHOD-049 backends: `e_step` (reference, dense, truncated,
+auto, fast Gauss, and the approximate METHOD-053 Nystroem with `nystrom_landmarks` and
+`nystrom_error_limit`, whose sampled error estimate results report; the editor default is auto with `e_step_tolerance` 1e-6), `threads` and
+the nonrigid `low_rank`, which lifts the full-kernel limit of 8192 source points. Results
+carry the backend that actually ran (`cpu_auto` or `cpu_mixed` when iterations used
+different policies); each trace row carries the E-step policy that ran and its error bound;
+low-rank runs report the kernel rank and its sampled approximation error. The `vulkan`
+E-step (METHOD-056) runs the dense two-pass form on the device while the kernel is wide:
+`Extrinsic.Runtime.CoherentPointDriftGpuEStep` is a per-run broker whose `Queue`
+returns an owned request event. The JobService coroutine uses the solver's
+`BeginStep`/`PendingExternalRequest`/`CompleteExternalStep` path, parks while a
+companion main-thread pump submits through `SpatialIndexCache::QueueGpuCompute`
+as an immediate request (GRAPHICS-150),
+and hands the readback back, usually within the frame. The broker leases its workspace from
+`SpatialIndexCache::LeaseGpuWorkspace` for each step and returns it when the step's pump ends;
+workspace buffers only grow, the float-float target is converted once and uploaded only when
+the workspace last held another target generation, and the per-iteration source staging is
+reused. Only the E-step is on the device: the M-step, objective and exactly evaluated rows stay
+on the CPU, so each iteration still uploads the moved source (32 bytes per point, plus 4 bytes
+per row of skip flags when any) and reads back `2n + 4m` doubles. Without the job
+lane, an operational device with shader float64, or after a device failure or a timeout observed by the owner pump, the
+iterations run the exact CPU choice; results count them in `e_step_fallbacks` and say why in
+`gpu_diagnostic`, and count device iterations in `e_step_device_iterations` (kernels too narrow
+for fp32 terms stay on the CPU by design and are not fallbacks). The `bayesian`
+method (METHOD-050, BCPD) adds `gamma`, `kappa` (0 keeps equal mixing weights) and
+`subsample` (farthest-point samples registered, deformation interpolated to every point);
+like nonrigid it writes positions or a displacement property. The shared
+`Extrinsic.Runtime.PointSamplingConfig` block (RUNTIME-289) makes the sampling method
+selectable: `subsample_*` chooses how the Bayesian source and target subsamples
+(`subsample`, `subsample_target`) are picked, `landmark_*` how the low-rank and Nystroem
+landmarks are picked (every `Geometry.PointSampling` method; exact farthest point by default). Point
+cloud consolidation takes the same block as `initial_*` for its initial samples (Random keeps
+the seeded legacy subsample; CPU and Vulkan paths share `SelectInitialSamples`).
+`subsample_backend` (CPD) and `initial_backend` (consolidation, `"cpu"` / `"vulkan"`) order
+those samples on the device: a framed job runs exact farthest point through
+`Extrinsic.Runtime.PointSamplingGpu` on the resident positions (CPD: captured live rows and
+model; consolidation: local rows) before the solver job, which depends on it and takes the
+verified order (`CPD::Params::SubsampleTargetOrder` / `SubsampleSourceOrder`,
+`Consolidation::Params::InitialOrder`; the geometry rejects orders that repeat or exceed an
+index). Any other case orders on the CPU and says why. CPD reports
+`subsample_requested_backend`, `subsample_target_backend`, `subsample_source_backend` (empty
+when that set is not subsampled) and `subsample_backend_diagnostic`; consolidation reports
+`initial_sampling_requested_backend`, `initial_sampling_backend` (empty for the random
+subsample) and `initial_sampling_diagnostic`, apart from its solve backend. A run that ends
+before solving (cancelled, rejected input) reports the backend that was to order its samples.
+CPD landmarks always stay on the CPU. Cancellation wakes the parked coroutine and
+abandons the pending step before CPU fallback or the M-step. Request latency
+statistics do not measure blocked worker time.
+
+
+## Point sampling editor integration
+
+`Extrinsic.Runtime.PointSamplingOperations` (RUNTIME-274) runs any `Geometry.PointSampling`
+method on one entity's point domain (point clouds, graph nodes, mesh vertices) from the
+`sandbox.point_sampling` section: `count` samples (0 orders every point), the shared sampling
+block without a prefix, an optional float `weights` property (importance weights or Poisson
+priority scores), and the output — a float rank plus a bool selection property on the source
+(one undoable step) or a new point-cloud entity with the samples in world space. Points are
+sampled in the entity's world frame, so parented entities are refused. The editor's "Point
+Sampling" window and the agent tools `preview_point_sampling` / `run_point_sampling` use it.
+CPU runs are synchronous. `backend` = Vulkan (RUNTIME-290) goes through the seam
+`Extrinsic.Runtime.PointSamplingGpu`: methods with a device kernel (exact, optionally weighted,
+farthest point via `Extrinsic.Graphics.FarthestPointSampling`) run as a framed GPU job in
+bounded chunks whose order prefixes only grow; the first 64 samples are recomputed on the CPU
+before the result may report `gpu_vulkan_compute`. Every other case (another method, no job
+lane or device, no shader float64, a device failure or mismatch) runs the CPU order and
+reports `requested_backend`, `backend` and `backend_diagnostic`.
+
+Framed GPU jobs of editor operations share `EditorFeatureDetail::MakeFramedGpuJobDesc`
+(`Editor/internal/Runtime.EditorFramedGpuJob.hpp`): the worker does nothing, the main thread
+queues `SpatialIndexCache::QueueGpuCompute` chunks from `IsReadyToApply` until the operation's
+`Observe` says done, then publishes (keypoints and point sampling use it).
+
+## Render artifact publication
+
+Renderer outputs become observable as runtime artifacts before any project
+data changes. `Extrinsic.Runtime.RenderArtifactPublication` stores copied
+`Graphics::RenderArtifactMetadata` plus runtime-owned lifecycle kind, UI status,
+payload target, provenance, diagnostics, revision counters, and audit records.
+Registering an artifact is a side-effect-free declaration from the project-data
+point of view. Registering a newer artifact for the same renderer/snapshot/view
+recipe/output purpose with different source revisions supersedes the older
+record instead of silently replacing it.
+
+Publish and apply are explicit command surfaces. Publish requires provenance and
+a target URI, and moves an unpublished artifact to `Published`. Apply requires a
+published `CandidateProjectResult`, provenance, a project target, and an undo
+label; it records that a project mutation is authorized for the caller-owned
+command path while the registry itself performs no ECS, scene, UI, renderer, RHI,
+or file-persistence mutation. Runtime/editor callers can wrap the apply command
+in `EditorCommandHistory`; undo returns the artifact to `Published` and appends
+an audit record. UI-facing status is deterministic across `Unpublished`,
+`Stale`, `Canceled`, `Failed`, `Superseded`, `Published`, and `Applied`.
+
+## Camera controls and startup UI
+
+`EngineConfig::Camera` selects an enabled Orbit controller by default; Fly,
+FreeLook and TopDown are also constructible. Without a world seed, the main
+controller uses a perspective camera at `(0, 0, 4)` looking down `-Z`. Omitting
+`CameraModule` produces neither a registry nor a fallback camera.
+
+Right- or middle-mouse drag rotates Orbit/Fly/FreeLook, WASD moves or pans,
+Shift accelerates movement, and the wheel zooms Orbit/TopDown. The app-owned
+focus-on-selection action exists only when both the exact camera registry and
+selection controller resolve. Controller replacement marks a one-shot
+`ExplicitCameraTransition` in the extracted view so graphics can discard stale
+previous-frame HZB occlusion without reading Runtime state.
+
+The Sandbox starts with only its menu bar visible. Registered windows start
+closed; the app owns their open bits, and global hide preserves those bits.
+Closed windows receive no draw callback and their selected-entity model
+sections are omitted from the workspace snapshot request. Runtime owns the
+models and commands; the shell owns widget and window state.
+
+The ImGui adapter does not advertise native cursor-shape or mouse-warp support.
+Cursor requests, including the parameterization splitter resize cursor, are not
+applied to the native window; clipboard and ordinary pointer events remain
+available through the platform port.
+
+## Geometry upload and residency
+
+`RenderExtractionCache` owns live ECS queries, typed topology adaptation, and
+entity-to-instance sidecars; it no longer owns a GPU geometry allocator, cache,
+or retire queue per domain. The private `Extrinsic.Runtime.GeometryPlanBuilders`
+module is registered only in `ExtrinsicRuntime`'s private CMake module set. Its
+free functions translate mesh, graph, point-cloud, procedural, mesh-edge, and
+mesh-vertex inputs into owning `Graphics::GeometryUploadPlan` values. Each plan
+contains a graphics-only stable key and generation, copied vertex/index/channel
+bytes, fixed formats, an update class and channel mask, a storage hint, bounds,
+and a debug name. The copy never borrows ECS property or topology storage.
+
+Optional normal and color authoring uses the canonical runtime
+`GeometryPropertyRef` (`domain`, `name`, `value kind`). Editor commands, config
+state, and imported-scene handoff persist that identity; the private adapters
+validate the expected domain/value kind, resolve it against the current
+`GeometrySources` snapshot, and send only resolved bytes to graphics. No ECS,
+property-set, or topology type crosses into `src/graphics/*`.
+
+All plans enter the concrete graphics-owned
+`GeometryResidencyCoordinator`, composed with the existing `GpuWorld`.
+Entity-unique mesh, graph, point-cloud, edge-view, and vertex-view keys use
+`Reconcile`; the procedural `(Kind, Hash(Params))` identity uses `Acquire` so
+identical entities share one handle and reference count. The coordinator owns
+validation, stale-generation rejection, same-generation reuse, in-place partial
+channel updates, full-replacement fallback, retire cancellation, frame-safe
+free, and hard shutdown. Runtime performs no direct `UploadGeometry`,
+`UpdateGeometryChannels`, or `FreeGeometry` call. Maintenance invokes exactly
+one `RenderExtractionCache::TickGeometryResidency` per frame and maps the freed
+key namespace back into the existing per-domain diagnostic counters.
+
+The domain adapters remain deliberately typed and private:
+
+- Mesh surface plans use `Extrinsic.Runtime.MeshSurfaceTopology` as the one
+  public topology-only truth for bounded ring validation, deleted-face skipping,
+  fan triangulation, and triangle-to-face order. Finite UVs are preserved with a
+  deterministic zero fallback; finite normals are normalized with a +Z
+  fallback; optional color becomes packed unorm8. Selection refinement, UV
+  diagnostics, normal-bake identity, extraction, and GPU acceptance consume the
+  same topology order.
+- Graph plans keep node positions in one geometry shared by independently
+  submitted line and point instances. Requested-lane changes rebuild the plan
+  because the line-index payload changes.
+- Point-cloud plans carry positions without indices and remain valid only for a
+  point lane with a uniform size source; unsupported surface/edge lanes or named
+  per-point size sources fail closed.
+- Mesh edge/vertex-view plans use separate residency keys and retained instances
+  over the authoritative mesh source. Edge topology is explicit when available
+  and otherwise derives from the canonical surface topology; a failed view does
+  not disturb the surface or sibling view.
+- Procedural triangle plans retain content-addressed sharing, source-conflict
+  diagnostics, refcount saturation protection, and resurrection inside the
+  deferred-retire window without a separate procedural cache or test seam.
+
+Dirty vertex-channel tags request `PartialPreferred`; topology, lane-mask,
+coarse dirty, vertex-count, or unsupported partial changes fall back to full
+replacement through the coordinator. A failed dirty plan or rejected upload
+releases stale residency and leaves the dirty signal available for recovery.
+The existing `*FailedPack` statistic field names remain compatibility
+observability only; they do not imply a public packer or a second lifecycle.
+
+Runtime plan builders copy channel bytes, update class/mask, bounds, and identity
+directly into the sole implemented uniform-SoA residency contract. The live
+`GpuGeometryResidencyView` reports exact channel descriptors rather than a
+fixed storage-lane field.
+
+`FindRenderableSidecarForTest(stableId)` exposes handles and boolean residency
+facts for procedural, mesh, graph, point-cloud, mesh-edge, and mesh-vertex lanes
+without exposing coordinator keys, plan-builder scratch, reference counts, or
+retire queues. Payload/layout parity is asserted through
+`GpuWorld::TryGetGeometryResidencyView(...)` fingerprints and counts; lifecycle
+contracts target `GeometryResidencyCoordinator` directly.
+
 ## Related references
 
 - Historical details: `runtime-subsystem-boundaries.md` (`legacy-background`).
@@ -1316,6 +1722,11 @@ test-only `Extrinsic.Runtime.PhysicsBridge` public module is retired.
 - Layer policy: [layering.md](layering.md).
 
 ## Primitive selection
+
+Editor domain/inspector and parameterization-view queries accept an optional
+explicit entity. It binds property catalogs, readiness, cached analysis and UV
+preview/commands without changing scene selection. Omitting it uses current
+selection; an explicit zero produces an empty model.
 
 The existing interaction module owns a shared selection service for entity and
 canonical primitive domains. See [primitive selection](primitive-selection.md)

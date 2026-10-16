@@ -4,6 +4,7 @@
 // Sphere-AABB), fallback GJK/EPA paths, and the ComputeContact dispatcher
 // including symmetric argument ordering.
 #include <gtest/gtest.h>
+#include <limits>
 
 #include <cmath>
 #include <type_traits>
@@ -19,6 +20,7 @@ import Geometry.Sphere;
 import Geometry.Capsule;
 import Geometry.ConvexHull;
 import Geometry.ContactManifold;
+import Geometry.GJK;
 import Geometry.Properties;
 import Geometry.ImplicitPlaneField;
 import Geometry.PointCloud;
@@ -421,4 +423,92 @@ TEST(ContactManifold, RayCast_AABB_InsideBox)
     // Origin inside box — should still return a hit
     ASSERT_TRUE(hit.has_value());
     EXPECT_NEAR(hit->Distance, 2.0f, kEps);
+}
+
+
+TEST(ContactManifold, SphereRayHitPreservesDirectionParameterization)
+{
+    const Sphere sphere{{5, 0, 0}, 1};
+    for (const float speed : {.5f, 1.f, 2.f})
+    {
+        SCOPED_TRACE(speed);
+        const auto hit = RayCast(Ray{{0, 0, 0}, {speed, 0, 0}}, sphere);
+        EXPECT_TRUE(hit.has_value());
+        if (hit)
+        {
+            EXPECT_NEAR(hit->Distance, 4.f / speed, 1.0e-6f);
+            ExpectNear(hit->Point, {4, 0, 0}, 1.0e-6f);
+            ExpectNear(hit->Normal, {-1, 0, 0}, 1.0e-6f);
+        }
+        EXPECT_FALSE(RayCast(Ray{{0, 2, 0}, {speed, 0, 0}}, sphere));
+        const auto inside = RayCast(Ray{{5, 0, 0}, {speed, 0, 0}}, sphere);
+        ASSERT_TRUE(inside);
+        EXPECT_EQ(inside->Distance, 0.f);
+        ExpectNear(inside->Normal, {-1, 0, 0}, 1.0e-6f);
+    }
+    EXPECT_FALSE(RayCast(Ray{{5, 0, 0}, {0, 0, 0}}, sphere));
+    EXPECT_FALSE(RayCast(Ray{{0, 0, 0}, {std::numeric_limits<float>::quiet_NaN(), 0, 0}}, sphere));
+}
+
+TEST(ContactManifold, ShortSimplexBoxesPreserveAnalyticPenetrationAcrossScaleAndRotation)
+{
+    const OBB baseA{glm::vec3(0), glm::vec3(1), glm::quat(1, 0, 0, 0)};
+    const OBB baseB{glm::vec3(1.5f, 0, 0), glm::vec3(1), glm::quat(1, 0, 0, 0)};
+    const auto shortSimplex = Internal::GJK_Intersection(baseA, baseB);
+    ASSERT_TRUE(shortSimplex);
+    ASSERT_LT(shortSimplex->Size, 4);
+    for (const float scale : {1.0e-3f, 1.0f, 1.0e3f})
+    {
+        for (const auto rotation : {glm::quat(1, 0, 0, 0),
+                glm::angleAxis(0.6f, glm::normalize(glm::vec3(1, 2, 3)))})
+        {
+            SCOPED_TRACE(scale);
+            const glm::vec3 translation = scale * glm::vec3(2, -3, 1);
+            const OBB a{translation, glm::vec3(scale), rotation};
+            const OBB b{translation + rotation * glm::vec3(1.5f * scale, 0, 0),
+                        glm::vec3(scale), rotation};
+            const auto simplex = Internal::GJK_Intersection(a, b);
+            ASSERT_TRUE(simplex);
+            const float depthTolerance = 4.0f * Internal::Config::EPA_EPSILON / simplex->InvScale;
+            const auto ab = ComputeContact(a, b);
+            const auto ba = ComputeContact(b, a);
+            ASSERT_TRUE(ab);
+            ASSERT_TRUE(ba);
+            EXPECT_NEAR(ab->PenetrationDepth, 0.5f * scale, depthTolerance);
+            EXPECT_NEAR(ba->PenetrationDepth, 0.5f * scale, depthTolerance);
+            ExpectNear(ab->Normal, rotation * glm::vec3(1, 0, 0), 1.0e-3f);
+            ExpectNear(ba->Normal, -ab->Normal, 1.0e-3f);
+            ExpectNear(ab->ContactPointA - ab->ContactPointB,
+                       ab->Normal * ab->PenetrationDepth, depthTolerance);
+            ExpectNear(ba->ContactPointA - ba->ContactPointB,
+                       ba->Normal * ba->PenetrationDepth, depthTolerance);
+        }
+    }
+}
+
+TEST(ContactManifold, SameCenterBoxesReturnTrueDepthWithAnyTiedAxisNormal)
+{
+    const OBB box{glm::vec3(0), glm::vec3(1), glm::quat(1, 0, 0, 0)};
+    const auto simplex = Internal::GJK_Intersection(box, box);
+    ASSERT_TRUE(simplex);
+    const auto contact = ComputeContact(box, box);
+    ASSERT_TRUE(contact);
+    const float tolerance = 4.0f * Internal::Config::EPA_EPSILON / simplex->InvScale;
+    EXPECT_NEAR(contact->PenetrationDepth, 2.0f, tolerance);
+    EXPECT_NEAR(glm::length(contact->Normal), 1.0f, 1.0e-4f);
+    const auto n = glm::abs(contact->Normal);
+    EXPECT_TRUE(n.x > 0.999f || n.y > 0.999f || n.z > 0.999f);
+    ExpectNear(contact->ContactPointA - contact->ContactPointB,
+               contact->Normal * contact->PenetrationDepth, tolerance);
+}
+
+TEST(ContactManifold, CoplanarHullsReturnTouchingWithoutInventedPenetration)
+{
+    ConvexHull plane;
+    plane.Vertices = {{-1,-1,0}, {1,-1,0}, {1,1,0}, {-1,1,0}};
+    const auto contact = ComputeContact(plane, plane);
+    ASSERT_TRUE(contact);
+    EXPECT_FLOAT_EQ(contact->PenetrationDepth, 0.0f);
+    EXPECT_NEAR(std::abs(contact->Normal.z), 1.0f, 1.0e-4f);
+    EXPECT_NEAR(glm::length(contact->Normal), 1.0f, 1.0e-4f);
 }

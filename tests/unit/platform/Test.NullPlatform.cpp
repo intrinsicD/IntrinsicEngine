@@ -43,8 +43,6 @@ TEST(NullPlatform, QueuesDrainsAndAppliesEventsDeterministically)
     EXPECT_EQ(window.GetFramebufferExtent().Width, 640);
     EXPECT_EQ(window.GetFramebufferExtent().Height, 480);
     EXPECT_TRUE(window.WasResized());
-    EXPECT_TRUE(window.ConsumeInputActivity());
-    EXPECT_FALSE(window.ConsumeInputActivity());
 
     EXPECT_TRUE(observedWindow.GetInput().IsKeyPressed(Extrinsic::Platform::Input::Key::Space));
     EXPECT_TRUE(observedWindow.GetInput().IsKeyJustPressed(Extrinsic::Platform::Input::Key::Space));
@@ -112,8 +110,6 @@ TEST(NullPlatform, BuffersTextAndDropEventsForEditorWorkflows)
 
     window.PollEvents();
 
-    EXPECT_TRUE(window.ConsumeInputActivity());
-    EXPECT_FALSE(window.ConsumeInputActivity());
 
     const auto drained = window.DrainEvents();
     ASSERT_EQ(drained.size(), 2u);
@@ -138,7 +134,7 @@ TEST(NullPlatform, BuffersTextAndDropEventsForEditorWorkflows)
 
 
 // UI-078 slice 2: native focus changes are ordinary queued events, delivered
-// in order to the listener and the drain, and count as input activity.
+// in order to the listener and the drain.
 TEST(NullPlatform, DeliversWindowFocusEventsInOrder)
 {
     WindowConfig config;
@@ -157,7 +153,6 @@ TEST(NullPlatform, DeliversWindowFocusEventsInOrder)
     window.QueueEvent(Extrinsic::Platform::WindowFocusEvent{.Focused = true});
     window.PollEvents();
 
-    EXPECT_TRUE(window.ConsumeInputActivity());
     auto drained = window.DrainEvents();
     ASSERT_EQ(drained.size(), 3u);
     ASSERT_EQ(callbacks.size(), 3u);
@@ -174,5 +169,85 @@ TEST(NullPlatform, DeliversWindowFocusEventsInOrder)
 
     window.QueueEvent(Extrinsic::Platform::WindowFocusEvent{.Focused = false});
     window.PollEvents();
-    EXPECT_TRUE(window.ConsumeInputActivity()) << "focus alone is input activity";
+    const auto focusOnly = window.DrainEvents();
+    ASSERT_EQ(focusOnly.size(), 1u);
+    const auto* lost = std::get_if<Extrinsic::Platform::WindowFocusEvent>(&focusOnly.front());
+    ASSERT_NE(lost, nullptr);
+    EXPECT_FALSE(lost->Focused);
+}
+
+
+TEST(NullPlatform, PreservesCompleteTapEdgesUntilNextPoll)
+{
+    NullWindow window{WindowConfig{}};
+    constexpr int key = Extrinsic::Platform::Input::Key::F;
+    window.QueueKey(key, true);
+    window.QueueKey(key, false);
+    window.QueueMouseButton(0, true);
+    window.QueueMouseButton(0, false);
+    window.PollEvents();
+
+    const Extrinsic::Platform::IWindow& observedWindow = window;
+    const auto& input = observedWindow.GetInput();
+    EXPECT_FALSE(input.IsKeyPressed(key));
+    EXPECT_TRUE(input.IsKeyJustPressed(key));
+    EXPECT_FALSE(input.IsMouseButtonPressed(0));
+    EXPECT_TRUE(input.IsMouseButtonJustPressed(0));
+    window.PollEvents();
+    EXPECT_FALSE(input.IsKeyJustPressed(key));
+    EXPECT_FALSE(input.IsMouseButtonJustPressed(0));
+}
+
+TEST(NullPlatform, HeldInputsDoNotRepeatEdgesAndRepressDoes)
+{
+    NullWindow window{WindowConfig{}};
+    constexpr int key = Extrinsic::Platform::Input::Key::F;
+    const Extrinsic::Platform::IWindow& observedWindow = window;
+    const auto& input = observedWindow.GetInput();
+    window.QueueKey(key, true);
+    window.QueueMouseButton(0, true);
+    window.PollEvents();
+    EXPECT_TRUE(input.IsKeyJustPressed(key));
+    EXPECT_TRUE(input.IsMouseButtonJustPressed(0));
+
+    window.QueueKey(key, true);
+    window.QueueMouseButton(0, true);
+    window.PollEvents();
+    EXPECT_TRUE(input.IsKeyPressed(key));
+    EXPECT_TRUE(input.IsMouseButtonPressed(0));
+    EXPECT_FALSE(input.IsKeyJustPressed(key));
+    EXPECT_FALSE(input.IsMouseButtonJustPressed(0));
+
+    window.QueueKey(key, false);
+    window.QueueKey(key, true);
+    window.QueueMouseButton(0, false);
+    window.QueueMouseButton(0, true);
+    window.PollEvents();
+    EXPECT_TRUE(input.IsKeyJustPressed(key));
+    EXPECT_TRUE(input.IsMouseButtonJustPressed(0));
+}
+
+TEST(NullPlatform, CallbackQueuedEventsWaitForNextPoll)
+{
+    NullWindow window{WindowConfig{}};
+    std::vector<Extrinsic::Platform::Event> callbacks;
+    window.Listen([&](const Extrinsic::Platform::Event& event)
+    {
+        callbacks.push_back(event);
+        if (std::holds_alternative<Extrinsic::Platform::KeyEvent>(event))
+            window.QueueClose();
+    });
+    window.QueueKey(Extrinsic::Platform::Input::Key::F, true);
+    window.PollEvents();
+    ASSERT_EQ(callbacks.size(), 1u);
+    EXPECT_FALSE(window.ShouldClose());
+    EXPECT_EQ(window.DrainEvents().size(), 1u);
+
+    window.PollEvents();
+    ASSERT_EQ(callbacks.size(), 2u);
+    EXPECT_TRUE(std::holds_alternative<Extrinsic::Platform::WindowCloseEvent>(callbacks.back()));
+    EXPECT_TRUE(window.ShouldClose());
+    EXPECT_EQ(window.DrainEvents().size(), 1u);
+    window.PollEvents();
+    EXPECT_EQ(callbacks.size(), 2u);
 }

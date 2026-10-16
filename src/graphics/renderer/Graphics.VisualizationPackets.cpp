@@ -175,6 +175,25 @@ namespace Extrinsic::Graphics
         }
     }
 
+    bool ExpandConstantScalarRange(const float value, const float halfWidth,
+                                   float& minValue, float& maxValue) noexcept
+    {
+        if (!std::isfinite(value) || !std::isfinite(halfWidth) || halfWidth <= 0.f)
+            return false;
+        float lower = value - halfWidth;
+        float upper = value + halfWidth;
+        if (lower == value)
+            lower = std::nextafter(value, -std::numeric_limits<float>::infinity());
+        if (upper == value)
+            upper = std::nextafter(value, std::numeric_limits<float>::infinity());
+        // At a finite representable limit only the inward endpoint can move.
+        if (!std::isfinite(lower)) lower = value;
+        if (!std::isfinite(upper)) upper = value;
+        minValue = lower;
+        maxValue = upper;
+        return true;
+    }
+
     std::uint32_t VectorFieldGlyphCount(const VectorFieldOverlayPacket& packet) noexcept
     {
         if (packet.RowStride == 0u || packet.RowCount == 0u)

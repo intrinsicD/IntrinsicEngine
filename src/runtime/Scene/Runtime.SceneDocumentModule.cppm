@@ -1,3 +1,4 @@
+// Owns scene-document persistence and edit history for the active world.
 module;
 
 #include <cstdint>
@@ -88,6 +89,8 @@ namespace Extrinsic::Runtime
         [[nodiscard]] Core::Result OnResolve(EngineSetup& setup) override;
         void OnShutdown(RuntimeModuleShutdownContext& context) override;
 
+        // Returns InvalidState while any queued save is unfinished, regardless of path.
+        // Rejection neither writes a file nor changes document/history state; it does not wait.
         [[nodiscard]] Core::Expected<SceneSerializationResult>
             SaveSceneToPath(std::string path);
         [[nodiscard]] Core::Expected<RuntimeQueuedSceneFileOperation>

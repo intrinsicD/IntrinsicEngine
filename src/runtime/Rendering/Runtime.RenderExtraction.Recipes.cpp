@@ -188,8 +188,8 @@ namespace Extrinsic::Runtime
                     if (scalar->RangeMin == scalar->RangeMax)
                     {
                         const float extent = std::max(0.5f, std::abs(scalar->RangeMin) * 1e-5f);
-                        scalar->RangeMin -= extent;
-                        scalar->RangeMax += extent;
+                        (void)Graphics::ExpandConstantScalarRange(
+                            scalar->RangeMin, extent, scalar->RangeMin, scalar->RangeMax);
                     }
                 }
                 ++stats.VisualizationRecipeScalarGpuFrontsObserved;

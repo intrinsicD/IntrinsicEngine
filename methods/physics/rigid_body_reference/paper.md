@@ -57,3 +57,13 @@ penetration slop and correction percentage.
 
 This package intentionally uses scalar CPU code and deterministic containers.
 It does not import engine runtime, ECS, graphics, platform, or RHI layers.
+
+Position correction uses remaining penetration along the captured normal after
+subtracting relative body displacement since contact generation. It does not
+reapply the original penetration every iteration. The operator-selected convergence
+criterion evaluates excess depth above allowed slop against the existing error
+tolerance: `rawDepth <= PenetrationSlop + max(PenetrationSlop, 1e-6)`. Raw-depth
+diagnostics remain distinct from that excess. This avoids letting float rounding
+of asymptotic corrections determine convergence. Static/static residuals retain
+the reference contract above; the engine World separately limits solver residuals
+to awake dynamic islands attempted in that step.

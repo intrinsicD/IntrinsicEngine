@@ -1,5 +1,10 @@
 module;
 
+#include <algorithm>
+#include <cmath>
+#include <optional>
+#include <vector>
+
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 
@@ -56,6 +61,28 @@ namespace Extrinsic::ECS::Systems::TransformHierarchy
                 child = next;
             }
         }
+    }
+
+    std::optional<glm::mat4> TryComposeWorldMatrix(const entt::registry& raw, entt::entity entity)
+    {
+        glm::mat4 matrix{1};
+        std::vector<entt::entity> visited;
+        while (entity != entt::null)
+        {
+            if (!raw.valid(entity) || visited.size() >= 4096 ||
+                std::ranges::find(visited, entity) != visited.end())
+                return {};
+            visited.push_back(entity);
+            if (const auto* t = raw.try_get<Components::Transform::Component>(entity))
+                matrix = Components::Transform::GetMatrix(*t) * matrix;
+            const auto* hierarchy = raw.try_get<Components::Hierarchy::Component>(entity);
+            entity = hierarchy ? hierarchy->Parent : entt::null;
+        }
+        for (unsigned i = 0; i < 4; ++i)
+            for (unsigned j = 0; j < 4; ++j)
+                if (!std::isfinite(matrix[i][j]))
+                    return {};
+        return matrix;
     }
 
     void OnUpdate(entt::registry& registry)

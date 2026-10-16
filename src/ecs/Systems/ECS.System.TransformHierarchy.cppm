@@ -1,6 +1,9 @@
+// Cached transform propagation and checked composition of current authored parent chains.
 module;
 
+#include <optional>
 #include <entt/fwd.hpp>
+#include <glm/mat4x4.hpp>
 
 export module Extrinsic.ECS.System.TransformHierarchy;
 
@@ -8,6 +11,13 @@ import Extrinsic.Core.FrameGraph;
 
 export namespace Extrinsic::ECS::Systems::TransformHierarchy
 {
+    // Compose current local transforms without reading or updating WorldMatrix.
+    // Missing local components contribute identity; entt::null is the identity
+    // root. Invalid parents, cycles, chains over 4096 nodes and nonfinite results
+    // return nullopt. No hierarchy or dirty/cache components are required.
+    [[nodiscard]] std::optional<glm::mat4> TryComposeWorldMatrix(
+        const entt::registry& registry, entt::entity entity);
+
     // Pass identifier used by the promoted FrameGraph registration helper and
     // by downstream systems that need to declare an ordering edge against the
     // transform update.

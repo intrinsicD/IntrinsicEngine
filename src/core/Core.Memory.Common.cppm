@@ -1,3 +1,4 @@
+// Common arena allocation concepts and alignment constants.
 module;
 
 #include <concepts>

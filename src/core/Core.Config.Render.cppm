@@ -1,3 +1,4 @@
+// Render configuration values consumed by the runtime composition root.
 module;
 
 #include <cstdint>

@@ -5,6 +5,7 @@ module;
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -26,7 +27,7 @@ import Extrinsic.Core.Hash;
 // TelemetrySystem is a process-global singleton (accessed via Get()). This is
 // an intentional exception to the "no global state" policy — instrumentation
 // is a cross-cutting concern with no meaningful owning subsystem, and the
-// write path is lock-free (atomics) to avoid hot-loop overhead.
+// category registration and aggregation share one lock; incremental counters are atomic.
 // -----------------------------------------------------------------------
 
 export namespace Extrinsic::Core::Telemetry
@@ -63,18 +64,6 @@ export namespace Extrinsic::Core::Telemetry
         uint32_t HeapCount = 0;
         std::array<GpuHeapBudget, kMaxMemoryHeaps> Heaps{};
         bool HasBudgetExtension = false;
-    };
-
-    // -----------------------------------------------------------------------
-    // Per-scope timing sample (ring-buffered)
-    // -----------------------------------------------------------------------
-    struct TimingSample
-    {
-        uint64_t StartTimeNs  = 0;
-        uint64_t DurationNs   = 0;
-        uint32_t NameHash     = 0;
-        uint16_t ThreadId     = 0;
-        uint16_t Depth        = 0;
     };
 
     struct TimingCategory
@@ -151,7 +140,6 @@ export namespace Extrinsic::Core::Telemetry
         // FrameGraph compile/execute times
         uint64_t FrameGraphCompileTimeNs    = 0;
         uint64_t FrameGraphExecuteTimeNs    = 0;
-        uint64_t FrameGraphCriticalPathTimeNs = 0;
     };
 
     // -----------------------------------------------------------------------
@@ -160,7 +148,6 @@ export namespace Extrinsic::Core::Telemetry
     class TelemetrySystem
     {
     public:
-        static constexpr std::size_t kMaxSamplesPerFrame = 4096;
         static constexpr std::size_t kMaxFrameHistory    = 120;
         static constexpr std::size_t kMaxCategories      = 256;
         static constexpr std::size_t kMaxPassTimings     = 32;
@@ -171,10 +158,11 @@ export namespace Extrinsic::Core::Telemetry
         void BeginFrame();
         void EndFrame();
 
-        // --- Incremental writes (any thread, lock-free) ---
-        void RecordSample(uint32_t nameHash, const char* name,
-                          uint64_t durationNs, uint16_t depth = 0);
+        // --- Incremental writes (any thread) ---
+        // Category names are borrowed for the process lifetime; snapshots copy aggregates.
+        void RecordSample(uint32_t nameHash, const char* name, uint64_t durationNs);
         void RecordDrawCall(uint32_t triangles = 0) noexcept;
+        // Main-thread history write.
         void SetGpuFrameTimeNs(uint64_t gpuTimeNs) noexcept;
         void SetPresentTimings(uint64_t fenceWaitNs,
                                uint64_t acquireNs,
@@ -185,8 +173,7 @@ export namespace Extrinsic::Core::Telemetry
                                 uint64_t cpuTimeNs) noexcept;
         void SetTaskStats(const TaskSchedulerStats& stats) noexcept;
         void SetFrameGraphTimings(uint64_t compileNs,
-                                  uint64_t executeNs,
-                                  uint64_t criticalPathNs) noexcept;
+                                  uint64_t executeNs) noexcept;
 
         // --- GPU memory budget (main thread) ---
         void SetGpuMemoryBudgets(const GpuMemorySnapshot& snapshot);
@@ -199,15 +186,11 @@ export namespace Extrinsic::Core::Telemetry
         [[nodiscard]] const std::vector<PassTimingEntry>& GetPassTimings() const noexcept
         { return m_PassTimings; }
 
-        // --- Queries ---
+        // Frame/history queries are main-thread-only; category snapshots are thread-safe.
         [[nodiscard]] const FrameStats& GetFrameStats(std::size_t framesAgo = 0) const noexcept;
         [[nodiscard]] double GetAverageFrameTimeMs(std::size_t frameCount = 60) const;
         [[nodiscard]] double GetAverageFPS(std::size_t frameCount = 60) const;
-        [[nodiscard]] const TimingCategory* GetCategories() const noexcept
-        { return m_Categories.data(); }
-        [[nodiscard]] std::size_t GetCategoryCount() const noexcept
-        { return m_CategoryCount.load(std::memory_order_relaxed); }
-        [[nodiscard]] std::vector<const TimingCategory*> GetCategoriesSortedByTime() const;
+        [[nodiscard]] std::vector<TimingCategory> GetCategories() const;
 
     private:
         TelemetrySystem() = default;
@@ -231,10 +214,12 @@ export namespace Extrinsic::Core::Telemetry
         std::atomic<uint64_t> m_SimCpuNs{0};
         std::atomic<uint64_t> m_FGCompileNs{0};
         std::atomic<uint64_t> m_FGExecuteNs{0};
-        std::atomic<uint64_t> m_FGCriticalPathNs{0};
-        std::atomic<std::size_t> m_CategoryCount{0};
+        mutable std::mutex m_CategoryMutex;
+        std::size_t m_CategoryCount = 0;
 
         // Task stats — written atomically field by field from any thread.
+        std::atomic<uint64_t> m_TaskInFlight{0};
+        std::atomic<uint64_t> m_TaskQueued{0};
         std::atomic<uint64_t> m_TaskParkCount{0};
         std::atomic<uint64_t> m_TaskUnparkCount{0};
         std::atomic<uint64_t> m_TaskParkP50Ns{0};
@@ -251,8 +236,6 @@ export namespace Extrinsic::Core::Telemetry
 
         std::array<FrameStats, kMaxFrameHistory>     m_FrameHistory{};
         std::array<TimingCategory, kMaxCategories>   m_Categories{};
-        std::array<TimingSample,
-            kMaxSamplesPerFrame * kMaxFrameHistory>  m_SampleBuffer{};
 
         std::vector<PassTimingEntry> m_PassTimings;
         GpuMemorySnapshot m_GpuMemory{};

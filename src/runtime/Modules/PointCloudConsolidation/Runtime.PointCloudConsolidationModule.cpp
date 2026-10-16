@@ -54,6 +54,7 @@ import Geometry.PointSampling;
 import Geometry.Properties;
 import Geometry.SupportRadius;
 
+#include "Editor/internal/Runtime.EditorPropertyHistory.hpp"
 #include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
 #include "Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.Internal.hpp"
 #include "Editor/internal/Runtime.EditorFramedGpuJob.hpp"
@@ -1848,7 +1849,7 @@ namespace Extrinsic::Runtime
                     ? EditorCommandHistoryStatus::Applied
                     : EditorCommandHistoryStatus::StaleEntity;
             };
-            const auto apply = [](
+            const auto apply = [history](
                 const ConsolidationMutationIdentity& candidate,
                 const ElementDomainPropertySnapshot& target)
             {
@@ -1865,9 +1866,11 @@ namespace Extrinsic::Runtime
                     ResolveMutablePropertySet(view, candidate.Domain);
                 if (current == nullptr)
                     return EditorCommandHistoryStatus::UnsupportedOperation;
-                return ApplyPropertyState(*current, *target)
-                    ? EditorCommandHistoryStatus::Applied
-                    : EditorCommandHistoryStatus::CommandFailed;
+                const EditorProcessingContext historyContext{.Scene = candidate.Scene, .CommandHistory = history};
+                const auto historyBefore = GeometryProcessingDetail::ObservePointPropertyHistory(historyContext, entity, candidate.Domain);
+                if (!ApplyPropertyState(*current, *target)) return EditorCommandHistoryStatus::CommandFailed;
+                GeometryProcessingDetail::RebasePointPropertyHistory(historyContext, entity, historyBefore);
+                return EditorCommandHistoryStatus::Applied;
             };
             const auto stamp = [](
                 const ConsolidationMutationIdentity& candidate,
@@ -1981,13 +1984,19 @@ namespace Extrinsic::Runtime
                     ? EditorCommandHistoryStatus::Applied
                     : EditorCommandHistoryStatus::StaleEntity;
             };
-            const auto apply = [](
+            const auto apply = [history](
                 const ConsolidationMutationIdentity& candidate,
                 const PointCloudVerticesSnapshot& target)
             {
-                return target != nullptr
-                    ? ApplyPointCloudVertices(candidate, *target)
-                    : EditorCommandHistoryStatus::CommandFailed;
+                if (!target) return EditorCommandHistoryStatus::CommandFailed;
+                const auto entity = ResolveEntity(candidate.Scene->Raw(), candidate.StableEntityId);
+                if (entity == ECS::InvalidEntityHandle) return EditorCommandHistoryStatus::StaleEntity;
+                const EditorProcessingContext historyContext{.Scene = candidate.Scene, .CommandHistory = history};
+                const auto historyBefore = GeometryProcessingDetail::ObservePointPropertyHistory(historyContext, entity, candidate.Domain);
+                const auto status = ApplyPointCloudVertices(candidate, *target);
+                if (status == EditorCommandHistoryStatus::Applied)
+                    GeometryProcessingDetail::RebasePointPropertyHistory(historyContext, entity, historyBefore);
+                return status;
             };
             const auto stamp = [](
                 const ConsolidationMutationIdentity& candidate,
@@ -2566,7 +2575,7 @@ namespace Extrinsic::Runtime
                 if(previous.IsValid()){++stats.JobsSubmitted;return true;}
                 ++stats.JobSubmissionFailures;return false;
             };
-            bool accepted=submit({.DebugName="Consolidation Vulkan support preparation",.Scope=world,.Kind=RuntimeTaskKinds::GeometryProcess,
+            bool accepted=submit({.DebugName="Consolidation Vulkan support preparation",.Scope=world,
                 .Work=[w](const JobCancellation& cancellation)
                 {
                     auto prepared=RunWorker(std::move(w->Snapshot),cancellation);
@@ -2595,13 +2604,13 @@ namespace Extrinsic::Runtime
             // Source density and L2 initialization precede at most MaxIterations updates.
             for(std::uint32_t stage=0;accepted && stage<request.Config.MaxIterations+2;++stage)
             {
-                accepted=submit({.DebugName="Consolidation Vulkan neighborhoods",.Scope=world,.Kind=RuntimeTaskKinds::GeometryProcess,
+                accepted=submit({.DebugName="Consolidation Vulkan neighborhoods",.Scope=world,
                     .Work=[](const JobCancellation&){return JobResultEnvelope::Make(true);},
                     .IsReadyToApply=[&cache,w]{return AdvanceProjectionGpu(cache,*w);},.ValidateBeforeApply=validate,
                     .PublishCompletion=check,.FinalizeUnpublishedOnMainThread=finalize});
                 if(!accepted)break;
                 const bool last=stage==request.Config.MaxIterations+1;
-                JobDesc step{.DebugName="Consolidation projection update",.Scope=world,.Kind=RuntimeTaskKinds::GeometryProcess,
+                JobDesc step{.DebugName="Consolidation projection update",.Scope=world,
                     .Work=[w](const JobCancellation&)
                     {
                         if(w->Projection->Phase()!=Consolidation::ProjectionPhase::Finished)

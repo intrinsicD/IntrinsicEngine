@@ -2,15 +2,29 @@
 #include <filesystem>
 #include <string>
 #include <optional>
+#include <array>
+#include <cstddef>
 
 import Extrinsic.Core.Filesystem.PathResolver;
 import Extrinsic.Core.Hash;
 import Extrinsic.Core.Error;
+import Extrinsic.Core.IOBackend;
 
 using namespace Extrinsic::Core;
 using namespace Extrinsic::Core::Hash;
 
 inline std::filesystem::path AsPath(const std::string& p) { return std::filesystem::path(p); }
+
+TEST(CoreFileIOBackend, ReportsBufferedWriteFailure)
+{
+    if (!std::filesystem::exists("/dev/full"))
+        GTEST_SKIP() << "/dev/full is unavailable on this host";
+    IO::FileIOBackend backend;
+    const std::array data{std::byte{42}};
+    const auto result = backend.Write(IO::IORequest{.Path = "/dev/full"}, data);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), ErrorCode::FileWriteError);
+}
 
 TEST(CoreFilesystemPathResolver, TryResolveShaderPathReturnsErrorWhenLookupMissing)
 {

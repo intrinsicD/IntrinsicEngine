@@ -3150,6 +3150,15 @@ namespace Extrinsic::Graphics
             }
             m_LastRenderGraphStats.Execute.DeviceOperational = m_Device->IsOperational();
 
+            if (!recipeValidationClean)
+            {
+                if (transientResourcesReady)
+                    m_LastRenderGraphStats.Diagnostic = "RenderGraph recipe validation failed.";
+                m_RenderGraphCompileCache.reset();
+                FinalizeCurrentRendererContractIntegrationStats(m_LastRenderGraphStats);
+                return;
+            }
+
             const auto executeBegin = std::chrono::steady_clock::now();
             std::vector<std::string_view> passNameByIndex(compiled->PassDeclarations.size());
             for (std::size_t passIndex = 0; passIndex < passNameByIndex.size() && passIndex < compiled->PassNames.size(); ++passIndex)
@@ -7778,8 +7787,8 @@ namespace Extrinsic::Graphics
         // seeded bytes, etc.) leaves the local decode buffer zeroed and
         // therefore falls through to the `EntityId == 0` NoHit branch —
         // safe by construction.
-        // Frames a capture may wait for an executed frame (minimized window,
-        // failing graph) before it fails instead of hanging its caller.
+        // Device frames allowed before a capture copy must be recorded.
+        // The budget pauses when a minimized window skips rendering.
         static constexpr std::uint64_t kBackbufferCaptureFrameBudget = 240u;
 
         void FinishBackbufferCapture(BackbufferCaptureResult result)
@@ -7849,7 +7858,7 @@ namespace Extrinsic::Graphics
                     }
                     if (width == 0u || height == 0u)
                     {
-                        return; // minimized; the frame budget bounds the wait
+                        return; // Wait until the backbuffer has a presentable extent.
                     }
                     capture.Width = width;
                     capture.Height = height;

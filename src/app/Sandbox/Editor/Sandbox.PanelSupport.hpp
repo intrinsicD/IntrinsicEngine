@@ -383,6 +383,21 @@ namespace Extrinsic::Sandbox::Editor
                             double& value, double defaultValue, float speed, const char* format = "%.3f");
     bool DrawSpecInputUInt(const char* label, std::span<const Runtime::ConfigFieldSpec> fields, std::string_view name,
                            std::uint32_t& value, std::uint32_t defaultValue);
+    // String-enum labels are looked up by stable token, never by enum ordinal.
+    // Names borrow the owner's NUL-terminated literal storage; missing labels are empty.
+    [[nodiscard]] const char* ConfigEnumDisplayLabel(const Runtime::ConfigFieldSpec* field,
+                                                     std::string_view token) noexcept;
+    // Keeps enum-code order for the existing raw-index ImGui Combo overload.
+    template <class TEnum, std::size_t Count>
+    [[nodiscard]] std::array<const char*, Count> OwnerConfigEnumLabels(
+        std::span<const Runtime::ConfigFieldSpec> fields, std::string_view name)
+    {
+        const auto* field = Runtime::FindConfigFieldSpec(fields, name);
+        std::array<const char*, Count> labels{};
+        for (std::size_t code = 0; code < Count; ++code)
+            labels[code] = ConfigEnumDisplayLabel(field, ToString(static_cast<TEnum>(code)));
+        return labels;
+    }
     // `value` is the payload's integer code (first name = the field's Min).
     // `visibleCount` (> 0) offers only the first names, for a mode in which later values are not selectable.
     bool DrawSpecEnumCombo(const char* label, std::span<const Runtime::ConfigFieldSpec> fields, std::string_view name,

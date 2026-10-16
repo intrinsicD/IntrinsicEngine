@@ -1,6 +1,7 @@
 module;
 
 #include <cerrno>
+#include <cstdint>
 #include <cstring>
 #include <string>
 #include <string_view>
@@ -106,13 +107,13 @@ namespace Extrinsic::Platform
             if (ready == 0) return LocalSocketStatus::Timeout;
             if (ready < 0) return LocalSocketStatus::SystemError;
 #ifdef MSG_NOSIGNAL
-            const ssize_t sent = ::send(m_Handle, data.data(), data.size(), MSG_NOSIGNAL);
+            const ssize_t sent = ::send(m_Handle, data.data(), data.size(), MSG_NOSIGNAL | MSG_DONTWAIT);
 #else
-            const ssize_t sent = ::send(m_Handle, data.data(), data.size(), 0);
+            const ssize_t sent = ::send(m_Handle, data.data(), data.size(), MSG_DONTWAIT);
 #endif
             if (sent < 0)
             {
-                if (errno == EINTR || errno == EAGAIN) continue;
+                if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) continue;
                 if (errno == EPIPE || errno == ECONNRESET) { Close(); return LocalSocketStatus::Closed; }
                 return LocalSocketStatus::SystemError;
             }
@@ -123,7 +124,9 @@ namespace Extrinsic::Platform
 
     LocalSocketListener::~LocalSocketListener() { Close(); }
     LocalSocketListener::LocalSocketListener(LocalSocketListener&& other) noexcept
-        : m_Handle(std::exchange(other.m_Handle, -1)), m_Path(std::move(other.m_Path)) {}
+        : m_Handle(std::exchange(other.m_Handle, -1)), m_Path(std::move(other.m_Path))
+        , m_PathDevice(std::exchange(other.m_PathDevice, 0))
+        , m_PathInode(std::exchange(other.m_PathInode, 0)) {}
     LocalSocketListener& LocalSocketListener::operator=(LocalSocketListener&& other) noexcept
     {
         if (this != &other)
@@ -131,15 +134,25 @@ namespace Extrinsic::Platform
             Close();
             m_Handle = std::exchange(other.m_Handle, -1);
             m_Path = std::move(other.m_Path);
+            m_PathDevice = std::exchange(other.m_PathDevice, 0);
+            m_PathInode = std::exchange(other.m_PathInode, 0);
         }
         return *this;
     }
 
     void LocalSocketListener::Close() noexcept
     {
-        if (m_Handle >= 0 && !m_Path.empty()) ::unlink(m_Path.c_str());
+        if (m_Handle >= 0 && !m_Path.empty())
+        {
+            struct stat current{};
+            if (::lstat(m_Path.c_str(), &current) == 0 && S_ISSOCK(current.st_mode)
+                && current.st_dev == m_PathDevice && current.st_ino == m_PathInode)
+                ::unlink(m_Path.c_str());
+        }
         CloseHandle(m_Handle);
         m_Path.clear();
+        m_PathDevice = 0;
+        m_PathInode = 0;
     }
 
     LocalSocketStatus LocalSocketListener::Listen(std::string_view path)
@@ -152,7 +165,9 @@ namespace Extrinsic::Platform
         {
             if (!S_ISSOCK(existing.st_mode)) return LocalSocketStatus::InvalidPath; // never replace a regular file
             LocalSocketConnection probe;
-            if (ConnectLocalSocket(path, probe) == LocalSocketStatus::Ok) return LocalSocketStatus::AddressInUse;
+            const auto status = ConnectLocalSocket(path, probe);
+            if (status == LocalSocketStatus::Ok) return LocalSocketStatus::AddressInUse;
+            if (status != LocalSocketStatus::Closed) return status;
             ::unlink(address.sun_path); // stale socket of a crashed process
         }
         int handle = OpenStream();
@@ -167,14 +182,21 @@ namespace Extrinsic::Platform
             CloseHandle(handle);
             return inUse ? LocalSocketStatus::AddressInUse : LocalSocketStatus::SystemError;
         }
-        if (::listen(handle, 4) != 0)
+        struct stat boundPath{};
+        if (::lstat(address.sun_path, &boundPath) != 0 || !S_ISSOCK(boundPath.st_mode))
         {
-            ::unlink(address.sun_path);
             CloseHandle(handle);
             return LocalSocketStatus::SystemError;
         }
         m_Handle = handle;
         m_Path.assign(path);
+        m_PathDevice = static_cast<std::uint64_t>(boundPath.st_dev);
+        m_PathInode = static_cast<std::uint64_t>(boundPath.st_ino);
+        if (::listen(handle, 4) != 0)
+        {
+            Close();
+            return LocalSocketStatus::SystemError;
+        }
         return LocalSocketStatus::Ok;
     }
 
@@ -221,10 +243,27 @@ namespace Extrinsic::Platform
     LocalSocketStatus LocalSocketConnection::SendAll(std::string_view, int) { return LocalSocketStatus::Unsupported; }
     LocalSocketListener::~LocalSocketListener() = default;
     LocalSocketListener::LocalSocketListener(LocalSocketListener&& other) noexcept
-        : m_Handle(std::exchange(other.m_Handle, -1)), m_Path(std::move(other.m_Path)) {}
+        : m_Handle(std::exchange(other.m_Handle, -1)), m_Path(std::move(other.m_Path))
+        , m_PathDevice(std::exchange(other.m_PathDevice, 0))
+        , m_PathInode(std::exchange(other.m_PathInode, 0)) {}
     LocalSocketListener& LocalSocketListener::operator=(LocalSocketListener&& other) noexcept
-    { m_Handle = std::exchange(other.m_Handle, -1); m_Path = std::move(other.m_Path); return *this; }
-    void LocalSocketListener::Close() noexcept { m_Handle = -1; m_Path.clear(); }
+    {
+        if (this != &other)
+        {
+            m_Handle = std::exchange(other.m_Handle, -1);
+            m_Path = std::move(other.m_Path);
+            m_PathDevice = std::exchange(other.m_PathDevice, 0);
+            m_PathInode = std::exchange(other.m_PathInode, 0);
+        }
+        return *this;
+    }
+    void LocalSocketListener::Close() noexcept
+    {
+        m_Handle = -1;
+        m_Path.clear();
+        m_PathDevice = 0;
+        m_PathInode = 0;
+    }
     LocalSocketStatus LocalSocketListener::Listen(std::string_view) { return LocalSocketStatus::Unsupported; }
     LocalSocketStatus LocalSocketListener::Accept(LocalSocketConnection&, int) { return LocalSocketStatus::Unsupported; }
     LocalSocketStatus ConnectLocalSocket(std::string_view, LocalSocketConnection&) { return LocalSocketStatus::Unsupported; }

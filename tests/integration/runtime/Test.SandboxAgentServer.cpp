@@ -33,6 +33,7 @@ import Extrinsic.Platform.LocalSocket;
 import Extrinsic.Runtime.AgentServer;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AsyncWorkModule;
+import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.CameraModule;
 import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.PointCloudConsolidationModule;
@@ -171,7 +172,8 @@ namespace
         bool Minimized{false}; // the window minimizes on the first frame: calls are served by Idle frames
         std::function<void(R::Engine&)> EveryFrame{}; // optional main-thread hook, run on every frame
 
-        explicit AgentRig(const std::string& tag, bool withCamera = false, bool minimized = false, unsigned workers = 1u)
+        explicit AgentRig(const std::string& tag, bool withCamera = false, bool minimized = false, unsigned workers = 1u,
+                          std::size_t maxMessageBytes = 8u << 20u)
             : Minimized(minimized)
         {
             SocketPath = (std::filesystem::temp_directory_path() / ("intrinsic-agent-" + tag + "-" + std::to_string(::getpid()) + ".sock")).string();
@@ -196,7 +198,8 @@ namespace
             Engine->EmplaceModule<R::PointCloudConsolidationModule>();
             Engine->EmplaceModule<R::ViewCaptureModule>(std::filesystem::temp_directory_path());
             Server = &Engine->EmplaceModule<R::AgentServerModule>(
-                R::AgentServerOptions{.SocketPath = SocketPath, .AllowedRoots = {std::filesystem::temp_directory_path().string()}});
+                R::AgentServerOptions{.SocketPath = SocketPath, .AllowedRoots = {std::filesystem::temp_directory_path().string()},
+                                      .MaxMessageBytes = maxMessageBytes});
             if (minimized) Engine->EmplaceModule<IdleExit>(Done, *Engine);
             Engine->Initialize();
         }
@@ -284,6 +287,124 @@ TEST(SandboxAgentServer, ContenderIsRefusedWithoutDisruptingTheOwner)
         rig.Check(P::ConnectLocalSocket(rig.SocketPath, successor.Connection) == P::LocalSocketStatus::Ok, "successor connect");
         rig.Check(successor.Request("initialize").contains("result"), "successor acquires released engine");
     });
+}
+
+TEST(SandboxAgentServer, InvalidUndoRedoArgumentsPreserveHistory)
+{
+    AgentRig rig("invalid-undo-arguments");
+    ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
+    auto* history = rig.Engine->Services().Find<R::EditorCommandHistory>();
+    ASSERT_NE(history, nullptr);
+    int value = 0;
+    ASSERT_TRUE(history->Execute({.Label = "first",
+        .Redo = [&] { value = 1; return R::EditorCommandHistoryStatus::Applied; },
+        .Undo = [&] { value = 0; return R::EditorCommandHistoryStatus::Applied; }}).Succeeded());
+    ASSERT_TRUE(history->Execute({.Label = "second",
+        .Redo = [&] { value = 2; return R::EditorCommandHistoryStatus::Applied; },
+        .Undo = [&] { value = 1; return R::EditorCommandHistoryStatus::Applied; }}).Succeeded());
+    rig.Run([&](Client& c) {
+        for (const auto* operation : {"undo", "redo"})
+        {
+            const auto before = c.Tool("history");
+            for (const Json& arguments : {Json::array(), Json(nullptr), Json{{"steps", -1}},
+                                         Json{{"steps", "2"}}, Json{{"steps", Json::array()}},
+                                         Json{{"steps", 4294967296ULL}}, Json{{"steps", 18446744073709551615ULL}},
+                                         Json{{"steps", 1.5}}, Json{{"steps", 0}}, Json{{"steps", 65}}})
+            {
+                const auto response = c.Request("tools/call", {{"name", operation}, {"arguments", arguments}});
+                const bool rejected = response.contains("error") ||
+                    (response.contains("result") && response["result"].value("isError", false));
+                rig.Check(rejected, std::string(operation) + " must reject " + arguments.dump());
+                rig.Check(c.Tool("history") == before, std::string(operation) + " rejection changed history");
+            }
+            // Omitting steps retains the documented one-step operation.
+            bool isError = true;
+            const auto result = c.Tool(operation, Json::object(), &isError);
+            const auto key = std::string_view(operation) == "undo" ? "undone" : "redone";
+            rig.Check(!isError && result[key].size() == 1u, std::string(operation) + " default: " + result.dump());
+        }
+    });
+    EXPECT_EQ(value, 2);
+}
+
+TEST(SandboxAgentServer, MessageLimitRejectsOversizedCompleteLinesAcrossReceives)
+{
+    constexpr std::size_t limit = 16384u; // LocalSocket receives at most 4096 bytes per call.
+    AgentRig rig("message-limit", false, false, 1u, limit);
+    ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
+    auto* history = rig.Engine->Services().Find<R::EditorCommandHistory>();
+    ASSERT_NE(history, nullptr);
+    int undoCalls = 0;
+    ASSERT_TRUE(history->Execute({.Label = "must survive oversized request",
+        .Redo = [] { return R::EditorCommandHistoryStatus::Applied; },
+        .Undo = [&] { ++undoCalls; return R::EditorCommandHistoryStatus::Applied; }}).Succeeded());
+    rig.Run([&](Client& c) {
+        const int acceptedId = c.NextId++;
+        std::string accepted = Json{{"jsonrpc", "2.0"}, {"id", acceptedId}, {"method", "ping"}}.dump();
+        accepted.resize(limit, ' ');
+        rig.Check(c.Connection.SendAll(accepted + "\n") == P::LocalSocketStatus::Ok, "send exact-limit request");
+        rig.Check(c.Await(acceptedId).contains("result"), "exact-limit request must be accepted");
+        const int rejectedId = c.NextId++;
+        std::string rejected = Json{{"jsonrpc", "2.0"}, {"id", rejectedId}, {"method", "tools/call"},
+                                    {"params", {{"name", "undo"}}}}.dump();
+        rejected.resize(limit + 1u, ' ');
+        rig.Check(c.Connection.SendAll(rejected + "\n") == P::LocalSocketStatus::Ok, "send oversized request");
+        rig.Check(c.Await(rejectedId, 100).is_null(), "oversized complete line must close the client before invocation");
+    });
+    EXPECT_EQ(undoCalls, 0);
+}
+
+TEST(SandboxAgentServer, ShutdownReturnsWithANonReadingClient)
+{
+    AgentRig rig("shutdown-nonreader");
+    std::atomic_bool responseStarted{false};
+    std::atomic_bool clientFinished{false};
+    std::atomic_bool shutdownComplete{false};
+    std::thread client([&] {
+        Client c;
+        for (int attempt = 0; attempt < 50 && P::ConnectLocalSocket(rig.SocketPath, c.Connection) != P::LocalSocketStatus::Ok; ++attempt)
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        rig.Check(c.Connection.IsOpen(), "connect");
+        if (c.Connection.IsOpen())
+        {
+            rig.Check(c.Request("initialize").contains("result"), "initialize");
+            // Echoing a large legal request id fills the socket without a synthetic server hook.
+            const Json ping{{"jsonrpc", "2.0"}, {"id", std::string(2u << 20u, 'x')}, {"method", "ping"}};
+            rig.Check(c.Connection.SendAll(ping.dump() + "\n") == P::LocalSocketStatus::Ok, "send large ping");
+            c.Buffer.clear();
+            const auto responseDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+            while (c.Buffer.empty() && std::chrono::steady_clock::now() < responseDeadline)
+            {
+                if (c.Connection.Receive(c.Buffer, 20) == P::LocalSocketStatus::Closed) break;
+            }
+            rig.Check(!c.Buffer.empty(), "server began sending the large response");
+            if (!c.Buffer.empty())
+            {
+                responseStarted.store(true);
+                // Keep the peer alive and unread while Shutdown joins the sender. The watchdog
+                // also releases the old blocking implementation, so a RED run cannot hang.
+                const auto watchdog = std::chrono::steady_clock::now() + std::chrono::seconds(9);
+                while (!shutdownComplete.load() && std::chrono::steady_clock::now() < watchdog)
+                    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            }
+        }
+        c.Connection.Close();
+        clientFinished.store(true);
+    });
+    const auto frameDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);
+    rig.Frames->OnFrame = [&](R::Engine& engine) {
+        if (responseStarted.load() || clientFinished.load() || std::chrono::steady_clock::now() >= frameDeadline)
+            engine.RequestExit();
+    };
+    rig.Engine->Run();
+    const auto started = std::chrono::steady_clock::now();
+    rig.Engine->Shutdown();
+    const auto elapsed = std::chrono::steady_clock::now() - started;
+    shutdownComplete.store(true);
+    client.join();
+    for (const auto& failure : rig.Failures) ADD_FAILURE() << failure;
+    ASSERT_TRUE(responseStarted.load());
+    EXPECT_LT(elapsed, std::chrono::seconds(7)) << "Shutdown must respect the sender's five-second timeout";
 }
 
 TEST(SandboxAgentServer, ClientRunsSmoothingThroughTheSocketAndUndoesIt)
@@ -408,7 +529,7 @@ TEST(SandboxAgentServer, ClientRunsSmoothingThroughTheSocketAndUndoesIt)
         check(cpd["variant"] == "rigid" && cpd["output"] == "positions", "cpd names its variant and output: " + cpd.dump());
         check(std::abs(std::as_const(vertices).Get<glm::vec3>("v:position")[0].x - 0.5f) < 1e-2f,
               "cpd moved the source positions");
-        auto cpdUndo = c.Tool("undo", {}, &isError);
+        auto cpdUndo = c.Tool("undo", Json::object(), &isError);
         check(!isError && cpdUndo["undone"].size() == 1u, "cpd undo: " + cpdUndo.dump());
         check(std::as_const(vertices).Get<glm::vec3>("v:position")[0] == beforeCpd, "undo restored the source positions");
         // RUNTIME-274: standalone point sampling through its section.

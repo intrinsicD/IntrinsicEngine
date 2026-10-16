@@ -1,5 +1,6 @@
 // tests/Test_Overlap.cpp — Primitive overlap / intersection tests.
 #include <gtest/gtest.h>
+#include <limits>
 
 #include <array>
 
@@ -381,4 +382,20 @@ TEST(Overlap, OBBSphereSeparated)
     OBB obb{glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), glm::quat(1, 0, 0, 0)};
     Sphere s{glm::vec3(5, 5, 5), 0.5f};
     EXPECT_FALSE(TestOverlap(obb, s));
+}
+
+
+TEST(Overlap, SphereRayOverlapIsInvariantToDirectionMagnitude)
+{
+    const Sphere sphere{{5, 0, 0}, 1};
+    for (const float speed : {.5f, 1.f, 2.f})
+    {
+        SCOPED_TRACE(speed);
+        EXPECT_TRUE(TestOverlap(Ray{{0, 0, 0}, {speed, 0, 0}}, sphere));
+        EXPECT_FALSE(TestOverlap(Ray{{0, 2, 0}, {speed, 0, 0}}, sphere));
+        EXPECT_FALSE(TestOverlap(Ray{{0, 0, 0}, {-speed, 0, 0}}, sphere));
+        EXPECT_TRUE(TestOverlap(Ray{{5, 0, 0}, {speed, 0, 0}}, sphere));
+    }
+    EXPECT_FALSE(TestOverlap(Ray{{5, 0, 0}, {0, 0, 0}}, sphere));
+    EXPECT_FALSE(TestOverlap(Ray{{0, 0, 0}, {std::numeric_limits<float>::quiet_NaN(), 0, 0}}, sphere));
 }

@@ -5,23 +5,17 @@ module;
 #include <string>
 #include <string_view>
 #include <expected>
-#include <type_traits>
 #include <unordered_map>
-#include <functional>
+#include <utility>
 
 module Extrinsic.Asset.Service;
 
 import Extrinsic.Core.Hash;
-import Extrinsic.Core.CallbackRegistry;
-import Extrinsic.Core.StrongHandle;
+import Extrinsic.Core.Filesystem.PathResolver;
 import Extrinsic.Asset.PathIndex;
 
 namespace Extrinsic::Assets
 {
-    using InternalLoaderRegistry =
-        Core::CallbackRegistry<Core::Expected<PayloadTicket>(std::string_view), AssetLoaderTag>;
-    using InternalLoaderToken = InternalLoaderRegistry::Token;
-
     struct AssetService::Impl
     {
         AssetPathIndex pathIndex;
@@ -30,12 +24,10 @@ namespace Extrinsic::Assets
         AssetEventBus eventBus;
         AssetLoadPipeline loadPipeline;
 
-        mutable std::mutex pathMutex;
+        // Service transactions precede pipeline, registry, payload, and path locks.
+        // Decoders and event dispatch never run under this mutex.
+        mutable std::mutex transactionMutex;
         std::unordered_map<AssetId, std::string, AssetIdHash> pathById;
-
-        mutable std::mutex loaderMutex;
-        std::unordered_map<AssetId, InternalLoaderToken, AssetIdHash> loaderByAsset;
-        InternalLoaderRegistry loaderRegistry;
 
         explicit Impl(AssetLoadPipelineTestHooks testHooks)
             : loadPipeline(std::move(testHooks))
@@ -43,39 +35,7 @@ namespace Extrinsic::Assets
             loadPipeline.BindRegistry(&registry);
             loadPipeline.BindEventBus(&eventBus);
         }
-
-        [[nodiscard]] Core::Expected<InternalLoaderToken> FindLoaderToken(AssetId id) const
-        {
-            std::scoped_lock lock(loaderMutex);
-            const auto it = loaderByAsset.find(id);
-            if (it == loaderByAsset.end())
-            {
-                return Core::Err<InternalLoaderToken>(Core::ErrorCode::AssetLoaderMissing);
-            }
-            return it->second;
-        }
-
-        void EraseLoader(AssetId id)
-        {
-            InternalLoaderToken token{};
-            {
-                std::scoped_lock lock(loaderMutex);
-                const auto it = loaderByAsset.find(id);
-                if (it == loaderByAsset.end())
-                {
-                    return;
-                }
-                token = it->second;
-                loaderByAsset.erase(it);
-            }
-            (void)loaderRegistry.Unregister(token);
-        }
     };
-
-    static_assert(!std::is_copy_constructible_v<AssetService>,
-              "AssetService must be non-copyable (CLAUDE.md subsystem contract).");
-    static_assert(!std::is_move_constructible_v<AssetService>,
-                  "AssetService must be non-movable; loader thunks capture 'this'.");
 
     AssetService::AssetService(AssetLoadPipelineTestHooks testHooks)
         : m_Impl(std::make_unique<Impl>(std::move(testHooks)))
@@ -84,295 +44,215 @@ namespace Extrinsic::Assets
 
     AssetService::~AssetService() = default;
 
-    AssetRegistry& AssetService::Registry() noexcept { return m_Impl->registry; }
-    AssetEventBus& AssetService::EventBus() noexcept { return m_Impl->eventBus; }
+    std::mutex& AssetService::TransactionMutex() const noexcept { return m_Impl->transactionMutex; }
+    const AssetRegistry& AssetService::Registry() const noexcept { return m_Impl->registry; }
     AssetPayloadStore& AssetService::PayloadStore() noexcept { return m_Impl->payloadStore; }
     const AssetPayloadStore& AssetService::PayloadStore() const noexcept { return m_Impl->payloadStore; }
-    AssetLoadPipeline& AssetService::LoadPipeline() noexcept { return m_Impl->loadPipeline; }
 
-    [[nodiscard]] Core::Expected<AssetMeta> AssetService::GetMeta(AssetId id) const
+    Core::Expected<AssetMeta> AssetService::GetMeta(AssetId id) const
     {
+        std::scoped_lock lock(m_Impl->transactionMutex);
         return m_Impl->registry.GetMeta(id);
     }
 
-    [[nodiscard]] Core::Expected<std::string> AssetService::GetPath(AssetId id) const
+    Core::Expected<std::string> AssetService::GetPath(AssetId id) const
     {
-        std::scoped_lock lock(m_Impl->pathMutex);
+        std::scoped_lock lock(m_Impl->transactionMutex);
         const auto it = m_Impl->pathById.find(id);
         if (it == m_Impl->pathById.end())
-        {
             return Core::Err<std::string>(Core::ErrorCode::ResourceNotFound);
-        }
         return it->second;
     }
 
-    [[nodiscard]] bool AssetService::IsAlive(AssetId id) const noexcept
+    bool AssetService::IsAlive(AssetId id) const noexcept
     {
+        std::scoped_lock lock(m_Impl->transactionMutex);
         return m_Impl->registry.IsAlive(id);
     }
 
-    [[nodiscard]] Core::Expected<LoaderToken> AssetService::GetReloadToken(AssetId id) const
+    Core::Expected<PayloadTicket> AssetService::GetPayloadTicket(AssetId id) const
     {
+        std::scoped_lock lock(m_Impl->transactionMutex);
         if (!m_Impl->registry.IsAlive(id))
-        {
-            return Core::Err<LoaderToken>(Core::ErrorCode::ResourceNotFound);
-        }
-        auto tokenOr = m_Impl->FindLoaderToken(id);
-        if (!tokenOr.has_value())
-        {
-            return Core::Err<LoaderToken>(tokenOr.error());
-        }
-        return LoaderToken{tokenOr->Index, tokenOr->Generation};
-    }
-
-    [[nodiscard]] Core::Expected<PayloadTicket> AssetService::GetPayloadTicket(AssetId id) const
-    {
-        if (!m_Impl->registry.IsAlive(id))
-        {
             return Core::Err<PayloadTicket>(Core::ErrorCode::ResourceNotFound);
-        }
         return m_Impl->payloadStore.GetTicket(id);
     }
 
     Core::Expected<AssetId> AssetService::LoadErased(
-        std::string_view path,
-        uint32_t typeId,
-        std::function<Core::Expected<PayloadTicket>(std::string_view, AssetId)> loader)
+        std::string_view path, uint32_t typeId, PreparedLoader loader)
     {
         if (path.empty())
-        {
             return Core::Err<AssetId>(Core::ErrorCode::InvalidArgument);
-        }
-
-        const auto abs = Core::Filesystem::GetAbsolutePath(std::string(path));
-
-        if (auto found = m_Impl->pathIndex.Find(abs); found.has_value())
+        const auto absolutePath = Core::Filesystem::GetAbsolutePath(std::string(path));
+        auto findExisting = [&]() -> Core::Expected<AssetId>
         {
+            auto found = m_Impl->pathIndex.Find(absolutePath);
+            if (!found.has_value())
+                return std::unexpected(found.error());
             const auto meta = m_Impl->registry.GetMeta(*found);
             if (!meta.has_value())
-            {
                 return std::unexpected(meta.error());
-            }
             if (meta->typeId != typeId)
-            {
                 return Core::Err<AssetId>(Core::ErrorCode::TypeMismatch);
-            }
             return *found;
-        }
-
-        // Publication requires a stable AssetId, so create the registry entry
-        // before invoking the loader and unwind it on failure.
-        auto idResult = m_Impl->registry.Create(Core::Hash::HashString(abs), typeId);
-        if (!idResult.has_value())
-        {
-            return idResult;
-        }
-        const AssetId id = *idResult;
-
-        auto ticket = loader(std::string_view(abs), id);
-        if (!ticket.has_value())
-        {
-            (void)m_Impl->registry.Destroy(id);
-            return std::unexpected(ticket.error());
-        }
-
-        if (auto r = m_Impl->pathIndex.Insert(abs, id); !r.has_value())
-        {
-            (void)m_Impl->payloadStore.Retire(id);
-            (void)m_Impl->registry.Destroy(id);
-            if (auto winner = m_Impl->pathIndex.Find(abs); winner.has_value())
-            {
-                return *winner;
-            }
-            return std::unexpected(r.error());
-        }
-
-        {
-            std::scoped_lock lock(m_Impl->pathMutex);
-            m_Impl->pathById[id] = abs;
-        }
-
-        if (auto r = m_Impl->registry.SetPayloadSlot(id, static_cast<uint32_t>(ticket->slot));
-            !r.has_value())
-        {
-            (void)m_Impl->payloadStore.Retire(id);
-            (void)m_Impl->pathIndex.Erase(abs, id);
-            {
-                std::scoped_lock lock(m_Impl->pathMutex);
-                m_Impl->pathById.erase(id);
-            }
-            (void)m_Impl->registry.Destroy(id);
-            return std::unexpected(r.error());
-        }
-
-        auto thunk = [loader = std::move(loader), this, id](
-                         std::string_view p) -> Core::Expected<PayloadTicket> {
-            if (!m_Impl->registry.IsAlive(id))
-            {
-                return Core::Err<PayloadTicket>(Core::ErrorCode::ResourceNotFound);
-            }
-            auto ticketInner = loader(p, id);
-            if (!ticketInner.has_value())
-            {
-                return std::unexpected(ticketInner.error());
-            }
-            return *ticketInner;
         };
 
-        const InternalLoaderToken token = m_Impl->loaderRegistry.Register(std::move(thunk));
+        AssetId id{};
         {
-            std::scoped_lock lock(m_Impl->loaderMutex);
-            m_Impl->loaderByAsset[id] = token;
+            std::scoped_lock lock(m_Impl->transactionMutex);
+            if (auto found = findExisting(); found.has_value()
+                || found.error() != Core::ErrorCode::ResourceNotFound)
+                return found;
+            auto created = m_Impl->registry.Create(Core::Hash::HashString(absolutePath), typeId);
+            if (!created.has_value())
+                return created;
+            id = *created;
         }
 
-        LoadRequest req{.id = id, .typeId = typeId, .path = abs, .needsGpuUpload = false};
-        if (auto q = m_Impl->loadPipeline.EnqueueIO(std::move(req)); !q.has_value())
+        // Decode against a provisional identity; no payload or path is published yet.
+        auto prepared = loader(absolutePath, id);
+        std::scoped_lock lock(m_Impl->transactionMutex);
+        if (!m_Impl->registry.IsAlive(id))
+            return Core::Err<AssetId>(Core::ErrorCode::ResourceNotFound);
+        if (!prepared.has_value())
         {
-            (void)m_Impl->loaderRegistry.Unregister(token);
-            {
-                std::scoped_lock lock(m_Impl->loaderMutex);
-                m_Impl->loaderByAsset.erase(id);
-            }
-            (void)m_Impl->payloadStore.Retire(id);
-            (void)m_Impl->pathIndex.Erase(abs, id);
-            {
-                std::scoped_lock lock(m_Impl->pathMutex);
-                m_Impl->pathById.erase(id);
-            }
             (void)m_Impl->registry.Destroy(id);
-            return std::unexpected(q.error());
+            return std::unexpected(prepared.error());
+        }
+        if (auto winner = findExisting(); winner.has_value()
+            || winner.error() != Core::ErrorCode::ResourceNotFound)
+        {
+            (void)m_Impl->registry.Destroy(id);
+            return winner;
         }
 
+        auto discard = [&]()
+        {
+            m_Impl->loadPipeline.Cancel(id);
+            (void)m_Impl->payloadStore.Retire(id);
+            m_Impl->pathById.erase(id);
+            (void)m_Impl->registry.Destroy(id);
+        };
+        auto ticket = (*prepared)();
+        if (!ticket.has_value())
+        {
+            discard();
+            return std::unexpected(ticket.error());
+        }
+        if (auto slot = m_Impl->registry.SetPayloadSlot(id, static_cast<uint32_t>(ticket->slot));
+            !slot.has_value())
+        {
+            discard();
+            return std::unexpected(slot.error());
+        }
+        m_Impl->pathById[id] = absolutePath;
+        if (auto queued = m_Impl->loadPipeline.EnqueueIO(LoadRequest{.id = id}); !queued.has_value())
+        {
+            discard();
+            return std::unexpected(queued.error());
+        }
+        if (auto inserted = m_Impl->pathIndex.Insert(absolutePath, id); !inserted.has_value())
+        {
+            discard();
+            return std::unexpected(inserted.error());
+        }
         return id;
     }
 
-    Core::Result AssetService::Reload(AssetId id)
+    Core::Result AssetService::ReloadErased(AssetId id, uint32_t typeId, PreparedLoader loader)
     {
-        if (!m_Impl->registry.IsAlive(id))
+        PayloadTicket expectedTicket{};
+        std::string path;
         {
-            return Core::Err(Core::ErrorCode::ResourceNotFound);
+            std::scoped_lock lock(m_Impl->transactionMutex);
+            auto meta = m_Impl->registry.GetMeta(id);
+            if (!meta.has_value())
+                return std::unexpected(meta.error());
+            if (meta->typeId != typeId)
+                return Core::Err(Core::ErrorCode::TypeMismatch);
+            if (meta->state != AssetState::Ready)
+                return Core::Err(Core::ErrorCode::InvalidState);
+            auto ticket = m_Impl->payloadStore.GetTicket(id);
+            if (!ticket.has_value())
+                return std::unexpected(ticket.error());
+            expectedTicket = *ticket;
+            const auto it = m_Impl->pathById.find(id);
+            if (it == m_Impl->pathById.end())
+                return Core::Err(Core::ErrorCode::ResourceNotFound);
+            path = it->second;
         }
 
-        const auto meta = m_Impl->registry.GetMeta(id);
+        auto prepared = loader(path, id);
+        std::scoped_lock lock(m_Impl->transactionMutex);
+        auto meta = m_Impl->registry.GetMeta(id);
         if (!meta.has_value())
-        {
             return std::unexpected(meta.error());
-        }
+        auto currentTicket = m_Impl->payloadStore.GetTicket(id);
+        if (!currentTicket.has_value())
+            return std::unexpected(currentTicket.error());
+        if (*currentTicket != expectedTicket || meta->state != AssetState::Ready)
+            return Core::Err(Core::ErrorCode::ResourceBusy);
+        if (!prepared.has_value())
+            return std::unexpected(prepared.error());
 
-        if (meta->state != AssetState::Ready)
-        {
-            return Core::Err(Core::ErrorCode::InvalidState);
-        }
-
+        // Checkpoint and rollback are one transaction: a dead or newer asset can
+        // never receive the payload captured before an unlocked decoder call.
         auto checkpoint = m_Impl->payloadStore.CaptureCheckpoint(id);
         if (!checkpoint.has_value())
-        {
             return std::unexpected(checkpoint.error());
-        }
-        const uint32_t previousPayloadSlot = meta->payloadSlot;
         auto restorePreviousPayload = [&]()
         {
             (void)m_Impl->payloadStore.RestoreCheckpoint(id, *checkpoint);
-            (void)m_Impl->registry.SetPayloadSlot(id, previousPayloadSlot);
+            (void)m_Impl->registry.SetPayloadSlot(id, meta->payloadSlot);
             auto currentState = m_Impl->registry.GetState(id);
             if (currentState.has_value() && *currentState != AssetState::Ready)
-            {
                 (void)m_Impl->registry.SetState(id, *currentState, AssetState::Ready);
-            }
         };
-
-        const auto tokenOr = m_Impl->FindLoaderToken(id);
-        if (!tokenOr.has_value())
-        {
-            return std::unexpected(tokenOr.error());
-        }
-        const InternalLoaderToken token = *tokenOr;
-
-        std::string path;
-        {
-            std::scoped_lock lock(m_Impl->pathMutex);
-            const auto pathIt = m_Impl->pathById.find(id);
-            if (pathIt == m_Impl->pathById.end())
-            {
-                return Core::Err(Core::ErrorCode::ResourceNotFound);
-            }
-            path = pathIt->second;
-        }
-
-        auto invokeResult = m_Impl->loaderRegistry.InvokeOr(
-            token, Core::ErrorCode::AssetLoaderMissing, std::string_view(path));
-        if (!invokeResult.has_value())
-        {
-            restorePreviousPayload();
-            return std::unexpected(invokeResult.error());
-        }
-        if (auto slot = m_Impl->registry.SetPayloadSlot(
-                id, static_cast<uint32_t>(invokeResult->slot));
+        auto ticket = (*prepared)();
+        if (!ticket.has_value())
+            return std::unexpected(ticket.error());
+        if (auto slot = m_Impl->registry.SetPayloadSlot(id, static_cast<uint32_t>(ticket->slot));
             !slot.has_value())
         {
             restorePreviousPayload();
             return slot;
         }
-
-        auto toUnloaded = m_Impl->registry.SetState(id, AssetState::Ready, AssetState::Unloaded);
-        if (!toUnloaded.has_value())
+        if (auto reset = m_Impl->registry.SetState(id, AssetState::Ready, AssetState::Unloaded);
+            !reset.has_value())
         {
             restorePreviousPayload();
-            return toUnloaded;
+            return reset;
         }
-
-        LoadRequest req{
-            .id = id,
-            .typeId = meta->typeId,
-            .path = path,
-            .needsGpuUpload = false,
-            .publishQueuedEvent = true,
-            .queuedEvent = AssetEvent::Reloaded,
-        };
-        auto result = m_Impl->loadPipeline.EnqueueIO(std::move(req));
-        if (!result.has_value())
-        {
+        auto queued = m_Impl->loadPipeline.EnqueueIO(LoadRequest{
+            .id = id, .publishQueuedEvent = true, .queuedEvent = AssetEvent::Reloaded});
+        if (!queued.has_value())
             restorePreviousPayload();
-            return result;
-        }
-
-        return Core::Ok();
+        return queued;
     }
 
     Core::Result AssetService::Destroy(AssetId id)
     {
-        if (!m_Impl->registry.IsAlive(id))
         {
-            return Core::Err(Core::ErrorCode::ResourceNotFound);
+            std::scoped_lock lock(m_Impl->transactionMutex);
+            if (!m_Impl->registry.IsAlive(id))
+                return Core::Err(Core::ErrorCode::ResourceNotFound);
+            m_Impl->loadPipeline.Cancel(id);
         }
-
-        m_Impl->loadPipeline.Cancel(id);
+        // Existing Ready listeners can still read their payload, and may re-enter.
         m_Impl->eventBus.Flush(id);
-        m_Impl->EraseLoader(id);
-
-        std::string path;
+        std::scoped_lock lock(m_Impl->transactionMutex);
+        if (!m_Impl->registry.IsAlive(id))
+            return Core::Ok(); // A nested/concurrent Destroy already retired this generation.
+        m_Impl->loadPipeline.Cancel(id); // Join any reload queued by the unlocked callbacks.
+        const auto path = m_Impl->pathById.find(id);
+        if (path != m_Impl->pathById.end())
         {
-            std::scoped_lock lock(m_Impl->pathMutex);
-            const auto pathIt = m_Impl->pathById.find(id);
-            if (pathIt != m_Impl->pathById.end())
-            {
-                path = pathIt->second;
-                m_Impl->pathById.erase(pathIt);
-            }
+            (void)m_Impl->pathIndex.Erase(path->second, id);
+            m_Impl->pathById.erase(path);
         }
-
-        if (!path.empty())
-        {
-            (void)m_Impl->pathIndex.Erase(path, id);
-        }
-
         (void)m_Impl->payloadStore.Retire(id);
-
         if (auto destroyed = m_Impl->registry.Destroy(id); !destroyed.has_value())
-        {
             return destroyed;
-        }
-
         m_Impl->eventBus.Publish(id, AssetEvent::Destroyed);
         return Core::Ok();
     }
@@ -384,37 +264,32 @@ namespace Extrinsic::Assets
 
     Core::Result AssetService::CompleteCpuLoadAndFlushEvent(const AssetId id)
     {
-        if (!m_Impl->registry.IsAlive(id))
         {
-            return Core::Err(Core::ErrorCode::ResourceNotFound);
+            std::scoped_lock lock(m_Impl->transactionMutex);
+            if (!m_Impl->registry.IsAlive(id))
+                return Core::Err(Core::ErrorCode::ResourceNotFound);
+            if (auto completed = m_Impl->loadPipeline.CompleteCpuLoad(id); !completed.has_value())
+                return completed;
         }
-
-        if (auto completed = m_Impl->loadPipeline.CompleteCpuLoad(id); !completed.has_value())
-            return completed;
-
         m_Impl->eventBus.Flush(id);
         return Core::Ok();
     }
 
-    bool AssetService::HasLoaderCallback(LoaderToken token) const
-    {
-        InternalLoaderToken internal{token.Index, token.Generation};
-        return m_Impl->loaderRegistry.Contains(internal);
-    }
-
-    std::size_t AssetService::LoaderCallbackCount() const
-    {
-        return m_Impl->loaderRegistry.Size();
-    }
-
     bool AssetService::PathIndexContains(std::string_view absolutePath) const
     {
+        std::scoped_lock lock(m_Impl->transactionMutex);
         return m_Impl->pathIndex.Contains(absolutePath);
     }
 
     AssetEventBus::ListenerToken AssetService::SubscribeAll(AssetEventBus::ListenerCallback cb)
     {
-        return m_Impl->eventBus.SubscribeAll(std::move(cb));
+        if (!cb)
+            return AssetEventBus::InvalidToken;
+        return m_Impl->eventBus.SubscribeAll([this, cb = std::move(cb)](AssetId id, AssetEvent event)
+        {
+            if (event == AssetEvent::Destroyed || IsAlive(id))
+                cb(id, event);
+        });
     }
 
     void AssetService::UnsubscribeAll(AssetEventBus::ListenerToken token)
@@ -424,11 +299,13 @@ namespace Extrinsic::Assets
 
     std::size_t AssetService::LiveAssetCount() const noexcept
     {
+        std::scoped_lock lock(m_Impl->transactionMutex);
         return m_Impl->registry.LiveCount();
     }
 
     Core::Result AssetService::ForceAssetState(AssetId id, AssetState expected, AssetState next)
     {
+        std::scoped_lock lock(m_Impl->transactionMutex);
         return m_Impl->registry.SetState(id, expected, next);
     }
 }

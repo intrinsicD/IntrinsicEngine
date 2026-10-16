@@ -181,7 +181,6 @@ export namespace Extrinsic::Core
         [[nodiscard]] Dag::ScheduleStats GetScheduleStats() const noexcept;
         [[nodiscard]] uint64_t LastCompileTimeNs()    const noexcept;
         [[nodiscard]] uint64_t LastExecuteTimeNs()    const noexcept;
-        [[nodiscard]] uint64_t LastCriticalPathTimeNs() const noexcept;
         [[nodiscard]] Dag::TaskGraphPlanReuseStats GetPlanReuseStats() const noexcept;
 
     private:

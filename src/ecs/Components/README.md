@@ -156,8 +156,10 @@ implemented in the matching `.cpp`):
   `graph.GarbageCollection()` if `HasGarbage()` so the resulting PropertySets
   are contiguous and all surviving vertex-star links are rebuilt in-range.
 - `PopulateFromCloud(registry, entity, cloud)` — emplaces `Vertices` with
-  canonical `v:position` (and `v:normal` when `HasNormals()`), preserving
-  the full `PointProperties()` PropertySet.
+  canonical `v:position` (and `v:normal` when `HasNormals()`). All properties
+  retain exactly the selected view rows, including nonzero view offsets.
+  Canonical vector keys replace conflicting types; canonical `v:deleted` and
+  `NumDeleted` reflect the cloud deletion mask. The source remains unchanged.
 
 Canonical key constants live in
 `Extrinsic.ECS.Components.GeometrySources::PropertyNames`
@@ -183,7 +185,8 @@ satisfy point/edge consumers without pretending to be a point cloud or graph,
 while graph and mesh entities expose the same physical vertex/halfedge/edge
 source types without losing their separate provenance.
 
-Each populate helper drops the entity's prior `GeometrySources`
+Cloud and mesh population prepare the replacement property sets before
+removing the existing source. Each populate helper drops the entity's prior `GeometrySources`
 components (`Vertices`/`Edges`/`Halfedges`/`Faces`) and
 topology markers (`HasMeshTopology`/`HasGraphTopology`) before
 emplacing the new domain, so a re-population from a different

@@ -1,3 +1,4 @@
+// Defines backend-independent window lifecycle, input, and event ports.
 module;
 
 #include <memory>
@@ -99,16 +100,15 @@ namespace Extrinsic::Platform
         [[nodiscard]] virtual bool IsMinimized() const = 0;
         [[nodiscard]] virtual bool WasResized() const = 0;
         virtual void AcknowledgeResize() = 0;
-        [[nodiscard]] virtual bool ConsumeInputActivity() = 0;
         [[nodiscard]] virtual Extent2D GetWindowExtent() const = 0;
         [[nodiscard]] virtual Extent2D GetFramebufferExtent() const = 0;
         [[nodiscard]] virtual void* GetNativeHandle() const = 0;
 
         using EventCallbackFn = std::function<void(const Event&)>;
+        // The event reference remains valid for this callback, even if it drains the queue.
         virtual void Listen(EventCallbackFn callback) = 0;
         [[nodiscard]] virtual std::vector<Event> DrainEvents() = 0;
 
-        virtual void OnUpdate() = 0;
         virtual void WaitForEventsTimeout(double timeoutSeconds) = 0;
 
         virtual void SetClipboardText(std::string_view text) = 0;

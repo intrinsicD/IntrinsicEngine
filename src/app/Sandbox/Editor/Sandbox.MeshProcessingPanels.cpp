@@ -1930,7 +1930,8 @@ namespace Extrinsic::Sandbox::Editor
                 "PCA fits local planes to spatial neighbors on the selected element domain. Radius mode uses "
                 "all neighbors within the radius; otherwise k nearest neighbors are used.");
             int backend = int(config.Backend);
-            if (ImGui::Combo("Backend##Normals", &backend, "CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH (resident PCA)\0"))
+            if (ImGui::Combo("Backend##Normals", &backend,
+                    OwnerConfigEnumLabels<Runtime::NormalEstimationBackend, 3>(Runtime::NormalEstimationConfigFieldSpecs(), "backend").data(), 3))
             {
                 config.Backend = Runtime::NormalEstimationBackend(backend);
                 changed = true;
@@ -2136,7 +2137,8 @@ namespace Extrinsic::Sandbox::Editor
             changed |= DrawProcessingScalarOutput(label, *ref);
         int method=int(config.Method), backend=int(config.Backend);
         if(ImGui::Combo("Method",&method,"Statistical\0Radius\0Local distance ratio\0")) {config.Method=Runtime::OutlierAnalysisMethod(method);changed=true;}
-        if(ImGui::Combo("Backend",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::OutlierAnalysisBackend(backend);changed=true;}
+        if (ImGui::Combo("Backend", &backend,
+                OwnerConfigEnumLabels<Runtime::OutlierAnalysisBackend, 3>(Runtime::OutlierAnalysisConfigFieldSpecs(), "backend").data(), 3)) {config.Backend=Runtime::OutlierAnalysisBackend(backend);changed=true;}
         if(config.Method==Runtime::OutlierAnalysisMethod::Statistical)
         {
             changed |= ImGui::InputScalar("Neighbors k",ImGuiDataType_U32,&config.KNeighbors);
@@ -2289,7 +2291,8 @@ namespace Extrinsic::Sandbox::Editor
         if(config.Backend!=Runtime::KeypointAnalysisBackend::VulkanCompute)
         {
             int backend=int(config.Backend);
-            if(ImGui::Combo("Acceleration",&backend,"CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH neighborhoods\0"))
+            if (ImGui::Combo("Acceleration", &backend,
+                    OwnerConfigEnumLabels<Runtime::KeypointAnalysisBackend, 3>(Runtime::KeypointAnalysisConfigFieldSpecs(), "backend").data(), 3))
             {config.Backend=Runtime::KeypointAnalysisBackend(backend);changed=true;}
         }
         changed |= ImGui::InputFloat("Salient radius (0 = automatic)",&config.SalientRadius);
@@ -2394,7 +2397,8 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::TreePop();
         }
         int backend=int(config.Backend);
-        if(ImGui::Combo("Backend",&backend,"CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::DescriptorAnalysisBackend(backend);changed=true;}
+        if (ImGui::Combo("Backend", &backend,
+                OwnerConfigEnumLabels<Runtime::DescriptorAnalysisBackend, 3>(Runtime::DescriptorAnalysisConfigFieldSpecs(), "backend").data(), 3)) {config.Backend=Runtime::DescriptorAnalysisBackend(backend);changed=true;}
         changed |= ImGui::InputFloat("Feature radius (0 = automatic)",&config.FeatureRadius);
         changed |= ImGui::InputScalar("Maximum neighbors (0 = all)",ImGuiDataType_U32,&config.MaxNeighbors);
         ImGui::TextWrapped("FPFH uses three eleven-bin histograms and nonzero normals. Automatic radius is five times mean nearest-neighbor spacing. A neighbor cap keeps the lowest source IDs within the radius.");
@@ -2468,7 +2472,8 @@ namespace Extrinsic::Sandbox::Editor
         }
         changed |= DrawProcessingScalarOutput("Density property", config.Density);
         int backend=int(config.Backend);
-        if(ImGui::Combo("Backend",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::KernelDensityBackend(backend);changed=true;}
+        if (ImGui::Combo("Backend", &backend,
+                OwnerConfigEnumLabels<Runtime::KernelDensityBackend, 3>(Runtime::KernelDensityConfigFieldSpecs(), "backend").data(), 3)) {config.Backend=Runtime::KernelDensityBackend(backend);changed=true;}
         changed |= ImGui::InputScalar("Neighbors k",ImGuiDataType_U32,&config.KNeighbors);
         changed |= ImGui::InputFloat("Bandwidth (0 = automatic)",&config.Bandwidth);
         ImGui::TextWrapped("Local Gaussian average over nearest candidates. Automatic bandwidth uses nearest-other spacing. Distances use the selected property coordinates.");
@@ -2531,7 +2536,8 @@ namespace Extrinsic::Sandbox::Editor
         for (auto [label, ref] : {std::pair{"Weight property", &config.Weights}})
             changed |= DrawProcessingScalarOutput(label, *ref);
         int backend=int(config.Backend);
-        if(ImGui::Combo("Backend",&backend,"CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::DensityWeightBackend(backend);changed=true;}
+        if (ImGui::Combo("Backend", &backend,
+                OwnerConfigEnumLabels<Runtime::DensityWeightBackend, 3>(Runtime::DensityWeightConfigFieldSpecs(), "backend").data(), 3)) {config.Backend=Runtime::DensityWeightBackend(backend);changed=true;}
         changed |= ImGui::InputDouble("Support radius",&config.SupportRadius);
         int kernel=int(config.Kernel),mode=int(config.Mode);
         if(ImGui::Combo("Kernel",&kernel,"Gaussian (sigma = h/4)\0LOP theta\0Wendland C2\0"))
@@ -2609,7 +2615,8 @@ namespace Extrinsic::Sandbox::Editor
             config.Method = Runtime::PointConstructionMethod(method);
             changed = true;
         }
-        if (ImGui::Combo("Backend", &backend, "CPU reference\0CPU LBVH (cached)\0Vulkan LBVH\0"))
+        if (ImGui::Combo("Backend", &backend,
+                OwnerConfigEnumLabels<Runtime::PointConstructionBackend, 3>(Runtime::PointConstructionConfigFieldSpecs(), "backend").data(), 3))
         {
             config.Backend = Runtime::PointConstructionBackend(backend);
             changed = true;
@@ -2736,7 +2743,8 @@ namespace Extrinsic::Sandbox::Editor
         }
         changed |= DrawProcessingScalarOutput("Radii property", config.Radii);
         int backend=int(config.Backend);
-        if(ImGui::Combo("Backend",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::PointSpacingBackend(backend);changed=true;}
+        if (ImGui::Combo("Backend", &backend,
+                OwnerConfigEnumLabels<Runtime::PointSpacingBackend, 3>(Runtime::PointSpacingConfigFieldSpecs(), "backend").data(), 3)) {config.Backend=Runtime::PointSpacingBackend(backend);changed=true;}
         changed |= ImGui::InputScalar("Neighbors k",ImGuiDataType_U32,&config.KNeighbors);
         changed |= ImGui::InputFloat("Radius scale",&config.ScaleFactor);
         ImGui::TextWrapped("Radius = scale times mean retained neighbor distance. Nearest-other spacing is reported separately. Values use the selected property coordinates; coverage is not guaranteed.");
@@ -2805,7 +2813,8 @@ namespace Extrinsic::Sandbox::Editor
         for (auto [label, ref] : {std::pair{"Output positions", &config.Output}})
             changed |= DrawProcessingPropertyName(label, ref->Name);
         int backend=int(config.Backend);
-        if(ImGui::Combo("Backend",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::BilateralFilterBackend(backend);changed=true;}
+        if (ImGui::Combo("Backend", &backend,
+                OwnerConfigEnumLabels<Runtime::BilateralFilterBackend, 3>(Runtime::BilateralFilterConfigFieldSpecs(), "backend").data(), 3)) {config.Backend=Runtime::BilateralFilterBackend(backend);changed=true;}
         changed |= ImGui::InputScalar("Neighbors k",ImGuiDataType_U32,&config.KNeighbors);
         changed |= ImGui::InputFloat("Spatial sigma (0 = automatic)",&config.SpatialSigma);
         changed |= ImGui::InputFloat("Normal sigma",&config.NormalSigma);
@@ -2894,7 +2903,8 @@ namespace Extrinsic::Sandbox::Editor
         if (config.Variant == Runtime::EditorICPVariant::PointToPlane)
             propertyChoice("Target normals##ICP", targetCatalog, config.TargetNormals, config.TargetPositions.Domain);
         int backend = int(config.Backend);
-        if (ImGui::Combo("Backend##ICP", &backend, "CPU KD-tree (reference)\0CPU LBVH (cached)\0Vulkan LBVH (CPU solve)\0"))
+        if (ImGui::Combo("Backend##ICP", &backend,
+                OwnerConfigEnumLabels<Runtime::RegistrationBackend, 3>(Runtime::RegistrationConfigFieldSpecs(), "backend").data(), 3))
         { config.Backend = Runtime::RegistrationBackend(backend); changed = true; }
         if (config.Backend == Runtime::RegistrationBackend::VulkanLBVH)
             if (const auto reason = Runtime::RegistrationVulkanUnavailableReason(context.Registration.Commands); !reason.empty())

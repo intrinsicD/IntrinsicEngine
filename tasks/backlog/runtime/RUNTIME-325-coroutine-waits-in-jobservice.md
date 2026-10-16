@@ -13,13 +13,31 @@ contract_review: Reviewed the catalog. A coroutine job kind changes the JobServi
 ---
 # RUNTIME-325 — Coroutine waits in JobService, or delete the coroutine path
 
+## Current status — 2026-10-16
+
+The operator selected the METHOD-056 CPD E-step as the first coroutine consumer
+on 2026-10-16. JobService coroutine ownership, request-scoped broker events,
+cancellation wakeups, and the CPD Begin/Complete consumer are integrated under
+[HARDEN-090](../../active/HARDEN-090-src-audit-remediation.md). The productive
+consumer now suspends while waiting for the device result; timeout is enforced
+by the owner-thread broker pump. Refusal/failure/timeout retain CPU fallback,
+while cancellation exits before fallback or another solver step.
+Focused CPU contracts, the dense Vulkan contract and the displayed Sandbox
+agent-driven CPD workflow have run under HARDEN-090. Its canonical verification
+record distinguishes functional success, the live process exit-budget timeout
+and the later short final-binary shutdown check. Physical UI clicks are not
+claimed. Final acceptance and retirement remain coordinated in HARDEN-090; no
+additional method is adopted here. The unchecked criteria below await reviewer
+acceptance.
+
 ## Goal
 - Give the existing coroutine waiting path in `Core.Tasks` a runtime home:
   `Tasks::Job` (coroutine type), `WaitFor(CounterEvent&)` / `WaitCounterAwaiter`
   and the sharded `WaitToken` park/unpark registry (`WaitShardCount = 16`,
-  `Core.Tasks.Internal.cppm`). Today only `tests/unit/core/Test.CoreTasks.cpp`
-  and `tests/benchmark/slo/Test.ArchitectureSLO.cpp` (`co_await` in
-  `TaskSchedulerLocalStealAndWakeCompletionBudgets`) use it.
+  `Core.Tasks.Internal.cppm`). Before this integration, only
+  `tests/unit/core/Test.CoreTasks.cpp` and
+  `tests/benchmark/slo/Test.ArchitectureSLO.cpp` used it; CPD is now the first
+  productive consumer through JobService.
 - Integrate it into the `Runtime.JobService` model and prove it with one real
   consumer: an iterative GPU↔CPU method that today blocks a worker or needs a
   hand-written state machine.
@@ -27,7 +45,7 @@ contract_review: Reviewed the catalog. A coroutine job kind changes the JobServi
   for integration with a decision gate.
 
 ## Acceptance criteria
-- [ ] Decision gate first: pick the consumer and confirm it with the operator.
+- [ ] Decision gate: the operator selected the CPD E-step on 2026-10-16.
       If no consumer adopts the coroutine path, delete `Tasks::Job`, the
       `Job&&` `Dispatch`/`Reschedule` overloads, `WaitCounterAwaiter`/`WaitFor`, `YieldAwaiter`,
       the `WaitToken` park/unpark API and their tests. Rewrite the SLO wake
@@ -49,11 +67,10 @@ contract_review: Reviewed the catalog. A coroutine job kind changes the JobServi
       device-owner thread. Unregistering a participant while a coroutine waits
       on it cancels the job cleanly.
 - [ ] First consumer: the METHOD-056 CPD device E-step broker
-      (`Runtime.CoherentPointDriftGpuEStep`) or another iterative GPU↔CPU method
-      the operator picks. The broker currently blocks the solver worker on a
-      `condition_variable::wait_for` with `Timeout` until the main-thread `Pump`
-      hands back the readback. It must keep CPU fallback on refusal, failure or
-      timeout and keep its stats.
+      (`Runtime.CoherentPointDriftGpuEStep`), selected by the operator. Replace
+      the former blocking solver-worker wait with request-scoped coroutine
+      suspension until main-thread `Pump` completes or times out the request.
+      Keep CPU fallback on refusal, failure or timeout and retain broker stats.
 - [ ] CPU contract tests cover dispatch, suspend/resume, cancellation while
       suspended, stale-world discard and teardown. The METHOD-056 Vulkan smoke
       still matches the CPU.
@@ -74,9 +91,9 @@ contract_review: Reviewed the catalog. A coroutine job kind changes the JobServi
 ## Verification
 ```bash
 cmake --build --preset ci --target IntrinsicCoreWrapperUnitTests IntrinsicRuntimeContractTests IntrinsicBenchmarkTests
-ctest --test-dir build/ci --output-on-failure --timeout 120 --no-tests=error -R '^(CoreTasks|RuntimeJobService|CoherentPointDriftOperations|CpdBrokerWorkspaceReuse|ArchitectureSLO|KernelCompilationLocality)\.'
+ctest --test-dir build/ci --output-on-failure --timeout 120 --no-tests=error -R '^(CoreTasks|RuntimeJobService|CoherentPointDriftOperations|CpdBrokerWorkspaceReuse|CpdSingleWorkerWait|ArchitectureSLO|KernelCompilationLocality)\.'
 cmake --build --preset ci-vulkan --target IntrinsicPointLBVHGpuTests
-ctest --test-dir build/ci-vulkan --output-on-failure --timeout 180 --no-tests=error -L gpu -L vulkan -R '^METHOD056VulkanCpdEStep\.'
+ctest --test-dir build/ci-vulkan --output-on-failure --timeout 180 --no-tests=error -L gpu -L vulkan -R '^METHOD056VulkanCpdEStep\.DenseStatisticsAndRegistrationMatchTheCpu$'
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md --check
 python3 tools/agents/check_task_policy.py --root . --strict

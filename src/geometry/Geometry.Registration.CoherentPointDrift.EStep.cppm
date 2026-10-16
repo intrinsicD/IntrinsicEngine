@@ -86,8 +86,6 @@ export namespace Geometry::CoherentPointDrift::EStep
     //   LogDenominator_n = log(sum_m exp(a_nm) + exp(LogOutlier)),  Pt1_n = sum_m exp(a_nm - LogDenominator_n),
     // and per source m
     //   P1_m = sum_n exp(a_nm - LogDenominator_n),  PX_m = sum_n exp(a_nm - LogDenominator_n) x_n.
-    // Returns false when it cannot (no device, refused shape, device failure); the iteration then
-    // runs on the CPU. Called on the thread that evaluates.
     struct ExternalRequest
     {
         PointSet Target{}, Moved{};
@@ -100,6 +98,7 @@ export namespace Geometry::CoherentPointDrift::EStep
         std::span<const std::uint32_t> SkipRows{};
         std::span<double> LogDenominator{}, Pt1{}, P1{}, PXx{}, PXy{}, PXz{};
     };
+    // Synchronous Evaluate invokes this callback on its own thread; false requests CPU fallback.
     using ExternalEvaluator = std::function<bool(const ExternalRequest&)>;
     // Vulkan: rows whose first-order fp32 error estimate (reported as their error bound) exceeds
     // this are evaluated exactly on the CPU (e.g. rows far from every source under a narrow
@@ -209,6 +208,8 @@ export namespace Geometry::CoherentPointDrift::EStep
     void ParallelRange(std::size_t count, std::size_t grain, std::uint32_t threads,
                        const std::function<void(std::size_t, std::size_t)>& body);
 
+    enum class EvaluationState : std::uint8_t { Failed, Complete, AwaitingExternal };
+
     class Evaluator
     {
     public:
@@ -217,7 +218,8 @@ export namespace Geometry::CoherentPointDrift::EStep
         Evaluator(Evaluator&&) noexcept;
         Evaluator& operator=(Evaluator&&) noexcept;
 
-        // The target is fixed for the evaluator's lifetime (its spatial index is cached).
+        // Replaces the fixed target and its cached index. Any pending external writer must
+        // have stopped before replacement; the pending evaluation is then abandoned.
         void SetTarget(PointSet target);
         // logOutlier = log c of the uniform component (-inf for no outliers). Optional finite
         // source log-weights w_m multiply each source's kernel term by exp(w_m) (Bayesian CPD's
@@ -225,8 +227,19 @@ export namespace Geometry::CoherentPointDrift::EStep
         // mass went to the outlier term or a value is not finite.
         [[nodiscard]] bool Evaluate(PointSet moved, double sigma2, double logOutlier, const Settings& settings,
                                     Sums& out, std::span<const double> sourceLogWeights = {});
+        // Split evaluation for an external device. While pending, moved and out must remain
+        // alive with stable storage; only the external writer may change request outputs.
+        // Request spans refer to evaluator-owned scratch and those views.
+        // Calls may migrate threads but must not overlap. A second Begin is rejected unchanged.
+        // AwaitingExternal is independent of Settings::External, used only by Evaluate.
+        [[nodiscard]] EvaluationState BeginEvaluate(PointSet moved, double sigma2, double logOutlier,
+                                                    const Settings& settings, Sums& out,
+                                                    std::span<const double> sourceLogWeights = {});
+        [[nodiscard]] const ExternalRequest* PendingExternalRequest() const noexcept;
+        // Consume supplied output once, or evaluate the same step on the CPU after refusal.
+        [[nodiscard]] bool CompleteExternal(bool success);
         // The landmarks of the last accepted or attempted Nystrom evaluation (empty before one);
-        // valid until the next Evaluate or SetTarget (diagnostics and tests).
+        // valid until the next BeginEvaluate/Evaluate or SetTarget (diagnostics and tests).
         [[nodiscard]] PointSet NystromLandmarks() const noexcept;
 
     private:

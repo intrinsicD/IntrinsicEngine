@@ -70,3 +70,23 @@ TEST(TriangleMetrics, NonFiniteTriangleReturnsFiniteZeroedMetrics)
     ExpectVecNear(bad.Angles(), {0.0f, 0.0f, 0.0f}, 0.0f);
     EXPECT_EQ(bad.StableArea(), 0.0f);
 }
+
+
+TEST(TriangleMetrics, UniformScalePreservesNormalAndInteriorProjection)
+{
+    for (const float scale : {1.0e-8f, 5.0e-4f, 1.0f, 1.0e8f})
+    {
+        SCOPED_TRACE(scale);
+        const Geometry::Triangle triangle{{0, 0, 0}, {scale, 0, 0}, {0, scale, 0}};
+        ExpectVecNear(triangle.GetNormal(), {0, 0, 1}, 1.0e-6f);
+        const glm::vec3 projected = Geometry::ClosestPoint(triangle, {scale * .2f, scale * .2f, scale * .3f});
+        ExpectVecNear(projected / scale, {.2f, .2f, 0}, 1.0e-6f);
+        ExpectVecNear(triangle.EdgeLengths() / scale, {std::sqrt(2.f), 1, 1}, 1.0e-6f);
+        EXPECT_NEAR(triangle.Perimeter() / scale, 2.f + std::sqrt(2.f), 1.0e-6f);
+        ExpectVecNear(triangle.Angles(), {std::numbers::pi_v<float> * .5f,
+                      std::numbers::pi_v<float> * .25f, std::numbers::pi_v<float> * .25f}, 1.0e-6f);
+    }
+    const Geometry::Triangle collinear{{0, 0, 0}, {1, 0, 0}, {2, 0, 0}};
+    EXPECT_EQ(collinear.GetNormal(), glm::vec3(0));
+    ExpectVecNear(Geometry::ClosestPoint(collinear, {.5f, 1, 0}), {.5f, 0, 0}, 1.0e-6f);
+}

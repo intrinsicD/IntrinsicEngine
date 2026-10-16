@@ -801,7 +801,6 @@ namespace Extrinsic::Core::Dag
         // Schedule stats and timings.
         uint64_t LastCompileNs = 0u;
         std::atomic<uint64_t> LastExecuteNs{0u};
-        uint64_t LastCriticalPathNs = 0u;
         ScheduleStats LastStats{};
         TaskGraphPlanReuseStats PlanReuseStats{};
 
@@ -1165,8 +1164,6 @@ namespace Extrinsic::Core::Dag
             m_Impl->ReplayRegistration = false;
             m_Impl->Compiled = true;
             m_Impl->LastCompileNs = 0u;
-            m_Impl->LastCriticalPathNs =
-                m_Impl->LastStats.criticalPathCost;
             ++m_Impl->PlanReuseStats.PlanReuseCount;
             m_Impl->PlanReuseStats.LastCompileReusedPlan = true;
             return Ok();
@@ -1194,7 +1191,6 @@ namespace Extrinsic::Core::Dag
             m_Impl->LastStats = ScheduleStats{};
             m_Impl->LastStats.lastDiagnostic = diagnostic;
             m_Impl->LastCompileNs = 0u;
-            m_Impl->LastCriticalPathNs = 0u;
             return Err(compiled.error());
         }
 
@@ -1212,7 +1208,6 @@ namespace Extrinsic::Core::Dag
         const auto t1 = std::chrono::high_resolution_clock::now();
         m_Impl->LastCompileNs = static_cast<std::uint64_t>(
             std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count());
-        m_Impl->LastCriticalPathNs = m_Impl->LastStats.criticalPathCost;
         return Ok();
     }
 
@@ -1472,7 +1467,6 @@ namespace Extrinsic::Core::Dag
         m_Impl->NextResourceIdx = 0u;
         m_Impl->LastCompileNs = 0u;
         m_Impl->LastExecuteNs.store(0u, std::memory_order_release);
-        m_Impl->LastCriticalPathNs = 0u;
         m_Impl->LastStats = ScheduleStats{};
         return Ok();
     }
@@ -1516,7 +1510,6 @@ namespace Extrinsic::Core::Dag
         m_Impl->NextResourceIdx = 0u;
         m_Impl->LastCompileNs = 0u;
         m_Impl->LastExecuteNs.store(0u, std::memory_order_release);
-        m_Impl->LastCriticalPathNs = 0u;
         return Ok();
     }
 
@@ -1548,7 +1541,6 @@ namespace Extrinsic::Core::Dag
     {
         return m_Impl->LastExecuteNs.load(std::memory_order_acquire);
     }
-    std::uint64_t TaskGraph::LastCriticalPathTimeNs() const noexcept { return m_Impl->LastCriticalPathNs; }
 
     ScheduleStats TaskGraph::GetScheduleStats() const noexcept
     {

@@ -85,5 +85,11 @@ Generated API and inventory docs:
 
 ## Reviews and reports
 
+- [Graphics source audit and follow-up handoff, 2026-10-16](reports/2026-10-16-src-graphics-audit.md)
+- [Source audit collection for cross-subsystem follow-up](reviews/src-audits.md)
+- [Runtime source audit and follow-up handoff, 2026-10-16](reviews/2026-10-16-src-runtime-audit.md)
 - [Reviews](reviews/)
+- [Geometry source audit 2026-10-16](reviews/2026-10-16-src-geometry-audit.md) — prioritized bugs, API/style findings, existing owners, reproduction evidence and cross-subsystem handoff.
 - [Reports](reports/)
+- [Audit src/platform vom 2026-10-16](reports/2026-10-16-src-platform-audit.md)
+- [Physics source audit and handoff 2026-10-16](reports/2026-10-16-src-physics-audit.md) — `src/physics`, Runtime/ECS integration, reproduced defects, cleanup and follow-up tests.

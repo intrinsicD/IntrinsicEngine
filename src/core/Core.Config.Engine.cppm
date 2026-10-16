@@ -1,3 +1,4 @@
+// Engine configuration values and sorted application-section storage.
 module;
 
 #include <algorithm>

@@ -4,6 +4,7 @@
 // imports, including Core.Error for shared result diagnostics.
 #pragma once
 #include <limits>
+#include "Editor/internal/Runtime.EditorPropertyHistory.hpp"
 #include "GeometryIntegration/Runtime.GeometryPositionCapture.hpp"
 
 extern "C++"
@@ -37,19 +38,8 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
 
     }
 
-        struct PointPropertyWatch
-        {
-            GeometryElementDomain Domain{};
-            std::string Name{};
-            std::size_t Count{};
-            std::optional<Geometry::PropertyRevision> Revision{};
-            bool operator==(const PointPropertyWatch&) const = default;
-        };
-    [[nodiscard]] PointPropertyWatch ObserveGeometryProperty(const GeometryEntityAvailability&, GeometryElementDomain, std::string);
     [[nodiscard]] Geometry::PropertySet* MutableGeometryProperties(entt::registry&, entt::entity, GeometryElementDomain);
     [[nodiscard]] GeometryElementDomain PrimaryPointDomain(const GeometryEntityAvailability&);
-    [[nodiscard]] bool GeometryPropertiesCurrent(const EditorProcessingContext&, entt::entity,
-                                               std::span<const PointPropertyWatch>);
 
     // Deferred mesh-field validation shares session lifetime and revision guards.
     [[nodiscard]] bool PrepareMeshFieldInput(
@@ -152,8 +142,8 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         std::span<const float> After{};
         std::span<const std::uint32_t> AfterUInt{};
     };
-    // Multi-output form: one undoable history entry guarded by the inputs' and every output's
-    // watch. Every column is prepared before history runs and every write is checked before
+    // Multi-output form: initial captured watches and shared replay watches protect every output.
+    // Input watches remain fixed. Every column is prepared before history runs and checked before
     // the first one, so no column is published alone. `InvalidCommand` reports an output whose
     // values its storage cannot represent exactly (the single-output form delegates here).
     [[nodiscard]] EditorCommandHistoryStatus PublishPointScalarField(

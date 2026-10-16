@@ -177,7 +177,6 @@ graphics task families.
 - [`tasks/done/GRAPHICS-014Q`](../../tasks/archive/GRAPHICS-014Q-visualization-runtime-backend-clarifications.md) records the four clarification decisions captured in §§1–4.
 - [`tasks/done/GRAPHICS-010Q`](../../tasks/archive/GRAPHICS-010Q-transient-debug-backend-clarifications.md) records the two-pipeline-variant policy reused by §5 and the transient-debug backend-local upload pattern referenced by §3.
 - `docs/architecture/rendering-three-pass.md` carries the matching visualization attribute and overlay packet contract section authored by `GRAPHICS-014Q`.
-- `src/graphics/renderer/README.md` carries the matching ownership-contract bullet next to the existing `Graphics.VisualizationPackets` entry.
 - `tests/contract/runtime/Test.VisualizationRecipes.cpp` covers every recipe
   alternative, deterministic failures, range policy, batch ownership, and the
   separate HTEX scheduling operation.

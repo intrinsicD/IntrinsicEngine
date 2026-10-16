@@ -48,6 +48,7 @@ target_sources(${target_name}
         FILE_SET memory_impl TYPE CXX_MODULES FILES
         Core.Memory.LinearArena.cpp
         PRIVATE
+        Core.Base64.cpp
         Core.Config.EngineLoad.cpp
         Core.Dag.Scheduler.Hazards.cpp
         Core.Dag.Scheduler.cpp

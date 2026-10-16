@@ -201,7 +201,12 @@
   its returned eigenvalues are clamped non-negative for that covariance use case.
   Signed curvature tensors use their own tangent-plane decomposition rather than
   passing a non-PSD matrix through this covariance-specific surface. No public
-  Eigen types appear on the `Geometry.PCA` surface.
+  Eigen types appear on the `Geometry.PCA` surface. The CPU eigensolver and its
+  float64 GLSL twin normalize covariance coefficients before rank tests and
+  restore eigenvalue units afterward. `ToPCA::Flat` uses the double eigenvalue
+  ratio without an absolute scale floor. Input float coordinates must still
+  resolve local offsets; casting covariance eigenvalues to the public float
+  `PCAResult` can underflow or overflow at extreme scales.
 
 ## API style, diagnostics, and numeric policy
 
@@ -1361,6 +1366,15 @@ Slice 3 pins the contract for that constant:
   requires. Any future migration to a magnitude tolerance must revisit
   this section and the GEOM-015 callsite audit before changing the
   constant.
+- **EPA handoff.** EPA completes an accepted line or triangle by appending
+  support points in the same normalized workspace. Initial face winding uses
+  the opposite tetrahedron vertex; expansion preserves directed horizon edges
+  and signed face distances. Flat support pairs within the inherited GJK
+  predicate slack report touching with zero depth. That slack grows for short
+  later GJK edges or small triangles: overlaps thinner than it report zero
+  depth, with no resolution finer than GJK's inherited tolerance. Invalid
+  expansion or the iteration limit returns no manifold with a diagnostic; it never fabricates
+  penetration. Physics creates no contact or trigger for that failed pair.
 - **Termination diagnostics.** GEOM-015 Slice 4 surfaces the GJK
   iteration count and termination reason via the
   `Geometry::Internal::GJKDiagnostics` out-param (with fields

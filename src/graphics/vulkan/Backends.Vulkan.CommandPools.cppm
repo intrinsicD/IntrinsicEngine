@@ -75,6 +75,10 @@ namespace Extrinsic::Backends::Vulkan
             return m_Recording;
         }
 
+        // EndFrame may discard only a frame whose primary recording never started.
+        [[nodiscard]] bool IsExecutable() const noexcept { return m_CommandBufferExecutable; }
+        [[nodiscard]] bool WasRecordingAttempted() const noexcept { return m_RecordingAttempted; }
+
         void Begin() override;
         void End()   override;
         void ExecuteSecondary(VulkanCommandContext& secondary);
@@ -143,6 +147,7 @@ namespace Extrinsic::Backends::Vulkan
         VkPipelineBindPoint m_BindPoint  = VK_PIPELINE_BIND_POINT_GRAPHICS;
         bool             m_Recording     = false;
         bool             m_CommandBufferExecutable = false;
+        bool             m_RecordingAttempted = false;
         VulkanCommandBufferLevel m_CommandBufferLevel = VulkanCommandBufferLevel::Primary;
 
         Core::ResourcePool<VulkanBuffer,   RHI::BufferHandle,   kMaxFramesInFlight>* m_Buffers   = nullptr;

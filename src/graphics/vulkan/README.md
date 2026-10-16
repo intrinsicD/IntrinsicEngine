@@ -160,9 +160,16 @@ available through the Vulkan 1.2/1.3 feature chain.
   diagnostics and return invalid `RHI::TransferToken` values instead of aborting
   through `VK_CHECK_FATAL`. Uploads also preflight service validity, data
   pointers, sizes, buffer ranges, texture mip/layer bounds, transfer-dst usage,
-  and staging allocation before recording commands. Submitted command buffers are
-  retained until the timeline semaphore reports completion, then reclaimed by
-  `CollectCompleted()` with the staging-belt allocation. Texture-upload final
+  and staging allocation before recording commands. Single-subresource uploads
+  require the exact mip byte count from `RHI.TextureUpload` and use its format
+  block alignment. The three upload entry points serialize allocation, CPU copy,
+  recording and submission as one staging transaction. Failed begin/end/submit
+  cancels that transaction; the span overload delegates to the raw-buffer path.
+  The private `StagingRing` counts occupied bytes including alignment/wrap
+  padding, pending reservations, and ticketed regions. `CollectCompleted()`
+  reclaims only completed regions under the belt mutex, without acquiring the
+  upload transaction mutex or holding locks while invoking readback callbacks.
+  Submitted command buffers are retained until their timeline completion. Texture-upload final
   layout transitions are recorded on the transfer command pool, so their
   destination stage/access scopes must remain transfer-queue-valid; shader-stage
   visibility is established later by graphics/renderer-side use barriers rather
@@ -300,6 +307,8 @@ available through the Vulkan 1.2/1.3 feature chain.
   carries the last frame/image indices, requested resize extent, availability
   booleans, pending-resize/device-lost flags, last Vulkan result code, and the
   same process-monotonic lifecycle counters exposed by `FallbackDiagnosticsSnapshot`.
+  `DeferredDeletesExecuted` counts completed native deletion actions once,
+  including shutdown flushes; it observes execution rather than CPU-handle retirement.
   UI-030 adds backend-local microsecond timings to the same snapshot for total
   begin-frame, fence wait, acquire-next-image, total end-frame, queue submit,
   and present calls. Fail-closed paths keep call-specific timings at zero when
@@ -313,6 +322,13 @@ available through the Vulkan 1.2/1.3 feature chain.
   asserts that fail-closed lifecycle skip paths never raise `DeviceLost` and
   that `LastVkResult` stays `0` (no Vulkan call issued) so renderer/runtime CI
   cannot accidentally confuse "Vulkan never bootstrapped" with "Vulkan was lost".
+- When a renderer aborts a serial frame before command recording starts,
+  `EndFrame` records only the acquired image's transition to present layout.
+  The normal submit/present path consumes the acquire semaphore, releases the
+  image, and permits frame-slot reuse; discarded backbuffer contents are unspecified.
+  Failed or partial recording is not replaced with this cleanup. A non-executable
+  serial context fails before fence reset, keeps the acquired state for teardown,
+  and cannot recover through `Resize`. Multi-queue submission is unchanged.
 - `VulkanCommandContext` is fail-closed before operational bring-up: unbound or
   not-begun command recording calls skip with logger diagnostics instead of
   issuing Vulkan commands against null/non-recording command-buffer state.
@@ -474,8 +490,13 @@ available through the Vulkan 1.2/1.3 feature chain.
   and [BUG-229](../../../tasks/backlog/bugs/BUG-229-nvidia-xephyr-shutdown-retention.md).
 - Runtime resource-slot reclamation is separate from deferred Vulkan-object
   destruction. `DestroyBuffer`/`DestroyTexture`/`DestroySampler`/
-  `DestroyPipeline` move the live Vulkan handles into the per-frame deletion
-  queue, then soft-delete the CPU `ResourcePool` slot. `VulkanDevice` runs
+  `DestroyPipeline` soft-delete the CPU `ResourcePool` slot and share one native
+  deletion action across all live frame-slot queues. The action executes once
+  after those queues pass their existing fence waits, including when destruction
+  occurs after `EndFrame` advances the slot. This retains resources for the same
+  frame cycle without storing a last-submission slot; it is frame-slot retirement,
+  not general last-use tracking for independently submitted transfer work.
+  `WaitIdle()` does not flush these queues; `Shutdown()` waits idle and flushes them. `VulkanDevice` runs
   `ProcessResourcePoolDeletions()` from the frame loop after retired work is
   fence-safe and from fail-closed `EndFrame()` exits, so buffer/image/sampler/
   pipeline slots return to the free list after the frames-in-flight retirement
@@ -824,6 +845,7 @@ is stable across a frame. Counters are process-monotonic across
 | `Backends.Vulkan.Mappings.cpp` | §2 RHI enum → Vulkan enum conversion tables (`ToVkFormat`, `ToVkImageLayout`, `AspectFromFormat`, `ToVkBufferUsage`, etc.) |
 | `Backends.Vulkan.DiagnosticsLogging.cpp` | §3 logging bridge for `VK_CHECK_*` macros declared in `Vulkan.hpp`; routes diagnostics through `Core::Log::*` without importing modules from the header. |
 | `Backends.Vulkan.Staging.cpp` | §5 `StagingBelt` — host-visible ring-buffer for async uploads |
+| `Backends.Vulkan.StagingRing.hpp` | Backend-private, std-only offset accounting shared by the belt and CPU tests |
 | `Backends.Vulkan.Profiler.cpp` | §6 `VulkanProfiler` — `IProfiler` backed by `VkQueryPool` timestamps |
 | `Backends.Vulkan.Bindless.cpp` | §7 `VulkanBindlessHeap` — `IBindlessHeap` with `PARTIALLY_BOUND` descriptor array |
 | `Backends.Vulkan.Transfer.cpp` | §8 `VulkanTransferQueue` — `ITransferQueue` via timeline semaphore, `StagingBelt`, and mapped readback slots |

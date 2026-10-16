@@ -121,10 +121,26 @@ export namespace Geometry::HalfedgeMesh
         [[nodiscard]] bool IsEmpty() const noexcept { return VertexCount() == 0; }
 
         // Validity / deletion
-        [[nodiscard]] bool IsValid(VertexHandle v) const { return v.Index < VerticesSize(); }
-        [[nodiscard]] bool IsValid(HalfedgeHandle h) const { return h.Index < HalfedgesSize(); }
-        [[nodiscard]] bool IsValid(EdgeHandle e) const { return e.Index < EdgesSize(); }
-        [[nodiscard]] bool IsValid(FaceHandle f) const { return f.Index < FacesSize(); }
+        [[nodiscard]] bool IsValid(VertexHandle v) const
+        {
+            const std::size_t offset = m_IsSubmeshView ? m_VertexRange.Offset : 0u;
+            return v.IsValid() && v.Index >= offset && v.Index - offset < VerticesSize();
+        }
+        [[nodiscard]] bool IsValid(HalfedgeHandle h) const
+        {
+            const std::size_t offset = m_IsSubmeshView ? m_EdgeRange.Offset * 2u : 0u;
+            return h.IsValid() && h.Index >= offset && h.Index - offset < HalfedgesSize();
+        }
+        [[nodiscard]] bool IsValid(EdgeHandle e) const
+        {
+            const std::size_t offset = m_IsSubmeshView ? m_EdgeRange.Offset : 0u;
+            return e.IsValid() && e.Index >= offset && e.Index - offset < EdgesSize();
+        }
+        [[nodiscard]] bool IsValid(FaceHandle f) const
+        {
+            const std::size_t offset = m_IsSubmeshView ? m_FaceRange.Offset : 0u;
+            return f.IsValid() && f.Index >= offset && f.Index - offset < FacesSize();
+        }
 
         [[nodiscard]] bool IsDeleted(VertexHandle v) const { return m_VDeleted[v]; }
         [[nodiscard]] bool IsDeleted(HalfedgeHandle h) const { return m_EDeleted[Edge(h)]; }

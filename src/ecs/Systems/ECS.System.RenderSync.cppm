@@ -1,3 +1,4 @@
+// Forwards world-update markers to runtime render dirty tags without owning GPU state.
 module;
 
 #include <cstdint>
@@ -21,8 +22,7 @@ export namespace Extrinsic::ECS::Systems::RenderSync
     struct Stats
     {
         // Number of entities that carried `Transform::WorldUpdatedTag` on
-        // entry to the pass (i.e. updates produced by the transform
-        // hierarchy this substep).
+        // entry to the pass (from hierarchy propagation or runtime physics writeback).
         std::uint32_t WorldUpdatedObserved = 0;
         // Number of entities on which `DirtyTags::DirtyTransform` was
         // newly stamped (or refreshed via emplace_or_replace) by the pass.
@@ -34,7 +34,7 @@ export namespace Extrinsic::ECS::Systems::RenderSync
 
     // Forward the CPU "world matrix was rewritten this substep" signal
     // (`Transform::WorldUpdatedTag`, produced by
-    // `Systems::TransformHierarchy`) into the GPU-sync signal
+    // `Systems::TransformHierarchy` or runtime physics writeback) into the GPU-sync signal
     // (`DirtyTags::DirtyTransform`, drained by runtime render extraction)
     // and clear `WorldUpdatedTag` so the producer/consumer cycle is
     // closed within the ECS layer.

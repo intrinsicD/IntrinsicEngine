@@ -15,6 +15,27 @@ import Geometry.RobustPredicates;
 
 namespace Geometry
 {
+    std::optional<float> RaySphereParameter(const Ray& ray, const Sphere& sphere)
+    {
+        if (!Validation::IsFinite(ray.Origin) || !Validation::IsFinite(ray.Direction) ||
+            !Validation::IsValid(sphere)) return std::nullopt;
+        const glm::dvec3 direction(ray.Direction);
+        const glm::dvec3 offset = glm::dvec3(ray.Origin) - glm::dvec3(sphere.Center);
+        const double a = glm::dot(direction, direction);
+        if (!(a > 0.0)) return std::nullopt;
+        const double b = glm::dot(offset, direction);
+        const double c = glm::dot(offset, offset) - double(sphere.Radius) * sphere.Radius;
+        if (c <= 0.0) return 0.0f;
+        if (b > 0.0) return std::nullopt;
+        const double discriminant = b * b - a * c;
+        if (discriminant < 0.0) return std::nullopt;
+        // Rationalized near root avoids subtracting two similar positive values.
+        const double parameter = c / (-b + std::sqrt(discriminant));
+        if (!std::isfinite(parameter) || parameter > std::numeric_limits<float>::max())
+            return std::nullopt;
+        return static_cast<float>(parameter);
+    }
+
     [[nodiscard]] bool RayAabbSlabInterval(const Ray& r,
                                            const AABB& b,
                                            float& tmin,

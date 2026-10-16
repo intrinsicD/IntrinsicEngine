@@ -7,9 +7,11 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <functional>
 #include <limits>
 #include <random>
 #include <span>
+#include <thread>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -1257,4 +1259,202 @@ TEST(CoherentPointDriftAccelerated, BoxLandmarksAreUniformOverTheUnionOfTheBoxes
         EXPECT_NEAR(onlyB / total, (vb - vab) / vu, 0.03) << int(pattern);
         EXPECT_NEAR(both / total, vab / vu, 0.03) << int(pattern);
     }
+}
+
+
+namespace
+{
+    void ExpectSplitResultMatchesReference(const CPD::Result& reference, const CPD::Result& split)
+    {
+        ASSERT_TRUE(reference.Succeeded());
+        ASSERT_TRUE(split.Succeeded());
+        ASSERT_EQ(split.TransformedSource.size(), reference.TransformedSource.size());
+        EXPECT_EQ(split.Iterations, reference.Iterations);
+        EXPECT_EQ(split.Stop, reference.Stop);
+        EXPECT_LE(MaxPointDifference(reference, split), 1e-9);
+        EXPECT_LE(MaxTransformDifference(reference, split), 1e-9);
+        EXPECT_NEAR(split.Sigma2, reference.Sigma2, 1e-9);
+        EXPECT_NEAR(split.NegativeLogLikelihood, reference.NegativeLogLikelihood,
+                    1e-9 * (1.0 + std::abs(reference.NegativeLogLikelihood)));
+    }
+}
+
+TEST(CoherentPointDriftAccelerated, SplitBayesianStepOwnsMixedRowsAcrossThreadsAndInterleavedSolvers)
+{
+    // Same narrow-row fixture as VulkanPolicyEvaluatesRowsTooNarrowForFp32OnTheCpu. The second
+    // iteration also carries nonuniform Bayesian source weights from the first M-step.
+    std::mt19937 random(73u);
+    std::normal_distribution<float> spread(0.0f, 0.03f);
+    std::vector<glm::vec3> target, source;
+    for (int k = 0; k < 120; ++k)
+    {
+        const float side = k % 2 ? 1.0f : -1.0f;
+        target.push_back({side + spread(random), spread(random), spread(random)});
+        source.push_back({side + spread(random), spread(random), spread(random)});
+    }
+    target.push_back({-1.0f, 0.4f, 0.0f});
+    CPD::Params params{.Method = CPD::Variant::Bayesian, .OutlierWeight = 0.0,
+        .MaxIterations = 2u, .Tolerance = 0.0, .InitialSigma2 = 1e-3,
+        .NormalizeInputs = false, .EStep = CPD::EStepPolicy::Vulkan, .Threads = 1u, .Kappa = 0.4};
+    bool cancelPaused = false;
+    params.Cancelled = [&] { return cancelPaused; };
+    auto referenceParams = params;
+    referenceParams.Cancelled = {};
+    referenceParams.EStep = CPD::EStepPolicy::Reference;
+    const auto reference = CPD::Register(target, source, referenceParams);
+    CPD::Solver solver, interleaved;
+    ASSERT_EQ(solver.Initialize(target, source, params), CPD::Status::Success);
+    ASSERT_EQ(interleaved.Initialize(target, source, referenceParams), CPD::Status::Success);
+    std::size_t calls = 0u, observations = 0u;
+    for (std::uint32_t iteration = 0u; iteration < 2u; ++iteration)
+    {
+        const auto before = solver.Current();
+        ASSERT_EQ(solver.BeginStep(), CPD::StepState::AwaitingExternal);
+        const auto* request = solver.PendingExternalRequest();
+        ASSERT_NE(request, nullptr);
+        ASSERT_EQ(request->LogWeights.size(), source.size());
+        if (iteration == 0u)
+        {
+            ASSERT_EQ(request->SkipRows.size(), target.size());
+            EXPECT_EQ(std::ranges::count(request->SkipRows, 1u), 1);
+            EXPECT_GT(std::ranges::count(request->SkipRows, 0u), 0);
+        }
+        else
+        {
+            const auto [least, greatest] = std::ranges::minmax_element(request->LogWeights);
+            EXPECT_GT(*greatest - *least, 1e-6);
+        }
+        EXPECT_EQ(solver.Current().Iterations, before.Iterations);
+        EXPECT_EQ(solver.Current().Sigma2, before.Sigma2);
+        EXPECT_EQ(MaxPointDifference(solver.Current(), before), 0.0);
+        cancelPaused = true;
+        (void)interleaved.Step();
+        std::size_t independentChunks = 0u;
+        CPD::EStep::ParallelRange(1u, 1u, 1u, [&](std::size_t, std::size_t) { ++independentChunks; });
+        EXPECT_EQ(independentChunks, 1u) << "Begin must restore the origin thread cancellation scope";
+        cancelPaused = false;
+        bool external = false;
+        const auto origin = std::this_thread::get_id();
+        std::thread::id completion;
+        std::size_t outsideCompletionChunks = 0u;
+        std::thread worker([&] {
+            completion = std::this_thread::get_id();
+            const std::function<bool()> cancelledOutsideSolver = [] { return true; };
+            const CPD::EStep::CancellationScope outer(&cancelledOutsideSolver);
+            external = ReferenceExternal(*request, calls);
+            (void)solver.CompleteExternalStep(external, [&](const CPD::IterationTrace&) { ++observations; });
+            CPD::EStep::ParallelRange(1u, 1u, 1u,
+                [&](std::size_t, std::size_t) { ++outsideCompletionChunks; });
+        });
+        worker.join();
+        EXPECT_NE(completion, origin);
+        EXPECT_EQ(outsideCompletionChunks, 0u) << "Complete must restore the completing thread scope";
+        ASSERT_TRUE(external);
+        EXPECT_EQ(solver.PendingExternalRequest(), nullptr);
+    }
+    ExpectSplitResultMatchesReference(reference, solver.Current());
+    EXPECT_EQ(calls, 2u);
+    EXPECT_EQ(observations, 2u);
+    EXPECT_EQ(solver.Current().EStepDeviceIterations, 2u);
+    EXPECT_EQ(solver.Current().EStepFallbacks, 0u);
+    EXPECT_GE(solver.Current().EStepDeviceCpuRows, 1u);
+}
+
+TEST(CoherentPointDriftAccelerated, SplitRefusalFallsBackOnTheCompletingThread)
+{
+    const auto source = Cloud(48u, 912u);
+    const auto target = Rigid(source, 0.2, {0.1, -0.05, 0.2}, 0.002, 913u);
+    CPD::Params params{.MaxIterations = 1u, .Tolerance = 0.0, .InitialSigma2 = 10.0,
+        .EStep = CPD::EStepPolicy::Vulkan, .Threads = 1u};
+    auto referenceParams = params;
+    referenceParams.EStep = CPD::EStepPolicy::Reference;
+    const auto reference = CPD::Register(target, source, referenceParams);
+    CPD::Solver solver;
+    ASSERT_EQ(solver.Initialize(target, source, params), CPD::Status::Success);
+    ASSERT_EQ(solver.BeginStep(), CPD::StepState::AwaitingExternal);
+    ASSERT_NE(solver.PendingExternalRequest(), nullptr);
+    std::size_t observations = 0u;
+    bool more = true;
+    std::thread worker([&] {
+        more = solver.CompleteExternalStep(false, [&](const CPD::IterationTrace&) { ++observations; });
+    });
+    worker.join();
+    EXPECT_FALSE(more); // successful final iteration has the same false return as Step
+    EXPECT_TRUE(solver.Finished());
+    EXPECT_EQ(solver.PendingExternalRequest(), nullptr);
+    ExpectSplitResultMatchesReference(reference, solver.Current());
+    EXPECT_EQ(observations, 1u);
+    EXPECT_EQ(solver.Current().EStepDeviceIterations, 0u);
+    EXPECT_EQ(solver.Current().EStepFallbacks, 1u);
+}
+
+TEST(CoherentPointDriftAccelerated, SplitReentrantBeginPreservesThePendingRequest)
+{
+    const auto source = Cloud(48u, 914u);
+    const auto target = Rigid(source, 0.3, {0.05, 0.1, -0.1}, 0.002, 915u);
+    CPD::Params params{.MaxIterations = 1u, .Tolerance = 0.0, .InitialSigma2 = 10.0,
+        .EStep = CPD::EStepPolicy::Vulkan, .Threads = 1u};
+    auto referenceParams = params;
+    referenceParams.EStep = CPD::EStepPolicy::Reference;
+    const auto reference = CPD::Register(target, source, referenceParams);
+    CPD::Solver solver;
+    ASSERT_EQ(solver.Initialize(target, source, params), CPD::Status::Success);
+    const auto before = solver.Current();
+    ASSERT_EQ(solver.BeginStep(), CPD::StepState::AwaitingExternal);
+    const auto* request = solver.PendingExternalRequest();
+    ASSERT_NE(request, nullptr);
+    const auto* data = request->P1.data();
+    EXPECT_EQ(solver.BeginStep(), CPD::StepState::Failed);
+    EXPECT_EQ(solver.Current().State, before.State);
+    ASSERT_EQ(solver.PendingExternalRequest(), request);
+    EXPECT_EQ(request->P1.data(), data);
+    EXPECT_EQ(solver.Current().Iterations, before.Iterations);
+    EXPECT_EQ(solver.Current().Sigma2, before.Sigma2);
+    EXPECT_EQ(MaxPointDifference(solver.Current(), before), 0.0);
+    std::size_t calls = 0u, observations = 0u;
+    ASSERT_TRUE(ReferenceExternal(*request, calls));
+    EXPECT_FALSE(solver.CompleteExternalStep(true, [&](const CPD::IterationTrace&) { ++observations; }));
+    EXPECT_EQ(solver.PendingExternalRequest(), nullptr);
+    EXPECT_FALSE(solver.CompleteExternalStep(true, [&](const CPD::IterationTrace&) { ++observations; }));
+    ExpectSplitResultMatchesReference(reference, solver.Current());
+    EXPECT_EQ(calls, 1u);
+    EXPECT_EQ(observations, 1u);
+    EXPECT_EQ(solver.Current().EStepDeviceIterations, 1u);
+    EXPECT_EQ(solver.Current().EStepFallbacks, 0u);
+}
+
+
+TEST(CoherentPointDriftAccelerated, SplitPendingStepCanBeAbandonedByReinitialization)
+{
+    const auto source = Cloud(48u, 916u);
+    const auto target = Rigid(source, 0.2, {0.1, -0.1, 0.05}, 0.002, 917u);
+    CPD::Params params{.MaxIterations = 1u, .Tolerance = 0.0, .InitialSigma2 = 10.0,
+        .EStep = CPD::EStepPolicy::Vulkan, .Threads = 1u};
+    EXPECT_FALSE(params.EStepExternal); // split requests do not require the synchronous callback
+    CPD::Solver solver;
+    ASSERT_EQ(solver.Initialize(target, source, params), CPD::Status::Success);
+    const auto before = solver.Current();
+    ASSERT_EQ(solver.BeginStep(), CPD::StepState::AwaitingExternal);
+    ASSERT_NE(solver.PendingExternalRequest(), nullptr);
+    const auto paused = solver.Current();
+    EXPECT_EQ(paused.State, before.State);
+    EXPECT_EQ(paused.Iterations, before.Iterations);
+    EXPECT_EQ(paused.Sigma2, before.Sigma2);
+    EXPECT_EQ(paused.ObjectiveHistory, before.ObjectiveHistory);
+    EXPECT_EQ(MaxPointDifference(paused, before), 0.0);
+    EXPECT_EQ(MaxTransformDifference(paused, before), 0.0);
+
+    // No external writer was started, so Initialize may discard the pending request.
+    const auto replacementSource = Cloud(32u, 918u);
+    const auto replacementTarget = Rigid(replacementSource, 0.3, {-0.2, 0.1, 0.0}, 0.002, 919u);
+    params.EStep = CPD::EStepPolicy::Reference;
+    const auto reference = CPD::Register(replacementTarget, replacementSource, params);
+    ASSERT_EQ(solver.Initialize(replacementTarget, replacementSource, params), CPD::Status::Success);
+    EXPECT_EQ(solver.PendingExternalRequest(), nullptr);
+    EXPECT_EQ(solver.Current().Iterations, 0u);
+    EXPECT_EQ(solver.Current().TransformedSource.size(), replacementSource.size());
+    solver.Run();
+    ExpectSplitResultMatchesReference(reference, solver.Current());
+    EXPECT_EQ(solver.Current().EStepDeviceIterations, 0u);
+    EXPECT_EQ(solver.Current().EStepFallbacks, 0u);
 }

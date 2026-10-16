@@ -1,3 +1,4 @@
+// Window configuration values and configured or headless backend selection.
 module;
 
 #include <cstdint>

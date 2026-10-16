@@ -1,14 +1,26 @@
 module;
 #include <cmath>
 #include <nlohmann/json.hpp>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <vector>
 module Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.ConfigFieldSpec;
+#include "Config/internal/Runtime.ConfigFieldJson.hpp"
 namespace Extrinsic::Runtime
 {
     namespace
     {
         using Json = nlohmann::json;
         constexpr std::string_view schema = "intrinsic.runtime.selection";
-        constexpr const char* targets[] = {"entity", "vertex", "edge", "face"};
+        constexpr std::string_view targets[] = {"entity", "vertex", "edge", "face"};
+        constexpr ConfigFieldSpec kSelectionFields[]{
+            {.Name = "target", .Type = ConfigFieldType::StringEnum, .Description = "Selectable primitive domain.", .EnumValues = targets},
+            {.Name = "highlight", .Type = ConfigFieldType::Bool, .Description = "Show selection highlights."},
+            {.Name = "point_radius", .Type = ConfigFieldType::Float, .Description = "Point selection radius in world units.", .Min = 1.e-6, .Max = 1.e6},
+        };
         Core::Config::EngineConfigSection Section(const SelectionInteractionConfig& value)
         {
             return {.Name = std::string{kSelectionConfigSectionName},
@@ -40,7 +52,7 @@ namespace Extrinsic::Runtime
         if (!doc.is_object())
             return reject("Selection config must be an object.");
         for (auto it = doc.begin(); it != doc.end(); ++it)
-            if (it.key() != "target" && it.key() != "highlight" && it.key() != "point_radius")
+            if (!FindConfigFieldSpec(kSelectionFields, it.key()))
                 return reject("Unknown selection field: " + it.key());
         SelectionInteractionConfig config;
         if (doc.contains("target"))
@@ -68,7 +80,7 @@ namespace Extrinsic::Runtime
             if (!doc["point_radius"].is_number())
                 return reject("point_radius must be positive and finite.");
             const double radius = doc["point_radius"].get<double>();
-            if (!std::isfinite(radius) || radius < 1.e-6 || radius > 1.e6)
+            if (!ConfigDetail::InConfigFieldRange(kSelectionFields, "point_radius", radius))
                 return reject("point_radius must be between 0.000001 and 1000000 world units.");
             config.PointRadius = static_cast<float>(radius);
         }
@@ -104,6 +116,8 @@ namespace Extrinsic::Runtime
     }
     Core::Config::EngineConfigSectionRegistration MakeSelectionConfigSectionRegistration()
     {
-        return {.DefaultSection = Section({}), .Validate = ValidateSelectionConfigSection};
+        return {.DefaultSection = Section({}), .Validate = ValidateSelectionConfigSection,
+                .SchemaJson = ConfigDetail::BuildSectionSchemaJson(schema, "Selection", "Primitive selection controls.",
+                    kSelectionFields, Json::parse(SerializeSelectionInteractionConfig({})))};
     }
 } // namespace Extrinsic::Runtime

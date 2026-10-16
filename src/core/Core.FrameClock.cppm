@@ -1,3 +1,4 @@
+// Completed-frame timing with clamped deltas and resampling after deliberate sleeps.
 module;
 
 #include <chrono>

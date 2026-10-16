@@ -2,14 +2,17 @@
 module;
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 export module Extrinsic.Runtime.PointSpacingConfig;
 export import Extrinsic.Runtime.GeometryProperty.Types;
+import Extrinsic.Runtime.ConfigFieldSpec;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 export namespace Extrinsic::Runtime
 {
+    extern "C++" [[nodiscard]] std::span<const ConfigFieldSpec> PointSpacingConfigFieldSpecs() noexcept;
     inline constexpr std::string_view kPointSpacingConfigSectionName="sandbox.point_spacing";
     inline constexpr std::string_view kPointSpacingConfigSectionSchemaId="intrinsic.runtime.sandbox.point_spacing";
     enum class PointSpacingBackend : std::uint8_t { CpuOctree, CpuLBVH, VulkanLBVH };

@@ -63,19 +63,17 @@ namespace Geometry
             return static_cast<float>(0.25 * std::sqrt(product));
         }
 
-        [[nodiscard]] bool HasNonDegenerateArea(const Triangle& triangle, const glm::vec3& edges)
+        [[nodiscard]] glm::dvec3 AreaNormal(const Triangle& triangle)
         {
-            if (!IsFinite(triangle))
-            {
-                return false;
-            }
-            if (!(edges.x > kTriangleDegenerateEpsilon) ||
-                !(edges.y > kTriangleDegenerateEpsilon) ||
-                !(edges.z > kTriangleDegenerateEpsilon))
-            {
-                return false;
-            }
-            return StableAreaFromEdges(edges) > kTriangleDegenerateEpsilon;
+            if (!IsFinite(triangle)) return glm::dvec3(0.0);
+            const glm::dvec3 ab = glm::dvec3(triangle.B) - glm::dvec3(triangle.A);
+            const glm::dvec3 ac = glm::dvec3(triangle.C) - glm::dvec3(triangle.A);
+            const glm::dvec3 bc = glm::dvec3(triangle.C) - glm::dvec3(triangle.B);
+            const glm::dvec3 normal = glm::cross(ab, ac);
+            const double scaleSquared = std::max({glm::dot(ab, ab), glm::dot(ac, ac), glm::dot(bc, bc)});
+            const double epsilon = kTriangleDegenerateEpsilon;
+            return glm::dot(normal, normal) > epsilon * epsilon * scaleSquared * scaleSquared
+                ? normal : glm::dvec3(0.0);
         }
     }
 
@@ -86,13 +84,9 @@ namespace Geometry
 
     glm::vec3 Triangle::GetNormal() const
     {
-        const glm::vec3 normal = glm::cross(B - A, C - A);
-        const float lenSq = glm::dot(normal, normal);
-        if (lenSq <= 1e-12f)
-        {
-            return glm::vec3(0.0f);
-        }
-        return normal * glm::inversesqrt(lenSq);
+        const glm::dvec3 normal = AreaNormal(*this);
+        const double lenSq = glm::dot(normal, normal);
+        return lenSq > 0.0 ? glm::vec3(normal / std::sqrt(lenSq)) : glm::vec3(0.0f);
     }
 
     float Triangle::GetArea() const
@@ -103,7 +97,7 @@ namespace Geometry
     glm::vec3 Triangle::EdgeLengths() const
     {
         const glm::vec3 edges = RawOppositeEdgeLengths(*this);
-        if (!HasNonDegenerateArea(*this, edges))
+        if (AreaNormal(*this) == glm::dvec3(0.0))
         {
             return glm::vec3{0.0f};
         }
@@ -119,7 +113,7 @@ namespace Geometry
     glm::vec3 Triangle::Angles() const
     {
         const glm::vec3 edges = RawOppositeEdgeLengths(*this);
-        if (!HasNonDegenerateArea(*this, edges))
+        if (AreaNormal(*this) == glm::dvec3(0.0))
         {
             return glm::vec3{0.0f};
         }
@@ -159,63 +153,63 @@ namespace Geometry
 
     glm::vec3 ClosestPoint(const Triangle& triangle, const glm::vec3& point)
     {
-        const glm::vec3 ab = triangle.B - triangle.A;
-        const glm::vec3 ac = triangle.C - triangle.A;
-        const glm::vec3 ap = point - triangle.A;
-        const glm::vec3 normal = glm::cross(ab, ac);
-        if (glm::dot(normal, normal) <= 1e-12f)
+        const glm::dvec3 a(triangle.A);
+        const glm::dvec3 ab = glm::dvec3(triangle.B) - a;
+        const glm::dvec3 ac = glm::dvec3(triangle.C) - a;
+        const glm::dvec3 ap = glm::dvec3(point) - a;
+        if (AreaNormal(triangle) == glm::dvec3(0.0))
         {
             const glm::vec3 abPoint = ClosestPoint(Segment{triangle.A, triangle.B}, point);
             const glm::vec3 bcPoint = ClosestPoint(Segment{triangle.B, triangle.C}, point);
             const glm::vec3 caPoint = ClosestPoint(Segment{triangle.C, triangle.A}, point);
-            const float abDistSq = glm::distance2(point, abPoint);
-            const float bcDistSq = glm::distance2(point, bcPoint);
-            const float caDistSq = glm::distance2(point, caPoint);
+            const double abDistSq = glm::distance2(glm::dvec3(point), glm::dvec3(abPoint));
+            const double bcDistSq = glm::distance2(glm::dvec3(point), glm::dvec3(bcPoint));
+            const double caDistSq = glm::distance2(glm::dvec3(point), glm::dvec3(caPoint));
             if (abDistSq <= bcDistSq && abDistSq <= caDistSq) return abPoint;
             if (bcDistSq <= caDistSq) return bcPoint;
             return caPoint;
         }
 
-        const float d1 = glm::dot(ab, ap);
-        const float d2 = glm::dot(ac, ap);
+        const double d1 = glm::dot(ab, ap);
+        const double d2 = glm::dot(ac, ap);
         if (d1 <= 0.0f && d2 <= 0.0f) return triangle.A;
 
-        const glm::vec3 bp = point - triangle.B;
-        const float d3 = glm::dot(ab, bp);
-        const float d4 = glm::dot(ac, bp);
+        const glm::dvec3 bp = glm::dvec3(point) - glm::dvec3(triangle.B);
+        const double d3 = glm::dot(ab, bp);
+        const double d4 = glm::dot(ac, bp);
         if (d3 >= 0.0f && d4 <= d3) return triangle.B;
 
-        const float vc = d1 * d4 - d3 * d2;
+        const double vc = d1 * d4 - d3 * d2;
         if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f)
         {
-            const float v = d1 / (d1 - d3);
-            return triangle.A + ab * v;
+            const double v = d1 / (d1 - d3);
+            return glm::vec3(a + ab * v);
         }
 
-        const glm::vec3 cp = point - triangle.C;
-        const float d5 = glm::dot(ab, cp);
-        const float d6 = glm::dot(ac, cp);
+        const glm::dvec3 cp = glm::dvec3(point) - glm::dvec3(triangle.C);
+        const double d5 = glm::dot(ab, cp);
+        const double d6 = glm::dot(ac, cp);
         if (d6 >= 0.0f && d5 <= d6) return triangle.C;
 
-        const float vb = d5 * d2 - d1 * d6;
+        const double vb = d5 * d2 - d1 * d6;
         if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f)
         {
-            const float w = d2 / (d2 - d6);
-            return triangle.A + ac * w;
+            const double w = d2 / (d2 - d6);
+            return glm::vec3(a + ac * w);
         }
 
-        const float va = d3 * d6 - d5 * d4;
+        const double va = d3 * d6 - d5 * d4;
         if (va <= 0.0f && (d4 - d3) >= 0.0f && (d5 - d6) >= 0.0f)
         {
-            const glm::vec3 bc = triangle.C - triangle.B;
-            const float w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
-            return triangle.B + bc * w;
+            const glm::dvec3 bc = glm::dvec3(triangle.C) - glm::dvec3(triangle.B);
+            const double w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+            return glm::vec3(glm::dvec3(triangle.B) + bc * w);
         }
 
-        const float denom = 1.0f / (va + vb + vc);
-        const float v = vb * denom;
-        const float w = vc * denom;
-        return triangle.A + ab * v + ac * w;
+        const double denom = 1.0f / (va + vb + vc);
+        const double v = vb * denom;
+        const double w = vc * denom;
+        return glm::vec3(a + ab * v + ac * w);
     }
 
     double SquaredDistance(const Triangle& triangle, const glm::vec3& point)

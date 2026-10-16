@@ -673,8 +673,12 @@ namespace Extrinsic::Runtime
         AgentOperationOutcome UndoRedo(const AgentOperationContext& context, std::string_view arguments, bool undo)
         {
             const auto args = ParseObject(arguments);
-            const std::uint32_t steps = args ? UInt(*args, "steps").value_or(1u) : 1u;
-            if (steps < 1 || steps > 64) return Fail("steps must be within 1..64.");
+            if (!args)
+                return {.IsError = true, .Text = "Arguments must be a JSON object.", .ErrorCode = "invalid_params"};
+            const auto requested = args->contains("steps") ? UInt(*args, "steps") : std::optional<std::uint32_t>{1u};
+            if (!requested || *requested < 1 || *requested > 64)
+                return {.IsError = true, .Text = "steps must be an integer within 1..64.", .ErrorCode = "invalid_params"};
+            const std::uint32_t steps = *requested;
             if (!PrepareSnapshot(context)) return Fail(kNoWorkspace);
             const auto scene = PrepareEditorSceneEditingFrame(*context.Attachment);
             if (!scene.DocumentCommands.Available()) return Fail("Undo/redo is unavailable in this workspace.");
@@ -1108,7 +1112,7 @@ namespace Extrinsic::Runtime
             none, true, ConfigSections);
         add("config_schema", "Config schema",
             "JSON Schema of the config section payloads (all sections, or one with 'section'): field descriptions, "
-            "ranges, integer-coded enums with x-enum-names, and property-reference kinds and domains.",
+            "ranges, integer or string-token enums with optional x-enum-names, and property-reference kinds and domains.",
             Schema("{" + kSectionProperty + "}"), true, ConfigSchema);
         add("config_get", "Get config section", "Active payload, defaults and payload schema of one config section.",
             Schema("{" + kSectionProperty + "}", R"(["section"])"), true, ConfigGet);

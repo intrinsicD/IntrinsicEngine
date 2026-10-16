@@ -1,7 +1,9 @@
+// Generation-checked simulation bodies, primitive contacts, linear constraints and sleep state.
 module;
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -45,6 +47,8 @@ export namespace Extrinsic::Physics
         InvalidGravityScale,
         InvalidStep,
         InvalidSolverSettings,
+        NumericalFailure,
+        UnsupportedShapeTransform,
     };
 
     struct Transform
@@ -84,6 +88,9 @@ export namespace Extrinsic::Physics
     {
         float DeltaSeconds{1.0f / 60.0f};
         glm::vec3 Gravity{0.0f, -9.80665f, 0.0f};
+        // Runtime owns externally authored kinematic poses; their velocity is
+        // still used by contact response. Standalone World calls integrate them.
+        bool IntegrateKinematicPoses{true};
     };
 
     struct StepDiagnostics
@@ -105,7 +112,6 @@ export namespace Extrinsic::Physics
         DisabledBody,
         DisabledShape,
         FilteredBody,
-        NonUniformDynamicScale,
         UnsupportedPair,
     };
 
@@ -143,7 +149,6 @@ export namespace Extrinsic::Physics
         std::uint32_t DisabledShapesSkipped{0u};
         std::uint32_t InvalidBodiesRejected{0u};
         std::uint32_t InvalidShapesRejected{0u};
-        std::uint32_t DynamicNonUniformScaleRejects{0u};
         std::uint32_t BroadphasePairs{0u};
         std::uint32_t ContactsGenerated{0u};
         std::uint32_t TriggerContacts{0u};
@@ -220,28 +225,30 @@ export namespace Extrinsic::Physics
 
     enum class SolveStatus : std::uint8_t
     {
-        // Residual penetration reached max(PenetrationSlop, epsilon) within
-        // MaxIterations passes.
+        // Residual depth above PenetrationSlop reached the existing error
+        // tolerance max(PenetrationSlop, epsilon) within MaxIterations passes.
         Converged,
         // Iteration budget exhausted with residual penetration above the
         // tolerance; NonConvergedIslands counts the islands that still carry
         // residual contacts.
         MaxIterationsReached,
-        // A non-finite body state was produced or observed during the solve;
-        // the offending island is left at its last finite state and the step
-        // reports fail-closed degradation.
+        // A non-finite trial was rejected. Each failed body/contact keeps its
+        // last finite state; independent bodies and islands still advance.
         Degraded,
     };
 
     struct SolveStepDiagnostics
     {
+        // Request validation only. Numerical failure is reported by Solve and,
+        // when integration fails, Integration.Status; the valid step is consumed.
         ValidationStatus Status{ValidationStatus::Valid};
         SolveStatus Solve{SolveStatus::Converged};
         std::uint32_t IterationsUsed{0u};
         std::uint32_t ContactsSolved{0u};
         std::uint32_t NonConvergedIslands{0u};
+        // Raw depth, not slop excess, for awake islands attempted this step.
         float MaxPenetrationBefore{0.0f};
-        // Residual penetration recomputed from live shapes after the solve.
+        // Raw residual depth from live shapes, restricted to attempted islands.
         float MaxPenetrationAfter{0.0f};
         // Largest approaching normal speed remaining across solved contacts
         // at the end of the final iteration pass.
@@ -279,8 +286,6 @@ export namespace Extrinsic::Physics
     [[nodiscard]] BodyDescriptor MakeDynamicBody(float mass = 1.0f, const Transform& pose = {});
 
     [[nodiscard]] bool IsFinite(const glm::vec3& value) noexcept;
-    [[nodiscard]] bool IsFinite(const glm::quat& value) noexcept;
-    [[nodiscard]] bool IsValidUnitRotation(const glm::quat& value) noexcept;
     [[nodiscard]] ValidationStatus Validate(const Transform& transform) noexcept;
     [[nodiscard]] ValidationStatus Validate(const ShapeDescriptor& descriptor) noexcept;
     [[nodiscard]] ValidationStatus Validate(const BodyDescriptor& descriptor) noexcept;
@@ -295,7 +300,7 @@ export namespace Extrinsic::Physics
         [[nodiscard]] BodyHandle AddBody(const BodyDescriptor& descriptor);
         [[nodiscard]] bool DestroyBody(BodyHandle handle);
         [[nodiscard]] bool UpdateBody(BodyHandle handle, const BodyDescriptor& descriptor);
-        [[nodiscard]] BodyDescriptor* GetBody(BodyHandle handle) noexcept;
+        // Borrowed read-only descriptor; mutation uses validated UpdateBody.
         [[nodiscard]] const BodyDescriptor* GetBody(BodyHandle handle) const noexcept;
         [[nodiscard]] bool Contains(BodyHandle handle) const noexcept;
 
@@ -316,12 +321,15 @@ export namespace Extrinsic::Physics
         // to body state; trigger contacts are excluded.
         [[nodiscard]] IslandBuildResult BuildIslands(const CollisionResult& collision) const;
 
-        // Sleep state queries/mutation. Sleep state is world-internal;
-        // UpdateBody() wakes the body because its descriptor changed.
+        // Sleep state is world-internal. Update/Destroy conservatively wake
+        // all dynamics because removed supports cannot propagate through contacts.
+        // Adding a static/kinematic body also wakes dynamics. WakeTransitions
+        // counts only wake propagation performed inside the current SolveStep.
         [[nodiscard]] bool IsBodyAsleep(BodyHandle handle) const noexcept;
         bool WakeBody(BodyHandle handle) noexcept;
 
-        void Clear() noexcept;
+        // Invalidates live handles while preserving slot generation history.
+        void Clear();
 
         [[nodiscard]] std::size_t BodyCount() const noexcept { return m_Diagnostics.BodyCount; }
         [[nodiscard]] const WorldDiagnostics& GetDiagnostics() const noexcept { return m_Diagnostics; }
@@ -344,8 +352,11 @@ export namespace Extrinsic::Physics
         [[nodiscard]] Slot* ResolveSlot(BodyHandle handle) noexcept;
         [[nodiscard]] const Slot* ResolveSlot(BodyHandle handle) const noexcept;
 
+        void WakeDynamicBodies() noexcept;
+
         std::vector<Slot> m_Slots{};
         std::vector<std::uint32_t> m_FreeList{};
         WorldDiagnostics m_Diagnostics{};
+        std::optional<glm::vec3> m_LastSolveGravity{};
     };
 }

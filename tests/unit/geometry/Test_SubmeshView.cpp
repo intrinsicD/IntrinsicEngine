@@ -347,3 +347,38 @@ TEST(SubmeshView_Cloud, GraphBackedCloudUsesCanonicalVertexPointProperty)
     EXPECT_FLOAT_EQ(graph.VertexPosition(Geometry::VertexHandle{0}).y, 78.0f);
 }
 
+
+
+TEST(SubmeshView_Cloud, ValidHandlesUseAbsoluteVisibleRange)
+{
+    Geometry::PointCloud::Cloud cloud;
+    for (int i = 0; i < 4; ++i) cloud.AddPoint({float(i), 0, 0});
+    const auto view = Geometry::PointCloud::Cloud::CreateView(cloud, {.Offset = 1, .Size = 2});
+    EXPECT_FALSE(view.IsValid(Geometry::VertexHandle{0}));
+    EXPECT_TRUE(view.IsValid(Geometry::VertexHandle{1}));
+    EXPECT_TRUE(view.IsValid(Geometry::VertexHandle{2}));
+    EXPECT_FALSE(view.IsValid(Geometry::VertexHandle{3}));
+    EXPECT_FALSE(view.IsValid(Geometry::VertexHandle{}));
+}
+
+TEST(SubmeshView_Mesh, ValidHandlesUseAbsoluteVisibleRanges)
+{
+    const auto mesh = MakeTwoTriangleSquare();
+    const auto view = Geometry::HalfedgeMesh::Mesh::CreateView(mesh,
+        {.Offset = 1, .Size = 2}, {.Offset = 2, .Size = 2}, {.Offset = 1, .Size = 1});
+    EXPECT_FALSE(view.IsValid(Geometry::VertexHandle{0}));
+    EXPECT_TRUE(view.IsValid(Geometry::VertexHandle{1}));
+    EXPECT_TRUE(view.IsValid(Geometry::VertexHandle{2}));
+    EXPECT_FALSE(view.IsValid(Geometry::VertexHandle{3}));
+    EXPECT_FALSE(view.IsValid(Geometry::EdgeHandle{1}));
+    EXPECT_TRUE(view.IsValid(Geometry::EdgeHandle{2}));
+    EXPECT_TRUE(view.IsValid(Geometry::EdgeHandle{3}));
+    EXPECT_FALSE(view.IsValid(Geometry::EdgeHandle{4}));
+    EXPECT_FALSE(view.IsValid(Geometry::HalfedgeHandle{3}));
+    EXPECT_TRUE(view.IsValid(Geometry::HalfedgeHandle{4}));
+    EXPECT_TRUE(view.IsValid(Geometry::HalfedgeHandle{7}));
+    EXPECT_FALSE(view.IsValid(Geometry::HalfedgeHandle{8}));
+    EXPECT_FALSE(view.IsValid(Geometry::FaceHandle{0}));
+    EXPECT_TRUE(view.IsValid(Geometry::FaceHandle{1}));
+    EXPECT_FALSE(view.IsValid(Geometry::FaceHandle{2}));
+}

@@ -38,21 +38,36 @@ namespace Geometry::Grid
     }
 
     SparseGrid::SparseGrid(const GridDimensions& dims)
-        : m_Dims(dims)
     {
+        static_cast<void>(Reset(dims));
     }
 
-    void SparseGrid::Reset(const GridDimensions& dims)
+    bool SparseGrid::Reset(const GridDimensions& dims)
     {
+        constexpr std::size_t coordinateLimit = std::size_t{1} << 24;
+        if (!dims.IsValid() || dims.NX >= coordinateLimit || dims.NY >= coordinateLimit ||
+            dims.NZ >= coordinateLimit) return false;
         m_Dims = dims;
         m_Cells.Clear();
         m_BlockTable.clear();
-        m_FreeBlocks.clear();
         m_AllocatedBlockCount = 0;
+        return true;
     }
 
-    std::size_t SparseGrid::TouchVertex(std::size_t x, std::size_t y, std::size_t z)
+    bool SparseGrid::ContainsVertex(std::size_t x, std::size_t y, std::size_t z) const noexcept
     {
+        return m_Dims.IsValid() && x <= m_Dims.NX && y <= m_Dims.NY && z <= m_Dims.NZ;
+    }
+
+    bool SparseGrid::ContainsBlock(std::size_t x, std::size_t y, std::size_t z) const noexcept
+    {
+        return m_Dims.IsValid() && x <= (m_Dims.NX >> BlockBits) &&
+            y <= (m_Dims.NY >> BlockBits) && z <= (m_Dims.NZ >> BlockBits);
+    }
+
+    std::optional<std::size_t> SparseGrid::TouchVertex(std::size_t x, std::size_t y, std::size_t z)
+    {
+        if (!ContainsVertex(x, y, z)) return std::nullopt;
         const auto bx = x >> BlockBits;
         const auto by = y >> BlockBits;
         const auto bz = z >> BlockBits;
@@ -70,6 +85,7 @@ namespace Geometry::Grid
 
     std::optional<std::size_t> SparseGrid::VertexIndex(std::size_t x, std::size_t y, std::size_t z) const
     {
+        if (!ContainsVertex(x, y, z)) return std::nullopt;
         const auto bx = x >> BlockBits;
         const auto by = y >> BlockBits;
         const auto bz = z >> BlockBits;
@@ -84,12 +100,14 @@ namespace Geometry::Grid
 
     bool SparseGrid::IsAllocated(std::size_t x, std::size_t y, std::size_t z) const
     {
+        if (!ContainsVertex(x, y, z)) return false;
         const uint64_t key = PackBlockKey(x >> BlockBits, y >> BlockBits, z >> BlockBits);
         return m_BlockTable.contains(key);
     }
 
-    std::size_t SparseGrid::TouchBlock(std::size_t bx, std::size_t by, std::size_t bz)
+    std::optional<std::size_t> SparseGrid::TouchBlock(std::size_t bx, std::size_t by, std::size_t bz)
     {
+        if (!ContainsBlock(bx, by, bz)) return std::nullopt;
         const uint64_t key = PackBlockKey(bx, by, bz);
         auto it = m_BlockTable.find(key);
         if (it != m_BlockTable.end())
@@ -102,14 +120,6 @@ namespace Geometry::Grid
 
     std::size_t SparseGrid::AllocateBlock()
     {
-        if (!m_FreeBlocks.empty())
-        {
-            auto base = m_FreeBlocks.back();
-            m_FreeBlocks.pop_back();
-            ++m_AllocatedBlockCount;
-            return base;
-        }
-
         const std::size_t base = m_Cells.Size();
         for (std::size_t i = 0; i < BlockVolume; ++i)
             m_Cells.PushBack();

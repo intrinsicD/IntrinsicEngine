@@ -35,17 +35,17 @@ namespace
 TEST(AssetLoadPipeline, EnqueueWithoutRegistryBoundFails)
 {
     AssetLoadPipeline p;
-    LoadRequest req{.id = AssetId{0u, 1u}, .typeId = 0u, .path = "", .needsGpuUpload = false};
+    LoadRequest req{.id = AssetId{0u, 1u}};
     auto r = p.EnqueueIO(std::move(req));
     ASSERT_FALSE(r.has_value());
     EXPECT_EQ(r.error(), ErrorCode::InvalidState);
 }
  
-TEST(AssetLoadPipeline, EnqueueTransitionsUnloadedToReadyInlineWhenNoGpu)
+TEST(AssetLoadPipeline, EnqueueTransitionsUnloadedToReadyInline)
 {
     PipelineFixture f;
     auto id = f.NewAsset();
-    LoadRequest req{.id = id, .typeId = 0u, .path = "/tmp/a", .needsGpuUpload = false};
+    LoadRequest req{.id = id};
     ASSERT_TRUE(f.pipeline.EnqueueIO(std::move(req)).has_value());
  
     auto st = f.registry.GetState(id).value();
@@ -53,52 +53,18 @@ TEST(AssetLoadPipeline, EnqueueTransitionsUnloadedToReadyInlineWhenNoGpu)
     EXPECT_EQ(f.pipeline.InFlightCount(), 0u);
     EXPECT_EQ(f.bus.PendingCount(), 1u); // Ready event queued
 }
- 
-TEST(AssetLoadPipeline, EnqueueWithGpuEndsInQueuedGPU)
-{
-    PipelineFixture f;
-    auto id = f.NewAsset();
-    LoadRequest req{.id = id, .typeId = 0u, .path = "/tmp/a", .needsGpuUpload = true};
-    ASSERT_TRUE(f.pipeline.EnqueueIO(std::move(req)).has_value());
- 
-    EXPECT_EQ(f.registry.GetState(id).value(), AssetState::QueuedGPU);
-    EXPECT_EQ(f.pipeline.InFlightCount(), 1u);
-}
- 
+
 TEST(AssetLoadPipeline, EnqueueFailsWhenAssetNotUnloaded)
 {
     PipelineFixture f;
     auto id = f.NewAsset();
     ASSERT_TRUE(f.registry.SetState(id, AssetState::Unloaded, AssetState::Ready).has_value());
-    LoadRequest req{.id = id, .typeId = 0u, .path = "", .needsGpuUpload = false};
+    LoadRequest req{.id = id};
     auto r = f.pipeline.EnqueueIO(std::move(req));
     ASSERT_FALSE(r.has_value());
     EXPECT_EQ(r.error(), ErrorCode::InvalidState);
 }
- 
-TEST(AssetLoadPipeline, OnGpuUploadedMovesFromQueuedGpuToReady)
-{
-    PipelineFixture f;
-    auto id = f.NewAsset();
-    LoadRequest req{.id = id, .typeId = 0u, .path = "", .needsGpuUpload = true};
-    ASSERT_TRUE(f.pipeline.EnqueueIO(std::move(req)).has_value());
-    ASSERT_EQ(f.registry.GetState(id).value(), AssetState::QueuedGPU);
- 
-    ASSERT_TRUE(f.pipeline.OnGpuUploaded(id).has_value());
-    EXPECT_EQ(f.registry.GetState(id).value(), AssetState::Ready);
-    EXPECT_EQ(f.pipeline.InFlightCount(), 0u);
-}
- 
-TEST(AssetLoadPipeline, OnGpuUploadedFromWrongStateFails)
-{
-    PipelineFixture f;
-    auto id = f.NewAsset();
-    // State is Unloaded, not QueuedGPU.
-    auto r = f.pipeline.OnGpuUploaded(id);
-    ASSERT_FALSE(r.has_value());
-    EXPECT_EQ(r.error(), ErrorCode::InvalidState);
-}
- 
+
 TEST(AssetLoadPipeline, OnCpuDecodedWithoutBindFails)
 {
     AssetLoadPipeline p;
@@ -117,26 +83,6 @@ TEST(AssetLoadPipeline, OnCpuDecodedForUnknownIdIsNotFound)
     EXPECT_EQ(r.error(), ErrorCode::ResourceNotFound);
 }
 
-TEST(AssetLoadPipeline, DuplicateCpuDecodeForGpuInFlightDoesNotDropUploadStage)
-{
-    PipelineFixture f;
-    auto id = f.NewAsset();
-    LoadRequest req{.id = id, .typeId = 0u, .path = "/tmp/a", .needsGpuUpload = true};
-    ASSERT_TRUE(f.pipeline.EnqueueIO(std::move(req)).has_value());
-    ASSERT_EQ(f.registry.GetState(id).value(), AssetState::QueuedGPU);
-    ASSERT_TRUE(f.pipeline.IsInFlight(id));
-
-    auto duplicate = f.pipeline.OnCpuDecoded(id);
-    ASSERT_FALSE(duplicate.has_value());
-    EXPECT_EQ(duplicate.error(), ErrorCode::InvalidState);
-    EXPECT_EQ(f.registry.GetState(id).value(), AssetState::QueuedGPU);
-    EXPECT_TRUE(f.pipeline.IsInFlight(id));
-
-    ASSERT_TRUE(f.pipeline.OnGpuUploaded(id).has_value());
-    EXPECT_EQ(f.registry.GetState(id).value(), AssetState::Ready);
-    EXPECT_FALSE(f.pipeline.IsInFlight(id));
-}
-
 TEST(AssetLoadPipeline, EventBusSeesReadyOnSuccess)
 {
     PipelineFixture f;
@@ -147,117 +93,16 @@ TEST(AssetLoadPipeline, EventBusSeesReadyOnSuccess)
     });
  
     auto id = f.NewAsset();
-    LoadRequest req{.id = id, .typeId = 0u, .path = "", .needsGpuUpload = false};
+    LoadRequest req{.id = id};
     ASSERT_TRUE(f.pipeline.EnqueueIO(std::move(req)).has_value());
     f.bus.Flush();
     EXPECT_EQ(ready.load(), 1);
 }
- 
-TEST(AssetLoadPipeline, MarkFailedMovesToFailedAndPublishesEvent)
-{
-    PipelineFixture f;
-    std::atomic<int> failed{0};
-    (void)f.bus.SubscribeAll([&](AssetId, AssetEvent e)
-    {
-        if (e == AssetEvent::Failed) ++failed;
-    });
- 
-    auto id = f.NewAsset();
-    ASSERT_TRUE(f.pipeline.MarkFailed(id).has_value());
-    EXPECT_EQ(f.registry.GetState(id).value(), AssetState::Failed);
- 
-    f.bus.Flush();
-    EXPECT_EQ(failed.load(), 1);
-}
- 
-TEST(AssetLoadPipeline, MarkFailedIsIdempotent)
-{
-    PipelineFixture f;
-    auto id = f.NewAsset();
-    ASSERT_TRUE(f.pipeline.MarkFailed(id).has_value());
-    EXPECT_TRUE(f.pipeline.MarkFailed(id).has_value());
-    EXPECT_EQ(f.registry.GetState(id).value(), AssetState::Failed);
-}
- 
-TEST(AssetLoadPipeline, PathIsCopiedInRequestAndSurvivesCallerString)
-{
-    // Regression: LoadRequest::path used to be const char* - pointing at
-    // a caller-owned buffer that could be freed before the async decode ran.
-    // We now own a std::string. Verify the field is populated.
-    PipelineFixture f;
-    auto id = f.NewAsset();
- 
-    std::string transient = "/tmp/transient.bin";
-    LoadRequest req{.id = id, .typeId = 0u, .path = transient, .needsGpuUpload = true};
-    ASSERT_TRUE(f.pipeline.EnqueueIO(std::move(req)).has_value());
-    transient = "clobbered"; // would have been a dangling pointer with const char*
- 
-    EXPECT_EQ(f.registry.GetState(id).value(), AssetState::QueuedGPU);
-    EXPECT_EQ(f.pipeline.InFlightCount(), 1u);
-}
- 
-TEST(AssetLoadPipeline, CancelDropsInFlightEntry)
-{
-    PipelineFixture f;
-    auto id = f.NewAsset();
-    LoadRequest req{.id = id, .typeId = 0u, .path = "", .needsGpuUpload = true};
-    ASSERT_TRUE(f.pipeline.EnqueueIO(std::move(req)).has_value());
-    EXPECT_TRUE(f.pipeline.IsInFlight(id));
- 
-    f.pipeline.Cancel(id);
-    EXPECT_FALSE(f.pipeline.IsInFlight(id));
-    EXPECT_EQ(f.pipeline.InFlightCount(), 0u);
-}
- 
+
 TEST(AssetLoadPipeline, CancelOnUnknownIdIsHarmless)
 {
     PipelineFixture f;
     f.pipeline.Cancel(AssetId{});
     f.pipeline.Cancel(AssetId{42u, 1u});
     SUCCEED();
-}
-
-TEST(AssetLoadPipeline, StageTrailTracksIoDecodeForGpuPath)
-{
-    PipelineFixture f;
-    auto id = f.NewAsset();
-
-    LoadRequest req{.id = id, .typeId = 0u, .path = "/tmp/a", .needsGpuUpload = true};
-    ASSERT_TRUE(f.pipeline.EnqueueIO(std::move(req)).has_value());
-
-    auto trail = f.pipeline.GetStageTrail(id);
-    ASSERT_TRUE(trail.has_value());
-    ASSERT_GE(trail->size(), 2u);
-    EXPECT_EQ((*trail)[0].stage, AssetLoadPipeline::Stage::AssetIO);
-    EXPECT_EQ((*trail)[1].stage, AssetLoadPipeline::Stage::AssetDecode);
-}
-
-TEST(AssetLoadPipeline, CompleteGpuFenceFinalizesQueuedGpuAssets)
-{
-    PipelineFixture f;
-    auto id = f.NewAsset();
-
-    LoadRequest req{.id = id, .typeId = 0u, .path = "/tmp/a", .needsGpuUpload = true};
-    ASSERT_TRUE(f.pipeline.EnqueueIO(std::move(req)).has_value());
-    ASSERT_EQ(f.registry.GetState(id).value(), AssetState::QueuedGPU);
-    ASSERT_TRUE(f.pipeline.ArmGpuFence(id, 17u).has_value());
-
-    EXPECT_EQ(f.pipeline.CompleteGpuFence(17u), 1u);
-    EXPECT_EQ(f.registry.GetState(id).value(), AssetState::Ready);
-    EXPECT_FALSE(f.pipeline.IsInFlight(id));
-}
-
-TEST(AssetLoadPipeline, StageTrailRemainsAvailableAfterCompletion)
-{
-    PipelineFixture f;
-    auto id = f.NewAsset();
-    LoadRequest req{.id = id, .typeId = 0u, .path = "/tmp/a", .needsGpuUpload = false};
-    ASSERT_TRUE(f.pipeline.EnqueueIO(std::move(req)).has_value());
-
-    auto trail = f.pipeline.GetStageTrail(id);
-    ASSERT_TRUE(trail.has_value());
-    ASSERT_GE(trail->size(), 3u);
-    EXPECT_EQ((*trail)[0].stage, AssetLoadPipeline::Stage::AssetIO);
-    EXPECT_EQ((*trail)[1].stage, AssetLoadPipeline::Stage::AssetDecode);
-    EXPECT_EQ(trail->back().stage, AssetLoadPipeline::Stage::Finalize);
 }

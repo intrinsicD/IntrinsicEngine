@@ -17,11 +17,15 @@ export namespace Extrinsic::ECS::Hierarchy
     //   - already attached to newParent: no-op.
     //   - reparent: detach from old parent, recompute child local transform
     //     so that world matrix is preserved, mark child IsDirtyTag, attach.
-    //   - if the parent's world matrix is singular (non-invertible) the child
-    //     local TRS resets to identity and IsDirtyTag is set.
+    //   - if the finite parent world matrix is singular, child local resets to
+    //     identity and IsDirtyTag is set. Nonfinite matrices or unrepresentable
+    //     local TRS otherwise reject before changing links or the local pose.
     void Attach(entt::registry& registry, EntityHandle child, EntityHandle newParent);
 
     // Detach `child` from its current parent, leaving it as a root entity.
-    // No-op if invalid or already detached.
+    // No-op if invalid or already detached; otherwise always unlinks. Ready
+    // world state supplies root-local TRS with exact translation; shear is lost.
+    // Unready/non-decomposable world state keeps authored local. A local transform
+    // is marked dirty in either case so teardown loops always make progress.
     void Detach(entt::registry& registry, EntityHandle child);
 }

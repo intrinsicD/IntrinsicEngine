@@ -123,8 +123,8 @@ namespace
     RHI::TextureDesc AnyTextureDesc()
     {
         return RHI::TextureDesc{
-            .Width  = 8,
-            .Height = 8,
+            .Width  = 4,
+            .Height = 4,
             .MipLevels = 1,
             .Fmt    = RHI::Format::RGBA8_UNORM,
             .Usage  = RHI::TextureUsage::Sampled | RHI::TextureUsage::TransferDst,
@@ -880,4 +880,86 @@ TEST(GpuAssetCache, GpuProducedTextureRejectsReadyFrameForTransferUpload)
         /*readyFrame=*/1u);
     ASSERT_FALSE(readyFrame.has_value());
     EXPECT_EQ(readyFrame.error(), Core::ErrorCode::InvalidState);
+}
+
+TEST(GpuAssetCache, RejectedUploadsNeverPublishAndKeepExistingCurrent)
+{
+    for (const bool texture : {false, true})
+    for (const bool hasPrevious : {false, true})
+    {
+        SCOPED_TRACE(texture ? "texture" : "buffer");
+        SCOPED_TRACE(hasPrevious ? "reload" : "initial");
+        CacheFixture fx;
+        fx.Device.Operational = true;
+        Graphics::GpuAssetCache cache(fx.BufferMgr, fx.TextureMgr, fx.SamplerMgr, fx.Device.TransferQueue);
+        fx.Device.TransferQueue.AcceptBufferUploads = true;
+        const auto id = MakeAssetId(90);
+        const auto upload = [&] {
+            if (texture)
+                return cache.RequestUpload(Graphics::GpuTextureRequest{
+                    .Id = id, .Bytes = ZeroBytes64, .Desc = AnyTextureDesc(), .Sampler = AnySampler()});
+            return cache.RequestUpload(Graphics::GpuBufferRequest{
+                .Id = id, .Bytes = ZeroBytes64, .Desc = AnyBufferDesc()});
+        };
+        if (hasPrevious)
+        {
+            ASSERT_TRUE(upload());
+            cache.Tick(0, 2);
+        }
+        const auto previous = cache.GetView(id);
+        ASSERT_EQ(previous.has_value(), hasPrevious);
+        fx.Device.TransferQueue.AcceptBufferUploads = false;
+        fx.Device.TransferQueue.FailTextureUploads = true;
+        const auto destroyedBuffers = fx.Device.DestroyBufferCount;
+        const auto destroyedTextures = fx.Device.DestroyTextureCount;
+        const auto rejected = upload();
+        EXPECT_FALSE(rejected);
+        if (!rejected) EXPECT_EQ(rejected.error(), Core::ErrorCode::AssetUploadFailed);
+        EXPECT_EQ(fx.Device.DestroyBufferCount, destroyedBuffers + (texture ? 0 : 1));
+        EXPECT_EQ(fx.Device.DestroyTextureCount, destroyedTextures + (texture ? 1 : 0));
+        cache.Tick(100, 2);
+        EXPECT_EQ(cache.GetState(id), Graphics::GpuAssetState::Failed);
+        EXPECT_EQ(cache.PendingRetireCount(), 0u);
+        const auto after = cache.GetView(id);
+        EXPECT_EQ(after.has_value(), hasPrevious);
+        if (hasPrevious && after && previous)
+        {
+            EXPECT_EQ(after->Generation, previous->Generation);
+            EXPECT_EQ(after->Buffer, previous->Buffer);
+            EXPECT_EQ(after->Texture, previous->Texture);
+        }
+        EXPECT_EQ(cache.GetDiagnostics().UploadFailures, 1u);
+    }
+}
+
+TEST(GpuAssetCache, RejectedFallbackUploadPreservesAbsentOrPreviousFallback)
+{
+    for (const bool hasPrevious : {false, true})
+    {
+        SCOPED_TRACE(hasPrevious);
+        CacheFixture fx;
+        fx.Device.Operational = true;
+        Graphics::GpuAssetCache cache(fx.BufferMgr, fx.TextureMgr, fx.SamplerMgr, fx.Device.TransferQueue);
+        fx.Device.TransferQueue.AcceptBufferUploads = true;
+        const Graphics::GpuTextureFallbackDesc desc{
+            .Bytes = ZeroBytes64, .Desc = AnyTextureDesc(), .Sampler = AnySampler()};
+        if (hasPrevious) ASSERT_TRUE(cache.InitializeFallbackTexture(desc));
+        const auto previous = cache.GetViewOrFallback(MakeAssetId(91));
+        ASSERT_EQ(previous.has_value(), hasPrevious);
+        fx.Device.TransferQueue.AcceptBufferUploads = false;
+        fx.Device.TransferQueue.FailTextureUploads = true;
+        const auto destroyedBuffers = fx.Device.DestroyBufferCount;
+        const auto destroyedTextures = fx.Device.DestroyTextureCount;
+        EXPECT_FALSE(cache.InitializeFallbackTexture(desc));
+        EXPECT_EQ(fx.Device.DestroyBufferCount, destroyedBuffers);
+        EXPECT_EQ(fx.Device.DestroyTextureCount, destroyedTextures + 1);
+        const auto after = cache.GetViewOrFallback(MakeAssetId(91));
+        EXPECT_EQ(after.has_value(), hasPrevious);
+        EXPECT_EQ(cache.GetDiagnostics().FallbackTextureReady, hasPrevious);
+        if (hasPrevious && after && previous)
+        {
+            EXPECT_EQ(after->View.Texture, previous->View.Texture);
+            EXPECT_EQ(after->View.Generation, previous->View.Generation);
+        }
+    }
 }

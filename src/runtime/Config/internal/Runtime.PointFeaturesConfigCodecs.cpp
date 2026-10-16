@@ -2,7 +2,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
-#include <initializer_list>
+#include <span>
 #include <limits>
 #include <nlohmann/json.hpp>
 #include <optional>
@@ -10,6 +10,7 @@
 #include <string_view>
 #include <utility>
 
+import Extrinsic.Runtime.ConfigFieldSpec;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 
@@ -19,11 +20,82 @@ import Extrinsic.Runtime.DescriptorAnalysisConfig;
 import Extrinsic.Runtime.PointConstructionConfig;
 
 #include "Config/internal/Runtime.PointConfigJson.hpp"
+#include "Config/internal/Runtime.ConfigFieldJson.hpp"
 
 namespace Extrinsic::Runtime
 {
     namespace
     {
+        constexpr Geometry::PropertyValueKind kFloatKind[]{Geometry::PropertyValueKind::Float};
+        constexpr Geometry::PropertyValueKind kUInt32Kind[]{Geometry::PropertyValueKind::UInt32};
+        constexpr Geometry::PropertyValueKind kVec3Kind[]{Geometry::PropertyValueKind::Vec3};
+        constexpr std::string_view kBilateralFilterBackend[]{"cpu_octree", "cpu_lbvh", "vulkan_lbvh"};
+        constexpr std::string_view kBilateralFilterBackendNames[]{"CPU octree", "CPU LBVH (cached)", "Vulkan LBVH"};
+        constexpr ConfigFieldSpec kBilateralFilterFields[]{
+            {.Name = "entity", .Type = ConfigFieldType::UInt, .Description = "Entity."},
+            {.Name = "k_neighbors", .Type = ConfigFieldType::UInt, .Description = "K neighbors."},
+            {.Name = "gpu_query_batch_size", .Type = ConfigFieldType::UInt, .Description = "Gpu query batch size.", .Min = 1, .Max = 16384},
+            {.Name = "iterations", .Type = ConfigFieldType::UInt, .Description = "Iterations.", .Min = 0, .Max = 100},
+            {.Name = "backend", .Type = ConfigFieldType::StringEnum, .Description = "Backend.", .EnumNames = kBilateralFilterBackendNames, .EnumValues = kBilateralFilterBackend},
+            {.Name = "spatial_sigma", .Type = ConfigFieldType::Float, .Description = "Zero selects automatic spatial sigma; positive values must remain positive in float storage.", .Min = 0, .Max = double(std::numeric_limits<float>::max())},
+            {.Name = "normal_sigma", .Type = ConfigFieldType::Float, .Description = "Nonnegative normal sigma; positive values must remain positive in float storage. The method floors it to 1e-6.", .Min = 0, .Max = double(std::numeric_limits<float>::max())},
+            {.Name = "positions", .Type = ConfigFieldType::PropertyRef, .Description = "Positions, normals and output must share an element domain.", .RefKinds = kVec3Kind},
+            {.Name = "normals", .Type = ConfigFieldType::PropertyRef, .Description = "Normals.", .RefKinds = kVec3Kind},
+            {.Name = "output", .Type = ConfigFieldType::PropertyRef, .Description = "May replace positions; cannot overwrite a normal input distinct from the positions input.", .RefKinds = kVec3Kind},
+        };
+        constexpr std::string_view kKeypointAnalysisBackend[]{"cpu_kdtree", "cpu_lbvh", "vulkan_lbvh", "vulkan_compute"};
+        constexpr std::string_view kKeypointAnalysisBackendNames[]{"CPU KD-tree", "CPU LBVH (cached)", "Vulkan LBVH neighborhoods", "Vulkan"};
+        constexpr ConfigFieldSpec kKeypointAnalysisFields[]{
+            {.Name = "entity", .Type = ConfigFieldType::UInt, .Description = "Entity."},
+            {.Name = "minimum_neighbors", .Type = ConfigFieldType::UInt, .Description = "Minimum neighbors."},
+            {.Name = "gpu_query_batch_size", .Type = ConfigFieldType::UInt, .Description = "Gpu query batch size.", .Min = 1, .Max = 16384},
+            {.Name = "gpu_radius_capacity", .Type = ConfigFieldType::UInt, .Description = "Gpu radius capacity.", .Min = 1, .Max = 1024},
+            {.Name = "backend", .Type = ConfigFieldType::StringEnum, .Description = "Backend.", .EnumNames = kKeypointAnalysisBackendNames, .EnumValues = kKeypointAnalysisBackend},
+            {.Name = "salient_radius", .Type = ConfigFieldType::Float, .Description = "Zero selects an automatic radius; positive values must remain positive in float storage.", .Min = 0, .Max = double(std::numeric_limits<float>::max())},
+            {.Name = "nonmax_radius", .Type = ConfigFieldType::Float, .Description = "Zero selects an automatic radius; positive values must remain positive in float storage.", .Min = 0, .Max = double(std::numeric_limits<float>::max())},
+            {.Name = "gamma21", .Type = ConfigFieldType::Float, .Description = "Gamma21.", .Min = 0, .Max = 1},
+            {.Name = "gamma32", .Type = ConfigFieldType::Float, .Description = "Gamma32.", .Min = 0, .Max = 1},
+            {.Name = "positions", .Type = ConfigFieldType::PropertyRef, .Description = "Positions, mask and score must have distinct names on the same element domain.", .RefKinds = kVec3Kind},
+            {.Name = "mask", .Type = ConfigFieldType::PropertyRef, .Description = "Mask.", .RefKinds = kUInt32Kind, .AnyScalar = true},
+            {.Name = "score", .Type = ConfigFieldType::PropertyRef, .Description = "Score.", .RefKinds = kFloatKind, .AnyScalar = true},
+        };
+        constexpr std::string_view kDescriptorAnalysisBackend[]{"cpu_kdtree", "cpu_lbvh", "vulkan_lbvh"};
+        constexpr ConfigFieldSpec kDescriptorAnalysisOutputsItem{.Name = "output", .Type = ConfigFieldType::PropertyRef, .RefKinds = kFloatKind, .AnyScalar = true};
+        constexpr std::string_view kDescriptorAnalysisBackendNames[]{"CPU KD-tree", "CPU LBVH (cached)", "Vulkan LBVH"};
+        constexpr ConfigFieldSpec kDescriptorAnalysisFields[]{
+            {.Name = "entity", .Type = ConfigFieldType::UInt, .Description = "Entity."},
+            {.Name = "max_neighbors", .Type = ConfigFieldType::UInt, .Description = "Max neighbors."},
+            {.Name = "gpu_query_batch_size", .Type = ConfigFieldType::UInt, .Description = "Gpu query batch size.", .Min = 1, .Max = 16384},
+            {.Name = "gpu_radius_capacity", .Type = ConfigFieldType::UInt, .Description = "Gpu radius capacity.", .Min = 1, .Max = 1024},
+            {.Name = "backend", .Type = ConfigFieldType::StringEnum, .Description = "Backend.", .EnumNames = kDescriptorAnalysisBackendNames, .EnumValues = kDescriptorAnalysisBackend},
+            {.Name = "feature_radius", .Type = ConfigFieldType::Float, .Description = "Zero selects an automatic radius; positive values must remain positive in float storage.", .Min = 0, .Max = double(std::numeric_limits<float>::max())},
+            {.Name = "positions", .Type = ConfigFieldType::PropertyRef, .Description = "Position and normal inputs must share an element domain.", .RefKinds = kVec3Kind},
+            {.Name = "normals", .Type = ConfigFieldType::PropertyRef, .Description = "Normals.", .RefKinds = kVec3Kind},
+            {.Name = "outputs", .Type = ConfigFieldType::Array, .Description = "Exactly 33 uniquely named scalar outputs on the input domain, distinct from both input names.", .Item = &kDescriptorAnalysisOutputsItem, .MinItems = 33u, .MaxItems = 33u},
+        };
+        constexpr std::string_view kPointConstructionBackend[]{"cpu_reference", "cpu_lbvh", "vulkan_lbvh"};
+        constexpr std::string_view kPointConstructionMethod[]{"hoppe", "knn_graph"};
+        constexpr std::string_view kPointConstructionBackendNames[]{"CPU reference", "CPU LBVH (cached)", "Vulkan LBVH"};
+        constexpr ConfigFieldSpec kPointConstructionFields[]{
+            {.Name = "entity", .Type = ConfigFieldType::UInt, .Description = "Entity."},
+            {.Name = "resolution", .Type = ConfigFieldType::UInt, .Description = "Resolution.", .Min = 1, .Max = 512},
+            {.Name = "k_neighbors", .Type = ConfigFieldType::UInt, .Description = "K neighbors.", .Min = 1, .Max = 63},
+            {.Name = "normal_k_neighbors", .Type = ConfigFieldType::UInt, .Description = "Normal k neighbors.", .Min = 3, .Max = 1024},
+            {.Name = "gpu_query_batch_size", .Type = ConfigFieldType::UInt, .Description = "Gpu query batch size.", .Min = 1, .Max = 16384},
+            {.Name = "max_grid_vertices", .Type = ConfigFieldType::UInt, .Description = "Max grid vertices.", .Min = 8, .Max = 16777216},
+            {.Name = "backend", .Type = ConfigFieldType::StringEnum, .Description = "Backend.", .EnumNames = kPointConstructionBackendNames, .EnumValues = kPointConstructionBackend},
+            {.Name = "method", .Type = ConfigFieldType::StringEnum, .Description = "Method.", .EnumValues = kPointConstructionMethod},
+            {.Name = "estimate_normals", .Type = ConfigFieldType::Bool, .Description = "Estimate normals."},
+            {.Name = "mutual", .Type = ConfigFieldType::Bool, .Description = "Mutual."},
+            {.Name = "output_name", .Type = ConfigFieldType::String, .Description = "Output entity name containing 1..256 bytes.", .NonEmpty = true},
+            {.Name = "bounding_box_padding", .Type = ConfigFieldType::Float, .Description = "Bounding box padding.", .Min = 0, .Max = double(std::numeric_limits<float>::max())},
+            {.Name = "normal_agreement_power", .Type = ConfigFieldType::Float, .Description = "Normal agreement power.", .Min = 0, .Max = double(std::numeric_limits<float>::max())},
+            {.Name = "kernel_sigma_scale", .Type = ConfigFieldType::Float, .Description = "Must be strictly positive after conversion to float; zero and positive values that underflow are rejected.", .Min = 0, .Max = double(std::numeric_limits<float>::max())},
+            {.Name = "min_distance_epsilon", .Type = ConfigFieldType::Float, .Description = "Min distance epsilon.", .Min = 0, .Max = double(std::numeric_limits<float>::max())},
+            {.Name = "positions", .Type = ConfigFieldType::PropertyRef, .Description = "Positions.", .RefKinds = kVec3Kind},
+            {.Name = "normals", .Type = ConfigFieldType::PropertyRef, .Description = "For Hoppe with estimate_normals disabled, supplied normals must share the position domain.", .RefKinds = kVec3Kind},
+        };
+
         using Json=nlohmann::json;
         BilateralFilterConfig ParseBilateralFilterConfig(const Json& data)
         {
@@ -55,21 +127,20 @@ namespace Extrinsic::Runtime
         auto input=ConfigDetail::ParseConfigJson(payload, false),data=ConfigDetail::ParseConfigJson(SerializeBilateralFilterConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, data, "Bilateral filter config must be an object.", "Unknown output field: ",
-            {"entity", "k_neighbors", "gpu_query_batch_size", "iterations"}))
+            kBilateralFilterFields))
             return RejectConfigSection(subject, std::move(*error));
-        if(data["gpu_query_batch_size"]==0 || data["gpu_query_batch_size"]>16384)
+        if(!ConfigDetail::InConfigFieldRange(kBilateralFilterFields, "gpu_query_batch_size", data["gpu_query_batch_size"].get<double>()))
             return RejectConfigSection(subject, "GPU query batch size must be 1..16384.");
-        if(data["backend"]!="cpu_octree" && data["backend"]!="cpu_lbvh" && data["backend"]!="vulkan_lbvh")return RejectConfigSection(subject, "Unknown output backend.");
+        if(!ConfigDetail::IsConfigFieldToken(kBilateralFilterFields, "backend", data["backend"]))return RejectConfigSection(subject, "Unknown output backend.");
         if (auto error = ConfigDetail::ValidatePointConfigNonnegativeFloats(
-            data, {"spatial_sigma", "normal_sigma"}))
+            data, kBilateralFilterFields))
             return RejectConfigSection(subject, std::move(*error));
-        if(data["iterations"]>100) return RejectConfigSection(subject, "Bilateral iterations must be 0..100.");
+        if(!ConfigDetail::InConfigFieldRange(kBilateralFilterFields, "iterations", data["iterations"].get<double>())) return RejectConfigSection(subject, "Bilateral iterations must be 0..100.");
         for(auto key:{"spatial_sigma","normal_sigma"})
             if(data[key].get<double>()>0 && data[key].get<float>()==0)
                 return RejectConfigSection(subject, std::string(key)+" must remain positive in float storage.");
-        const BilateralFilterConfig defaults;
         if (auto error = ConfigDetail::ValidatePointConfigPropertyRefs(
-            data, {{"positions", defaults.Positions.ValueKind}, {"normals", defaults.Normals.ValueKind}, {"output", defaults.Output.ValueKind}}))
+            data, kBilateralFilterFields))
             return RejectConfigSection(subject, std::move(*error));
         if(data["positions"]["domain"]!=data["output"]["domain"] || data["positions"]["domain"]!=data["normals"]["domain"])
             return RejectConfigSection(subject, "Positions, normals and output must share an element domain.");
@@ -84,9 +155,13 @@ namespace Extrinsic::Runtime
     void SetBilateralFilterConfig(Core::Config::EngineConfig& c,const BilateralFilterConfig& value)
     {Core::Config::UpsertEngineConfigSection(c.AppSections,ConfigDetail::MakeConfigSection(
             kBilateralFilterConfigSectionName, kBilateralFilterConfigSectionSchemaId, 1, SerializeBilateralFilterConfig(value)));}
+    std::span<const ConfigFieldSpec> BilateralFilterConfigFieldSpecs() noexcept
+    { return kBilateralFilterFields; }
     Core::Config::EngineConfigSectionRegistration MakeBilateralFilterConfigSectionRegistration()
     {return ConfigDetail::MakeSectionRegistration(
-            kBilateralFilterConfigSectionName, kBilateralFilterConfigSectionSchemaId, 1, SerializeBilateralFilterConfig({}), ValidateBilateralFilterConfigSection, {});}
+            kBilateralFilterConfigSectionName, kBilateralFilterConfigSectionSchemaId, 1, SerializeBilateralFilterConfig({}), ValidateBilateralFilterConfigSection,
+            ConfigDetail::BuildSectionSchemaJson(kBilateralFilterConfigSectionSchemaId, "BilateralFilter", "Validated BilateralFilter configuration.",
+                kBilateralFilterFields, ConfigDetail::ParseConfigJson(SerializeBilateralFilterConfig({}), true)));}
 }
 
 namespace Extrinsic::Runtime
@@ -128,24 +203,22 @@ namespace Extrinsic::Runtime
         auto input=ConfigDetail::ParseConfigJson(payload, false),data=ConfigDetail::ParseConfigJson(SerializeKeypointAnalysisConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, data, "Keypoint analysis config must be an object.", "Unknown keypoint field: ",
-            {"entity", "minimum_neighbors", "gpu_query_batch_size", "gpu_radius_capacity"}))
+            kKeypointAnalysisFields))
             return RejectConfigSection(subject, std::move(*error));
-        if(data["gpu_query_batch_size"]==0 || data["gpu_query_batch_size"]>16384 ||
-           data["gpu_radius_capacity"]==0 || data["gpu_radius_capacity"]>1024)
+        if(!ConfigDetail::InConfigFieldRange(kKeypointAnalysisFields, "gpu_query_batch_size", data["gpu_query_batch_size"].get<double>()) ||
+           !ConfigDetail::InConfigFieldRange(kKeypointAnalysisFields, "gpu_radius_capacity", data["gpu_radius_capacity"].get<double>()))
             return RejectConfigSection(subject, "GPU query batch must be 1..16384 and complete radius capacity 1..1024.");
-        if(data["backend"]!="cpu_kdtree" && data["backend"]!="cpu_lbvh" && data["backend"]!="vulkan_lbvh" && data["backend"]!="vulkan_compute")
+        if(!ConfigDetail::IsConfigFieldToken(kKeypointAnalysisFields, "backend", data["backend"]))
             return RejectConfigSection(subject, "Unknown keypoint backend.");
         for(auto key:{"salient_radius","nonmax_radius"})
-            if(!data[key].is_number() || !std::isfinite(data[key].get<double>()) || data[key]<0 ||
-               data[key].get<double>()>std::numeric_limits<float>::max() ||
+            if(!data[key].is_number() || !ConfigDetail::InConfigFieldRange(kKeypointAnalysisFields, key, data[key].get<double>()) ||
                (data[key]>0 && data[key].get<float>()==0))
                 return RejectConfigSection(subject, std::string(key)+" must be zero (automatic) or a positive representable float.");
         for(auto key:{"gamma21","gamma32"})
-            if(!data[key].is_number() || !std::isfinite(data[key].get<double>()) || data[key]<0 || data[key]>1)
+            if(!data[key].is_number() || !ConfigDetail::InConfigFieldRange(kKeypointAnalysisFields, key, data[key].get<double>()))
                 return RejectConfigSection(subject, std::string(key)+" must be finite in [0,1].");
-        const KeypointAnalysisConfig defaults;
         if (auto error = ConfigDetail::ValidatePointConfigPropertyRefs(
-            data, {{"positions", defaults.Positions.ValueKind}, {"mask", defaults.Mask.ValueKind}, {"score", defaults.Score.ValueKind}}))
+            data, kKeypointAnalysisFields))
             return RejectConfigSection(subject, std::move(*error));
         if(data["positions"]["domain"]!=data["mask"]["domain"] || data["mask"]["domain"]!=data["score"]["domain"] ||
            data["positions"]["name"]==data["mask"]["name"] || data["positions"]["name"]==data["score"]["name"] || data["mask"]["name"]==data["score"]["name"])
@@ -159,9 +232,13 @@ namespace Extrinsic::Runtime
     void SetKeypointAnalysisConfig(Core::Config::EngineConfig& c,const KeypointAnalysisConfig& value)
     {Core::Config::UpsertEngineConfigSection(c.AppSections,ConfigDetail::MakeConfigSection(
             kKeypointAnalysisConfigSectionName, kKeypointAnalysisConfigSectionSchemaId, 1, SerializeKeypointAnalysisConfig(value)));}
+    std::span<const ConfigFieldSpec> KeypointAnalysisConfigFieldSpecs() noexcept
+    { return kKeypointAnalysisFields; }
     Core::Config::EngineConfigSectionRegistration MakeKeypointAnalysisConfigSectionRegistration()
     {return ConfigDetail::MakeSectionRegistration(
-            kKeypointAnalysisConfigSectionName, kKeypointAnalysisConfigSectionSchemaId, 1, SerializeKeypointAnalysisConfig({}), ValidateKeypointAnalysisConfigSection, {});}
+            kKeypointAnalysisConfigSectionName, kKeypointAnalysisConfigSectionSchemaId, 1, SerializeKeypointAnalysisConfig({}), ValidateKeypointAnalysisConfigSection,
+            ConfigDetail::BuildSectionSchemaJson(kKeypointAnalysisConfigSectionSchemaId, "KeypointAnalysis", "Validated KeypointAnalysis configuration.",
+                kKeypointAnalysisFields, ConfigDetail::ParseConfigJson(SerializeKeypointAnalysisConfig({}), true)));}
 }
 
 namespace Extrinsic::Runtime
@@ -211,28 +288,27 @@ namespace Extrinsic::Runtime
         auto input=ConfigDetail::ParseConfigJson(payload, false),data=ConfigDetail::ParseConfigJson(SerializeDescriptorAnalysisConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, data, "Descriptor analysis config must be an object.", "Unknown descriptor field: ",
-            {"entity", "max_neighbors", "gpu_query_batch_size", "gpu_radius_capacity"}))
+            kDescriptorAnalysisFields))
             return RejectConfigSection(subject, std::move(*error));
-        if(data["gpu_query_batch_size"]==0 || data["gpu_query_batch_size"]>16384 ||
-           data["gpu_radius_capacity"]==0 || data["gpu_radius_capacity"]>1024)
+        if(!ConfigDetail::InConfigFieldRange(kDescriptorAnalysisFields, "gpu_query_batch_size", data["gpu_query_batch_size"].get<double>()) ||
+           !ConfigDetail::InConfigFieldRange(kDescriptorAnalysisFields, "gpu_radius_capacity", data["gpu_radius_capacity"].get<double>()))
             return RejectConfigSection(subject, "GPU query batch must be 1..16384 and complete radius capacity 1..1024.");
-        if(data["backend"]!="cpu_kdtree" && data["backend"]!="cpu_lbvh" && data["backend"]!="vulkan_lbvh")
+        if(!ConfigDetail::IsConfigFieldToken(kDescriptorAnalysisFields, "backend", data["backend"]))
             return RejectConfigSection(subject, "Unknown descriptor backend.");
         for(auto key:{"feature_radius"})
-            if(!data[key].is_number() || !std::isfinite(data[key].get<double>()) || data[key]<0 ||
-               data[key].get<double>()>std::numeric_limits<float>::max() ||
+            if(!data[key].is_number() || !ConfigDetail::InConfigFieldRange(kDescriptorAnalysisFields, key, data[key].get<double>()) ||
                (data[key]>0 && data[key].get<float>()==0))
                 return RejectConfigSection(subject, std::string(key)+" must be zero (automatic) or a positive representable float.");
         using ConfigDetail::PointPropertyValidation;
-        if(ConfigDetail::ValidatePointPropertyRef(data["positions"],Geometry::PropertyValueKind::Vec3) != PointPropertyValidation::Valid ||
-           ConfigDetail::ValidatePointPropertyRef(data["normals"],Geometry::PropertyValueKind::Vec3) != PointPropertyValidation::Valid ||
+        if(ConfigDetail::ValidatePointPropertyRef(data["positions"], FindConfigFieldSpec(kDescriptorAnalysisFields, "positions")->RefKinds.front(), FindConfigFieldSpec(kDescriptorAnalysisFields, "positions")->AnyScalar) != PointPropertyValidation::Valid ||
+           ConfigDetail::ValidatePointPropertyRef(data["normals"], FindConfigFieldSpec(kDescriptorAnalysisFields, "normals")->RefKinds.front(), FindConfigFieldSpec(kDescriptorAnalysisFields, "normals")->AnyScalar) != PointPropertyValidation::Valid ||
            data["positions"]["domain"]!=data["normals"]["domain"])
             return RejectConfigSection(subject, "Positions and normals need canonical vec3 references on the same domain.");
-        if(!data["outputs"].is_array() || data["outputs"].size()!=33)return RejectConfigSection(subject, "FPFH requires exactly 33 float output references.");
-        for(unsigned i=0;i<33;++i)
+        if(!data["outputs"].is_array() || data["outputs"].size()!=*FindConfigFieldSpec(kDescriptorAnalysisFields, "outputs")->MinItems)return RejectConfigSection(subject, "FPFH requires exactly 33 float output references.");
+        for(std::size_t i=0;i<data["outputs"].size();++i)
         {
             const auto& ref=data["outputs"][i];
-            if(ConfigDetail::ValidatePointPropertyRef(ref,Geometry::PropertyValueKind::Float, true) != PointPropertyValidation::Valid || ref["domain"]!=data["positions"]["domain"] ||
+            if(ConfigDetail::ValidatePointPropertyRef(ref, FindConfigFieldSpec(kDescriptorAnalysisFields, "outputs")->Item->RefKinds.front(), FindConfigFieldSpec(kDescriptorAnalysisFields, "outputs")->Item->AnyScalar) != PointPropertyValidation::Valid || ref["domain"]!=data["positions"]["domain"] ||
                ref["name"]==data["positions"]["name"] || ref["name"]==data["normals"]["name"])
                 return RejectConfigSection(subject, "Descriptor outputs must be float properties on the input domain, distinct from inputs.");
             for(unsigned j=0;j<i;++j)if(ref["name"]==data["outputs"][j]["name"])
@@ -247,9 +323,13 @@ namespace Extrinsic::Runtime
     void SetDescriptorAnalysisConfig(Core::Config::EngineConfig& c,const DescriptorAnalysisConfig& value)
     {Core::Config::UpsertEngineConfigSection(c.AppSections,ConfigDetail::MakeConfigSection(
             kDescriptorAnalysisConfigSectionName, kDescriptorAnalysisConfigSectionSchemaId, 1, SerializeDescriptorAnalysisConfig(value)));}
+    std::span<const ConfigFieldSpec> DescriptorAnalysisConfigFieldSpecs() noexcept
+    { return kDescriptorAnalysisFields; }
     Core::Config::EngineConfigSectionRegistration MakeDescriptorAnalysisConfigSectionRegistration()
     {return ConfigDetail::MakeSectionRegistration(
-            kDescriptorAnalysisConfigSectionName, kDescriptorAnalysisConfigSectionSchemaId, 1, SerializeDescriptorAnalysisConfig({}), ValidateDescriptorAnalysisConfigSection, {});}
+            kDescriptorAnalysisConfigSectionName, kDescriptorAnalysisConfigSectionSchemaId, 1, SerializeDescriptorAnalysisConfig({}), ValidateDescriptorAnalysisConfigSection,
+            ConfigDetail::BuildSectionSchemaJson(kDescriptorAnalysisConfigSectionSchemaId, "DescriptorAnalysis", "Validated DescriptorAnalysis configuration.",
+                kDescriptorAnalysisFields, ConfigDetail::ParseConfigJson(SerializeDescriptorAnalysisConfig({}), true)));}
 }
 
 namespace Extrinsic::Runtime
@@ -338,21 +418,15 @@ namespace Extrinsic::Runtime
              data = ConfigDetail::ParseConfigJson(SerializePointConstructionConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, data, "Point construction config must be an object.", "Unknown construction field: ",
-            {"entity", "resolution", "k_neighbors",
-             "normal_k_neighbors", "gpu_query_batch_size", "max_grid_vertices"}))
+            kPointConstructionFields))
             return RejectConfigSection(subject, std::move(*error));
-        if (data["resolution"] < 1 || data["resolution"] > 512 || data["k_neighbors"] < 1 ||
-            data["k_neighbors"] > 63 || data["normal_k_neighbors"] < 3 ||
-            data["normal_k_neighbors"] > 1024 || data["gpu_query_batch_size"] < 1 ||
-            data["gpu_query_batch_size"] > 16384 || data["max_grid_vertices"] < 8 ||
-            data["max_grid_vertices"] > (1u << 24))
+        if (!ConfigDetail::InConfigFieldRange(kPointConstructionFields, "resolution", data["resolution"].get<double>()) || !ConfigDetail::InConfigFieldRange(kPointConstructionFields, "k_neighbors", data["k_neighbors"].get<double>()) || !ConfigDetail::InConfigFieldRange(kPointConstructionFields, "normal_k_neighbors", data["normal_k_neighbors"].get<double>()) || !ConfigDetail::InConfigFieldRange(kPointConstructionFields, "gpu_query_batch_size", data["gpu_query_batch_size"].get<double>()) || !ConfigDetail::InConfigFieldRange(kPointConstructionFields, "max_grid_vertices", data["max_grid_vertices"].get<double>()))
             return RejectConfigSection(subject,
                 "Resolution must be 1..512, k 1..63, normal k 3..1024, batch 1..16384 "
                 "and grid budget 8..16777216.");
-        if (data["backend"] != "cpu_reference" && data["backend"] != "cpu_lbvh" &&
-            data["backend"] != "vulkan_lbvh")
+        if (!ConfigDetail::IsConfigFieldToken(kPointConstructionFields, "backend", data["backend"]))
             return RejectConfigSection(subject, "Unknown construction backend.");
-        if (data["method"] != "hoppe" && data["method"] != "knn_graph")
+        if (!ConfigDetail::IsConfigFieldToken(kPointConstructionFields, "method", data["method"]))
             return RejectConfigSection(subject, "Unknown construction method.");
         if (!data["estimate_normals"].is_boolean() || !data["mutual"].is_boolean())
             return RejectConfigSection(subject, "Construction switches must be boolean.");
@@ -360,13 +434,13 @@ namespace Extrinsic::Runtime
             data["output_name"].get<std::string>().size() > 256)
             return RejectConfigSection(subject, "Output name must contain 1..256 bytes.");
         if (auto error = ConfigDetail::ValidatePointConfigNonnegativeFloats(
-            data, {"bounding_box_padding", "normal_agreement_power", "kernel_sigma_scale", "min_distance_epsilon"}))
+            data, kPointConstructionFields))
             return RejectConfigSection(subject, std::move(*error));
         if (data["kernel_sigma_scale"].get<float>() <= 0)
             return RejectConfigSection(subject, "Kernel sigma scale must be positive.");
         using ConfigDetail::PointPropertyValidation;
-        if (ConfigDetail::ValidatePointPropertyRef(data["positions"], Geometry::PropertyValueKind::Vec3) != PointPropertyValidation::Valid ||
-            ConfigDetail::ValidatePointPropertyRef(data["normals"], Geometry::PropertyValueKind::Vec3) != PointPropertyValidation::Valid)
+        if (ConfigDetail::ValidatePointPropertyRef(data["positions"], FindConfigFieldSpec(kPointConstructionFields, "positions")->RefKinds.front(), FindConfigFieldSpec(kPointConstructionFields, "positions")->AnyScalar) != PointPropertyValidation::Valid ||
+            ConfigDetail::ValidatePointPropertyRef(data["normals"], FindConfigFieldSpec(kPointConstructionFields, "normals")->RefKinds.front(), FindConfigFieldSpec(kPointConstructionFields, "normals")->AnyScalar) != PointPropertyValidation::Valid)
             return RejectConfigSection(subject, "Inputs require canonical vec3 property references.");
         if (data["method"] == "hoppe" && data["estimate_normals"] == false &&
             data["positions"]["domain"] != data["normals"]["domain"])
@@ -384,9 +458,13 @@ namespace Extrinsic::Runtime
         Core::Config::UpsertEngineConfigSection(c.AppSections, ConfigDetail::MakeConfigSection(
             kPointConstructionConfigSectionName, kPointConstructionConfigSectionSchemaId, 1, SerializePointConstructionConfig(value)));
     }
+    std::span<const ConfigFieldSpec> PointConstructionConfigFieldSpecs() noexcept
+    { return kPointConstructionFields; }
     Core::Config::EngineConfigSectionRegistration MakePointConstructionConfigSectionRegistration()
     {
         return ConfigDetail::MakeSectionRegistration(
-            kPointConstructionConfigSectionName, kPointConstructionConfigSectionSchemaId, 1, SerializePointConstructionConfig({}), ValidatePointConstructionConfigSection, {});
+            kPointConstructionConfigSectionName, kPointConstructionConfigSectionSchemaId, 1, SerializePointConstructionConfig({}), ValidatePointConstructionConfigSection,
+            ConfigDetail::BuildSectionSchemaJson(kPointConstructionConfigSectionSchemaId, "PointConstruction", "Validated PointConstruction configuration.",
+                kPointConstructionFields, ConfigDetail::ParseConfigJson(SerializePointConstructionConfig({}), true)));
     }
 } // namespace Extrinsic::Runtime

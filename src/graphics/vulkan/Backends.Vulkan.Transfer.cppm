@@ -12,6 +12,7 @@ module;
 #include <vector>
 
 #include "Vulkan.hpp"
+#include "Backends.Vulkan.StagingRing.hpp"
 
 export module Extrinsic.Backends.Vulkan:Transfer;
 
@@ -50,28 +51,20 @@ namespace Extrinsic::Backends::Vulkan
 
         [[nodiscard]] Allocation Allocate(size_t sizeBytes, size_t alignment);
         void Retire(uint64_t retireValue);
+        void CancelPending();
         void GarbageCollect(uint64_t completedValue);
 
         [[nodiscard]] bool IsValid() const noexcept;
         [[nodiscard]] size_t Capacity() const noexcept { return m_Capacity; }
 
     private:
-        static size_t AlignUp(size_t v, size_t a) { return a == 0 ? v : ((v + a - 1) / a) * a; }
-
-        struct Region { size_t Begin, End; uint64_t RetireValue; };
-
         VkDevice      m_Device  = VK_NULL_HANDLE;
         VmaAllocator  m_Vma     = VK_NULL_HANDLE;
         VkBuffer      m_Buffer  = VK_NULL_HANDLE;
         VmaAllocation m_Alloc   = VK_NULL_HANDLE;
         void*         m_Mapped  = nullptr;
         size_t        m_Capacity;
-        size_t        m_Head    = 0;
-        size_t        m_Tail    = 0;
-        size_t        m_PendingBegin = 0;
-        size_t        m_PendingEnd   = 0;
-        bool          m_HasPending   = false;
-        std::deque<Region> m_InFlight;
+        Detail::StagingRing m_Ring;
         std::mutex    m_Mutex;
     };
 
@@ -195,6 +188,8 @@ namespace Extrinsic::Backends::Vulkan
         VkCommandPool m_CmdPool       = VK_NULL_HANDLE;
         std::atomic<uint64_t> m_NextTicket{1};
         std::unique_ptr<StagingBelt> m_Belt;
+        // One pending staging transaction; command-pool/queue locks stay nested inside it.
+        std::mutex m_UploadMutex;
         mutable std::mutex m_Mutex;
         std::deque<RetiredCommandBuffer> m_InFlightCommandBuffers;
         std::vector<ReadbackSlot> m_ReadbackSlots;

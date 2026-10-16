@@ -469,7 +469,7 @@ namespace Extrinsic::Runtime
             context, std::move(onComplete), report(EditorCommandStatus::Pending, "Keypoint analysis queued."), "Keypoint analysis"};
         const auto validate=[context,w]{return MS::ValidateQueuedJob(w->Abandoned,CurrentInput(context,*w));};
         JobDesc desc{
-            .DebugName="Keypoint covariance and suppression",.Scope=context.World,.Kind=RuntimeTaskKinds::GeometryProcess,
+            .DebugName="Keypoint covariance and suppression",.Scope=context.World,
             .Work=[w](const JobCancellation&){Compute(*w);return JobResultEnvelope::Make(true);},
             .ValidateBeforeApply=validate,
             .PublishCompletion=[context,w,delivery](KernelEventBus&,const JobResultEnvelope&){return delivery.Publish(Publish(context,w));},
@@ -477,7 +477,7 @@ namespace Extrinsic::Runtime
         if(w->Config.Backend==KeypointAnalysisBackend::VulkanLBVH)
         {
             JobDesc prepare{
-                .DebugName="Keypoint scale",.Scope=context.World,.Kind=RuntimeTaskKinds::GeometryProcess,
+                .DebugName="Keypoint scale",.Scope=context.World,
                 .Work=[w](const JobCancellation&){Prepare(*w);return JobResultEnvelope::Make(true);},
                 .ValidateBeforeApply=validate,
                 .PublishCompletion=[w](KernelEventBus&,const JobResultEnvelope&)
@@ -487,7 +487,7 @@ namespace Extrinsic::Runtime
             identity.Run=scale; // later stages join the run
             if(!scale.IsValid())return delivery.Rejected("scale");
             JobDesc gpu{
-                .DebugName="Keypoint radius support (Vulkan)",.Scope=context.World,.Kind=RuntimeTaskKinds::GeometryProcess,
+                .DebugName="Keypoint radius support (Vulkan)",.Scope=context.World,
                 .Work=[](const JobCancellation&){return JobResultEnvelope::Make(true);},
                 .IsReadyToApply=[context,w]{return AdvanceGpu(context,*w);},
                 .PublishCompletion=[w](KernelEventBus&,const JobResultEnvelope&){return w->Rows.Finished;},

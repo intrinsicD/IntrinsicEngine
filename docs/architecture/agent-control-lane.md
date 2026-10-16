@@ -109,6 +109,12 @@ Nothing exists without the launch flag: no module, thread or socket.
 
 ## Protocol
 
+Present `tools/call.arguments` must be a JSON object. Undo and redo default to one
+step only when `steps` is omitted; a supplied value must be an integer in 1..64.
+Malformed arguments are rejected before invoking a mutation. The socket rejects
+each complete line exceeding `MaxMessageBytes` before queueing it and applies the
+same bound to an incomplete line, including lines assembled over multiple receives.
+
 - Version negotiation: `initialize` echoes the client's `protocolVersion` when it is one of
   `kAgentSupportedProtocolVersions` (`2025-06-18`, `2025-03-26`, `2024-11-05`) and otherwise
   answers the newest, `2025-06-18`; the client then decides whether to continue.

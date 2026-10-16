@@ -107,6 +107,7 @@ namespace Extrinsic::Runtime
         RenderExtractionCache m_RenderExtractionCache{};
         std::unique_ptr<RenderWorldPool> m_RenderWorldPool{};
         std::uint64_t m_RenderExtractionFrameIndex{0u};
+        std::uint64_t m_LastRenderedSceneEpoch{0u};
         std::unique_ptr<Core::FrameGraph> m_FrameGraph;
         RuntimeInputActionRegistry m_InputActions{};
         CommandBus m_CommandBus{};
@@ -1035,6 +1036,7 @@ namespace Extrinsic::Runtime
             m_Impl->m_ServiceRegistry.Find<Graphics::GpuAssetCache>();
         const auto renderContractBegin = std::chrono::steady_clock::now();
         const auto renderBeginFrameBegin = std::chrono::steady_clock::now();
+        (void)m_Impl->m_Window->DrainEvents();
         pacing.RendererBeganFrame = m_Impl->m_Renderer->BeginFrame(frame);
         pacing.RenderBeginFrameMicros = ElapsedMicros(renderBeginFrameBegin);
         if (!pacing.RendererBeganFrame)
@@ -1074,13 +1076,23 @@ namespace Extrinsic::Runtime
                 m_Impl->m_RenderExtractionCache.GetLastStats();
         }
 
-        // Synchronous mode consumes the same-frame snapshot. Pipelined mode
-        // intentionally consumes the previously published front.
+        // A scene boundary consumes its first successful publication immediately.
+        // Later pipelined frames resume consuming the previously published front.
+        const bool publishedNewScene =
+            backSlot != RenderWorldPool::kInvalidSlot &&
+            m_Impl->m_RenderExtractionCache.SceneEpoch() !=
+                m_Impl->m_LastRenderedSceneEpoch;
         frameContext.PooledFrontSlot =
-            m_Impl->m_Config.Render.SynchronousExtraction
+            m_Impl->m_Config.Render.SynchronousExtraction || publishedNewScene
                 ? renderWorldPool.AcquireFront(frameContext.FrameIndex)
                 : renderWorldPool.AcquirePreviousFront(
                       frameContext.FrameIndex);
+        if (backSlot != RenderWorldPool::kInvalidSlot &&
+            frameContext.PooledFrontSlot != RenderWorldPool::kInvalidSlot)
+        {
+            m_Impl->m_LastRenderedSceneEpoch =
+                m_Impl->m_RenderExtractionCache.SceneEpoch();
+        }
         const std::uint32_t extractSlot =
             frameContext.PooledFrontSlot != RenderWorldPool::kInvalidSlot
                 ? frameContext.PooledFrontSlot

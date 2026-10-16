@@ -339,7 +339,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointCloudServi
 # Cross-cutting discovery answers which algorithms and domains apply; it
 # must not acquire a back edge onto any method family's results or config.
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Discovery
-        --check-source src/runtime/Editor/Operations/Runtime.PointSetOperations.Processing.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
         --forbid-module Geometry.HalfedgeMesh
         --forbid-module Extrinsic.Runtime.SpatialIndexCache
@@ -821,7 +821,7 @@ endif()
 # Borrowing device/cache pointers must not import their complete APIs or kernels.
 intrinsic_add_module_boundary_test(EditorCompilationLocality.ProcessingServiceBorrows
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cppm
-        --check-source src/runtime/Editor/Operations/Runtime.PointSetOperations.Processing.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
         --check-source src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm
         --forbid-module Extrinsic.RHI.Device
         --forbid-module Extrinsic.Runtime.SpatialIndexCache
@@ -885,7 +885,7 @@ set_tests_properties(EditorCompilationLocality.AssetService
 intrinsic_add_module_boundary_test(EditorCompilationLocality.SceneRegistryBorrows
         --check-source src/runtime/Editor/Runtime.EditorCommandHistory.cppm
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cppm
-        --check-source src/runtime/Editor/Operations/Runtime.PointSetOperations.Processing.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
         --check-source src/runtime/GeometryIntegration/Runtime.PrimitiveSelectionRefinement.cppm
         --check-source src/runtime/Editor/Operations/Runtime.SceneEditingOperations.cppm
         --check-source src/runtime/Scene/Runtime.SceneSerialization.cppm
@@ -1912,6 +1912,7 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
         Test.ComputeParallelPrimitivesGpuSmoke.cpp
         Test.GpuTransferFacadeGpuSmoke.cpp
         Test.TextureReadbackGpuSmoke.cpp
+        Test.VulkanTransferLifetimeGpuSmoke.cpp
         Test.DefaultRecipeSurfaceGpuSmoke.cpp
         Test.HzbOcclusionConservatismGpuSmoke.cpp
         Test.ImGuiSurfaceGpuSmoke.cpp
@@ -2099,6 +2100,7 @@ set(_graphics_contract_test_files
     Test.DeviceCapabilityDefaults.cpp
     Test.TextureReadback.cpp
     Test.TextureUploadLayout.cpp
+    Test.VulkanStagingRing.cpp
     Test.TransferQueueReadback.cpp
 )
 intrinsic_resolve_test_sources(_graphics_contract_test_sources
@@ -2805,7 +2807,11 @@ set(_intrinsic_multiworker_test_budgets
     "IntrinsicRuntimeContractTests|RuntimeAssetImportFormatCoverage.QueuedImportsRejectActiveWorldSwitchBeforeApply|3"
     "IntrinsicRuntimeContractTests|RuntimeAssetImportFormatCoverage.QueuedImportRejectsAwayAndBackBindingEpoch|3"
     "IntrinsicRuntimeContractTests|RuntimeAssetImportFormatCoverage.RetiredWorldImportTerminalizesQueueState|3"
+    "IntrinsicRuntimeContractTests|CpdBrokerWorkspaceReuse.StepsAndRunsReuseThePooledWorkspaceAndUploadEachTargetOnce|3"
+    "IntrinsicRuntimeContractTests|CpdBrokerWorkspaceReuse.CancelledAndRefusedComputationsKeepTheirLeaseUntilDoneAndFailClosed|3"
+    "IntrinsicRuntimeContractTests|CpdBrokerWorkspaceReuse.RequestEventsKeepTheirIdentityAndSettledLatency|3"
     "IntrinsicRuntimeContractTests|RuntimeJobService.BoundedApplyLimitsWorkPerDrainWithoutStarving|3"
+    "IntrinsicRuntimeContractTests|RuntimeJobService.ReadyJobsHonorPriorityAndEqualPrioritySubmissionOrder|2"
     "IntrinsicRuntimeContractTests|RuntimeJobService.CancelAfterWorkerFinishFinalizesExactlyOnce|3"
     "IntrinsicRuntimeContractTests|RuntimeJobService.CancelAfterWorkerFinishSuppressesGatePublication|3"
     "IntrinsicRuntimeContractTests|RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing|2"

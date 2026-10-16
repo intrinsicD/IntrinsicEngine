@@ -83,7 +83,7 @@ dvec3 pcaVector(precise dmat3 a, double lambda)
     precise double length=pcaDot(best,best);
     return length>1e-30lf?best/sqrt(length):dvec3(0.0lf);
 }
-void pcaEigen(double a00,double a01,double a02,double a11,double a12,double a22,out precise dvec3 values,out precise dmat3 vectors)
+void pcaEigenNormalized(double a00,double a01,double a02,double a11,double a12,double a22,out precise dvec3 values,out precise dmat3 vectors)
 {
     precise dmat3 a=dmat3(dvec3(a00,a01,a02),dvec3(a01,a11,a12),dvec3(a02,a12,a22));
     precise double mean=(a00+a11+a22)/3.0lf;
@@ -117,4 +117,14 @@ void pcaEigen(double a00,double a01,double a02,double a11,double a12,double a22,
     if(!(length>1e-15lf)){pcaStable(a,values,vectors);return;}
     vectors[2]/=length;
     values=dvec3(max(l2,0.0lf),max(l1,0.0lf),max(l0,0.0lf));
+}
+
+// CPU twin: PCADetail::Eigen. Normalize before products and rank tests, then
+// restore eigenvalue units without scaling the eigenvectors.
+void pcaEigen(double a00,double a01,double a02,double a11,double a12,double a22,out precise dvec3 values,out precise dmat3 vectors)
+{
+    precise double scale=max(max(max(abs(a00),abs(a01)),max(abs(a02),abs(a11))),max(abs(a12),abs(a22)));
+    if(scale==0.0lf){values=dvec3(0.0lf);vectors=dmat3(1.0lf);return;}
+    pcaEigenNormalized(a00/scale,a01/scale,a02/scale,a11/scale,a12/scale,a22/scale,values,vectors);
+    values*=scale;
 }

@@ -30,6 +30,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
+import Extrinsic.Core.Tasks.CounterEvent;
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.Engine;
@@ -56,6 +57,17 @@ namespace
     namespace GS = Extrinsic::ECS::Components::GeometrySources;
     namespace T = Extrinsic::ECS::Components::Transform;
     namespace CPD = Geometry::CoherentPointDrift;
+
+    // Parity/scaling arms are synchronous reference callers; the editor arm below uses
+    // JobService's coroutine lane and never blocks a worker on this event.
+    bool EvaluateBrokerBlocking(Runtime::CoherentPointDriftGpuEStep& broker,
+                                const CPD::EStep::ExternalRequest& request)
+    {
+        auto ready = broker.Queue(request);
+        if (!ready) return false;
+        ready->WaitForProgress(1u);
+        return broker.Complete(ready, request);
+    }
 
     struct Shutdown
     {
@@ -175,7 +187,7 @@ namespace
             // Wraps the broker to keep the per-row denominators (Sums only carries their sum).
             const CPD::EStep::Settings vulkan{.Policy = CPD::EStepPolicy::Vulkan, .Tolerance = 1e-6,
                 .External = [&](const CPD::EStep::ExternalRequest& r) {
-                    const bool ok = Broker->Evaluate(r);
+                    const bool ok = EvaluateBrokerBlocking(*Broker, r);
                     deviceLogDen.assign(r.LogDenominator.begin(), r.LogDenominator.end());
                     deviceSkipped.assign(r.SkipRows.begin(), r.SkipRows.end());
                     return ok;
@@ -426,7 +438,7 @@ namespace
                 for (std::size_t v; in >> v;) sizes.push_back(v);
             }
             if (sizes.empty()) sizes = {1'000, 10'000, 100'000};
-            const auto external = [broker = Broker](const CPD::EStep::ExternalRequest& r) { return broker->Evaluate(r); };
+            const auto external = [broker = Broker](const CPD::EStep::ExternalRequest& r) { return EvaluateBrokerBlocking(*broker, r); };
             const CPD::Params base{.OutlierWeight = 0.05, .MaxIterations = 100, .EStepTolerance = 1e-6};
             {
                 CPD::Params warm = base;
@@ -485,7 +497,7 @@ namespace
                         << ", \"runtime_ms\": " << run.Median << ", \"runtime_ms_min\": " << run.Min
                         << ", \"runtime_ms_max\": " << run.Max << ", \"repetitions\": " << run.Repetitions
                         << ", \"ms_per_iteration\": " << (res.Iterations ? run.Median / double(res.Iterations) : 0.0)
-                        << ", \"worker_wait_ms_first_run\": " << 1e3 * run.WaitSeconds
+                        << ", \"request_latency_ms_first_run\": " << 1e3 * run.WaitSeconds
                         << ", \"rms_error_to_truth\": " << run.Rms << ", \"kernel_evaluations\": " << res.KernelEvaluations
                         << ", \"e_step_sampled_error\": " << res.EStepSampledError;
                     if (run.Parity) out << ", \"max_point_delta\": " << *run.Parity << ", \"parity_against\": \"rigid_vulkan_cpu_twin\"";
@@ -592,7 +604,7 @@ TEST(METHOD056VulkanCpdEStep, DenseStatisticsAndRegistrationMatchTheCpu)
     EXPECT_LE(pointError, 1e-4 * extent);
 
     std::printf("METHOD-056 parity: %zu cases, max |dlog den| %.3g, Pt1 %.3g, P1 %.3g, PX %.3g, log-den sum %.3g; "
-                "bitwise %d; %llu device E-steps in %.1f ms (worker wait %.1f ms); editor run %u iterations in %.1f ms, "
+                "bitwise %d; %llu device E-steps in %.1f ms (request latency %.1f ms); editor run %u iterations in %.1f ms, "
                 "point error %.3g\n",
                 run->ParityCases, run->MaxErrors.LogDenominator, run->MaxErrors.Pt1, run->MaxErrors.P1, run->MaxErrors.PX,
                 run->LogDenSumError, int(run->Bitwise), static_cast<unsigned long long>(run->Stats.Completed), run->ParityMs,

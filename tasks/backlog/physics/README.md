@@ -9,6 +9,7 @@ its dependencies, conditional gates, scope and verification.
 - [PHYSICS-005 — Vulkan SPH fluid reference integration](PHYSICS-005-vulkan-sph-fluid.md)
 - [PHYSICS-006 — Vulkan particle-spring reference integration](PHYSICS-006-vulkan-particle-spring.md)
 - [PHYSICS-007 — Vulkan XPBD cloth constraints and integration](PHYSICS-007-vulkan-xpbd-cloth.md)
+- [PHYSICS-008 — Spatial broadphase and k-DOP deformable collision](PHYSICS-008-spatial-broadphase-and-kdop-deformable-collision.md)
 
 Completed and superseded work is recorded in the
 [retirement log](../../done/RETIREMENT-LOG.md) and Git history.

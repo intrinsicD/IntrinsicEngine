@@ -949,10 +949,12 @@ namespace Extrinsic::Sandbox::Editor
             {
                 if (config.Backend == Backend::CpuLBVH && config.Strategy != Runtime::PointCloudConsolidationStrategy::Lop)
                 { config.Backend = Backend::CpuReference; changed = true; }
-                const auto label = [](Backend backend) {
-                    if (backend == Backend::CpuLBVH) return "CPU LBVH (cached)";
-                    if (backend == Backend::VulkanLBVH) return "Vulkan LBVH";
-                    return "CPU reference neighborhoods";
+                const auto* backendField = Runtime::FindConfigFieldSpec(
+                    Runtime::PointCloudConsolidationConfigFieldSpecs(), "backend");
+                const auto label = [backendField](Backend backend) {
+                    if (backend != Backend::CpuLBVH && backend != Backend::VulkanLBVH)
+                        backend = Backend::CpuReference;
+                    return ConfigEnumDisplayLabel(backendField, Runtime::StableToken(backend));
                 };
                 if (ImGui::BeginCombo("Acceleration##PointCloudConsolidation", label(config.Backend)))
                 {

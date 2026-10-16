@@ -1,3 +1,4 @@
+// Bounded EPA penetration queries over GJK-normalized support-map simplices.
 module;
 #include <glm/glm.hpp>
 #include <cmath>
@@ -13,6 +14,7 @@ export module Geometry.EPA;
 import Geometry.GJK;
 import Geometry.Support;
 import Geometry.Primitives;
+import Geometry.RobustPredicates;
 import Extrinsic.Core.Memory;
 
 export namespace Geometry::Internal
@@ -39,41 +41,18 @@ export namespace Geometry::Internal
             bool operator==(const Edge& other) const { return A == other.A && B == other.B; }
         };
 
-        // Returns a valid face, or a face with Normal=(0,0,0) and Distance=max
-        // when the three vertices are collinear (degenerate).
-        [[nodiscard]] inline PolytopeFace MakeFace(std::span<const glm::vec3> polytope, int i0, int i1, int i2)
+        struct SeedDirection
         {
-            PolytopeFace f{};
-            f.Indices = {i0, i1, i2};
-            const glm::vec3 a = polytope[i0];
-            const glm::vec3 b = polytope[i1];
-            const glm::vec3 c = polytope[i2];
+            glm::vec3 Direction;
+            double TouchingSlack;
+        };
 
-            const glm::vec3 cross = glm::cross(b - a, c - a);
-            const float lenSq = glm::dot(cross, cross);
-
-            // Guard: collinear vertices produce a zero cross product.
-            // Mark as degenerate with infinite distance so it is never chosen
-            // as the closest face during EPA expansion.
-            if (lenSq < 1e-20f)
-            {
-                f.Normal = glm::vec3(0.0f);
-                f.Distance = std::numeric_limits<float>::max();
-                return f;
-            }
-
-            // Winding order matters for EPA. We assume CCW relative to origin.
-            f.Normal = cross * (1.0f / std::sqrt(lenSq));
-            f.Distance = glm::dot(f.Normal, a);
-
-            // Ensure outward-facing normal.
-            if (f.Distance < 0)
-            {
-                f.Normal = -f.Normal;
-                f.Distance = -f.Distance;
-            }
-            return f;
-        }
+        // Complete an accepted line/triangle without replacing its vertices.
+        [[nodiscard]] std::optional<SeedDirection> SeedExpansion(std::span<const glm::vec3> simplex);
+        // Preserve directed horizon winding; Distance remains signed.
+        [[nodiscard]] PolytopeFace MakeFace(std::span<const glm::vec3> polytope, int i0, int i1, int i2);
+        [[nodiscard]] PolytopeFace MakeSeedFace(std::span<const glm::vec3> polytope,
+                                                int i0, int i1, int i2, int opposite);
     }
 
     // =========================================================================
@@ -106,11 +85,22 @@ export namespace Geometry::Internal
         Extrinsic::Core::Memory::ArenaAllocator<Detail::PolytopeFace> faceAlloc(scratch);
         Extrinsic::Core::Memory::ArenaAllocator<Detail::Edge> edgeAlloc(scratch);
 
-        if (gjkSimplex.Size != 4) return std::nullopt;
+        if (gjkSimplex.Size < 1 || gjkSimplex.Size > 4) return std::nullopt;
 
         // Use the same normalization factor that GJK used.
         const float invScale = gjkSimplex.InvScale;
-        const float scale = (invScale > 1e-30f) ? (1.0f / invScale) : 1.0f;
+        if (!std::isfinite(invScale) || invScale <= 0.0f) return std::nullopt;
+        const auto contactAt = [&](const glm::vec3& direction, double normalizedDepth) -> std::optional<EPAResult>
+        {
+            const float depth = static_cast<float>(std::max(normalizedDepth, 0.0) / double(invScale));
+            const glm::vec3 point = Geometry::Support(a, direction);
+            if (!std::isfinite(depth) || !std::isfinite(point.x) ||
+                !std::isfinite(point.y) || !std::isfinite(point.z)) return std::nullopt;
+            return EPAResult{direction, depth, point};
+        };
+        // GJK returns one point only when its initial +X support is within its origin tolerance.
+        if (gjkSimplex.Size == 1)
+            return contactAt(glm::vec3(1.0f, 0.0f, 0.0f), 0.0);
 
         Vec3Vec polytope(vec3Alloc);
         FaceVec faces(faceAlloc);
@@ -118,15 +108,38 @@ export namespace Geometry::Internal
         polytope.reserve(4 + MAX_ITER + 1);
         faces.reserve(64);
 
-        for (int i = 0; i < 4; ++i) polytope.push_back(gjkSimplex.Points[i]);
+        for (int i = 0; i < gjkSimplex.Size; ++i) polytope.push_back(gjkSimplex.Points[i]);
+        while (polytope.size() < 4)
+        {
+            const auto seed = Detail::SeedExpansion(std::span<const glm::vec3>(polytope));
+            if (!seed) return std::nullopt;
+            const auto& direction = seed->Direction;
+            const glm::vec3 positive = MinkowskiDifference::Support(a, b, direction) * invScale;
+            const glm::vec3 negative = MinkowskiDifference::Support(a, b, -direction) * invScale;
+            const glm::dvec3 normal(direction);
+            const double upper = glm::dot(glm::dvec3(positive), normal);
+            const double lower = glm::dot(glm::dvec3(negative), normal);
+            if (!std::isfinite(upper) || !std::isfinite(lower)) return std::nullopt;
+            if (std::abs(upper) <= seed->TouchingSlack && std::abs(lower) <= seed->TouchingSlack)
+                return contactAt(direction, 0.0);
+            const double origin = glm::dot(glm::dvec3(polytope.front()), normal);
+            const double positiveHeight = std::abs(upper - origin);
+            const double negativeHeight = std::abs(lower - origin);
+            if (!(std::max(positiveHeight, negativeHeight) > 0.0)) return std::nullopt;
+            polytope.push_back(positiveHeight >= negativeHeight ? positive : negative);
+        }
 
-        faces.push_back(Detail::MakeFace(std::span<const glm::vec3>(polytope), 0, 1, 2));
-        faces.push_back(Detail::MakeFace(std::span<const glm::vec3>(polytope), 0, 2, 3));
-        faces.push_back(Detail::MakeFace(std::span<const glm::vec3>(polytope), 2, 1, 3));
-        faces.push_back(Detail::MakeFace(std::span<const glm::vec3>(polytope), 1, 0, 3));
+        const auto seed = std::span<const glm::vec3>(polytope);
+        faces.push_back(Detail::MakeSeedFace(seed, 0, 1, 2, 3));
+        faces.push_back(Detail::MakeSeedFace(seed, 0, 2, 3, 1));
+        faces.push_back(Detail::MakeSeedFace(seed, 2, 1, 3, 0));
+        faces.push_back(Detail::MakeSeedFace(seed, 1, 0, 3, 2));
+        for (const auto& face : faces)
+            if (glm::dot(face.Normal, face.Normal) == 0.0f) return std::nullopt;
 
         for (int iter = 0; iter < MAX_ITER; ++iter)
         {
+            if (faces.empty()) return std::nullopt;
             float minDist = std::numeric_limits<float>::max();
             size_t closestFaceIdx = 0;
 
@@ -147,19 +160,15 @@ export namespace Geometry::Internal
             // Support query in original space, normalized into the workspace.
             const glm::vec3 support =
                 (Geometry::Support(a, searchDir) - Geometry::Support(b, -searchDir)) * invScale;
-            const float sDist = glm::dot(support, searchDir);
+            const double sDist = glm::dot(glm::dvec3(support), glm::dvec3(searchDir));
+            if (!std::isfinite(sDist)) return std::nullopt;
 
             if (std::abs(sDist - minDist) < Config::EPA_EPSILON)
             {
-                EPAResult result{};
-                // The polytope lives in the Minkowski difference A - B, so the
-                // outward face normal closest to the origin is the direction A
-                // must move *against* to separate — i.e. the A->B normal under
-                // the documented contact convention (BUG-025).
-                result.Normal = searchDir; // Normal A->B (unit vector, scale-invariant)
-                result.Depth = sDist * scale; // Unscale penetration depth to world space
-                result.ContactPoint = Geometry::Support(a, searchDir); // Already in world space
-                return result;
+                // The outward Minkowski A-B face normal is the A->B contact
+                // normal. Accepted GJK slack can leave a nonpositive distance;
+                // that is touching, never a negative penetration.
+                return contactAt(searchDir, sDist);
             }
 
             FaceVec newFaces(faceAlloc);
@@ -182,7 +191,13 @@ export namespace Geometry::Internal
 
             for (const Detail::PolytopeFace& f : faces)
             {
-                if (glm::dot(f.Normal, support - polytope[f.Indices[0]]) > 0)
+                // A rounded unit normal can make an exactly coplanar point
+                // visible and create a zero-area horizon face. Classify from
+                // the vertices with the canonical filtered volume predicate.
+                const auto side = RobustPredicates::Orientation3D(polytope[f.Indices[0]],
+                    polytope[f.Indices[1]], polytope[f.Indices[2]], support);
+                if (side.Certainty == RobustPredicates::Certainty::Certain &&
+                    side.Sign == RobustPredicates::Sign::Positive)
                 {
                     AddEdge(f.Indices[0], f.Indices[1]);
                     AddEdge(f.Indices[1], f.Indices[2]);
@@ -202,7 +217,9 @@ export namespace Geometry::Internal
 
             for (const Detail::Edge& edge : uniqueEdges)
             {
-                newFaces.push_back(Detail::MakeFace(polySpan, edge.A, edge.B, newIdx));
+                const auto face = Detail::MakeFace(polySpan, edge.A, edge.B, newIdx);
+                if (glm::dot(face.Normal, face.Normal) == 0.0f) return std::nullopt;
+                newFaces.push_back(face);
             }
 
             faces = std::move(newFaces);

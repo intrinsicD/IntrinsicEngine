@@ -111,7 +111,6 @@ namespace Extrinsic::Platform::Backends::Glfw
         }
 
         glfwSetWindowUserPointer(m_Window, this);
-        GetInput().Initialize(m_Window);
         SeedCachedDimensions();
         SetupCallbacks();
         m_IsValid = true;
@@ -126,26 +125,20 @@ namespace Extrinsic::Platform::Backends::Glfw
         }
     }
 
-    void Window::PollEvents()
-    {
-        OnUpdate();
-    }
-
     bool Window::ShouldClose() const
     {
         return m_ShouldClose || (m_Window && glfwWindowShouldClose(m_Window));
     }
 
+    bool Window::IsMinimized() const
+    {
+        return (m_Window && glfwGetWindowAttrib(m_Window, GLFW_ICONIFIED) == GLFW_TRUE)
+            || m_FramebufferExtent.Width == 0 || m_FramebufferExtent.Height == 0;
+    }
+
     void Window::AcknowledgeResize()
     {
         m_WasResized = false;
-    }
-
-    bool Window::ConsumeInputActivity()
-    {
-        const bool hadActivity = m_InputActivity;
-        m_InputActivity = false;
-        return hadActivity;
     }
 
     void Window::Listen(EventCallbackFn callback)
@@ -160,7 +153,7 @@ namespace Extrinsic::Platform::Backends::Glfw
         return drained;
     }
 
-    void Window::OnUpdate()
+    void Window::PollEvents()
     {
         if (!m_IsValid) return;
 
@@ -225,10 +218,10 @@ namespace Extrinsic::Platform::Backends::Glfw
     void Window::Emit(Platform::Event event)
     {
         ApplyEvent(event);
-        m_Events.push_back(std::move(event));
+        m_Events.push_back(event);
         if (m_Callback)
         {
-            m_Callback(m_Events.back());
+            m_Callback(event);
         }
     }
 
@@ -240,37 +233,27 @@ namespace Extrinsic::Platform::Backends::Glfw
             if constexpr (std::is_same_v<T, Platform::WindowCloseEvent>)
             {
                 m_ShouldClose = true;
-                m_InputActivity = true;
             }
             else if constexpr (std::is_same_v<T, Platform::WindowResizeEvent>)
             {
                 m_FramebufferExtent = {.Width = value.Width, .Height = value.Height};
                 m_WasResized = true;
-                m_InputActivity = true;
             }
             else if constexpr (std::is_same_v<T, Platform::KeyEvent>)
             {
                 GetInput().SetKeyState(value.KeyCode, value.IsPressed);
-                m_InputActivity = true;
             }
             else if constexpr (std::is_same_v<T, Platform::MouseButtonEvent>)
             {
                 GetInput().SetMouseButtonState(value.ButtonCode, value.IsPressed);
-                m_InputActivity = true;
             }
             else if constexpr (std::is_same_v<T, Platform::ScrollEvent>)
             {
                 GetInput().AccumulateScroll(static_cast<float>(value.XOffset), static_cast<float>(value.YOffset));
-                m_InputActivity = true;
             }
             else if constexpr (std::is_same_v<T, Platform::CursorEvent>)
             {
                 GetInput().SetMousePosition(static_cast<float>(value.XPos), static_cast<float>(value.YPos));
-            }
-            else if constexpr (std::is_same_v<T, Platform::CharEvent> || std::is_same_v<T, Platform::WindowDropEvent> ||
-                               std::is_same_v<T, Platform::WindowFocusEvent>)
-            {
-                m_InputActivity = true;
             }
         }, event);
     }

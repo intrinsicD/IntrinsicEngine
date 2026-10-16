@@ -32,6 +32,13 @@ namespace Extrinsic::Assets
             {
                 return Core::Err(Core::ErrorCode::OutOfRange);
             }
+            for (const float component : material.BaseColorFactor)
+            {
+                if (!std::isfinite(component))
+                    return Core::Err(Core::ErrorCode::AssetInvalidData);
+            }
+            if (!std::isfinite(material.MetallicFactor) || !std::isfinite(material.RoughnessFactor))
+                return Core::Err(Core::ErrorCode::AssetInvalidData);
             return Core::Ok();
         }
 
@@ -41,11 +48,6 @@ namespace Extrinsic::Assets
             if (!payload.IsValid())
             {
                 return Core::Err(Core::ErrorCode::AssetInvalidData);
-            }
-            if (!IsAssetModelSceneGeometryKind(payload.PayloadKind)
-                || !IsGeometryPayloadKind(payload.PayloadKind))
-            {
-                return Core::Err(Core::ErrorCode::AssetTypeMismatch);
             }
             return Core::Ok();
         }
@@ -277,9 +279,7 @@ namespace Extrinsic::Assets
 
     bool IsAssetModelSceneGeometryKind(const AssetPayloadKind kind) noexcept
     {
-        return kind == AssetPayloadKind::Mesh
-            || kind == AssetPayloadKind::PointCloud
-            || kind == AssetPayloadKind::Graph;
+        return IsGeometryPayloadKind(kind);
     }
 
     std::uint32_t BytesPerPixel(const AssetTexturePixelFormat format) noexcept

@@ -189,7 +189,10 @@ namespace Geometry::PointCloud
     }
     std::optional<CloudStatistics> ComputeStatistics(const Cloud& cloud, const StatisticsParams& params)
     {
-        return ComputeStatistics(cloud.Positions(), params);
+        std::vector<glm::vec3> positions;
+        positions.reserve(cloud.VerticesSize());
+        for (const VertexHandle point : cloud.LivePoints()) positions.push_back(cloud.Position(point));
+        return ComputeStatistics(positions, params);
     }
     std::optional<CloudStatistics> ComputeStatistics(std::span<const glm::vec3> positions,
         const StatisticsParams& params)
@@ -887,6 +890,97 @@ namespace Geometry::PointCloud
     // EstimateKernelDensity
     // =========================================================================
 
+    namespace
+    {
+        template <class Query>
+        std::optional<KDEResult> KernelDensityWithQueries(
+            std::span<const glm::vec3> positions, std::span<const double> nnDists,
+            const KDEParams& params, Query&& query)
+        {
+            const std::size_t n = positions.size();
+            // Preserve the spacing heuristic: a univariate rule applied to NN distances,
+            // with mean-spacing and absolute floors. This is not a multivariate bandwidth fit.
+            double bandwidth = params.Bandwidth;
+            if (bandwidth <= 0.0f)
+            {
+                // Use standard deviation of NN distances, floored by mean NN distance
+                // to avoid degenerate bandwidth on uniform point clouds.
+                double mean = 0.0f;
+                for (double d : nnDists) mean += d;
+                mean /= static_cast<double>(n);
+
+                double variance = 0.0f;
+                for (double d : nnDists)
+                {
+                    double diff = d - mean;
+                    variance += diff * diff;
+                }
+                variance /= static_cast<double>(n);
+                double sigma = std::sqrt(variance);
+
+                // For uniform point clouds, σ ≈ 0 but mean spacing is meaningful.
+                // Use max(σ, mean) so the bandwidth scales with point density.
+                sigma = std::max(sigma, mean);
+
+                bandwidth = 1.06 * sigma * std::pow(static_cast<double>(n), -0.2);
+                bandwidth = std::max(bandwidth, 1e-8);
+            }
+
+            const double invH2 = -0.5f / (bandwidth * bandwidth);
+            // 3D isotropic Gaussian normalization: 1 / ((2π)^(3/2) * h³)
+            const double pi = static_cast<double>(std::numbers::pi);
+            const double normFactor = 1.0f / (std::pow(2.0f * pi, 1.5f) * bandwidth * bandwidth * bandwidth);
+
+            if (!std::isfinite(float(bandwidth)) || !std::isfinite(invH2) || !std::isfinite(normFactor) || normFactor <= 0)
+                return std::nullopt;
+
+            // Phase 2: Compute density at each point via KNN Gaussian KDE.
+            KDEResult result{};
+            result.Densities.resize(n, 0.0f);
+            result.UsedBandwidth = bandwidth;
+            double densitySum = 0.0f;
+            double minDensity = std::numeric_limits<double>::max();
+            double maxDensity = 0.0f;
+
+            for (std::size_t i = 0; i < n; ++i)
+            {
+                double kde = 0.0f;
+                uint32_t neighborCount = 0;
+                for (const std::size_t ni : query(i))
+                {
+                    if (ni == i) continue;
+                    double dist = std::sqrt(DistanceSquared(positions[ni], positions[i]));
+                    const double exponent = dist * dist * invH2;
+                    // Match the device: flush double-subnormal tails before evaluating exp.
+                    const double kernel = exponent < -708.0 ? 0.0 : std::exp(exponent);
+                    if (kernel > 0.0 && normFactor >= std::numeric_limits<double>::min() / kernel)
+                        kde += normFactor * kernel;
+                    ++neighborCount;
+                }
+
+                if (neighborCount > 0)
+                {
+                    kde = kde < std::numeric_limits<double>::min() * double(neighborCount)
+                        ? 0.0 : kde / static_cast<double>(neighborCount);
+                }
+
+                if (!std::isfinite(float(kde))) return std::nullopt;
+                result.Densities[i] = kde;
+                densitySum += kde;
+                minDensity = std::min(minDensity, kde);
+                maxDensity = std::max(maxDensity, kde);
+            }
+
+            if (!std::isfinite(densitySum)) return std::nullopt;
+            result.MeanDensity = n > 0 && densitySum >= std::numeric_limits<double>::min() * double(n)
+                ? densitySum / static_cast<double>(n) : 0.0;
+            result.MinDensity = minDensity;
+            result.MaxDensity = maxDensity;
+
+            return result;
+        }
+    }
+
     std::optional<KDEResult> EstimateKernelDensityFromNeighbors(
         std::span<const glm::vec3> positions, std::span<const std::uint32_t> candidates,
         const KDEParams& params)
@@ -914,87 +1008,8 @@ namespace Geometry::PointCloud
             if (!std::isfinite(nearest)) return std::nullopt;
             nnDists[i] = nearest;
         }
-        // Preserve the spacing heuristic: a univariate rule applied to NN distances,
-        // with mean-spacing and absolute floors. This is not a multivariate bandwidth fit.
-        double bandwidth = params.Bandwidth;
-        if (bandwidth <= 0.0f)
-        {
-            // Use standard deviation of NN distances, floored by mean NN distance
-            // to avoid degenerate bandwidth on uniform point clouds.
-            double mean = 0.0f;
-            for (double d : nnDists) mean += d;
-            mean /= static_cast<double>(n);
-
-            double variance = 0.0f;
-            for (double d : nnDists)
-            {
-                double diff = d - mean;
-                variance += diff * diff;
-            }
-            variance /= static_cast<double>(n);
-            double sigma = std::sqrt(variance);
-
-            // For uniform point clouds, σ ≈ 0 but mean spacing is meaningful.
-            // Use max(σ, mean) so the bandwidth scales with point density.
-            sigma = std::max(sigma, mean);
-
-            bandwidth = 1.06 * sigma * std::pow(static_cast<double>(n), -0.2);
-            bandwidth = std::max(bandwidth, 1e-8);
-        }
-
-        const double invH2 = -0.5f / (bandwidth * bandwidth);
-        // 3D isotropic Gaussian normalization: 1 / ((2π)^(3/2) * h³)
-        const double pi = static_cast<double>(std::numbers::pi);
-        const double normFactor = 1.0f / (std::pow(2.0f * pi, 1.5f) * bandwidth * bandwidth * bandwidth);
-
-        if (!std::isfinite(float(bandwidth)) || !std::isfinite(invH2) || !std::isfinite(normFactor) || normFactor <= 0)
-            return std::nullopt;
-
-        // Phase 2: Compute density at each point via KNN Gaussian KDE.
-        KDEResult result{};
-        result.Densities.resize(n, 0.0f);
-        result.UsedBandwidth = bandwidth;
-        double densitySum = 0.0f;
-        double minDensity = std::numeric_limits<double>::max();
-        double maxDensity = 0.0f;
-
-        for (std::size_t i = 0; i < n; ++i)
-        {
-
-            double kde = 0.0f;
-            uint32_t neighborCount = 0;
-            for (auto ni : candidates.subspan(i * width, width))
-            {
-                if (ni == i) continue;
-                double dist = std::sqrt(DistanceSquared(positions[ni], positions[i]));
-                const double exponent = dist * dist * invH2;
-                // Match the device: flush double-subnormal tails before evaluating exp.
-                const double kernel = exponent < -708.0 ? 0.0 : std::exp(exponent);
-                if (kernel > 0.0 && normFactor >= std::numeric_limits<double>::min() / kernel)
-                    kde += normFactor * kernel;
-                ++neighborCount;
-            }
-
-            if (neighborCount > 0)
-            {
-                kde = kde < std::numeric_limits<double>::min() * double(neighborCount)
-                    ? 0.0 : kde / static_cast<double>(neighborCount);
-            }
-
-            if (!std::isfinite(float(kde))) return std::nullopt;
-            result.Densities[i] = kde;
-            densitySum += kde;
-            minDensity = std::min(minDensity, kde);
-            maxDensity = std::max(maxDensity, kde);
-        }
-
-        if (!std::isfinite(densitySum)) return std::nullopt;
-        result.MeanDensity = n > 0 && densitySum >= std::numeric_limits<double>::min() * double(n)
-            ? densitySum / static_cast<double>(n) : 0.0;
-        result.MinDensity = minDensity;
-        result.MaxDensity = maxDensity;
-
-        return result;
+        return KernelDensityWithQueries(positions, nnDists, params,
+            [&](std::size_t i) { return candidates.subspan(i * width, width); });
     }
 
     std::optional<KDEResult> EstimateKernelDensity(
@@ -1041,89 +1056,11 @@ namespace Geometry::PointCloud
             nnDists[i] = nearestDist;
         }
 
-        // Preserve the inherited univariate NN-spacing heuristic and its floors.
-        double bandwidth = params.Bandwidth;
-        if (bandwidth <= 0.0f)
-        {
-            // Silverman's rule: h = 1.06 * σ * n^(-1/5)
-            // Use standard deviation of NN distances, floored by mean NN distance
-            // to avoid degenerate bandwidth on uniform point clouds.
-            double mean = 0.0f;
-            for (double d : nnDists) mean += d;
-            mean /= static_cast<double>(n);
-
-            double variance = 0.0f;
-            for (double d : nnDists)
-            {
-                double diff = d - mean;
-                variance += diff * diff;
-            }
-            variance /= static_cast<double>(n);
-            double sigma = std::sqrt(variance);
-
-            // For uniform point clouds, σ ≈ 0 but mean spacing is meaningful.
-            // Use max(σ, mean) so the bandwidth scales with point density.
-            sigma = std::max(sigma, mean);
-
-            bandwidth = 1.06 * sigma * std::pow(static_cast<double>(n), -0.2);
-            bandwidth = std::max(bandwidth, 1e-8);
-        }
-
-        const double invH2 = -0.5f / (bandwidth * bandwidth);
-        // 3D isotropic Gaussian normalization: 1 / ((2π)^(3/2) * h³)
-        const double pi = static_cast<double>(std::numbers::pi);
-        const double normFactor = 1.0f / (std::pow(2.0f * pi, 1.5f) * bandwidth * bandwidth * bandwidth);
-
-        if (!std::isfinite(float(bandwidth)) || !std::isfinite(invH2) || !std::isfinite(normFactor) || normFactor <= 0)
-            return std::nullopt;
-
-        // Phase 2: Compute density at each point via KNN Gaussian KDE.
-        KDEResult result{};
-        result.Densities.resize(n, 0.0f);
-        result.UsedBandwidth = bandwidth;
-        double densitySum = 0.0f;
-        double minDensity = std::numeric_limits<double>::max();
-        double maxDensity = 0.0f;
-
-        for (std::size_t i = 0; i < n; ++i)
-        {
+        return KernelDensityWithQueries(positions, nnDists, params, [&](std::size_t i) {
             knnIndices.clear();
             octree.QueryKNN(positions[i], kQuery, knnIndices, true);
-
-            double kde = 0.0f;
-            uint32_t neighborCount = 0;
-            for (std::size_t ni : knnIndices)
-            {
-                if (ni == i) continue;
-                double dist = std::sqrt(DistanceSquared(positions[ni], positions[i]));
-                const double exponent = dist * dist * invH2;
-                // Match the device: flush double-subnormal tails before evaluating exp.
-                const double kernel = exponent < -708.0 ? 0.0 : std::exp(exponent);
-                if (kernel > 0.0 && normFactor >= std::numeric_limits<double>::min() / kernel)
-                    kde += normFactor * kernel;
-                ++neighborCount;
-            }
-
-            if (neighborCount > 0)
-            {
-                kde = kde < std::numeric_limits<double>::min() * double(neighborCount)
-                    ? 0.0 : kde / static_cast<double>(neighborCount);
-            }
-
-            if (!std::isfinite(float(kde))) return std::nullopt;
-            result.Densities[i] = kde;
-            densitySum += kde;
-            minDensity = std::min(minDensity, kde);
-            maxDensity = std::max(maxDensity, kde);
-        }
-
-        if (!std::isfinite(densitySum)) return std::nullopt;
-        result.MeanDensity = n > 0 && densitySum >= std::numeric_limits<double>::min() * double(n)
-            ? densitySum / static_cast<double>(n) : 0.0;
-        result.MinDensity = minDensity;
-        result.MaxDensity = maxDensity;
-
-        return result;
+            return std::span<const std::size_t>(knnIndices);
+        });
     }
 
     std::optional<KDEResult> EstimateKernelDensity(Cloud& cloud, const KDEParams& params)

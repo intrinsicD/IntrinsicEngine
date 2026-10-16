@@ -839,20 +839,10 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
             const EditorProcessingContext& context,
             const std::shared_ptr<EditorRegistrationCpuJobState>& state)
         {
-            const std::uint32_t estimatedCost =
-                std::max<std::uint32_t>(
-                    1u,
-                    static_cast<std::uint32_t>(
-                        (std::max(state->SourceBinding.Points.size(),
-                                  state->TargetBinding.Points.size()) +
-                         1023u) /
-                        1024u));
             return JobDesc{
                 .DebugName = "Sandbox.RegistrationICP",
                 .Scope = context.World,
                 .Priority = Core::Dag::TaskPriority::Normal,
-                .Kind = RuntimeTaskKinds::GeometryProcess,
-                .EstimatedCost = estimatedCost,
                 .Work =
                     [state](const JobCancellation&) -> JobResultEnvelope
                     {

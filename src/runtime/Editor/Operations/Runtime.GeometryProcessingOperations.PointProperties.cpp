@@ -79,6 +79,111 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
 {
     namespace GS = ECS::Components::GeometrySources;
     using D = GeometryElementDomain;
+    struct PointPropertyHistoryWatch
+    {
+        EditorCommandHistory* History{};
+        PointPropertyWatch Expected{};
+    };
+    namespace
+    {
+        // History records own guards; the entity only locates the current guard per key.
+        struct PointPropertyHistorySlots
+        {
+            std::vector<std::weak_ptr<PointPropertyHistoryWatch>> Entries{};
+        };
+    }
+
+    std::vector<PointPropertyWatch> ObserveGeometryProperties(
+        const EditorProcessingContext& context, entt::entity entity, std::span<const GeometryPropertyRef> refs)
+    {
+        const auto available = BuildGeometryAvailability(context.Scene->Raw(), entity);
+        std::vector<PointPropertyWatch> watches;
+        watches.reserve(refs.size());
+        for (const auto& ref : refs)
+            watches.push_back(ObserveGeometryProperty(available, ref.Domain, ref.Name));
+        return watches;
+    }
+
+    std::vector<PointPropertyWatch> ObservePointPropertyHistory(
+        const EditorProcessingContext& context, entt::entity entity, std::optional<GeometryElementDomain> domain)
+    {
+        std::vector<PointPropertyWatch> result;
+        if (!context.CommandHistory) return result;
+        const auto* slots = context.Scene->Raw().try_get<PointPropertyHistorySlots>(entity);
+        if (!slots) return result;
+        const auto available = BuildGeometryAvailability(context.Scene->Raw(), entity);
+        for (const auto& weak : slots->Entries)
+            if (const auto guard = weak.lock(); guard && guard->History == context.CommandHistory &&
+                (!domain || guard->Expected.Domain == *domain))
+                result.push_back(ObserveGeometryProperty(available, guard->Expected.Domain, guard->Expected.Name));
+        return result;
+    }
+
+    PointPropertyHistoryWatches CapturePointPropertyHistory(
+        const EditorProcessingContext& context, entt::entity entity, std::span<const GeometryPropertyRef> refs)
+    {
+        PointPropertyHistoryWatches result;
+        for (auto watch : ObserveGeometryProperties(context, entity, refs))
+        {
+            std::shared_ptr<PointPropertyHistoryWatch> guard;
+            if (context.CommandHistory)
+            {
+                auto& entries = context.Scene->Raw().get_or_emplace<PointPropertyHistorySlots>(entity).Entries;
+                std::erase_if(entries, [](const auto& slot) { return slot.expired(); });
+                const auto slot = std::ranges::find_if(entries, [&](const auto& weak) {
+                    const auto live = weak.lock();
+                    return live && live->History == context.CommandHistory &&
+                        live->Expected.Domain == watch.Domain && live->Expected.Name == watch.Name;
+                });
+                if (slot != entries.end())
+                {
+                    guard = slot->lock();
+                    if (guard->Expected != watch) guard.reset();
+                }
+                if (!guard)
+                {
+                    guard = std::make_shared<PointPropertyHistoryWatch>(
+                        PointPropertyHistoryWatch{context.CommandHistory, std::move(watch)});
+                    if (slot == entries.end()) entries.push_back(guard);
+                    else *slot = guard;
+                }
+            }
+            else guard = std::make_shared<PointPropertyHistoryWatch>(
+                PointPropertyHistoryWatch{nullptr, std::move(watch)});
+            result.push_back(std::move(guard));
+        }
+        return result;
+    }
+
+    bool PointPropertyHistoryCurrent(const EditorProcessingContext& context, entt::entity entity,
+                                    std::span<const std::shared_ptr<PointPropertyHistoryWatch>> watches)
+    {
+        return std::ranges::all_of(watches, [&](const auto& watch) {
+            return GeometryPropertiesCurrent(context, entity, std::span(&watch->Expected, 1));
+        });
+    }
+
+    void StampPointPropertyHistory(const EditorProcessingContext& context, entt::entity entity,
+                                  std::span<const std::shared_ptr<PointPropertyHistoryWatch>> watches)
+    {
+        const auto available = BuildGeometryAvailability(context.Scene->Raw(), entity);
+        for (const auto& watch : watches)
+            watch->Expected = ObserveGeometryProperty(available, watch->Expected.Domain, watch->Expected.Name);
+    }
+
+    void RebasePointPropertyHistory(const EditorProcessingContext& context, entt::entity entity,
+                                   std::span<const PointPropertyWatch> before)
+    {
+        if (!context.CommandHistory) return;
+        const auto* slots = context.Scene->Raw().try_get<PointPropertyHistorySlots>(entity);
+        if (!slots) return;
+        const auto available = BuildGeometryAvailability(context.Scene->Raw(), entity);
+        for (const auto& weak : slots->Entries)
+            if (const auto guard = weak.lock(); guard && guard->History == context.CommandHistory &&
+                std::ranges::find(before, guard->Expected) != before.end())
+                guard->Expected = ObserveGeometryProperty(available, guard->Expected.Domain, guard->Expected.Name);
+    }
+
     GeometryPropertyCatalogSnapshot BuildPointInputCandidateCatalog(
         const GeometryEntityAvailability& availability, std::uint32_t id)
     {
@@ -570,14 +675,17 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         using State = std::vector<GeometryScalarPropertySnapshot>;
         auto before = std::make_shared<State>();
         std::vector<GeometryPropertyRef> refs;
-        auto revisions = std::make_shared<std::vector<PointPropertyWatch>>();
+        std::vector<PointPropertyWatch> revisions;
         for (const auto& output : outputs)
         {
             if (!output.Before) return EditorCommandHistoryStatus::InvalidCommand;
             before->push_back(*output.Before);
             refs.push_back(output.Output);
-            revisions->push_back(output.Watch);
+            revisions.push_back(output.Watch);
         }
+        if (!EditorProcessingContextWorldCurrent(context) || !GeometryPropertiesCurrent(context, entity, w.Inputs) ||
+            !GeometryPropertiesCurrent(context, entity, revisions))
+            return EditorCommandHistoryStatus::StaleEntity;
         auto after = std::make_shared<State>(*before);
         for (std::size_t i = 0; i < outputs.size(); ++i)
         {
@@ -587,32 +695,35 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
                 : PrepareGeometryScalarProperty((*after)[i], output.Output.ValueKind, w.SlotCount, w.Slots, output.AfterUInt);
             if (!prepared) return EditorCommandHistoryStatus::InvalidCommand;
         }
-        const auto mutate = [context, entity, inputs=w.Inputs, refs=std::move(refs), revisions](const State& target)
+        auto outputWatches = CapturePointPropertyHistory(context, entity, refs);
+        const auto mutate = [context, entity, inputs=w.Inputs, refs=std::move(refs),
+                             outputWatches=std::move(outputWatches)](const State& expected, const State& target)
         {
-            if (!GeometryPropertiesCurrent(context, entity, inputs) ||
-                !GeometryPropertiesCurrent(context, entity, *revisions))
+            if (!EditorProcessingContextWorldCurrent(context) || !GeometryPropertiesCurrent(context, entity, inputs) ||
+                !PointPropertyHistoryCurrent(context, entity, outputWatches))
                 return EditorCommandHistoryStatus::StaleEntity;
             auto& raw = context.Scene->Raw();
             // Check every column before writing any, so a refused column leaves all unchanged.
             for (std::size_t i = 0; i < refs.size(); ++i)
             {
                 const auto* props = MutableGeometryProperties(raw, entity, refs[i].Domain);
-                if (!props || !CanApplyGeometryScalarProperty(*props, refs[i], target[i]))
+                if (!props || props->Exists(refs[i].Name) != expected[i].Exists ||
+                    !SameGeometryScalarPropertySnapshot(CaptureGeometryScalarProperty(*props, refs[i]), expected[i]))
+                    return EditorCommandHistoryStatus::StaleEntity;
+                if (!CanApplyGeometryScalarProperty(*props, refs[i], target[i]))
                     return EditorCommandHistoryStatus::InvalidCommand;
             }
             for (std::size_t i = 0; i < refs.size(); ++i)
                 (void)ApplyGeometryScalarProperty(*MutableGeometryProperties(raw, entity, refs[i].Domain), refs[i], target[i]);
-            const auto a = BuildGeometryAvailability(raw, entity);
-            for (auto& revision : *revisions)
-                revision = ObserveGeometryProperty(a, revision.Domain, revision.Name);
+            StampPointPropertyHistory(context, entity, outputWatches);
             // Scalar buffers follow their property revision. They do not alter
             // resident positions, topology or vertex channels.
             if (context.InvalidateWorkspaceSnapshotCache) context.InvalidateWorkspaceSnapshotCache();
             return EditorCommandHistoryStatus::Applied;
         };
         return context.CommandHistory ? context.CommandHistory->Execute({.Label=std::move(label),
-            .Redo=[mutate,after]{return mutate(*after);},
-            .Undo=[mutate,before]{return mutate(*before);}}).Status : mutate(*after);
+            .Redo=[mutate,before,after]{return mutate(*before,*after);},
+            .Undo=[mutate,before,after]{return mutate(*after,*before);}}).Status : mutate(*before,*after);
     }
 
 

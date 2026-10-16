@@ -22,6 +22,7 @@
 #include <chrono>
 #include <limits>
 #include <thread>
+import Extrinsic.Core.Tasks.CounterEvent;
 import Extrinsic.Runtime.CoherentPointDriftGpuEStep;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.Module;
@@ -686,11 +687,22 @@ TEST(CoherentPointDriftOperations, VulkanSubsamplesWithoutADeviceRunOnTheCpuAndS
         << queued.SubsampleBackendDiagnostic;
 }
 
+namespace
+{
+    bool EvaluateBrokerBlocking(R::CoherentPointDriftGpuEStep& broker,
+        const Geometry::CoherentPointDrift::EStep::ExternalRequest& request)
+    {
+        auto ready = broker.Queue(request);
+        if (!ready) return false;
+        ready->WaitForProgress(1u);
+        return broker.Complete(ready, request);
+    }
+}
+
 TEST(CoherentPointDriftOperations, VulkanEStepBrokerFailsClosedAndTimesOut)
 {
-    // METHOD-056 review: the worker/main-thread handoff without a framed device. A refused
-    // computation closes the broker (later iterations do not wait), and a request nobody pumps
-    // times out and closes it too; both make Evaluate return false (the CPU runs the iteration).
+    // Refusal and an elapsed deadline both close the broker. The owner observes the deadline
+    // during Pump; Queue never blocks and there is no timer thread.
     R::SpatialIndexCache cache; // no device: no workspace lease, so the computation is refused
     const std::vector<double> x{0.0, 1.0}, zero(2, 0.0), weights(2, 0.0);
     std::vector<double> logDen(2), pt1(2), p1(2), px(2), py(2), pz(2);
@@ -702,18 +714,24 @@ TEST(CoherentPointDriftOperations, VulkanEStepBrokerFailsClosedAndTimesOut)
         R::CoherentPointDriftGpuEStep broker(cache);
         std::atomic<bool> done{false};
         bool evaluated = true;
-        std::thread worker([&] { evaluated = broker.Evaluate(request); done = true; });
+        std::thread worker([&] { evaluated = EvaluateBrokerBlocking(broker, request); done = true; });
         while (!done) { broker.Pump(); std::this_thread::yield(); }
         worker.join();
         EXPECT_FALSE(evaluated);
         EXPECT_TRUE(broker.Closed());
         EXPECT_FALSE(broker.Diagnostic().empty());
         EXPECT_EQ(broker.Stats().Failed, 1u);
-        EXPECT_FALSE(broker.Evaluate(request)) << "a closed broker answers at once";
+        EXPECT_FALSE(EvaluateBrokerBlocking(broker, request)) << "a closed broker answers at once";
     }
     {
         R::CoherentPointDriftGpuEStep broker(cache, std::chrono::milliseconds{20});
-        EXPECT_FALSE(broker.Evaluate(request)) << "nobody pumps: the wait times out";
+        auto ready = broker.Queue(request);
+        ASSERT_TRUE(ready);
+        std::this_thread::sleep_for(std::chrono::milliseconds{25});
+        EXPECT_FALSE(broker.Closed()) << "only the owner pump observes the deadline";
+        broker.Pump();
+        EXPECT_EQ(ready->PendingCount(), 0u);
+        EXPECT_FALSE(broker.Complete(ready, request));
         EXPECT_TRUE(broker.Closed());
         EXPECT_NE(broker.Diagnostic().find("in time"), std::string::npos) << broker.Diagnostic();
     }
@@ -726,6 +744,7 @@ namespace
     class CpdBrokerWorkspaceReuse : public ::testing::Test
     {
     protected:
+        explicit CpdBrokerWorkspaceReuse(unsigned workers = 2u) : Jobs(workers) {}
         Extrinsic::Tests::MockDevice Device;
         Extrinsic::Tests::EditorJobHarness Jobs;
         R::WorldRegistry Worlds;
@@ -801,7 +820,7 @@ namespace
         {
             std::atomic<bool> done{false};
             bool evaluated = false;
-            std::thread worker([&] { evaluated = broker.Evaluate(c.Request()); done = true; });
+            std::thread worker([&] { evaluated = EvaluateBrokerBlocking(broker, c.Request()); done = true; });
             while (!done)
             {
                 broker.Pump();
@@ -816,6 +835,126 @@ namespace
             return std::size_t(std::ranges::count_if(Device.BufferWrites, [&](const auto& w) { return w.Data.size() == bytes; }));
         }
     };
+
+    class CpdSingleWorkerWait : public CpdBrokerWorkspaceReuse
+    {
+    protected:
+        CpdSingleWorkerWait() : CpdBrokerWorkspaceReuse(1u) {}
+    };
+}
+
+TEST_F(CpdSingleWorkerWait, PendingGpuEStepReleasesTheWorkerForOrdinaryJobs)
+{
+    Scene scene;
+    const auto points = Cloud(64, 31);
+    auto shifted = points;
+    for (auto& point : shifted) point += glm::vec3{0.02f, -0.01f, 0.03f};
+    const auto source = Make(scene.Registry, D::PointCloudPoint, points);
+    const auto target = Make(scene.Registry, D::PointCloudPoint, shifted);
+    Jobs.Attach(scene.Context);
+    scene.Context.SpatialIndices = &Cache;
+    scene.Context.Device = &Device;
+    R::EditorCoherentPointDriftResult failure;
+    const auto run = R::StartEditorCoherentPointDrift(scene.Commands(), {
+        .SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target),
+        .MaxIterations = 1u, .InitialSigma2 = 10.0,
+        .EStep = R::CoherentPointDriftEStep::Vulkan, .Threads = 1u}, failure);
+    ASSERT_TRUE(run) << failure.Message;
+    ASSERT_EQ(R::StepEditorCoherentPointDrift(scene.Commands(), run, 1u), R::EditorCommandStatus::Pending);
+    const auto cleanup = [&] {
+        R::CancelEditorCoherentPointDrift(run);
+        (void)Jobs.Jobs().CancelAll();
+        // Closing the auxiliary pump also unblocks the pre-coroutine baseline.
+        (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
+        if (Held) Deliver();
+        (void)Jobs.Jobs().ShutdownGpuQueueParticipants([&] { Device.WaitIdle(); });
+        Jobs.Jobs().CancelAndDrain();
+    };
+    const auto requestDeadline = std::chrono::steady_clock::now() + std::chrono::seconds{3};
+    while (!Held && std::chrono::steady_clock::now() < requestDeadline)
+    {
+        (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
+        std::this_thread::sleep_for(std::chrono::milliseconds{1});
+    }
+    if (!Held)
+    {
+        cleanup();
+        FAIL() << "The actual CPD operation never reached its held GPU readback.";
+    }
+    std::atomic<bool> ordinaryRan{false};
+    const auto token = Jobs.Jobs().Submit(R::JobDesc{
+        .DebugName = "CPD.worker-availability-control",
+        .Work = [&](const R::JobCancellation&) {
+            ordinaryRan.store(true, std::memory_order_release);
+            return R::JobResultEnvelope::Make(true);
+        },
+        .PublishCompletion = [](R::KernelEventBus&, const R::JobResultEnvelope&) { return true; },
+    });
+    EXPECT_TRUE(token.IsValid());
+    const auto ordinaryDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds{500};
+    while (!ordinaryRan.load(std::memory_order_acquire) && std::chrono::steady_clock::now() < ordinaryDeadline)
+        std::this_thread::sleep_for(std::chrono::milliseconds{1});
+    EXPECT_TRUE(ordinaryRan.load(std::memory_order_acquire))
+        << "A pending E-step must suspend its coroutine, freeing the sole worker.";
+    EXPECT_TRUE(Held.has_value()) << "The control must finish before the GPU result is delivered.";
+    cleanup();
+}
+
+TEST_F(CpdSingleWorkerWait, EditorCancelWakesPendingEStepWithoutFallbackOrIteration)
+{
+    Scene scene;
+    const auto points = Cloud(64, 31);
+    auto shifted = points;
+    for (auto& point : shifted) point += glm::vec3{0.02f, -0.01f, 0.03f};
+    const auto source = Make(scene.Registry, D::PointCloudPoint, points);
+    const auto target = Make(scene.Registry, D::PointCloudPoint, shifted);
+    Jobs.Attach(scene.Context);
+    scene.Context.SpatialIndices = &Cache;
+    scene.Context.Device = &Device;
+    R::EditorCoherentPointDriftResult failure;
+    const auto run = R::StartEditorCoherentPointDrift(scene.Commands(), {
+        .SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target),
+        .MaxIterations = 1u, .InitialSigma2 = 10.0,
+        .EStep = R::CoherentPointDriftEStep::Vulkan, .Threads = 1u}, failure);
+    ASSERT_TRUE(run) << failure.Message;
+    ASSERT_EQ(R::StepEditorCoherentPointDrift(scene.Commands(), run, 1u), R::EditorCommandStatus::Pending);
+    const auto cleanup = [&] {
+        (void)Jobs.Jobs().CancelAll();
+        (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
+        if (Held) Deliver();
+        (void)Jobs.Jobs().ShutdownGpuQueueParticipants([&] { Device.WaitIdle(); });
+        Jobs.Jobs().CancelAndDrain();
+    };
+    const auto requestDeadline = std::chrono::steady_clock::now() + std::chrono::seconds{3};
+    while (!Held && std::chrono::steady_clock::now() < requestDeadline)
+    {
+        (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
+        std::this_thread::sleep_for(std::chrono::milliseconds{1});
+    }
+    if (!Held)
+    {
+        ADD_FAILURE() << "The real CPD step did not queue its device request.";
+        cleanup();
+        return;
+    }
+    R::JobToken step;
+    for (const auto& job : Jobs.Jobs().SnapshotAll())
+        if (job.DebugName == "Sandbox.CoherentPointDrift") step = job.Token;
+    EXPECT_TRUE(step.IsValid());
+    R::CancelEditorCoherentPointDrift(run);
+    const auto cancelDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds{500};
+    while (!Jobs.Jobs().IsComplete(step) && std::chrono::steady_clock::now() < cancelDeadline)
+    {
+        (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
+        std::this_thread::sleep_for(std::chrono::milliseconds{1});
+    }
+    EXPECT_TRUE(Jobs.Jobs().IsComplete(step)) << "Editor cancel must wake the parked step by itself.";
+    EXPECT_TRUE(Held.has_value()) << "The GPU must still be pending until all assertions finish.";
+    const auto snapshot = R::SnapshotEditorCoherentPointDrift(run);
+    EXPECT_EQ(snapshot.Phase, R::EditorCoherentPointDriftPhase::Cancelled);
+    EXPECT_EQ(snapshot.Result.EStepFallbacks, 0u);
+    EXPECT_TRUE(snapshot.Trace.empty());
+    cleanup();
 }
 
 TEST_F(CpdBrokerWorkspaceReuse, StepsAndRunsReuseThePooledWorkspaceAndUploadEachTargetOnce)
@@ -887,7 +1026,7 @@ TEST_F(CpdBrokerWorkspaceReuse, CancelledAndRefusedComputationsKeepTheirLeaseUnt
         R::CoherentPointDriftGpuEStep run(Cache);
         std::atomic<bool> done{false};
         bool evaluated = true;
-        std::thread worker([&] { evaluated = run.Evaluate(c.Request()); done = true; });
+        std::thread worker([&] { evaluated = EvaluateBrokerBlocking(run, c.Request()); done = true; });
         while (!Held) { run.Pump(); std::this_thread::yield(); }
         run.Close("cancelled");
         worker.join();
@@ -909,7 +1048,7 @@ TEST_F(CpdBrokerWorkspaceReuse, CancelledAndRefusedComputationsKeepTheirLeaseUnt
         EXPECT_EQ(run.Stats().Completed, 1u);
         EXPECT_TRUE(run.Closed());
         EXPECT_EQ(run.Diagnostic(), "cancelled");
-        EXPECT_FALSE(run.Evaluate(c.Request()));
+        EXPECT_FALSE(EvaluateBrokerBlocking(run, c.Request()));
         RetireFrames();
         R::CoherentPointDriftGpuEStep after(Cache);
         ASSERT_TRUE(Evaluate(after, c));
@@ -923,7 +1062,44 @@ TEST_F(CpdBrokerWorkspaceReuse, CancelledAndRefusedComputationsKeepTheirLeaseUnt
     EXPECT_TRUE(refused.Closed());
     EXPECT_FALSE(refused.Diagnostic().empty());
     EXPECT_EQ(refused.Stats().Failed, 1u);
-    EXPECT_FALSE(refused.Evaluate(c.Request()));
+    EXPECT_FALSE(EvaluateBrokerBlocking(refused, c.Request()));
+}
+
+TEST_F(CpdBrokerWorkspaceReuse, RequestEventsKeepTheirIdentityAndSettledLatency)
+{
+    Case c(3, 2, 401);
+    R::CoherentPointDriftGpuEStep broker(Cache);
+    const auto first = broker.Queue(c.Request());
+    ASSERT_TRUE(first);
+    broker.Pump();
+    ASSERT_TRUE(Held);
+    Deliver();
+    broker.Pump();
+    ASSERT_TRUE(first->IsReady());
+    ASSERT_TRUE(broker.Complete(first, c.Request()));
+
+    const auto second = broker.Queue(c.Request());
+    ASSERT_TRUE(second);
+    EXPECT_NE(first, second);
+    EXPECT_FALSE(second->IsReady());
+    broker.Pump();
+    ASSERT_TRUE(Held);
+    Deliver();
+    broker.Pump();
+    ASSERT_TRUE(second->IsReady());
+    EXPECT_FALSE(broker.Complete(first, c.Request()));
+    const double settledRequestSeconds = broker.Stats().WaitSeconds;
+    EXPECT_GT(settledRequestSeconds, 0.0);
+    broker.Close("cancelled");
+    broker.Close("cancelled again");
+    EXPECT_EQ(broker.Stats().WaitSeconds, settledRequestSeconds);
+    EXPECT_EQ(first->PendingCount(), 0u);
+    EXPECT_EQ(second->PendingCount(), 0u);
+    EXPECT_FALSE(broker.Complete(second, c.Request()));
+    EXPECT_FALSE(broker.Queue(c.Request()));
+    EXPECT_EQ(broker.Stats().Requests, 2u);
+    EXPECT_EQ(broker.Stats().Completed, 2u);
+    broker.ReleaseDeviceResources();
 }
 
 TEST(CoherentPointDriftOperations, CancelAnswersAtOnceAndTraceRowsCarryElapsedTime)

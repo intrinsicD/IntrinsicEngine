@@ -16,8 +16,8 @@ layout(location = 0) out vec4 outColor;
 // the legacy `set 1, binding 1` `sampler2DShadow` model from
 // `assets/shaders/deferred_lighting.frag` cannot be honored; the bindless-
 // index push-constant is the equivalent wiring. See
-// `src/graphics/renderer/README.md` ("Slice C: shadow-atlas binding") for
-// the durable rule and `ShadowAtlasBindlessIndex == 0` as the
+// the pass contracts in `docs/architecture/rendering-three-pass.md`;
+// `ShadowAtlasBindlessIndex == 0` is the
 // `kInvalidBindlessIndex` sentinel that disables shadow sampling.
 layout(push_constant, scalar) uniform PushConstants
 {

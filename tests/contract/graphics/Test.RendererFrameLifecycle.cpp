@@ -7251,3 +7251,39 @@ TEST(RendererFrameLifecycle,
 
     renderer->Shutdown();
 }
+
+
+TEST(RendererFrameLifecycle, FailedTransientAllocationStopsBeforeCommandRecording)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{177u, 1u};
+    auto renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 320, .Height = 240}};
+    auto world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+    ASSERT_TRUE(renderer->GetLastRenderGraphStats().Execute.Succeeded);
+    (void)renderer->EndFrame(frame);
+    device.NextFrame.FrameIndex = 1;
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    const auto begins = device.CommandContext.BeginCalls;
+    device.FailNextTextureCreate = true;
+    renderer->ExecuteFrame(frame, world);
+    const auto& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_FALSE(device.FailNextTextureCreate) << "The transient allocation must consume the injected failure";
+    EXPECT_TRUE(stats.Compile.Succeeded);
+    EXPECT_FALSE(stats.Execute.Succeeded);
+    EXPECT_NE(stats.Diagnostic.find("transient RHI resource allocation failed"), std::string::npos);
+    ASSERT_FALSE(device.RecipeGraphValidationCalls.empty());
+    EXPECT_FALSE(device.RecipeGraphValidationCalls.back());
+    EXPECT_EQ(device.CommandContext.BeginCalls, begins);
+    EXPECT_TRUE(stats.CommandRecords.Passes.empty());
+    renderer->Shutdown();
+}

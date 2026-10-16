@@ -66,7 +66,7 @@ target_sources(${target_name}
         Editor/Runtime.EditorWorkspaceSnapshots.cppm
         Editor/Runtime.EditorJobProjection.cppm
         Editor/Operations/Runtime.SceneEditingOperations.cppm
-        Editor/Operations/Runtime.PointSetOperations.Processing.cppm
+        Editor/Operations/Runtime.GeometryProcessingOperations.cppm
         Editor/Operations/Runtime.VisualizationEditingOperations.cppm
         Editor/Operations/Runtime.RenderRecipeEditingOperations.cppm
         Editor/Runtime.EditorPropertyWidgets.cppm

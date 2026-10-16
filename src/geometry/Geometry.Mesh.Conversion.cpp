@@ -57,13 +57,14 @@ namespace Geometry::Mesh::Conversion
 
         void AppendAttributeRemapWarning(std::vector<ConversionDiagnostic>& diagnostics,
                                          MeshSoup::AttributeDomain domain,
-                                         std::string_view detail)
+                                         std::string_view detail,
+                                         std::string_view name = "attribute")
         {
             diagnostics.push_back(ConversionDiagnostic{
                 .Kind = ConversionDiagnosticKind::AttributeRemapSkipped,
                 .Severity = MeshSoup::ValidationSeverity::Warning,
                 .AttributeDomainValue = domain,
-                .AttributeName = "attribute",
+                .AttributeName = std::string{name},
                 .Detail = std::string{detail},
             });
         }
@@ -182,10 +183,12 @@ namespace Geometry::Mesh::Conversion
     ToIndexedMeshResult ToIndexedMesh(const HalfedgeMesh::Mesh& mesh)
     {
         ToIndexedMeshResult result;
+        const std::size_t vertexOffset = mesh.IsSubmeshView() ? mesh.VertexRange().Offset : 0u;
+        const std::size_t faceOffset = mesh.IsSubmeshView() ? mesh.FaceRange().Offset : 0u;
         std::vector<MeshSoup::Index> remap(mesh.VerticesSize(), kInvalidIndex);
         for (std::size_t i = 0u; i < mesh.VerticesSize(); ++i)
         {
-            const VertexHandle vertex{static_cast<PropertyIndex>(i)};
+            const VertexHandle vertex{static_cast<PropertyIndex>(vertexOffset + i)};
             if (mesh.IsDeleted(vertex))
             {
                 continue;
@@ -196,7 +199,7 @@ namespace Geometry::Mesh::Conversion
         std::vector<MeshSoup::Index> faceIndices;
         for (std::size_t i = 0u; i < mesh.FacesSize(); ++i)
         {
-            const FaceHandle face{static_cast<PropertyIndex>(i)};
+            const FaceHandle face{static_cast<PropertyIndex>(faceOffset + i)};
             if (mesh.IsDeleted(face))
             {
                 continue;
@@ -205,20 +208,20 @@ namespace Geometry::Mesh::Conversion
             faceIndices.clear();
             for (const VertexHandle vertex : mesh.VerticesAroundFace(face))
             {
-                if (!vertex.IsValid() || vertex.Index >= remap.size() || remap[vertex.Index] == kInvalidIndex)
+                if (!mesh.IsValid(vertex) || remap[vertex.Index - vertexOffset] == kInvalidIndex)
                 {
                     result.Diagnostics.push_back(ConversionDiagnostic{
                         .Kind = ConversionDiagnosticKind::AddFaceFailed,
                         .Severity = MeshSoup::ValidationSeverity::Error,
-                        .FaceIndex = i,
+                        .FaceIndex = face.Index,
                         .VertexIndex = vertex.Index,
                         .AttributeDomainValue = MeshSoup::AttributeDomain::Face,
                         .AttributeName = "face vertex index",
-                        .Detail = "halfedge face references an invalid or deleted vertex",
+                        .Detail = "halfedge face references a vertex outside the view or an invalid/deleted vertex",
                     });
                     return result;
                 }
-                faceIndices.push_back(remap[vertex.Index]);
+                faceIndices.push_back(remap[vertex.Index - vertexOffset]);
             }
 
             if (faceIndices.size() < 3u)
@@ -226,7 +229,7 @@ namespace Geometry::Mesh::Conversion
                 result.Diagnostics.push_back(ConversionDiagnostic{
                     .Kind = ConversionDiagnosticKind::AddFaceFailed,
                     .Severity = MeshSoup::ValidationSeverity::Error,
-                    .FaceIndex = i,
+                    .FaceIndex = face.Index,
                     .AttributeDomainValue = MeshSoup::AttributeDomain::Face,
                     .AttributeName = "face vertex count",
                     .Detail = "halfedge face has fewer than three vertices",
@@ -266,6 +269,19 @@ namespace Geometry::Mesh::Conversion
             AppendAttributeRemapWarning(result.Diagnostics,
                                         MeshSoup::AttributeDomain::Face,
                                         "halfedge-to-soup conversion preserves face indices; generic halfedge face properties remain on the source mesh");
+        }
+
+        for (const std::string_view name : mesh.HalfedgeProperties().Properties())
+        {
+            if (name == "h:connectivity" || name == "h:face") continue;
+            AppendAttributeRemapWarning(result.Diagnostics, MeshSoup::AttributeDomain::Corner,
+                "halfedge properties remain on the source mesh; corner remapping is not performed", name);
+        }
+        for (const std::string_view name : mesh.EdgeProperties().Properties())
+        {
+            if (name == "e:deleted") continue;
+            AppendAttributeRemapWarning(result.Diagnostics, MeshSoup::AttributeDomain::Corner,
+                "edge properties remain on the source mesh; indexed soup has no edge attribute domain", name);
         }
 
         return result;

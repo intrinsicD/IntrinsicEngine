@@ -2,15 +2,18 @@
 module;
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 export module Extrinsic.Runtime.DensityWeightConfig;
 export import Extrinsic.Runtime.GeometryProperty.Types;
 export import Geometry.PointCloud.Kernels.Types;
+import Extrinsic.Runtime.ConfigFieldSpec;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 export namespace Extrinsic::Runtime
 {
+    extern "C++" [[nodiscard]] std::span<const ConfigFieldSpec> DensityWeightConfigFieldSpecs() noexcept;
     inline constexpr std::string_view kDensityWeightConfigSectionName="sandbox.density_weights";
     inline constexpr std::string_view kDensityWeightConfigSectionSchemaId="intrinsic.runtime.sandbox.density_weights";
     enum class DensityWeightBackend : std::uint8_t { CpuKDTree, CpuLBVH, VulkanLBVH };

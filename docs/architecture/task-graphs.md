@@ -15,10 +15,10 @@ Both surfaces compile explicit dependencies and resource hazards into
 `PlanTask { id, topoOrder, batch }`. Core does not assign execution lanes,
 carry queue budgets, or define CPU/GPU/streaming queue domains.
 
-`TaskKind` is an opaque, strongly typed numeric token. Core carries the token
-without defining a named task taxonomy. Runtime owns the current named
-tokens in `RuntimeTaskKinds`, including asset, geometry, physics, and render
-work.
+`TaskKind` is an opaque, strongly typed numeric token in Core DAG descriptions;
+Core does not define a named task taxonomy. Runtime JobService jobs carry priority
+and explicit dependencies, with no unused kind or estimated-cost metadata. DAG
+`TaskGraph` estimated costs remain inputs to its critical-path ordering.
 
 `Extrinsic.Core.Dag.TaskGraph` is the closure-based graph. Its
 `TaskGraphExecutionMode` is deliberately semantic-neutral:
@@ -33,42 +33,45 @@ graph.
 
 ## Scheduler preferences and wake contract
 
-The Core task scheduler exposes fixed, generic `High`, `Normal`, `Low`, and
-`Background` preference lanes. `TaskGraph` maps `Critical` and `High` passes to
-`High`, `Normal` to `Normal`, and `Low` and `Background` to `Low` when it
-dispatches worker-eligible callbacks. Workers inspect lanes from high to low,
-but this is a preference policy rather than a realtime or starvation-free
-guarantee.
+The Core scheduler exposes helpable `High`, `Normal` and `Low` lanes, followed
+by worker-only `BackgroundCritical`, `BackgroundHigh`, `BackgroundNormal`,
+`BackgroundLow` and `Background` lanes. `TaskGraph` maps Critical/High passes
+to High, Normal to Normal, and Low/Background to Low. Runtime JobService maps
+its five priorities to the corresponding worker-only lanes. Workers scan in
+that order; priority is preferential, not realtime or starvation-free.
 
-The scheduler's `Background` lane is additionally worker-only: external help
-(`TryRunOne()`, `WaitForAll()`, and therefore `TaskGraphCompletion::Wait()`)
-never executes it. Long work that nothing waits on synchronously—every runtime
-`JobService` job—uses it, so a frame-graph `Wait()` on the main thread cannot
-pop a queued job and run it inside the frame (`BUG-231`). Graph passes never
-use it, so a waiter can always help-run its own graph's ready passes and any
-ordinary task they spawned; the render-graph record join likewise help-runs
-its own record tasks instead of spinning while every worker is busy.
+External help (`TryRunOne()`, `WaitForAll()` and `TaskGraphCompletion::Wait()`)
+never executes worker-only lanes. A frame-graph wait cannot inline a queued
+runtime job (`BUG-231`), while graph passes remain helpable. Worker-only lanes
+use the existing mutex-protected FIFO for every submission, including worker
+submissions, preserving enqueue order within each lane without local LIFO or
+bounded-ring refill overtaking. Concurrent workers need not finish in that order.
 
-`Initialize()` starts at least one worker, and workers' own loops drain
-`Background`. The one deadlock hazard is a `Background` task that blocks in a
-helped wait on another `Background` task while every worker does the same:
-helpers skip the lane, so nothing is left to run the awaited work. Helped waits
-from non-`Background` code are safe, because a helper that finds only
-`Background` work parks on the work-progress epoch, which the workers advance
-as they retire that work. The rule is that `Background` tasks never wait on
-other `Background` tasks.
+`Initialize()` starts at least one worker. Worker-only tasks must not block in
+helped waits on other worker-only tasks: if all workers wait, helpers cannot run
+the awaited jobs. Ordinary helped waits park on the work-progress epoch when
+only worker-only work remains, and workers advance it as that work retires.
+
+Runtime jobs may supply `CoroutineWork` instead of synchronous `Work`. The
+factory constructs a free coroutine with owned arguments on the worker; its
+completion enters the existing JobService apply/finalizer path. `Running`
+includes a parked coroutine, whose continuation retains its worker-only lane.
+`Cancel`, `CancelAll*` and `CancelAndDrain` are main-thread APIs. Cancellation
+invokes the consumer's sticky `WakeOnCancel` outside the service lock; it must
+not block or publish. `CancelAndDrain` collects wakeups and invokes them before
+`WaitForAll`. The [CPD editor integration](runtime.md#coherent-point-drift-editor-integration)
+describes the current consumer's per-request device wait and fallback contract.
 
 The cost is on machines with few workers (`hardware_concurrency() - 1`, or all
 hardware threads when there are two or fewer, and at least one): a long
-`Background` job delays short jobs queued behind it, since the waiting main
+worker-only job delays short jobs queued behind it, since the waiting main
 thread no longer runs them inline. Frame latency is what the lane protects.
 
-Each worker has one local deque per lane. The external inject path retains a
+Each worker has one local deque per helpable lane. The external inject path retains a
 65,536-task lock-free queue for the common `Normal` lane and uses bounded
 8,192-task lock-free queues for each of the additional `High` and `Low` lanes;
 per-lane overflow deques preserve accepted work after those bounds are reached.
-Ordinary workers use advisory queued counts for the less common `High` and
-`Low` lanes, always inspect the common `Normal` lane, and opportunistically
+Ordinary workers use advisory queued counts for all lanes except `Normal`, always inspect the common `Normal` lane, and opportunistically
 skip contended victim deques. Completion help is stricter: `WaitForAll()` and
 `TryRunOne()` ignore those hints and use definitive, high-to-low scans that
 wait through short worker-deque critical sections.

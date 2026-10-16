@@ -7,6 +7,21 @@ extern "C++"
 {
     namespace Extrinsic::Runtime::ConfigDetail
     {
+        // Point owners retain their diagnostic phases; each phase filters the same table.
+        [[nodiscard]] std::optional<std::string> ValidatePointConfigFields(
+            const nlohmann::json& input, nlohmann::json& defaults,
+            std::string_view objectError, std::string_view unknownFieldPrefix,
+            std::span<const ConfigFieldSpec> fields);
+        [[nodiscard]] std::optional<std::string> ValidatePointConfigNonnegativeFloats(
+            const nlohmann::json& values, std::span<const ConfigFieldSpec> fields);
+        [[nodiscard]] std::optional<std::string> ValidatePointConfigPropertyRefs(
+            const nlohmann::json& values, std::span<const ConfigFieldSpec> fields);
+        // A missing field name returns false; otherwise checks its declared numeric range.
+        [[nodiscard]] bool InConfigFieldRange(std::span<const ConfigFieldSpec> fields,
+            std::string_view name, double value) noexcept;
+        // A missing field name or non-string JSON value returns false.
+        [[nodiscard]] bool IsConfigFieldToken(std::span<const ConfigFieldSpec> fields,
+            std::string_view name, const nlohmann::json& value);
         // Merges `input` into `merged` (the serialized defaults) rejecting unknown keys,
         // then checks every declared field's type and range in table order. Returns the
         // first diagnostic; cross-field rules stay with the section's validator.

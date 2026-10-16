@@ -98,6 +98,9 @@ CPU_ENGINE_CONFIG_ROOTS = (
     ),
 )
 CPU_MULTIWORKER_SOURCE_TARGETS = {
+    "tests/contract/runtime/Test.CoherentPointDriftOperations.cpp": (
+        "IntrinsicRuntimeContractTests"
+    ),
     "tests/benchmark/slo/Test.ArchitectureSLO.cpp": "IntrinsicBenchmarkTests",
     "tests/contract/runtime/Test.AssetImportFormatCoverage.cpp": (
         "IntrinsicRuntimeContractTests"
@@ -243,6 +246,13 @@ def _source_multiworker_budgets() -> set[tuple[str, str, int]]:
             ):
                 case_budgets.add(2)
 
+            # This fixture creates two workers; its one-worker subclass is separate.
+            if (
+                relative_path == "tests/contract/runtime/Test.CoherentPointDriftOperations.cpp"
+                and name.startswith("CpdBrokerWorkspaceReuse.")
+            ):
+                case_budgets.add(2)
+
             if len(case_budgets) > 1:
                 raise AssertionError(
                     f"ambiguous worker budgets in {relative_path}:{name}: "
@@ -312,7 +322,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         source_budgets = _source_multiworker_budgets()
 
         self.assertEqual(declared, source_budgets)
-        self.assertEqual(len(declared), 88)
+        self.assertEqual(len(declared), 92)
         self.assertEqual(
             {
                 budget: sum(
@@ -320,7 +330,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
                 )
                 for budget in (2, 3, 4, 8)
             },
-            {2: 4, 3: 60, 4: 22, 8: 2},
+            {2: 5, 3: 63, 4: 22, 8: 2},
         )
         self.assertIn(
             "Declared multi-worker test "

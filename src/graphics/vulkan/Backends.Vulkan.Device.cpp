@@ -58,6 +58,7 @@ namespace
     VulkanBootstrapDiagnosticsSnapshot g_BootstrapDiagnostics{};
     std::mutex g_FrameLifecycleDiagnosticsMutex;
     VulkanFrameLifecycleDiagnosticsSnapshot g_FrameLifecycleDiagnostics{};
+    std::atomic<std::uint64_t> g_DeferredDeletesExecuted{0};
     std::mutex g_ServiceDiagnosticsMutex;
     VulkanServiceDiagnosticsSnapshot g_ServiceDiagnostics{};
     std::mutex g_PipelineDiagnosticsMutex;
@@ -163,6 +164,7 @@ namespace
         snapshot.EndFrameAttempts = g_FallbackEndFrameAttempts.load(std::memory_order_relaxed);
         snapshot.PresentAttempts = g_FallbackPresentAttempts.load(std::memory_order_relaxed);
         snapshot.ResizeAttempts = g_FallbackResizeAttempts.load(std::memory_order_relaxed);
+        snapshot.DeferredDeletesExecuted = g_DeferredDeletesExecuted.load(std::memory_order_relaxed);
     }
 
     template <typename Mutator>
@@ -2887,6 +2889,30 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
         return;
     }
 
+    std::vector<PendingQueueSubmitBatch>& pendingBatches = m_QueueSubmitBatches[frame.FrameIndex];
+    if (pendingBatches.empty())
+    {
+        auto& context = m_CmdContexts[frame.FrameIndex];
+        if (!context.WasRecordingAttempted() && perFrame.AcquiredImageIndex < m_SwapchainHandles.size())
+        {
+            // A renderer abort before Begin still owns an acquired image/semaphore.
+            // Discard its contents, then use the normal submit/present lifecycle to release it.
+            context.Begin();
+            context.TextureBarrier(m_SwapchainHandles[perFrame.AcquiredImageIndex],
+                                   RHI::TextureLayout::Undefined, RHI::TextureLayout::Present);
+            context.End();
+        }
+        // Failed or partial recording stays acquired until teardown. Do not reset a
+        // fence which this frame cannot signal; resize is not a recovery path here.
+        if (!context.IsExecutable())
+        {
+            recordEnd(VulkanFrameEndStatus::FailedSubmit, VK_NOT_READY, 0);
+            Core::Log::Warn("[VulkanDevice::EndFrame] serial command buffer is not executable; submit skipped");
+            ProcessResourcePoolDeletions();
+            return;
+        }
+    }
+
     VkResult result = vkResetFences(m_Device, 1u, &perFrame.Fence);
     if (result != VK_SUCCESS)
     {
@@ -2897,7 +2923,6 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
         return;
     }
 
-    std::vector<PendingQueueSubmitBatch>& pendingBatches = m_QueueSubmitBatches[frame.FrameIndex];
     if (!pendingBatches.empty())
     {
         const auto queueForAffinity = [this](const RHI::QueueAffinity queue) noexcept
@@ -5722,15 +5747,36 @@ void VulkanDevice::DeferDelete(VulkanDeferredDelete fn)
 {
     if (!fn)
         return;
+    fn = [action = std::move(fn)]() mutable {
+        action();
+        g_DeferredDeletesExecuted.fetch_add(1, std::memory_order_relaxed);
+    };
 
-    if (m_Device == VK_NULL_HANDLE || m_FrameSlot >= kMaxFramesInFlight ||
-        m_Frames[m_FrameSlot].Fence == VK_NULL_HANDLE)
+    std::uint32_t remaining = 0;
+    if (m_Device != VK_NULL_HANDLE)
+        for (const auto& frame : m_Frames)
+            if (frame.Fence != VK_NULL_HANDLE) ++remaining;
+    if (remaining == 0)
     {
         fn();
         return;
     }
 
-    m_Frames[m_FrameSlot].DeletionQueue.push_back(std::move(fn));
+    // All slots avoid new last-submission state and rotation assumptions,
+    // with the same full-frame-cycle retention as the submitting slot.
+    struct PendingDelete
+    {
+        VulkanDeferredDelete Action;
+        std::uint32_t Remaining;
+    };
+    auto pending = std::make_shared<PendingDelete>(PendingDelete{std::move(fn), remaining});
+    for (auto& frame : m_Frames)
+    {
+        if (frame.Fence == VK_NULL_HANDLE) continue;
+        frame.DeletionQueue.push_back([pending] {
+            if (--pending->Remaining == 0) pending->Action();
+        });
+    }
 }
 
 void VulkanDevice::FlushDeletionQueue(uint32_t frameSlot)

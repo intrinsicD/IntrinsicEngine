@@ -515,13 +515,11 @@ namespace
         [[nodiscard]] bool IsMinimized() const override { return false; }
         [[nodiscard]] bool WasResized() const override { return false; }
         void AcknowledgeResize() override {}
-        [[nodiscard]] bool ConsumeInputActivity() override { return false; }
         [[nodiscard]] Platform::Extent2D GetWindowExtent() const override { return {.Width = 400, .Height = 300}; }
         [[nodiscard]] Platform::Extent2D GetFramebufferExtent() const override { return {.Width = 800, .Height = 600}; }
         [[nodiscard]] void* GetNativeHandle() const override { return nullptr; }
         void Listen(EventCallbackFn) override {}
         [[nodiscard]] std::vector<Platform::Event> DrainEvents() override { return {}; }
-        void OnUpdate() override {}
         void WaitForEventsTimeout(double) override {}
         void SetClipboardText(std::string_view) override {}
         [[nodiscard]] std::string GetClipboardText() const override { return {}; }

@@ -1,3 +1,4 @@
+// Vector heat solves provide tangent transport and logarithmic maps on triangle meshes.
 module;
 
 #include <cstddef>

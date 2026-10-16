@@ -25,8 +25,11 @@ import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Tasks;
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Component.Light;
+import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.SceneDocumentModule;
@@ -235,6 +238,11 @@ namespace
         void Frame(double, double) override
         {
             auto& engine = Kernel();
+            const auto modelLoader = [](std::string_view, Assets::AssetId)
+                -> Core::Expected<Assets::AssetModelScenePayload>
+            {
+                return MakeWorldSwitchModelPayload();
+            };
             ++VariableTicks;
             if (VariableTicks == 2u)
             {
@@ -243,12 +251,7 @@ namespace
                 auto loaded = RequiredEngineService<Extrinsic::Assets::AssetService>(engine).Load<
                     Assets::AssetModelScenePayload>(
                     "/virtual/bug-068-world-switch.gltf",
-                    [](std::string_view,
-                       Assets::AssetId)
-                        -> Core::Expected<Assets::AssetModelScenePayload>
-                    {
-                        return MakeWorldSwitchModelPayload();
-                    });
+                    modelLoader);
                 LoadSucceeded = loaded.has_value();
                 if (loaded.has_value())
                 {
@@ -266,7 +269,7 @@ namespace
                 EntityCountAfterReady = CountLiveEntities(*engine.Worlds().Get(engine.ActiveWorld()));
                 ReloadBeforeDestroySucceeded =
                     ModelAsset.IsValid() &&
-                    RequiredEngineService<Extrinsic::Assets::AssetService>(engine).Reload(ModelAsset).has_value();
+                    RequiredEngineService<Extrinsic::Assets::AssetService>(engine).Reload<Assets::AssetModelScenePayload>(ModelAsset, modelLoader).has_value();
                 if (ReloadBeforeDestroySucceeded)
                 {
                     ReloadBeforeDestroyCompletionSucceeded =
@@ -284,7 +287,7 @@ namespace
                     CountLiveEntities(*engine.Worlds().Get(engine.ActiveWorld()));
                 ReloadAfterDestroySucceeded =
                     ModelAsset.IsValid() &&
-                    RequiredEngineService<Extrinsic::Assets::AssetService>(engine).Reload(ModelAsset).has_value();
+                    RequiredEngineService<Extrinsic::Assets::AssetService>(engine).Reload<Assets::AssetModelScenePayload>(ModelAsset, modelLoader).has_value();
                 if (ReloadAfterDestroySucceeded)
                 {
                     ReloadAfterDestroyCompletionSucceeded =
@@ -512,6 +515,74 @@ TEST(RuntimeWorldRegistry, EngineBootsFrameZeroWorldAndAppliesSwitchAtMaintenanc
     EXPECT_EQ(appPtr->ThirdVariableActive, appPtr->CreatedWorld);
     EXPECT_EQ(appPtr->LastExtractionWorld, appPtr->CreatedWorld);
 
+    engine.Shutdown();
+}
+
+TEST(RuntimeWorldRegistry, PipelinedWorldSwitchConsumesFirstNewWorldSnapshot)
+{
+    class PipelinedWorldProbe final : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        void Resolve() override
+        {
+            auto& engine = Kernel();
+            NewWorld = engine.Worlds().CreateWorld("pipelined replacement");
+            AddLights(*engine.Worlds().Get(engine.ActiveWorld()), 3u);
+            AddLights(*engine.Worlds().Get(NewWorld), 2u);
+        }
+
+        void Frame(double, double) override
+        {
+            auto& engine = Kernel();
+            ++Frames;
+            if (Frames == 2u)
+            {
+                OldLights = engine.GetRenderer().GetLastRenderGraphStats()
+                    .Contract.LightingResolvedLightCount;
+                SwitchSucceeded =
+                    engine.Worlds().RequestSetActiveWorld(NewWorld).has_value();
+            }
+            if (Frames == 4u)
+            {
+                NewLights = engine.GetRenderer().GetLastRenderGraphStats()
+                    .Contract.LightingResolvedLightCount;
+                ObservedWorld = engine.ActiveWorld();
+                engine.RequestExit();
+            }
+        }
+
+        Runtime::WorldHandle NewWorld{};
+        Runtime::WorldHandle ObservedWorld{};
+        std::uint32_t Frames{0u};
+        std::uint32_t OldLights{0u};
+        std::uint32_t NewLights{0u};
+        bool SwitchSucceeded{false};
+
+    private:
+        static void AddLights(ECS::Scene::Registry& scene, std::uint32_t count)
+        {
+            for (std::uint32_t i = 0u; i < count; ++i)
+            {
+                const auto entity = scene.Create();
+                scene.Raw().emplace<ECS::Components::Transform::WorldMatrix>(entity);
+                scene.Raw().emplace<ECS::Components::Lights::DirectionalLight>(entity);
+            }
+        }
+    };
+
+    auto config = NullWindowHeadlessConfig();
+    config.Render.SynchronousExtraction = false;
+    auto probe = std::make_unique<PipelinedWorldProbe>();
+    const PipelinedWorldProbe* observed = probe.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(probe));
+    engine.Initialize();
+    engine.Run();
+
+    EXPECT_TRUE(observed->SwitchSucceeded);
+    EXPECT_EQ(observed->Frames, 4u);
+    EXPECT_EQ(observed->ObservedWorld, observed->NewWorld);
+    EXPECT_EQ(observed->OldLights, 3u);
+    EXPECT_EQ(observed->NewLights, 2u);
     engine.Shutdown();
 }
 

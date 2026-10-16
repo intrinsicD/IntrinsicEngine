@@ -60,21 +60,6 @@ namespace Extrinsic::ECS::Systems::BoundsPropagation
             const glm::vec3 worldCenter = glm::vec3{worldMatrix * glm::vec4{localCenter, 1.0f}};
 
             constexpr float kAxisEpsilon = 1.0e-8f;
-            glm::mat3 rotationBasis{1.0f};
-            if (lenX > kAxisEpsilon && lenY > kAxisEpsilon && lenZ > kAxisEpsilon)
-            {
-                rotationBasis = glm::mat3{col0 / lenX, col1 / lenY, col2 / lenZ};
-            }
-
-            Components::Culling::World::Bounds world{};
-            world.WorldBoundingOBB.Center = worldCenter;
-            world.WorldBoundingOBB.Extents = glm::vec3{
-                lenX * localExtents.x,
-                lenY * localExtents.y,
-                lenZ * localExtents.z,
-            };
-            world.WorldBoundingOBB.Rotation = glm::normalize(glm::quat_cast(rotationBasis));
-
             const auto axesAreNonOrthogonal = [=](
                 const glm::vec3& lhs,
                 const float lhsLength,
@@ -95,6 +80,37 @@ namespace Extrinsic::ECS::Systems::BoundsPropagation
                 || axesAreNonOrthogonal(col0, lenX, col2, lenZ)
                 || axesAreNonOrthogonal(col1, lenY, col2, lenZ);
 
+            const bool hasDegenerateAxis =
+                lenX <= kAxisEpsilon || lenY <= kAxisEpsilon || lenZ <= kAxisEpsilon;
+            const bool useWorldAabb = hasAffineShear || hasDegenerateAxis;
+            const Geometry::AABB worldAabb = local.LocalBoundingAABB.IsValid() && useWorldAabb
+                ? Geometry::TransformAABB(local.LocalBoundingAABB, worldMatrix)
+                : Geometry::AABB{};
+
+            Components::Culling::World::Bounds world{};
+            world.WorldBoundingOBB.Center = worldCenter;
+            world.WorldBoundingOBB.Extents = glm::vec3{
+                lenX * localExtents.x, lenY * localExtents.y, lenZ * localExtents.z};
+            world.WorldBoundingOBB.Rotation = glm::quat{1.0f, 0.0f, 0.0f, 0.0f};
+            if (useWorldAabb)
+            {
+                // A sheared or collapsed basis is not an orthonormal OBB frame.
+                if (local.LocalBoundingAABB.IsValid())
+                {
+                    world.WorldBoundingOBB.Center = worldAabb.GetCenter();
+                    world.WorldBoundingOBB.Extents = worldAabb.GetExtents();
+                }
+            }
+            else
+            {
+                glm::mat3 rotationBasis{col0 / lenX, col1 / lenY, col2 / lenZ};
+                // Flipping a box axis changes no enclosed points, but gives
+                // quat_cast a proper rotation when the transform is mirrored.
+                if (glm::determinant(rotationBasis) < 0.0f)
+                    rotationBasis[0] = -rotationBasis[0];
+                world.WorldBoundingOBB.Rotation = glm::normalize(glm::quat_cast(rotationBasis));
+            }
+
             const float dot01 = glm::dot(col0, col1);
             const float dot02 = glm::dot(col0, col2);
             const float dot12 = glm::dot(col1, col2);
@@ -113,8 +129,6 @@ namespace Extrinsic::ECS::Systems::BoundsPropagation
                 // is TRS. A max-column scale applied to the local sphere does
                 // not necessarily enclose that affine result. Transforming the
                 // local AABB corners and circumscribing their world AABB does.
-                const Geometry::AABB worldAabb =
-                    Geometry::TransformAABB(local.LocalBoundingAABB, worldMatrix);
                 world.WorldBoundingSphere.Center = worldAabb.GetCenter();
                 world.WorldBoundingSphere.Radius =
                     glm::length(worldAabb.GetExtents());

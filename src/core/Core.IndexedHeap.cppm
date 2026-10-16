@@ -1,3 +1,4 @@
+// Indexed min-heap with deterministic ties, decrease-key and arbitrary removal.
 module;
 
 #include <cstddef>

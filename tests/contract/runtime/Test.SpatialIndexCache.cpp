@@ -26,6 +26,7 @@ import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Geometry.HalfedgeMesh;
 import Geometry.Graph;
+import Geometry.PointCloud;
 namespace R = Extrinsic::Runtime;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
 using D = R::GeometryElementDomain;
@@ -522,4 +523,31 @@ TEST_F(SpatialWorkspaceLeases, TransformedQueriesRefuseUnsupportedAndNonfiniteTr
     pose[3].x = std::numeric_limits<double>::quiet_NaN();
     EXPECT_EQ(Cache.QueueGpuNearestTransformed(target.Handle, points, pose)->State, R::SpatialQueryState::Failed);
     EXPECT_EQ(Cache.Stats().GpuQueryUploadBytes, 0u);
+}
+
+
+TEST(SpatialIndexCache, PopulatedCloudExcludesDeletedRowsFromSpatialQueries)
+{
+    R::WorldRegistry worlds;
+    const auto world = worlds.CreateWorld("populated-cloud");
+    auto& scene = *worlds.Get(world);
+    const auto entity = scene.Create();
+    Geometry::PointCloud::Cloud cloud;
+    (void)cloud.AddPoint({0, 0, 0});
+    const auto deleted = cloud.AddPoint({1, 0, 0});
+    (void)cloud.AddPoint({4, 0, 0});
+    cloud.DeletePoint(deleted);
+    GS::PopulateFromCloud(scene.Raw(), entity, cloud);
+    R::SpatialIndexCache cache(worlds);
+
+    const auto acquired = cache.Acquire(world, entity, Ref(D::PointCloudPoint, "v:position"));
+    ASSERT_TRUE(acquired.Ready()) << acquired.Diagnostic;
+    const auto nearest = cache.Nearest(acquired.Handle, {1, 0, 0});
+    ASSERT_TRUE(nearest);
+    EXPECT_EQ(nearest->Index, 0u);
+    const auto neighbors = cache.KNearest(acquired.Handle, {1, 0, 0}, 8);
+    ASSERT_TRUE(neighbors);
+    ASSERT_EQ(neighbors->size(), 2u);
+    EXPECT_EQ((*neighbors)[0].Index, 0u);
+    EXPECT_EQ((*neighbors)[1].Index, 2u);
 }

@@ -88,6 +88,7 @@ namespace Extrinsic::Runtime::ConfigDetail
         const std::uint32_t schemaVersion,
         std::string defaultPayloadJson,
         const SectionValidatorFn validate,
+        std::string schemaJson,
         Core::Config::EngineConfigSectionChangedCallback&& onChanged)
     {
         return Core::Config::EngineConfigSectionRegistration{
@@ -98,6 +99,7 @@ namespace Extrinsic::Runtime::ConfigDetail
                 std::move(defaultPayloadJson)),
             .Validate = validate,
             .OnChanged = std::move(onChanged),
+            .SchemaJson = std::move(schemaJson),
         };
     }
 
@@ -129,17 +131,19 @@ namespace Extrinsic::Runtime::ConfigDetail
     std::optional<std::string> ValidatePointConfigFields(
         const nlohmann::json& input, nlohmann::json& defaults,
         const std::string_view objectError, const std::string_view unknownFieldPrefix,
-        const std::initializer_list<std::string_view> unsignedFields)
+        const std::span<const ConfigFieldSpec> fields)
     {
         if (!input.is_object()) return std::string(objectError);
         for (auto it = input.begin(); it != input.end(); ++it)
         {
-            if (!defaults.contains(it.key()))
+            if (!defaults.contains(it.key()) || !FindConfigFieldSpec(fields, it.key()))
                 return std::string(unknownFieldPrefix) + it.key();
             defaults[it.key()] = it.value();
         }
-        for (const auto key : unsignedFields)
+        for (const auto& field : fields)
         {
+            if (field.Type != ConfigFieldType::UInt && field.Type != ConfigFieldType::Enum) continue;
+            const auto key = field.Name;
             const auto& value = defaults.at(std::string(key));
             if (!value.is_number_unsigned() ||
                 value.get<std::uint64_t>() > std::numeric_limits<std::uint32_t>::max())
@@ -149,13 +153,14 @@ namespace Extrinsic::Runtime::ConfigDetail
     }
 
     std::optional<std::string> ValidatePointConfigNonnegativeFloats(
-        const nlohmann::json& values, const std::initializer_list<std::string_view> fields)
+        const nlohmann::json& values, const std::span<const ConfigFieldSpec> fields)
     {
-        for (const auto key : fields)
+        for (const auto& field : fields)
         {
+            if (field.Type != ConfigFieldType::Float) continue;
+            const auto key = field.Name;
             const auto& value = values.at(std::string(key));
-            if (!value.is_number() || !std::isfinite(value.get<double>()) || value.get<double>() < 0 ||
-                value.get<double>() > std::numeric_limits<float>::max())
+            if (!value.is_number() || !AcceptsConfigFieldNumber(field, value.get<double>()))
                 return std::string(key) + " must be a finite nonnegative float.";
         }
         return std::nullopt;
@@ -213,17 +218,35 @@ namespace Extrinsic::Runtime::ConfigDetail
 
     std::optional<std::string> ValidatePointConfigPropertyRefs(
         const nlohmann::json& values,
-        const std::initializer_list<std::pair<std::string_view, Geometry::PropertyValueKind>> fields)
+        const std::span<const ConfigFieldSpec> fields)
     {
-        for (const auto& [key, kind] : fields)
+        for (const auto& field : fields)
         {
-            const auto validation = ValidatePointPropertyRef(values.at(std::string(key)), kind, true);
+            if (field.Type != ConfigFieldType::PropertyRef) continue;
+            const auto key = field.Name;
+            const auto validation = field.RefKinds.size() == 1u
+                ? ValidatePointPropertyRef(values.at(std::string(key)), field.RefKinds.front(), field.AnyScalar)
+                : PointPropertyValidation::InvalidReference;
             if (validation == PointPropertyValidation::InvalidReference)
                 return std::string(key) + " needs a canonical typed property reference.";
             if (validation == PointPropertyValidation::UnknownDomain)
                 return "Unknown element domain.";
         }
         return std::nullopt;
+    }
+
+    bool InConfigFieldRange(const std::span<const ConfigFieldSpec> fields,
+                           const std::string_view name, const double value) noexcept
+    {
+        const auto* field = FindConfigFieldSpec(fields, name);
+        return field && AcceptsConfigFieldNumber(*field, value);
+    }
+
+    bool IsConfigFieldToken(const std::span<const ConfigFieldSpec> fields,
+                            const std::string_view name, const nlohmann::json& value)
+    {
+        const auto* field = FindConfigFieldSpec(fields, name);
+        return field && value.is_string() && AcceptsConfigFieldToken(*field, value.get_ref<const std::string&>());
     }
 
     namespace
@@ -276,6 +299,7 @@ namespace Extrinsic::Runtime::ConfigDetail
         std::optional<std::string> CheckField(const ConfigFieldSpec& field, const nlohmann::json& value)
         {
             const std::string name{field.Name};
+            if (value.is_null() && field.Nullable) return std::nullopt;
             switch (field.Type)
             {
             case ConfigFieldType::Bool:
@@ -308,6 +332,21 @@ namespace Extrinsic::Runtime::ConfigDetail
                     return name + (field.Nullable ? " must be null or a" : " must be a") +
                            (field.NonEmpty ? " nonempty string." : " string.");
                 return std::nullopt;
+            case ConfigFieldType::StringEnum:
+                if (!value.is_string() || !AcceptsConfigFieldToken(field, value.get_ref<const std::string&>()))
+                    return "Unknown " + name + " value; " + DescribeConfigFieldRange(field) + ".";
+                return std::nullopt;
+            case ConfigFieldType::Array:
+                if (!value.is_array() || (field.MinItems && value.size() < *field.MinItems) ||
+                    (field.MaxItems && value.size() > *field.MaxItems))
+                    return name + " has an invalid array length.";
+                if (field.Item)
+                    for (const auto& item : value)
+                        if (auto error = CheckField(*field.Item, item)) return error;
+                return std::nullopt;
+            case ConfigFieldType::Object:
+                // Nested fallback owners validate and merge their objects themselves.
+                return value.is_object() ? std::nullopt : std::optional{name + " must be an object."};
             case ConfigFieldType::UIntArray:
                 if (!value.is_array()) return name + " must be an array of unsigned 32-bit integers.";
                 for (const auto& item : value)
@@ -368,13 +407,10 @@ namespace Extrinsic::Runtime::ConfigDetail
         return errors;
     }
 
-    std::string BuildSectionSchemaJson(
-        const std::string_view schemaId, const std::string_view title, const std::string_view description,
-        const std::span<const ConfigFieldSpec> fields, const nlohmann::json& defaults)
+    namespace
     {
         using OJson = nlohmann::ordered_json;
-        OJson properties = OJson::object();
-        for (const auto& field : fields)
+        OJson BuildFieldSchema(const ConfigFieldSpec& field, const nlohmann::json* defaultValue)
         {
             OJson p = OJson::object();
             const auto bound = [&](const char* inclusive, const char* exclusive, const std::optional<double>& v, bool excl) {
@@ -420,18 +456,54 @@ namespace Extrinsic::Runtime::ConfigDetail
                 p["type"] = field.Nullable ? OJson::array({"string", "null"}) : OJson("string");
                 if (field.NonEmpty) p["minLength"] = 1;
                 break;
+            case ConfigFieldType::StringEnum:
+                p["type"] = "string";
+                p["enum"] = field.EnumValues;
+                if (!field.EnumNames.empty()) p["x-enum-names"] = field.EnumNames;
+                break;
+            case ConfigFieldType::Array:
+                p["type"] = "array";
+                if (field.Item) p["items"] = BuildFieldSchema(*field.Item, nullptr);
+                if (field.MinItems) p["minItems"] = *field.MinItems;
+                if (field.MaxItems) p["maxItems"] = *field.MaxItems;
+                break;
+            case ConfigFieldType::Object:
+                p["type"] = "object";
+                p["properties"] = OJson::object();
+                for (const auto& child : std::span{field.Fields, field.FieldCount})
+                {
+                    const nlohmann::json* childDefault = nullptr;
+                    if (defaultValue && defaultValue->is_object())
+                        if (const auto it = defaultValue->find(std::string(child.Name)); it != defaultValue->end()) childDefault = &*it;
+                    p["properties"][std::string(child.Name)] = BuildFieldSchema(child, childDefault);
+                }
+                p["additionalProperties"] = false;
+                break;
             case ConfigFieldType::UIntArray:
                 p["type"] = "array";
                 p["items"] = {{"type", "integer"}, {"minimum", 0}, {"maximum", std::numeric_limits<std::uint32_t>::max()}};
                 break;
             case ConfigFieldType::PropertyRef:
             {
-                const auto kinds = RefKindTokens(field);
+                OJson kinds = RefKindTokens(field);
+                if (field.IntegerRefKinds)
+                {
+                    kinds = OJson::array();
+                    for (unsigned code = unsigned(Kind::Unknown); code <= unsigned(Kind::Vec4); ++code)
+                    {
+                        const auto kind = Kind(code);
+                        bool accepted = std::ranges::find(field.RefKinds, kind) != field.RefKinds.end();
+                        if (field.AnyScalar && kind >= kFirstScalar && kind <= kLastScalar)
+                            for (const auto listed : field.RefKinds)
+                                accepted |= GeometryPropertyComponentCount(listed) == 1u;
+                        if (accepted) kinds.push_back(code);
+                    }
+                }
                 const auto domains = RefDomainTokens(field);
                 p["type"] = field.Nullable ? OJson::array({"object", "null"}) : OJson("object");
                 p["properties"] = {{"domain", {{"type", "string"}, {"enum", domains}}},
                                    {"name", {{"type", "string"}, {"minLength", 1}}},
-                                   {"kind", {{"type", "string"}, {"enum", kinds}}}};
+                                   {"kind", {{"type", field.IntegerRefKinds ? "integer" : "string"}, {"enum", kinds}}}};
                 p["required"] = {"domain", "name", "kind"};
                 p["additionalProperties"] = false;
                 p["x-property-kinds"] = kinds;
@@ -439,10 +511,22 @@ namespace Extrinsic::Runtime::ConfigDetail
                 break;
             }
             }
+            if (field.Nullable && p["type"].is_string()) p["type"] = OJson::array({p["type"], "null"});
             if (!field.Description.empty()) p["description"] = std::string(field.Description);
-            if (const auto it = defaults.find(std::string(field.Name)); it != defaults.end())
-                p["default"] = OJson::parse(it->dump());
-            properties[std::string(field.Name)] = std::move(p);
+            if (defaultValue) p["default"] = OJson::parse(defaultValue->dump());
+            return p;
+        }
+    }
+
+    std::string BuildSectionSchemaJson(
+        const std::string_view schemaId, const std::string_view title, const std::string_view description,
+        const std::span<const ConfigFieldSpec> fields, const nlohmann::json& defaults)
+    {
+        OJson properties = OJson::object();
+        for (const auto& field : fields)
+        {
+            const auto it = defaults.find(std::string(field.Name));
+            properties[std::string(field.Name)] = BuildFieldSchema(field, it == defaults.end() ? nullptr : &*it);
         }
         OJson schema{{"$schema", "https://json-schema.org/draft/2020-12/schema"}, {"$id", std::string(schemaId)},
                      {"title", std::string(title)}, {"description", std::string(description)}, {"type", "object"},
@@ -473,6 +557,212 @@ namespace Extrinsic::Runtime
 
         using ConfigDetail::MakeConfigSection;
         using ConfigDetail::MakeSectionRegistration;
+
+
+        using FT = ConfigFieldType;
+        using Kind = Geometry::PropertyValueKind;
+        using Domain = GeometryElementDomain;
+        constexpr std::array kScalarKinds{Kind::Bool, Kind::Int32, Kind::UInt32, Kind::UInt64, Kind::Float, Kind::Double};
+        constexpr std::array kFeatureKinds{Kind::Bool, Kind::Int32, Kind::UInt32, Kind::UInt64, Kind::Float, Kind::Double, Kind::Vec2, Kind::Vec3};
+        constexpr std::array kVec2Kinds{Kind::Vec2}, kVec3Kinds{Kind::Vec3}, kVec4Kinds{Kind::Vec4};
+        constexpr std::array kKnownDomains{Domain::MeshVertex, Domain::MeshEdge, Domain::MeshHalfedge, Domain::MeshFace,
+                                           Domain::GraphNode, Domain::GraphHalfedge, Domain::GraphEdge, Domain::PointCloudPoint};
+        constexpr std::array kAllDomains{Domain::Unknown, Domain::MeshVertex, Domain::MeshEdge, Domain::MeshHalfedge, Domain::MeshFace,
+                                         Domain::GraphNode, Domain::GraphHalfedge, Domain::GraphEdge, Domain::PointCloudPoint};
+        constexpr std::array kVertexDomain{Domain::MeshVertex}, kEdgeDomain{Domain::MeshEdge},
+                             kFaceDomain{Domain::MeshFace}, kHalfedgeDomain{Domain::MeshHalfedge};
+        constexpr std::array kMeshInputDomains{Domain::MeshVertex, Domain::MeshFace};
+        constexpr std::array<std::string_view, 2> kInitialBackendTokens{"cpu", "vulkan"};
+        constexpr std::array<std::string_view, 4> kConsolidationBackendLabels{
+            "CPU reference neighborhoods", "Vulkan", "CPU LBVH (cached)", "Vulkan LBVH"};
+        constexpr ConfigFieldSpec kUvCoordinate{.Type = FT::Float,
+            .Min = -static_cast<double>(std::numeric_limits<float>::max()),
+            .Max = static_cast<double>(std::numeric_limits<float>::max())};
+        constexpr ConfigFieldSpec kUvPair{.Type = FT::Array, .Item = &kUvCoordinate, .MinItems = 2, .MaxItems = 2};
+        constexpr ConfigFieldSpec kFiniteNumber{.Type = FT::Float};
+        constexpr ConfigFieldSpec kSegmentationFeature{.Type = FT::PropertyRef,
+            .RefKinds = kFeatureKinds, .RefDomains = kMeshInputDomains, .IntegerRefKinds = true};
+        // These are registered-default binding domains. File-load validation can use a
+        // non-default reference; ReadPropertyRef preserves that existing narrower contract.
+        const std::array kClusteringPropertyFields{
+            ConfigFieldSpec{.Name = "positions", .Type = FT::PropertyRef, .RefKinds = kVec3Kinds, .RefDomains = kKnownDomains, .IntegerRefKinds = true},
+            ConfigFieldSpec{.Name = "labels", .Type = FT::PropertyRef, .RefKinds = kScalarKinds, .RefDomains = kKnownDomains, .IntegerRefKinds = true},
+            ConfigFieldSpec{.Name = "colors", .Type = FT::PropertyRef, .RefKinds = kVec4Kinds, .RefDomains = kKnownDomains, .IntegerRefKinds = true},
+            ConfigFieldSpec{.Name = "scalar_labels", .Type = FT::PropertyRef, .Nullable = true, .RefKinds = kScalarKinds, .RefDomains = kKnownDomains, .IntegerRefKinds = true},
+        };
+
+        constexpr std::array<std::string_view, 4> kProgressivePoissonChannelTokens{"Level", "Rank", "SplatRadius", "PrefixVisible"};
+        constexpr std::array<std::string_view, 2> kProgressivePoissonBackendTokens{"CpuReference", "VulkanCompute"};
+        constexpr std::array<std::string_view, 2> kClusteringBackendTokens{"CpuReference", "VulkanCompute"};
+        constexpr std::array<std::string_view, 2> kCurvatureSegmentationSelectionModeTokens{"fixed_count", "automatic"};
+        constexpr std::array<std::string_view, 3> kCurvatureSegmentationMethodTokens{"curvature_gmm", "feature_aligned_patches", "feature_boundary_curves_v1"};
+        const std::array kPointCloudConsolidationStrategyTokens{StableToken(PointCloudConsolidationStrategy::Lop), StableToken(PointCloudConsolidationStrategy::Wlop), StableToken(PointCloudConsolidationStrategy::Clop), StableToken(PointCloudConsolidationStrategy::Ear)};
+        const std::array kPointCloudConsolidationBackendTokens{StableToken(PointCloudConsolidationBackend::CpuReference), StableToken(PointCloudConsolidationBackend::VulkanCompute), StableToken(PointCloudConsolidationBackend::CpuLBVH), StableToken(PointCloudConsolidationBackend::VulkanLBVH)};
+        const std::array kPointCloudConsolidationNormalSourceTokens{StableToken(PointCloudConsolidationNormalSource::AuthoredOrEstimate), StableToken(PointCloudConsolidationNormalSource::RequireAuthored)};
+        const std::array kPointCloudConsolidationSupportRadiusModeTokens{StableToken(PointCloudConsolidationSupportRadiusMode::Auto), StableToken(PointCloudConsolidationSupportRadiusMode::Manual)};
+        constexpr std::array<std::string_view, 2> kKMeansInitializationTokens{"Random", "Hierarchical"};
+        constexpr std::array<std::string_view, 2> kAtlasMethodTokens{"fast_staged", "xatlas"};
+        constexpr std::array<std::string_view, 4> kAtlasDistortionTokens{"none", "angle", "area", "both"};
+        constexpr std::array<std::string_view, 4> kParameterizationStrategyTokens{"lscm", "harmonic_cotangent", "tutte_uniform", "bff"};
+        constexpr std::array<std::string_view, 3> kParameterizationBoundaryPolicyTokens{"circle", "square", "custom"};
+        constexpr std::array<std::string_view, 3> kParameterizationBffBoundaryModeTokens{"automatic_conformal", "target_lengths", "target_angles"};
+        constexpr std::array<std::string_view, 2> kParameterizationUvRenderModeTokens{"cpu_layout", "gpu_shaded"};
+        constexpr std::array<std::string_view, 4> kParameterizationUvBackgroundModeTokens{"grid", "checker", "texel_density", "texture"};
+
+        const std::array kParameterizationViewFields{
+            ConfigFieldSpec{.Name = "render_mode", .Type = FT::StringEnum, .EnumValues = kParameterizationUvRenderModeTokens},
+            ConfigFieldSpec{.Name = "background_mode", .Type = FT::StringEnum, .EnumValues = kParameterizationUvBackgroundModeTokens},
+            ConfigFieldSpec{.Name = "show_distortion_heatmap", .Type = FT::Bool},
+            ConfigFieldSpec{.Name = "split_enabled", .Type = FT::Bool},
+            ConfigFieldSpec{.Name = "atlas_on_left", .Type = FT::Bool},
+            ConfigFieldSpec{.Name = "split_ratio", .Type = FT::Float, .Min = 0.2, .Max = static_cast<double>(0.8f)},
+        };
+        const std::array kParameterizationAtlasFields{
+            ConfigFieldSpec{.Name = "method", .Type = FT::StringEnum, .Description = "XAtlas requires the angle distortion objective; fast_staged supports every listed objective.", .EnumValues = kAtlasMethodTokens},
+            ConfigFieldSpec{.Name = "distortion", .Type = FT::StringEnum, .EnumValues = kAtlasDistortionTokens},
+            ConfigFieldSpec{.Name = "guide", .Type = FT::PropertyRef, .Description = "Optional scalar mesh vertex or face property; its nonempty name must not contain NUL.", .Nullable = true, .RefKinds = kScalarKinds, .RefDomains = kMeshInputDomains, .IntegerRefKinds = true},
+            ConfigFieldSpec{.Name = "region_count", .Type = FT::UInt, .Description = "Zero selects the number of guide components automatically.", .Min = 0, .Max = 64},
+            ConfigFieldSpec{.Name = "resolution", .Type = FT::UInt, .Min = 16, .Max = 16384},
+            ConfigFieldSpec{.Name = "padding", .Type = FT::UInt, .Description = "Packing requires 2 * padding + 1 < resolution so usable interior space remains.", .Min = 0, .Max = 32},
+            ConfigFieldSpec{.Name = "texels_per_unit", .Type = FT::Float, .Min = 0.0, .Max = 1.0e12},
+            ConfigFieldSpec{.Name = "max_conformal_distortion", .Type = FT::Float, .Min = 1.0, .Max = 1.0e6},
+            ConfigFieldSpec{.Name = "max_area_distortion", .Type = FT::Float, .Min = 1.0, .Max = 1.0e6},
+            ConfigFieldSpec{.Name = "max_charts", .Type = FT::UInt, .Min = 1, .Max = 1000000},
+            ConfigFieldSpec{.Name = "max_iterations", .Type = FT::UInt, .Min = 1, .Max = 1000},
+            ConfigFieldSpec{.Name = "allow_xatlas_fallback", .Type = FT::Bool},
+        };
+        const std::array kParameterizationLscmFields{
+            ConfigFieldSpec{.Name = "auto_pins", .Type = FT::Bool, .Description = "When false, the two pin vertices must differ; invalid manual pins retain the entire reference LSCM group."},
+            ConfigFieldSpec{.Name = "pin_vertex_0", .Type = FT::UInt, .Min = 0, .Max = std::numeric_limits<std::uint32_t>::max()},
+            ConfigFieldSpec{.Name = "pin_vertex_1", .Type = FT::UInt, .Min = 0, .Max = std::numeric_limits<std::uint32_t>::max()},
+            ConfigFieldSpec{.Name = "pin_uv_0", .Type = FT::Array, .Item = &kUvCoordinate, .MinItems = kUvPair.MinItems, .MaxItems = kUvPair.MaxItems},
+            ConfigFieldSpec{.Name = "pin_uv_1", .Type = FT::Array, .Item = &kUvCoordinate, .MinItems = kUvPair.MinItems, .MaxItems = kUvPair.MaxItems},
+            ConfigFieldSpec{.Name = "solver_tolerance", .Type = FT::Float, .Min = std::numeric_limits<double>::min(), .Max = 1.0e30},
+            ConfigFieldSpec{.Name = "max_solver_iterations", .Type = FT::UInt, .Min = 1, .Max = std::numeric_limits<std::uint32_t>::max()},
+        };
+        const std::array kParameterizationHarmonicFields{
+            ConfigFieldSpec{.Name = "boundary", .Type = FT::StringEnum, .EnumValues = kParameterizationBoundaryPolicyTokens},
+            ConfigFieldSpec{.Name = "arc_length_spacing", .Type = FT::Bool},
+            ConfigFieldSpec{.Name = "clamp_non_convex_weights", .Type = FT::Bool},
+            ConfigFieldSpec{.Name = "pinned_vertices", .Type = FT::UIntArray, .Description = "Provide together with pinned_uvs and with equal length; otherwise both reference arrays are retained."},
+            ConfigFieldSpec{.Name = "pinned_uvs", .Type = FT::Array, .Description = "Provide together with pinned_vertices and with equal length; otherwise both reference arrays are retained.", .Item = &kUvPair},
+        };
+        const std::array kParameterizationBffFields{
+            ConfigFieldSpec{.Name = "mode", .Type = FT::StringEnum, .EnumValues = kParameterizationBffBoundaryModeTokens},
+            ConfigFieldSpec{.Name = "boundary_data", .Type = FT::Array, .Description = "Automatic mode requires no data; target_lengths requires nonempty positive lengths; target_angles requires nonempty angles summing to 2*pi within angle_sum_tolerance. Invalid combinations retain the reference BFF group.", .Item = &kFiniteNumber},
+            ConfigFieldSpec{.Name = "angle_sum_tolerance", .Type = FT::Float, .Min = std::numeric_limits<double>::min(), .Max = 1.0e30},
+            ConfigFieldSpec{.Name = "degeneracy_tolerance", .Type = FT::Float, .Min = std::numeric_limits<double>::min(), .Max = 1.0e30},
+        };
+        const std::array kClusteringFields{
+            ConfigFieldSpec{.Name = "cluster_count", .Type = FT::UInt, .Min = 1, .Max = 1024},
+            ConfigFieldSpec{.Name = "gpu_preview_interval", .Type = FT::UInt, .Min = 1, .Max = 1000000},
+            ConfigFieldSpec{.Name = "max_iterations", .Type = FT::UInt, .Min = 1, .Max = 4096},
+            ConfigFieldSpec{.Name = "seed", .Type = FT::UInt, .Min = 0, .Max = std::numeric_limits<std::uint32_t>::max()},
+            ConfigFieldSpec{.Name = "initialization", .Type = FT::StringEnum, .EnumValues = kKMeansInitializationTokens},
+            ConfigFieldSpec{.Name = "backend", .Type = FT::StringEnum, .EnumValues = kClusteringBackendTokens},
+            ConfigFieldSpec{.Name = "properties", .Type = FT::Object, .Description = "Bindings share one element domain and have distinct nonempty NUL-free names. Outputs must not replace topology or position storage; unknown nested keys are silently ignored.", .Nullable = true, .Fields = kClusteringPropertyFields.data(), .FieldCount = kClusteringPropertyFields.size()},
+        };
+        const std::array kCurvatureSegmentationFields{
+            ConfigFieldSpec{.Name = "features", .Type = FT::Array, .Description = "At most three total scalar components; feature-curve methods require computed curvature.", .Item = &kSegmentationFeature, .MaxItems = 3},
+            ConfigFieldSpec{.Name = "positions", .Type = FT::PropertyRef, .RefKinds = kVec3Kinds, .RefDomains = kVertexDomain, .IntegerRefKinds = true},
+            ConfigFieldSpec{.Name = "components", .Type = FT::PropertyRef, .RefKinds = kScalarKinds, .RefDomains = kFaceDomain, .IntegerRefKinds = true},
+            ConfigFieldSpec{.Name = "regions", .Type = FT::PropertyRef, .RefKinds = kScalarKinds, .RefDomains = kFaceDomain, .IntegerRefKinds = true},
+            ConfigFieldSpec{.Name = "region_colors", .Type = FT::PropertyRef, .RefKinds = kVec4Kinds, .RefDomains = kFaceDomain, .IntegerRefKinds = true},
+            ConfigFieldSpec{.Name = "boundaries", .Type = FT::PropertyRef, .RefKinds = kScalarKinds, .RefDomains = kEdgeDomain, .IntegerRefKinds = true},
+            ConfigFieldSpec{.Name = "boundary_colors", .Type = FT::PropertyRef, .RefKinds = kVec4Kinds, .RefDomains = kEdgeDomain, .IntegerRefKinds = true},
+            ConfigFieldSpec{.Name = "hard_features", .Type = FT::PropertyRef, .RefKinds = kScalarKinds, .RefDomains = kEdgeDomain, .IntegerRefKinds = true},
+            ConfigFieldSpec{.Name = "feature_confidence", .Type = FT::PropertyRef, .RefKinds = kScalarKinds, .RefDomains = kEdgeDomain, .IntegerRefKinds = true},
+            ConfigFieldSpec{.Name = "boundary_roles", .Type = FT::PropertyRef, .RefKinds = kScalarKinds, .RefDomains = kEdgeDomain, .IntegerRefKinds = true},
+            ConfigFieldSpec{.Name = "feature_colors", .Type = FT::PropertyRef, .RefKinds = kVec4Kinds, .RefDomains = kEdgeDomain, .IntegerRefKinds = true},
+            ConfigFieldSpec{.Name = "method", .Type = FT::StringEnum, .EnumValues = kCurvatureSegmentationMethodTokens},
+            ConfigFieldSpec{.Name = "selection_mode", .Type = FT::StringEnum, .EnumValues = kCurvatureSegmentationSelectionModeTokens},
+            ConfigFieldSpec{.Name = "fixed_component_count", .Type = FT::UInt, .Min = 1, .Max = 1024},
+            ConfigFieldSpec{.Name = "automatic_min_components", .Type = FT::UInt, .Description = "Must not exceed automatic_max_components; invalid ordering retains both reference bounds.", .Min = 1, .Max = 1024},
+            ConfigFieldSpec{.Name = "automatic_max_components", .Type = FT::UInt, .Description = "Must be at least automatic_min_components; invalid ordering retains both reference bounds.", .Min = 1, .Max = 1024},
+            ConfigFieldSpec{.Name = "automatic_fit_tolerance", .Type = FT::Float, .Min = 1.0e-12, .Max = 1.0e12},
+            ConfigFieldSpec{.Name = "automatic_complexity_weight", .Type = FT::Float, .Min = 0.0, .Max = 1.0e12},
+            ConfigFieldSpec{.Name = "max_em_iterations", .Type = FT::UInt, .Min = 1, .Max = 100000},
+            ConfigFieldSpec{.Name = "em_relative_tolerance", .Type = FT::Float, .Min = 0.0, .Max = 1.0},
+            ConfigFieldSpec{.Name = "covariance_floor", .Type = FT::Float, .Min = 1.0e-15, .Max = 1.0e6},
+            ConfigFieldSpec{.Name = "seed", .Type = FT::UInt, .Min = 0, .Max = std::numeric_limits<std::uint32_t>::max()},
+            ConfigFieldSpec{.Name = "spatial_weight", .Type = FT::Float, .Min = 0.0, .Max = 1.0e12},
+            ConfigFieldSpec{.Name = "feature_sensitivity", .Type = FT::Float, .Min = 0.0, .Max = 1.0e12},
+            ConfigFieldSpec{.Name = "max_spatial_iterations", .Type = FT::UInt, .Min = 1, .Max = 100000},
+            ConfigFieldSpec{.Name = "minimum_region_faces", .Type = FT::UInt, .Min = 1, .Max = std::numeric_limits<std::uint32_t>::max()},
+            ConfigFieldSpec{.Name = "feature_base_radius_ratio", .Type = FT::Float, .Min = 1.0e-12, .Max = 1.0},
+            ConfigFieldSpec{.Name = "hard_dihedral_threshold_degrees", .Type = FT::Float, .Min = 0.0, .Max = 180.0},
+            ConfigFieldSpec{.Name = "patch_complexity_cost", .Type = FT::Float, .Min = 0.0, .Max = 1.0e12},
+        };
+        const std::array kPointCloudConsolidationFields{
+            ConfigFieldSpec{.Name = "backend", .Type = FT::StringEnum, .EnumNames = kConsolidationBackendLabels, .EnumValues = kPointCloudConsolidationBackendTokens},
+            ConfigFieldSpec{.Name = "initial_backend", .Type = FT::StringEnum, .EnumValues = kInitialBackendTokens},
+            ConfigFieldSpec{.Name = "strategy", .Type = FT::StringEnum, .EnumValues = kPointCloudConsolidationStrategyTokens},
+            ConfigFieldSpec{.Name = "support_radius_mode", .Type = FT::StringEnum, .EnumValues = kPointCloudConsolidationSupportRadiusModeTokens},
+            ConfigFieldSpec{.Name = "support_radius", .Type = FT::Float, .Min = 1.0e-12, .Max = 1.0e12},
+            ConfigFieldSpec{.Name = "max_support_neighbors", .Type = FT::UInt, .Min = 1, .Max = 1'000'000},
+            ConfigFieldSpec{.Name = "max_predicted_contributions", .Type = FT::UInt, .Min = 1, .Max = 1'000'000'000'000LL},
+            ConfigFieldSpec{.Name = "repulsion_weight", .Type = FT::Float, .Min = 0.0, .Max = 0.499999999999},
+            ConfigFieldSpec{.Name = "max_iterations", .Type = FT::UInt, .Min = 1, .Max = 4096},
+            ConfigFieldSpec{.Name = "convergence_tolerance", .Type = FT::Float, .Min = 0.0, .Max = 1.0e12},
+            ConfigFieldSpec{.Name = "target_point_count", .Type = FT::UInt, .Description = "Zero or an explicit count of at least two is accepted. One retains the reference value with a warning.", .Min = 0, .Max = 1'000'000},
+            ConfigFieldSpec{.Name = "seed", .Type = FT::UInt, .Min = 0, .Max = std::numeric_limits<std::uint32_t>::max()},
+            ConfigFieldSpec{.Name = "gpu_preview_interval", .Type = FT::UInt, .Min = 1, .Max = 1000000},
+            ConfigFieldSpec{.Name = "gpu_query_batch_size", .Type = FT::UInt, .Min = 1, .Max = 16384},
+            ConfigFieldSpec{.Name = "gpu_radius_capacity", .Type = FT::UInt, .Min = 1, .Max = 1024},
+            ConfigFieldSpec{.Name = "wlop_anisotropic", .Type = FT::Bool},
+            ConfigFieldSpec{.Name = "normal_source", .Type = FT::StringEnum, .EnumValues = kPointCloudConsolidationNormalSourceTokens},
+            ConfigFieldSpec{.Name = "normal_angle_radians", .Type = FT::Float, .Min = 1.0e-6, .Max = std::numbers::pi_v<double> - 1.0e-6},
+            ConfigFieldSpec{.Name = "normal_refinement_rounds", .Type = FT::UInt, .Description = "For EAR or anisotropic WLOP, values above max_iterations fall back to the reference rounds clamped to [1, max_iterations].", .Min = 1, .Max = 4096},
+            ConfigFieldSpec{.Name = "clop_mixture_component_count", .Type = FT::UInt, .Min = 1, .Max = 1'000'000},
+            ConfigFieldSpec{.Name = "clop_mixture_max_iterations", .Type = FT::UInt, .Min = 1, .Max = 4096},
+            ConfigFieldSpec{.Name = "clop_mixture_relative_tolerance", .Type = FT::Float, .Min = 0.0, .Max = 1.0},
+            ConfigFieldSpec{.Name = "clop_covariance_floor", .Type = FT::Float, .Min = 1.0e-18, .Max = 1.0e12},
+            ConfigFieldSpec{.Name = "ear_edge_sensitivity", .Type = FT::Float, .Min = 1.0e-12, .Max = 1.0e6},
+        };
+        const std::array kProgressivePoissonFields{
+            ConfigFieldSpec{.Name = "positions", .Type = FT::PropertyRef, .Description = "Bindings use distinct nonempty NUL-free names and cannot name topology storage or Unknown-domain v:deleted. Output domains must be Unknown or the input domain. Listed domains describe registered defaults; file load may restrict them to a non-default reference domain.", .RefKinds = kVec3Kinds, .RefDomains = kAllDomains, .IntegerRefKinds = true},
+            ConfigFieldSpec{.Name = "level_property", .Type = FT::PropertyRef, .RefKinds = kScalarKinds, .RefDomains = kAllDomains, .IntegerRefKinds = true},
+            ConfigFieldSpec{.Name = "rank_property", .Type = FT::PropertyRef, .RefKinds = kScalarKinds, .RefDomains = kAllDomains, .IntegerRefKinds = true},
+            ConfigFieldSpec{.Name = "splat_radius_property", .Type = FT::PropertyRef, .RefKinds = kScalarKinds, .RefDomains = kAllDomains, .IntegerRefKinds = true},
+            ConfigFieldSpec{.Name = "prefix_visible_property", .Type = FT::PropertyRef, .RefKinds = kScalarKinds, .RefDomains = kAllDomains, .IntegerRefKinds = true},
+            ConfigFieldSpec{.Name = "dimension", .Type = FT::UInt, .Min = 2, .Max = 3},
+            ConfigFieldSpec{.Name = "grid_width", .Type = FT::UInt, .Min = 1, .Max = 4096},
+            ConfigFieldSpec{.Name = "max_levels", .Type = FT::UInt, .Min = 1, .Max = 32},
+            ConfigFieldSpec{.Name = "hash_load_factor", .Type = FT::Float, .Min = 0.01, .Max = 16.0},
+            ConfigFieldSpec{.Name = "radius_alpha", .Type = FT::Float, .Min = -1.0, .Max = 0.999},
+            ConfigFieldSpec{.Name = "randomize_grid_origin", .Type = FT::Bool},
+            ConfigFieldSpec{.Name = "grid_origin_seed", .Type = FT::UInt, .Min = 0, .Max = std::numeric_limits<std::int32_t>::max()},
+            ConfigFieldSpec{.Name = "shuffle_within_levels", .Type = FT::Bool},
+            ConfigFieldSpec{.Name = "shuffle_seed", .Type = FT::UInt, .Min = 0, .Max = std::numeric_limits<std::int32_t>::max()},
+            ConfigFieldSpec{.Name = "prefix_count", .Type = FT::UInt, .Min = 0, .Max = 10'000'000},
+            ConfigFieldSpec{.Name = "channel", .Type = FT::StringEnum, .EnumValues = kProgressivePoissonChannelTokens},
+            ConfigFieldSpec{.Name = "backend", .Type = FT::StringEnum, .EnumValues = kProgressivePoissonBackendTokens},
+            ConfigFieldSpec{.Name = "auto_run_on_edit", .Type = FT::Bool},
+            ConfigFieldSpec{.Name = "debounce_seconds", .Type = FT::Float, .Min = 0.0, .Max = 10.0},
+        };
+        const std::array kParameterizationFields{
+            ConfigFieldSpec{.Name = "positions", .Type = FT::PropertyRef, .Description = "Vertex positions must have a nonempty NUL-free name distinct from texcoords.", .RefKinds = kVec3Kinds, .RefDomains = kVertexDomain, .IntegerRefKinds = true},
+            ConfigFieldSpec{.Name = "texcoords", .Type = FT::PropertyRef, .Description = "Output must have a nonempty NUL-free name distinct from positions and must not replace structural vertex storage.", .RefKinds = kVec2Kinds, .RefDomains = kVertexDomain, .IntegerRefKinds = true},
+            ConfigFieldSpec{.Name = "corner_texcoords_to_retire", .Type = FT::PropertyRef, .Description = "Optional non-structural halfedge vec2 property with a nonempty NUL-free name.", .Nullable = true, .RefKinds = kVec2Kinds, .RefDomains = kHalfedgeDomain, .IntegerRefKinds = true},
+            ConfigFieldSpec{.Name = "strategy", .Type = FT::StringEnum, .EnumValues = kParameterizationStrategyTokens},
+            ConfigFieldSpec{.Name = "lscm", .Type = FT::Object, .Fields = kParameterizationLscmFields.data(), .FieldCount = kParameterizationLscmFields.size()},
+            ConfigFieldSpec{.Name = "harmonic", .Type = FT::Object, .Fields = kParameterizationHarmonicFields.data(), .FieldCount = kParameterizationHarmonicFields.size()},
+            ConfigFieldSpec{.Name = "bff", .Type = FT::Object, .Fields = kParameterizationBffFields.data(), .FieldCount = kParameterizationBffFields.size()},
+            ConfigFieldSpec{.Name = "view", .Type = FT::Object, .Fields = kParameterizationViewFields.data(), .FieldCount = kParameterizationViewFields.size()},
+            ConfigFieldSpec{.Name = "atlas", .Type = FT::Object, .Fields = kParameterizationAtlasFields.data(), .FieldCount = kParameterizationAtlasFields.size()},
+        };
+
+        // Reuse the sampling owner's prefixed specs; both schema and parser share them.
+        const std::vector<ConfigFieldSpec>& ConsolidationFields()
+        {
+            static const auto fields = [] {
+                std::vector<ConfigFieldSpec> result(kPointCloudConsolidationFields.begin(), kPointCloudConsolidationFields.end());
+                const auto sampling = PointSamplingFieldSpecs("initial_");
+                result.insert(result.end(), sampling.begin(), sampling.end());
+                return result;
+            }();
+            return fields;
+        }
 
         struct ValidationContext
         {
@@ -511,7 +801,8 @@ namespace Extrinsic::Runtime
             {
                 return;
             }
-            context.Result->State = Core::Config::EngineConfigState::FallbackApplied;
+            if (context.Result->State != Core::Config::EngineConfigState::Invalid)
+                context.Result->State = Core::Config::EngineConfigState::FallbackApplied;
             context.Result->Diagnostics.push_back(Core::Config::EngineConfigDiagnostic{
                 .State = Core::Config::EngineConfigState::FallbackApplied,
                 .Severity =
@@ -538,17 +829,10 @@ namespace Extrinsic::Runtime
             return it == object.end() ? nullptr : &*it;
         }
 
-        [[nodiscard]] bool Contains(
-            const std::initializer_list<std::string_view> allowed,
-            const std::string_view key) noexcept
-        {
-            return std::find(allowed.begin(), allowed.end(), key) != allowed.end();
-        }
-
         void AddUnknownFieldDiagnostics(
             ValidationContext& context,
             const json& object,
-            const std::initializer_list<std::string_view> allowed)
+            const std::span<const ConfigFieldSpec> fields)
         {
             if (!object.is_object())
             {
@@ -557,7 +841,7 @@ namespace Extrinsic::Runtime
             for (const auto& [key, value] : object.items())
             {
                 (void)value;
-                if (!Contains(allowed, key))
+                if (!FindConfigFieldSpec(fields, key))
                 {
                     AddWarning(
                         context,
@@ -652,8 +936,7 @@ namespace Extrinsic::Runtime
             ValidationContext& context,
             const json& object,
             const std::string_view key,
-            const std::int64_t minValue,
-            const std::int64_t maxValue)
+            const std::span<const ConfigFieldSpec> fields)
         {
             const json* value = FindMember(object, key);
             if (value == nullptr)
@@ -685,7 +968,7 @@ namespace Extrinsic::Runtime
             {
                 number = value->get<std::int64_t>();
             }
-            if (!number.has_value() || *number < minValue || *number > maxValue)
+            if (!number.has_value() || !ConfigDetail::InConfigFieldRange(fields, key, static_cast<double>(*number)))
             {
                 AddWarning(
                     context,
@@ -701,8 +984,7 @@ namespace Extrinsic::Runtime
             ValidationContext& context,
             const json& object,
             const std::string_view key,
-            const double minValue,
-            const double maxValue)
+            const std::span<const ConfigFieldSpec> fields)
         {
             const json* value = FindMember(object, key);
             if (value == nullptr)
@@ -719,7 +1001,7 @@ namespace Extrinsic::Runtime
                 return std::nullopt;
             }
             const double number = value->get<double>();
-            if (!std::isfinite(number) || number < minValue || number > maxValue)
+            if (!ConfigDetail::InConfigFieldRange(fields, key, number))
             {
                 AddWarning(
                     context,
@@ -741,7 +1023,7 @@ namespace Extrinsic::Runtime
             {
                 return std::nullopt;
             }
-            if (!value->is_array() || value->size() != 2u ||
+            if (!value->is_array() || value->size() != kUvPair.MinItems.value() ||
                 !(*value)[0].is_number() || !(*value)[1].is_number())
             {
                 AddWarning(
@@ -754,10 +1036,7 @@ namespace Extrinsic::Runtime
 
             const double u = (*value)[0].get<double>();
             const double v = (*value)[1].get<double>();
-            constexpr double kMaxFloat =
-                static_cast<double>(std::numeric_limits<float>::max());
-            if (!std::isfinite(u) || !std::isfinite(v) ||
-                std::abs(u) > kMaxFloat || std::abs(v) > kMaxFloat)
+            if (!AcceptsConfigFieldNumber(kUvCoordinate, u) || !AcceptsConfigFieldNumber(kUvCoordinate, v))
             {
                 AddWarning(
                     context,
@@ -849,7 +1128,7 @@ namespace Extrinsic::Runtime
             for (std::size_t index = 0; index < value->size(); ++index)
             {
                 const json& element = (*value)[index];
-                if (!element.is_array() || element.size() != 2u ||
+                if (!element.is_array() || element.size() != kUvPair.MinItems.value() ||
                     !element[0].is_number() || !element[1].is_number())
                 {
                     AddWarning(
@@ -862,10 +1141,7 @@ namespace Extrinsic::Runtime
                 }
                 const double u = element[0].get<double>();
                 const double v = element[1].get<double>();
-                constexpr double kMaxFloat =
-                    static_cast<double>(std::numeric_limits<float>::max());
-                if (!std::isfinite(u) || !std::isfinite(v) ||
-                    std::abs(u) > kMaxFloat || std::abs(v) > kMaxFloat)
+                if (!AcceptsConfigFieldNumber(kUvCoordinate, u) || !AcceptsConfigFieldNumber(kUvCoordinate, v))
                 {
                     AddWarning(
                         context,
@@ -934,11 +1210,11 @@ namespace Extrinsic::Runtime
         [[nodiscard]] std::optional<ProgressivePoissonPlaygroundChannel>
         ParseProgressivePoissonChannel(const std::string_view value) noexcept
         {
-            if (value == "Level") return ProgressivePoissonPlaygroundChannel::Level;
-            if (value == "Rank") return ProgressivePoissonPlaygroundChannel::Rank;
-            if (value == "SplatRadius")
+            if (value == kProgressivePoissonChannelTokens[0]) return ProgressivePoissonPlaygroundChannel::Level;
+            if (value == kProgressivePoissonChannelTokens[1]) return ProgressivePoissonPlaygroundChannel::Rank;
+            if (value == kProgressivePoissonChannelTokens[2])
                 return ProgressivePoissonPlaygroundChannel::SplatRadius;
-            if (value == "PrefixVisible")
+            if (value == kProgressivePoissonChannelTokens[3])
                 return ProgressivePoissonPlaygroundChannel::PrefixVisible;
             return std::nullopt;
         }
@@ -946,9 +1222,9 @@ namespace Extrinsic::Runtime
         [[nodiscard]] std::optional<ProgressivePoissonPlaygroundBackend>
         ParseProgressivePoissonBackend(const std::string_view value) noexcept
         {
-            if (value == "CpuReference")
+            if (value == kProgressivePoissonBackendTokens[0])
                 return ProgressivePoissonPlaygroundBackend::CpuReference;
-            if (value == "VulkanCompute")
+            if (value == kProgressivePoissonBackendTokens[1])
                 return ProgressivePoissonPlaygroundBackend::VulkanCompute;
             return std::nullopt;
         }
@@ -956,9 +1232,9 @@ namespace Extrinsic::Runtime
         [[nodiscard]] std::optional<ClusteringBackend>
         ParseClusteringBackend(const std::string_view value) noexcept
         {
-            if (value == "CpuReference")
+            if (value == kClusteringBackendTokens[0])
                 return ClusteringBackend::CpuReference;
-            if (value == "VulkanCompute")
+            if (value == kClusteringBackendTokens[1])
                 return ClusteringBackend::VulkanCompute;
             return std::nullopt;
         }
@@ -967,11 +1243,11 @@ namespace Extrinsic::Runtime
         ParseCurvatureSegmentationSelectionMode(
             const std::string_view value) noexcept
         {
-            if (value == "fixed_count")
+            if (value == kCurvatureSegmentationSelectionModeTokens[0])
             {
                 return CurvatureSegmentationSelectionMode::FixedCount;
             }
-            if (value == "automatic")
+            if (value == kCurvatureSegmentationSelectionModeTokens[1])
             {
                 return CurvatureSegmentationSelectionMode::Automatic;
             }
@@ -982,11 +1258,11 @@ namespace Extrinsic::Runtime
         ParseCurvatureSegmentationMethod(
             const std::string_view value) noexcept
         {
-            if (value == "curvature_gmm")
+            if (value == kCurvatureSegmentationMethodTokens[0])
                 return CurvatureSegmentationMethod::CurvatureGmm;
-            if (value == "feature_aligned_patches")
+            if (value == kCurvatureSegmentationMethodTokens[1])
                 return CurvatureSegmentationMethod::FeatureAlignedPatches;
-            if (value == "feature_boundary_curves_v1")
+            if (value == kCurvatureSegmentationMethodTokens[2])
                 return CurvatureSegmentationMethod::FeatureBoundaryCurves;
             return std::nullopt;
         }
@@ -995,13 +1271,13 @@ namespace Extrinsic::Runtime
         ParsePointCloudConsolidationStrategy(
             const std::string_view value) noexcept
         {
-            if (value == "lop")
+            if (value == kPointCloudConsolidationStrategyTokens[0])
                 return PointCloudConsolidationStrategy::Lop;
-            if (value == "wlop")
+            if (value == kPointCloudConsolidationStrategyTokens[1])
                 return PointCloudConsolidationStrategy::Wlop;
-            if (value == "clop")
+            if (value == kPointCloudConsolidationStrategyTokens[2])
                 return PointCloudConsolidationStrategy::Clop;
-            if (value == "ear")
+            if (value == kPointCloudConsolidationStrategyTokens[3])
                 return PointCloudConsolidationStrategy::Ear;
             return std::nullopt;
         }
@@ -1010,12 +1286,12 @@ namespace Extrinsic::Runtime
         ParsePointCloudConsolidationBackend(
             const std::string_view value) noexcept
         {
-            if (value == "cpu_reference")
+            if (value == kPointCloudConsolidationBackendTokens[0])
                 return PointCloudConsolidationBackend::CpuReference;
-            if (value == "gpu_vulkan_compute")
+            if (value == kPointCloudConsolidationBackendTokens[1])
                 return PointCloudConsolidationBackend::VulkanCompute;
-            if (value == "cpu_lbvh") return PointCloudConsolidationBackend::CpuLBVH;
-            if (value == "vulkan_lbvh") return PointCloudConsolidationBackend::VulkanLBVH;
+            if (value == kPointCloudConsolidationBackendTokens[2]) return PointCloudConsolidationBackend::CpuLBVH;
+            if (value == kPointCloudConsolidationBackendTokens[3]) return PointCloudConsolidationBackend::VulkanLBVH;
             return std::nullopt;
         }
 
@@ -1023,12 +1299,12 @@ namespace Extrinsic::Runtime
         ParsePointCloudConsolidationNormalSource(
             const std::string_view value) noexcept
         {
-            if (value == "authored_or_estimate")
+            if (value == kPointCloudConsolidationNormalSourceTokens[0])
             {
                 return PointCloudConsolidationNormalSource::
                     AuthoredOrEstimate;
             }
-            if (value == "require_authored")
+            if (value == kPointCloudConsolidationNormalSourceTokens[1])
             {
                 return PointCloudConsolidationNormalSource::RequireAuthored;
             }
@@ -1040,9 +1316,9 @@ namespace Extrinsic::Runtime
         ParsePointCloudConsolidationSupportRadiusMode(
             const std::string_view value) noexcept
         {
-            if (value == "auto")
+            if (value == kPointCloudConsolidationSupportRadiusModeTokens[0])
                 return PointCloudConsolidationSupportRadiusMode::Auto;
-            if (value == "manual")
+            if (value == kPointCloudConsolidationSupportRadiusModeTokens[1])
                 return PointCloudConsolidationSupportRadiusMode::Manual;
             return std::nullopt;
         }
@@ -1050,8 +1326,8 @@ namespace Extrinsic::Runtime
         [[nodiscard]] std::optional<KMeansInitialization>
         ParseKMeansInitialization(const std::string_view value) noexcept
         {
-            if (value == "Random") return KMeansInitialization::Random;
-            if (value == "Hierarchical")
+            if (value == kKMeansInitializationTokens[0]) return KMeansInitialization::Random;
+            if (value == kKMeansInitializationTokens[1])
                 return KMeansInitialization::Hierarchical;
             return std::nullopt;
         }
@@ -1060,61 +1336,61 @@ namespace Extrinsic::Runtime
         ParseAtlasMethod(const std::string_view value) noexcept
         {
             using M = Geometry::UvAtlas::UvAtlasMethod;
-            if (value == "fast_staged") return M::FastStaged;
-            if (value == "xatlas") return M::XAtlas;
+            if (value == kAtlasMethodTokens[0]) return M::FastStaged;
+            if (value == kAtlasMethodTokens[1]) return M::XAtlas;
             return std::nullopt;
         }
         [[nodiscard]] std::optional<Geometry::UvAtlas::UvAtlasDistortion>
         ParseAtlasDistortion(const std::string_view value) noexcept
         {
             using D = Geometry::UvAtlas::UvAtlasDistortion;
-            if (value == "none") return D::None;
-            if (value == "angle") return D::Angle;
-            if (value == "area") return D::Area;
-            if (value == "both") return D::Both;
+            if (value == kAtlasDistortionTokens[0]) return D::None;
+            if (value == kAtlasDistortionTokens[1]) return D::Angle;
+            if (value == kAtlasDistortionTokens[2]) return D::Area;
+            if (value == kAtlasDistortionTokens[3]) return D::Both;
             return std::nullopt;
         }
         [[nodiscard]] std::string_view ToConfigString(const Geometry::UvAtlas::UvAtlasMethod value) noexcept
         {
             using M = Geometry::UvAtlas::UvAtlasMethod;
-            switch (value) { case M::FastStaged: return "fast_staged"; case M::XAtlas: return "xatlas"; default: return "invalid"; }
+            switch (value) { case M::FastStaged: return kAtlasMethodTokens[0]; case M::XAtlas: return kAtlasMethodTokens[1]; default: return "invalid"; }
         }
         [[nodiscard]] std::string_view ToConfigString(const Geometry::UvAtlas::UvAtlasDistortion value) noexcept
         {
             using D = Geometry::UvAtlas::UvAtlasDistortion;
-            switch (value) { case D::None: return "none"; case D::Angle: return "angle"; case D::Area: return "area"; case D::Both: return "both"; }
+            switch (value) { case D::None: return kAtlasDistortionTokens[0]; case D::Angle: return kAtlasDistortionTokens[1]; case D::Area: return kAtlasDistortionTokens[2]; case D::Both: return kAtlasDistortionTokens[3]; }
             return "invalid";
         }
 
         [[nodiscard]] std::optional<ParameterizationStrategyKind>
         ParseParameterizationStrategy(const std::string_view value) noexcept
         {
-            if (value == "lscm") return ParameterizationStrategyKind::Lscm;
-            if (value == "harmonic_cotangent")
+            if (value == kParameterizationStrategyTokens[0]) return ParameterizationStrategyKind::Lscm;
+            if (value == kParameterizationStrategyTokens[1])
                 return ParameterizationStrategyKind::HarmonicCotangent;
-            if (value == "tutte_uniform")
+            if (value == kParameterizationStrategyTokens[2])
                 return ParameterizationStrategyKind::TutteUniform;
-            if (value == "bff") return ParameterizationStrategyKind::Bff;
+            if (value == kParameterizationStrategyTokens[3]) return ParameterizationStrategyKind::Bff;
             return std::nullopt;
         }
 
         [[nodiscard]] std::optional<ParameterizationBoundaryPolicy>
         ParseParameterizationBoundaryPolicy(const std::string_view value) noexcept
         {
-            if (value == "circle") return ParameterizationBoundaryPolicy::Circle;
-            if (value == "square") return ParameterizationBoundaryPolicy::Square;
-            if (value == "custom") return ParameterizationBoundaryPolicy::Custom;
+            if (value == kParameterizationBoundaryPolicyTokens[0]) return ParameterizationBoundaryPolicy::Circle;
+            if (value == kParameterizationBoundaryPolicyTokens[1]) return ParameterizationBoundaryPolicy::Square;
+            if (value == kParameterizationBoundaryPolicyTokens[2]) return ParameterizationBoundaryPolicy::Custom;
             return std::nullopt;
         }
 
         [[nodiscard]] std::optional<ParameterizationBffBoundaryMode>
         ParseParameterizationBffBoundaryMode(const std::string_view value) noexcept
         {
-            if (value == "automatic_conformal")
+            if (value == kParameterizationBffBoundaryModeTokens[0])
                 return ParameterizationBffBoundaryMode::AutomaticConformal;
-            if (value == "target_lengths")
+            if (value == kParameterizationBffBoundaryModeTokens[1])
                 return ParameterizationBffBoundaryMode::TargetLengths;
-            if (value == "target_angles")
+            if (value == kParameterizationBffBoundaryModeTokens[2])
                 return ParameterizationBffBoundaryMode::TargetAngles;
             return std::nullopt;
         }
@@ -1122,9 +1398,9 @@ namespace Extrinsic::Runtime
         [[nodiscard]] std::optional<ParameterizationUvRenderMode>
         ParseParameterizationUvRenderMode(const std::string_view value) noexcept
         {
-            if (value == "cpu_layout")
+            if (value == kParameterizationUvRenderModeTokens[0])
                 return ParameterizationUvRenderMode::CpuLayout;
-            if (value == "gpu_shaded")
+            if (value == kParameterizationUvRenderModeTokens[1])
                 return ParameterizationUvRenderMode::GpuShaded;
             return std::nullopt;
         }
@@ -1133,12 +1409,12 @@ namespace Extrinsic::Runtime
         ParseParameterizationUvBackgroundMode(
             const std::string_view value) noexcept
         {
-            if (value == "grid") return ParameterizationUvBackgroundMode::Grid;
-            if (value == "checker")
+            if (value == kParameterizationUvBackgroundModeTokens[0]) return ParameterizationUvBackgroundMode::Grid;
+            if (value == kParameterizationUvBackgroundModeTokens[1])
                 return ParameterizationUvBackgroundMode::Checker;
-            if (value == "texel_density")
+            if (value == kParameterizationUvBackgroundModeTokens[2])
                 return ParameterizationUvBackgroundMode::TexelDensity;
-            if (value == "texture")
+            if (value == kParameterizationUvBackgroundModeTokens[3])
                 return ParameterizationUvBackgroundMode::Texture;
             return std::nullopt;
         }
@@ -1148,14 +1424,14 @@ namespace Extrinsic::Runtime
         {
             switch (value)
             {
-            case ProgressivePoissonPlaygroundChannel::Level: return "Level";
-            case ProgressivePoissonPlaygroundChannel::Rank: return "Rank";
+            case ProgressivePoissonPlaygroundChannel::Level: return kProgressivePoissonChannelTokens[0];
+            case ProgressivePoissonPlaygroundChannel::Rank: return kProgressivePoissonChannelTokens[1];
             case ProgressivePoissonPlaygroundChannel::SplatRadius:
-                return "SplatRadius";
+                return kProgressivePoissonChannelTokens[2];
             case ProgressivePoissonPlaygroundChannel::PrefixVisible:
-                return "PrefixVisible";
+                return kProgressivePoissonChannelTokens[3];
             }
-            return "Level";
+            return kProgressivePoissonChannelTokens[0];
         }
 
         [[nodiscard]] std::string_view ToConfigString(
@@ -1164,11 +1440,11 @@ namespace Extrinsic::Runtime
             switch (value)
             {
             case ProgressivePoissonPlaygroundBackend::CpuReference:
-                return "CpuReference";
+                return kProgressivePoissonBackendTokens[0];
             case ProgressivePoissonPlaygroundBackend::VulkanCompute:
-                return "VulkanCompute";
+                return kProgressivePoissonBackendTokens[1];
             }
-            return "CpuReference";
+            return kProgressivePoissonBackendTokens[0];
         }
 
         [[nodiscard]] std::string_view ToConfigString(
@@ -1176,11 +1452,11 @@ namespace Extrinsic::Runtime
         {
             switch (value)
             {
-            case ClusteringBackend::VulkanCompute: return "VulkanCompute";
+            case ClusteringBackend::VulkanCompute: return kClusteringBackendTokens[1];
             case ClusteringBackend::None:
-            case ClusteringBackend::CpuReference: return "CpuReference";
+            case ClusteringBackend::CpuReference: return kClusteringBackendTokens[0];
             }
-            return "CpuReference";
+            return kClusteringBackendTokens[0];
         }
 
         [[nodiscard]] std::string_view ToConfigString(
@@ -1189,11 +1465,11 @@ namespace Extrinsic::Runtime
             switch (value)
             {
             case CurvatureSegmentationSelectionMode::FixedCount:
-                return "fixed_count";
+                return kCurvatureSegmentationSelectionModeTokens[0];
             case CurvatureSegmentationSelectionMode::Automatic:
-                return "automatic";
+                return kCurvatureSegmentationSelectionModeTokens[1];
             }
-            return "automatic";
+            return kCurvatureSegmentationSelectionModeTokens[1];
         }
 
         [[nodiscard]] std::string_view ToConfigString(
@@ -1202,13 +1478,13 @@ namespace Extrinsic::Runtime
             switch (value)
             {
             case CurvatureSegmentationMethod::CurvatureGmm:
-                return "curvature_gmm";
+                return kCurvatureSegmentationMethodTokens[0];
             case CurvatureSegmentationMethod::FeatureAlignedPatches:
-                return "feature_aligned_patches";
+                return kCurvatureSegmentationMethodTokens[1];
             case CurvatureSegmentationMethod::FeatureBoundaryCurves:
-                return "feature_boundary_curves_v1";
+                return kCurvatureSegmentationMethodTokens[2];
             }
-            return "curvature_gmm";
+            return kCurvatureSegmentationMethodTokens[0];
         }
 
         [[nodiscard]] std::string_view ToConfigString(
@@ -1216,10 +1492,10 @@ namespace Extrinsic::Runtime
         {
             switch (value)
             {
-            case KMeansInitialization::Random: return "Random";
-            case KMeansInitialization::Hierarchical: return "Hierarchical";
+            case KMeansInitialization::Random: return kKMeansInitializationTokens[0];
+            case KMeansInitialization::Hierarchical: return kKMeansInitializationTokens[1];
             }
-            return "Hierarchical";
+            return kKMeansInitializationTokens[1];
         }
 
         [[nodiscard]] std::string_view ToConfigString(
@@ -1251,14 +1527,14 @@ namespace Extrinsic::Runtime
         {
             switch (value)
             {
-            case ParameterizationStrategyKind::Lscm: return "lscm";
+            case ParameterizationStrategyKind::Lscm: return kParameterizationStrategyTokens[0];
             case ParameterizationStrategyKind::HarmonicCotangent:
-                return "harmonic_cotangent";
+                return kParameterizationStrategyTokens[1];
             case ParameterizationStrategyKind::TutteUniform:
-                return "tutte_uniform";
-            case ParameterizationStrategyKind::Bff: return "bff";
+                return kParameterizationStrategyTokens[2];
+            case ParameterizationStrategyKind::Bff: return kParameterizationStrategyTokens[3];
             }
-            return "lscm";
+            return kParameterizationStrategyTokens[0];
         }
 
         [[nodiscard]] std::string_view ToConfigString(
@@ -1266,11 +1542,11 @@ namespace Extrinsic::Runtime
         {
             switch (value)
             {
-            case ParameterizationBoundaryPolicy::Circle: return "circle";
-            case ParameterizationBoundaryPolicy::Square: return "square";
-            case ParameterizationBoundaryPolicy::Custom: return "custom";
+            case ParameterizationBoundaryPolicy::Circle: return kParameterizationBoundaryPolicyTokens[0];
+            case ParameterizationBoundaryPolicy::Square: return kParameterizationBoundaryPolicyTokens[1];
+            case ParameterizationBoundaryPolicy::Custom: return kParameterizationBoundaryPolicyTokens[2];
             }
-            return "circle";
+            return kParameterizationBoundaryPolicyTokens[0];
         }
 
         [[nodiscard]] std::string_view ToConfigString(
@@ -1279,13 +1555,13 @@ namespace Extrinsic::Runtime
             switch (value)
             {
             case ParameterizationBffBoundaryMode::AutomaticConformal:
-                return "automatic_conformal";
+                return kParameterizationBffBoundaryModeTokens[0];
             case ParameterizationBffBoundaryMode::TargetLengths:
-                return "target_lengths";
+                return kParameterizationBffBoundaryModeTokens[1];
             case ParameterizationBffBoundaryMode::TargetAngles:
-                return "target_angles";
+                return kParameterizationBffBoundaryModeTokens[2];
             }
-            return "automatic_conformal";
+            return kParameterizationBffBoundaryModeTokens[0];
         }
 
         [[nodiscard]] std::string_view ToConfigString(
@@ -1293,10 +1569,10 @@ namespace Extrinsic::Runtime
         {
             switch (value)
             {
-            case ParameterizationUvRenderMode::CpuLayout: return "cpu_layout";
-            case ParameterizationUvRenderMode::GpuShaded: return "gpu_shaded";
+            case ParameterizationUvRenderMode::CpuLayout: return kParameterizationUvRenderModeTokens[0];
+            case ParameterizationUvRenderMode::GpuShaded: return kParameterizationUvRenderModeTokens[1];
             }
-            return "cpu_layout";
+            return kParameterizationUvRenderModeTokens[0];
         }
 
         [[nodiscard]] std::string_view ToConfigString(
@@ -1304,13 +1580,13 @@ namespace Extrinsic::Runtime
         {
             switch (value)
             {
-            case ParameterizationUvBackgroundMode::Grid: return "grid";
-            case ParameterizationUvBackgroundMode::Checker: return "checker";
+            case ParameterizationUvBackgroundMode::Grid: return kParameterizationUvBackgroundModeTokens[0];
+            case ParameterizationUvBackgroundMode::Checker: return kParameterizationUvBackgroundModeTokens[1];
             case ParameterizationUvBackgroundMode::TexelDensity:
-                return "texel_density";
-            case ParameterizationUvBackgroundMode::Texture: return "texture";
+                return kParameterizationUvBackgroundModeTokens[2];
+            case ParameterizationUvBackgroundMode::Texture: return kParameterizationUvBackgroundModeTokens[3];
             }
-            return "grid";
+            return kParameterizationUvBackgroundModeTokens[0];
         }
 
         template <typename Enum, typename Parser>
@@ -1399,40 +1675,25 @@ namespace Extrinsic::Runtime
             if (!object.has_value())
                 return config;
 
-            AddUnknownFieldDiagnostics(
-                context,
-                *object,
-                {"cluster_count",
-                 "gpu_preview_interval",
-                 "max_iterations",
-                 "seed",
-                 "initialization",
-                 "backend", "properties"});
-            if (const auto value = ReadInteger(
-                    context, *object, "cluster_count", 1, 1024))
+            AddUnknownFieldDiagnostics(context, *object, kClusteringFields);
+            if (const auto value = ReadInteger(context, *object, "cluster_count", kClusteringFields))
             {
                 config.Parameters.ClusterCount =
                     static_cast<std::uint32_t>(*value);
                 CountParsed(context);
             }
-            if (const auto value = ReadInteger(context, *object, "gpu_preview_interval", 1, 1000000))
+            if (const auto value = ReadInteger(context, *object, "gpu_preview_interval", kClusteringFields))
             {
                 config.Parameters.GpuPreviewInterval = static_cast<std::uint32_t>(*value);
                 CountParsed(context);
             }
-            if (const auto value = ReadInteger(
-                    context, *object, "max_iterations", 1, 4096))
+            if (const auto value = ReadInteger(context, *object, "max_iterations", kClusteringFields))
             {
                 config.Parameters.MaxIterations =
                     static_cast<std::uint32_t>(*value);
                 CountParsed(context);
             }
-            if (const auto value = ReadInteger(
-                    context,
-                    *object,
-                    "seed",
-                    0,
-                    std::numeric_limits<std::uint32_t>::max()))
+            if (const auto value = ReadInteger(context, *object, "seed", kClusteringFields))
             {
                 config.Parameters.Seed =
                     static_cast<std::uint32_t>(*value);
@@ -1496,27 +1757,7 @@ namespace Extrinsic::Runtime
             if (!object.has_value())
                 return config;
 
-            AddUnknownFieldDiagnostics(
-                context,
-                *object,
-                {"features", "positions", "components", "regions", "region_colors", "boundaries", "boundary_colors", "hard_features", "feature_confidence", "boundary_roles", "feature_colors", "method",
-                 "selection_mode",
-                 "fixed_component_count",
-                 "automatic_min_components",
-                 "automatic_max_components",
-                 "automatic_fit_tolerance",
-                 "automatic_complexity_weight",
-                 "max_em_iterations",
-                 "em_relative_tolerance",
-                 "covariance_floor",
-                 "seed",
-                 "spatial_weight",
-                 "feature_sensitivity",
-                 "max_spatial_iterations",
-                 "minimum_region_faces",
-                 "feature_base_radius_ratio",
-                 "hard_dihedral_threshold_degrees",
-                 "patch_complexity_cost"});
+            AddUnknownFieldDiagnostics(context, *object, kCurvatureSegmentationFields);
 
             if (ReadEnum(
                     context,
@@ -1537,143 +1778,87 @@ namespace Extrinsic::Runtime
             {
                 CountParsed(context);
             }
-            if (const auto value = ReadInteger(
-                    context, *object, "fixed_component_count", 1, 1024))
+            if (const auto value = ReadInteger(context, *object, "fixed_component_count", kCurvatureSegmentationFields))
             {
                 config.FixedComponentCount =
                     static_cast<std::uint32_t>(*value);
                 CountParsed(context);
             }
-            if (const auto value = ReadNumber(
-                    context,
-                    *object,
-                    "feature_base_radius_ratio",
-                    1.0e-12,
-                    1.0))
+            if (const auto value = ReadNumber(context, *object, "feature_base_radius_ratio", kCurvatureSegmentationFields))
             {
                 config.FeatureBaseRadiusRatio = *value;
                 CountParsed(context);
             }
-            if (const auto value = ReadNumber(
-                    context,
-                    *object,
-                    "hard_dihedral_threshold_degrees",
-                    0.0,
-                    180.0))
+            if (const auto value = ReadNumber(context, *object, "hard_dihedral_threshold_degrees", kCurvatureSegmentationFields))
             {
                 config.HardDihedralThresholdDegrees = *value;
                 CountParsed(context);
             }
-            if (const auto value = ReadNumber(
-                    context,
-                    *object,
-                    "patch_complexity_cost",
-                    0.0,
-                    1.0e12))
+            if (const auto value = ReadNumber(context, *object, "patch_complexity_cost", kCurvatureSegmentationFields))
             {
                 config.PatchComplexityCost = *value;
                 CountParsed(context);
             }
-            if (const auto value = ReadInteger(
-                    context, *object, "automatic_min_components", 1, 1024))
+            if (const auto value = ReadInteger(context, *object, "automatic_min_components", kCurvatureSegmentationFields))
             {
                 config.AutomaticMinComponents =
                     static_cast<std::uint32_t>(*value);
                 CountParsed(context);
             }
-            if (const auto value = ReadInteger(
-                    context, *object, "automatic_max_components", 1, 1024))
+            if (const auto value = ReadInteger(context, *object, "automatic_max_components", kCurvatureSegmentationFields))
             {
                 config.AutomaticMaxComponents =
                     static_cast<std::uint32_t>(*value);
                 CountParsed(context);
             }
-            if (const auto value = ReadNumber(
-                    context,
-                    *object,
-                    "automatic_fit_tolerance",
-                    1.0e-12,
-                    1.0e12))
+            if (const auto value = ReadNumber(context, *object, "automatic_fit_tolerance", kCurvatureSegmentationFields))
             {
                 config.AutomaticFitTolerance = *value;
                 CountParsed(context);
             }
-            if (const auto value = ReadNumber(
-                    context,
-                    *object,
-                    "automatic_complexity_weight",
-                    0.0,
-                    1.0e12))
+            if (const auto value = ReadNumber(context, *object, "automatic_complexity_weight", kCurvatureSegmentationFields))
             {
                 config.AutomaticComplexityWeight = *value;
                 CountParsed(context);
             }
-            if (const auto value = ReadInteger(
-                    context, *object, "max_em_iterations", 1, 100000))
+            if (const auto value = ReadInteger(context, *object, "max_em_iterations", kCurvatureSegmentationFields))
             {
                 config.MaxEmIterations =
                     static_cast<std::uint32_t>(*value);
                 CountParsed(context);
             }
-            if (const auto value = ReadNumber(
-                    context,
-                    *object,
-                    "em_relative_tolerance",
-                    0.0,
-                    1.0))
+            if (const auto value = ReadNumber(context, *object, "em_relative_tolerance", kCurvatureSegmentationFields))
             {
                 config.EmRelativeTolerance = *value;
                 CountParsed(context);
             }
-            if (const auto value = ReadNumber(
-                    context,
-                    *object,
-                    "covariance_floor",
-                    1.0e-15,
-                    1.0e6))
+            if (const auto value = ReadNumber(context, *object, "covariance_floor", kCurvatureSegmentationFields))
             {
                 config.CovarianceFloor = *value;
                 CountParsed(context);
             }
-            if (const auto value = ReadInteger(
-                    context,
-                    *object,
-                    "seed",
-                    0,
-                    std::numeric_limits<std::uint32_t>::max()))
+            if (const auto value = ReadInteger(context, *object, "seed", kCurvatureSegmentationFields))
             {
                 config.Seed = static_cast<std::uint32_t>(*value);
                 CountParsed(context);
             }
-            if (const auto value = ReadNumber(
-                    context, *object, "spatial_weight", 0.0, 1.0e12))
+            if (const auto value = ReadNumber(context, *object, "spatial_weight", kCurvatureSegmentationFields))
             {
                 config.SpatialWeight = *value;
                 CountParsed(context);
             }
-            if (const auto value = ReadNumber(
-                    context, *object, "feature_sensitivity", 0.0, 1.0e12))
+            if (const auto value = ReadNumber(context, *object, "feature_sensitivity", kCurvatureSegmentationFields))
             {
                 config.FeatureSensitivity = *value;
                 CountParsed(context);
             }
-            if (const auto value = ReadInteger(
-                    context,
-                    *object,
-                    "max_spatial_iterations",
-                    1,
-                    100000))
+            if (const auto value = ReadInteger(context, *object, "max_spatial_iterations", kCurvatureSegmentationFields))
             {
                 config.MaxSpatialIterations =
                     static_cast<std::uint32_t>(*value);
                 CountParsed(context);
             }
-            if (const auto value = ReadInteger(
-                    context,
-                    *object,
-                    "minimum_region_faces",
-                    1,
-                    std::numeric_limits<std::uint32_t>::max()))
+            if (const auto value = ReadInteger(context, *object, "minimum_region_faces", kCurvatureSegmentationFields))
             {
                 config.MinimumRegionFaces =
                     static_cast<std::uint32_t>(*value);
@@ -1696,7 +1881,7 @@ namespace Extrinsic::Runtime
             if (const auto* features = FindMember(*object, "features"))
             {
                 config.Features.clear();
-                if (!features->is_array() || features->size() > 3u)
+                if (!features->is_array() || features->size() > FindConfigFieldSpec(kCurvatureSegmentationFields, "features")->MaxItems.value())
                 {
                     config.Features.emplace_back();
                 }
@@ -1769,33 +1954,7 @@ namespace Extrinsic::Runtime
                 }
             }
 
-            AddUnknownFieldDiagnostics(
-                context,
-                plain,
-                {"backend",
-                 "initial_backend",
-                 "strategy",
-                 "support_radius_mode",
-                 "support_radius",
-                 "max_support_neighbors",
-                 "max_predicted_contributions",
-                 "repulsion_weight",
-                 "max_iterations",
-                 "convergence_tolerance",
-                 "target_point_count",
-                 "seed",
-                 "gpu_preview_interval",
-                 "gpu_query_batch_size",
-                 "gpu_radius_capacity",
-                 "wlop_anisotropic",
-                 "normal_source",
-                 "normal_angle_radians",
-                 "normal_refinement_rounds",
-                 "clop_mixture_component_count",
-                 "clop_mixture_max_iterations",
-                 "clop_mixture_relative_tolerance",
-                 "clop_covariance_floor",
-                 "ear_edge_sensitivity"});
+            AddUnknownFieldDiagnostics(context, plain, kPointCloudConsolidationFields);
 
             if (ReadEnum(
                     context,
@@ -1812,8 +1971,8 @@ namespace Extrinsic::Runtime
                     *object,
                     "initial_backend",
                     [](std::string_view text) -> std::optional<PointSamplingBackend> {
-                        if (text == "cpu") return PointSamplingBackend::Cpu;
-                        if (text == "vulkan") return PointSamplingBackend::Vulkan;
+                        if (text == kInitialBackendTokens[0]) return PointSamplingBackend::Cpu;
+                        if (text == kInitialBackendTokens[1]) return PointSamplingBackend::Vulkan;
                         return std::nullopt;
                     },
                     config.InitialBackend))
@@ -1838,58 +1997,39 @@ namespace Extrinsic::Runtime
             {
                 CountParsed(context);
             }
-            if (const auto value = ReadNumber(
-                    context, *object, "support_radius", 1.0e-12, 1.0e12))
+            if (const auto value = ReadNumber(context, *object, "support_radius", kPointCloudConsolidationFields))
             {
                 config.SupportRadius = *value;
                 CountParsed(context);
             }
-            if (const auto value = ReadInteger(
-                    context,
-                    *object,
-                    "max_support_neighbors",
-                    1,
-                    1'000'000))
+            if (const auto value = ReadInteger(context, *object, "max_support_neighbors", kPointCloudConsolidationFields))
             {
                 config.MaxSupportNeighbors =
                     static_cast<std::uint32_t>(*value);
                 CountParsed(context);
             }
-            if (const auto value = ReadInteger(
-                    context,
-                    *object,
-                    "max_predicted_contributions",
-                    1,
-                    1'000'000'000'000LL))
+            if (const auto value = ReadInteger(context, *object, "max_predicted_contributions", kPointCloudConsolidationFields))
             {
                 config.MaxPredictedContributions =
                     static_cast<std::uint64_t>(*value);
                 CountParsed(context);
             }
-            if (const auto value = ReadNumber(
-                    context, *object, "repulsion_weight", 0.0, 0.499999999999))
+            if (const auto value = ReadNumber(context, *object, "repulsion_weight", kPointCloudConsolidationFields))
             {
                 config.RepulsionWeight = *value;
                 CountParsed(context);
             }
-            if (const auto value = ReadInteger(
-                    context, *object, "max_iterations", 1, 4096))
+            if (const auto value = ReadInteger(context, *object, "max_iterations", kPointCloudConsolidationFields))
             {
                 config.MaxIterations = static_cast<std::uint32_t>(*value);
                 CountParsed(context);
             }
-            if (const auto value = ReadNumber(
-                    context,
-                    *object,
-                    "convergence_tolerance",
-                    0.0,
-                    1.0e12))
+            if (const auto value = ReadNumber(context, *object, "convergence_tolerance", kPointCloudConsolidationFields))
             {
                 config.ConvergenceTolerance = *value;
                 CountParsed(context);
             }
-            if (const auto value = ReadInteger(
-                    context, *object, "target_point_count", 0, 1'000'000))
+            if (const auto value = ReadInteger(context, *object, "target_point_count", kPointCloudConsolidationFields))
             {
                 if (*value == 1)
                 {
@@ -1906,21 +2046,16 @@ namespace Extrinsic::Runtime
                     CountParsed(context);
                 }
             }
-            if (const auto value = ReadInteger(
-                    context,
-                    *object,
-                    "seed",
-                    0,
-                    std::numeric_limits<std::uint32_t>::max()))
+            if (const auto value = ReadInteger(context, *object, "seed", kPointCloudConsolidationFields))
             {
                 config.Seed = static_cast<std::uint32_t>(*value);
                 CountParsed(context);
             }
-            if (const auto value = ReadInteger(context, *object, "gpu_preview_interval", 1, 1000000))
+            if (const auto value = ReadInteger(context, *object, "gpu_preview_interval", kPointCloudConsolidationFields))
             { config.GpuPreviewInterval = static_cast<std::uint32_t>(*value); CountParsed(context); }
-            if (const auto value = ReadInteger(context, *object, "gpu_query_batch_size", 1, 16384))
+            if (const auto value = ReadInteger(context, *object, "gpu_query_batch_size", kPointCloudConsolidationFields))
             { config.GpuQueryBatchSize = static_cast<std::uint32_t>(*value); CountParsed(context); }
-            if (const auto value = ReadInteger(context, *object, "gpu_radius_capacity", 1, 1024))
+            if (const auto value = ReadInteger(context, *object, "gpu_radius_capacity", kPointCloudConsolidationFields))
             { config.GpuRadiusCapacity = static_cast<std::uint32_t>(*value); CountParsed(context); }
             if (const auto value = ReadBool(
                     context, *object, "wlop_anisotropic"))
@@ -1937,75 +2072,40 @@ namespace Extrinsic::Runtime
             {
                 CountParsed(context);
             }
-            if (const auto value = ReadNumber(
-                    context,
-                    *object,
-                    "normal_angle_radians",
-                    1.0e-6,
-                    std::numbers::pi_v<double> - 1.0e-6))
+            if (const auto value = ReadNumber(context, *object, "normal_angle_radians", kPointCloudConsolidationFields))
             {
                 config.NormalAngleRadians = *value;
                 CountParsed(context);
             }
-            if (const auto value = ReadInteger(
-                    context,
-                    *object,
-                    "normal_refinement_rounds",
-                    1,
-                    4096))
+            if (const auto value = ReadInteger(context, *object, "normal_refinement_rounds", kPointCloudConsolidationFields))
             {
                 config.NormalRefinementRounds =
                     static_cast<std::uint32_t>(*value);
                 CountParsed(context);
             }
-            if (const auto value = ReadInteger(
-                    context,
-                    *object,
-                    "clop_mixture_component_count",
-                    1,
-                    1'000'000))
+            if (const auto value = ReadInteger(context, *object, "clop_mixture_component_count", kPointCloudConsolidationFields))
             {
                 config.ClopMixtureComponentCount =
                     static_cast<std::uint32_t>(*value);
                 CountParsed(context);
             }
-            if (const auto value = ReadInteger(
-                    context,
-                    *object,
-                    "clop_mixture_max_iterations",
-                    1,
-                    4096))
+            if (const auto value = ReadInteger(context, *object, "clop_mixture_max_iterations", kPointCloudConsolidationFields))
             {
                 config.ClopMixtureMaxIterations =
                     static_cast<std::uint32_t>(*value);
                 CountParsed(context);
             }
-            if (const auto value = ReadNumber(
-                    context,
-                    *object,
-                    "clop_mixture_relative_tolerance",
-                    0.0,
-                    1.0))
+            if (const auto value = ReadNumber(context, *object, "clop_mixture_relative_tolerance", kPointCloudConsolidationFields))
             {
                 config.ClopMixtureRelativeTolerance = *value;
                 CountParsed(context);
             }
-            if (const auto value = ReadNumber(
-                    context,
-                    *object,
-                    "clop_covariance_floor",
-                    1.0e-18,
-                    1.0e12))
+            if (const auto value = ReadNumber(context, *object, "clop_covariance_floor", kPointCloudConsolidationFields))
             {
                 config.ClopCovarianceFloor = *value;
                 CountParsed(context);
             }
-            if (const auto value = ReadNumber(
-                    context,
-                    *object,
-                    "ear_edge_sensitivity",
-                    1.0e-12,
-                    1.0e6))
+            if (const auto value = ReadNumber(context, *object, "ear_edge_sensitivity", kPointCloudConsolidationFields))
             {
                 config.EarEdgeSensitivity = *value;
                 CountParsed(context);
@@ -2038,49 +2138,33 @@ namespace Extrinsic::Runtime
                 return config;
             }
 
-            AddUnknownFieldDiagnostics(
-                context,
-                *object,
-                {"positions", "level_property", "rank_property", "splat_radius_property", "prefix_visible_property", "dimension",
-                 "grid_width",
-                 "max_levels",
-                 "hash_load_factor",
-                 "radius_alpha",
-                 "randomize_grid_origin",
-                 "grid_origin_seed",
-                 "shuffle_within_levels",
-                 "shuffle_seed",
-                 "prefix_count",
-                 "channel",
-                 "backend",
-                 "auto_run_on_edit",
-                 "debounce_seconds"});
+            AddUnknownFieldDiagnostics(context, *object, kProgressivePoissonFields);
 
-            if (const auto value = ReadInteger(context, *object, "dimension", 2, 3))
+            if (const auto value = ReadInteger(context, *object, "dimension", kProgressivePoissonFields))
             {
                 config.Dimension = static_cast<std::uint32_t>(*value);
                 CountParsed(context);
             }
             if (const auto value =
-                    ReadInteger(context, *object, "grid_width", 1, 4096))
+                    ReadInteger(context, *object, "grid_width", kProgressivePoissonFields))
             {
                 config.GridWidth = static_cast<std::uint32_t>(*value);
                 CountParsed(context);
             }
             if (const auto value =
-                    ReadInteger(context, *object, "max_levels", 1, 32))
+                    ReadInteger(context, *object, "max_levels", kProgressivePoissonFields))
             {
                 config.MaxLevels = static_cast<std::uint32_t>(*value);
                 CountParsed(context);
             }
             if (const auto value =
-                    ReadNumber(context, *object, "hash_load_factor", 0.01, 16.0))
+                    ReadNumber(context, *object, "hash_load_factor", kProgressivePoissonFields))
             {
                 config.HashLoadFactor = *value;
                 CountParsed(context);
             }
             if (const auto value =
-                    ReadNumber(context, *object, "radius_alpha", -1.0, 0.999))
+                    ReadNumber(context, *object, "radius_alpha", kProgressivePoissonFields))
             {
                 config.RadiusAlpha = *value;
                 CountParsed(context);
@@ -2091,12 +2175,7 @@ namespace Extrinsic::Runtime
                 config.RandomizeGridOrigin = *value;
                 CountParsed(context);
             }
-            if (const auto value = ReadInteger(
-                    context,
-                    *object,
-                    "grid_origin_seed",
-                    0,
-                    std::numeric_limits<std::int32_t>::max()))
+            if (const auto value = ReadInteger(context, *object, "grid_origin_seed", kProgressivePoissonFields))
             {
                 config.GridOriginSeed = static_cast<std::uint32_t>(*value);
                 CountParsed(context);
@@ -2107,18 +2186,12 @@ namespace Extrinsic::Runtime
                 config.ShuffleWithinLevels = *value;
                 CountParsed(context);
             }
-            if (const auto value = ReadInteger(
-                    context,
-                    *object,
-                    "shuffle_seed",
-                    0,
-                    std::numeric_limits<std::int32_t>::max()))
+            if (const auto value = ReadInteger(context, *object, "shuffle_seed", kProgressivePoissonFields))
             {
                 config.ShuffleSeed = static_cast<std::uint32_t>(*value);
                 CountParsed(context);
             }
-            if (const auto value = ReadInteger(
-                    context, *object, "prefix_count", 0, 10'000'000))
+            if (const auto value = ReadInteger(context, *object, "prefix_count", kProgressivePoissonFields))
             {
                 config.PrefixCount = static_cast<std::uint32_t>(*value);
                 CountParsed(context);
@@ -2147,8 +2220,7 @@ namespace Extrinsic::Runtime
                 config.AutoRunOnEdit = *value;
                 CountParsed(context);
             }
-            if (const auto value = ReadNumber(
-                    context, *object, "debounce_seconds", 0.0, 10.0))
+            if (const auto value = ReadNumber(context, *object, "debounce_seconds", kProgressivePoissonFields))
             {
                 config.DebounceSeconds = *value;
                 CountParsed(context);
@@ -2178,10 +2250,7 @@ namespace Extrinsic::Runtime
                 return config;
             }
 
-            AddUnknownFieldDiagnostics(
-                context,
-                *object,
-                {"positions", "texcoords", "corner_texcoords_to_retire", "strategy", "lscm", "harmonic", "bff", "view", "atlas"});
+            AddUnknownFieldDiagnostics(context, *object, kParameterizationFields);
             const ParameterizationLscmConfig referenceLscm = config.Lscm;
             const ParameterizationBffConfig referenceBff = config.Bff;
 
@@ -2208,12 +2277,7 @@ namespace Extrinsic::Runtime
                 }
                 else
                 {
-                    AddUnknownFieldDiagnostics(
-                        viewContext,
-                        *view,
-                        {"render_mode",
-                         "background_mode",
-                         "show_distortion_heatmap", "split_enabled", "atlas_on_left", "split_ratio"});
+                    AddUnknownFieldDiagnostics(viewContext, *view, kParameterizationViewFields);
                     if (ReadEnum(
                             viewContext,
                             *view,
@@ -2240,7 +2304,7 @@ namespace Extrinsic::Runtime
                     }
                     if (const auto value = ReadBool(viewContext, *view, "split_enabled")) config.View.SplitEnabled = *value;
                     if (const auto value = ReadBool(viewContext, *view, "atlas_on_left")) config.View.AtlasOnLeft = *value;
-                    if (const auto value = ReadNumber(viewContext, *view, "split_ratio", 0.2, static_cast<double>(0.8f)))
+                    if (const auto value = ReadNumber(viewContext, *view, "split_ratio", kParameterizationViewFields))
                         config.View.SplitRatio = static_cast<float>(*value);
                     else if (FindMember(*view, "split_ratio") && context.Result)
                     {
@@ -2267,36 +2331,33 @@ namespace Extrinsic::Runtime
                 if (!atlas->is_object()) invalid("Atlas configuration must be an object.");
                 else
                 {
-                    AddUnknownFieldDiagnostics(atlasContext, *atlas,
-                        {"method", "distortion", "guide", "region_count", "resolution", "padding",
-                         "texels_per_unit", "max_conformal_distortion", "max_area_distortion",
-                         "max_charts", "max_iterations", "allow_xatlas_fallback"});
+                    AddUnknownFieldDiagnostics(atlasContext, *atlas, kParameterizationAtlasFields);
                     if (FindMember(*atlas, "method") && !ReadEnum(atlasContext, *atlas, "method", ParseAtlasMethod, config.Atlas.Method))
                         invalid("Atlas method must be fast_staged or xatlas.");
                     if (FindMember(*atlas, "distortion") && !ReadEnum(atlasContext, *atlas, "distortion", ParseAtlasDistortion, config.Atlas.Distortion))
                         invalid("Atlas distortion must be none, angle, area or both.");
-                    const auto integer = [&](const char* key, std::uint32_t& target, const std::int64_t minimum, const std::int64_t maximum)
+                    const auto integer = [&](const char* key, std::uint32_t& target)
                     {
                         if (!FindMember(*atlas, key)) return;
-                        if (const auto value = ReadInteger(atlasContext, *atlas, key, minimum, maximum))
+                        if (const auto value = ReadInteger(atlasContext, *atlas, key, kParameterizationAtlasFields))
                         { target = static_cast<std::uint32_t>(*value); CountParsed(atlasContext); }
                         else invalid(std::string{"Invalid atlas "} + key + ".");
                     };
-                    integer("region_count", config.Atlas.RegionCount, 0, 64);
-                    integer("resolution", config.Atlas.Resolution, 16, 16384);
-                    integer("padding", config.Atlas.Padding, 0, 32);
-                    integer("max_charts", config.Atlas.MaxCharts, 1, 1000000);
-                    integer("max_iterations", config.Atlas.MaxIterations, 1, 1000);
-                    const auto number = [&](const char* key, auto& target, const double minimum, const double maximum)
+                    integer("region_count", config.Atlas.RegionCount);
+                    integer("resolution", config.Atlas.Resolution);
+                    integer("padding", config.Atlas.Padding);
+                    integer("max_charts", config.Atlas.MaxCharts);
+                    integer("max_iterations", config.Atlas.MaxIterations);
+                    const auto number = [&](const char* key, auto& target)
                     {
                         if (!FindMember(*atlas, key)) return;
-                        if (const auto value = ReadNumber(atlasContext, *atlas, key, minimum, maximum))
+                        if (const auto value = ReadNumber(atlasContext, *atlas, key, kParameterizationAtlasFields))
                         { target = static_cast<std::remove_reference_t<decltype(target)>>(*value); CountParsed(atlasContext); }
                         else invalid(std::string{"Invalid atlas "} + key + ".");
                     };
-                    number("texels_per_unit", config.Atlas.TexelsPerUnit, 0.0, 1.0e12);
-                    number("max_conformal_distortion", config.Atlas.MaxConformalDistortion, 1.0, 1.0e6);
-                    number("max_area_distortion", config.Atlas.MaxAreaDistortion, 1.0, 1.0e6);
+                    number("texels_per_unit", config.Atlas.TexelsPerUnit);
+                    number("max_conformal_distortion", config.Atlas.MaxConformalDistortion);
+                    number("max_area_distortion", config.Atlas.MaxAreaDistortion);
                     if (FindMember(*atlas, "allow_xatlas_fallback"))
                     {
                         if (const auto value = ReadBool(atlasContext, *atlas, "allow_xatlas_fallback"))
@@ -2330,39 +2391,20 @@ namespace Extrinsic::Runtime
                 }
                 else
                 {
-                    AddUnknownFieldDiagnostics(
-                        lscmContext,
-                        *lscm,
-                        {"auto_pins",
-                         "pin_vertex_0",
-                         "pin_vertex_1",
-                         "pin_uv_0",
-                         "pin_uv_1",
-                         "solver_tolerance",
-                         "max_solver_iterations"});
+                    AddUnknownFieldDiagnostics(lscmContext, *lscm, kParameterizationLscmFields);
                     if (const auto value =
                             ReadBool(lscmContext, *lscm, "auto_pins"))
                     {
                         config.Lscm.AutoPins = *value;
                         CountParsed(lscmContext);
                     }
-                    if (const auto value = ReadInteger(
-                            lscmContext,
-                            *lscm,
-                            "pin_vertex_0",
-                            0,
-                            std::numeric_limits<std::uint32_t>::max()))
+                    if (const auto value = ReadInteger(lscmContext, *lscm, "pin_vertex_0", kParameterizationLscmFields))
                     {
                         config.Lscm.PinVertex0 =
                             static_cast<std::uint32_t>(*value);
                         CountParsed(lscmContext);
                     }
-                    if (const auto value = ReadInteger(
-                            lscmContext,
-                            *lscm,
-                            "pin_vertex_1",
-                            0,
-                            std::numeric_limits<std::uint32_t>::max()))
+                    if (const auto value = ReadInteger(lscmContext, *lscm, "pin_vertex_1", kParameterizationLscmFields))
                     {
                         config.Lscm.PinVertex1 =
                             static_cast<std::uint32_t>(*value);
@@ -2380,22 +2422,12 @@ namespace Extrinsic::Runtime
                         config.Lscm.PinUv1 = *value;
                         CountParsed(lscmContext);
                     }
-                    if (const auto value = ReadNumber(
-                            lscmContext,
-                            *lscm,
-                            "solver_tolerance",
-                            std::numeric_limits<double>::min(),
-                            1.0e30))
+                    if (const auto value = ReadNumber(lscmContext, *lscm, "solver_tolerance", kParameterizationLscmFields))
                     {
                         config.Lscm.SolverTolerance = *value;
                         CountParsed(lscmContext);
                     }
-                    if (const auto value = ReadInteger(
-                            lscmContext,
-                            *lscm,
-                            "max_solver_iterations",
-                            1,
-                            std::numeric_limits<std::uint32_t>::max()))
+                    if (const auto value = ReadInteger(lscmContext, *lscm, "max_solver_iterations", kParameterizationLscmFields))
                     {
                         config.Lscm.MaxSolverIterations =
                             static_cast<std::uint32_t>(*value);
@@ -2419,14 +2451,7 @@ namespace Extrinsic::Runtime
                 }
                 else
                 {
-                    AddUnknownFieldDiagnostics(
-                        harmonicContext,
-                        *harmonic,
-                        {"boundary",
-                         "arc_length_spacing",
-                         "clamp_non_convex_weights",
-                         "pinned_vertices",
-                         "pinned_uvs"});
+                    AddUnknownFieldDiagnostics(harmonicContext, *harmonic, kParameterizationHarmonicFields);
                     if (ReadEnum(
                             harmonicContext,
                             *harmonic,
@@ -2501,13 +2526,7 @@ namespace Extrinsic::Runtime
                 }
                 else
                 {
-                    AddUnknownFieldDiagnostics(
-                        bffContext,
-                        *bff,
-                        {"mode",
-                         "boundary_data",
-                         "angle_sum_tolerance",
-                         "degeneracy_tolerance"});
+                    AddUnknownFieldDiagnostics(bffContext, *bff, kParameterizationBffFields);
                     if (ReadEnum(
                             bffContext,
                             *bff,
@@ -2523,22 +2542,12 @@ namespace Extrinsic::Runtime
                         config.Bff.BoundaryData = *value;
                         CountParsed(bffContext);
                     }
-                    if (const auto value = ReadNumber(
-                            bffContext,
-                            *bff,
-                            "angle_sum_tolerance",
-                            std::numeric_limits<double>::min(),
-                            1.0e30))
+                    if (const auto value = ReadNumber(bffContext, *bff, "angle_sum_tolerance", kParameterizationBffFields))
                     {
                         config.Bff.AngleSumTolerance = *value;
                         CountParsed(bffContext);
                     }
-                    if (const auto value = ReadNumber(
-                            bffContext,
-                            *bff,
-                            "degeneracy_tolerance",
-                            std::numeric_limits<double>::min(),
-                            1.0e30))
+                    if (const auto value = ReadNumber(bffContext, *bff, "degeneracy_tolerance", kParameterizationBffFields))
                     {
                         config.Bff.DegeneracyTolerance = *value;
                         CountParsed(bffContext);
@@ -2867,15 +2876,18 @@ namespace Extrinsic::Runtime
             return "Select none, angle, area or both distortion objectives.";
         if (config.Method == M::XAtlas && config.Distortion != D::Angle)
             return "XAtlas supports the angle objective; select fast_staged for none, area or both.";
-        if (config.Resolution < 16u || config.Resolution > 16384u || config.Padding > 32u ||
+        if (!ConfigDetail::InConfigFieldRange(kParameterizationAtlasFields, "resolution", config.Resolution) ||
+            !ConfigDetail::InConfigFieldRange(kParameterizationAtlasFields, "padding", config.Padding) ||
             config.Padding * 2u + 1u >= config.Resolution)
             return "Atlas resolution must be 16..16384 with at most 32 padding texels and usable interior space.";
-        if (!std::isfinite(config.TexelsPerUnit) || config.TexelsPerUnit < 0.0f || config.TexelsPerUnit > 1.0e12f)
+        if (!ConfigDetail::InConfigFieldRange(kParameterizationAtlasFields, "texels_per_unit", config.TexelsPerUnit))
             return "Atlas texel density must be finite and non-negative.";
-        if (!std::isfinite(config.MaxConformalDistortion) || config.MaxConformalDistortion < 1.0 || config.MaxConformalDistortion > 1.0e6 ||
-            !std::isfinite(config.MaxAreaDistortion) || config.MaxAreaDistortion < 1.0 || config.MaxAreaDistortion > 1.0e6)
+        if (!ConfigDetail::InConfigFieldRange(kParameterizationAtlasFields, "max_conformal_distortion", config.MaxConformalDistortion) ||
+            !ConfigDetail::InConfigFieldRange(kParameterizationAtlasFields, "max_area_distortion", config.MaxAreaDistortion))
             return "Atlas distortion limits must be finite and at least one (at most 1e6).";
-        if (config.MaxCharts == 0u || config.MaxCharts > 1000000u || config.MaxIterations == 0u || config.MaxIterations > 1000u || config.RegionCount > 64u)
+        if (!ConfigDetail::InConfigFieldRange(kParameterizationAtlasFields, "max_charts", config.MaxCharts) ||
+            !ConfigDetail::InConfigFieldRange(kParameterizationAtlasFields, "max_iterations", config.MaxIterations) ||
+            !ConfigDetail::InConfigFieldRange(kParameterizationAtlasFields, "region_count", config.RegionCount))
             return "Atlas budgets require 1..1000000 charts, 1..1000 iterations and 0..64 guide components (zero selects automatically).";
         if (config.Guide)
         {
@@ -3292,6 +3304,9 @@ namespace Extrinsic::Runtime
             kClusteringConfigSectionSchemaVersion,
             SerializeClusteringConfig(ClusteringConfig{}),
             ValidateClusteringConfigSection,
+            ConfigDetail::BuildSectionSchemaJson(kClusteringConfigSectionSchemaId, "Clustering",
+                "Fields omitted or invalid retain the reference where supported; binding and cross-field rules remain authoritative.",
+                kClusteringFields, ConfigDetail::ParseConfigJson(SerializeClusteringConfig(ClusteringConfig{}), true)),
             std::move(onChanged));
     }
 
@@ -3306,6 +3321,9 @@ namespace Extrinsic::Runtime
             SerializeCurvatureSegmentationConfig(
                 CurvatureSegmentationConfig{}),
             ValidateCurvatureSegmentationConfigSection,
+            ConfigDetail::BuildSectionSchemaJson(kCurvatureSegmentationConfigSectionSchemaId, "CurvatureSegmentation",
+                "Fields omitted or invalid retain the reference where supported; binding and cross-field rules remain authoritative.",
+                kCurvatureSegmentationFields, ConfigDetail::ParseConfigJson(SerializeCurvatureSegmentationConfig(CurvatureSegmentationConfig{}), true)),
             std::move(onChanged));
     }
 
@@ -3320,6 +3338,9 @@ namespace Extrinsic::Runtime
             SerializeProgressivePoissonPlaygroundConfig(
                 ProgressivePoissonPlaygroundConfig{}),
             ValidateProgressivePoissonConfigSection,
+            ConfigDetail::BuildSectionSchemaJson(kProgressivePoissonConfigSectionSchemaId, "ProgressivePoisson",
+                "Fields omitted or invalid retain the reference where supported; binding and cross-field rules remain authoritative.",
+                kProgressivePoissonFields, ConfigDetail::ParseConfigJson(SerializeProgressivePoissonPlaygroundConfig(ProgressivePoissonPlaygroundConfig{}), true)),
             std::move(onChanged));
     }
 
@@ -3336,8 +3357,14 @@ namespace Extrinsic::Runtime
             kParameterizationConfigSectionSchemaVersion,
             SerializeParameterizationConfig(defaults),
             ValidateParameterizationConfigSection,
+            ConfigDetail::BuildSectionSchemaJson(kParameterizationConfigSectionSchemaId, "Parameterization",
+                "Fields omitted or invalid retain the reference where supported; binding and cross-field rules remain authoritative.",
+                kParameterizationFields, ConfigDetail::ParseConfigJson(SerializeParameterizationConfig(defaults), true)),
             std::move(onChanged));
     }
+
+    std::span<const ConfigFieldSpec> PointCloudConsolidationConfigFieldSpecs() noexcept
+    { return ConsolidationFields(); }
 
     Core::Config::EngineConfigSectionRegistration
     MakePointCloudConsolidationConfigSectionRegistration(
@@ -3350,6 +3377,9 @@ namespace Extrinsic::Runtime
             SerializePointCloudConsolidationConfig(
                 PointCloudConsolidationConfig{}),
             ValidatePointCloudConsolidationConfigSection,
+            ConfigDetail::BuildSectionSchemaJson(kPointCloudConsolidationConfigSectionSchemaId, "PointCloudConsolidation",
+                "Fields omitted or invalid retain the reference where supported; binding and cross-field rules remain authoritative.",
+                ConsolidationFields(), ConfigDetail::ParseConfigJson(SerializePointCloudConsolidationConfig(PointCloudConsolidationConfig{}), true)),
             std::move(onChanged));
     }
 }

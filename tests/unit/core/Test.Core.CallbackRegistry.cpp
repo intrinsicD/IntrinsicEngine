@@ -195,6 +195,7 @@ TEST(CoreCallbackRegistry, ConcurrentInvokeAndReregisterIsSafe)
     ExpectedLoader reg;
     std::atomic<bool> stop{false};
  
+    std::atomic<bool> readerStarted{false};
     auto tk = reg.Register([](std::string_view s) -> std::expected<int, FakeError>
     {
         return static_cast<int>(s.size());
@@ -203,23 +204,27 @@ TEST(CoreCallbackRegistry, ConcurrentInvokeAndReregisterIsSafe)
     // Reader thread: spin invoking. Stale tokens return the sentinel - that's
     // fine. What must not happen is a crash, a data race, or an invocation
     // of the wrong callable after unregister/re-register.
-    std::thread reader([&] {
+    const auto original = tk;
+    std::thread reader([&, original] {
         while (!stop.load(std::memory_order_relaxed))
         {
-            auto r = reg.InvokeOr(tk, FakeError::Missing, std::string_view{"abcd"});
+            auto r = reg.InvokeOr(original, FakeError::Missing, std::string_view{"abcd"});
             if (r.has_value())
             {
                 EXPECT_EQ(*r, 4);
             }
+            readerStarted.store(true, std::memory_order_release);
         }
     });
  
+    while (!readerStarted.load(std::memory_order_acquire))
+        std::this_thread::yield();
     for (int i = 0; i < 500; ++i)
     {
         (void)reg.Unregister(tk);
-        tk = reg.Register([](std::string_view s) -> std::expected<int, FakeError>
+        tk = reg.Register([](std::string_view) -> std::expected<int, FakeError>
         {
-            return static_cast<int>(s.size());
+            return -17;
         });
     }
  

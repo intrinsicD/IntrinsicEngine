@@ -296,10 +296,12 @@ namespace Extrinsic::Runtime
                 if (!CanApplyGeometryScalarProperty(*props, c.Mask, target.Mask) ||
                     !CanApplyGeometryScalarProperty(*props, c.Score, target.Score))
                     return EditorCommandHistoryStatus::InvalidCommand;
+                const auto historyBefore = *revisions;
                 (void)ApplyGeometryScalarProperty(*props, c.Mask, target.Mask);
                 (void)ApplyGeometryScalarProperty(*props, c.Score, target.Score);
                 const auto a=BuildGeometryAvailability(context.Scene->Raw(),entity);
                 *revisions={ObserveGeometryProperty(a,c.Mask.Domain,c.Mask.Name),ObserveGeometryProperty(a,c.Score.Domain,c.Score.Name)};
+                GeometryProcessingDetail::RebasePointPropertyHistory(context, entity, historyBefore);
                 RestoreStamp(context,entity,target.Stamp,false,&c.Mask);
                 if (context.InvalidateWorkspaceSnapshotCache) context.InvalidateWorkspaceSnapshotCache();
                 return EditorCommandHistoryStatus::Applied;
@@ -648,7 +650,6 @@ namespace Extrinsic::Runtime
         JobDesc desc{
             .DebugName = "Outlier estimation",
             .Scope = context.World,
-            .Kind = RuntimeTaskKinds::GeometryProcess,
             .Work = [w](const JobCancellation &) -> JobResultEnvelope {
                 Compute(*w);
                 return JobResultEnvelope::Make(true);

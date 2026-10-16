@@ -245,46 +245,48 @@ namespace Geometry::KMeans
 
         std::vector<glm::dvec3> sums(k, glm::dvec3(0.0));
         std::vector<uint32_t> counts(k, 0u);
-        std::vector<uint32_t> nextLabels(points.size(), 0u);
+
+        auto assign = [&](bool accumulate) -> std::optional<bool>
+        {
+            static_cast<void>(RebuildCentroidTree(result.Centroids, cpuScratch));
+            result.Inertia = 0.0f;
+            float maxDistance = -1.0f;
+            bool changed = false;
+            for (std::size_t i = 0; i < points.size(); ++i)
+            {
+                const auto assignment = FindNearestCentroid(points[i], result.Centroids, cpuScratch);
+                if (!assignment) return std::nullopt;
+                const auto [cluster, distance] = *assignment;
+                changed |= result.Labels[i] != cluster;
+                result.Labels[i] = cluster;
+                result.SquaredDistances[i] = distance;
+                result.Inertia += distance;
+                if (distance > maxDistance)
+                {
+                    maxDistance = distance;
+                    result.MaxDistanceIndex = static_cast<uint32_t>(i);
+                }
+                if (accumulate)
+                {
+                    sums[cluster] += glm::dvec3(points[i]);
+                    ++counts[cluster];
+                }
+            }
+            return changed;
+        };
 
         const float tol2 = params.ConvergenceTolerance * params.ConvergenceTolerance;
-        bool anyLabelChanged = true;
-
+        bool finalCentroidsChanged = false;
         for (uint32_t iter = 0; iter < params.MaxIterations; ++iter)
         {
             std::fill(sums.begin(), sums.end(), glm::dvec3(0.0));
             std::fill(counts.begin(), counts.end(), 0u);
-            static_cast<void>(RebuildCentroidTree(result.Centroids, cpuScratch));
-
-            float inertia = 0.0f;
-            float maxDistance = -1.0f;
-            uint32_t maxDistanceIndex = 0;
-            anyLabelChanged = false;
-
-            for (std::size_t i = 0; i < points.size(); ++i)
-            {
-                const auto assignment = FindNearestCentroid(points[i], result.Centroids, cpuScratch);
-                if (!assignment)
-                    return std::nullopt;
-
-                const auto [bestCluster, bestDistance] = *assignment;
-                nextLabels[i] = bestCluster;
-                result.SquaredDistances[i] = bestDistance;
-                sums[bestCluster] += glm::dvec3(points[i]);
-                ++counts[bestCluster];
-                inertia += bestDistance;
-
-                if (bestDistance > maxDistance)
-                {
-                    maxDistance = bestDistance;
-                    maxDistanceIndex = static_cast<uint32_t>(i);
-                }
-
-                if (nextLabels[i] != result.Labels[i])
-                    anyLabelChanged = true;
-            }
+            const auto changed = assign(true);
+            if (!changed) return std::nullopt;
+            const bool anyLabelChanged = iter == 0 || *changed;
 
             float maxShift = 0.0f;
+            finalCentroidsChanged = false;
             for (uint32_t c = 0; c < k; ++c)
             {
                 glm::vec3 nextCentroid = result.Centroids[c];
@@ -294,17 +296,15 @@ namespace Geometry::KMeans
                 }
                 else
                 {
-                    nextCentroid = points[maxDistanceIndex];
+                    nextCentroid = points[result.MaxDistanceIndex];
                 }
 
+                finalCentroidsChanged |= result.Centroids[c] != nextCentroid;
                 maxShift = std::max(maxShift, SquaredDistance(result.Centroids[c], nextCentroid));
                 result.Centroids[c] = nextCentroid;
             }
 
             result.Iterations = iter + 1;
-            result.Inertia = inertia;
-            result.MaxDistanceIndex = maxDistanceIndex;
-            result.Labels = nextLabels;
             if (onIteration)
                 onIteration(iter + 1, params.MaxIterations);
 
@@ -315,6 +315,7 @@ namespace Geometry::KMeans
             }
         }
 
+        if (finalCentroidsChanged && !assign(false)) return std::nullopt;
         return result;
     }
 

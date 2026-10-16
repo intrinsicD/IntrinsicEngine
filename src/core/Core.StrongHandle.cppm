@@ -1,3 +1,4 @@
+// Type-tagged generational handles and hashes for opaque resource references.
 module;
 
 #include <cstdint>

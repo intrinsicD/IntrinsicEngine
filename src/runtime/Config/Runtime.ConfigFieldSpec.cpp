@@ -21,11 +21,12 @@ namespace Extrinsic::Runtime
 
     std::string DescribeConfigFieldRange(const ConfigFieldSpec& field)
     {
-        if (field.Type == ConfigFieldType::Enum)
+        if (field.Type == ConfigFieldType::Enum || field.Type == ConfigFieldType::StringEnum)
         {
+            const auto values = field.Type == ConfigFieldType::StringEnum ? field.EnumValues : field.EnumNames;
             std::string text = "one of: ";
-            for (std::size_t i = 0; i < field.EnumNames.size(); ++i)
-                text += (i ? ", " : "") + std::string(field.EnumNames[i]);
+            for (std::size_t i = 0; i < values.size(); ++i)
+                text += (i ? ", " : "") + std::string(values[i]);
             return text;
         }
         if (field.Type == ConfigFieldType::String)
@@ -47,7 +48,14 @@ namespace Extrinsic::Runtime
         if (!(value - value == 0.0)) return false; // NaN or infinity
         if (field.Min && (field.ExclusiveMin ? value <= *field.Min : value < *field.Min)) return false;
         if (field.Max && (field.ExclusiveMax ? value >= *field.Max : value > *field.Max)) return false;
+        if (field.Type == ConfigFieldType::Enum &&
+            (value < field.Min.value_or(0.0) || value >= field.Min.value_or(0.0) + field.EnumNames.size())) return false;
         return true;
+    }
+
+    bool AcceptsConfigFieldToken(const ConfigFieldSpec& field, const std::string_view value) noexcept
+    {
+        return std::ranges::find(field.EnumValues, value) != field.EnumValues.end();
     }
 
     double ClampToConfigFieldRange(const ConfigFieldSpec& field, double value) noexcept

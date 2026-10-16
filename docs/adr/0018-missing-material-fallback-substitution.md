@@ -106,5 +106,4 @@ Follow-up tasks required: none from this ADR. Any future per-record reason-tag g
 
 - [`tasks/done/GRAPHICS-031`](../../tasks/archive/GRAPHICS-031-default-debug-surface-material.md) records the parent planning contract for both [ADR-0017](0017-default-debug-surface-material.md) and this ADR.
 - [`tasks/done/GRAPHICS-031B`](../../tasks/archive/GRAPHICS-031B-default-debug-surface-substitution-and-diagnostics.md) records the substitution + diagnostics implementation captured in §§1–4.
-- `src/graphics/renderer/README.md` carries the matching `MaterialSystem` substitution behavior bullet, including the three-counter shape.
 - The default CPU correctness gate (`ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`) exercises the snapshot span-copy substitution, the three counter sites, and the runtime-agnostic property (the same sentinel description triggers identical substitution + counter behavior) without requiring a Vulkan device.

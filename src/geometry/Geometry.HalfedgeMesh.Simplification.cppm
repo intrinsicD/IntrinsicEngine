@@ -1,3 +1,4 @@
+// Quadric-based halfedge-mesh simplification with configurable collapse and feature constraints.
 module;
 
 #include <cstddef>

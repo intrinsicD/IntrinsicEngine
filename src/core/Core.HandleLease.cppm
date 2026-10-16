@@ -1,3 +1,4 @@
+// Move-only ownership leases for manager-retained opaque handles.
 module;
 
 #include <concepts>

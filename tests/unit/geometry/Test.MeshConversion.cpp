@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -75,6 +77,7 @@ TEST(MeshConversion, ConvertsHalfedgeMeshToIndexedSoupAndBack)
     const auto soupResult = Geometry::Mesh::Conversion::ToIndexedMesh(mesh);
 
     ASSERT_TRUE(soupResult.Succeeded());
+    EXPECT_TRUE(soupResult.Diagnostics.empty());
     EXPECT_EQ(soupResult.Mesh.VertexCount(), 4u);
     EXPECT_EQ(soupResult.Mesh.FaceCount(), 1u);
     ASSERT_EQ(soupResult.Mesh.Face(0u).Indices.size(), 4u);
@@ -144,4 +147,60 @@ TEST(MeshConversion, ReusesValidationContextAndPreservesZeroAreaRenderTopology)
     EXPECT_EQ(converted.Mesh.FaceCount(), 1u);
     EXPECT_EQ(context.Result().Count(ValidationDiagnosticKind::DegenerateFace), 1u);
     EXPECT_EQ(context.Result().CornerCount, 3u);
+}
+
+
+TEST(MeshConversion, SubviewConvertsOnlyVisibleAbsoluteRanges)
+{
+    Geometry::HalfedgeMesh::Mesh mesh;
+    for (const float x : {0.f, 10.f})
+    {
+        const auto a = mesh.AddVertex({x, 0, 0});
+        const auto b = mesh.AddVertex({x + 1, 0, 0});
+        const auto c = mesh.AddVertex({x, 1, 0});
+        ASSERT_TRUE(mesh.AddTriangle(a, b, c));
+    }
+    const auto view = Geometry::HalfedgeMesh::Mesh::CreateView(mesh,
+        {.Offset = 3, .Size = 3}, {.Offset = 3, .Size = 3}, {.Offset = 1, .Size = 1});
+    const auto result = Geometry::Mesh::Conversion::ToIndexedMesh(view);
+    ASSERT_TRUE(result.Succeeded());
+    ASSERT_EQ(result.Mesh.VertexCount(), 3u);
+    ASSERT_EQ(result.Mesh.FaceCount(), 1u);
+    EXPECT_EQ(result.Mesh.Position(0), glm::vec3(10, 0, 0));
+    EXPECT_EQ(result.Mesh.Position(1), glm::vec3(11, 0, 0));
+    EXPECT_EQ(result.Mesh.Position(2), glm::vec3(10, 1, 0));
+    auto indices = result.Mesh.Face(0).Indices;
+    std::ranges::sort(indices);
+    EXPECT_EQ(indices, (std::vector<Geometry::MeshSoup::Index>{0, 1, 2}));
+    EXPECT_FALSE(Geometry::MeshSoup::Validate(result.Mesh).HasErrors());
+    const auto incomplete = Geometry::HalfedgeMesh::Mesh::CreateView(mesh,
+        {.Offset = 4, .Size = 2}, {.Offset = 3, .Size = 3}, {.Offset = 1, .Size = 1});
+    const auto rejected = Geometry::Mesh::Conversion::ToIndexedMesh(incomplete);
+    EXPECT_FALSE(rejected.Succeeded());
+    EXPECT_TRUE(std::ranges::any_of(rejected.Diagnostics, [](const auto& diagnostic) {
+        return diagnostic.Kind == ConversionDiagnosticKind::AddFaceFailed;
+    }));
+}
+
+TEST(MeshConversion, ReportsDiscardedHalfedgeAndEdgeAttributes)
+{
+    for (const std::string_view name : {"h:texcoord", "h:normal", "e:feature"})
+    {
+        SCOPED_TRACE(name);
+        Geometry::HalfedgeMesh::Mesh mesh;
+        const auto a = mesh.AddVertex({0, 0, 0});
+        const auto b = mesh.AddVertex({1, 0, 0});
+        const auto c = mesh.AddVertex({0, 1, 0});
+        ASSERT_TRUE(mesh.AddTriangle(a, b, c));
+        if (name == "h:texcoord") (void)mesh.HalfedgeProperties().Add<glm::vec2>(std::string(name), {});
+        else if (name == "h:normal") (void)mesh.HalfedgeProperties().Add<glm::vec3>(std::string(name), {});
+        else (void)mesh.EdgeProperties().Add<bool>(std::string(name), false);
+        const auto result = Geometry::Mesh::Conversion::ToIndexedMesh(mesh);
+        EXPECT_TRUE(result.Succeeded());
+        EXPECT_TRUE(std::ranges::any_of(result.Diagnostics, [&](const auto& diagnostic) {
+            return diagnostic.Kind == ConversionDiagnosticKind::AttributeRemapSkipped &&
+                   diagnostic.Severity == Geometry::MeshSoup::ValidationSeverity::Warning &&
+                   diagnostic.AttributeName == name;
+        }));
+    }
 }

@@ -451,11 +451,13 @@ namespace Extrinsic::Runtime
                     return EditorCommandHistoryStatus::StaleEntity;
                 auto* properties = GP::MutableGeometryProperties(context.Scene->Raw(), entity, output.Domain);
                 if (!properties || !Same(Capture(*properties, output), expected)) return EditorCommandHistoryStatus::StaleEntity;
+                const auto historyBefore = GP::ObserveGeometryProperties(context, entity, std::span(&output, 1));
                 std::visit([&](const auto& rows) {
                     using T = typename std::decay_t<decltype(rows)>::value_type;
                     if (target.Exists) properties->GetOrAdd<T>(output.Name).Vector() = rows;
                     else if (auto property = properties->Get<T>(output.Name)) properties->Remove(property);
                 }, target.Values);
+                GP::RebasePointPropertyHistory(context, entity, historyBefore);
                 ECS::Components::DirtyTags::MarkGpuDirty(context.Scene->Raw(), entity);
                 if (output.Name == GS::PropertyNames::kPosition) ECS::Components::DirtyTags::MarkVertexPositionsDirty(context.Scene->Raw(), entity);
                 if (context.InvalidateWorkspaceSnapshotCache) context.InvalidateWorkspaceSnapshotCache();

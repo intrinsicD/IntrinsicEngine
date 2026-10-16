@@ -1,7 +1,7 @@
 // Compiles NormalEstimation, Registration config codecs together to share JSON work.
 #include <cmath>
 #include <cstdint>
-#include <initializer_list>
+#include <span>
 #include <limits>
 #include <nlohmann/json.hpp>
 #include <optional>
@@ -9,6 +9,7 @@
 #include <string_view>
 #include <utility>
 
+import Extrinsic.Runtime.ConfigFieldSpec;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 
@@ -16,11 +17,55 @@ import Extrinsic.Runtime.NormalEstimationConfig;
 import Extrinsic.Runtime.RegistrationConfig;
 
 #include "Config/internal/Runtime.PointConfigJson.hpp"
+#include "Config/internal/Runtime.ConfigFieldJson.hpp"
 
 namespace Extrinsic::Runtime
 {
     namespace
     {
+        constexpr Geometry::PropertyValueKind kVec3Kind[]{Geometry::PropertyValueKind::Vec3};
+        constexpr std::string_view kNormalEstimationOrientation[]{"Unoriented", "Minimum spanning tree"};
+        constexpr std::string_view kNormalEstimationWeighting[]{"Uniform", "Area", "Angle", "Area and angle", "Max"};
+        constexpr std::string_view kNormalEstimationMethod[]{"point_set_pca", "mesh_face_weighted", "graph_neighborhood", "mesh_face_normals"};
+        constexpr std::string_view kNormalEstimationBackend[]{"cpu_kdtree", "cpu_lbvh", "vulkan_lbvh", "vulkan"};
+        constexpr ConfigFieldSpec kNormalEstimationFallbackNormalItem{.Name = "coordinate", .Type = ConfigFieldType::Float, .Min = -double(std::numeric_limits<float>::max()), .Max = double(std::numeric_limits<float>::max())};
+        constexpr std::string_view kNormalEstimationBackendNames[]{"CPU KD-tree", "CPU LBVH (cached)", "Vulkan LBVH (resident PCA)", "Vulkan (GPU property residency, double precision)"};
+        constexpr ConfigFieldSpec kNormalEstimationFields[]{
+            {.Name = "entity", .Type = ConfigFieldType::UInt, .Description = "Entity."},
+            {.Name = "k_neighbors", .Type = ConfigFieldType::UInt, .Description = "K neighbors.", .Min = 1},
+            {.Name = "minimum_neighbors", .Type = ConfigFieldType::UInt, .Description = "Minimum neighbors.", .Min = 1},
+            {.Name = "orientation", .Type = ConfigFieldType::Enum, .Description = "Orientation.", .EnumNames = kNormalEstimationOrientation},
+            {.Name = "weighting", .Type = ConfigFieldType::Enum, .Description = "Weighting.", .EnumNames = kNormalEstimationWeighting},
+            {.Name = "gpu_query_batch_size", .Type = ConfigFieldType::UInt, .Description = "Gpu query batch size.", .Min = 1, .Max = 16384},
+            {.Name = "method", .Type = ConfigFieldType::StringEnum, .Description = "Method.", .EnumValues = kNormalEstimationMethod},
+            {.Name = "backend", .Type = ConfigFieldType::StringEnum, .Description = "Backend.", .EnumNames = kNormalEstimationBackendNames, .EnumValues = kNormalEstimationBackend},
+            {.Name = "use_radius", .Type = ConfigFieldType::Bool, .Description = "Select radius search; radius must remain positive in float storage."},
+            {.Name = "orient_toward_fallback", .Type = ConfigFieldType::Bool, .Description = "Orient toward fallback."},
+            {.Name = "radius", .Type = ConfigFieldType::Float, .Description = "Must remain positive in float storage when use_radius is enabled; zero is allowed otherwise.", .Min = 0, .Max = double(std::numeric_limits<float>::max())},
+            {.Name = "degenerate_epsilon", .Type = ConfigFieldType::Float, .Description = "Degenerate epsilon.", .Min = 0, .ExclusiveMin = true},
+            {.Name = "collinear_epsilon", .Type = ConfigFieldType::Float, .Description = "Collinear epsilon.", .Min = 0, .ExclusiveMin = true},
+            {.Name = "fallback_normal", .Type = ConfigFieldType::Array, .Description = "Fallback normal.", .Item = &kNormalEstimationFallbackNormalItem, .MinItems = 3u, .MaxItems = 3u},
+            {.Name = "positions", .Type = ConfigFieldType::PropertyRef, .Description = "Mesh-face normals require mesh-vertex positions and a mesh-face output (Unknown is also accepted). Other methods require distinct input/output names on the same domain.", .RefKinds = kVec3Kind},
+            {.Name = "output", .Type = ConfigFieldType::PropertyRef, .Description = "Output.", .RefKinds = kVec3Kind},
+        };
+        constexpr std::string_view kRegistrationVariant[]{"point_to_point", "point_to_plane"};
+        constexpr std::string_view kRegistrationBackend[]{"cpu_kdtree", "cpu_lbvh", "vulkan_lbvh"};
+        constexpr std::string_view kRegistrationBackendNames[]{"CPU KD-tree (reference)", "CPU LBVH (cached)", "Vulkan LBVH (CPU solve)"};
+        constexpr ConfigFieldSpec kRegistrationFields[]{
+            {.Name = "source_entity", .Type = ConfigFieldType::UInt, .Description = "Source entity."},
+            {.Name = "target_entity", .Type = ConfigFieldType::UInt, .Description = "Target entity."},
+            {.Name = "max_iterations", .Type = ConfigFieldType::UInt, .Description = "Max iterations.", .Min = 1},
+            {.Name = "trajectory_step", .Type = ConfigFieldType::UInt, .Description = "Trajectory step."},
+            {.Name = "variant", .Type = ConfigFieldType::StringEnum, .Description = "Variant.", .EnumValues = kRegistrationVariant},
+            {.Name = "backend", .Type = ConfigFieldType::StringEnum, .Description = "Backend.", .EnumNames = kRegistrationBackendNames, .EnumValues = kRegistrationBackend},
+            {.Name = "max_correspondence_distance", .Type = ConfigFieldType::Float, .Description = "Max correspondence distance."},
+            {.Name = "inlier_ratio", .Type = ConfigFieldType::Float, .Description = "Inlier ratio.", .Min = 0, .Max = 1, .ExclusiveMin = true},
+            {.Name = "convergence_threshold", .Type = ConfigFieldType::Float, .Description = "Convergence threshold.", .Min = 0},
+            {.Name = "source_positions", .Type = ConfigFieldType::PropertyRef, .Description = "Source positions.", .RefKinds = kVec3Kind},
+            {.Name = "target_positions", .Type = ConfigFieldType::PropertyRef, .Description = "Target positions.", .RefKinds = kVec3Kind},
+            {.Name = "target_normals", .Type = ConfigFieldType::PropertyRef, .Description = "Target normals.", .RefKinds = kVec3Kind},
+        };
+
         using Json = nlohmann::json;
         NormalEstimationConfig ParseNormalEstimationConfig(const Json &d)
         {
@@ -109,40 +154,37 @@ namespace Extrinsic::Runtime
              d = ConfigDetail::ParseConfigJson(SerializeNormalEstimationConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, d, "Normal estimation config must be an object.", "Unknown normal field: ",
-            {"entity", "k_neighbors", "minimum_neighbors",
-             "orientation", "weighting", "gpu_query_batch_size"}))
+            kNormalEstimationFields))
             return RejectConfigSection(subject, std::move(*error));
-        if (d["k_neighbors"] == 0 || d["minimum_neighbors"] == 0 || d["orientation"] > 1 ||
-            d["weighting"] > 4)
+        if (!ConfigDetail::InConfigFieldRange(kNormalEstimationFields, "k_neighbors", d["k_neighbors"].get<double>()) || !ConfigDetail::InConfigFieldRange(kNormalEstimationFields, "minimum_neighbors", d["minimum_neighbors"].get<double>()) || !ConfigDetail::InConfigFieldRange(kNormalEstimationFields, "orientation", d["orientation"].get<double>()) ||
+            !ConfigDetail::InConfigFieldRange(kNormalEstimationFields, "weighting", d["weighting"].get<double>()))
             return RejectConfigSection(subject, "Positive neighborhood sizes, orientation 0..1 and weighting 0..4 are required.");
-        if (d["method"] != "point_set_pca" && d["method"] != "mesh_face_weighted" &&
-            d["method"] != "graph_neighborhood" && d["method"] != "mesh_face_normals")
+        if (!ConfigDetail::IsConfigFieldToken(kNormalEstimationFields, "method", d["method"]))
             return RejectConfigSection(subject, "Unknown normal method.");
-        if (d["backend"] != "cpu_kdtree" && d["backend"] != "cpu_lbvh" && d["backend"] != "vulkan_lbvh" &&
-            d["backend"] != "vulkan")
+        if (!ConfigDetail::IsConfigFieldToken(kNormalEstimationFields, "backend", d["backend"]))
             return RejectConfigSection(subject, "Normal backend must be cpu_kdtree, cpu_lbvh, vulkan_lbvh or vulkan.");
-        if (d["gpu_query_batch_size"] == 0 || d["gpu_query_batch_size"] > 16384)
+        if (!ConfigDetail::InConfigFieldRange(kNormalEstimationFields, "gpu_query_batch_size", d["gpu_query_batch_size"].get<double>()))
             return RejectConfigSection(subject, "GPU query batch size must be in 1..16384.");
         if (!d["use_radius"].is_boolean() || !d["orient_toward_fallback"].is_boolean())
             return RejectConfigSection(subject, "Normal toggles must be boolean.");
         for (auto key : {"radius", "degenerate_epsilon", "collinear_epsilon"})
             if (!d[key].is_number() || !std::isfinite(d[key].get<double>()))
                 return RejectConfigSection(subject, std::string(key) + " must be finite.");
-        if (d["radius"].get<double>() < 0 || d["radius"].get<double>() > std::numeric_limits<float>::max() ||
-            (d["use_radius"].get<bool>() && d["radius"] <= 0) || d["degenerate_epsilon"] <= 0 ||
-            d["collinear_epsilon"] <= 0)
+        if (!ConfigDetail::InConfigFieldRange(kNormalEstimationFields, "radius", d["radius"].get<double>()) ||
+            (d["use_radius"].get<bool>() && d["radius"].get<float>() <= 0) || !ConfigDetail::InConfigFieldRange(kNormalEstimationFields, "degenerate_epsilon", d["degenerate_epsilon"].get<double>()) ||
+            !ConfigDetail::InConfigFieldRange(kNormalEstimationFields, "collinear_epsilon", d["collinear_epsilon"].get<double>()))
             return RejectConfigSection(subject, "Normal radii and numerical epsilons are outside their supported range.");
         auto &fallback = d["fallback_normal"];
-        if (!fallback.is_array() || fallback.size() != 3)
+        if (!fallback.is_array() || fallback.size() != *FindConfigFieldSpec(kNormalEstimationFields, "fallback_normal")->MinItems)
             return RejectConfigSection(subject, "Fallback normal must have three finite float coordinates.");
         for (auto &x : fallback)
             if (!x.is_number() || !std::isfinite(x.get<double>()) ||
-                std::abs(x.get<double>()) > std::numeric_limits<float>::max())
+                !AcceptsConfigFieldNumber(*FindConfigFieldSpec(kNormalEstimationFields, "fallback_normal")->Item, x.get<double>()))
                 return RejectConfigSection(subject, "Fallback normal coordinates must be finite floats.");
         for (auto key : {"positions", "output"})
         {
             const auto validation = ConfigDetail::ValidatePointPropertyRef(
-                d[key], Geometry::PropertyValueKind::Vec3);
+                d[key], FindConfigFieldSpec(kNormalEstimationFields, key)->RefKinds.front());
             if (validation == ConfigDetail::PointPropertyValidation::InvalidReference)
                 return RejectConfigSection(subject, std::string(key) + " requires domain, nonempty name and kind=vec3.");
             if (validation == ConfigDetail::PointPropertyValidation::UnknownDomain)
@@ -173,10 +215,14 @@ namespace Extrinsic::Runtime
         Core::Config::UpsertEngineConfigSection(c.AppSections, ConfigDetail::MakeConfigSection(
             kNormalEstimationConfigSectionName, kNormalEstimationConfigSectionSchemaId, 1, SerializeNormalEstimationConfig(v)));
     }
+    std::span<const ConfigFieldSpec> NormalEstimationConfigFieldSpecs() noexcept
+    { return kNormalEstimationFields; }
     Core::Config::EngineConfigSectionRegistration MakeNormalEstimationConfigSectionRegistration()
     {
         return ConfigDetail::MakeSectionRegistration(
-            kNormalEstimationConfigSectionName, kNormalEstimationConfigSectionSchemaId, 1, SerializeNormalEstimationConfig({}), ValidateNormalEstimationConfigSection, {});
+            kNormalEstimationConfigSectionName, kNormalEstimationConfigSectionSchemaId, 1, SerializeNormalEstimationConfig({}), ValidateNormalEstimationConfigSection,
+            ConfigDetail::BuildSectionSchemaJson(kNormalEstimationConfigSectionSchemaId, "NormalEstimation", "Validated NormalEstimation configuration.",
+                kNormalEstimationFields, ConfigDetail::ParseConfigJson(SerializeNormalEstimationConfig({}), true)));
     }
 } // namespace Extrinsic::Runtime
 
@@ -234,23 +280,23 @@ namespace Extrinsic::Runtime
         auto doc = ConfigDetail::ParseConfigJson(SerializeRegistrationConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, doc, "Registration config must be an object.", "Unknown registration field: ",
-            {"source_entity", "target_entity", "max_iterations", "trajectory_step"}))
+            kRegistrationFields))
             return RejectConfigSection(subject, std::move(*error));
-        if (doc["max_iterations"] == 0) return RejectConfigSection(subject, "max_iterations must be positive.");
+        if (!ConfigDetail::InConfigFieldRange(kRegistrationFields, "max_iterations", doc["max_iterations"].get<double>())) return RejectConfigSection(subject, "max_iterations must be positive.");
         for (auto key : {"max_correspondence_distance", "inlier_ratio", "convergence_threshold"})
             if (!doc[key].is_number() || !std::isfinite(doc[key].get<double>()))
                 return RejectConfigSection(subject, std::string(key) + " must be finite.");
-        if (doc["inlier_ratio"] <= 0 || doc["inlier_ratio"] > 1 || doc["convergence_threshold"] < 0)
+        if (!ConfigDetail::InConfigFieldRange(kRegistrationFields, "inlier_ratio", doc["inlier_ratio"].get<double>()) || !ConfigDetail::InConfigFieldRange(kRegistrationFields, "convergence_threshold", doc["convergence_threshold"].get<double>()))
             return RejectConfigSection(subject, "inlier_ratio must be in (0,1]; convergence_threshold must be nonnegative.");
-        if (doc["variant"] != "point_to_point" && doc["variant"] != "point_to_plane")
+        if (!ConfigDetail::IsConfigFieldToken(kRegistrationFields, "variant", doc["variant"]))
             return RejectConfigSection(subject, "variant must be point_to_point or point_to_plane.");
-        if (doc["backend"] != "cpu_kdtree" && doc["backend"] != "cpu_lbvh" && doc["backend"] != "vulkan_lbvh")
+        if (!ConfigDetail::IsConfigFieldToken(kRegistrationFields, "backend", doc["backend"]))
             return RejectConfigSection(subject, "backend must be cpu_kdtree, cpu_lbvh or vulkan_lbvh.");
         for (auto key : {"source_positions", "target_positions", "target_normals"})
         {
             const auto& ref = doc[key];
             using ConfigDetail::PointPropertyValidation;
-            const auto validation = ConfigDetail::ValidatePointPropertyRef(ref, Geometry::PropertyValueKind::Vec3);
+            const auto validation = ConfigDetail::ValidatePointPropertyRef(ref, FindConfigFieldSpec(kRegistrationFields, key)->RefKinds.front());
             if (validation == PointPropertyValidation::InvalidReference || !ref["domain"].is_string())
                 return RejectConfigSection(subject, std::string(key) + " requires domain, name and kind=vec3.");
             if (validation == PointPropertyValidation::UnknownDomain)
@@ -267,9 +313,13 @@ namespace Extrinsic::Runtime
         Core::Config::UpsertEngineConfigSection(config.AppSections, ConfigDetail::MakeConfigSection(
             kRegistrationConfigSectionName, kRegistrationConfigSectionSchemaId, 1, SerializeRegistrationConfig(value)));
     }
+    std::span<const ConfigFieldSpec> RegistrationConfigFieldSpecs() noexcept
+    { return kRegistrationFields; }
     Core::Config::EngineConfigSectionRegistration MakeRegistrationConfigSectionRegistration()
     {
         return ConfigDetail::MakeSectionRegistration(
-            kRegistrationConfigSectionName, kRegistrationConfigSectionSchemaId, 1, SerializeRegistrationConfig({}), ValidateRegistrationConfigSection, {});
+            kRegistrationConfigSectionName, kRegistrationConfigSectionSchemaId, 1, SerializeRegistrationConfig({}), ValidateRegistrationConfigSection,
+            ConfigDetail::BuildSectionSchemaJson(kRegistrationConfigSectionSchemaId, "Registration", "Validated Registration configuration.",
+                kRegistrationFields, ConfigDetail::ParseConfigJson(SerializeRegistrationConfig({}), true)));
     }
 }

@@ -101,6 +101,37 @@ TEST(CoreMemoryLinearArena, ArrayAllocation)
     EXPECT_EQ(arena.Used(), values.size() * sizeof(int));
 }
 
+TEST(CoreMemoryLinearArena, AlignsTheActualBaseAddress)
+{
+    LinearArena arena(1024u * 1024u);
+    const auto base = arena.AllocBytes(0);
+    ASSERT_TRUE(base.has_value());
+    const auto address = reinterpret_cast<std::uintptr_t>(base->data());
+    const auto alignment = 2u * (address & (~address + 1u));
+    ASSERT_GE(alignment, 128u);
+    if (alignment > arena.Capacity())
+        GTEST_SKIP() << "Arena base already satisfies every alignment within its capacity";
+    ASSERT_NE(address % alignment, 0u);
+    ASSERT_EQ(arena.Used(), 0u);
+
+    const auto allocation = arena.AllocBytes(1, alignment);
+    ASSERT_TRUE(allocation.has_value());
+    EXPECT_EQ(reinterpret_cast<std::uintptr_t>(allocation->data()) % alignment, 0u);
+    EXPECT_LE(arena.Used(), arena.Capacity());
+}
+
+TEST(CoreMemoryLinearArena, RejectsInvalidAlignmentWithoutConsumingStorage)
+{
+    LinearArena arena(1024);
+    for (const std::size_t alignment : {0u, 3u})
+    {
+        const auto allocation = arena.AllocBytes(1, alignment);
+        ASSERT_FALSE(allocation.has_value());
+        EXPECT_EQ(allocation.error(), Extrinsic::Core::ErrorCode::InvalidArgument);
+        EXPECT_EQ(arena.Used(), 0u);
+    }
+}
+
 TEST(CoreMemoryLinearArena, FrameResetLoopReusesAddress)
 {
     LinearArena arena(sizeof(int) * 2);

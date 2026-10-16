@@ -33,10 +33,6 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
     // Creates the entity with import-parity render/selection authoring and
     // culling bounds, selects it, and records create/destroy in the command
     // history. Undo refuses (StaleEntity) once the entity was edited.
-    // Transform matrices composed up the hierarchy; nullopt for cycles, broken
-    // parents or non-finite results.
-    [[nodiscard]] std::optional<glm::mat4> ComposeEditorWorldMatrix(const entt::registry& raw,
-                                                                    entt::entity entity);
     [[nodiscard]] EditorGeneratedEntityPublication PublishEditorGeneratedEntity(
         const EditorProcessingContext& context, EditorGeneratedEntityRequest request);
 }

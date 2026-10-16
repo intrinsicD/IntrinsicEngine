@@ -2136,7 +2136,8 @@ namespace Extrinsic::Sandbox::Editor
     {
         std::string text{field.Description};
         if (const auto range = Runtime::DescribeConfigFieldRange(field);
-            !range.empty() && field.Type != Runtime::ConfigFieldType::Enum)
+            !range.empty() && field.Type != Runtime::ConfigFieldType::Enum &&
+            field.Type != Runtime::ConfigFieldType::StringEnum)
             text += (text.empty() ? "" : "\n") + std::string("Accepted: ") + range;
         if (!defaultValue.empty()) text += (text.empty() ? "" : "\n") + std::string("Default: ") + std::string(defaultValue);
         return text;
@@ -2218,6 +2219,16 @@ namespace Extrinsic::Sandbox::Editor
             value = static_cast<std::uint32_t>(Runtime::ClampToConfigFieldRange(*field, double(value)));
         DrawConfigFieldHint(field, std::to_string(defaultValue));
         return changed;
+    }
+
+    const char* ConfigEnumDisplayLabel(const Runtime::ConfigFieldSpec* const field,
+                                       const std::string_view token) noexcept
+    {
+        if (field != nullptr)
+            for (std::size_t index = 0; index < field->EnumValues.size(); ++index)
+                if (field->EnumValues[index] == token && index < field->EnumNames.size())
+                    return field->EnumNames[index].data();
+        return "";
     }
 
     bool DrawSpecEnumCombo(const char* label, const std::span<const Runtime::ConfigFieldSpec> fields,

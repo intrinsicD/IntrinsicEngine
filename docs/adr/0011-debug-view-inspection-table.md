@@ -128,5 +128,4 @@ Follow-up tasks required: none from this ADR. Future user-selectable visualizati
 - [`tasks/done/GRAPHICS-013B`](../../tasks/archive/GRAPHICS-013B-debug-view-and-render-target-inspection.md) records the underlying `Extrinsic.Graphics.DebugViewSystem` contract, the inspection table shape, the requested-name resolution, and the structured fallback diagnostics.
 - [`tasks/done/GRAPHICS-013BQ`](../../tasks/archive/GRAPHICS-013BQ-debug-view-backend-clarifications.md) records the four clarification decisions captured in §§1–4.
 - `docs/architecture/rendering-three-pass.md` carries the matching debug-view contract block authored by `GRAPHICS-013BQ`.
-- `src/graphics/renderer/README.md` carries the matching ownership-contract bullet next to the existing `DebugViewSystem` line.
 - The default CPU correctness gate (`ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`) exercises the inspection table, the visualization-mode mapping table, the `DebugViewRGBA` previewable exclusion, and the four-`uint32` push-constant packing without a Vulkan device.

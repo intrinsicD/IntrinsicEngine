@@ -1,3 +1,4 @@
+// Scoped CSG operations on closed halfedge meshes, with unsupported-overlap diagnostics.
 module;
 
 #include <optional>

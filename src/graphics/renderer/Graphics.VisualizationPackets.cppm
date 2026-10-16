@@ -16,6 +16,12 @@ import Extrinsic.Graphics.Colormap;
 
 export namespace Extrinsic::Graphics
 {
+    // Expand a constant display range by the caller's preferred half-width.
+    // Finite positive inputs yield finite, distinct endpoints even at FLT_MAX.
+    // Invalid inputs return false without changing either output.
+    [[nodiscard]] bool ExpandConstantScalarRange(
+        float value, float halfWidth, float& minValue, float& maxValue) noexcept;
+
     enum class VisualizationAttributeDomain : std::uint8_t
     {
         Vertex = 0,

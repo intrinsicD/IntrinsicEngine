@@ -79,9 +79,9 @@ performance-improvement claims:
   hosted Release pilot and all 700 observations in the 500-run frame-only plus
   two 100-run combined local populations. Execute p95 must remain below 8.333334
   milliseconds, half of a 60 Hz frame. The old
-  `LastCriticalPathTimeNs()` assertion was removed because that accessor
-  currently carries the scheduler's abstract `criticalPathCost`, not elapsed
-  nanoseconds; Core's scheduler tests own the cost/tie-breaker contract.
+  `LastCriticalPathTimeNs()` assertion and accessor were removed because they
+  mislabeled the scheduler's abstract `criticalPathCost` as elapsed nanoseconds.
+  `GetScheduleStats().criticalPathCost` and Core tests own the cost/tie-breaker contract.
 - The scheduler case excludes three warmup rounds and measures 20 rounds. In
   each round one worker creates 3,000 child tasks in its worker-local deque and
   blocks until they finish, so the full 69,000-task population must be

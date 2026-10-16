@@ -10,7 +10,7 @@ layout(buffer_reference, scalar) buffer Doubles { double v[]; };
 layout(buffer_reference, scalar) buffer UInts { uint v[]; };
 layout(buffer_reference, scalar) buffer Stats {
     float inertia; float maxDistance; uint maxShift;
-    uint maxDistanceIndex; uint changed; uint invalid;
+    uint maxDistanceIndex; uint changed; uint invalid; // changed: labels=1, centroids=2
     double inertiaSum;
 };
 layout(push_constant, scalar) uniform Push {

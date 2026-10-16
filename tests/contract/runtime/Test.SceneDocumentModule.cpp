@@ -1,6 +1,8 @@
 #include <chrono>
+#include <csignal>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <string>
@@ -9,27 +11,46 @@
 #include <utility>
 #include <vector>
 
+#if defined(__unix__) || defined(__APPLE__)
+#include <sys/resource.h>
+#include <unistd.h>
+#endif
+
+#include <entt/entity/registry.hpp>
+#include <glm/glm.hpp>
 #include <gtest/gtest.h>
 
 #include "RuntimeTestModule.hpp"
 
 import Extrinsic.Core.Config.Engine;
+import Geometry.Properties;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Error;
+import Extrinsic.Core.IOBackend;
 import Extrinsic.Core.Tasks;
 import Extrinsic.ECS.Component.MetaData;
+import Extrinsic.ECS.Component.Hierarchy;
+import Extrinsic.ECS.Component.Light;
+import Extrinsic.ECS.Component.Transform.WorldMatrix;
+import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Hierarchy.Mutation;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.Renderer;
+import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.SceneDocumentModule;
+import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.ServiceRegistry;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
 
@@ -629,7 +650,7 @@ TEST(SceneDocumentModule,
 {
     TempSceneFile valid(
         "runtime172-lifetime.scene.json",
-        R"({"version":5,"entities":[{"id":0,"name":"Late"}]})");
+        R"({"version":6,"entities":[{"id":0,"name":"Late"}]})");
     const bool schedulerWasInitialized =
         Core::Tasks::Scheduler::IsInitialized();
     if (!schedulerWasInitialized)
@@ -662,6 +683,380 @@ TEST(SceneDocumentModule,
 
     if (!schedulerWasInitialized)
         Core::Tasks::Scheduler::Shutdown();
+}
+
+TEST(SceneDocumentModule, PipelinedReplacementWithoutAssetWorkflowConsumesNewScene)
+{
+    class PipelinedDocumentProbe final : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        void Resolve() override { AddLights(3u); }
+
+        void Frame(double, double) override
+        {
+            auto& engine = Kernel();
+            ++Frames;
+            if (Frames == 3u)
+            {
+                OldLights = engine.GetRenderer().GetLastRenderGraphStats()
+                    .Contract.LightingResolvedLightCount;
+                AssetWorkflowAbsent = engine.Services()
+                    .Find<Runtime::AssetWorkflowModule>() == nullptr;
+                auto* documents = engine.Services()
+                    .Find<Runtime::SceneDocumentModule>();
+                ReplacementSucceeded = documents != nullptr &&
+                    documents->NewSceneDocument().has_value();
+                if (ReplacementSucceeded)
+                    AddLights(2u);
+            }
+            if (Frames == 4u)
+            {
+                NewLights = engine.GetRenderer().GetLastRenderGraphStats()
+                    .Contract.LightingResolvedLightCount;
+                engine.RequestExit();
+            }
+        }
+
+        std::uint32_t Frames{0u};
+        std::uint32_t OldLights{0u};
+        std::uint32_t NewLights{0u};
+        bool AssetWorkflowAbsent{false};
+        bool ReplacementSucceeded{false};
+
+    private:
+        void AddLights(std::uint32_t count)
+        {
+            auto& engine = Kernel();
+            auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+            for (std::uint32_t i = 0u; i < count; ++i)
+            {
+                const auto entity = scene.Create();
+                scene.Raw().emplace<ECSC::Transform::WorldMatrix>(entity);
+                scene.Raw().emplace<ECSC::Lights::DirectionalLight>(entity);
+            }
+        }
+    };
+
+    auto config = HeadlessConfig();
+    config.Render.SynchronousExtraction = false;
+    auto probe = std::make_unique<PipelinedDocumentProbe>();
+    const PipelinedDocumentProbe* observed = probe.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(probe));
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.Initialize();
+    engine.Run();
+
+    EXPECT_TRUE(observed->AssetWorkflowAbsent);
+    EXPECT_TRUE(observed->ReplacementSucceeded);
+    EXPECT_EQ(observed->Frames, 4u);
+    EXPECT_EQ(observed->OldLights, 3u);
+    EXPECT_EQ(observed->NewLights, 2u);
+    engine.Shutdown();
+}
+
+TEST(SceneDocumentModule, QueuedSaveKeepsLaterEditsDirty)
+{
+    TempSceneFile file("runtime-save-revision.scene.json", "");
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.EmplaceModule<Runtime::AsyncWorkModule>();
+    auto& documents = engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.Initialize();
+    auto* history = engine.Services().Find<Runtime::EditorCommandHistory>();
+    ASSERT_NE(history, nullptr);
+    (void)history->MarkDirty("before snapshot");
+    const auto snapshotRevision = history->Snapshot().Revision;
+    const auto queued = documents.QueueSceneSaveToPath(file.Path.string());
+    ASSERT_TRUE(queued.has_value());
+    ASSERT_TRUE(WaitUntilAwaitingGate(engine.Jobs(), queued->Task));
+    (void)history->MarkDirty("after snapshot");
+    ASSERT_TRUE(DrainUntilTerminal(engine.Jobs(), engine.Events(), queued->Task));
+    EXPECT_EQ(engine.Jobs().GetState(queued->Task), Runtime::JobState::Published);
+    EXPECT_TRUE(history->IsDirty());
+    EXPECT_EQ(history->Snapshot().SavedRevision, snapshotRevision);
+    engine.Shutdown();
+}
+
+TEST(SceneDocumentModule, QueuedSavePreservesAttributeBindings)
+{
+    TempSceneFile file("runtime-save-bindings.scene.json", "");
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.EmplaceModule<Runtime::AsyncWorkModule>();
+    auto& documents = engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.Initialize();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const auto entity = scene.Create();
+    auto& properties = scene.Raw().emplace<ECSC::GeometrySources::Vertices>(entity).Properties;
+    properties.Resize(2u);
+    (void)properties.GetOrAdd<glm::vec3>("v:position", glm::vec3{1.0f});
+    (void)properties.GetOrAdd<glm::vec3>("v:custom_normal", glm::vec3{0.0f, 0.0f, 1.0f});
+    const Runtime::VertexChannelSourceBinding normal{
+        .Enabled = true,
+        .Property = {Runtime::GeometryElementDomain::PointCloudPoint, "v:custom_normal", Geometry::PropertyValueKind::Vec3},
+    };
+    scene.Raw().emplace<Runtime::VertexChannelBindingSet>(entity, Runtime::VertexChannelBindingSet{.Normal = normal});
+    const auto queued = documents.QueueSceneSaveToPath(file.Path.string());
+    ASSERT_TRUE(queued.has_value());
+    ASSERT_TRUE(DrainUntilTerminal(engine.Jobs(), engine.Events(), queued->Task));
+    Core::IO::FileIOBackend backend;
+    ECS::Scene::Registry loaded;
+    const auto result = Runtime::LoadSceneDocument(loaded, file.Path.string(), backend);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Stats.AttributeBindingEntities, 1u);
+    const auto bound = loaded.Raw().view<const Runtime::VertexChannelBindingSet, const ECSC::GeometrySources::Vertices>();
+    ASSERT_NE(bound.begin(), bound.end());
+    for (const auto loadedEntity : bound)
+    {
+        EXPECT_EQ(bound.get<const Runtime::VertexChannelBindingSet>(loadedEntity).Normal, normal);
+        const auto& restored = bound.get<const ECSC::GeometrySources::Vertices>(loadedEntity).Properties;
+        const auto values = restored.Get<glm::vec3>("v:custom_normal");
+        ASSERT_TRUE(values);
+        EXPECT_EQ(values.Vector(), std::vector<glm::vec3>(2u, glm::vec3{0.0f, 0.0f, 1.0f}));
+    }
+    engine.Shutdown();
+}
+
+TEST(SceneDocumentModule, QueuedSavePreservesSiblingOrder)
+{
+    TempSceneFile file("runtime-queued-save-siblings.scene.json", "");
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    auto& documents = engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.Initialize();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const auto create = [&](const std::string& name) {
+        const auto entity = scene.Create();
+        scene.Raw().emplace<ECSC::MetaData>(entity, ECSC::MetaData{.EntityName = name});
+        return entity;
+    };
+    const auto parent = create("Parent");
+    const auto a = create("A");
+    const auto b = create("B");
+    const auto c = create("C");
+    ECS::Hierarchy::Attach(scene.Raw(), a, parent);
+    ECS::Hierarchy::Attach(scene.Raw(), c, parent);
+    ECS::Hierarchy::Attach(scene.Raw(), b, parent);
+    const auto save = documents.QueueSceneSaveToPath(file.Path.string());
+    ASSERT_TRUE(save.has_value());
+    ASSERT_TRUE(DrainUntilTerminal(engine.Jobs(), engine.Events(), save->Task));
+    ASSERT_EQ(engine.Jobs().GetState(save->Task), Runtime::JobState::Published);
+    ECS::Scene::Registry loaded;
+    Core::IO::FileIOBackend backend;
+    ASSERT_TRUE(Runtime::LoadSceneDocument(loaded, file.Path.string(), backend).has_value());
+    auto loadedParent = ECS::InvalidEntityHandle;
+    loaded.Raw().view<const ECSC::MetaData>().each([&](const ECS::EntityHandle entity, const ECSC::MetaData& metadata) {
+        if (metadata.EntityName == "Parent") loadedParent = entity;
+    });
+    ASSERT_NE(loadedParent, ECS::InvalidEntityHandle);
+    const auto& hierarchy = loaded.Raw().get<ECSC::Hierarchy::Component>(loadedParent);
+    EXPECT_EQ(hierarchy.ChildCount, 3u);
+    auto child = hierarchy.FirstChild;
+    auto previous = ECS::InvalidEntityHandle;
+    for (const std::string_view name : {"B", "C", "A"})
+    {
+        ASSERT_TRUE(loaded.IsValid(child));
+        EXPECT_EQ(loaded.Raw().get<ECSC::MetaData>(child).EntityName, name);
+        const auto& link = loaded.Raw().get<ECSC::Hierarchy::Component>(child);
+        EXPECT_EQ(link.Parent, loadedParent);
+        EXPECT_EQ(link.PrevSibling, previous);
+        previous = child;
+        child = link.NextSibling;
+    }
+    EXPECT_EQ(child, ECS::InvalidEntityHandle);
+    engine.Shutdown();
+}
+
+TEST(SceneDocumentModule, FailedNativeSavePreservesExistingFile)
+{
+#if defined(__unix__) || defined(__APPLE__)
+    const auto directory = std::filesystem::temp_directory_path() /
+        ("runtime-native-save-" + std::to_string(::getpid()));
+    ASSERT_TRUE(std::filesystem::create_directory(directory));
+    const std::string sentinel = "previous complete scene document";
+    TempSceneFile file((directory / "scene.json").string(), sentinel);
+    EXPECT_EXIT({
+        ModuleHarness harness;
+        if (!harness.Start()) ::_exit(1);
+        auto* scene = harness.Worlds.Get(harness.World);
+        const auto entity = scene->Create();
+        scene->Raw().emplace<ECSC::MetaData>(entity, ECSC::MetaData{.EntityName = std::string(16384u, 'x')});
+        auto* history = harness.Services.Find<Runtime::EditorCommandHistory>();
+        if (!history) ::_exit(2);
+        (void)history->MarkDirty("unsaved scene");
+        struct rlimit limit{};
+        if (::getrlimit(RLIMIT_FSIZE, &limit) != 0) ::_exit(3);
+        limit.rlim_cur = 1024u;
+        if (std::signal(SIGXFSZ, SIG_IGN) == SIG_ERR || ::setrlimit(RLIMIT_FSIZE, &limit) != 0) ::_exit(4);
+        const auto saved = harness.Module->SaveSceneToPath(file.Path.string());
+        ::_exit(!saved && saved.error() == Core::ErrorCode::FileWriteError && history->IsDirty() ? 0 : 5);
+    }, ::testing::ExitedWithCode(0), "");
+    std::ifstream input(file.Path, std::ios::binary);
+    EXPECT_EQ(std::string(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()), sentinel);
+    for (const auto& entry : std::filesystem::directory_iterator(directory))
+        EXPECT_EQ(entry.path(), file.Path) << "failed saves must remove their sibling temporary file";
+    std::error_code ignored;
+    std::filesystem::remove_all(directory, ignored);
+#else
+    GTEST_SKIP() << "deterministic native write failure requires RLIMIT_FSIZE";
+#endif
+}
+
+TEST(SceneDocumentModule, QueuedSavesPublishInSubmissionOrder)
+{
+    TempSceneFile file("runtime-save-order.scene.json", "");
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.EmplaceModule<Runtime::AsyncWorkModule>();
+    auto& documents = engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.Initialize();
+    auto* history = engine.Services().Find<Runtime::EditorCommandHistory>();
+    ASSERT_NE(history, nullptr);
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const auto entity = scene.Create();
+    auto& metadata = scene.Raw().emplace<ECSC::MetaData>(entity, ECSC::MetaData{.EntityName = "first"});
+    (void)history->MarkDirty("first");
+    const auto first = documents.QueueSceneSaveToPath(file.Path.string());
+    ASSERT_TRUE(first.has_value());
+    ASSERT_TRUE(WaitUntilAwaitingGate(engine.Jobs(), first->Task));
+    metadata.EntityName = "second";
+    (void)history->MarkDirty("second");
+    const auto secondRevision = history->Snapshot().Revision;
+    const auto second = documents.QueueSceneSaveToPath(file.Path.string());
+    ASSERT_TRUE(second.has_value());
+    EXPECT_EQ(engine.Jobs().GetState(second->Task), Runtime::JobState::AwaitingDependencies);
+    ASSERT_TRUE(DrainUntilTerminal(engine.Jobs(), engine.Events(), first->Task));
+    ASSERT_TRUE(DrainUntilTerminal(engine.Jobs(), engine.Events(), second->Task));
+    EXPECT_EQ(engine.Jobs().GetState(second->Task), Runtime::JobState::Published);
+    EXPECT_EQ(history->Snapshot().SavedRevision, secondRevision);
+    EXPECT_FALSE(history->IsDirty());
+    Core::IO::FileIOBackend backend;
+    ECS::Scene::Registry loaded;
+    ASSERT_TRUE(Runtime::LoadSceneDocument(loaded, file.Path.string(), backend).has_value());
+    EXPECT_TRUE(ContainsNamedEntity(loaded, "second"));
+    EXPECT_FALSE(ContainsNamedEntity(loaded, "first"));
+    engine.Shutdown();
+}
+
+TEST(SceneDocumentModule, SynchronousSaveRejectsEveryPathUntilQueuedSaveSettles)
+{
+    TempSceneFile queuedFile("runtime-sync-busy-queued.scene.json", "queued destination");
+    TempSceneFile otherFile("runtime-sync-busy-other.scene.json", "other destination");
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.EmplaceModule<Runtime::AsyncWorkModule>();
+    auto& documents = engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.Initialize();
+    auto* history = engine.Services().Find<Runtime::EditorCommandHistory>();
+    ASSERT_NE(history, nullptr);
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const auto entity = scene.Create();
+    auto& metadata = scene.Raw().emplace<ECSC::MetaData>(entity, ECSC::MetaData{.EntityName = "queued"});
+    (void)history->MarkDirty("queued snapshot");
+    const auto queued = documents.QueueSceneSaveToPath(queuedFile.Path.string());
+    ASSERT_TRUE(queued.has_value());
+    ASSERT_TRUE(WaitUntilAwaitingGate(engine.Jobs(), queued->Task));
+    metadata.EntityName = "later edit";
+    (void)history->MarkDirty("later edit");
+    const auto before = history->Snapshot();
+    ASSERT_TRUE(before.Dirty);
+    const auto readBytes = [](const std::filesystem::path& path) {
+        std::ifstream input(path, std::ios::binary);
+        return std::string(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+    };
+    for (const auto* file : {&queuedFile, &otherFile})
+    {
+        SCOPED_TRACE(file->Path.string());
+        const auto bytes = readBytes(file->Path);
+        ASSERT_FALSE(bytes.empty());
+        const auto rejected = documents.SaveSceneToPath(file->Path.string());
+        EXPECT_FALSE(rejected.has_value());
+        if (!rejected) EXPECT_EQ(rejected.error(), Core::ErrorCode::InvalidState);
+        EXPECT_EQ(readBytes(file->Path), bytes);
+        const auto after = history->Snapshot();
+        EXPECT_EQ(after.Revision, before.Revision);
+        EXPECT_EQ(after.SavedRevision, before.SavedRevision);
+        EXPECT_EQ(after.Dirty, before.Dirty);
+        EXPECT_EQ(after.HasActivePath, before.HasActivePath);
+        EXPECT_EQ(after.ActivePath, before.ActivePath);
+        EXPECT_EQ(after.UndoCount, before.UndoCount);
+        EXPECT_EQ(after.RedoCount, before.RedoCount);
+        EXPECT_FALSE(documents.GetLastSceneFileEvent().has_value());
+    }
+    ASSERT_TRUE(DrainUntilTerminal(engine.Jobs(), engine.Events(), queued->Task));
+    ASSERT_EQ(engine.Jobs().GetState(queued->Task), Runtime::JobState::Published);
+    EXPECT_TRUE(history->IsDirty());
+    ASSERT_TRUE(documents.SaveSceneToPath(otherFile.Path.string()).has_value());
+    EXPECT_FALSE(history->IsDirty());
+    EXPECT_EQ(history->Snapshot().SavedRevision, before.Revision);
+    EXPECT_EQ(history->Snapshot().ActivePath, otherFile.Path.string());
+    Core::IO::FileIOBackend backend;
+    ECS::Scene::Registry loaded;
+    ASSERT_TRUE(Runtime::LoadSceneDocument(loaded, otherFile.Path.string(), backend).has_value());
+    EXPECT_TRUE(ContainsNamedEntity(loaded, "later edit"));
+    EXPECT_FALSE(ContainsNamedEntity(loaded, "queued"));
+    engine.Shutdown();
+}
+
+TEST(SceneDocumentModule, CancelledSaveChainAllowsAFreshSave)
+{
+    TempSceneFile file("runtime-save-cancel-chain.scene.json", "");
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.EmplaceModule<Runtime::AsyncWorkModule>();
+    auto& documents = engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.Initialize();
+    const auto first = documents.QueueSceneSaveToPath(file.Path.string());
+    ASSERT_TRUE(first.has_value());
+    ASSERT_TRUE(WaitUntilAwaitingGate(engine.Jobs(), first->Task));
+    const auto second = documents.QueueSceneSaveToPath(file.Path.string());
+    ASSERT_TRUE(second.has_value());
+    ASSERT_TRUE(engine.Jobs().Cancel(first->Task));
+    ASSERT_TRUE(DrainUntilTerminal(engine.Jobs(), engine.Events(), second->Task));
+    EXPECT_EQ(engine.Jobs().GetState(second->Task), Runtime::JobState::Cancelled);
+    const auto fresh = documents.QueueSceneSaveToPath(file.Path.string());
+    ASSERT_TRUE(fresh.has_value());
+    ASSERT_TRUE(DrainUntilTerminal(engine.Jobs(), engine.Events(), fresh->Task));
+    EXPECT_EQ(engine.Jobs().GetState(fresh->Task), Runtime::JobState::Published);
+    engine.Shutdown();
+}
+
+TEST(SceneDocumentModule, ReplacementRetainsUnfinishedSaveDependencyUntilFinalization)
+{
+    for (const bool switchWorld : {false, true})
+    {
+        SCOPED_TRACE(switchWorld ? "active world rebind" : "same-world document replacement");
+        TempSceneFile file("runtime-save-replacement-chain.scene.json", "");
+        Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<StubApplication>());
+        engine.EmplaceModule<Runtime::AsyncWorkModule>();
+        auto& documents = engine.EmplaceModule<Runtime::SceneDocumentModule>();
+        engine.Initialize();
+        auto* history = engine.Services().Find<Runtime::EditorCommandHistory>();
+        ASSERT_NE(history, nullptr);
+        const auto first = documents.QueueSceneSaveToPath(file.Path.string());
+        ASSERT_TRUE(first.has_value());
+        ASSERT_TRUE(WaitUntilAwaitingGate(engine.Jobs(), first->Task));
+        if (switchWorld)
+        {
+            const auto replacement = engine.Worlds().CreateWorld("replacement");
+            ASSERT_TRUE(engine.Worlds().RequestSetActiveWorld(replacement).has_value());
+            ASSERT_EQ(engine.Worlds().ApplyMaintenance(engine.Events(), engine.Jobs()).AppliedActiveWorldChanges, 1u);
+            (void)documents.GetLastSceneFileEvent();
+        }
+        else
+            ASSERT_TRUE(documents.NewSceneDocument().has_value());
+        (void)history->MarkDirty("replacement contents");
+        const auto second = documents.QueueSceneSaveToPath(file.Path.string());
+        ASSERT_TRUE(second.has_value());
+        EXPECT_EQ(engine.Jobs().GetState(second->Task), Runtime::JobState::AwaitingDependencies);
+        ASSERT_TRUE(DrainUntilTerminal(engine.Jobs(), engine.Events(), first->Task));
+        ASSERT_TRUE(DrainUntilTerminal(engine.Jobs(), engine.Events(), second->Task));
+        EXPECT_EQ(engine.Jobs().GetState(second->Task), Runtime::JobState::Cancelled);
+        ASSERT_TRUE(documents.GetLastSceneFileEvent());
+        EXPECT_EQ(documents.GetLastSceneFileEvent()->Task, second->Task);
+        EXPECT_EQ(documents.GetLastSceneFileEvent()->Error, Core::ErrorCode::InvalidState);
+        EXPECT_TRUE(history->IsDirty());
+        const auto fresh = documents.QueueSceneSaveToPath(file.Path.string());
+        ASSERT_TRUE(fresh.has_value());
+        ASSERT_TRUE(DrainUntilTerminal(engine.Jobs(), engine.Events(), fresh->Task));
+        EXPECT_EQ(engine.Jobs().GetState(fresh->Task), Runtime::JobState::Published);
+        EXPECT_FALSE(history->IsDirty());
+        engine.Shutdown();
+    }
 }
 
 TEST(SceneDocumentModule,

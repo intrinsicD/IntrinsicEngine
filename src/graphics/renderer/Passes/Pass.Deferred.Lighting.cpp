@@ -19,9 +19,9 @@ namespace Extrinsic::Graphics
         // `sampler2DShadow` cannot be honored on the promoted Vulkan pipeline
         // layout, which declares only the bindless set at `set = 0`, so the
         // engine substitutes a bindless-index push-constant for the same
-        // logical "binding". See `src/graphics/renderer/README.md` ("Shader
-        // push-constant compatibility policy" + "Slice C: shadow-atlas
-        // binding") for the durable rule.
+        // logical "binding". See the shader ABI policy in
+        // `src/graphics/renderer/README.md` and the pass contracts in
+        // `docs/architecture/rendering-three-pass.md`.
         struct alignas(16) DeferredLightingPushConstants
         {
             std::uint64_t SceneTableBDA            = 0;

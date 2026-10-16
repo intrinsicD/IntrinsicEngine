@@ -1,10 +1,11 @@
 // Declarative config field tables (RUNTIME-276). One table per config section drives
 // the mechanical part of its validation, its generated JSON Schema (agents) and the
 // editor's field hints, so names, types, ranges and enum names cannot drift apart.
-// Enums stay integer-coded in payloads; their names are metadata.
+// Integer and string enum payloads retain the representation chosen by their owner.
 module;
 
 #include <cstdint>
+#include <cstddef>
 #include <optional>
 #include <span>
 #include <string>
@@ -27,6 +28,9 @@ export namespace Extrinsic::Runtime
         String,
         UIntArray,   // array of unsigned 32-bit integers
         PropertyRef, // {"domain","name","kind"} property binding
+        StringEnum,  // one of EnumValues (wire tokens), optionally named by EnumNames
+        Array,       // homogeneous Item with optional length bounds
+        Object,      // nested Fields; schema only, owner retains merge/fallback semantics
     };
 
     struct ConfigFieldSpec
@@ -38,7 +42,7 @@ export namespace Extrinsic::Runtime
         std::optional<double> Max{};
         bool ExclusiveMin{false};
         bool ExclusiveMax{false};
-        bool Nullable{false}; // String and PropertyRef may be null
+        bool Nullable{false};
         bool NonEmpty{false}; // String must not be empty
         std::span<const std::string_view> EnumNames{};
         // PropertyRef: accepted value kinds (any scalar kind when AnyScalar and a
@@ -46,6 +50,12 @@ export namespace Extrinsic::Runtime
         std::span<const Geometry::PropertyValueKind> RefKinds{};
         std::span<const GeometryElementDomain> RefDomains{};
         bool AnyScalar{false};
+        std::span<const std::string_view> EnumValues{};
+        const ConfigFieldSpec* Item{nullptr};
+        std::optional<std::size_t> MinItems{}, MaxItems{};
+        const ConfigFieldSpec* Fields{nullptr};
+        std::size_t FieldCount{0u};
+        bool IntegerRefKinds{false};
     };
 
     [[nodiscard]] const ConfigFieldSpec* FindConfigFieldSpec(
@@ -60,4 +70,6 @@ export namespace Extrinsic::Runtime
     // True when `value` is finite and inside the declared range, exclusive bounds included. Command
     // owners and the agent's params share this check, so a range is declared once.
     [[nodiscard]] bool AcceptsConfigFieldNumber(const ConfigFieldSpec& field, double value) noexcept;
+    // Exact membership in EnumValues; an empty value list accepts no token.
+    [[nodiscard]] bool AcceptsConfigFieldToken(const ConfigFieldSpec& field, std::string_view value) noexcept;
 }

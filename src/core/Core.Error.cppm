@@ -1,3 +1,4 @@
+// Shared engine error codes and expected-style result helpers.
 module;
 
 #include <cstdint>

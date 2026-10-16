@@ -1,3 +1,4 @@
+// Linear scratch allocation with checked capacity, epoch markers and rewind/reset.
 module;
 
 #include <cstddef>

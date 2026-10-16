@@ -92,6 +92,7 @@ void VulkanCommandContext::Bind(VkDevice device, VkCommandBuffer cmd,
     m_BindPoint     = VK_PIPELINE_BIND_POINT_GRAPHICS;
     m_Recording     = false;
     m_CommandBufferExecutable = false;
+    m_RecordingAttempted = false;
     m_CommandBufferLevel = commandBufferLevel;
 }
 
@@ -168,6 +169,7 @@ void VulkanCommandContext::UpdateFrameSampledDescriptor(RHI::TextureHandle textu
 
 void VulkanCommandContext::Begin()
 {
+    m_RecordingAttempted = true;
     [[maybe_unused]] Core::Telemetry::ScopedTimer timer{"VulkanCommandContext::Begin", Extrinsic::Core::Telemetry::HashString("VulkanCommandContext::Begin")};
     m_CommandBufferExecutable = false;
     if (!CanBegin())

@@ -124,6 +124,13 @@ TEST(PrimitiveSelection, GraphNodesEdgesHalfedgesAndPointCloudRows)
     GS::PopulateFromCloud(h.Scene.Raw(), h.Entity, cloud);
     EXPECT_TRUE(h.Change(Edit::Replace, {0}, D::PointCloudPoint).Usable());
     EXPECT_EQ(h.Read(D::GraphNode).Status, Status::UnsupportedDomain);
+    auto& vertices = h.Scene.Raw().get<GS::Vertices>(h.Entity).Properties;
+    ASSERT_TRUE(vertices.Exists("v:deleted"));
+    vertices.Get<glm::vec3>("v:position")[0] += glm::vec3{1, 2, 3};
+    EXPECT_EQ(h.Read(D::PointCloudPoint).Indices, (std::vector<std::uint32_t>{0}));
+    vertices.Get<bool>("v:deleted")[0] = true;
+    EXPECT_EQ(h.Read(D::PointCloudPoint).Status, Status::StaleTopology);
+    EXPECT_EQ(h.Change(Edit::Replace, {0}, D::PointCloudPoint).Status, Status::InvalidIndex);
 }
 TEST(PrimitiveSelection, PicksCaptureTargetAndModifiersAndDoNotToggleOwnerOff)
 {

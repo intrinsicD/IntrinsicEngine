@@ -59,6 +59,87 @@ namespace
     };
 }
 
+TEST(PropertyFilterWorkspace, ResidentMovesRespectDispatchLimitsAcrossGroupBoundary)
+{
+    for (const std::uint32_t rows : {65535u * 64u, 65535u * 64u + 1u, 1u << 24u})
+    {
+        SCOPED_TRACE(rows);
+        MockDevice device;
+        device.ShaderFloat64 = true;
+        MockCommandContext commands;
+        G::PropertyFilterWorkspace workspace(device);
+        const auto makeView = [&] {
+            const auto handle = device.CreateBuffer({.SizeBytes = std::uint64_t(rows) * 8u,
+                .Usage = Extrinsic::RHI::BufferUsage::Storage});
+            return G::PropertyFilterResidentView{.Buffer = handle,
+                .Address = device.GetBufferDeviceAddress(handle), .Double = true};
+        };
+        const auto working = makeView();
+        const G::PropertyFilterResidentIo io{.Input = makeView(), .Output = makeView(), .Rows = rows};
+        ASSERT_TRUE(workspace.RecordLoad(commands, io, 1, working.Buffer, working.Address, 1, 1));
+        ASSERT_TRUE(workspace.RecordStore(commands, io, 1, working.Buffer, working.Address, 1, 1));
+        ASSERT_EQ(commands.DispatchRecords.size(), 2u);
+        for (const auto& dispatch : commands.DispatchRecords)
+        {
+            EXPECT_GE(dispatch.X, 1u);
+            EXPECT_LE(dispatch.X, 65535u);
+            EXPECT_GE(dispatch.Y, 1u);
+            EXPECT_LE(dispatch.Y, 65535u);
+            EXPECT_EQ(dispatch.Z, 1u);
+            const auto groups = std::uint64_t(dispatch.X) * dispatch.Y;
+            const auto required = (std::uint64_t(rows) + 63u) / 64u;
+            EXPECT_GE(groups, required);
+            EXPECT_LT(groups, required + 65535u);
+            EXPECT_EQ(dispatch.X, 65535u);
+            EXPECT_EQ(dispatch.Y, rows == 65535u * 64u ? 1u : rows == (1u << 24u) ? 5u : 2u);
+        }
+    }
+}
+
+TEST(PropertyFilterWorkspace, ResidentFilterRespectDispatchLimitsAcrossGroupBoundary)
+{
+    constexpr std::uint32_t rows = 65535u * 64u + 1u;
+    MockDevice device;
+    device.ShaderFloat64 = true;
+    MockCommandContext commands;
+    G::PropertyFilterWorkspace workspace(device);
+    const auto makeView = [&] {
+        const auto handle = device.CreateBuffer({.SizeBytes = std::uint64_t(rows) * 8u,
+            .Usage = Extrinsic::RHI::BufferUsage::Storage});
+        return G::PropertyFilterResidentView{.Buffer = handle,
+            .Address = device.GetBufferDeviceAddress(handle), .Double = true};
+    };
+    const G::PropertyFilterResidentIo io{.Input = makeView(), .Output = makeView(), .Rows = rows};
+    const std::vector<double> degree(rows, 0.0);
+    const std::vector<std::uint32_t> fixed(rows, 1u);
+    ASSERT_TRUE(workspace.Record(commands,
+        {.Degree = degree, .Fixed = fixed}, {.Step = 0.5}, &io).IsValid());
+    ASSERT_EQ(commands.DispatchRecords.size(), 3u);
+    for (const auto& dispatch : commands.DispatchRecords)
+    {
+        EXPECT_EQ(dispatch.X, 65535u);
+        EXPECT_EQ(dispatch.Y, 2u);
+        EXPECT_EQ(dispatch.Z, 1u);
+    }
+}
+
+TEST(PropertyFilterWorkspace, BilateralWithoutEdgesKeepsZeroSizedDispatch)
+{
+    MockDevice device;
+    device.ShaderFloat64 = true;
+    MockCommandContext commands;
+    G::PropertyFilterWorkspace workspace(device);
+    const std::vector<double> values{7.25}, degree{0.0};
+    const std::vector<std::uint32_t> fixed{1u};
+    ASSERT_TRUE(workspace.Record(commands,
+        {.Values = values, .Degree = degree, .Fixed = fixed},
+        {.Method = G::PropertyFilterGpuMethod::Bilateral, .Step = 0.5}).IsValid());
+    ASSERT_EQ(commands.DispatchRecords.size(), 3u);
+    EXPECT_EQ(commands.DispatchRecords[0].X, 0u);
+    EXPECT_EQ(commands.DispatchRecords[0].Y, 1u);
+    EXPECT_EQ(commands.DispatchRecords[0].Z, 1u);
+}
+
 TEST(PropertyFilterWorkspace, WarmRunsKeepPipelineAndBuffersAndRewriteEveryInput)
 {
     MockDevice device;

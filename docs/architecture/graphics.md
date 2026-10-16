@@ -148,10 +148,15 @@ and rendering state ownership remain unchanged.
   renderer, runtime, ECS, or asset-service knowledge to support the ring.
 - `Extrinsic.Graphics.GpuTransfer` is the graphics-layer facade over the
   ADR-0023 transfer foundation. It validates buffer ranges through
-  `RHI.BufferTransfer`, schedules async uploads through `ITransferQueue`, emits
-  `TransferWrite -> ShaderRead` only from its post-`CollectCompleted()` drain
-  after the upload token completes, and wraps readbacks with the required
-  `TransferRead` bracket. It is for algorithm/user-owned transfers; `GpuWorld`
+  `RHI.BufferTransfer` and schedules async uploads through `ITransferQueue`.
+  Its post-`CollectCompleted()` drain emits `TransferWrite -> ReadyAccess`
+  exactly once after each upload token completes. `UploadInCommand` instead
+  copies an existing staging buffer and records that barrier immediately on the
+  supplied command context; the caller retains staging storage until that
+  command buffer executes. Readbacks must be scheduled after the producer
+  submission is enqueued; the transfer backend owns source-write-to-read
+  synchronization, not the facade's supplied frame command context.
+  It is for algorithm/user-owned transfers; `GpuWorld`
   retains its existing managed geometry upload barriers. This prevents the
   BUG-049 missing/eager-barrier class from recurring without adding a new RHI
   surface.
@@ -177,6 +182,28 @@ and rendering state ownership remain unchanged.
   `SceneInteractionModule` directly owns bounded frame-correlation records and
   selection-specific policy; RUNTIME-195 does not fold them into compute-result
   batches.
+
+### Backbuffer capture
+
+`IRenderer::RequestBackbufferCapture` returns zero while another capture is
+in flight or the device is not operational. `TakeBackbufferCapture(ticket)`
+reports `Pending`, then returns the `Ready` or `Failed` result once; subsequent
+takes report `Unknown`. The renderer records a
+backbuffer copy to a host-visible buffer and reads it only after the issuing
+frame slot has been retired. Results are tightly packed RGBA8 with opaque alpha;
+BGRA inputs are swizzled and the result retains the source sRGB flag. Runtime's
+`ViewCapture` owner handles file encoding and publication.
+
+The source lifecycle waits for a presentable extent. A resize before recording
+reallocates the buffer; an extent mismatch at record time waits for a later
+frame. Rebuild, shutdown, a non-operational device, unsupported format or failed
+buffer allocation fails the ticket. Before a copy is recorded, a 240-device-frame
+budget also applies. It does not bound elapsed time when Runtime skips rendering
+for a minimized window: a pending UI capture waits for restoration. Runtime
+fails an agent capture operation when the window becomes unpresentable, including
+an already pending operation; its underlying capture may still finish and write
+the requested file after restoration. These are source contracts, not a claim of
+dedicated capture-test coverage.
 
 ## Vulkan operational readiness and runtime fallback
 

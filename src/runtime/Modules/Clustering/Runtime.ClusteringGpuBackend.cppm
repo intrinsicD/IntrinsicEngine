@@ -15,6 +15,7 @@ namespace Extrinsic::Runtime
     struct KMeansGpuDiagnostics
     {
         float Inertia{}, MaxDistance{-1}, MaxShift{};
+        // Changed bits: labels=1, centroids=2; shared with kmeans_state.glsl.
         std::uint32_t MaxDistanceIndex{}, Changed{}, Invalid{};
         double InertiaSum{};
     };

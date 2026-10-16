@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <cstdlib>
 #include <limits>
 #include <string>
 #include <utility>
@@ -758,4 +759,95 @@ TEST(ECSGeometrySourcesPopulate, PreparedMeshPublishesOwnedBuffersWithoutRebuild
     EXPECT_EQ(view.HalfedgeSource->Properties.Get<std::uint32_t>(PropertyNames::kHalfedgeNext).Vector().data(), halfedgeData);
     EXPECT_EQ(view.VertexSource->Properties.Size(), 4u);
     EXPECT_EQ(view.FaceSource->Properties.Size(), 2u);
+}
+
+
+namespace
+{
+    bool CloudCanonicalCollisionHandled(const bool normal)
+    {
+        Registry scene;
+        const auto entity = scene.Create();
+        Geometry::PointCloud::Cloud cloud;
+        const auto point = cloud.AddPoint({1, 2, 3});
+        if (normal)
+        {
+            cloud.EnableNormals();
+            cloud.Normal(point) = glm::vec3{0, 0, 1};
+        }
+        const std::string key{normal ? PropertyNames::kNormal : PropertyNames::kPosition};
+        (void)cloud.PointProperties().GetOrAdd<float>(key, 99.0f);
+        GeometrySources::PopulateFromCloud(scene.Raw(), entity, cloud);
+        const auto property = scene.Raw().get<GeometrySources::Vertices>(entity)
+            .Properties.Get<glm::vec3>(key);
+        return property && property.Vector().size() == 1u
+            && property.Vector()[0] == (normal ? glm::vec3{0, 0, 1} : glm::vec3{1, 2, 3});
+    }
+}
+
+TEST(ECSGeometrySourcesPopulate, PopulateFromCloudReplacesWrongTypedCanonicalPosition)
+{
+    EXPECT_EXIT(std::_Exit(CloudCanonicalCollisionHandled(false) ? 0 : 1),
+                ::testing::ExitedWithCode(0), "");
+}
+
+TEST(ECSGeometrySourcesPopulate, PopulateFromCloudReplacesWrongTypedCanonicalNormal)
+{
+    EXPECT_EXIT(std::_Exit(CloudCanonicalCollisionHandled(true) ? 0 : 1),
+                ::testing::ExitedWithCode(0), "");
+}
+
+TEST(ECSGeometrySourcesPopulate, PopulateFromCloudPublishesCanonicalDeletedRows)
+{
+    Registry scene;
+    const auto entity = scene.Create();
+    Geometry::PointCloud::Cloud cloud;
+    (void)cloud.AddPoint({0, 0, 0});
+    const auto removed = cloud.AddPoint({1, 0, 0});
+    (void)cloud.AddPoint({4, 0, 0});
+    cloud.DeletePoint(removed);
+
+    GeometrySources::PopulateFromCloud(scene.Raw(), entity, cloud);
+
+    const auto& vertices = scene.Raw().get<GeometrySources::Vertices>(entity);
+    const auto deleted = vertices.Properties.Get<bool>("v:deleted");
+    ASSERT_TRUE(deleted);
+    EXPECT_EQ(deleted.Vector(), (std::vector<bool>{false, true, false}));
+    EXPECT_EQ(vertices.NumDeleted, 1u);
+    EXPECT_EQ(GeometrySources::VertexCount(vertices), 2u);
+    EXPECT_EQ(cloud.VerticesSize(), 3u);
+    EXPECT_TRUE(cloud.IsDeleted(removed));
+}
+
+TEST(ECSGeometrySourcesPopulate, PopulateFromCloudViewCopiesOnlySelectedPropertyRows)
+{
+    Registry scene;
+    const auto entity = scene.Create();
+    Geometry::PointCloud::Cloud cloud;
+    for (int i = 0; i < 4; ++i) (void)cloud.AddPoint({static_cast<float>(i), 0, 0});
+    auto weights = cloud.PointProperties().GetOrAdd<float>("p:user_weight");
+    weights.Vector() = {10, 20, 30, 40};
+    auto vectors = cloud.PointProperties().GetOrAdd<glm::vec3>("p:user_vector");
+    vectors.Vector() = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}, {10, 11, 12}};
+    cloud.DeletePoint(Geometry::VertexHandle{2});
+    auto view = Geometry::PointCloud::Cloud::CreateView(cloud, {1, 2});
+
+    GeometrySources::PopulateFromCloud(scene.Raw(), entity, view);
+
+    const auto& vertices = scene.Raw().get<GeometrySources::Vertices>(entity);
+    EXPECT_EQ(vertices.Properties.Size(), 2u);
+    EXPECT_EQ(vertices.Properties.Get<float>("p:user_weight").Vector(),
+              (std::vector<float>{20, 30}));
+    EXPECT_EQ(vertices.Properties.Get<glm::vec3>("p:user_vector").Vector(),
+              (std::vector<glm::vec3>{{4, 5, 6}, {7, 8, 9}}));
+    EXPECT_EQ(vertices.Properties.Get<glm::vec3>(PropertyNames::kPosition).Vector(),
+              (std::vector<glm::vec3>{{1, 0, 0}, {2, 0, 0}}));
+    const auto deleted = vertices.Properties.Get<bool>("v:deleted");
+    ASSERT_TRUE(deleted);
+    EXPECT_EQ(deleted.Vector(), (std::vector<bool>{false, true}));
+    EXPECT_EQ(vertices.NumDeleted, 1u);
+    EXPECT_EQ(GeometrySources::VertexCount(vertices), 1u);
+    EXPECT_EQ(cloud.PointProperties().Size(), 4u);
+    EXPECT_EQ(weights.Vector(), (std::vector<float>{10, 20, 30, 40}));
+    EXPECT_EQ(cloud.Position(Geometry::VertexHandle{2}), (glm::vec3{2, 0, 0}));
 }

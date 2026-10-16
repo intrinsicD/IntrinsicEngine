@@ -309,10 +309,11 @@ namespace Extrinsic::Runtime
                 if (spec.Field != nullptr) defaults[std::string(spec.Field->Name)] = spec.Default;
             Json schema = Json::parse(ConfigDetail::BuildSectionSchemaJson("", name, "", fields, defaults));
             for (const char* key : {"$schema", "$id", "title", "description"}) schema.erase(key);
-            // Enums are integer codes in the owner's schema; the agent also takes their names.
+            // Integer-coded operation enums also accept their human-readable names.
+            // String-token section enums retain their owner's wire representation.
             for (auto& [key, property] : schema["properties"].items())
             {
-                if (!property.contains("x-enum-names")) continue;
+                if (property.value("type", "") != "integer" || !property.contains("x-enum-names")) continue;
                 Json codes{{"type", "integer"}, {"enum", property["enum"]}};
                 Json names{{"type", "string"}, {"enum", property["x-enum-names"]}};
                 property.erase("type");

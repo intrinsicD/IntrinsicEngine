@@ -162,5 +162,4 @@ Follow-up tasks required: none from this ADR. The opt-in copy / blit fast-path, 
 - [`tasks/done/GRAPHICS-013C`](../../tasks/archive/GRAPHICS-013C-imgui-overlay-and-present.md) records the underlying `ImGuiOverlaySystem` and `Pass.Present` data-only contracts.
 - [`tasks/done/GRAPHICS-013CQ`](../../tasks/archive/GRAPHICS-013CQ-imgui-present-backend-clarifications.md) records the four clarification decisions captured in §§1–4.
 - `docs/architecture/rendering-three-pass.md` carries the matching ImGui overlay and present / finalization contract block authored by `GRAPHICS-013CQ`.
-- `src/graphics/renderer/README.md` carries the matching ownership-contract bullet next to the existing `ImGuiOverlaySystem` line.
 - The default CPU correctness gate (`ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`) exercises `SetPipeline` / `HasOverlayWork` / `BuildPushConstants` for the overlay seam and the fullscreen-triangle present finalization without a Vulkan device.

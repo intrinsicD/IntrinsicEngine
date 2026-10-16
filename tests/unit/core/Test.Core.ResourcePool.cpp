@@ -162,6 +162,32 @@ TEST(CoreResourcePool, InvalidHandlesReturnResourceNotFound)
     EXPECT_EQ(pool.GetIfValid(outOfRange), nullptr);
 }
 
+TEST(CoreResourcePool, ClearPreservesStaleIdentityAcrossReuse)
+{
+    ImmediatePool pool;
+    const auto first = pool.Emplace(1, "first");
+    const auto second = pool.Emplace(2, "second");
+    pool.Remove(first, 0);
+    pool.ProcessDeletions(1);
+    const auto recycled = pool.Emplace(3, "recycled");
+    ASSERT_EQ(recycled.Index, first.Index);
+    ASSERT_NE(recycled.Generation, second.Generation);
+    pool.Clear();
+    ASSERT_EQ(pool.Capacity(), 0u);
+    const auto freshFirst = pool.Emplace(4, "fresh-first");
+    const auto freshSecond = pool.Emplace(5, "fresh-second");
+    for (const auto stale : {first, second, recycled})
+    {
+        EXPECT_FALSE(pool.Get(stale).has_value());
+        pool.Remove(stale, 1);
+    }
+    pool.ProcessDeletions(2);
+    ASSERT_TRUE(pool.Get(freshFirst).has_value());
+    ASSERT_TRUE(pool.Get(freshSecond).has_value());
+    EXPECT_EQ((*pool.Get(freshFirst))->Value, 4);
+    EXPECT_EQ((*pool.Get(freshSecond))->Value, 5);
+}
+
 TEST(CoreResourcePool, ConcurrentReadsAreSafe)
 {
     ImmediatePool pool;
@@ -199,3 +225,29 @@ TEST(CoreResourcePool, ConcurrentReadsAreSafe)
 }
 
 
+TEST(CoreResourcePool, ConcurrentRetirementReclaimsAndReusesEverySlot)
+{
+    ImmediatePool pool;
+    std::vector<Handle> handles;
+    for (int value = 0; value < 10000; ++value)
+        handles.push_back(pool.Add({value, "retired"}));
+    std::atomic<bool> done{false};
+    std::thread remover([&] {
+        for (const auto handle : handles) pool.Remove(handle, 0);
+        done.store(true, std::memory_order_release);
+    });
+    while (!done.load(std::memory_order_acquire)) pool.ProcessDeletions(1);
+    remover.join();
+    pool.ProcessDeletions(1);
+    for (const auto handle : handles) EXPECT_FALSE(pool.Get(handle));
+    std::vector<Handle> replacements;
+    for (int value = 0; value < 10000; ++value)
+        replacements.push_back(pool.Add({value, "replacement"}));
+    EXPECT_EQ(pool.Capacity(), handles.size());
+    for (int value = 0; value < 10000; ++value)
+    {
+        const auto resource = pool.Get(replacements[value]);
+        ASSERT_TRUE(resource);
+        EXPECT_EQ((*resource)->Value, value);
+    }
+}

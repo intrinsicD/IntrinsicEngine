@@ -1078,16 +1078,20 @@ namespace Extrinsic::Runtime
                         : EditorCommandHistoryStatus::StaleEntity;
                 };
             const auto apply =
-                [](
+                [commandHistory = context.CommandHistory](
                     const ProgressivePoissonMutationIdentity& candidate,
                     const ProgressivePoissonEntitySnapshot& target)
                 {
                     if (target == nullptr)
                         return EditorCommandHistoryStatus::CommandFailed;
-                    return ApplyProgressivePoissonEntityState(
-                        candidate.Scene,
-                        candidate.StableEntityId,
-                        *target);
+                    const auto entity = ResolveStableEntity(candidate.Scene->Raw(), candidate.StableEntityId);
+                    if (!entity) return EditorCommandHistoryStatus::StaleEntity;
+                    const EditorProcessingContext historyContext{.Scene = candidate.Scene, .CommandHistory = commandHistory};
+                    const auto historyBefore = GeometryProcessingDetail::ObservePointPropertyHistory(historyContext, *entity, std::nullopt);
+                    const auto status = ApplyProgressivePoissonEntityState(candidate.Scene, candidate.StableEntityId, *target);
+                    if (status == EditorCommandHistoryStatus::Applied)
+                        GeometryProcessingDetail::RebasePointPropertyHistory(historyContext, *entity, historyBefore);
+                    return status;
                 };
             const auto stamp =
                 [](
@@ -1544,10 +1548,6 @@ namespace Extrinsic::Runtime
                 .DebugName = "Sandbox.ProgressivePoisson.CPU",
                 .Scope = context.World,
                 .Priority = Core::Dag::TaskPriority::Normal,
-                .Kind = RuntimeTaskKinds::GeometryProcess,
-                .EstimatedCost = std::max<std::uint32_t>(
-                    1u,
-                    (inputCount + 1023u) / 1024u),
                 .Work =
                     [state](const JobCancellation&) -> JobResultEnvelope
                     {

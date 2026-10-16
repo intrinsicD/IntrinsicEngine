@@ -35,16 +35,15 @@ export namespace Extrinsic::Platform::Input {
             float x{0.0f}, y{0.0f};
         };
 
-        void Initialize(void* windowHandle);
-
         [[nodiscard]] bool IsKeyPressed(int keycode) const;
+        // True if a press transition occurred since BeginFrame, even after release.
         [[nodiscard]] bool IsKeyJustPressed(int keycode) const;
         [[nodiscard]] bool IsMouseButtonPressed(int button) const;
+        // True if a press transition occurred since BeginFrame, even after release.
         [[nodiscard]] bool IsMouseButtonJustPressed(int button) const;
 
         [[nodiscard]] XY GetMousePosition() const { return m_MousePosition; }
         [[nodiscard]] XY GetScrollDelta() const { return {m_FrameScrollX, m_FrameScrollY}; }
-        [[nodiscard]] XY GetScrollAccum() const { return {m_ScrollAccumX, m_ScrollAccumY}; }
 
         void AccumulateScroll(float xOffset, float yOffset);
         void SetKeyState(int keycode, bool pressed);
@@ -54,14 +53,12 @@ export namespace Extrinsic::Platform::Input {
         void Update();
 
     private:
-        void* m_WindowHandle = nullptr;
-
         static constexpr int kMouseButtons = 8;
-        std::array<std::uint8_t, kMouseButtons> m_PrevMouse{};
+        std::array<std::uint8_t, kMouseButtons> m_PressedMouse{};
         std::array<std::uint8_t, kMouseButtons> m_CurrMouse{};
 
         static constexpr int kMaxTrackedKeys = 400;
-        std::array<std::uint8_t, kMaxTrackedKeys> m_PrevKeys{};
+        std::array<std::uint8_t, kMaxTrackedKeys> m_PressedKeys{};
         std::array<std::uint8_t, kMaxTrackedKeys> m_CurrKeys{};
 
         float m_ScrollAccumX = 0.0f;

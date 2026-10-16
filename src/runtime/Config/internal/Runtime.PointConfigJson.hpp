@@ -32,7 +32,8 @@ extern "C++"
         [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeSectionRegistration(
             std::string_view name, std::string_view schemaId, std::uint32_t schemaVersion,
             std::string defaultPayloadJson, SectionValidatorFn validate,
-            Core::Config::EngineConfigSectionChangedCallback&& onChanged);
+            std::string schemaJson,
+            Core::Config::EngineConfigSectionChangedCallback&& onChanged = {});
 
         // Decodes a point config only from a Valid canonical payload.
         template <class T>
@@ -47,18 +48,6 @@ extern "C++"
             return parse(ParseConfigJson(*payload, true));
         }
 
-        // Defaults contain each unsigned field. Nested values replace defaults;
-        // unknown keys precede integer diagnostics, which follow the supplied order.
-        [[nodiscard]] std::optional<std::string> ValidatePointConfigFields(
-            const nlohmann::json& input, nlohmann::json& defaults,
-            std::string_view objectError, std::string_view unknownFieldPrefix,
-            std::initializer_list<std::string_view> unsignedFields);
-
-        // Fields exist in the merged defaults; the first invalid field wins.
-        [[nodiscard]] std::optional<std::string> ValidatePointConfigNonnegativeFloats(
-            const nlohmann::json& values,
-            std::initializer_list<std::string_view> fields);
-
         enum class PointPropertyValidation { Valid, InvalidReference, UnknownDomain };
 
         [[nodiscard]] const char* PointPropertyKindToken(Geometry::PropertyValueKind kind) noexcept;
@@ -66,10 +55,6 @@ extern "C++"
         [[nodiscard]] nlohmann::json EncodeVec3PointPropertyRef(const GeometryPropertyRef& ref);
         [[nodiscard]] PointPropertyValidation ValidatePointPropertyRef(
             const nlohmann::json& ref, Geometry::PropertyValueKind kind, bool allowScalarConversion = false);
-        // Fields exist in the merged defaults; diagnostics follow the supplied order.
-        [[nodiscard]] std::optional<std::string> ValidatePointConfigPropertyRefs(
-            const nlohmann::json& values,
-            std::initializer_list<std::pair<std::string_view, Geometry::PropertyValueKind>> fields);
         // Decodes validated bindings without changing the caller's expected value kind.
         void DecodePointPropertyRef(const nlohmann::json& value, GeometryPropertyRef& ref);
     }

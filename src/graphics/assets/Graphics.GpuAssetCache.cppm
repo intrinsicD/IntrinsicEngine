@@ -1,3 +1,5 @@
+// Maps asset IDs to graphics-owned buffer and texture residency,
+// with upload state, resource views, and deferred lease retirement.
 module;
 
 #include <cstddef>
@@ -47,11 +49,10 @@ import Extrinsic.RHI.TransferQueue;
 //   `framesInFlight` frames after the swap.
 //
 // Threading:
-//   RequestUpload / NotifyFailed / NotifyReloaded / NotifyDestroyed
-//   are safe from any thread (they do not call IDevice).  Tick()
-//   must run on the render thread because Lease destruction calls
-//   the manager's Release() path, which may reach into IDevice.
-//   GetState / GetView are lock-protected reads.
+//   The cache mutex serializes slot metadata. RequestUpload and fallback
+//   initialization call IDevice and inherit its thread/queue requirements.
+//   Tick runs on the render thread; retiring leases may call IDevice through
+//   their managers. GetState / GetView are lock-protected reads.
 //
 // Texture residency slice:
 //   Texture uploads may carry an externally owned sampler handle or a
@@ -204,6 +205,8 @@ export namespace Extrinsic::Graphics
         //                          stays in its previous state for a retry.
         //   OutOfDeviceMemory    — Buffer/Texture allocation failed; entry
         //                          transitions to Failed.
+        //   AssetUploadFailed — transfer rejected the upload; entry becomes Failed
+        //                       and existing Current is retained.
         //   InvalidArgument   — Id is not valid.
         Core::Result RequestUpload(const GpuBufferRequest&  req);
         Core::Result RequestUpload(const GpuTextureRequest& req);

@@ -77,16 +77,25 @@ namespace Geometry::PointCloudIO
         }
 
         template <typename T>
-        [[nodiscard]] bool AllFinite(std::span<const T> values)
+        [[nodiscard]] bool AllFinite(std::span<const T> values, std::span<const std::size_t> rows)
         {
-            for (const T& value : values)
+            for (const std::size_t row : rows)
             {
-                if (!IsFinite(value))
+                if (!IsFinite(values[row]))
                 {
                     return false;
                 }
             }
             return true;
+        }
+
+        [[nodiscard]] std::vector<std::size_t> LiveRows(const PointCloud::Cloud& cloud)
+        {
+            std::vector<std::size_t> rows;
+            rows.reserve(cloud.VerticesSize());
+            const std::size_t offset = cloud.IsSubmeshView() ? cloud.VertexRange().Offset : 0;
+            for (const VertexHandle point : cloud.LivePoints()) rows.push_back(point.Index - offset);
+            return rows;
         }
 
         [[nodiscard]] std::optional<glm::vec4> ParseRgb(std::span<const std::string_view> tokens, std::size_t offset)
@@ -1873,23 +1882,24 @@ namespace Geometry::PointCloudIO
         }
 
         const auto& source = cloud.Cloud;
-        if (source.IsEmpty())
+        const auto rows = LiveRows(source);
+        if (rows.empty())
         {
             return PointCloudIOWriteStatus::EmptyCloud;
         }
 
         const auto positions = source.Positions();
-        const std::size_t pointCount = positions.size();
+        const std::size_t pointCount = rows.size();
 
-        const bool hasNormals = source.HasNormals() && source.Normals().size() == pointCount;
-        const bool hasColors = source.HasColors() && source.Colors().size() == pointCount;
-        const bool hasRadii = source.HasRadii() && source.Radii().size() == pointCount;
+        const bool hasNormals = source.HasNormals() && source.Normals().size() == positions.size();
+        const bool hasColors = source.HasColors() && source.Colors().size() == positions.size();
+        const bool hasRadii = source.HasRadii() && source.Radii().size() == positions.size();
         const auto normals = hasNormals ? source.Normals() : std::span<const glm::vec3>{};
         const auto colors = hasColors ? source.Colors() : std::span<const glm::vec4>{};
         const auto radii = hasRadii ? source.Radii() : std::span<const float>{};
 
-        if (!AllFinite(positions) || (hasNormals && !AllFinite(normals)) ||
-            (hasColors && !AllFinite(colors)) || (hasRadii && !AllFinite(radii)))
+        if (!AllFinite(positions, rows) || (hasNormals && !AllFinite(normals, rows)) ||
+            (hasColors && !AllFinite(colors, rows)) || (hasRadii && !AllFinite(radii, rows)))
         {
             return PointCloudIOWriteStatus::FileWriteError;
         }
@@ -1936,7 +1946,7 @@ namespace Geometry::PointCloudIO
         }
         stream << "end_header\n";
 
-        for (std::size_t i = 0; i < pointCount; ++i)
+        for (const std::size_t i : rows)
         {
             const auto& p = positions[i];
             int written = std::snprintf(buffer, sizeof(buffer),
@@ -2011,23 +2021,24 @@ namespace Geometry::PointCloudIO
         }
 
         const auto& source = cloud.Cloud;
-        if (source.IsEmpty())
+        const auto rows = LiveRows(source);
+        if (rows.empty())
         {
             return PointCloudIOWriteStatus::EmptyCloud;
         }
 
         const auto positions = source.Positions();
-        const std::size_t pointCount = positions.size();
+        const std::size_t pointCount = rows.size();
 
-        const bool hasNormals = source.HasNormals() && source.Normals().size() == pointCount;
-        const bool hasColors = source.HasColors() && source.Colors().size() == pointCount;
-        const bool hasRadii = source.HasRadii() && source.Radii().size() == pointCount;
+        const bool hasNormals = source.HasNormals() && source.Normals().size() == positions.size();
+        const bool hasColors = source.HasColors() && source.Colors().size() == positions.size();
+        const bool hasRadii = source.HasRadii() && source.Radii().size() == positions.size();
         const auto normals = hasNormals ? source.Normals() : std::span<const glm::vec3>{};
         const auto colors = hasColors ? source.Colors() : std::span<const glm::vec4>{};
         const auto radii = hasRadii ? source.Radii() : std::span<const float>{};
 
-        if (!AllFinite(positions) || (hasNormals && !AllFinite(normals)) ||
-            (hasColors && !AllFinite(colors)) || (hasRadii && !AllFinite(radii)))
+        if (!AllFinite(positions, rows) || (hasNormals && !AllFinite(normals, rows)) ||
+            (hasColors && !AllFinite(colors, rows)) || (hasRadii && !AllFinite(radii, rows)))
         {
             return PointCloudIOWriteStatus::FileWriteError;
         }
@@ -2074,7 +2085,7 @@ namespace Geometry::PointCloudIO
         }
         stream << "end_header\n";
 
-        for (std::size_t i = 0; i < pointCount; ++i)
+        for (const std::size_t i : rows)
         {
             const auto& p = positions[i];
             if (!WriteLittleEndian(stream, p.x) || !WriteLittleEndian(stream, p.y) ||
@@ -2129,18 +2140,18 @@ namespace Geometry::PointCloudIO
         }
 
         const auto& source = cloud.Cloud;
-        if (source.IsEmpty())
+        const auto rows = LiveRows(source);
+        if (rows.empty())
         {
             return PointCloudIOWriteStatus::EmptyCloud;
         }
 
         const auto positions = source.Positions();
-        const std::size_t pointCount = positions.size();
 
-        const bool hasColors = source.HasColors() && source.Colors().size() == pointCount;
+        const bool hasColors = source.HasColors() && source.Colors().size() == positions.size();
         const auto colors = hasColors ? source.Colors() : std::span<const glm::vec4>{};
 
-        if (!AllFinite(positions) || (hasColors && !AllFinite(colors)))
+        if (!AllFinite(positions, rows) || (hasColors && !AllFinite(colors, rows)))
         {
             return PointCloudIOWriteStatus::FileWriteError;
         }
@@ -2152,7 +2163,7 @@ namespace Geometry::PointCloudIO
         }
 
         char buffer[256];
-        for (std::size_t i = 0; i < pointCount; ++i)
+        for (const std::size_t i : rows)
         {
             const auto& p = positions[i];
             int written = 0;
@@ -2208,21 +2219,22 @@ namespace Geometry::PointCloudIO
             }
 
             const auto& source = cloud.Cloud;
-            if (source.IsEmpty())
+            const auto rows = LiveRows(source);
+            if (rows.empty())
             {
                 return PointCloudIOWriteStatus::EmptyCloud;
             }
 
             const auto positions = source.Positions();
-            const std::size_t pointCount = positions.size();
+            const std::size_t pointCount = rows.size();
 
-            const bool hasNormals = source.HasNormals() && source.Normals().size() == pointCount;
-            const bool hasColors = source.HasColors() && source.Colors().size() == pointCount;
+            const bool hasNormals = source.HasNormals() && source.Normals().size() == positions.size();
+            const bool hasColors = source.HasColors() && source.Colors().size() == positions.size();
             const auto normals = hasNormals ? source.Normals() : std::span<const glm::vec3>{};
             const auto colors = hasColors ? source.Colors() : std::span<const glm::vec4>{};
 
-            if (!AllFinite(positions) || (hasNormals && !AllFinite(normals)) ||
-                (hasColors && !AllFinite(colors)))
+            if (!AllFinite(positions, rows) || (hasNormals && !AllFinite(normals, rows)) ||
+                (hasColors && !AllFinite(colors, rows)))
             {
                 return PointCloudIOWriteStatus::FileWriteError;
             }
@@ -2312,7 +2324,7 @@ namespace Geometry::PointCloudIO
 
             if (encoding == PCDEncoding::Ascii)
             {
-                for (std::size_t i = 0; i < pointCount; ++i)
+                for (const std::size_t i : rows)
                 {
                     const auto& p = positions[i];
                     int written = std::snprintf(buffer, sizeof(buffer),
@@ -2361,7 +2373,7 @@ namespace Geometry::PointCloudIO
             }
             else
             {
-                for (std::size_t i = 0; i < pointCount; ++i)
+                for (const std::size_t i : rows)
                 {
                     const auto& p = positions[i];
                     if (!WriteLittleEndian(stream, p.x) || !WriteLittleEndian(stream, p.y) ||

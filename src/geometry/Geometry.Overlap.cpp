@@ -176,16 +176,7 @@ namespace Geometry
 
         bool Overlap_Analytic(const Ray& r, const Sphere& s)
         {
-            glm::vec3 m = r.Origin - s.Center;
-            float b = glm::dot(m, r.Direction);
-            float c = glm::dot(m, m) - s.Radius * s.Radius;
-
-            if (c > 0.0f && b > 0.0f) return false;
-
-            float discr = b * b - c;
-            if (discr < 0.0f) return false;
-
-            return true;
+            return RaySphereParameter(r, s).has_value();
         }
 
         bool Overlap_Analytic(const Sphere& a, const Sphere& b)

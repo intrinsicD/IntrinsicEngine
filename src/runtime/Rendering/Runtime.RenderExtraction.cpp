@@ -38,6 +38,7 @@ import Extrinsic.ECS.Component.Culling.Local;
 import Extrinsic.ECS.Component.Culling.World;
 import Extrinsic.ECS.System.BoundsPropagation;
 import Geometry.AABB;
+import Geometry.OBB;
 import Geometry.Sphere;
 import Extrinsic.ECS.Component.Light;
 import Extrinsic.Asset.Registry;
@@ -96,6 +97,11 @@ namespace Extrinsic::Runtime
     void RenderExtractionCache::ClearSceneState(Graphics::IRenderer& renderer)
     {
         m_State->ClearSceneState(renderer);
+    }
+
+    std::uint64_t RenderExtractionCache::SceneEpoch() const noexcept
+    {
+        return m_State->m_SceneEpoch;
     }
 
     void RenderExtractionCache::Shutdown(Graphics::IRenderer& renderer)
@@ -426,8 +432,9 @@ namespace Extrinsic::Runtime
             {
                 bounds.WorldSphere = {worldBounds->WorldBoundingSphere.Center,
                                       worldBounds->WorldBoundingSphere.Radius};
-                bounds.WorldAabbMin = {worldBounds->WorldBoundingOBB.Center - worldBounds->WorldBoundingOBB.Extents, 0.f};
-                bounds.WorldAabbMax = {worldBounds->WorldBoundingOBB.Center + worldBounds->WorldBoundingOBB.Extents, 0.f};
+                const Geometry::AABB aabb = Geometry::ToAABB(worldBounds->WorldBoundingOBB);
+                bounds.WorldAabbMin = {aabb.Min, 0.f};
+                bounds.WorldAabbMax = {aabb.Max, 0.f};
             }
             return bounds;
         }
@@ -477,8 +484,9 @@ namespace Extrinsic::Runtime
                 return bounds;
             bounds.LocalSphere = {local.LocalBoundingSphere.Center, local.LocalBoundingSphere.Radius};
             bounds.WorldSphere = {world.WorldBoundingSphere.Center, world.WorldBoundingSphere.Radius};
-            bounds.WorldAabbMin = {world.WorldBoundingOBB.Center - world.WorldBoundingOBB.Extents, 0.f};
-            bounds.WorldAabbMax = {world.WorldBoundingOBB.Center + world.WorldBoundingOBB.Extents, 0.f};
+            const Geometry::AABB aabb = Geometry::ToAABB(world.WorldBoundingOBB);
+            bounds.WorldAabbMin = {aabb.Min, 0.f};
+            bounds.WorldAabbMax = {aabb.Max, 0.f};
             return bounds;
         }
 
@@ -2626,7 +2634,9 @@ namespace Extrinsic::Runtime
         m_VectorFieldCaches.clear();
         m_SceneInteraction = {};
 
-        renderer.SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{});
+        for (std::uint32_t slot = 0u; slot < RenderWorldPool::kMaxBuffers; ++slot)
+            renderer.SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{}, slot);
+        ++m_SceneEpoch;
         m_LastStats = stats;
     }
 

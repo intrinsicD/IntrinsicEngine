@@ -38,6 +38,7 @@ import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.PropertyTextureBake;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.CommandContext;
@@ -1986,8 +1987,8 @@ namespace Extrinsic::Runtime
                         const float delta = std::max(
                             1.0e-6f,
                             std::abs(prepared.RangeMin) * 1.0e-6f);
-                        prepared.RangeMin -= delta;
-                        prepared.RangeMax += delta;
+                        (void)Graphics::ExpandConstantScalarRange(
+                            prepared.RangeMin, delta, prepared.RangeMin, prepared.RangeMax);
                     }
                 }
                 if (!std::isfinite(prepared.RangeMin) ||

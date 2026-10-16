@@ -29,7 +29,8 @@ export namespace Extrinsic::Assets
         [[nodiscard]] ListenerToken SubscribeAll(ListenerCallback cb);
         void UnsubscribeAll(ListenerToken token);
         void Publish(AssetId id, AssetEvent ev);
-        // Invokes queued callbacks synchronously; callers flush on the main thread.
+        // Invokes a queue/listener snapshot synchronously without the queue lock.
+        // Concurrent flush callers must synchronize their own listener state.
         void Flush();
         // Drains one asset while preserving unrelated pending events.
         void Flush(AssetId id);

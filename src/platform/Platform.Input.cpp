@@ -6,11 +6,6 @@ module Extrinsic.Platform.Input;
 
 namespace Extrinsic::Platform::Input
 {
-    void Context::Initialize(void* windowHandle)
-    {
-        m_WindowHandle = windowHandle;
-    }
-
     bool Context::IsKeyPressed(int keycode) const
     {
         if (keycode < 0 || keycode >= kMaxTrackedKeys) return false;
@@ -20,7 +15,7 @@ namespace Extrinsic::Platform::Input
     bool Context::IsKeyJustPressed(int keycode) const
     {
         if (keycode < 0 || keycode >= kMaxTrackedKeys) return false;
-        return (m_CurrKeys[keycode] != 0) && (m_PrevKeys[keycode] == 0);
+        return m_PressedKeys[keycode] != 0;
     }
 
     bool Context::IsMouseButtonPressed(int button) const
@@ -32,7 +27,7 @@ namespace Extrinsic::Platform::Input
     bool Context::IsMouseButtonJustPressed(int button) const
     {
         if (button < 0 || button >= kMouseButtons) return false;
-        return (m_CurrMouse[button] != 0) && (m_PrevMouse[button] == 0);
+        return m_PressedMouse[button] != 0;
     }
 
     void Context::AccumulateScroll(float xOffset, float yOffset)
@@ -44,12 +39,14 @@ namespace Extrinsic::Platform::Input
     void Context::SetKeyState(int keycode, bool pressed)
     {
         if (keycode < 0 || keycode >= kMaxTrackedKeys) return;
+        if (pressed && !m_CurrKeys[keycode]) m_PressedKeys[keycode] = 1;
         m_CurrKeys[keycode] = static_cast<std::uint8_t>(pressed);
     }
 
     void Context::SetMouseButtonState(int button, bool pressed)
     {
         if (button < 0 || button >= kMouseButtons) return;
+        if (pressed && !m_CurrMouse[button]) m_PressedMouse[button] = 1;
         m_CurrMouse[button] = static_cast<std::uint8_t>(pressed);
     }
 
@@ -60,8 +57,8 @@ namespace Extrinsic::Platform::Input
 
     void Context::BeginFrame()
     {
-        m_PrevMouse = m_CurrMouse;
-        m_PrevKeys = m_CurrKeys;
+        m_PressedMouse.fill(0);
+        m_PressedKeys.fill(0);
         m_FrameScrollX = 0.0f;
         m_FrameScrollY = 0.0f;
     }

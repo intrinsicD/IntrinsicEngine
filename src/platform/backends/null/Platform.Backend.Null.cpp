@@ -16,7 +16,6 @@ namespace Extrinsic::Platform::Backends::Null
         : m_WindowExtent{.Width = config.Width, .Height = config.Height}
         , m_FramebufferExtent{.Width = config.Width, .Height = config.Height}
     {
-        GetInput().Initialize(nullptr);
     }
 
     void NullWindow::QueueEvent(Platform::Event event)
@@ -57,29 +56,23 @@ namespace Extrinsic::Platform::Backends::Null
     void NullWindow::PollEvents()
     {
         GetInput().BeginFrame();
-        for (auto& event : m_PendingEvents)
+        std::vector<Platform::Event> pending;
+        pending.swap(m_PendingEvents);
+        for (const auto& event : pending)
         {
             ApplyEvent(event);
-            m_Events.push_back(std::move(event));
+            m_Events.push_back(event);
             if (m_Callback)
             {
-                m_Callback(m_Events.back());
+                m_Callback(event);
             }
         }
-        m_PendingEvents.clear();
         GetInput().Update();
     }
 
     void NullWindow::AcknowledgeResize()
     {
         m_WasResized = false;
-    }
-
-    bool NullWindow::ConsumeInputActivity()
-    {
-        const bool hadActivity = m_InputActivity;
-        m_InputActivity = false;
-        return hadActivity;
     }
 
     void NullWindow::Listen(EventCallbackFn callback)
@@ -92,11 +85,6 @@ namespace Extrinsic::Platform::Backends::Null
         auto drained = std::move(m_Events);
         m_Events.clear();
         return drained;
-    }
-
-    void NullWindow::OnUpdate()
-    {
-        PollEvents();
     }
 
     void NullWindow::WaitForEventsTimeout(double timeoutSeconds)
@@ -128,38 +116,28 @@ namespace Extrinsic::Platform::Backends::Null
             if constexpr (std::is_same_v<T, Platform::WindowCloseEvent>)
             {
                 m_ShouldClose = true;
-                m_InputActivity = true;
             }
             else if constexpr (std::is_same_v<T, Platform::WindowResizeEvent>)
             {
                 m_WindowExtent = {.Width = value.Width, .Height = value.Height};
                 m_FramebufferExtent = {.Width = value.Width, .Height = value.Height};
                 m_WasResized = true;
-                m_InputActivity = true;
             }
             else if constexpr (std::is_same_v<T, Platform::KeyEvent>)
             {
                 GetInput().SetKeyState(value.KeyCode, value.IsPressed);
-                m_InputActivity = true;
             }
             else if constexpr (std::is_same_v<T, Platform::MouseButtonEvent>)
             {
                 GetInput().SetMouseButtonState(value.ButtonCode, value.IsPressed);
-                m_InputActivity = true;
             }
             else if constexpr (std::is_same_v<T, Platform::ScrollEvent>)
             {
                 GetInput().AccumulateScroll(static_cast<float>(value.XOffset), static_cast<float>(value.YOffset));
-                m_InputActivity = true;
             }
             else if constexpr (std::is_same_v<T, Platform::CursorEvent>)
             {
                 GetInput().SetMousePosition(static_cast<float>(value.XPos), static_cast<float>(value.YPos));
-            }
-            else if constexpr (std::is_same_v<T, Platform::CharEvent> || std::is_same_v<T, Platform::WindowDropEvent> ||
-                               std::is_same_v<T, Platform::WindowFocusEvent>)
-            {
-                m_InputActivity = true;
             }
         }, event);
     }

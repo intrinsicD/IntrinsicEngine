@@ -55,6 +55,13 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] Core::Expected<std::string> SerializeSceneDocument(
         const ECS::Scene::Registry& scene);
 
+    // Native file save publishes a complete sibling temporary file by rename.
+    // Failure leaves the destination unchanged; this is not an fsync guarantee.
+    [[nodiscard]] Core::Expected<SceneSerializationResult> SaveSceneDocument(
+        const ECS::Scene::Registry& scene,
+        std::string_view path);
+
+    // An explicit backend owns its own write/replace semantics.
     [[nodiscard]] Core::Expected<SceneSerializationResult> SaveSceneDocument(
         const ECS::Scene::Registry& scene,
         std::string_view path,

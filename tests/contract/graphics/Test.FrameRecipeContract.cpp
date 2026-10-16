@@ -2896,3 +2896,225 @@ TEST(FrameRecipeContract, OverrideProjectionAvailableThroughRecipeOwner)
     EXPECT_EQ(projection.DisabledSlotCount, 0u);
     EXPECT_TRUE(projection.Features.EnablePostProcess);
 }
+
+namespace
+{
+    FrameRecipePassContribution ActiveDefaultContribution(
+        FrameRecipePassKind kind, const FrameRecipeFeatures& features = {})
+    {
+        FrameRecipePassContributionRegistry registry;
+        RegisterDefaultFrameRecipeOverlayContributions(registry, features, {}, {});
+        auto contribution = *std::ranges::find_if(registry.Passes, [kind](const auto& entry) {
+            return entry.Kind == kind;
+        });
+        contribution.Enabled = true;
+        return contribution;
+    }
+
+    FrameRecipeBuildResult BuildContributionFixture(
+        RenderGraph& graph, const FrameRecipePassContribution& contribution,
+        const FrameRecipeFeatures& features = {})
+    {
+        return BuildDefaultFrameRecipeWithContributions(
+            graph, features, MakeImports(), {.Width = 640u, .Height = 360u},
+            {}, {}, {}, {contribution});
+    }
+
+    void ExpectUnsupportedContribution(
+        const FrameRecipePassContribution& contribution,
+        const FrameRecipeFeatures& features = {})
+    {
+        // Description is intentionally broader than the canonical builder.
+        const auto described = DescribeDefaultFrameRecipeWithContributions(features, {contribution});
+        ASSERT_TRUE(described.Succeeded);
+        RenderGraph graph;
+        const auto built = BuildContributionFixture(graph, contribution, features);
+        EXPECT_FALSE(built.Succeeded);
+        EXPECT_NE(built.Diagnostic.find(contribution.Name), std::string::npos)
+            << built.Diagnostic;
+    }
+}
+
+TEST(FrameRecipeContract, BuildRejectsUnsupportedKind)
+{
+    auto contribution = ActiveDefaultContribution(FrameRecipePassKind::ImGui);
+    contribution.Id = FramePassId{9000u};
+    contribution.Kind = FrameRecipePassKind::Culling;
+    ExpectUnsupportedContribution(contribution);
+}
+
+TEST(FrameRecipeContract, BuildRejectsUnsupportedQueue)
+{
+    auto contribution = ActiveDefaultContribution(FrameRecipePassKind::ImGui);
+    contribution.Queue = RenderQueue::AsyncCompute;
+    ExpectUnsupportedContribution(contribution);
+}
+
+TEST(FrameRecipeContract, BuildRejectsUnsupportedAnchorPlacement)
+{
+    auto contribution = ActiveDefaultContribution(FrameRecipePassKind::ImGui);
+    contribution.Anchor.Placement = FrameRecipeContributionAnchorPlacement::Before;
+    ExpectUnsupportedContribution(contribution);
+}
+
+TEST(FrameRecipeContract, BuildRejectsUnsupportedAnchorPass)
+{
+    auto contribution = ActiveDefaultContribution(FrameRecipePassKind::ImGui);
+    contribution.Anchor.PassId = ToFramePassId(FrameRecipePassKind::Surface);
+    ExpectUnsupportedContribution(contribution);
+}
+
+TEST(FrameRecipeContract, BuildRejectsUnsupportedReads)
+{
+    auto contribution = ActiveDefaultContribution(FrameRecipePassKind::VisualizationOverlay);
+    contribution.Reads = {ToFrameResourceId(FrameRecipeResourceKind::SceneColorHDR)};
+    ExpectUnsupportedContribution(contribution);
+}
+
+TEST(FrameRecipeContract, BuildRejectsUnsupportedWrites)
+{
+    auto contribution = ActiveDefaultContribution(FrameRecipePassKind::VisualizationOverlay);
+    contribution.Writes = {ToFrameResourceId(FrameRecipeResourceKind::SceneDepth)};
+    ExpectUnsupportedContribution(contribution);
+}
+
+TEST(FrameRecipeContract, BuildRejectsUnsupportedFinalization)
+{
+    auto contribution = ActiveDefaultContribution(FrameRecipePassKind::ImGui);
+    contribution.FinalizesBackbuffer = false;
+    ExpectUnsupportedContribution(contribution);
+}
+
+TEST(FrameRecipeContract, DebugViewBuildRejectsMultipleInputs)
+{
+    auto contribution = ActiveDefaultContribution(FrameRecipePassKind::DebugView);
+    contribution.Reads = {ToFrameResourceId(FrameRecipeResourceKind::SceneColorHDR), ToFrameResourceId(FrameRecipeResourceKind::SceneDepth)};
+    ExpectUnsupportedContribution(contribution);
+}
+
+TEST(FrameRecipeContract, DebugViewBuildRejectsBufferInput)
+{
+    auto contribution = ActiveDefaultContribution(FrameRecipePassKind::DebugView);
+    contribution.Reads = {ToFrameResourceId(FrameRecipeResourceKind::SceneTable)};
+    ExpectUnsupportedContribution(contribution);
+}
+
+TEST(FrameRecipeContract, DebugViewBuildRejectsEmptyInput)
+{
+    auto contribution = ActiveDefaultContribution(FrameRecipePassKind::DebugView);
+    contribution.Reads = {};
+    ExpectUnsupportedContribution(contribution);
+}
+
+TEST(FrameRecipeContract, DebugViewUnavailableTextureAlreadyFailsValidation)
+{
+    auto contribution = ActiveDefaultContribution(FrameRecipePassKind::DebugView);
+    contribution.Reads = {ToFrameResourceId(FrameRecipeResourceKind::ShadowAtlas)};
+    const auto described = DescribeDefaultFrameRecipeWithContributions({}, {contribution});
+    EXPECT_FALSE(described.Succeeded);
+    RenderGraph graph;
+    const auto built = BuildContributionFixture(graph, contribution);
+    EXPECT_FALSE(built.Succeeded);
+    EXPECT_FALSE(built.Diagnostic.empty());
+}
+
+TEST(FrameRecipeContract, DebugViewBuildRejectsBackbufferInput)
+{
+    auto contribution = ActiveDefaultContribution(FrameRecipePassKind::DebugView);
+    contribution.Reads = {ToFrameResourceId(FrameRecipeResourceKind::Backbuffer)};
+    ExpectUnsupportedContribution(contribution);
+}
+
+TEST(FrameRecipeContract, DebugViewBuildRejectsSelfInput)
+{
+    auto contribution = ActiveDefaultContribution(FrameRecipePassKind::DebugView);
+    contribution.Reads = {ToFrameResourceId(FrameRecipeResourceKind::DebugViewRGBA)};
+    ExpectUnsupportedContribution(contribution);
+}
+
+TEST(FrameRecipeContract, ActiveOutlineWithoutDepthPrepassAlreadyFailsValidation)
+{
+    FrameRecipeFeatures features;
+    features.EnableDepthPrepass = false;
+    const auto contribution = ActiveDefaultContribution(FrameRecipePassKind::SelectionOutline, features);
+    const auto described = DescribeDefaultFrameRecipeWithContributions(features, {contribution});
+    EXPECT_FALSE(described.Succeeded);
+    RenderGraph graph;
+    const auto built = BuildContributionFixture(graph, contribution, features);
+    EXPECT_FALSE(built.Succeeded);
+    EXPECT_FALSE(built.Diagnostic.empty());
+}
+
+TEST(FrameRecipeContract, DisabledUnsupportedContributionRemainsBuildNoOp)
+{
+    auto contribution = ActiveDefaultContribution(FrameRecipePassKind::ImGui);
+    contribution.Id = FramePassId{9000u};
+    contribution.Name = "DisabledUnsupported";
+    contribution.Kind = FrameRecipePassKind::Culling;
+    contribution.Queue = RenderQueue::AsyncCompute;
+    contribution.Enabled = false;
+    RenderGraph graph;
+    const auto built = BuildContributionFixture(graph, contribution);
+    ASSERT_TRUE(built.Succeeded) << built.Diagnostic;
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    EXPECT_EQ(std::ranges::find(compiled->PassNames, contribution.Name), compiled->PassNames.end());
+}
+
+TEST(FrameRecipeContract, BuildRejectsCustomIdForSupportedKind)
+{
+    auto contribution = ActiveDefaultContribution(FrameRecipePassKind::ImGui);
+    contribution.Id = FramePassId{9001u};
+    ExpectUnsupportedContribution(contribution);
+}
+
+TEST(FrameRecipeContract, SupportedContributionCustomNameReachesCompiledGraph)
+{
+    auto contribution = ActiveDefaultContribution(FrameRecipePassKind::ImGui);
+    contribution.Name = "CustomImGui";
+    RenderGraph graph;
+    const auto built = BuildContributionFixture(graph, contribution);
+    ASSERT_TRUE(built.Succeeded) << built.Diagnostic;
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    const auto pass = std::ranges::find(compiled->PassNames, contribution.Name);
+    ASSERT_NE(pass, compiled->PassNames.end());
+    const auto index = static_cast<std::size_t>(pass - compiled->PassNames.begin());
+    EXPECT_EQ(compiled->PassIds[index], contribution.Id);
+    EXPECT_EQ(compiled->PassQueues[index], RenderQueue::Graphics);
+}
+
+TEST(FrameRecipeContract, DebugViewSelectedTextureReadIsMaterialized)
+{
+    auto contribution = ActiveDefaultContribution(FrameRecipePassKind::DebugView);
+    contribution.Reads = {ToFrameResourceId(FrameRecipeResourceKind::SceneDepth)};
+    RenderGraph graph;
+    const auto built = BuildContributionFixture(graph, contribution);
+    ASSERT_TRUE(built.Succeeded) << built.Diagnostic;
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    EXPECT_TRUE(PassReadsTexture(*compiled, "DebugViewPass", "SceneDepth"));
+    EXPECT_FALSE(PassReadsTexture(*compiled, "DebugViewPass", "SceneColorLDR"));
+    const auto described = DescribeDefaultFrameRecipeWithContributions({}, {contribution});
+    ASSERT_TRUE(described.Succeeded);
+    EXPECT_FALSE(ValidateRecipeCompiledGraph(described.Recipe, *compiled).HasErrors());
+}
+
+TEST(FrameRecipeContract, DebugViewBuildRejectsUnmaterializedTexture)
+{
+    FrameRecipeFeatures features;
+    features.EnableHZBBuild = true;
+    auto contribution = ActiveDefaultContribution(FrameRecipePassKind::DebugView, features);
+    contribution.Reads = {ToFrameResourceId(FrameRecipeResourceKind::HZBCurrent)};
+    auto imports = MakeImports();
+    imports.HZBCurrent = {};
+    const auto described = DescribeDefaultFrameRecipeWithContributions(features, {contribution});
+    ASSERT_TRUE(described.Succeeded);
+    RenderGraph graph;
+    const auto built = BuildDefaultFrameRecipeWithContributions(
+        graph, features, imports, {.Width = 640u, .Height = 360u},
+        {}, {}, {}, {contribution});
+    EXPECT_FALSE(built.Succeeded);
+    EXPECT_NE(built.Diagnostic.find(contribution.Name), std::string::npos)
+        << built.Diagnostic;
+}

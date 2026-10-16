@@ -33,6 +33,7 @@ import Extrinsic.ECS.Component.Hierarchy;
 import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
+import Extrinsic.ECS.System.TransformHierarchy;
 import Extrinsic.ECS.Component.Culling.Local;
 import Extrinsic.ECS.Component.Culling.World;
 import Extrinsic.ECS.Components.GeometrySources;
@@ -100,7 +101,7 @@ namespace Extrinsic::Runtime
         {
             if (!Attached(c) || !Detail::GeometryPropertiesCurrent(c, w.Entity, w.Inputs))
                 return false;
-            const auto matrix = GeometryProcessingDetail::ComposeEditorWorldMatrix(c.Scene->Raw(), w.Entity);
+            const auto matrix = ECS::Systems::TransformHierarchy::TryComposeWorldMatrix(c.Scene->Raw(), w.Entity);
             return matrix && *matrix == w.SourceMatrix;
         }
         bool GpuPoint(glm::vec3 p)
@@ -150,7 +151,7 @@ namespace Extrinsic::Runtime
                  !ResolveGeometryProperty(a, c.Normals, props->Size(), false).Resolved()))
                 return fail("Hoppe reconstruction requires count-matched normals on the position "
                             "domain, or CPU normal estimation.");
-            const auto matrix = GeometryProcessingDetail::ComposeEditorWorldMatrix(context.Scene->Raw(), *entity);
+            const auto matrix = ECS::Systems::TransformHierarchy::TryComposeWorldMatrix(context.Scene->Raw(), *entity);
             if (!matrix || !std::isfinite(glm::determinant(glm::mat3(*matrix))) ||
                 glm::determinant(glm::mat3(*matrix)) == 0)
                 return fail(
@@ -594,7 +595,6 @@ namespace Extrinsic::Runtime
         const auto validate = [context, w] { return MS::ValidateQueuedJob(w->Abandoned, Current(context, *w)); };
         JobDesc final{.DebugName = "Point construction",
                       .Scope = context.World,
-                      .Kind = RuntimeTaskKinds::GeometryProcess,
                       .Work =
                           [w](const JobCancellation& cancellation)
                       {
@@ -620,7 +620,6 @@ namespace Extrinsic::Runtime
         {
             JobDesc prepare{.DebugName = "Prepare point construction",
                             .Scope = context.World,
-                            .Kind = RuntimeTaskKinds::GeometryProcess,
                             .Work =
                                 [w](const JobCancellation&)
                             {
@@ -642,7 +641,6 @@ namespace Extrinsic::Runtime
                 return delivery.Rejected("preparation");
             JobDesc gpu{.DebugName = "Construction neighbors (Vulkan)",
                         .Scope = context.World,
-                        .Kind = RuntimeTaskKinds::GeometryProcess,
                         .Work = [](const JobCancellation&)
                         { return JobResultEnvelope::Make(true); },
                         .IsReadyToApply = [context, w] { return AdvanceGpu(context, *w); },
@@ -732,27 +730,6 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
                     v.FaceSource ? v.FaceSource->Properties.Revision() : 0};
         }
     } // namespace
-    std::optional<glm::mat4> ComposeEditorWorldMatrix(const entt::registry& raw, entt::entity entity)
-    {
-        glm::mat4 matrix{1};
-        std::vector<entt::entity> visited;
-        while (entity != entt::null)
-        {
-            if (!raw.valid(entity) || visited.size() >= 4096 ||
-                std::ranges::find(visited, entity) != visited.end())
-                return {};
-            visited.push_back(entity);
-            if (const auto* t = raw.try_get<Transform::Component>(entity))
-                matrix = Transform::GetMatrix(*t) * matrix;
-            const auto* hierarchy = raw.try_get<ECS::Components::Hierarchy::Component>(entity);
-            entity = hierarchy ? hierarchy->Parent : entt::null;
-        }
-        for (unsigned i = 0; i < 4; ++i)
-            for (unsigned j = 0; j < 4; ++j)
-                if (!std::isfinite(matrix[i][j]))
-                    return {};
-        return matrix;
-    }
     EditorGeneratedEntityPublication PublishEditorGeneratedEntity(
         const EditorProcessingContext& context, EditorGeneratedEntityRequest request)
     {

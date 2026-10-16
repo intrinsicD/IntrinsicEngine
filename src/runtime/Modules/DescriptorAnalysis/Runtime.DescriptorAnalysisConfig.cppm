@@ -3,14 +3,17 @@ module;
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 export module Extrinsic.Runtime.DescriptorAnalysisConfig;
 export import Extrinsic.Runtime.GeometryProperty.Types;
+import Extrinsic.Runtime.ConfigFieldSpec;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 export namespace Extrinsic::Runtime
 {
+    extern "C++" [[nodiscard]] std::span<const ConfigFieldSpec> DescriptorAnalysisConfigFieldSpecs() noexcept;
     inline constexpr std::string_view kDescriptorAnalysisConfigSectionName="sandbox.descriptor_analysis";
     inline constexpr std::string_view kDescriptorAnalysisConfigSectionSchemaId="intrinsic.runtime.sandbox.descriptor_analysis";
     enum class DescriptorAnalysisBackend : std::uint8_t { CpuKDTree, CpuLBVH, VulkanLBVH };

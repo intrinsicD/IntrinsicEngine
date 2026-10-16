@@ -1,3 +1,4 @@
+// Dense and sparse property-backed grids with explicit spatial index contracts.
 module;
 
 #include <cassert>
@@ -236,10 +237,12 @@ export namespace Geometry::Grid
 
         SparseGrid() = default;
 
+        // Rejected dimensions leave a default, invalid grid. Each cell count must
+        // be in [1, 2^24 - 1] so every vertex fits the packed block coordinates.
         explicit SparseGrid(const GridDimensions& dims);
 
-        // Reinitialize with new dimensions. Clears all allocated blocks.
-        void Reset(const GridDimensions& dims);
+        // Validate before clearing blocks/properties; rejection preserves this grid.
+        [[nodiscard]] bool Reset(const GridDimensions& dims);
 
         // --- Dimensions ---
 
@@ -254,11 +257,11 @@ export namespace Geometry::Grid
         // --- Cell access ---
 
         // Returns the PropertySet index for vertex (x, y, z), allocating the
-        // containing block if it doesn't exist yet.
-        [[nodiscard]] std::size_t TouchVertex(std::size_t x, std::size_t y, std::size_t z);
+        // containing block if it does not exist. Out-of-range coordinates return nullopt.
+        [[nodiscard]] std::optional<std::size_t> TouchVertex(std::size_t x, std::size_t y, std::size_t z);
 
         // Returns the PropertySet index for vertex (x, y, z), or nullopt if
-        // the containing block is not allocated.
+        // coordinates are out of range or the containing block is not allocated.
         [[nodiscard]] std::optional<std::size_t> VertexIndex(std::size_t x, std::size_t y, std::size_t z) const;
 
         // Check if the block containing (x, y, z) is allocated.
@@ -266,9 +269,9 @@ export namespace Geometry::Grid
 
         // --- Block-level operations ---
 
-        // Allocate the block containing (x, y, z) if not already present.
-        // Returns the base PropertySet index of the block.
-        std::size_t TouchBlock(std::size_t bx, std::size_t by, std::size_t bz);
+        // Allocate a block by block coordinates. Returns its base PropertySet index,
+        // or nullopt if the block does not intersect the logical vertex grid.
+        [[nodiscard]] std::optional<std::size_t> TouchBlock(std::size_t bx, std::size_t by, std::size_t bz);
 
         // --- Iteration ---
 
@@ -361,6 +364,9 @@ export namespace Geometry::Grid
         }
 
     private:
+        [[nodiscard]] bool ContainsVertex(std::size_t x, std::size_t y, std::size_t z) const noexcept;
+        [[nodiscard]] bool ContainsBlock(std::size_t x, std::size_t y, std::size_t z) const noexcept;
+
         // Pack block coordinates into a single 64-bit key.
         // 21 bits each for bx, by, bz — supports grids up to 2^24 vertices per axis.
         [[nodiscard]] static uint64_t PackBlockKey(std::size_t bx, std::size_t by, std::size_t bz) noexcept
@@ -388,13 +394,12 @@ export namespace Geometry::Grid
             return lz * BlockSize * BlockSize + ly * BlockSize + lx;
         }
 
-        // Allocate a new block, reusing freed slots if available.
+        // Allocate a new contiguous block.
         [[nodiscard]] std::size_t AllocateBlock();
 
         GridDimensions m_Dims;
         PropertySet m_Cells;
         std::unordered_map<uint64_t, std::size_t> m_BlockTable;
-        std::vector<std::size_t> m_FreeBlocks;
         std::size_t m_AllocatedBlockCount{0};
     };
 

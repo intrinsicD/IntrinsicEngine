@@ -1,3 +1,4 @@
+// Counted task completion with coroutine parking and progress notification.
 module;
 
 #include <coroutine>

@@ -31,6 +31,7 @@ import Geometry.HalfedgeMesh.Utils;
 import Geometry.Properties;
 #include "Config/internal/Runtime.PointConfigJson.hpp"
 #include "Config/internal/Runtime.ConfigFieldJson.hpp"
+#include "Editor/internal/Runtime.EditorPropertyHistory.hpp"
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.ActionReadinessConfig.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
@@ -255,8 +256,10 @@ namespace Extrinsic::Runtime
             if (props.Exists(c.Output.Name) != expected.Exists ||
                 (expected.Exists && (!output || !GeometryValueComparison::BitEqual(output.Vector(), expected.Values))))
                 return EditorCommandHistoryStatus::StaleEntity;
+            const auto historyBefore = GeometryProcessingDetail::ObserveGeometryProperties(context, entity, std::span(&c.Output, 1));
             if (target.Exists) props.GetOrAdd<glm::vec3>(c.Output.Name).Vector() = target.Values;
             else if (auto property = props.Get<glm::vec3>(c.Output.Name)) props.Remove(property);
+            GeometryProcessingDetail::RebasePointPropertyHistory(context, entity, historyBefore);
             ECS::Components::DirtyTags::MarkGpuDirty(raw, entity);
             if (context.InvalidateWorkspaceSnapshotCache) context.InvalidateWorkspaceSnapshotCache();
             return EditorCommandHistoryStatus::Applied;

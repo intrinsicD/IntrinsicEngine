@@ -1,3 +1,4 @@
+// Integer extents, offsets and rectangles with checked nonnegative dimension access.
 module;
 
 #include <cstdint>

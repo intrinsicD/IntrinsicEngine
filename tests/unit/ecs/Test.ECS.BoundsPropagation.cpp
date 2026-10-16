@@ -300,3 +300,61 @@ TEST(ECSBoundsPropagation, FrameGraphRegistersAfterTransformHierarchy)
     }
     EXPECT_TRUE(foundBoundsLater);
 }
+
+
+namespace
+{
+    void ExpectTransformedCornersInsideObb(const glm::mat4& matrix)
+    {
+        const auto local = MakeUnitLocalBounds();
+        Components::Culling::World::Bounds world;
+        ASSERT_TRUE(BoundsSystem::TryComputeWorldBounds(local, matrix, world));
+        const auto& obb = world.WorldBoundingOBB;
+        for (int corner = 0; corner < 8; ++corner)
+        {
+            const glm::vec3 localCorner{
+                (corner & 1) ? 1.0f : -1.0f,
+                (corner & 2) ? 1.0f : -1.0f,
+                (corner & 4) ? 1.0f : -1.0f};
+            const glm::vec3 transformed{matrix * glm::vec4{localCorner, 1.0f}};
+            const glm::vec3 inObb = glm::inverse(obb.Rotation) * (transformed - obb.Center);
+            for (int axis = 0; axis < 3; ++axis)
+                EXPECT_LE(std::abs(inObb[axis]), obb.Extents[axis] + 1.0e-5f)
+                    << "corner=" << corner << " axis=" << axis;
+        }
+    }
+}
+
+TEST(ECSBoundsPropagation, ReflectedTransformObbEnclosesEveryCorner)
+{
+    const auto rotation = glm::rotate(glm::mat4{1.0f}, glm::radians(90.0f), glm::vec3{0, 0, 1});
+    ExpectTransformedCornersInsideObb(glm::scale(rotation, glm::vec3{-2, 1, 1}));
+}
+
+TEST(ECSBoundsPropagation, ShearedTransformObbEnclosesEveryCorner)
+{
+    const auto scale = glm::scale(glm::mat4{1.0f}, glm::vec3{4, 1, 1});
+    ExpectTransformedCornersInsideObb(glm::rotate(scale, glm::radians(45.0f), glm::vec3{0, 0, 1}));
+}
+
+TEST(ECSBoundsPropagation, DegenerateRotatedTransformObbEnclosesEveryCorner)
+{
+    const auto rotation = glm::rotate(glm::mat4{1.0f}, glm::radians(45.0f), glm::vec3{0, 0, 1});
+    ExpectTransformedCornersInsideObb(glm::scale(rotation, glm::vec3{0, 2, 1}));
+}
+
+TEST(ECSBoundsPropagation, OrdinaryRotatedTransformKeepsOrientedBounds)
+{
+    const auto rotation = glm::rotate(glm::mat4{1.0f}, glm::radians(90.0f), glm::vec3{0, 0, 1});
+    const auto matrix = glm::scale(rotation, glm::vec3{2, 1, 3});
+    Components::Culling::World::Bounds world;
+    ASSERT_TRUE(BoundsSystem::TryComputeWorldBounds(MakeUnitLocalBounds(), matrix, world));
+    EXPECT_NEAR(world.WorldBoundingOBB.Extents.x, 2.0f, 1.0e-5f);
+    EXPECT_NEAR(world.WorldBoundingOBB.Extents.y, 1.0f, 1.0e-5f);
+    EXPECT_NEAR(world.WorldBoundingOBB.Extents.z, 3.0f, 1.0e-5f);
+    const glm::vec3 xAxis = world.WorldBoundingOBB.Rotation * glm::vec3{1, 0, 0};
+    EXPECT_NEAR(xAxis.x, 0.0f, 1.0e-5f);
+    EXPECT_NEAR(xAxis.y, 1.0f, 1.0e-5f);
+    EXPECT_NEAR(xAxis.z, 0.0f, 1.0e-5f);
+    ExpectTransformedCornersInsideObb(matrix);
+}

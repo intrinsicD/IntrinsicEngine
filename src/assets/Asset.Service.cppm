@@ -9,6 +9,9 @@ module;
 #include <memory>
 #include <expected>
 #include <functional>
+#include <mutex>
+#include <type_traits>
+#include <utility>
 
 export module Extrinsic.Asset.Service;
 
@@ -18,20 +21,11 @@ import Extrinsic.Asset.PayloadStore;
 import Extrinsic.Asset.LoadPipeline;
 import Extrinsic.Asset.EventBus;
 import Extrinsic.Asset.TypePool;
-import Extrinsic.Core.Filesystem.PathResolver;
 
 export namespace Extrinsic::Assets
 {
-    struct AssetLoaderTag;
-
-    struct LoaderToken
-    {
-        uint32_t Index = 0;
-        uint32_t Generation = 0;
-        [[nodiscard]] constexpr bool IsValid() const noexcept { return Generation != 0; }
-        auto operator<=>(const LoaderToken&) const = default;
-    };
-
+    // Public calls serialize publication; decoders and listeners run unlocked.
+    // The service must outlive its calls, outstanding callbacks, and borrowed reads.
     class AssetService
     {
     public:
@@ -42,57 +36,57 @@ export namespace Extrinsic::Assets
         AssetService(AssetService&&) = delete;
         AssetService& operator=(AssetService&&) = delete;
 
-        [[nodiscard]] Core::Expected<AssetId> LoadErased(
-            std::string_view path,
-            uint32_t typeId,
-            std::function<Core::Expected<PayloadTicket>(std::string_view absPath, AssetId id)> loader);
-
-        // Reuses the loader captured by the asset's successful Load call.
-        Core::Result Reload(AssetId id);
-
+        // A successful read borrows storage until the next Reload/Destroy of id.
+        // Callers must order span use against concurrent mutations of that asset.
         template <class T>
         [[nodiscard]] Core::Expected<std::span<const T>> Read(AssetId id) const;
 
         template <class T, class Loader>
         [[nodiscard]] Core::Expected<AssetId> Load(std::string_view path, Loader&& loader);
 
+        // A competing successful reload wins over an older decode (ResourceBusy).
         template <class T, class Loader>
         Core::Result Reload(AssetId id, Loader&& loader);
 
         [[nodiscard]] Core::Expected<AssetMeta> GetMeta(AssetId id) const;
         [[nodiscard]] Core::Expected<std::string> GetPath(AssetId id) const;
-        [[nodiscard]] Core::Expected<LoaderToken> GetReloadToken(AssetId id) const;
         [[nodiscard]] Core::Expected<PayloadTicket> GetPayloadTicket(AssetId id) const;
         [[nodiscard]] bool IsAlive(AssetId id) const noexcept;
 
         Core::Result Destroy(AssetId id);
         void Tick();
-        // Main-thread completion joins state/event publication before draining callbacks.
+        // Joins state/event publication, then drains callbacks without a service lock.
         Core::Result CompleteCpuLoadAndFlushEvent(AssetId id);
 
         template <class T>
         [[nodiscard]] static uint32_t TypeIdOf() noexcept;
 
+        // Nonterminal events are delivered only while id is alive. Events describe
+        // history, not a retained payload version; a later Reload may already be visible.
         [[nodiscard]] AssetEventBus::ListenerToken SubscribeAll(AssetEventBus::ListenerCallback cb);
         void UnsubscribeAll(AssetEventBus::ListenerToken token);
 
-        // Read-only test and diagnostic seams expose facade state without
-        // granting mutable access to its components.
-        [[nodiscard]] bool HasLoaderCallback(LoaderToken token) const;
-        [[nodiscard]] std::size_t LoaderCallbackCount() const;
+        // Read-only diagnostic seams do not grant component mutation.
         [[nodiscard]] bool PathIndexContains(std::string_view absolutePath) const;
         [[nodiscard]] std::size_t LiveAssetCount() const noexcept;
         // Test seam; production state transitions remain owned by the pipeline.
         Core::Result ForceAssetState(AssetId id, AssetState expected, AssetState next);
 
     private:
-        // Inline templates cannot dereference the incomplete Impl; these
-        // private accessors preserve the facade while supplying its components.
-        [[nodiscard]] AssetRegistry& Registry() noexcept;
-        [[nodiscard]] AssetEventBus& EventBus() noexcept;
+        using PayloadPublisher = std::move_only_function<Core::Expected<PayloadTicket>()>;
+        using PreparedLoader = std::move_only_function<Core::Expected<PayloadPublisher>(std::string_view, AssetId)>;
+
+        template <class T, class Loader>
+        [[nodiscard]] PreparedLoader PrepareLoader(Loader&& loader);
+        [[nodiscard]] Core::Expected<AssetId> LoadErased(
+            std::string_view path, uint32_t typeId, PreparedLoader loader);
+        Core::Result ReloadErased(AssetId id, uint32_t typeId, PreparedLoader loader);
+
+        // Inline templates cannot dereference the incomplete Impl.
+        [[nodiscard]] std::mutex& TransactionMutex() const noexcept;
+        [[nodiscard]] const AssetRegistry& Registry() const noexcept;
         [[nodiscard]] AssetPayloadStore& PayloadStore() noexcept;
         [[nodiscard]] const AssetPayloadStore& PayloadStore() const noexcept;
-        [[nodiscard]] AssetLoadPipeline& LoadPipeline() noexcept;
 
         struct Impl;
         std::unique_ptr<Impl> m_Impl;
@@ -101,133 +95,45 @@ export namespace Extrinsic::Assets
     template <class T>
     uint32_t AssetService::TypeIdOf() noexcept
     {
-        const auto p = TypePools<AssetId>::Type<std::remove_cvref_t<T>>();
-        if constexpr (sizeof(std::uintptr_t) > sizeof(uint32_t))
-        {
-            return static_cast<uint32_t>(p ^ (p >> 32));
-        }
-        else
-        {
-            return static_cast<uint32_t>(p);
-        }
+        return TypePools<AssetId>::Type32<T>();
     }
 
     template <class T, class Loader>
-    [[nodiscard]] Core::Expected<AssetId> AssetService::Load(std::string_view path, Loader&& loader)
+    AssetService::PreparedLoader AssetService::PrepareLoader(Loader&& loader)
     {
-        const uint32_t typeId = TypeIdOf<T>();
-        auto captured = std::forward<Loader>(loader);
-        auto erased = [this, captured = std::move(captured)](
-                          std::string_view absPath, AssetId id) mutable
-            -> Core::Expected<PayloadTicket> {
-            auto payload = captured(absPath, id);
+        return [this, captured = std::forward<Loader>(loader)](
+                   std::string_view absPath, AssetId id) mutable -> Core::Expected<PayloadPublisher>
+        {
+            // Enforce the requested type at the decoding boundary, before publication.
+            Core::Expected<std::remove_cvref_t<T>> payload = captured(absPath, id);
             if (!payload.has_value())
-            {
                 return std::unexpected(payload.error());
-            }
-            return PayloadStore().Publish(id, std::move(*payload));
+
+            return PayloadPublisher{[this, id, decoded = std::move(*payload)]() mutable
+            {
+                return PayloadStore().Publish(id, std::move(decoded));
+            }};
         };
-        return LoadErased(path, typeId, std::move(erased));
+    }
+
+    template <class T, class Loader>
+    Core::Expected<AssetId> AssetService::Load(std::string_view path, Loader&& loader)
+    {
+        return LoadErased(path, TypeIdOf<T>(), PrepareLoader<T>(std::forward<Loader>(loader)));
     }
 
     template <class T>
     Core::Expected<std::span<const T>> AssetService::Read(AssetId id) const
     {
-        if (!IsAlive(id))
-        {
+        std::scoped_lock lock(TransactionMutex());
+        if (!Registry().IsAlive(id))
             return Core::Err<std::span<const T>>(Core::ErrorCode::ResourceNotFound);
-        }
         return PayloadStore().ReadSpan<T>(id);
     }
 
     template <class T, class Loader>
     Core::Result AssetService::Reload(AssetId id, Loader&& loader)
     {
-        if (!IsAlive(id))
-        {
-            return Core::Err(Core::ErrorCode::ResourceNotFound);
-        }
-
-        const auto meta = Registry().GetMeta(id);
-        if (!meta.has_value())
-        {
-            return std::unexpected(meta.error());
-        }
-
-        if (meta->typeId != TypeIdOf<T>())
-        {
-            return Core::Err(Core::ErrorCode::TypeMismatch);
-        }
-
-        if (meta->state != AssetState::Ready)
-        {
-            return Core::Err(Core::ErrorCode::InvalidState);
-        }
-
-        auto checkpoint = PayloadStore().CaptureCheckpoint(id);
-        if (!checkpoint.has_value())
-        {
-            return std::unexpected(checkpoint.error());
-        }
-
-        const uint32_t previousPayloadSlot = meta->payloadSlot;
-        auto restorePreviousPayload = [&]()
-        {
-            (void)PayloadStore().RestoreCheckpoint(id, *checkpoint);
-            (void)Registry().SetPayloadSlot(id, previousPayloadSlot);
-            auto currentState = Registry().GetState(id);
-            if (currentState.has_value() && *currentState != AssetState::Ready)
-            {
-                (void)Registry().SetState(id, *currentState, AssetState::Ready);
-            }
-        };
-
-        auto pathResult = GetPath(id);
-        if (!pathResult.has_value())
-        {
-            return std::unexpected(pathResult.error());
-        }
-        std::string path = std::move(*pathResult);
-
-        auto payload = loader(std::string_view(path), id);
-        if (!payload.has_value())
-        {
-            return std::unexpected(payload.error());
-        }
-
-        auto ticket = PayloadStore().Publish(id, std::move(*payload));
-        if (!ticket.has_value())
-        {
-            return std::unexpected(ticket.error());
-        }
-        if (auto slot = Registry().SetPayloadSlot(id, static_cast<uint32_t>(ticket->slot));
-            !slot.has_value())
-        {
-            restorePreviousPayload();
-            return slot;
-        }
-
-        auto toUnloaded = Registry().SetState(id, AssetState::Ready, AssetState::Unloaded);
-        if (!toUnloaded.has_value())
-        {
-            restorePreviousPayload();
-            return toUnloaded;
-        }
-
-        LoadRequest req{
-            .id = id,
-            .typeId = meta->typeId,
-            .path = path,
-            .needsGpuUpload = false,
-            .publishQueuedEvent = true,
-            .queuedEvent = AssetEvent::Reloaded,
-        };
-        if (auto r = LoadPipeline().EnqueueIO(std::move(req)); !r.has_value())
-        {
-            restorePreviousPayload();
-            return r;
-        }
-
-        return Core::Ok();
+        return ReloadErased(id, TypeIdOf<T>(), PrepareLoader<T>(std::forward<Loader>(loader)));
     }
 }

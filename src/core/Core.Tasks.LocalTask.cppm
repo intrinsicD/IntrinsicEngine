@@ -1,3 +1,4 @@
+// Move-only callable storage for scheduler dispatch without heap allocation.
 module;
 
 #include <memory>
@@ -51,7 +52,7 @@ namespace Extrinsic::Core::Tasks
                           "Task alignment requirement too strict.");
 
             auto* ptr = reinterpret_cast<Model<Type>*>(m_Storage);
-            std::construct_at(ptr, std::forward<F>(f));
+            std::construct_at(ptr, Type(std::forward<F>(f)));
             m_VTable = ptr;
         }
 

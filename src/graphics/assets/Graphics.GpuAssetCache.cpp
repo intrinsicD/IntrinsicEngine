@@ -48,9 +48,8 @@ namespace Extrinsic::Graphics
 
         struct Slot
         {
-            // Visible to GetView() once state == Ready.  Empty before then
-            // for first-time uploads; retains the previous resource for the
-            // duration of an in-flight reload.
+            // GetView() retains the last published resource during a reload
+            // and after a rejected upload; a first upload has no Current yet.
             RHI::BufferManager::BufferLease   CurrentBuffer{};
             RHI::TextureManager::TextureLease CurrentTexture{};
             RHI::SamplerManager::SamplerLease CurrentSampler{};
@@ -250,6 +249,13 @@ namespace Extrinsic::Graphics
         const RHI::TransferToken token = m_Impl->Transfer.UploadBuffer(
             handle, req.Bytes, /*offset=*/0);
 
+        if (!token.IsValid())
+        {
+            ++m_Impl->Diagnostics.UploadFailures;
+            slot.State = GpuAssetState::Failed;
+            return Core::Err(Core::ErrorCode::AssetUploadFailed);
+        }
+
         // Drop any earlier pending (defensive: state machine forbids
         // overlapping pending uploads, but be explicit).
         m_Impl->RetirePending(slot);
@@ -323,6 +329,13 @@ namespace Extrinsic::Graphics
         const RHI::TransferToken token = m_Impl->Transfer.UploadTexture(
             handle, req.Bytes.data(), static_cast<std::uint64_t>(req.Bytes.size()),
             /*mipLevel=*/0, /*arrayLayer=*/0);
+
+        if (!token.IsValid())
+        {
+            ++m_Impl->Diagnostics.UploadFailures;
+            slot.State = GpuAssetState::Failed;
+            return Core::Err(Core::ErrorCode::AssetUploadFailed);
+        }
 
         const RHI::BindlessIndex bindless = m_Impl->Textures.GetBindlessIndex(handle);
 
@@ -509,12 +522,17 @@ namespace Extrinsic::Graphics
         const RHI::TextureHandle handle = textureOr->GetHandle();
         if (!desc.Bytes.empty())
         {
-            (void)m_Impl->Transfer.UploadTexture(
+            const auto token = m_Impl->Transfer.UploadTexture(
                 handle,
                 desc.Bytes.data(),
                 static_cast<std::uint64_t>(desc.Bytes.size()),
                 /*mipLevel=*/0,
                 /*arrayLayer=*/0);
+            if (!token.IsValid())
+            {
+                ++m_Impl->Diagnostics.UploadFailures;
+                return Core::Err(Core::ErrorCode::AssetUploadFailed);
+            }
         }
 
         m_Impl->FallbackTexture = std::move(*textureOr);

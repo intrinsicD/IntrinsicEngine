@@ -34,7 +34,6 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         return JobDesc{
             .DebugName = state->Job.DebugName,
             .Scope = state->Job.Scope,
-            .Kind = RuntimeTaskKinds::GeometryProcess,
             .Work = [](const JobCancellation&) { return JobResultEnvelope::Make(true); },
             .IsReadyToApply = [state] {
                 auto& s = *state;

@@ -139,7 +139,6 @@ namespace
             Runtime::JobDesc desc{
                 .DebugName = "RUNTIME-141 slow editor method job",
                 .Scope = engine.ActiveWorld(),
-                .Kind = Runtime::RuntimeTaskKinds::GeometryProcess,
                 .Work =
                     [this](const Runtime::JobCancellation&)
                         -> Runtime::JobResultEnvelope
@@ -1119,4 +1118,59 @@ TEST(ImGuiAdapterEngineWiring, FocusLossWhileMinimizedCancelsDragWithoutHistory)
     EXPECT_EQ(engine.Services().Find<Runtime::EditorCommandHistory>()->UndoCount(), 0u);
     EXPECT_EQ(gizmo->Diagnostics().DragsCommitted, 0u);
     engine.Shutdown();
+}
+
+TEST(ImGuiAdapterEngineWiring, MinimizedReleaseAndFocusReachTheRestoredUi)
+{
+    for (const bool loseFocus : {false, true})
+    {
+        SCOPED_TRACE(loseFocus);
+        Intrinsic::Tests::RuntimeTestKernel engine(
+            NullWindowHeadlessConfig(), std::make_unique<BoundedRunApplication>(8u));
+        engine.EmplaceModule<Runtime::EditorUiModule>();
+        auto& probe = engine.EmplaceModule<GizmoFrontendProbe>();
+        int idleFrames = 0;
+        bool sawHeld = false;
+        bool sawRestored = false;
+        probe.Idle = [&]
+        {
+            auto& window = static_cast<Platform::Backends::Null::NullWindow&>(engine.GetWindow());
+            if (++idleFrames == 1)
+            {
+                window.QueueKey('A', false);
+                if (loseFocus)
+                    window.QueueEvent(Platform::WindowFocusEvent{.Focused = false});
+            }
+            else if (idleFrames == 2)
+                window.QueueResize(640, 480);
+            else if (idleFrames >= 4)
+                engine.RequestExit();
+        };
+        engine.Initialize();
+        probe.UiBuild = [&](const std::uint32_t frame)
+        {
+            auto& window = static_cast<Platform::Backends::Null::NullWindow&>(engine.GetWindow());
+            if (frame == 1u)
+                window.QueueKey('A', true);
+            else if (frame == 2u)
+            {
+                sawHeld = ImGui::IsKeyDown(ImGuiKey_A);
+                EXPECT_TRUE(sawHeld);
+                window.QueueResize(0, 0);
+            }
+            else
+            {
+                sawRestored = true;
+                EXPECT_FALSE(ImGui::IsKeyDown(ImGuiKey_A));
+                EXPECT_EQ(ImGui::GetIO().AppFocusLost, loseFocus);
+                engine.RequestExit();
+            }
+        };
+        engine.Run();
+        EXPECT_TRUE(sawHeld);
+        EXPECT_TRUE(sawRestored);
+        EXPECT_EQ(idleFrames, 2);
+        EXPECT_EQ(probe.Frame, 3u);
+        engine.Shutdown();
+    }
 }

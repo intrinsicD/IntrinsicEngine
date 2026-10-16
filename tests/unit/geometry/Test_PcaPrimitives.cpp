@@ -217,3 +217,55 @@ TEST(PcaPrimitives, PortableDoubleEigenSolverPreservesEigenpairsAndRepeatedRoots
             EXPECT_NEAR(glm::dot(glm::cross(result.Eigenvectors[0],result.Eigenvectors[1]),result.Eigenvectors[2]),1,1e-12);
         }
 }
+
+TEST(PcaPrimitives, TinyAndScaledPlanesPreserveEigenpairsAndPlaneFit)
+{
+    for (const float scale : {1.0e-8f, 1.0e-5f, 1.0f, 1.0e8f})
+    {
+        for (const auto rotation : {glm::quat(1, 0, 0, 0), MakeRotation()})
+        {
+            SCOPED_TRACE(scale);
+            std::vector<glm::vec3> points;
+            for (int i : {-1, 0, 1})
+                for (int j : {-1, 0, 1})
+                    points.push_back(rotation * glm::vec3(0, i * scale, j * scale));
+            const auto pca = Geometry::ToPCA(points);
+            ASSERT_TRUE(pca.Valid);
+            EXPECT_TRUE(pca.Flat);
+            const glm::vec3 normal = rotation * glm::vec3(1, 0, 0);
+            EXPECT_NEAR(std::abs(glm::dot(pca.Eigenvectors[2], normal)), 1.0f, 2.0e-5f);
+            const double scaleSquared = double(scale) * scale;
+            const glm::dmat3 frame(glm::mat3_cast(rotation));
+            const glm::dmat3 normalizedCovariance = frame * glm::dmat3(
+                glm::dvec3(0), glm::dvec3(0, 2.0 / 3.0, 0), glm::dvec3(0, 0, 2.0 / 3.0))
+                * glm::transpose(frame);
+            for (int axis = 0; axis < 3; ++axis)
+            {
+                const glm::dvec3 vector(pca.Eigenvectors[axis]);
+                const double value = pca.Eigenvalues[axis] / scaleSquared;
+                EXPECT_LE(glm::length(normalizedCovariance * vector - value * vector), 2.0e-5);
+            }
+            const auto plane = Geometry::ToPlane(points);
+            EXPECT_NEAR(std::abs(glm::dot(plane.Normal, normal)), 1.0f, 2.0e-5f);
+            for (const auto point : points)
+                EXPECT_LE(std::abs(Geometry::SignedDistance(plane, point)), 2.0e-5f * scale);
+        }
+    }
+}
+
+TEST(PcaPrimitives, TinyFullRankCloudDoesNotBecomeFlatThroughAbsoluteFloor)
+{
+    for (const float scale : {1.0e-10f, 1.0e-5f, 1.0f})
+    {
+        SCOPED_TRACE(scale);
+        const auto points = MakeRotatedBoxCorners(glm::vec3(0),
+            scale * glm::vec3(3, 2, 1), glm::quat(1, 0, 0, 0));
+        const auto pca = Geometry::ToPCA(points);
+        ASSERT_TRUE(pca.Valid);
+        EXPECT_FALSE(pca.Flat);
+        const double scaleSquared = double(scale) * scale;
+        EXPECT_NEAR(pca.Eigenvalues.x / scaleSquared, 9.0, 2.0e-5);
+        EXPECT_NEAR(pca.Eigenvalues.y / scaleSquared, 4.0, 2.0e-5);
+        EXPECT_NEAR(pca.Eigenvalues.z / scaleSquared, 1.0, 2.0e-5);
+    }
+}

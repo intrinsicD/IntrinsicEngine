@@ -179,6 +179,11 @@ namespace Extrinsic::Core::Dag
                         outStats.lastDiagnostic = oss.str();
                         return Err<std::vector<PlanTask>>(ErrorCode::InvalidArgument);
                     }
+                    if (depIt->second == i)
+                    {
+                        outStats.lastDiagnostic = taskLabel(i) + ": a task cannot depend on itself";
+                        return Err<std::vector<PlanTask>>(ErrorCode::InvalidState);
+                    }
                     addEdge(depIt->second, i, EdgeReason::ExplicitDependency);
                 }
             }

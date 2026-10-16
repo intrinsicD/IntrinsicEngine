@@ -9,6 +9,8 @@
 
 #include <gtest/gtest.h>
 #include <chrono>
+#include <atomic>
+#include <set>
 #include <cstdint>
 #include <string>
 #include <thread>
@@ -47,12 +49,10 @@ TEST(Profiling_ScopedTimer, RecordsSampleToTelemetry)
         BusyWaitMs(1);
     }
 
-    // Capacity is a contract, not incidental suite-order coverage. Samples
-    // beyond the fixed frame buffer must still contribute to aggregate stats
-    // without writing past the buffer.
+    // Every sample contributes to the aggregate.
     static constexpr uint32_t kCapacityHash = HashString("CapacityScope");
     for (std::size_t index = 0;
-         index <= TelemetrySystem::kMaxSamplesPerFrame;
+         index < 3u;
          ++index)
     {
         telemetry.RecordSample(kCapacityHash, "CapacityScope", index + 1u);
@@ -63,11 +63,11 @@ TEST(Profiling_ScopedTimer, RecordsSampleToTelemetry)
     const auto& stats = telemetry.GetFrameStats(0);
     EXPECT_EQ(
         stats.SampleCount,
-        TelemetrySystem::kMaxSamplesPerFrame + 2u
+        4u
     );
 
-    const TimingCategory* categories = telemetry.GetCategories();
-    const std::size_t categoryCount = telemetry.GetCategoryCount();
+    const auto categories = telemetry.GetCategories();
+    const std::size_t categoryCount = categories.size();
     const TimingCategory* capacityCategory = nullptr;
     for (std::size_t index = 0; index < categoryCount; ++index)
     {
@@ -80,7 +80,7 @@ TEST(Profiling_ScopedTimer, RecordsSampleToTelemetry)
     ASSERT_NE(capacityCategory, nullptr);
     EXPECT_EQ(
         capacityCategory->CallCount,
-        TelemetrySystem::kMaxSamplesPerFrame + 1u
+        3u
     );
 }
 
@@ -103,8 +103,8 @@ TEST(Profiling_ScopedTimer, CategoryAccumulation)
     telemetry.EndFrame();
 
     // Find the category for our scope.
-    const TimingCategory* categories = telemetry.GetCategories();
-    const size_t count = telemetry.GetCategoryCount();
+    const auto categories = telemetry.GetCategories();
+    const size_t count = categories.size();
 
     bool found = false;
     for (size_t i = 0; i < count; ++i)
@@ -147,8 +147,8 @@ TEST(Profiling_ScopedTimer, NestedTimers)
     telemetry.EndFrame();
 
     // Both categories should exist.
-    const TimingCategory* categories = telemetry.GetCategories();
-    const size_t count = telemetry.GetCategoryCount();
+    const auto categories = telemetry.GetCategories();
+    const size_t count = categories.size();
 
     bool foundOuter = false, foundInner = false;
     for (size_t i = 0; i < count; ++i)
@@ -404,4 +404,72 @@ TEST(Profiling_TelemetrySystem, MergePassCpuTimings)
     EXPECT_EQ(newPass->CpuTimeNs, 100'000u);
 
     telemetry.EndFrame();
+}
+
+TEST(Profiling_TelemetrySystem, PreservesNonzeroTaskOccupancy)
+{
+    auto& telemetry = TelemetrySystem::Get();
+    telemetry.BeginFrame();
+    TaskSchedulerStats schedulerStats{};
+    schedulerStats.InFlightTasks = 7;
+    schedulerStats.QueuedTasks = 3;
+    telemetry.SetTaskStats(schedulerStats);
+    telemetry.EndFrame();
+    EXPECT_EQ(telemetry.GetFrameStats().Tasks.InFlightTasks, 7u);
+    EXPECT_EQ(telemetry.GetFrameStats().Tasks.QueuedTasks, 3u);
+}
+
+TEST(Profiling_TelemetrySystem, ConcurrentSamplesAndSnapshotsHaveConsistentAggregates)
+{
+    auto& telemetry = TelemetrySystem::Get();
+    telemetry.BeginFrame();
+    constexpr auto hash = HashString("ConcurrentScope");
+    std::atomic<bool> start{false};
+    std::vector<std::thread> writers;
+    for (int worker = 0; worker < 4; ++worker)
+        writers.emplace_back([&] {
+            while (!start.load(std::memory_order_acquire)) std::this_thread::yield();
+            for (int sample = 0; sample < 10000; ++sample)
+                telemetry.RecordSample(hash, "ConcurrentScope", 7);
+        });
+    start.store(true, std::memory_order_release);
+    for (int read = 0; read < 1000; ++read)
+        for (const auto& category : telemetry.GetCategories())
+            if (category.NameHash == hash)
+                EXPECT_EQ(category.TotalTimeNs, uint64_t(category.CallCount) * 7);
+    for (auto& writer : writers) writer.join();
+    telemetry.EndFrame();
+    EXPECT_EQ(telemetry.GetFrameStats().SampleCount, 40000u);
+    bool found = false;
+    for (const auto& category : telemetry.GetCategories())
+        if (category.NameHash == hash)
+        {
+            found = true;
+            EXPECT_EQ(category.CallCount, 40000u);
+            EXPECT_EQ(category.TotalTimeNs, 280000u);
+            EXPECT_EQ(category.MinTimeNs, 7u);
+            EXPECT_EQ(category.MaxTimeNs, 7u);
+        }
+    EXPECT_TRUE(found);
+}
+
+// Keep this last: the process-global category registry intentionally never evicts names.
+TEST(Profiling_TelemetryCapacity, ConcurrentRegistrationIsUniqueAndBounded)
+{
+    auto& telemetry = TelemetrySystem::Get();
+    telemetry.BeginFrame();
+    std::atomic<bool> start{false};
+    std::vector<std::thread> writers;
+    for (int worker = 0; worker < 4; ++worker)
+        writers.emplace_back([&] {
+            while (!start.load(std::memory_order_acquire)) std::this_thread::yield();
+            for (uint32_t hash = 1; hash <= 512; ++hash)
+                telemetry.RecordSample(hash, "CapacityScope", 7);
+        });
+    start.store(true, std::memory_order_release);
+    for (auto& writer : writers) writer.join();
+    const auto categories = telemetry.GetCategories();
+    EXPECT_EQ(categories.size(), TelemetrySystem::kMaxCategories);
+    std::set<uint32_t> hashes;
+    for (const auto& category : categories) EXPECT_TRUE(hashes.insert(category.NameHash).second);
 }

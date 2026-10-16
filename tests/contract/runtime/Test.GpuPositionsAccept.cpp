@@ -25,6 +25,9 @@ import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.PointSetOperations;
+import Extrinsic.Runtime.RegistrationOperations;
+import Extrinsic.Runtime.MeshTopologyOperations;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.GpuPropertyBinding;
@@ -47,9 +50,10 @@ namespace
         G::GpuPropertyResidency Residency{Device};
         Extrinsic::Tests::EditorJobHarness Jobs;
         R::GeometryPropertyRef Positions{Domain::PointCloudPoint, "v:position", K::Vec3};
-        Harness()
+        explicit Harness(const Domain domain = Domain::PointCloudPoint)
+            : Positions{domain, "v:position", K::Vec3}
         {
-            Entity = Intrinsic::Tests::MakePointDomainSource(Scene, Domain::PointCloudPoint);
+            Entity = Intrinsic::Tests::MakePointDomainSource(Scene, domain);
             auto& props = Props();
             auto rows = props.GetOrAdd<glm::vec3>("v:position", glm::vec3{0.f});
             for (std::size_t i = 0; i < props.Size(); ++i) rows[i] = {float(i), 0.5f * float(i), 0.f};
@@ -58,7 +62,7 @@ namespace
             Context.CommandHistory = &History;
             Jobs.Attach(Context);
         }
-        Geometry::PropertySet& Props() { return Intrinsic::Tests::PointDomainProperties(Scene, Entity, Domain::PointCloudPoint); }
+        Geometry::PropertySet& Props() { return Intrinsic::Tests::PointDomainProperties(Scene, Entity, Positions.Domain); }
         std::vector<glm::vec3> Rows() { return std::as_const(Props()).Get<glm::vec3>("v:position").Vector(); }
         auto Commands() { return R::BindEditorProcessingCommands(Context); }
         auto Id() { return R::SelectionController::ToStableEntityId(Entity); }
@@ -136,6 +140,221 @@ TEST(GpuPositionsAccept, AcceptPublishesEveryRowUndoablyAndBindsTheFrontAsTheCan
     ASSERT_TRUE(h.History.Redo().Succeeded());
     EXPECT_EQ(h.Rows(), front);
     EXPECT_TRUE(h.Dirty());
+}
+
+TEST(GpuPositionsAccept, SuccessiveEditsReplayAndRejectForeignOutputChanges)
+{
+    Harness h;
+    const auto before = h.Rows();
+    std::vector<std::vector<glm::vec3>> applied;
+    for (const auto shift : {glm::vec3{1.0f, 0.0f, 0.0f}, glm::vec3{0.0f, 2.0f, 0.0f}})
+    {
+        const auto run = h.Ready();
+        ASSERT_TRUE(run);
+        applied.push_back(h.Shifted(shift));
+        std::optional<R::EditorGpuPositionAcceptResult> delivered;
+        ASSERT_EQ(R::AcceptEditorGpuPositionRun(h.Commands(), run, h.Residency, "Move points",
+            [&](R::EditorGpuPositionAcceptResult result) { delivered = result; }, applied.back()).Status,
+            R::EditorCommandStatus::Pending);
+        ASSERT_TRUE(h.Jobs.DrainUntilTerminal());
+        ASSERT_TRUE(delivered);
+        ASSERT_EQ(delivered->Status, R::EditorCommandStatus::Applied) << delivered->Message;
+    }
+    ASSERT_TRUE(h.History.Undo().Succeeded());
+    EXPECT_EQ(h.Rows(), applied[0]);
+    ASSERT_TRUE(h.History.Undo().Succeeded());
+    EXPECT_EQ(h.Rows(), before);
+    ASSERT_TRUE(h.History.Redo().Succeeded());
+    EXPECT_EQ(h.Rows(), applied[0]);
+    ASSERT_TRUE(h.History.Redo().Succeeded());
+    EXPECT_EQ(h.Rows(), applied[1]);
+    h.Props().Get<glm::vec3>("v:position")[0] = glm::vec3{99.0f};
+    EXPECT_EQ(h.History.Undo().Status, R::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(h.History.UndoCount(), 2u);
+    EXPECT_EQ(h.Rows()[0], glm::vec3{99.0f});
+
+    // Whole-set publication also rebases a later position command on this entity.
+    Harness mixed;
+    const auto original = mixed.Rows();
+    ASSERT_FALSE(mixed.Props().Exists("v:deleted"));
+    auto direct = mixed.Context;
+    direct.JobCommands = {};
+    R::EditorProgressivePoissonCommand poisson{.StableEntityId = mixed.Id()};
+    poisson.Config.Dimension = 2;
+    poisson.Config.GridWidth = 3;
+    poisson.Config.MaxLevels = 5;
+    poisson.Config.RadiusAlpha = 0.4;
+    poisson.Config.ShuffleWithinLevels = false;
+    const auto authored = R::ApplyEditorProgressivePoissonCommand(
+        R::BindEditorProcessingCommands(direct), poisson);
+    ASSERT_TRUE(authored.Succeeded()) << authored.Message;
+    ASSERT_FALSE(mixed.Props().Exists("v:deleted"));
+    const auto ranks = std::as_const(mixed.Props()).Get<float>(poisson.Config.Rank.Name).Vector();
+    const auto authoredRevision = mixed.Revision();
+    const auto mixedRun = mixed.Ready();
+    ASSERT_TRUE(mixedRun);
+    const auto moved = mixed.Shifted({1.0f, 2.0f, 0.0f});
+    std::optional<R::EditorGpuPositionAcceptResult> mixedResult;
+    ASSERT_EQ(R::AcceptEditorGpuPositionRun(mixed.Commands(), mixedRun, mixed.Residency, "Move points",
+        [&](R::EditorGpuPositionAcceptResult result) { mixedResult = result; }, moved).Status,
+        R::EditorCommandStatus::Pending);
+    ASSERT_TRUE(mixed.Jobs.DrainUntilTerminal());
+    ASSERT_TRUE(mixedResult);
+    ASSERT_EQ(mixedResult->Status, R::EditorCommandStatus::Applied) << mixedResult->Message;
+    ASSERT_TRUE(mixed.History.Undo().Succeeded());
+    EXPECT_EQ(mixed.Rows(), original);
+    ASSERT_TRUE(mixed.History.Undo().Succeeded());
+    EXPECT_FALSE(mixed.Props().Exists(poisson.Config.Rank.Name));
+    EXPECT_EQ(mixed.Rows(), original);
+    ASSERT_TRUE(mixed.History.Redo().Succeeded());
+    EXPECT_EQ(std::as_const(mixed.Props()).Get<float>(poisson.Config.Rank.Name).Vector(), ranks);
+    EXPECT_EQ(mixed.Rows(), original);
+    EXPECT_NE(mixed.Revision(), authoredRevision);
+    ASSERT_TRUE(mixed.History.Redo().Succeeded());
+    EXPECT_EQ(mixed.Rows(), moved);
+    EXPECT_EQ(mixed.History.UndoCount(), 2u);
+    EXPECT_EQ(mixed.History.RedoCount(), 0u);
+
+    // Local-watch authors must also preserve an earlier position command's legal undo prefix.
+    for (const bool cpd : {true, false})
+    {
+        SCOPED_TRACE(cpd ? "Positions -> CPD" : "Positions -> Bilateral");
+        Harness reverse;
+        reverse.Props().Get<glm::vec3>("v:position").Vector() =
+            {{0, 0, 0}, {1, 0, .2f}, {0, 1, 0}, {1, 1, 0}, {.5f, .5f, .1f}};
+        (void)reverse.Props().GetOrAdd<glm::vec3>("v:normal", {0, 0, 1});
+        const auto originalRows = reverse.Rows();
+        const auto run = reverse.Ready();
+        ASSERT_TRUE(run);
+        const auto movedRows = reverse.Shifted({1, 2, 0});
+        std::optional<R::EditorGpuPositionAcceptResult> delivered;
+        ASSERT_EQ(R::AcceptEditorGpuPositionRun(reverse.Commands(), run, reverse.Residency, "Move points",
+            [&](R::EditorGpuPositionAcceptResult result) { delivered = result; }, movedRows).Status,
+            R::EditorCommandStatus::Pending);
+        ASSERT_TRUE(reverse.Jobs.DrainUntilTerminal());
+        ASSERT_TRUE(delivered);
+        ASSERT_EQ(delivered->Status, R::EditorCommandStatus::Applied) << delivered->Message;
+        auto direct = reverse.Context;
+        direct.JobCommands = {};
+        if (cpd)
+        {
+            const auto target = Intrinsic::Tests::MakePointDomainSource(reverse.Scene, Domain::PointCloudPoint);
+            Intrinsic::Tests::PointDomainProperties(reverse.Scene, target, Domain::PointCloudPoint)
+                .GetOrAdd<glm::vec3>("v:position").Vector() = reverse.Shifted({.1f, .2f, .3f});
+            R::CoherentPointDriftConfig config;
+            config.SourceStableEntityId = reverse.Id();
+            config.TargetStableEntityId = R::SelectionController::ToStableEntityId(target);
+            config.OutlierWeight = 0;
+            config.Output = R::CoherentPointDriftOutput::Positions;
+            config.EStep = R::CoherentPointDriftEStep::Reference;
+            const auto registered = R::ApplyEditorCoherentPointDriftCommand(R::BindEditorProcessingCommands(direct), config);
+            ASSERT_TRUE(registered.Succeeded()) << registered.Message;
+        }
+        else
+        {
+            R::BilateralFilterConfig config;
+            config.StableEntityId = reverse.Id();
+            config.Positions = config.Output = reverse.Positions;
+            config.Normals = {Domain::PointCloudPoint, "v:normal", K::Vec3};
+            config.KNeighbors = 2;
+            config.SpatialSigma = 2;
+            config.Iterations = 3;
+            const auto filtered = R::ApplyEditorBilateralFilterCommand(R::BindEditorProcessingCommands(direct), config);
+            ASSERT_TRUE(filtered.Succeeded()) << filtered.Message;
+        }
+        ASSERT_NE(reverse.Rows(), movedRows);
+        ASSERT_EQ(reverse.History.UndoCount(), 2u);
+        ASSERT_TRUE(reverse.History.Undo().Succeeded());
+        EXPECT_EQ(reverse.Rows(), movedRows);
+        EXPECT_TRUE(reverse.History.Undo().Succeeded());
+        EXPECT_EQ(reverse.Rows(), originalRows);
+        EXPECT_EQ(reverse.History.UndoCount(), 0u);
+        EXPECT_EQ(reverse.History.RedoCount(), 2u);
+    }
+
+    // Topology undo restores exact stored sources, including an absent optional deletion mask.
+    {
+        Harness mesh(Domain::MeshVertex);
+        mesh.Props().Get<glm::vec3>("v:position").Vector() = {{0, 0, 0}, {2, 0, 0}, {0, 3, 0}, {2, 3, 0}};
+        auto deleted = mesh.Props().Get<bool>("v:deleted");
+        ASSERT_TRUE(deleted);
+        mesh.Props().Remove(deleted);
+        ASSERT_FALSE(mesh.Props().Exists("v:deleted"));
+        const auto originalRows = mesh.Rows();
+        const auto run = mesh.Ready();
+        ASSERT_TRUE(run);
+        const auto movedRows = mesh.Shifted({1, 2, 0});
+        std::optional<R::EditorGpuPositionAcceptResult> delivered;
+        ASSERT_EQ(R::AcceptEditorGpuPositionRun(mesh.Commands(), run, mesh.Residency, "Move mesh vertices",
+            [&](R::EditorGpuPositionAcceptResult result) { delivered = result; }, movedRows).Status,
+            R::EditorCommandStatus::Pending);
+        ASSERT_TRUE(mesh.Jobs.DrainUntilTerminal());
+        ASSERT_TRUE(delivered);
+        ASSERT_EQ(delivered->Status, R::EditorCommandStatus::Applied) << delivered->Message;
+        auto direct = mesh.Context;
+        direct.JobCommands = {};
+        const auto subdivided = R::ApplyEditorMeshSubdivideCommand(R::BindEditorProcessingCommands(direct),
+            R::EditorMeshSubdivideCommand{.StableEntityId = mesh.Id()});
+        ASSERT_TRUE(subdivided.Succeeded()) << subdivided.Message;
+        ASSERT_GT(mesh.Rows().size(), movedRows.size());
+        ASSERT_EQ(mesh.History.UndoCount(), 2u);
+        ASSERT_TRUE(mesh.History.Undo().Succeeded());
+        EXPECT_EQ(mesh.Rows(), movedRows);
+        EXPECT_FALSE(mesh.Props().Exists("v:deleted"));
+        EXPECT_TRUE(mesh.History.Undo().Succeeded());
+        EXPECT_EQ(mesh.Rows(), originalRows);
+        EXPECT_EQ(mesh.History.UndoCount(), 0u);
+        EXPECT_EQ(mesh.History.RedoCount(), 2u);
+    }
+
+    for (const bool replaceSet : {false, true})
+    for (const bool redo : {false, true})
+    {
+        SCOPED_TRACE(replaceSet);
+        SCOPED_TRACE(redo);
+        Harness foreign;
+        unsigned invalidations = 0;
+        foreign.Context.InvalidateWorkspaceSnapshotCache = [&] { ++invalidations; };
+        const auto run = foreign.Ready();
+        ASSERT_TRUE(run);
+        std::optional<R::EditorGpuPositionAcceptResult> delivered;
+        ASSERT_EQ(R::AcceptEditorGpuPositionRun(foreign.Commands(), run, foreign.Residency, "Move points",
+            [&](R::EditorGpuPositionAcceptResult result) { delivered = result; },
+            foreign.Shifted({1.0f, 0.0f, 0.0f})).Status, R::EditorCommandStatus::Pending);
+        ASSERT_TRUE(foreign.Jobs.DrainUntilTerminal());
+        ASSERT_TRUE(delivered);
+        ASSERT_EQ(delivered->Status, R::EditorCommandStatus::Applied);
+        if (redo) ASSERT_TRUE(foreign.History.Undo().Succeeded());
+        const auto expected = foreign.Rows();
+        auto& props = foreign.Props();
+        const auto previousId = props.Registry().Find("v:position");
+        const auto previousRevision = props.FindPropertyRevision("v:position");
+        ASSERT_FALSE(props.Exists("v:deleted"));
+        if (replaceSet)
+        {
+            const auto replacement = props;
+            props = replacement;
+            ASSERT_EQ(props.Registry().Find("v:position"), previousId);
+        }
+        else
+        {
+            auto old = props.Get<glm::vec3>("v:position");
+            props.Remove(old);
+            props.GetOrAdd<glm::vec3>("v:position").Vector() = expected;
+            ASSERT_NE(props.Registry().Find("v:position"), previousId);
+        }
+        ASSERT_NE(props.FindPropertyRevision("v:position"), previousRevision);
+        ASSERT_EQ(foreign.Rows(), expected);
+        const auto undoCount = foreign.History.UndoCount();
+        const auto redoCount = foreign.History.RedoCount();
+        invalidations = 0;
+        EXPECT_EQ((redo ? foreign.History.Redo() : foreign.History.Undo()).Status,
+                  R::EditorCommandHistoryStatus::StaleEntity);
+        EXPECT_EQ(foreign.History.UndoCount(), undoCount);
+        EXPECT_EQ(foreign.History.RedoCount(), redoCount);
+        EXPECT_EQ(foreign.Rows(), expected);
+        EXPECT_EQ(invalidations, 0u);
+    }
 }
 
 TEST(GpuPositionsAccept, AStaleRunIsRefusedBeforeAndAtPublication)

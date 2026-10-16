@@ -1,3 +1,5 @@
+// Exposes the Vulkan device factory, backend diagnostics, and queue policies
+// used by the RHI implementation without exporting Vulkan handles.
 module;
 #include <array>
 #include <cstddef>
@@ -335,6 +337,8 @@ namespace Extrinsic::Backends::Vulkan
         bool SwapchainImagesAvailable = false;
         bool DeviceLost = false;
         bool ResizePending = false;
+        // Process-monotonic count after the actual deferred resource action completes.
+        std::uint64_t DeferredDeletesExecuted = 0;
     };
 
     export [[nodiscard]] VulkanFrameLifecycleDiagnosticsSnapshot

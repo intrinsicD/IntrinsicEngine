@@ -28,13 +28,7 @@ export namespace Extrinsic::Assets
     template <class T>
     [[nodiscard]] std::uint32_t AssetPayloadTypeIdOf() noexcept
     {
-        using StoredT = std::remove_cvref_t<T>;
-        const auto value = TypePools<AssetId>::Type<StoredT>();
-        if constexpr (sizeof(std::uintptr_t) > sizeof(std::uint32_t))
-        {
-            return static_cast<std::uint32_t>(value ^ (value >> 32));
-        }
-        return static_cast<std::uint32_t>(value);
+        return TypePools<AssetId>::Type32<T>();
     }
 
     struct AssetGeometryPayload

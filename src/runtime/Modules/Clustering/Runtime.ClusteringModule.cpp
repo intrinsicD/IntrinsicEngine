@@ -681,7 +681,7 @@ namespace Extrinsic::Runtime
                                }
                                return EditorCommandHistoryStatus::Applied;
                            },
-                           [](
+                           [history](
                                const KMeansMutationIdentity& mutation,
                                const KMeansOutputPropertySnapshot& target)
                            {
@@ -690,9 +690,14 @@ namespace Extrinsic::Runtime
                                    return EditorCommandHistoryStatus::
                                        CommandFailed;
                                }
-                               return ApplyKMeansOutputState(
-                                   mutation,
-                                   *target);
+                               const auto entity = ResolveEntity(mutation.Scene->Raw(), mutation.StableEntityId);
+                               if (entity == ECS::InvalidEntityHandle) return EditorCommandHistoryStatus::StaleEntity;
+                               const EditorProcessingContext historyContext{.Scene = mutation.Scene, .CommandHistory = history};
+                               const auto historyBefore = GeometryProcessingDetail::ObservePointPropertyHistory(historyContext, entity, mutation.Properties.InputPositions.Domain);
+                               const auto status = ApplyKMeansOutputState(mutation, *target);
+                               if (status == EditorCommandHistoryStatus::Applied)
+                                   GeometryProcessingDetail::RebasePointPropertyHistory(historyContext, entity, historyBefore);
+                               return status;
                            },
                            [](
                                const KMeansMutationIdentity& mutation,

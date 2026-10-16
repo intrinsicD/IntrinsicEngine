@@ -179,7 +179,9 @@ namespace Extrinsic::Runtime
             if (atCap && (!spec->ReadOnly || spec->NeedsPresentedFrame))
                 return Dump(ErrorResponse(id, -32000, "too many pending calls"));
             const auto argsIt = params.find("arguments");
-            const std::string arguments = argsIt != params.end() && argsIt->is_object() ? Dump(*argsIt) : "{}";
+            if (argsIt != params.end() && !argsIt->is_object())
+                return Dump(ErrorResponse(id, -32602, "tools/call arguments must be a JSON object"));
+            const std::string arguments = argsIt != params.end() ? Dump(*argsIt) : "{}";
             auto outcome = InvokeAgentOperation(*m_Registry, name, context, arguments, m_ReadOnly);
             if (outcome.Continuation)
             {
@@ -331,6 +333,12 @@ namespace Extrinsic::Runtime
                 { dropClient(); continue; }
                 for (std::size_t newline; (newline = buffer.find('\n')) != std::string::npos;)
                 {
+                    if (newline > Options.MaxMessageBytes)
+                    {
+                        Core::Log::Warn("[AgentServer] dropping client: message exceeds {} bytes", Options.MaxMessageBytes);
+                        dropClient();
+                        break;
+                    }
                     std::string line = buffer.substr(0, newline);
                     buffer.erase(0, newline + 1);
                     if (!line.empty() && line.back() == '\r') line.pop_back();

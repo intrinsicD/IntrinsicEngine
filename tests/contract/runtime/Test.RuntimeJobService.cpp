@@ -9,6 +9,9 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <coroutine>
+#include <functional>
+#include <utility>
 #include <mutex>
 #include <memory>
 #include <string>
@@ -19,8 +22,10 @@
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
+import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Dag.TaskGraph;
 import Extrinsic.Core.Tasks;
+import Extrinsic.Core.Tasks.CounterEvent;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Descriptors;
@@ -1039,6 +1044,64 @@ namespace
     }
 }
 
+TEST(RuntimeJobService, ReadyJobsHonorPriorityAndEqualPrioritySubmissionOrder)
+{
+    SchedulerScope scheduler{1};
+    Runtime::JobService jobs;
+    std::vector<int> workOrder;
+    std::vector<std::thread::id> workThreads;
+    std::mutex workMutex;
+    CompletionQueueInterlock blocker;
+    struct ReleaseAndDrain
+    {
+        CompletionQueueInterlock& Blocker;
+        ~ReleaseAndDrain()
+        {
+            Blocker.ReleaseWorker();
+            Extrinsic::Core::Tasks::Scheduler::WaitForAll();
+        }
+    } releaseAndDrain{blocker};
+    Extrinsic::Core::Tasks::Scheduler::Dispatch(
+        [&] { blocker.PauseWorker({}); });
+    ASSERT_TRUE(blocker.WaitForWorkerPause());
+
+    using Priority = Extrinsic::Core::Dag::TaskPriority;
+    constexpr std::array priorities{
+        Priority::Background, Priority::Low, Priority::Normal,
+        Priority::High, Priority::Critical, Priority::High};
+    for (std::size_t i = 0; i < priorities.size(); ++i)
+    {
+        Runtime::JobDesc desc = Runtime::MakeCpuJobDesc<JobProbeResult>(
+            "priority." + std::to_string(i),
+            Runtime::DefaultWorldHandle,
+            [&, value = static_cast<int>(i)](const Runtime::JobCancellation&)
+            {
+                std::lock_guard lock(workMutex);
+                workOrder.push_back(value);
+                workThreads.push_back(std::this_thread::get_id());
+                return JobProbeResult{.Value = value};
+            },
+            [](const JobProbeResult& result)
+            { return JobSuppressedCompleted{.Value = result.Value}; });
+        desc.Priority = priorities[i];
+        ASSERT_TRUE(jobs.Submit(std::move(desc)).IsValid());
+    }
+
+    // Even Critical runtime work stays on workers while the frame helps tasks.
+    EXPECT_FALSE(Extrinsic::Core::Tasks::Scheduler::TryRunOne());
+    {
+        std::lock_guard lock(workMutex);
+        EXPECT_TRUE(workOrder.empty());
+    }
+    blocker.ReleaseWorker();
+    Extrinsic::Core::Tasks::Scheduler::WaitForAll();
+
+    EXPECT_EQ(workOrder, (std::vector<int>{4, 3, 5, 2, 1, 0}));
+    ASSERT_EQ(workThreads.size(), priorities.size());
+    for (const std::thread::id thread : workThreads)
+        EXPECT_NE(thread, std::this_thread::get_id());
+}
+
 TEST(RuntimeJobService, DependenciesGateDispatchUntilUpstreamPublishes)
 {
     SchedulerScope scheduler{2};
@@ -1118,7 +1181,8 @@ TEST(RuntimeJobService, DependentIsCancelledWhenUpstreamDoesNotPublish)
     // Cancellation is terminal for both the upstream and the released dependent,
     // so neither may linger in the in-flight aggregate before reaping.
     const Runtime::JobServiceStats cancelled = jobs.Stats();
-    EXPECT_GE(cancelled.DependencyCancelledJobs, 1u);
+    EXPECT_EQ(cancelled.CancelledJobs, 2u);
+    EXPECT_EQ(cancelled.DependencyCancelledJobs, 1u);
     EXPECT_EQ(cancelled.InFlightJobs, 0u);
     EXPECT_EQ(cancelled.AwaitingDependencyJobs, 0u);
 }
@@ -1487,6 +1551,56 @@ namespace
     };
 }
 
+TEST(RuntimeJobService, DirectCancellationOfPendingDependencyIsCountedOnce)
+{
+    SchedulerScope scheduler{1};
+    Runtime::JobService jobs;
+    Runtime::KernelEventBus events;
+    std::vector<int> publishOrder;
+    FinalizerProbe probe;
+    std::atomic<bool> childWorkRan{false};
+
+    Runtime::JobDesc upstreamDesc =
+        MakeCountingJob("cancel.direct.upstream", 1, publishOrder);
+    const Runtime::JobToken upstream = jobs.Submit(std::move(upstreamDesc));
+    ASSERT_TRUE(upstream.IsValid());
+    ASSERT_TRUE(WaitUntil([&]
+    {
+        return jobs.GetState(upstream) == Runtime::JobState::AwaitingGate;
+    }));
+
+    Runtime::JobDesc childDesc =
+        MakeCountingJob("cancel.direct.child", 2, publishOrder);
+    childDesc.DependsOn.push_back(
+        Runtime::JobDependency{.Job = upstream, .Reason = "needs upstream"});
+    childDesc.Work = [&](const Runtime::JobCancellation&)
+    {
+        childWorkRan.store(true, std::memory_order_release);
+        return Runtime::JobResultEnvelope::Make<CountedResult>(
+            CountedResult{.Value = 2});
+    };
+    childDesc.FinalizeUnpublishedOnMainThread = probe.Hook();
+    const Runtime::JobToken child = jobs.Submit(std::move(childDesc));
+    ASSERT_TRUE(child.IsValid());
+    ASSERT_EQ(jobs.GetState(child), Runtime::JobState::AwaitingDependencies);
+
+    EXPECT_TRUE(jobs.Cancel(child));
+    EXPECT_EQ(jobs.DrainCompletions(events), 1u);
+    EXPECT_EQ(jobs.DrainCompletions(events), 0u);
+
+    EXPECT_EQ(jobs.GetState(child), Runtime::JobState::Cancelled);
+    EXPECT_TRUE(jobs.IsComplete(child));
+    EXPECT_EQ(jobs.GetState(upstream), Runtime::JobState::Published);
+    EXPECT_FALSE(childWorkRan.load(std::memory_order_acquire));
+    EXPECT_EQ(publishOrder, (std::vector<int>{1}));
+    EXPECT_EQ(probe.Calls, 1);
+    EXPECT_EQ(probe.Thread, std::this_thread::get_id());
+    const Runtime::JobServiceStats stats = jobs.Stats();
+    EXPECT_EQ(stats.CancelledJobs, 1u);
+    EXPECT_EQ(stats.DependencyCancelledJobs, 0u);
+    EXPECT_EQ(stats.AwaitingDependencyJobs, 0u);
+}
+
 TEST(RuntimeJobService,
      WorkerTerminalStateWaitsForUnpublishedFinalizerBeforeCompletion)
 {
@@ -1693,6 +1807,8 @@ TEST(RuntimeJobService, DependencyCancelledJobFinalizesInTheSameDrain)
     EXPECT_EQ(probe.Calls, 1);
     EXPECT_EQ(probe.Thread, std::this_thread::get_id());
     EXPECT_TRUE(publishOrder.empty());
+    EXPECT_EQ(jobs.Stats().CancelledJobs, 2u);
+    EXPECT_EQ(jobs.Stats().DependencyCancelledJobs, 1u);
 }
 
 TEST(RuntimeJobService, PublishedJobNeverRunsTheUnpublishedFinalizer)
@@ -2044,4 +2160,112 @@ TEST(RuntimeJobService, EnvelopeTypeNameNamesThePayloadType)
     const auto envelope = Extrinsic::Runtime::JobResultEnvelope::Make(TypeNameProbe::ProbeResult{});
     EXPECT_NE(envelope.TypeName().find("TypeNameProbe::ProbeResult"), std::string_view::npos)
         << envelope.TypeName();
+}
+
+namespace
+{
+    Extrinsic::Core::Tasks::Job ParkedServiceWork(
+        std::shared_ptr<Extrinsic::Core::Tasks::CounterEvent> ready,
+        std::shared_ptr<std::atomic<bool>> resumed,
+        std::move_only_function<void(Runtime::JobResultEnvelope)> complete)
+    {
+        co_await Extrinsic::Core::Tasks::WaitFor(*ready);
+        resumed->store(true);
+        complete(Runtime::JobResultEnvelope::Make(true));
+    }
+}
+
+TEST(RuntimeJobService, CoroutineWorkPublishesOrCancelsExactlyOnceAfterItsWake)
+{
+    using Scheduler = Extrinsic::Core::Tasks::Scheduler;
+    for (const int mode : {0, 1, 2, 3, 4})
+    {
+        SCOPED_TRACE(mode); // complete, Cancel, CancelAll, CancelAllForWorld, CancelAndDrain
+        SchedulerScope scheduler{1};
+        Runtime::JobService jobs;
+        Runtime::KernelEventBus events;
+        const Runtime::WorldHandle world{1u, 1u};
+        const auto ownerThread = std::this_thread::get_id();
+        auto ready = std::make_shared<Extrinsic::Core::Tasks::CounterEvent>(1u);
+        auto resumed = std::make_shared<std::atomic<bool>>(false);
+        std::atomic<bool> signalled{false};
+        const auto signal = [&] { if (!signalled.exchange(true)) ready->Signal(); };
+        const auto before = Scheduler::GetStats();
+        int publications = 0, finalizations = 0, wakes = 0;
+        Runtime::JobToken token{};
+        token = jobs.Submit({
+            .DebugName = "Parked service coroutine",
+            .Scope = world,
+            .CoroutineWork = [ready, resumed](Runtime::JobCancellation,
+                std::move_only_function<void(Runtime::JobResultEnvelope)> complete) {
+                return ParkedServiceWork(ready, resumed, std::move(complete));
+            },
+            .WakeOnCancel = [&] {
+                EXPECT_EQ(std::this_thread::get_id(), ownerThread);
+                EXPECT_EQ(jobs.GetState(token), Runtime::JobState::Running); // outside service mutex
+                ++wakes;
+                signal();
+            },
+            .PublishCompletion = [&](Runtime::KernelEventBus&, const Runtime::JobResultEnvelope&) {
+                EXPECT_EQ(std::this_thread::get_id(), ownerThread);
+                ++publications;
+                return true;
+            },
+            .FinalizeUnpublishedOnMainThread = [&] {
+                EXPECT_EQ(std::this_thread::get_id(), ownerThread);
+                ++finalizations;
+            },
+        });
+        EXPECT_TRUE(token.IsValid());
+        const bool parked = WaitUntil([&] { return Scheduler::GetStats().ParkCount > before.ParkCount; });
+        EXPECT_TRUE(parked);
+        EXPECT_FALSE(resumed->load());
+        EXPECT_EQ(jobs.GetState(token), Runtime::JobState::Running);
+
+        // Bound a broken wake/drain implementation without holding a worker. The normal
+        // path notifies this watchdog immediately; only the mutation reaches its timeout.
+        std::mutex watchdogMutex;
+        std::condition_variable watchdogCv;
+        bool finished = false;
+        std::atomic<bool> rescued{false};
+        std::thread watchdog([&] {
+            std::unique_lock lock(watchdogMutex);
+            if (!watchdogCv.wait_for(lock, 1s, [&] { return finished; }))
+            {
+                rescued = true;
+                signal();
+            }
+        });
+        if (mode == 0) signal();
+        else if (mode == 1) EXPECT_TRUE(jobs.Cancel(token));
+        else if (mode == 2) EXPECT_EQ(jobs.CancelAll(), 1u);
+        else if (mode == 3) EXPECT_EQ(jobs.CancelAllForWorld(world), 1u);
+        else jobs.CancelAndDrain();
+        Scheduler::WaitForAll();
+        if (!resumed->load())
+        {
+            // WaitForAll does not count a parked frame. On a broken wake path,
+            // let the watchdog release it before destroying the service/scheduler.
+            EXPECT_TRUE(WaitUntil([&] { return resumed->load(); }));
+            Scheduler::WaitForAll();
+        }
+        {
+            std::scoped_lock lock(watchdogMutex);
+            finished = true;
+        }
+        watchdogCv.notify_one();
+        watchdog.join();
+        EXPECT_FALSE(rescued.load());
+        EXPECT_TRUE(resumed->load());
+        (void)jobs.DrainCompletions(events);
+        (void)jobs.DrainCompletions(events);
+        EXPECT_EQ(publications, mode == 0 ? 1 : 0);
+        EXPECT_EQ(finalizations, mode == 0 ? 0 : 1);
+        EXPECT_EQ(wakes, mode == 0 ? 0 : 1);
+        EXPECT_EQ(Scheduler::GetStats().ParkCount - before.ParkCount,
+                  Scheduler::GetStats().UnparkCount - before.UnparkCount);
+        jobs.CancelAndDrain();
+        EXPECT_EQ(finalizations, mode == 0 ? 0 : 1);
+        EXPECT_EQ(wakes, mode == 0 ? 0 : 1);
+    }
 }

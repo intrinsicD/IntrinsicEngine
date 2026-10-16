@@ -90,7 +90,7 @@ export namespace Extrinsic::Runtime
 
         void ClearHistory();
         void ResetDocument(std::string path = {});
-        void MarkSaved(std::string path = {});
+        void MarkSaved(std::string path = {}, std::optional<std::uint64_t> savedRevision = std::nullopt);
         void SetActivePath(std::string path);
         void SetCapacity(std::size_t capacity);
         // Prepended to every label recorded while set (e.g. "Agent: " for

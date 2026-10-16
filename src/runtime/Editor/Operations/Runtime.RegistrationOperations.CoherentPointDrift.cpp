@@ -11,6 +11,7 @@ module;
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <coroutine>
 #include <limits>
 #include <functional>
 #include <memory>
@@ -32,6 +33,8 @@ import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Error;
+import Extrinsic.Core.Tasks;
+import Extrinsic.Core.Tasks.CounterEvent;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Component.Hierarchy;
 import Extrinsic.ECS.Component.Transform;
@@ -167,8 +170,8 @@ namespace Extrinsic::Runtime
         }
 
         // Shared by readiness (no value copy) and Start (values copied, world space).
-        // Why a Vulkan E-step cannot run here (empty: it can). The worker waits for results the
-        // main thread records, so it needs the job lane and a framed device with shader float64.
+        // Why a Vulkan E-step cannot run here (empty: it can). The coroutine awaits results
+        // recorded on the main thread, requiring the job lane and a framed device with shader float64.
         std::string VulkanEStepUnavailable(const EditorProcessingContext& context)
         {
             if (!context.JobCommands.Available()) return "No job lane";
@@ -329,9 +332,6 @@ namespace Extrinsic::Runtime
                 else
                 {
                     run->GpuEStep = std::make_shared<CoherentPointDriftGpuEStep>(*context.SpatialIndices);
-                    run->Params.EStepExternal = [broker = run->GpuEStep](const CPD::EStep::ExternalRequest& request) {
-                        return broker->Evaluate(request);
-                    };
                 }
             }
             return std::nullopt;
@@ -391,15 +391,12 @@ namespace Extrinsic::Runtime
             ++snapshot.Revision;
         }
 
-        // Runs up to `iterations` EM iterations (0: until the solver ends); one snapshot per
-        // iteration (UI-067: the trace carries elapsed times, the stage shows the phase in flight).
-        void RunSteps(EditorCoherentPointDriftRun& run, std::uint32_t iterations, const JobCancellation& cancellation)
+        bool InitializeRun(EditorCoherentPointDriftRun& run)
         {
-            const auto now = [] { return std::chrono::steady_clock::now(); };
             if (!run.Initialized)
             {
                 run.Initialized = true;
-                run.Started = run.LastIteration = now();
+                run.Started = run.LastIteration = std::chrono::steady_clock::now();
                 {
                     std::scoped_lock lock{run.Mutex};
                     run.Snapshot.RunStarted = run.Started;
@@ -417,44 +414,100 @@ namespace Extrinsic::Runtime
                         ? "Coherent Point Drift was cancelled; nothing was applied."
                         : "Coherent Point Drift rejected the input: " + std::string(CPD::ToString(status)) + ".";
                     ++run.Snapshot.Revision;
-                    return;
+                    return false;
                 }
             }
-            std::uint32_t done = 0;
-            const CPD::IterationObserver observer = [&run, &now](const CPD::IterationTrace& trace) {
-                const auto at = now();
-                const double iterationSeconds = std::chrono::duration<double>(at - run.LastIteration).count();
-                run.LastIteration = at;
-                std::scoped_lock lock{run.Mutex};
-                run.Snapshot.Trace.push_back({.Iteration = trace.Iteration, .Sigma2 = trace.Sigma2,
-                                              .NegativeLogLikelihood = trace.NegativeLogLikelihood,
-                                              .Objective = trace.Objective, .MatchedWeight = trace.MatchedWeight,
-                                              .EStep = std::string(CPD::ToString(trace.EStep)),
-                                              .EStepErrorBound = trace.EStepErrorBound,
-                                              .EStepSampledError = trace.EStepSampledError,
-                                              .NystromLocal = trace.NystromLocal,
-                                              .KernelEvaluations = trace.KernelEvaluations,
-                                              .Seconds = std::chrono::duration<double>(at - run.Started).count(),
-                                              .IterationSeconds = iterationSeconds});
+            return true;
+        }
+
+        void ObserveIteration(EditorCoherentPointDriftRun& run, const CPD::IterationTrace& trace)
+        {
+            const auto at = std::chrono::steady_clock::now();
+            const double iterationSeconds = std::chrono::duration<double>(at - run.LastIteration).count();
+            run.LastIteration = at;
+            std::scoped_lock lock{run.Mutex};
+            run.Snapshot.Trace.push_back({.Iteration = trace.Iteration, .Sigma2 = trace.Sigma2,
+                                          .NegativeLogLikelihood = trace.NegativeLogLikelihood,
+                                          .Objective = trace.Objective, .MatchedWeight = trace.MatchedWeight,
+                                          .EStep = std::string(CPD::ToString(trace.EStep)),
+                                          .EStepErrorBound = trace.EStepErrorBound,
+                                          .EStepSampledError = trace.EStepSampledError,
+                                          .NystromLocal = trace.NystromLocal,
+                                          .KernelEvaluations = trace.KernelEvaluations,
+                                          .Seconds = std::chrono::duration<double>(at - run.Started).count(),
+                                          .IterationSeconds = iterationSeconds});
+        }
+
+        bool Cancelled(EditorCoherentPointDriftRun& run, const JobCancellation& cancellation)
+        {
+            if (!cancellation.IsCancelled() && !run.CancelRequested.load()) return false;
+            PublishProgress(run, Phase::Cancelled);
+            return true;
+        }
+
+        bool FinishIteration(EditorCoherentPointDriftRun& run, const std::uint32_t done,
+                             const std::uint32_t iterations)
+        {
+            const bool ended = run.Solver.Finished();
+            const bool batchDone = iterations != 0u && done >= iterations;
+            PublishProgress(run, ended ? std::optional{run.Solver.Current().Succeeded() ? Phase::Finished : Phase::Failed}
+                               : batchDone ? std::optional{Phase::Paused} : std::nullopt);
+            return ended || batchDone;
+        }
+
+        // CPU/no-job runs and coroutine runs share initialization, trace and publication.
+        void RunSteps(EditorCoherentPointDriftRun& run, const std::uint32_t iterations,
+                      const JobCancellation& cancellation)
+        {
+            if (Cancelled(run, cancellation) || !InitializeRun(run)) return;
+            const CPD::IterationObserver observer = [&run](const CPD::IterationTrace& trace) {
+                ObserveIteration(run, trace);
             };
-            run.LastIteration = now(); // a paused run's idle time is not iteration time
+            run.LastIteration = std::chrono::steady_clock::now();
+            std::uint32_t done = 0;
             while (!run.Solver.Finished())
             {
-                if (cancellation.IsCancelled() || run.CancelRequested.load())
-                {
-                    PublishProgress(run, Phase::Cancelled);
-                    return;
-                }
+                if (Cancelled(run, cancellation)) return;
                 run.Solver.Step(observer);
-                ++done;
-                const bool ended = run.Solver.Finished();
-                const bool batchDone = iterations != 0u && done >= iterations;
-                PublishProgress(run, ended ? std::optional{run.Solver.Current().Succeeded() ? Phase::Finished : Phase::Failed}
-                                   : batchDone ? std::optional{Phase::Paused} : std::nullopt);
-                if (ended || batchDone) return;
+                if (FinishIteration(run, ++done, iterations)) return;
             }
-            // Finished before this call (e.g. a converged solver asked for more steps).
             PublishProgress(run, run.Solver.Current().Succeeded() ? Phase::Finished : Phase::Failed);
+        }
+
+        // Arguments live in the coroutine frame; the JobDesc factory itself never suspends.
+        Core::Tasks::Job RunStepsCoroutine(EditorCoherentPointDriftRunHandle run,
+                                          const std::uint32_t iterations,
+                                          JobCancellation cancellation,
+                                          std::move_only_function<void(JobResultEnvelope)> complete)
+        {
+            if (!Cancelled(*run, cancellation) && InitializeRun(*run))
+            {
+                const CPD::IterationObserver observer = [&run](const CPD::IterationTrace& trace) {
+                    ObserveIteration(*run, trace);
+                };
+                run->LastIteration = std::chrono::steady_clock::now();
+                std::uint32_t done = 0;
+                while (!run->Solver.Finished())
+                {
+                    if (Cancelled(*run, cancellation)) break;
+                    const auto step = run->Solver.BeginStep(observer);
+                    if (step == CPD::StepState::AwaitingExternal)
+                    {
+                        const auto* request = run->Solver.PendingExternalRequest();
+                        auto ready = run->GpuEStep->Queue(*request);
+                        if (ready) co_await Core::Tasks::WaitFor(*ready);
+                        // A cancellation abandons the pending step without CPU fallback or M-step.
+                        if (Cancelled(*run, cancellation)) break;
+                        const bool success = ready && run->GpuEStep->Complete(ready, *request);
+                        (void)run->Solver.CompleteExternalStep(success, observer);
+                    }
+                    if (FinishIteration(*run, ++done, iterations)) break;
+                }
+                if (done == 0u && !Cancelled(*run, cancellation))
+                    PublishProgress(*run, run->Solver.Current().Succeeded() ? Phase::Finished : Phase::Failed);
+            }
+            run->GpuEStep->SetWorkerActive(false);
+            complete(JobResultEnvelope::Make(true));
         }
 
         bool InputsCurrent(const EditorProcessingContext& context, const EditorCoherentPointDriftRun& run,
@@ -565,11 +618,13 @@ namespace Extrinsic::Runtime
                     return EditorCommandHistoryStatus::StaleEntity;
                 auto& registry = context.Scene->Raw();
                 auto* set = GPD::MutableGeometryProperties(registry, entity, domain);
+                const auto historyBefore = *revisions;
                 if (target.Exists) set->GetOrAdd<glm::vec3>(name).Vector() = target.Values;
                 else if (auto property = set->Get<glm::vec3>(name)) set->Remove(property);
                 if (!target.Normals.empty()) set->GetOrAdd<glm::vec3>(std::string(kNormal)).Vector() = target.Normals;
                 const auto now = BuildGeometryAvailability(registry, entity);
                 for (auto& watch : *revisions) watch = GPD::ObserveGeometryProperty(now, domain, watch.Name);
+                GPD::RebasePointPropertyHistory(context, entity, historyBefore);
                 ECS::Components::DirtyTags::MarkGpuDirty(registry, entity);
                 if (positions) ECS::Components::DirtyTags::MarkVertexPositionsDirty(registry, entity);
                 if (!target.Normals.empty()) ECS::Components::DirtyTags::MarkVertexNormalsDirty(registry, entity);
@@ -736,18 +791,10 @@ namespace Extrinsic::Runtime
                 return EditorCommandStatus::Pending;
             }
             auto delivered = std::make_shared<bool>(false);
-            const std::size_t work = std::max(run->SourceWorld.size(), run->TargetWorld.size());
             JobDesc desc{
                 .DebugName = "Sandbox.CoherentPointDrift",
                 .Scope = context.World,
                 .Priority = Core::Dag::TaskPriority::Normal,
-                .Kind = RuntimeTaskKinds::GeometryProcess,
-                .EstimatedCost = std::uint32_t(std::min<std::size_t>(1u << 20, 1u + work / 1024u)),
-                .Work = [run, iterations](const JobCancellation& cancellation) -> JobResultEnvelope {
-                    RunSteps(*run, iterations, cancellation);
-                    if (run->GpuEStep) run->GpuEStep->SetWorkerActive(false);
-                    return JobResultEnvelope::Make(true);
-                },
                 .ValidateBeforeApply = [] { return JobApplyValidation::Current; },
                 .PublishCompletion = [context, run, publish, delivered](KernelEventBus&, const JobResultEnvelope&) {
                     if (run->GpuEStep) run->GpuEStep->SetWorkerActive(false);
@@ -778,18 +825,33 @@ namespace Extrinsic::Runtime
                     }
                 },
             };
+            if (run->GpuEStep)
+            {
+                desc.CoroutineWork = [run, iterations](JobCancellation cancellation,
+                    std::move_only_function<void(JobResultEnvelope)> complete) {
+                    return RunStepsCoroutine(run, iterations, std::move(cancellation), std::move(complete));
+                };
+                desc.WakeOnCancel = [run] {
+                    run->CancelRequested = true;
+                    run->GpuEStep->Close("Coherent Point Drift was cancelled.");
+                };
+            }
+            else
+                desc.Work = [run, iterations](const JobCancellation& cancellation) {
+                    RunSteps(*run, iterations, cancellation);
+                    return JobResultEnvelope::Make(true);
+                };
             if (run->GpuEStep && !run->GpuEStep->Closed())
             {
-                // The step worker waits on this job, which pumps its device E-steps on the main
-                // thread every drain until the worker is done.
+                // The coroutine parks while this job pumps device E-steps on the main
+                // thread every drain until the run is done.
                 run->GpuEStep->SetWorkerActive(true);
                 auto broker = run->GpuEStep;
                 JobDesc pump{
                     .DebugName = "Sandbox.CoherentPointDrift.VulkanEStep",
                     .Scope = context.World,
-                    // Ahead of the step job, so its trivial work never waits behind a blocked worker.
+                    // Establish the main-thread pump ahead of the step job.
                     .Priority = Core::Dag::TaskPriority::High,
-                    .Kind = RuntimeTaskKinds::GeometryProcess,
                     .Work = [](const JobCancellation&) { return JobResultEnvelope::Make(true); },
                     .IsReadyToApply = [broker] {
                         broker->Pump();
@@ -929,6 +991,7 @@ namespace Extrinsic::Runtime
         // Answers at once: the solver polls the flag inside kernel builds and every E-step chunk,
         // and a step still in flight publishes nothing more than this cancelled phase.
         run->CancelRequested = true;
+        if (run->GpuEStep) run->GpuEStep->Close("Coherent Point Drift was cancelled.");
         std::scoped_lock lock{run->Mutex};
         if (run->Snapshot.Phase == Phase::Ready || run->Snapshot.Phase == Phase::Paused ||
             run->Snapshot.Phase == Phase::Running)

@@ -221,6 +221,26 @@ TEST(CoreDagScheduler, RegisterProducerRejectsNullQuery)
     EXPECT_EQ(producer.error(), Extrinsic::Core::ErrorCode::InvalidArgument);
 }
 
+TEST(CoreDagScheduler, ExplicitSelfDependencyIsRejected)
+{
+    auto scheduler = CreateDagScheduler();
+    auto query = [](void*, void* context, EmitPendingTaskFn emit)
+    {
+        const TaskId id{1, 1};
+        const std::array dependencies{id};
+        return emit(context, PendingTaskDesc{
+            .id = id, .debugName = "SelfCycle", .dependsOn = dependencies,
+        }) ? Extrinsic::Core::Ok() : Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::InvalidState);
+    };
+    ASSERT_TRUE(scheduler->RegisterProducer(ProducerInfo{.name = "self"}, nullptr, query).has_value());
+    ASSERT_TRUE(scheduler->QueryAllPending().has_value());
+    const auto plan = scheduler->BuildSchedule();
+    ASSERT_FALSE(plan.has_value());
+    EXPECT_EQ(plan.error(), Extrinsic::Core::ErrorCode::InvalidState);
+    EXPECT_NE(scheduler->GetLastStats().lastDiagnostic.find("SelfCycle"), std::string::npos);
+    EXPECT_NE(scheduler->GetLastStats().lastDiagnostic.find("cannot depend on itself"), std::string::npos);
+}
+
 TEST(CoreDagScheduler, UnregisterMissingProducerReturnsNotFound)
 {
     auto scheduler = CreateDagScheduler();

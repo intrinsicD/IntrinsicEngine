@@ -29,6 +29,8 @@ export namespace Geometry::Mesh::Conversion
         MeshSoup::ValidationDiagnosticKind ValidationKind{MeshSoup::ValidationDiagnosticKind::InvalidIndex};
         std::size_t FaceIndex{static_cast<std::size_t>(-1)};
         MeshSoup::Index VertexIndex{static_cast<MeshSoup::Index>(-1)};
+        // AttributeRemapSkipped uses Corner for halfedge and edge properties; indexed
+        // soup has no edge domain. AttributeName and Detail identify the source domain.
         MeshSoup::AttributeDomain AttributeDomainValue{MeshSoup::AttributeDomain::Vertex};
         std::string AttributeName;
         std::string Detail;

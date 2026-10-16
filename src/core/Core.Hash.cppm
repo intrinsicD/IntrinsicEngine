@@ -73,7 +73,7 @@ namespace Extrinsic::Core::Hash
         {
         }
 
-        auto operator<=>(const StringID&) const = default;
+        constexpr auto operator<=>(const StringID& other) const { return Value <=> other.Value; }
 
         // Equality only compares Value, not DebugString
         bool operator==(const StringID& other) const { return Value == other.Value; }

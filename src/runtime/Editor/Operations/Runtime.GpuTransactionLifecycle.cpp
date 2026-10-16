@@ -223,7 +223,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
     JobToken SubmitGpuTransactionRun(const GpuTransactionHandle& t, std::string debugName)
     {
         JobDesc job{
-            .DebugName = std::move(debugName), .Scope = t->Context.World, .Kind = RuntimeTaskKinds::GeometryProcess,
+            .DebugName = std::move(debugName), .Scope = t->Context.World,
             .Work = [](const JobCancellation&) { return JobResultEnvelope::Make(true); },
             .IsReadyToApply = [t] { return !GpuTransactionCurrent(*t) || !t->Hooks.Poll || t->Hooks.Poll(); },
             .ValidateBeforeApply = [t] { return MeshSupport::ValidateQueuedJob(t->Abandoned, GpuTransactionCurrent(*t)); },
@@ -292,7 +292,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
             }
         t->Phase = EditorGpuTransactionPhase::Accepting;
         JobDesc accept{
-            .DebugName = t->AcceptJobName, .Scope = t->Context.World, .Kind = RuntimeTaskKinds::GeometryProcess,
+            .DebugName = t->AcceptJobName, .Scope = t->Context.World,
             .Work = [](const JobCancellation&) { return JobResultEnvelope::Make(true); },
             .IsReadyToApply = [t] {
                 if (!GpuTransactionCurrent(*t)) return true;

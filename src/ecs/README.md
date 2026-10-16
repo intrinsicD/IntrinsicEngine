@@ -40,12 +40,12 @@ plain data; systems are stateless functions that operate on components.
   (HARDEN-065 slice 2).
 - `Extrinsic.ECS.Component.Culling.Local`
 - `Extrinsic.ECS.Component.Culling.World`
-- `Extrinsic.ECS.Component.AssetInstance`
+- `Extrinsic.ECS.Components.AssetInstance`
 - `Extrinsic.ECS.Component.Collider`
 - `Extrinsic.ECS.Component.RigidBody`
 - `Extrinsic.ECS.Component.Light`
 - `Extrinsic.ECS.Component.ProceduralGeometryRef`
-- `Extrinsic.ECS.Component.Selection`
+- `Extrinsic.ECS.Components.Selection`
 - `Extrinsic.ECS.Component.ShadowCaster`
 - `Extrinsic.ECS.Component.StableId` — 128-bit UUID-shaped durable identity
   value type (`HARDEN-068-Impl-A`). Optional sparse component; not assigned
@@ -77,7 +77,10 @@ commands are queued, replayed, undone, coalesced, or translated from input.
 - **Hierarchy mutation.** ECS owns the deterministic `Hierarchy::Attach` and
   `Hierarchy::Detach` operations and their invariants (invalid/self/cycle
   rejection, idempotency, parent/child link maintenance, and world-position
-  preservation when transform state is ready). Higher layers decide which user
+  preservation when transform state is ready). Attach rejects an unrepresentable
+  local transform before changing links; detach always unlinks for teardown,
+  preserving translation and extracting TRS when possible (shear is dropped).
+  Higher layers decide which user
   action invokes those primitives and how that action participates in history
   or serialization.
 - **Guarded hierarchy queries.** `Hierarchy::Structure::CollectChildren`
@@ -100,7 +103,7 @@ commands are queued, replayed, undone, coalesced, or translated from input.
   consumes that CPU recompute marker and `System.RenderSync` forwards the GPU
   dirty signal. No transform command object is promoted by HARDEN-063.
 - **Selection and hover mutation.** ECS owns the selection/hover data carriers
-  (`SelectableTag`, `SelectedTag`, `HoveredTag`, and `PickID`). Runtime/editor
+  (`SelectableTag`, `SelectedTag`, and `HoveredTag`). Runtime/editor
   owns replace/add/toggle/clear semantics, primitive-cache invalidation policy,
   input interpretation, GPU pick readback translation, and event dispatch.
 
@@ -253,9 +256,10 @@ enforces the no-`entt` rule on this one
 module specifically; the existing directory-recursive sweep enforces the
 shared `ecs -> {core, geometry}` import constraint. CPU-only `unit;ecs`
 payload tests live in `tests/unit/ecs/Test.ECS.StableIdentity.cpp`.
-Generator helpers and the optional `Runtime::StableIdRegistry` sidecar
-ship in **HARDEN-068-Impl-B** (slice 3) only when a concrete
-serializer/selection consumer demands them.
+Runtime selection resolves stable IDs through the runtime-owned
+`Extrinsic.Runtime.StableEntityLookup` sidecar. ECS owns the value type;
+lookup policy and frame wiring are described in
+[the architecture reference](../../docs/architecture/ecs.md#stable-identity-and-scene-metadata).
 
 ## Component boundary contract
 
@@ -281,8 +285,8 @@ counterpart:
 
 - `Geometry::Sphere`, `Geometry::AABB`, `Geometry::OBB` — bounding volumes
   on `Culling.Local` / `Culling.World` and `Light::AmbientLight`.
-- `Geometry::PropertySet` (via `ObserverPtr`) — non-owning property set
-  views on `GeometrySources::{Vertices,Edges,Faces,Halfedges,Tetrahedra}`.
+- `Geometry::PropertySet` — owned property sets on
+  `GeometrySources::{Vertices,Edges,Halfedges,Faces}`.
 
 Adding new `Geometry.*` imports to ECS requires the new dependency to be
 data-only (CPU descriptor or non-owning view) and to be motivated by the

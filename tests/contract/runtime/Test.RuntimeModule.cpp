@@ -20,6 +20,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Platform.Backend.Null;
 import Extrinsic.Platform.Input;
+import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.Engine;
@@ -718,4 +719,38 @@ TEST(RuntimeModule, IdleHooksRunOnMinimizedFramesAndUiHooksDoNot)
     EXPECT_EQ(state.UiEndFrames, 1);
     EXPECT_EQ(state.IdleFrames, 3);
     EXPECT_EQ(state.IdleFramesAtCommand, 1) << "a command enqueued by an Idle hook is drained by the next minimized frame";
+}
+
+TEST(RuntimeModule, WindowEventsAreDiscardedWithoutEditorUi)
+{
+    class CursorProbe final : public Runtime::IRuntimeModule
+    {
+    public:
+        explicit CursorProbe(Runtime::Engine& engine) : Engine(engine) {}
+        std::string_view Name() const noexcept override { return "CursorProbe"; }
+        Core::Result OnRegister(Runtime::EngineSetup& setup) override
+        {
+            return setup.RegisterFrameHook(Runtime::FramePhase::UiBuild,
+                [this](Runtime::RuntimeFrameHookContext&)
+                {
+                    if (++Frames == 8u)
+                        Engine.RequestExit();
+                    else
+                        static_cast<Extrinsic::Platform::Backends::Null::NullWindow&>(
+                            Engine.GetWindow()).QueueCursor(Frames, Frames);
+                });
+        }
+        void OnShutdown(Runtime::RuntimeModuleShutdownContext&) override {}
+        Runtime::Engine& Engine;
+        std::uint32_t Frames{};
+    };
+    Runtime::Engine engine(NullWindowHeadlessConfig());
+    auto& probe = engine.EmplaceModule<CursorProbe>(engine);
+    engine.Initialize();
+    static_cast<Extrinsic::Platform::Backends::Null::NullWindow&>(
+        engine.GetWindow()).QueueCursor(0.0, 0.0);
+    engine.Run();
+    EXPECT_EQ(probe.Frames, 8u);
+    EXPECT_TRUE(engine.GetWindow().DrainEvents().empty());
+    engine.Shutdown();
 }

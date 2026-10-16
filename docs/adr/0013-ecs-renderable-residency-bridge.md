@@ -129,5 +129,4 @@ Follow-up tasks required: the remaining static / dynamic stream extraction, hier
 
 - [`tasks/done/GRAPHICS-028`](../../tasks/archive/GRAPHICS-028-ecs-renderable-residency-bridge.md) records the parent planning contract captured in §§1, 3–6.
 - [`tasks/done/GRAPHICS-023A`](../../tasks/archive/GRAPHICS-023A-gpu-scene-slot-asset-generation-tracking.md), [`023B`](../../tasks/archive/GRAPHICS-023B-gpu-scene-slot-asset-rebind-decision.md), [`023C`](../../tasks/archive/GRAPHICS-023C-runtime-asset-generation-observation.md), and [`023D`](../../tasks/archive/GRAPHICS-023D-runtime-asset-generation-rebind-acknowledgment.md) record the four-step asset-rebind observation / acknowledgment loop captured in §2.
-- `src/graphics/renderer/README.md` carries the matching CPU-only `GpuSceneSlot` ownership note alongside the runtime extraction documentation.
 - The default CPU correctness gate (`ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`) exercises `GpuSceneSlot::EvaluateSourceAssetRebind(...)` and `Runtime::AcknowledgeRenderableAssetRebind(...)` without requiring an asset cache or a Vulkan device.

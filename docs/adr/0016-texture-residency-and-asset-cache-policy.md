@@ -171,6 +171,5 @@ Follow-up tasks required: none from this ADR. Bounded eviction, `RequestStreamin
 - [`tasks/done/GRAPHICS-015`](../../tasks/archive/GRAPHICS-015-gpu-assets-textures-residency.md) records the underlying `Graphics.GpuAssetCache` contract, `GpuTextureRequest`, `InitializeFallbackTexture` / `GetViewOrFallback`, and `GpuAssetCacheDiagnostics` field set.
 - [`tasks/done/GRAPHICS-015Q`](../../tasks/archive/GRAPHICS-015Q-texture-residency-backend-clarifications.md) records the six clarification decisions captured in §§1–6.
 - `docs/architecture/rendering-three-pass.md` carries the matching "Per `GRAPHICS-015Q`" paragraph next to the existing `GRAPHICS-014Q` paragraph.
-- `src/graphics/renderer/README.md` carries the matching `MaterialSystem` / `GpuAssetCache` ownership-contract bullet listing the five visible decisions.
 - `src/graphics/assets/README.md` carries the matching "Per `GRAPHICS-015Q`" subsection under "Texture residency and fallback policy".
 - The default CPU correctness gate (`ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`) exercises `GpuAssetCache` reservation / upload / retire flows, the fallback resolution, and the `GpuAssetCacheDiagnostics` counter set without requiring a Vulkan device.

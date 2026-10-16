@@ -501,7 +501,7 @@ namespace Extrinsic::Runtime
                                                     const std::shared_ptr<NormalWork> &w)
         {
             auto &r = w->Result;
-            if (!CurrentNormalInput(context, *w, true))
+            if (!Detail::EditorProcessingContextWorldCurrent(context) || !CurrentNormalInput(context, *w, true))
             {
                 r.Status = EditorCommandStatus::StaleEntity;
                 r.Message = "Normal input or output changed before publication.";
@@ -516,26 +516,29 @@ namespace Extrinsic::Runtime
             };
             auto before = std::make_shared<OutputState>(OutputState{w->OutputWatch.Revision.has_value(), w->Before});
             auto after = std::make_shared<OutputState>(OutputState{true, w->After});
-            auto revision = std::make_shared<Watch>(w->OutputWatch);
+            auto outputWatches = Detail::CapturePointPropertyHistory(context, w->Entity, std::span(&w->Config.Output, 1));
             const auto mutate = [context, entity = w->Entity, inputs = w->Inputs, output = w->Config.Output,
-                                 revision](const OutputState &expected, const OutputState &target) {
-                if (!Detail::GeometryPropertiesCurrent(context, entity, inputs))
+                                 outputWatches=std::move(outputWatches)]
+                                (const OutputState &expected, const OutputState &target) {
+                if (!Detail::EditorProcessingContextWorldCurrent(context) ||
+                    !Detail::GeometryPropertiesCurrent(context, entity, inputs) ||
+                    !Detail::PointPropertyHistoryCurrent(context, entity, outputWatches))
                     return EditorCommandHistoryStatus::StaleEntity;
                 auto *props = Detail::MutableGeometryProperties(context.Scene->Raw(), entity, output.Domain);
-                const auto a = BuildGeometryAvailability(context.Scene->Raw(), entity);
-                if (!props || Detail::ObserveGeometryProperty(a, revision->Domain, revision->Name) != *revision)
+                if (!props || props->Exists(output.Name) != expected.Exists)
                     return EditorCommandHistoryStatus::StaleEntity;
                 const auto &read = std::as_const(*props);
                 const auto current = read.Get<glm::vec3>(output.Name);
                 // Deleted output rows may contain NaNs; compare their stored bits.
                 if (expected.Exists && (!current || !GeometryValueComparison::BitEqual(current.Vector(), expected.Values)))
                     return EditorCommandHistoryStatus::StaleEntity;
+                if (target.Exists && target.Values.size() != props->Size())
+                    return EditorCommandHistoryStatus::InvalidCommand;
                 if (target.Exists)
                     props->GetOrAdd<glm::vec3>(output.Name).Vector() = target.Values;
                 else if (auto p = props->Get<glm::vec3>(output.Name))
                     props->Remove(p);
-                *revision = Detail::ObserveGeometryProperty(BuildGeometryAvailability(context.Scene->Raw(), entity), revision->Domain,
-                                    revision->Name);
+                Detail::StampPointPropertyHistory(context, entity, outputWatches);
                 if (output.Domain == D::MeshFace)
                     ECS::Components::DirtyTags::MarkGpuDirty(context.Scene->Raw(), entity);
                 else
@@ -1348,7 +1351,6 @@ namespace Extrinsic::Runtime
         JobDesc desc{
             .DebugName = "Normal estimation",
             .Scope = context.World,
-            .Kind = RuntimeTaskKinds::GeometryProcess,
             .Work = [w](const JobCancellation &) -> JobResultEnvelope {
                 ComputeNormals(*w);
                 return JobResultEnvelope::Make(true);

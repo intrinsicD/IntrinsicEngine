@@ -302,7 +302,8 @@ namespace Intrinsic::Methods::Physics::RigidBodyReference
             return contacts;
         }
 
-        void ResolveContact(std::vector<BodyState>& bodies, const Contact& contact, const StepParams& params)
+        void ResolveContact(std::vector<BodyState>& bodies, const Contact& contact, const StepParams& params,
+                            const std::vector<Vec3>& initialPositions)
         {
             BodyState& a = bodies[contact.BodyA];
             BodyState& b = bodies[contact.BodyB];
@@ -325,7 +326,10 @@ namespace Intrinsic::Methods::Physics::RigidBodyReference
                 b.LinearVelocity         = b.LinearVelocity + contact.Normal * (impulse * invB);
             }
 
-            const double correctionDepth = std::max(contact.Penetration - params.PenetrationSlop, 0.0);
+            const double remainingDepth = contact.Penetration - Dot(
+                (b.Position - initialPositions[contact.BodyB]) -
+                (a.Position - initialPositions[contact.BodyA]), contact.Normal);
+            const double correctionDepth = std::max(remainingDepth - params.PenetrationSlop, 0.0);
             if (correctionDepth > 0.0)
             {
                 const Vec3 correction = contact.Normal * ((Clamp(params.PositionCorrectionPercent, 0.0, 1.0) * correctionDepth) / invSum);
@@ -610,11 +614,16 @@ namespace Intrinsic::Methods::Physics::RigidBodyReference
             result.Diagnostics.MaxPenetration = std::max(result.Diagnostics.MaxPenetration, contact.Penetration);
         }
 
+        std::vector<Vec3> initialPositions;
+        initialPositions.reserve(result.Bodies.size());
+        for (const BodyState& body : result.Bodies)
+            initialPositions.push_back(body.Position);
+
         for (int iteration = 0; iteration < params.SolverIterations; ++iteration)
         {
             for (const Contact& contact : result.Contacts)
             {
-                ResolveContact(result.Bodies, contact, params);
+                ResolveContact(result.Bodies, contact, params, initialPositions);
             }
         }
 
@@ -626,7 +635,7 @@ namespace Intrinsic::Methods::Physics::RigidBodyReference
         }
         result.Diagnostics.KineticEnergyAfter = ComputeKineticEnergy(result.Bodies);
         result.Diagnostics.EnergyDrift = result.Diagnostics.KineticEnergyAfter - result.Diagnostics.KineticEnergyBefore;
-        result.Diagnostics.Converged = result.Diagnostics.ResidualPenetration <= std::max(params.PenetrationSlop, 1.0e-6);
+        result.Diagnostics.Converged = result.Diagnostics.ResidualPenetration <= params.PenetrationSlop + std::max(params.PenetrationSlop, 1.0e-6);
         return result;
     }
 } // namespace Intrinsic::Methods::Physics::RigidBodyReference

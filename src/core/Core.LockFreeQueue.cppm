@@ -1,3 +1,4 @@
+// Bounded concurrent queue using per-slot sequence counters for producer and consumer ownership.
 module;
 
 #include <atomic>

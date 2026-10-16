@@ -1,3 +1,4 @@
+// Loop subdivision refines triangle meshes with optional crease preservation and face budgets.
 module;
 
 #include <cstddef>

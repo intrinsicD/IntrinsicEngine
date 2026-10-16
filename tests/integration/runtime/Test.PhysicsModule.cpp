@@ -5,7 +5,9 @@
 #include <utility>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <gtest/gtest.h>
+#include <nlohmann/json.hpp>
 
 #include "RuntimeTestModule.hpp"
 
@@ -13,6 +15,7 @@ import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.ECS.Component.Collider;
+import Extrinsic.ECS.Component.Hierarchy;
 import Extrinsic.ECS.Component.RigidBody;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
@@ -561,4 +564,418 @@ TEST(PhysicsModule, NullEngineRunAdvancesDynamicAndPreservesStaticKinematicEcsPo
     EXPECT_GT(snapshot.Diagnostics.DynamicWritebacks, 0u);
     EXPECT_GT(snapshot.Diagnostics.StaticWritebacksSkipped, 0u);
     EXPECT_GT(snapshot.Diagnostics.KinematicWritebacksSkipped, 0u);
+}
+
+
+TEST(PhysicsModule, FreshParentTransformsSeparateEqualLocalColliderPoses)
+{
+    PhysicsModuleHarness harness;
+    ASSERT_TRUE(harness.Module().ApplyConfig(EnabledConfig()).has_value());
+    auto& scene = harness.ActiveScene();
+    auto& raw = scene.Raw();
+    for (const int index : {0, 1})
+    {
+        const auto parent = scene.Create();
+        Transform::Component pose;
+        pose.Position.x = static_cast<float>(index) * 10.0f;
+        raw.emplace<Transform::Component>(parent, pose);
+        const auto child = CreateAuthoredBody(scene, Id(100u + index), RigidBody::MakeDynamic());
+        raw.emplace<Components::Hierarchy::Component>(child).Parent = parent;
+    }
+    harness.RunSimulation(0.01);
+    const auto diagnostics = harness.Module().GetSnapshot().Diagnostics;
+    EXPECT_EQ(diagnostics.ActiveWorldBodyCount, 2u);
+    EXPECT_EQ(diagnostics.LastContactsSolved, 0u);
+    EXPECT_FLOAT_EQ(diagnostics.LastMaxPenetrationBefore, 0.0f);
+}
+
+TEST(PhysicsModule, WorldGravityWritesBackThroughRotatedParent)
+{
+    PhysicsModuleHarness harness;
+    auto config = EnabledConfig();
+    config.Gravity.y = -1.0f;
+    ASSERT_TRUE(harness.Module().ApplyConfig(config).has_value());
+    auto& scene = harness.ActiveScene();
+    auto& raw = scene.Raw();
+    const auto parent = scene.Create();
+    Transform::Component parentPose;
+    parentPose.Rotation = glm::angleAxis(glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    raw.emplace<Transform::Component>(parent, parentPose);
+    const auto child = CreateAuthoredBody(scene, Id(110u), RigidBody::MakeDynamic());
+    raw.emplace<Components::Hierarchy::Component>(child).Parent = parent;
+    harness.RunSimulation(0.01);
+    const auto& local = raw.get<Transform::Component>(child);
+    EXPECT_NEAR(local.Position.x, -0.0001f, 1.0e-7f);
+    EXPECT_NEAR(local.Position.y, 0.0f, 1.0e-7f);
+    const auto worldPosition = parentPose.Rotation * local.Position;
+    EXPECT_NEAR(worldPosition.x, 0.0f, 1.0e-7f);
+    EXPECT_NEAR(worldPosition.y, -0.0001f, 1.0e-7f);
+}
+
+TEST(PhysicsModule, DynamicParentWritesBackBeforeDynamicChild)
+{
+    PhysicsModuleHarness harness;
+    auto config = EnabledConfig();
+    config.Gravity.y = -1.0f;
+    ASSERT_TRUE(harness.Module().ApplyConfig(config).has_value());
+    auto& scene = harness.ActiveScene();
+    auto& raw = scene.Raw();
+    // Create the child first so entity-order writeback is not hierarchy order.
+    const auto child = CreateAuthoredBody(scene, Id(120u), RigidBody::MakeDynamic(), glm::vec3(0.0f, 10.0f, 0.0f));
+    const auto parent = CreateAuthoredBody(scene, Id(121u), RigidBody::MakeDynamic());
+    raw.emplace<Components::Hierarchy::Component>(child).Parent = parent;
+    harness.RunSimulation(0.01);
+    EXPECT_NEAR(raw.get<Transform::Component>(parent).Position.y, -0.0001f, 1.0e-7f);
+    EXPECT_NEAR(raw.get<Transform::Component>(child).Position.y, 10.0f, 1.0e-6f);
+    EXPECT_EQ(harness.Module().GetSnapshot().Diagnostics.ActiveWorldBodyCount, 2u);
+    harness.RunSimulation(0.01);
+    EXPECT_NEAR(raw.get<Transform::Component>(parent).Position.y, -0.0003f, 1.0e-7f);
+    EXPECT_NEAR(raw.get<Transform::Component>(child).Position.y, 10.0f, 1.0e-6f);
+    EXPECT_EQ(harness.Module().GetSnapshot().Diagnostics.BodiesUpdated, 0u);
+}
+
+TEST(PhysicsModule, MissingOrRemovedTransformCannotRetainPhysicsSidecar)
+{
+    for (const bool createFirst : {false, true})
+    {
+        SCOPED_TRACE(createFirst);
+        PhysicsModuleHarness harness;
+        ASSERT_TRUE(harness.Module().ApplyConfig(EnabledConfig()).has_value());
+        auto& scene = harness.ActiveScene();
+        const auto entity = CreateAuthoredBody(scene, Id(130u), RigidBody::MakeDynamic());
+        if (createFirst)
+        {
+            harness.RunSimulation(0.0);
+            ASSERT_EQ(harness.Module().GetSnapshot().Diagnostics.ActiveWorldBodyCount, 1u);
+        }
+        scene.Raw().remove<Transform::Component>(entity);
+        harness.RunSimulation(0.0);
+        const auto diagnostics = harness.Module().GetSnapshot().Diagnostics;
+        EXPECT_EQ(diagnostics.ActiveWorldBodyCount, 0u);
+        EXPECT_EQ(diagnostics.SidecarCount, 0u);
+        EXPECT_EQ(diagnostics.MissingTransforms, 1u);
+    }
+}
+
+TEST(PhysicsModule, NonVelocityAuthoringEditsPreserveIntegratedVelocity)
+{
+    for (const int edit : {0, 1, 2})
+    {
+        SCOPED_TRACE(edit);
+        PhysicsModuleHarness harness;
+        auto config = EnabledConfig();
+        config.Gravity.y = -1.0f;
+        ASSERT_TRUE(harness.Module().ApplyConfig(config).has_value());
+        auto& scene = harness.ActiveScene();
+        auto& raw = scene.Raw();
+        const auto entity = CreateAuthoredBody(scene, Id(140u), RigidBody::MakeDynamic());
+        harness.RunSimulation(0.01);
+        ASSERT_NEAR(raw.get<Transform::Component>(entity).Position.y, -0.0001f, 1.0e-7f);
+        auto& authoring = raw.get<RigidBody::Component>(entity);
+        if (edit == 0)
+            authoring.Mass.Mass = 2.0f;
+        else if (edit == 1)
+            raw.get<Collider::Component>(entity).Shapes[0] = Collider::MakeSphere(0.6f);
+        else
+            authoring.LinearDamping = 0.5f;
+        const float damping = 1.0f - authoring.LinearDamping * 0.01f;
+        harness.RunSimulation(0.01);
+        const float secondY = -0.0001f - 0.0002f * damping;
+        EXPECT_NEAR(raw.get<Transform::Component>(entity).Position.y, secondY, 1.0e-7f);
+        EXPECT_EQ(authoring.LinearVelocity, glm::vec3(0.0f));
+        authoring.LinearVelocity.y = -0.3f;
+        harness.RunSimulation(0.01);
+        EXPECT_NEAR(raw.get<Transform::Component>(entity).Position.y, secondY - 0.0031f * damping, 1.0e-7f);
+    }
+}
+
+TEST(PhysicsModule, KinematicAuthoredPoseStaysFixedWhileVelocityDrivesContacts)
+{
+    PhysicsModuleHarness harness;
+    ASSERT_TRUE(harness.Module().ApplyConfig(EnabledConfig()).has_value());
+    auto& scene = harness.ActiveScene();
+    auto kinematic = RigidBody::MakeKinematic();
+    kinematic.LinearVelocity.x = 1.0f;
+    const auto anchor = CreateAuthoredBody(scene, Id(150u), kinematic);
+    const auto dynamic = CreateAuthoredBody(scene, Id(151u), RigidBody::MakeDynamic(), glm::vec3(0.8f, 0.0f, 0.0f));
+    harness.RunSimulation(0.01);
+    EXPECT_NEAR(harness.Module().GetSnapshot().Diagnostics.LastMaxPenetrationBefore, 0.2f, 1.0e-6f);
+    EXPECT_EQ(scene.Raw().get<Transform::Component>(anchor).Position, glm::vec3(0.0f));
+    const float afterContact = scene.Raw().get<Transform::Component>(dynamic).Position.x;
+    EXPECT_GT(afterContact, 0.8f);
+    scene.Raw().get<Collider::Component>(anchor).Shapes[0].Filter.CollidesWithBits = 0u;
+    harness.RunSimulation(0.01);
+    EXPECT_NEAR(scene.Raw().get<Transform::Component>(dynamic).Position.x, afterContact + 0.01f, 1.0e-6f);
+    EXPECT_EQ(scene.Raw().get<Transform::Component>(anchor).Position, glm::vec3(0.0f));
+}
+
+TEST(PhysicsModule, RuntimeFiltersAdmitDefaultsOmitZeroAndRejectUnsupportedPolicy)
+{
+    for (const int policy : {0, 1, 2, 3, 4, 5})
+    {
+        SCOPED_TRACE(policy);
+        PhysicsModuleHarness harness;
+        ASSERT_TRUE(harness.Module().ApplyConfig(EnabledConfig()).has_value());
+        auto& scene = harness.ActiveScene();
+        const auto a = CreateAuthoredBody(scene, Id(160u), RigidBody::MakeDynamic());
+        const auto b = CreateAuthoredBody(scene, Id(161u), RigidBody::MakeDynamic(), glm::vec3(0.8f, 0.0f, 0.0f));
+        auto& filterA = scene.Raw().get<Collider::Component>(a).Shapes[0].Filter;
+        auto& filterB = scene.Raw().get<Collider::Component>(b).Shapes[0].Filter;
+        if (policy == 1)
+            filterA.CategoryBits = 0u;
+        if (policy == 2)
+            filterA.CollidesWithBits = 0u;
+        if (policy == 3)
+            filterA.GroupIndex = filterB.GroupIndex = 7;
+        if (policy == 4)
+            filterA.GroupIndex = filterB.GroupIndex = -7;
+        if (policy == 5)
+            filterA.CollidesWithBits = 4u;
+        harness.RunSimulation(0.01);
+        const auto diagnostics = harness.Module().GetSnapshot().Diagnostics;
+        const bool expectedContact = policy == 0;
+        EXPECT_EQ(diagnostics.LastContactsSolved > 0u, expectedContact);
+        EXPECT_EQ(scene.Raw().get<Transform::Component>(a).Position.x < 0.0f, expectedContact);
+        const unsigned bodies = policy == 3 || policy == 4 ? 0u : policy == 5 ? 1u : 2u;
+        EXPECT_EQ(diagnostics.ActiveWorldBodyCount, bodies);
+        EXPECT_EQ(diagnostics.InvalidDescriptors > 0u, policy >= 3);
+        if (policy >= 3)
+            EXPECT_EQ(diagnostics.LastUnsupportedReason, Runtime::PhysicsUnsupportedReason::CollisionFilter);
+    }
+}
+
+TEST(PhysicsModule, UnsupportedAuthoredFieldsRemoveExistingSidecar)
+{
+    for (const int field : {0, 1, 2, 3, 4, 5, 6})
+    {
+        SCOPED_TRACE(field);
+        PhysicsModuleHarness harness;
+        ASSERT_TRUE(harness.Module().ApplyConfig(EnabledConfig()).has_value());
+        auto& scene = harness.ActiveScene();
+        const auto entity = CreateAuthoredBody(scene, Id(170u), RigidBody::MakeDynamic());
+        harness.RunSimulation(0.0);
+        ASSERT_EQ(harness.Module().GetSnapshot().Diagnostics.ActiveWorldBodyCount, 1u);
+        auto& rigidBody = scene.Raw().get<RigidBody::Component>(entity);
+        auto& shape = scene.Raw().get<Collider::Component>(entity).Shapes[0];
+        switch (field)
+        {
+        case 0: rigidBody.Mass.Policy = RigidBody::MassPolicy::Density; break;
+        case 1: rigidBody.Mass.LocalCenterOfMass.x = 0.1f; break;
+        case 2: rigidBody.AllowSleep = false; break;
+        case 3: rigidBody.StartsAwake = false; break;
+        case 4: rigidBody.ContinuousCollisionDetection = true; break;
+        case 5: shape.Surface.StaticFriction = 0.1f; break;
+        case 6: shape.Offsets.ContactOffset = 0.1f; break;
+        }
+        harness.RunSimulation(0.0);
+        const auto diagnostics = harness.Module().GetSnapshot().Diagnostics;
+        EXPECT_EQ(diagnostics.ActiveWorldBodyCount, 0u);
+        EXPECT_EQ(diagnostics.SidecarCount, 0u);
+        EXPECT_GT(diagnostics.InvalidDescriptors, 0u);
+        using Reason = Runtime::PhysicsUnsupportedReason;
+        constexpr Reason reasons[]{Reason::MassPolicy, Reason::CenterOfMass, Reason::SleepPolicy,
+            Reason::SleepPolicy, Reason::ContinuousCollisionDetection, Reason::Material, Reason::ContactOffsets};
+        EXPECT_EQ(diagnostics.LastUnsupportedReason, reasons[field]);
+        EXPECT_EQ(diagnostics.UnsupportedAuthoring, 1u);
+    }
+}
+
+
+TEST(PhysicsModule, DynamicParentMustHaveUniformWorldScaleEvenWhenChildWorldDoes)
+{
+    for (const bool uniformParent : {false, true})
+    {
+        SCOPED_TRACE(uniformParent);
+        PhysicsModuleHarness harness;
+        ASSERT_TRUE(harness.Module().ApplyConfig(EnabledConfig()).has_value());
+        auto& scene = harness.ActiveScene();
+        auto& raw = scene.Raw();
+        const auto parent = scene.Create();
+        Transform::Component parentPose;
+        parentPose.Scale = uniformParent ? glm::vec3(2.0f) : glm::vec3(2.0f, 1.0f, 1.0f);
+        raw.emplace<Transform::Component>(parent, parentPose);
+        const auto child = CreateAuthoredBody(scene, Id(180u), RigidBody::MakeDynamic());
+        raw.get<Transform::Component>(child).Scale = 1.0f / parentPose.Scale;
+        raw.emplace<Components::Hierarchy::Component>(child).Parent = parent;
+        harness.RunSimulation(0.0);
+        const auto first = harness.Module().GetSnapshot().Diagnostics;
+        EXPECT_EQ(first.ActiveWorldBodyCount, uniformParent ? 1u : 0u);
+        EXPECT_EQ(first.InvalidDescriptors > 0u, !uniformParent);
+        if (!uniformParent)
+            EXPECT_EQ(first.LastUnsupportedReason, Runtime::PhysicsUnsupportedReason::DynamicParentTransform);
+        harness.RunSimulation(0.01);
+        const auto second = harness.Module().GetSnapshot().Diagnostics;
+        EXPECT_EQ(second.ActiveWorldBodyCount, uniformParent ? 1u : 0u);
+        EXPECT_EQ(second.BodiesCreated, uniformParent ? 1u : 0u);
+        EXPECT_EQ(second.BodiesRemoved, 0u);
+    }
+}
+
+
+TEST(PhysicsModule, GravityHotApplyWakesExistingSleepingBody)
+{
+    PhysicsModuleHarness harness;
+    auto config = EnabledConfig();
+    ASSERT_TRUE(harness.Module().ApplyConfig(config).has_value());
+    auto& scene = harness.ActiveScene();
+    const auto dynamic = CreateAuthoredBody(scene, Id(190u), RigidBody::MakeDynamic());
+    for (unsigned step = 0; step < 60u; ++step)
+        harness.RunSimulation(0.01);
+    ASSERT_EQ(scene.Raw().get<Transform::Component>(dynamic).Position, glm::vec3(0.0f));
+    ASSERT_EQ(harness.Module().GetSnapshot().Diagnostics.BodiesCreated, 1u);
+    config.Gravity.y = -1.0f;
+    ASSERT_TRUE(harness.Module().ApplyConfig(config).has_value());
+    harness.RunSimulation(0.01);
+    EXPECT_NEAR(scene.Raw().get<Transform::Component>(dynamic).Position.y, -0.0001f, 1.0e-7f);
+    EXPECT_EQ(harness.Module().GetSnapshot().Diagnostics.BodiesCreated, 1u);
+    EXPECT_EQ(harness.Module().GetSnapshot().Diagnostics.BodiesUpdated, 0u);
+}
+
+TEST(PhysicsModule, UnsupportedDynamicScaleOverFloorNeverBecomesActivePhysicsBody)
+{
+    PhysicsModuleHarness harness;
+    auto config = EnabledConfig();
+    config.Gravity.y = -1.0f;
+    ASSERT_TRUE(harness.Module().ApplyConfig(config).has_value());
+    auto& scene = harness.ActiveScene();
+    const auto floor = CreateAuthoredBody(scene, Id(200u), RigidBody::MakeStatic(), glm::vec3(0.0f, -0.5f, 0.0f));
+    scene.Raw().get<Collider::Component>(floor).Shapes[0] = Collider::MakeBox(glm::vec3(5.0f, 0.5f, 5.0f));
+    const auto dynamic = CreateAuthoredBody(scene, Id(201u), RigidBody::MakeDynamic(), glm::vec3(0.0f, 2.0f, 0.0f));
+    scene.Raw().get<Transform::Component>(dynamic).Scale = glm::vec3(1.0f, 2.0f, 1.0f);
+    harness.RunSimulation(0.01);
+    const auto diagnostics = harness.Module().GetSnapshot().Diagnostics;
+    EXPECT_EQ(diagnostics.ActiveWorldBodyCount, 1u);
+    EXPECT_EQ(diagnostics.SidecarCount, 1u);
+    EXPECT_EQ(diagnostics.InvalidDescriptors, 1u);
+    EXPECT_EQ(diagnostics.UnsupportedAuthoring, 1u);
+    EXPECT_EQ(diagnostics.LastUnsupportedReason, Runtime::PhysicsUnsupportedReason::ShapeTransform);
+    EXPECT_EQ(scene.Raw().get<Transform::Component>(dynamic).Position, glm::vec3(0.0f, 2.0f, 0.0f));
+}
+
+
+TEST(PhysicsModuleConfig, RegistrationSchemaDescribesExistingPayloadBoundsAndGravity)
+{
+    using Json = nlohmann::json;
+    const auto registration = Runtime::MakePhysicsModuleConfigSectionRegistration();
+    ASSERT_FALSE(registration.SchemaJson.empty());
+    const auto schema = Json::parse(registration.SchemaJson, nullptr, false);
+    ASSERT_TRUE(schema.is_object());
+    ASSERT_TRUE(schema.contains("properties"));
+    const auto& properties = schema["properties"];
+    ASSERT_TRUE(properties.is_object());
+    const auto defaults = Json::parse(registration.DefaultSection.PayloadJson);
+    ASSERT_EQ(properties.size(), defaults.size());
+    EXPECT_EQ(schema.value("additionalProperties", true), false);
+    EXPECT_EQ(schema.value("x-fallback", false), true);
+    for (const auto& [name, value] : defaults.items())
+    {
+        ASSERT_TRUE(properties.contains(name));
+        ASSERT_TRUE(properties[name].contains("default"));
+        EXPECT_EQ(properties[name]["default"], value);
+    }
+    EXPECT_EQ(properties["enabled"]["type"], "boolean");
+    EXPECT_NEAR(properties["fixed_delta_seconds"]["minimum"].get<double>(), 1.0e-6, 1.0e-12);
+    EXPECT_EQ(properties["fixed_delta_seconds"]["maximum"], 1.0);
+    EXPECT_EQ(properties["max_accumulated_seconds"]["maximum"], 10.0);
+    EXPECT_EQ(properties["max_steps_per_frame"]["type"], "integer");
+    EXPECT_EQ(properties["max_steps_per_frame"]["minimum"], 1);
+    EXPECT_EQ(properties["max_steps_per_frame"]["maximum"], 1024);
+    const auto& gravity = properties["gravity"];
+    EXPECT_EQ(gravity["type"], "array");
+    EXPECT_EQ(gravity["minItems"], 3);
+    EXPECT_EQ(gravity["maxItems"], 3);
+    ASSERT_TRUE(gravity.contains("items"));
+    EXPECT_EQ(gravity["items"]["type"], "number");
+    EXPECT_EQ(gravity["items"]["minimum"], -100000.0);
+    EXPECT_EQ(gravity["items"]["maximum"], 100000.0);
+}
+
+TEST(PhysicsModuleConfig, DeclarativeSchemaKeepsFallbackCountsAndAccumulationClamp)
+{
+    using Json = nlohmann::json;
+    Runtime::PhysicsModuleConfig reference;
+    reference.FixedDeltaSeconds = 0.02f;
+    reference.MaxAccumulatedSeconds = 0.2f;
+    reference.MaxStepsPerFrame = 3u;
+    reference.Gravity = glm::vec3(1.0f, 2.0f, 3.0f);
+    const auto defaults = Runtime::SerializePhysicsModuleConfig(reference);
+    const auto result = Runtime::ValidatePhysicsModuleConfigSection(
+        R"({"enabled":true,"fixed_delta_seconds":"bad","max_steps_per_frame":0,"gravity":[0,100001,0],"extra":1})",
+        defaults, "physics");
+    EXPECT_EQ(result.State, CoreConfig::EngineConfigState::FallbackApplied);
+    EXPECT_EQ(result.ParsedFieldCount, 1u);
+    ASSERT_EQ(result.Diagnostics.size(), 4u);
+    EXPECT_EQ(result.Diagnostics[0].Code, CoreConfig::EngineConfigDiagnosticCode::UnknownField);
+    EXPECT_EQ(result.Diagnostics[0].Subject, "physics.extra");
+    EXPECT_EQ(result.Diagnostics[1].Subject, "physics.fixed_delta_seconds");
+    EXPECT_EQ(result.Diagnostics[1].Message, "Expected a numeric value; reference value retained.");
+    EXPECT_EQ(result.Diagnostics[2].Subject, "physics.max_steps_per_frame");
+    EXPECT_EQ(result.Diagnostics[2].Message, "Expected an integer in [1, 1024]; reference value retained.");
+    EXPECT_EQ(result.Diagnostics[3].Subject, "physics.gravity");
+    EXPECT_EQ(result.Diagnostics[3].Message,
+        "Expected three finite gravity components in the supported range; reference value retained.");
+    auto expected = Json::parse(defaults);
+    expected["enabled"] = true;
+    EXPECT_EQ(Json::parse(result.CanonicalPayloadJson), expected);
+
+    const auto clamp = Runtime::ValidatePhysicsModuleConfigSection(
+        R"({"fixed_delta_seconds":0.5,"max_accumulated_seconds":0.1})", defaults, "physics");
+    EXPECT_EQ(clamp.State, CoreConfig::EngineConfigState::FallbackApplied);
+    EXPECT_EQ(clamp.ParsedFieldCount, 2u);
+    ASSERT_EQ(clamp.Diagnostics.size(), 1u);
+    EXPECT_EQ(clamp.Diagnostics[0].Subject, "physics.max_accumulated_seconds");
+    expected = Json::parse(defaults);
+    expected["fixed_delta_seconds"] = 0.5;
+    expected["max_accumulated_seconds"] = 0.5;
+    EXPECT_EQ(Json::parse(clamp.CanonicalPayloadJson), expected);
+
+    for (const auto& gravity : {Json::array({-100000.0, 0.0, 100000.0}),
+                               Json::array({1.0, 2.0}), Json::array({1.0, "bad", 3.0})})
+    {
+        const bool accepted = gravity.size() == 3u && gravity[1].is_number();
+        const auto parsed = Runtime::ValidatePhysicsModuleConfigSection(
+            Json{{"gravity", gravity}}.dump(), defaults, "physics");
+        EXPECT_EQ(parsed.State, accepted ? CoreConfig::EngineConfigState::Valid :
+            CoreConfig::EngineConfigState::FallbackApplied);
+        EXPECT_EQ(parsed.ParsedFieldCount, accepted ? 1u : 0u);
+        EXPECT_EQ(Json::parse(parsed.CanonicalPayloadJson)["gravity"],
+            accepted ? gravity : Json::parse(defaults)["gravity"]);
+    }
+}
+
+
+TEST(PhysicsModule, StaticAndKinematicChildrenFollowDynamicParentsAfterAdmission)
+{
+    for (const bool kinematic : {false, true})
+    {
+        SCOPED_TRACE(kinematic);
+        PhysicsModuleHarness harness;
+        ASSERT_TRUE(harness.Module().ApplyConfig(EnabledConfig()).has_value());
+        auto& scene = harness.ActiveScene();
+        auto& raw = scene.Raw();
+        auto moving = RigidBody::MakeDynamic();
+        moving.LinearVelocity = glm::vec3(100.0f, 0.0f, 0.0f);
+        moving.LinearDamping = 0.0f;
+        const auto parent = CreateAuthoredBody(scene, Id(230u), moving);
+        const auto child = CreateAuthoredBody(scene, Id(231u),
+            kinematic ? RigidBody::MakeKinematic() : RigidBody::MakeStatic(),
+            glm::vec3(0.0f, 10.0f, 0.0f));
+        raw.emplace<Components::Hierarchy::Component>(child).Parent = parent;
+        const auto probe = CreateAuthoredBody(scene, Id(232u), RigidBody::MakeDynamic(),
+            glm::vec3(1.8f, 10.0f, 0.0f));
+
+        harness.RunSimulation(0.01);
+        EXPECT_NEAR(raw.get<Transform::Component>(parent).Position.x, 1.0f, 1e-6f);
+        EXPECT_EQ(harness.Module().GetSnapshot().Diagnostics.LastContactsSolved, 0u);
+        EXPECT_EQ(harness.Module().GetSnapshot().Diagnostics.ActiveWorldBodyCount, 3u);
+        // The next sync must move the child's physics collider from x=0 to x=1,
+        // where the probe overlaps by 0.2. The parent's own collider is far below.
+        harness.RunSimulation(0.01);
+        const auto diagnostics = harness.Module().GetSnapshot().Diagnostics;
+        EXPECT_EQ(diagnostics.BodiesUpdated, 1u);
+        EXPECT_GT(diagnostics.LastContactsSolved, 0u);
+        EXPECT_NEAR(diagnostics.LastMaxPenetrationBefore, 0.2f, 1e-6f);
+        EXPECT_GT(raw.get<Transform::Component>(probe).Position.x, 1.8f);
+        EXPECT_EQ(raw.get<Transform::Component>(child).Position, glm::vec3(0.0f, 10.0f, 0.0f));
+    }
 }

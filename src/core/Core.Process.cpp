@@ -94,20 +94,21 @@ namespace Extrinsic::Core::Process
 
         // Returns true if process exited, false on timeout.
         bool WaitForProcess(pid_t pid, int& status,
-                            std::chrono::milliseconds timeout) noexcept
+                            std::chrono::steady_clock::time_point deadline) noexcept
         {
-            if (timeout.count() <= 0)
+            if (deadline == std::chrono::steady_clock::time_point::max())
             {
                 waitpid(pid, &status, 0);
                 return true;
             }
-            const auto deadline = std::chrono::steady_clock::now() + timeout;
-            while (std::chrono::steady_clock::now() < deadline)
+            for (;;)
             {
                 const pid_t w = waitpid(pid, &status, WNOHANG);
                 if (w == pid || w < 0) return true;
+                const auto now = std::chrono::steady_clock::now();
+                if (now >= deadline) return false;
                 const auto rem = std::chrono::duration_cast<std::chrono::milliseconds>(
-                    deadline - std::chrono::steady_clock::now());
+                    deadline - now);
                 const auto sl = std::min(rem, std::chrono::milliseconds(50));
                 if (sl.count() > 0)
                 {
@@ -116,7 +117,6 @@ namespace Extrinsic::Core::Process
                     nanosleep(&ts, nullptr);
                 }
             }
-            return false;
         }
     } // namespace
 
@@ -185,17 +185,17 @@ namespace Extrinsic::Core::Process
             return result;
         }
 
+        const bool hasTimeout = config.Timeout.count() > 0;
+        const auto deadline = hasTimeout
+            ? std::chrono::steady_clock::now() + config.Timeout
+            : std::chrono::steady_clock::time_point::max();
+
         if (config.CaptureOutput)
         {
             stdoutPipe.CloseWrite();
             stderrPipe.CloseWrite();
             SetNonBlocking(stdoutPipe.ReadEnd);
             SetNonBlocking(stderrPipe.ReadEnd);
-
-            const bool hasTimeout = config.Timeout.count() > 0;
-            const auto deadline   = hasTimeout
-                ? std::chrono::steady_clock::now() + config.Timeout
-                : std::chrono::steady_clock::time_point::max();
 
             std::array<struct pollfd, 2> pfds{};
             pfds[0] = {stdoutPipe.ReadEnd, POLLIN, 0};
@@ -236,10 +236,7 @@ namespace Extrinsic::Core::Process
         }
 
         int status = 0;
-        const auto waitTimeout = config.CaptureOutput
-            ? std::chrono::milliseconds(0)   // already drained; process likely done
-            : config.Timeout;
-        if (!WaitForProcess(pid, status, waitTimeout))
+        if (!WaitForProcess(pid, status, deadline))
         {
             result.TimedOut = true;
             TerminateAndReap(pid);

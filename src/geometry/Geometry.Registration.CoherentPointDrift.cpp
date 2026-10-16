@@ -220,10 +220,9 @@ namespace Geometry::CoherentPointDrift
                                               0.5 * kDimension * std::log(std::numbers::pi * 2.0 * Sigma2)));
         }
 
-        bool AcceleratedExpectationStep(double& negativeLogLikelihood, double& matched)
+        [[nodiscard]] EStep::Settings AcceleratedSettings() const
         {
-            EStep::Sums& sums = AcceleratedSums;
-            const EStep::Settings settings{.Policy = Config.EStep, .Tolerance = Config.EStepTolerance,
+            return EStep::Settings{.Policy = Config.EStep, .Tolerance = Config.EStepTolerance,
                                            .Threads = Config.Threads, .NystromLandmarks = Config.NystromLandmarks,
                                            .NystromErrorLimit = Config.NystromErrorLimit,
                                            .NystromLocalSigma = Config.NystromLocalSigma,
@@ -232,9 +231,87 @@ namespace Geometry::CoherentPointDrift
                                            .NystromSchedule = Config.NystromSchedule,
                                            .NystromPattern = Config.NystromPattern,
                                            .External = Config.EStepExternal};
-            if (!Accelerated.Evaluate({Moved.X, Moved.Y, Moved.Z}, Sigma2, LogOutlierConstant(), settings, sums,
-                                      SourceLogWeight))
+        }
+
+        bool FinishStep(const bool expected, const double nll, const double matched,
+                        const IterationObserver& observer)
+        {
+            const auto cancelled = [this] { return Config.Cancelled && Config.Cancelled(); };
+            const auto stage = [this](const Stage value) { if (Config.StageObserver) Config.StageObserver(value); };
+            // A cancelled E-step skipped chunks: its statistics are incomplete, whatever it returned.
+            if (cancelled())
+            {
+                Fail(Status::Cancelled);
                 return false;
+            }
+            if (!expected)
+            {
+                Fail(Status::NumericalFailure);
+                return false;
+            }
+            const double objective = nll + Coherence();
+            LastNll = nll;
+            LastMatched = matched;
+            const bool converged = HasPreviousObjective &&
+                std::abs(LastObjective - objective) <= Config.Tolerance * std::abs(objective);
+            LastObjective = objective;
+            HasPreviousObjective = true;
+            if (converged)
+            {
+                Stop = Termination::Converged;
+                Ended = true;
+                return false;
+            }
+
+            Status status = Status::Success;
+            stage(Stage::MaximizationStep);
+            switch (Config.Method)
+            {
+            case Variant::Rigid: status = RigidStep(matched); break;
+            case Variant::Affine: status = AffineStep(matched); break;
+            case Variant::Nonrigid: status = NonrigidStep(matched); break;
+            case Variant::Bayesian: status = BayesianStep(matched); break;
+            }
+            // M-steps using the parallel helpers may have skipped chunks as well.
+            if (cancelled()) status = Status::Cancelled;
+            if (status != Status::Success)
+            {
+                Fail(status);
+                return false;
+            }
+            if (std::isnan(Sigma2) || std::isinf(Sigma2) || !Translation.allFinite() || !Linear.allFinite())
+            {
+                Fail(Status::NumericalFailure);
+                return false;
+            }
+            // Rounding can drive sigma^2 to or below zero once the sets coincide.
+            const bool floor = !(Sigma2 > Config.Sigma2Floor);
+            if (floor) Sigma2 = Config.Sigma2Floor;
+            ++Iterations;
+            ObjectiveHistory.push_back(objective);
+            Sigma2History.push_back(Sigma2 * Scale * Scale);
+            UsedPolicies |= 1u << unsigned(LastPolicy);
+            if (LastPolicy == EStepPolicy::Vulkan) ++EStepDeviceIterations; // completed iterations only
+            if (observer)
+            {
+                // Built directly: Current() would copy histories and, when subsampled, interpolate.
+                observer(IterationTrace{.Iteration = Iterations - 1u, .Sigma2 = Sigma2 * Scale * Scale,
+                                        .NegativeLogLikelihood = nll, .Objective = objective,
+                                        .MatchedWeight = matched,
+                                        .Transform = Config.Method == Variant::Nonrigid ? glm::dmat4(1.0) : WorldTransform(),
+                                        .EStep = LastPolicy, .EStepErrorBound = LastErrorBound,
+                                        .EStepSampledError = LastSampledError, .NystromLocal = LastNystromLocal,
+                                        .KernelEvaluations = LastKernelEvaluations});
+            }
+            if (floor) Stop = Termination::SigmaFloor;
+            else if (Iterations >= Config.MaxIterations) Stop = Termination::IterationCap;
+            Ended = Stop != Termination::None;
+            return !Ended;
+        }
+
+        bool ConsumeAcceleratedSums(double& negativeLogLikelihood, double& matched)
+        {
+            EStep::Sums& sums = AcceleratedSums;
             P1.swap(sums.P1); Pt1.swap(sums.Pt1);
             PX.X.swap(sums.PXx); PX.Y.swap(sums.PXy); PX.Z.swap(sums.PXz);
             negativeLogLikelihood = NegativeLogLikelihood(sums.LogDenominatorSum);
@@ -254,7 +331,6 @@ namespace Geometry::CoherentPointDrift
 
         bool ExpectationStep(double& negativeLogLikelihood, double& matched)
         {
-            if (Config.EStep != EStepPolicy::Reference) return AcceleratedExpectationStep(negativeLogLikelihood, matched);
             const std::size_t n = Target.Size(), m = Moved.Size();
             const double twoSigma2 = 2.0 * Sigma2;
             const double logC = LogOutlierConstant();
@@ -804,90 +880,60 @@ namespace Geometry::CoherentPointDrift
 
     bool Solver::Step(const IterationObserver& observer)
     {
+        const auto phase = BeginStep(observer);
+        if (phase != StepState::AwaitingExternal)
+            return phase == StepState::Complete && !Finished();
+        const auto* request = PendingExternalRequest();
+        return CompleteExternalStep(m_State->Config.EStepExternal && m_State->Config.EStepExternal(*request), observer);
+    }
+
+    StepState Solver::BeginStep(const IterationObserver& observer)
+    {
         State& s = *m_State;
-        if (s.Ended) return false;
+        if (s.Accelerated.PendingExternalRequest()) return StepState::Failed;
+        if (s.Ended) return s.Failure == Status::Success ? StepState::Complete : StepState::Failed;
         const EStep::CancellationScope scope(&s.Config.Cancelled);
-        const auto cancelled = [&s] { return s.Config.Cancelled && s.Config.Cancelled(); };
-        const auto stage = [&s](const Stage value) { if (s.Config.StageObserver) s.Config.StageObserver(value); };
-        if (cancelled())
+        if (s.Config.Cancelled && s.Config.Cancelled())
+        {
+            s.Fail(Status::Cancelled);
+            return StepState::Failed;
+        }
+        if (s.Config.StageObserver) s.Config.StageObserver(Stage::ExpectationStep);
+        if (s.Config.Method == Variant::Bayesian) s.UpdateBayesianWeights();
+        ++s.Revision;
+        double nll = 0.0, matched = 0.0;
+        bool expected = false;
+        if (s.Config.EStep == EStepPolicy::Reference)
+            expected = s.ExpectationStep(nll, matched);
+        else
+        {
+            const auto phase = s.Accelerated.BeginEvaluate({s.Moved.X, s.Moved.Y, s.Moved.Z}, s.Sigma2,
+                s.LogOutlierConstant(), s.AcceleratedSettings(), s.AcceleratedSums, s.SourceLogWeight);
+            if (phase == EStep::EvaluationState::AwaitingExternal) return StepState::AwaitingExternal;
+            expected = phase == EStep::EvaluationState::Complete && s.ConsumeAcceleratedSums(nll, matched);
+        }
+        (void)s.FinishStep(expected, nll, matched, observer);
+        return s.Failure == Status::Success ? StepState::Complete : StepState::Failed;
+    }
+
+    const EStep::ExternalRequest* Solver::PendingExternalRequest() const noexcept
+    {
+        return m_State->Accelerated.PendingExternalRequest();
+    }
+
+    bool Solver::CompleteExternalStep(const bool success, const IterationObserver& observer)
+    {
+        State& s = *m_State;
+        if (!s.Accelerated.PendingExternalRequest()) return false;
+        const EStep::CancellationScope scope(&s.Config.Cancelled);
+        if (s.Config.Cancelled && s.Config.Cancelled())
         {
             s.Fail(Status::Cancelled);
             return false;
         }
         double nll = 0.0, matched = 0.0;
-        stage(Stage::ExpectationStep);
-        if (s.Config.Method == Variant::Bayesian) s.UpdateBayesianWeights();
-        ++s.Revision;
-        const bool expected = s.ExpectationStep(nll, matched);
-        // A cancelled E-step skipped chunks: its statistics are incomplete, whatever it returned.
-        if (cancelled())
-        {
-            s.Fail(Status::Cancelled);
-            return false;
-        }
-        if (!expected)
-        {
-            s.Fail(Status::NumericalFailure);
-            return false;
-        }
-        const double objective = nll + s.Coherence();
-        s.LastNll = nll;
-        s.LastMatched = matched;
-        const bool converged = s.HasPreviousObjective &&
-            std::abs(s.LastObjective - objective) <= s.Config.Tolerance * std::abs(objective);
-        s.LastObjective = objective;
-        s.HasPreviousObjective = true;
-        if (converged)
-        {
-            s.Stop = Termination::Converged;
-            s.Ended = true;
-            return false;
-        }
-
-        Status status = Status::Success;
-        stage(Stage::MaximizationStep);
-        switch (s.Config.Method)
-        {
-        case Variant::Rigid: status = s.RigidStep(matched); break;
-        case Variant::Affine: status = s.AffineStep(matched); break;
-        case Variant::Nonrigid: status = s.NonrigidStep(matched); break;
-        case Variant::Bayesian: status = s.BayesianStep(matched); break;
-        }
-        // M-steps using the parallel helpers may have skipped chunks as well.
-        if (cancelled()) status = Status::Cancelled;
-        if (status != Status::Success)
-        {
-            s.Fail(status);
-            return false;
-        }
-        if (std::isnan(s.Sigma2) || std::isinf(s.Sigma2) || !s.Translation.allFinite() || !s.Linear.allFinite())
-        {
-            s.Fail(Status::NumericalFailure);
-            return false;
-        }
-        // Rounding can drive sigma^2 to or below zero once the sets coincide.
-        const bool floor = !(s.Sigma2 > s.Config.Sigma2Floor);
-        if (floor) s.Sigma2 = s.Config.Sigma2Floor;
-        ++s.Iterations;
-        s.ObjectiveHistory.push_back(objective);
-        s.Sigma2History.push_back(s.Sigma2 * s.Scale * s.Scale);
-        s.UsedPolicies |= 1u << unsigned(s.LastPolicy);
-        if (s.LastPolicy == EStepPolicy::Vulkan) ++s.EStepDeviceIterations; // completed iterations only
-        if (observer)
-        {
-            // Built directly: Current() would copy histories and, when subsampled, interpolate.
-            observer(IterationTrace{.Iteration = s.Iterations - 1u, .Sigma2 = s.Sigma2 * s.Scale * s.Scale,
-                                    .NegativeLogLikelihood = nll, .Objective = objective,
-                                    .MatchedWeight = matched,
-                                    .Transform = s.Config.Method == Variant::Nonrigid ? glm::dmat4(1.0) : s.WorldTransform(),
-                                    .EStep = s.LastPolicy, .EStepErrorBound = s.LastErrorBound,
-                                    .EStepSampledError = s.LastSampledError, .NystromLocal = s.LastNystromLocal,
-                                    .KernelEvaluations = s.LastKernelEvaluations});
-        }
-        if (floor) s.Stop = Termination::SigmaFloor;
-        else if (s.Iterations >= s.Config.MaxIterations) s.Stop = Termination::IterationCap;
-        s.Ended = s.Stop != Termination::None;
-        return !s.Ended;
+        const bool expected = s.Accelerated.CompleteExternal(success) && s.ConsumeAcceleratedSums(nll, matched);
+        return s.FinishStep(expected, nll, matched, observer);
     }
 
     void Solver::Run(const IterationObserver& observer)

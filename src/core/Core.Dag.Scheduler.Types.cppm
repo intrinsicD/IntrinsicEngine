@@ -1,3 +1,4 @@
+// DAG task identities, resource accesses, scheduling descriptors and diagnostics.
 module;
 
 #include <cstddef>

@@ -1,3 +1,4 @@
+// Thread-safe generational resource slots with deferred reclamation and reusable Clear.
 module;
 
 #include <concepts>
@@ -57,7 +58,7 @@ export namespace Extrinsic::Core
             const uint32_t index = AllocSlot();
             Slot& slot = m_Slots[index];
             slot.Data.emplace(std::move(resource));
-            ++slot.Generation;
+            slot.Generation = ++m_NextGeneration;
             slot.IsActive = true;
             return Handle{index, slot.Generation};
         }
@@ -86,9 +87,9 @@ export namespace Extrinsic::Core
         // Must be called once per frame on the maintenance thread.
         void ProcessDeletions(uint64_t globalFrameNumber)
         {
+            std::unique_lock lock(m_Mutex);
             if (m_PendingKill.empty())
                 return;
-            std::unique_lock lock(m_Mutex);
             std::erase_if(m_PendingKill, [&](const PendingKill& k)
             {
                 if (globalFrameNumber <= k.KillFrame + RetirementFrames)
@@ -115,6 +116,8 @@ export namespace Extrinsic::Core
         }
 
         // --- Read path -------------------------------------------------
+        // Returned pointers are borrowed: prevent reclamation/Clear and concurrent
+        // payload mutation for the entire use, beyond the lookup lock.
 
         // Returns Err(ResourceNotFound) for invalid / stale / inactive handles.
         [[nodiscard]] Core::Expected<T*> Get(Handle handle) const
@@ -214,6 +217,7 @@ export namespace Extrinsic::Core
         };
 
         mutable std::shared_mutex m_Mutex;
+        uint32_t m_NextGeneration = 0;
         std::deque<Slot>     m_Slots;
         std::deque<uint32_t> m_Free;
         std::vector<PendingKill> m_PendingKill;

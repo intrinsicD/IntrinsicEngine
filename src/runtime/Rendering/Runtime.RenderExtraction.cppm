@@ -389,8 +389,10 @@ export namespace Extrinsic::Runtime
             const RuntimeSceneInteractionRenderSnapshot& snapshot);
         // Scene replacement boundary: free scene-owned renderable sidecars,
         // hard-shutdown unified geometry residency, clear per-entity extraction
-        // settings and visualization recipes, and submit an empty snapshot.
+        // settings and visualization recipes, empty every snapshot slot, and
+        // advance SceneEpoch so the next published frame starts the new scene.
         void ClearSceneState(Graphics::IRenderer& renderer);
+        [[nodiscard]] std::uint64_t SceneEpoch() const noexcept;
         void Shutdown(Graphics::IRenderer& renderer);
 
         // One maintenance hook for every runtime-authored geometry lane.

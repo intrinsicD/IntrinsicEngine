@@ -28,7 +28,7 @@ void main(){
         return;
     }
     if(gl_GlobalInvocationID.x>=pc.count)return;
-    if(pc.phase==0){store3(pc.positions,row,load3(pc.inputBDA,slot(row)));UInts(pc.labels).v[row]=0;return;}
+    if(pc.phase==0){store3(pc.positions,row,load3(pc.inputBDA,slot(row)));UInts(pc.labels).v[row]=0xffffffffu;return;}
     if(pc.phase==5){Floats(pc.presentation).v[row]=float(UInts(pc.outputBDA).v[row]);return;}
     if(pc.phase==4)UInts(pc.outputBDA).v[slot(row)]=UInts(pc.labels).v[row];
 }

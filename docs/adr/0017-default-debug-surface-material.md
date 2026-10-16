@@ -125,5 +125,4 @@ Follow-up tasks required: none from this ADR. The debug-variant family registrat
 - [`tasks/done/GRAPHICS-031`](../../tasks/archive/GRAPHICS-031-default-debug-surface-material.md) records the parent planning contract captured in §§1–6.
 - [`tasks/done/GRAPHICS-031A`](../../tasks/archive/GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md) records the shader pair, vertex format, descriptor / push-constant reuse, pipeline state, and cull-bucket reuse implementation captured in §§2–5.
 - [ADR-0018](0018-missing-material-fallback-substitution.md) records the substitution / diagnostics half (when and why slot 0 replaces a snapshot record's resolved slot, and which counters increment).
-- `src/graphics/renderer/README.md` carries the matching `Graphics.MaterialSystem` ownership-contract bullet documenting the slot-0 contents.
 - The default CPU correctness gate (`ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`) exercises the slot-0 registration, the `kMaterialLayoutVersion == 1` SSBO layout consumption, and the `RebuildGpuResources()` byte-identical republish without requiring a Vulkan device.

@@ -44,6 +44,29 @@ vocabulary, `FrameRecipe*` means the per-frame pass/resource graph driver, while
 config or UI recipe lane must project onto `FrameRecipeFeatures` before it can
 affect a rendered frame.
 
+## Shared rendering contracts
+
+`RenderingContract` owns CPU-only renderer descriptors, snapshot envelopes,
+binding intents, recipes, view/output descriptions, artifact metadata and their
+validation. `CurrentRendererContractAdapter` builds those values from immutable
+`RenderFrameInput` or `RenderWorld` inputs. It is data-only and does not record
+commands or import Runtime, ECS, platform, live asset services or backend types.
+
+`SharedRenderRecipeExecution` consumes the immutable world and scoped snapshot
+metadata to produce visibility/grouping, LOD/spatial, lighting/environment and
+fallback data. Optional acceleration-structure products are build requests,
+not allocated backend resources. `SharedRecipeRendererProductDeclaration` and
+`CheckSharedRecipeCompatibility` compare declared consumers with produced data
+and renderer capabilities before the frame recipe interprets them.
+
+`Renderer::ExecuteFrame` validates the current contract before composing the
+frame. Incompatible metadata, unsupported shared products or invalid artifact
+declarations fail closed; degraded but supported fallback products remain
+usable. `RenderGraphFrameStats` exposes contract identities, product counts and
+diagnostics. After execution, output artifacts are marked available, missing or
+failed. Graphics emits metadata only; Runtime's `RenderArtifactPublication`
+owns registration, publication and apply commands.
+
 ## Recipe Config Lane
 
 `src/graphics/renderer/Graphics.RenderRecipeConfig.*` owns the external
@@ -87,6 +110,18 @@ and is invalidated by any resize of that vector. A missing slot drives
 fail-closed behavior at each lane — `Unsupported`/`UnknownRecipeSlot`
 diagnostics in config, and a declared-but-absent placeholder row in the editor
 model.
+
+Config-authored binding domains are limited to `MeshVertex`, `MeshFace`,
+`GraphNode`, `GraphEdge`, `PointCloudPoint` and `Scene`. The fixed-core name must
+match the context; required bindings cannot be overridden, and an override must
+target a role allowed by a declared extension slot. `Degraded` and
+`FallbackApplied` previews are usable only when contract validation has no errors.
+
+The live `recipe.disabledExtensionSlots` mapping can disable `postprocess`,
+`debug-view`, `picking` and `lighting` (lighting-path fallback and clustered-light
+compute gates). It never enables a gate that derived defaults left off. Unknown,
+fixed-core or unsupported requests preserve those defaults and are reported in
+`RenderGraphFrameStats::FrameRecipeOverrideDiagnostics`.
 
 ## Edit Lanes
 
@@ -150,6 +185,19 @@ reports per-frame compile attempt/cache-hit counters through
 `RenderGraphFrameStats::Compile`. The multi-KB compiler debug dump is lazy:
 default frames leave `RenderGraphFrameStats::DebugDump` empty, and explicit
 renderer debug-dump enablement builds it from the current compiled graph.
+
+Both cache hits and fresh compiles use `ValidateRecipeCompiledGraph` after
+current imported handles are rebound. Frame-slot transient allocation follows;
+the renderer publishes the recipe-aware error count and resource readiness through
+`IDevice::NoteRecipeGraphValidation`. The bare compile result lacks the recipe's
+imported-resource authorization and does not determine the published boolean.
+A failed recipe build, compile, validation or transient allocation publishes
+`false` and discards the cached graph before command recording.
+
+RenderGraph emits `BeforePass` barrier packets immediately before each matching
+callback, `AfterPass` packets immediately after it, and imported-resource
+final-state packets after the last pass. Logical transient handles are replaced
+with current RHI resources before the renderer submits those barriers.
 
 ## GPU Timestamp Diagnostics
 

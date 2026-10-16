@@ -73,6 +73,21 @@ TEST(CoreGraphCompiler, IndependentNodesHaveNoOrderingEdges)
     EXPECT_EQ(plan[1].batch, 0u);
 }
 
+TEST(CoreGraphCompiler, ExplicitSelfDependencyIsRejected)
+{
+    auto graph = CreateTaskPlanGraph();
+    const TaskId id{1, 1};
+    const std::array dependencies{id};
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{
+        .id = id, .debugName = "SelfCycle", .dependsOn = dependencies,
+    }).has_value());
+    const auto plan = graph->BuildPlan();
+    ASSERT_FALSE(plan.has_value());
+    EXPECT_EQ(plan.error(), Extrinsic::Core::ErrorCode::InvalidState);
+    EXPECT_NE(graph->GetLastStats().lastDiagnostic.find("SelfCycle"), std::string::npos);
+    EXPECT_NE(graph->GetLastStats().lastDiagnostic.find("cannot depend on itself"), std::string::npos);
+}
+
 TEST(CoreGraphCompiler, ExplicitDependenciesProduceTopologicalLayers)
 {
     auto graph = CreateTaskPlanGraph();

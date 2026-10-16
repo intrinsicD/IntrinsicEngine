@@ -622,6 +622,37 @@ TEST(VisualizationRecipes, HtexRecreateIsASeparateTypedJobOperation)
     EXPECT_EQ(jobs.GetState(scheduled.Task), R::JobState::Published);
 }
 
+TEST(VisualizationRecipes, LargeConstantScalarFieldsHaveFiniteNonemptyRanges)
+{
+    struct Case { float Value, Min, Max; };
+    constexpr Case cases[]{
+        {2.0f, 1.5f, 2.5f},
+        {16777216.0f, 16777215.0f, 16777218.0f},
+        {-16777216.0f, -16777218.0f, -16777215.0f},
+        {0x1.fffffep127f, 0x1.fffffcp127f, 0x1.fffffep127f},
+        {-0x1.fffffep127f, -0x1.fffffep127f, -0x1.fffffcp127f},
+    };
+    for (const auto& test : cases)
+    {
+        SCOPED_TRACE(test.Value);
+        RecipeSourceFixture source{};
+        ASSERT_TRUE(source.Vertices.Properties.Add<float>("flat", test.Value).IsValid());
+        const auto encoded = R::EncodeVisualizationRecipe(source.Availability,
+            R::VisualizationRecipe{.Data = R::ScalarVisualizationRecipe{
+                .Source = {.Domain = R::GeometryElementDomain::MeshVertex, .Name = "flat",
+                           .ValueKind = Geometry::PropertyValueKind::Float}}});
+        ASSERT_TRUE(encoded.Succeeded());
+        ASSERT_EQ(encoded.Batch.Scalars.size(), 1u);
+        const auto& packet = encoded.Batch.Scalars.front();
+        EXPECT_TRUE(std::isfinite(packet.RangeMin));
+        EXPECT_TRUE(std::isfinite(packet.RangeMax));
+        EXPECT_LT(packet.RangeMin, packet.RangeMax);
+        EXPECT_EQ(packet.RangeMin, test.Min);
+        EXPECT_EQ(packet.RangeMax, test.Max);
+        EXPECT_EQ(encoded.Diagnostics.FlatAutoRangeExpandedCount, 1u);
+    }
+}
+
 TEST(VisualizationRecipes, ScalarRangePoliciesRemainDeterministic)
 {
     RecipeSourceFixture source{};

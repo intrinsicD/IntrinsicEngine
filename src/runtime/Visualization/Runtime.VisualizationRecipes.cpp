@@ -297,8 +297,7 @@ namespace Extrinsic::Runtime
 
             if (minValue == maxValue)
             {
-                minValue -= 0.5f;
-                maxValue += 0.5f;
+                (void)Graphics::ExpandConstantScalarRange(minValue, 0.5f, minValue, maxValue);
                 ++stats.FlatAutoRangeExpandedCount;
             }
 
@@ -1369,7 +1368,6 @@ namespace Extrinsic::Runtime
                 ? std::string{"Visualization.HtexRecreate"}
                 : std::string{"Visualization.HtexRecreate."} + request.DebugName,
             .Scope = request.World,
-            .EstimatedCost = 1u,
             .Work = [payloadToken = request.PayloadToken](const JobCancellation&)
             {
                 return JobResultEnvelope::Make<HtexRecreateScheduled>(

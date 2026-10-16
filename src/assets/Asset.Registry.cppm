@@ -19,7 +19,7 @@ export namespace Extrinsic::Assets
 
     enum class AssetState : uint8_t
     {
-        Unloaded, QueuedIO, LoadedCPU, QueuedGPU, Ready, Failed
+        Unloaded, QueuedIO, LoadedCPU, Ready, Failed
     };
 
     struct AssetMeta

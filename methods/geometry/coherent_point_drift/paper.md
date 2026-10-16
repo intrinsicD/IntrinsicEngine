@@ -220,9 +220,14 @@ CPU dense pass (a review found that a row far from every source under a narrow k
 ~1e-4 in fp32 without this). The largest admitted estimate is reported as the iteration's
 error bound (not rigorous: term errors partly cancel), and results count the CPU rows.
 Without an evaluator, or when it fails, the iteration runs the exact CPU choice and
-`EStepFallbacks` counts it; `EStepDeviceIterations` counts the device iterations. In the editor the solver worker
-waits while a pump job submits the passes off-frame (GRAPHICS-150), so one device E-step costs
-about one engine frame of latency. Measured (C117, RTX 3050): E-step statistics within 1e-7
+`EStepFallbacks` counts it; `EStepDeviceIterations` counts the device iterations. The synchronous
+Geometry wrapper uses the supplied external callback. The editor instead drives
+`BeginStep` / `PendingExternalRequest` / `CompleteExternalStep`: its coroutine parks on a
+per-request event while a main-thread pump submits the passes off-frame (GRAPHICS-150).
+The worker is free for other jobs during that wait. Cancellation wakes the coroutine and
+abandons the pending step before fallback or the M-step; deadlines are observed by the
+next owner pump. Broker wait statistics measure request latency, not blocked worker time.
+One device E-step still includes the pump cadence. Measured (C117, RTX 3050): E-step statistics within 1e-7
 relative of CPU dense on the smoke fixtures (including a far row evaluated on the CPU);
 10^5-point rigid registration in 19.8 s instead of 185 s for the same route with the CPU dense
 pass (Auto 188 s, Nystroem 121 s; 21 of 48 iterations on the device, no CPU rows needed there),

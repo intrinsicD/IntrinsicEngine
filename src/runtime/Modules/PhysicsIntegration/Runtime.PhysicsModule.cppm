@@ -1,3 +1,4 @@
+// Validated optional physics composition, authored ECS synchronization and copied diagnostics.
 module;
 
 #include <cstdint>
@@ -57,6 +58,21 @@ export namespace Extrinsic::Runtime
     MakePhysicsModuleConfigSectionRegistration(
         PhysicsModuleConfigChangedCallback onChanged = {});
 
+    enum class PhysicsUnsupportedReason : std::uint8_t
+    {
+        None,
+        MassPolicy,
+        CenterOfMass,
+        SleepPolicy,
+        ContinuousCollisionDetection,
+        Material,
+        ContactOffsets,
+        CollisionFilter,
+        WorldTransform,
+        DynamicParentTransform,
+        ShapeTransform,
+    };
+
     struct PhysicsModuleDiagnostics
     {
         bool Enabled{false};
@@ -75,6 +91,9 @@ export namespace Extrinsic::Runtime
         std::uint64_t BodiesUpdated{0u};
         std::uint64_t BodiesRemoved{0u};
         std::uint64_t InvalidDescriptors{0u};
+        std::uint64_t UnsupportedAuthoring{0u};
+        PhysicsUnsupportedReason LastUnsupportedReason{PhysicsUnsupportedReason::None};
+        std::uint64_t WritebackFailures{0u};
         std::uint64_t MissingStableIds{0u};
         std::uint64_t DuplicateStableIds{0u};
         std::uint64_t MissingAuthoringComponents{0u};

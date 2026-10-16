@@ -2,14 +2,17 @@
 module;
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 export module Extrinsic.Runtime.KernelDensityConfig;
 export import Extrinsic.Runtime.GeometryProperty.Types;
+import Extrinsic.Runtime.ConfigFieldSpec;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 export namespace Extrinsic::Runtime
 {
+    extern "C++" [[nodiscard]] std::span<const ConfigFieldSpec> KernelDensityConfigFieldSpecs() noexcept;
     inline constexpr std::string_view kKernelDensityConfigSectionName="sandbox.kernel_density";
     inline constexpr std::string_view kKernelDensityConfigSectionSchemaId="intrinsic.runtime.sandbox.kernel_density";
     enum class KernelDensityBackend : std::uint8_t { CpuOctree, CpuLBVH, VulkanLBVH };

@@ -1,7 +1,12 @@
 // Local Unix-domain socket listener/connection: round trip, permissions, stale files and errors.
+#include <algorithm>
+#include <cerrno>
 #include <filesystem>
+#include <fcntl.h>
 #include <string>
 #include <thread>
+#include <utility>
+#include <sys/resource.h>
 #include <unistd.h>
 #include <cstdio>
 #include <cstring>
@@ -99,4 +104,106 @@ TEST(LocalSocket, RejectsLiveOwnersAndReplacesStaleFiles)
     std::string buffer;
     EXPECT_EQ(nobody.Receive(buffer, 0), P::LocalSocketStatus::Closed);
     EXPECT_EQ(nobody.SendAll("x"), P::LocalSocketStatus::Closed);
+}
+
+
+TEST(LocalSocket, SendAllTimesOutWhenPeerDoesNotRead)
+{
+    // Setup stays in the child so both GTest death-test styles exercise one owner.
+    EXPECT_EXIT({
+        ::alarm(2);
+        const int result = []
+        {
+            const auto path = TempSocketPath("send-timeout");
+            P::LocalSocketListener listener;
+            if (listener.Listen(path) != P::LocalSocketStatus::Ok) return 2;
+            P::LocalSocketConnection client;
+            if (P::ConnectLocalSocket(path, client) != P::LocalSocketStatus::Ok) return 3;
+            P::LocalSocketConnection accepted;
+            if (listener.Accept(accepted, 200) != P::LocalSocketStatus::Ok) return 4;
+            return accepted.SendAll(std::string(8u * 1024u * 1024u, 'x'), 20)
+                    == P::LocalSocketStatus::Timeout ? 0 : 1;
+        }();
+        ::_exit(result);
+    }, ::testing::ExitedWithCode(0), "");
+}
+
+TEST(LocalSocket, FailedOwnershipProbePreservesLiveSocket)
+{
+    // FD exhaustion belongs only to the child, never to the test runner.
+    EXPECT_EXIT({
+        ::alarm(2);
+        const int result = []
+        {
+            const auto path = TempSocketPath("probe-error");
+            P::LocalSocketListener listener;
+            if (listener.Listen(path) != P::LocalSocketStatus::Ok) return 2;
+            struct stat original{};
+            if (::lstat(path.c_str(), &original) != 0) return 3;
+            struct rlimit limit{};
+            if (::getrlimit(RLIMIT_NOFILE, &limit) != 0) return 4;
+            limit.rlim_cur = std::min(limit.rlim_cur, rlim_t{64});
+            if (::setrlimit(RLIMIT_NOFILE, &limit) != 0) return 5;
+            while (::open("/dev/null", O_RDONLY) >= 0) {}
+            if (errno != EMFILE) return 6;
+            P::LocalSocketListener contender;
+            const auto status = contender.Listen(path);
+            struct stat current{};
+            const bool preserved = ::lstat(path.c_str(), &current) == 0
+                && current.st_dev == original.st_dev && current.st_ino == original.st_ino;
+            return status == P::LocalSocketStatus::SystemError && preserved ? 0 : 1;
+        }();
+        ::_exit(result);
+    }, ::testing::ExitedWithCode(0), "");
+}
+
+TEST(LocalSocket, ClosePreservesReplacementFile)
+{
+    const auto path = TempSocketPath("replacement-file");
+    P::LocalSocketListener listener;
+    ASSERT_EQ(listener.Listen(path), P::LocalSocketStatus::Ok);
+    ASSERT_EQ(::unlink(path.c_str()), 0);
+    std::FILE* replacement = std::fopen(path.c_str(), "w");
+    ASSERT_NE(replacement, nullptr);
+    std::fputs("replacement data", replacement);
+    std::fclose(replacement);
+
+    listener.Close();
+    EXPECT_TRUE(std::filesystem::is_regular_file(path));
+    std::filesystem::remove(path);
+}
+
+TEST(LocalSocket, ClosePreservesSuccessorListenerAfterMove)
+{
+    const auto path = TempSocketPath("successor");
+    P::LocalSocketListener first;
+    ASSERT_EQ(first.Listen(path), P::LocalSocketStatus::Ok);
+    P::LocalSocketListener moved(std::move(first));
+    ASSERT_EQ(::unlink(path.c_str()), 0);
+    P::LocalSocketListener successor;
+    ASSERT_EQ(successor.Listen(path), P::LocalSocketStatus::Ok);
+
+    moved.Close();
+    EXPECT_TRUE(std::filesystem::exists(path));
+    P::LocalSocketConnection client;
+    EXPECT_EQ(P::ConnectLocalSocket(path, client), P::LocalSocketStatus::Ok);
+}
+
+TEST(LocalSocket, MovesTransferSocketPathOwnership)
+{
+    const auto path = TempSocketPath("move-source");
+    const auto replacedPath = TempSocketPath("move-target");
+    P::LocalSocketListener first;
+    ASSERT_EQ(first.Listen(path), P::LocalSocketStatus::Ok);
+    P::LocalSocketListener moved(std::move(first));
+    first.Close();
+    EXPECT_TRUE(std::filesystem::exists(path));
+    P::LocalSocketListener assigned;
+    ASSERT_EQ(assigned.Listen(replacedPath), P::LocalSocketStatus::Ok);
+    assigned = std::move(moved);
+    moved.Close();
+    EXPECT_FALSE(std::filesystem::exists(replacedPath));
+    EXPECT_TRUE(std::filesystem::exists(path));
+    assigned.Close();
+    EXPECT_FALSE(std::filesystem::exists(path));
 }

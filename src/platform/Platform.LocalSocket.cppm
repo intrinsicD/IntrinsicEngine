@@ -64,12 +64,14 @@ export namespace Extrinsic::Platform
         [[nodiscard]] LocalSocketStatus Accept(LocalSocketConnection& out, int timeoutMs);
         [[nodiscard]] bool IsListening() const noexcept { return m_Handle >= 0; }
         [[nodiscard]] const std::string& Path() const noexcept { return m_Path; }
-        // Stops listening and removes the socket file this listener created.
+        // Stops listening; removes the path only if it still names this socket.
         void Close() noexcept;
 
     private:
         int m_Handle{-1};
         std::string m_Path{};
+        std::uint64_t m_PathDevice{};
+        std::uint64_t m_PathInode{};
     };
 
     [[nodiscard]] LocalSocketStatus ConnectLocalSocket(std::string_view path, LocalSocketConnection& out);

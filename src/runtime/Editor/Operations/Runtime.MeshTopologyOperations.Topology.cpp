@@ -58,6 +58,7 @@ import Geometry.HalfedgeMesh.Simplification;
 import Geometry.HalfedgeMesh.Smoothing;
 import Geometry.HalfedgeMesh.Subdivision;
 
+#include "Editor/internal/Runtime.EditorPropertyHistory.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
 
@@ -297,7 +298,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                             }
                             return EditorCommandHistoryStatus::Applied;
                         },
-                        [](
+                        [commandHistory = context.CommandHistory](
                             const MeshPropertyMutationIdentity& identity,
                             const MeshPositionState& target)
                         {
@@ -306,10 +307,14 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                                 return EditorCommandHistoryStatus::
                                     CommandFailed;
                             }
-                            return ApplyMeshDenoisePositionState(
-                                identity.Scene,
-                                identity.StableEntityId,
-                                *target);
+                            const auto entity = SelectionController::ToEntityHandle(identity.StableEntityId);
+                            const EditorProcessingContext historyContext{.Scene = identity.Scene, .CommandHistory = commandHistory};
+                            const GeometryPropertyRef output{GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3};
+                            const auto historyBefore = GeometryProcessingDetail::ObserveGeometryProperties(historyContext, entity, std::span(&output, 1));
+                            const auto status = ApplyMeshDenoisePositionState(identity.Scene, identity.StableEntityId, *target);
+                            if (status == EditorCommandHistoryStatus::Applied)
+                                GeometryProcessingDetail::RebasePointPropertyHistory(historyContext, entity, historyBefore);
+                            return status;
                         },
                         [](
                             const MeshPropertyMutationIdentity& identity,
@@ -736,7 +741,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                             }
                             return EditorCommandHistoryStatus::Applied;
                         },
-                        [](
+                        [history = context.CommandHistory](
                             const MeshPropertyMutationIdentity& identity,
                             const MeshTopologyState& target)
                         {
@@ -745,12 +750,20 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                                 return EditorCommandHistoryStatus::
                                     CommandFailed;
                             }
-                            return ApplyMeshTopologyState(
+                            const auto entity = ResolveStableEntity(identity.Scene->Raw(), identity.StableEntityId);
+                            if (!entity) return EditorCommandHistoryStatus::StaleEntity;
+                            const EditorProcessingContext historyContext{.Scene = identity.Scene, .CommandHistory = history};
+                            // The publication replaces all four geometry property sets.
+                            const auto historyBefore = GeometryProcessingDetail::ObservePointPropertyHistory(historyContext, *entity, std::nullopt);
+                            const auto status = ApplyMeshTopologyState(
                                 identity.Scene,
                                 identity.StableEntityId,
                                 target.Mesh != nullptr ? *target.Mesh
                                                        : kEmptyMeshTopology,
                                 target.Stored.get());
+                            if (status == EditorCommandHistoryStatus::Applied)
+                                GeometryProcessingDetail::RebasePointPropertyHistory(historyContext, *entity, historyBefore);
+                            return status;
                         },
                         [](
                             const MeshPropertyMutationIdentity& identity,
@@ -2126,20 +2139,10 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             const EditorProcessingContext& context,
             const std::shared_ptr<EditorMeshCpuJobState>& state)
         {
-            const std::uint32_t estimatedCost =
-                std::max<std::uint32_t>(
-                    1u,
-                    static_cast<std::uint32_t>(
-                        (std::max(state->SnapshotPositions.size(),
-                                  state->BeforeMesh.FaceCount()) +
-                         1023u) /
-                        1024u));
             return JobDesc{
                 .DebugName = MeshCpuJobName(state->Kind),
                 .Scope = context.World,
                 .Priority = Core::Dag::TaskPriority::Normal,
-                .Kind = RuntimeTaskKinds::GeometryProcess,
-                .EstimatedCost = estimatedCost,
                 .Work =
                     [state](const JobCancellation&) -> JobResultEnvelope
                     {

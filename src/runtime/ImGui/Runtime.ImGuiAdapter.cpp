@@ -422,8 +422,7 @@ namespace Extrinsic::Runtime
         // uploads it through `ImGuiOverlaySystem`, so do not advertise ImGui
         // 1.92 dynamic texture handling until graphics processes
         // ImDrawData::Textures[] and acknowledges ImTextureData requests.
-        io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors;
-        io.BackendFlags |= ImGuiBackendFlags_HasSetMousePos;
+        // Cursor-shape and mouse-warp requests are not handled by this adapter.
         io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;
 
         ImGuiPlatformIO& platformIo = ImGui::GetPlatformIO();

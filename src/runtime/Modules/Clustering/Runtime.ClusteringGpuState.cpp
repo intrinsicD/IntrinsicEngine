@@ -53,7 +53,7 @@ namespace Extrinsic::Runtime
             KMeansGpuPhase Phase{KMeansGpuPhase::Initialize};
             KMeansPagingLimits Limits{KMeansPagingForTesting};
             std::uint32_t Row{}, Inner{}, Count{}, Clusters{}, PreviewDeferrals{};
-            bool Boundary{}, Presented{}, Terminal{}, Ready{}, Accepting{}, Stop{}, Discard{}, Recorded{};
+            bool Boundary{}, Presented{}, Terminal{}, FinalAssignment{}, Ready{}, Accepting{}, Stop{}, Discard{}, Recorded{};
         };
         RHI::IDevice& Device;
         std::shared_ptr<bool> Alive{std::make_shared<bool>(true)};
@@ -220,13 +220,14 @@ namespace Extrinsic::Runtime
             std::uint32_t depth=KMeansSubmissionSerialDepth;
             // Device-only phase transitions continue in this command buffer under
             // the shared pair/depth budgets. Recording stops at the host boundaries:
-            // completed Update (convergence diagnostics) and terminal Presentation.
+            // completed Update, final assignment Reduce, and terminal Presentation.
             for(;;){
                 const auto outer=a->Phase==KMeansGpuPhase::Update?a->Clusters:
                     a->Phase==KMeansGpuPhase::Presentation?std::uint32_t(a->Snapshot.SlotCount):a->Count;
                 const auto inner=a->Phase==KMeansGpuPhase::Assign?a->Clusters:a->Phase==KMeansGpuPhase::Update?a->Count:1u;
                 if(a->Row==outer){
-                    if(a->Phase==KMeansGpuPhase::Update){a->Boundary=true;break;}
+                    if(a->Phase==KMeansGpuPhase::Update||
+                       (a->FinalAssignment&&a->Phase==KMeansGpuPhase::Reduce)){a->Boundary=true;break;}
                     if(a->Phase==KMeansGpuPhase::Presentation){a->Presented=true;if(a->Terminal)break;}
                     a->Phase=a->Phase==KMeansGpuPhase::Initialize?KMeansGpuPhase::Assign:
                         a->Phase==KMeansGpuPhase::Assign?KMeansGpuPhase::Reduce:
@@ -294,13 +295,22 @@ namespace Extrinsic::Runtime
                     if(a->Page->Data.size()!=sizeof(KMeansGpuDiagnostics)){Finish(KMeansRunStatus::GeometryProcessingFailed,"K-Means diagnostic readback size mismatch.");return;}
                     KMeansGpuDiagnostics d;std::memcpy(&d,a->Page->Data.data(),sizeof(d));
                     if(d.Invalid||!std::isfinite(d.Inertia)||!std::isfinite(d.MaxShift)){Finish(KMeansRunStatus::GeometryProcessingFailed,"K-Means device numerical failure.");return;}
-                    ++a->Result.Iterations;a->Result.Inertia=d.Inertia;a->Result.MaxDistanceIndex=d.MaxDistanceIndex;
-                    a->Result.Converged=!d.Changed||d.MaxShift<=a->Snapshot.Params.ConvergenceTolerance*a->Snapshot.Params.ConvergenceTolerance;
-                    a->Geometry.Iterations=a->Result.Iterations;a->Geometry.Converged=a->Result.Converged;
+                    a->Result.Inertia=d.Inertia;a->Result.MaxDistanceIndex=d.MaxDistanceIndex;
                     a->Geometry.Inertia=d.Inertia;a->Geometry.MaxDistanceIndex=d.MaxDistanceIndex;
-                    a->Terminal=a->Stop||a->Result.Converged||a->Result.Iterations==a->Snapshot.Params.MaxIterations;
-                    a->Phase=a->Terminal||a->Result.Iterations%a->Snapshot.Command.Parameters.GpuPreviewInterval==0?
-                        KMeansGpuPhase::Preview:KMeansGpuPhase::Assign;
+                    if(a->FinalAssignment){
+                        // Refresh labels and diagnostics for the final centroids;
+                        // this is not another Lloyd update or convergence decision.
+                        a->FinalAssignment=false;a->Phase=KMeansGpuPhase::Preview;
+                    }else{
+                        ++a->Result.Iterations;
+                        a->Result.Converged=(d.Changed&1u)==0||d.MaxShift<=a->Snapshot.Params.ConvergenceTolerance*a->Snapshot.Params.ConvergenceTolerance;
+                        a->Geometry.Iterations=a->Result.Iterations;a->Geometry.Converged=a->Result.Converged;
+                        a->Terminal=a->Stop||a->Result.Converged||a->Result.Iterations==a->Snapshot.Params.MaxIterations;
+                        a->FinalAssignment=a->Terminal&&(d.Changed&2u)!=0;
+                        a->Phase=a->FinalAssignment?KMeansGpuPhase::Assign:
+                            a->Terminal||a->Result.Iterations%a->Snapshot.Command.Parameters.GpuPreviewInterval==0?
+                                KMeansGpuPhase::Preview:KMeansGpuPhase::Assign;
+                    }
                 }
                 a->Page.reset();
             }

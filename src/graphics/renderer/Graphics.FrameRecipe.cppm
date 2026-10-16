@@ -573,6 +573,13 @@ namespace Extrinsic::Graphics
                                                                         const FrameRecipeAAOptions& aaOptions,
                                                                         const FrameRecipeShadowSizing& shadowSizing = {},
                                                                         FrameRecipeTemporalOptions temporalOptions = {});
+    // Builds only the four canonical overlay kinds with their canonical ids,
+    // queues, anchors, finalization and ordered resource declarations. Names
+    // remain customizable. DebugView instead accepts one materialized texture
+    // read, excluding Backbuffer and its own output; invalid input never falls
+    // back silently. Disabled contributions do not execute. General descriptor
+    // introspection is broader than this materialization contract. On failure,
+    // discard/reset the graph: late texture validation can follow graph writes.
     export [[nodiscard]] FrameRecipeBuildResult BuildDefaultFrameRecipeWithContributions(
         RenderGraph& graph,
         const FrameRecipeFeatures& features,

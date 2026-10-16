@@ -169,17 +169,16 @@ but it exports the domain-free `TaskPlanGraph` API.
 - `Extrinsic.Core.Tasks.Internal`
 - `Extrinsic.Core.Tasks.LocalTask`
 
-`Scheduler::Dispatch()` uses four fixed, domain-neutral preference lanes:
-`High`, `Normal`, `Low`, and `Background`. Workers scan them in that order.
-Each worker owns one local deque per lane, and external dispatch uses one
-inject queue per lane. The common `Normal` inject queue retains its
-65,536-task lock-free capacity; the additional queues are bounded at 8,192
-tasks each. `Background` is also worker-only: external help never executes
-it (see `TryRunOne()` below), so it carries long work, such as runtime
-`JobService` jobs, that no thread waits on synchronously. Every
-lane has a mutex-protected overflow deque, so exhausting the bounded lock-free
-queue does not drop accepted work. Priority is deliberately preferential, not
-a realtime or starvation-free contract.
+`Scheduler::Dispatch()` uses three helpable preference lanes (`High`, `Normal`,
+`Low`), followed by five worker-only lanes (`BackgroundCritical`,
+`BackgroundHigh`, `BackgroundNormal`, `BackgroundLow`, `Background`). Workers
+scan in that order. Helpable lanes use worker-local deques and bounded inject
+queues (65,536 slots for Normal, 8,192 for High and Low), with mutex-protected
+overflow. Worker-only lanes use those existing mutex-protected deques as their
+sole FIFO, including submissions from workers. Runtime jobs map their five
+priorities to these lanes. Equal-priority worker-only tasks start in enqueue
+order when a single worker drains them; concurrent workers do not guarantee
+completion order. Priority is preferential, not realtime or starvation-free.
 
 Ordinary worker scans use advisory queued counts for `High` and `Low`, always
 inspect the common `Normal` lane, and opportunistically skip a contended victim
@@ -234,19 +233,14 @@ for stable queue emptiness immediately before the helper parks. It does not
 impose graph or runtime domain policy.
 
 External help (`TryRunOne()` and the help loop in `WaitForAll()`) never pops
-the worker-only `Background` lane, whether the caller is a worker or not. A
-waiting frame thread therefore cannot inline a long job and stall until it
-ends (`BUG-231`). Only workers' own loops run `Background` tasks, and
-`Initialize()` always starts at least one worker.
+worker-only lanes, whether the caller is a worker or not. A waiting frame thread
+therefore cannot inline a long job (`BUG-231`). Only workers' own loops drain
+these lanes, and `Initialize()` always starts at least one worker.
 
-The deadlock hazard is narrow: a `Background` task that blocks in a helped
-wait on another `Background` task while every worker does the same. Nothing
-can then run the awaited tasks, because helpers skip the lane and every worker
-is blocked. Helped waits from non-`Background` code (frame-graph waits, the
-render-graph record join, `WaitForAll()` on the main thread) are safe: a waiter
-that finds only `Background` work parks on the work-progress epoch, and the
-workers drain that lane and advance the epoch as each task retires.
-`Background` tasks must therefore not wait on other `Background` tasks.
+Worker-only tasks must not block in helped waits on other worker-only tasks:
+if every worker does so, no thread can execute the awaited work. Helped waits
+from ordinary frame/graph work are safe: a helper finding only worker-only work
+parks on the work-progress epoch, which workers advance as tasks retire.
 
 Trade-off: the pool has `hardware_concurrency() - 1` workers (all hardware
 threads on machines with two or fewer, and at least one). With few workers a
@@ -285,11 +279,11 @@ consumes at composition time. Per-field ownership is:
   platform backend selected by CMake. Tests can set `WindowBackend::Null` to
   force the deterministic headless platform window without importing platform
   modules into core config.
-- `ReferenceScene { Enabled, Selector }` — opt-in seam consumed by
-  `Runtime::Engine::Initialize()` to populate a deterministic reference
-  renderable through the runtime-owned `Extrinsic.Runtime.ReferenceScene`
-  registry. `EngineConfig{}` defaults to `Enabled = false` so existing
-  CPU/null tests observe zero renderable candidates;
+- `ReferenceScene { Enabled, Selector }` — app-owned opt-in initial content.
+  Applications such as Sandbox use the plain
+  `Extrinsic.Runtime.ReferenceScene` bootstrap functions; generic
+  `Runtime::Engine::Initialize()` does not create reference geometry.
+  `EngineConfig{}` defaults to `Enabled = false`;
   `Runtime::CreateReferenceEngineConfig()` flips it to
   `true`/`ReferenceSceneSelector::Triangle`. The provider implementation
   lives in `runtime`; `core` only carries the value-type enum
@@ -327,4 +321,8 @@ partition are documented in
   panels, geometry operators, shader reload, and GPU-memory policy stay with
   their owning layers.
 - `Extrinsic.Core.BoundedHeap` and `Extrinsic.Core.Telemetry` provide
-  dependency-free utility and instrumentation facilities.
+  dependency-free utility and instrumentation facilities. Timing-category registration,
+  accumulation, reset and copied snapshots share one mutex; frame/history, GPU
+  budget and pass-timing state stay on the main thread. Category names remain
+  process-lifetime borrows. Scheduler queue entries own suspended coroutine frames
+  until resume and reclaim discarded entries during shutdown.

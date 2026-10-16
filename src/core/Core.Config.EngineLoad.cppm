@@ -1,3 +1,4 @@
+// Engine configuration preview, validation, serialization and section registration.
 module;
 
 #include <cstdint>

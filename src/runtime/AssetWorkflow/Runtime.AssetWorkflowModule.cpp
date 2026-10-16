@@ -663,7 +663,7 @@ namespace Extrinsic::Runtime
                 if (BoundWorld == context.World &&
                     BoundRegistry == &context.Registry)
                 {
-                    DestroySceneBinding(true);
+                    DestroySceneBinding(false);
                 }
             }
 

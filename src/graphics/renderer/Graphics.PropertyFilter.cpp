@@ -32,6 +32,13 @@ namespace Extrinsic::Graphics
         };
         static_assert(sizeof(Push) == 128 && offsetof(Push, Scalar) == 120);
         constexpr auto kShaderAccess = RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite;
+        // Tile the existing supported row/edge capacities within Vulkan's guaranteed group limits.
+        void DispatchLinear(RHI::ICommandContext& commands, const std::uint32_t count)
+        {
+            const auto groups = (count + 63u) / 64u;
+            commands.Dispatch(std::min(groups, 65535u), std::max(1u, (groups + 65534u) / 65535u), 1u);
+        }
+
     }
 
     struct PropertyFilterWorkspace::Impl
@@ -170,7 +177,7 @@ namespace Extrinsic::Graphics
                       .ScalarType = property.Double ? Scalar::Float64 : Scalar::Float32,
                       .RowStride = rowStride, .ChannelStride = channelStride};
             commands.PushConstants(&push, sizeof(push), 0);
-            commands.Dispatch((rows + 63u) / 64u, 1, 1);
+            DispatchLinear(commands, rows);
             if (store)
             {
                 // Ready for the renderer's reads and the Accept readback.
@@ -284,7 +291,7 @@ namespace Extrinsic::Graphics
             push.Scalar = scalar;
             commands.PushConstants(&push, sizeof(push), 0);
             const auto threads = mode == BilateralWeights ? edgeCount : rows;
-            commands.Dispatch(std::uint32_t((threads + 63) / 64), 1, 1);
+            DispatchLinear(commands, threads);
             for (auto buffer : {dst, weights, degree})
                 commands.BufferBarrier(buffer, RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite,
                                        RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite);

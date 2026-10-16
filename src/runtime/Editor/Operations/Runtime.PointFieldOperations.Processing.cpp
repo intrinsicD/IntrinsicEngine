@@ -290,7 +290,6 @@ namespace Extrinsic::Runtime
             JobDesc desc{
                 .DebugName = label,
                 .Scope = context.World,
-                .Kind = RuntimeTaskKinds::GeometryProcess,
                 .Work = [w](const JobCancellation &) -> JobResultEnvelope {
                     Compute(*w);
                     return JobResultEnvelope::Make(true);

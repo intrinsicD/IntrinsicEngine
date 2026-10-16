@@ -49,6 +49,7 @@ namespace
         std::vector<glm::vec3> Reference, Before;
         std::chrono::steady_clock::time_point Started;
         unsigned Step{}, Mode{}, Starts{};
+        std::size_t TinyPlaneBegin{};
         bool Done{};
         R::SpatialIndexCacheStats Final{};
         auto Commands() { return R::BindEditorProcessingCommands(Context); }
@@ -73,6 +74,13 @@ namespace
                 points.push_back({x * .2f, y * .2f, .03f*x*x + noise(random)});
             for (int x = 0; x < 8; ++x) points.push_back({10.f + x*.1f, 0, 0});
             for (int x = 0; x < 8; ++x) points.push_back({20, 0, 0});
+            TinyPlaneBegin = points.size();
+            // Two isolated tiny planar neighborhoods: YZ and a tilted plane.
+            // The tilted plane keeps y=-z exactly, even when its x coordinates round.
+            for (int y : {-1,0,1}) for (int z : {-1,0,1})
+                points.push_back({30.f, y*1e-5f, z*1e-5f});
+            for (int x : {-1,0,1}) for (int y : {-1,0,1})
+                points.push_back({40.f+x*1e-5f, y*1e-5f, -y*1e-5f});
             Props().Resize(points.size());
             Props().GetOrAdd<glm::vec3>("samples").Vector() = points;
             Props().GetOrAdd<bool>("v:deleted")[4] = true;
@@ -127,6 +135,12 @@ namespace
             // sqrt/division rounding. Ordered double covariance/eigensolve should be much closer.
             EXPECT_LE(std::max({delta.x,delta.y,delta.z}), 8*double(std::numeric_limits<float>::epsilon()));
             EXPECT_LE(angle, 2e-6);
+            for (std::size_t i = TinyPlaneBegin; i < rows.size(); ++i)
+            {
+                const auto expected = i < TinyPlaneBegin+9 ? glm::vec3(1,0,0)
+                    : glm::normalize(glm::vec3(0,1,1));
+                EXPECT_NEAR(std::abs(glm::dot(rows[i], expected)), 1.f, 2e-5f);
+            }
             EXPECT_EQ(rows[4], glm::vec3(7,8,9));
         }
         void Frame(double, double) override

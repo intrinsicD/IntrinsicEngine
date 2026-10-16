@@ -36,7 +36,6 @@ namespace Extrinsic::Core
     Dag::ScheduleStats FrameGraph::GetScheduleStats() const noexcept { return m_Graph->GetScheduleStats(); }
     uint64_t     FrameGraph::LastCompileTimeNs()   const noexcept { return m_Graph->LastCompileTimeNs(); }
     uint64_t     FrameGraph::LastExecuteTimeNs()   const noexcept { return m_Graph->LastExecuteTimeNs(); }
-    uint64_t     FrameGraph::LastCriticalPathTimeNs() const noexcept { return m_Graph->LastCriticalPathTimeNs(); }
     Dag::TaskGraphPlanReuseStats FrameGraph::GetPlanReuseStats() const noexcept
     {
         return m_Graph->GetPlanReuseStats();

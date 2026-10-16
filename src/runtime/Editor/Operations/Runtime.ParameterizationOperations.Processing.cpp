@@ -57,6 +57,7 @@ import Geometry.Mesh.Conversion;
 import Geometry.UvAtlas;
 import Geometry.HalfedgeMesh.Segmentation;
 
+#include "Editor/internal/Runtime.EditorPropertyHistory.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
 
@@ -716,16 +717,23 @@ using namespace GeometryProcessingDetail::MeshSupport;
                         }
                         return EditorCommandHistoryStatus::Applied;
                     },
-                    [](
+                    [commandHistory = context.CommandHistory](
                         const MeshPropertyMutationIdentity& identity,
                         const UvPropertySnapshot& target)
                     {
                         if (target == nullptr)
                             return EditorCommandHistoryStatus::CommandFailed;
-                        return ApplyUvPublishedProperties(
-                            identity.Scene,
-                            identity.StableEntityId,
-                            *target);
+                        const auto entity = ResolveStableEntity(identity.Scene->Raw(), identity.StableEntityId);
+                        if (!entity) return EditorCommandHistoryStatus::StaleEntity;
+                        const EditorProcessingContext historyContext{.Scene = identity.Scene, .CommandHistory = commandHistory};
+                        const std::array outputs{
+                            GeometryPropertyRef{GeometryElementDomain::MeshFace, "f:atlas_region", Geometry::PropertyValueKind::UInt32},
+                            GeometryPropertyRef{GeometryElementDomain::MeshFace, "f:atlas_chart", Geometry::PropertyValueKind::UInt32}};
+                        const auto historyBefore = GeometryProcessingDetail::ObserveGeometryProperties(historyContext, *entity, outputs);
+                        const auto status = ApplyUvPublishedProperties(identity.Scene, identity.StableEntityId, *target);
+                        if (status == EditorCommandHistoryStatus::Applied)
+                            GeometryProcessingDetail::RebasePointPropertyHistory(historyContext, *entity, historyBefore);
+                        return status;
                     },
                     [](
                         const MeshPropertyMutationIdentity& identity,
@@ -1271,14 +1279,6 @@ using namespace GeometryProcessingDetail::MeshSupport;
             .DebugName = "Sandbox.UvRegeneration.CPU",
             .Scope = context.World,
             .Priority = Core::Dag::TaskPriority::Normal,
-            .Kind = RuntimeTaskKinds::GeometryProcess,
-            .EstimatedCost = std::max<std::uint32_t>(
-                1u,
-                static_cast<std::uint32_t>(
-                    (std::max(state->Soup.Mesh.VertexCount(),
-                              state->Soup.Mesh.FaceCount()) +
-                     1023u) /
-                    1024u)),
             .Work =
                 [state](const JobCancellation& cancellation) -> JobResultEnvelope
                 {

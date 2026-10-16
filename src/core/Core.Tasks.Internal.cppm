@@ -1,3 +1,4 @@
+// Private scheduler queues, worker state and wait-token ownership.
 module;
 
 #include <array>
@@ -23,7 +24,7 @@ export namespace Extrinsic::Core::Tasks
 {
     namespace Detail
     {
-        inline constexpr std::size_t PriorityLaneCount = 4u;
+        inline constexpr std::size_t PriorityLaneCount = 8u;
         // Lanes [0, HelpableLaneCount) may be executed by external help
         // (TryRunOne, WaitForAll). Later lanes are worker-only.
         inline constexpr std::size_t HelpableLaneCount = 3u;
@@ -31,7 +32,8 @@ export namespace Extrinsic::Core::Tasks
         inline constexpr std::size_t HighPriorityInjectCapacity = 8'192u;
         inline constexpr std::size_t NormalPriorityInjectCapacity = 65'536u;
         inline constexpr std::size_t LowPriorityInjectCapacity = 8'192u;
-        inline constexpr std::size_t BackgroundInjectCapacity = 8'192u;
+        // Worker-only lanes use the mutex-protected FIFO; keep their unused ring minimal.
+        inline constexpr std::size_t BackgroundInjectCapacity = 2u;
 
         [[nodiscard]] bool CpuRelaxOnce() noexcept;
         void CpuRelaxOrYield() noexcept;
@@ -76,12 +78,15 @@ export namespace Extrinsic::Core::Tasks
 
             std::vector<std::thread> workers;
             std::vector<WorkerState> workerStates;
-            // Preserve the common Normal lane's 64K capacity while bounding
-            // the High, Low and Background lanes at 8K slots each.
+            // Helpable lanes retain their bounded rings; worker-only lanes use OverflowQueue.
             std::array<InjectLane, PriorityLaneCount> injectLanes{
                 InjectLane{HighPriorityInjectCapacity},
                 InjectLane{NormalPriorityInjectCapacity},
                 InjectLane{LowPriorityInjectCapacity},
+                InjectLane{BackgroundInjectCapacity},
+                InjectLane{BackgroundInjectCapacity},
+                InjectLane{BackgroundInjectCapacity},
+                InjectLane{BackgroundInjectCapacity},
                 InjectLane{BackgroundInjectCapacity},
             };
 
@@ -124,6 +129,7 @@ export namespace Extrinsic::Core::Tasks
                 std::coroutine_handle<> Handle{};
                 std::shared_ptr<std::atomic<bool>> Alive{};
                 std::chrono::steady_clock::time_point ParkedAt{};
+                std::uint8_t Lane{0u};
             };
 
             struct WaitSlot
@@ -193,4 +199,5 @@ export namespace Extrinsic::Core::Tasks
     // These are defined exactly once in Core.Tasks.State.cpp.
     extern std::unique_ptr<Detail::SchedulerContext> s_Ctx;
     extern thread_local int s_WorkerIndex;
+    extern thread_local std::uint8_t s_CurrentPriorityLane;
 }

@@ -26,6 +26,7 @@ import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.NormalOperations;
+import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.GpuPropertyBinding;
@@ -177,6 +178,102 @@ TEST(NormalTransaction, AcceptKeepsDeletedRowsAndAnExistingOutputsBytes)
     EXPECT_EQ(normals[0], glm::vec3(1.f, 0.f, 0.f));
     ASSERT_TRUE(h.History.Undo().Succeeded());
     EXPECT_EQ(std::as_const(h.Vertices()).Get<glm::vec3>("v:normal")[0], glm::vec3(7.f, 8.f, 9.f));
+}
+
+TEST(NormalTransaction, SuccessiveEditsReplayAndRejectForeignOutputChanges)
+{
+    Harness h;
+    (void)h.Vertices().GetOrAdd<glm::vec3>("v:normal", glm::vec3{1.0f, 0.0f, 0.0f});
+    const auto normals = [&] { return std::as_const(h.Vertices()).Get<glm::vec3>("v:normal").Vector(); };
+    for (const auto value : {glm::vec3{0.0f, 1.0f, 0.0f}, glm::vec3{0.0f, 0.0f, 1.0f}})
+    {
+        const auto run = h.Ready(value);
+        ASSERT_TRUE(run);
+        ASSERT_EQ(R::AcceptEditorNormalEstimation(h.Commands(), run).Status, R::EditorCommandStatus::Pending);
+        ASSERT_TRUE(h.Jobs.DrainUntilTerminal());
+        ASSERT_EQ(R::SnapshotEditorNormalEstimation(h.Commands(), run).Phase, R::EditorGpuTransactionPhase::Applied);
+    }
+    ASSERT_TRUE(h.History.Undo().Succeeded());
+    EXPECT_EQ(normals(), std::vector<glm::vec3>(h.Rows(), glm::vec3{0.0f, 1.0f, 0.0f}));
+    ASSERT_TRUE(h.History.Undo().Succeeded());
+    EXPECT_EQ(normals(), std::vector<glm::vec3>(h.Rows(), glm::vec3{1.0f, 0.0f, 0.0f}));
+    ASSERT_TRUE(h.History.Redo().Succeeded());
+    EXPECT_EQ(normals(), std::vector<glm::vec3>(h.Rows(), glm::vec3{0.0f, 1.0f, 0.0f}));
+    ASSERT_TRUE(h.History.Redo().Succeeded());
+    EXPECT_EQ(normals(), std::vector<glm::vec3>(h.Rows(), glm::vec3{0.0f, 0.0f, 1.0f}));
+    h.Vertices().Get<glm::vec3>("v:normal")[0] = glm::vec3{99.0f};
+    EXPECT_EQ(h.History.Undo().Status, R::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(h.History.UndoCount(), 2u);
+    EXPECT_EQ(normals()[0], glm::vec3{99.0f});
+
+    // A real Vec3 author must remain compatible with subsequent normal history.
+    Harness mixed;
+    auto direct = mixed.Context;
+    direct.JobCommands = {};
+    R::EditorMeshCurvatureCommand curvature{
+        .StableEntityId = mixed.Config.StableEntityId,
+        .Output = R::EditorMeshCurvatureOutput::All,
+        .PublishPrincipalDirections = true};
+    curvature.Direction1 = mixed.Config.Output;
+    const auto authored = R::ApplyEditorMeshCurvatureCommand(
+        R::BindEditorProcessingCommands(direct), curvature);
+    ASSERT_TRUE(authored.Succeeded()) << authored.Message;
+    ASSERT_TRUE(authored.DirectionsPublished) << authored.Message;
+    const auto authoredValues = std::as_const(mixed.Vertices()).Get<glm::vec3>("v:normal").Vector();
+    const auto authoredId = mixed.Vertices().Registry().Find("v:normal");
+    const glm::vec3 edited{7.0f, 8.0f, 9.0f};
+    const auto mixedRun = mixed.Ready(edited);
+    ASSERT_TRUE(mixedRun);
+    ASSERT_EQ(R::AcceptEditorNormalEstimation(mixed.Commands(), mixedRun).Status,
+              R::EditorCommandStatus::Pending);
+    ASSERT_TRUE(mixed.Jobs.DrainUntilTerminal());
+    ASSERT_EQ(R::SnapshotEditorNormalEstimation(mixed.Commands(), mixedRun).Phase,
+              R::EditorGpuTransactionPhase::Applied);
+    ASSERT_TRUE(mixed.History.Undo().Succeeded());
+    EXPECT_EQ(std::as_const(mixed.Vertices()).Get<glm::vec3>("v:normal").Vector(), authoredValues);
+    ASSERT_TRUE(mixed.History.Undo().Succeeded());
+    EXPECT_FALSE(mixed.Vertices().Exists("v:normal"));
+    ASSERT_TRUE(mixed.History.Redo().Succeeded());
+    EXPECT_EQ(std::as_const(mixed.Vertices()).Get<glm::vec3>("v:normal").Vector(), authoredValues);
+    EXPECT_NE(mixed.Vertices().Registry().Find("v:normal"), authoredId);
+    ASSERT_TRUE(mixed.History.Redo().Succeeded());
+    EXPECT_EQ(std::as_const(mixed.Vertices()).Get<glm::vec3>("v:normal").Vector(),
+              std::vector<glm::vec3>(mixed.Rows(), edited));
+    EXPECT_EQ(mixed.History.UndoCount(), 2u);
+    EXPECT_EQ(mixed.History.RedoCount(), 0u);
+
+    for (const bool redo : {false, true})
+    {
+        SCOPED_TRACE(redo);
+        Harness foreign;
+        auto& props = foreign.Vertices();
+        (void)props.GetOrAdd<glm::vec3>("v:normal", glm::vec3{1.0f, 0.0f, 0.0f});
+        unsigned invalidations = 0;
+        foreign.Context.InvalidateWorkspaceSnapshotCache = [&] { ++invalidations; };
+        const auto run = foreign.Ready({0.0f, 1.0f, 0.0f});
+        ASSERT_TRUE(run);
+        ASSERT_EQ(R::AcceptEditorNormalEstimation(foreign.Commands(), run).Status,
+                  R::EditorCommandStatus::Pending);
+        ASSERT_TRUE(foreign.Jobs.DrainUntilTerminal());
+        ASSERT_EQ(R::SnapshotEditorNormalEstimation(foreign.Commands(), run).Phase,
+                  R::EditorGpuTransactionPhase::Applied);
+        if (redo) ASSERT_TRUE(foreign.History.Undo().Succeeded());
+        const auto expected = std::as_const(props).Get<glm::vec3>("v:normal").Vector();
+        const auto previousId = props.Registry().Find("v:normal");
+        auto old = props.Get<glm::vec3>("v:normal");
+        props.Remove(old);
+        props.GetOrAdd<glm::vec3>("v:normal").Vector() = expected;
+        ASSERT_NE(props.Registry().Find("v:normal"), previousId);
+        const auto undoCount = foreign.History.UndoCount();
+        const auto redoCount = foreign.History.RedoCount();
+        invalidations = 0;
+        EXPECT_EQ((redo ? foreign.History.Redo() : foreign.History.Undo()).Status,
+                  R::EditorCommandHistoryStatus::StaleEntity);
+        EXPECT_EQ(foreign.History.UndoCount(), undoCount);
+        EXPECT_EQ(foreign.History.RedoCount(), redoCount);
+        EXPECT_EQ(std::as_const(props).Get<glm::vec3>("v:normal").Vector(), expected);
+        EXPECT_EQ(invalidations, 0u);
+    }
 }
 
 TEST(NormalTransaction, DiscardPublishesNothingAndReleasesTheRing)

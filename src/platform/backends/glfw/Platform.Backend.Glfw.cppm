@@ -1,3 +1,4 @@
+// Owns a native GLFW window and translates native callbacks into platform events.
 module;
 
 #include <memory>
@@ -21,13 +22,14 @@ namespace Extrinsic::Platform::Backends::Glfw
     public:
         explicit Window(const Core::Config::WindowConfig& config);
         ~Window() override;
+        Window(const Window&) = delete;
+        Window& operator=(const Window&) = delete;
 
         void PollEvents() override;
         [[nodiscard]] bool ShouldClose() const override;
-        [[nodiscard]] bool IsMinimized() const override { return m_FramebufferExtent.Width == 0 || m_FramebufferExtent.Height == 0; }
+        [[nodiscard]] bool IsMinimized() const override;
         [[nodiscard]] bool WasResized() const override { return m_WasResized; }
         void AcknowledgeResize() override;
-        [[nodiscard]] bool ConsumeInputActivity() override;
         [[nodiscard]] Platform::Extent2D GetWindowExtent() const override { return m_WindowExtent; }
         [[nodiscard]] Platform::Extent2D GetFramebufferExtent() const override { return m_FramebufferExtent; }
         [[nodiscard]] void* GetNativeHandle() const override { return m_Window; }
@@ -35,7 +37,6 @@ namespace Extrinsic::Platform::Backends::Glfw
         void Listen(EventCallbackFn callback) override;
         [[nodiscard]] std::vector<Platform::Event> DrainEvents() override;
 
-        void OnUpdate() override;
         void WaitForEventsTimeout(double timeoutSeconds) override;
 
         void SetClipboardText(std::string_view text) override;
@@ -53,7 +54,6 @@ namespace Extrinsic::Platform::Backends::Glfw
         Platform::Extent2D m_FramebufferExtent{};
         bool m_ShouldClose{false};
         bool m_WasResized{false};
-        bool m_InputActivity{false};
         bool m_IsValid{false};
         Platform::CursorMode m_CursorMode{Platform::CursorMode::Normal};
         GLFWwindow* m_Window{nullptr};

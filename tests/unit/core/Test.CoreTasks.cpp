@@ -7,6 +7,7 @@
 #include <coroutine>
 #include <algorithm>
 #include <memory>
+#include <latch>
 #include <numeric>
 #include <random>
 
@@ -126,6 +127,28 @@ TEST(CoreTasks, BasicDispatch) {
     Scheduler::Shutdown();
 }
 
+TEST(CoreTasks, DispatchAcceptsNamedAndMoveOnlyCallablesExactlyOnce)
+{
+    Scheduler::Initialize(1);
+    std::atomic<int> calls{0};
+    std::atomic<int> total{0};
+    auto named = [&]
+    {
+        ++calls;
+        total += 3;
+    };
+    Scheduler::Dispatch(named);
+    Scheduler::Dispatch([value = std::make_unique<int>(7), &calls, &total]
+    {
+        ++calls;
+        total += *value;
+    });
+    Scheduler::WaitForAll();
+    Scheduler::Shutdown();
+    EXPECT_EQ(calls.load(), 2);
+    EXPECT_EQ(total.load(), 10);
+}
+
 TEST(CoreTasks, SaturatedPriorityLanesPreferHighPriorityWork)
 {
     Scheduler::Initialize(1);
@@ -183,6 +206,52 @@ TEST(CoreTasks, SaturatedPriorityLanesPreferHighPriorityWork)
         EXPECT_EQ(order[index], 1u) << "low-priority task ran at index " << index;
 
     Scheduler::Shutdown();
+}
+
+TEST(CoreTasks, BackgroundRefillCannotOvertakeQueuedOverflow)
+{
+    Scheduler::Initialize(1);
+    std::latch firstStarted{1}, releaseFirst{1}, secondStarted{1}, releaseSecond{1};
+    std::vector<unsigned> order;
+    constexpr unsigned last = 8194;
+    order.reserve(last + 1);
+    Scheduler::Dispatch([&] {
+        firstStarted.count_down();
+        releaseFirst.wait();
+    });
+    firstStarted.wait();
+    Scheduler::Dispatch(DispatchPriority::Background, [&] {
+        order.push_back(0);
+        secondStarted.count_down();
+        releaseSecond.wait();
+    });
+    for (unsigned id = 1; id < last; ++id)
+        Scheduler::Dispatch(DispatchPriority::Background, [&, id] { order.push_back(id); });
+    EXPECT_FALSE(Scheduler::TryRunOne());
+    releaseFirst.count_down();
+    secondStarted.wait();
+    // With bounded-first enqueue, a slot is now free while older tasks remain in overflow.
+    Scheduler::Dispatch(DispatchPriority::Background, [&] { order.push_back(last); });
+    EXPECT_FALSE(Scheduler::TryRunOne());
+    releaseSecond.count_down();
+    Scheduler::WaitForAll();
+    Scheduler::Shutdown();
+    std::vector<unsigned> expected(last + 1);
+    std::iota(expected.begin(), expected.end(), 0u);
+    EXPECT_EQ(order, expected);
+}
+
+TEST(CoreTasks, WorkerSubmittedBackgroundTasksPreserveFifo)
+{
+    Scheduler::Initialize(1);
+    std::vector<unsigned> order;
+    Scheduler::Dispatch(DispatchPriority::Background, [&] {
+        for (unsigned id = 0; id < 8; ++id)
+            Scheduler::Dispatch(DispatchPriority::Background, [&, id] { order.push_back(id); });
+    });
+    Scheduler::WaitForAll();
+    Scheduler::Shutdown();
+    EXPECT_EQ(order, (std::vector<unsigned>{0, 1, 2, 3, 4, 5, 6, 7}));
 }
 
 TEST(CoreTasks, DispatchWhileWorkerIsActiveSuppressesWakeNotification)
@@ -1052,7 +1121,7 @@ TEST(CoreTasks, SchedulerStatsCanBeExportedToFrameTelemetry)
 
     telemetry.BeginFrame();
     telemetry.SetTaskStats(telemetryStats);
-    telemetry.SetFrameGraphTimings(100, 200, 150);
+    telemetry.SetFrameGraphTimings(100, 200);
     telemetry.EndFrame();
 
     const auto& frameStats = telemetry.GetFrameStats(0);
@@ -1070,7 +1139,6 @@ TEST(CoreTasks, SchedulerStatsCanBeExportedToFrameTelemetry)
     EXPECT_DOUBLE_EQ(frameStats.Tasks.StealSuccessRatio, schedulerStats.StealSuccessRatio);
     EXPECT_EQ(frameStats.FrameGraphCompileTimeNs, 100u);
     EXPECT_EQ(frameStats.FrameGraphExecuteTimeNs, 200u);
-    EXPECT_EQ(frameStats.FrameGraphCriticalPathTimeNs, 150u);
 
     Scheduler::Shutdown();
 }
@@ -1160,4 +1228,165 @@ TEST(CoreTasks, JobMoveAssignment_CleansUpPrevious)
     EXPECT_EQ(counter.load(std::memory_order_relaxed), 1);
 
     Scheduler::Shutdown();
+}
+
+namespace
+{
+    void BlockWorkerUntilShutdown(std::atomic<bool>* started)
+    {
+        auto previous = Scheduler::ObserveWorkProgress();
+        --previous.Epoch; // A past epoch cannot become the current monotonically increasing epoch.
+        started->store(true, std::memory_order_release);
+        started->notify_all();
+        while (Scheduler::WaitForWorkProgress(previous))
+            std::this_thread::yield();
+    }
+
+    Job TrackQueuedFrame(std::shared_ptr<int> lifetime, std::atomic<int>* resumed)
+    {
+        (void)lifetime;
+        resumed->fetch_add(1);
+        co_return;
+    }
+
+    Job YieldBehindShutdownBlocker(std::shared_ptr<int> lifetime,
+                                   std::atomic<bool>* blockerStarted,
+                                   std::atomic<int>* resumed)
+    {
+        (void)lifetime;
+        Scheduler::Dispatch(DispatchPriority::High, [blockerStarted] {
+            BlockWorkerUntilShutdown(blockerStarted);
+        });
+        co_await Yield();
+        resumed->fetch_add(1);
+    }
+}
+
+TEST(CoreTasks, ShutdownReclaimsQueuedFrameBeforeItsFirstResume)
+{
+    Scheduler::Initialize(1);
+    std::atomic<bool> blockerStarted{false};
+    Scheduler::Dispatch([&] { BlockWorkerUntilShutdown(&blockerStarted); });
+    blockerStarted.wait(false, std::memory_order_acquire);
+    auto lifetime = std::make_shared<int>(42);
+    const std::weak_ptr<int> observed = lifetime;
+    std::atomic<int> resumed{0};
+    Scheduler::Dispatch(TrackQueuedFrame(std::move(lifetime), &resumed));
+    Scheduler::Shutdown();
+    EXPECT_EQ(resumed.load(), 0);
+    EXPECT_TRUE(observed.expired());
+}
+
+TEST(CoreTasks, ShutdownReclaimsQueuedYieldWithoutResumingIt)
+{
+    Scheduler::Initialize(1);
+    std::atomic<bool> blockerStarted{false};
+    auto lifetime = std::make_shared<int>(42);
+    const std::weak_ptr<int> observed = lifetime;
+    std::atomic<int> resumed{0};
+    Scheduler::Dispatch(YieldBehindShutdownBlocker(std::move(lifetime), &blockerStarted, &resumed));
+    blockerStarted.wait(false, std::memory_order_acquire);
+    Scheduler::Shutdown();
+    EXPECT_EQ(resumed.load(), 0);
+    EXPECT_TRUE(observed.expired());
+}
+
+
+namespace
+{
+    void BlockLaneProbeWorker(std::atomic<bool>* started, std::atomic<bool>* release)
+    {
+        started->store(true, std::memory_order_release);
+        while (!release->load(std::memory_order_acquire))
+            release->wait(false, std::memory_order_acquire);
+    }
+
+    Job ProbeBackgroundContinuationLane(int mode, CounterEvent* event,
+                                        std::atomic<int>* resumed,
+                                        std::atomic<bool>* nestedHelpRan,
+                                        std::atomic<bool>* resumedOnMain,
+                                        std::thread::id mainThread,
+                                        std::atomic<bool>* blockerStarted,
+                                        std::atomic<bool>* releaseBlocker)
+    {
+        if (mode == 1)
+        {
+            Scheduler::Dispatch(DispatchPriority::High, [nestedHelpRan] {
+                nestedHelpRan->store(true, std::memory_order_release);
+            });
+            (void)Scheduler::TryRunOne();
+        }
+        if (mode == 2)
+        {
+            Scheduler::Dispatch(DispatchPriority::High, [blockerStarted, releaseBlocker] {
+                BlockLaneProbeWorker(blockerStarted, releaseBlocker);
+            });
+            co_await Yield();
+        }
+        else
+            co_await WaitFor(*event);
+        resumedOnMain->store(std::this_thread::get_id() == mainThread, std::memory_order_release);
+        resumed->fetch_add(1, std::memory_order_release);
+    }
+}
+
+TEST(CoreTasks, BackgroundContinuationKeepsWorkerLaneAcrossWaitYieldAndNestedHelp)
+{
+    for (const int mode : {0, 1, 2})
+    {
+        SCOPED_TRACE(mode); // plain wait, wait after nested help, yield
+        Scheduler::Initialize(1);
+        CounterEvent event{1};
+        std::atomic<int> resumed{0};
+        std::atomic<bool> nestedHelpRan{false}, resumedOnMain{false};
+        std::atomic<bool> blockerStarted{false}, releaseBlocker{false};
+        const auto waitUntil = [](auto ready) {
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{10};
+            while (!ready() && std::chrono::steady_clock::now() < deadline)
+                std::this_thread::yield();
+            return ready();
+        };
+        const auto release = [&] {
+            releaseBlocker.store(true, std::memory_order_release);
+            releaseBlocker.notify_all();
+        };
+        Scheduler::Dispatch(DispatchPriority::Background, ProbeBackgroundContinuationLane(
+            mode, &event, &resumed, &nestedHelpRan, &resumedOnMain, std::this_thread::get_id(),
+            &blockerStarted, &releaseBlocker));
+        if (mode != 2)
+        {
+            const bool parked = waitUntil([] { return Scheduler::GetParkCount() == 1u; });
+            if (!parked)
+            {
+                release();
+                event.Signal();
+                Scheduler::Shutdown();
+                ASSERT_TRUE(parked);
+            }
+            Scheduler::Dispatch(DispatchPriority::BackgroundCritical, [&] {
+                BlockLaneProbeWorker(&blockerStarted, &releaseBlocker);
+            });
+        }
+        const bool blocked = waitUntil([&] { return blockerStarted.load(std::memory_order_acquire); });
+        if (!blocked)
+        {
+            release();
+            event.Signal();
+            Scheduler::Shutdown();
+            ASSERT_TRUE(blocked);
+        }
+        if (mode != 2)
+            event.Signal(); // Main must not transfer its Normal lane to the parked frame.
+        EXPECT_FALSE(Scheduler::TryRunOne());
+        EXPECT_EQ(resumed.load(std::memory_order_acquire), 0);
+        if (mode == 1)
+            EXPECT_TRUE(nestedHelpRan.load(std::memory_order_acquire));
+        release();
+        Scheduler::WaitForAll();
+        EXPECT_EQ(resumed.load(std::memory_order_acquire), 1);
+        EXPECT_FALSE(resumedOnMain.load(std::memory_order_acquire));
+        if (mode != 2)
+            EXPECT_EQ(Scheduler::GetParkCount(), Scheduler::GetUnparkCount());
+        Scheduler::Shutdown();
+    }
 }

@@ -527,8 +527,6 @@ void ExpectColorsExactlyEqual(
                 .DebugName = "Test.DirectMeshPostProcessWorkerBarrier",
                 .Scope = world,
                 .Priority = Extrinsic::Core::Dag::TaskPriority::Normal,
-                .Kind = Runtime::RuntimeTaskKinds::Generic,
-                .EstimatedCost = 1u,
                 .Work =
                     [this](const Runtime::JobCancellation&)
                     {

@@ -24,6 +24,7 @@ import Extrinsic.Backends.Vulkan;
 import Geometry.PointCloud.Features;
 import Extrinsic.Runtime.RegistrationOperations;
 import Extrinsic.Graphics.PointLBVH;
+import Extrinsic.Graphics.PropertyFilter;
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
@@ -198,6 +199,60 @@ namespace
         }
     }
 } // namespace
+TEST(PropertyFilterGpuSmoke, ResidentMovesCoverRowsBeyondSingleDispatchDimension)
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
+        GTEST_SKIP() << "GLFW unavailable";
+    auto config = Extrinsic::Runtime::CreateReferenceEngineConfig();
+    config.Window.Width = 64;
+    config.Window.Height = 64;
+    config.Render.EnableValidation = true;
+    config.Render.EnableVSync = false;
+    config.ReferenceScene.Enabled = false;
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::make_unique<App>());
+    engine.Initialize();
+    Shutdown shutdown{engine};
+    engine.Run();
+    auto& device = engine.GetDevice();
+    if (!device.IsOperational())
+        GTEST_SKIP() << "Operational Vulkan device unavailable";
+    if (!device.SupportsShaderFloat64())
+        GTEST_SKIP() << "Shader float64 unavailable";
+
+    constexpr std::uint32_t rows = 65535u * 64u + 1u;
+    std::vector<float> values(rows, 7.25f), result(rows, -3.0f);
+    Buffer input(device, values.size() * sizeof(float));
+    Buffer output(device, result.size() * sizeof(float));
+    Buffer working(device, std::uint64_t(rows) * sizeof(double));
+    ASSERT_TRUE(input.Handle.IsValid());
+    ASSERT_TRUE(output.Handle.IsValid());
+    ASSERT_TRUE(working.Handle.IsValid());
+    device.WriteBuffer(input.Handle, values.data(), values.size() * sizeof(float));
+    device.WriteBuffer(output.Handle, result.data(), result.size() * sizeof(float));
+    const G::PropertyFilterResidentIo io{
+        .Input = {.Buffer = input.Handle, .Address = device.GetBufferDeviceAddress(input.Handle)},
+        .Output = {.Buffer = output.Handle, .Address = device.GetBufferDeviceAddress(output.Handle)},
+        // Preserve the sentinel so an omitted final tile cannot pass through target initialization.
+        .OutputBytes = 0, .Rows = rows};
+    G::PropertyFilterWorkspace workspace(device);
+    RHI::FrameHandle frame;
+    ASSERT_TRUE(device.BeginFrame(frame));
+    auto& commands = device.GetGraphicsContext(frame.FrameIndex);
+    commands.Begin();
+    const auto address = device.GetBufferDeviceAddress(working.Handle);
+    const bool loaded = workspace.RecordLoad(commands, io, 1, working.Handle, address, 1, 1);
+    const bool stored = loaded && workspace.RecordStore(commands, io, 1, working.Handle, address, 1, 1);
+    commands.End();
+    device.EndFrame(frame);
+    device.Present(frame);
+    device.WaitIdle();
+    ASSERT_TRUE(loaded);
+    ASSERT_TRUE(stored);
+    device.ReadBuffer(output.Handle, result.data(), result.size() * sizeof(float));
+    const auto mismatch = std::ranges::find_if(result, [](float value) { return value != 7.25f; });
+    ASSERT_EQ(mismatch, result.end()) << "First incorrect row: " << std::distance(result.begin(), mismatch);
+}
+
 TEST(PointLBVHGpuSmoke, VulkanBuildAndQueriesMatchExhaustiveCpuAndReuseAllocations)
 {
     if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())

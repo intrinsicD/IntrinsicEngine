@@ -1,6 +1,7 @@
 // Virtual-source geodesic distance published on the mesh's own vertices.
 module;
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <bit>
@@ -37,6 +38,7 @@ import Geometry.Properties;
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
+#include "Editor/internal/Runtime.EditorPropertyHistory.hpp"
 
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.hpp"
 #include "Editor/Operations/Runtime.MeshFieldOperations.Properties.hpp"
@@ -181,7 +183,7 @@ namespace Extrinsic::Runtime
         const auto deletedVertices =
             std::make_shared<const std::vector<bool>>(std::move(source.DeletedVertices));
         const auto mutate = [scene = context.Scene, entity = *entity, signature, positions,
-                             deletedVertices,
+                             deletedVertices, history = context.CommandHistory,
                              distanceRef, sourceRef,
                              positionProperty = command.Config.PositionProperty.Name, capture,
                              invalidate = context.InvalidateWorkspaceSnapshotCache](
@@ -208,8 +210,14 @@ namespace Extrinsic::Runtime
             if (!CanApplyGeometryScalarProperty(props, distanceRef, target.Distance) ||
                 !CanApplyGeometryScalarProperty(props, sourceRef, target.Source))
                 return EditorCommandHistoryStatus::CommandFailed;
+            const EditorProcessingContext historyContext{.Scene = scene, .CommandHistory = history};
+            const std::array outputs{distanceRef, sourceRef};
+            const auto beforeWrites = GeometryProcessingDetail::ObserveGeometryProperties(
+                historyContext, entity, outputs);
             (void)ApplyGeometryScalarProperty(props, distanceRef, target.Distance);
             (void)ApplyGeometryScalarProperty(props, sourceRef, target.Source);
+            GeometryProcessingDetail::RebasePointPropertyHistory(
+                historyContext, entity, beforeWrites);
             if (invalidate)
                 invalidate();
             return EditorCommandHistoryStatus::Applied;

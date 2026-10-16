@@ -49,7 +49,9 @@ world handles.
 - `ShapeDescriptor` currently supports first-phase primitive descriptors for
   sphere, capsule, and box/OBB-local-pose authoring.
 - `World` owns create/destroy/update/get/contains/clear lifecycle APIs and
-  rejects invalid descriptors or stale handles with diagnostics.
+  rejects invalid descriptors or stale handles with diagnostics. `GetBody`
+  borrows a read-only descriptor; changes go through validated `UpdateBody`.
+  `Clear` invalidates live handles and preserves slot generations for reuse.
 - `Step(StepInput)` runs a deterministic CPU-only unconstrained integration:
   static bodies are skipped, kinematic bodies integrate authored velocities,
   and dynamic bodies integrate gravity, damping, linear velocity, and angular
@@ -57,14 +59,16 @@ world handles.
 - `ComputeCollisionContacts()` emits physics-owned broadphase candidate pairs,
   contact records, and diagnostics for first-phase sphere, capsule, and box/OBB
   shapes. It wraps geometry-owned primitive/contact kernels without exposing
-  geometry ownership as the physics public contract.
+  geometry ownership as the physics public contract. Each query owns one
+  64 KiB EPA scratch arena, reset between pairs that used it; contact records
+  retain values only and do not borrow arena storage.
 
 World diagnostics currently report body counts, create/destroy/update counts,
 invalid descriptor rejects, stale handle rejects, executed step count, and the
 last step's static/kinematic/dynamic/disabled body counters. Collision result
 diagnostics report visited/skipped bodies and shapes, deterministic broadphase
 pair count, generated contact count, trigger contact count, invalid body/shape
-rejects, dynamic non-uniform scale rejects, and unsupported pair count.
+rejects and unsupported pair count.
 `LastRejectReason` records the most recent skip/reject category for focused
 diagnostics; counters remain the authoritative aggregate.
 
@@ -99,6 +103,29 @@ diagnostics; counters remain the authoritative aggregate.
   integration while asleep, and wakes when its island gains an awake member or
   its descriptor is updated (`UpdateBody`/`WakeBody`). Sleep state lives in
   world slots, never in ECS.
+- Position correction uses the remaining depth along each captured normal,
+  subtracting the relative displacement since contact generation after integration.
+  Convergence evaluates excess depth above the allowed slop against the existing
+  error tolerance: `rawDepth <= PenetrationSlop + max(PenetrationSlop, 1e-6)`.
+  This operator-selected definition avoids classifying an asymptotic approach to
+  slop by float rounding. Penetration diagnostics retain raw depth, not excess.
+  Residual diagnostics include only contacts of awake dynamic islands actually
+  attempted in this step; sleeping and static-only contacts remain queryable
+  but do not create unsolved residuals or non-convergence reports.
+- Integration and each contact update validate trial state before publication.
+  Integration also checks enabled contact shapes' composed transforms before
+  committing the trial pose and velocities.
+  Failed trials preserve the last finite state and independent bodies/islands
+  continue. For a valid request `SolveStepDiagnostics::Status` stays `Valid`,
+  while `Solve=Degraded` reports numerical failure and `Integration.Status`
+  identifies an integration failure. Raw `Step` reports `NumericalFailure`.
+- Disabling sleep or changing gravity wakes dynamics before integration. Moving
+  static/kinematic contact anchors wake their dynamic island before solving.
+  Update/Destroy of any body and Add of static/kinematic bodies conservatively
+  wake all dynamics, including neighbours of removed or teleported supports.
+  This avoids a contact cache, but animated kinematic authoring can therefore
+  keep every dynamic body awake. `WakeTransitions` counts only wakes inside the
+  current solve; mutations are observed through sleep state and subsequent motion.
 - `SolveStepDiagnostics` reports validation status, solve status
   (`Converged` / `MaxIterationsReached` / `Degraded` fail-closed on non-finite
   state), iterations used, contacts solved, non-converged island count,
@@ -170,9 +197,24 @@ Runtime owns the optional composition module:
   `Physics::World::SolveStep`, then writes only dynamic poses back to ECS and
   stamps `Transform::IsDirtyTag` plus `Transform::WorldUpdatedTag`. Static and
   kinematic writeback is deliberately skipped and diagnosed.
+- Current world transforms are composed through the canonical pure ECS parent
+  chain helper, without depending on cached WorldMatrix freshness. Dynamic
+  writeback is parent-before-child and converts world pose back to local TRS;
+  Engine retains ownership of the dirty cache flush. A dynamic body's parent
+  must have representable positive uniform-scale world TRS so future rotations
+  remain writable. Missing transforms and unsupported authored state remove
+  the binding. Defensive writeback failures are skipped and counted.
 - A deterministic authoring fingerprint updates a body only when its ECS
-  descriptor changes. Physics-owned velocity and pose evolution therefore are
-  not reset by the next unchanged authoring sync.
+  descriptor changes. Mass, collider and damping edits retain simulated linear
+  and angular velocity unless that authored velocity was explicitly edited.
+  Kinematic poses stay externally authored while their velocity participates
+  in contact response; standalone Physics World still integrates them by default.
+- Runtime admits default collision filters and omits shapes with zero category
+  or mask and group zero. An entirely filtered body remains noncontacting.
+  Other filter policies are unsupported; pair masks/groups are not a Physics
+  feature. Active density policy, nonzero center of mass, nondefault sleep/CCD
+  settings, materials and contact offsets are likewise rejected with a named
+  `PhysicsUnsupportedReason` in the module snapshot instead of being ignored.
 - `sandbox.physics` is the one config lane for enablement, fixed delta,
   accumulation bound, step budget, and gravity. It defaults disabled, and a
   disabled module owns no physics worlds. File, editor-source, agent/CLI, and
@@ -206,6 +248,25 @@ Later or separately gated shapes:
 - convex decomposition for dynamic concave content.
 
 Dynamic concave triangle mesh simulation is forbidden in the first phase.
+
+Supported body/child shape transforms have orthogonal composed axes; normalized
+pairwise axis dot products must have magnitude at most `1e-4`. Axis lengths
+come from `diag(bodyScale) * childRotation * diag(childScale)`, normalizing the
+child quaternion and forming its rotation matrix in double precision. This
+preserves the existing composed position and rotation. Box extents, capsule height/radius and
+the conservative sphere radius use those lengths. Shear, nonfinite composed
+shape dimensions and nonuniform dynamic contact scales are rejected by
+AddBody/UpdateBody with `UnsupportedShapeTransform`. Runtime exposes that as
+`PhysicsUnsupportedReason::ShapeTransform` and does not create an active sidecar.
+This validation applies to enabled contact shapes, including spheres: a rotated
+sphere under nonuniform body scale is rejected when its composed axes are not
+orthogonal. No special sheared-sphere approximation is used.
+
+The `sandbox.physics` config registration publishes a schema from the same field
+table used by its parser. Gravity is exactly three finite numbers in
+`[-100000, 100000]`. Invalid fields retain their reference values with the existing
+warning/counting behavior (`x-fallback: true`); the cross-field exception still
+raises an accumulation limit below the fixed-step duration to one fixed step.
 
 ## Transform, Units, and Diagnostics
 

@@ -494,6 +494,33 @@ TEST(RuntimeTextureBakeModule, CanonicalBindingSharesCornerAtlasAndRecordsSource
     EXPECT_TRUE(Runtime::IsPropertyTextureBakeRecordBindable(ready, token));
 }
 
+TEST(RuntimeTextureBakeModule, ExtremeConstantAutoRangesRemainFinite)
+{
+    struct Case { float Value, Min, Max; };
+    constexpr Case cases[]{
+        {2.0f, 0x1.ffffdep0f, 0x1.000010p1f},
+        {0x1.fffffep127f, 0x1.ffffdcp127f, 0x1.fffffep127f},
+        {-0x1.fffffep127f, -0x1.fffffep127f, -0x1.ffffdcp127f},
+    };
+    for (const auto& test : cases)
+    {
+        SCOPED_TRACE(test.Value);
+        BakeHarness harness{};
+        ASSERT_TRUE(harness.Start());
+        const ECS::EntityHandle entity = MakeSeamedQuad(harness.Scene());
+        Mutate<float>(harness.Scene().Raw().get<GS::Vertices>(entity).Properties, "v:heat",
+            [&test](auto& values) { values.assign(values.size(), test.Value); });
+        const auto result = harness.Service->Bake(HeatRequest(harness, entity, "flat_heat"));
+        ASSERT_EQ(result.Status, PropertyTextureBakeStatus::Scheduled) << result.Diagnostic;
+        const auto record = RecordNamed(harness, entity, "flat_heat");
+        EXPECT_TRUE(std::isfinite(record.RangeMin));
+        EXPECT_TRUE(std::isfinite(record.RangeMax));
+        EXPECT_LT(record.RangeMin, record.RangeMax);
+        EXPECT_EQ(record.RangeMin, test.Min);
+        EXPECT_EQ(record.RangeMax, test.Max);
+    }
+}
+
 TEST(RuntimeTextureBakeModule, ExplicitAtlasBindingIsExactAndNeverReplacedByCanonicalUvs)
 {
     BakeHarness harness{};

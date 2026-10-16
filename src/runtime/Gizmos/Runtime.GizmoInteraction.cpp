@@ -327,30 +327,6 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        // Element-wise reconstruction check. The affine last row must be
-        // exact (up to float noise) independent of magnitudes, so perspective
-        // never hides behind a large scale or translation. Each 3x3 column
-        // and the translation column get a tolerance relative to their own
-        // magnitude, so large translations do not hide 3x3 shear.
-        [[nodiscard]] bool MatchesTrs(const glm::mat4& reconstructed, const glm::mat4& expected) noexcept
-        {
-            constexpr float kAbsTolerance = 1.0e-5f;
-            constexpr float kRelTolerance = 1.0e-4f;
-            if (!IsAffine(expected))
-                return false;
-            for (int c = 0; c < 4; ++c)
-            {
-                float magnitude = 0.f;
-                for (int r = 0; r < 3; ++r)
-                    magnitude = std::max(magnitude, std::abs(expected[c][r]));
-                const float tolerance = kAbsTolerance + kRelTolerance * magnitude;
-                for (int r = 0; r < 3; ++r)
-                    if (!(std::abs(reconstructed[c][r] - expected[c][r]) <= tolerance))
-                        return false;
-            }
-            return true;
-        }
-
         // No-op test. The 3x3 part compares composed local matrices, so
         // equivalent TRS (a mirror stored as scale (-1,1,1), or decomposed as
         // (-1,-1,-1) with a 180-degree turn) compare equal. Translation gets
@@ -598,8 +574,7 @@ namespace Extrinsic::Runtime
             if (!IsFiniteMatrix(local))
                 return {GizmoStatus::NonFiniteMatrix, target.Entity};
             Tf::Component candidate{};
-            if (!Tf::TryComputeLocalTransform(world, target.ParentWorld, candidate) ||
-                !MatchesTrs(Tf::GetMatrix(candidate), local))
+            if (!Tf::TryComputeLocalTransform(world, target.ParentWorld, candidate))
             {
                 return {GizmoStatus::NonTrsResult, target.Entity};
             }

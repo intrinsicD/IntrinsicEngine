@@ -158,5 +158,4 @@ public payload.
 
 - [`tasks/done/GRAPHICS-011`](../../tasks/archive/GRAPHICS-011-spatial-debug-visualizers.md) records the underlying `Extrinsic.Graphics.SpatialDebugVisualizers` packet contract and the canonical truncation budget / diagnostics surface that this ADR keeps frozen.
 - [`tasks/done/GRAPHICS-011Q`](../../tasks/archive/GRAPHICS-011Q-spatial-debug-adapter-clarifications.md) records the five clarification decisions captured in §§1–5.
-- `src/graphics/renderer/README.md` carries the matching spatial-debug-visualizer bullet authored by `GRAPHICS-011Q`.
 - The default CPU correctness gate (`ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`) exercises the data-only packet contract under `tests/unit/graphics/` and any runtime-side adapter integration tests under `tests/integration/runtime/` without requiring a Vulkan device.

@@ -74,6 +74,9 @@ namespace Extrinsic::Core::IO
             if (!file)
                 return std::unexpected(Core::ErrorCode::FileWriteError);
         }
+        file.close();
+        if (!file)
+            return std::unexpected(Core::ErrorCode::FileWriteError);
         return Core::Ok();
     }
 }

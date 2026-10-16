@@ -2201,8 +2201,6 @@ namespace Extrinsic::Runtime
                     FileNameFromPath(request.Path),
                 .Scope = submissionWorld,
                 .Priority = Core::Dag::TaskPriority::Normal,
-                .Kind = RuntimeTaskKinds::AssetDecode,
-                .EstimatedCost = 4u,
                 .Work = [
                     state,
                     path = request.Path,
@@ -2489,8 +2487,6 @@ namespace Extrinsic::Runtime
                     FileNameFromPath(request.Path),
                 .Scope = submissionWorld,
                 .Priority = Core::Dag::TaskPriority::Normal,
-                .Kind = RuntimeTaskKinds::AssetDecode,
-                .EstimatedCost = 4u,
                 .Work = [
                     state,
                     ioBackendFactory = std::move(ioBackendFactory),

@@ -260,6 +260,21 @@ TEST(OutlierAnalysisConfig, RoundTripAndSharedPreviewApplyRun)
     }
 }
 
+TEST(OutlierAnalysisConfig, RadiusMustRemainPositiveInFloatStorage)
+{
+    EXPECT_FALSE(R::ValidateOutlierAnalysisConfigSection(
+        R"({"method":"radius","radius":1e-100})", {}, "test").Usable());
+    for (const auto payload : {R"({"method":"radius","radius":1.401298464324817e-45})",
+                               R"({"method":"radius","radius":1.1754943508222875e-38})",
+                               R"({"method":"radius","radius":3.4028234663852886e38})"})
+    {
+        const auto accepted = R::ValidateOutlierAnalysisConfigSection(payload, {}, "test");
+        ASSERT_TRUE(accepted.Usable()) << payload;
+        EXPECT_TRUE(R::ValidateOutlierAnalysisConfigSection(
+            accepted.CanonicalPayloadJson, {}, "test").Usable()) << accepted.CanonicalPayloadJson;
+    }
+}
+
 TEST(OutlierAnalysis, MaskAndScoreUseSharedVisualizationRecipesOnEveryDomain)
 {
     for(unsigned d=1;d<=8;++d)

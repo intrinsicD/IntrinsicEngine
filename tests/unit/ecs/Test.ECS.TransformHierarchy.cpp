@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <limits>
+
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -170,4 +172,53 @@ TEST(ECSTransformHierarchy, EntityWithoutTransformIsIgnored)
     TransformSystem::OnUpdate(raw);
 
     EXPECT_FALSE(raw.all_of<Components::Transform::WorldUpdatedTag>(bare));
+}
+
+
+TEST(ECSTransformHierarchy, PureCompositionReadsCurrentLocalsWithoutTouchingCache)
+{
+    entt::registry raw;
+    const auto parent = raw.create();
+    const auto middle = raw.create();
+    const auto child = raw.create();
+    auto& parentLocal = raw.emplace<Components::Transform::Component>(parent);
+    parentLocal.Position = glm::vec3(3.0f, 0.0f, 0.0f);
+    auto& childLocal = raw.emplace<Components::Transform::Component>(child);
+    childLocal.Position = glm::vec3(0.0f, 2.0f, 0.0f);
+    raw.emplace<Components::Hierarchy::Component>(middle).Parent = parent;
+    raw.emplace<Components::Hierarchy::Component>(child).Parent = middle;
+    auto& cached = raw.emplace<Components::Transform::WorldMatrix>(child);
+    cached.Matrix = glm::mat4(7.0f);
+    raw.emplace<Components::Transform::IsDirtyTag>(child);
+    const auto result = TransformSystem::TryComposeWorldMatrix(raw, child);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_TRUE(MatricesNear(*result, glm::translate(glm::mat4(1.0f), glm::vec3(3.0f, 2.0f, 0.0f))));
+    EXPECT_TRUE(MatricesNear(cached.Matrix, glm::mat4(7.0f)));
+    EXPECT_TRUE(raw.all_of<Components::Transform::IsDirtyTag>(child));
+    EXPECT_FALSE(raw.all_of<Components::Transform::WorldUpdatedTag>(child));
+    const auto root = TransformSystem::TryComposeWorldMatrix(raw, parent);
+    ASSERT_TRUE(root.has_value());
+    EXPECT_TRUE(MatricesNear(*root, Components::Transform::GetMatrix(parentLocal)));
+    const auto identity = TransformSystem::TryComposeWorldMatrix(raw, entt::null);
+    ASSERT_TRUE(identity.has_value());
+    EXPECT_TRUE(MatricesNear(*identity, glm::mat4(1.0f)));
+}
+
+TEST(ECSTransformHierarchy, PureCompositionRejectsBrokenCyclesAndNonfiniteChains)
+{
+    entt::registry raw;
+    const auto parent = raw.create();
+    const auto child = raw.create();
+    raw.emplace<Components::Transform::Component>(parent);
+    raw.emplace<Components::Transform::Component>(child);
+    auto& hierarchy = raw.emplace<Components::Hierarchy::Component>(child);
+    hierarchy.Parent = parent;
+    raw.destroy(parent);
+    EXPECT_FALSE(TransformSystem::TryComposeWorldMatrix(raw, child).has_value());
+    EXPECT_FALSE(TransformSystem::TryComposeWorldMatrix(raw, parent).has_value());
+    hierarchy.Parent = child;
+    EXPECT_FALSE(TransformSystem::TryComposeWorldMatrix(raw, child).has_value());
+    hierarchy.Parent = entt::null;
+    raw.get<Components::Transform::Component>(child).Position.x = std::numeric_limits<float>::infinity();
+    EXPECT_FALSE(TransformSystem::TryComposeWorldMatrix(raw, child).has_value());
 }

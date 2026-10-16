@@ -24,10 +24,15 @@ whose `$defs` hold every registered section in name order with `x-schema-id` and
 `{"type":"object","x-schema-missing":true}`. The generated schemas are
 authoritative for section field names, types, ranges and enum names: they come
 from the owners' declarative `ConfigFieldSpec` tables (`Extrinsic.Runtime.ConfigFieldSpec`,
-RUNTIME-276), the same tables their validators check. Enums stay integer-coded;
-`x-enum-names` lists their meaning. Property references carry `x-property-kinds`
-and `x-domains`. `Test.EngineConfigSectionSchemas.cpp` keeps schema and validator
-in agreement.
+RUNTIME-276), the same tables their validators check. Enums retain each owner's
+integer-code or string-token format; optional `x-enum-names` carries UI labels.
+Property references retain their owner's string or integer kind encoding and
+carry `x-property-kinds` and `x-domains`. Nested objects and arrays describe their
+children and cardinality without inventing child defaults under null objects.
+Owner validators retain cross-field rules, float representability checks and
+their existing reference-based fallback or group-clamp behavior.
+`Test.EngineConfigSectionSchemas.cpp` checks schemas and current codec behavior
+against independent literal boundaries and wire-format controls.
 
 ```json
 {

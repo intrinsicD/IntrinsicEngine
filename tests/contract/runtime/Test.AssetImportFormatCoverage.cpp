@@ -4081,7 +4081,11 @@ TEST(RuntimeAssetImportFormatCoverage, AuthoredVertexUvsArePublishedWithoutAtlas
     for (const auto& job : RequiredEngineService<Runtime::JobService>(engine).SnapshotAll())
         EXPECT_FALSE(job.DebugName.starts_with("Runtime.DirectMeshPostProcess."));
     auto& assets = RequiredEngineService<Assets::AssetService>(engine);
-    ASSERT_TRUE(assets.Reload(imported->Asset).has_value());
+    ASSERT_TRUE(assets.Reload<Geometry::MeshIO::MeshIOResult>(
+        imported->Asset, [](std::string_view path, Assets::AssetId)
+        {
+            return Geometry::MeshIO::LoadOBJ(path);
+        }).has_value());
     ASSERT_TRUE(assets.CompleteCpuLoadAndFlushEvent(imported->Asset).has_value());
     const auto reloaded = assets.Read<Geometry::MeshIO::MeshIOResult>(imported->Asset);
     ASSERT_TRUE(reloaded.has_value());

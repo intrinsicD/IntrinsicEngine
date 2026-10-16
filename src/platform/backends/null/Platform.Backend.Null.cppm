@@ -1,3 +1,4 @@
+// Provides a deterministic headless window and queued events for runtime and tests.
 module;
 
 #include <memory>
@@ -17,6 +18,7 @@ namespace Extrinsic::Platform::Backends::Null
     public:
         explicit NullWindow(const Core::Config::WindowConfig& config);
 
+        // Events queued by a listener are consumed by the next poll.
         void QueueEvent(Platform::Event event);
         void QueueResize(int width, int height);
         void QueueClose();
@@ -32,7 +34,6 @@ namespace Extrinsic::Platform::Backends::Null
         [[nodiscard]] bool WasResized() const override { return m_WasResized; }
 
         void AcknowledgeResize() override;
-        [[nodiscard]] bool ConsumeInputActivity() override;
 
         [[nodiscard]] Platform::Extent2D GetWindowExtent() const override { return m_WindowExtent; }
         [[nodiscard]] Platform::Extent2D GetFramebufferExtent() const override { return m_FramebufferExtent; }
@@ -41,7 +42,6 @@ namespace Extrinsic::Platform::Backends::Null
         void Listen(EventCallbackFn callback) override;
         [[nodiscard]] std::vector<Platform::Event> DrainEvents() override;
 
-        void OnUpdate() override;
         void WaitForEventsTimeout(double timeoutSeconds) override;
 
         void SetClipboardText(std::string_view text) override;
@@ -56,7 +56,6 @@ namespace Extrinsic::Platform::Backends::Null
         Platform::Extent2D m_FramebufferExtent{};
         bool m_ShouldClose{false};
         bool m_WasResized{false};
-        bool m_InputActivity{false};
         Platform::CursorMode m_CursorMode{Platform::CursorMode::Normal};
         std::string m_Clipboard{};
         EventCallbackFn m_Callback{};

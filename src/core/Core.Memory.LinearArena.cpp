@@ -6,6 +6,7 @@ module;
 #include <cstring>
 #include <expected>
 #include <limits>
+#include <memory>
 #include <span> // NOLINT(misc-include-cleaner)
 
 module Extrinsic.Core.Memory:LinearArena.Impl;
@@ -130,16 +131,16 @@ namespace Extrinsic::Core::Memory
 
         if (size > m_Capacity || align > m_Capacity)
             return std::unexpected(ErrorCode::OutOfRange);
+        if (!IsPowerOfTwo(align))
+            return std::unexpected(ErrorCode::InvalidArgument);
 
         const size_t safeAlign = std::max(align, alignof(std::max_align_t));
-        auto alignedOffset = AlignUp(m_Offset, safeAlign);
-        if (!alignedOffset)
-            return std::unexpected(alignedOffset.error());
-
-        const size_t offset = *alignedOffset;
-        if (offset > m_Capacity || size > (m_Capacity - offset))
+        void* aligned = m_Start + m_Offset;
+        size_t remaining = m_Capacity - m_Offset;
+        if (!std::align(safeAlign, size, aligned, remaining))
             return std::unexpected(ErrorCode::OutOfMemory);
 
+        const size_t offset = static_cast<std::byte*>(aligned) - m_Start;
         m_Offset = offset + size;
         Telemetry::Alloc::RecordAlloc(size);
         return std::span<std::byte>(m_Start + offset, size);

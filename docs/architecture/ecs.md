@@ -14,6 +14,28 @@
 - Allowed: `core` and geometry handles/types only when explicitly justified.
 - Disallowed: direct dependency on graphics/runtime/app internals.
 
+## Transform and hierarchy mutation
+
+`TryDecomposeMatrix` extracts finite TRS components and leaves its output
+unchanged on failure. `TryComputeLocalTransform` additionally verifies that
+TRS reconstruction represents the affine local matrix; shear and perspective
+that cannot be represented are rejected. Runtime gizmo edits use this same
+validation.
+
+`Hierarchy::Attach` computes a ready child's new local transform before
+changing links. Unrepresentable results leave the hierarchy untouched; the
+existing finite singular-parent policy uses an identity local transform.
+`Detach` always removes the parent link and marks a local transform dirty,
+so teardown loops make progress. Ready decomposable world state becomes the
+new local TRS, preserving translation while dropping shear; unavailable or
+non-decomposable world state leaves authored local values intact.
+
+World bounds retain oriented boxes for orthogonal transforms, including
+reflections. Sheared and degenerate transforms use a world-axis-aligned box
+from the transformed local AABB. `WorldUpdatedTag` is produced by hierarchy
+traversal and runtime physics writeback, consumed by bounds propagation, and
+cleared by render sync after forwarding `DirtyTransform`.
+
 ## Geometry element-source components
 
 ECS geometry is materialized by physical element domain, independently of the
@@ -34,6 +56,14 @@ garbage collection rebuilds those representatives and the complete surviving
 vertex-star rings after compaction rather than remapping links that may still
 reference deleted edges. Provenance signals do not stand in for missing source
 components.
+
+`PopulateFromCloud` copies exactly the selected view rows across every
+property. Its canonical position/normal arrays replace conflicting property
+types, and its canonical deletion mask plus `NumDeleted` preserve deleted
+rows for spatial consumers. Replacement data is prepared before changing the
+entity; the cloud remains unchanged. The deletion channel also supplies runtime
+selection's row-identity stamp: position-only edits retain point selections,
+while deletion-mask or row-count changes invalidate them.
 
 `BuildConstView` and `BuildMutableView` classify an exact complete layout.
 `BuildSourceAvailability` separately reports marker-derived provenance and the
@@ -135,9 +165,7 @@ shared `ecs -> {core, geometry}` import constraint. CPU-only
 construction, sentinel equality, `operator<=>`, hashability across the
 module boundary, swapped-halves hash distinguishability, and the
 trivially-copyable / standard-layout / 16-byte size invariants.
-Generator helpers and the optional runtime lookup sidecar land
-when a concrete serializer/selection consumer demands them. The
-selection path is that consumer: `RUNTIME-092` Slice A realised the
+The selection path is the concrete runtime lookup consumer: `RUNTIME-092` Slice A realised the
 Decision-3 sidecar as `Extrinsic.Runtime.StableEntityLookup`
 (`src/runtime/Scene/Runtime.StableEntityLookup.cppm`), a runtime-owned
 `StableId -> entt::entity` winner-map with deterministic

@@ -433,6 +433,10 @@ namespace Extrinsic::Runtime
             if (!properties) return EditorCommandHistoryStatus::StaleEntity;
             for (const auto& p : publications)
                 if (!PG::Same(PG::Capture(*properties, p.Ref), redo ? p.Before : p.After)) return EditorCommandHistoryStatus::StaleEntity;
+            std::vector<GeometryPropertyRef> outputs;
+            outputs.reserve(publications.size());
+            for (const auto& p : publications) outputs.push_back(p.Ref);
+            const auto historyBefore = GP::ObserveGeometryProperties(context, entity, outputs);
             for (const auto& p : publications)
             {
                 const auto& target = redo ? p.After : p.Before;
@@ -442,6 +446,7 @@ namespace Extrinsic::Runtime
                     else if (auto property = properties->Get<T>(p.Ref.Name)) properties->Remove(property);
                 }, target.Values);
             }
+            GP::RebasePointPropertyHistory(context, entity, historyBefore);
             ECS::Components::DirtyTags::MarkGpuDirty(context.Scene->Raw(), entity);
             if (context.InvalidateWorkspaceSnapshotCache) context.InvalidateWorkspaceSnapshotCache();
             return EditorCommandHistoryStatus::Applied;

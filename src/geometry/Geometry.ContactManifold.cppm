@@ -9,7 +9,7 @@ module;
 export module Geometry.ContactManifold;
 
 import Geometry.Primitives;
-import Geometry.GJK; // Should contain GJK_EPA logic in full version
+import Geometry.GJK;
 import Geometry.EPA;
 import Geometry.Support;
 import Extrinsic.Core.Memory;
@@ -42,7 +42,7 @@ export namespace Geometry
     struct ContactManifold
     {
         glm::vec3 Normal;           // Unit vector pointing from A to B
-        float PenetrationDepth;     // Positive value indicating overlap magnitude
+        float PenetrationDepth;     // Nonnegative overlap magnitude; zero means touching
         glm::vec3 ContactPointA;    // Contact point on surface of object A
         glm::vec3 ContactPointB;    // Contact point on surface of object B
     };
@@ -70,43 +70,6 @@ export namespace Geometry
 
         std::optional<RayHit> RayCast_Analytic(const Ray& r, const Sphere& s);
         std::optional<RayHit> RayCast_Analytic(const Ray& r, const AABB& box);
-
-        // Small helper for fallback paths: best-effort world-space "center" estimation.
-        // This must be cheap and constexpr-friendly; it shouldn't allocate.
-        template <typename Shape>
-        [[nodiscard]]  glm::vec3 CenterOf(const Shape& s)
-        {
-            if constexpr (requires { s.Center; })
-            {
-                return s.Center;
-            }
-            else if constexpr (std::same_as<Shape, Capsule>)
-            {
-                return (s.PointA + s.PointB) * 0.5f;
-            }
-            else if constexpr (std::same_as<Shape, AABB>)
-            {
-                return (s.Min + s.Max) * 0.5f;
-            }
-            else if constexpr (std::same_as<Shape, OBB>)
-            {
-                return s.Center;
-            }
-            else if constexpr (std::same_as<Shape, ConvexHull>)
-            {
-                // Robust even for empty hulls.
-                if (s.Vertices.empty()) return glm::vec3(0.0f);
-                glm::vec3 sum(0.0f);
-                for (const glm::vec3& v : s.Vertices) sum += v;
-                return sum / static_cast<float>(s.Vertices.size());
-            }
-            else
-            {
-                // Unknown shape type. Returning 0 keeps compilation working and preserves
-                // the "log warning + unstable manifold" behavior, but without hard errors.
-                return glm::vec3(0.0f);
-            }
-        }
 
         // --- Fallback ---
 
@@ -136,23 +99,12 @@ export namespace Geometry
                     return m;
                 }
 
-                // Fallback if EPA fails (e.g. numerical instability or degenerate simplex)
-                // Use heuristic center-diff
-                Extrinsic::Core::Log::Warn("Physics: GJK hit but EPA failed. Using heuristic fallback.");
-
-                ContactManifold m{};
-                glm::vec3 dir = CenterOf(b) - CenterOf(a);
-                if (glm::length2(dir) < 1e-10f) m.Normal = glm::vec3(0, 1, 0);
-                else m.Normal = glm::normalize(dir);
-                m.PenetrationDepth = 0.001f;
-                m.ContactPointA = Geometry::Support(a, m.Normal);
-                m.ContactPointB = Geometry::Support(b, -m.Normal);
-                return m;
+                Extrinsic::Core::Log::Warn("Physics: GJK hit but EPA failed; no contact manifold produced.");
             }
             return std::nullopt;
         }
 
-        // Back-compat overload (existing call sites): uses a small local scratch.
+        // Convenience query with local scratch; repeated callers should supply an arena.
         template <typename A, typename B>
         std::optional<ContactManifold> Contact_Fallback(const A& a, const B& b)
         {

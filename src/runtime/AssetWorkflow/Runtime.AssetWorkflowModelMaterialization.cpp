@@ -1102,7 +1102,6 @@ namespace Extrinsic::Runtime
             JobDesc desc{};
             desc.DebugName = std::move(name);
             desc.Scope = world;
-            desc.Kind = RuntimeTaskKinds::GeometryProcess;
             desc.Work = [payloadToken](const JobCancellation&) -> JobResultEnvelope
             {
                 return JobResultEnvelope::Make<ProgressiveEnrichmentResult>(
@@ -1213,7 +1212,6 @@ namespace Extrinsic::Runtime
                     JobDesc schedule{};
                     schedule.DebugName = "schedule normal GPU bake request";
                     schedule.Scope = options.World;
-                    schedule.Kind = RuntimeTaskKinds::GeometryProcess;
                     if (uvJob.IsValid())
                     {
                         schedule.DependsOn.push_back(JobDependency{
@@ -1316,7 +1314,6 @@ namespace Extrinsic::Runtime
                 JobDesc albedoBake{};
                 albedoBake.DebugName = "schedule albedo GPU bake request";
                 albedoBake.Scope = options.World;
-                albedoBake.Kind = RuntimeTaskKinds::GeometryProcess;
                 if (uvJob.IsValid())
                 {
                     albedoBake.DependsOn.push_back(JobDependency{

@@ -45,11 +45,7 @@ namespace Geometry
             if (!Geometry::Validation::IsFinite(tri.A) || !Geometry::Validation::IsFinite(tri.B) || !Geometry::Validation::IsFinite(tri.C))
                 return false;
 
-            const glm::vec3 normal = glm::cross(tri.B - tri.A, tri.C - tri.A);
-            return std::isfinite(normal.x) &&
-                   std::isfinite(normal.y) &&
-                   std::isfinite(normal.z) &&
-                   glm::dot(normal, normal) > 1.0e-12f;
+            return tri.GetNormal() != glm::vec3(0.0f);
         }
 
         [[nodiscard]] bool HitLess(const MeshClosestFaceHit& lhs,

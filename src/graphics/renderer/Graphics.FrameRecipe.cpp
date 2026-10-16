@@ -1499,6 +1499,45 @@ namespace Extrinsic::Graphics
         }
         const FrameRecipeIntrospection& declaration = declarationResult.Recipe;
 
+        const auto rejectContribution = [](const FrameRecipePassContribution& contribution,
+                                           const std::string_view reason) {
+            return FrameRecipeBuildResult{
+                .Succeeded = false,
+                .Diagnostic = "FrameRecipe contribution '" + std::string{contribution.Name} +
+                    "': " + std::string{reason},
+            };
+        };
+        FrameRecipePassContributionRegistry supported;
+        RegisterDefaultFrameRecipeOverlayContributions(supported, features, aaOptions, temporalOptions);
+        for (const FrameRecipePassContribution& contribution : contributions)
+        {
+            if (!contribution.Enabled)
+                continue;
+            const auto canonical = std::ranges::find_if(supported.Passes, [&](const auto& entry) {
+                return entry.Kind == contribution.Kind;
+            });
+            if (canonical == supported.Passes.end())
+                return rejectContribution(contribution, "unsupported Kind.");
+            // Runtime recorders and texture bindings dispatch by canonical id.
+            // Graph construction alone cannot make a custom id executable.
+            if (contribution.Id != canonical->Id)
+                return rejectContribution(contribution, "Id must match the canonical Kind.");
+            if (contribution.Queue != canonical->Queue)
+                return rejectContribution(contribution, "unsupported Queue.");
+            if (contribution.Anchor.PassId != canonical->Anchor.PassId ||
+                contribution.Anchor.Placement != canonical->Anchor.Placement)
+                return rejectContribution(contribution, "unsupported Anchor.");
+            if (contribution.Writes != canonical->Writes)
+                return rejectContribution(contribution, "unsupported Writes.");
+            if (contribution.FinalizesBackbuffer != canonical->FinalizesBackbuffer)
+                return rejectContribution(contribution, "unsupported FinalizesBackbuffer.");
+            // DebugView's real renderer caller chooses one preview texture;
+            // validate that choice against materialized resources below.
+            if (contribution.Kind != FrameRecipePassKind::DebugView &&
+                contribution.Reads != canonical->Reads)
+                return rejectContribution(contribution, "unsupported Reads.");
+        }
+
         auto importBackbuffer = [&graph](std::string name,
                                          const RHI::TextureHandle handle,
                                          const FrameRecipeResourceKind kind) {
@@ -2097,8 +2136,8 @@ namespace Extrinsic::Graphics
                     // from `assets/shaders/deferred_lighting.frag` is not
                     // representable on the engine's bindless-only pipeline
                     // layout; the bindless-index push-constant is the
-                    // equivalent wiring. See `src/graphics/renderer/README.md`
-                    // ("Slice C: shadow-atlas binding") for the durable rule.
+                    // equivalent wiring. See the pass contracts in
+                    // `docs/architecture/rendering-three-pass.md`.
                     builder.Read(shadowAtlas, TextureUsage::ShaderRead);
                 }
                 builder.Write(hdr, TextureUsage::ColorAttachmentWrite);
@@ -2406,15 +2445,14 @@ namespace Extrinsic::Graphics
 
         auto resolveDebugViewInput = [&](const FrameRecipePassContribution& contribution) -> TextureRef
         {
-            for (const FrameResourceId id : contribution.Reads)
-            {
-                const TextureRef texture = textureForFrameResourceId(id);
-                if (texture.IsValid())
-                {
-                    return texture;
-                }
-            }
-            return presentSource;
+            if (contribution.Reads.size() != 1u)
+                return TextureRef{};
+            const TextureRef input = textureForFrameResourceId(contribution.Reads.front());
+            if (!input.IsValid() ||
+                (input.Index == backbuffer.Index && input.Generation == backbuffer.Generation) ||
+                (input.Index == debugView.Index && input.Generation == debugView.Generation))
+                return TextureRef{};
+            return input;
         };
 
         for (const FrameRecipePassContribution& contribution : contributions)
@@ -2444,6 +2482,9 @@ namespace Extrinsic::Graphics
             else if (contribution.Kind == FrameRecipePassKind::DebugView && debugViewActive)
             {
                 const TextureRef input = resolveDebugViewInput(contribution);
+                if (!input.IsValid())
+                    return rejectContribution(contribution,
+                        "Reads must select one materialized texture other than Backbuffer or DebugViewRGBA.");
                 addRecipePassWithId(contribution.Id, std::string{contribution.Name}, [=](RenderGraphBuilder& builder) {
                     builder.Read(input, TextureUsage::ShaderRead);
                     builder.Write(debugView, TextureUsage::ColorAttachmentWrite);

@@ -74,7 +74,7 @@ at least once, several more than once:
   reserved; texture leases start at slot 3. This exact defect class shipped
   three times: `BUG-014` (font atlas clobbered), `BUG-016` (barrier auto-bind
   + ImGuiPass racing slot 0), `BUG-019` (a fix re-colliding on slot 0). The
-  contract is documented in `src/graphics/renderer/README.md`.
+  contract is documented in `src/graphics/vulkan/README.md`.
 - **Render-id convention.** GPU instance-table render id =
   `uint32(entt handle) + 1`; `0` is reserved for background/none
   (`entt::null` wraps to 0). `StableEntityLookup::ToRenderId`/`ToEntityHandle`

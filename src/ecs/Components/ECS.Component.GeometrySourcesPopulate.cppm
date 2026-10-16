@@ -45,9 +45,10 @@ export namespace Extrinsic::ECS::Components::GeometrySources
                            entt::entity entity,
                            Geometry::Graph::Graph& graph);
 
-    // Populate Vertices from a point cloud. Writes "v:position" (and
-    // "v:normal" when HasNormals()) plus copies the full PointProperties()
-    // PropertySet to preserve user attributes.
+    // Populate owned Vertices from the cloud or its selected view rows, preserving
+    // all user attributes. Canonical "v:position", active "v:normal", and
+    // "v:deleted" replace colliding names; NumDeleted counts selected deleted rows.
+    // Preparation precedes replacement of ECS sources and does not mutate cloud.
     void PopulateFromCloud(entt::registry& registry,
                            entt::entity entity,
                            Geometry::PointCloud::Cloud& cloud);

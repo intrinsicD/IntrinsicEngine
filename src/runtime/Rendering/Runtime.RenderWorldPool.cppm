@@ -1,3 +1,4 @@
+// Owner-thread snapshot-slot lifecycle with held-reference back pressure.
 module;
 
 #include <atomic>
@@ -36,11 +37,9 @@ export namespace Extrinsic::Runtime
     // (extraction) acquires a free *back* slot, writes the next snapshot, and
     // publishes it as the *front*; the consumer (renderer) acquires the current
     // front under a refcount across its in-flight GPU window and releases it at
-    // frame retire. The published front index is a single
-    // `std::atomic<std::uint32_t>` (release on publish / acquire on consume) and
-    // per-slot refcounts are atomic, so the only cross-thread shared mutation is
-    // the index plus the refcounts and no torn snapshot is ever visible — slot
-    // contents are fully written before the index publish.
+    // frame retire. All calls, including diagnostics and refcount inspection,
+    // must be serialized on the owner thread. Atomic indices and refcounts do
+    // not make the slot bookkeeping or snapshot storage thread-safe.
     //
     // This slice owns the *lifecycle of slot indices* only; binding the real
     // `RuntimeRenderSnapshotBatch` backing storage to each slot is owned by
@@ -64,8 +63,7 @@ export namespace Extrinsic::Runtime
     // referenced slot.
     //
     // Layering: imports nothing from graphics/ECS/platform; manages only
-    // indices and atomics. Single-threaded-safe and (for the index/refcount
-    // mutations) thread-safe for the documented one-producer/one-consumer model.
+    // indices and atomics under the serialized owner-thread contract.
     class RenderWorldPool
     {
     public:

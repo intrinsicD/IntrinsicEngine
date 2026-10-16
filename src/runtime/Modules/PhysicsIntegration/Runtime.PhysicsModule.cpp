@@ -8,6 +8,7 @@ module;
 #include <limits>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -28,18 +29,23 @@ import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.StrongHandle;
 import Extrinsic.ECS.Component.Collider;
+import Extrinsic.ECS.Component.Hierarchy;
 import Extrinsic.ECS.Component.RigidBody;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.ECS.System.TransformHierarchy;
 import Extrinsic.Physics.World;
 import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.ConfigFieldSpec;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
+
+#include "Config/internal/Runtime.ConfigFieldJson.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -57,6 +63,28 @@ namespace Extrinsic::Runtime
         constexpr float kMaximumAccumulatedSeconds = 10.0f;
         constexpr float kMaximumGravityMagnitude = 100'000.0f;
         constexpr std::uint32_t kMaximumStepsPerFrame = 1'024u;
+
+        constexpr ConfigFieldSpec kGravityItem{
+            .Type = ConfigFieldType::Float,
+            .Min = -kMaximumGravityMagnitude,
+            .Max = kMaximumGravityMagnitude,
+        };
+        constexpr std::array<ConfigFieldSpec, 5u> kPhysicsConfigFields{{
+            {.Name = "enabled", .Type = ConfigFieldType::Bool,
+             .Description = "Enable fixed-step physics simulation."},
+            {.Name = "fixed_delta_seconds", .Type = ConfigFieldType::Float,
+             .Description = "Duration of each physics step in seconds.",
+             .Min = kMinimumFixedDeltaSeconds, .Max = kMaximumFixedDeltaSeconds},
+            {.Name = "max_accumulated_seconds", .Type = ConfigFieldType::Float,
+             .Description = "Maximum accumulated simulation time; raised to one fixed step when smaller.",
+             .Min = kMinimumFixedDeltaSeconds, .Max = kMaximumAccumulatedSeconds},
+            {.Name = "max_steps_per_frame", .Type = ConfigFieldType::UInt,
+             .Description = "Maximum physics steps processed in one frame.",
+             .Min = 1.0, .Max = kMaximumStepsPerFrame},
+            {.Name = "gravity", .Type = ConfigFieldType::Array,
+             .Description = "World-space acceleration components in meters per second squared.",
+             .Item = &kGravityItem, .MinItems = 3u, .MaxItems = 3u},
+        }};
 
         [[nodiscard]] bool IsFiniteBoundedGravity(const glm::vec3 value) noexcept
         {
@@ -118,18 +146,6 @@ namespace Extrinsic::Runtime
             return std::string{subject} + "." + std::string{field};
         }
 
-        [[nodiscard]] bool IsKnownConfigField(const std::string_view field) noexcept
-        {
-            constexpr std::array<std::string_view, 5u> kKnown{
-                "enabled",
-                "fixed_delta_seconds",
-                "max_accumulated_seconds",
-                "max_steps_per_frame",
-                "gravity",
-            };
-            return std::find(kKnown.begin(), kKnown.end(), field) != kKnown.end();
-        }
-
         [[nodiscard]] PhysicsModuleConfig ParsePhysicsModuleConfig(
             const std::string_view payload,
             const PhysicsModuleConfig& reference,
@@ -160,7 +176,7 @@ namespace Extrinsic::Runtime
             for (const auto& [key, value] : object.items())
             {
                 (void)value;
-                if (!IsKnownConfigField(key))
+                if (FindConfigFieldSpec(kPhysicsConfigFields, key) == nullptr)
                 {
                     AddConfigWarning(
                         result,
@@ -180,9 +196,7 @@ namespace Extrinsic::Runtime
                 const auto it = object.find(std::string{key});
                 return it == object.end() ? nullptr : &*it;
             };
-            const auto readNumber = [&](const std::string_view key,
-                                        const double minimum,
-                                        const double maximum)
+            const auto readNumber = [&](const std::string_view key)
                 -> std::optional<double>
             {
                 const json* const value = find(key);
@@ -198,7 +212,7 @@ namespace Extrinsic::Runtime
                     return std::nullopt;
                 }
                 const double number = value->get<double>();
-                if (!std::isfinite(number) || number < minimum || number > maximum)
+                if (!AcceptsConfigFieldNumber(*FindConfigFieldSpec(kPhysicsConfigFields, key), number))
                 {
                     AddConfigWarning(
                         result,
@@ -228,17 +242,11 @@ namespace Extrinsic::Runtime
                 }
             }
 
-            if (const std::optional<double> value = readNumber(
-                    "fixed_delta_seconds",
-                    kMinimumFixedDeltaSeconds,
-                    kMaximumFixedDeltaSeconds))
+            if (const std::optional<double> value = readNumber("fixed_delta_seconds"))
             {
                 config.FixedDeltaSeconds = static_cast<float>(*value);
             }
-            if (const std::optional<double> value = readNumber(
-                    "max_accumulated_seconds",
-                    kMinimumFixedDeltaSeconds,
-                    kMaximumAccumulatedSeconds))
+            if (const std::optional<double> value = readNumber("max_accumulated_seconds"))
             {
                 config.MaxAccumulatedSeconds = static_cast<float>(*value);
             }
@@ -257,8 +265,9 @@ namespace Extrinsic::Runtime
                     if (signedValue >= 0)
                         parsed = static_cast<std::uint64_t>(signedValue);
                 }
-                if (!parsed.has_value() || *parsed == 0u ||
-                    *parsed > kMaximumStepsPerFrame)
+                if (!parsed.has_value() || !AcceptsConfigFieldNumber(
+                        *FindConfigFieldSpec(kPhysicsConfigFields, "max_steps_per_frame"),
+                        static_cast<double>(*parsed)))
                 {
                     AddConfigWarning(
                         result,
@@ -275,11 +284,13 @@ namespace Extrinsic::Runtime
 
             if (const json* const gravity = find("gravity"); gravity != nullptr)
             {
-                bool valid = gravity->is_array() && gravity->size() == 3u;
+                const auto& field = *FindConfigFieldSpec(kPhysicsConfigFields, "gravity");
+                bool valid = gravity->is_array() && gravity->size() >= *field.MinItems &&
+                    gravity->size() <= *field.MaxItems;
                 glm::vec3 parsed{0.0f};
                 if (valid)
                 {
-                    for (std::size_t index = 0u; index < 3u; ++index)
+                    for (std::size_t index = 0u; index < gravity->size(); ++index)
                     {
                         if (!(*gravity)[index].is_number())
                         {
@@ -287,8 +298,7 @@ namespace Extrinsic::Runtime
                             break;
                         }
                         const double component = (*gravity)[index].get<double>();
-                        if (!std::isfinite(component) ||
-                            std::abs(component) > kMaximumGravityMagnitude)
+                        if (!AcceptsConfigFieldNumber(*field.Item, component))
                         {
                             valid = false;
                             break;
@@ -453,6 +463,14 @@ namespace Extrinsic::Runtime
             return hash;
         }
 
+        [[nodiscard]] std::optional<glm::mat4> ParentWorldMatrix(
+            const entt::registry& raw, const ECS::EntityHandle entity)
+        {
+            const auto* hierarchy = raw.try_get<EcsComponents::Hierarchy::Component>(entity);
+            return ECS::Systems::TransformHierarchy::TryComposeWorldMatrix(
+                raw, hierarchy ? hierarchy->Parent : entt::null);
+        }
+
         [[nodiscard]] bool PoseEquals(const Transform::Component& transform,
                                       const Physics::Transform& pose) noexcept
         {
@@ -462,7 +480,8 @@ namespace Extrinsic::Runtime
                 transform.Rotation.w == pose.Rotation.w &&
                 transform.Rotation.x == pose.Rotation.x &&
                 transform.Rotation.y == pose.Rotation.y &&
-                transform.Rotation.z == pose.Rotation.z;
+                transform.Rotation.z == pose.Rotation.z &&
+                transform.Scale == pose.Scale;
         }
     }
 
@@ -562,6 +581,12 @@ namespace Extrinsic::Runtime
                     typed(*value);
             };
         }
+        auto schema = json::parse(ConfigDetail::BuildSectionSchemaJson(
+            kPhysicsModuleConfigSectionSchemaId, "Physics",
+            "Fixed-step physics settings; invalid fields retain their reference values.",
+            kPhysicsConfigFields,
+            json::parse(SerializePhysicsModuleConfig(PhysicsModuleConfig{}))));
+        schema["x-fallback"] = true;
         return Core::Config::EngineConfigSectionRegistration{
             .DefaultSection = Core::Config::EngineConfigSection{
                 .Name = std::string{kPhysicsModuleConfigSectionName},
@@ -572,6 +597,7 @@ namespace Extrinsic::Runtime
             },
             .Validate = ValidatePhysicsModuleConfigSection,
             .OnChanged = std::move(callback),
+            .SchemaJson = schema.dump(),
         };
     }
 
@@ -586,6 +612,8 @@ namespace Extrinsic::Runtime
             ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
             std::uint64_t LastSeenGeneration{0u};
             std::uint64_t AuthoringFingerprint{0u};
+            glm::vec3 AuthoredLinearVelocity{0.0f};
+            glm::vec3 AuthoredAngularVelocity{0.0f};
         };
 
         struct WorldState
@@ -668,27 +696,46 @@ namespace Extrinsic::Runtime
             RefreshDerivedDiagnostics();
         }
 
+        [[nodiscard]] bool RejectUnsupported(PhysicsUnsupportedReason reason, bool recordDiagnostics)
+        {
+            if (recordDiagnostics)
+            {
+                ++Diagnostics.UnsupportedAuthoring;
+                Diagnostics.LastUnsupportedReason = reason;
+            }
+            return false;
+        }
+
         [[nodiscard]] bool TryBuildDescriptor(
-            entt::registry& raw,
+            const entt::registry& raw,
             const ECS::EntityHandle entity,
             Physics::BodyDescriptor& descriptor,
-            const bool recordMissingTransform)
+            const bool recordDiagnostics)
         {
             descriptor = {};
-            if (const auto* const transform =
-                    raw.try_get<Transform::Component>(entity))
+            if (!raw.all_of<Transform::Component>(entity))
             {
-                descriptor.Pose = ConvertTransform(*transform);
+                if (recordDiagnostics)
+                    ++Diagnostics.MissingTransforms;
+                return false;
             }
-            else if (recordMissingTransform)
-            {
-                ++Diagnostics.MissingTransforms;
-            }
+            const auto world = ECS::Systems::TransformHierarchy::TryComposeWorldMatrix(raw, entity);
+            Transform::Component worldTransform;
+            if (!world || !Transform::TryComputeLocalTransform(*world, glm::mat4(1.0f), worldTransform))
+                return RejectUnsupported(PhysicsUnsupportedReason::WorldTransform, recordDiagnostics);
+            descriptor.Pose = ConvertTransform(worldTransform);
 
-            const auto* const rigidBody =
-                raw.try_get<RigidBody::Component>(entity);
+            const auto* rigidBody = raw.try_get<RigidBody::Component>(entity);
             if (rigidBody != nullptr)
             {
+                if (rigidBody->Mass.Policy == RigidBody::MassPolicy::Density)
+                    return RejectUnsupported(PhysicsUnsupportedReason::MassPolicy, recordDiagnostics);
+                if (rigidBody->Mass.LocalCenterOfMass != glm::vec3(0.0f))
+                    return RejectUnsupported(PhysicsUnsupportedReason::CenterOfMass, recordDiagnostics);
+                if (!rigidBody->AllowSleep || !rigidBody->StartsAwake)
+                    return RejectUnsupported(PhysicsUnsupportedReason::SleepPolicy, recordDiagnostics);
+                if (rigidBody->ContinuousCollisionDetection)
+                    return RejectUnsupported(PhysicsUnsupportedReason::ContinuousCollisionDetection, recordDiagnostics);
                 descriptor.Motion = ConvertMotion(rigidBody->Motion);
                 descriptor.LinearVelocity = rigidBody->LinearVelocity;
                 descriptor.AngularVelocity = rigidBody->AngularVelocity;
@@ -696,8 +743,21 @@ namespace Extrinsic::Runtime
                 descriptor.LinearDamping = rigidBody->LinearDamping;
                 descriptor.AngularDamping = rigidBody->AngularDamping;
                 descriptor.GravityScale = rigidBody->GravityScale;
-                descriptor.ParticipatesInContacts =
-                    rigidBody->ParticipatesInContacts;
+                descriptor.ParticipatesInContacts = rigidBody->ParticipatesInContacts;
+                if (descriptor.Motion == Physics::MotionType::Dynamic)
+                {
+                    const auto parent = ParentWorldMatrix(raw, entity);
+                    Transform::Component parentTransform;
+                    if (!parent || !Transform::TryComputeLocalTransform(*parent, glm::mat4(1.0f), parentTransform))
+                        return RejectUnsupported(PhysicsUnsupportedReason::DynamicParentTransform, recordDiagnostics);
+                    const auto scale = parentTransform.Scale;
+                    const float largest = std::max({scale.x, scale.y, scale.z});
+                    const float smallest = std::min({scale.x, scale.y, scale.z});
+                    // Uniform positive parent TRS keeps future world rotations
+                    // representable as local TRS (same relative tolerance as ECS).
+                    if (smallest <= 0.0f || largest - smallest > 1.0e-4f * largest)
+                        return RejectUnsupported(PhysicsUnsupportedReason::DynamicParentTransform, recordDiagnostics);
+                }
             }
             else
             {
@@ -707,18 +767,37 @@ namespace Extrinsic::Runtime
                 descriptor.ParticipatesInContacts = true;
             }
 
-            if (const auto* const collider =
-                    raw.try_get<Collider::Component>(entity))
+            bool omittedByFilter = false;
+            if (const auto* collider = raw.try_get<Collider::Component>(entity))
             {
                 descriptor.Shapes.reserve(collider->Shapes.size());
                 for (const Collider::ShapeDescriptor& shape : collider->Shapes)
                 {
-                    if (shape.Enabled)
-                        descriptor.Shapes.push_back(ConvertShape(shape));
+                    if (!shape.Enabled)
+                        continue;
+                    if (shape.Filter.GroupIndex == 0 &&
+                        (shape.Filter.CategoryBits == 0u || shape.Filter.CollidesWithBits == 0u))
+                    {
+                        omittedByFilter = true;
+                        continue;
+                    }
+                    if (shape.Filter.GroupIndex != 0 || shape.Filter.CategoryBits != 1u ||
+                        shape.Filter.CollidesWithBits != 0xFFFF'FFFFu)
+                        return RejectUnsupported(PhysicsUnsupportedReason::CollisionFilter, recordDiagnostics);
+                    if (shape.Surface.Id != 0u || shape.Surface.StaticFriction != 0.5f ||
+                        shape.Surface.DynamicFriction != 0.5f || shape.Surface.Restitution != 0.0f)
+                        return RejectUnsupported(PhysicsUnsupportedReason::Material, recordDiagnostics);
+                    if (shape.Offsets.ContactOffset != 0.02f || shape.Offsets.RestOffset != 0.0f)
+                        return RejectUnsupported(PhysicsUnsupportedReason::ContactOffsets, recordDiagnostics);
+                    descriptor.Shapes.push_back(ConvertShape(shape));
                 }
             }
-            return Physics::Validate(descriptor) ==
-                Physics::ValidationStatus::Valid;
+            if (omittedByFilter && descriptor.Shapes.empty())
+                descriptor.ParticipatesInContacts = false;
+            const auto status = Physics::Validate(descriptor);
+            if (status == Physics::ValidationStatus::UnsupportedShapeTransform)
+                return RejectUnsupported(PhysicsUnsupportedReason::ShapeTransform, recordDiagnostics);
+            return status == Physics::ValidationStatus::Valid;
         }
 
         void RemoveBinding(WorldState& state,
@@ -832,6 +911,8 @@ namespace Extrinsic::Runtime
                 }
 
                 const std::uint64_t fingerprint = Fingerprint(descriptor);
+                const glm::vec3 authoredLinearVelocity = descriptor.LinearVelocity;
+                const glm::vec3 authoredAngularVelocity = descriptor.AngularVelocity;
                 auto [bindingIt, inserted] = state.Bindings.try_emplace(*stableId);
                 Binding& binding = bindingIt->second;
                 binding.Entity = entity;
@@ -853,6 +934,14 @@ namespace Extrinsic::Runtime
                 }
                 else if (binding.AuthoringFingerprint != fingerprint)
                 {
+                    const auto* current = state.World.GetBody(binding.Handle);
+                    if (current != nullptr)
+                    {
+                        if (authoredLinearVelocity == binding.AuthoredLinearVelocity)
+                            descriptor.LinearVelocity = current->LinearVelocity;
+                        if (authoredAngularVelocity == binding.AuthoredAngularVelocity)
+                            descriptor.AngularVelocity = current->AngularVelocity;
+                    }
                     if (state.World.UpdateBody(binding.Handle, descriptor))
                     {
                         binding.AuthoringFingerprint = fingerprint;
@@ -872,6 +961,8 @@ namespace Extrinsic::Runtime
                         ++Diagnostics.BodiesCreated;
                     }
                 }
+                binding.AuthoredLinearVelocity = authoredLinearVelocity;
+                binding.AuthoredAngularVelocity = authoredAngularVelocity;
             }
 
             for (auto it = state.Bindings.begin(); it != state.Bindings.end();)
@@ -891,24 +982,34 @@ namespace Extrinsic::Runtime
         {
             Diagnostics.LastWritebackOrder = NextOrder();
             entt::registry& raw = scene.Raw();
-            std::vector<Binding*> bindings{};
+            std::vector<std::pair<std::size_t, Binding*>> bindings;
             bindings.reserve(state.Bindings.size());
             for (auto& [id, binding] : state.Bindings)
             {
                 (void)id;
-                bindings.push_back(&binding);
-            }
-            std::sort(
-                bindings.begin(),
-                bindings.end(),
-                [](const Binding* const lhs, const Binding* const rhs)
+                std::size_t depth = 0;
+                auto entity = binding.Entity;
+                while (raw.valid(entity) && depth < 4096)
                 {
-                    return static_cast<std::uint32_t>(lhs->Entity) <
-                        static_cast<std::uint32_t>(rhs->Entity);
-                });
-
-            for (Binding* const binding : bindings)
+                    const auto* hierarchy = raw.try_get<EcsComponents::Hierarchy::Component>(entity);
+                    if (hierarchy == nullptr || hierarchy->Parent == entt::null)
+                        break;
+                    entity = hierarchy->Parent;
+                    ++depth;
+                }
+                bindings.emplace_back(depth, &binding);
+            }
+            std::sort(bindings.begin(), bindings.end(), [](const auto& lhs, const auto& rhs)
             {
+                if (lhs.first != rhs.first)
+                    return lhs.first < rhs.first;
+                return static_cast<std::uint32_t>(lhs.second->Entity) <
+                    static_cast<std::uint32_t>(rhs.second->Entity);
+            });
+
+            for (const auto& [depth, binding] : bindings)
+            {
+                (void)depth;
                 const Physics::BodyDescriptor* const body =
                     state.World.GetBody(binding->Handle);
                 if (body == nullptr || !raw.valid(binding->Entity) ||
@@ -927,18 +1028,40 @@ namespace Extrinsic::Runtime
                     continue;
                 }
 
-                auto& transform = raw.get<Transform::Component>(binding->Entity);
-                if (PoseEquals(transform, body->Pose))
+                const Transform::Component worldPose{
+                    .Position = body->Pose.Position,
+                    .Rotation = body->Pose.Rotation,
+                    .Scale = body->Pose.Scale,
+                };
+                const auto parent = ParentWorldMatrix(raw, binding->Entity);
+                Transform::Component local;
+                if (!parent || !Transform::TryComputeLocalTransform(Transform::GetMatrix(worldPose), *parent, local))
+                {
+                    ++Diagnostics.WritebackFailures;
                     continue;
-                transform.Position = body->Pose.Position;
-                transform.Rotation = body->Pose.Rotation;
+                }
+                auto& transform = raw.get<Transform::Component>(binding->Entity);
+                if (PoseEquals(transform, ConvertTransform(local)))
+                    continue;
+                transform = local;
                 raw.emplace_or_replace<Transform::IsDirtyTag>(binding->Entity);
                 raw.emplace_or_replace<Transform::WorldUpdatedTag>(binding->Entity);
                 ++Diagnostics.DynamicWritebacks;
-
-                Physics::BodyDescriptor authored{};
-                if (TryBuildDescriptor(raw, binding->Entity, authored, false))
+            }
+            // All ancestors have published before fingerprints are composed.
+            // Engine owns the dirty transform-cache flush after Simulation.
+            for (const auto& [depth, binding] : bindings)
+            {
+                (void)depth;
+                Physics::BodyDescriptor authored;
+                const auto* body = state.World.GetBody(binding->Handle);
+                if (body != nullptr && body->Motion == Physics::MotionType::Dynamic &&
+                    raw.valid(binding->Entity) && TryBuildDescriptor(raw, binding->Entity, authored, false))
+                {
                     binding->AuthoringFingerprint = Fingerprint(authored);
+                    binding->AuthoredLinearVelocity = authored.LinearVelocity;
+                    binding->AuthoredAngularVelocity = authored.AngularVelocity;
+                }
             }
         }
 
@@ -982,6 +1105,7 @@ namespace Extrinsic::Runtime
                     state.World.SolveStep(Physics::StepInput{
                         .DeltaSeconds = Config.FixedDeltaSeconds,
                         .Gravity = Config.Gravity,
+                        .IntegrateKinematicPoses = false,
                     });
                 Diagnostics.LastContactsSolved = step.ContactsSolved;
                 Diagnostics.LastNonConvergedIslands =

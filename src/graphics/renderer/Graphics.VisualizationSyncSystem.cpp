@@ -419,8 +419,8 @@ namespace Extrinsic::Graphics
                         const float center = std::isfinite(cfg.ScalarRangeMin)
                             ? cfg.ScalarRangeMin
                             : 0.f;
-                        cfg.ScalarRangeMin = center - 0.5f;
-                        cfg.ScalarRangeMax = center + 0.5f;
+                        (void)ExpandConstantScalarRange(
+                            center, 0.5f, cfg.ScalarRangeMin, cfg.ScalarRangeMax);
                     }
                 }
                 const bool externalScalar = scalarPacket != nullptr && scalarPacket->ScalarBufferBDA != 0u &&

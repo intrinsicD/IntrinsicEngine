@@ -98,17 +98,9 @@ namespace Geometry::Internal
 
     std::optional<RayHit> RayCast_Analytic(const Ray& r, const Sphere& s)
     {
-        glm::vec3 m = r.Origin - s.Center;
-        float b = glm::dot(m, r.Direction);
-        float c = glm::dot(m, m) - s.Radius * s.Radius;
-
-        if (c > 0.0f && b > 0.0f) return std::nullopt;
-
-        float discr = b * b - c;
-        if (discr < 0.0f) return std::nullopt;
-
-        float t = -b - std::sqrt(discr);
-        if (t < 0.0f) t = 0.0f;
+        const auto parameter = RaySphereParameter(r, s);
+        if (!parameter) return std::nullopt;
+        const float t = *parameter;
 
         RayHit hit{};
         hit.Distance = t;

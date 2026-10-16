@@ -1,3 +1,4 @@
+// Structured process execution with explicit arguments, output capture and optional timeouts.
 module;
 
 #include <chrono>

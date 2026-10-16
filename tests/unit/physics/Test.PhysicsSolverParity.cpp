@@ -2,8 +2,8 @@
 // (`Extrinsic.Physics.World::SolveStep`) and the canonical METHOD-001 CPU
 // reference (`methods/physics/rigid_body_reference`).
 //
-// The reference is canonical truth: these tests run the same fixture through
-// both implementations with matched parameters and assert the world solver
+// An independent analytic projection fixture checks the shared algorithm;
+// matched-parameter fixtures additionally assert that the world solver
 // tracks the reference within documented tolerances. The world stores float
 // state while the reference computes in double, so tolerances are absolute
 // and sized for ~60 accumulated steps (1e-4) or a single solve (1e-5).
@@ -145,7 +145,8 @@ TEST(PhysicsSolverParity, OverlappingSpherePairMatchesReferenceContactSolve)
     EXPECT_NEAR(worldA->LinearVelocity.x, result.Bodies[0].LinearVelocity.X, kContactTolerance);
     EXPECT_NEAR(worldB->LinearVelocity.x, result.Bodies[1].LinearVelocity.X, kContactTolerance);
 
-    // Both implementations report convergence diagnostics for the fixture.
+    // Eight corrections leave approximately .0010005 raw depth, whose
+    // excess above slop is below the existing .001 error tolerance.
     EXPECT_EQ(diagnostics.Solve, Physics::SolveStatus::Converged);
     EXPECT_TRUE(result.Diagnostics.Converged);
     EXPECT_NEAR(diagnostics.MaxPenetrationBefore,
@@ -153,3 +154,32 @@ TEST(PhysicsSolverParity, OverlappingSpherePairMatchesReferenceContactSolve)
                 kContactTolerance);
 }
 
+
+
+TEST(PhysicsSolverParity, ReferenceProjectionMatchesAnalyticRemainingDepth)
+{
+    for (const int iterations : {1, 2, 8})
+    {
+        SCOPED_TRACE(iterations);
+        const std::vector<Ref::BodyState> bodies{
+            ReferenceDynamicSphere(glm::vec3(0.0f), 0.5, 1.0),
+            ReferenceDynamicSphere(glm::vec3(0.8f, 0.0f, 0.0f), 0.5, 1.0),
+        };
+        Ref::StepParams params;
+        params.Gravity = Ref::Vec3{0.0, 0.0, 0.0};
+        params.SolverIterations = iterations;
+        const auto result = Ref::Step(bodies, params);
+        ASSERT_EQ(result.Diagnostics.Code, Ref::ValidationCode::Valid);
+        EXPECT_EQ(result.Diagnostics.Converged, iterations == 8);
+        ASSERT_EQ(result.Bodies.size(), 2u);
+        const double initialSeparation = bodies[1].Position.X - bodies[0].Position.X;
+        const double expected = 1.0 - params.PenetrationSlop -
+            (1.0 - initialSeparation - params.PenetrationSlop) *
+            std::pow(1.0 - params.PositionCorrectionPercent, iterations);
+        const double actual = result.Bodies[1].Position.X - result.Bodies[0].Position.X;
+        EXPECT_NEAR(actual, expected, 1.0e-12);
+        EXPECT_LE(actual, 1.0);
+        EXPECT_NEAR(result.Bodies[0].Position.X + result.Bodies[1].Position.X,
+                    initialSeparation, 1.0e-12);
+    }
+}

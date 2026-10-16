@@ -245,27 +245,45 @@ namespace Extrinsic::ECS::Components::GeometrySources
                            entt::entity entity,
                            Geometry::PointCloud::Cloud& cloud)
     {
-        ResetGeometrySourceComponents(registry, entity);
-
-        const std::size_t pSize = cloud.VerticesSize();
-
-        auto& vComp = registry.emplace_or_replace<Vertices>(entity);
-        vComp.Properties = cloud.PointProperties();
-        vComp.NumDeleted = pSize - cloud.VertexCount();
-
+        Vertices candidate;
+        candidate.Properties = cloud.PointProperties();
+        const std::size_t size = cloud.VerticesSize();
+        const std::size_t offset = cloud.IsSubmeshView() ? cloud.VertexRange().Offset : 0u;
+        if (cloud.IsSubmeshView())
         {
-            const auto positions = cloud.Positions();
-            auto posProp = vComp.Properties.GetOrAdd<glm::vec3>(
-                std::string{PropertyNames::kPosition}, glm::vec3(0.0f));
-            posProp.Vector().assign(positions.begin(), positions.end());
+            // Ascending swaps gather the selected rows without touching a future
+            // source row. Resize every erased property, not only known channels.
+            for (std::size_t i = 0; i < size; ++i)
+                candidate.Properties.Swap(i, offset + i);
+            candidate.Properties.Resize(size);
         }
+
+        RemovePropertyIfPresent(candidate.Properties, PropertyNames::kPosition);
+        auto positions = candidate.Properties.GetOrAdd<glm::vec3>(
+            std::string{PropertyNames::kPosition}, glm::vec3(0.0f));
+        const auto sourcePositions = cloud.Positions();
+        positions.Vector().assign(sourcePositions.begin(), sourcePositions.end());
 
         if (cloud.HasNormals())
         {
-            const auto normals = cloud.Normals();
-            auto normProp = vComp.Properties.GetOrAdd<glm::vec3>(
+            RemovePropertyIfPresent(candidate.Properties, PropertyNames::kNormal);
+            auto normals = candidate.Properties.GetOrAdd<glm::vec3>(
                 std::string{PropertyNames::kNormal}, glm::vec3(0.0f, 1.0f, 0.0f));
-            normProp.Vector().assign(normals.begin(), normals.end());
+            const auto sourceNormals = cloud.Normals();
+            normals.Vector().assign(sourceNormals.begin(), sourceNormals.end());
         }
+
+        RemovePropertyIfPresent(candidate.Properties, "v:deleted");
+        auto deleted = candidate.Properties.GetOrAdd<bool>("v:deleted", false);
+        for (std::size_t i = 0; i < size; ++i)
+        {
+            const bool isDeleted = cloud.IsDeleted(Geometry::VertexHandle{
+                static_cast<Geometry::PropertyIndex>(offset + i)});
+            deleted[i] = isDeleted;
+            candidate.NumDeleted += isDeleted ? 1u : 0u;
+        }
+
+        ResetGeometrySourceComponents(registry, entity);
+        registry.emplace_or_replace<Vertices>(entity, std::move(candidate));
     }
 }

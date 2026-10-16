@@ -705,6 +705,19 @@ namespace Geometry::CoherentPointDrift::EStep
 
     struct Evaluator::Impl
     {
+        struct PendingEvaluation
+        {
+            PointSet Moved{};
+            double Sigma2{0.0}, LogOutlier{0.0}, Tolerance{0.0};
+            std::uint32_t Threads{0u};
+            std::size_t PartialBudgetBytes{0u};
+            Sums* Output{nullptr};
+            std::vector<double> RowEstimate{};
+            std::vector<std::uint32_t> CpuRows{};
+            ExternalRequest Request{};
+        };
+        std::unique_ptr<PendingEvaluation> Pending{};
+
         std::vector<double> TargetX{}, TargetY{}, TargetZ{};
         KdTree TargetTree{}, SourceTree{};
         std::vector<double> LogDenominator{}, Radius2{}, RowBound{};
@@ -793,23 +806,14 @@ namespace Geometry::CoherentPointDrift::EStep
             });
         }
 
-        // External (Vulkan) rows; false when the evaluator is absent, fails or returns non-finite
-        // or negative statistics (the caller then runs the CPU choice). Rows flagged in `cpuRows`
-        // are skipped by the device and evaluated here exactly (denominator, Pt1 and their
-        // P1/PX terms, added per source in row order); the others report their estimate as bound.
-        bool ExternalRows(const Settings& settings, const PointSet& moved, const double sigma2, const double logC,
-                          const std::vector<double>& estimate, const std::vector<std::uint32_t>& cpuRows,
-                          const std::uint32_t threads, Sums& out)
+        // Validate completed external rows, then merge the exact CPU rows in their
+        // original order. Refusal or invalid statistics takes the existing dense fallback.
+        bool AcceptExternalRows(const PointSet& moved, const double sigma2, const double logC,
+                                const std::vector<double>& estimate, const std::vector<std::uint32_t>& cpuRows,
+                                const std::uint32_t threads, Sums& out)
         {
             const std::size_t n = TargetX.size(), m = moved.Size();
-            if (!settings.External) return false;
             const bool anyCpuRow = std::ranges::any_of(cpuRows, [](const std::uint32_t flag) { return flag != 0u; });
-            const ExternalRequest request{.Target = Target(), .Moved = moved, .TargetGeneration = TargetGeneration,
-                .Sigma2 = sigma2, .LogOutlier = logC - LogWeightShift, .LogWeights = LogWeight,
-                .SkipRows = anyCpuRow ? std::span<const std::uint32_t>(cpuRows) : std::span<const std::uint32_t>{},
-                .LogDenominator = LogDenominator, .Pt1 = out.Pt1, .P1 = out.P1,
-                .PXx = out.PXx, .PXy = out.PXy, .PXz = out.PXz};
-            if (!settings.External(request)) return false;
             for (std::size_t j = 0; j < n; ++j)
             {
                 if (anyCpuRow && cpuRows[j] != 0u) continue;
@@ -1593,6 +1597,35 @@ namespace Geometry::CoherentPointDrift::EStep
             evaluations += std::uint64_t(sourceSamples) * n;
             return sampledError <= errorLimit;
         }
+        bool FinishStatistics(Sums& out, const EStepPolicy used, const std::size_t blocks,
+                              const bool nystrom = false, const double sampledError = 0.0,
+                              const bool nystromLocal = false, const bool externalFallback = false,
+                              const std::uint64_t nystromEvaluations = 0u)
+        {
+            const std::size_t n = TargetX.size();
+            out.Used = used;
+            out.LogDenominatorSum = 0.0;
+            out.Matched = 0.0;
+            out.ErrorBound = 0.0;
+            out.KernelEvaluations = 0u;
+            for (std::size_t j = 0; j < n; ++j)
+            {
+                out.LogDenominatorSum += LogDenominator[j];
+                out.Matched += out.Pt1[j];
+                out.ErrorBound = std::max(out.ErrorBound, RowBound[j]);
+                out.KernelEvaluations += RowEvaluations[j];
+            }
+            // The two-pass fallback evaluates every kept pair twice.
+            if (blocks == 0u && used != EStepPolicy::FastGauss && !nystrom) out.KernelEvaluations *= 2u;
+            out.KernelEvaluations += ExtraEvaluations + nystromEvaluations;
+            out.SampledError = nystrom ? sampledError : 0.0;
+            out.NystromLocal = nystromLocal;
+            out.ExternalFallback = externalFallback;
+            SourceTreeCurrent = false;
+            UpdateScales(out.P1);
+            return std::isfinite(out.LogDenominatorSum) && out.Matched > std::numeric_limits<double>::min() * double(n);
+        }
+
     };
 
     Evaluator::Evaluator() : m_Impl(std::make_unique<Impl>()) {}
@@ -1608,6 +1641,7 @@ namespace Geometry::CoherentPointDrift::EStep
     void Evaluator::SetTarget(const PointSet target)
     {
         Impl& s = *m_Impl;
+        s.Pending.reset();
         s.TargetX.assign(target.X.begin(), target.X.end());
         s.TargetY.assign(target.Y.begin(), target.Y.end());
         s.TargetZ.assign(target.Z.begin(), target.Z.end());
@@ -1628,13 +1662,55 @@ namespace Geometry::CoherentPointDrift::EStep
     bool Evaluator::Evaluate(const PointSet moved, const double sigma2, const double logOutlier, const Settings& settings,
                              Sums& out, const std::span<const double> sourceLogWeights)
     {
+        const auto state = BeginEvaluate(moved, sigma2, logOutlier, settings, out, sourceLogWeights);
+        if (state != EvaluationState::AwaitingExternal)
+            return state == EvaluationState::Complete;
+        const auto* request = PendingExternalRequest();
+        return CompleteExternal(settings.External && settings.External(*request));
+    }
+
+    const ExternalRequest* Evaluator::PendingExternalRequest() const noexcept
+    {
+        return m_Impl->Pending ? &m_Impl->Pending->Request : nullptr;
+    }
+
+    bool Evaluator::CompleteExternal(const bool success)
+    {
         Impl& s = *m_Impl;
+        if (!s.Pending) return false;
+        const auto pending = std::move(s.Pending);
+        Sums& out = *pending->Output;
+        const auto moved = pending->Moved;
+        const bool external = success && s.AcceptExternalRows(moved, pending->Sigma2, pending->LogOutlier,
+            pending->RowEstimate, pending->CpuRows, pending->Threads, out);
+        s.ExtraEvaluations = 0u;
+        s.FixedEntries = 0u;
+        std::size_t blocks = 0u;
+        if (!external)
+        {
+            s.Resize(s.TargetX.size(), moved.Size(), out);
+            blocks = Impl::RowBlocks(s.TargetX.size(), moved.Size(), pending->PartialBudgetBytes, false);
+            if (blocks > 0u)
+                s.BlockedRows(moved, 2.0 * pending->Sigma2, pending->LogOutlier, false,
+                              pending->Tolerance, blocks, out, pending->Threads);
+            else
+                s.DenseRows(moved, 2.0 * pending->Sigma2, pending->LogOutlier, out, pending->Threads);
+        }
+        return s.FinishStatistics(out, external ? EStepPolicy::Vulkan : EStepPolicy::Dense,
+                                  blocks, false, 0.0, false, !external);
+    }
+
+    EvaluationState Evaluator::BeginEvaluate(const PointSet moved, const double sigma2, const double logOutlier, const Settings& settings,
+                             Sums& out, const std::span<const double> sourceLogWeights)
+    {
+        Impl& s = *m_Impl;
+        if (s.Pending) return EvaluationState::Failed;
         const std::size_t n = s.TargetX.size(), m = moved.Size();
         if (n == 0 || m == 0 || !(sigma2 > 0.0) || !(settings.Tolerance > 0.0 && settings.Tolerance < 1.0))
-            return false;
+            return EvaluationState::Failed;
         if (!sourceLogWeights.empty() &&
             (sourceLogWeights.size() != m || !std::ranges::all_of(sourceLogWeights, [](const double w) { return std::isfinite(w); })))
-            return false;
+            return EvaluationState::Failed;
         s.Weighted = !sourceLogWeights.empty();
         s.LogWeightShift = sourceLogWeights.empty() ? 0.0 : *std::ranges::max_element(sourceLogWeights);
         s.LogWeight.resize(m);
@@ -1655,7 +1731,7 @@ namespace Geometry::CoherentPointDrift::EStep
         // between truncated and dense (the fast Gauss transform loses to dense in 3-D).
         double sampledError = 0.0;
         std::uint64_t nystromEvaluations = 0u;
-        bool nystrom = false, allowFastGauss = true, wantExternal = false, external = false;
+        bool nystrom = false, allowFastGauss = true, wantExternal = false;
         if (used == EStepPolicy::Vulkan)
         {
             // The device runs what Auto would run densely; truncation stays on the CPU.
@@ -1669,7 +1745,7 @@ namespace Geometry::CoherentPointDrift::EStep
                 !(settings.NystromLocalSigma >= 0.0) || !std::isfinite(settings.NystromLocalSigma) ||
                 !ValidNystromVariant(settings.NystromSource, settings.NystromSchedule, settings.NystromPattern,
                                      settings.NystromSampling.Method))
-                return false;
+                return EvaluationState::Failed;
         }
         const bool nystromLocal = used == EStepPolicy::Nystrom && std::sqrt(sigma2) < settings.NystromLocalSigma;
         if (nystromLocal) used = EStepPolicy::Truncated;
@@ -1751,7 +1827,6 @@ namespace Geometry::CoherentPointDrift::EStep
         else if (used == EStepPolicy::FastGauss &&
                  !s.PlanFastGauss(moved, sigma2, settings.Tolerance, false, threads, sourcePlan, targetPlan))
             used = EStepPolicy::Dense; // no plan meets the bound
-        bool externalFallback = false;
         // Kernels too narrow for fp32 terms (see ExternalErrorEstimate) stay on the exact CPU pass.
         // Rows too narrow for fp32 terms (see ExternalRowEstimates) run exactly on the CPU; when
         // they are the majority the whole iteration does.
@@ -1771,20 +1846,31 @@ namespace Geometry::CoherentPointDrift::EStep
         out.ExternalCpuRows = 0u;
         if (wantExternal && used == EStepPolicy::Dense && 2u * cpuRowCount <= n)
         {
-            external = s.ExternalRows(settings, moved, sigma2, logOutlier, rowEstimate, cpuRows, threads, out);
-            if (external) used = EStepPolicy::Vulkan;
-            else
-            {
-                externalFallback = true;
-                s.Resize(n, m, out);
-            }
+            auto pending = std::make_unique<Impl::PendingEvaluation>();
+            pending->Moved = moved;
+            pending->Sigma2 = sigma2;
+            pending->LogOutlier = logOutlier;
+            pending->Tolerance = settings.Tolerance;
+            pending->Threads = threads;
+            pending->PartialBudgetBytes = settings.PartialBudgetBytes;
+            pending->Output = &out;
+            pending->RowEstimate = std::move(rowEstimate);
+            pending->CpuRows = std::move(cpuRows);
+            pending->Request = ExternalRequest{
+                .Target = s.Target(), .Moved = moved, .TargetGeneration = s.TargetGeneration,
+                .Sigma2 = sigma2, .LogOutlier = logOutlier - s.LogWeightShift, .LogWeights = s.LogWeight,
+                .SkipRows = cpuRowCount != 0u ? std::span<const std::uint32_t>(pending->CpuRows) :
+                    std::span<const std::uint32_t>{},
+                .LogDenominator = s.LogDenominator, .Pt1 = out.Pt1, .P1 = out.P1,
+                .PXx = out.PXx, .PXy = out.PXy, .PXz = out.PXz};
+            s.Pending = std::move(pending);
+            return EvaluationState::AwaitingExternal;
         }
         s.ExtraEvaluations = 0u;
         s.FixedEntries = 0u;
-        // The external form is two-pass (every pair twice), like blocks == 0.
-        const std::size_t blocks = used == EStepPolicy::FastGauss || nystrom || external
+        const std::size_t blocks = used == EStepPolicy::FastGauss || nystrom
             ? 0u : Impl::RowBlocks(n, m, settings.PartialBudgetBytes, used == EStepPolicy::Truncated);
-        if (nystrom || external) {}
+        if (nystrom) {}
         else if (used == EStepPolicy::FastGauss)
             s.FastGaussRows(moved, sigma2, logOutlier, settings.Tolerance, sourcePlan, targetPlan, out, threads);
         else if (blocks > 0u)
@@ -1794,27 +1880,9 @@ namespace Geometry::CoherentPointDrift::EStep
         else
             s.DenseRows(moved, twoSigma2, logOutlier, out, threads);
 
-        out.Used = used;
-        out.LogDenominatorSum = 0.0;
-        out.Matched = 0.0;
-        out.ErrorBound = 0.0;
-        out.KernelEvaluations = 0u;
-        for (std::size_t j = 0; j < n; ++j)
-        {
-            out.LogDenominatorSum += s.LogDenominator[j];
-            out.Matched += out.Pt1[j];
-            out.ErrorBound = std::max(out.ErrorBound, s.RowBound[j]);
-            out.KernelEvaluations += s.RowEvaluations[j];
-        }
-        // The two-pass fallback evaluates every kept pair twice.
-        if (blocks == 0u && used != EStepPolicy::FastGauss && !nystrom) out.KernelEvaluations *= 2u;
-        out.KernelEvaluations += s.ExtraEvaluations + nystromEvaluations;
-        out.SampledError = nystrom ? sampledError : 0.0;
-        out.NystromLocal = nystromLocal;
-        out.ExternalFallback = externalFallback;
-        s.SourceTreeCurrent = false;
-        s.UpdateScales(out.P1);
-        return std::isfinite(out.LogDenominatorSum) && out.Matched > std::numeric_limits<double>::min() * double(n);
+        return s.FinishStatistics(out, used, blocks, nystrom, sampledError, nystromLocal,
+                                  false, nystromEvaluations)
+            ? EvaluationState::Complete : EvaluationState::Failed;
     }
 
     std::vector<std::uint32_t> SamplePoints(const PointSet points, const std::size_t count,

@@ -19,6 +19,7 @@ export module Extrinsic.Runtime.JobService;
 import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Hash;
 import Extrinsic.Core.StrongHandle;
+import Extrinsic.Core.Tasks;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.WorldHandle;
 
@@ -30,19 +31,6 @@ extern "C++" { namespace Extrinsic::RHI { class ICommandContext; } }
 
 namespace Extrinsic::Runtime
 {
-    // Execution-lane taxonomy retained by the one surviving runtime execution
-    // surface after RUNTIME-194 retired the duplicate schedulers.
-    export namespace RuntimeTaskKinds
-    {
-        inline constexpr Core::Dag::TaskKind Generic{0u};
-        inline constexpr Core::Dag::TaskKind AssetIO{1u};
-        inline constexpr Core::Dag::TaskKind AssetDecode{2u};
-        inline constexpr Core::Dag::TaskKind AssetUpload{3u};
-        inline constexpr Core::Dag::TaskKind GeometryProcess{4u};
-        inline constexpr Core::Dag::TaskKind PhysicsStep{5u};
-        inline constexpr Core::Dag::TaskKind RenderPass{6u};
-    }
-
     export struct JobTokenTag;
     export using JobToken = Core::StrongHandle<JobTokenTag>;
 
@@ -60,7 +48,7 @@ namespace Extrinsic::Runtime
         // and main-thread-ordered rather than racing on a worker.
         AwaitingDependencies,
         Queued,
-        Running,
+        Running, // Includes coroutine work suspended on an external completion.
         AwaitingGate,
         // Finished on a worker, but the caller's readiness gate says the result
         // cannot be applied yet (for example a GPU readback that has not landed).
@@ -199,9 +187,10 @@ namespace Extrinsic::Runtime
         // before this job is queued; a dependency that cancels or is discarded
         // cancels this job too, so a chain never applies half its work.
         std::vector<JobDependency> DependsOn{};
+        // Ready work prefers Critical through Background; equal priorities
+        // follow scheduler enqueue order. All priorities remain worker-only.
+        // Running jobs are not preempted and starvation freedom is not promised.
         Core::Dag::TaskPriority Priority{Core::Dag::TaskPriority::Normal};
-        Core::Dag::TaskKind Kind{RuntimeTaskKinds::Generic};
-        std::uint32_t EstimatedCost{1u};
 
         // Document/world epoch captured at submit time. A drain compares it
         // against the service's current generation for the job's world and
@@ -210,6 +199,17 @@ namespace Extrinsic::Runtime
 
         std::move_only_function<JobResultEnvelope(const JobCancellation&)>
             Work{};
+
+        // Exactly one of Work/CoroutineWork is required. The factory is synchronous;
+        // it must return a valid Job before invoking completion. The coroutine owns
+        // cancellation/completion by value and completes once.
+        // Suspended work stays Running; cancellation must wake its external wait.
+        std::move_only_function<Core::Tasks::Job(
+            JobCancellation, std::move_only_function<void(JobResultEnvelope)>)>
+            CoroutineWork{};
+        // Sticky, once-only wakeup on the cancelling thread, outside the service
+        // lock. Must not block or publish. CancelAndDrain wakes before joining.
+        std::move_only_function<void()> WakeOnCancel{};
 
         // Optional readiness gate consulted on the main thread. Returning false
         // parks the finished result for a later drain instead of applying it.
@@ -362,6 +362,8 @@ namespace Extrinsic::Runtime
         JobService& operator=(const JobService&) = delete;
 
         [[nodiscard]] JobToken Submit(JobDesc desc);
+        // Cancellation APIs (Cancel, CancelAll*, CancelAndDrain) are main-thread
+        // operations; wake callbacks run there outside the service lock.
         [[nodiscard]] bool Cancel(JobToken token);
         [[nodiscard]] std::uint64_t CancelAllForWorld(WorldHandle world);
         // Requests cancellation of every live job in ascending token order;
@@ -428,6 +430,9 @@ namespace Extrinsic::Runtime
         // dependencies are satisfied onto the shared CPU pool.
         static void DispatchJob(const std::shared_ptr<SharedState>& state,
                                 const std::shared_ptr<JobRecord>& job);
+        static void FinishWork(const std::shared_ptr<SharedState>& state,
+                               const std::shared_ptr<JobRecord>& job,
+                               JobResultEnvelope result);
 
         // Releases dependency-blocked jobs whose upstream work is terminal, and
         // cancels those whose upstream did not publish.

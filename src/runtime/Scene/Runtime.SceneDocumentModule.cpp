@@ -33,13 +33,16 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
+import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
+import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.ServiceRegistry;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
 
@@ -102,21 +105,24 @@ namespace Extrinsic::Runtime
 
             const auto* hierarchy =
                 sourceRaw.try_get<ECSC::Hierarchy::Component>(source);
-            if (hierarchy == nullptr ||
-                hierarchy->Parent == ECS::InvalidEntityHandle)
-            {
+            if (hierarchy == nullptr)
                 return;
-            }
 
-            const auto parent = remap.find(hierarchy->Parent);
-            if (parent == remap.end())
-                return;
+            const auto mapped = [&remap](const ECS::EntityHandle entity)
+            {
+                const auto found = remap.find(entity);
+                return found == remap.end() ? ECS::InvalidEntityHandle : found->second;
+            };
 
             destinationRaw.emplace_or_replace<
                 ECSC::Hierarchy::Component>(
                 destination,
                 ECSC::Hierarchy::Component{
-                    .Parent = parent->second});
+                    .Parent = mapped(hierarchy->Parent),
+                    .FirstChild = mapped(hierarchy->FirstChild),
+                    .NextSibling = mapped(hierarchy->NextSibling),
+                    .PrevSibling = mapped(hierarchy->PrevSibling),
+                    .ChildCount = hierarchy->ChildCount});
         }
 
         void SnapshotSerializableScene(
@@ -191,6 +197,9 @@ namespace Extrinsic::Runtime
                     sourceEntity, destinationEntity);
                 CopySerializableComponent<
                     G::VisualizationLaneOverrides>(
+                    sourceRaw, destinationRaw,
+                    sourceEntity, destinationEntity);
+                CopySerializableComponent<VertexChannelBindingSet>(
                     sourceRaw, destinationRaw,
                     sourceEntity, destinationEntity);
 
@@ -268,6 +277,7 @@ namespace Extrinsic::Runtime
         {
             std::string Path{};
             JobToken Task{};
+            std::uint64_t Revision{};
             ECS::Scene::Registry Snapshot{};
             std::optional<SceneSerializationResult> Result{};
             Core::ErrorCode Error{Core::ErrorCode::Unknown};
@@ -316,6 +326,8 @@ namespace Extrinsic::Runtime
 
             WorldRegistry* Worlds{nullptr};
             JobService* Jobs{nullptr};
+            RenderExtractionCache* Extraction{nullptr};
+            Graphics::IRenderer* Renderer{nullptr};
             EditorCommandHistory History{};
             WorldHandle BoundWorld{};
             ECS::Scene::Registry* BoundRegistry{nullptr};
@@ -325,6 +337,7 @@ namespace Extrinsic::Runtime
             std::optional<RuntimeSceneFileEvent> LastEvent{};
             std::uint64_t EventSequence{0u};
             std::vector<JobToken> OwnedTasks{};
+            JobToken LastQueuedSave{};
             std::vector<ParticipantSlot> ParticipantSlots{};
             std::vector<std::uint32_t> FreeParticipantSlots{};
             std::uint64_t NextParticipantSequence{1u};
@@ -432,6 +445,8 @@ namespace Extrinsic::Runtime
                 const JobToken task)
             {
                 std::erase(OwnedTasks, task);
+                if (LastQueuedSave == task)
+                    LastQueuedSave = {};
             }
 
             template <typename QueuedOperation>
@@ -469,6 +484,8 @@ namespace Extrinsic::Runtime
                 }
                 operation.Task = handle;
                 OwnedTasks.push_back(handle);
+                if (kind == RuntimeSceneFileOperation::Save)
+                    LastQueuedSave = handle;
                 Core::Log::Info(
                     "[Runtime] Queued scene {}: path='{}'",
                     kind == RuntimeSceneFileOperation::Save ? "save" : "load",
@@ -558,6 +575,11 @@ namespace Extrinsic::Runtime
                 const std::vector<ParticipantInvocation>
                     participants = SnapshotParticipants();
 
+                // Invalidate render history even when no asset workflow is composed,
+                // before participants release resources borrowed from this registry.
+                if (Extraction != nullptr && Renderer != nullptr)
+                    Extraction->ClearSceneState(*Renderer);
+
                 // Advancing before the first callback invalidates all older
                 // queued operations while the outgoing registry is still
                 // live. The context names the replacement generation shared
@@ -607,6 +629,8 @@ namespace Extrinsic::Runtime
                 CancelOwnedTasks();
                 BoundWorld = {};
                 BoundRegistry = nullptr;
+                Extraction = nullptr;
+                Renderer = nullptr;
                 ResetDurableDocumentState();
             }
         };
@@ -804,6 +828,10 @@ namespace Extrinsic::Runtime
         // The kernel owns the one execution service, so queued document IO no
         // longer depends on an optional async module being composed.
         m_Impl->Shared->Jobs = &setup.Jobs();
+        m_Impl->Shared->Extraction =
+            setup.Services().Find<RenderExtractionCache>();
+        m_Impl->Shared->Renderer =
+            setup.Services().Find<Graphics::IRenderer>();
         return Core::Ok();
     }
 
@@ -843,9 +871,15 @@ namespace Extrinsic::Runtime
                 Core::ErrorCode::InvalidPath);
         }
 
-        Core::IO::FileIOBackend backend;
+        if (state->Jobs != nullptr && state->LastQueuedSave.IsValid() &&
+            !state->Jobs->IsComplete(state->LastQueuedSave))
+        {
+            return Core::Err<SceneSerializationResult>(
+                Core::ErrorCode::InvalidState);
+        }
+
         auto saved = SaveSceneDocument(
-            *state->BoundRegistry, path, backend);
+            *state->BoundRegistry, path);
         if (saved.has_value())
         {
             state->CurrentDocumentPath = path;
@@ -875,8 +909,13 @@ namespace Extrinsic::Runtime
         auto operation =
             std::make_shared<QueuedSceneSaveState>();
         operation->Path = std::move(path);
+        operation->Revision = state->History.Snapshot().Revision;
         SnapshotSerializableScene(
             *binding.Registry, operation->Snapshot);
+
+        std::vector<JobDependency> dependencies;
+        if (state->LastQueuedSave.IsValid() && !state->Jobs->IsComplete(state->LastQueuedSave))
+            dependencies.push_back({state->LastQueuedSave, "Preserve scene-save submission order"});
 
         const std::weak_ptr<Impl::State> weakState = state;
         const JobToken handle =
@@ -885,18 +924,15 @@ namespace Extrinsic::Runtime
                     .DebugName = "Runtime.SceneSave." +
                         FileNameFromPath(operation->Path),
                     .Scope = binding.World,
+                    .DependsOn = std::move(dependencies),
                     .Priority =
                         Core::Dag::TaskPriority::Normal,
-                    .Kind = RuntimeTaskKinds::AssetDecode,
-                    .EstimatedCost = 3u,
                     .Work =
                         [operation](const JobCancellation&)
                         {
-                            Core::IO::FileIOBackend backend;
                             auto saved = SaveSceneDocument(
                                 operation->Snapshot,
-                                operation->Path,
-                                backend);
+                                operation->Path);
                             if (!saved.has_value())
                             {
                                 operation->Error =
@@ -954,7 +990,7 @@ namespace Extrinsic::Runtime
                                 locked->CurrentDocumentPath =
                                     operation->Path;
                                 locked->History.MarkSaved(
-                                    operation->Path);
+                                    operation->Path, operation->Revision);
                             }
 
                             RuntimeSceneFileEvent event{
@@ -1057,8 +1093,6 @@ namespace Extrinsic::Runtime
                     .Scope = binding.World,
                     .Priority =
                         Core::Dag::TaskPriority::Normal,
-                    .Kind = RuntimeTaskKinds::AssetDecode,
-                    .EstimatedCost = 4u,
                     .Work =
                         [operation](const JobCancellation&)
                         {

@@ -7,6 +7,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
 #include <limits>
 #include <optional>
 #include <span>
@@ -54,6 +55,7 @@ import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.MeshSurfaceTopology;
+import Extrinsic.Runtime.ViewCapture;
 
 namespace Extrinsic::Runtime
 {
@@ -180,9 +182,10 @@ namespace Extrinsic::Runtime
         // presentation slot semantics (RUNTIME-318; point/line color is the
         // visualization overlay). Version 4 adds the per-domain typed property
         // tables (RUNTIME-319). Version 5 drops the legacy property-reference
-        // keys `propertyName`/`expectedValueKind` (REVIEW-007 PK12). Older
+        // keys `propertyName`/`expectedValueKind` (REVIEW-007 PK12). Version 6
+        // requires sibling order for each parent link. Older
         // versions are rejected, not upgraded.
-        constexpr std::uint32_t kSceneDocumentVersion = 5u;
+        constexpr std::uint32_t kSceneDocumentVersion = 6u;
         constexpr std::uint32_t kInvalidSerializedId = 0xFFFFFFFFu;
 
         [[nodiscard]] std::uint32_t EntitySortKey(const ECS::EntityHandle entity) noexcept
@@ -2781,6 +2784,7 @@ namespace Extrinsic::Runtime
             {
                 ECS::EntityHandle Child{ECS::InvalidEntityHandle};
                 std::uint32_t ParentId{kInvalidSerializedId};
+                std::uint32_t SiblingOrder{0u};
             };
 
             ECS::Scene::Registry loadedScene;
@@ -2868,22 +2872,51 @@ namespace Extrinsic::Runtime
                 if (entityJson.contains("parentId"))
                 {
                     std::uint32_t parentId = 0u;
-                    if (!TryReadEntityId(entityJson["parentId"], parentId))
+                    std::uint32_t siblingOrder = 0u;
+                    if (!TryReadEntityId(entityJson["parentId"], parentId) ||
+                        !entityJson.contains("siblingOrder") ||
+                        !TryReadEntityId(entityJson["siblingOrder"], siblingOrder))
                         return Core::Err<SceneDeserializationResult>(Core::ErrorCode::InvalidFormat);
                     pendingParents.push_back(PendingParent{
                         .Child = entity,
                         .ParentId = parentId,
+                        .SiblingOrder = siblingOrder,
                     });
+                }
+                else if (entityJson.contains("siblingOrder"))
+                {
+                    return Core::Err<SceneDeserializationResult>(Core::ErrorCode::InvalidFormat);
                 }
             }
 
+            std::unordered_map<std::uint32_t, std::vector<const PendingParent*>> children;
             for (const PendingParent& pending : pendingParents)
             {
-                const auto found = idToEntity.find(pending.ParentId);
-                if (found == idToEntity.end())
+                if (!idToEntity.contains(pending.ParentId))
                     return Core::Err<SceneDeserializationResult>(Core::ErrorCode::InvalidFormat);
-                ECS::Hierarchy::Attach(raw, pending.Child, found->second);
-                ++result.Stats.HierarchyLinks;
+                children[pending.ParentId].push_back(&pending);
+            }
+            for (const auto& [parentId, pendingChildren] : children)
+            {
+                std::vector<ECS::EntityHandle> ordered(pendingChildren.size(), ECS::InvalidEntityHandle);
+                for (const PendingParent* pending : pendingChildren)
+                {
+                    if (pending->SiblingOrder >= ordered.size() ||
+                        ordered[pending->SiblingOrder] != ECS::InvalidEntityHandle)
+                        return Core::Err<SceneDeserializationResult>(Core::ErrorCode::InvalidFormat);
+                    ordered[pending->SiblingOrder] = pending->Child;
+                }
+                const ECS::EntityHandle parent = idToEntity.at(parentId);
+                // Attach prepends, so reverse the authored order. A refused
+                // self/cyclic link must not turn a malformed scene into roots.
+                for (auto child = ordered.rbegin(); child != ordered.rend(); ++child)
+                {
+                    ECS::Hierarchy::Attach(raw, *child, parent);
+                    const auto* hierarchy = raw.try_get<ECSC::Hierarchy::Component>(*child);
+                    if (hierarchy == nullptr || hierarchy->Parent != parent)
+                        return Core::Err<SceneDeserializationResult>(Core::ErrorCode::InvalidFormat);
+                    ++result.Stats.HierarchyLinks;
+                }
             }
 
             scene.Clear();
@@ -2900,6 +2933,32 @@ namespace Extrinsic::Runtime
         entityToId.reserve(entities.size());
         for (std::uint32_t index = 0u; index < entities.size(); ++index)
             entityToId.emplace(entities[index], index);
+
+        std::unordered_map<ECS::EntityHandle, std::uint32_t> siblingOrders;
+        siblingOrders.reserve(entities.size());
+        for (const ECS::EntityHandle parent : entities)
+        {
+            const auto* hierarchy = raw.try_get<ECSC::Hierarchy::Component>(parent);
+            if (hierarchy == nullptr)
+                continue;
+            std::uint32_t order = 0u;
+            ECS::EntityHandle previous = ECS::InvalidEntityHandle;
+            for (ECS::EntityHandle child = hierarchy->FirstChild;
+                 child != ECS::InvalidEntityHandle;)
+            {
+                if (!entityToId.contains(child))
+                    return Core::Err<std::string>(Core::ErrorCode::InvalidFormat);
+                const auto* link = raw.try_get<ECSC::Hierarchy::Component>(child);
+                if (link == nullptr || link->Parent != parent || link->PrevSibling != previous ||
+                    !siblingOrders.emplace(child, order).second)
+                    return Core::Err<std::string>(Core::ErrorCode::InvalidFormat);
+                ++order;
+                previous = child;
+                child = link->NextSibling;
+            }
+            if (order != hierarchy->ChildCount)
+                return Core::Err<std::string>(Core::ErrorCode::InvalidFormat);
+        }
 
         SceneSerializationStats stats{};
         json root = json::object();
@@ -2948,11 +3007,12 @@ namespace Extrinsic::Runtime
                 hierarchy != nullptr && hierarchy->Parent != ECS::InvalidEntityHandle)
             {
                 const auto parent = entityToId.find(hierarchy->Parent);
-                if (parent != entityToId.end())
-                {
-                    entityJson["parentId"] = parent->second;
-                    ++stats.HierarchyLinks;
-                }
+                const auto order = siblingOrders.find(entity);
+                if (parent == entityToId.end() || order == siblingOrders.end())
+                    return Core::Err<std::string>(Core::ErrorCode::InvalidFormat);
+                entityJson["parentId"] = parent->second;
+                entityJson["siblingOrder"] = order->second;
+                ++stats.HierarchyLinks;
             }
 
             CountUnsupportedPersistenceDiagnostics(raw, entity, stats);
@@ -3008,6 +3068,61 @@ namespace Extrinsic::Runtime
         return root.dump(2);
     }
 
+    namespace
+    {
+        [[nodiscard]] SceneSerializationResult SerializedSceneResult(const std::string_view document)
+        {
+            const json root = json::parse(document.begin(), document.end(), nullptr, false);
+            SceneSerializationStats stats{};
+            if (root.is_object() && root.contains("stats") && root["stats"].is_object())
+            {
+                const json& statsJson = root["stats"];
+                stats.Entities = statsJson.value("entities", 0u);
+                stats.SelectableEntities = statsJson.value("selectableEntities", 0u);
+                stats.TransformEntities = statsJson.value("transformEntities", 0u);
+                stats.HierarchyLinks = statsJson.value("hierarchyLinks", 0u);
+                stats.MeshEntities = statsJson.value("meshEntities", 0u);
+                stats.GraphEntities = statsJson.value("graphEntities", 0u);
+                stats.PointCloudEntities = statsJson.value("pointCloudEntities", 0u);
+                stats.RenderHintEntities = statsJson.value("renderHintEntities", 0u);
+                stats.GeometryPresentationEntities = statsJson.value(
+                    "geometryPresentationEntities",
+                    statsJson.value("progressiveRenderDataEntities", 0u));
+                stats.AttributeBindingEntities = statsJson.value("attributeBindingEntities", 0u);
+                stats.GeometryProperties = statsJson.value("geometryProperties", 0u);
+                stats.UnpersistedGeometryProperties =
+                    statsJson.value("unpersistedGeometryProperties", 0u);
+                stats.UnsupportedPersistenceEntities =
+                    statsJson.value("unsupportedPersistenceEntities", 0u);
+                stats.UnsupportedLightEntities =
+                    statsJson.value("unsupportedLightEntities", 0u);
+                stats.UnsupportedShadowEntities =
+                    statsJson.value("unsupportedShadowEntities", 0u);
+                stats.UnsupportedPhysicsEntities =
+                    statsJson.value("unsupportedPhysicsEntities", 0u);
+                stats.UnsupportedAssetInstanceEntities =
+                    statsJson.value("unsupportedAssetInstanceEntities", 0u);
+            }
+            return SceneSerializationResult{.Stats = stats};
+        }
+    }
+
+    Core::Expected<SceneSerializationResult> SaveSceneDocument(
+        const ECS::Scene::Registry& scene,
+        const std::string_view path)
+    {
+        if (path.empty())
+            return Core::Err<SceneSerializationResult>(Core::ErrorCode::InvalidPath);
+        auto document = SerializeSceneDocument(scene);
+        if (!document.has_value())
+            return Core::Err<SceneSerializationResult>(document.error());
+
+        const auto* bytes = reinterpret_cast<const std::uint8_t*>(document->data());
+        if (WriteViewCaptureFile(std::filesystem::path{path}, {bytes, document->size()}, true))
+            return Core::Err<SceneSerializationResult>(Core::ErrorCode::FileWriteError);
+        return SerializedSceneResult(*document);
+    }
+
     Core::Expected<SceneSerializationResult> SaveSceneDocument(
         const ECS::Scene::Registry& scene,
         const std::string_view path,
@@ -3015,51 +3130,17 @@ namespace Extrinsic::Runtime
     {
         if (path.empty())
             return Core::Err<SceneSerializationResult>(Core::ErrorCode::InvalidPath);
-
         auto document = SerializeSceneDocument(scene);
         if (!document.has_value())
             return Core::Err<SceneSerializationResult>(document.error());
 
         const auto* bytes = reinterpret_cast<const std::byte*>(document->data());
-        const std::span<const std::byte> data(bytes, document->size());
         const Core::Result written = backend.Write(
             Core::IO::IORequest{.Path = std::string(path)},
-            data);
+            {bytes, document->size()});
         if (!written.has_value())
             return Core::Err<SceneSerializationResult>(written.error());
-
-        const json root = json::parse(*document, nullptr, false);
-        SceneSerializationStats stats{};
-        if (root.is_object() && root.contains("stats") && root["stats"].is_object())
-        {
-            const json& statsJson = root["stats"];
-            stats.Entities = statsJson.value("entities", 0u);
-            stats.SelectableEntities = statsJson.value("selectableEntities", 0u);
-            stats.TransformEntities = statsJson.value("transformEntities", 0u);
-            stats.HierarchyLinks = statsJson.value("hierarchyLinks", 0u);
-            stats.MeshEntities = statsJson.value("meshEntities", 0u);
-            stats.GraphEntities = statsJson.value("graphEntities", 0u);
-            stats.PointCloudEntities = statsJson.value("pointCloudEntities", 0u);
-            stats.RenderHintEntities = statsJson.value("renderHintEntities", 0u);
-            stats.GeometryPresentationEntities = statsJson.value(
-                "geometryPresentationEntities",
-                statsJson.value("progressiveRenderDataEntities", 0u));
-            stats.AttributeBindingEntities = statsJson.value("attributeBindingEntities", 0u);
-            stats.GeometryProperties = statsJson.value("geometryProperties", 0u);
-            stats.UnpersistedGeometryProperties =
-                statsJson.value("unpersistedGeometryProperties", 0u);
-            stats.UnsupportedPersistenceEntities =
-                statsJson.value("unsupportedPersistenceEntities", 0u);
-            stats.UnsupportedLightEntities =
-                statsJson.value("unsupportedLightEntities", 0u);
-            stats.UnsupportedShadowEntities =
-                statsJson.value("unsupportedShadowEntities", 0u);
-            stats.UnsupportedPhysicsEntities =
-                statsJson.value("unsupportedPhysicsEntities", 0u);
-            stats.UnsupportedAssetInstanceEntities =
-                statsJson.value("unsupportedAssetInstanceEntities", 0u);
-        }
-        return SceneSerializationResult{.Stats = stats};
+        return SerializedSceneResult(*document);
     }
 
     Core::Expected<SceneDeserializationResult> DeserializeSceneDocument(

@@ -2,16 +2,19 @@
 module;
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <glm/vec3.hpp>
 export module Extrinsic.Runtime.NormalEstimationConfig;
 export import Extrinsic.Runtime.GeometryProperty.Types;
 export import Geometry.NormalEstimation.Types;
+import Extrinsic.Runtime.ConfigFieldSpec;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 export namespace Extrinsic::Runtime
 {
+    extern "C++" [[nodiscard]] std::span<const ConfigFieldSpec> NormalEstimationConfigFieldSpecs() noexcept;
     inline constexpr std::string_view kNormalEstimationConfigSectionName = "sandbox.normal_estimation";
     inline constexpr std::string_view kNormalEstimationConfigSectionSchemaId =
         "intrinsic.runtime.sandbox.normal_estimation";

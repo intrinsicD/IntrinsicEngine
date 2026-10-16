@@ -1,6 +1,6 @@
 # Platform
 
-`src/platform` owns the windowing and input abstractions used by the
+`src/platform` owns windowing, input, and local stream sockets used by the
 engine. The public surface is a port-style interface; concrete backends live in
 explicit backend modules under `backends/`.
 
@@ -11,6 +11,9 @@ explicit backend modules under `backends/`.
 - `Extrinsic.Platform.LocalSocket` — owner-only (0600) Unix-domain stream
   listener/connection with timeout-bounded, non-throwing I/O for the opt-in agent
   control lane; `Unsupported` on platforms without Unix-domain sockets.
+  Writes poll after nonblocking sends stall. Listener cleanup removes only its
+  original socket inode; an ownership probe must confirm a stale endpoint before
+  replacement.
 
 ## Backends
 
@@ -25,7 +28,7 @@ explicit backend modules under `backends/`.
 
 ```bash
 cmake --preset ci -DINTRINSIC_PLATFORM_BACKEND=Null
-cmake --preset ci -DINTRINSIC_PLATFORM_BACKEND=Glfw
+cmake --preset ci -DINTRINSIC_HEADLESS_NO_GLFW=OFF -DINTRINSIC_PLATFORM_BACKEND=Glfw
 ```
 
 `INTRINSIC_PLATFORM_BACKEND=Auto` selects `Glfw` for non-headless Linux/Vulkan
@@ -44,6 +47,7 @@ closed and does not silently fall back to Null.
 ```text
 Platform.IWindow.cppm
 Platform.Input.cppm
+Platform.LocalSocket.cppm
 Platform.CreateWindow.cpp
 backends/
   null/
@@ -71,35 +75,19 @@ programmatic focus changes are not granted without user input, so
 `GlfwPlatformSmoke.NativeFocusChangesEmitWindowFocusEvents` skips there; its
 native focus evidence is X11.
 
-Platform owns window/input ports only. It exposes input state/events to runtime;
+Platform owns window/input ports and local stream sockets. It exposes input state/events to runtime;
 it does not create graphics camera snapshots, pick requests, gizmo packets, or
 transform mutations directly.
 
 ## GLFW/X11 sanitizer lifetime contract
 
-The GLFW backend owns one process-static `GLFWLifetime`. Normal process
-teardown reaches `GLFWLifetime::~GLFWLifetime()` -> `glfwTerminate()` ->
-`XUnregisterIMInstantiateCallback()` -> `XCloseIM()` before exit. Affected
-libX11 1.7.5 builds can nevertheless retain one 408-byte temporary XIM object
-inside `_XimRegisterIMInstantiateCallback`; xorg/libX11 commit `1d118226`
-corrects that library-owned allocation.
-
-`GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl` preserves the diagnosis
-as a Linux + GLFW regression. Its standalone helper wraps `glfwTerminate` and
-uses reverse `atexit` ordering to prove the engine's process-static lifetime
-calls it exactly once before LeakSanitizer's exit sweep. A separate helper mode
-allocates `Bug082SyntheticEngineLeak`; the CMake runner requires that process
-to fail with a LeakSanitizer report for the named 4096-byte allocation before
-accepting the clean GLFW run.
-
-Both subprocesses explicitly use `detect_leaks=1`, and the helper deliberately
-does not link the shared GTest/TestSupport sanitizer defaults. On hosts with
-the affected libX11, the runner admits only the exact
-`_XimRegisterIMInstantiateCallback` row from the repository suppression file;
-an exact-file guard and explicit symbolizer keep broader X11/GLFW patterns out.
-The named 4096-byte control must still fail under that same file. The CTest
-entry reports an environment skip when ASan is not active or a usable X11
-display is unavailable.
+The GLFW backend owns one process-static lifetime and terminates GLFW once at
+process teardown. `GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl` checks
+that ordering with leak detection enabled and an intentional engine-leak control.
+It skips when ASan or a usable X11 display is unavailable. The bounded libX11
+XIM suppression and its negative control are described in
+[the test guide](../../tests/README.md) and enforced by
+[the lifecycle runner](../../tests/regression/platform/Run.GlfwLifecycleLsanContract.cmake).
 
 ## Event contract and editor file boundary
 
@@ -107,9 +95,16 @@ display is unavailable.
 data-only payloads:
 
 - `WindowResizeEvent` carries framebuffer-pixel width/height and drives
-  resize/minimize state (`0x0` is minimized for Null and GLFW).
+  resize state. Either zero framebuffer dimension is minimized for Null and
+  GLFW; on X11, GLFW also reports native iconification with a nonzero framebuffer.
+  Native Wayland cannot report iconification through GLFW; zero extent remains
+  the available signal there.
 - `KeyEvent`, `MouseButtonEvent`, `ScrollEvent`, and `CursorEvent` update the
-  per-frame `Platform.Input::Context` state owned by the window port. The same
+  per-frame `Platform.Input::Context` state owned by the window port. Press edges
+  survive a press and release within one poll, and clear at the next poll; held
+  input does not produce another edge. Null listeners can queue events for the
+  next poll without changing the current delivery batch. Listener arguments
+  remain valid through their invocation even when they drain the queue. The same
   events are drained by `Runtime.ImGuiAdapter`, which is the only consumer that
   translates them into ImGui IO; the platform layer names no ImGui type and
   forwards to no ImGui platform backend because none is initialized. The
