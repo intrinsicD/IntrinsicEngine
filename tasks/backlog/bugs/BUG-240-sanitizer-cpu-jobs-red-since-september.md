@@ -33,6 +33,9 @@ contract_review: Sanitizer test lane failures; no catalog contract covers CI tes
   - UBSan, 1 of 4003: `IntrinsicGeometryScalarfieldExtremaTests.Grouped` timeout.
 - The assertion failure passes in `full-cpu`; it may be timing-dependent (one scheduler worker,
   debounce) and needs a reproduction before it is classed as a flake.
+- 2026-10-18: the CPD case above is split into `...UseTheAutomaticLowRank` and
+  `...KeepTheFullKernelWhenExactIsAsked` (one exact iteration) after it also timed out in
+  `full-cpu`; locally 6.5 s became 0.7 s + 3.0 s. Its ASan timing is not re-measured.
 
 ## Acceptance criteria
 - [ ] The ProgressivePoisson panel failure is reproduced (ASan build) and fixed at its root cause.

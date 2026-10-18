@@ -343,8 +343,8 @@ TEST(CoherentPointDriftOperations, ReadinessExplainsWhyARunCannotStart)
 }
 
 // Above 1024 registered source points a deforming run with low_rank 0 uses the automatic rank
-// (the full kernel costs O(m^3) per iteration); auto_low_rank off keeps the exact full kernel.
-TEST(CoherentPointDriftOperations, LargeDeformingRunsUseTheAutomaticLowRankUnlessExactIsAsked)
+// (the full kernel costs O(m^3) per iteration).
+TEST(CoherentPointDriftOperations, LargeDeformingRunsUseTheAutomaticLowRank)
 {
     Scene s;
     const auto points = Cloud(1100, 41);
@@ -359,11 +359,6 @@ TEST(CoherentPointDriftOperations, LargeDeformingRunsUseTheAutomaticLowRankUnles
     EXPECT_GT(automatic.KernelRank, 0u);
     EXPECT_LE(automatic.KernelRank, R::kCoherentPointDriftAutoLowRank);
 
-    config.AutoLowRank = false;
-    const auto exact = R::ApplyEditorCoherentPointDriftCommand(s.Commands(), config);
-    ASSERT_TRUE(exact.Succeeded()) << exact.Message;
-    EXPECT_EQ(exact.KernelRank, 0u) << "the full kernel was asked for";
-
     // Below the threshold the default stays exact.
     const auto small = Make(s.Registry, D::PointCloudPoint, Cloud(200, 43));
     config = {.SourceStableEntityId = Id(small), .TargetStableEntityId = Id(target), .Method = M::Nonrigid,
@@ -371,6 +366,23 @@ TEST(CoherentPointDriftOperations, LargeDeformingRunsUseTheAutomaticLowRankUnles
     const auto smallRun = R::ApplyEditorCoherentPointDriftCommand(s.Commands(), config);
     ASSERT_TRUE(smallRun.Succeeded()) << smallRun.Message;
     EXPECT_EQ(smallRun.KernelRank, 0u);
+}
+
+// auto_low_rank off keeps the exact full kernel. A separate case: above the threshold the full
+// kernel costs seconds per iteration in Debug.
+TEST(CoherentPointDriftOperations, LargeDeformingRunsKeepTheFullKernelWhenExactIsAsked)
+{
+    Scene s;
+    const auto points = Cloud(1100, 41);
+    std::vector<glm::vec3> moved;
+    for (const auto& p : points) moved.push_back(p + glm::vec3(0.05f * p.y, 0.0f, 0.02f));
+    const auto source = Make(s.Registry, D::PointCloudPoint, points);
+    const auto target = Make(s.Registry, D::PointCloudPoint, moved);
+    const auto exact = R::ApplyEditorCoherentPointDriftCommand(s.Commands(),
+        {.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target), .Method = M::Nonrigid,
+         .MaxIterations = 1u, .Output = O::DisplacementProperty, .AutoLowRank = false});
+    ASSERT_TRUE(exact.Succeeded()) << exact.Message;
+    EXPECT_EQ(exact.KernelRank, 0u) << "the full kernel was asked for";
 }
 
 TEST(CoherentPointDriftOperations, QueuedRunsCompleteOnTheJobServiceAndDeliverOneResult)
@@ -621,15 +633,15 @@ TEST(CoherentPointDriftOperations, SamplingMethodsAreSelectableForSubsamplesAndL
     const auto source = Make(s.Registry, D::PointCloudPoint, points);
     const auto target = Make(s.Registry, D::PointCloudPoint, moved);
     R::CoherentPointDriftConfig bayesian{.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target),
-                                         .Method = M::Bayesian, .OutlierWeight = 0.1, .Output = O::DisplacementProperty,
-                                         .DisplacementName = "bcpd", .Subsample = 300};
+                                         .Method = M::Bayesian, .OutlierWeight = 0.1, .MaxIterations = 5u,
+                                         .Output = O::DisplacementProperty, .DisplacementName = "bcpd", .Subsample = 300};
     bayesian.SubsampleSampling.Method = R::PointSamplingMethod::Random;
     bayesian.SubsampleSampling.Seed = 4u;
     const auto subsampled = R::ApplyEditorCoherentPointDriftCommand(s.Commands(), bayesian);
     ASSERT_TRUE(subsampled.Succeeded()) << subsampled.Message;
     R::CoherentPointDriftConfig lowRank{.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target),
-                                        .Method = M::Nonrigid, .OutlierWeight = 0.0, .Output = O::DisplacementProperty,
-                                        .DisplacementName = "warp", .LowRank = 30};
+                                        .Method = M::Nonrigid, .OutlierWeight = 0.0, .MaxIterations = 5u,
+                                        .Output = O::DisplacementProperty, .DisplacementName = "warp", .LowRank = 30};
     lowRank.LandmarkSampling.Method = R::PointSamplingMethod::Random;
     const auto result = R::ApplyEditorCoherentPointDriftCommand(s.Commands(), lowRank);
     ASSERT_TRUE(result.Succeeded()) << result.Message;
