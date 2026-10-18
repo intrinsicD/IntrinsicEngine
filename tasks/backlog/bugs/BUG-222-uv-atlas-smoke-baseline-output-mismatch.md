@@ -35,6 +35,13 @@ This identifies an unrelated failing workload, not a proven root cause.
   faces. This does not satisfy the distinct baseline-output gate.
 - [Sealed local result](../../evidence/BUG-222/uv-atlas-result.json.gz).
 - Full local runner log: `/tmp/property-smoothing-benchmarks.log`.
+- 2026-10-18: this workload is the only failure of `nightly-deep` "Run benchmark smoke"
+  on every night since at least 2026-10-09. A local `build/ci` run at `3302d06e3` gives
+  the same signature `13353140223134595692`: topology and counts equal the baseline;
+  mean conformal distortion 1.18279 → 1.0000016, max stretch 0.70546 → 0.35485,
+  `uv_max.y` 0.91768 → 0.98922 (planar 32×32 grid). Atlas-path commits after the
+  baseline: `25d270681` (BUG-101; its report shows unchanged output), `1846a5692`,
+  `985c7671e`, `9221c02c8`.
 
 ## Acceptance criteria
 
