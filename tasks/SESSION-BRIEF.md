@@ -230,6 +230,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `UI-049` — Editor panels are sized so that labels clip and results are hidden (tasks/backlog/ui/UI-049-editor-panel-sizing-and-readability.md)
 - unblocked: `UI-075` — One Appearance panel for all domains with per-attribute source selectors (tasks/backlog/ui/UI-075-unified-appearance-panel-with-attribute-source-selectors.md)
 - unblocked: `UI-076` — Camera preset and focus visual smoke (tasks/backlog/ui/UI-076-camera-preset-visual-smoke.md)
+- unblocked: `UI-080` — Editable local rotation in the Sandbox Inspector (tasks/backlog/ui/UI-080-editable-inspector-rotation.md)
 
 ## Unthemed
 

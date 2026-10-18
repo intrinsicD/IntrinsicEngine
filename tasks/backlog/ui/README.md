@@ -17,6 +17,7 @@ its dependencies, conditional gates, scope and verification.
 - [UI-076 — Camera preset and focus visual smoke](UI-076-camera-preset-visual-smoke.md)
 - [UI-077 — Readiness field markers in every config panel](UI-077-readiness-field-markers-in-all-panels.md)
 - [UI-079 — Run the ImGuizmo smokes at a real HiDPI pixel ratio](../../active/UI-079-imguizmo-hidpi-operational-run.md)
+- [UI-080 — Editable local rotation in the Sandbox Inspector](UI-080-editable-inspector-rotation.md)
 
 ## Agent lane and inspection windows
 
