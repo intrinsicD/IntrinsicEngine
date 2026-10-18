@@ -538,9 +538,11 @@ TEST(CoherentPointDriftOperations, NystromLandmarkVariantRoundTripsAndReachesThe
                                 Choice{Src::BoundingBox, Sch::Mixed, Pat::Halton, "cpd_box_halton"},
                                 Choice{Src::UnionRandom, Sch::Fixed, Pat::Random, "cpd_union"}})
     {
+        // Here every variant reaches its largest sampled error within the first 10 iterations
+        // (measured), so 10 iterations keep the values below at half the runtime.
         R::CoherentPointDriftConfig config{.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target),
-                                           .OutlierWeight = 0.0, .EStep = R::CoherentPointDriftEStep::Nystrom,
-                                           .NystromLandmarks = 64};
+                                           .OutlierWeight = 0.0, .MaxIterations = 10u,
+                                           .EStep = R::CoherentPointDriftEStep::Nystrom, .NystromLandmarks = 64};
         config.Output = O::DisplacementProperty;
         // Box landmarks miss the default 1e-3 (box Halton even 0.05) in every iteration here (measured).
         config.NystromErrorLimit = 0.5;
