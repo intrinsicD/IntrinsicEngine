@@ -1114,8 +1114,9 @@ def _require_execution_counter(value: object, context: str) -> int | float:
     count = _require_number(value, context)
     if count < 0 or count > MAX_RELIABLE_EXECUTION_COUNTER:
         raise CoverageError(
-            f"{context}: saturated or negative LLVM execution counter; "
-            "coverage builds require atomic profile updates"
+            f"{context}: saturated or negative LLVM execution counter; causes are "
+            "non-atomic profile updates or a Clang counter-map gap such as a ?: "
+            "with a constant operand inside a braced initializer (tools/ci/README.md)"
         )
     return count
 
@@ -1152,7 +1153,9 @@ def _covered_lines_from_segments(path: str, raw_segments: object) -> set[str]:
         line, column = segment[0], segment[1]
         if not isinstance(line, int) or not isinstance(column, int):
             raise CoverageError(f"{path}: malformed LLVM segment coordinate")
-        count = _require_execution_counter(segment[2], f"{path}: segment")
+        count = _require_execution_counter(
+            segment[2], f"{path}:{line}:{column}: segment"
+        )
         has_count = segment[3]
         is_gap = segment[5]
         if not isinstance(has_count, bool) or not isinstance(is_gap, bool):
@@ -1217,10 +1220,10 @@ def normalize_llvm_cov_export(
             if not isinstance(branch, list) or len(branch) < 9:
                 raise CoverageError(f"{normalized}: malformed branch record")
             true_count = _require_execution_counter(
-                branch[4], f"{normalized}: true branch"
+                branch[4], f"{normalized}:{branch[0]}:{branch[1]}: true branch"
             )
             false_count = _require_execution_counter(
-                branch[5], f"{normalized}: false branch"
+                branch[5], f"{normalized}:{branch[0]}:{branch[1]}: false branch"
             )
             base = _location_key(normalized, branch, suffix="branch")
             if true_count > 0:
@@ -1257,7 +1260,7 @@ def normalize_llvm_cov_export(
             if not isinstance(region, list) or len(region) < 8:
                 raise CoverageError(f"llvm-cov function {name!r} has a bad region")
             execution_count = _require_execution_counter(
-                region[4], f"{name}: region"
+                region[4], f"{name} at {region[0]}:{region[1]}: region"
             )
             file_id = region[5]
             if (

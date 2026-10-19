@@ -174,7 +174,11 @@ namespace Extrinsic::Runtime
                 entity = ParentOf(registry, entity);
             }
             if (!IsFiniteMatrix(world))
-                return {GizmoStatus::NonFiniteMatrix, visited.empty() ? InvalidEntityHandle : visited.front()};
+            {
+                // Outside the initializer: Clang coverage miscounts a ?: with a constant operand inside braces (BUG-242).
+                const EntityHandle failed = visited.empty() ? InvalidEntityHandle : visited.front();
+                return {GizmoStatus::NonFiniteMatrix, failed};
+            }
             outWorld = world;
             return {};
         }

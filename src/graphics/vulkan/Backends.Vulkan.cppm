@@ -87,14 +87,14 @@ namespace Extrinsic::Backends::Vulkan
         const std::uint32_t presentFamily,
         const RHI::QueueCapabilityProfile frameGraphProfile) noexcept
     {
+        // Outside the initializer: Clang coverage miscounts a ?: with a constant operand inside braces (BUG-242).
+        const std::uint32_t asyncCompute =
+            frameGraphProfile.SupportsAsyncCompute ? asyncComputeFamily : kIgnoredVulkanQueueFamily;
+        const std::uint32_t transfer = frameGraphProfile.SupportsTransfer ? transferFamily : kIgnoredVulkanQueueFamily;
         return VulkanFrameGraphBarrierQueueFamilies{
             .Graphics = graphicsFamily,
-            .AsyncCompute = frameGraphProfile.SupportsAsyncCompute
-                                ? asyncComputeFamily
-                                : kIgnoredVulkanQueueFamily,
-            .Transfer = frameGraphProfile.SupportsTransfer
-                            ? transferFamily
-                            : kIgnoredVulkanQueueFamily,
+            .AsyncCompute = asyncCompute,
+            .Transfer = transfer,
             .Present = presentFamily,
         };
     }

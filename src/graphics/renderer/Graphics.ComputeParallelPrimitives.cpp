@@ -122,6 +122,9 @@ namespace Extrinsic::Graphics
             }
 
             const bool hasScratchLevels = !plan.ScratchLevels.empty();
+            // Outside the initializer: Clang coverage miscounts a ?: with a constant operand inside braces (BUG-242).
+            const std::uint64_t blockSumsOffsetBytes =
+                hasScratchLevels ? plan.ScratchLevels.front().OffsetBytes : kParallelPrimitiveInvalidOffset;
             const std::uint32_t firstDispatchIndex =
                 static_cast<std::uint32_t>(plan.Dispatches.size());
             plan.Dispatches.push_back(ParallelPrimitiveDispatchDesc{
@@ -135,14 +138,11 @@ namespace Extrinsic::Graphics
                 .GroupCountZ = 1u,
                 .InputRole = inputRole,
                 .OutputRole = outputRole,
-                .BlockSumsRole = hasScratchLevels
-                    ? ParallelPrimitiveBufferRole::Scratch
-                    : ParallelPrimitiveBufferRole::None,
+                .BlockSumsRole =
+                    hasScratchLevels ? ParallelPrimitiveBufferRole::Scratch : ParallelPrimitiveBufferRole::None,
                 .InputOffsetBytes = inputOffsetBytes,
                 .OutputOffsetBytes = outputOffsetBytes,
-                .BlockSumsOffsetBytes = hasScratchLevels
-                    ? plan.ScratchLevels.front().OffsetBytes
-                    : kParallelPrimitiveInvalidOffset,
+                .BlockSumsOffsetBytes = blockSumsOffsetBytes,
             });
             if (hasScratchLevels)
             {

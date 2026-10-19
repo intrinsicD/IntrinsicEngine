@@ -627,16 +627,14 @@ TEST(ECSHierarchy, CollectQueriesFailClosedWhenTraversalLimitIsExceeded)
         });
     for (std::size_t i = 0u; i < children.size(); ++i)
     {
-        raw.emplace<Components::Hierarchy::Component>(
-            children[i],
+        // Outside the initializer: Clang coverage miscounts a ?: with a constant operand inside braces (BUG-242).
+        const EntityHandle next = i + 1u < children.size() ? children[i + 1u] : InvalidEntityHandle;
+        const EntityHandle prev = i > 0u ? children[i - 1u] : InvalidEntityHandle;
+        raw.emplace<Components::Hierarchy::Component>(children[i],
             Components::Hierarchy::Component{
                 .Parent = root,
-                .NextSibling =
-                    i + 1u < children.size()
-                        ? children[i + 1u]
-                        : InvalidEntityHandle,
-                .PrevSibling =
-                    i > 0u ? children[i - 1u] : InvalidEntityHandle,
+                .NextSibling = next,
+                .PrevSibling = prev,
             });
     }
 

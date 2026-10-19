@@ -239,10 +239,13 @@ namespace Extrinsic::Backends::Null
             if (desc.SizeBytes == 0u)
                 return {};
 
+            // Outside the initializer: Clang coverage miscounts a ?: with a constant operand inside braces (BUG-242).
+            const std::uint32_t memoryTypeBits =
+                desc.HostVisible ? kHostVisibleMemoryTypeBit : kDeviceLocalMemoryTypeBit;
             return RHI::ResourceMemoryRequirements{
                 .SizeBytes = AlignUp(desc.SizeBytes, kPlacedResourceAlignmentBytes),
                 .AlignmentBytes = kPlacedResourceAlignmentBytes,
-                .MemoryTypeBits = desc.HostVisible ? kHostVisibleMemoryTypeBit : kDeviceLocalMemoryTypeBit,
+                .MemoryTypeBits = memoryTypeBits,
                 .DedicatedAllocationRequired = false,
             };
         }
