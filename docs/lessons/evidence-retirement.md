@@ -37,8 +37,12 @@ METHOD-083 owns their eventual cleanup. Do not move or regenerate these inputs
 while its reviewed configuration depends on them. This retention does not
 preserve the completed METHOD-081/082 run outputs.
 
-The METHOD-040, METHOD-043, METHOD-077 and METHOD-083 evidence directories and
-backlog BUG-221/222/225/228/229 evidence remain. The open HKTex design context
+The METHOD-040, METHOD-043 and METHOD-083 evidence directories and
+backlog BUG-221/222/225/228/229 evidence remain. METHOD-077's tracked diagnostic
+was retired on 2026-10-19; its files remain at Git object
+`bfc95f02dd367b11631daa1248605b9ce9548fba` and its
+[result summary](../results/method077_cpd_landmark_variants_2026-10-10.md)
+records the outcome. The open HKTex design context
 (`heat_kernel_texture_discussion_20260924`, `hktex_default_design_20260924`,
 `hktex_task_plan_20260924`) remains with GRAPHICS-105/METHOD-048. The curvature
 frog diagnostic belongs to open METHOD-040.
@@ -48,7 +52,7 @@ Ownership of the old `geodesics_virtual_source_2026-09-08`,
 `point_lbvh_2026-09-08` and `registration_spatial_2026-09-08` diagnostics was
 not established in this cleanup; they remain for explicit owner triage.
 Unrelated untracked reports, research notes and METHOD-077 reference files
-were preserved. Git history was not rewritten.
+were preserved (deleted at METHOD-077's 2026-10-19 retirement). Git history was not rewritten.
 
 ## Lessons extracted
 

@@ -234,7 +234,7 @@ Zusätzlich wurden die temporären C++-Proben `staging-ring-repro.cpp` und `grap
 
 Der Default-Branch war nicht vollständig grün. Diese bereits vorhandenen CI-Probleme sind keine aus diesem Audit abgeleiteten Graphics-Regressionsbelege:
 
-- [CPU-CI 38869189381](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/38869189381): Build erfolgreich; Testselektion bricht vor der vollständigen CPU-Ausführung ab, weil `RenderWorldPoolEngineWiring.SourceRules` keinem registrierten Producer zugeordnet wird. Das anschließend fehlende Timing-Artefakt ist ein Folgefehler. Inzwischen unter [BUG-244](../../tasks/backlog/bugs/BUG-244-cpu-selection-rejects-source-rules-producer.md) erfasst.
+- [CPU-CI 38869189381](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/38869189381): Build erfolgreich; Testselektion bricht vor der vollständigen CPU-Ausführung ab, weil `RenderWorldPoolEngineWiring.SourceRules` keinem registrierten Producer zugeordnet wird. Das anschließend fehlende Timing-Artefakt ist ein Folgefehler. Inzwischen unter [BUG-244](../../tasks/done/BUG-244-cpu-selection-rejects-source-rules-producer.md) erfasst.
 - [Docs-CI 38869189384](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/38869189384): erfolgreich.
 - [Nightly 38854737500](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/38854737500), älterer Quellstand: Benchmark-Seal lehnt Backend-Namen für `geometry.harmonic_field.smoke.json` und `geometry.property_smoothing.variational_fit_solvers.smoke.json` ab (`cpu_reference_sparse_cholesky`, `cpu_admm_sparse_cholesky`). Kein Nachweis einer numerischen Graphics-Regression. Inzwischen [BUG-245](../../tasks/backlog/bugs/BUG-245-nightly-smoke-backend-manifest-mismatch.md).
 

@@ -148,7 +148,7 @@ Produktionsreichweite. P3 sind Wartungsverbesserungen ohne gemessenen Performanc
 - **Repro:** Neun Punkte `(0,i*1e-5,j*1e-5)`, `i,j in {-1,0,1}`: kleinste Eigenrichtung Z statt X. Die bei 1 gekappte Kovarianzskala lässt den isotropen Fallback zu früh greifen.
 - **Fix/Regression:** Vorhandenen relativen Cutoff-Task umsetzen; Nullkovarianz, wiederholte Eigenwerte, rotierte Ebenen, Maßstäbe und CPU-/Shader-Konsistenz abdecken.
 - **Betroffene:** Normalen, Features, Graph-Normalen, OneRing-PCA, Plane-/Segment-/OBB-Fitting, direkte `SymmetricEigen3`-Nutzer.
-- **Owner:** [GEOM-114](../../tasks/backlog/geometry/GEOM-114-scale-relative-pca-isotropic-cutoff.md); nicht duplizieren. GPU-Parität hier nicht geprüft.
+- **Owner:** [GEOM-114](../../tasks/done/GEOM-114-scale-relative-pca-isotropic-cutoff.md); nicht duplizieren. GPU-Parität hier nicht geprüft.
 
 ## GEO-AUD-08 Ray Sphere setzt normierte Richtungen voraus
 
@@ -193,7 +193,7 @@ Produktionsreichweite. P3 sind Wartungsverbesserungen ohne gemessenen Performanc
 - **Beleg:** Verstoß gegen vorhandene [API-Stilkonvention](../architecture/geometry-api-style.md), bereits erfasst.
 - **Betroffen:** `Geometry.HalfedgeMesh.{Boolean,CatmullClark,Curvature,DEC,Geodesic,ModalAnalysis,Parameterization,Remeshing,SignedHeatMethod,Simplification,Smoothing,Subdivision,VectorHeatMethod}.cppm` exportieren die kürzeren `Geometry.<Name>`-Module.
 - **Folge/Fix:** Importnamen und Dateisuche passen nicht zusammen. Die im Task offene Wahl entscheiden; Option A (Modulnamen an Dateien anpassen) vermeidet 26 Dateiumzüge, ändert laut Task aber rund 66 Importstellen. Empfehlung, keine bereits getroffene Betreiberentscheidung. Mechanik und Semantik getrennt halten.
-- **Owner:** [GEOM-115](../../tasks/backlog/geometry/GEOM-115-halfedge-module-names-match-file-stems.md); kein zweiter Rename-Task oder Compatibility-Wrapper.
+- **Owner:** [GEOM-115](../../tasks/done/GEOM-115-halfedge-module-names-match-file-stems.md); kein zweiter Rename-Task oder Compatibility-Wrapper.
 
 ## GEO-AUD-14 Physics nutzt den vorhandenen Scratch Overload nicht
 
@@ -338,7 +338,7 @@ absichtlich seine eigene Sentinel-Datei, niemals ein Nutzerdokument verwenden.
 
 ## CI Ausgangslage
 
-- [ci-linux-clang 38869189381](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/38869189381), gleicher Commit: `Capture CPU test selection` scheitert, weil `RenderWorldPoolEngineWiring.SourceRules` keinem registrierten Producer zugeordnet wird. Fehlender Timing-Report ist eine Folge; Full-CPU-Testschritt lief dort nicht. Diagnose im ursprünglichen Audit direkt über `gh run view 38869189381 --log-failed` gelesen. Owner: [BUG-244](../../tasks/backlog/bugs/BUG-244-cpu-selection-rejects-source-rules-producer.md).
+- [ci-linux-clang 38869189381](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/38869189381), gleicher Commit: `Capture CPU test selection` scheitert, weil `RenderWorldPoolEngineWiring.SourceRules` keinem registrierten Producer zugeordnet wird. Fehlender Timing-Report ist eine Folge; Full-CPU-Testschritt lief dort nicht. Diagnose im ursprünglichen Audit direkt über `gh run view 38869189381 --log-failed` gelesen. Owner: [BUG-244](../../tasks/done/BUG-244-cpu-selection-rejects-source-rules-producer.md).
 - [nightly-deep 38854737500](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/38854737500), Commit `4a5eede778b0830787fa139156f468c7ecf553e4`: Benchmark-/Sealing-Schritt fehlgeschlagen. [BUG-245](../../tasks/backlog/bugs/BUG-245-nightly-smoke-backend-manifest-mismatch.md) enthält die Detaildiagnose zweier Backend-/Manifest-Namen aus dem parallelen Assets-Audit. Diese Detaildiagnose wurde hier nicht unabhängig aus dem vollständigen Nightly-Log reproduziert.
 - `ci-docs` war für den geprüften HEAD erfolgreich. Rote Läufe belegen keine fehlgeschlagenen Geometry-Numeriktests. Keine CI-Reparatur in diesem Audit.
 

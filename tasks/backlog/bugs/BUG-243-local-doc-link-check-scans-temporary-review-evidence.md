@@ -37,3 +37,5 @@ python3 tools/agents/check_task_policy.py --root . --strict
   criterion 1 PARTIAL — the rule is defined, but no checker test exists, `:line` links are still read as
   literal file names, and untracked local `*.md` evidence is still scanned. Open decision: add a
   checker test and/or `:line` support, or narrow criterion 1 to the storage rule.
+- 2026-10-19: the `.txt` copies of the original reproducer (renamed from `.md` by `000eedca8`) were
+  removed with METHOD-077's retirement (preserved at `bfc95f02d`); criterion 1 is unchanged.

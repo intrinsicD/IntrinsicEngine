@@ -403,7 +403,7 @@ resolution (such as a missing entity/domain) has null status and a diagnostic co
 
 Schemas from declarative config field tables:
 [CORE-010](../../tasks/done/CORE-010-config-section-schema-export.md),
-[RUNTIME-276](../../tasks/backlog/runtime/RUNTIME-276-declarative-config-field-specs.md),
+[RUNTIME-276](../../tasks/done/RUNTIME-276-declarative-config-field-specs.md),
 [UI-057](../../tasks/done/UI-057-schema-driven-field-hints.md).
 Structured readiness:
 [RUNTIME-277](../../tasks/done/RUNTIME-277-structured-action-readiness-reasons.md),

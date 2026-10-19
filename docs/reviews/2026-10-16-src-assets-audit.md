@@ -432,7 +432,7 @@ Tests kann sie entsprechend der Repository-Retention entfernt werden.
 ## CI-Kontext getrennt von den Assets-Befunden
 
 Vorbestehende CI-Fehler und deren Belege stehen ausschließlich in
-[BUG-244](../../tasks/backlog/bugs/BUG-244-cpu-selection-rejects-source-rules-producer.md)
+[BUG-244](../../tasks/done/BUG-244-cpu-selection-rejects-source-rules-producer.md)
 (CPU-Testproduzentenzuordnung) und
 [BUG-245](../../tasks/backlog/bugs/BUG-245-nightly-smoke-backend-manifest-mismatch.md)
 (Benchmark-Versiegelung). Sie wurden nicht im Assets-Audit repariert.

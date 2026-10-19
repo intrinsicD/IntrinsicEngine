@@ -7,6 +7,13 @@ the [retirement record](evidence-retirement.md) identifies its Git snapshot.
 
 ## Nyström CPD
 
+- **Calibrate before comparing approximation variants.** METHOD-077's frozen
+  landmark comparison ran all 138 cells, but the exact arm did not register
+  the full fixture and Nyström ran in at most six of 150 iterations, so it
+  gave no ranking. Before freezing, check that the reference arm solves the
+  fixture against ground truth and that the approximation is active in a
+  meaningful share of the work. See [C125](../../ara/logic/claims.md#c125-method-077s-landmark-variant-comparison-yields-no-ranking-because-the-exact-arm-misses-the-full-fixture)
+  and the [result summary](../results/method077_cpd_landmark_variants_2026-10-10.md).
 - **Retry only when something relevant changes.** METHOD-078's unconditional
   retries repeated rejected approximations without increasing accepted steps.
   A synthetic counterexample to caching did not demonstrate a benefit on the

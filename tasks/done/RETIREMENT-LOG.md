@@ -1,5 +1,39 @@
 # Retirement Log
 
+## 2026-10-19 — METHOD-077 result record and four HARDEN-090 linked tasks
+
+Retired [METHOD-077](METHOD-077-cpd-nystrom-landmark-variant-experiment.md),
+[BUG-244](BUG-244-cpu-selection-rejects-source-rules-producer.md),
+[GEOM-114](GEOM-114-scale-relative-pca-isotropic-cutoff.md),
+[GEOM-115](GEOM-115-halfedge-module-names-match-file-stems.md) and
+[RUNTIME-276](RUNTIME-276-declarative-config-field-specs.md) at the operator's request.
+
+- METHOD-077 (`74a198c0e`, `bbdf1af79`): all 138 frozen cells completed, but the exact arm
+  misses the `full` fixture, so the frozen rule gives no landmark-variant ranking. Recorded as
+  refuted [C125](../../ara/logic/claims.md#c125-method-077s-landmark-variant-comparison-yields-no-ranking-because-the-exact-arm-misses-the-full-fixture)
+  (O272), with a [result summary](../../docs/results/method077_cpd_landmark_variants_2026-10-10.md)
+  recomputed from the raw records and a calibration lesson in
+  [registration lessons](../../docs/lessons/registration-and-atlas.md). The tracked diagnostic
+  `ara/evidence/diagnostics/method077_cpd_landmark_variants_20261009/` (161 files) was removed and
+  remains at Git object `bfc95f02dd367b11631daa1248605b9ce9548fba`; its six uncommitted reference
+  position files were deleted locally. No open task consumes them (METHOD-083 uses the METHOD-081/082
+  inputs listed in [evidence retirement](../../docs/lessons/evidence-retirement.md)).
+- BUG-244 (`2d4c5ed84`): criterion 3 is met by main
+  [`ci-linux-clang` run 39168698007](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/39168698007)
+  on `64d691ae5` — CPU selection capture succeeds and the full CPU suite reports 0 failures of 4076 (7 skipped at runtime);
+  `RenderWorldPoolEngineWiring.SourceRules` passes. Selection parity was not exercised by that push run.
+- GEOM-114 (`ffe7e8372`), GEOM-115 (`149172027`) and RUNTIME-276 (`f010ebf33`, `ffe7e8372`): all
+  criteria were already accepted by the independent reviewers recorded in each note and in
+  [HARDEN-090](../active/HARDEN-090-src-audit-remediation.md); the same main run adds a full CPU suite
+  without failures. RUNTIME-276 is re-profiled from `standard` to micro (interactive finish, no report).
+- BUG-245 stays open: nightly run 39203553565 on `64d691ae5` seals all 41 results, but the strict
+  validator step is not reached while BUG-222 fails the benchmark smoke. No test or benchmark was rerun for this retirement.
+- Review: independent read-only reviewer `a71c0bff2810ec640` — "APPROVE WITH NITS" and "Deletion list
+  approved" on diff `9b3bf21f6a6e873d669b05fb73173270acd36c70a4b02a830b37d1aef87e8e5d` and deletion list
+  `abe73b32c534cb18617ace1561348725f9025bb0c26b461d622a114f7ddb0705` (raw numbers recomputed before
+  removal); "DELTA APPROVE" on the fix delta `f1c47b221c178f57488dc1f046854310731f4860725b6e81b28fb8ac0201d61c`.
+  Afterwards only its optional RUNTIME-276 wording nit, this line and the approved deletion were applied.
+
 ## 2026-10-17 — src workflow follow-up
 
 Retired [HARDEN-091](HARDEN-091-src-workflow-followup.md),

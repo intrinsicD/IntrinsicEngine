@@ -241,7 +241,7 @@ Nicht ausgeführt: vollständige CPU-Suite, ASan/UBSan, native GLFW-Minimize/Res
 
 ### Bereits rote CI außerhalb dieses Befundumfangs
 
-- [Main Linux-Clang-Lauf](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/38869189381): Capture CPU test selection scheitert an RenderWorldPoolEngineWiring.SourceRules ohne registrierten Producer. Der fehlende test.json-Timingreport ist eine Folge. Separat erfasst in [BUG-244](../../tasks/backlog/bugs/BUG-244-cpu-selection-rejects-source-rules-producer.md).
+- [Main Linux-Clang-Lauf](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/38869189381): Capture CPU test selection scheitert an RenderWorldPoolEngineWiring.SourceRules ohne registrierten Producer. Der fehlende test.json-Timingreport ist eine Folge. Separat erfasst in [BUG-244](../../tasks/done/BUG-244-cpu-selection-rejects-source-rules-producer.md).
 - [Nightly-Lauf](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/38854737500): bereits rot; separater Backend-/Manifest-Abgleich in [BUG-245](../../tasks/backlog/bugs/BUG-245-nightly-smoke-backend-manifest-mismatch.md). In diesem Audit wurde kein Benchmark ausgeführt.
 - [ci-docs am Audit-Commit](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/38869189384): grün.
 

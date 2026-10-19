@@ -46,7 +46,6 @@ and their paired UI or method work are recorded there, not here.
 
 ## Agent control lane and inspection operations
 
-- [RUNTIME-276 — Declarative `ConfigFieldSpec` tables, schema generation and conformance test](RUNTIME-276-declarative-config-field-specs.md)
 - [RUNTIME-280 — Selection-by-query operations and mask publication](RUNTIME-280-selection-query-operations.md)
 - [RUNTIME-281 — Deterministic view capture command](RUNTIME-281-deterministic-view-capture-command.md)
 - [RUNTIME-282 — Headless batch CLI](RUNTIME-282-headless-batch-cli.md)

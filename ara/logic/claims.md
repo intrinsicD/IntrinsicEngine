@@ -1,7 +1,8 @@
 # Claims
 
 Retention: completed raw artifacts referenced as `36a7b5062d9be3239d667efd9e41c4d4028ba249:path`
-are historical Git objects, not files retained in this checkout. Statements,
+(or another exact `commit:path`, such as C125's `bfc95f02d…`) are historical Git objects, not
+files retained in this checkout. Statements,
 statuses and limitations below describe the original observations; cleanup did
 not rerun or revalidate them. See [evidence retirement](../../docs/lessons/evidence-retirement.md).
 
@@ -2536,3 +2537,14 @@ not rerun or revalidate them. See [evidence retirement](../../docs/lessons/evide
 - **Dependencies**: []
 - **Tags**: Bayesian CPD, CPU, partial overlap, ground truth, negative result
 - **From staging**: O271
+
+## C125: METHOD-077's landmark-variant comparison yields no ranking because the exact arm misses the full fixture
+- **Statement**: The frozen METHOD-077 CPU comparison (Bayesian CPD, 100000 points, fixtures full/partial × seeds 1–3, packet digest 7bb6c4250b736f4f1f4e1e707546a13fbe856fe2b1815db434da8dcb22bc4e3f, commit 74a198c0e) completed all 138 cells, but its exact gate fails on all three full pairs: exact `rms_to_truth` .156–.158 exceeds .02 and the similarity scale ends, at the 150-iteration cap, at 1.0114–1.0116 against the true 1.1. With 3 of 6 pairs undecided the frozen decision rule gives no landmark-variant ranking; P1 and P3 are not evaluable, P2 and P4–P7 hold, and every determinism, baseline, floor, negative and perturbation gate passes. Nyström is accepted in only 1–6 (point landmarks) or 0–1 (box landmarks) of 150 iterations. Wall times are descriptive only and support no speed claim.
+- **Status**: refuted — the comparison's premise that the exact arm registers the full fixture fails, so the operator question remains unanswered by this run
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Recomputation from the bound raw records shows an exact `rms_to_truth` at or below .02 on a full pair, four or more decided pairs, or a record not bound to the frozen commit and runner.
+- **Proof**: [docs/results/method077_cpd_landmark_variants_2026-10-10.md, docs/lessons/registration-and-atlas.md, bfc95f02dd367b11631daa1248605b9ce9548fba:ara/evidence/diagnostics/method077_cpd_landmark_variants_20261009/runs/results.jsonl, bfc95f02dd367b11631daa1248605b9ce9548fba:ara/evidence/diagnostics/method077_cpd_landmark_variants_20261009/runs/analysis.json, bfc95f02dd367b11631daa1248605b9ce9548fba:ara/evidence/diagnostics/method077_cpd_landmark_variants_20261009/audit.md, bfc95f02dd367b11631daa1248605b9ce9548fba:ara/evidence/diagnostics/method077_cpd_landmark_variants_20261009/preflight/manifest.txt]
+- **Dependencies**: []
+- **Tags**: Bayesian CPD, Nyström, CPU, landmark variants, calibration, negative result
+- **From staging**: O272

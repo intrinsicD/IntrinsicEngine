@@ -294,7 +294,7 @@ Grenzprüfungen. [MakeSectionRegistration](../../src/runtime/Config/internal/Run
 mit Schemaerzeugung. [Test.EngineConfigSectionSchemas.cpp](../../tests/integration/runtime/Test.EngineConfigSectionSchemas.cpp):56
 überspringt fehlende Schemas; der Agent erhält für diese Familien keine vollständigen Metadaten.
 
-Das ist bestehende Arbeit in [RUNTIME-276](../../tasks/backlog/runtime/RUNTIME-276-declarative-config-field-specs.md),
+Das ist bestehende Arbeit in [RUNTIME-276](../../tasks/done/RUNTIME-276-declarative-config-field-specs.md),
 kein Anlass für einen zweiten Schema-Unterbau. Familie für Familie auf den
 vorhandenen Owner migrieren, Cross-Field-Prüfungen behalten und Validator/Schema-
 Übereinstimmung testen. Alte Familien verwenden teilweise String-Enums; der Task
@@ -393,7 +393,7 @@ die passenden Build-/Strukturprüfungen sichern die Umbenennung ab.
 | Bestehender Task | Stand beim Audit und Abgrenzung |
 | --- | --- |
 | [RUNTIME-274](../../tasks/active/RUNTIME-274-point-cloud-subsampling-workflow.md) | Sampling existiert. Weitere Voxel-/Octree-Strategien, progressive Prefix-Anzeige und Integrationsabdeckung sind offen. Erklärt nicht die neuen Fehler 001/002. |
-| [RUNTIME-276](../../tasks/backlog/runtime/RUNTIME-276-declarative-config-field-specs.md) | Bestehender Owner der unvollständigen Feldtabellen-/Schemamigration, siehe 009. |
+| [RUNTIME-276](../../tasks/done/RUNTIME-276-declarative-config-field-specs.md) | Bestehender Owner der unvollständigen Feldtabellen-/Schemamigration, siehe 009. |
 | [RUNTIME-294](../../tasks/active/RUNTIME-294-migrate-gpu-methods-to-property-residency.md) | Verbleibende GPU-Residency-Migrationen sind in Methoden-Slices 301–310 aufgeteilt. Nicht jede ursprüngliche Tabellenzeile ist weiterhin unimplementiert. |
 | [RUNTIME-311](../../tasks/backlog/runtime/RUNTIME-311-unify-gpu-scalar-outlier-transaction-lifecycle.md) und [RUNTIME-314](../../tasks/backlog/runtime/RUNTIME-314-reuse-existing-processing-helpers.md) | Bereits gelandete Konsolidierungen und noch offene GPU-Verifikation unterscheiden. Alte Copy-paste-Befunde nicht ungeprüft erneut anlegen. |
 
@@ -467,7 +467,7 @@ Der Default-Branch war bereits vor dem Audit rot:
   `RenderWorldPoolEngineWiring.SourceRules` ohne registrierten Producer bei
   `Capture CPU test selection`. Der nachfolgend fehlende `test.json`-Report ist
   ein Folgefehler. Bestehender Owner:
-  [BUG-244](../../tasks/backlog/bugs/BUG-244-cpu-selection-rejects-source-rules-producer.md).
+  [BUG-244](../../tasks/done/BUG-244-cpu-selection-rejects-source-rules-producer.md).
 - [nightly-deep 38854737500](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/38854737500)
   auf älterem Commit `4a5eede778b0830787fa139156f468c7ecf553e4`: vorherige 5.817
   CPU- und 62 Slow-Tests grün; Benchmark-Sealer lehnt

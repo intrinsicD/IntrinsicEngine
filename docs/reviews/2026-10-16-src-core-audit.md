@@ -564,7 +564,7 @@ Am Bezugsstand war `ci-docs` grün. Der Main-Run
 [38869189381](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/38869189381)
 scheiterte vor der CPU-Testausführung: `RenderWorldPoolEngineWiring.SourceRules`
 ließ sich keinem registrierten Producer zuordnen. Das ist in
-[BUG-244](../../tasks/backlog/bugs/BUG-244-cpu-selection-rejects-source-rules-producer.md)
+[BUG-244](../../tasks/done/BUG-244-cpu-selection-rejects-source-rules-producer.md)
 dokumentiert; der fehlende spätere `test.json`-Report ist ein Folgefehler.
 
 Der Nachtlauf
