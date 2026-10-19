@@ -33,7 +33,7 @@ This identifies an unrelated failing workload, not a proven root cause.
 - Quality-vector L2 difference: `0.38978686878190383`.
 - Large-case topology is deterministic, finite and reports success; zero flipped
   faces. This does not satisfy the distinct baseline-output gate.
-- [Sealed local result](../../evidence/BUG-222/uv-atlas-result.json.gz).
+- [Sealed local result](https://github.com/intrinsicD/IntrinsicEngine/blob/e8c9a4ef73cbdb7e05de80e49ee90f8dcc3d0b07/tasks/evidence/BUG-222/uv-atlas-result.json.gz) (removed at retirement).
 - Full local runner log: `/tmp/property-smoothing-benchmarks.log`.
 - 2026-10-18: this workload is the only failure of `nightly-deep` "Run benchmark smoke"
   on every night since at least 2026-10-09. A local `build/ci` run at `3302d06e3` gives
@@ -47,7 +47,7 @@ This identifies an unrelated failing workload, not a proven root cause.
 
 - [x] Reproduce on an isolated source revision and identify the first relevant atlas change.
 - [x] Decide whether the output is a regression or an intentionally changed contract, with numerical evidence.
-- [ ] Repair the implementation or update the reviewed baseline protocol without weakening unrelated gates.
+- [x] Repair the implementation or update the reviewed baseline protocol without weakening unrelated gates.
 
 ## Diagnosis — 2026-10-19
 
@@ -93,3 +93,31 @@ cmake --build --preset ci --target IntrinsicBenchmarkSmoke
 python3 tools/benchmark/run_and_seal.py --executable build/ci/bin/IntrinsicBenchmarkSmoke --output /tmp/bug222-benchmarks --manifests-root benchmarks --run-id bug222-reproduction
 python3 tools/benchmark/validate_benchmark_results.py --root /tmp/bug222-benchmarks --manifests-root benchmarks --strict
 ```
+
+## Baseline replacement — 2026-10-19
+- Operator decision (verbatim): "also da es für BUG-222 (die uv atlanten) noch keine gute
+  baseline gab, möchte ich dass die neue baseline entfernt wird wenn es ein besseres gibt." The
+  baseline is therefore the best reviewed output, not frozen history; this reverses BUG-213's
+  "do not rewrite the baseline" for this workload. The validator and all thresholds are unchanged.
+- Light-tier pre-flight (packet `tasks/evidence/BUG-222/preflight/baseline-e8c9a4ef/packet.md`,
+  ignored, deleted at retirement; commit `e8c9a4ef7`, sha256 `4fd9d77af82b0a57a04d6806995cd74d94fad96c7398de62ab3e2e30d44d1c5e`):
+  fresh reviewer `aed27603042849c13` "REVISE" (status normalization, float32 UV round trip,
+  self-matching idle probe, broken links), then "PASS" on revision 2.
+- Capture R1 at `e8c9a4ef7` (`ci` Debug, clang++-23, host idle before and after): every
+  predicted identity value matched exactly; large-grid median 138.264352 ms (descriptive). A first
+  start was ended by the 11:59 systemd-oomd kill of the desktop app before R1 ran; no output existed.
+  The normalized, sealed snapshot is
+  `benchmarks/baselines/geometry_uv_atlas_fast_staged_edge_grouping_scaling_e8c9a4ef.json`;
+  manifest params and `Bench.UvAtlasSmoke.hpp` constants carry the same values (UV bounds as exact
+  float32 values). The `8ca52438` snapshot was removed; it stays in Git history.
+- Verification R2 after the update: `run_and_seal.py` exit 0 over all 41 workloads, this workload
+  passed with quality L2 exactly 0 and a matching signature, strict result validation passed;
+  `benchmarks/baselines` validates strictly. A first R2 attempt was stopped before the smoke ran
+  because its idle probe matched its own shell. Release (`ci-release`) identity is not observed.
+
+## Completion
+Completed 2026-10-19. Commit: `47c02f34b`.
+The next `nightly-deep` run is the remote confirmation. Final review: independent read-only
+reviewer `a67189829ef4ed8e1`, "APPROVE WITH NITS" and criterion 3 "accepted" on staged diff
+`cb606397254f7cda8afbb6e101ed779cf6bde433a2587513aa70607aceea4594`; its text nits were applied
+afterwards.

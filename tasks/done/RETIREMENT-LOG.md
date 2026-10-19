@@ -1,5 +1,20 @@
 # Retirement Log
 
+## 2026-10-19 — BUG-222 UV-atlas baseline replaced
+
+Retired [BUG-222](BUG-222-uv-atlas-smoke-baseline-output-mismatch.md) (`47c02f34b`).
+
+- `9221c02c8` rewrote the FastStaged chart solver and packing; its parent reproduces the old
+  `8ca52438` output exactly. The new output has identical topology and lower mean conformal
+  distortion (1.18279 → 1.0000016) and max stretch (0.70546 → 0.35485) on this one planar-grid
+  fixture, so the frozen output baseline was stale, not the solver.
+- By operator decision the baseline is the best reviewed output, not frozen history (reversing
+  BUG-213 for this workload). A light-tier pre-flight (REVISE, then PASS) froze the capture; the
+  `e8c9a4ef` snapshot replaces `8ca52438` (kept in Git history), with matching manifest params and
+  header constants. Verification (`ci` Debug, one host): the full smoke `run_and_seal.py` exits 0, this workload passes
+  with quality L2 exactly 0, strict validation passes. Thresholds and validator are unchanged.
+  Release identity and the next nightly run are not yet observed.
+
 ## 2026-10-19 — BUG-245 sealing confirmed and BUG-243 link-gate scope
 
 Retired [BUG-245](BUG-245-nightly-smoke-backend-manifest-mismatch.md) and
