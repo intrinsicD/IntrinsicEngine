@@ -27,6 +27,10 @@ CI helper scripts and workflow validation tools.
   from the merge. Coverage builds use atomic profile-counter updates because
   CPU tests exercise instrumented production paths from multiple threads; the
   collector rejects non-atomic build identity and saturated LLVM counters.
+  Negative counters also come from a Clang counter-map gap (BUG-242): a `?:`
+  whose operands are lvalues, one of them a named constant, written directly
+  inside a braced initializer gets no counter of its own and borrows the
+  function-entry counter. Bind such a conditional to a local first.
 - `compare_source_coverage.py`: validates two normalized coverage reports and,
   in `--test-only-refactor` mode, rejects identity drift or loss of any
   previously covered production line, region, or branch arm. Its

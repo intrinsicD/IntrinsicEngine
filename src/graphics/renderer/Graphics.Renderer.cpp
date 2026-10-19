@@ -1108,16 +1108,19 @@ namespace Extrinsic::Graphics
             for (const TextureBarrierPacket& barrier : packet.TextureBarriers)
             {
                 const bool liveTransfer = isLiveCrossQueueTransfer(barrier.OwnershipTransfer);
+                // Outside the initializer: Clang coverage miscounts a ?: with a constant operand inside braces (BUG-242).
+                const std::uint32_t srcFamily =
+                    liveTransfer ? barrier.OwnershipTransfer.SourceQueueFamily : kNoQueueFamilyTransfer;
+                const std::uint32_t dstFamily =
+                    liveTransfer ? barrier.OwnershipTransfer.DestinationQueueFamily : kNoQueueFamilyTransfer;
                 textureBarriers.push_back(RHI::TextureBarrierDesc{
                     .Texture = graph.TextureHandles[barrier.TextureIndex],
                     .BeforeLayout = ToTextureLayout(barrier.Before),
                     .AfterLayout = ToTextureLayout(barrier.After),
                     .BeforeAccess = ToMemoryAccess(barrier.Before),
                     .AfterAccess = ToMemoryAccess(barrier.After),
-                    .SrcQueueFamily = liveTransfer ? barrier.OwnershipTransfer.SourceQueueFamily
-                                                   : kNoQueueFamilyTransfer,
-                    .DstQueueFamily = liveTransfer ? barrier.OwnershipTransfer.DestinationQueueFamily
-                                                   : kNoQueueFamilyTransfer,
+                    .SrcQueueFamily = srcFamily,
+                    .DstQueueFamily = dstFamily,
                 });
             }
 
@@ -1126,14 +1129,17 @@ namespace Extrinsic::Graphics
             for (const BufferBarrierPacket& barrier : packet.BufferBarriers)
             {
                 const bool liveTransfer = isLiveCrossQueueTransfer(barrier.OwnershipTransfer);
+                // Outside the initializer: Clang coverage miscounts a ?: with a constant operand inside braces (BUG-242).
+                const std::uint32_t srcFamily =
+                    liveTransfer ? barrier.OwnershipTransfer.SourceQueueFamily : kNoQueueFamilyTransfer;
+                const std::uint32_t dstFamily =
+                    liveTransfer ? barrier.OwnershipTransfer.DestinationQueueFamily : kNoQueueFamilyTransfer;
                 bufferBarriers.push_back(RHI::BufferBarrierDesc{
                     .Buffer = graph.BufferHandles[barrier.BufferIndex],
                     .BeforeAccess = ToMemoryAccess(barrier.Before),
                     .AfterAccess = ToMemoryAccess(barrier.After),
-                    .SrcQueueFamily = liveTransfer ? barrier.OwnershipTransfer.SourceQueueFamily
-                                                   : kNoQueueFamilyTransfer,
-                    .DstQueueFamily = liveTransfer ? barrier.OwnershipTransfer.DestinationQueueFamily
-                                                   : kNoQueueFamilyTransfer,
+                    .SrcQueueFamily = srcFamily,
+                    .DstQueueFamily = dstFamily,
                 });
             }
 

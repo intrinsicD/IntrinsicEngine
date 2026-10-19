@@ -1371,10 +1371,12 @@ class SourceCoverageTests(unittest.TestCase):
             if str(raw_file["filename"]).endswith("src/alpha.cpp")
         )
         self.assertTrue(production_file["branches"])
-        production_file["branches"][0][4] = (1 << 63) - 1
+        branch = production_file["branches"][0]
+        branch[4] = (1 << 63) - 1
         with self.assertRaisesRegex(
             CoverageError,
-            r"(?is)saturated.*atomic profile",
+            rf"(?is)src/alpha\.cpp:{branch[0]}:{branch[1]}: true branch: "
+            r"saturated.*atomic profile.*counter-map gap",
         ):
             normalize_llvm_cov_export(raw_export, self.source_root)
 
