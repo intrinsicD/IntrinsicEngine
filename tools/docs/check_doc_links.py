@@ -5,11 +5,14 @@ from __future__ import annotations
 
 import argparse
 import fnmatch
+import os
 import re
+import subprocess
 from pathlib import Path
 
 LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 FENCED_CODE_PATTERN = re.compile(r"```.*?```", re.DOTALL)
+LINE_SUFFIX_PATTERN = re.compile(r":\d+(?:-\d+)?$")
 IGNORED_TOP_LEVEL_PATTERNS = {
     ".git",
     ".idea",
@@ -80,6 +83,30 @@ def normalize_target(source_file: Path, raw_link: str) -> Path:
     return (source_file.parent / target_text).resolve()
 
 
+def line_suffix_target_exists(source_file: Path, raw_link: str) -> bool:
+    # Source links such as `file.cpp:42` or `file.cpp:42-60` name lines of an existing file.
+    target_text = raw_link.split("#", 1)[0].strip()
+    stripped = LINE_SUFFIX_PATTERN.sub("", target_text)
+    return stripped != target_text and (source_file.parent / stripped).resolve().is_file()
+
+
+def discover_markdown_files(root: Path) -> list[Path]:
+    # Git-ignored files (local evidence, review copies) are not maintained documentation and
+    # never exist in a CI checkout; outside a Git work tree every file is scanned.
+    try:
+        listed = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+            check=True,
+            capture_output=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError):
+        candidates = list(root.rglob("*.md"))
+    else:
+        # Filter here: a "*.md" pathspec depends on GIT_*_PATHSPECS and could silently match nothing.
+        candidates = [root / os.fsdecode(name) for name in listed.split(b"\0") if name.endswith(b".md")]
+    return sorted(p for p in candidates if p.is_file() and not is_ignored_path(p, root))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path("."), help="Repository root")
@@ -87,7 +114,7 @@ def main() -> int:
     args = parser.parse_args()
 
     root = args.root.resolve()
-    markdown_files = sorted(p for p in root.rglob("*.md") if not is_ignored_path(p, root))
+    markdown_files = discover_markdown_files(root)
 
     broken: list[tuple[Path, str]] = []
     checked = 0
@@ -110,7 +137,7 @@ def main() -> int:
                 continue
             checked += 1
             target = normalize_target(md_file, link)
-            if not target.exists():
+            if not target.exists() and not line_suffix_target_exists(md_file, link):
                 broken.append((md_file, link))
 
     print(f"[check_doc_links] Root: {root}")
