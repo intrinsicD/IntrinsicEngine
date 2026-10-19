@@ -81,6 +81,7 @@ absolute. All 12 candidate deltas were exactly zero, so
 status/provenance, public topology maps, chart records, seam records, and exact
 output-UV bit patterns was `5684639256857304174` for both revisions.
 
-The durable baseline payload is
-[`geometry_uv_atlas_fast_staged_edge_grouping_scaling_8ca52438.json`](../baselines/geometry_uv_atlas_fast_staged_edge_grouping_scaling_8ca52438.json).
+The durable baseline payload was
+[`geometry_uv_atlas_fast_staged_edge_grouping_scaling_8ca52438.json`](https://github.com/intrinsicD/IntrinsicEngine/blob/e8c9a4ef73cbdb7e05de80e49ee90f8dcc3d0b07/benchmarks/baselines/geometry_uv_atlas_fast_staged_edge_grouping_scaling_8ca52438.json)
+(historical; BUG-222 replaced it on 2026-10-19).
 No timing-ratio gate is attached to this PR-fast smoke benchmark.

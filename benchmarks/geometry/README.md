@@ -160,12 +160,15 @@ Keeping the constants in the headers is the binding mechanism.
 16x16/32x32 planar-grid scaling measurement. It warms one pair, measures five
 alternating pairs, reports median small/large runtimes and their face-normalized
 scaling factor, and verifies finite UVs, face preservation, no fallback, and
-deterministic public atlas output. Its checked-in `8ca52438` baseline and
+deterministic public atlas output. Its checked-in `e8c9a4ef` baseline (BUG-222,
+`ci` Debug on one host) replaced the stale `8ca52438` snapshot, whose output
+predates the `9221c02c8` chart solver; the
 [`BUG-101 result report`](../reports/BUG-101-uv-atlas-edge-grouping-scaling.md)
-support only the documented same-host, same-toolchain before/after comparison;
-the smoke test has no flaky timing-ratio gate or broader speedup claim.
-The scaling manifest remains byte-identical to the manifest bound by that
-historical baseline. This fixed workload uses the Angle objective explicitly
+keeps the original before/after comparison. By operator decision this baseline
+is the best reviewed output, not frozen history: replace it (and remove the old
+snapshot) through the same reviewed capture when a change yields better output.
+The smoke test has no flaky timing-ratio gate or broader speedup claim.
+This fixed workload uses the Angle objective explicitly
 in `MakeOptions`; it does not expose objective selection as a benchmark parameter.
 The separate property-guided-atlas manifest records selectable objectives.
 

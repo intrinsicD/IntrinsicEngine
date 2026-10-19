@@ -39,14 +39,14 @@ inline constexpr std::size_t kUvAtlasEdgeGroupingWarmupPairs = 1u;
 inline constexpr std::size_t kUvAtlasEdgeGroupingMeasuredPairs = 5u;
 inline constexpr const char *kUvAtlasEdgeGroupingTimingStatistic =
     "median_alternating_pair_runtime";
-inline constexpr const char *kUvAtlasEdgeGroupingBaselineCommit = "8ca52438";
+inline constexpr const char *kUvAtlasEdgeGroupingBaselineCommit = "e8c9a4ef";
 inline constexpr const char *kUvAtlasEdgeGroupingBaselineSnapshot =
     "benchmarks/baselines/"
-    "geometry_uv_atlas_fast_staged_edge_grouping_scaling_8ca52438.json";
+    "geometry_uv_atlas_fast_staged_edge_grouping_scaling_e8c9a4ef.json";
 inline constexpr double kUvAtlasEdgeGroupingBaselineLargeRuntimeMilliseconds =
-    1031.89589499999988220;
+    138.26435200000000236;
 inline constexpr double kUvAtlasEdgeGroupingBaselineNormalizedScalingFactor =
-    1.72673931985979334;
+    1.09890400135024402;
 inline constexpr std::size_t kUvAtlasEdgeGroupingQualityVectorSize = 12u;
 inline constexpr std::size_t kUvAtlasEdgeGroupingBaselineOutputVertexCount =
     1089u;
@@ -56,20 +56,21 @@ inline constexpr std::size_t kUvAtlasEdgeGroupingBaselineChartCount = 1u;
 inline constexpr std::size_t kUvAtlasEdgeGroupingBaselineSeamCount = 0u;
 inline constexpr std::size_t kUvAtlasEdgeGroupingBaselineBoundarySeamCount =
     128u;
-inline constexpr double kUvAtlasEdgeGroupingBaselineUvMinX = 0.0078125;
-inline constexpr double kUvAtlasEdgeGroupingBaselineUvMinY = 0.0078125;
+// UV bounds are float32 values; written so the double constant equals them exactly.
+inline constexpr double kUvAtlasEdgeGroupingBaselineUvMinX = 0.009343489073216915;
+inline constexpr double kUvAtlasEdgeGroupingBaselineUvMinY = 0.008750040084123611;
 inline constexpr double kUvAtlasEdgeGroupingBaselineUvMaxX =
-    0.99218755960464478;
+    0.9898112416267395;
 inline constexpr double kUvAtlasEdgeGroupingBaselineUvMaxY =
-    0.91768068075180054;
+    0.9892177581787109;
 inline constexpr double kUvAtlasEdgeGroupingBaselineMeanConformalDistortion =
-    1.18278551100503537;
+    1.00000158118600724;
 inline constexpr double kUvAtlasEdgeGroupingBaselineMaxStretch =
-    0.70545702589212356;
+    0.35484934437508903;
 inline constexpr std::size_t kUvAtlasEdgeGroupingBaselineFlippedElementCount =
     0u;
 inline constexpr std::uint64_t kUvAtlasEdgeGroupingBaselineOutputSignature =
-    5684639256857304174ull;
+    13353140223134595692ull;
 
 struct UvAtlasSmokeMetrics {
   double RuntimeMilliseconds{0.0};

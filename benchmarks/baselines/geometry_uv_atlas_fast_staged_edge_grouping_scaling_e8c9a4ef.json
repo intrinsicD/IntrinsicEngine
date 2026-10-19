@@ -1,0 +1,198 @@
+{
+  "attempt_id": "attempt-001",
+  "backend": "cpu_optimized",
+  "benchmark_id": "geometry.uv_atlas.fast_staged_edge_grouping.scaling",
+  "claim_eligible": false,
+  "commit": "e8c9a4ef73cbdb7e05de80e49ee90f8dcc3d0b07",
+  "config_digest": "8b569f0cf9806eab258b487686f3f00c577656f1bf8b6753f162297921d74223",
+  "dataset": "builtin.uv_atlas_edge_grouping_grid_pair_v1",
+  "diagnostics": {
+    "baseline": true,
+    "baseline_commit": "e8c9a4ef",
+    "baseline_comparison_scope": "same-host same-toolchain local before/after",
+    "baseline_large_median_runtime_ms": 138.264352,
+    "baseline_normalized_runtime_scaling_factor": 1.098904001350244,
+    "baseline_output_signature": "13353140223134595692",
+    "baseline_snapshot": "benchmarks/baselines/geometry_uv_atlas_fast_staged_edge_grouping_scaling_e8c9a4ef.json",
+    "build_type": "Debug",
+    "candidate_to_baseline_large_runtime_ratio": 1.0,
+    "candidate_to_baseline_normalized_scaling_ratio": 1.0,
+    "compiler": "clang 23.0.0",
+    "dataset_generation": "deterministic indexed planar grids",
+    "deterministic_topology": true,
+    "face_count_ratio": 4.0,
+    "harness_equivalence": "header constants change after capture and affect only the normalized self-comparison fields",
+    "host_activity": "before R1: no ninja/clang++/cmake --build/ctest after 0 s wait; after R1: no ninja/clang++/cmake --build/ctest after 0 s wait",
+    "host_cpu": "AMD Ryzen 9 7950X 16-Core Processor",
+    "host_os": "Linux 6.8.0-138-generic x86_64",
+    "large_boundary_seam_count": 128,
+    "large_chart_count": 1,
+    "large_face_count": 2048,
+    "large_finite_normalized": true,
+    "large_flipped_element_count": 0,
+    "large_grid_side": 32,
+    "large_max_stretch": 0.354849344375089,
+    "large_mean_conformal_distortion": 1.0000015811860072,
+    "large_median_runtime_ms": 138.264352,
+    "large_output_face_count": 2048,
+    "large_output_vertex_count": 1089,
+    "large_runtime_samples_ms": [
+      137.721972,
+      138.264352,
+      139.092842,
+      137.331671,
+      138.447641
+    ],
+    "large_seam_count": 0,
+    "large_succeeded": true,
+    "large_used_fallback": false,
+    "large_uv_max": [
+      0.9898112416267395,
+      0.9892177581787109
+    ],
+    "large_uv_min": [
+      0.00934348907321692,
+      0.00875004008412361
+    ],
+    "large_vertex_count": 1089,
+    "matches_baseline_output_signature": true,
+    "measured_pairs": 5,
+    "measurement_order": "alternating_small_large_large_small",
+    "mode": "performance_scaling_smoke",
+    "normalized_runtime_scaling_factor": 1.098904001350244,
+    "output_signature": "13353140223134595692",
+    "performance_claim": false,
+    "preset": "ci",
+    "quality_vector_baseline": {
+      "boundary_seam_count": 128,
+      "chart_count": 1,
+      "flipped_element_count": 0,
+      "max_stretch": 0.354849344375089,
+      "mean_conformal_distortion": 1.0000015811860072,
+      "output_face_count": 2048,
+      "output_vertex_count": 1089,
+      "seam_count": 0,
+      "uv_max": [
+        0.9898112416267395,
+        0.9892177581787109
+      ],
+      "uv_min": [
+        0.009343489073216915,
+        0.008750040084123611
+      ]
+    },
+    "quality_vector_definition": "relative output vertex/face/chart counts, absolute seam count, relative boundary count, raw normalized UV bounds, relative mean conformal distortion/max stretch, absolute flipped count",
+    "quality_vector_delta": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "runner": "IntrinsicBenchmarkSmoke",
+    "runtime_scaling_ratio": 4.395616005400976,
+    "sanitizers": "none",
+    "small_face_count": 512,
+    "small_grid_side": 16,
+    "small_median_runtime_ms": 31.455057,
+    "small_runtime_samples_ms": [
+      31.455057,
+      31.806427,
+      31.492866999999997,
+      31.161837,
+      31.392467
+    ],
+    "small_vertex_count": 289,
+    "source_revision": "e8c9a4ef73cbdb7e05de80e49ee90f8dcc3d0b07",
+    "source_worktree": "main checkout at e8c9a4ef7",
+    "timed_implementation": "unmodified e8c9a4ef7 UV atlas sources",
+    "timing_statistic": "median_alternating_pair_runtime",
+    "warmup_pairs": 1
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/geometry_uv_atlas_fast_staged_edge_grouping_scaling.yaml",
+    "sha256": "30795b474eb3de85b0a2cd0f4e9c9c14940fcd6b586785e1883e0809e36fddd1"
+  },
+  "method": "geometry.uv_atlas.fast_staged_edge_grouping",
+  "metrics": {
+    "quality_error_l2": 0.0,
+    "runtime_ms": 138.264352,
+    "throughput_items_per_sec": 14812.205535089766
+  },
+  "resolved_params": {
+    "adoption_claim": false,
+    "baseline_boundary_seam_count": 128,
+    "baseline_chart_count": 1,
+    "baseline_commit": "e8c9a4ef",
+    "baseline_flipped_element_count": 0,
+    "baseline_large_median_runtime_ms": 138.264352,
+    "baseline_max_stretch": 0.354849344375089,
+    "baseline_mean_conformal_distortion": 1.0000015811860072,
+    "baseline_normalized_runtime_scaling_factor": 1.098904001350244,
+    "baseline_output_face_count": 2048,
+    "baseline_output_signature": "13353140223134595692",
+    "baseline_output_vertex_count": 1089,
+    "baseline_seam_count": 0,
+    "baseline_snapshot": "benchmarks/baselines/geometry_uv_atlas_fast_staged_edge_grouping_scaling_e8c9a4ef.json",
+    "baseline_uv_max": [
+      0.9898112416267395,
+      0.9892177581787109
+    ],
+    "baseline_uv_min": [
+      0.009343489073216915,
+      0.008750040084123611
+    ],
+    "fixture_generator": "indexed_planar_grid",
+    "large_face_count": 2048,
+    "large_grid_side": 32,
+    "measured_pairs": 5,
+    "measurement_order": "alternating_small_large_large_small",
+    "padding": 2,
+    "resolution": 256,
+    "small_face_count": 512,
+    "small_grid_side": 16,
+    "timing_statistic": "median_alternating_pair_runtime",
+    "warmup_pairs": 1
+  },
+  "run_id": "baseline-e8c9a4ef-edge-grouping",
+  "schema_version": 2,
+  "source": {
+    "revision": "e8c9a4ef73cbdb7e05de80e49ee90f8dcc3d0b07",
+    "state": "unverified_commit"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 5000,
+      "metric": "runtime_ms",
+      "observed": 138.264352,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "smoke_runtime_ms_max"
+    },
+    {
+      "limit": 1e-12,
+      "metric": "quality_error_l2",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_l2_max"
+    }
+  ],
+  "thresholds": {
+    "quality_error_l2_max": 1e-12,
+    "smoke_runtime_ms_max": 5000
+  },
+  "warmup_policy": {
+    "measured_pairs": 5,
+    "warmup_pairs": 1
+  }
+}
