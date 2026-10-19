@@ -472,7 +472,7 @@ Der Default-Branch war bereits vor dem Audit rot:
   auf älterem Commit `4a5eede778b0830787fa139156f468c7ecf553e4`: vorherige 5.817
   CPU- und 62 Slow-Tests grün; Benchmark-Sealer lehnt
   `cpu_reference_sparse_cholesky` und `cpu_admm_sparse_cholesky` ab.
-  Bestehender Owner: [BUG-245](../../tasks/backlog/bugs/BUG-245-nightly-smoke-backend-manifest-mismatch.md).
+  Bestehender Owner: [BUG-245](../../tasks/done/BUG-245-nightly-smoke-backend-manifest-mismatch.md).
 - `ci-docs` auf dem Audit-Commit war grün. Die CI-Fehler sind keine Belege für
   numerische Runtime-Fehler. Im Audit wurde kein Benchmark gestartet.
 

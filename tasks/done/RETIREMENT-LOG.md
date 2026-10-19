@@ -1,5 +1,26 @@
 # Retirement Log
 
+## 2026-10-19 — BUG-245 sealing confirmed and BUG-243 link-gate scope
+
+Retired [BUG-245](BUG-245-nightly-smoke-backend-manifest-mismatch.md) and
+[BUG-243](BUG-243-local-doc-link-check-scans-temporary-review-evidence.md) at the operator's request.
+
+- BUG-245 (`c8d6354a8`): nightly-deep run 39203553565 on `64d691ae5` seals all 41 results, including
+  the two formerly rejected sparse-solver records; sealing applies the same per-record
+  `validate_result_data` as the strict standalone validator, which this run does not reach because
+  BUG-222 fails the smoke executable. HARDEN-090's BUG-244/245 criterion is checked.
+- BUG-243 (`164580ada`): the strict doc-link check skips Git-ignored files inside a Git
+  work tree and accepts `path:line` targets of existing files, by operator decision. Five new cases
+  are mutation-checked; the full local checkout passes strictly (4664 links at the implementation commit).
+- BUG-222 stays open with its diagnosis recorded: `9221c02c8` is the first changed revision (its
+  parent reproduces the baseline exactly), an intended chart-solver/packing change that left the
+  frozen output baseline stale. Its repair needs an operator decision on the BUG-213 frozen binding.
+- Review: independent read-only reviewer `aef1a072eb3203ef8` — "APPROVE WITH NITS" on staged diff
+  `753369d0525bf9acc4f0a5cf4e02055bab29e382b0a23fe2d7b4a42e8fab4b94` ("accepted": BUG-243 criterion 1,
+  BUG-245 criterion 3, HARDEN-090's BUG-244/245 criterion, BUG-222 criteria 1–2); "DELTA APPROVE" on the
+  nit delta `0d3ae98dbc9d87afebc8cab4b46da872628ec37121c176627d9bbb54c70385d9`. Afterwards only the
+  implementation hash and this line were added.
+
 ## 2026-10-19 — METHOD-077 result record and four HARDEN-090 linked tasks
 
 Retired [METHOD-077](METHOD-077-cpd-nystrom-landmark-variant-experiment.md),

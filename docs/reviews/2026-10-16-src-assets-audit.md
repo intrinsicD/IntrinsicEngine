@@ -434,7 +434,7 @@ Tests kann sie entsprechend der Repository-Retention entfernt werden.
 Vorbestehende CI-Fehler und deren Belege stehen ausschließlich in
 [BUG-244](../../tasks/done/BUG-244-cpu-selection-rejects-source-rules-producer.md)
 (CPU-Testproduzentenzuordnung) und
-[BUG-245](../../tasks/backlog/bugs/BUG-245-nightly-smoke-backend-manifest-mismatch.md)
+[BUG-245](../../tasks/done/BUG-245-nightly-smoke-backend-manifest-mismatch.md)
 (Benchmark-Versiegelung). Sie wurden nicht im Assets-Audit repariert.
 
 ## Einstieg für Codex 6 Astra Ultra

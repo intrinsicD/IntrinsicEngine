@@ -339,7 +339,7 @@ absichtlich seine eigene Sentinel-Datei, niemals ein Nutzerdokument verwenden.
 ## CI Ausgangslage
 
 - [ci-linux-clang 38869189381](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/38869189381), gleicher Commit: `Capture CPU test selection` scheitert, weil `RenderWorldPoolEngineWiring.SourceRules` keinem registrierten Producer zugeordnet wird. Fehlender Timing-Report ist eine Folge; Full-CPU-Testschritt lief dort nicht. Diagnose im ursprünglichen Audit direkt über `gh run view 38869189381 --log-failed` gelesen. Owner: [BUG-244](../../tasks/done/BUG-244-cpu-selection-rejects-source-rules-producer.md).
-- [nightly-deep 38854737500](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/38854737500), Commit `4a5eede778b0830787fa139156f468c7ecf553e4`: Benchmark-/Sealing-Schritt fehlgeschlagen. [BUG-245](../../tasks/backlog/bugs/BUG-245-nightly-smoke-backend-manifest-mismatch.md) enthält die Detaildiagnose zweier Backend-/Manifest-Namen aus dem parallelen Assets-Audit. Diese Detaildiagnose wurde hier nicht unabhängig aus dem vollständigen Nightly-Log reproduziert.
+- [nightly-deep 38854737500](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/38854737500), Commit `4a5eede778b0830787fa139156f468c7ecf553e4`: Benchmark-/Sealing-Schritt fehlgeschlagen. [BUG-245](../../tasks/done/BUG-245-nightly-smoke-backend-manifest-mismatch.md) enthält die Detaildiagnose zweier Backend-/Manifest-Namen aus dem parallelen Assets-Audit. Diese Detaildiagnose wurde hier nicht unabhängig aus dem vollständigen Nightly-Log reproduziert.
 - `ci-docs` war für den geprüften HEAD erfolgreich. Rote Läufe belegen keine fehlgeschlagenen Geometry-Numeriktests. Keine CI-Reparatur in diesem Audit.
 
 ## Übergabe an die gemeinsame src Auswertung

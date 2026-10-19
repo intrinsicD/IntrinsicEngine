@@ -335,7 +335,7 @@ Am auditierten HEAD war [ci-docs](https://github.com/intrinsicD/IntrinsicEngine/
 
 > BLOCKED: selected CTest test 'RenderWorldPoolEngineWiring.SourceRules' does not map to a registered producer
 
-Das spätere fehlende `test.json` ist eine Folge. Dies ist keine fehlgeschlagene Physics-Testassertion. Die parallel erfasste Notiz [BUG-244](../../tasks/done/BUG-244-cpu-selection-rejects-source-rules-producer.md) besitzt die Reparatur. Der ebenfalls rote [nightly-deep-Lauf](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/38854737500) ist separat in [BUG-245](../../tasks/backlog/bugs/BUG-245-nightly-smoke-backend-manifest-mismatch.md) erfasst. Deren Ursachen wurden nicht im Physics-Audit repariert. CI-Zustände sind historische Beobachtungen dieses Stands, keine Aussage über spätere Runs.
+Das spätere fehlende `test.json` ist eine Folge. Dies ist keine fehlgeschlagene Physics-Testassertion. Die parallel erfasste Notiz [BUG-244](../../tasks/done/BUG-244-cpu-selection-rejects-source-rules-producer.md) besitzt die Reparatur. Der ebenfalls rote [nightly-deep-Lauf](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/38854737500) ist separat in [BUG-245](../../tasks/done/BUG-245-nightly-smoke-backend-manifest-mismatch.md) erfasst. Deren Ursachen wurden nicht im Physics-Audit repariert. CI-Zustände sind historische Beobachtungen dieses Stands, keine Aussage über spätere Runs.
 
 ## Rollen und Review
 

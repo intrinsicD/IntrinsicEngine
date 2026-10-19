@@ -82,7 +82,6 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-193` — Investigate GPU pacing variability and watchdog margin (tasks/backlog/bugs/BUG-193-gpu-pacing-and-watchdog-margin.md)
 - unblocked: `BUG-240` — ASan and UBSan CPU jobs have been red since 2026-09-05 (tasks/backlog/bugs/BUG-240-sanitizer-cpu-jobs-red-since-september.md)
 - unblocked: `BUG-242` — CPU coverage rejects an invalid LLVM execution counter (tasks/backlog/bugs/BUG-242-cpu-source-coverage-counter-invalid.md)
-- unblocked: `BUG-245` — Nightly smoke sealing rejects two emitted backend names (tasks/backlog/bugs/BUG-245-nightly-smoke-backend-manifest-mismatch.md)
 - unblocked: `BUG-247` — Local root hygiene rejects existing tool state (tasks/backlog/bugs/BUG-247-local-root-hygiene-state-mismatch.md)
 - unblocked: `RUNTIME-291` — Scale-aware default radii for point operations (tasks/backlog/runtime/RUNTIME-291-scale-aware-radius-defaults.md)
 
@@ -243,7 +242,6 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-228` — Vulkan smoke timeout depends on the display environment (tasks/backlog/bugs/BUG-228-desktop-display-vulkan-smoke-timeouts.md)
 - unblocked: `BUG-229` — NVIDIA shutdown retention on a nested Xephyr display (tasks/backlog/bugs/BUG-229-nvidia-xephyr-shutdown-retention.md)
 - unblocked: `BUG-232` — A failed frame submit loses an accepted position copy (tasks/backlog/bugs/BUG-232-gpuworld-commit-copy-lost-on-failed-submit.md)
-- unblocked: `BUG-243` — Local strict doc-link check scans temporary review evidence (tasks/backlog/bugs/BUG-243-local-doc-link-check-scans-temporary-review-evidence.md)
 - unblocked: `BUILD-012` — Evaluate replacing the ImGui vcpkg overlay port with the registry port (tasks/backlog/process/BUILD-012-imgui-registry-port-evaluation.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 - unblocked: `GRAPHICS-147` — Refine shared Morton cells in the GPU point LBVH (tasks/backlog/rendering/GRAPHICS-147-gpu-lbvh-shared-cell-refinement.md)

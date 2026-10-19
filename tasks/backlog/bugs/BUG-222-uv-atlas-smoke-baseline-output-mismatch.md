@@ -45,9 +45,45 @@ This identifies an unrelated failing workload, not a proven root cause.
 
 ## Acceptance criteria
 
-- [ ] Reproduce on an isolated source revision and identify the first relevant atlas change.
-- [ ] Decide whether the output is a regression or an intentionally changed contract, with numerical evidence.
+- [x] Reproduce on an isolated source revision and identify the first relevant atlas change.
+- [x] Decide whether the output is a regression or an intentionally changed contract, with numerical evidence.
 - [ ] Repair the implementation or update the reviewed baseline protocol without weakening unrelated gates.
+
+## Diagnosis — 2026-10-19
+
+Host `hochvogel`, clang++-23, `ci` preset (Debug). HEAD runs used `build/ci` at `c4f4ec100`;
+older revisions were built in a separate worktree (`VCPKG_MANIFEST_INSTALL=OFF`, the main
+checkout's installed packages; `vcpkg.json` changed only after 2026-10-07). The HEAD objective
+probes temporarily changed only `options.Distortion` in `MakeOptions`
+(`benchmarks/geometry/Bench_UvAtlasSmoke.cpp`), rebuilt, ran and restored it. Predictions were
+fixed before each run; signatures are of the 32×32 workload.
+
+| Run | Prediction | Outcome |
+| --- | --- | --- |
+| HEAD, unchanged (`Angle`) | new signature | `13353140223134595692`, failed — holds |
+| HEAD, `Distortion = None` | baseline signature | `13147532661243740981`, 158 charts, conformal 3.43 — refuted |
+| HEAD, `Area` / `Both` | one of them baseline | `1578760485508691887` / `11944554893966438409`, conformal 1.0000013 / 1.0000016 — refuted |
+| `c97235568` (= `9221c02c8^`) | baseline signature | `5684639256857304174`, passed, quality L2 0 — holds |
+| `9221c02c8` | new signature | `13353140223134595692`, failed — holds |
+
+- First relevant change: `9221c02c8` ("Implement property-guided UV atlases and split atlas
+  inspection", METHOD-047). It replaced the FastStaged per-chart solve in
+  `Geometry.UvAtlas.cpp` (LSCM, then uniform square-boundary Tutte, then planar projection)
+  with `Geometry.UvAtlas.ChartSolve.cpp` and explicit objectives (Angle = LSCM, see
+  `docs/methods/property_guided_atlas.md`), and changed packing (area-normalized charts, one
+  reserved texel per shelf cell). The new `Distortion` option alone does not explain it: no
+  objective at HEAD reproduces the old output, and HEAD still emits the `9221c02c8` signature.
+- Verdict: an intended solver/packing change left the frozen output baseline stale; it is not
+  an output regression on this fixture. Topology is identical (1089 vertices, 2048 faces, one
+  chart, no seams, 128 boundary seams, no flips, no fallback); mean conformal distortion
+  1.18279 → 1.0000016 and max stretch 0.70546 → 0.35485; UV extents differ through packing.
+  Large-grid median runtime on this host 111.5 → 139.0 ms (Debug; this workload has no timing
+  gate). One fixture and one host; no method-quality or performance claim.
+- Why it stayed red: BUG-213 (`54fe0deb0`) restored the manifest byte-identical to the
+  immutable `8ca52438` result (which binds its sha256) and kept Angle in `MakeOptions`, but the
+  output signature and quality vector in that manifest and in `Bench.UvAtlasSmoke.hpp` remain
+  the pre-`9221c02c8` values. A repair therefore needs an operator decision on the frozen
+  binding (BUG-213 said not to rewrite the baseline or hash).
 
 ## Verification
 

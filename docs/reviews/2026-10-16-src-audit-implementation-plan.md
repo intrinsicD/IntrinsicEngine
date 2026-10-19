@@ -213,7 +213,7 @@ SRC-RUNTIME-005 ist vollständig PHYS-AUDIT-02 zugeordnet.
 
 | Owner / bestehender Task | Behandlung und Abhängigkeit |
 | --- | --- |
-| **CI:** [BUG-244](../../tasks/done/BUG-244-cpu-selection-rejects-source-rules-producer.md), [BUG-245](../../tasks/backlog/bugs/BUG-245-nightly-smoke-backend-manifest-mismatch.md) | Einmalige Owner der in mehreren Berichten genannten CI-Probleme. Keine acht weiteren CI-Aufgaben. |
+| **CI:** [BUG-244](../../tasks/done/BUG-244-cpu-selection-rejects-source-rules-producer.md), [BUG-245](../../tasks/done/BUG-245-nightly-smoke-backend-manifest-mismatch.md) | Einmalige Owner der in mehreren Berichten genannten CI-Probleme. Keine acht weiteren CI-Aufgaben. |
 | **Geometry:** [GEOM-114](../../tasks/done/GEOM-114-scale-relative-pca-isotropic-cutoff.md), [GEOM-115](../../tasks/done/GEOM-115-halfedge-module-names-match-file-stems.md) | Direkte Owner für GEO-07 bzw. GEO-13. Naming-Entscheidung bleibt beim Operator. |
 | **Geometry:** [GEOM-073](../../tasks/backlog/geometry/GEOM-073-point-analysis-property-span-contracts.md), [GEOM-074](../../tasks/backlog/geometry/GEOM-074-graph-property-adjacency-contracts.md) | Verbleibende Borrow-/Span-Seams, kein Ersatz für neue Löschmasken-, Export-, View- oder Numerikfixes. Bereits gelieferte Teile nicht neu planen. |
 | **Runtime:** [RUNTIME-276](../../tasks/done/RUNTIME-276-declarative-config-field-specs.md), [RUNTIME-325](../../tasks/backlog/runtime/RUNTIME-325-coroutine-waits-in-jobservice.md), [RUNTIME-282](../../tasks/backlog/runtime/RUNTIME-282-headless-batch-cli.md) | Configschema; Coroutine-Consumerentscheidung; vorgesehenes Process-Modul. Vorhandene Verträge verhindern vorschnelle Neubauten/Löschungen. |

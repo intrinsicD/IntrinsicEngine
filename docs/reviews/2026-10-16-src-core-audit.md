@@ -571,7 +571,7 @@ Der Nachtlauf
 [38854737500](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/38854737500)
 scheiterte beim Versiegeln zweier Benchmarkresultate wegen der Backendnamen
 `cpu_reference_sparse_cholesky` und `cpu_admm_sparse_cholesky`. Owner ist
-[BUG-245](../../tasks/backlog/bugs/BUG-245-nightly-smoke-backend-manifest-mismatch.md).
+[BUG-245](../../tasks/done/BUG-245-nightly-smoke-backend-manifest-mismatch.md).
 Diese beiden bereits parallel erfassten CI-Probleme sind keine Ergebnisse einer
 Core-Reparatur und werden hier nicht erneut als Core-Tasks angelegt.
 
