@@ -1,5 +1,17 @@
 # Retirement Log
 
+## 2026-10-20 — BUG-242 coverage counter-map gap
+
+Retired [BUG-242](BUG-242-cpu-source-coverage-counter-invalid.md) (`ca66d4261`).
+
+- The weekly CPU coverage collection failed closed on negative LLVM counts. Atomic updates were
+  already on; Clang's PGO counter map misses a `?:` that Sema rebuilds inside a braced
+  initializer (lvalue operands, one a named constant), so its true arm borrows the entry counter.
+- 11 such conditionals in 6 files, found by a frontend-IR scan of all instrumented coverage TUs,
+  now bind to locals; the collector error names the location and both causes. Local Clang 23
+  and CI Clang 20 (run 39246934388) collections pass. Defaulted comparison operators still skew
+  branch counts through the same gap; that and a reintroduction guard are a separate follow-up.
+
 ## 2026-10-19 — BUG-222 UV-atlas baseline replaced
 
 Retired [BUG-222](BUG-222-uv-atlas-smoke-baseline-output-mismatch.md) (`47c02f34b`).

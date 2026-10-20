@@ -61,3 +61,16 @@ records that unresolved distinction and its follow-up owner.
 For unexplained module-layout or virtual-dispatch failures, reuse the existing
 [stale-build triage procedure](../../tools/agents/skills/intrinsicengine-stale-build-triage/SKILL.md)
 before changing source; do not duplicate its cache-disabled reproduction rules.
+
+## A fail-closed message must not name a single cause
+
+Five weekly `ci-source-coverage` runs (2026-09-07 to 2026-10-19) failed with an
+error that blamed non-atomic profile updates, although atomic updates were
+already enabled. The real cause was a
+Clang counter-map gap: a `?:` with lvalue operands, one a named constant,
+written directly inside a braced initializer borrows the function-entry
+counter. Before blaming threads, check whether the bad region's true count
+equals its function's count. The collector error now names the location and
+both causes, and the [collector notes](../../tools/ci/README.md) give the
+coding rule. [BUG-242](../../tasks/done/BUG-242-cpu-source-coverage-counter-invalid.md)
+records the diagnosis.

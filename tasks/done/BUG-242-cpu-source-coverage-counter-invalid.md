@@ -26,7 +26,7 @@ No PR exists for the current local METHOD-083 branch.
 
 ## Acceptance criteria
 - [x] Diagnose profile collection/counter invalidity from this job's raw artifacts.
-- [ ] Re-run collection successfully without suppressing invalid counters.
+- [x] Re-run collection successfully without suppressing invalid counters.
 
 ## Verification
 Reproduce the failing workflow command with its saved profile artifacts, then run the
@@ -48,6 +48,15 @@ owning coverage-tool tests and strict task policy checks.
   read-only sandbox, recursion protection instruction-only) on `ca66d4261`, diff SHA-256
   `ead732073167781a1e15bbe93fad1c2a5204c0f27910cfea9e14dfc52c19f743`: **approve**;
   criterion 1 met; criterion 2 "met locally, pending Clang-20 CI confirmation".
-- Open: a `ci-source-coverage` run (Clang 20) on a pushed revision containing `ca66d4261`.
 - Follow-ups, not in this slice: the same gap skews branch counts of 33 defaulted comparison
   operators (never negative in this cohort); no committed guard against reintroducing the pattern.
+
+## Completion
+Completed 2026-10-20. Commit: `ca66d4261`, merged to `main` in `eb1ee134f`.
+Clang-20 confirmation: `ci-source-coverage` run 39246934388 (workflow_dispatch on `eb1ee134f`):
+all executed steps succeeded (the optional grouped-CTest steps were skipped), tooling
+regressions 35 OK, collection `ok: targets=33 objects=33 raw_profiles=33`, self-parity ok.
+Criterion 2: Codex, same thread, delta round on this retirement diff: "met"; its two wording
+corrections are applied.
+`tasks/evidence/BUG-242/` stays local until the follow-up session on defaulted comparison
+operators and a reintroduction guard, which reads its `ir_scan.py` and inventories, has finished.

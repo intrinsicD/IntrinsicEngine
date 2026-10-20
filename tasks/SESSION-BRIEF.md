@@ -81,7 +81,6 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-149` — Benchmark sealer escapes dotted output directories (tasks/backlog/bugs/BUG-149-benchmark-sealer-dotted-output-directory.md)
 - unblocked: `BUG-193` — Investigate GPU pacing variability and watchdog margin (tasks/backlog/bugs/BUG-193-gpu-pacing-and-watchdog-margin.md)
 - unblocked: `BUG-240` — ASan and UBSan CPU jobs have been red since 2026-09-05 (tasks/backlog/bugs/BUG-240-sanitizer-cpu-jobs-red-since-september.md)
-- unblocked: `BUG-242` — CPU coverage rejects an invalid LLVM execution counter (tasks/backlog/bugs/BUG-242-cpu-source-coverage-counter-invalid.md)
 - unblocked: `BUG-247` — Local root hygiene rejects existing tool state (tasks/backlog/bugs/BUG-247-local-root-hygiene-state-mismatch.md)
 - unblocked: `RUNTIME-291` — Scale-aware default radii for point operations (tasks/backlog/runtime/RUNTIME-291-scale-aware-radius-defaults.md)
 
