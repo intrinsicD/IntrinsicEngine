@@ -30,7 +30,16 @@ CI helper scripts and workflow validation tools.
   Negative counters also come from a Clang counter-map gap (BUG-242): a `?:`
   whose operands are lvalues, one of them a named constant, written directly
   inside a braced initializer gets no counter of its own and borrows the
-  function-entry counter. Bind such a conditional to a local first.
+  function-entry counter. Bind such a conditional to a local first. The same
+  gap leaves the synthesized `&&` chain of a defaulted comparison without
+  counters, so its branch records on `= default` carry the entry count, not
+  outcomes; the collector validates them but omits them from covered branch arms.
+- `check_coverage_counter_map.py`: re-emits frontend IR for every built,
+  instrumented production TU of a coverage tree and fails when a function
+  increments its entry counter more than once outside a `= default`
+  declaration, the silent form of the BUG-242 gap. Runs in
+  `ci-source-coverage.yml` after the build; it costs about one compile of the
+  production TUs.
 - `compare_source_coverage.py`: validates two normalized coverage reports and,
   in `--test-only-refactor` mode, rejects identity drift or loss of any
   previously covered production line, region, or branch arm. Its

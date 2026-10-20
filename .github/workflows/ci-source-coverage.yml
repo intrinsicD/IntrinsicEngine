@@ -55,6 +55,14 @@ jobs:
             --json-out build/ci-coverage-cpu/ci-timing/phases/build.json \
             -- cmake --build --preset ci-coverage-cpu --target IntrinsicCpuCoverageTests
 
+      - name: Check production coverage counter map
+        run: |
+          python3 tools/ci/time_command.py \
+            --label "Check production coverage counter map" \
+            --json-out build/ci-coverage-cpu/ci-timing/phases/counter-map.json \
+            -- python3 tools/ci/check_coverage_counter_map.py \
+            --build-dir build/ci-coverage-cpu
+
       - name: Collect complete CPU correctness source coverage
         run: |
           python3 tools/ci/time_command.py \
@@ -88,6 +96,7 @@ jobs:
           python3 tools/ci/aggregate_gate_timing.py \
             --configure-json build/ci-coverage-cpu/ci-timing/phases/configure.json \
             --build-json build/ci-coverage-cpu/ci-timing/phases/build.json \
+            --test-json build/ci-coverage-cpu/ci-timing/phases/counter-map.json \
             --test-json build/ci-coverage-cpu/ci-timing/phases/test.json \
             --gate ci-source-coverage \
             --preset ci-coverage-cpu \

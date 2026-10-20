@@ -566,6 +566,15 @@ counters. Their shared production, build-input, and compile-command digests are
 and `6fc85cd42aef613364a666bb180d4d8f1981e74f81bd94575a7ec5a755873622`;
 the declared cohort comparison reported zero lost regions and branch arms.
 
+`BUG-242` found a Clang counter-map gap that is usually silent: an expression
+present only in Sema's semantic form, such as a constant-operand `?:` rebuilt
+inside a braced initializer, is counted with the function-entry counter, so the
+function's derived counts are wrong and only sometimes negative. After the build
+the workflow runs `tools/ci/check_coverage_counter_map.py`, which re-emits
+frontend IR for each built production TU and fails on any second entry-counter
+increment outside a `= default` declaration. Its cost is about one compile of
+the production TUs.
+
 ### Included and excluded sources
 
 The engine-owned production roots are C++ source and headers under `src/` and
@@ -594,7 +603,9 @@ diagnostics and never merged into execution evidence.
 `coverage.json` records schema version, production source/build-input and
 compile-command digests, compiler/tool versions, preset/build/backend identity,
 the exclusion policy, profile diagnostics, per-file summaries, and normalized
-covered line, function, region, and true/false branch-outcome keys. The
+covered line, function, region, and true/false branch-outcome keys. Branch
+records on a defaulted comparison's `= default` are excluded from those keys:
+Clang gives their synthesized `&&` chain no counters (BUG-242). The
 artifact also retains the exact case/label/executable inventory in
 `test-inventory.json`, per-target GoogleTest XML, raw `llvm-cov` JSON, raw
 profiles, the merged profile, per-executable logs, and failure diagnostics. The
