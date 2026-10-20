@@ -60,3 +60,10 @@ Criterion 2: Codex, same thread, delta round on this retirement diff: "met"; its
 corrections are applied.
 `tasks/evidence/BUG-242/` stays local until the follow-up session on defaulted comparison
 operators and a reintroduction guard, which reads its `ir_scan.py` and inventories, has finished.
+
+## Follow-up
+Both follow-ups landed in `df3849db8` (merged to `main` in `c14da0062`; operator decisions,
+hosted run 39399689989 and Codex approval are in the merge message): the collector omits branch
+records on `= default` comparisons, and `ci-source-coverage` runs
+`tools/ci/check_coverage_counter_map.py` on the built production TUs. The follow-up session has
+finished with `tasks/evidence/BUG-242/`.
