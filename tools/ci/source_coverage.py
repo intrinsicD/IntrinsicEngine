@@ -21,6 +21,11 @@ COVERAGE_SCHEMA = "intrinsic.cpu-source-coverage/v2"
 TEST_INVENTORY_SCHEMA = "intrinsic.cpu-test-inventory/v2"
 EXECUTION_IDENTITY_SCHEMA = "intrinsic.cpu-source-coverage-execution/v3"
 MAX_RELIABLE_EXECUTION_COUNTER = (1 << 63) - 2
+# Clang locates a defaulted function on `default` when defined in class and on
+# the last token of its declarator when defined out of class.
+_DEFAULTED_IN_CLASS = re.compile(r"=\s*default$")
+_DEFAULTED_OUT_OF_CLASS = re.compile(r"(?:\)|\w+|&&?)\s*=\s*default\s*;")
+_COMMENT = re.compile(r"//[^\n]*|/\*.*?\*/", re.DOTALL)
 PRODUCTION_ROOTS = ("src", "methods")
 PRODUCTION_SUFFIXES = frozenset(
     {
@@ -864,6 +869,7 @@ def _normalize_repo_path(path: str | Path, repo_root: Path) -> str | None:
 
 def exclusion_identity() -> dict[str, object]:
     rules: dict[str, object] = {
+        "branches": ["defaulted-comparison"],
         "path_segments": sorted(EXCLUDED_PATH_SEGMENTS),
         "production_roots": list(PRODUCTION_ROOTS),
         "suffixes": sorted(PRODUCTION_SUFFIXES),
@@ -1175,6 +1181,22 @@ def _covered_lines_from_segments(path: str, raw_segments: object) -> set[str]:
     return covered
 
 
+def _is_defaulted_declaration(source_lines: Sequence[str], line: int, column: int) -> bool:
+    # Clang's counter map skips the synthesized && chain of a defaulted
+    # comparison; its branch records borrow the function-entry counter, so
+    # they measure no outcome (BUG-242).
+    if not 0 < line <= len(source_lines) or column < 1:
+        return False
+    text = source_lines[line - 1]
+    # Two lines of context either side cover `=` and `default` wrapped apart.
+    before = "\n".join([*source_lines[max(0, line - 3) : line - 1], text[:column]])
+    after = "\n".join([text[column - 1 :], *source_lines[line : line + 2]])
+    return bool(
+        _DEFAULTED_IN_CLASS.search(_COMMENT.sub(" ", before))
+        or _DEFAULTED_OUT_OF_CLASS.match(_COMMENT.sub(" ", after))
+    )
+
+
 def normalize_llvm_cov_export(
     raw_export: Mapping[str, object], repo_root: Path
 ) -> dict[str, object]:
@@ -1216,6 +1238,14 @@ def normalize_llvm_cov_export(
         branches = raw_file.get("branches", [])
         if not isinstance(branches, list):
             raise CoverageError(f"{normalized}: branches must be an array")
+        source_lines: list[str] = []
+        if branches:
+            try:
+                source_lines = (repo_root / normalized).read_text(
+                    encoding="utf-8", errors="replace"
+                ).splitlines()
+            except OSError as error:
+                raise CoverageError(f"{normalized}: cannot read source: {error}")
         for branch in branches:
             if not isinstance(branch, list) or len(branch) < 9:
                 raise CoverageError(f"{normalized}: malformed branch record")
@@ -1226,6 +1256,8 @@ def normalize_llvm_cov_export(
                 branch[5], f"{normalized}:{branch[0]}:{branch[1]}: false branch"
             )
             base = _location_key(normalized, branch, suffix="branch")
+            if _is_defaulted_declaration(source_lines, branch[0], branch[1]):
+                continue
             if true_count > 0:
                 covered_branch_arms.add(f"{base}:true")
             if false_count > 0:

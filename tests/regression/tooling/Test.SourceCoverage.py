@@ -19,6 +19,7 @@ from typing import Any, Iterable, Sequence
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 RUN_COVERAGE = REPO_ROOT / "tools" / "ci" / "run_source_coverage.py"
+CHECK_COUNTER_MAP = REPO_ROOT / "tools" / "ci" / "check_coverage_counter_map.py"
 COMPARE_COVERAGE = REPO_ROOT / "tools" / "ci" / "compare_source_coverage.py"
 MINIMUM_LLVM_MAJOR = 20
 sys.path.insert(0, str(REPO_ROOT / "tools" / "ci"))
@@ -243,6 +244,76 @@ file(
     "${CMAKE_BINARY_DIR}/test-inventories/IntrinsicCpuCoverageTests.txt"
     "${aggregate_inventory}"
 )
+"""
+
+DEFAULTED_COMPARISON_SOURCE = r"""
+struct Key {
+    int a = 0;
+    int b = 0;
+    friend bool operator==(const Key&, const Key&) = default;
+};
+struct WrappedKey {
+    int a = 0;
+    int b = 0;
+    friend bool operator==(const WrappedKey&, const WrappedKey&) =
+        default;
+};
+struct CommentedKey {
+    int a = 0;
+    int b = 0;
+    friend bool operator==(const CommentedKey&, const CommentedKey&) = /* note */ default;
+};
+struct OutOfClassKey {
+    int a = 0;
+    int b = 0;
+    friend bool operator==(const OutOfClassKey&, const OutOfClassKey&);
+};
+bool operator==(const OutOfClassKey&, const OutOfClassKey&) = default;
+struct NoexceptKey {
+    int a = 0;
+    int b = 0;
+    friend bool operator==(const NoexceptKey&, const NoexceptKey&) noexcept;
+};
+bool operator==(const NoexceptKey&, const NoexceptKey&) noexcept = default;
+struct WrappedOutOfClassKey {
+    int a = 0;
+    int b = 0;
+    friend bool operator==(const WrappedOutOfClassKey&, const WrappedOutOfClassKey&);
+};
+bool operator==(const WrappedOutOfClassKey&, const WrappedOutOfClassKey&)
+    = default;
+[[gnu::noinline]] bool handwritten(const Key& lhs, const Key& rhs) {
+    return lhs.a == rhs.a && lhs.b == rhs.b;
+}
+[[gnu::noinline]] int commented(bool x) { return x /* = default */ ? 1 : 0; }
+int main(int argc, char**) {
+    const Key key{argc, 2};
+    int hits = (key == Key{1, 3}) + handwritten(key, Key{1, 3});
+    hits += WrappedKey{argc, 2} == WrappedKey{2, 2};
+    hits += OutOfClassKey{argc, 2} == OutOfClassKey{1, 3};
+    hits += NoexceptKey{argc, 2} == NoexceptKey{1, 3};
+    hits += CommentedKey{argc, 2} == CommentedKey{1, 3};
+    hits += WrappedOutOfClassKey{argc, 2} == WrappedOutOfClassKey{1, 3};
+    hits += commented(argc == 1) + commented(argc == 2);
+    switch (hits) {
+    case 7: return 1;
+    default: return 0;
+    }
+}
+"""
+
+COUNTER_MAP_GAP_SOURCE = r"""
+constexpr unsigned kNone = ~0u;
+struct Pair { unsigned a = kNone; unsigned b = kNone; };
+struct Key { int a = 0; int b = 0; friend bool operator==(const Key&, const Key&); };
+bool operator==(const Key&, const Key&)
+    = default;
+#include "../external/vendor.hpp"
+Pair use_vendor(bool e, const unsigned& x) { return vendor(e, x); }
+Pair constant_operand(bool e, const unsigned& x) { return {1, e ? x /* = default */ : kNone}; }
+Pair prvalue_operand(bool e, const unsigned& x) { return {1, e ? x : ~0u}; }
+Pair hoisted(bool e, const unsigned& x) { const unsigned v = e ? x : kNone; return {1, v}; }
+bool same(const Key& lhs, const Key& rhs) { return lhs == rhs; }
 """
 
 ALPHA_SOURCE = r"""
@@ -1379,6 +1450,146 @@ class SourceCoverageTests(unittest.TestCase):
             r"saturated.*atomic profile.*counter-map gap",
         ):
             normalize_llvm_cov_export(raw_export, self.source_root)
+
+    def test_defaulted_comparison_branches_are_not_coverage_evidence(self) -> None:
+        project = self.root / "defaulted-comparison"
+        source = project / "src" / "keys.cpp"
+        _write(source, DEFAULTED_COMPARISON_SOURCE)
+        binary = project / "keys"
+        profile = project / "keys.profdata"
+        _run(
+            [
+                self.compiler,
+                "-std=c++20",
+                "-fprofile-instr-generate",
+                "-fcoverage-mapping",
+                str(source),
+                "-o",
+                str(binary),
+            ],
+            cwd=project,
+        )
+        _run(["env", f"LLVM_PROFILE_FILE={project / 'keys.profraw'}", str(binary)], cwd=project)
+        _run(
+            [self.llvm_profdata, "merge", "-o", str(profile), str(project / "keys.profraw")],
+            cwd=project,
+        )
+        exported = subprocess.run(
+            [self.llvm_cov, "export", f"--instr-profile={profile}", str(binary)],
+            cwd=project,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        raw_export = json.loads(exported.stdout)
+        lines = source.read_text(encoding="utf-8").splitlines()
+
+        def line_of(text: str) -> int:
+            return next(index for index, line in enumerate(lines, 1) if text in line)
+
+        defaulted = {
+            line_of("const Key&) = default;"),
+            line_of("        default;"),
+            line_of("OutOfClassKey&) = default;"),
+            line_of("NoexceptKey&) noexcept = default;"),
+            line_of("/* note */ default;"),
+            line_of("    = default;") - 1,  # out of class: on the declarator line
+        }
+        recorded = {
+            branch[0] for branch in raw_export["data"][0]["files"][0]["branches"]
+        }
+        # Clang still emits records for the synthesized && chain; they borrow
+        # the function-entry counter (BUG-242).
+        self.assertTrue(defaulted <= recorded, recorded)
+        arm_lines = {
+            int(arm.split(":")[1])
+            for arm in normalize_llvm_cov_export(raw_export, project)[
+                "covered_branch_arms"
+            ]
+        }
+        self.assertFalse(defaulted & arm_lines, arm_lines)
+        self.assertIn(line_of("return lhs.a == rhs.a"), arm_lines)
+        self.assertIn(line_of("default: return 0;"), arm_lines)
+        self.assertIn(line_of("return x /* = default */"), arm_lines)
+
+        branch = next(
+            branch
+            for branch in raw_export["data"][0]["files"][0]["branches"]
+            if branch[0] in defaulted
+        )
+        branch[5] = -1
+        with self.assertRaisesRegex(CoverageError, r"false branch: saturated"):
+            normalize_llvm_cov_export(raw_export, project)
+
+    def test_counter_map_check_flags_production_entry_counter_reuse(self) -> None:
+        project = self.root / "counter-map"
+        build = project / "build"
+        records = []
+        _write(
+            project / "external" / "vendor.hpp",
+            "inline Pair vendor(bool e, const unsigned& x) { return {1, e ? x : kNone}; }\n",
+        )
+        for relative in ("src/gap.cpp", "tests/gap_test.cpp"):
+            source = project / relative
+            _write(source, COUNTER_MAP_GAP_SOURCE)
+            obj = build / f"{source.stem}.o"
+            arguments = [
+                self.compiler,
+                "-std=c++20",
+                "-g",
+                "-fprofile-instr-generate",
+                "-fprofile-update=atomic",
+                "-fcoverage-mapping",
+                "-c",
+                str(source),
+                "-o",
+                str(obj),
+            ]
+            build.mkdir(parents=True, exist_ok=True)
+            _run(arguments, cwd=build)
+            records.append({"arguments": arguments, "directory": str(build), "file": str(source)})
+        (build / "compile_commands.json").write_text(json.dumps(records), encoding="utf-8")
+
+        def check() -> subprocess.CompletedProcess[str]:
+            return _run(
+                [
+                    sys.executable,
+                    str(CHECK_COUNTER_MAP),
+                    "--build-dir",
+                    str(build),
+                    "--repo-root",
+                    str(project),
+                ],
+                cwd=project,
+                check=False,
+            )
+
+        gap = project / "src" / "gap.cpp"
+        line = next(
+            index
+            for index, text in enumerate(gap.read_text(encoding="utf-8").splitlines(), 1)
+            if text.startswith("Pair constant_operand")
+        )
+        result = check()
+        self.assertEqual(result.returncode, 1, result.stdout)
+        flagged = re.findall(r"^(\S+?):(\d+):\d+: ", result.stdout, re.MULTILINE)
+        self.assertEqual(flagged, [("src/gap.cpp", str(line))], result.stdout)
+
+        gap.write_text(
+            gap.read_text(encoding="utf-8").replace(
+                "{ return {1, e ? x /* = default */ : kNone}; }",
+                "{ const unsigned v = e ? x : kNone; return {1, v}; }",
+            ),
+            encoding="utf-8",
+        )
+        result = check()
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("scanned 1 production", result.stdout)
+
+        gap.write_text("int broken(\n", encoding="utf-8")
+        result = check()
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("src/gap.cpp: cannot emit IR", result.stdout)
 
     def test_reports_are_path_normalized_and_equal_across_build_directories(
         self,
