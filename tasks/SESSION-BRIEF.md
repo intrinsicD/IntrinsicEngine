@@ -19,6 +19,7 @@ picking backlog work; theme priorities and rationale live in
 - `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/active/UI-037-linear-domain-action-readiness-tooltips.md)
 - `UI-053` — Curvature-extremum engine overlay (tasks/active/UI-053-curvature-extremum-engine-overlay.md)
 - `UI-079` — Run the ImGuizmo smokes at a real HiDPI pixel ratio (tasks/active/UI-079-imguizmo-hidpi-operational-run.md)
+- `UI-081` — Evenly spread vector-field glyphs from a progressive element order (tasks/active/UI-081-vector-field-even-glyph-order.md)
 
 ## Theme B — Rendering modernization
 
